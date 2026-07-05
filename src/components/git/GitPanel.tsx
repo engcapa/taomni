@@ -93,6 +93,12 @@ interface GitPanelProps {
   onOpenWorkspace?: (repoRoot: string) => void;
   changesView?: ReactNode;
   workspaceLogView?: ReactNode;
+  workspaceHeader?: {
+    title: string;
+    summary: string;
+    selectedRepoName: string;
+    selectedRepoRoot: string;
+  };
   changeCountOverride?: number | null;
 }
 
@@ -118,6 +124,7 @@ export function GitPanel({
   onOpenWorkspace,
   changesView,
   workspaceLogView,
+  workspaceHeader,
   changeCountOverride = null,
 }: GitPanelProps) {
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
@@ -500,6 +507,22 @@ export function GitPanel({
           <span className="max-w-40 truncate text-[11px] text-[var(--taomni-text-muted)]" title={repoRoot}>
             {repoName}
           </span>
+        ) : workspaceHeader ? (
+          <>
+            <GitBranch className="w-4 h-4 text-[var(--taomni-accent)]" />
+            <div className="min-w-0">
+              <div className="font-semibold leading-4 truncate">Workspace Git · {workspaceHeader.title}</div>
+              <div className="text-[11px] text-[var(--taomni-text-muted)] truncate max-w-[520px]">{workspaceHeader.summary}</div>
+            </div>
+            <span className="taomni-divider-v h-5 mx-1" />
+            <span
+              className="inline-flex items-center gap-1 h-6 max-w-56 rounded bg-[var(--taomni-hover)] px-2 text-[11px]"
+              title={workspaceHeader.selectedRepoRoot}
+            >
+              <span className="shrink-0 text-[var(--taomni-text-muted)]">Repository detail</span>
+              <span className="min-w-0 truncate font-medium">{workspaceHeader.selectedRepoName}</span>
+            </span>
+          </>
         ) : (
           <>
             <GitBranch className="w-4 h-4 text-[var(--taomni-accent)]" />

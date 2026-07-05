@@ -146,6 +146,26 @@ describe("GitPanel", () => {
     expect(useAppStore.getState().uiFontSize).toBe(12);
   });
 
+  it("labels the header as workspace Git when embedded in the multi-repo manager", async () => {
+    render(
+      <GitPanel
+        repoRoot="D:\\repo"
+        workspaceHeader={{
+          title: "Code Workspace",
+          summary: "3 repositories · 1 changed files",
+          selectedRepoName: "repo",
+          selectedRepoRoot: "D:\\repo",
+        }}
+        changesView={<div>Workspace changes body</div>}
+      />,
+    );
+
+    await waitFor(() => expect(gitMocks.gitSnapshot).toHaveBeenCalled());
+    expect(screen.getByText("Workspace Git · Code Workspace")).toBeInTheDocument();
+    expect(screen.getByText("Repository detail")).toBeInTheDocument();
+    expect(screen.queryByText("Git · repo")).not.toBeInTheDocument();
+  });
+
   it("keeps the visited log view mounted across Git sub-tab switches", async () => {
     gitMocks.gitLog.mockResolvedValue([
       {

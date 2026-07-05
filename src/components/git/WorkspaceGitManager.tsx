@@ -701,6 +701,12 @@ export function WorkspaceGitManager({
               visible={visible}
               onOpenWorkspace={onOpenWorkspace}
               changeCountOverride={totalChangedFiles}
+              workspaceHeader={{
+                title,
+                summary: `${normalizedRoots.length} repositories · ${totalChangedFiles} changed files`,
+                selectedRepoName: selectedRoot.name,
+                selectedRepoRoot: selectedRoot.repoRoot,
+              }}
               workspaceLogView={(
                 <WorkspaceCommitLog
                   roots={normalizedRoots}
@@ -725,6 +731,7 @@ export function WorkspaceGitManager({
                   commitMessage={commitMessage}
                   setCommitMessage={setCommitMessage}
                   canCommitAndPush={canPushCheckedChanges}
+                  scopeSummary={`${normalizedRoots.length} repositories · ${totalChangedFiles} changed files`}
                   stageAll={stageAllChanges}
                   unstageAll={unstageAllChanges}
                   stageSelected={stageSelectedChanges}
