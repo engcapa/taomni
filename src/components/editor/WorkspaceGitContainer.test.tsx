@@ -45,4 +45,20 @@ describe("WorkspaceGitContainer", () => {
 
     expect(screen.getByTestId("git-panel")).toHaveAttribute("data-repo-root", "/repo/app");
   });
+
+  it("opens the workspace Git manager from the embedded panel header", async () => {
+    const onOpenManager = vi.fn();
+    render(
+      <WorkspaceGitContainer
+        visible
+        activeRootId="app"
+        gitRoots={[gitRoot({ id: "app", name: "app", repoRoot: "/repo/app", rootIds: ["app"] })]}
+        onOpenManager={onOpenManager}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Open Git manager" }));
+
+    expect(onOpenManager).toHaveBeenCalledTimes(1);
+  });
 });

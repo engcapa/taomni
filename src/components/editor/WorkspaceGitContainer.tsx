@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { GitBranch } from "lucide-react";
+import { ExternalLink, GitBranch } from "lucide-react";
 import type { WorkspaceGitRoot } from "../../lib/editor/workspace";
 import { GitPanel } from "../git/GitPanel";
 
@@ -7,12 +7,14 @@ interface WorkspaceGitContainerProps {
   gitRoots: WorkspaceGitRoot[];
   activeRootId: string | null;
   visible: boolean;
+  onOpenManager?: () => void;
 }
 
 export function WorkspaceGitContainer({
   gitRoots,
   activeRootId,
   visible,
+  onOpenManager,
 }: WorkspaceGitContainerProps) {
   const [selectedRepoRoot, setSelectedRepoRoot] = useState("");
   const lastActiveRootIdRef = useRef<string | null>(null);
@@ -67,6 +69,19 @@ export function WorkspaceGitContainer({
           <span className="min-w-0 truncate text-[11px] text-[var(--taomni-code-muted)]" title={selectedRepo.repoRoot}>
             {selectedRepo.repoRoot}
           </span>
+        )}
+        <div className="flex-1" />
+        {onOpenManager && (
+          <button
+            type="button"
+            className="h-7 w-7 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40 disabled:cursor-default"
+            title="Open Git manager"
+            aria-label="Open Git manager"
+            disabled={gitRoots.length === 0}
+            onClick={onOpenManager}
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </button>
         )}
       </div>
       <div className="flex-1 min-h-0">

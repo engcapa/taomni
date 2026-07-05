@@ -293,6 +293,17 @@ export interface MailTabInfo {
 
 export interface GitTabInfo {
   repoRoot: string;
+  workspaceName?: string;
+  workspaceRoots?: GitWorkspaceRootInfo[];
+  activeRepoRoot?: string | null;
+}
+
+export interface GitWorkspaceRootInfo {
+  id: string;
+  name: string;
+  path: string;
+  repoRoot: string;
+  rootIds: string[];
 }
 
 export type CodeWorkspaceRootKind = "git" | "folder";

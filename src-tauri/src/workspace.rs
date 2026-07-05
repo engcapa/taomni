@@ -9,6 +9,8 @@ const DEFAULT_RECURSIVE_MAX_DEPTH: usize = 25;
 const DEFAULT_RECURSIVE_MAX_FILES: usize = 2_000;
 const HARD_RECURSIVE_MAX_DEPTH: usize = 100;
 const HARD_RECURSIVE_MAX_FILES: usize = 10_000;
+const GIT_ROOT_SCAN_MAX_DEPTH: usize = 4;
+const GIT_ROOT_SCAN_MAX_DIRS: usize = 2_000;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -139,23 +141,22 @@ pub fn workspace_detect_git_roots(
         if !meta.is_dir() {
             continue;
         }
-        let Some(repo_root) = find_git_repo_root(&path) else {
-            continue;
-        };
-        let repo_root = path_to_string(&repo_root);
-        if let Some(existing) = repos.iter_mut().find(|item| item.repo_root == repo_root) {
-            if !existing.root_ids.contains(&root.id) {
-                existing.root_ids.push(root.id);
-            }
-            continue;
+        let mut found = Vec::new();
+        if let Some(repo_root) = find_git_repo_root(&path) {
+            found.push(repo_root);
         }
-        repos.push(WorkspaceGitRoot {
-            id: root.id.clone(),
-            name: root.name,
-            path: path_to_string(&path),
-            repo_root,
-            root_ids: vec![root.id],
-        });
+        let mut remaining_dirs = GIT_ROOT_SCAN_MAX_DIRS;
+        collect_nested_git_roots(
+            &path,
+            0,
+            GIT_ROOT_SCAN_MAX_DEPTH,
+            &mut remaining_dirs,
+            &mut found,
+        )?;
+
+        for repo_root in found {
+            upsert_workspace_git_root(&mut repos, &root, &path, &repo_root);
+        }
     }
     repos.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     Ok(repos)
@@ -591,6 +592,97 @@ fn find_git_repo_root(path: &Path) -> Option<PathBuf> {
     None
 }
 
+fn upsert_workspace_git_root(
+    repos: &mut Vec<WorkspaceGitRoot>,
+    workspace_root: &WorkspaceGitRootCandidate,
+    workspace_path: &Path,
+    repo_root: &Path,
+) {
+    let repo_root = path_to_string(repo_root);
+    if let Some(existing) = repos.iter_mut().find(|item| item.repo_root == repo_root) {
+        if !existing.root_ids.contains(&workspace_root.id) {
+            existing.root_ids.push(workspace_root.id.clone());
+        }
+        return;
+    }
+    repos.push(WorkspaceGitRoot {
+        id: format!("{}:{}", workspace_root.id, repo_root),
+        name: repo_display_name(repo_root.as_str(), &workspace_root.name),
+        path: path_to_string(workspace_path),
+        repo_root,
+        root_ids: vec![workspace_root.id.clone()],
+    });
+}
+
+fn collect_nested_git_roots(
+    dir: &Path,
+    depth: usize,
+    max_depth: usize,
+    remaining_dirs: &mut usize,
+    repos: &mut Vec<PathBuf>,
+) -> Result<(), String> {
+    if depth > max_depth || *remaining_dirs == 0 {
+        return Ok(());
+    }
+    *remaining_dirs = (*remaining_dirs).saturating_sub(1);
+    if dir.join(".git").exists() && !repos.iter().any(|repo| repo == dir) {
+        repos.push(dir.to_path_buf());
+    }
+    if depth == max_depth {
+        return Ok(());
+    }
+    let Ok(read) = fs::read_dir(dir) else {
+        return Ok(());
+    };
+    for entry in read {
+        if *remaining_dirs == 0 {
+            return Ok(());
+        }
+        let Ok(entry) = entry else {
+            continue;
+        };
+        let path = entry.path();
+        let Ok(meta) = fs::symlink_metadata(&path) else {
+            continue;
+        };
+        if !meta.is_dir() || meta.file_type().is_symlink() {
+            continue;
+        }
+        if should_skip_git_root_scan_dir(&path) {
+            continue;
+        }
+        collect_nested_git_roots(&path, depth + 1, max_depth, remaining_dirs, repos)?;
+    }
+    Ok(())
+}
+
+fn should_skip_git_root_scan_dir(path: &Path) -> bool {
+    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    matches!(
+        name,
+        ".git"
+            | ".hg"
+            | ".svn"
+            | "node_modules"
+            | "target"
+            | "dist"
+            | "build"
+            | ".next"
+            | ".turbo"
+            | ".cache"
+    )
+}
+
+fn repo_display_name(repo_root: &str, fallback: &str) -> String {
+    Path::new(repo_root)
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| fallback.to_string())
+}
+
 fn path_to_string(path: &Path) -> String {
     path.to_string_lossy().to_string()
 }
@@ -914,6 +1006,31 @@ mod tests {
             .find(|item| item.repo_root == repo_root)
             .expect("target repo should be detected");
         assert_eq!(detected.root_ids, vec!["repo", "app"]);
+    }
+
+    #[test]
+    fn detects_child_git_roots_under_plain_workspace_root() {
+        let dir = tempfile::tempdir().unwrap();
+        let workspace = dir.path().join("workspace");
+        let app = workspace.join("app");
+        let service = workspace.join("service");
+        fs::create_dir_all(app.join(".git")).unwrap();
+        fs::create_dir_all(service.join(".git")).unwrap();
+        fs::create_dir_all(workspace.join("node_modules/ignored/.git")).unwrap();
+
+        let repos = workspace_detect_git_roots(vec![WorkspaceGitRootCandidate {
+            id: "workspace".into(),
+            name: "workspace".into(),
+            path: workspace.to_string_lossy().to_string(),
+        }])
+        .unwrap();
+
+        let app_root = app.to_string_lossy().to_string();
+        let service_root = service.to_string_lossy().to_string();
+        let repo_roots: Vec<_> = repos.iter().map(|item| item.repo_root.as_str()).collect();
+        assert!(repo_roots.contains(&app_root.as_str()));
+        assert!(repo_roots.contains(&service_root.as_str()));
+        assert_eq!(repos.len(), 2);
     }
 
     #[test]
