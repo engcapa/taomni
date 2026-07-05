@@ -331,6 +331,7 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
           role="dialog"
           aria-label={label}
           data-testid={`${testId}-popover`}
+          data-tao-floating-portal="notes-date-time"
           style={{
             position: "fixed",
             left: pos.left,

@@ -1,6 +1,7 @@
 import { CheckCircle2, Circle, Pin } from "lucide-react";
 import type { NoteItem } from "../../lib/notes";
 import { useT } from "../../lib/i18n";
+import { renderLinkedNoteText } from "./NoteLinkText";
 
 interface NotesListProps {
   notes: NoteItem[];
@@ -68,12 +69,12 @@ export function NotesList({ notes, activeNoteId, onSelect, onToggleComplete }: N
                       done ? "line-through text-[var(--taomni-text-muted)]" : ""
                     }`}
                   >
-                    {note.title.trim() || t("notes.untitled")}
+                    {renderLinkedNoteText(note.title.trim() || t("notes.untitled"))}
                   </span>
                 </div>
                 {note.body.trim() && (
                   <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
-                    {note.body.trim()}
+                    {renderLinkedNoteText(note.body.trim())}
                   </div>
                 )}
                 {stepTotal > 0 && (

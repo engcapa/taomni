@@ -349,6 +349,20 @@ describe("ChatDrawer layout resizing", () => {
     expect(useChatStore.getState().drawerOpen).toBe(true);
   });
 
+  it("keeps a floating drawer open when a Tao portal popover is clicked", () => {
+    useChatStore.setState({ drawerPosition: "top", drawerPinned: false });
+    render(
+      <>
+        <ChatDrawer />
+        <div data-testid="notes-date-popover" data-tao-floating-portal="notes-date-time">Date picker</div>
+      </>,
+    );
+
+    fireEvent.pointerDown(screen.getByTestId("notes-date-popover"));
+
+    expect(useChatStore.getState().drawerOpen).toBe(true);
+  });
+
   it("resizes a top drawer by dragging its bottom edge", () => {
     useChatStore.setState({ drawerPosition: "top" });
     render(<ChatDrawer />);

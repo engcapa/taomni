@@ -398,6 +398,70 @@ body {
   color: var(--taomni-text-muted);
 }
 
+.notes-link-field-shell {
+  position: relative;
+  width: 100%;
+}
+
+.notes-link-field-shell > .taomni-input {
+  position: relative;
+  z-index: 1;
+}
+
+.notes-link-field-shell[data-has-url="true"] > .taomni-input {
+  background: transparent;
+  color: transparent;
+  caret-color: var(--taomni-text);
+}
+
+.notes-link-field-shell[data-has-url="true"] > .taomni-input::selection {
+  color: transparent;
+  background: var(--taomni-editor-selection-bg);
+}
+
+.notes-link-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  box-sizing: border-box;
+  pointer-events: none;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: var(--taomni-input-bg);
+  color: var(--taomni-text);
+  font: inherit;
+}
+
+.notes-link-overlay-title {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 6px;
+  white-space: pre;
+}
+
+.notes-link-overlay-body {
+  min-height: 80px;
+  padding: 0 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.notes-link-textarea {
+  display: block;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.notes-rendered-link {
+  color: var(--taomni-link, var(--taomni-accent));
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* Notes panel local typography. Many notes controls use compact fixed Tailwind
    sizes, so route them through the per-notes font-size preference here. */
 [data-testid="notes-panel"] {
@@ -427,7 +491,35 @@ body {
 }
 
 .notes-sticky-window {
-  box-shadow: var(--taomni-shadow-lg), 0 22px 45px -22px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--taomni-shadow-lg), 0 18px 38px -18px rgba(0, 0, 0, 0.42);
+}
+.notes-floating-window,
+.notes-detached-window {
+  border: 0;
+  border-radius: 8px;
+}
+.notes-detached-window [data-testid="notes-panel"],
+.notes-floating-window [data-testid="notes-panel"] {
+  background: var(--taomni-sidebar-bg);
+}
+.notes-floating-window > [data-testid="floating-notes-drag"],
+.notes-detached-window > [data-testid="notes-detached-toolbar"] {
+  height: 32px;
+  background: var(--taomni-chrome-bg);
+}
+.notes-floating-window > [data-testid="floating-notes-drag"] .taomni-btn,
+.notes-detached-window > [data-testid="notes-detached-toolbar"] .taomni-btn {
+  border-color: transparent;
+  background: transparent;
+}
+.notes-floating-window [data-testid="notes-toolbar"],
+.notes-detached-window [data-testid="notes-toolbar"] {
+  gap: 4px;
+  padding: 4px 6px;
+}
+.notes-floating-window [data-testid="notes-new"] span,
+.notes-detached-window [data-testid="notes-new"] span {
+  display: none;
 }
 .notes-sticky-fold {
   position: absolute;

@@ -32,6 +32,7 @@ export type NotesTheme =
   | "dark"
   | "paper"
   | "sticky"
+  | "sticky_bright"
   | "mint"
   | "sky"
   | "rose"
@@ -69,11 +70,16 @@ const DEFAULT_NOTES_FONT_SIZE = 12;
 const MIN_NOTES_FONT_SIZE = 10;
 const MAX_NOTES_FONT_SIZE = 20;
 
+const LEGACY_DEFAULT_NOTES_PANEL_SIZE = {
+  width: 460,
+  height: 560,
+};
+
 export const DEFAULT_NOTES_PANEL_POSITION: NotesPanelPosition = {
   x: 120,
   y: 120,
-  width: 460,
-  height: 560,
+  width: 260,
+  height: 320,
 };
 
 function coerceTheme(value: unknown): NotesTheme {
@@ -81,6 +87,7 @@ function coerceTheme(value: unknown): NotesTheme {
     value === "dark" ||
     value === "paper" ||
     value === "sticky" ||
+    value === "sticky_bright" ||
     value === "mint" ||
     value === "sky" ||
     value === "rose" ||
@@ -135,6 +142,20 @@ function normalizeStatusFilters(values: unknown): NoteFilter[] {
     next.push(filter);
   }
   return next.length > 0 ? next : ["recent_incomplete"];
+}
+
+function normalizePanelPosition(position: NotesPanelPosition): NotesPanelPosition {
+  const width = Number(position.width) || DEFAULT_NOTES_PANEL_POSITION.width;
+  const height = Number(position.height) || DEFAULT_NOTES_PANEL_POSITION.height;
+  const isLegacyDefault =
+    width === LEGACY_DEFAULT_NOTES_PANEL_SIZE.width &&
+    height === LEGACY_DEFAULT_NOTES_PANEL_SIZE.height;
+  return {
+    x: Number(position.x) || DEFAULT_NOTES_PANEL_POSITION.x,
+    y: Number(position.y) || DEFAULT_NOTES_PANEL_POSITION.y,
+    width: isLegacyDefault ? DEFAULT_NOTES_PANEL_POSITION.width : width,
+    height: isLegacyDefault ? DEFAULT_NOTES_PANEL_POSITION.height : height,
+  };
 }
 
 interface NotesStore {
@@ -421,12 +442,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
       const statusFilters = normalizeStatusFilters(parse<NoteFilter[] | NoteFilter>(PREF_STATUS_FILTERS, lastFilter));
       set({
         panelMode: parse<string>(PREF_PANEL_MODE, "hub") === "floating" ? "floating" : "hub",
-        panelPosition: {
-          x: Number(position.x) || DEFAULT_NOTES_PANEL_POSITION.x,
-          y: Number(position.y) || DEFAULT_NOTES_PANEL_POSITION.y,
-          width: Number(position.width) || DEFAULT_NOTES_PANEL_POSITION.width,
-          height: Number(position.height) || DEFAULT_NOTES_PANEL_POSITION.height,
-        },
+        panelPosition: normalizePanelPosition(position),
         alwaysOnTopInApp: parse<boolean>(PREF_PANEL_ALWAYS_ON_TOP, false) === true,
         theme: coerceTheme(parse<string>(PREF_PANEL_THEME, "taomni")),
         font: coerceFont(parse<string>(PREF_PANEL_FONT, "inherit")),

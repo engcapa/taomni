@@ -1,10 +1,14 @@
-import { useEffect } from "react";
-import { X } from "lucide-react";
+import { useCallback, useEffect, type MouseEvent as ReactMouseEvent } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { PanelRightClose } from "lucide-react";
 import { closeCurrentDetachedWindow } from "../../lib/detachWindowing";
 import { useT } from "../../lib/i18n";
+import { isTauriRuntime } from "../../lib/runtime";
 import { useNotesStore } from "../../stores/notesStore";
 import { notesFontSizeStyle, notesFontStyle, notesThemeStyle } from "../../lib/notes/notesTheme";
 import { NotesPanel } from "./NotesPanel";
+import { emitNotesDockSignal, subscribeNotesDockSignal } from "../../lib/notes/notesWindowSync";
+import { WindowResizeHandles } from "../window/WindowResizeHandles";
 
 /**
  * NotesDetachedWindow — native OS-level window for notes when running inside Tauri runtime.
@@ -21,43 +25,91 @@ export function NotesDetachedWindow() {
     document.title = `${t("notes.title")} - taomni`;
   }, [t]);
 
+  const closeDetachedNotesWindow = useCallback(() => {
+    void closeCurrentDetachedWindow().catch(() => {
+      window.close();
+    });
+  }, []);
+
+  useEffect(() => {
+    return subscribeNotesDockSignal(closeDetachedNotesWindow);
+  }, [closeDetachedNotesWindow]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return undefined;
+    let disposed = false;
+    let unlisten: (() => void) | null = null;
+    void getCurrentWindow()
+      .onCloseRequested((event) => {
+        event.preventDefault();
+        setPanelMode("hub");
+        emitNotesDockSignal();
+        closeDetachedNotesWindow();
+      })
+      .then((next) => {
+        if (disposed) next();
+        else unlisten = next;
+      })
+      .catch(() => {
+        /* close hook unavailable */
+      });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [closeDetachedNotesWindow, setPanelMode]);
+
   const dockToHub = () => {
     setPanelMode("hub");
-    void closeCurrentDetachedWindow();
+    emitNotesDockSignal();
+    closeDetachedNotesWindow();
+  };
+
+  const startDrag = (event: ReactMouseEvent) => {
+    if (event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    if (target.closest("button,input,select,textarea,[data-no-window-drag]")) return;
+    if (!target.closest("[data-window-drag]")) return;
+    void getCurrentWindow().startDragging().catch(() => {});
   };
 
   return (
     <div
-      className="relative h-screen min-h-0 flex flex-col notes-sticky-window"
+      className="relative h-screen min-h-0 flex flex-col notes-sticky-window notes-detached-window overflow-hidden"
       style={{
         background: "var(--taomni-sidebar-bg)",
         color: "var(--taomni-text)",
-        ...notesThemeStyle(theme),
+        ...notesThemeStyle(theme === "taomni" ? "sticky_bright" : theme),
         ...notesFontStyle(font),
         ...notesFontSizeStyle(fontSize),
       }}
       data-testid="notes-detached-window"
     >
       <div
-        className="h-6 shrink-0 flex items-center gap-2 px-2"
-        style={{ background: "rgba(0, 0, 0, 0.05)" }}
+        className="h-7 shrink-0 flex items-center gap-1 px-1.5 select-none"
+        style={{ background: "var(--taomni-chrome-bg)" }}
         data-testid="notes-detached-toolbar"
+        data-window-drag
+        onMouseDown={startDrag}
       >
-        <span className="flex-1 min-w-0 truncate text-[11px] font-medium opacity-65">{t("notes.title")}</span>
+        <div className="flex-1 h-full min-w-0" aria-hidden="true" data-window-drag />
         <button
           type="button"
-          className="taomni-btn h-4 w-4 p-0 inline-flex items-center justify-center rounded hover:bg-black/10 hover:text-red-500"
+          className="taomni-btn relative z-30 h-5 w-5 p-0 inline-flex items-center justify-center rounded hover:bg-black/10"
           onClick={dockToHub}
+          onMouseDown={(event) => event.stopPropagation()}
           title={t("notes.dock")}
           aria-label={t("notes.dock")}
           data-testid="notes-detached-dock"
+          data-no-window-drag
         >
-          <X className="w-3 h-3" />
+          <PanelRightClose className="w-3.5 h-3.5" />
         </button>
       </div>
       <div className="flex-1 min-h-0 flex flex-col">
         <NotesPanel />
       </div>
+      <WindowResizeHandles className="absolute inset-0 z-20" edgeSize={5} cornerSize={10} />
       <div className="notes-sticky-fold" aria-hidden="true" />
     </div>
   );

@@ -1651,6 +1651,7 @@ export const zhCN: DeepPartial<typeof en> = {
     theme_dark: "深色",
     theme_paper: "便签纸",
     theme_sticky: "便利贴",
+    theme_sticky_bright: "醒目便利贴",
     theme_mint: "薄荷",
     theme_sky: "天蓝",
     theme_rose: "玫瑰",

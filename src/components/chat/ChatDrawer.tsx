@@ -93,8 +93,6 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const [showOpacityMenu, setShowOpacityMenu] = useState(false);
   const hubTab = useTaoHubStore((s) => s.hubTab);
   const setHubTab = useTaoHubStore((s) => s.setHubTab);
-  const notesPanelMode = useNotesStore((s) => s.panelMode);
-  const setNotesPanelMode = useNotesStore((s) => s.setPanelMode);
   const notesTheme = useNotesStore((s) => s.theme);
   const noteAlerts = useNotesStore((s) => s.alerts);
   const setActiveNote = useNotesStore((s) => s.setActiveNote);
@@ -508,7 +506,8 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
       if (
         target.closest('[data-testid="ai-chat-drawer"]') ||
         target.closest('[data-testid="ai-chat-drawer-ribbon"]') ||
-        target.closest('[data-testid="ai-chat-safety-gate"]')
+        target.closest('[data-testid="ai-chat-safety-gate"]') ||
+        target.closest("[data-tao-floating-portal]")
       ) {
         return;
       }
@@ -915,24 +914,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
             embedded
           />
         ) : hubTab === "notes" ? (
-          notesPanelMode === "floating" ? (
-            <div
-              className="flex-1 min-h-0 flex flex-col items-center justify-center gap-2 p-6 text-center text-[12px] text-[var(--taomni-text-muted)]"
-              data-testid="notes-floating-placeholder"
-            >
-              <span>{t("notes.panelModeFloating")}</span>
-              <button
-                type="button"
-                className="taomni-btn h-6 px-2 text-[11px]"
-                onClick={() => setNotesPanelMode("hub")}
-                data-testid="notes-dock-from-hub"
-              >
-                {t("notes.dock")}
-              </button>
-            </div>
-          ) : (
-            <NotesPanel />
-          )
+          <NotesPanel />
         ) : (
         <>
         {/* History panel */}

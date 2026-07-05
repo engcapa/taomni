@@ -1,10 +1,21 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type UIEvent as ReactUIEvent,
+} from "react";
+import { open as tauriOpen } from "@tauri-apps/plugin-shell";
 import { ArrowLeft, Archive, ArchiveRestore, CheckCircle2, Circle, Pin, Plus, Trash2, X } from "lucide-react";
 import type { NoteItem, StepInput, UpdateNoteInput } from "../../lib/notes";
 import { useNotesStore } from "../../stores/notesStore";
 import { confirmAppDialog } from "../../lib/appDialogs";
 import { useT } from "../../lib/i18n";
 import { NoteDateTimeField } from "./NoteDateTimeField";
+import { extractNoteUrls, findNoteUrlAtIndex } from "../../lib/notes/noteLinks";
+import { isTauriRuntime } from "../../lib/runtime";
+import { renderLinkedNoteText } from "./NoteLinkText";
 
 const COLOR_SWATCHES = ["#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899"];
 const PRIORITIES = [0, 1, 2, 3] as const;
@@ -38,6 +49,7 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
   const [newStep, setNewStep] = useState("");
   const [newTag, setNewTag] = useState("");
   const noteIdRef = useRef(note.id);
+  const bodyLinkOverlayRef = useRef<HTMLDivElement | null>(null);
 
   // Resync the draft when a different note is selected.
   useEffect(() => {
@@ -106,6 +118,38 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
     const map = new Map(allTags.map((tg) => [tg.id, tg]));
     return (id: string) => map.get(id)?.name ?? note.tags.find((tg) => tg.id === id)?.name ?? id;
   }, [allTags, note.tags]);
+  const titleHasUrl = useMemo(() => extractNoteUrls(title).length > 0, [title]);
+  const bodyHasUrl = useMemo(() => extractNoteUrls(body).length > 0, [body]);
+  const titleLinkPreview = useMemo(() => renderLinkedNoteText(title), [title]);
+  const bodyLinkPreview = useMemo(() => renderLinkedNoteText(body), [body]);
+
+  const openNoteUrl = (url: string) => {
+    if (isTauriRuntime()) {
+      void tauriOpen(url).catch((err) => {
+        console.error("notes: failed to open URL", err);
+      });
+      return;
+    }
+    const newWindow = window.open(url, "_blank", "noopener,noreferrer");
+    if (newWindow) newWindow.opener = null;
+  };
+
+  const handleTextUrlClick = (
+    event: ReactMouseEvent<HTMLInputElement | HTMLTextAreaElement>,
+    text: string,
+  ) => {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+    const match = findNoteUrlAtIndex(text, event.currentTarget.selectionStart ?? 0);
+    if (!match) return;
+    event.preventDefault();
+    openNoteUrl(match.url);
+  };
+
+  const syncBodyLinkOverlayScroll = (event: ReactUIEvent<HTMLTextAreaElement>) => {
+    if (bodyLinkOverlayRef.current) {
+      bodyLinkOverlayRef.current.scrollTop = event.currentTarget.scrollTop;
+    }
+  };
 
   return (
     <div className="flex-1 min-h-0 flex flex-col" data-testid="note-editor" data-note-id={note.id}>
@@ -184,24 +228,52 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
 
       {/* Editable fields */}
       <div className="flex-1 min-h-0 overflow-y-auto p-2 flex flex-col gap-2">
-        <input
-          type="text"
-          className="taomni-input h-7 text-[13px] font-semibold w-full"
-          placeholder={t("notes.titlePlaceholder")}
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onBlur={() => commit({ title })}
-          data-testid="note-editor-title"
-        />
-        <textarea
-          className="taomni-input text-[12px] w-full resize-none min-h-[80px]"
-          placeholder={t("notes.bodyPlaceholder")}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          onBlur={() => commit({ body })}
-          rows={4}
-          data-testid="note-editor-body"
-        />
+        <div className="notes-link-field-shell" data-has-url={titleHasUrl || undefined}>
+          {titleHasUrl && (
+            <div
+              className="notes-link-overlay notes-link-overlay-title"
+              aria-hidden="true"
+              data-testid="note-editor-title-link-preview"
+            >
+              {titleLinkPreview}
+            </div>
+          )}
+          <input
+            type="text"
+            className="taomni-input h-7 text-[13px] font-semibold w-full"
+            placeholder={t("notes.titlePlaceholder")}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onClick={(e) => handleTextUrlClick(e, title)}
+            onBlur={() => commit({ title })}
+            data-testid="note-editor-title"
+            data-has-url={titleHasUrl || undefined}
+          />
+        </div>
+        <div className="notes-link-field-shell" data-has-url={bodyHasUrl || undefined}>
+          {bodyHasUrl && (
+            <div
+              ref={bodyLinkOverlayRef}
+              className="notes-link-overlay notes-link-overlay-body"
+              aria-hidden="true"
+              data-testid="note-editor-body-link-preview"
+            >
+              {bodyLinkPreview}
+            </div>
+          )}
+          <textarea
+            className="taomni-input notes-link-textarea text-[12px] w-full resize-none min-h-[80px]"
+            placeholder={t("notes.bodyPlaceholder")}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            onClick={(e) => handleTextUrlClick(e, body)}
+            onScroll={syncBodyLinkOverlayScroll}
+            onBlur={() => commit({ body })}
+            rows={4}
+            data-testid="note-editor-body"
+            data-has-url={bodyHasUrl || undefined}
+          />
+        </div>
 
         {/* Priority + dates */}
         <div className="flex flex-wrap items-center gap-2 text-[11px]">

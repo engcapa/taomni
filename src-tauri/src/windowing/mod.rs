@@ -20,7 +20,7 @@ fn default_size(kind: &str) -> (f64, f64, f64, f64) {
         "rdp" | "vnc" => (1280.0, 800.0, 800.0, 480.0),
         "terminal" => (1024.0, 680.0, 640.0, 360.0),
         "database" => (1280.0, 820.0, 780.0, 480.0),
-        "notes" => (520.0, 640.0, 340.0, 300.0),
+        "notes" => (260.0, 320.0, 220.0, 220.0),
         // A detached LanChat window mirrors the main panel's two-pane
         // layout (≈252px roster + conversation), so it needs room for both.
         "lan-chat" => (820.0, 620.0, 600.0, 440.0),
@@ -98,6 +98,12 @@ pub async fn open_detached_window(
         .min_inner_size(min_w, min_h)
         .resizable(true)
         .enable_clipboard_access();
+
+    let builder = if kind == "notes" {
+        builder.decorations(false)
+    } else {
+        builder
+    };
 
     // Keep the SFTP-precedent platform tweak: on Windows we let the
     // webview's HTML5 dragstart/over/drop events fire normally. Linux
