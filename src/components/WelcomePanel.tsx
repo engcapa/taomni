@@ -695,8 +695,8 @@ function RecentWorkspacesPanel({
       data-testid="welcome-recent-workspaces"
       className="min-w-0"
     >
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        <div className="relative min-w-[240px] flex-1">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <div className="relative min-w-[min(100%,240px)] flex-[1_1_240px]">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--taomni-text-muted)]" />
           <input
             data-testid="welcome-recent-workspace-filter"
@@ -712,7 +712,7 @@ function RecentWorkspacesPanel({
         </div>
         <button
           data-testid="welcome-recent-workspace-clear-filter"
-          className="taomni-btn h-8 shrink-0 px-3 inline-flex items-center justify-center gap-1.5"
+          className="taomni-btn h-8 max-w-full px-3 inline-flex items-center justify-center gap-1.5"
           type="button"
           disabled={!hasFilter}
           onClick={onClearFilter}
@@ -720,10 +720,10 @@ function RecentWorkspacesPanel({
           <X className="w-3.5 h-3.5" />
           <span>{t("welcome.recentWorkspacesClearFilter")}</span>
         </button>
-        <div className="h-6 w-px shrink-0" style={{ background: "var(--taomni-divider)" }} />
+        <div className="h-6 w-px" style={{ background: "var(--taomni-divider)" }} />
         <button
           data-testid="welcome-recent-workspace-open-new"
-          className="taomni-btn h-8 shrink-0 px-3 inline-flex items-center gap-1.5"
+          className="taomni-btn h-8 max-w-full px-3 inline-flex items-center gap-1.5"
           type="button"
           disabled={!onOpenNewWorkspace}
           onClick={onOpenNewWorkspace}
@@ -733,7 +733,7 @@ function RecentWorkspacesPanel({
         </button>
         <button
           data-testid="welcome-recent-workspace-clear-all"
-          className="taomni-btn h-8 shrink-0 px-3 inline-flex items-center gap-1.5"
+          className="taomni-btn h-8 max-w-full px-3 inline-flex items-center gap-1.5"
           type="button"
           disabled={!onClearWorkspaces || workspaces.length === 0}
           onClick={() => void confirmClearWorkspaces()}
@@ -1040,8 +1040,8 @@ function RecentSessionsPanel({
       data-testid="welcome-recent-sessions"
       className="min-w-0"
     >
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        <div className="relative min-w-[220px] flex-1">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <div className="relative min-w-[min(100%,220px)] flex-[1_1_220px]">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--taomni-text-muted)]" />
           <input
             data-testid="welcome-recent-filter"
@@ -1057,7 +1057,7 @@ function RecentSessionsPanel({
         </div>
         <select
           data-testid="welcome-recent-type-filter"
-          className="taomni-input h-8 w-[132px] shrink-0"
+          className="taomni-input h-8 w-[132px] max-w-full"
           aria-label={t("welcome.recentSessionsType")}
           value={typeFilter}
           disabled={sessions.length === 0}
@@ -1070,7 +1070,7 @@ function RecentSessionsPanel({
             </option>
           ))}
         </select>
-        <div className="relative w-[172px] shrink-0">
+        <div className="relative w-[172px] max-w-full">
           <ArrowUpDown className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--taomni-text-muted)]" />
           <select
             data-testid="welcome-recent-sort"
@@ -1094,7 +1094,7 @@ function RecentSessionsPanel({
         </div>
         <button
           data-testid="welcome-recent-clear-filter"
-          className="taomni-btn h-8 shrink-0 px-3 inline-flex items-center justify-center gap-1.5"
+          className="taomni-btn h-8 max-w-full px-3 inline-flex items-center justify-center gap-1.5"
           type="button"
           disabled={!hasFilter}
           onClick={onClearFilter}
@@ -1102,10 +1102,10 @@ function RecentSessionsPanel({
           <X className="w-3.5 h-3.5" />
           <span>{t("welcome.recentSessionsClearFilter")}</span>
         </button>
-        <div className="h-6 w-px shrink-0" style={{ background: "var(--taomni-divider)" }} />
+        <div className="h-6 w-px" style={{ background: "var(--taomni-divider)" }} />
         <button
           data-testid="welcome-recent-select-filtered"
-          className="taomni-btn h-8 shrink-0 px-3 inline-flex items-center justify-center gap-1.5"
+          className="taomni-btn h-8 max-w-full px-3 inline-flex items-center justify-center gap-1.5"
           type="button"
           disabled={filteredSessions.length === 0}
           onClick={onSelectFiltered}
@@ -1115,7 +1115,7 @@ function RecentSessionsPanel({
         </button>
         <button
           data-testid="welcome-recent-open-all"
-          className="taomni-btn h-8 shrink-0 px-3 inline-flex items-center gap-1.5"
+          className="taomni-btn h-8 max-w-full px-3 inline-flex items-center gap-1.5"
           type="button"
           disabled={!canOpen || sessions.length === 0}
           onClick={() => onOpenSessions?.(sessions)}
@@ -1125,7 +1125,7 @@ function RecentSessionsPanel({
         </button>
         <button
           data-testid="welcome-recent-open-filtered"
-          className="taomni-btn h-8 shrink-0 px-3 inline-flex items-center gap-1.5"
+          className="taomni-btn h-8 max-w-full px-3 inline-flex items-center gap-1.5"
           type="button"
           disabled={!canOpen || filteredSessions.length === 0}
           onClick={() => onOpenSessions?.(filteredSessions)}
@@ -1135,7 +1135,7 @@ function RecentSessionsPanel({
         </button>
         <button
           data-testid="welcome-recent-open-selected"
-          className="taomni-btn h-8 shrink-0 px-3 inline-flex items-center gap-1.5"
+          className="taomni-btn h-8 max-w-full px-3 inline-flex items-center gap-1.5"
           type="button"
           disabled={!canOpen || selectedSessions.length === 0}
           onClick={() => onOpenSessions?.(selectedSessions)}
@@ -1146,7 +1146,7 @@ function RecentSessionsPanel({
         {onOpenSettings ? (
           <button
             data-testid="welcome-recent-settings"
-            className="taomni-btn h-8 w-8 shrink-0 p-0 inline-flex items-center justify-center"
+            className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center"
             type="button"
             title={t("welcome.recentSessionsSettings")}
             aria-label={t("welcome.recentSessionsSettings")}
