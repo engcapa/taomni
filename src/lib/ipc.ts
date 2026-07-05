@@ -1,5 +1,11 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import {
+  open as openDialog,
+  save as saveDialog,
+  type OpenDialogOptions,
+  type SaveDialogOptions,
+} from "@tauri-apps/plugin-dialog";
 import type {
   DbConnectInfo,
   HBaseConnectInfo,
@@ -518,30 +524,77 @@ export async function listSystemFonts(): Promise<string[]> {
   return invoke<string[]>("list_system_fonts", {});
 }
 
+function optionalDialogPath(path?: string | null): string | undefined {
+  const trimmed = path?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function firstDialogPath(selected: string | string[] | null): string | null {
+  if (typeof selected === "string") return selected;
+  if (Array.isArray(selected)) {
+    return selected.find((item) => typeof item === "string" && item.trim()) ?? null;
+  }
+  return null;
+}
+
+function saveDialogDefaultPath(defaultName?: string, currentPath?: string): string | undefined {
+  const name = optionalDialogPath(defaultName);
+  const current = optionalDialogPath(currentPath);
+  if (!name) return current;
+  if (!current) return name;
+  if (/[\\/]$/.test(current)) return `${current}${name}`;
+
+  const slash = Math.max(current.lastIndexOf("/"), current.lastIndexOf("\\"));
+  if (slash >= 0) return `${current.slice(0, slash + 1)}${name}`;
+  return name;
+}
+
+async function selectOnePath(options: OpenDialogOptions): Promise<string | null> {
+  return firstDialogPath(await openDialog({ multiple: false, ...options }));
+}
+
 export async function selectPrivateKeyFile(currentPath?: string): Promise<string | null> {
-  return invoke<string | null>("select_private_key_file", { currentPath: currentPath ?? null });
+  return selectOnePath({
+    title: "Select private key",
+    directory: false,
+    defaultPath: optionalDialogPath(currentPath),
+  });
 }
 
 export async function selectUploadFile(): Promise<string[]> {
-  return invoke<string[]>("select_upload_file", {});
+  const selected = await openDialog({
+    title: "Select files to send",
+    multiple: true,
+    directory: false,
+  });
+  return selected?.filter((item) => item.trim()) ?? [];
 }
 
 export async function selectSaveDirectory(currentPath?: string): Promise<string | null> {
-  return invoke<string | null>("select_save_directory", { currentPath: currentPath ?? null });
+  return selectOnePath({
+    title: "Select save directory",
+    directory: true,
+    defaultPath: optionalDialogPath(currentPath),
+  });
 }
 
 export async function selectSaveFilePath(
   defaultName?: string,
   currentPath?: string,
 ): Promise<string | null> {
-  return invoke<string | null>("select_save_file_path", {
-    defaultName: defaultName ?? null,
-    currentPath: currentPath ?? null,
-  });
+  const options: SaveDialogOptions = {
+    title: "Save as",
+    defaultPath: saveDialogDefaultPath(defaultName, currentPath),
+  };
+  return saveDialog(options);
 }
 
 export async function selectFilePath(currentPath?: string): Promise<string | null> {
-  return invoke<string | null>("select_file_path", { currentPath: currentPath ?? null });
+  return selectOnePath({
+    title: "Select file to open",
+    directory: false,
+    defaultPath: optionalDialogPath(currentPath),
+  });
 }
 
 export async function getHomeDir(): Promise<string | null> {
@@ -549,7 +602,11 @@ export async function getHomeDir(): Promise<string | null> {
 }
 
 export async function selectFolderPath(currentPath?: string): Promise<string | null> {
-  return invoke<string | null>("select_folder_path", { currentPath: currentPath ?? null });
+  return selectOnePath({
+    title: "Select folder to open",
+    directory: true,
+    defaultPath: optionalDialogPath(currentPath),
+  });
 }
 
 export async function readFileBytes(path: string): Promise<Uint8Array> {

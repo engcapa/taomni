@@ -50,7 +50,6 @@ import {
   Braces,
   ChevronDown,
   ChevronRight,
-  ExternalLink,
   File,
   FilePlus,
   Folder,
@@ -130,7 +129,6 @@ import { renderFormatted } from "../../lib/chat/renderFormatted";
 import { useAppStore } from "../../stores/appStore";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { languageForPath } from "../git/diffLanguage";
-import { WorkspaceGitContainer } from "./WorkspaceGitContainer";
 import type {
   CodeWorkspaceFileRef,
   CodeWorkspaceLooseFileInfo,
@@ -209,8 +207,6 @@ const LSP_CUSTOM_COMMANDS_KEY = "taomni.codeWorkspace.lspCustomCommands.v1";
 const CUSTOM_LSP_COMMAND_ID = "__custom__";
 const TREE_FONT_SIZE_KEY = "taomni.codeWorkspace.treeFontSize.v1";
 const TREE_VIEW_MODE_KEY = "taomni.codeWorkspace.treeViewMode.v1";
-const BOTTOM_PANEL_OPEN_KEY = "taomni.codeWorkspace.bottomPanelOpen.v1";
-const BOTTOM_PANEL_SIZE_KEY = "taomni.codeWorkspace.bottomPanelSize.v1";
 const FLAT_VIEW_MAX_FILES = 2_000;
 const FLAT_VIEW_MAX_DEPTH = 25;
 const CODE_WORKSPACE_MIN_FONT_SIZE = 8;
@@ -624,39 +620,6 @@ function writeCodeWorkspaceTreeViewMode(mode: TreeViewMode): void {
   }
 }
 
-function readCodeWorkspaceBottomPanelOpen(): boolean {
-  try {
-    return window.localStorage.getItem(BOTTOM_PANEL_OPEN_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function writeCodeWorkspaceBottomPanelOpen(open: boolean): void {
-  try {
-    window.localStorage.setItem(BOTTOM_PANEL_OPEN_KEY, open ? "true" : "false");
-  } catch {
-    // Ignore storage failures.
-  }
-}
-
-function readCodeWorkspaceBottomPanelSize(): number {
-  try {
-    const raw = Number(window.localStorage.getItem(BOTTOM_PANEL_SIZE_KEY));
-    return Number.isFinite(raw) ? Math.min(55, Math.max(18, raw)) : 32;
-  } catch {
-    return 32;
-  }
-}
-
-function writeCodeWorkspaceBottomPanelSize(size: number): void {
-  try {
-    window.localStorage.setItem(BOTTOM_PANEL_SIZE_KEY, String(Math.round(size)));
-  } catch {
-    // Ignore storage failures.
-  }
-}
-
 function emptyLspFileState(): LspFileState {
   return {
     status: null,
@@ -760,8 +723,6 @@ export function CodeWorkspaceTab({
   const [codeViewProfile, setCodeViewProfileState] = useState<CodeViewProfile>(() => loadCodeViewProfile());
   const [treeFontSize, setTreeFontSizeState] = useState(() => readCodeWorkspaceTreeFontSize());
   const [treeViewMode, setTreeViewModeState] = useState<TreeViewMode>(() => readCodeWorkspaceTreeViewMode());
-  const [bottomPanelOpen, setBottomPanelOpenState] = useState(() => readCodeWorkspaceBottomPanelOpen());
-  const [bottomPanelSize, setBottomPanelSize] = useState(() => readCodeWorkspaceBottomPanelSize());
   const [roots, setRoots] = useState<CodeWorkspaceRootInfo[]>(() => initialRoots(workspace));
   const [looseFiles, setLooseFiles] = useState<CodeWorkspaceLooseFileInfo[]>(() => initialLooseFiles(workspace));
   const [directories, setDirectories] = useState<Record<string, DirectoryState>>({});
@@ -769,7 +730,6 @@ export function CodeWorkspaceTab({
   const [flatFiles, setFlatFiles] = useState<Record<string, FlatFilesState>>({});
   const [gitRoots, setGitRoots] = useState<WorkspaceGitRoot[]>([]);
   const [gitRootsLoading, setGitRootsLoading] = useState(false);
-  const [gitRootsError, setGitRootsError] = useState<string | null>(null);
   const [gitSnapshots, setGitSnapshots] = useState<Record<string, WorkspaceGitSnapshotState>>({});
   const [expandedRoots, setExpandedRoots] = useState<Set<string>>(() => new Set(initialRoots(workspace).map((root) => root.id)));
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(() => new Set(initialRoots(workspace).map((root) => rootDirKey(root.id, ""))));
@@ -932,11 +892,6 @@ export function CodeWorkspaceTab({
     writeCodeWorkspaceTreeViewMode(mode);
     setStatusMessage(`File tree view: ${mode}`);
   }, [setStatusMessage]);
-
-  const setBottomPanelOpen = useCallback((open: boolean) => {
-    setBottomPanelOpenState(open);
-    writeCodeWorkspaceBottomPanelOpen(open);
-  }, []);
 
   const zoomTargetForNode = useCallback((target: EventTarget | null): "tree" | "editor" => {
     const node = target instanceof Node ? target : null;
@@ -1399,7 +1354,6 @@ export function CodeWorkspaceTab({
     let cancelled = false;
     if (roots.length === 0) {
       setGitRoots([]);
-      setGitRootsError(null);
       setGitRootsLoading(false);
       setGitSnapshots({});
       return () => {
@@ -1408,7 +1362,6 @@ export function CodeWorkspaceTab({
     }
 
     setGitRootsLoading(true);
-    setGitRootsError(null);
     void workspaceDetectGitRoots(roots.map((root) => ({
       id: root.id,
       name: root.name,
@@ -1423,7 +1376,6 @@ export function CodeWorkspaceTab({
       if (cancelled) return;
       const message = errorMessage(err);
       setGitRoots([]);
-      setGitRootsError(message);
       setStatusMessage(message);
     }).finally(() => {
       if (!cancelled) setGitRootsLoading(false);
@@ -2615,18 +2567,10 @@ export function CodeWorkspaceTab({
           onClick={refreshTree}
         />
         <IconButton
-          label={bottomPanelOpen ? "Hide Git panel" : "Show Git panel"}
+          label="Open Git tab"
           testId="code-workspace-git-panel-toggle"
           icon={gitRootsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <GitBranch className="w-3.5 h-3.5" />}
-          active={bottomPanelOpen}
-          disabled={!gitRootsLoading && !gitRootsError && gitRoots.length === 0}
-          onClick={() => setBottomPanelOpen(!bottomPanelOpen)}
-        />
-        <IconButton
-          label="Open Git manager"
-          testId="code-workspace-git-manager-open"
-          icon={<ExternalLink className="w-3.5 h-3.5" />}
-          disabled={!onOpenGitManager || gitRoots.length === 0}
+          disabled={gitRootsLoading || !onOpenGitManager || gitRoots.length === 0}
           onClick={openGitManager}
         />
       </header>
@@ -2859,140 +2803,101 @@ export function CodeWorkspaceTab({
                 })}
               </div>
             )}
-            <PanelGroup
-              orientation="vertical"
+            <div
               id={`code-workspace-editor-stack-${workspace.workspaceId ?? workspace.repoRoot ?? tabId}`}
               className="flex-1 min-h-0"
             >
-              <Panel
-                id="editor-body"
-                defaultSize={bottomPanelOpen ? 68 : 100}
-                minSize={bottomPanelOpen ? 30 : 100}
-                className="min-h-0"
-              >
-                <div className="h-full min-h-0 relative">
-                  {activeFile ? (
-                    <div className="absolute inset-0 flex flex-col">
-                  <div className="min-h-7 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)]">
-                    <span className="truncate">{activeFile.subtitle}</span>
-                    <span className="shrink-0">{formatBytes(activeFile.size)}</span>
-                    {formatMtime(activeFile.mtime) && (
-                      <span className="shrink-0">{formatMtime(activeFile.mtime)}</span>
-                    )}
-                    {activeFile.loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    {activeLspState?.syncing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    <LspStatusPill state={activeLspState} diagnostics={activeDiagnostics} />
-                    {isMarkdownPath(activeFile.languagePath) && (
-                      <div className="ml-auto flex items-center gap-0.5">
-                        <ModeButton
-                          label="Edit"
-                          active={activeMarkdownMode === "edit"}
-                          icon={<File className="w-3 h-3" />}
-                          onClick={() => setActiveMarkdownMode("edit")}
-                        />
-                        <ModeButton
-                          label="Preview"
-                          active={activeMarkdownMode === "preview"}
-                          icon={<Eye className="w-3 h-3" />}
-                          onClick={() => setActiveMarkdownMode("preview")}
-                        />
-                        <ModeButton
-                          label="Split"
-                          active={activeMarkdownMode === "split"}
-                          icon={<Columns2 className="w-3 h-3" />}
-                          onClick={() => setActiveMarkdownMode("split")}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  {activeFile.error && (
-                    <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-red-500/30 bg-red-500/10 text-[12px] text-red-500">
-                      <AlertTriangle className="w-4 h-4 shrink-0" />
-                      <span className="min-w-0 truncate">{activeFile.error}</span>
-                    </div>
-                  )}
-                  <div data-testid="code-workspace-editor" className="flex-1 min-h-0">
-                    {activeFile.loading ? (
-                      <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-code-muted)]">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      </div>
-                    ) : isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "preview" ? (
-                      <MarkdownPreview file={activeFile} onOpenHref={openMarkdownHref} />
-                    ) : isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "split" ? (
-                      <div className="h-full min-h-0 grid grid-cols-2">
-                        <div className="min-w-0 min-h-0 border-r border-[var(--taomni-code-border)]">
-                          <WorkspaceCodeEditor
-                            key={`${activeFile.key}:edit`}
-                            path={activeFile.languagePath}
-                            doc={activeFile.text}
-                            visible={visible}
-                            diagnostics={activeDiagnostics}
-                            reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
-                            onChange={(doc) => updateFileText(activeFile.key, doc)}
-                            onSave={() => void saveFile(activeFile.key)}
-                            onHover={(position) => getLspHover(activeFile, position)}
-                            onDefinition={(position) => goToDefinition(activeFile, position)}
-                            onReferences={(position) => findReferences(activeFile, position)}
+              <div className="h-full min-h-0 relative">
+                {activeFile ? (
+                  <div className="absolute inset-0 flex flex-col">
+                    <div className="min-h-7 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)]">
+                      <span className="truncate">{activeFile.subtitle}</span>
+                      <span className="shrink-0">{formatBytes(activeFile.size)}</span>
+                      {formatMtime(activeFile.mtime) && (
+                        <span className="shrink-0">{formatMtime(activeFile.mtime)}</span>
+                      )}
+                      {activeFile.loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      {activeLspState?.syncing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      <LspStatusPill state={activeLspState} diagnostics={activeDiagnostics} />
+                      {isMarkdownPath(activeFile.languagePath) && (
+                        <div className="ml-auto flex items-center gap-0.5">
+                          <ModeButton
+                            label="Edit"
+                            active={activeMarkdownMode === "edit"}
+                            icon={<File className="w-3 h-3" />}
+                            onClick={() => setActiveMarkdownMode("edit")}
+                          />
+                          <ModeButton
+                            label="Preview"
+                            active={activeMarkdownMode === "preview"}
+                            icon={<Eye className="w-3 h-3" />}
+                            onClick={() => setActiveMarkdownMode("preview")}
+                          />
+                          <ModeButton
+                            label="Split"
+                            active={activeMarkdownMode === "split"}
+                            icon={<Columns2 className="w-3 h-3" />}
+                            onClick={() => setActiveMarkdownMode("split")}
                           />
                         </div>
+                      )}
+                    </div>
+                    {activeFile.error && (
+                      <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-red-500/30 bg-red-500/10 text-[12px] text-red-500">
+                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                        <span className="min-w-0 truncate">{activeFile.error}</span>
+                      </div>
+                    )}
+                    <div data-testid="code-workspace-editor" className="flex-1 min-h-0">
+                      {activeFile.loading ? (
+                        <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-code-muted)]">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        </div>
+                      ) : isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "preview" ? (
                         <MarkdownPreview file={activeFile} onOpenHref={openMarkdownHref} />
-                      </div>
-                    ) : (
-                      <WorkspaceCodeEditor
-                        key={activeFile.key}
-                        path={activeFile.languagePath}
-                        doc={activeFile.text}
-                        visible={visible}
-                        diagnostics={activeDiagnostics}
-                        reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
-                        onChange={(doc) => updateFileText(activeFile.key, doc)}
-                        onSave={() => void saveFile(activeFile.key)}
-                        onHover={(position) => getLspHover(activeFile, position)}
-                        onDefinition={(position) => goToDefinition(activeFile, position)}
-                        onReferences={(position) => findReferences(activeFile, position)}
-                      />
-                    )}
+                      ) : isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "split" ? (
+                        <div className="h-full min-h-0 grid grid-cols-2">
+                          <div className="min-w-0 min-h-0 border-r border-[var(--taomni-code-border)]">
+                            <WorkspaceCodeEditor
+                              key={`${activeFile.key}:edit`}
+                              path={activeFile.languagePath}
+                              doc={activeFile.text}
+                              visible={visible}
+                              diagnostics={activeDiagnostics}
+                              reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
+                              onChange={(doc) => updateFileText(activeFile.key, doc)}
+                              onSave={() => void saveFile(activeFile.key)}
+                              onHover={(position) => getLspHover(activeFile, position)}
+                              onDefinition={(position) => goToDefinition(activeFile, position)}
+                              onReferences={(position) => findReferences(activeFile, position)}
+                            />
+                          </div>
+                          <MarkdownPreview file={activeFile} onOpenHref={openMarkdownHref} />
+                        </div>
+                      ) : (
+                        <WorkspaceCodeEditor
+                          key={activeFile.key}
+                          path={activeFile.languagePath}
+                          doc={activeFile.text}
+                          visible={visible}
+                          diagnostics={activeDiagnostics}
+                          reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
+                          onChange={(doc) => updateFileText(activeFile.key, doc)}
+                          onSave={() => void saveFile(activeFile.key)}
+                          onHover={(position) => getLspHover(activeFile, position)}
+                          onDefinition={(position) => goToDefinition(activeFile, position)}
+                          onReferences={(position) => findReferences(activeFile, position)}
+                        />
+                      )}
+                    </div>
                   </div>
-                    </div>
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-code-muted)]">
-                      No file open
-                    </div>
-                  )}
-                </div>
-              </Panel>
-              {bottomPanelOpen && (
-                <>
-                  <PanelResizeHandle className="h-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors cursor-row-resize" />
-                  <Panel
-                    id="workspace-git"
-                    defaultSize={bottomPanelSize}
-                    minSize={18}
-                    maxSize={55}
-                    className="min-h-0"
-                    onResize={(size) => {
-                      const nextSize = typeof size === "number" ? size : Number.parseFloat(String(size));
-                      if (!Number.isFinite(nextSize)) return;
-                      setBottomPanelSize(nextSize);
-                      writeCodeWorkspaceBottomPanelSize(nextSize);
-                    }}
-                  >
-                    {gitRootsError ? (
-                      <div className="h-full flex items-center justify-center text-[12px] text-red-500">
-                        {gitRootsError}
-                      </div>
-                    ) : (
-                      <WorkspaceGitContainer
-                        gitRoots={gitRoots}
-                        activeRootId={activeRootId}
-                        visible={visible && bottomPanelOpen}
-                        onOpenManager={openGitManager}
-                      />
-                    )}
-                  </Panel>
-                </>
-              )}
-            </PanelGroup>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-code-muted)]">
+                    No file open
+                  </div>
+                )}
+              </div>
+            </div>
           </main>
         </Panel>
       </PanelGroup>
