@@ -91,7 +91,7 @@ describe("WorkspaceGitManager", () => {
     cleanup();
   });
 
-  it("commits changed files across checked repositories and keeps the selected repo in the Git panel", async () => {
+  it("keeps file-level changes out of the workspace sidebar and shows the selected repo in the Git panel", async () => {
     render(
       <WorkspaceGitManager
         workspaceName="Workspace"
@@ -104,22 +104,14 @@ describe("WorkspaceGitManager", () => {
     );
 
     await waitFor(() => expect(gitMocks.gitSnapshot).toHaveBeenCalledWith("/repo/app"));
+    expect(screen.getByText("Repositories")).toBeInTheDocument();
+    expect(screen.getByText("2/2")).toBeInTheDocument();
     expect(screen.getByTestId("git-panel")).toHaveAttribute("data-repo-root", "/repo/service");
+    expect(screen.getByRole("checkbox", { name: "Select app" })).toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Select src/ignored.ts" })).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Commit message")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Select src/ignored.ts" }));
-    fireEvent.change(screen.getByPlaceholderText("Commit message"), {
-      target: { value: "batch commit" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Commit" }));
-
-    await waitFor(() => {
-      expect(gitMocks.gitCommit).toHaveBeenCalledWith(
-        "/repo/app",
-        "batch commit",
-        false,
-        ["src/App.tsx"],
-      );
-    });
-    expect(gitMocks.gitCommit).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByText("app"));
+    expect(screen.getByTestId("git-panel")).toHaveAttribute("data-repo-root", "/repo/app");
   });
 });

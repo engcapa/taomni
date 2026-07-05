@@ -8,7 +8,6 @@ import {
 import {
   AlertTriangle,
   Download,
-  FileText,
   GitBranch,
   GitCommitHorizontal,
   GitMerge,
@@ -17,15 +16,12 @@ import {
   Upload,
 } from "lucide-react";
 import {
-  gitCommit,
   gitFetch,
-  gitChangeLabel,
   gitPull,
   gitPush,
   gitRepoName,
   gitSnapshot,
   selectedRemote,
-  type GitChange,
   type GitSnapshot,
 } from "../../lib/git";
 import { alertAppDialog } from "../../lib/appDialogs";
@@ -65,8 +61,6 @@ export function WorkspaceGitManager({
   const [snapshots, setSnapshots] = useState<Record<string, RepoSnapshotState>>({});
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
   const [panelVersion, setPanelVersion] = useState(0);
-  const [commitMessage, setCommitMessage] = useState("");
-  const [excludedCommitPaths, setExcludedCommitPaths] = useState<Record<string, Set<string>>>({});
 
   const selectedRoot = useMemo(
     () => normalizedRoots.find((root) => root.repoRoot === selectedRepoRoot) ?? normalizedRoots[0] ?? null,
@@ -76,25 +70,11 @@ export function WorkspaceGitManager({
     () => normalizedRoots.filter((root) => checkedRepoRoots.has(root.repoRoot)),
     [checkedRepoRoots, normalizedRoots],
   );
-  const commitSelection = useMemo(() => {
-    const byRepo: Record<string, string[]> = {};
-    let totalFiles = 0;
-    let selectedFiles = 0;
-    let selectedRepos = 0;
-    for (const root of normalizedRoots) {
-      const changes = snapshots[root.repoRoot]?.snapshot?.changes ?? [];
-      const excluded = excludedCommitPaths[root.repoRoot] ?? new Set<string>();
-      const selected = changes.filter((change) => !excluded.has(change.path)).map((change) => change.path);
-      byRepo[root.repoRoot] = selected;
-      totalFiles += changes.length;
-      selectedFiles += selected.length;
-      if (selected.length > 0) selectedRepos += 1;
-    }
-    return { byRepo, totalFiles, selectedFiles, selectedRepos };
-  }, [excludedCommitPaths, normalizedRoots, snapshots]);
-  const allChecked = normalizedRoots.length > 0
-    && checkedRoots.length === normalizedRoots.length
-    && (commitSelection.totalFiles === 0 || commitSelection.selectedFiles === commitSelection.totalFiles);
+  const totalChangedFiles = useMemo(
+    () => normalizedRoots.reduce((total, root) => total + (snapshots[root.repoRoot]?.snapshot?.changes.length ?? 0), 0),
+    [normalizedRoots, snapshots],
+  );
+  const allChecked = normalizedRoots.length > 0 && checkedRoots.length === normalizedRoots.length;
   const title = workspaceName?.trim() || "Code Workspace";
 
   useEffect(() => {
@@ -162,49 +142,11 @@ export function WorkspaceGitManager({
       else next.delete(repoRoot);
       return next;
     });
-    setExcludedCommitPaths((current) => {
-      const changes = snapshots[repoRoot]?.snapshot?.changes ?? [];
-      if (changes.length === 0) return current;
-      const next = { ...current };
-      if (checked) {
-        delete next[repoRoot];
-      } else {
-        next[repoRoot] = new Set(changes.map((change) => change.path));
-      }
-      return next;
-    });
-  }, [snapshots]);
-
-  const toggleFileChecked = useCallback((repoRoot: string, path: string, checked: boolean) => {
-    setExcludedCommitPaths((current) => {
-      const next = { ...current };
-      const excluded = new Set(next[repoRoot] ?? []);
-      if (checked) excluded.delete(path);
-      else excluded.add(path);
-      if (excluded.size > 0) next[repoRoot] = excluded;
-      else delete next[repoRoot];
-      return next;
-    });
-    if (checked) {
-      setCheckedRepoRoots((current) => {
-        if (current.has(repoRoot)) return current;
-        const next = new Set(current);
-        next.add(repoRoot);
-        return next;
-      });
-    }
   }, []);
 
   const setAllChecked = useCallback((checked: boolean) => {
     setCheckedRepoRoots(checked ? new Set(normalizedRoots.map((root) => root.repoRoot)) : new Set());
-    setExcludedCommitPaths(() => {
-      if (checked) return {};
-      return Object.fromEntries(normalizedRoots.map((root) => [
-        root.repoRoot,
-        new Set((snapshots[root.repoRoot]?.snapshot?.changes ?? []).map((change) => change.path)),
-      ]));
-    });
-  }, [normalizedRoots, snapshots]);
+  }, [normalizedRoots]);
 
   const runBatch = useCallback(async (
     label: string,
@@ -244,25 +186,6 @@ export function WorkspaceGitManager({
     }
   }, [checkedRoots, refreshRepo, setStatusMessage]);
 
-  const batchCommit = useCallback(async (push: boolean) => {
-    const message = commitMessage.trim();
-    if (!message || commitSelection.selectedFiles === 0) return;
-    await runBatch(push ? "Commit and Push" : "Commit", async (_root, snapshot) => {
-      const excluded = excludedCommitPaths[snapshot.repoRoot] ?? new Set<string>();
-      const paths = snapshot.changes.filter((change) => !excluded.has(change.path)).map((change) => change.path);
-      if (paths.length === 0) return "skipped";
-      await gitCommit(snapshot.repoRoot, message, false, paths);
-      if (push) {
-        const remote = selectedRemote(snapshot);
-        if (remote && snapshot.currentBranch) {
-          await gitPush(snapshot.repoRoot, remote.name, snapshot.currentBranch, !snapshot.upstream);
-        }
-      }
-      return "completed";
-    });
-    setCommitMessage("");
-  }, [commitMessage, commitSelection.selectedFiles, excludedCommitPaths, runBatch]);
-
   const batchFetch = useCallback(() => runBatch("Fetch", async (_root, snapshot) => {
     const remote = selectedRemote(snapshot);
     if (!remote) return "skipped";
@@ -285,7 +208,6 @@ export function WorkspaceGitManager({
   }), [runBatch]);
 
   const busy = busyLabel !== null;
-  const canCommit = !busy && commitSelection.selectedFiles > 0 && commitMessage.trim().length > 0;
   const refreshChecked = useCallback(async () => {
     if (checkedRoots.length === 0) return;
     setBusyLabel("Refresh");
@@ -308,7 +230,7 @@ export function WorkspaceGitManager({
         <div className="min-w-0">
           <div className="font-semibold leading-4 truncate">Git · {title}</div>
           <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
-            {normalizedRoots.length} repositories · {commitSelection.totalFiles} changed files
+            {normalizedRoots.length} repositories · {totalChangedFiles} changed files
           </div>
         </div>
         <div className="flex-1" />
@@ -349,9 +271,9 @@ export function WorkspaceGitManager({
                 disabled={normalizedRoots.length === 0}
                 onChange={(event) => setAllChecked(event.target.checked)}
               />
-              <span>Changes</span>
+              <span>Repositories</span>
               <span className="text-[11px] text-[var(--taomni-text-muted)]">
-                {commitSelection.selectedFiles}/{commitSelection.totalFiles}
+                {checkedRoots.length}/{normalizedRoots.length}
               </span>
             </label>
             <div className="flex-1" />
@@ -374,44 +296,11 @@ export function WorkspaceGitManager({
                   error={state?.error ?? null}
                   selected={selected}
                   checked={checked}
-                  excludedPaths={excludedCommitPaths[root.repoRoot] ?? new Set()}
                   onChecked={(next) => toggleChecked(root.repoRoot, next)}
-                  onFileChecked={(path, next) => toggleFileChecked(root.repoRoot, path, next)}
                   onSelect={() => setSelectedRepoRoot(root.repoRoot)}
                 />
               );
             })}
-          </div>
-          <div className="shrink-0 border-t border-[var(--taomni-divider)] p-2">
-            <textarea
-              value={commitMessage}
-              onChange={(event) => setCommitMessage(event.target.value)}
-              placeholder="Commit message"
-              className="taomni-input h-24 w-full resize-none p-2 text-[12px]"
-            />
-            <div className="mt-2 flex items-center gap-2">
-              <span className="min-w-0 flex-1 truncate text-[11px] text-[var(--taomni-text-muted)]">
-                {commitSelection.selectedFiles} files in {commitSelection.selectedRepos} repos
-              </span>
-              <button
-                type="button"
-                className="taomni-btn h-7 px-2 inline-flex items-center gap-1"
-                disabled={!canCommit}
-                onClick={() => void batchCommit(false)}
-              >
-                <GitCommitHorizontal className="w-3.5 h-3.5" />
-                <span>Commit</span>
-              </button>
-              <button
-                type="button"
-                className="taomni-btn h-7 px-2 inline-flex items-center gap-1"
-                disabled={!canCommit}
-                onClick={() => void batchCommit(true)}
-              >
-                <Upload className="w-3.5 h-3.5" />
-                <span>Commit and Push</span>
-              </button>
-            </div>
           </div>
         </aside>
 
@@ -439,9 +328,7 @@ function RepoRow({
   error,
   selected,
   checked,
-  excludedPaths,
   onChecked,
-  onFileChecked,
   onSelect,
 }: {
   root: GitWorkspaceRootInfo;
@@ -450,15 +337,11 @@ function RepoRow({
   error: string | null;
   selected: boolean;
   checked: boolean;
-  excludedPaths: Set<string>;
   onChecked: (checked: boolean) => void;
-  onFileChecked: (path: string, checked: boolean) => void;
   onSelect: () => void;
 }) {
   const branch = snapshot?.detached ? `detached ${snapshot.headOid ?? ""}` : snapshot?.currentBranch ?? "";
   const changes = snapshot?.changes ?? [];
-  const selectedChanges = changes.filter((change) => !excludedPaths.has(change.path)).length;
-  const repoChecked = changes.length > 0 ? selectedChanges === changes.length : checked;
   return (
     <div
       className={`group border-b border-[var(--taomni-divider)] ${selected ? "bg-[var(--taomni-hover)]" : "hover:bg-[var(--taomni-hover)]"}`}
@@ -467,7 +350,7 @@ function RepoRow({
         <input
           type="checkbox"
           className="mt-1 accent-[var(--taomni-accent)]"
-          checked={repoChecked}
+          checked={checked}
           onChange={(event) => onChecked(event.target.checked)}
           onClick={(event) => event.stopPropagation()}
           aria-label={`Select ${root.name}`}
@@ -497,7 +380,7 @@ function RepoRow({
         </button>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <span className={`rounded px-1.5 py-0.5 text-[11px] ${changes.length > 0 ? "bg-[var(--taomni-accent)] text-white" : "bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"}`}>
-            {selectedChanges}/{changes.length}
+            {changes.length}
           </span>
           {snapshot && (snapshot.ahead > 0 || snapshot.behind > 0) && (
             <span className="text-[10px] text-[var(--taomni-text-muted)]">
@@ -506,77 +389,12 @@ function RepoRow({
           )}
         </div>
       </div>
-      {changes.length > 0 ? (
-        <div className="pb-1">
-          {changes.map((change) => (
-            <ChangeRow
-              key={`${change.path}:${change.staged}:${change.unstaged}`}
-              change={change}
-              checked={!excludedPaths.has(change.path)}
-              onChecked={(next) => onFileChecked(change.path, next)}
-              onSelect={onSelect}
-            />
-          ))}
-        </div>
-      ) : snapshot && !loading && !error ? (
+      {snapshot && changes.length === 0 && !loading && !error ? (
         <div className="px-9 pb-2 text-[11px] text-[var(--taomni-text-muted)]">
           No changes
         </div>
       ) : null}
     </div>
-  );
-}
-
-function ChangeRow({
-  change,
-  checked,
-  onChecked,
-  onSelect,
-}: {
-  change: GitChange;
-  checked: boolean;
-  onChecked: (checked: boolean) => void;
-  onSelect: () => void;
-}) {
-  return (
-    <div className="flex items-center gap-2 py-1 pl-9 pr-3 text-[12px] hover:bg-[var(--taomni-hover)]">
-      <input
-        type="checkbox"
-        className="shrink-0 accent-[var(--taomni-accent)]"
-        checked={checked}
-        onChange={(event) => onChecked(event.target.checked)}
-        aria-label={`Select ${change.path}`}
-      />
-      <StatusBadge change={change} />
-      <button
-        type="button"
-        className="min-w-0 flex-1 text-left"
-        title={change.path}
-        onClick={onSelect}
-      >
-        <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
-          <FileText className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
-          <span className="truncate">{change.path}</span>
-        </span>
-      </button>
-    </div>
-  );
-}
-
-function StatusBadge({ change }: { change: GitChange }) {
-  const label = change.conflict ? "!" : change.status.slice(0, 1).toUpperCase();
-  const color = change.conflict
-    ? "border-red-500/40 bg-red-500/10 text-red-500"
-    : change.staged
-      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-500"
-      : "border-[var(--taomni-divider)] bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]";
-  return (
-    <span
-      className={`inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded border px-1 text-[10px] font-semibold ${color}`}
-      title={gitChangeLabel(change)}
-    >
-      {label || "?"}
-    </span>
   );
 }
 
