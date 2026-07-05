@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, X } from "lucide-react";
 import { useLocale, useT } from "../../lib/i18n";
+import { useNotesStore } from "../../stores/notesStore";
+import { notesFontSizeStyle, notesFontStyle, notesThemeStyle } from "../../lib/notes/notesTheme";
 
 interface NoteDateTimeFieldProps {
   label: string;
@@ -100,6 +103,8 @@ function displayValue(value: number | null): string {
  * App-owned date-time picker for notes. It avoids platform-native datetime
  * pickers whose Linux WebKit/GTK behavior can omit time selection or keep the
  * popover stuck open after a day is chosen.
+ * Supports both manual text input and click/slider selection, rendering
+ * the popover inside a Portal to avoid parent boundary scroll clipping.
  */
 export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTimeFieldProps) {
   const t = useT();
@@ -109,6 +114,21 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
   const [month, setMonth] = useState(() => monthFromValue(value));
   const [draftDate, setDraftDate] = useState(() => partsFromSeconds(value).date);
   const [draftTime, setDraftTime] = useState(() => partsFromSeconds(value).time);
+
+  const theme = useNotesStore((s) => s.theme);
+  const font = useNotesStore((s) => s.font);
+  const fontSize = useNotesStore((s) => s.fontSize);
+
+  const themeStyle = notesThemeStyle(theme);
+  const fontStyle = notesFontStyle(font);
+  const fontSizeStyle = notesFontSizeStyle(fontSize);
+
+  const [inputText, setInputText] = useState(() => displayValue(value));
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+
+  useEffect(() => {
+    setInputText(displayValue(value));
+  }, [value]);
 
   useEffect(() => {
     if (!open) return;
@@ -123,6 +143,8 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target;
       if (target instanceof Node && rootRef.current?.contains(target)) return;
+      const popover = document.querySelector(`[data-testid="${testId}-popover"]`);
+      if (popover && target instanceof Node && popover.contains(target)) return;
       setOpen(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
@@ -134,10 +156,47 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
       document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("keydown", onKeyDown, true);
     };
+  }, [open, testId]);
+
+  useEffect(() => {
+    if (!open || !rootRef.current) {
+      setPos(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      if (!rootRef.current) return;
+      const rect = rootRef.current.getBoundingClientRect();
+      const popoverWidth = 248;
+      const popoverHeight = 320;
+      const margin = 8;
+
+      let left = rect.left;
+      if (left + popoverWidth > window.innerWidth - margin) {
+        left = window.innerWidth - popoverWidth - margin;
+      }
+      left = Math.max(margin, left);
+
+      let top = rect.bottom + 4;
+      if (top + popoverHeight > window.innerHeight - margin) {
+        top = rect.top - popoverHeight - 4;
+      }
+      top = Math.max(margin, top);
+
+      setPos({ left, top });
+    };
+
+    updatePosition();
+
+    window.addEventListener("resize", updatePosition, true);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition, true);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
   }, [open]);
 
   const cells = useMemo(() => buildCalendar(month), [month]);
-  const shown = displayValue(value);
   const monthLabel = useMemo(
     () => new Intl.DateTimeFormat(locale, { month: "short", year: "numeric" }).format(month),
     [locale, month],
@@ -165,6 +224,7 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
     setDraftTime(nextTime);
     commit(nextDate, nextTime, true);
   };
+
   const commitDone = () => {
     if (draftDate) {
       commit(draftDate, draftTime, true);
@@ -178,23 +238,77 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
     setDraftTime(timeStringFromParts(hour, minute));
   };
 
+  const DATETIME_REGEX = /^(\d{4})-(\d{1,2})-(\d{1,2})\s+(\d{1,2}):(\d{1,2})$/;
+
+  const parseDateTimeString = (str: string): number | null => {
+    const match = str.trim().match(DATETIME_REGEX);
+    if (!match) return null;
+    const [, y, m, d, h, min] = match.map(Number);
+    if (m < 1 || m > 12) return null;
+    if (d < 1 || d > 31) return null;
+    if (h < 0 || h > 23) return null;
+    if (min < 0 || min > 59) return null;
+
+    const date = new Date(y, m - 1, d, h, min, 0, 0);
+    const ms = date.getTime();
+    return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
+  };
+
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const text = e.target.value;
+    setInputText(text);
+    const parsed = parseDateTimeString(text);
+    if (parsed !== null) {
+      onChange(parsed);
+      const parts = partsFromSeconds(parsed);
+      if (parts.date) {
+        setDraftDate(parts.date);
+        setDraftTime(parts.time);
+        setMonth(monthFromValue(parsed));
+      }
+    }
+  };
+
+  const handleInputBlur = () => {
+    const parsed = parseDateTimeString(inputText);
+    if (parsed !== null) {
+      onChange(parsed);
+    } else {
+      setInputText(displayValue(value));
+    }
+  };
+
+  const handleInputKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      const parsed = parseDateTimeString(inputText);
+      if (parsed !== null) {
+        onChange(parsed);
+        setOpen(false);
+      }
+    }
+  };
+
   return (
     <div className="relative inline-flex items-center gap-1" ref={rootRef}>
       <span className="text-[var(--taomni-text-muted)]">{label}</span>
-      <button
-        type="button"
-        className="taomni-input h-6 min-w-[136px] max-w-[168px] px-1.5 text-[11px] inline-flex items-center gap-1 text-left"
-        onClick={() => setOpen((next) => !next)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-label={shown ? `${label}: ${shown}` : label}
-        data-testid={testId}
-      >
-        <CalendarDays className="w-3 h-3 shrink-0 text-[var(--taomni-text-muted)]" />
-        <span className={shown ? "truncate" : "truncate text-[var(--taomni-text-muted)]"}>
-          {shown || t("notes.dateTimePlaceholder")}
-        </span>
-      </button>
+      <div className="relative inline-flex items-center min-w-[136px] max-w-[168px]">
+        <CalendarDays className="w-3 h-3 absolute left-1.5 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)] pointer-events-none" />
+        <input
+          type="text"
+          className="taomni-input h-6 w-full pl-6 pr-1.5 text-[11px] text-left"
+          value={inputText}
+          onChange={handleInputChange}
+          onBlur={handleInputBlur}
+          onKeyDown={handleInputKeyDown}
+          onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
+          placeholder={t("notes.dateTimePlaceholder")}
+          data-testid={testId}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-label={label}
+        />
+      </div>
       {value != null && (
         <button
           type="button"
@@ -211,12 +325,24 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
         </button>
       )}
 
-      {open && (
+      {open && pos && createPortal(
         <div
-          className="absolute left-0 top-7 z-40 w-[248px] rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-2 shadow-lg"
+          className="rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-2 shadow-lg"
           role="dialog"
           aria-label={label}
           data-testid={`${testId}-popover`}
+          style={{
+            position: "fixed",
+            left: pos.left,
+            top: pos.top,
+            zIndex: 9999,
+            width: "248px",
+            color: "var(--taomni-text)",
+            background: "var(--taomni-panel-bg)",
+            ...themeStyle,
+            ...fontStyle,
+            ...fontSizeStyle,
+          }}
         >
           <div className="mb-1.5 flex items-center gap-1">
             <button
@@ -321,7 +447,8 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
               {t("notes.dateTimeDone")}
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

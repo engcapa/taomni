@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
-import { PanelRightClose } from "lucide-react";
+import { X } from "lucide-react";
 import { useNotesStore, type NotesPanelPosition } from "../../stores/notesStore";
 import { notesFontSizeStyle, notesFontStyle, notesThemeStyle } from "../../lib/notes/notesTheme";
 import { useT } from "../../lib/i18n";
@@ -121,24 +121,24 @@ export function FloatingNotesPanel() {
     >
       {/* Drag handle / title bar */}
       <div
-        className="flex items-center gap-2 px-2 h-7 shrink-0 border-b border-[var(--taomni-divider)] cursor-move select-none"
-        style={{ background: "var(--taomni-panel-bg)", touchAction: "none" }}
+        className="flex items-center gap-2 px-2 h-6 shrink-0 cursor-move select-none"
+        style={{ background: "rgba(0, 0, 0, 0.05)", touchAction: "none" }}
         onPointerDown={startDrag("move")}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         data-testid="floating-notes-drag"
       >
-        <span className="text-[12px] font-semibold flex-1 truncate">{t("notes.title")}</span>
+        <span className="text-[11px] font-medium opacity-65 flex-1 truncate">{t("notes.title")}</span>
         <button
           type="button"
-          className="taomni-btn h-5 w-5 p-0 inline-flex items-center justify-center"
+          className="taomni-btn h-4 w-4 p-0 inline-flex items-center justify-center rounded hover:bg-black/10 hover:text-red-500"
           onClick={() => setPanelMode("hub")}
           title={t("notes.dock")}
           aria-label={t("notes.dock")}
           data-testid="floating-notes-dock"
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <PanelRightClose className="w-3.5 h-3.5" />
+          <X className="w-3 h-3" />
         </button>
       </div>
 
