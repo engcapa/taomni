@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { computeNewTerminalTitle, useAppStore } from "./appStore";
+import { computeNewTerminalTitle, recentWorkspaceIdFromParts, useAppStore, type CodeWorkspaceContext } from "./appStore";
 import type { RecentWorkspace, Tab } from "../types";
 
 const tab = (id: string, overrides: Partial<Tab> = {}): Tab => ({
@@ -15,6 +15,7 @@ describe("appStore.moveTab", () => {
     useAppStore.setState({
       tabs: [tab("a"), tab("b"), tab("c"), tab("d")],
       activeTabId: "a",
+      recentWorkspaceIdByWorkspaceInstance: {},
     });
   });
 
@@ -187,6 +188,35 @@ describe("appStore.duplicateTab", () => {
     expect(useAppStore.getState().tabs.find((t) => t.id !== "rdp" && t.title === "Desktop-1")?.terminalProfile).toBeUndefined();
   });
 
+  it("duplicates code workspaces as a new runtime instance of the same definition", () => {
+    const root = { id: "root-a", name: "repo", path: "/repo/app", kind: "git" as const };
+    useAppStore.setState({
+      tabs: [
+        tab("code", {
+          type: "code-workspace",
+          title: "Code · repo",
+          codeWorkspace: {
+            repoRoot: "/repo/app",
+            workspaceId: "workspace-definition",
+            workspaceInstanceId: "workspace-instance-original",
+            name: "repo",
+            roots: [root],
+            looseFiles: [],
+            initialFile: null,
+          },
+        }),
+      ],
+      activeTabId: "code",
+    });
+
+    useAppStore.getState().duplicateTab("code");
+
+    const copy = useAppStore.getState().tabs[1];
+    expect(copy.codeWorkspace?.workspaceId).toBe("workspace-definition");
+    expect(copy.codeWorkspace?.workspaceInstanceId).toMatch(/^workspace-instance-/);
+    expect(copy.codeWorkspace?.workspaceInstanceId).not.toBe("workspace-instance-original");
+  });
+
   it("mints a unique id distinct from the source", () => {
     useAppStore.getState().duplicateTab("a");
     const ids = useAppStore.getState().tabs.map((t) => t.id);
@@ -327,8 +357,55 @@ describe("appStore.recentWorkspaces", () => {
       activeTabId: "welcome",
       codeWorkspaceByTab: {},
       recentWorkspaces: [],
+      recentWorkspaceIdByWorkspaceInstance: {},
       welcomeRecentSessionLimit: 20,
     });
+  });
+
+  const workspaceContext = (
+    roots: Array<{ id: string; name: string; path: string; kind: "git" | "folder" }>,
+  ): CodeWorkspaceContext => ({
+    repoRoot: roots[0]?.path ?? "",
+    activePath: null,
+    openPaths: [],
+    dirtyPaths: [],
+    roots,
+    looseFiles: [],
+    activeFile: null,
+    openFiles: [],
+    dirtyFiles: [],
+    lsp: null,
+  });
+
+  const codeWorkspaceTab = (
+    id: string,
+    roots: Array<{ id: string; name: string; path: string; kind: "git" | "folder" }>,
+    workspaceInstanceId: string,
+  ): Tab => tab(id, {
+    type: "code-workspace",
+    title: `Code · ${roots[0]?.name ?? "Workspace"}`,
+    codeWorkspace: {
+      repoRoot: roots[0]?.path ?? "",
+      workspaceId: recentWorkspaceIdFromParts(roots, []),
+      workspaceInstanceId,
+      name: roots[0]?.name ?? "Workspace",
+      roots,
+      looseFiles: [],
+      initialFile: null,
+    },
+  });
+
+  const recentWorkspace = (
+    roots: Array<{ id: string; name: string; path: string; kind: "git" | "folder" }>,
+    lastOpenedAt: number,
+  ): RecentWorkspace => ({
+    id: recentWorkspaceIdFromParts(roots, []),
+    name: roots[0]?.name ?? "Workspace",
+    roots,
+    looseFiles: [],
+    lastOpenedAt,
+    lastActiveFile: null,
+    isGitRepo: roots.some((root) => root.kind === "git"),
   });
 
   it("records a code workspace tab from the latest workspace context", () => {
@@ -381,6 +458,72 @@ describe("appStore.recentWorkspaces", () => {
       lastActiveFile: { kind: "root", rootId: "root-main", path: "src/App.tsx" },
     });
     expect(JSON.parse(window.localStorage.getItem("taomni.recentWorkspaces.v1") ?? "[]")).toHaveLength(1);
+  });
+
+  it("builds recent workspace ids from the path definition, not runtime root ids", () => {
+    const singleA = [{ id: "root-a", name: "repo", path: "/repo/app", kind: "git" as const }];
+    const singleB = [{ id: "root-b", name: "repo", path: "/repo/app", kind: "git" as const }];
+    const multi = [
+      { id: "root-a", name: "repo", path: "/repo/app", kind: "git" as const },
+      { id: "root-c", name: "data", path: "/data/repo2", kind: "folder" as const },
+    ];
+
+    expect(recentWorkspaceIdFromParts(singleA, [])).toBe(recentWorkspaceIdFromParts(singleB, []));
+    expect(recentWorkspaceIdFromParts(singleA, [])).not.toBe(recentWorkspaceIdFromParts(multi, []));
+  });
+
+  it("replaces earlier recent definitions when the same workspace instance changes roots", () => {
+    const roots3 = [
+      { id: "root-1", name: "kiro.rs", path: "/repo/kiro.rs", kind: "git" as const },
+      { id: "root-2", name: "api", path: "/repo/api", kind: "folder" as const },
+      { id: "root-3", name: "web", path: "/repo/web", kind: "folder" as const },
+    ];
+    const roots4 = [...roots3, { id: "root-4", name: "docs", path: "/repo/docs", kind: "folder" as const }];
+    const roots5 = [...roots4, { id: "root-5", name: "tools", path: "/repo/tools", kind: "folder" as const }];
+    useAppStore.setState({
+      tabs: [
+        { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+        codeWorkspaceTab("code", roots3, "workspace-instance-a"),
+      ],
+      recentWorkspaces: [
+        recentWorkspace(roots4, 4),
+        recentWorkspace(roots3, 3),
+      ],
+      recentWorkspaceIdByWorkspaceInstance: {
+        "workspace-instance-a": recentWorkspaceIdFromParts(roots3, []),
+      },
+    });
+
+    useAppStore.getState().setTabCodeWorkspaceContext("code", workspaceContext(roots5));
+
+    const recent = useAppStore.getState().recentWorkspaces;
+    expect(recent).toHaveLength(1);
+    expect(recent[0].id).toBe(recentWorkspaceIdFromParts(roots5, []));
+    expect(recent[0].roots.map((root) => root.name)).toEqual(["kiro.rs", "api", "web", "docs", "tools"]);
+    expect(JSON.parse(window.localStorage.getItem("taomni.recentWorkspaces.v1") ?? "[]")).toHaveLength(1);
+  });
+
+  it("keeps an old recent definition when another workspace instance still uses it", () => {
+    const roots1 = [
+      { id: "root-1", name: "kiro.rs", path: "/repo/kiro.rs", kind: "git" as const },
+    ];
+    const roots2 = [...roots1, { id: "root-2", name: "api", path: "/repo/api", kind: "folder" as const }];
+    useAppStore.setState({
+      tabs: [
+        { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+        codeWorkspaceTab("code-a", roots1, "workspace-instance-a"),
+        codeWorkspaceTab("code-b", roots1, "workspace-instance-b"),
+      ],
+    });
+
+    useAppStore.getState().setTabCodeWorkspaceContext("code-a", workspaceContext(roots1));
+    useAppStore.getState().setTabCodeWorkspaceContext("code-b", workspaceContext(roots1));
+    useAppStore.getState().setTabCodeWorkspaceContext("code-a", workspaceContext(roots2));
+
+    expect(useAppStore.getState().recentWorkspaces.map((workspace) => workspace.id)).toEqual([
+      recentWorkspaceIdFromParts(roots2, []),
+      recentWorkspaceIdFromParts(roots1, []),
+    ]);
   });
 
   it("persists, limits, removes, and clears recent workspace entries", () => {

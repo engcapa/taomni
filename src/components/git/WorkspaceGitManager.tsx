@@ -46,6 +46,7 @@ import {
   type GitBlobPair,
   type GitSnapshot,
 } from "../../lib/git";
+import { notifyGitRepoChanged, subscribeGitRepoRefresh } from "../../lib/gitRefresh";
 import { alertAppDialog, confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { useAppStore } from "../../stores/appStore";
 import type { GitWorkspaceRootInfo } from "../../types";
@@ -274,6 +275,13 @@ export function WorkspaceGitManager({
     await Promise.allSettled(targets.map((root) => refreshRepo(root.repoRoot)));
   }, [normalizedRoots, refreshRepo]);
 
+  useEffect(() => subscribeGitRepoRefresh((repoRoot) => {
+    if (normalizedRoots.some((root) => root.repoRoot === repoRoot)) {
+      void refreshRepo(repoRoot);
+      setPanelVersion((current) => current + 1);
+    }
+  }), [normalizedRoots, refreshRepo]);
+
   useEffect(() => {
     if (!visible || normalizedRoots.length === 0 || singleRepoMode) return;
     void refreshRepos(normalizedRoots);
@@ -376,6 +384,7 @@ export function WorkspaceGitManager({
           if (result === "completed") {
             completed += 1;
             await refreshRepo(root.repoRoot);
+            notifyGitRepoChanged(root.repoRoot);
           } else {
             skipped += 1;
           }
@@ -543,6 +552,7 @@ export function WorkspaceGitManager({
           if (result === "completed") {
             completed += 1;
             await refreshRepo(root.repoRoot);
+            notifyGitRepoChanged(root.repoRoot);
           } else {
             skipped += 1;
           }

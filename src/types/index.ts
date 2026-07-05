@@ -296,6 +296,9 @@ export interface GitTabInfo {
   workspaceName?: string;
   workspaceRoots?: GitWorkspaceRootInfo[];
   activeRepoRoot?: string | null;
+  sourceWorkspaceInstanceId?: string;
+  sourceWorkspaceId?: string;
+  sourceWorkspaceName?: string;
 }
 
 export interface GitWorkspaceRootInfo {
@@ -339,6 +342,7 @@ export interface CodeWorkspaceTabInfo {
   repoRoot: string;
   initialPath?: string | null;
   workspaceId?: string;
+  workspaceInstanceId?: string;
   name?: string;
   roots?: CodeWorkspaceRootInfo[];
   looseFiles?: CodeWorkspaceLooseFileInfo[];

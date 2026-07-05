@@ -79,6 +79,7 @@ import {
   type GitStashEntry,
   type GitTag,
 } from "../../lib/git";
+import { notifyGitRepoChanged, subscribeGitRepoRefresh } from "../../lib/gitRefresh";
 import { alertAppDialog, confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
 import { ChangesTree } from "./ChangesTree";
@@ -179,6 +180,7 @@ export function GitPanel({
   const [menu, setMenu] = useState<{ x: number; y: number; path: string } | null>(null);
   const [headerMenu, setHeaderMenu] = useState<{ x: number; y: number } | null>(null);
   const [commitMenu, setCommitMenu] = useState<{ x: number; y: number; entry: GitLogEntry } | null>(null);
+  const [repoRefreshRevision, setRepoRefreshRevision] = useState(0);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const anchorRef = useRef<string | null>(null);
   const [operation, setOperation] = useState<GitOperationState | null>(null);
@@ -312,7 +314,13 @@ export function GitPanel({
 
   useEffect(() => {
     void refresh();
-  }, [refresh, refreshToken]);
+  }, [refresh, refreshToken, repoRefreshRevision]);
+
+  useEffect(() => subscribeGitRepoRefresh((changedRepoRoot) => {
+    if (changedRepoRoot === repoRoot) {
+      setRepoRefreshRevision((current) => current + 1);
+    }
+  }), [repoRoot]);
 
   useEffect(() => {
     let cancelled = false;
@@ -394,6 +402,7 @@ export function GitPanel({
       try {
         await action();
         await refresh();
+        notifyGitRepoChanged(repoRoot);
         setStatusMessage(`${label} completed`);
       } catch (err) {
         const message = errorMessage(err);
@@ -404,7 +413,7 @@ export function GitPanel({
         setBusy(false);
       }
     },
-    [refresh, setStatusMessage],
+    [refresh, repoRoot, setStatusMessage],
   );
 
   const changesList = useMemo(() => snapshot?.changes ?? [], [snapshot]);
