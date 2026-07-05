@@ -425,6 +425,8 @@ export const zhCN: DeepPartial<typeof en> = {
     localDirectoryPersonal: "常用",
     localDirectoryOpenAria: "在 {label} 打开终端：{path}",
     localDirectoriesLoadFailed: "加载本地目录失败：{error}",
+    localDirectoriesEmpty: "暂无可用的本地目录快捷入口。",
+    historyTabsLabel: "欢迎页快捷入口和历史记录",
     admin: "管理员",
     adminTitle: "以管理员身份打开",
     newSessionTitle: "新建会话…",

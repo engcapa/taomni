@@ -426,6 +426,8 @@ const dict = {
     localDirectoryPersonal: "personal",
     localDirectoryOpenAria: "Open terminal in {label}: {path}",
     localDirectoriesLoadFailed: "Failed to load local directories: {error}",
+    localDirectoriesEmpty: "No local directory shortcuts are available.",
+    historyTabsLabel: "Welcome shortcuts and history",
     admin: "Admin",
     adminTitle: "Open as administrator",
     newSessionTitle: "New session…",

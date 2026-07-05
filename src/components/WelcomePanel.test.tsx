@@ -103,6 +103,16 @@ describe("WelcomePanel", () => {
     await waitFor(() => {
       expect(screen.getByText("PowerShell")).toBeInTheDocument();
     });
+
+    const historyTabs = within(screen.getByRole("tablist", { name: "Welcome shortcuts and history" })).getAllByRole("tab");
+    expect(historyTabs.map((tab) => tab.getAttribute("data-testid"))).toEqual([
+      "welcome-history-tab-sessions",
+      "welcome-history-tab-workspaces",
+      "welcome-history-tab-directories",
+    ]);
+    expect(historyTabs[0]).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("welcome-recent-sessions")).toBeInTheDocument();
+    expect(screen.queryByTestId("welcome-local-directories")).not.toBeInTheDocument();
   });
 
   it("shows local directory shortcuts and starts a terminal in the clicked directory", async () => {
@@ -117,8 +127,10 @@ describe("WelcomePanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("welcome-local-directories")).toBeInTheDocument();
+      expect(screen.getByText("PowerShell")).toBeInTheDocument();
     });
+    fireEvent.click(screen.getByTestId("welcome-history-tab-directories"));
+    expect(screen.getByTestId("welcome-local-directories")).toBeInTheDocument();
 
     const rows = screen.getAllByTestId("welcome-local-directory");
     expect(rows).toHaveLength(2);
@@ -231,6 +243,7 @@ describe("WelcomePanel", () => {
       expect(screen.getByText("PowerShell")).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByTestId("welcome-history-tab-workspaces"));
     expect(screen.getByTestId("welcome-recent-workspaces")).toBeInTheDocument();
     expect(screen.getAllByTestId("welcome-recent-workspace-row")).toHaveLength(2);
 
@@ -294,8 +307,10 @@ describe("WelcomePanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("welcome-recent-sessions")).toBeInTheDocument();
+      expect(screen.getByText("PowerShell")).toBeInTheDocument();
     });
+
+    expect(screen.getByTestId("welcome-recent-sessions")).toBeInTheDocument();
 
     const rows = screen.getAllByTestId("welcome-recent-session-row");
     fireEvent.click(within(rows[0]).getByTestId("welcome-recent-select"));
