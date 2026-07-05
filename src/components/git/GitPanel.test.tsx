@@ -1,8 +1,9 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../../stores/appStore";
 import { GitPanel } from "./GitPanel";
 import type { GitLogEntry, GitOperationState, GitSnapshot } from "../../lib/git";
+import { notifyGitRepoChanged, subscribeGitRepoRefresh } from "../../lib/gitRefresh";
 
 const gitMocks = vi.hoisted(() => {
   const settings = {
@@ -113,6 +114,16 @@ describe("GitPanel", () => {
     cleanup();
   });
 
+  it("delivers repo refresh events to subscribers", () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeGitRepoRefresh(listener);
+
+    notifyGitRepoChanged("D:\\repo");
+
+    expect(listener).toHaveBeenCalledWith("D:\\repo", expect.any(Number));
+    unsubscribe();
+  });
+
   it("uses Ctrl plus/minus/zero to adjust global UI font size while the Git panel is active", async () => {
     render(<GitPanel repoRoot="D:\\repo" />);
 
@@ -218,6 +229,22 @@ describe("GitPanel", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(gitMocks.gitLog).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes when the same repository publishes a Git refresh revision", async () => {
+    render(<GitPanel repoRoot="/repo" />);
+
+    await waitFor(() => expect(gitMocks.gitSnapshot).toHaveBeenCalledTimes(1));
+    act(() => {
+      notifyGitRepoChanged("/other");
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(gitMocks.gitSnapshot).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      notifyGitRepoChanged("/repo");
+    });
+    await waitFor(() => expect(gitMocks.gitSnapshot).toHaveBeenCalledTimes(2));
   });
 
   it("does not refresh the repository snapshot when selecting a branch", async () => {

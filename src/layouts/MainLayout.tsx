@@ -33,7 +33,7 @@ import { WindowResizeHandles } from "../components/window/WindowResizeHandles";
 import { TerminalPanel, type TerminalLocalPathUploadRequest } from "../components/terminal/TerminalPanel";
 import { GitPanel } from "../components/git/GitPanel";
 import { WorkspaceGitManager } from "../components/git/WorkspaceGitManager";
-import { CodeWorkspaceTab } from "../components/editor/CodeWorkspaceTab";
+import { CodeWorkspaceTab, type CodeWorkspaceGitManagerPayload } from "../components/editor/CodeWorkspaceTab";
 import { MultiExecBar } from "../components/terminal/MultiExecBar";
 import { SessionEditor } from "../components/session/SessionEditor";
 import { AuthPrompt } from "../components/session/AuthPrompt";
@@ -72,7 +72,7 @@ import {
 import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams, DetachedDbParams } from "../components/detached/DetachedSessionWindow";
 import { Columns2, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
 import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo, MailConnectionSecurity, MailTabInfo, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, GitWorkspaceRootInfo, RecentWorkspace } from "../types";
-import { computeNewTerminalTitle, recentWorkspaceIdFromParts, useAppStore, type TerminalSplitLayout } from "../stores/appStore";
+import { computeNewTerminalTitle, newWorkspaceInstanceId, recentWorkspaceIdFromParts, useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { WelcomePanel } from "../components/WelcomePanel";
 import { AboutDialog } from "../components/AboutDialog";
@@ -605,6 +605,7 @@ export function MainLayout() {
     removeTab,
     duplicateTab,
     updateTabTitle,
+    updateGitTabInfo,
     setActiveTab,
     moveTabToIndex,
     toggleSidebar,
@@ -1803,27 +1804,34 @@ export function MainLayout() {
     });
   }, [addTab, setActiveTab]);
 
-  const openWorkspaceGitManager = useCallback((payload: {
-    workspaceName: string;
-    roots: GitWorkspaceRootInfo[];
-    activeRepoRoot: string | null;
-  }) => {
+  const openWorkspaceGitManager = useCallback((payload: CodeWorkspaceGitManagerPayload) => {
     const workspaceRoots = normalizeGitWorkspaceRoots(payload.roots);
     if (workspaceRoots.length === 0) return;
     const activeRepoRoot = payload.activeRepoRoot && workspaceRoots.some((root) => root.repoRoot === payload.activeRepoRoot)
       ? payload.activeRepoRoot
       : workspaceRoots[0].repoRoot;
-    const key = gitWorkspaceRootsKey(workspaceRoots);
-    const existing = tabsRef.current.find((tab) => (
-      tab.type === "git"
-      && !!tab.git?.workspaceRoots?.length
-      && gitWorkspaceRootsKey(tab.git.workspaceRoots) === key
-    ));
+    const name = payload.workspaceName.trim() || "Code Workspace";
+    const existing = tabsRef.current.find((tab) => {
+      if (tab.type !== "git" || !tab.git?.workspaceRoots?.length) return false;
+      if (payload.workspaceInstanceId) {
+        return tab.git.sourceWorkspaceInstanceId === payload.workspaceInstanceId;
+      }
+      return gitWorkspaceRootsKey(tab.git.workspaceRoots) === gitWorkspaceRootsKey(workspaceRoots);
+    });
     if (existing) {
+      updateGitTabInfo(existing.id, {
+        ...existing.git!,
+        repoRoot: activeRepoRoot,
+        workspaceName: name,
+        workspaceRoots,
+        activeRepoRoot,
+        sourceWorkspaceInstanceId: payload.workspaceInstanceId ?? existing.git?.sourceWorkspaceInstanceId,
+        sourceWorkspaceId: payload.workspaceId ?? existing.git?.sourceWorkspaceId,
+        sourceWorkspaceName: name,
+      }, `Git · ${name}`);
       setActiveTab(existing.id);
       return;
     }
-    const name = payload.workspaceName.trim() || "Code Workspace";
     addTab({
       id: `git-workspace-${Date.now()}`,
       type: "git",
@@ -1834,9 +1842,41 @@ export function MainLayout() {
         workspaceName: name,
         workspaceRoots,
         activeRepoRoot,
+        sourceWorkspaceInstanceId: payload.workspaceInstanceId,
+        sourceWorkspaceId: payload.workspaceId,
+        sourceWorkspaceName: name,
       },
     });
-  }, [addTab, setActiveTab]);
+  }, [addTab, setActiveTab, updateGitTabInfo]);
+
+  const syncWorkspaceGitManager = useCallback((payload: CodeWorkspaceGitManagerPayload) => {
+    const sourceWorkspaceInstanceId = payload.workspaceInstanceId;
+    if (!sourceWorkspaceInstanceId) return;
+    const workspaceRoots = normalizeGitWorkspaceRoots(payload.roots);
+    if (workspaceRoots.length === 0) return;
+    const existing = tabsRef.current.find((tab) => (
+      tab.type === "git"
+      && tab.git?.sourceWorkspaceInstanceId === sourceWorkspaceInstanceId
+    ));
+    if (!existing?.git) return;
+    const existingActiveRepoRoot = existing.git.activeRepoRoot ?? existing.git.repoRoot;
+    const activeRepoRoot = existingActiveRepoRoot && workspaceRoots.some((root) => root.repoRoot === existingActiveRepoRoot)
+      ? existingActiveRepoRoot
+      : payload.activeRepoRoot && workspaceRoots.some((root) => root.repoRoot === payload.activeRepoRoot)
+        ? payload.activeRepoRoot
+        : workspaceRoots[0].repoRoot;
+    const name = payload.workspaceName.trim() || "Code Workspace";
+    updateGitTabInfo(existing.id, {
+      ...existing.git,
+      repoRoot: activeRepoRoot,
+      workspaceName: name,
+      workspaceRoots,
+      activeRepoRoot,
+      sourceWorkspaceInstanceId,
+      sourceWorkspaceId: payload.workspaceId ?? existing.git.sourceWorkspaceId,
+      sourceWorkspaceName: name,
+    }, `Git · ${name}`);
+  }, [updateGitTabInfo]);
 
   const openCodeWorkspaceInfo = useCallback((workspace: CodeWorkspaceTabInfo) => {
     const roots = workspace.roots ?? [];
@@ -1868,6 +1908,7 @@ export function MainLayout() {
       codeWorkspace: {
         ...workspace,
         workspaceId: workspace.workspaceId ?? identity,
+        workspaceInstanceId: workspace.workspaceInstanceId ?? newWorkspaceInstanceId(),
         name: title,
       },
     });
@@ -1914,6 +1955,7 @@ export function MainLayout() {
       codeWorkspace: {
         repoRoot: "",
         workspaceId: id,
+        workspaceInstanceId: newWorkspaceInstanceId(),
         name: "Editor Workspace",
         roots: [],
         looseFiles: [],
@@ -3649,6 +3691,7 @@ export function MainLayout() {
                         workspace={tab.codeWorkspace}
                         visible={isActive}
                         onOpenGitManager={openWorkspaceGitManager}
+                        onSyncGitManager={syncWorkspaceGitManager}
                       />
                     </div>
                   );

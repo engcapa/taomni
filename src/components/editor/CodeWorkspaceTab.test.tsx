@@ -234,6 +234,7 @@ describe("CodeWorkspaceTab", () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
       workspaceId: "ws-multi",
+      workspaceInstanceId: "instance-multi",
       name: "Multi Repo",
       roots: [
         { id: "app", name: "app", path: "/repo/app", kind: "git" },
@@ -287,7 +288,7 @@ describe("CodeWorkspaceTab", () => {
     await waitFor(() => {
       expect(lspMocks.lspOpenDocument).toHaveBeenCalledWith(
         {
-          workspaceId: "ws-multi",
+          workspaceId: "instance-multi",
           rootPath: "/repo/app",
           filePath: "src/Program.cs",
           serverCommandId: null,
@@ -533,6 +534,8 @@ describe("CodeWorkspaceTab", () => {
 
     expect(onOpenGitManager).toHaveBeenCalledWith({
       workspaceName: "Git",
+      workspaceInstanceId: "ws-git",
+      workspaceId: "ws-git",
       roots: [
         {
           id: "app",
@@ -631,6 +634,8 @@ describe("CodeWorkspaceTab", () => {
 
     expect(onOpenGitManager).toHaveBeenCalledWith({
       workspaceName: "Child Repos",
+      workspaceInstanceId: "ws-child-git",
+      workspaceId: "ws-child-git",
       roots: [
         {
           id: "workspace:/workspace/app",

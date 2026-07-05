@@ -94,6 +94,7 @@ import {
   gitSnapshot,
   type GitChange,
 } from "../../lib/git";
+import { notifyGitRepoChanged, subscribeGitRepoRefresh } from "../../lib/gitRefresh";
 import {
   lspChangeDocument,
   lspCloseDocument,
@@ -140,11 +141,16 @@ interface CodeWorkspaceTabProps {
   tabId: string;
   workspace: CodeWorkspaceTabInfo;
   visible?: boolean;
-  onOpenGitManager?: (payload: {
+  onOpenGitManager?: (payload: CodeWorkspaceGitManagerPayload) => void;
+  onSyncGitManager?: (payload: CodeWorkspaceGitManagerPayload) => void;
+}
+
+export interface CodeWorkspaceGitManagerPayload {
     workspaceName: string;
+    workspaceInstanceId?: string;
+    workspaceId?: string;
     roots: WorkspaceGitRoot[];
     activeRepoRoot: string | null;
-  }) => void;
 }
 
 interface DirectoryState {
@@ -751,6 +757,7 @@ export function CodeWorkspaceTab({
   workspace,
   visible = true,
   onOpenGitManager,
+  onSyncGitManager,
 }: CodeWorkspaceTabProps) {
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const setTabCodeWorkspaceContext = useAppStore((s) => s.setTabCodeWorkspaceContext);
@@ -1007,9 +1014,9 @@ export function CodeWorkspaceTab({
     return () => el.removeEventListener("wheel", handleWheel, { capture: true });
   }, [stepCodeViewFontSize, stepTreeFontSize, visible, zoomTargetForNode]);
 
-  const workspaceId = useMemo(
-    () => workspace.workspaceId ?? workspace.repoRoot?.trim() ?? tabId,
-    [tabId, workspace.repoRoot, workspace.workspaceId],
+  const workspaceInstanceId = useMemo(
+    () => workspace.workspaceInstanceId ?? workspace.workspaceId ?? workspace.repoRoot?.trim() ?? tabId,
+    [tabId, workspace.repoRoot, workspace.workspaceId, workspace.workspaceInstanceId],
   );
 
   const findRoot = useCallback((rootId: string) => rootsRef.current.find((root) => root.id === rootId) ?? null, []);
@@ -1072,7 +1079,7 @@ export function CodeWorkspaceTab({
         const root = findRoot(file.ref.rootId);
         if (!root) return null;
         return {
-          workspaceId,
+          workspaceId: workspaceInstanceId,
           rootPath: root.path,
           filePath: file.ref.path,
           serverCommandId,
@@ -1080,14 +1087,14 @@ export function CodeWorkspaceTab({
         };
       }
       return {
-        workspaceId,
+        workspaceId: workspaceInstanceId,
         rootPath: null,
         filePath: file.ref.path,
         serverCommandId,
         customServerCommand,
       };
     },
-    [findRoot, lspCommandPrefs, lspCustomCommands, workspaceId],
+    [findRoot, lspCommandPrefs, lspCustomCommands, workspaceInstanceId],
   );
 
   const nextLspVersion = useCallback((key: string) => {
@@ -1429,6 +1436,18 @@ export function CodeWorkspaceTab({
     return () => window.clearInterval(timer);
   }, [gitRoots, refreshWorkspaceGitSnapshots]);
 
+  useEffect(() => subscribeGitRepoRefresh((repoRoot) => {
+    const root = gitRootsRef.current.find((item) => item.repoRoot === repoRoot);
+    if (root) void refreshWorkspaceGitSnapshots([root]);
+  }), [refreshWorkspaceGitSnapshots]);
+
+  const notifyWorkspacePathGitChanged = useCallback((rootId: string, path: string) => {
+    const root = findRoot(rootId);
+    if (!root) return;
+    const repo = gitRootForWorkspacePath(root, path, gitRootsRef.current);
+    if (repo) notifyGitRepoChanged(repo.repoRoot);
+  }, [findRoot]);
+
   useEffect(() => {
     if (treeViewMode !== "compact") return;
     for (const [key, state] of Object.entries(directories)) {
@@ -1619,11 +1638,12 @@ export function CodeWorkspaceTab({
       const ref: CodeWorkspaceFileRef = { kind: "root", rootId: root.id, path: file.path };
       setSelected({ kind: "file", ref });
       await openFile(ref);
+      notifyWorkspacePathGitChanged(root.id, file.path);
       setStatusMessage(`Created ${root.name} / ${file.path}`);
     } catch (err) {
       setStatusMessage(errorMessage(err));
     }
-  }, [findRoot, loadDir, openFile, selectedRootDirectory, setStatusMessage]);
+  }, [findRoot, loadDir, notifyWorkspacePathGitChanged, openFile, selectedRootDirectory, setStatusMessage]);
 
   const createDir = useCallback(async () => {
     if (!selectedRootDirectory) {
@@ -1646,11 +1666,12 @@ export function CodeWorkspaceTab({
       await loadDir(root.id, parentPath(entry.path));
       setExpandedDirs((current) => new Set(current).add(rootDirKey(root.id, parentPath(entry.path))));
       setSelected({ kind: "dir", rootId: root.id, path: entry.path });
+      notifyWorkspacePathGitChanged(root.id, entry.path);
       setStatusMessage(`Created ${root.name} / ${entry.path}`);
     } catch (err) {
       setStatusMessage(errorMessage(err));
     }
-  }, [findRoot, loadDir, selectedRootDirectory, setStatusMessage]);
+  }, [findRoot, loadDir, notifyWorkspacePathGitChanged, selectedRootDirectory, setStatusMessage]);
 
   const renameSelected = useCallback(async () => {
     if (!selected) return;
@@ -1720,11 +1741,13 @@ export function CodeWorkspaceTab({
         return file ? fileKey(remapFileRef(file.ref, root.id, selectedPath, newPath)) : current;
       });
       setSelected(entry.fileType === "dir" ? { kind: "dir", rootId: root.id, path: newPath } : { kind: "file", ref: { kind: "root", rootId: root.id, path: newPath } });
+      notifyWorkspacePathGitChanged(root.id, selectedPath);
+      notifyWorkspacePathGitChanged(root.id, newPath);
       setStatusMessage(`Renamed to ${root.name} / ${newPath}`);
     } catch (err) {
       setStatusMessage(errorMessage(err));
     }
-  }, [findRoot, loadDir, selected, setStatusMessage]);
+  }, [findRoot, loadDir, notifyWorkspacePathGitChanged, selected, setStatusMessage]);
 
   const deleteSelected = useCallback(async () => {
     if (!selected) return;
@@ -1810,11 +1833,12 @@ export function CodeWorkspaceTab({
         return file && fileRefUnder(file.ref, root.id, selectedPath) ? remainingOpen[0] ?? null : current;
       });
       setSelected(null);
+      notifyWorkspacePathGitChanged(root.id, selectedPath);
       setStatusMessage(`Deleted ${root.name} / ${selectedPath}`);
     } catch (err) {
       setStatusMessage(errorMessage(err));
     }
-  }, [findRoot, loadDir, selected, setStatusMessage]);
+  }, [findRoot, loadDir, notifyWorkspacePathGitChanged, selected, setStatusMessage]);
 
   const updateFileText = useCallback((key: string, text: string) => {
     setOpenFiles((current) => {
@@ -1867,6 +1891,9 @@ export function CodeWorkspaceTab({
           };
         });
         setStatusMessage(`Saved ${file.subtitle}`);
+        if (file.ref.kind === "root") {
+          notifyWorkspacePathGitChanged(file.ref.rootId, file.ref.path);
+        }
         void saveLspDocument(file, textToSave);
       } catch (err) {
         const message = errorMessage(err);
@@ -1881,7 +1908,7 @@ export function CodeWorkspaceTab({
         setStatusMessage(message);
       }
     },
-    [activeKey, findRoot, saveLspDocument, setStatusMessage],
+    [activeKey, findRoot, notifyWorkspacePathGitChanged, saveLspDocument, setStatusMessage],
   );
 
   const reloadFile = useCallback(
@@ -2179,14 +2206,26 @@ export function CodeWorkspaceTab({
   );
   const activeDiagnostics = activeLspState?.diagnostics ?? [];
   const title = workspaceTitle(workspace, roots, looseFiles);
-  const openGitManager = useCallback(() => {
-    if (!onOpenGitManager || gitRoots.length === 0) return;
-    onOpenGitManager({
+  const gitManagerPayload = useMemo<CodeWorkspaceGitManagerPayload | null>(() => {
+    if (gitRoots.length === 0) return null;
+    return {
       workspaceName: title,
+      workspaceInstanceId,
+      workspaceId: workspace.workspaceId,
       roots: gitRoots,
       activeRepoRoot: activeGitRoot?.repoRoot ?? gitRoots[0]?.repoRoot ?? null,
-    });
-  }, [activeFile, activeGitRoot, gitRoots, onOpenGitManager, title]);
+    };
+  }, [activeGitRoot, gitRoots, title, workspace.workspaceId, workspaceInstanceId]);
+
+  const openGitManager = useCallback(() => {
+    if (!onOpenGitManager || !gitManagerPayload) return;
+    onOpenGitManager(gitManagerPayload);
+  }, [gitManagerPayload, onOpenGitManager]);
+
+  useEffect(() => {
+    if (!onSyncGitManager || !gitManagerPayload) return;
+    onSyncGitManager(gitManagerPayload);
+  }, [gitManagerPayload, onSyncGitManager]);
 
   useEffect(() => {
     const firstRoot = roots[0] ?? null;
@@ -2600,7 +2639,7 @@ export function CodeWorkspaceTab({
 
       <PanelGroup
         orientation="horizontal"
-        id={`code-workspace-${workspace.workspaceId ?? workspace.repoRoot ?? tabId}`}
+        id={`code-workspace-${workspaceInstanceId}`}
         className="flex-1 min-h-0"
       >
         <Panel id="project" defaultSize="24%" minSize="15%" maxSize="45%" className="min-w-0">
@@ -2827,7 +2866,7 @@ export function CodeWorkspaceTab({
               </div>
             )}
             <div
-              id={`code-workspace-editor-stack-${workspace.workspaceId ?? workspace.repoRoot ?? tabId}`}
+              id={`code-workspace-editor-stack-${workspaceInstanceId}`}
               className="flex-1 min-h-0"
             >
               <div className="h-full min-h-0 relative">

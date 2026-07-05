@@ -4,6 +4,7 @@ import type {
   CodeWorkspaceLooseFileInfo,
   CodeWorkspaceRootInfo,
   CodeWorkspaceRootKind,
+  GitTabInfo,
   RecentWorkspace,
   Tab,
 } from "../types";
@@ -140,6 +141,7 @@ interface AppState {
   uiFontSize: number;
   welcomeRecentSessionLimit: number;
   recentWorkspaces: RecentWorkspace[];
+  recentWorkspaceIdByWorkspaceInstance: Record<string, string>;
   /**
    * Transient focus filter for the open-tab strip (issue #121). When set, the
    * strip only renders tabs matching the filter; the rest are hidden, not
@@ -205,6 +207,7 @@ interface AppState {
   removeTab: (id: string) => void;
   removeTabs: (ids: string[]) => void;
   updateTabTitle: (id: string, title: string) => void;
+  updateGitTabInfo: (id: string, git: GitTabInfo, title?: string) => void;
   setActiveTab: (id: string) => void;
   moveTab: (fromId: string, targetId: string, position: "before" | "after") => void;
   moveTabToIndex: (id: string, toIndex: number) => void;
@@ -491,6 +494,10 @@ export function recentWorkspaceIdFromParts(
   return `workspace-${hashString(identity)}`;
 }
 
+export function newWorkspaceInstanceId(): string {
+  return `workspace-instance-${crypto.randomUUID()}`;
+}
+
 function recentWorkspaceName(
   explicitName: string | undefined,
   roots: readonly CodeWorkspaceRootInfo[],
@@ -580,6 +587,104 @@ function upsertRecentWorkspaceList(
   ]
     .sort((a, b) => b.lastOpenedAt - a.lastOpenedAt)
     .slice(0, clampWelcomeRecentSessionLimit(limit));
+}
+
+function codeWorkspaceInstanceId(tab: Tab | undefined): string | null {
+  if (tab?.type !== "code-workspace" || !tab.codeWorkspace) return null;
+  return tab.codeWorkspace.workspaceInstanceId ?? tab.id;
+}
+
+function hasOtherWorkspaceInstanceWithRecentId(
+  idsByInstance: Readonly<Record<string, string>>,
+  instanceId: string,
+  recentId: string,
+): boolean {
+  return Object.entries(idsByInstance).some(([otherInstanceId, otherRecentId]) => (
+    otherInstanceId !== instanceId && otherRecentId === recentId
+  ));
+}
+
+function recentRootKey(root: CodeWorkspaceRootInfo): string {
+  return `${root.kind}:${normalizeWorkspacePath(root.path)}`;
+}
+
+function isSupersededRecentWorkspaceDefinition(
+  candidate: RecentWorkspace,
+  latest: RecentWorkspace,
+): boolean {
+  if (candidate.id === latest.id) return false;
+  const candidateSize = candidate.roots.length + candidate.looseFiles.length;
+  const latestSize = latest.roots.length + latest.looseFiles.length;
+  if (candidateSize === 0 || candidateSize >= latestSize) return false;
+  if (candidate.name !== latest.name && candidate.roots[0]?.path !== latest.roots[0]?.path) {
+    return false;
+  }
+  const latestRoots = new Set(latest.roots.map(recentRootKey));
+  const latestLooseFiles = new Set(latest.looseFiles.map((file) => normalizeWorkspacePath(file.path)));
+  return (
+    candidate.roots.every((root) => latestRoots.has(recentRootKey(root))) &&
+    candidate.looseFiles.every((file) => latestLooseFiles.has(normalizeWorkspacePath(file.path)))
+  );
+}
+
+function upsertRecentWorkspaceForTab(
+  current: readonly RecentWorkspace[],
+  idsByInstance: Readonly<Record<string, string>>,
+  tab: Tab | undefined,
+  context: CodeWorkspaceContext | undefined,
+  now: number,
+  limit: number,
+): {
+  recentWorkspaces: RecentWorkspace[];
+  recentWorkspaceIdByWorkspaceInstance: Record<string, string>;
+} {
+  const workspace = recentWorkspaceFromTab(tab, context, now);
+  const normalized = workspace ? normalizeRecentWorkspace(workspace) : null;
+  if (!normalized) {
+    return {
+      recentWorkspaces: current as RecentWorkspace[],
+      recentWorkspaceIdByWorkspaceInstance: idsByInstance as Record<string, string>,
+    };
+  }
+
+  const instanceId = codeWorkspaceInstanceId(tab);
+  let base = current;
+  let nextIdsByInstance = idsByInstance as Record<string, string>;
+  if (instanceId) {
+    const previousId = idsByInstance[instanceId] ?? tab?.codeWorkspace?.workspaceId ?? null;
+    if (
+      previousId &&
+      previousId !== normalized.id &&
+      !hasOtherWorkspaceInstanceWithRecentId(idsByInstance, instanceId, previousId)
+    ) {
+      base = base.filter((item) => item.id !== previousId);
+    }
+    if (previousId && previousId !== normalized.id) {
+      base = base.filter((item) => (
+        hasOtherWorkspaceInstanceWithRecentId(idsByInstance, instanceId, item.id) ||
+        !isSupersededRecentWorkspaceDefinition(item, normalized)
+      ));
+    }
+    if (idsByInstance[instanceId] !== normalized.id) {
+      nextIdsByInstance = { ...idsByInstance, [instanceId]: normalized.id };
+    }
+  }
+
+  return {
+    recentWorkspaces: upsertRecentWorkspaceList(base, normalized, limit),
+    recentWorkspaceIdByWorkspaceInstance: nextIdsByInstance,
+  };
+}
+
+function shouldRecordRecentWorkspaceContext(
+  current: CodeWorkspaceContext | undefined,
+  next: CodeWorkspaceContext,
+): boolean {
+  return (
+    !current ||
+    !jsonEqual(current.roots, next.roots) ||
+    !jsonEqual(current.looseFiles, next.looseFiles)
+  );
 }
 
 function readRecentWorkspaces(limit: number): RecentWorkspace[] {
@@ -723,23 +828,28 @@ export const useAppStore = create<AppState>((set) => ({
   uiFontSize: readUiFontSize(),
   welcomeRecentSessionLimit: initialWelcomeRecentSessionLimit,
   recentWorkspaces: readRecentWorkspaces(initialWelcomeRecentSessionLimit),
+  recentWorkspaceIdByWorkspaceInstance: {},
   tabFilter: null,
 
   addTab: (tab) =>
     set((s) => {
       const nextTabs = [...s.tabs, tab];
-      const recentWorkspaces = upsertRecentWorkspaceList(
+      const recentResult = upsertRecentWorkspaceForTab(
         s.recentWorkspaces,
-        recentWorkspaceFromTab(tab, undefined, Date.now()),
+        s.recentWorkspaceIdByWorkspaceInstance,
+        tab,
+        undefined,
+        Date.now(),
         s.welcomeRecentSessionLimit,
       );
-      if (recentWorkspaces !== s.recentWorkspaces) {
-        writeRecentWorkspaces(recentWorkspaces);
+      if (recentResult.recentWorkspaces !== s.recentWorkspaces) {
+        writeRecentWorkspaces(recentResult.recentWorkspaces);
       }
       return {
         tabs: nextTabs,
         activeTabId: tab.id,
-        recentWorkspaces,
+        recentWorkspaces: recentResult.recentWorkspaces,
+        recentWorkspaceIdByWorkspaceInstance: recentResult.recentWorkspaceIdByWorkspaceInstance,
         // A freshly opened tab must be visible, so drop any active focus filter.
         tabFilter: null,
         terminalSplitActive: tab.type === "terminal" ? s.terminalSplitActive : false,
@@ -765,21 +875,32 @@ export const useAppStore = create<AppState>((set) => ({
           source.type === "terminal" ? overrides?.terminalInitialCwd : undefined,
         terminalProfile:
           source.type === "terminal" ? overrides?.terminalProfile ?? source.terminalProfile : source.terminalProfile,
+        codeWorkspace:
+          source.type === "code-workspace" && source.codeWorkspace
+            ? {
+                ...source.codeWorkspace,
+                workspaceInstanceId: newWorkspaceInstanceId(),
+              }
+            : source.codeWorkspace,
       };
       const next = s.tabs.slice();
       next.splice(idx + 1, 0, copy);
-      const recentWorkspaces = upsertRecentWorkspaceList(
+      const recentResult = upsertRecentWorkspaceForTab(
         s.recentWorkspaces,
-        recentWorkspaceFromTab(copy, undefined, Date.now()),
+        s.recentWorkspaceIdByWorkspaceInstance,
+        copy,
+        undefined,
+        Date.now(),
         s.welcomeRecentSessionLimit,
       );
-      if (recentWorkspaces !== s.recentWorkspaces) {
-        writeRecentWorkspaces(recentWorkspaces);
+      if (recentResult.recentWorkspaces !== s.recentWorkspaces) {
+        writeRecentWorkspaces(recentResult.recentWorkspaces);
       }
       return {
         tabs: next,
         activeTabId: copy.id,
-        recentWorkspaces,
+        recentWorkspaces: recentResult.recentWorkspaces,
+        recentWorkspaceIdByWorkspaceInstance: recentResult.recentWorkspaceIdByWorkspaceInstance,
         // A freshly opened tab must be visible, so drop any active focus filter.
         tabFilter: null,
         terminalSplitActive: copy.type === "terminal" ? s.terminalSplitActive : false,
@@ -797,18 +918,22 @@ export const useAppStore = create<AppState>((set) => ({
         activeId = next[Math.min(idx, next.length - 1)]?.id ?? null;
       }
       const validIds = new Set(next.map((tab) => tab.id));
-      const recentWorkspaces = upsertRecentWorkspaceList(
+      const recentResult = upsertRecentWorkspaceForTab(
         s.recentWorkspaces,
-        recentWorkspaceFromTab(tab, s.codeWorkspaceByTab[id], Date.now()),
+        s.recentWorkspaceIdByWorkspaceInstance,
+        tab,
+        s.codeWorkspaceByTab[id],
+        Date.now(),
         s.welcomeRecentSessionLimit,
       );
-      if (recentWorkspaces !== s.recentWorkspaces) {
-        writeRecentWorkspaces(recentWorkspaces);
+      if (recentResult.recentWorkspaces !== s.recentWorkspaces) {
+        writeRecentWorkspaces(recentResult.recentWorkspaces);
       }
       return {
         tabs: next,
         activeTabId: activeId,
-        recentWorkspaces,
+        recentWorkspaces: recentResult.recentWorkspaces,
+        recentWorkspaceIdByWorkspaceInstance: recentResult.recentWorkspaceIdByWorkspaceInstance,
         terminalSplitActive: s.terminalSplitActive && activeTabIsTerminal(next, activeId),
         terminalSplitInputLockedTabIds: pruneSet(s.terminalSplitInputLockedTabIds, validIds),
         multiExecSelectedTabIds: pruneSet(s.multiExecSelectedTabIds, validIds),
@@ -828,13 +953,19 @@ export const useAppStore = create<AppState>((set) => ({
       }
       const validIds = new Set(next.map((tab) => tab.id));
       let recentWorkspaces = s.recentWorkspaces;
+      let recentWorkspaceIdByWorkspaceInstance = s.recentWorkspaceIdByWorkspaceInstance;
       const now = Date.now();
       for (const tab of closingTabs) {
-        recentWorkspaces = upsertRecentWorkspaceList(
+        const recentResult = upsertRecentWorkspaceForTab(
           recentWorkspaces,
-          recentWorkspaceFromTab(tab, s.codeWorkspaceByTab[tab.id], now),
+          recentWorkspaceIdByWorkspaceInstance,
+          tab,
+          s.codeWorkspaceByTab[tab.id],
+          now,
           s.welcomeRecentSessionLimit,
         );
+        recentWorkspaces = recentResult.recentWorkspaces;
+        recentWorkspaceIdByWorkspaceInstance = recentResult.recentWorkspaceIdByWorkspaceInstance;
       }
       if (recentWorkspaces !== s.recentWorkspaces) {
         writeRecentWorkspaces(recentWorkspaces);
@@ -843,6 +974,7 @@ export const useAppStore = create<AppState>((set) => ({
         tabs: next,
         activeTabId: activeId,
         recentWorkspaces,
+        recentWorkspaceIdByWorkspaceInstance,
         terminalSplitActive: s.terminalSplitActive && activeTabIsTerminal(next, activeId),
         terminalSplitInputLockedTabIds: pruneSet(s.terminalSplitInputLockedTabIds, validIds),
         multiExecSelectedTabIds: pruneSet(s.multiExecSelectedTabIds, validIds),
@@ -856,20 +988,41 @@ export const useAppStore = create<AppState>((set) => ({
       statusMessage: tr("status.renamedTab", { title }),
     })),
 
+  updateGitTabInfo: (id, git, title) =>
+    set((s) => {
+      const tab = s.tabs.find((item) => item.id === id);
+      if (!tab || tab.type !== "git") return s;
+      return {
+        tabs: s.tabs.map((item) => (
+          item.id === id
+            ? {
+                ...item,
+                title: title ?? item.title,
+                git,
+              }
+            : item
+        )),
+      };
+    }),
+
   setActiveTab: (id) =>
     set((s) => {
       const tab = s.tabs.find((item) => item.id === id);
-      const recentWorkspaces = upsertRecentWorkspaceList(
+      const recentResult = upsertRecentWorkspaceForTab(
         s.recentWorkspaces,
-        recentWorkspaceFromTab(tab, s.codeWorkspaceByTab[id], Date.now()),
+        s.recentWorkspaceIdByWorkspaceInstance,
+        tab,
+        s.codeWorkspaceByTab[id],
+        Date.now(),
         s.welcomeRecentSessionLimit,
       );
-      if (recentWorkspaces !== s.recentWorkspaces) {
-        writeRecentWorkspaces(recentWorkspaces);
+      if (recentResult.recentWorkspaces !== s.recentWorkspaces) {
+        writeRecentWorkspaces(recentResult.recentWorkspaces);
       }
       return {
         activeTabId: id,
-        recentWorkspaces,
+        recentWorkspaces: recentResult.recentWorkspaces,
+        recentWorkspaceIdByWorkspaceInstance: recentResult.recentWorkspaceIdByWorkspaceInstance,
         terminalSplitActive: tab?.type === "terminal" ? s.terminalSplitActive : false,
       };
     }),
@@ -1098,15 +1251,26 @@ export const useAppStore = create<AppState>((set) => ({
   recordCodeWorkspaceTab: (tabId) =>
     set((s) => {
       const tab = s.tabs.find((item) => item.id === tabId);
-      const recentWorkspaces = upsertRecentWorkspaceList(
+      const recentResult = upsertRecentWorkspaceForTab(
         s.recentWorkspaces,
-        recentWorkspaceFromTab(tab, s.codeWorkspaceByTab[tabId], Date.now()),
+        s.recentWorkspaceIdByWorkspaceInstance,
+        tab,
+        s.codeWorkspaceByTab[tabId],
+        Date.now(),
         s.welcomeRecentSessionLimit,
       );
-      if (recentWorkspaces !== s.recentWorkspaces) {
-        writeRecentWorkspaces(recentWorkspaces);
+      if (recentResult.recentWorkspaces !== s.recentWorkspaces) {
+        writeRecentWorkspaces(recentResult.recentWorkspaces);
       }
-      return recentWorkspaces === s.recentWorkspaces ? s : { recentWorkspaces };
+      return (
+        recentResult.recentWorkspaces === s.recentWorkspaces &&
+        recentResult.recentWorkspaceIdByWorkspaceInstance === s.recentWorkspaceIdByWorkspaceInstance
+      )
+        ? s
+        : {
+            recentWorkspaces: recentResult.recentWorkspaces,
+            recentWorkspaceIdByWorkspaceInstance: recentResult.recentWorkspaceIdByWorkspaceInstance,
+          };
     }),
 
   removeRecentWorkspace: (id) =>
@@ -1185,7 +1349,27 @@ export const useAppStore = create<AppState>((set) => ({
       ) {
         return s;
       }
+      const tab = s.tabs.find((item) => item.id === tabId);
+      const shouldRecordRecent = shouldRecordRecentWorkspaceContext(current, context);
+      const recentResult = shouldRecordRecent
+        ? upsertRecentWorkspaceForTab(
+            s.recentWorkspaces,
+            s.recentWorkspaceIdByWorkspaceInstance,
+            tab,
+            context,
+            Date.now(),
+            s.welcomeRecentSessionLimit,
+          )
+        : {
+            recentWorkspaces: s.recentWorkspaces,
+            recentWorkspaceIdByWorkspaceInstance: s.recentWorkspaceIdByWorkspaceInstance,
+          };
+      if (recentResult.recentWorkspaces !== s.recentWorkspaces) {
+        writeRecentWorkspaces(recentResult.recentWorkspaces);
+      }
       return {
+        recentWorkspaces: recentResult.recentWorkspaces,
+        recentWorkspaceIdByWorkspaceInstance: recentResult.recentWorkspaceIdByWorkspaceInstance,
         codeWorkspaceByTab: {
           ...s.codeWorkspaceByTab,
           [tabId]: context,

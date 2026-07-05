@@ -232,6 +232,34 @@ describe("WorkspaceGitManager", () => {
     expect(gitMocks.gitCommit).toHaveBeenCalledTimes(1);
   });
 
+  it("falls back the active repository when updated roots remove it", async () => {
+    const { rerender } = render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/service"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("git-panel")).toHaveAttribute("data-repo-root", "/repo/service"));
+
+    rerender(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/service"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "api", name: "api", path: "/repo", repoRoot: "/repo/api", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("git-panel")).toHaveAttribute("data-repo-root", "/repo/api"));
+  });
+
   it("keeps workspace change selections isolated when repositories contain the same file path", async () => {
     gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
       repoRoot === "/repo/app"
