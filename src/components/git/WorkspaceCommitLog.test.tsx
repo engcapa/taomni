@@ -88,6 +88,10 @@ describe("WorkspaceCommitLog", () => {
           { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
           { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
         ]}
+        snapshots={{
+          "/repo/app": { snapshot: null },
+          "/repo/service": { snapshot: null },
+        }}
       />,
     );
 
