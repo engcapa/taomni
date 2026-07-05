@@ -99,6 +99,7 @@ interface GitPanelProps {
   workspaceBranchesView?: ReactNode;
   workspaceTagsView?: ReactNode;
   workspaceSettingsView?: ReactNode;
+  workspaceSettingsAggregateView?: ReactNode | ((showCurrent: () => void) => ReactNode);
   workspaceHeader?: {
     title: string;
     summary: string;
@@ -112,6 +113,8 @@ interface GitPanelProps {
   changeCountOverride?: number | null;
   refreshToken?: number;
 }
+
+type WorkspaceSettingsAggregateView = ReactNode | ((showCurrent: () => void) => ReactNode);
 
 type GitView = "changes" | "log" | "branches" | "tags" | "stash" | "settings";
 
@@ -137,6 +140,7 @@ export function GitPanel({
   workspaceBranchesView,
   workspaceTagsView,
   workspaceSettingsView,
+  workspaceSettingsAggregateView,
   workspaceHeader,
   changeCountOverride = null,
   refreshToken = 0,
@@ -841,31 +845,34 @@ export function GitPanel({
         )}
         {mountedViews.has("settings") && (
           <div className="h-full min-h-0" style={{ display: view === "settings" ? "block" : "none" }}>
-          {workspaceSettingsView ?? <SettingsView
-            snapshot={snapshot}
-            settings={settingsDraft}
-            setSettings={setSettingsDraft}
-            remoteDrafts={remoteDrafts}
-            setRemoteDrafts={setRemoteDrafts}
-            busy={busy}
-            onSaveSettings={() => void runAction("Save Git settings", () => gitSaveSettings(repoRoot, settingsDraft))}
-            onSaveRemote={(remote, draft) => void runAction("Save remote", async () => {
-              await gitSetRemote(repoRoot, draft.name || remote.name, draft.fetchUrl, draft.pushUrl);
-              await gitSaveRemoteAuth(repoRoot, draft.name || remote.name, draft.username, draft.token, false);
-              setRemoteDrafts({ ...remoteDrafts, [remote.name]: { ...draft, token: "" } });
-            })}
-            onClearToken={(remote) => void runAction("Clear remote token", async () => {
-              await gitSaveRemoteAuth(repoRoot, remote.name, remoteDrafts[remote.name]?.username ?? remote.username, null, true);
-            })}
-            onDeleteRemote={(remote) => void confirmAndRun("Delete remote", `Delete remote ${remote.name}?`, true, () => runAction("Delete remote", () => gitDeleteRemote(repoRoot, remote.name)))}
-            onAddRemote={async () => {
-              const name = await promptAppDialog({ title: "Add remote", label: "Remote name", initialValue: "origin" });
-              if (!name) return;
-              const url = await promptAppDialog({ title: "Add remote", label: "Remote URL" });
-              if (!url) return;
-              await runAction("Add remote", () => gitSetRemote(repoRoot, name, url, null));
-            }}
-          />}
+            <WorkspaceSettingsSwitcher
+              aggregateView={workspaceSettingsAggregateView}
+              currentView={workspaceSettingsView ?? <SettingsView
+                snapshot={snapshot}
+                settings={settingsDraft}
+                setSettings={setSettingsDraft}
+                remoteDrafts={remoteDrafts}
+                setRemoteDrafts={setRemoteDrafts}
+                busy={busy}
+                onSaveSettings={() => void runAction("Save Git settings", () => gitSaveSettings(repoRoot, settingsDraft))}
+                onSaveRemote={(remote, draft) => void runAction("Save remote", async () => {
+                  await gitSetRemote(repoRoot, draft.name || remote.name, draft.fetchUrl, draft.pushUrl);
+                  await gitSaveRemoteAuth(repoRoot, draft.name || remote.name, draft.username, draft.token, false);
+                  setRemoteDrafts({ ...remoteDrafts, [remote.name]: { ...draft, token: "" } });
+                })}
+                onClearToken={(remote) => void runAction("Clear remote token", async () => {
+                  await gitSaveRemoteAuth(repoRoot, remote.name, remoteDrafts[remote.name]?.username ?? remote.username, null, true);
+                })}
+                onDeleteRemote={(remote) => void confirmAndRun("Delete remote", `Delete remote ${remote.name}?`, true, () => runAction("Delete remote", () => gitDeleteRemote(repoRoot, remote.name)))}
+                onAddRemote={async () => {
+                  const name = await promptAppDialog({ title: "Add remote", label: "Remote name", initialValue: "origin" });
+                  if (!name) return;
+                  const url = await promptAppDialog({ title: "Add remote", label: "Remote URL" });
+                  if (!url) return;
+                  await runAction("Add remote", () => gitSetRemote(repoRoot, name, url, null));
+                }}
+              />}
+            />
           </div>
         )}
         </>
@@ -1318,6 +1325,47 @@ function StashView({
         <DiffPane diff={diff} loading={diffLoading} />
       </Panel>
     </PanelGroup>
+  );
+}
+
+function WorkspaceSettingsSwitcher({
+  currentView,
+  aggregateView,
+}: {
+  currentView: ReactNode;
+  aggregateView?: WorkspaceSettingsAggregateView;
+}) {
+  const [mode, setMode] = useState<"current" | "aggregate">("current");
+
+  if (!aggregateView) return <>{currentView}</>;
+
+  const showCurrent = () => setMode("current");
+  const aggregate = typeof aggregateView === "function" ? aggregateView(showCurrent) : aggregateView;
+
+  return (
+    <div className="h-full min-h-0 flex flex-col">
+      <div className="h-9 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
+        <div className="inline-flex h-7 rounded border border-[var(--taomni-divider)] overflow-hidden">
+          <button
+            type="button"
+            className={`px-2 text-[12px] ${mode === "current" ? "bg-[var(--taomni-hover)]" : "hover:bg-[var(--taomni-hover)]"}`}
+            onClick={() => setMode("current")}
+          >
+            Current Repository
+          </button>
+          <button
+            type="button"
+            className={`px-2 text-[12px] border-l border-[var(--taomni-divider)] ${mode === "aggregate" ? "bg-[var(--taomni-hover)]" : "hover:bg-[var(--taomni-hover)]"}`}
+            onClick={() => setMode("aggregate")}
+          >
+            Aggregate
+          </button>
+        </div>
+      </div>
+      <div className="flex-1 min-h-0">
+        {mode === "current" ? currentView : aggregate}
+      </div>
+    </div>
   );
 }
 
