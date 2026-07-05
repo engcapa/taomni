@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import mermaid from "mermaid";
+import type { ComponentProps } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { DEFAULT_CODE_VIEW_PROFILE, saveCodeViewProfile } from "../../lib/codeViewProfile";
 import type { CodeWorkspaceTabInfo } from "../../types";
@@ -60,22 +61,6 @@ vi.mock("../../lib/git", () => gitMocks);
 
 vi.mock("../git/diffLanguage", () => ({
   languageForPath: vi.fn(async () => null),
-}));
-
-vi.mock("./WorkspaceGitContainer", () => ({
-  WorkspaceGitContainer: ({
-    gitRoots,
-    activeRootId,
-  }: {
-    gitRoots: Array<{ repoRoot: string; name: string }>;
-    activeRootId: string | null;
-  }) => (
-    <div data-testid="workspace-git-container" data-active-root-id={activeRootId ?? ""}>
-      {gitRoots.map((root) => (
-        <span key={root.repoRoot}>{root.name}</span>
-      ))}
-    </div>
-  ),
 }));
 
 function file(
@@ -160,8 +145,11 @@ function documentStatus(overrides: Partial<LspDocumentStatus> = {}): LspDocument
   };
 }
 
-function renderWorkspace(workspace: CodeWorkspaceTabInfo) {
-  return render(<CodeWorkspaceTab tabId="tab-code" workspace={workspace} visible />);
+function renderWorkspace(
+  workspace: CodeWorkspaceTabInfo,
+  props: Partial<ComponentProps<typeof CodeWorkspaceTab>> = {},
+) {
+  return render(<CodeWorkspaceTab tabId="tab-code" workspace={workspace} visible {...props} />);
 }
 
 describe("CodeWorkspaceTab", () => {
@@ -471,7 +459,7 @@ describe("CodeWorkspaceTab", () => {
     });
   });
 
-  it("detects git roots, decorates file changes, and opens the embedded git panel", async () => {
+  it("detects git roots, decorates file changes, and opens the Git tab from the toolbar", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
       workspaceId: "ws-git",
@@ -526,7 +514,8 @@ describe("CodeWorkspaceTab", () => {
       },
     });
 
-    renderWorkspace(workspace);
+    const onOpenGitManager = vi.fn();
+    renderWorkspace(workspace, { onOpenGitManager });
 
     expect(await screen.findByText("Code · Git")).toBeInTheDocument();
     await waitFor(() => {
@@ -536,14 +525,25 @@ describe("CodeWorkspaceTab", () => {
       expect(gitMocks.gitSnapshot).toHaveBeenCalledWith("/repo/app");
     });
     expect(await screen.findByTestId("code-workspace-git-status")).toHaveTextContent("M");
+    expect(screen.queryByTestId("code-workspace-git-manager-open")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-git-container")).not.toBeInTheDocument();
 
     await waitFor(() => expect(screen.getByTestId("code-workspace-git-panel-toggle")).not.toBeDisabled());
     fireEvent.click(screen.getByTestId("code-workspace-git-panel-toggle"));
 
-    const container = await screen.findByTestId("workspace-git-container");
-    expect(container).toHaveAttribute("data-active-root-id", "app");
-    expect(container).toHaveTextContent("app");
-    expect(window.localStorage.getItem("taomni.codeWorkspace.bottomPanelOpen.v1")).toBe("true");
+    expect(onOpenGitManager).toHaveBeenCalledWith({
+      workspaceName: "Git",
+      roots: [
+        {
+          id: "app",
+          name: "app",
+          path: "/repo/app",
+          repoRoot: "/repo/app",
+          rootIds: ["app"],
+        },
+      ],
+      activeRepoRoot: "/repo/app",
+    });
   });
 
   it("has no theme picker and follows the shared Code View Appearance profile", async () => {
