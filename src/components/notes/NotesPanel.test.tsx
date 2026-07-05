@@ -157,11 +157,13 @@ describe("NotesPanel", () => {
 
     fireEvent.click(screen.getByTestId("notes-floating-toggle"));
     expect(useNotesStore.getState().panelMode).toBe("floating");
-    expect(screen.getByTestId("notes-floating-toggle")).toHaveTextContent("In hub");
+    expect(screen.getByTestId("notes-floating-toggle")).toHaveAttribute("aria-label", "In hub");
+    expect(screen.getByTestId("notes-floating-toggle")).toHaveAttribute("title", "In hub");
 
     fireEvent.click(screen.getByTestId("notes-floating-toggle"));
     expect(useNotesStore.getState().panelMode).toBe("hub");
-    expect(screen.getByTestId("notes-floating-toggle")).toHaveTextContent("Floating");
+    expect(screen.getByTestId("notes-floating-toggle")).toHaveAttribute("aria-label", "Floating");
+    expect(screen.getByTestId("notes-floating-toggle")).toHaveAttribute("title", "Floating");
   });
 
   it("keeps floating controls out of the settings panel", async () => {
@@ -183,6 +185,26 @@ describe("NotesPanel", () => {
     await waitFor(() => expect(screen.getByTestId("note-editor")).toBeInTheDocument());
     expect(store).toHaveLength(1);
     expect(store[0].completed_at).toBeNull();
+  });
+
+  it("returns to the recent-incomplete view before creating a note from a non-matching view", async () => {
+    useNotesStore.setState({
+      prefsLoaded: true,
+      filter: "completed",
+      statusFilters: ["completed"],
+      search: "missing",
+      tagFilterId: "tag-1",
+    });
+    render(<NotesPanel />);
+    await screen.findByTestId("notes-new");
+
+    fireEvent.click(screen.getByTestId("notes-new"));
+
+    await waitFor(() => expect(screen.getByTestId("note-editor")).toBeInTheDocument());
+    expect(useNotesStore.getState().filter).toBe("recent_incomplete");
+    expect(useNotesStore.getState().statusFilters).toEqual(["recent_incomplete"]);
+    expect(useNotesStore.getState().search).toBe("");
+    expect(useNotesStore.getState().tagFilterId).toBeNull();
   });
 
   it("keeps completed notes out of the default recent-incomplete view", async () => {

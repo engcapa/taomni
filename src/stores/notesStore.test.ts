@@ -179,6 +179,25 @@ describe("notesStore", () => {
     expect(useNotesStore.getState().activeNoteId).toBe(note?.id);
   });
 
+  it("resets non-matching filters when creating a new note", async () => {
+    useNotesStore.setState({
+      filter: "completed",
+      statusFilters: ["completed"],
+      search: "missing",
+      tagFilterId: "tag-1",
+    });
+
+    const note = await useNotesStore.getState().createNote({ title: "visible draft" });
+
+    expect(note?.completed_at).toBeNull();
+    expect(useNotesStore.getState().filter).toBe("recent_incomplete");
+    expect(useNotesStore.getState().statusFilters).toEqual(["recent_incomplete"]);
+    expect(useNotesStore.getState().search).toBe("");
+    expect(useNotesStore.getState().tagFilterId).toBeNull();
+    expect(useNotesStore.getState().activeNoteId).toBe(note?.id);
+    expect(useNotesStore.getState().notes.some((n) => n.id === note?.id)).toBe(true);
+  });
+
   it("updates a note's title", async () => {
     const note = await useNotesStore.getState().createNote({ title: "old" });
     await useNotesStore.getState().updateNote(note!.id, { title: "new", body: "" });

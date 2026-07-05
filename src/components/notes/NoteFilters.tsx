@@ -44,6 +44,7 @@ export function NoteStatusFilter({ filters, onToggleFilter, className = "" }: No
     selected.length === 1
       ? t(`notes.filters.${selected[0]}`)
       : t("notes.statusCount", { count: selected.length });
+  const buttonLabel = `${t("notes.status")}: ${summary}`;
 
   useEffect(() => {
     if (!open) return;
@@ -70,17 +71,16 @@ export function NoteStatusFilter({ filters, onToggleFilter, className = "" }: No
     >
       <button
         type="button"
-        className="taomni-btn h-6 max-w-[150px] px-2 inline-flex items-center gap-1 text-[11px]"
+        className="taomni-btn h-6 w-8 p-0 inline-flex items-center justify-center gap-0.5"
         onClick={() => setOpen((value) => !value)}
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label={buttonLabel}
+        title={buttonLabel}
         data-testid="notes-filter-menu"
       >
         <ListFilter className="w-3.5 h-3.5" />
-        <span className="max-w-[112px] truncate">
-          {t("notes.status")}: {summary}
-        </span>
-        <ChevronDown className="w-3 h-3" />
+        <ChevronDown className="w-2.5 h-2.5" />
       </button>
       {open && (
         <div
@@ -100,6 +100,7 @@ export function NoteStatusFilter({ filters, onToggleFilter, className = "" }: No
                 className={`flex h-7 w-full items-center gap-2 rounded px-2 text-left text-[11px] ${
                   active ? "bg-[var(--taomni-selected)] text-[var(--taomni-accent)]" : "hover:bg-[var(--taomni-hover)]"
                 }`}
+                title={t(`notes.filters.${f}`)}
                 onClick={() => onToggleFilter(f)}
               >
                 <span className="w-3.5 shrink-0">{active && <Check className="w-3.5 h-3.5" />}</span>

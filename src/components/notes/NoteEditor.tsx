@@ -266,13 +266,14 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
         </button>
         <button
           type="button"
-          className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
+          className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
           onClick={() => void toggleComplete(note.id, !done)}
+          title={done ? t("notes.reopen") : t("notes.complete")}
+          aria-label={done ? t("notes.reopen") : t("notes.complete")}
           aria-pressed={done}
           data-testid="note-editor-complete"
         >
           {done ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> : <Circle className="w-3.5 h-3.5" />}
-          <span>{done ? t("notes.completed") : t("notes.complete")}</span>
         </button>
         <div className="flex-1" />
         <button
@@ -431,6 +432,7 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
               className={`w-4 h-4 rounded-full border border-[var(--taomni-divider)] ${note.color === c ? "ring-2 ring-offset-1 ring-[var(--taomni-accent)]" : ""}`}
               style={{ background: c }}
               onClick={() => commit({ color: c })}
+              title={`${t("notes.color")} ${c}`}
               aria-label={`${t("notes.color")} ${c}`}
               data-testid={`note-editor-color-${c}`}
             />
@@ -455,6 +457,7 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
                     )
                   }
                   aria-pressed={stepDone}
+                  title={stepDone ? t("notes.reopen") : t("notes.complete")}
                   aria-label={stepDone ? t("notes.reopen") : t("notes.complete")}
                 >
                   {stepDone ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> : <Circle className="w-3.5 h-3.5" />}
@@ -472,6 +475,7 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
                   type="button"
                   className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center hover:text-red-400"
                   onClick={() => persistSteps(steps.filter((_, j) => j !== i))}
+                  title={t("notes.delete")}
                   aria-label={t("notes.delete")}
                 >
                   <X className="w-3 h-3" />
@@ -503,6 +507,7 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
                   setNewStep("");
                 }
               }}
+              title={t("notes.addStep")}
               aria-label={t("notes.addStep")}
             >
               <Plus className="w-3.5 h-3.5" />
@@ -525,6 +530,7 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
                   type="button"
                   className="hover:text-red-400"
                   onClick={() => removeTag(id)}
+                  title={`${t("notes.delete")} ${tagName(id)}`}
                   aria-label={`${t("notes.delete")} ${tagName(id)}`}
                 >
                   <X className="w-2.5 h-2.5" />

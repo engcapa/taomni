@@ -40,6 +40,7 @@ export function NoteThemeSettings() {
           options={themeOptions}
           ariaLabel={t("notes.theme")}
           testId="note-theme-select"
+          title={t("notes.theme")}
           onChange={(next) => setTheme(next as NotesTheme)}
         />
       </div>
@@ -56,6 +57,7 @@ export function NoteThemeSettings() {
           onChange={(event) => setFont(event.target.value as NotesFont)}
           data-testid="note-font-select"
           aria-label={t("notes.font")}
+          title={t("notes.font")}
         >
           {NOTES_FONTS.map((value: NotesFont) => (
             <option key={value} value={value}>

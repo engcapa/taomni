@@ -52,9 +52,11 @@ export function FloatingNotesPanel() {
   useEffect(() => {
     return subscribeNotesDockSignal(() => {
       openedNativeRef.current = false;
+      dragRef.current = null;
+      setPanelPosition(posRef.current);
       setPanelMode("hub");
     });
-  }, [setPanelMode]);
+  }, [setPanelMode, setPanelPosition]);
 
   // Keep local geometry in sync with persisted prefs when not actively dragging.
   useEffect(() => {
@@ -72,13 +74,15 @@ export function FloatingNotesPanel() {
       kind: "notes",
       sessionId: "panel",
       title: t("notes.title"),
+      x: panelPosition.x,
+      y: panelPosition.y,
       width: panelPosition.width,
       height: panelPosition.height,
     }).catch((err) => {
       openedNativeRef.current = false;
       console.warn("notes: failed to open detached window", err);
     });
-  }, [panelMode, panelPosition.height, panelPosition.width, t]);
+  }, [panelMode, panelPosition.height, panelPosition.width, panelPosition.x, panelPosition.y, t]);
 
   if (panelMode !== "floating") return null;
   if (isTauriRuntime()) return null;
@@ -117,6 +121,12 @@ export function FloatingNotesPanel() {
     }
   };
 
+  const dockToHub = () => {
+    dragRef.current = null;
+    setPanelPosition(posRef.current);
+    setPanelMode("hub");
+  };
+
   const style: CSSProperties = {
     left: pos.x,
     top: pos.y,
@@ -147,7 +157,7 @@ export function FloatingNotesPanel() {
         <button
           type="button"
           className="taomni-btn h-5 w-5 p-0 inline-flex items-center justify-center rounded hover:bg-black/10"
-          onClick={() => setPanelMode("hub")}
+          onClick={dockToHub}
           title={t("notes.dock")}
           aria-label={t("notes.dock")}
           data-testid="floating-notes-dock"
@@ -159,7 +169,7 @@ export function FloatingNotesPanel() {
 
       {/* Notes content */}
       <div className="flex-1 min-h-0 flex flex-col">
-        <NotesPanel />
+        <NotesPanel showPanelModeToggle={false} />
       </div>
 
       {/* Resize handle (bottom-right) */}

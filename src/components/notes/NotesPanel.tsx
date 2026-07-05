@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Monitor, PanelRightClose, Plus, Search, Settings } from "lucide-react";
 import { useNotesStore } from "../../stores/notesStore";
 import { useT } from "../../lib/i18n";
@@ -9,12 +9,16 @@ import { NoteThemeSettings } from "./NoteThemeSettings";
 import { notesFontSizeStyle, notesFontStyle, notesThemeDensity, notesThemeStyle } from "../../lib/notes/notesTheme";
 import { emitNotesDockSignal } from "../../lib/notes/notesWindowSync";
 
+interface NotesPanelProps {
+  showPanelModeToggle?: boolean;
+}
+
 /**
  * NotesPanel — the 便签 tab content inside the Tao Hub. A master/detail surface
  * sized for the narrow drawer: toolbar + filter chips over the list, with the
  * editor replacing the list when a note is selected (§4.2).
  */
-export function NotesPanel() {
+export function NotesPanel({ showPanelModeToggle = true }: NotesPanelProps = {}) {
   const t = useT();
   const notes = useNotesStore((s) => s.notes);
   const loading = useNotesStore((s) => s.loading);
@@ -38,6 +42,8 @@ export function NotesPanel() {
   const panelMode = useNotesStore((s) => s.panelMode);
   const setPanelMode = useNotesStore((s) => s.setPanelMode);
   const [showSettings, setShowSettings] = useState(false);
+  const [creatingNote, setCreatingNote] = useState(false);
+  const creatingNoteRef = useRef(false);
 
   useEffect(() => {
     // Bootstrap prefs → list in order (prefs may restore a non-default filter),
@@ -63,6 +69,19 @@ export function NotesPanel() {
     setPanelMode("floating");
   };
 
+  const handleCreateNote = async () => {
+    if (creatingNoteRef.current) return;
+    creatingNoteRef.current = true;
+    setCreatingNote(true);
+    try {
+      const note = await createNote({ title: "" });
+      if (note) setActiveNote(note.id);
+    } finally {
+      creatingNoteRef.current = false;
+      setCreatingNote(false);
+    }
+  };
+
   return (
     <div
       className="flex-1 min-h-0 flex flex-col"
@@ -82,14 +101,14 @@ export function NotesPanel() {
           >
             <button
               type="button"
-              className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
-              onClick={() => void createNote({ title: "" })}
+              className="taomni-btn h-6 w-6 shrink-0 p-0 inline-flex items-center justify-center"
+              onClick={() => void handleCreateNote()}
+              disabled={creatingNote}
               title={t("notes.newNote")}
               aria-label={t("notes.newNoteAria")}
               data-testid="notes-new"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>{t("notes.newNote")}</span>
             </button>
             <NoteStatusFilter filters={statusFilters} onToggleFilter={toggleStatusFilter} />
             <div className="relative flex-1 min-w-0">
@@ -104,18 +123,19 @@ export function NotesPanel() {
                 data-testid="notes-search"
               />
             </div>
-            <button
-              type="button"
-              className={`taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px] ${floatingActive ? "bg-[var(--taomni-selected)] text-[var(--taomni-accent)]" : ""}`}
-              onClick={toggleFloatingPanel}
-              title={floatingActive ? t("notes.panelModeHub") : t("notes.panelModeFloating")}
-              aria-label={floatingActive ? t("notes.panelModeHub") : t("notes.panelModeFloating")}
-              aria-pressed={floatingActive}
-              data-testid="notes-floating-toggle"
-            >
-              {floatingActive ? <PanelRightClose className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
-              <span>{floatingActive ? t("notes.panelModeHub") : t("notes.panelModeFloating")}</span>
-            </button>
+            {showPanelModeToggle && (
+              <button
+                type="button"
+                className={`taomni-btn h-6 w-6 shrink-0 p-0 inline-flex items-center justify-center ${floatingActive ? "bg-[var(--taomni-selected)] text-[var(--taomni-accent)]" : ""}`}
+                onClick={toggleFloatingPanel}
+                title={floatingActive ? t("notes.panelModeHub") : t("notes.panelModeFloating")}
+                aria-label={floatingActive ? t("notes.panelModeHub") : t("notes.panelModeFloating")}
+                aria-pressed={floatingActive}
+                data-testid="notes-floating-toggle"
+              >
+                {floatingActive ? <PanelRightClose className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
+              </button>
+            )}
             <button
               type="button"
               className={`taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center ${showSettings ? "bg-[var(--taomni-selected)]" : ""}`}

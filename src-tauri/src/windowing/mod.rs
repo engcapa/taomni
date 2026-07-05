@@ -60,6 +60,8 @@ pub async fn open_detached_window(
     kind: String,
     session_id: String,
     title: Option<String>,
+    x: Option<f64>,
+    y: Option<f64>,
     width: Option<f64>,
     height: Option<f64>,
 ) -> Result<(), String> {
@@ -104,6 +106,13 @@ pub async fn open_detached_window(
         .min_inner_size(min_w, min_h)
         .resizable(true)
         .enable_clipboard_access();
+
+    let builder = match (x, y) {
+        (Some(x), Some(y)) if x.is_finite() && y.is_finite() => {
+            builder.position(x.max(0.0), y.max(0.0))
+        }
+        _ => builder,
+    };
 
     let builder = if kind == "notes" {
         let builder = builder

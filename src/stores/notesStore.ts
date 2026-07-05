@@ -69,6 +69,7 @@ const PREF_STATUS_FILTERS = "notes.statusFilters";
 const DEFAULT_NOTES_FONT_SIZE = 12;
 const MIN_NOTES_FONT_SIZE = 10;
 const MAX_NOTES_FONT_SIZE = 20;
+let loadNotesRequestSeq = 0;
 
 const LEGACY_DEFAULT_NOTES_PANEL_SIZE = {
   width: 460,
@@ -241,6 +242,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
 
   loadNotes: async () => {
     const { filter, statusFilters, search, tagFilterId } = get();
+    const requestSeq = ++loadNotesRequestSeq;
     set({ loading: true });
     try {
       const notes = await listNotes({
@@ -250,8 +252,10 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         tag_id: tagFilterId ?? undefined,
         now: nowSecs(),
       });
+      if (requestSeq !== loadNotesRequestSeq) return;
       set({ notes: Array.isArray(notes) ? notes : [], notesLoaded: true, loading: false });
     } catch (e) {
+      if (requestSeq !== loadNotesRequestSeq) return;
       console.error("notes_list failed:", e);
       set({ notesLoaded: true, loading: false });
     }
@@ -269,9 +273,17 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   createNote: async (input) => {
     try {
       const note = await createNoteIpc(input ?? {});
-      set((s) => ({ notes: [note, ...s.notes], activeNoteId: note.id }));
-      // A brand-new note may not match the current filter (e.g. "completed");
-      // reload so the visible list stays consistent with the active view.
+      const statusFilters: NoteFilter[] = ["recent_incomplete"];
+      set((s) => ({
+        notes: [note, ...s.notes.filter((n) => n.id !== note.id)],
+        activeNoteId: note.id,
+        filter: "recent_incomplete",
+        statusFilters,
+        search: "",
+        tagFilterId: null,
+      }));
+      void persistPref(PREF_LAST_FILTER, "recent_incomplete");
+      void persistPref(PREF_STATUS_FILTERS, statusFilters);
       void get().loadNotes();
       return note;
     } catch (e) {
