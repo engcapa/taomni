@@ -40,6 +40,7 @@ import { useAppStore } from "../../stores/appStore";
 import type { GitWorkspaceRootInfo } from "../../types";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
 import { GitPanel } from "./GitPanel";
+import { WorkspaceCommitLog } from "./WorkspaceCommitLog";
 import { WorkspaceChangesView } from "./WorkspaceChangesView";
 import {
   retainWorkspaceChangeKeys,
@@ -700,6 +701,12 @@ export function WorkspaceGitManager({
               visible={visible}
               onOpenWorkspace={onOpenWorkspace}
               changeCountOverride={totalChangedFiles}
+              workspaceLogView={(
+                <WorkspaceCommitLog
+                  roots={normalizedRoots}
+                  busy={busy}
+                />
+              )}
               changesView={(
                 <WorkspaceChangesView
                   roots={normalizedRoots}

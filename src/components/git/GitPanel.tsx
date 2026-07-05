@@ -92,10 +92,12 @@ interface GitPanelProps {
   embedded?: boolean;
   onOpenWorkspace?: (repoRoot: string) => void;
   changesView?: ReactNode;
+  workspaceLogView?: ReactNode;
   changeCountOverride?: number | null;
 }
 
 type GitView = "changes" | "log" | "branches" | "tags" | "stash" | "settings";
+type LogScope = "workspace" | "repository";
 
 const EMPTY_SETTINGS: GitRepoSettings = {
   userName: null,
@@ -115,12 +117,14 @@ export function GitPanel({
   embedded = false,
   onOpenWorkspace,
   changesView,
+  workspaceLogView,
   changeCountOverride = null,
 }: GitPanelProps) {
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const setUiFontSize = useAppStore((s) => s.setUiFontSize);
   const [view, setView] = useState<GitView>("changes");
   const [mountedViews, setMountedViews] = useState<Set<GitView>>(() => new Set(["changes"]));
+  const [logScope, setLogScope] = useState<LogScope>(() => workspaceLogView ? "workspace" : "repository");
   const [snapshot, setSnapshot] = useState<GitSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -217,6 +221,10 @@ export function GitPanel({
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [setGitUiFontSize, visible]);
+
+  useEffect(() => {
+    if (!workspaceLogView) setLogScope("repository");
+  }, [workspaceLogView]);
 
   useEffect(() => {
     if (!visible) return;
@@ -647,12 +655,49 @@ export function GitPanel({
         )}
         {mountedViews.has("log") && (
           <div className="h-full min-h-0" style={{ display: view === "log" ? "block" : "none" }}>
-          <CommitLog
-            repoRoot={repoRoot}
-            headOid={snapshot?.headOid ?? null}
-            busy={busy}
-            onContextMenu={(entry, x, y) => setCommitMenu({ x, y, entry })}
-          />
+          {workspaceLogView ? (
+            <div className="h-full min-h-0 flex flex-col">
+              <div className="h-9 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
+                <span className="text-[12px] text-[var(--taomni-text-muted)]">Log scope</span>
+                <div className="inline-flex rounded border border-[var(--taomni-divider)] overflow-hidden">
+                  <button
+                    type="button"
+                    className={`h-7 px-3 text-[12px] ${logScope === "workspace" ? "bg-[var(--taomni-accent)] text-white" : "hover:bg-[var(--taomni-hover)]"}`}
+                    onClick={() => setLogScope("workspace")}
+                  >
+                    Workspace
+                  </button>
+                  <button
+                    type="button"
+                    className={`h-7 px-3 text-[12px] ${logScope === "repository" ? "bg-[var(--taomni-accent)] text-white" : "hover:bg-[var(--taomni-hover)]"}`}
+                    onClick={() => setLogScope("repository")}
+                  >
+                    Repository
+                  </button>
+                </div>
+                <span className="min-w-0 truncate text-[11px] text-[var(--taomni-text-muted)]">
+                  {logScope === "workspace" ? "All detected repositories" : repoName}
+                </span>
+              </div>
+              <div className="flex-1 min-h-0">
+                {logScope === "workspace" ? workspaceLogView : (
+                  <CommitLog
+                    repoRoot={repoRoot}
+                    headOid={snapshot?.headOid ?? null}
+                    busy={busy}
+                    onContextMenu={(entry, x, y) => setCommitMenu({ x, y, entry })}
+                  />
+                )}
+              </div>
+            </div>
+          ) : (
+            <CommitLog
+              repoRoot={repoRoot}
+              headOid={snapshot?.headOid ?? null}
+              busy={busy}
+              onContextMenu={(entry, x, y) => setCommitMenu({ x, y, entry })}
+            />
+          )}
           </div>
         )}
         {mountedViews.has("branches") && (
