@@ -53,7 +53,11 @@ export function FloatingNotesPanel() {
     return subscribeNotesDockSignal(() => {
       openedNativeRef.current = false;
       dragRef.current = null;
-      setPanelPosition(posRef.current);
+      if (isTauriRuntime()) {
+        void useNotesStore.getState().loadPrefs();
+      } else {
+        setPanelPosition(posRef.current);
+      }
       setPanelMode("hub");
     });
   }, [setPanelMode, setPanelPosition]);
