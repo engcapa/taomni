@@ -77,6 +77,7 @@ type RecentSessionSort =
   | "type-desc"
   | "host-asc"
   | "host-desc";
+type WelcomeHistoryTab = "directories" | "workspaces" | "sessions";
 
 export function WelcomePanel({
   onStartLocalTerminal,
@@ -110,6 +111,7 @@ export function WelcomePanel({
   const [recentSort, setRecentSort] = useState<RecentSessionSort>("last-desc");
   const [selectedRecentIds, setSelectedRecentIds] = useState<string[]>([]);
   const [workspaceQuery, setWorkspaceQuery] = useState("");
+  const [historyTab, setHistoryTab] = useState<WelcomeHistoryTab>("sessions");
   const { setStatusMessage } = useAppStore();
   const t = useT();
 
@@ -280,6 +282,12 @@ export function WelcomePanel({
     }
   };
 
+  const handleStartInDirectory = (directory: LocalDirectoryShortcut) => {
+    const shell = localShellSelectionFromOption(selectedShell, directory.path);
+    const cwd = selectedShell?.id.startsWith("wsl:") ? undefined : directory.path;
+    onStartLocalTerminal(shell, cwd);
+  };
+
   return (
     <div data-testid="welcome-panel" className="w-full h-full min-w-0 overflow-auto" style={{ background: "var(--taomni-bg)" }}>
       <div className="w-full max-w-[1320px] mx-auto px-6 sm:px-8 lg:px-10 py-8">
@@ -323,12 +331,6 @@ export function WelcomePanel({
             }}
             onStartAsAdministrator={handleStartAsAdministrator}
             onOpenHomeFolder={onOpenLocalPath ? () => void handleOpenHomeFolder() : undefined}
-            directories={localDirectories}
-            onStartInDirectory={(directory) => {
-              const shell = localShellSelectionFromOption(selectedShell, directory.path);
-              const cwd = selectedShell?.id.startsWith("wsl:") ? undefined : directory.path;
-              onStartLocalTerminal(shell, cwd);
-            }}
           />
           {wslStatus === "ready" && wslDistros.length > 0 && (
             <WslCard
@@ -372,51 +374,69 @@ export function WelcomePanel({
           ) : null}
         </div>
 
-        <RecentWorkspacesPanel
+        <WelcomeHistoryPanel
           translate={t}
-          workspaces={recentWorkspaces}
-          filteredWorkspaces={filteredRecentWorkspaces}
-          query={workspaceQuery}
-          onQueryChange={setWorkspaceQuery}
-          onClearFilter={() => setWorkspaceQuery("")}
-          onOpenWorkspace={onOpenRecentWorkspace}
-          onRemoveWorkspace={onRemoveRecentWorkspace}
-          onClearWorkspaces={onClearRecentWorkspaces}
-          onRevealWorkspace={onRevealRecentWorkspace}
-          onOpenNewWorkspace={onOpenNewWorkspace}
-        />
-
-        <RecentSessionsPanel
-          translate={t}
-          sessions={recentSessions}
-          filteredSessions={filteredRecentSessions}
-          typeOptions={recentTypeOptions}
-          query={recentQuery}
-          typeFilter={recentType}
-          sort={recentSort}
-          selectedIds={selectedRecentSet}
-          selectedCount={selectedRecentIds.length}
-          onQueryChange={setRecentQuery}
-          onTypeFilterChange={setRecentType}
-          onSortChange={setRecentSort}
-          onToggleSession={(id) => {
-            setSelectedRecentIds((ids) =>
-              ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id],
-            );
-          }}
-          onClearFilter={() => {
-            setRecentQuery("");
-            setRecentType("all");
-          }}
-          onSelectFiltered={() => setSelectedRecentIds(filteredRecentSessions.map((session) => session.id))}
-          onClearSelection={() => setSelectedRecentIds([])}
-          onOpenSession={onOpenRecentSession}
-          onOpenSessions={onOpenRecentSessions}
-          onEditSession={onEditRecentSession}
-          onRevealSession={onRevealRecentSession}
-          selectedSessions={selectedRecentSessions}
-          onSetSelectedSessions={setSelectedRecentIds}
-          onOpenSettings={onOpenSettings}
+          activeTab={historyTab}
+          directoryCount={localDirectories.length}
+          workspaceCount={filteredRecentWorkspaces.length}
+          sessionCount={filteredRecentSessions.length}
+          onActiveTabChange={setHistoryTab}
+          directoriesPanel={(
+            <LocalDirectoriesPanel
+              translate={t}
+              directories={localDirectories}
+              onStartInDirectory={handleStartInDirectory}
+            />
+          )}
+          workspacesPanel={(
+            <RecentWorkspacesPanel
+              translate={t}
+              workspaces={recentWorkspaces}
+              filteredWorkspaces={filteredRecentWorkspaces}
+              query={workspaceQuery}
+              onQueryChange={setWorkspaceQuery}
+              onClearFilter={() => setWorkspaceQuery("")}
+              onOpenWorkspace={onOpenRecentWorkspace}
+              onRemoveWorkspace={onRemoveRecentWorkspace}
+              onClearWorkspaces={onClearRecentWorkspaces}
+              onRevealWorkspace={onRevealRecentWorkspace}
+              onOpenNewWorkspace={onOpenNewWorkspace}
+            />
+          )}
+          sessionsPanel={(
+            <RecentSessionsPanel
+              translate={t}
+              sessions={recentSessions}
+              filteredSessions={filteredRecentSessions}
+              typeOptions={recentTypeOptions}
+              query={recentQuery}
+              typeFilter={recentType}
+              sort={recentSort}
+              selectedIds={selectedRecentSet}
+              selectedCount={selectedRecentIds.length}
+              onQueryChange={setRecentQuery}
+              onTypeFilterChange={setRecentType}
+              onSortChange={setRecentSort}
+              onToggleSession={(id) => {
+                setSelectedRecentIds((ids) =>
+                  ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id],
+                );
+              }}
+              onClearFilter={() => {
+                setRecentQuery("");
+                setRecentType("all");
+              }}
+              onSelectFiltered={() => setSelectedRecentIds(filteredRecentSessions.map((session) => session.id))}
+              onClearSelection={() => setSelectedRecentIds([])}
+              onOpenSession={onOpenRecentSession}
+              onOpenSessions={onOpenRecentSessions}
+              onEditSession={onEditRecentSession}
+              onRevealSession={onRevealRecentSession}
+              selectedSessions={selectedRecentSessions}
+              onSetSelectedSessions={setSelectedRecentIds}
+              onOpenSettings={onOpenSettings}
+            />
+          )}
         />
 
         <div className="mt-7 text-[12px] text-[var(--taomni-text-muted)]">
@@ -466,6 +486,159 @@ function localShellSelectionFromOption(
     name: shell.name,
     ...(args.length > 0 ? { args } : {}),
   };
+}
+
+function WelcomeHistoryPanel({
+  translate: t,
+  activeTab,
+  directoryCount,
+  workspaceCount,
+  sessionCount,
+  directoriesPanel,
+  workspacesPanel,
+  sessionsPanel,
+  onActiveTabChange,
+}: {
+  translate: TranslateFn;
+  activeTab: WelcomeHistoryTab;
+  directoryCount: number;
+  workspaceCount: number;
+  sessionCount: number;
+  directoriesPanel: React.ReactNode;
+  workspacesPanel: React.ReactNode;
+  sessionsPanel: React.ReactNode;
+  onActiveTabChange: (tab: WelcomeHistoryTab) => void;
+}) {
+  const tabs: Array<{
+    id: WelcomeHistoryTab;
+    label: string;
+    count: number;
+    icon: React.ReactNode;
+  }> = [
+    {
+      id: "sessions",
+      label: t("welcome.recentSessionsHeading"),
+      count: sessionCount,
+      icon: <History className="w-3.5 h-3.5" />,
+    },
+    {
+      id: "workspaces",
+      label: t("welcome.recentWorkspacesHeading"),
+      count: workspaceCount,
+      icon: <Folder className="w-3.5 h-3.5" />,
+    },
+    {
+      id: "directories",
+      label: t("welcome.localDirectoriesHeading"),
+      count: directoryCount,
+      icon: <FolderOpen className="w-3.5 h-3.5" />,
+    },
+  ];
+
+  return (
+    <section
+      data-testid="welcome-history-panel"
+      className="mt-6 overflow-hidden rounded-md border"
+      style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
+    >
+      <div className="flex flex-wrap items-center gap-2 border-b p-2" style={{ borderColor: "var(--taomni-divider)" }}>
+        <div
+          className="flex min-w-0 flex-1 flex-wrap items-center gap-1"
+          role="tablist"
+          aria-label={t("welcome.historyTabsLabel")}
+        >
+          {tabs.map((tab) => {
+            const selected = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                id={`welcome-history-tab-${tab.id}`}
+                data-testid={`welcome-history-tab-${tab.id}`}
+                className="h-8 min-w-0 rounded px-3 inline-flex items-center gap-1.5 text-[12px] font-medium"
+                style={{
+                  background: selected ? "var(--taomni-selected)" : "transparent",
+                  color: selected ? "var(--taomni-text)" : "var(--taomni-text-muted)",
+                  border: `1px solid ${selected ? "var(--taomni-selected-border)" : "transparent"}`,
+                }}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                aria-controls={`welcome-history-tabpanel-${tab.id}`}
+                onClick={() => onActiveTabChange(tab.id)}
+              >
+                <span className="shrink-0 text-[var(--taomni-accent)]">{tab.icon}</span>
+                <span className="truncate">{tab.label}</span>
+                <span className="shrink-0 text-[11px] taomni-mono text-[var(--taomni-text-muted)]">
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div
+        id={`welcome-history-tabpanel-${activeTab}`}
+        className="p-4"
+        role="tabpanel"
+        aria-labelledby={`welcome-history-tab-${activeTab}`}
+      >
+        {activeTab === "directories" ? directoriesPanel : null}
+        {activeTab === "workspaces" ? workspacesPanel : null}
+        {activeTab === "sessions" ? sessionsPanel : null}
+      </div>
+    </section>
+  );
+}
+
+function LocalDirectoriesPanel({
+  translate: t,
+  directories,
+  onStartInDirectory,
+}: {
+  translate: TranslateFn;
+  directories: LocalDirectoryShortcut[];
+  onStartInDirectory: (directory: LocalDirectoryShortcut) => void;
+}) {
+  return (
+    <section data-testid="welcome-local-directories" className="min-w-0">
+      <div className="max-h-[320px] overflow-auto pr-1">
+        {directories.length === 0 ? (
+          <div className="py-4 text-[12px] text-[var(--taomni-text-muted)]">
+            {t("welcome.localDirectoriesEmpty")}
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {directories.map((directory) => (
+              <button
+                key={`${directory.kind}:${directory.path}`}
+                data-testid="welcome-local-directory"
+                data-directory-path={directory.path}
+                className="w-full min-w-0 rounded border bg-[var(--taomni-input-bg)] px-2 py-1.5 text-left hover:bg-[var(--taomni-control-hover)] focus-visible:bg-[var(--taomni-control-hover)]"
+                style={{ borderColor: "var(--taomni-divider)" }}
+                type="button"
+                title={directory.path}
+                aria-label={t("welcome.localDirectoryOpenAria", { label: directory.label, path: directory.path })}
+                onClick={() => onStartInDirectory(directory)}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <FolderOpen className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
+                  <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-[var(--taomni-text)]">
+                    {directory.label}
+                  </span>
+                  <span className="shrink-0 rounded border px-1.5 py-0.5 text-[10px] taomni-mono text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
+                    {directory.kind === "personal" ? t("welcome.localDirectoryPersonal") : t("welcome.localDirectorySystem")}
+                  </span>
+                </span>
+                <span className="mt-0.5 block truncate text-[11px] taomni-mono text-[var(--taomni-text-muted)]">
+                  {directory.path}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
 }
 
 function RecentWorkspacesPanel({
@@ -520,48 +693,10 @@ function RecentWorkspacesPanel({
   return (
     <section
       data-testid="welcome-recent-workspaces"
-      className="mt-6 border-y py-4"
-      style={{ borderColor: "var(--taomni-divider)" }}
+      className="min-w-0"
     >
-      <div className="flex flex-wrap items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <FolderOpen className="w-4 h-4 text-[var(--taomni-accent)]" />
-            <div className="font-semibold">{t("welcome.recentWorkspacesHeading")}</div>
-            <span className="text-[11px] taomni-mono text-[var(--taomni-text-muted)]">
-              {t("welcome.recentWorkspacesCount", { count: filteredWorkspaces.length })}
-            </span>
-          </div>
-          <div className="mt-0.5 text-[12px] text-[var(--taomni-text-muted)]">
-            {t("welcome.recentWorkspacesSubtitle")}
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <button
-            data-testid="welcome-recent-workspace-open-new"
-            className="taomni-btn h-8 px-3 inline-flex items-center gap-1.5"
-            type="button"
-            disabled={!onOpenNewWorkspace}
-            onClick={onOpenNewWorkspace}
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>{t("welcome.recentWorkspacesOpenNew")}</span>
-          </button>
-          <button
-            data-testid="welcome-recent-workspace-clear-all"
-            className="taomni-btn h-8 px-3 inline-flex items-center gap-1.5"
-            type="button"
-            disabled={!onClearWorkspaces || workspaces.length === 0}
-            onClick={() => void confirmClearWorkspaces()}
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>{t("welcome.recentWorkspacesClearAll")}</span>
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
-        <div className="relative min-w-0">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <div className="relative min-w-[240px] flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--taomni-text-muted)]" />
           <input
             data-testid="welcome-recent-workspace-filter"
@@ -577,13 +712,34 @@ function RecentWorkspacesPanel({
         </div>
         <button
           data-testid="welcome-recent-workspace-clear-filter"
-          className="taomni-btn h-8 px-3 inline-flex items-center justify-center gap-1.5"
+          className="taomni-btn h-8 shrink-0 px-3 inline-flex items-center justify-center gap-1.5"
           type="button"
           disabled={!hasFilter}
           onClick={onClearFilter}
         >
           <X className="w-3.5 h-3.5" />
           <span>{t("welcome.recentWorkspacesClearFilter")}</span>
+        </button>
+        <div className="h-6 w-px shrink-0" style={{ background: "var(--taomni-divider)" }} />
+        <button
+          data-testid="welcome-recent-workspace-open-new"
+          className="taomni-btn h-8 shrink-0 px-3 inline-flex items-center gap-1.5"
+          type="button"
+          disabled={!onOpenNewWorkspace}
+          onClick={onOpenNewWorkspace}
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>{t("welcome.recentWorkspacesOpenNew")}</span>
+        </button>
+        <button
+          data-testid="welcome-recent-workspace-clear-all"
+          className="taomni-btn h-8 shrink-0 px-3 inline-flex items-center gap-1.5"
+          type="button"
+          disabled={!onClearWorkspaces || workspaces.length === 0}
+          onClick={() => void confirmClearWorkspaces()}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          <span>{t("welcome.recentWorkspacesClearAll")}</span>
         </button>
       </div>
 
@@ -882,70 +1038,10 @@ function RecentSessionsPanel({
   return (
     <section
       data-testid="welcome-recent-sessions"
-      className="mt-6 border-y py-4"
-      style={{ borderColor: "var(--taomni-divider)" }}
+      className="min-w-0"
     >
-      <div className="flex flex-wrap items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <History className="w-4 h-4 text-[var(--taomni-accent)]" />
-            <div className="font-semibold">{t("welcome.recentSessionsHeading")}</div>
-            <span className="text-[11px] taomni-mono text-[var(--taomni-text-muted)]">
-              {t("welcome.recentSessionsCount", { count: filteredSessions.length })}
-            </span>
-          </div>
-          <div className="mt-0.5 text-[12px] text-[var(--taomni-text-muted)]">
-            {t("welcome.recentSessionsSubtitle")}
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <button
-            data-testid="welcome-recent-open-all"
-            className="taomni-btn h-8 px-3 inline-flex items-center gap-1.5"
-            type="button"
-            disabled={!canOpen || sessions.length === 0}
-            onClick={() => onOpenSessions?.(sessions)}
-          >
-            <Play className="w-3.5 h-3.5" />
-            <span>{t("welcome.recentSessionsOpenAll")}</span>
-          </button>
-          <button
-            data-testid="welcome-recent-open-filtered"
-            className="taomni-btn h-8 px-3 inline-flex items-center gap-1.5"
-            type="button"
-            disabled={!canOpen || filteredSessions.length === 0}
-            onClick={() => onOpenSessions?.(filteredSessions)}
-          >
-            <Play className="w-3.5 h-3.5" />
-            <span>{t("welcome.recentSessionsOpenFiltered")}</span>
-          </button>
-          <button
-            data-testid="welcome-recent-open-selected"
-            className="taomni-btn h-8 px-3 inline-flex items-center gap-1.5"
-            type="button"
-            disabled={!canOpen || selectedSessions.length === 0}
-            onClick={() => onOpenSessions?.(selectedSessions)}
-          >
-            <Play className="w-3.5 h-3.5" />
-            <span>{t("welcome.recentSessionsOpenSelected")}</span>
-          </button>
-          {onOpenSettings ? (
-            <button
-              data-testid="welcome-recent-settings"
-              className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center"
-              type="button"
-              title={t("welcome.recentSessionsSettings")}
-              aria-label={t("welcome.recentSessionsSettings")}
-              onClick={onOpenSettings}
-            >
-              <Settings className="w-[18px] h-[18px]" aria-hidden="true" />
-            </button>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_180px_auto_auto]">
-        <div className="relative min-w-0">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--taomni-text-muted)]" />
           <input
             data-testid="welcome-recent-filter"
@@ -961,7 +1057,7 @@ function RecentSessionsPanel({
         </div>
         <select
           data-testid="welcome-recent-type-filter"
-          className="taomni-input h-8 w-full"
+          className="taomni-input h-8 w-[132px] shrink-0"
           aria-label={t("welcome.recentSessionsType")}
           value={typeFilter}
           disabled={sessions.length === 0}
@@ -974,7 +1070,7 @@ function RecentSessionsPanel({
             </option>
           ))}
         </select>
-        <div className="relative min-w-0">
+        <div className="relative w-[172px] shrink-0">
           <ArrowUpDown className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--taomni-text-muted)]" />
           <select
             data-testid="welcome-recent-sort"
@@ -997,8 +1093,19 @@ function RecentSessionsPanel({
           </select>
         </div>
         <button
+          data-testid="welcome-recent-clear-filter"
+          className="taomni-btn h-8 shrink-0 px-3 inline-flex items-center justify-center gap-1.5"
+          type="button"
+          disabled={!hasFilter}
+          onClick={onClearFilter}
+        >
+          <X className="w-3.5 h-3.5" />
+          <span>{t("welcome.recentSessionsClearFilter")}</span>
+        </button>
+        <div className="h-6 w-px shrink-0" style={{ background: "var(--taomni-divider)" }} />
+        <button
           data-testid="welcome-recent-select-filtered"
-          className="taomni-btn h-8 px-3 inline-flex items-center justify-center gap-1.5"
+          className="taomni-btn h-8 shrink-0 px-3 inline-flex items-center justify-center gap-1.5"
           type="button"
           disabled={filteredSessions.length === 0}
           onClick={onSelectFiltered}
@@ -1007,15 +1114,47 @@ function RecentSessionsPanel({
           <span>{t("welcome.recentSessionsSelectFiltered")}</span>
         </button>
         <button
-          data-testid="welcome-recent-clear-filter"
-          className="taomni-btn h-8 px-3 inline-flex items-center justify-center gap-1.5"
+          data-testid="welcome-recent-open-all"
+          className="taomni-btn h-8 shrink-0 px-3 inline-flex items-center gap-1.5"
           type="button"
-          disabled={!hasFilter}
-          onClick={onClearFilter}
+          disabled={!canOpen || sessions.length === 0}
+          onClick={() => onOpenSessions?.(sessions)}
         >
-          <X className="w-3.5 h-3.5" />
-          <span>{t("welcome.recentSessionsClearFilter")}</span>
+          <Play className="w-3.5 h-3.5" />
+          <span>{t("welcome.recentSessionsOpenAll")}</span>
         </button>
+        <button
+          data-testid="welcome-recent-open-filtered"
+          className="taomni-btn h-8 shrink-0 px-3 inline-flex items-center gap-1.5"
+          type="button"
+          disabled={!canOpen || filteredSessions.length === 0}
+          onClick={() => onOpenSessions?.(filteredSessions)}
+        >
+          <Play className="w-3.5 h-3.5" />
+          <span>{t("welcome.recentSessionsOpenFiltered")}</span>
+        </button>
+        <button
+          data-testid="welcome-recent-open-selected"
+          className="taomni-btn h-8 shrink-0 px-3 inline-flex items-center gap-1.5"
+          type="button"
+          disabled={!canOpen || selectedSessions.length === 0}
+          onClick={() => onOpenSessions?.(selectedSessions)}
+        >
+          <Play className="w-3.5 h-3.5" />
+          <span>{t("welcome.recentSessionsOpenSelected")}</span>
+        </button>
+        {onOpenSettings ? (
+          <button
+            data-testid="welcome-recent-settings"
+            className="taomni-btn h-8 w-8 shrink-0 p-0 inline-flex items-center justify-center"
+            type="button"
+            title={t("welcome.recentSessionsSettings")}
+            aria-label={t("welcome.recentSessionsSettings")}
+            onClick={onOpenSettings}
+          >
+            <Settings className="w-[18px] h-[18px]" aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
 
       <div className="mt-2 min-h-[26px] flex flex-wrap items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
@@ -1290,8 +1429,6 @@ function LocalTerminalCard({
   onStart,
   onStartAsAdministrator,
   onOpenHomeFolder,
-  directories,
-  onStartInDirectory,
 }: {
   translate: TranslateFn;
   shells: LocalShellOption[];
@@ -1303,8 +1440,6 @@ function LocalTerminalCard({
   onStart: () => void;
   onStartAsAdministrator: () => void;
   onOpenHomeFolder?: () => void;
-  directories: LocalDirectoryShortcut[];
-  onStartInDirectory: (directory: LocalDirectoryShortcut) => void;
 }) {
   const hasChoices = shells.length > 1;
   const canElevate = selectedShell?.canElevate ?? false;
@@ -1391,47 +1526,6 @@ function LocalTerminalCard({
           )}
         </div>
       </div>
-      {directories.length > 0 ? (
-        <div
-          data-testid="welcome-local-directories"
-          className="mt-3 pt-3 border-t min-h-0"
-          style={{ borderColor: "var(--taomni-divider)" }}
-        >
-          <div className="flex items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
-            <Folder className="w-3.5 h-3.5" />
-            <span className="font-medium text-[var(--taomni-text)]">{t("welcome.localDirectoriesHeading")}</span>
-            <span className="truncate">{t("welcome.localDirectoriesHint")}</span>
-          </div>
-          <div className="mt-2 max-h-[132px] overflow-y-auto pr-1 space-y-1">
-            {directories.map((directory) => (
-              <button
-                key={`${directory.kind}:${directory.path}`}
-                data-testid="welcome-local-directory"
-                data-directory-path={directory.path}
-                className="w-full min-w-0 rounded border bg-[var(--taomni-input-bg)] px-2 py-1.5 text-left hover:bg-[var(--taomni-control-hover)] focus-visible:bg-[var(--taomni-control-hover)]"
-                style={{ borderColor: "var(--taomni-divider)" }}
-                type="button"
-                title={directory.path}
-                aria-label={t("welcome.localDirectoryOpenAria", { label: directory.label, path: directory.path })}
-                onClick={() => onStartInDirectory(directory)}
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  <FolderOpen className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
-                  <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-[var(--taomni-text)]">
-                    {directory.label}
-                  </span>
-                  <span className="shrink-0 rounded border px-1.5 py-0.5 text-[10px] taomni-mono text-[var(--taomni-text-muted)]" style={{ borderColor: "var(--taomni-divider)" }}>
-                    {directory.kind === "personal" ? t("welcome.localDirectoryPersonal") : t("welcome.localDirectorySystem")}
-                  </span>
-                </span>
-                <span className="mt-0.5 block truncate text-[11px] taomni-mono text-[var(--taomni-text-muted)]">
-                  {directory.path}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
