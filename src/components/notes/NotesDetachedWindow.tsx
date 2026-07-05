@@ -28,9 +28,11 @@ export function NotesDetachedWindow() {
   useEffect(() => {
     document.documentElement.classList.add("notes-detached-document");
     document.body.classList.add("notes-detached-document");
+    document.getElementById("root")?.classList.add("notes-detached-root");
     return () => {
       document.documentElement.classList.remove("notes-detached-document");
       document.body.classList.remove("notes-detached-document");
+      document.getElementById("root")?.classList.remove("notes-detached-root");
     };
   }, []);
 

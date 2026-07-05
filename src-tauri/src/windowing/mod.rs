@@ -11,7 +11,9 @@
 //! source of truth for which `kind` strings are valid. Anything else
 //! lands in the catch-all error branch below.
 
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{
+    AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, utils::config::Color,
+};
 
 /// Default size for a detached window, picked per kind. RDP/VNC need
 /// more breathing room than a shell.
@@ -64,6 +66,10 @@ pub async fn open_detached_window(
     validate_kind(&kind)?;
     let label = label_for(&kind, &session_id);
     if let Some(existing) = app_handle.get_webview_window(&label) {
+        if kind == "notes" {
+            let _ = existing.set_always_on_top(true);
+            let _ = existing.set_background_color(Some(Color(0, 0, 0, 0)));
+        }
         let _ = existing.set_focus();
         return Ok(());
     }
@@ -100,7 +106,14 @@ pub async fn open_detached_window(
         .enable_clipboard_access();
 
     let builder = if kind == "notes" {
-        builder.decorations(false).transparent(true)
+        let builder = builder
+            .decorations(false)
+            .always_on_top(true)
+            .shadow(true)
+            .background_color(Color(0, 0, 0, 0));
+        #[cfg(not(target_os = "macos"))]
+        let builder = builder.transparent(true);
+        builder
     } else {
         builder
     };

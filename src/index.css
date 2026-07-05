@@ -320,7 +320,8 @@ body {
 
 html.notes-detached-document,
 html.notes-detached-document body,
-body.notes-detached-document {
+body.notes-detached-document,
+#root.notes-detached-root {
   background: transparent;
 }
 
@@ -502,7 +503,8 @@ body.notes-detached-document {
 .notes-floating-window,
 .notes-detached-window {
   border: 0;
-  border-radius: 10px;
+  border-radius: 14px;
+  clip-path: inset(0 round 14px);
   isolation: isolate;
 }
 .notes-detached-window [data-testid="notes-panel"],
