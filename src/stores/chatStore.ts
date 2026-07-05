@@ -122,6 +122,7 @@ export function isChatCapableTabType(type: string | null | undefined): boolean {
     type === "database" ||
     type === "redis" ||
     type === "mail" ||
+    type === "git" ||
     type === "code-workspace"
   );
 }
