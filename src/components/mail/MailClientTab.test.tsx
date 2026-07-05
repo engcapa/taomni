@@ -277,6 +277,10 @@ describe("MailClientTab", () => {
     expect(root.style.getPropertyValue("--taomni-bg")).toBe("#282a36");
     expect(root.style.getPropertyValue("--taomni-text")).toBe("#f8f8f2");
     expect(root.style.getPropertyValue("--taomni-accent")).toBe("#8be9fd");
+    expect(root.style.getPropertyValue("--taomni-accent-soft")).not.toBe("");
+    expect(root.style.getPropertyValue("--taomni-button-from")).not.toBe("");
+    expect(root.style.getPropertyValue("--taomni-button-hover-to")).not.toBe("");
+    expect(root.style.getPropertyValue("--taomni-button-disabled")).not.toBe("");
   });
 
   it("does not force borders onto HTML email layout tables", async () => {

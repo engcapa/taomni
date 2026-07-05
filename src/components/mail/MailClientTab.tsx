@@ -280,13 +280,44 @@ function mixColor(foreground: string, background: string, amount: number): strin
   return `#${hex(mixed[0])}${hex(mixed[1])}${hex(mixed[2])}`;
 }
 
+function colorLuminance(value: string): number | null {
+  const rgb = parseHexColor(value);
+  if (!rgb) return null;
+  const [r, g, b] = rgb.map((channel) => {
+    const normalized = channel / 255;
+    return normalized <= 0.03928
+      ? normalized / 12.92
+      : ((normalized + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
 function mailAppearanceStyle(profile: TerminalProfile | undefined, fontSize: number, appPrefersDark: boolean): CSSProperties {
   const terminalProfile = profile ?? DEFAULT_MAIL_TERMINAL_PROFILE;
   const theme = resolveMailTheme(terminalProfile.theme, appPrefersDark);
   const background = color(theme.background, "#1d1f21");
   const foreground = color(theme.foreground, "#eaeaea");
   const accent = color(theme.blue ?? theme.cyan ?? theme.cursor, "#83a7d8");
+  const darkBackground = (colorLuminance(background) ?? 0) < 0.5;
+  const accentSoft = darkBackground
+    ? mixColor(foreground, accent, 24)
+    : mixColor(background, accent, 24);
   const divider = mixColor(foreground, background, 18);
+  const buttonFrom = darkBackground
+    ? mixColor(foreground, background, 12)
+    : mixColor(foreground, background, 2);
+  const buttonTo = darkBackground
+    ? mixColor(foreground, background, 8)
+    : mixColor(foreground, background, 7);
+  const buttonHoverFrom = darkBackground
+    ? mixColor(foreground, background, 18)
+    : mixColor(foreground, background, 4);
+  const buttonHoverTo = darkBackground
+    ? mixColor(foreground, background, 13)
+    : mixColor(foreground, background, 11);
+  const buttonDisabled = darkBackground
+    ? mixColor(foreground, background, 5)
+    : mixColor(foreground, background, 6);
   return {
     "--taomni-bg": background,
     "--taomni-panel-bg": mixColor(foreground, background, 5),
@@ -300,6 +331,12 @@ function mailAppearanceStyle(profile: TerminalProfile | undefined, fontSize: num
     "--taomni-hover": mixColor(accent, background, 16),
     "--taomni-selected": mixColor(accent, background, 26),
     "--taomni-accent": accent,
+    "--taomni-accent-soft": accentSoft,
+    "--taomni-button-from": buttonFrom,
+    "--taomni-button-to": buttonTo,
+    "--taomni-button-hover-from": buttonHoverFrom,
+    "--taomni-button-hover-to": buttonHoverTo,
+    "--taomni-button-disabled": buttonDisabled,
     "--taomni-text": foreground,
     "--taomni-text-muted": mixColor(foreground, background, 62),
     fontFamily: terminalProfile.fontFamily || DEFAULT_MAIL_TERMINAL_PROFILE.fontFamily,

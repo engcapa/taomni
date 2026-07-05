@@ -607,6 +607,37 @@ describe("ChatDrawerRibbon", () => {
     expect(openTabChat).toHaveBeenCalledWith("stable-chat-tab");
   });
 
+  it("shows Tao for git tabs and opens the git tab chat", () => {
+    const openTabChat = vi.fn().mockResolvedValue(undefined);
+    useAppStore.setState({
+      tabs: [{
+        id: "git-tab",
+        type: "git",
+        title: "Git taomni",
+        closable: true,
+        git: { repoRoot: "/repo/taomni" },
+      }],
+      activeTabId: "git-tab",
+    });
+    useChatStore.setState({
+      drawerOpen: false,
+      drawerPosition: "left",
+      drawerPinned: true,
+      openTabChat,
+    });
+
+    render(
+      <div className="relative h-32 w-32">
+        <ChatDrawerRibbon />
+      </div>,
+    );
+
+    const ribbon = screen.getByTestId("ai-chat-drawer-ribbon");
+    expect(ribbon).toHaveTextContent(/^Tao$/);
+    fireEvent.click(ribbon);
+    expect(openTabChat).toHaveBeenCalledWith("git-tab");
+  });
+
   it.each([
     ["left", 4, 300],
     ["right", 796, 300],
