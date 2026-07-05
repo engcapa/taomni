@@ -11,8 +11,12 @@ import {
 export interface ChangesTreeProps {
   changes: GitChange[];
   treeMode: boolean;
+  grouped?: boolean;
+  busy?: boolean;
   checked: Set<string>;
   onToggleChecked: (paths: string[], value: boolean) => void;
+  onStagePaths?: (paths: string[]) => void;
+  onUnstagePaths?: (paths: string[]) => void;
   selected: Set<string>;
   activePath: string | null;
   onSelect: (path: string, mods: { ctrl: boolean; shift: boolean }) => void;
@@ -20,6 +24,13 @@ export interface ChangesTreeProps {
 }
 
 type TriState = "all" | "none" | "some";
+type ChangeSectionKind = "staged" | "changes" | "untracked";
+
+interface ChangeSection {
+  kind: ChangeSectionKind;
+  title: string;
+  changes: GitChange[];
+}
 
 function TriCheckbox({
   state,
@@ -63,34 +74,37 @@ function StatusPill({ change }: { change: GitChange }) {
 export function ChangesTree({
   changes,
   treeMode,
+  grouped = true,
+  busy = false,
   checked,
   onToggleChecked,
+  onStagePaths,
+  onUnstagePaths,
   selected,
   activePath,
   onSelect,
   onContextMenu,
 }: ChangesTreeProps) {
-  const tree = useMemo(() => buildPathTree(changes), [changes]);
-  const flat = useMemo(
-    () => [...changes].sort((a, b) => a.path.localeCompare(b.path)),
-    [changes],
-  );
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const [collapsedSections, setCollapsedSections] = useState<Set<ChangeSectionKind>>(() => new Set());
 
-  const dirState = (node: ChangeTreeDir): TriState => {
-    const files = collectFilePaths(node);
-    const on = files.filter((p) => checked.has(p)).length;
+  const sections = useMemo(() => partitionChanges(changes), [changes]);
+
+  const pathsState = (paths: string[]): TriState => {
+    const on = paths.filter((p) => checked.has(p)).length;
     if (on === 0) return "none";
-    if (on === files.length) return "all";
+    if (on === paths.length) return "all";
     return "some";
   };
 
-  const renderFile = (change: GitChange, depth: number) => {
+  const dirState = (node: ChangeTreeDir): TriState => pathsState(collectFilePaths(node));
+
+  const renderFile = (change: GitChange, depth: number, sectionKey = "all") => {
     const isActive = activePath === change.path;
     const isSelected = selected.has(change.path);
     return (
       <div
-        key={`${change.status}-${change.path}`}
+        key={`${sectionKey}-${change.status}-${change.path}`}
         role="button"
         tabIndex={0}
         style={{ paddingLeft: 8 + depth * 14 }}
@@ -118,11 +132,12 @@ export function ChangesTree({
     );
   };
 
-  const renderNode = (node: ChangeTreeNode, depth: number): React.ReactNode => {
-    if (node.type === "file") return renderFile(node.change, depth);
-    const isCollapsed = collapsed.has(node.path);
+  const renderNode = (node: ChangeTreeNode, depth: number, sectionKey = "all"): React.ReactNode => {
+    if (node.type === "file") return renderFile(node.change, depth, sectionKey);
+    const collapsedKey = `${sectionKey}:${node.path}`;
+    const isCollapsed = collapsed.has(collapsedKey);
     return (
-      <div key={`dir-${node.path}`}>
+      <div key={`${sectionKey}-dir-${node.path}`}>
         <div
           role="button"
           tabIndex={0}
@@ -131,8 +146,8 @@ export function ChangesTree({
           onClick={() =>
             setCollapsed((prev) => {
               const next = new Set(prev);
-              if (next.has(node.path)) next.delete(node.path);
-              else next.add(node.path);
+              if (next.has(collapsedKey)) next.delete(collapsedKey);
+              else next.add(collapsedKey);
               return next;
             })
           }
@@ -150,8 +165,70 @@ export function ChangesTree({
           <Folder className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
           <span className="truncate text-[12px]">{node.name}</span>
         </div>
-        {!isCollapsed && node.children.map((child) => renderNode(child, depth + 1))}
+        {!isCollapsed && node.children.map((child) => renderNode(child, depth + 1, sectionKey))}
       </div>
+    );
+  };
+
+  const renderChangeSet = (items: GitChange[], sectionKey = "all") => {
+    if (treeMode) {
+      return buildPathTree(items).map((node) => renderNode(node, 0, sectionKey));
+    }
+    return [...items]
+      .sort((a, b) => a.path.localeCompare(b.path))
+      .map((change) => renderFile(change, 0, sectionKey));
+  };
+
+  const renderSection = (section: ChangeSection) => {
+    if (section.changes.length === 0) return null;
+    const paths = uniquePaths(section.changes);
+    const isCollapsed = collapsedSections.has(section.kind);
+    const action =
+      section.kind === "staged"
+        ? { label: "Unstage All", run: onUnstagePaths }
+        : { label: "Stage All", run: onStagePaths };
+    return (
+      <section key={section.kind} className="border-b border-[var(--taomni-divider)] last:border-b-0">
+        <div className="h-8 flex items-center gap-2 px-2 bg-[var(--taomni-bg)] border-b border-[var(--taomni-divider)]">
+          <button
+            type="button"
+            className="shrink-0 flex items-center justify-center text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"
+            aria-label={isCollapsed ? `Expand ${section.title}` : `Collapse ${section.title}`}
+            onClick={() =>
+              setCollapsedSections((current) => {
+                const next = new Set(current);
+                if (next.has(section.kind)) next.delete(section.kind);
+                else next.add(section.kind);
+                return next;
+              })
+            }
+          >
+            {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+          <TriCheckbox
+            state={pathsState(paths)}
+            onChange={(value) => onToggleChecked(paths, value)}
+          />
+          <span className="min-w-0 truncate text-[11px] font-semibold uppercase text-[var(--taomni-text-muted)]">
+            {section.title} ({section.changes.length})
+          </span>
+          <div className="flex-1" />
+          {action.run ? (
+            <button
+              type="button"
+              className="taomni-btn h-6 px-1.5 text-[10px]"
+              disabled={busy || paths.length === 0}
+              onClick={(event) => {
+                event.stopPropagation();
+                action.run?.(paths);
+              }}
+            >
+              {action.label}
+            </button>
+          ) : null}
+        </div>
+        {isCollapsed ? null : renderChangeSet(section.changes, section.kind)}
+      </section>
     );
   };
 
@@ -165,13 +242,27 @@ export function ChangesTree({
 
   return (
     <div className="flex-1 min-h-0 overflow-auto">
-      {treeMode ? tree.map((node) => renderNode(node, 0)) : flat.map((change) => renderFile(change, 0))}
+      {grouped ? sections.map(renderSection) : renderChangeSet(changes)}
     </div>
   );
+}
+
+function partitionChanges(changes: GitChange[]): ChangeSection[] {
+  const staged = changes.filter((change) => change.staged);
+  const unstaged = changes.filter((change) => change.unstaged && change.status !== "untracked");
+  const untracked = changes.filter((change) => change.status === "untracked");
+  return [
+    { kind: "staged", title: "Staged Changes", changes: staged },
+    { kind: "changes", title: "Changes", changes: unstaged },
+    { kind: "untracked", title: "Untracked", changes: untracked },
+  ];
+}
+
+function uniquePaths(changes: GitChange[]): string[] {
+  return [...new Set(changes.map((change) => change.path))];
 }
 
 function lastSegment(path: string): string {
   const parts = path.split("/").filter(Boolean);
   return parts[parts.length - 1] ?? path;
 }
-

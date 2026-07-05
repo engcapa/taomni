@@ -15,7 +15,9 @@ import {
   GitFork,
   GitMerge,
   Loader2,
+  MoreVertical,
   Plus,
+  RefreshCcw,
   RefreshCw,
   Save,
   Settings,
@@ -98,6 +100,10 @@ interface GitPanelProps {
     summary: string;
     selectedRepoName: string;
     selectedRepoRoot: string;
+    repoSelector?: ReactNode;
+    branchBadge?: ReactNode;
+    changeSummary?: ReactNode;
+    actionControls?: ReactNode;
   };
   changeCountOverride?: number | null;
 }
@@ -160,6 +166,7 @@ export function GitPanel({
   });
   const [amendChecked, setAmendChecked] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number; path: string } | null>(null);
+  const [headerMenu, setHeaderMenu] = useState<{ x: number; y: number } | null>(null);
   const [commitMenu, setCommitMenu] = useState<{ x: number; y: number; entry: GitLogEntry } | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const anchorRef = useRef<string | null>(null);
@@ -478,6 +485,48 @@ export function GitPanel({
       },
     );
   };
+  const syncCurrentBranch = () => {
+    if (!remoteName) return;
+    void runAction("Sync", async () => {
+      await gitPull(repoRoot, remoteName, pullBranchForRemote(snapshot, remoteName));
+      await gitPush(repoRoot, remoteName, snapshot?.currentBranch ?? null, !snapshot?.upstream);
+    });
+  };
+  const checkoutBranchByName = () => {
+    void (async () => {
+      const branch = await promptAppDialog({
+        title: "Checkout branch",
+        label: "Checkout an existing branch",
+        placeholder: "branch name",
+        confirmLabel: "Checkout",
+      });
+      const target = branch?.trim();
+      if (target) await runAction("Checkout", () => gitCheckoutBranch(repoRoot, target));
+    })();
+  };
+  const createBranchFromHead = () => {
+    void (async () => {
+      const branch = await promptAppDialog({
+        title: "New branch",
+        label: "Create and checkout a branch",
+        placeholder: "branch name",
+        confirmLabel: "Create",
+      });
+      const target = branch?.trim();
+      if (target) await runAction("New branch", () => gitCreateBranch(repoRoot, target, null, true));
+    })();
+  };
+  const forcePushCurrentBranch = () => {
+    if (!remoteName || !snapshot?.currentBranch) return;
+    const branch = snapshot.currentBranch;
+    const setUpstream = !snapshot.upstream;
+    void confirmAndRun(
+      "Force push",
+      `Force push ${branch} to ${remoteName} using --force-with-lease?`,
+      true,
+      () => runAction("Force push", () => gitPush(repoRoot, remoteName, branch, setUpstream, true)),
+    );
+  };
   const resolveConflict = (side: "ours" | "theirs") => {
     const targets = changesList.filter((c) => opPaths.includes(c.path) && c.conflict).map((c) => c.path);
     if (targets.length === 0) return;
@@ -510,18 +559,27 @@ export function GitPanel({
         ) : workspaceHeader ? (
           <>
             <GitBranch className="w-4 h-4 text-[var(--taomni-accent)]" />
-            <div className="min-w-0">
-              <div className="font-semibold leading-4 truncate">Workspace Git · {workspaceHeader.title}</div>
-              <div className="text-[11px] text-[var(--taomni-text-muted)] truncate max-w-[520px]">{workspaceHeader.summary}</div>
-            </div>
-            <span className="taomni-divider-v h-5 mx-1" />
-            <span
-              className="inline-flex items-center gap-1 h-6 max-w-56 rounded bg-[var(--taomni-hover)] px-2 text-[11px]"
-              title={workspaceHeader.selectedRepoRoot}
-            >
-              <span className="shrink-0 text-[var(--taomni-text-muted)]">Repository detail</span>
-              <span className="min-w-0 truncate font-medium">{workspaceHeader.selectedRepoName}</span>
-            </span>
+            {workspaceHeader.repoSelector ? (
+              <>
+                <span className="shrink-0 font-semibold leading-4">Git</span>
+                {workspaceHeader.repoSelector}
+              </>
+            ) : (
+              <>
+                <div className="min-w-0">
+                  <div className="font-semibold leading-4 truncate">Workspace Git · {workspaceHeader.title}</div>
+                  <div className="text-[11px] text-[var(--taomni-text-muted)] truncate max-w-[520px]">{workspaceHeader.summary}</div>
+                </div>
+                <span className="taomni-divider-v h-5 mx-1" />
+                <span
+                  className="inline-flex items-center gap-1 h-6 max-w-56 rounded bg-[var(--taomni-hover)] px-2 text-[11px]"
+                  title={workspaceHeader.selectedRepoRoot}
+                >
+                  <span className="shrink-0 text-[var(--taomni-text-muted)]">Repository detail</span>
+                  <span className="min-w-0 truncate font-medium">{workspaceHeader.selectedRepoName}</span>
+                </span>
+              </>
+            )}
           </>
         ) : (
           <>
@@ -533,35 +591,41 @@ export function GitPanel({
             <span className="taomni-divider-v h-5 mx-1" />
           </>
         )}
-        <BranchBadge snapshot={snapshot} />
-        {displayedChangeCount !== null && (
+        {workspaceHeader?.branchBadge ?? <BranchBadge snapshot={snapshot} />}
+        {workspaceHeader?.changeSummary ?? (displayedChangeCount !== null && (
           <span className="text-[11px] text-[var(--taomni-text-muted)]">
             {displayedChangeCount} changes
             {snapshot && (snapshot.ahead || snapshot.behind) ? ` · ↑${snapshot.ahead} ↓${snapshot.behind}` : ""}
           </span>
-        )}
+        ))}
         <div className="flex-1" />
-        {onOpenWorkspace && !embedded && (
-          <IconButton
-            label="Open code workspace"
-            icon={<Braces className="w-3.5 h-3.5" />}
-            onClick={() => onOpenWorkspace(repoRoot)}
-          />
+        {workspaceHeader?.actionControls ?? (
+          <>
+            <select
+              className="taomni-input h-7 w-32"
+              value={remoteName}
+              onChange={(event) => setRemoteName(event.target.value)}
+              disabled={!snapshot?.remotes.length}
+            >
+              {snapshot?.remotes.length ? snapshot.remotes.map((remote) => (
+                <option key={remote.name} value={remote.name}>{remote.name}</option>
+              )) : <option value="">No remote</option>}
+            </select>
+            <IconButton label="Fetch" icon={<Download className="w-3.5 h-3.5" />} disabled={busy || !remoteName} onClick={() => void runAction("Fetch", () => gitFetch(repoRoot, remoteName))} />
+            <IconButton label="Pull" icon={<GitMerge className="w-3.5 h-3.5" />} disabled={busy || !remoteName} onClick={() => void runAction("Pull", () => gitPull(repoRoot, remoteName, pullBranchForRemote(snapshot, remoteName)))} />
+            <IconButton label="Push" icon={<Upload className="w-3.5 h-3.5" />} disabled={busy || !remoteName} onClick={() => void runAction("Push", () => gitPush(repoRoot, remoteName, snapshot?.currentBranch ?? null, !snapshot?.upstream))} />
+            <button
+              type="button"
+              className="taomni-btn h-7 w-7 inline-flex items-center justify-center"
+              title="More Git actions"
+              aria-label="More Git actions"
+              onClick={(event) => setHeaderMenu({ x: event.clientX, y: event.clientY })}
+            >
+              <MoreVertical className="w-3.5 h-3.5" />
+            </button>
+            <IconButton label="Refresh" icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />} disabled={loading} onClick={() => void refresh()} />
+          </>
         )}
-        <select
-          className="taomni-input h-7 w-32"
-          value={remoteName}
-          onChange={(event) => setRemoteName(event.target.value)}
-          disabled={!snapshot?.remotes.length}
-        >
-          {snapshot?.remotes.length ? snapshot.remotes.map((remote) => (
-            <option key={remote.name} value={remote.name}>{remote.name}</option>
-          )) : <option value="">No remote</option>}
-        </select>
-        <IconButton label="Fetch" icon={<Download className="w-3.5 h-3.5" />} disabled={busy || !remoteName} onClick={() => void runAction("Fetch", () => gitFetch(repoRoot, remoteName))} />
-        <IconButton label="Pull" icon={<GitMerge className="w-3.5 h-3.5" />} disabled={busy || !remoteName} onClick={() => void runAction("Pull", () => gitPull(repoRoot, remoteName, pullBranchForRemote(snapshot, remoteName)))} />
-        <IconButton label="Push" icon={<Upload className="w-3.5 h-3.5" />} disabled={busy || !remoteName} onClick={() => void runAction("Push", () => gitPush(repoRoot, remoteName, snapshot?.currentBranch ?? null, !snapshot?.upstream))} />
-        <IconButton label="Refresh" icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />} disabled={loading} onClick={() => void refresh()} />
       </header>
 
       <nav className="h-9 shrink-0 flex items-center gap-1 px-3 border-b border-[var(--taomni-divider)]">
@@ -667,6 +731,12 @@ export function GitPanel({
               hasRemote={!!remoteName}
               stageAll={stageAll}
               unstageAll={unstageAll}
+              stagePaths={(paths) => {
+                if (paths.length) void runAction("Stage", () => gitStage(repoRoot, paths));
+              }}
+              unstagePaths={(paths) => {
+                if (paths.length) void runAction("Unstage", () => gitUnstage(repoRoot, paths));
+              }}
               stageSelected={stageSelected}
               unstageSelected={unstageSelected}
               discardSelected={discardSelected}
@@ -831,6 +901,47 @@ export function GitPanel({
         </>
         )}
       </main>
+      {headerMenu && (
+        <ContextMenu
+          x={headerMenu.x}
+          y={headerMenu.y}
+          onClose={() => setHeaderMenu(null)}
+          items={[
+            {
+              label: "Sync",
+              icon: <RefreshCcw className="w-3.5 h-3.5" />,
+              disabled: busy || !remoteName,
+              onClick: syncCurrentBranch,
+            },
+            {
+              label: "Checkout branch...",
+              icon: <GitFork className="w-3.5 h-3.5" />,
+              disabled: busy,
+              onClick: checkoutBranchByName,
+            },
+            {
+              label: "New branch...",
+              icon: <Plus className="w-3.5 h-3.5" />,
+              disabled: busy,
+              onClick: createBranchFromHead,
+            },
+            {
+              label: "Open code workspace",
+              icon: <Braces className="w-3.5 h-3.5" />,
+              disabled: !onOpenWorkspace,
+              onClick: () => onOpenWorkspace?.(repoRoot),
+            },
+            { label: "", separator: true },
+            {
+              label: "Force push with lease...",
+              icon: <Upload className="w-3.5 h-3.5" />,
+              disabled: busy || !remoteName || !snapshot?.currentBranch,
+              danger: true,
+              onClick: forcePushCurrentBranch,
+            },
+          ]}
+        />
+      )}
       {menu && (
         <ContextMenu
           x={menu.x}
@@ -899,6 +1010,8 @@ function ChangesView({
   hasRemote,
   stageAll,
   unstageAll,
+  stagePaths,
+  unstagePaths,
   stageSelected,
   unstageSelected,
   discardSelected,
@@ -926,6 +1039,8 @@ function ChangesView({
   hasRemote: boolean;
   stageAll: () => void;
   unstageAll: () => void;
+  stagePaths: (paths: string[]) => void;
+  unstagePaths: (paths: string[]) => void;
   stageSelected: () => void;
   unstageSelected: () => void;
   discardSelected: () => void;
@@ -953,6 +1068,9 @@ function ChangesView({
           treeMode={treeMode}
           checked={checked}
           onToggleChecked={onToggleChecked}
+          busy={busy}
+          onStagePaths={stagePaths}
+          onUnstagePaths={unstagePaths}
           selected={selected}
           activePath={activePath}
           onSelect={onSelect}

@@ -304,6 +304,7 @@ export interface GitWorkspaceRootInfo {
   path: string;
   repoRoot: string;
   rootIds: string[];
+  isSubmodule?: boolean;
 }
 
 export type CodeWorkspaceRootKind = "git" | "folder";

@@ -1,6 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ReactNode } from "react";
 import { useAppStore } from "../../stores/appStore";
 import type { GitSnapshot } from "../../lib/git";
 import { WorkspaceGitManager } from "./WorkspaceGitManager";
@@ -34,8 +33,12 @@ vi.mock("../../lib/git", () => gitMocks);
 vi.mock("../../lib/appDialogs", () => dialogMocks);
 
 vi.mock("./GitPanel", () => ({
-  GitPanel: ({ repoRoot, changesView }: { repoRoot: string; changesView?: ReactNode }) => (
+  GitPanel: ({ repoRoot, changesView, workspaceHeader }: any) => (
     <div data-testid="git-panel" data-repo-root={repoRoot}>
+      <div data-testid="mock-git-header">
+        {workspaceHeader?.repoSelector}
+        {workspaceHeader?.actionControls}
+      </div>
       {changesView}
     </div>
   ),
@@ -147,7 +150,7 @@ describe("WorkspaceGitManager", () => {
     expect(screen.queryByTestId("workspace-git-sidebar")).not.toBeInTheDocument();
   });
 
-  it("keeps file-level changes out of the workspace sidebar and shows the selected repo in the Git panel", async () => {
+  it("uses a header repo selector by default and keeps file-level changes out of the optional repo panel", async () => {
     render(
       <WorkspaceGitManager
         workspaceName="Workspace"
@@ -160,18 +163,23 @@ describe("WorkspaceGitManager", () => {
     );
 
     await waitFor(() => expect(gitMocks.gitSnapshot).toHaveBeenCalledWith("/repo/app"));
-    const sidebar = screen.getByTestId("workspace-git-sidebar");
-    expect(within(sidebar).getByText("Repositories")).toBeInTheDocument();
-    expect(within(sidebar).getByText("2/2")).toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-git-sidebar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("workspace-repo-selector")).toHaveTextContent("All Repositories (2)");
     expect(screen.getByTestId("git-panel")).toHaveAttribute("data-repo-root", "/repo/service");
-    expect(within(sidebar).getByRole("checkbox", { name: "Select app" })).toBeInTheDocument();
-    expect(within(sidebar).queryByText("src/ignored.ts")).not.toBeInTheDocument();
-    expect(within(sidebar).queryByPlaceholderText("Commit message")).not.toBeInTheDocument();
     expect(screen.getByText("src/App.tsx")).toBeInTheDocument();
     expect(screen.getByText("src/ignored.ts")).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: "Show Repository Panel" }));
+    const sidebar = screen.getByTestId("workspace-git-sidebar");
+    expect(within(sidebar).getByText("Repositories")).toBeInTheDocument();
+    expect(within(sidebar).getByText("2/2")).toBeInTheDocument();
+    expect(within(sidebar).getByRole("checkbox", { name: "Select app" })).toBeInTheDocument();
+    expect(within(sidebar).queryByText("src/ignored.ts")).not.toBeInTheDocument();
+    expect(within(sidebar).queryByPlaceholderText("Commit message")).not.toBeInTheDocument();
+
     fireEvent.click(within(sidebar).getByText("app"));
     expect(screen.getByTestId("git-panel")).toHaveAttribute("data-repo-root", "/repo/app");
+    expect(screen.getByTestId("workspace-repo-selector")).toHaveTextContent("app");
 
     const ignoredRow = screen.getByText("src/ignored.ts").closest("[role='button']");
     expect(ignoredRow).not.toBeNull();

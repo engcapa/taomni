@@ -56,6 +56,7 @@ pub struct WorkspaceGitRoot {
     pub path: String,
     pub repo_root: String,
     pub root_ids: Vec<String>,
+    pub is_submodule: bool,
 }
 
 #[tauri::command]
@@ -609,9 +610,16 @@ fn upsert_workspace_git_root(
         id: format!("{}:{}", workspace_root.id, repo_root),
         name: repo_display_name(repo_root.as_str(), &workspace_root.name),
         path: path_to_string(workspace_path),
+        is_submodule: is_git_file(repo_root.as_str()),
         repo_root,
         root_ids: vec![workspace_root.id.clone()],
     });
+}
+
+fn is_git_file(repo_root: &str) -> bool {
+    fs::symlink_metadata(Path::new(repo_root).join(".git"))
+        .map(|meta| meta.is_file())
+        .unwrap_or(false)
 }
 
 fn collect_nested_git_roots(
@@ -622,6 +630,9 @@ fn collect_nested_git_roots(
     repos: &mut Vec<PathBuf>,
 ) -> Result<(), String> {
     if depth > max_depth || *remaining_dirs == 0 {
+        return Ok(());
+    }
+    if depth > 0 && should_skip_git_root_scan_dir(dir) {
         return Ok(());
     }
     *remaining_dirs = (*remaining_dirs).saturating_sub(1);
@@ -1030,7 +1041,41 @@ mod tests {
         let repo_roots: Vec<_> = repos.iter().map(|item| item.repo_root.as_str()).collect();
         assert!(repo_roots.contains(&app_root.as_str()));
         assert!(repo_roots.contains(&service_root.as_str()));
-        assert_eq!(repos.len(), 2);
+        assert!(!repo_roots.iter().any(|root| root.contains("node_modules")));
+        assert_eq!(
+            repo_roots
+                .iter()
+                .filter(|root| Path::new(root).starts_with(&workspace))
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn marks_git_file_roots_as_submodules() {
+        let dir = tempfile::tempdir().unwrap();
+        let workspace = dir.path().join("workspace");
+        let submodule = workspace.join("vendor/lib");
+        fs::create_dir_all(&submodule).unwrap();
+        fs::write(
+            submodule.join(".git"),
+            "gitdir: ../../.git/modules/vendor/lib\n",
+        )
+        .unwrap();
+
+        let repos = workspace_detect_git_roots(vec![WorkspaceGitRootCandidate {
+            id: "workspace".into(),
+            name: "workspace".into(),
+            path: workspace.to_string_lossy().to_string(),
+        }])
+        .unwrap();
+
+        let submodule_root = submodule.to_string_lossy().to_string();
+        let detected = repos
+            .iter()
+            .find(|item| item.repo_root == submodule_root)
+            .expect("submodule should be detected");
+        assert!(detected.is_submodule);
     }
 
     #[test]

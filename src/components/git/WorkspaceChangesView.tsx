@@ -42,6 +42,8 @@ export interface WorkspaceChangesViewProps {
   scopeSummary: string;
   stageAll: () => void;
   unstageAll: () => void;
+  stagePaths: (repoRoot: string, paths: string[]) => void;
+  unstagePaths: (repoRoot: string, paths: string[]) => void;
   stageSelected: () => void;
   unstageSelected: () => void;
   discardSelected: () => void;
@@ -78,6 +80,8 @@ export function WorkspaceChangesView({
   scopeSummary,
   stageAll,
   unstageAll,
+  stagePaths,
+  unstagePaths,
   stageSelected,
   unstageSelected,
   discardSelected,
@@ -198,6 +202,8 @@ export function WorkspaceChangesView({
               checkedRepoPathCount={checkedChangePathsByRepo[root.repoRoot]?.length ?? 0}
               canPush={pushableRepoRoots.has(root.repoRoot)}
               onToggleChecked={onToggleChecked}
+              onStagePaths={stagePaths}
+              onUnstagePaths={unstagePaths}
               onSelect={onSelect}
               onContextMenu={onContextMenu}
             />
@@ -253,6 +259,8 @@ function RepoChangeGroup({
   checkedRepoPathCount,
   canPush,
   onToggleChecked,
+  onStagePaths,
+  onUnstagePaths,
   onSelect,
   onContextMenu,
 }: {
@@ -275,6 +283,8 @@ function RepoChangeGroup({
   checkedRepoPathCount: number;
   canPush: boolean;
   onToggleChecked: (repoRoot: string, paths: string[], value: boolean) => void;
+  onStagePaths: (repoRoot: string, paths: string[]) => void;
+  onUnstagePaths: (repoRoot: string, paths: string[]) => void;
   onSelect: (repoRoot: string, path: string, mods: { ctrl: boolean; shift: boolean }) => void;
   onContextMenu: (repoRoot: string, path: string, event: ReactMouseEvent) => void;
 }) {
@@ -294,22 +304,7 @@ function RepoChangeGroup({
   );
   const parsedFocus = focusedKey ? parseWorkspaceChangeKey(focusedKey) : null;
   const activePath = parsedFocus?.repoRoot === root.repoRoot ? parsedFocus.path : null;
-  const stagedChanges = changes.filter((change) => change.staged);
-  const unstagedChanges = changes.filter((change) => !change.staged);
   const canCommitRepo = !busy && checkedRepoPathCount > 0 && commitMessage.trim().length > 0;
-
-  const renderTree = (subset: GitSnapshot["changes"]) => (
-    <ChangesTree
-      changes={subset}
-      treeMode={treeMode}
-      checked={checkedPaths}
-      onToggleChecked={(paths, value) => onToggleChecked(root.repoRoot, paths, value)}
-      selected={selectedPaths}
-      activePath={activePath}
-      onSelect={(path, mods) => onSelect(root.repoRoot, path, mods)}
-      onContextMenu={(path, event) => onContextMenu(root.repoRoot, path, event)}
-    />
-  );
 
   return (
     <section className="border-b border-[var(--taomni-divider)]">
@@ -344,22 +339,19 @@ function RepoChangeGroup({
         </div>
       ) : changes.length > 0 ? (
         <>
-          {stagedChanges.length > 0 && (
-            <>
-              <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)] bg-[var(--taomni-bg)]">
-                Staged ({stagedChanges.length})
-              </div>
-              {renderTree(stagedChanges)}
-            </>
-          )}
-          {unstagedChanges.length > 0 && (
-            <>
-              <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)] bg-[var(--taomni-bg)]">
-                Changes ({unstagedChanges.length})
-              </div>
-              {renderTree(unstagedChanges)}
-            </>
-          )}
+          <ChangesTree
+            changes={changes}
+            treeMode={treeMode}
+            checked={checkedPaths}
+            onToggleChecked={(paths, value) => onToggleChecked(root.repoRoot, paths, value)}
+            busy={busy}
+            onStagePaths={(paths) => onStagePaths(root.repoRoot, paths)}
+            onUnstagePaths={(paths) => onUnstagePaths(root.repoRoot, paths)}
+            selected={selectedPaths}
+            activePath={activePath}
+            onSelect={(path, mods) => onSelect(root.repoRoot, path, mods)}
+            onContextMenu={(path, event) => onContextMenu(root.repoRoot, path, event)}
+          />
           <div className="flex items-center gap-1.5 px-2 py-1.5 border-t border-[var(--taomni-divider)]">
             <input
               className="taomni-input h-7 min-w-0 flex-1 text-[12px]"
