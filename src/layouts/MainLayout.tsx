@@ -32,6 +32,7 @@ import { StatusBar } from "../components/statusbar/StatusBar";
 import { WindowResizeHandles } from "../components/window/WindowResizeHandles";
 import { TerminalPanel, type TerminalLocalPathUploadRequest } from "../components/terminal/TerminalPanel";
 import { GitPanel } from "../components/git/GitPanel";
+import { WorkspaceGitManager } from "../components/git/WorkspaceGitManager";
 import { CodeWorkspaceTab } from "../components/editor/CodeWorkspaceTab";
 import { MultiExecBar } from "../components/terminal/MultiExecBar";
 import { SessionEditor } from "../components/session/SessionEditor";
@@ -70,7 +71,7 @@ import {
 } from "../lib/detachedSession";
 import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams, DetachedDbParams } from "../components/detached/DetachedSessionWindow";
 import { Columns2, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
-import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo, MailConnectionSecurity, MailTabInfo, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, RecentWorkspace } from "../types";
+import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo, MailConnectionSecurity, MailTabInfo, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, GitWorkspaceRootInfo, RecentWorkspace } from "../types";
 import { computeNewTerminalTitle, recentWorkspaceIdFromParts, useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { WelcomePanel } from "../components/WelcomePanel";
@@ -569,6 +570,27 @@ function sessionToHBaseConnectInfo(session: SessionConfig, password?: string): H
     krb5ConfPath: str("hbaseKrb5ConfPath") || null,
     hbaseSitePath: str("hbaseSitePath") || null,
   };
+}
+
+function normalizeGitWorkspaceRoots(roots: readonly GitWorkspaceRootInfo[]): GitWorkspaceRootInfo[] {
+  const seen = new Set<string>();
+  const next: GitWorkspaceRootInfo[] = [];
+  for (const root of roots) {
+    const repoRoot = root.repoRoot.trim();
+    if (!repoRoot || seen.has(repoRoot)) continue;
+    seen.add(repoRoot);
+    next.push({
+      ...root,
+      repoRoot,
+      name: root.name || gitRepoName(repoRoot),
+      rootIds: root.rootIds ?? [],
+    });
+  }
+  return next.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+}
+
+function gitWorkspaceRootsKey(roots: readonly GitWorkspaceRootInfo[]): string {
+  return roots.map((root) => root.repoRoot).sort((a, b) => a.localeCompare(b)).join("\n");
 }
 
 export function MainLayout() {
@@ -1765,7 +1787,9 @@ export function MainLayout() {
   const openGitTab = useCallback((repoRoot: string) => {
     const normalized = repoRoot.trim();
     if (!normalized) return;
-    const existing = tabsRef.current.find((tab) => tab.type === "git" && tab.git?.repoRoot === normalized);
+    const existing = tabsRef.current.find(
+      (tab) => tab.type === "git" && tab.git?.repoRoot === normalized && !tab.git?.workspaceRoots?.length,
+    );
     if (existing) {
       setActiveTab(existing.id);
       return;
@@ -1776,6 +1800,41 @@ export function MainLayout() {
       title: `Git · ${gitRepoName(normalized)}`,
       closable: true,
       git: { repoRoot: normalized },
+    });
+  }, [addTab, setActiveTab]);
+
+  const openWorkspaceGitManager = useCallback((payload: {
+    workspaceName: string;
+    roots: GitWorkspaceRootInfo[];
+    activeRepoRoot: string | null;
+  }) => {
+    const workspaceRoots = normalizeGitWorkspaceRoots(payload.roots);
+    if (workspaceRoots.length === 0) return;
+    const activeRepoRoot = payload.activeRepoRoot && workspaceRoots.some((root) => root.repoRoot === payload.activeRepoRoot)
+      ? payload.activeRepoRoot
+      : workspaceRoots[0].repoRoot;
+    const key = gitWorkspaceRootsKey(workspaceRoots);
+    const existing = tabsRef.current.find((tab) => (
+      tab.type === "git"
+      && !!tab.git?.workspaceRoots?.length
+      && gitWorkspaceRootsKey(tab.git.workspaceRoots) === key
+    ));
+    if (existing) {
+      setActiveTab(existing.id);
+      return;
+    }
+    const name = payload.workspaceName.trim() || "Code Workspace";
+    addTab({
+      id: `git-workspace-${Date.now()}`,
+      type: "git",
+      title: `Git · ${name}`,
+      closable: true,
+      git: {
+        repoRoot: activeRepoRoot,
+        workspaceName: name,
+        workspaceRoots,
+        activeRepoRoot,
+      },
     });
   }, [addTab, setActiveTab]);
 
@@ -3550,17 +3609,28 @@ export function MainLayout() {
                 {gitTabs.map((tab) => {
                   if (!tab.git) return null;
                   const isActive = activeTabId === tab.id;
+                  const workspaceRoots = tab.git.workspaceRoots ?? [];
                   return (
                     <div
                       key={tab.id}
                       className="absolute inset-0"
                       style={{ display: isActive ? "block" : "none" }}
                     >
-                      <GitPanel
-                        repoRoot={tab.git.repoRoot}
-                        visible={isActive}
-                        onOpenWorkspace={openCodeWorkspaceTab}
-                      />
+                      {workspaceRoots.length > 0 ? (
+                        <WorkspaceGitManager
+                          workspaceName={tab.git.workspaceName}
+                          roots={workspaceRoots}
+                          activeRepoRoot={tab.git.activeRepoRoot ?? tab.git.repoRoot}
+                          visible={isActive}
+                          onOpenWorkspace={openCodeWorkspaceTab}
+                        />
+                      ) : (
+                        <GitPanel
+                          repoRoot={tab.git.repoRoot}
+                          visible={isActive}
+                          onOpenWorkspace={openCodeWorkspaceTab}
+                        />
+                      )}
                     </div>
                   );
                 })}
@@ -3578,6 +3648,7 @@ export function MainLayout() {
                         tabId={tab.id}
                         workspace={tab.codeWorkspace}
                         visible={isActive}
+                        onOpenGitManager={openWorkspaceGitManager}
                       />
                     </div>
                   );

@@ -50,6 +50,7 @@ import {
   Braces,
   ChevronDown,
   ChevronRight,
+  ExternalLink,
   File,
   FilePlus,
   Folder,
@@ -141,6 +142,11 @@ interface CodeWorkspaceTabProps {
   tabId: string;
   workspace: CodeWorkspaceTabInfo;
   visible?: boolean;
+  onOpenGitManager?: (payload: {
+    workspaceName: string;
+    roots: WorkspaceGitRoot[];
+    activeRepoRoot: string | null;
+  }) => void;
 }
 
 interface DirectoryState {
@@ -747,6 +753,7 @@ export function CodeWorkspaceTab({
   tabId,
   workspace,
   visible = true,
+  onOpenGitManager,
 }: CodeWorkspaceTabProps) {
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const setTabCodeWorkspaceContext = useAppStore((s) => s.setTabCodeWorkspaceContext);
@@ -2009,6 +2016,7 @@ export function CodeWorkspaceTab({
     }
     return map;
   }, [gitRoots]);
+  const activeGitRoot = activeRootId ? gitRootByRootId.get(activeRootId) ?? null : null;
   const gitChangeByRootPath = useMemo(() => {
     const map = new Map<string, GitChange>();
     for (const root of roots) {
@@ -2196,6 +2204,14 @@ export function CodeWorkspaceTab({
   );
   const activeDiagnostics = activeLspState?.diagnostics ?? [];
   const title = workspaceTitle(workspace, roots, looseFiles);
+  const openGitManager = useCallback(() => {
+    if (!onOpenGitManager || gitRoots.length === 0) return;
+    onOpenGitManager({
+      workspaceName: title,
+      roots: gitRoots,
+      activeRepoRoot: activeGitRoot?.repoRoot ?? gitRoots[0]?.repoRoot ?? null,
+    });
+  }, [activeGitRoot, gitRoots, onOpenGitManager, title]);
 
   useEffect(() => {
     const firstRoot = roots[0] ?? null;
@@ -2606,6 +2622,13 @@ export function CodeWorkspaceTab({
           disabled={!gitRootsLoading && !gitRootsError && gitRoots.length === 0}
           onClick={() => setBottomPanelOpen(!bottomPanelOpen)}
         />
+        <IconButton
+          label="Open Git manager"
+          testId="code-workspace-git-manager-open"
+          icon={<ExternalLink className="w-3.5 h-3.5" />}
+          disabled={!onOpenGitManager || gitRoots.length === 0}
+          onClick={openGitManager}
+        />
       </header>
 
       <PanelGroup
@@ -2963,6 +2986,7 @@ export function CodeWorkspaceTab({
                         gitRoots={gitRoots}
                         activeRootId={activeRootId}
                         visible={visible && bottomPanelOpen}
+                        onOpenManager={openGitManager}
                       />
                     )}
                   </Panel>
