@@ -398,17 +398,51 @@ function relativePathWithinRoot(rootPath: string, filePath: string): string | nu
   return file.startsWith(`${root}/`) ? file.slice(root.length + 1) : null;
 }
 
+function absoluteWorkspacePath(root: CodeWorkspaceRootInfo, workspacePath: string): string {
+  const rootPath = normalizeFsPath(root.path);
+  const cleanPath = normalizeFsPath(workspacePath).replace(/^\/+/, "");
+  return cleanPath ? `${rootPath}/${cleanPath}` : rootPath;
+}
+
 function gitPathForWorkspacePath(
   root: CodeWorkspaceRootInfo,
   repo: WorkspaceGitRoot,
   workspacePath: string,
 ): string | null {
   const repoRoot = normalizeFsPath(repo.repoRoot);
+  const filePath = absoluteWorkspacePath(root, workspacePath);
+  if (filePath === repoRoot) return "";
+  return filePath.startsWith(`${repoRoot}/`) ? filePath.slice(repoRoot.length + 1) : null;
+}
+
+function workspacePathForGitPath(
+  root: CodeWorkspaceRootInfo,
+  repo: WorkspaceGitRoot,
+  gitPath: string,
+): string | null {
   const rootPath = normalizeFsPath(root.path);
-  if (rootPath === repoRoot) return workspacePath;
-  if (!rootPath.startsWith(`${repoRoot}/`)) return null;
-  const prefix = rootPath.slice(repoRoot.length + 1);
-  return workspacePath ? `${prefix}/${workspacePath}` : prefix;
+  const repoRoot = normalizeFsPath(repo.repoRoot);
+  const cleanPath = normalizeFsPath(gitPath).replace(/^\/+/, "");
+  const filePath = cleanPath ? `${repoRoot}/${cleanPath}` : repoRoot;
+  if (filePath === rootPath) return "";
+  return filePath.startsWith(`${rootPath}/`) ? filePath.slice(rootPath.length + 1) : null;
+}
+
+function gitRootsForWorkspaceRoot(root: CodeWorkspaceRootInfo, gitRoots: WorkspaceGitRoot[]): WorkspaceGitRoot[] {
+  return gitRoots
+    .filter((repo) => repo.rootIds.includes(root.id))
+    .sort((a, b) => normalizeFsPath(b.repoRoot).length - normalizeFsPath(a.repoRoot).length);
+}
+
+function gitRootForWorkspacePath(
+  root: CodeWorkspaceRootInfo,
+  workspacePath: string,
+  gitRoots: WorkspaceGitRoot[],
+): WorkspaceGitRoot | null {
+  for (const repo of gitRootsForWorkspaceRoot(root, gitRoots)) {
+    if (gitPathForWorkspacePath(root, repo, workspacePath) !== null) return repo;
+  }
+  return null;
 }
 
 function rootDirKey(rootId: string, path = ""): string {
@@ -1961,36 +1995,25 @@ export function CodeWorkspaceTab({
     ? markdownModes[activeFile.key] ?? "edit"
     : "edit";
   const activeRootId = activeFile?.ref.kind === "root" ? activeFile.ref.rootId : null;
-  const gitRootByRootId = useMemo(() => {
-    const map = new Map<string, WorkspaceGitRoot>();
-    for (const root of gitRoots) {
-      root.rootIds.forEach((rootId) => map.set(rootId, root));
-    }
-    return map;
-  }, [gitRoots]);
-  const activeGitRoot = activeRootId ? gitRootByRootId.get(activeRootId) ?? null : null;
+  const activeRoot = activeRootId ? roots.find((root) => root.id === activeRootId) ?? null : null;
+  const activeGitRoot = activeRoot && activeFile?.ref.kind === "root"
+    ? gitRootForWorkspacePath(activeRoot, activeFile.ref.path, gitRoots)
+    : null;
   const gitChangeByRootPath = useMemo(() => {
     const map = new Map<string, GitChange>();
     for (const root of roots) {
-      const repo = gitRootByRootId.get(root.id);
-      if (!repo) continue;
-      const snapshot = gitSnapshots[repo.repoRoot];
-      if (!snapshot?.changes.length) continue;
-      for (const change of snapshot.changes) {
-        const rootPrefix = gitPathForWorkspacePath(root, repo, "");
-        if (rootPrefix === null) continue;
-        const normalizedPrefix = rootPrefix.replace(/\/+$/, "");
-        const workspacePath = normalizedPrefix
-          ? change.path.startsWith(`${normalizedPrefix}/`)
-            ? change.path.slice(normalizedPrefix.length + 1)
-            : null
-          : change.path;
-        if (!workspacePath) continue;
-        map.set(`${root.id}:${workspacePath}`, change);
+      for (const repo of gitRootsForWorkspaceRoot(root, gitRoots)) {
+        const snapshot = gitSnapshots[repo.repoRoot];
+        if (!snapshot?.changes.length) continue;
+        for (const change of snapshot.changes) {
+          const workspacePath = workspacePathForGitPath(root, repo, change.path);
+          if (workspacePath === null) continue;
+          map.set(`${root.id}:${workspacePath}`, change);
+        }
       }
     }
     return map;
-  }, [gitRootByRootId, gitSnapshots, roots]);
+  }, [gitRoots, gitSnapshots, roots]);
 
   useEffect(() => {
     if (!visible || !activeFile || activeFile.loading) return;
@@ -2163,7 +2186,7 @@ export function CodeWorkspaceTab({
       roots: gitRoots,
       activeRepoRoot: activeGitRoot?.repoRoot ?? gitRoots[0]?.repoRoot ?? null,
     });
-  }, [activeGitRoot, gitRoots, onOpenGitManager, title]);
+  }, [activeFile, activeGitRoot, gitRoots, onOpenGitManager, title]);
 
   useEffect(() => {
     const firstRoot = roots[0] ?? null;

@@ -15,6 +15,7 @@ import {
   GitMerge,
   Loader2,
   RefreshCw,
+  Search,
   Upload,
 } from "lucide-react";
 import {
@@ -37,6 +38,7 @@ import {
 import { alertAppDialog, confirmAppDialog } from "../../lib/appDialogs";
 import { useAppStore } from "../../stores/appStore";
 import type { GitWorkspaceRootInfo } from "../../types";
+import { ContextMenu, type MenuItem } from "../ContextMenu";
 import { GitPanel } from "./GitPanel";
 import { WorkspaceChangesView } from "./WorkspaceChangesView";
 import {
@@ -81,8 +83,11 @@ export function WorkspaceGitManager({
   const [uncheckedChangeKeys, setUncheckedChangeKeys] = useState<Set<string>>(() => new Set());
   const [selectedChangeKeys, setSelectedChangeKeys] = useState<Set<string>>(() => new Set());
   const [focusedChangeKey, setFocusedChangeKey] = useState<string | null>(null);
+  const [changeMenu, setChangeMenu] = useState<{ x: number; y: number } | null>(null);
   const [pair, setPair] = useState<GitBlobPair | null>(null);
   const [pairLoading, setPairLoading] = useState(false);
+  const [repoFilter, setRepoFilter] = useState("");
+  const [showCleanRepos, setShowCleanRepos] = useState(true);
   const [treeMode, setTreeMode] = useState(() => {
     try {
       return localStorage.getItem("taomni.git.workspace.changes.tree") !== "flat";
@@ -129,6 +134,16 @@ export function WorkspaceGitManager({
     () => Object.values(checkedChangePathsByRepo).filter((paths) => paths.length > 0).length,
     [checkedChangePathsByRepo],
   );
+  const canPushCheckedChanges = useMemo(() => {
+    const repoRoots = Object.entries(checkedChangePathsByRepo)
+      .filter(([, paths]) => paths.length > 0)
+      .map(([repoRoot]) => repoRoot);
+    if (repoRoots.length === 0) return false;
+    return repoRoots.every((repoRoot) => {
+      const snapshot = snapshots[repoRoot]?.snapshot;
+      return !!snapshot?.currentBranch && !!selectedRemote(snapshot);
+    });
+  }, [checkedChangePathsByRepo, snapshots]);
   const focusedChange = useMemo(
     () => allChanges.find((entry) => entry.key === focusedChangeKey) ?? null,
     [allChanges, focusedChangeKey],
@@ -147,9 +162,31 @@ export function WorkspaceGitManager({
     if (retainedSelected.length > 0) return retainedSelected;
     return focusedChangeKey && validChangeKeys.has(focusedChangeKey) ? [focusedChangeKey] : [];
   }, [focusedChangeKey, selectedChangeKeys, validChangeKeys]);
+  const selectedOperationEntries = useMemo(
+    () => selectedOperationKeys
+      .map((key) => allChanges.find((entry) => entry.key === key))
+      .filter((entry): entry is (typeof allChanges)[number] => !!entry),
+    [allChanges, selectedOperationKeys],
+  );
   const totalChangedFiles = allChanges.length;
   const allChecked = normalizedRoots.length > 0 && checkedRoots.length === normalizedRoots.length;
   const title = workspaceName?.trim() || "Code Workspace";
+  const singleRepoMode = normalizedRoots.length === 1;
+  const filteredSidebarRoots = useMemo(() => {
+    const query = repoFilter.trim().toLowerCase();
+    return normalizedRoots.filter((root) => {
+      const snapshot = snapshots[root.repoRoot]?.snapshot ?? null;
+      const hasChanges = (snapshot?.changes.length ?? 0) > 0;
+      if (!showCleanRepos && !hasChanges) return false;
+      if (!query) return true;
+      return (
+        root.name.toLowerCase().includes(query) ||
+        root.repoRoot.toLowerCase().includes(query) ||
+        (snapshot?.currentBranch ?? "").toLowerCase().includes(query) ||
+        (snapshot?.upstream ?? "").toLowerCase().includes(query)
+      );
+    });
+  }, [normalizedRoots, repoFilter, showCleanRepos, snapshots]);
 
   useEffect(() => {
     try {
@@ -225,9 +262,9 @@ export function WorkspaceGitManager({
   }, [normalizedRoots, refreshRepo]);
 
   useEffect(() => {
-    if (!visible || normalizedRoots.length === 0) return;
+    if (!visible || normalizedRoots.length === 0 || singleRepoMode) return;
     void refreshRepos(normalizedRoots);
-  }, [normalizedRoots, refreshRepos, visible]);
+  }, [normalizedRoots, refreshRepos, singleRepoMode, visible]);
 
   useEffect(() => {
     let cancelled = false;
@@ -274,19 +311,6 @@ export function WorkspaceGitManager({
     setCheckedRepoRoots(checked ? new Set(normalizedRoots.map((root) => root.repoRoot)) : new Set());
   }, [normalizedRoots]);
 
-  const toggleRepoChangeChecked = useCallback((repoRoot: string, checked: boolean) => {
-    const changes = snapshots[repoRoot]?.snapshot?.changes ?? [];
-    setUncheckedChangeKeys((current) => {
-      const next = new Set(current);
-      for (const change of changes) {
-        const key = workspaceChangeKey(repoRoot, change.path);
-        if (checked) next.delete(key);
-        else next.add(key);
-      }
-      return next;
-    });
-  }, [snapshots]);
-
   const toggleChangeChecked = useCallback((repoRoot: string, paths: string[], checked: boolean) => {
     setUncheckedChangeKeys((current) => {
       const next = new Set(current);
@@ -331,6 +355,7 @@ export function WorkspaceGitManager({
   ) => {
     event.preventDefault();
     selectWorkspaceChange(repoRoot, path, { ctrl: false, shift: false });
+    setChangeMenu({ x: event.clientX, y: event.clientY });
   }, [selectWorkspaceChange]);
 
   const runChangeAction = useCallback(async (
@@ -548,6 +573,16 @@ export function WorkspaceGitManager({
     }
   }, [checkedRoots, refreshRepos, setStatusMessage]);
 
+  if (singleRepoMode && selectedRoot) {
+    return (
+      <GitPanel
+        repoRoot={selectedRoot.repoRoot}
+        visible={visible}
+        onOpenWorkspace={onOpenWorkspace}
+      />
+    );
+  }
+
   return (
     <div
       data-testid="workspace-git-manager"
@@ -610,10 +645,31 @@ export function WorkspaceGitManager({
             <div className="flex-1" />
             {busyLabel && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-accent)]" />}
           </div>
+          <div className="h-9 shrink-0 flex items-center gap-1.5 border-b border-[var(--taomni-divider)] px-2">
+            <div className="relative min-w-0 flex-1">
+              <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
+              <input
+                className="taomni-input h-7 w-full pl-7"
+                value={repoFilter}
+                placeholder="Filter repositories"
+                onChange={(event) => setRepoFilter(event.target.value)}
+              />
+            </div>
+            <button
+              type="button"
+              className={`taomni-btn h-7 px-2 text-[11px] ${showCleanRepos ? "" : "bg-[var(--taomni-hover)]"}`}
+              title={showCleanRepos ? "Hide clean repositories" : "Show clean repositories"}
+              onClick={() => setShowCleanRepos((current) => !current)}
+            >
+              Changed
+            </button>
+          </div>
           <div className="flex-1 min-h-0 overflow-auto">
             {normalizedRoots.length === 0 ? (
               <EmptyState title="No Git repositories detected" />
-            ) : normalizedRoots.map((root) => {
+            ) : filteredSidebarRoots.length === 0 ? (
+              <EmptyState title="No repositories match the filter" />
+            ) : filteredSidebarRoots.map((root) => {
               const state = snapshots[root.repoRoot];
               const snapshot = state?.snapshot ?? null;
               const selected = selectedRoot?.repoRoot === root.repoRoot;
@@ -627,6 +683,7 @@ export function WorkspaceGitManager({
                   error={state?.error ?? null}
                   selected={selected}
                   checked={checked}
+                  workspacePath={root.path}
                   onChecked={(next) => toggleChecked(root.repoRoot, next)}
                   onSelect={() => setSelectedRepoRoot(root.repoRoot)}
                 />
@@ -660,6 +717,7 @@ export function WorkspaceGitManager({
                   pairLoading={pairLoading}
                   commitMessage={commitMessage}
                   setCommitMessage={setCommitMessage}
+                  canCommitAndPush={canPushCheckedChanges}
                   stageAll={stageAllChanges}
                   unstageAll={unstageAllChanges}
                   stageSelected={stageSelectedChanges}
@@ -667,7 +725,6 @@ export function WorkspaceGitManager({
                   discardSelected={discardSelectedChanges}
                   commit={() => commitWorkspaceChanges(false)}
                   commitAndPush={() => commitWorkspaceChanges(true)}
-                  onToggleRepoChecked={toggleRepoChangeChecked}
                   onToggleChecked={toggleChangeChecked}
                   onSelect={selectWorkspaceChange}
                   onContextMenu={openWorkspaceChangeMenu}
@@ -679,6 +736,19 @@ export function WorkspaceGitManager({
           )}
         </main>
       </div>
+      {changeMenu && (
+        <ContextMenu
+          x={changeMenu.x}
+          y={changeMenu.y}
+          onClose={() => setChangeMenu(null)}
+          items={workspaceChangeMenuItems({
+            entries: selectedOperationEntries,
+            onStage: stageSelectedChanges,
+            onUnstage: unstageSelectedChanges,
+            onDiscard: discardSelectedChanges,
+          })}
+        />
+      )}
     </div>
   );
 }
@@ -690,6 +760,7 @@ function RepoRow({
   error,
   selected,
   checked,
+  workspacePath,
   onChecked,
   onSelect,
 }: {
@@ -699,11 +770,13 @@ function RepoRow({
   error: string | null;
   selected: boolean;
   checked: boolean;
+  workspacePath: string;
   onChecked: (checked: boolean) => void;
   onSelect: () => void;
 }) {
   const branch = snapshot?.detached ? `detached ${snapshot.headOid ?? ""}` : snapshot?.currentBranch ?? "";
   const changes = snapshot?.changes ?? [];
+  const relation = repoRelationLabel(root.repoRoot, workspacePath);
   return (
     <div
       className={`group border-b border-[var(--taomni-divider)] ${selected ? "bg-[var(--taomni-hover)]" : "hover:bg-[var(--taomni-hover)]"}`}
@@ -732,7 +805,7 @@ function RepoRow({
             <span className="min-w-0 truncate">{branch || "No branch"}</span>
           </div>
           <div className="mt-1 truncate text-[11px] text-[var(--taomni-text-muted)]" title={root.repoRoot}>
-            {root.repoRoot}
+            {relation ? `${relation} · ${root.repoRoot}` : root.repoRoot}
           </div>
           {error && (
             <div className="mt-1 truncate text-[11px] text-red-500" title={error}>
@@ -758,6 +831,63 @@ function RepoRow({
       ) : null}
     </div>
   );
+}
+
+function repoRelationLabel(repoRoot: string, workspacePath: string): string | null {
+  const repo = normalizePath(repoRoot);
+  const workspace = normalizePath(workspacePath);
+  if (!repo || !workspace || repo === workspace) return null;
+  if (repo.startsWith(`${workspace}/`)) return `inside ${repo.slice(workspace.length + 1)}`;
+  if (workspace.startsWith(`${repo}/`)) return `root ${workspace.slice(repo.length + 1)}`;
+  return null;
+}
+
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, "/").replace(/\/+$/, "");
+}
+
+function workspaceChangeMenuItems({
+  entries,
+  onStage,
+  onUnstage,
+  onDiscard,
+}: {
+  entries: Array<{
+    repoRoot: string;
+    repoName: string;
+    change: { path: string };
+  }>;
+  onStage: () => void;
+  onUnstage: () => void;
+  onDiscard: () => void;
+}): MenuItem[] {
+  const disabled = entries.length === 0;
+  const copy = (text: string) => {
+    void navigator.clipboard?.writeText(text).catch(() => {});
+  };
+  const absolutePaths = entries.map((entry) => {
+    const sep = entry.repoRoot.includes("\\") ? "\\" : "/";
+    return `${entry.repoRoot}${sep}${entry.change.path.split("/").join(sep)}`;
+  });
+  const relativePaths = entries.map((entry) => (
+    entries.length > 1 ? `${entry.repoName}: ${entry.change.path}` : entry.change.path
+  ));
+  return [
+    { label: "Stage", disabled, onClick: onStage },
+    { label: "Unstage", disabled, onClick: onUnstage },
+    { label: "Discard...", disabled, danger: true, onClick: onDiscard },
+    { label: "", separator: true },
+    {
+      label: entries.length > 1 ? `Copy paths (${entries.length})` : "Copy path",
+      disabled,
+      onClick: () => copy(absolutePaths.join("\n")),
+    },
+    {
+      label: "Copy relative path",
+      disabled,
+      onClick: () => copy(relativePaths.join("\n")),
+    },
+  ];
 }
 
 function ToolbarButton({

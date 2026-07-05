@@ -132,6 +132,21 @@ describe("WorkspaceGitManager", () => {
     cleanup();
   });
 
+  it("uses the full single-repository Git panel without the multi-repo sidebar", () => {
+    render(
+      <WorkspaceGitManager
+        workspaceName="Single"
+        roots={[
+          { id: "app", name: "app", path: "/repo/app", repoRoot: "/repo/app", rootIds: ["app"] },
+        ]}
+      />,
+    );
+
+    expect(screen.getByTestId("git-panel")).toHaveAttribute("data-repo-root", "/repo/app");
+    expect(screen.queryByTestId("workspace-git-manager")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-git-sidebar")).not.toBeInTheDocument();
+  });
+
   it("keeps file-level changes out of the workspace sidebar and shows the selected repo in the Git panel", async () => {
     render(
       <WorkspaceGitManager

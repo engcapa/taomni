@@ -546,6 +546,111 @@ describe("CodeWorkspaceTab", () => {
     });
   });
 
+  it("selects the child repository that owns the active file inside a plain workspace root", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/workspace",
+      workspaceId: "ws-child-git",
+      name: "Child Repos",
+      roots: [{ id: "workspace", name: "workspace", path: "/workspace", kind: "folder" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "workspace", path: "service/src/api.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("api.ts", "service/src/api.ts")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("service/src/api.ts", "export const api = true;"));
+    workspaceMocks.workspaceDetectGitRoots.mockResolvedValue([
+      {
+        id: "workspace:/workspace/app",
+        name: "app",
+        path: "/workspace",
+        repoRoot: "/workspace/app",
+        rootIds: ["workspace"],
+      },
+      {
+        id: "workspace:/workspace/service",
+        name: "service",
+        path: "/workspace",
+        repoRoot: "/workspace/service",
+        rootIds: ["workspace"],
+      },
+    ]);
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => ({
+      repoRoot,
+      currentBranch: "main",
+      headOid: null,
+      detached: false,
+      upstream: null,
+      ahead: 0,
+      behind: 0,
+      changes: repoRoot === "/workspace/service"
+        ? [
+          {
+            path: "src/api.ts",
+            oldPath: null,
+            status: "modified",
+            staged: false,
+            unstaged: true,
+            conflict: false,
+          },
+        ]
+        : [
+          {
+            path: "src/App.tsx",
+            oldPath: null,
+            status: "modified",
+            staged: false,
+            unstaged: true,
+            conflict: false,
+          },
+        ],
+      remotes: [],
+      branches: [],
+      stashes: [],
+      tags: [],
+      settings: {
+        userName: null,
+        userEmail: null,
+        httpProxy: null,
+        httpsProxy: null,
+        pullRebase: null,
+        pushDefault: null,
+        coreAutocrlf: null,
+        coreFilemode: null,
+        commitGpgsign: null,
+      },
+    }));
+
+    const onOpenGitManager = vi.fn();
+    renderWorkspace(workspace, { onOpenGitManager });
+
+    expect(await screen.findByText("Code · Child Repos")).toBeInTheDocument();
+    await waitFor(() => expect(gitMocks.gitSnapshot).toHaveBeenCalledWith("/workspace/service"));
+    expect(await screen.findByTestId("code-workspace-git-status")).toHaveTextContent("M");
+
+    await waitFor(() => expect(screen.getByTestId("code-workspace-git-panel-toggle")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("code-workspace-git-panel-toggle"));
+
+    expect(onOpenGitManager).toHaveBeenCalledWith({
+      workspaceName: "Child Repos",
+      roots: [
+        {
+          id: "workspace:/workspace/app",
+          name: "app",
+          path: "/workspace",
+          repoRoot: "/workspace/app",
+          rootIds: ["workspace"],
+        },
+        {
+          id: "workspace:/workspace/service",
+          name: "service",
+          path: "/workspace",
+          repoRoot: "/workspace/service",
+          rootIds: ["workspace"],
+        },
+      ],
+      activeRepoRoot: "/workspace/service",
+    });
+  });
+
   it("has no theme picker and follows the shared Code View Appearance profile", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
