@@ -12,7 +12,6 @@ import {
   Braces,
   Check,
   ChevronDown,
-  ChevronRight,
   Circle,
   Download,
   Ellipsis,
@@ -22,8 +21,6 @@ import {
   GitFork,
   GitMerge,
   Loader2,
-  PanelLeftClose,
-  PanelLeft,
   Plus,
   RefreshCcw,
   RefreshCw,
@@ -98,15 +95,6 @@ export function WorkspaceGitManager({
     loadRepoScope(workspaceRootsKey(normalizedRoots), normalizedRoots)
       ?? initialRepoScope(normalizedRoots, activeRepoRoot)
   ));
-  const [railCollapsed, setRailCollapsed] = useState(() => {
-    try {
-      const saved = localStorage.getItem(WORKSPACE_RAIL_KEY);
-      return saved === null ? true : saved === "1";
-    } catch {
-      return true;
-    }
-  });
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
   const [repoCommitMessages, setRepoCommitMessages] = useState<Record<string, string>>({});
   const [snapshots, setSnapshots] = useState<Record<string, RepoSnapshotState>>({});
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
@@ -118,8 +106,6 @@ export function WorkspaceGitManager({
   const [changeMenu, setChangeMenu] = useState<{ x: number; y: number } | null>(null);
   const [pair, setPair] = useState<GitBlobPair | null>(null);
   const [pairLoading, setPairLoading] = useState(false);
-  const [repoFilter, setRepoFilter] = useState("");
-  const [showCleanRepos, setShowCleanRepos] = useState(true);
   const [repoRemoteNames, setRepoRemoteNames] = useState<Record<string, string>>({});
   const [headerMenu, setHeaderMenu] = useState<{ x: number; y: number } | null>(null);
   const [treeMode, setTreeMode] = useState(() => {
@@ -138,10 +124,6 @@ export function WorkspaceGitManager({
   const scopedRoots = useMemo(
     () => rootsForScope(normalizedRoots, repoScope),
     [normalizedRoots, repoScope],
-  );
-  const scopedRepoRootSet = useMemo(
-    () => new Set(scopedRoots.map((root) => root.repoRoot)),
-    [scopedRoots],
   );
   const repoScopeIsAll = repoScope.mode === "all";
   const repoScopeIsMulti = repoScope.mode !== "single";
@@ -213,24 +195,8 @@ export function WorkspaceGitManager({
     [allChanges, selectedOperationKeys],
   );
   const totalChangedFiles = allChanges.length;
-  const allChecked = normalizedRoots.length > 0 && scopedRoots.length === normalizedRoots.length;
   const title = workspaceName?.trim() || "Code Workspace";
   const singleRepoMode = normalizedRoots.length === 1;
-  const filteredSidebarRoots = useMemo(() => {
-    const query = repoFilter.trim().toLowerCase();
-    return normalizedRoots.filter((root) => {
-      const snapshot = snapshots[root.repoRoot]?.snapshot ?? null;
-      const hasChanges = (snapshot?.changes.length ?? 0) > 0;
-      if (!showCleanRepos && !hasChanges) return false;
-      if (!query) return true;
-      return (
-        root.name.toLowerCase().includes(query) ||
-        root.repoRoot.toLowerCase().includes(query) ||
-        (snapshot?.currentBranch ?? "").toLowerCase().includes(query) ||
-        (snapshot?.upstream ?? "").toLowerCase().includes(query)
-      );
-    });
-  }, [normalizedRoots, repoFilter, showCleanRepos, snapshots]);
 
   useEffect(() => {
     try {
@@ -269,14 +235,6 @@ export function WorkspaceGitManager({
   useEffect(() => {
     saveRepoScope(rootsKey, repoScope, normalizedRoots);
   }, [normalizedRoots, repoScope, rootsKey]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(WORKSPACE_RAIL_KEY, railCollapsed ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-  }, [railCollapsed]);
 
   const refreshRepo = useCallback(async (repoRoot: string) => {
     setSnapshots((current) => ({
@@ -352,23 +310,6 @@ export function WorkspaceGitManager({
       cancelled = true;
     };
   }, [focusedChange, setStatusMessage]);
-
-  const toggleRepoInScope = useCallback((repoRoot: string, checked: boolean) => {
-    const next = new Set(scopedRoots.map((root) => root.repoRoot));
-    if (checked) next.add(repoRoot);
-    else next.delete(repoRoot);
-    if (next.size === 0) return;
-    setRepoScope(scopeFromRepoRoots(next, normalizedRoots));
-  }, [normalizedRoots, scopedRoots]);
-
-  const setAllChecked = useCallback((checked: boolean) => {
-    if (checked) {
-      setRepoScope({ mode: "all" });
-      return;
-    }
-    const fallback = selectedRoot?.repoRoot ?? normalizedRoots[0]?.repoRoot ?? "";
-    if (fallback) setRepoScope({ mode: "single", repoRoot: fallback });
-  }, [normalizedRoots, selectedRoot]);
 
   const toggleChangeChecked = useCallback((repoRoot: string, paths: string[], checked: boolean) => {
     setUncheckedChangeKeys((current) => {
@@ -753,20 +694,6 @@ export function WorkspaceGitManager({
     return { ahead, behind };
   }, [scopedRoots, snapshots]);
 
-  const toggleGroupCollapsed = useCallback((groupKey: string) => {
-    setCollapsedGroups((current) => {
-      const next = new Set(current);
-      if (next.has(groupKey)) next.delete(groupKey);
-      else next.add(groupKey);
-      return next;
-    });
-  }, []);
-
-  const railGroups = useMemo(
-    () => buildRailGroups(filteredSidebarRoots),
-    [filteredSidebarRoots],
-  );
-
   const busy = busyLabel !== null;
   const refreshOperationRoots = useCallback(async () => {
     if (operationRoots.length === 0) return;
@@ -801,109 +728,6 @@ export function WorkspaceGitManager({
       data-testid="workspace-git-manager"
       className="h-full w-full min-h-0 flex bg-[var(--taomni-bg)] text-[var(--taomni-text)]"
     >
-      {!railCollapsed && (
-        <aside
-          data-testid="workspace-git-sidebar"
-          className="w-[240px] min-w-[220px] max-w-[34%] shrink-0 border-r border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] flex flex-col"
-        >
-          <div className="h-9 shrink-0 flex items-center gap-2 border-b border-[var(--taomni-divider)] px-3">
-            <label className="inline-flex items-center gap-2 text-[12px]">
-              <input
-                type="checkbox"
-                className="accent-[var(--taomni-accent)]"
-                checked={allChecked}
-                disabled={normalizedRoots.length === 0}
-                onChange={(event) => setAllChecked(event.target.checked)}
-              />
-              <span>Repositories</span>
-              <span className="text-[11px] text-[var(--taomni-text-muted)]">
-                {scopedRoots.length}/{normalizedRoots.length}
-              </span>
-            </label>
-            <div className="flex-1" />
-            {busyLabel && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-accent)]" />}
-            <button
-              type="button"
-              className="taomni-btn h-6 w-6 flex items-center justify-center"
-              title="Hide repositories"
-              aria-label="Hide repositories"
-              onClick={() => setRailCollapsed(true)}
-            >
-              <PanelLeftClose className="w-3.5 h-3.5" />
-            </button>
-          </div>
-          <div className="h-9 shrink-0 flex items-center gap-1.5 border-b border-[var(--taomni-divider)] px-2">
-            <div className="relative min-w-0 flex-1">
-              <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
-              <input
-                className="taomni-input h-7 w-full pl-7"
-                value={repoFilter}
-                placeholder="Filter repositories"
-                onChange={(event) => setRepoFilter(event.target.value)}
-              />
-            </div>
-            <button
-              type="button"
-              className={`taomni-btn h-7 px-2 text-[11px] ${showCleanRepos ? "" : "bg-[var(--taomni-hover)]"}`}
-              title={showCleanRepos ? "Hide clean repositories" : "Show clean repositories"}
-              onClick={() => setShowCleanRepos((current) => !current)}
-            >
-              Changed
-            </button>
-          </div>
-          <div className="flex-1 min-h-0 overflow-auto">
-            {normalizedRoots.length === 0 ? (
-              <EmptyState title="No Git repositories detected" />
-            ) : filteredSidebarRoots.length === 0 ? (
-              <EmptyState title="No repositories match the filter" />
-            ) : railGroups.map((group) => {
-              const showGroupHeader = railGroups.length > 1;
-              const collapsed = collapsedGroups.has(group.key);
-              return (
-                <div key={group.key}>
-                  {showGroupHeader && (
-                    <button
-                      type="button"
-                      className="w-full flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
-                      onClick={() => toggleGroupCollapsed(group.key)}
-                    >
-                      {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                      <FolderGit2 className="w-3.5 h-3.5" />
-                      <span className="truncate">{group.name}</span>
-                      <span className="ml-auto">{group.rows.length}</span>
-                    </button>
-                  )}
-                  {!collapsed && group.rows.map(({ root, depth }) => {
-                    const state = snapshots[root.repoRoot];
-                    const snapshot = state?.snapshot ?? null;
-                    const selected = selectedRoot?.repoRoot === root.repoRoot;
-                    const checked = scopedRepoRootSet.has(root.repoRoot);
-                    return (
-                      <RepoRow
-                        key={root.repoRoot}
-                        root={root}
-                        snapshot={snapshot}
-                        loading={!!state?.loading}
-                        error={state?.error ?? null}
-                        selected={selected}
-                        checked={checked}
-                        workspacePath={root.path}
-                        depth={depth}
-                        onChecked={(next) => toggleRepoInScope(root.repoRoot, next)}
-                        onSelect={() => {
-                          setSelectedRepoRoot(root.repoRoot);
-                          setRepoScope({ mode: "single", repoRoot: root.repoRoot });
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        </aside>
-      )}
-
       <main className="flex-1 min-w-0 min-h-0">
         {selectedRoot ? (
           <GitPanel
@@ -924,7 +748,6 @@ export function WorkspaceGitManager({
                   scope={repoScope}
                   selectedRoot={selectedRoot}
                   scopedRoots={scopedRoots}
-                  onOpenPanel={() => setRailCollapsed(false)}
                   onScopeChange={(next) => {
                     setRepoScope(next);
                     if (next.mode === "single") setSelectedRepoRoot(next.repoRoot);
@@ -1102,11 +925,6 @@ export function WorkspaceGitManager({
               icon: <Plus className="w-3.5 h-3.5" />,
               disabled: operationDisabled,
               onClick: () => batchCreateBranch(),
-            },
-            {
-              label: railCollapsed ? "Show Repository Panel" : "Hide Repository Panel",
-              icon: railCollapsed ? <PanelLeft className="w-3.5 h-3.5" /> : <PanelLeftClose className="w-3.5 h-3.5" />,
-              onClick: () => setRailCollapsed((current) => !current),
             },
             {
               label: "Open code workspace",
@@ -1438,7 +1256,6 @@ function RepoSelector({
   selectedRoot,
   scopedRoots,
   onScopeChange,
-  onOpenPanel,
 }: {
   roots: GitWorkspaceRootInfo[];
   snapshots: Record<string, RepoSnapshotState>;
@@ -1446,7 +1263,6 @@ function RepoSelector({
   selectedRoot: GitWorkspaceRootInfo | null;
   scopedRoots: GitWorkspaceRootInfo[];
   onScopeChange: (scope: RepoScope) => void;
-  onOpenPanel: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
@@ -1523,15 +1339,6 @@ function RepoSelector({
 
   return (
     <div className="flex items-center gap-1 min-w-0">
-      <button
-        type="button"
-        className="taomni-btn h-7 w-7 inline-flex items-center justify-center"
-        title="Show Repository Panel"
-        aria-label="Show Repository Panel"
-        onClick={onOpenPanel}
-      >
-        <PanelLeft className="w-3.5 h-3.5 text-[var(--taomni-text)]" />
-      </button>
       <div ref={ref} className="relative min-w-0">
         <button
           type="button"
@@ -1670,101 +1477,6 @@ function RepoStatusIcon({ loading, error, changes }: { loading: boolean; error: 
   return <Check className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />;
 }
 
-function RepoRow({
-  root,
-  snapshot,
-  loading,
-  error,
-  selected,
-  checked,
-  workspacePath,
-  depth = 0,
-  onChecked,
-  onSelect,
-}: {
-  root: GitWorkspaceRootInfo;
-  snapshot: GitSnapshot | null;
-  loading: boolean;
-  error: string | null;
-  selected: boolean;
-  checked: boolean;
-  workspacePath: string;
-  depth?: number;
-  onChecked: (checked: boolean) => void;
-  onSelect: () => void;
-}) {
-  const branch = snapshot?.detached ? `detached ${snapshot.headOid ?? ""}` : snapshot?.currentBranch ?? "";
-  const changes = snapshot?.changes ?? [];
-  const relation = repoRelationLabel(root.repoRoot, workspacePath);
-  return (
-    <div
-      className={`group border-b border-[var(--taomni-divider)] ${selected ? "bg-[var(--taomni-hover)]" : "hover:bg-[var(--taomni-hover)]"}`}
-    >
-      <div
-        className="flex items-start gap-2 px-2 py-1.5"
-        style={depth > 0 ? { paddingLeft: `${12 + depth * 16}px` } : undefined}
-      >
-        <input
-          type="checkbox"
-          className="mt-1 accent-[var(--taomni-accent)]"
-          checked={checked}
-          onChange={(event) => onChecked(event.target.checked)}
-          onClick={(event) => event.stopPropagation()}
-          aria-label={`Select ${root.name}`}
-        />
-        <button
-          type="button"
-          className="min-w-0 flex-1 text-left"
-          title={root.repoRoot}
-          onClick={onSelect}
-        >
-          <div className="flex items-center gap-2">
-            <span className="min-w-0 truncate text-[13px] font-medium">{root.name || gitRepoName(root.repoRoot)}</span>
-            {root.isSubmodule && (
-              <span className="shrink-0 rounded border border-[var(--taomni-divider)] px-1 text-[9px] uppercase text-[var(--taomni-text-muted)]">
-                sub
-              </span>
-            )}
-            {loading && <Loader2 className="w-3 h-3 shrink-0 animate-spin text-[var(--taomni-accent)]" />}
-            {error && <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-500" />}
-          </div>
-          <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
-            <GitCommitHorizontal className="w-3 h-3 shrink-0" />
-            <span className="min-w-0 truncate">{branch || "No branch"}</span>
-          </div>
-          {relation ? (
-            <div className="mt-0.5 truncate text-[10px] text-[var(--taomni-text-muted)]">{relation}</div>
-          ) : null}
-          {error && (
-            <div className="mt-1 truncate text-[11px] text-red-500" title={error}>
-              {error}
-            </div>
-          )}
-        </button>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <span className={`rounded px-1.5 py-0.5 text-[11px] ${changes.length > 0 ? "bg-[var(--taomni-accent)] text-white" : "bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"}`}>
-            {changes.length}
-          </span>
-          {snapshot && (snapshot.ahead > 0 || snapshot.behind > 0) && (
-            <span className="text-[10px] text-[var(--taomni-text-muted)]">
-              ↑{snapshot.ahead} ↓{snapshot.behind}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function repoRelationLabel(repoRoot: string, workspacePath: string): string | null {
-  const repo = normalizePath(repoRoot);
-  const workspace = normalizePath(workspacePath);
-  if (!repo || !workspace || repo === workspace) return null;
-  if (repo.startsWith(`${workspace}/`)) return `inside ${repo.slice(workspace.length + 1)}`;
-  if (workspace.startsWith(`${repo}/`)) return `root ${workspace.slice(repo.length + 1)}`;
-  return null;
-}
-
 function normalizePath(path: string): string {
   return path.replace(/\\/g, "/").replace(/\/+$/, "");
 }
@@ -1847,7 +1559,6 @@ function EmptyState({ title }: { title: string }) {
 }
 
 const WORKSPACE_SCOPE_KEY = "taomni.git.workspace.scope.v1";
-const WORKSPACE_RAIL_KEY = "taomni.git.workspace.rail.collapsed";
 
 function workspaceRootsKey(roots: readonly GitWorkspaceRootInfo[]): string {
   return roots.map((root) => root.repoRoot).sort((a, b) => a.localeCompare(b)).join("\n");

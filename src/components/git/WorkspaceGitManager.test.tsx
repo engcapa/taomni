@@ -188,7 +188,7 @@ describe("WorkspaceGitManager", () => {
     expect(screen.queryByTestId("workspace-git-sidebar")).not.toBeInTheDocument();
   });
 
-  it("uses a header repo selector by default and keeps file-level changes out of the optional repo panel", async () => {
+  it("uses only the header repo selector for multi-repo scope changes", async () => {
     render(
       <WorkspaceGitManager
         workspaceName="Workspace"
@@ -202,20 +202,14 @@ describe("WorkspaceGitManager", () => {
 
     await waitFor(() => expect(gitMocks.gitSnapshot).toHaveBeenCalledWith("/repo/app"));
     expect(screen.queryByTestId("workspace-git-sidebar")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show Repository Panel" })).not.toBeInTheDocument();
     expect(screen.getByTestId("workspace-repo-selector")).toHaveTextContent("All Repositories (2)");
     expect(screen.getByTestId("git-panel")).toHaveAttribute("data-repo-root", "/repo/service");
     expect(screen.getByText("src/App.tsx")).toBeInTheDocument();
     expect(screen.getByText("src/ignored.ts")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Show Repository Panel" }));
-    const sidebar = screen.getByTestId("workspace-git-sidebar");
-    expect(within(sidebar).getByText("Repositories")).toBeInTheDocument();
-    expect(within(sidebar).getByText("2/2")).toBeInTheDocument();
-    expect(within(sidebar).getByRole("checkbox", { name: "Select app" })).toBeInTheDocument();
-    expect(within(sidebar).queryByText("src/ignored.ts")).not.toBeInTheDocument();
-    expect(within(sidebar).queryByPlaceholderText("Commit message")).not.toBeInTheDocument();
-
-    fireEvent.click(within(sidebar).getByText("app"));
+    fireEvent.click(screen.getByTestId("workspace-repo-selector"));
+    fireEvent.click(within(screen.getByTestId("workspace-repo-selector-menu")).getByTitle("/repo/app"));
     expect(screen.getByTestId("git-panel")).toHaveAttribute("data-repo-root", "/repo/app");
     expect(screen.getByTestId("workspace-repo-selector")).toHaveTextContent("app");
 
