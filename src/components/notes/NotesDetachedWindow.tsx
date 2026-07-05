@@ -25,6 +25,15 @@ export function NotesDetachedWindow() {
     document.title = `${t("notes.title")} - taomni`;
   }, [t]);
 
+  useEffect(() => {
+    document.documentElement.classList.add("notes-detached-document");
+    document.body.classList.add("notes-detached-document");
+    return () => {
+      document.documentElement.classList.remove("notes-detached-document");
+      document.body.classList.remove("notes-detached-document");
+    };
+  }, []);
+
   const closeDetachedNotesWindow = useCallback(() => {
     void closeCurrentDetachedWindow().catch(() => {
       window.close();

@@ -318,6 +318,12 @@ body {
   background: var(--taomni-chrome-bg);
 }
 
+html.notes-detached-document,
+html.notes-detached-document body,
+body.notes-detached-document {
+  background: transparent;
+}
+
 #root {
   width: 100vw;
   height: 100vh;
@@ -496,7 +502,8 @@ body {
 .notes-floating-window,
 .notes-detached-window {
   border: 0;
-  border-radius: 8px;
+  border-radius: 10px;
+  isolation: isolate;
 }
 .notes-detached-window [data-testid="notes-panel"],
 .notes-floating-window [data-testid="notes-panel"] {

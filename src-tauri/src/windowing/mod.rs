@@ -100,7 +100,7 @@ pub async fn open_detached_window(
         .enable_clipboard_access();
 
     let builder = if kind == "notes" {
-        builder.decorations(false)
+        builder.decorations(false).transparent(true)
     } else {
         builder
     };
