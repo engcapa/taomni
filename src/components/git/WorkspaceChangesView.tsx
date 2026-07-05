@@ -1,8 +1,9 @@
-import { useMemo, useRef, type MouseEvent as ReactMouseEvent } from "react";
+import { useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import {
   AlertTriangle,
   GitBranch,
   Loader2,
+  Search,
 } from "lucide-react";
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
 import type { GitBlobPair, GitSnapshot } from "../../lib/git";
@@ -35,6 +36,8 @@ export interface WorkspaceChangesViewProps {
   pairLoading: boolean;
   commitMessage: string;
   setCommitMessage: (message: string) => void;
+  canCommitAndPush: boolean;
+  scopeSummary: string;
   stageAll: () => void;
   unstageAll: () => void;
   stageSelected: () => void;
@@ -42,7 +45,6 @@ export interface WorkspaceChangesViewProps {
   discardSelected: () => void;
   commit: () => void;
   commitAndPush: () => void;
-  onToggleRepoChecked: (repoRoot: string, value: boolean) => void;
   onToggleChecked: (repoRoot: string, paths: string[], value: boolean) => void;
   onSelect: (repoRoot: string, path: string, mods: { ctrl: boolean; shift: boolean }) => void;
   onContextMenu: (repoRoot: string, path: string, event: ReactMouseEvent) => void;
@@ -64,6 +66,8 @@ export function WorkspaceChangesView({
   pairLoading,
   commitMessage,
   setCommitMessage,
+  canCommitAndPush,
+  scopeSummary,
   stageAll,
   unstageAll,
   stageSelected,
@@ -71,19 +75,31 @@ export function WorkspaceChangesView({
   discardSelected,
   commit,
   commitAndPush,
-  onToggleRepoChecked,
   onToggleChecked,
   onSelect,
   onContextMenu,
 }: WorkspaceChangesViewProps) {
+  const [filter, setFilter] = useState("");
+  const normalizedFilter = filter.trim().toLowerCase();
   const groups = roots.map((root) => ({
     root,
     state: snapshots[root.repoRoot],
     snapshot: snapshots[root.repoRoot]?.snapshot ?? null,
+    visibleChanges: (snapshots[root.repoRoot]?.snapshot?.changes ?? []).filter((change) => (
+      !normalizedFilter ||
+      root.name.toLowerCase().includes(normalizedFilter) ||
+      root.repoRoot.toLowerCase().includes(normalizedFilter) ||
+      change.path.toLowerCase().includes(normalizedFilter) ||
+      (change.oldPath ?? "").toLowerCase().includes(normalizedFilter) ||
+      change.status.toLowerCase().includes(normalizedFilter) ||
+      (change.conflict ? "conflict conflicted" : "").includes(normalizedFilter) ||
+      (change.staged ? "staged" : "unstaged").includes(normalizedFilter)
+    )),
   }));
   const totalChanges = groups.reduce((total, group) => total + (group.snapshot?.changes.length ?? 0), 0);
+  const visibleChangeCount = groups.reduce((total, group) => total + group.visibleChanges.length, 0);
   const hasVisibleGroups = groups.some((group) => (
-    (group.snapshot?.changes.length ?? 0) > 0 || group.state?.loading || group.state?.error
+    group.visibleChanges.length > 0 || group.state?.loading || group.state?.error
   ));
   const hasStaged = groups.some((group) => group.snapshot?.changes.some((change) => change.staged));
   const active = useMemo(() => {
@@ -99,6 +115,11 @@ export function WorkspaceChangesView({
   return (
     <PanelGroup orientation="horizontal" id="workspace-git-changes-layout">
       <Panel id="workspace-changes-list" defaultSize={38} minSize={26} className="min-w-0 min-h-0 flex flex-col border-r border-[var(--taomni-divider)]">
+        <div className="h-8 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
+          <GitBranch className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
+          <span className="font-semibold text-[12px]">Workspace changes</span>
+          <span className="min-w-0 truncate text-[11px] text-[var(--taomni-text-muted)]">{scopeSummary}</span>
+        </div>
         <ChangesListToolbar
           busy={busy}
           checkedCount={checkedCount}
@@ -110,24 +131,40 @@ export function WorkspaceChangesView({
           onUnstageAll={unstageAll}
           onToggleTreeMode={() => setTreeMode(!treeMode)}
         />
+        <div className="h-9 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)]">
+          <div className="relative min-w-0 flex-1">
+            <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
+            <input
+              className="taomni-input h-7 w-full pl-7"
+              value={filter}
+              placeholder="Filter changes"
+              onChange={(event) => setFilter(event.target.value)}
+            />
+          </div>
+          {filter.trim() ? (
+            <span className="shrink-0 text-[11px] text-[var(--taomni-text-muted)]">
+              {visibleChangeCount}/{totalChanges}
+            </span>
+          ) : null}
+        </div>
 
         <div className="flex-1 min-h-0 overflow-auto">
           {!hasVisibleGroups ? (
             <div className="h-full min-h-24 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
-              No local changes
+              {filter.trim() ? "No matching changes" : "No local changes"}
             </div>
-          ) : groups.map(({ root, state, snapshot }) => (
+          ) : groups.map(({ root, state, snapshot, visibleChanges }) => (
             <RepoChangeGroup
               key={root.repoRoot}
               root={root}
               snapshot={snapshot}
+              changes={visibleChanges}
               loading={!!state?.loading}
               error={state?.error ?? null}
               treeMode={treeMode}
               checkedKeys={checkedKeys}
               selectedKeys={selectedKeys}
               focusedKey={focusedKey}
-              onToggleRepoChecked={onToggleRepoChecked}
               onToggleChecked={onToggleChecked}
               onSelect={onSelect}
               onContextMenu={onContextMenu}
@@ -139,7 +176,7 @@ export function WorkspaceChangesView({
           message={commitMessage}
           onMessageChange={setCommitMessage}
           canCommit={canCommit}
-          canCommitAndPush={canCommit}
+          canCommitAndPush={canCommit && canCommitAndPush}
           onCommit={commit}
           onCommitAndPush={commitAndPush}
           summary={`${checkedCount} files in ${checkedRepoCount} repos`}
@@ -167,31 +204,30 @@ export function WorkspaceChangesView({
 function RepoChangeGroup({
   root,
   snapshot,
+  changes,
   loading,
   error,
   treeMode,
   checkedKeys,
   selectedKeys,
   focusedKey,
-  onToggleRepoChecked,
   onToggleChecked,
   onSelect,
   onContextMenu,
 }: {
   root: GitWorkspaceRootInfo;
   snapshot: GitSnapshot | null;
+  changes: GitSnapshot["changes"];
   loading: boolean;
   error: string | null;
   treeMode: boolean;
   checkedKeys: Set<string>;
   selectedKeys: Set<string>;
   focusedKey: string | null;
-  onToggleRepoChecked: (repoRoot: string, value: boolean) => void;
   onToggleChecked: (repoRoot: string, paths: string[], value: boolean) => void;
   onSelect: (repoRoot: string, path: string, mods: { ctrl: boolean; shift: boolean }) => void;
   onContextMenu: (repoRoot: string, path: string, event: ReactMouseEvent) => void;
 }) {
-  const changes = snapshot?.changes ?? [];
   if (changes.length === 0 && !loading && !error) return null;
 
   const branch = snapshot?.detached ? `detached ${snapshot.headOid ?? ""}` : snapshot?.currentBranch ?? "No branch";
@@ -216,7 +252,7 @@ function RepoChangeGroup({
           state={checkState(checkedCount, changes.length)}
           disabled={changes.length === 0}
           ariaLabel={`Select changes in ${root.name}`}
-          onChange={(value) => onToggleRepoChecked(root.repoRoot, value)}
+          onChange={(value) => onToggleChecked(root.repoRoot, changes.map((change) => change.path), value)}
         />
         <GitBranch className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
         <span className="min-w-0 truncate text-[12px] font-medium">{root.name}</span>
