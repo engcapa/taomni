@@ -4,6 +4,8 @@ import { NOTES_FONTS, NOTES_THEMES } from "../../lib/notes/notesTheme";
 import { useT } from "../../lib/i18n";
 import { ThemePreviewSelect } from "../theme/ThemePreviewSelect";
 import { NotesThemeLinePreview } from "../theme/themePreviews";
+import { isTauriRuntime } from "../../lib/runtime";
+import { openDetachedWindow } from "../../lib/detachWindowing";
 
 /**
  * NoteThemeSettings — theme picker + panel-mode toggle + in-app always-on-top,
@@ -16,6 +18,9 @@ export function NoteThemeSettings() {
   const setTheme = useNotesStore((s) => s.setTheme);
   const font = useNotesStore((s) => s.font);
   const setFont = useNotesStore((s) => s.setFont);
+  const fontSize = useNotesStore((s) => s.fontSize);
+  const setFontSize = useNotesStore((s) => s.setFontSize);
+  const panelPosition = useNotesStore((s) => s.panelPosition);
   const panelMode = useNotesStore((s) => s.panelMode);
   const setPanelMode = useNotesStore((s) => s.setPanelMode);
   const alwaysOnTop = useNotesStore((s) => s.alwaysOnTopInApp);
@@ -26,6 +31,21 @@ export function NoteThemeSettings() {
     preview: <NotesThemeLinePreview theme={th} />,
     testId: `note-theme-${th}`,
   }));
+  const openFloatingNotes = () => {
+    if (isTauriRuntime() && panelMode === "floating") {
+      void openDetachedWindow({
+        kind: "notes",
+        sessionId: "panel",
+        title: t("notes.title"),
+        width: panelPosition.width,
+        height: panelPosition.height,
+      }).catch((err) => {
+        console.warn("notes: failed to open detached window", err);
+      });
+      return;
+    }
+    setPanelMode("floating");
+  };
 
   return (
     <div
@@ -65,6 +85,24 @@ export function NoteThemeSettings() {
         </select>
       </label>
 
+      {/* Font size */}
+      <label className="flex items-center gap-2">
+        <span className="text-[var(--taomni-text-muted)]">{t("notes.fontSize")}</span>
+        <input
+          type="range"
+          min="10"
+          max="20"
+          step="1"
+          className="h-4 flex-1 min-w-0"
+          style={{ accentColor: "var(--taomni-accent)" }}
+          value={fontSize}
+          onChange={(event) => setFontSize(Number(event.target.value))}
+          data-testid="note-font-size-slider"
+          aria-label={t("notes.fontSize")}
+        />
+        <span className="taomni-mono w-9 text-right tabular-nums">{fontSize}px</span>
+      </label>
+
       {/* Panel mode */}
       <div className="flex items-center gap-2">
         <span className="text-[var(--taomni-text-muted)]">{t("notes.panelMode")}</span>
@@ -88,7 +126,7 @@ export function NoteThemeSettings() {
             }`}
             aria-pressed={panelMode === "floating"}
             data-testid="note-panel-mode-floating"
-            onClick={() => setPanelMode("floating")}
+            onClick={openFloatingNotes}
           >
             <Monitor className="w-3 h-3" />
             {t("notes.panelModeFloating")}

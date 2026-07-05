@@ -108,6 +108,11 @@ describe("detectDetachedRoute", () => {
     expect(detectDetachedRoute()).toEqual({ kind: "database", id: "db-session" });
   });
 
+  it("parses notes detached routes", () => {
+    window.history.replaceState(null, "", "/index.html#notes=panel");
+    expect(detectDetachedRoute()).toEqual({ kind: "notes", id: "panel" });
+  });
+
   it("ignores unknown kinds", () => {
     window.history.replaceState(null, "", "/index.html#bogus=oops");
     expect(detectDetachedRoute()).toBeNull();

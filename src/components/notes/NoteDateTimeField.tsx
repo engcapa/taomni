@@ -31,6 +31,23 @@ function localTimeString(date: Date): string {
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function clampTimePart(value: number, max: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(max, Math.max(0, Math.round(value)));
+}
+
+function timePartsFromString(value: string): { hour: number; minute: number } {
+  const [hour = 0, minute = 0] = value.split(":").map((part) => Number(part));
+  return {
+    hour: clampTimePart(hour, 23),
+    minute: clampTimePart(minute, 59),
+  };
+}
+
+function timeStringFromParts(hour: number, minute: number): string {
+  return `${pad(clampTimePart(hour, 23))}:${pad(clampTimePart(minute, 59))}`;
+}
+
 function partsFromSeconds(value: number | null): { date: string; time: string } {
   if (value == null) return { date: "", time: DEFAULT_TIME };
   const date = new Date(value * 1000);
@@ -134,7 +151,9 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
   );
 
   const commit = (dateValue: string, timeValue: string, close = false) => {
-    onChange(secondsFromParts(dateValue, timeValue));
+    if (dateValue) {
+      onChange(secondsFromParts(dateValue, timeValue));
+    }
     if (close) setOpen(false);
   };
 
@@ -145,6 +164,18 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
     setDraftDate(nextDate);
     setDraftTime(nextTime);
     commit(nextDate, nextTime, true);
+  };
+  const commitDone = () => {
+    if (draftDate) {
+      commit(draftDate, draftTime, true);
+    } else {
+      setOpen(false);
+    }
+  };
+
+  const timeParts = timePartsFromString(draftTime);
+  const updateDraftTime = (hour: number, minute: number) => {
+    setDraftTime(timeStringFromParts(hour, minute));
   };
 
   return (
@@ -182,7 +213,7 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
 
       {open && (
         <div
-          className="absolute left-0 top-7 z-40 w-[226px] rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-2 shadow-lg"
+          className="absolute left-0 top-7 z-40 w-[248px] rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-2 shadow-lg"
           role="dialog"
           aria-label={label}
           data-testid={`${testId}-popover`}
@@ -237,20 +268,44 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
             })}
           </div>
 
-          <div className="mt-2 flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
-            <span className="text-[10px] text-[var(--taomni-text-muted)]">{t("notes.dateTimeTime")}</span>
-            <input
-              type="time"
-              className="taomni-input h-6 flex-1 text-[11px]"
-              value={draftTime}
-              onChange={(event) => {
-                const next = event.target.value || DEFAULT_TIME;
-                setDraftTime(next);
-                if (draftDate) commit(draftDate, next);
-              }}
-              data-testid={`${testId}-time`}
-            />
+          <div className="mt-2 flex items-start gap-1.5">
+            <Clock className="mt-4 w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
+            <div className="flex-1 min-w-0">
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <span className="text-[10px] text-[var(--taomni-text-muted)]">{t("notes.dateTimeTime")}</span>
+                <span className="taomni-mono text-[11px] tabular-nums">{draftTime}</span>
+              </div>
+              <label className="flex h-5 items-center gap-1.5">
+                <span className="w-6 shrink-0 text-[10px] text-[var(--taomni-text-muted)]">{t("notes.dateTimeHour")}</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="23"
+                  step="1"
+                  className="h-4 flex-1 min-w-0"
+                  style={{ accentColor: "var(--taomni-accent)" }}
+                  value={timeParts.hour}
+                  onChange={(event) => updateDraftTime(Number(event.target.value), timeParts.minute)}
+                  aria-label={t("notes.dateTimeHour")}
+                  data-testid={`${testId}-hour`}
+                />
+              </label>
+              <label className="flex h-5 items-center gap-1.5">
+                <span className="w-6 shrink-0 text-[10px] text-[var(--taomni-text-muted)]">{t("notes.dateTimeMinute")}</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="59"
+                  step="1"
+                  className="h-4 flex-1 min-w-0"
+                  style={{ accentColor: "var(--taomni-accent)" }}
+                  value={timeParts.minute}
+                  onChange={(event) => updateDraftTime(timeParts.hour, Number(event.target.value))}
+                  aria-label={t("notes.dateTimeMinute")}
+                  data-testid={`${testId}-minute`}
+                />
+              </label>
+            </div>
           </div>
 
           <div className="mt-2 flex items-center justify-between gap-1">
@@ -260,7 +315,7 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
             <button
               type="button"
               className="taomni-btn h-6 px-2 text-[11px]"
-              onClick={() => setOpen(false)}
+              onClick={commitDone}
               data-testid={`${testId}-done`}
             >
               {t("notes.dateTimeDone")}

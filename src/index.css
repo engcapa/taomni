@@ -398,6 +398,51 @@ body {
   color: var(--taomni-text-muted);
 }
 
+/* Notes panel local typography. Many notes controls use compact fixed Tailwind
+   sizes, so route them through the per-notes font-size preference here. */
+[data-testid="notes-panel"] {
+  --taomni-notes-font-size: var(--taomni-ui-font-size);
+  font-size: var(--taomni-notes-font-size);
+}
+[data-testid="notes-panel"] .text-\[10px\] {
+  font-size: max(9px, calc(var(--taomni-notes-font-size) - 2px));
+  line-height: 1.25;
+}
+[data-testid="notes-panel"] .text-\[11px\] {
+  font-size: max(10px, calc(var(--taomni-notes-font-size) - 1px));
+  line-height: 1.28;
+}
+[data-testid="notes-panel"] .text-\[12px\],
+[data-testid="notes-panel"] .text-xs {
+  font-size: var(--taomni-notes-font-size);
+  line-height: 1.35;
+}
+[data-testid="notes-panel"] .text-\[13px\] {
+  font-size: calc(var(--taomni-notes-font-size) + 1px);
+  line-height: 1.35;
+}
+[data-testid="notes-panel"] .text-sm {
+  font-size: calc(var(--taomni-notes-font-size) + 2px);
+  line-height: 1.35;
+}
+
+.notes-sticky-window {
+  box-shadow: var(--taomni-shadow-lg), 0 22px 45px -22px rgba(0, 0, 0, 0.35);
+}
+.notes-sticky-fold {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 34px;
+  height: 34px;
+  pointer-events: none;
+  clip-path: polygon(100% 0, 0 100%, 100% 100%);
+  background:
+    linear-gradient(135deg, transparent 0 46%, rgba(0, 0, 0, 0.14) 47% 49%, rgba(255, 255, 255, 0.55) 50% 100%),
+    linear-gradient(135deg, color-mix(in srgb, var(--taomni-panel-bg) 76%, white), var(--taomni-card-bg));
+  box-shadow: -3px -3px 7px rgba(0, 0, 0, 0.14);
+}
+
 .taomni-mono {
   font-family: var(--taomni-code-font-family);
 }

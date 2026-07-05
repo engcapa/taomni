@@ -26,8 +26,28 @@ import {
 } from "../lib/notes";
 
 export type NotesPanelMode = "hub" | "floating";
-export type NotesTheme = "taomni" | "light" | "dark" | "paper" | "compact";
-export type NotesFont = "inherit" | "inter" | "outfit" | "system" | "mono";
+export type NotesTheme =
+  | "taomni"
+  | "light"
+  | "dark"
+  | "paper"
+  | "sticky"
+  | "mint"
+  | "sky"
+  | "rose"
+  | "graphite"
+  | "compact";
+export type NotesFont =
+  | "inherit"
+  | "inter"
+  | "outfit"
+  | "system"
+  | "rounded"
+  | "serif"
+  | "songti"
+  | "kaiti"
+  | "handwriting"
+  | "mono";
 
 export interface NotesPanelPosition {
   x: number;
@@ -42,8 +62,12 @@ const PREF_PANEL_POSITION = "notes.panel.position";
 const PREF_PANEL_ALWAYS_ON_TOP = "notes.panel.alwaysOnTopInApp";
 const PREF_PANEL_THEME = "notes.panel.theme";
 const PREF_PANEL_FONT = "notes.panel.font";
+const PREF_PANEL_FONT_SIZE = "notes.panel.fontSize";
 const PREF_LAST_FILTER = "notes.lastFilter";
 const PREF_STATUS_FILTERS = "notes.statusFilters";
+const DEFAULT_NOTES_FONT_SIZE = 12;
+const MIN_NOTES_FONT_SIZE = 10;
+const MAX_NOTES_FONT_SIZE = 20;
 
 export const DEFAULT_NOTES_PANEL_POSITION: NotesPanelPosition = {
   x: 120,
@@ -56,15 +80,34 @@ function coerceTheme(value: unknown): NotesTheme {
   return value === "light" ||
     value === "dark" ||
     value === "paper" ||
+    value === "sticky" ||
+    value === "mint" ||
+    value === "sky" ||
+    value === "rose" ||
+    value === "graphite" ||
     value === "compact"
     ? value
     : "taomni";
 }
 
 function coerceFont(value: unknown): NotesFont {
-  return value === "inter" || value === "outfit" || value === "system" || value === "mono"
+  return value === "inter" ||
+    value === "outfit" ||
+    value === "system" ||
+    value === "rounded" ||
+    value === "serif" ||
+    value === "songti" ||
+    value === "kaiti" ||
+    value === "handwriting" ||
+    value === "mono"
     ? value
     : "inherit";
+}
+
+function clampNotesFontSize(value: unknown): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return DEFAULT_NOTES_FONT_SIZE;
+  return Math.min(MAX_NOTES_FONT_SIZE, Math.max(MIN_NOTES_FONT_SIZE, Math.round(n)));
 }
 
 function coerceFilter(value: unknown): NoteFilter {
@@ -112,6 +155,7 @@ interface NotesStore {
   alwaysOnTopInApp: boolean;
   theme: NotesTheme;
   font: NotesFont;
+  fontSize: number;
   prefsLoaded: boolean;
 
   loadNotes: () => Promise<void>;
@@ -144,6 +188,7 @@ interface NotesStore {
   setAlwaysOnTop: (value: boolean) => void;
   setTheme: (theme: NotesTheme) => void;
   setFont: (font: NotesFont) => void;
+  setFontSize: (size: number) => void;
 }
 
 async function persistPref(key: string, value: unknown): Promise<void> {
@@ -170,6 +215,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   alwaysOnTopInApp: false,
   theme: "taomni",
   font: "inherit",
+  fontSize: DEFAULT_NOTES_FONT_SIZE,
   prefsLoaded: false,
 
   loadNotes: async () => {
@@ -384,6 +430,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
         alwaysOnTopInApp: parse<boolean>(PREF_PANEL_ALWAYS_ON_TOP, false) === true,
         theme: coerceTheme(parse<string>(PREF_PANEL_THEME, "taomni")),
         font: coerceFont(parse<string>(PREF_PANEL_FONT, "inherit")),
+        fontSize: clampNotesFontSize(parse<number>(PREF_PANEL_FONT_SIZE, DEFAULT_NOTES_FONT_SIZE)),
         filter: statusFilters[0],
         statusFilters,
         prefsLoaded: true,
@@ -417,6 +464,12 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   setFont: (font) => {
     set({ font });
     void persistPref(PREF_PANEL_FONT, font);
+  },
+
+  setFontSize: (fontSize) => {
+    const next = clampNotesFontSize(fontSize);
+    set({ fontSize: next });
+    void persistPref(PREF_PANEL_FONT_SIZE, next);
   },
 }));
 

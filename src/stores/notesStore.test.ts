@@ -77,6 +77,7 @@ beforeEach(() => {
     panelMode: "hub",
     theme: "taomni",
     font: "inherit",
+    fontSize: 12,
     prefsLoaded: false,
   });
   invokeMock.mockReset();
@@ -216,15 +217,26 @@ describe("notesStore", () => {
     useNotesStore.getState().setPanelMode("floating");
     useNotesStore.getState().setTheme("paper");
     useNotesStore.getState().setFont("outfit");
+    useNotesStore.getState().setFontSize(16);
     await Promise.resolve();
     expect(prefs["notes.panel.mode"]).toBe(JSON.stringify("floating"));
     expect(prefs["notes.panel.theme"]).toBe(JSON.stringify("paper"));
     expect(prefs["notes.panel.font"]).toBe(JSON.stringify("outfit"));
+    expect(prefs["notes.panel.fontSize"]).toBe(JSON.stringify(16));
     // Reload picks the persisted values back up.
     await useNotesStore.getState().loadPrefs();
     expect(useNotesStore.getState().panelMode).toBe("floating");
     expect(useNotesStore.getState().theme).toBe("paper");
     expect(useNotesStore.getState().font).toBe("outfit");
+    expect(useNotesStore.getState().fontSize).toBe(16);
+  });
+
+  it("clamps the persisted notes font size", async () => {
+    useNotesStore.getState().setFontSize(99);
+    await Promise.resolve();
+    expect(prefs["notes.panel.fontSize"]).toBe(JSON.stringify(20));
+    await useNotesStore.getState().loadPrefs();
+    expect(useNotesStore.getState().fontSize).toBe(20);
   });
 });
 
