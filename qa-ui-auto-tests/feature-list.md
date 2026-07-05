@@ -3540,6 +3540,38 @@ controls:
     selector: '[data-testid="tao-hub-tab-notes"]'
     kind: interactive
     optional: true
+  - id: tao-hub-tab-notifications
+    selector: '[data-testid="tao-hub-tab-notifications"]'
+    kind: interactive
+    optional: true
+  - id: tao-alert-inbox
+    selector: '[data-testid="tao-alert-inbox"]'
+    kind: display
+    optional: true
+  - id: tao-alert-inbox-item
+    selector: '[data-testid="tao-alert-inbox-item"]'
+    kind: display
+    optional: true
+  - id: tao-alert-history-search
+    selector: '[data-testid="tao-alert-history-search"]'
+    kind: interactive
+    optional: true
+  - id: tao-alert-history-clear
+    selector: '[data-testid="tao-alert-history-clear"]'
+    kind: interactive
+    optional: true
+  - id: tao-alert-history-limit-30
+    selector: '[data-testid="tao-alert-history-limit-30"]'
+    kind: interactive
+    optional: true
+  - id: tao-alert-history-limit-300
+    selector: '[data-testid="tao-alert-history-limit-300"]'
+    kind: interactive
+    optional: true
+  - id: tao-alert-history-result
+    selector: '[data-testid="tao-alert-history-result"]'
+    kind: display
+    optional: true       # only visible when a history search has matches
   - id: notes-panel
     selector: '[data-testid="notes-panel"]'
     kind: display
@@ -3623,10 +3655,10 @@ controls:
 -->
 
 - 统一 `TaoRibbon` 四边任意位置悬浮入口，拖动落点决定 edge + offsetRatio（`localStorage: taomni.chatDrawer.layout.v1`），带节制的临期/过期/AI 完成 badge 与跳动提示
-- `Tao Hub`：单一抽屉两个主 tab（`Chat` / `便签`），记住上次 tab（`localStorage: taomni.taoHub.lastTab.v1`）
+- `Tao Hub`：单一抽屉三个主 tab（`Chat` / `便签` / `通知`），记住上次非通知 tab（`localStorage: taomni.taoHub.lastTab.v1`）
 - `便签`：独立 `notes.db` + 统一便签模型（完成 / 置顶 / 归档 / 颜色 / 优先级 / due / reminder / 步骤 / 标签）；默认「最近未完成」视图；搜索、过滤视图；主题 taomni/system/light/dark/paper/compact
 - 单例 `FloatingNotesPanel`：hub ↔ floating 模式切换，可拖拽 / 调整大小，Taomni 内部置顶（层级低于 vault / 认证弹窗）
-- `TaoAlertInbox` + `TaoAlertPoller`：便签临期(黄)/过期(红) + AI 后台完成(ai_done) 汇聚，点击跳转目标或打开事件列表
+- `TaoAlertInbox` + `TaoAlertPoller`：便签临期(黄)/过期(红) + AI 后台完成(ai_done) + 邮件新消息汇聚，点击跳转目标或打开事件列表；通知历史默认隐藏，可搜索查询，支持 30/300 条保留上限与手工清空（`localStorage: taomni.taoAlerts.history.v1` / `taomni.taoAlerts.historyLimit.v1`）
 - Chat 抽屉四边可 pinned：左右为侧栏、上/下为横向条（窄窗自动回退浮动，见 `resolveChatDock`）
 - **e2e 测试限制**：Tauri 命令在浏览器模式走 stub（localStorage 模拟 notes.db）；真实持久化、跨进程提醒调度、原生窗口置顶不在浏览器冒烟覆盖，由 Rust / Vitest 单测承担。Ribbon 拖动、上/下 pin、告警优先级与跳转的判定逻辑分别由 `ribbonPlacement`/`chatDock`/`taoAlerts` 单测覆盖
 
