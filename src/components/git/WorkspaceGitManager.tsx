@@ -906,11 +906,11 @@ export function WorkspaceGitManager({
       <main className="flex-1 min-w-0 min-h-0">
         {selectedRoot ? (
           <GitPanel
-            key={`${selectedRoot.repoRoot}:${panelVersion}`}
             repoRoot={selectedRoot.repoRoot}
             visible={visible}
             onOpenWorkspace={onOpenWorkspace}
             changeCountOverride={totalChangedFiles}
+            refreshToken={panelVersion}
             workspaceHeader={{
               title,
               summary: scopeSummary,
@@ -1008,6 +1008,21 @@ export function WorkspaceGitManager({
                 busy={busy}
               />
             )}
+            workspaceBranchesView={repoScopeIsAll ? (
+              <WorkspaceBranchesView
+                roots={scopedRoots}
+                snapshots={snapshots}
+              />
+            ) : undefined}
+            workspaceTagsView={repoScopeIsAll ? (
+              <WorkspaceTagsView
+                roots={scopedRoots}
+                snapshots={snapshots}
+              />
+            ) : undefined}
+            workspaceSettingsView={repoScopeIsAll ? (
+              <WorkspaceSettingsNotice roots={scopedRoots} />
+            ) : undefined}
             changesView={(
               <WorkspaceChangesView
                 roots={scopedRoots}
@@ -1114,6 +1129,190 @@ export function WorkspaceGitManager({
         />
       )}
     </div>
+  );
+}
+
+function WorkspaceBranchesView({
+  roots,
+  snapshots,
+}: {
+  roots: GitWorkspaceRootInfo[];
+  snapshots: Record<string, RepoSnapshotState>;
+}) {
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const rows = useMemo(() => (
+    roots.flatMap((root) => (
+      (snapshots[root.repoRoot]?.snapshot?.branches ?? [])
+        .filter((branch) => workspaceBranchMatchesQuery(root, branch, normalizedQuery))
+        .map((branch) => ({ root, branch }))
+    ))
+  ), [normalizedQuery, roots, snapshots]);
+  const total = roots.reduce((count, root) => (
+    count + (snapshots[root.repoRoot]?.snapshot?.branches.length ?? 0)
+  ), 0);
+
+  return (
+    <div className="h-full min-h-0 flex flex-col">
+      <div className="h-9 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)]">
+        <div className="relative w-64 max-w-full min-w-44">
+          <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
+          <input
+            className="taomni-input h-7 w-full pl-7"
+            placeholder="Search branches"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
+        <span className="text-[11px] text-[var(--taomni-text-muted)]">
+          {roots.length} repositories
+        </span>
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto">
+        {total === 0 ? (
+          <EmptyState title="No branches" />
+        ) : rows.length === 0 ? (
+          <EmptyState title="No branches match" />
+        ) : rows.map(({ root, branch }) => (
+          <div
+            key={`${root.repoRoot}:${branch.fullName}`}
+            className="w-full px-3 py-2 flex items-center gap-2 border-b border-[var(--taomni-divider)]"
+            title={`${root.repoRoot} · ${branch.fullName}`}
+          >
+            <GitFork className={`w-4 h-4 shrink-0 ${branch.current ? "text-[var(--taomni-accent)]" : "text-[var(--taomni-text-muted)]"}`} />
+            <span className="shrink-0 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1 text-[10px] text-[var(--taomni-text-muted)]">
+              {root.name}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] truncate">{branch.name}</div>
+              <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+                {branch.upstream ? `tracks ${branch.upstream}` : branch.remote ? "remote" : "local"}
+                {branch.subject ? ` · ${branch.subject}` : ""}
+              </div>
+            </div>
+            {branch.current && <span className="text-[11px] text-[var(--taomni-accent)]">current</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WorkspaceTagsView({
+  roots,
+  snapshots,
+}: {
+  roots: GitWorkspaceRootInfo[];
+  snapshots: Record<string, RepoSnapshotState>;
+}) {
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const rows = useMemo(() => (
+    roots.flatMap((root) => (
+      (snapshots[root.repoRoot]?.snapshot?.tags ?? [])
+        .filter((tag) => workspaceTagMatchesQuery(root, tag, normalizedQuery))
+        .map((tag) => ({ root, tag }))
+    ))
+  ), [normalizedQuery, roots, snapshots]);
+  const total = roots.reduce((count, root) => (
+    count + (snapshots[root.repoRoot]?.snapshot?.tags.length ?? 0)
+  ), 0);
+
+  return (
+    <div className="h-full min-h-0 flex flex-col">
+      <div className="h-9 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)]">
+        <div className="relative w-64 max-w-full min-w-44">
+          <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
+          <input
+            className="taomni-input h-7 w-full pl-7"
+            placeholder="Search tags"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
+        <span className="text-[11px] text-[var(--taomni-text-muted)]">
+          {roots.length} repositories
+        </span>
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto">
+        {total === 0 ? (
+          <EmptyState title="No tags" />
+        ) : rows.length === 0 ? (
+          <EmptyState title="No tags match" />
+        ) : rows.map(({ root, tag }) => (
+          <div
+            key={`${root.repoRoot}:${tag.name}`}
+            className="w-full px-3 py-2 flex items-center gap-2 border-b border-[var(--taomni-divider)]"
+            title={`${root.repoRoot} · ${tag.name}`}
+          >
+            <GitCommitHorizontal className="w-4 h-4 shrink-0 text-[var(--taomni-text-muted)]" />
+            <span className="shrink-0 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1 text-[10px] text-[var(--taomni-text-muted)]">
+              {root.name}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] truncate">{tag.name}</div>
+              <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+                <span className="taomni-mono text-[var(--taomni-accent)]">{tag.oid}</span>
+                {tag.annotated ? " · annotated" : " · lightweight"}{tag.subject ? ` · ${tag.subject}` : ""}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WorkspaceSettingsNotice({ roots }: { roots: GitWorkspaceRootInfo[] }) {
+  return (
+    <div className="h-full min-h-0 flex flex-col">
+      <div className="h-9 shrink-0 flex items-center px-3 border-b border-[var(--taomni-divider)] text-[12px] text-[var(--taomni-text-muted)]">
+        Git settings are repository-specific. Select a repository above to edit settings.
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto">
+        {roots.map((root) => (
+          <div
+            key={root.repoRoot}
+            className="px-3 py-2 border-b border-[var(--taomni-divider)]"
+            title={root.repoRoot}
+          >
+            <div className="text-[12px] font-medium truncate">{root.name}</div>
+            <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">{root.repoRoot}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function workspaceBranchMatchesQuery(
+  root: GitWorkspaceRootInfo,
+  branch: GitSnapshot["branches"][number],
+  query: string,
+): boolean {
+  if (!query) return true;
+  return (
+    root.name.toLowerCase().includes(query) ||
+    root.repoRoot.toLowerCase().includes(query) ||
+    branch.name.toLowerCase().includes(query) ||
+    branch.fullName.toLowerCase().includes(query) ||
+    (branch.upstream ?? "").toLowerCase().includes(query) ||
+    (branch.subject ?? "").toLowerCase().includes(query)
+  );
+}
+
+function workspaceTagMatchesQuery(
+  root: GitWorkspaceRootInfo,
+  tag: GitSnapshot["tags"][number],
+  query: string,
+): boolean {
+  if (!query) return true;
+  return (
+    root.name.toLowerCase().includes(query) ||
+    root.repoRoot.toLowerCase().includes(query) ||
+    tag.name.toLowerCase().includes(query) ||
+    tag.oid.toLowerCase().includes(query) ||
+    (tag.subject ?? "").toLowerCase().includes(query)
   );
 }
 

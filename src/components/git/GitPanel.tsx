@@ -96,6 +96,9 @@ interface GitPanelProps {
   onOpenWorkspace?: (repoRoot: string) => void;
   changesView?: ReactNode;
   workspaceLogView?: ReactNode;
+  workspaceBranchesView?: ReactNode;
+  workspaceTagsView?: ReactNode;
+  workspaceSettingsView?: ReactNode;
   workspaceHeader?: {
     title: string;
     summary: string;
@@ -107,10 +110,10 @@ interface GitPanelProps {
     actionControls?: ReactNode;
   };
   changeCountOverride?: number | null;
+  refreshToken?: number;
 }
 
 type GitView = "changes" | "log" | "branches" | "tags" | "stash" | "settings";
-type LogScope = "workspace" | "repository";
 
 const EMPTY_SETTINGS: GitRepoSettings = {
   userName: null,
@@ -131,14 +134,17 @@ export function GitPanel({
   onOpenWorkspace,
   changesView,
   workspaceLogView,
+  workspaceBranchesView,
+  workspaceTagsView,
+  workspaceSettingsView,
   workspaceHeader,
   changeCountOverride = null,
+  refreshToken = 0,
 }: GitPanelProps) {
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const setUiFontSize = useAppStore((s) => s.setUiFontSize);
   const [view, setView] = useState<GitView>("changes");
   const [mountedViews, setMountedViews] = useState<Set<GitView>>(() => new Set(["changes"]));
-  const [logScope, setLogScope] = useState<LogScope>(() => workspaceLogView ? "workspace" : "repository");
   const [snapshot, setSnapshot] = useState<GitSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -238,10 +244,6 @@ export function GitPanel({
   }, [setGitUiFontSize, visible]);
 
   useEffect(() => {
-    if (!workspaceLogView) setLogScope("repository");
-  }, [workspaceLogView]);
-
-  useEffect(() => {
     if (!visible) return;
     const el = rootRef.current;
     if (!el) return;
@@ -306,7 +308,7 @@ export function GitPanel({
 
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+  }, [refresh, refreshToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -750,56 +752,20 @@ export function GitPanel({
         )}
         {mountedViews.has("log") && (
           <div className="h-full min-h-0" style={{ display: view === "log" ? "block" : "none" }}>
-          {workspaceLogView ? (
-            <div className="h-full min-h-0 flex flex-col">
-              <div className="h-9 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
-                <span className="text-[12px] text-[var(--taomni-text-muted)]">Log scope</span>
-                <div className="inline-flex rounded border border-[var(--taomni-divider)] overflow-hidden">
-                  <button
-                    type="button"
-                    className={`h-7 px-3 text-[12px] ${logScope === "workspace" ? "bg-[var(--taomni-accent)] text-white" : "hover:bg-[var(--taomni-hover)]"}`}
-                    onClick={() => setLogScope("workspace")}
-                  >
-                    Workspace
-                  </button>
-                  <button
-                    type="button"
-                    className={`h-7 px-3 text-[12px] ${logScope === "repository" ? "bg-[var(--taomni-accent)] text-white" : "hover:bg-[var(--taomni-hover)]"}`}
-                    onClick={() => setLogScope("repository")}
-                  >
-                    Repository
-                  </button>
-                </div>
-                <span className="min-w-0 truncate text-[11px] text-[var(--taomni-text-muted)]">
-                  {logScope === "workspace" ? (workspaceHeader?.summary ?? "Workspace repositories") : repoName}
-                </span>
-              </div>
-              <div className="flex-1 min-h-0">
-                {logScope === "workspace" ? workspaceLogView : (
-                  <CommitLog
-                    repoRoot={repoRoot}
-                    headOid={snapshot?.headOid ?? null}
-                    branches={snapshot?.branches ?? []}
-                    busy={busy}
-                    onContextMenu={(entry, x, y) => setCommitMenu({ x, y, entry })}
-                  />
-                )}
-              </div>
-            </div>
-          ) : (
-            <CommitLog
-              repoRoot={repoRoot}
-              headOid={snapshot?.headOid ?? null}
-              branches={snapshot?.branches ?? []}
-              busy={busy}
-              onContextMenu={(entry, x, y) => setCommitMenu({ x, y, entry })}
-            />
-          )}
+            {workspaceLogView ?? (
+              <CommitLog
+                repoRoot={repoRoot}
+                headOid={snapshot?.headOid ?? null}
+                branches={snapshot?.branches ?? []}
+                busy={busy}
+                onContextMenu={(entry, x, y) => setCommitMenu({ x, y, entry })}
+              />
+            )}
           </div>
         )}
         {mountedViews.has("branches") && (
           <div className="h-full min-h-0" style={{ display: view === "branches" ? "block" : "none" }}>
-          <BranchesView
+          {workspaceBranchesView ?? <BranchesView
             snapshot={snapshot}
             selected={selectedBranch}
             setSelected={setSelectedBranch}
@@ -831,12 +797,12 @@ export function GitPanel({
               if (!selectedBranch || !snapshot?.currentBranch) return;
               setCompare({ refA: selectedBranch.name, refB: snapshot.currentBranch, title: `${selectedBranch.name} → ${snapshot.currentBranch}` });
             }}
-          />
+          />}
           </div>
         )}
         {mountedViews.has("tags") && (
           <div className="h-full min-h-0" style={{ display: view === "tags" ? "block" : "none" }}>
-          <TagsView
+          {workspaceTagsView ?? <TagsView
             snapshot={snapshot}
             busy={busy}
             hasRemote={!!remoteName}
@@ -849,7 +815,7 @@ export function GitPanel({
             onCheckout={(tag) => void confirmAndRun("Checkout tag", `Checkout ${tag.name}? This detaches HEAD.`, false, () => runAction("Checkout tag", () => gitCheckoutTag(repoRoot, tag.name)))}
             onDelete={(tag) => void confirmAndRun("Delete tag", `Delete tag ${tag.name}?`, true, () => runAction("Delete tag", () => gitDeleteTag(repoRoot, tag.name)))}
             onPush={(tag) => void runAction("Push tag", () => gitPushTag(repoRoot, remoteName || null, tag.name, false))}
-          />
+          />}
           </div>
         )}
         {mountedViews.has("stash") && (
@@ -875,7 +841,7 @@ export function GitPanel({
         )}
         {mountedViews.has("settings") && (
           <div className="h-full min-h-0" style={{ display: view === "settings" ? "block" : "none" }}>
-          <SettingsView
+          {workspaceSettingsView ?? <SettingsView
             snapshot={snapshot}
             settings={settingsDraft}
             setSettings={setSettingsDraft}
@@ -899,7 +865,7 @@ export function GitPanel({
               if (!url) return;
               await runAction("Add remote", () => gitSetRemote(repoRoot, name, url, null));
             }}
-          />
+          />}
           </div>
         )}
         </>
