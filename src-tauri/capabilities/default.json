@@ -8,7 +8,8 @@
     "rdp-*",
     "vnc-*",
     "terminal-*",
-    "lan-chat-*"
+    "lan-chat-*",
+    "notes-*"
   ],
   "permissions": [
     "core:default",

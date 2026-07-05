@@ -1655,6 +1655,7 @@ const dict = {
     theme_dark: "Dark",
     theme_paper: "Paper",
     theme_sticky: "Sticky",
+    theme_sticky_bright: "Bright sticky",
     theme_mint: "Mint",
     theme_sky: "Sky",
     theme_rose: "Rose",

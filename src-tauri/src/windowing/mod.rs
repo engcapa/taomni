@@ -11,7 +11,9 @@
 //! source of truth for which `kind` strings are valid. Anything else
 //! lands in the catch-all error branch below.
 
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{
+    AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, utils::config::Color,
+};
 
 /// Default size for a detached window, picked per kind. RDP/VNC need
 /// more breathing room than a shell.
@@ -20,7 +22,7 @@ fn default_size(kind: &str) -> (f64, f64, f64, f64) {
         "rdp" | "vnc" => (1280.0, 800.0, 800.0, 480.0),
         "terminal" => (1024.0, 680.0, 640.0, 360.0),
         "database" => (1280.0, 820.0, 780.0, 480.0),
-        "notes" => (520.0, 640.0, 340.0, 300.0),
+        "notes" => (260.0, 320.0, 220.0, 220.0),
         // A detached LanChat window mirrors the main panel's two-pane
         // layout (≈252px roster + conversation), so it needs room for both.
         "lan-chat" => (820.0, 620.0, 600.0, 440.0),
@@ -64,6 +66,10 @@ pub async fn open_detached_window(
     validate_kind(&kind)?;
     let label = label_for(&kind, &session_id);
     if let Some(existing) = app_handle.get_webview_window(&label) {
+        if kind == "notes" {
+            let _ = existing.set_always_on_top(true);
+            let _ = existing.set_background_color(Some(Color(0, 0, 0, 0)));
+        }
         let _ = existing.set_focus();
         return Ok(());
     }
@@ -98,6 +104,19 @@ pub async fn open_detached_window(
         .min_inner_size(min_w, min_h)
         .resizable(true)
         .enable_clipboard_access();
+
+    let builder = if kind == "notes" {
+        let builder = builder
+            .decorations(false)
+            .always_on_top(true)
+            .shadow(true)
+            .background_color(Color(0, 0, 0, 0));
+        #[cfg(not(target_os = "macos"))]
+        let builder = builder.transparent(true);
+        builder
+    } else {
+        builder
+    };
 
     // Keep the SFTP-precedent platform tweak: on Windows we let the
     // webview's HTML5 dragstart/over/drop events fire normally. Linux

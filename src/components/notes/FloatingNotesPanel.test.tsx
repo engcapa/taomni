@@ -1,7 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FloatingNotesPanel } from "./FloatingNotesPanel";
-import { useNotesStore } from "../../stores/notesStore";
+import { NotesPanel } from "./NotesPanel";
+import { DEFAULT_NOTES_PANEL_POSITION, useNotesStore } from "../../stores/notesStore";
 
 const invokeMock = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
@@ -26,6 +27,7 @@ beforeEach(() => {
     prefsLoaded: true,
     activeNoteId: null,
     filter: "recent_incomplete",
+    statusFilters: ["recent_incomplete"],
     search: "",
     tagFilterId: null,
     tags: [],
@@ -35,7 +37,7 @@ beforeEach(() => {
     font: "inherit",
     fontSize: 12,
     alwaysOnTopInApp: false,
-    panelPosition: { x: 100, y: 100, width: 460, height: 560 },
+    panelPosition: DEFAULT_NOTES_PANEL_POSITION,
   });
   delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
 });
@@ -59,6 +61,19 @@ describe("FloatingNotesPanel", () => {
     expect(screen.getAllByTestId("floating-notes-panel")).toHaveLength(1);
   });
 
+  it("adds a floating panel without removing the hub notes panel", async () => {
+    useNotesStore.setState({ panelMode: "floating" });
+    render(
+      <>
+        <NotesPanel />
+        <FloatingNotesPanel />
+      </>,
+    );
+
+    expect(await screen.findByTestId("floating-notes-panel")).toBeInTheDocument();
+    expect(screen.getAllByTestId("notes-panel")).toHaveLength(2);
+  });
+
   it("docks back to the hub, hiding the floating panel", async () => {
     useNotesStore.setState({ panelMode: "floating" });
     render(<FloatingNotesPanel />);
@@ -77,6 +92,15 @@ describe("FloatingNotesPanel", () => {
     expect(panel).toHaveAttribute("data-always-on-top", "true");
   });
 
+  it("docks the main window when a detached notes window signals dock", () => {
+    useNotesStore.setState({ panelMode: "floating" });
+    render(<FloatingNotesPanel />);
+
+    window.dispatchEvent(new StorageEvent("storage", { key: "taomni.notes.dockSignal.v1" }));
+
+    expect(useNotesStore.getState().panelMode).toBe("hub");
+  });
+
   it("opens an OS notes window instead of rendering the in-app panel in Tauri", async () => {
     (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {};
     useNotesStore.setState({ panelMode: "floating" });
@@ -87,8 +111,8 @@ describe("FloatingNotesPanel", () => {
         kind: "notes",
         sessionId: "panel",
         title: "Notes",
-        width: 460,
-        height: 560,
+        width: DEFAULT_NOTES_PANEL_POSITION.width,
+        height: DEFAULT_NOTES_PANEL_POSITION.height,
       }),
     );
     expect(screen.queryByTestId("floating-notes-panel")).not.toBeInTheDocument();

@@ -147,6 +147,32 @@ describe("NotesPanel", () => {
     expect(toolbar).toContainElement(screen.getByTestId("notes-new"));
     expect(toolbar).toContainElement(screen.getByTestId("notes-filter-menu"));
     expect(toolbar).toContainElement(screen.getByTestId("notes-search"));
+    expect(toolbar).toContainElement(screen.getByTestId("notes-floating-toggle"));
+    expect(toolbar).toContainElement(screen.getByTestId("notes-settings-toggle"));
+  });
+
+  it("toggles the additive floating panel from the top toolbar", async () => {
+    render(<NotesPanel />);
+    await screen.findByTestId("notes-floating-toggle");
+
+    fireEvent.click(screen.getByTestId("notes-floating-toggle"));
+    expect(useNotesStore.getState().panelMode).toBe("floating");
+    expect(screen.getByTestId("notes-floating-toggle")).toHaveTextContent("In hub");
+
+    fireEvent.click(screen.getByTestId("notes-floating-toggle"));
+    expect(useNotesStore.getState().panelMode).toBe("hub");
+    expect(screen.getByTestId("notes-floating-toggle")).toHaveTextContent("Floating");
+  });
+
+  it("keeps floating controls out of the settings panel", async () => {
+    render(<NotesPanel />);
+    await screen.findByTestId("notes-settings-toggle");
+
+    fireEvent.click(screen.getByTestId("notes-settings-toggle"));
+
+    expect(await screen.findByTestId("note-theme-settings")).toBeInTheDocument();
+    expect(screen.queryByTestId("note-panel-mode-floating")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("note-panel-mode-hub")).not.toBeInTheDocument();
   });
 
   it("creates a new note that defaults to incomplete and opens the editor", async () => {
@@ -204,5 +230,26 @@ describe("NotesPanel", () => {
     fireEvent.change(titleInput, { target: { value: "renamed" } });
     fireEvent.blur(titleInput);
     await waitFor(() => expect(store[0].title).toBe("renamed"));
+  });
+
+  it("opens a body URL in the browser on ctrl click", async () => {
+    const note = blank("link note");
+    note.body = "See https://example.com/docs.";
+    store.push(note);
+    const openSpy = vi.spyOn(window, "open").mockReturnValue({ opener: null } as Window);
+
+    render(<NotesPanel />);
+    expect(await screen.findByText("https://example.com/docs")).toHaveClass("notes-rendered-link");
+    fireEvent.click(await screen.findByText("link note"));
+
+    const body = (await screen.findByTestId("note-editor-body")) as HTMLTextAreaElement;
+    const linkPreview = await screen.findByTestId("note-editor-body-link-preview");
+    expect(linkPreview.querySelector(".notes-rendered-link")).toHaveTextContent("https://example.com/docs");
+    body.focus();
+    body.setSelectionRange(note.body.indexOf("example"), note.body.indexOf("example"));
+    fireEvent.click(body, { ctrlKey: true });
+
+    expect(openSpy).toHaveBeenCalledWith("https://example.com/docs", "_blank", "noopener,noreferrer");
+    openSpy.mockRestore();
   });
 });

@@ -135,6 +135,38 @@ const STICKY: NotesPalette = {
   "--taomni-shadow-lg": "0 18px 34px -8px rgba(80, 52, 0, 0.25), 0 5px 12px rgba(80, 52, 0, 0.12)",
 };
 
+const STICKY_BRIGHT: NotesPalette = {
+  "--taomni-bg": "#fbff8f",
+  "--taomni-chrome-bg": "#effa00",
+  "--taomni-sidebar-bg": "#fbff98",
+  "--taomni-panel-bg": "#f3fb39",
+  "--taomni-card-bg": "#fdffa8",
+  "--taomni-card-border": "#bbc318",
+  "--taomni-text": "#191a05",
+  "--taomni-text-muted": "#60640e",
+  "--taomni-divider": "#d2d74d",
+  "--taomni-hover": "#f2f869",
+  "--taomni-selected": "#e8f100",
+  "--taomni-selected-border": "#9ca500",
+  "--taomni-accent": "#273000",
+  "--taomni-accent-soft": "#4b5c00",
+  "--taomni-link": "#0f55c8",
+  "--taomni-control-hover": "rgba(25, 26, 5, 0.08)",
+  "--taomni-input-bg": "#fdffa8",
+  "--taomni-input-border": "#b7bd25",
+  "--taomni-button-from": "#fdffa8",
+  "--taomni-button-to": "#f3fb39",
+  "--taomni-button-hover-from": "#ffffc8",
+  "--taomni-button-hover-to": "#e8f100",
+  "--taomni-button-disabled": "#ecf283",
+  "--taomni-scrollbar-track": "#fbff98",
+  "--taomni-scrollbar-thumb": "#b7bd25",
+  "--taomni-scrollbar-thumb-hover": "#858c00",
+  "--taomni-shadow-sm": "0 1px 2px rgba(54, 59, 0, 0.12)",
+  "--taomni-shadow-md": "0 6px 18px -3px rgba(54, 59, 0, 0.18), 0 2px 5px rgba(54, 59, 0, 0.08)",
+  "--taomni-shadow-lg": "0 16px 32px -10px rgba(25, 26, 5, 0.34), 0 8px 18px -8px rgba(25, 26, 5, 0.24)",
+};
+
 const MINT: NotesPalette = {
   "--taomni-bg": "#edfdf6",
   "--taomni-chrome-bg": "#d8f7e8",
@@ -274,6 +306,8 @@ export function notesThemeStyle(theme: NotesTheme): CSSProperties {
       return PAPER as CSSProperties;
     case "sticky":
       return STICKY as CSSProperties;
+    case "sticky_bright":
+      return STICKY_BRIGHT as CSSProperties;
     case "mint":
       return MINT as CSSProperties;
     case "sky":
@@ -300,6 +334,7 @@ export const NOTES_THEMES: NotesTheme[] = [
   "dark",
   "paper",
   "sticky",
+  "sticky_bright",
   "mint",
   "sky",
   "rose",

@@ -1,4 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import type { CSSProperties, MouseEvent as ReactMouseEvent } from "react";
 import { isTauriRuntime } from "../../lib/runtime";
 
 type ResizeDirection =
@@ -14,11 +15,17 @@ type ResizeDirection =
 interface ResizeHandle {
   direction: ResizeDirection;
   className: string;
-  cursor: React.CSSProperties["cursor"];
+  cursor: CSSProperties["cursor"];
 }
 
 const EDGE_SIZE = 6;
 const CORNER_SIZE = 14;
+
+interface WindowResizeHandlesProps {
+  className?: string;
+  edgeSize?: number;
+  cornerSize?: number;
+}
 
 const HANDLES: ResizeHandle[] = [
   {
@@ -63,10 +70,14 @@ const HANDLES: ResizeHandle[] = [
   },
 ];
 
-export function WindowResizeHandles() {
+export function WindowResizeHandles({
+  className = "fixed inset-0 z-[10000]",
+  edgeSize = EDGE_SIZE,
+  cornerSize = CORNER_SIZE,
+}: WindowResizeHandlesProps = {}) {
   if (!isTauriRuntime()) return null;
 
-  const startResize = (direction: ResizeDirection) => (event: React.MouseEvent) => {
+  const startResize = (direction: ResizeDirection) => (event: ReactMouseEvent) => {
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
@@ -74,13 +85,13 @@ export function WindowResizeHandles() {
   };
 
   return (
-    <div className="fixed inset-0 z-[10000] pointer-events-none" aria-hidden="true">
+    <div className={`${className} pointer-events-none`} aria-hidden="true">
       {HANDLES.map((handle) => {
         const isCorner = handle.direction.length > 5;
-        const style: React.CSSProperties = {
+        const style: CSSProperties = {
           cursor: handle.cursor,
-          height: isCorner ? CORNER_SIZE : EDGE_SIZE,
-          width: isCorner ? CORNER_SIZE : EDGE_SIZE,
+          height: isCorner ? cornerSize : edgeSize,
+          width: isCorner ? cornerSize : edgeSize,
           pointerEvents: "auto",
         };
 

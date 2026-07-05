@@ -16,6 +16,7 @@ describe("notesTheme", () => {
     const dark = notesThemeStyle("dark") as Record<string, string>;
     const paper = notesThemeStyle("paper") as Record<string, string>;
     const sticky = notesThemeStyle("sticky") as Record<string, string>;
+    const stickyBright = notesThemeStyle("sticky_bright") as Record<string, string>;
     const mint = notesThemeStyle("mint") as Record<string, string>;
     const sky = notesThemeStyle("sky") as Record<string, string>;
     const rose = notesThemeStyle("rose") as Record<string, string>;
@@ -24,12 +25,13 @@ describe("notesTheme", () => {
     expect(dark["--taomni-bg"]).toBe("#0f172a");
     expect(paper["--taomni-bg"]).toBe("#fdf6e3");
     expect(sticky["--taomni-bg"]).toBe("#fff4a8");
+    expect(stickyBright["--taomni-bg"]).toBe("#fbff8f");
     expect(mint["--taomni-bg"]).toBe("#edfdf6");
     expect(sky["--taomni-bg"]).toBe("#eff7ff");
     expect(rose["--taomni-bg"]).toBe("#fff1f5");
     expect(graphite["--taomni-bg"]).toBe("#202124");
     // The local theme must cover generic controls inside the Tao pane too.
-    for (const p of [light, dark, paper, sticky, mint, sky, rose, graphite]) {
+    for (const p of [light, dark, paper, sticky, stickyBright, mint, sky, rose, graphite]) {
       expect(p["--taomni-text"]).toBeTruthy();
       expect(p["--taomni-bg"]).toBeTruthy();
       expect(p["--taomni-input-bg"]).toBeTruthy();
@@ -47,7 +49,19 @@ describe("notesTheme", () => {
   });
 
   it("exposes app-following and explicit note themes", () => {
-    expect(NOTES_THEMES).toEqual(["taomni", "light", "dark", "paper", "sticky", "mint", "sky", "rose", "graphite", "compact"]);
+    expect(NOTES_THEMES).toEqual([
+      "taomni",
+      "light",
+      "dark",
+      "paper",
+      "sticky",
+      "sticky_bright",
+      "mint",
+      "sky",
+      "rose",
+      "graphite",
+      "compact",
+    ]);
   });
 
   it("exposes expanded font stacks and a local font-size variable", () => {

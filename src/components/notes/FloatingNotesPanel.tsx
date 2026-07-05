@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
-import { X } from "lucide-react";
+import { PanelRightClose } from "lucide-react";
 import { useNotesStore, type NotesPanelPosition } from "../../stores/notesStore";
 import { notesFontSizeStyle, notesFontStyle, notesThemeStyle } from "../../lib/notes/notesTheme";
 import { useT } from "../../lib/i18n";
 import { NotesPanel } from "./NotesPanel";
 import { isTauriRuntime } from "../../lib/runtime";
 import { openDetachedWindow } from "../../lib/detachWindowing";
+import { subscribeNotesDockSignal } from "../../lib/notes/notesWindowSync";
 
-const MIN_WIDTH = 320;
-const MIN_HEIGHT = 260;
+const MIN_WIDTH = 240;
+const MIN_HEIGHT = 220;
 
 function clampPosition(pos: NotesPanelPosition): NotesPanelPosition {
   const vw = typeof window === "undefined" ? 1280 : window.innerWidth;
@@ -38,12 +39,26 @@ export function FloatingNotesPanel() {
   const fontSize = useNotesStore((s) => s.fontSize);
 
   const [pos, setPos] = useState<NotesPanelPosition>(() => clampPosition(panelPosition));
+  const posRef = useRef(pos);
   const dragRef = useRef<{ mode: "move" | "resize"; startX: number; startY: number; base: NotesPanelPosition } | null>(null);
   const openedNativeRef = useRef(false);
 
+  const setClampedPos = (next: NotesPanelPosition) => {
+    const clamped = clampPosition(next);
+    posRef.current = clamped;
+    setPos(clamped);
+  };
+
+  useEffect(() => {
+    return subscribeNotesDockSignal(() => {
+      openedNativeRef.current = false;
+      setPanelMode("hub");
+    });
+  }, [setPanelMode]);
+
   // Keep local geometry in sync with persisted prefs when not actively dragging.
   useEffect(() => {
-    if (!dragRef.current) setPos(clampPosition(panelPosition));
+    if (!dragRef.current) setClampedPos(panelPosition);
   }, [panelPosition]);
 
   useEffect(() => {
@@ -74,9 +89,9 @@ export function FloatingNotesPanel() {
     const dx = event.clientX - drag.startX;
     const dy = event.clientY - drag.startY;
     if (drag.mode === "move") {
-      setPos(clampPosition({ ...drag.base, x: drag.base.x + dx, y: drag.base.y + dy }));
+      setClampedPos({ ...drag.base, x: drag.base.x + dx, y: drag.base.y + dy });
     } else {
-      setPos(clampPosition({ ...drag.base, width: drag.base.width + dx, height: drag.base.height + dy }));
+      setClampedPos({ ...drag.base, width: drag.base.width + dx, height: drag.base.height + dy });
     }
   };
 
@@ -88,13 +103,13 @@ export function FloatingNotesPanel() {
     } catch {
       /* browser preview */
     }
-    setPanelPosition(pos);
+    setPanelPosition(posRef.current);
   };
 
   const startDrag = (mode: "move" | "resize") => (event: ReactPointerEvent) => {
     if (event.button !== 0) return;
     event.preventDefault();
-    dragRef.current = { mode, startX: event.clientX, startY: event.clientY, base: pos };
+    dragRef.current = { mode, startX: event.clientX, startY: event.clientY, base: posRef.current };
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
     } catch {
@@ -107,38 +122,38 @@ export function FloatingNotesPanel() {
     top: pos.y,
     width: pos.width,
     height: pos.height,
-    ...notesThemeStyle(theme),
+    ...notesThemeStyle(theme === "taomni" ? "sticky_bright" : theme),
     ...notesFontStyle(font),
     ...notesFontSizeStyle(fontSize),
   };
 
   return (
     <div
-      className={`fixed notes-sticky-window flex flex-col rounded-md border border-[var(--taomni-divider)] shadow-2xl overflow-hidden ${alwaysOnTop ? "z-40" : "z-30"}`}
+      className={`fixed notes-sticky-window notes-floating-window flex flex-col shadow-2xl overflow-hidden ${alwaysOnTop ? "z-40" : "z-30"}`}
       style={{ ...style, background: "var(--taomni-sidebar-bg)", color: "var(--taomni-text)" }}
       data-testid="floating-notes-panel"
       data-always-on-top={alwaysOnTop || undefined}
     >
       {/* Drag handle / title bar */}
       <div
-        className="flex items-center gap-2 px-2 h-6 shrink-0 cursor-move select-none"
-        style={{ background: "rgba(0, 0, 0, 0.05)", touchAction: "none" }}
+        className="flex items-center gap-1 px-1.5 h-7 shrink-0 cursor-move select-none"
+        style={{ background: "var(--taomni-chrome-bg)", touchAction: "none" }}
         onPointerDown={startDrag("move")}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         data-testid="floating-notes-drag"
       >
-        <span className="text-[11px] font-medium opacity-65 flex-1 truncate">{t("notes.title")}</span>
+        <div className="flex-1 min-w-0" aria-hidden="true" />
         <button
           type="button"
-          className="taomni-btn h-4 w-4 p-0 inline-flex items-center justify-center rounded hover:bg-black/10 hover:text-red-500"
+          className="taomni-btn h-5 w-5 p-0 inline-flex items-center justify-center rounded hover:bg-black/10"
           onClick={() => setPanelMode("hub")}
           title={t("notes.dock")}
           aria-label={t("notes.dock")}
           data-testid="floating-notes-dock"
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <X className="w-3 h-3" />
+          <PanelRightClose className="w-3.5 h-3.5" />
         </button>
       </div>
 
