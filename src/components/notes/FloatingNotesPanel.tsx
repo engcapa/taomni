@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { PanelRightClose } from "lucide-react";
 import { useNotesStore, type NotesPanelPosition } from "../../stores/notesStore";
-import { notesFontStyle, notesThemeStyle } from "../../lib/notes/notesTheme";
+import { notesFontSizeStyle, notesFontStyle, notesThemeStyle } from "../../lib/notes/notesTheme";
 import { useT } from "../../lib/i18n";
 import { NotesPanel } from "./NotesPanel";
+import { isTauriRuntime } from "../../lib/runtime";
+import { openDetachedWindow } from "../../lib/detachWindowing";
 
 const MIN_WIDTH = 320;
 const MIN_HEIGHT = 260;
@@ -33,16 +35,38 @@ export function FloatingNotesPanel() {
   const alwaysOnTop = useNotesStore((s) => s.alwaysOnTopInApp);
   const theme = useNotesStore((s) => s.theme);
   const font = useNotesStore((s) => s.font);
+  const fontSize = useNotesStore((s) => s.fontSize);
 
   const [pos, setPos] = useState<NotesPanelPosition>(() => clampPosition(panelPosition));
   const dragRef = useRef<{ mode: "move" | "resize"; startX: number; startY: number; base: NotesPanelPosition } | null>(null);
+  const openedNativeRef = useRef(false);
 
   // Keep local geometry in sync with persisted prefs when not actively dragging.
   useEffect(() => {
     if (!dragRef.current) setPos(clampPosition(panelPosition));
   }, [panelPosition]);
 
+  useEffect(() => {
+    if (panelMode !== "floating") {
+      openedNativeRef.current = false;
+      return;
+    }
+    if (!isTauriRuntime() || openedNativeRef.current) return;
+    openedNativeRef.current = true;
+    void openDetachedWindow({
+      kind: "notes",
+      sessionId: "panel",
+      title: t("notes.title"),
+      width: panelPosition.width,
+      height: panelPosition.height,
+    }).catch((err) => {
+      openedNativeRef.current = false;
+      console.warn("notes: failed to open detached window", err);
+    });
+  }, [panelMode, panelPosition.height, panelPosition.width, t]);
+
   if (panelMode !== "floating") return null;
+  if (isTauriRuntime()) return null;
 
   const onPointerMove = (event: ReactPointerEvent) => {
     const drag = dragRef.current;
@@ -85,11 +109,12 @@ export function FloatingNotesPanel() {
     height: pos.height,
     ...notesThemeStyle(theme),
     ...notesFontStyle(font),
+    ...notesFontSizeStyle(fontSize),
   };
 
   return (
     <div
-      className={`fixed flex flex-col rounded-md border border-[var(--taomni-divider)] shadow-2xl overflow-hidden ${alwaysOnTop ? "z-40" : "z-30"}`}
+      className={`fixed notes-sticky-window flex flex-col rounded-md border border-[var(--taomni-divider)] shadow-2xl overflow-hidden ${alwaysOnTop ? "z-40" : "z-30"}`}
       style={{ ...style, background: "var(--taomni-sidebar-bg)", color: "var(--taomni-text)" }}
       data-testid="floating-notes-panel"
       data-always-on-top={alwaysOnTop || undefined}
@@ -131,6 +156,7 @@ export function FloatingNotesPanel() {
         onPointerUp={endDrag}
         data-testid="floating-notes-resize"
       />
+      <div className="notes-sticky-fold" aria-hidden="true" />
     </div>
   );
 }

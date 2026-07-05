@@ -6,7 +6,7 @@ import { NotesList } from "./NotesList";
 import { NoteStatusFilter, NoteTagFilters } from "./NoteFilters";
 import { NoteEditor } from "./NoteEditor";
 import { NoteThemeSettings } from "./NoteThemeSettings";
-import { notesFontStyle, notesThemeDensity, notesThemeStyle } from "../../lib/notes/notesTheme";
+import { notesFontSizeStyle, notesFontStyle, notesThemeDensity, notesThemeStyle } from "../../lib/notes/notesTheme";
 
 /**
  * NotesPanel — the 便签 tab content inside the Tao Hub. A master/detail surface
@@ -33,6 +33,7 @@ export function NotesPanel() {
   const activeNoteId = useNotesStore((s) => s.activeNoteId);
   const theme = useNotesStore((s) => s.theme);
   const font = useNotesStore((s) => s.font);
+  const fontSize = useNotesStore((s) => s.fontSize);
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
@@ -46,6 +47,7 @@ export function NotesPanel() {
   const activeNote = activeNoteId ? notes.find((n) => n.id === activeNoteId) ?? null : null;
   const themeStyle = notesThemeStyle(theme);
   const fontStyle = notesFontStyle(font);
+  const fontSizeStyle = notesFontSizeStyle(fontSize);
   const density = notesThemeDensity(theme);
 
   return (
@@ -54,7 +56,7 @@ export function NotesPanel() {
       data-testid="notes-panel"
       data-notes-theme={theme}
       data-density={density}
-      style={{ background: "var(--taomni-sidebar-bg)", color: "var(--taomni-text)", ...themeStyle, ...fontStyle }}
+      style={{ background: "var(--taomni-sidebar-bg)", color: "var(--taomni-text)", ...themeStyle, ...fontStyle, ...fontSizeStyle }}
     >
       {activeNote ? (
         <NoteEditor note={activeNote} onClose={() => setActiveNote(null)} />

@@ -32,12 +32,18 @@ beforeEach(() => {
     alerts: [],
     panelMode: "hub",
     theme: "taomni",
+    font: "inherit",
+    fontSize: 12,
     alwaysOnTopInApp: false,
     panelPosition: { x: 100, y: 100, width: 460, height: 560 },
   });
+  delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
 });
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  delete (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+});
 
 describe("FloatingNotesPanel", () => {
   it("is hidden in hub mode", () => {
@@ -69,5 +75,22 @@ describe("FloatingNotesPanel", () => {
     // Stays below modal dialogs (z-50) but above normal content.
     expect(panel.className).toContain("z-40");
     expect(panel).toHaveAttribute("data-always-on-top", "true");
+  });
+
+  it("opens an OS notes window instead of rendering the in-app panel in Tauri", async () => {
+    (window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {};
+    useNotesStore.setState({ panelMode: "floating" });
+    render(<FloatingNotesPanel />);
+
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith("open_detached_window", {
+        kind: "notes",
+        sessionId: "panel",
+        title: "Notes",
+        width: 460,
+        height: 560,
+      }),
+    );
+    expect(screen.queryByTestId("floating-notes-panel")).not.toBeInTheDocument();
   });
 });
