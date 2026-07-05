@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Circle,
   Download,
+  Ellipsis,
   FolderGit2,
   GitBranch,
   GitCommitHorizontal,
@@ -22,8 +23,7 @@ import {
   GitMerge,
   Loader2,
   PanelLeftClose,
-  PanelLeftOpen,
-  MoreVertical,
+  PanelLeft,
   Plus,
   RefreshCcw,
   RefreshCw,
@@ -990,7 +990,7 @@ export function WorkspaceGitManager({
                     disabled={operationDisabled}
                     onClick={(event) => setHeaderMenu({ x: event.clientX, y: event.clientY })}
                   >
-                    <MoreVertical className="w-3.5 h-3.5" />
+                    <Ellipsis className="w-3.5 h-3.5 text-[var(--taomni-text)]" />
                   </button>
                   <ToolbarButton
                     label="Refresh"
@@ -1003,7 +1003,8 @@ export function WorkspaceGitManager({
             }}
             workspaceLogView={(
               <WorkspaceCommitLog
-                roots={normalizedRoots}
+                roots={scopedRoots}
+                snapshots={snapshots}
                 busy={busy}
               />
             )}
@@ -1077,7 +1078,7 @@ export function WorkspaceGitManager({
             },
             {
               label: railCollapsed ? "Show Repository Panel" : "Hide Repository Panel",
-              icon: railCollapsed ? <PanelLeftOpen className="w-3.5 h-3.5" /> : <PanelLeftClose className="w-3.5 h-3.5" />,
+              icon: railCollapsed ? <PanelLeft className="w-3.5 h-3.5" /> : <PanelLeftClose className="w-3.5 h-3.5" />,
               onClick: () => setRailCollapsed((current) => !current),
             },
             {
@@ -1180,7 +1181,7 @@ function RepoSelector({
         aria-label="Show Repository Panel"
         onClick={onOpenPanel}
       >
-        <PanelLeftOpen className="w-3.5 h-3.5" />
+        <PanelLeft className="w-3.5 h-3.5 text-[var(--taomni-text)]" />
       </button>
       <div ref={ref} className="relative min-w-0">
         <button

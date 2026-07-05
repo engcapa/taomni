@@ -15,11 +15,12 @@ import {
   GitFork,
   GitMerge,
   Loader2,
-  MoreVertical,
+  Ellipsis,
   Plus,
   RefreshCcw,
   RefreshCw,
   Save,
+  Search,
   Settings,
   Trash2,
   Upload,
@@ -621,7 +622,7 @@ export function GitPanel({
               aria-label="More Git actions"
               onClick={(event) => setHeaderMenu({ x: event.clientX, y: event.clientY })}
             >
-              <MoreVertical className="w-3.5 h-3.5" />
+              <Ellipsis className="w-3.5 h-3.5 text-[var(--taomni-text)]" />
             </button>
             <IconButton label="Refresh" icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />} disabled={loading} onClick={() => void refresh()} />
           </>
@@ -696,12 +697,13 @@ export function GitPanel({
             onClose={() => setCompare(null)}
           />
         ) : historyPath ? (
-          <CommitLog
-            repoRoot={repoRoot}
-            headOid={snapshot?.headOid ?? null}
-            busy={busy}
-            pathFilter={historyPath}
-            onClose={() => setHistoryPath(null)}
+            <CommitLog
+              repoRoot={repoRoot}
+              headOid={snapshot?.headOid ?? null}
+              branches={snapshot?.branches ?? []}
+              busy={busy}
+              pathFilter={historyPath}
+              onClose={() => setHistoryPath(null)}
             onContextMenu={(entry, x, y) => setCommitMenu({ x, y, entry })}
           />
         ) : (
@@ -769,7 +771,7 @@ export function GitPanel({
                   </button>
                 </div>
                 <span className="min-w-0 truncate text-[11px] text-[var(--taomni-text-muted)]">
-                  {logScope === "workspace" ? "All detected repositories" : repoName}
+                  {logScope === "workspace" ? (workspaceHeader?.summary ?? "Workspace repositories") : repoName}
                 </span>
               </div>
               <div className="flex-1 min-h-0">
@@ -777,6 +779,7 @@ export function GitPanel({
                   <CommitLog
                     repoRoot={repoRoot}
                     headOid={snapshot?.headOid ?? null}
+                    branches={snapshot?.branches ?? []}
                     busy={busy}
                     onContextMenu={(entry, x, y) => setCommitMenu({ x, y, entry })}
                   />
@@ -787,6 +790,7 @@ export function GitPanel({
             <CommitLog
               repoRoot={repoRoot}
               headOid={snapshot?.headOid ?? null}
+              branches={snapshot?.branches ?? []}
               busy={busy}
               onContextMenu={(entry, x, y) => setCommitMenu({ x, y, entry })}
             />
@@ -1132,8 +1136,13 @@ function BranchesView({
   onCompare: () => void;
 }) {
   const branches = snapshot?.branches ?? [];
-  const local = branches.filter((b) => !b.remote);
-  const remote = branches.filter((b) => b.remote);
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredBranches = useMemo(() => (
+    branches.filter((branch) => branchMatchesQuery(branch, normalizedQuery))
+  ), [branches, normalizedQuery]);
+  const local = filteredBranches.filter((b) => !b.remote);
+  const remote = filteredBranches.filter((b) => b.remote);
   const renderGroup = (label: string, list: GitBranchInfo[]) =>
     list.length === 0 ? null : (
       <div>
@@ -1164,6 +1173,15 @@ function BranchesView({
   return (
     <div className="h-full min-h-0 flex flex-col">
       <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)] overflow-x-auto">
+        <div className="relative w-56 min-w-40 shrink-0">
+          <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
+          <input
+            className="taomni-input h-7 w-full pl-7"
+            placeholder="Search branches"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
         <IconButton label="New" icon={<Plus className="w-3.5 h-3.5" />} disabled={busy} onClick={onCreate} />
         <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected || selected.current} onClick={onCheckout}>Checkout</button>
         <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected || selected.current || selected.remote} onClick={onMerge}>Merge</button>
@@ -1174,7 +1192,7 @@ function BranchesView({
         <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy || !selected || selected.current || selected.remote} onClick={onDelete}>Delete</button>
       </div>
       <div className="flex-1 min-h-0 overflow-auto">
-        {branches.length === 0 ? <EmptyState title="No branches" /> : (
+        {branches.length === 0 ? <EmptyState title="No branches" /> : filteredBranches.length === 0 ? <EmptyState title="No branches match" /> : (
           <>
             {renderGroup("Local", local)}
             {renderGroup("Remote", remote)}
@@ -1204,17 +1222,31 @@ function TagsView({
 }) {
   const tags = snapshot?.tags ?? [];
   const [selected, setSelected] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredTags = useMemo(() => (
+    tags.filter((tag) => tagMatchesQuery(tag, normalizedQuery))
+  ), [tags, normalizedQuery]);
   const current = tags.find((t) => t.name === selected) ?? null;
   return (
     <div className="h-full min-h-0 flex flex-col">
       <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)]">
+        <div className="relative w-56 min-w-40 shrink-0">
+          <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
+          <input
+            className="taomni-input h-7 w-full pl-7"
+            placeholder="Search tags"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
         <IconButton label="New tag" icon={<Plus className="w-3.5 h-3.5" />} disabled={busy} onClick={onCreate} />
         <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !current} onClick={() => current && onCheckout(current)}>Checkout</button>
         <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !current || !hasRemote} onClick={() => current && onPush(current)}>Push</button>
         <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy || !current} onClick={() => current && onDelete(current)}>Delete</button>
       </div>
       <div className="flex-1 min-h-0 overflow-auto">
-        {tags.length === 0 ? <EmptyState title="No tags" /> : tags.map((tag) => (
+        {tags.length === 0 ? <EmptyState title="No tags" /> : filteredTags.length === 0 ? <EmptyState title="No tags match" /> : filteredTags.map((tag) => (
           <button
             key={tag.name}
             type="button"
@@ -1233,6 +1265,25 @@ function TagsView({
         ))}
       </div>
     </div>
+  );
+}
+
+function branchMatchesQuery(branch: GitBranchInfo, query: string): boolean {
+  if (!query) return true;
+  return (
+    branch.name.toLowerCase().includes(query) ||
+    branch.fullName.toLowerCase().includes(query) ||
+    (branch.upstream ?? "").toLowerCase().includes(query) ||
+    (branch.subject ?? "").toLowerCase().includes(query)
+  );
+}
+
+function tagMatchesQuery(tag: GitTag, query: string): boolean {
+  if (!query) return true;
+  return (
+    tag.name.toLowerCase().includes(query) ||
+    tag.oid.toLowerCase().includes(query) ||
+    (tag.subject ?? "").toLowerCase().includes(query)
   );
 }
 

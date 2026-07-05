@@ -6,6 +6,7 @@ import {
   gitCommitFiles,
   gitLog,
   type GitBlobPair,
+  type GitBranch as GitBranchInfo,
   type GitChange,
   type GitLogEntry,
 } from "../../lib/git";
@@ -47,18 +48,19 @@ function GraphCell({ row, maxWidth }: { row: GraphRow; maxWidth: number }) {
 export interface CommitLogProps {
   repoRoot: string;
   headOid: string | null;
+  branches?: GitBranchInfo[];
   busy: boolean;
   onContextMenu: (entry: GitLogEntry, x: number, y: number) => void;
   pathFilter?: string | null;
   onClose?: () => void;
 }
 
-export function CommitLog({ repoRoot, headOid, busy, onContextMenu, pathFilter, onClose }: CommitLogProps) {
+export function CommitLog({ repoRoot, headOid, branches = [], busy, onContextMenu, pathFilter, onClose }: CommitLogProps) {
   const [entries, setEntries] = useState<GitLogEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [appliedQuery, setAppliedQuery] = useState("");
-  const [allBranches, setAllBranches] = useState(false);
+  const [branchFilter, setBranchFilter] = useState("__current__");
   const [limit, setLimit] = useState(200);
   const [selectedOid, setSelectedOid] = useState<string | null>(null);
   const [files, setFiles] = useState<GitChange[]>([]);
@@ -72,12 +74,20 @@ export function CommitLog({ repoRoot, headOid, busy, onContextMenu, pathFilter, 
     return () => clearTimeout(id);
   }, [query]);
 
+  useEffect(() => {
+    if (branchFilter === "__current__" || branchFilter === "__all__") return;
+    if (!branches.some((branch) => branch.name === branchFilter)) {
+      setBranchFilter("__current__");
+    }
+  }, [branchFilter, branches]);
+
   const loadEntries = useCallback(async () => {
     setLoading(true);
     try {
       const next = await gitLog(repoRoot, limit, {
         grep: appliedQuery || null,
-        all: allBranches,
+        all: branchFilter === "__all__",
+        branch: branchFilter === "__current__" || branchFilter === "__all__" ? null : branchFilter,
         path: pathFilter || null,
       });
       setEntries(next);
@@ -89,7 +99,7 @@ export function CommitLog({ repoRoot, headOid, busy, onContextMenu, pathFilter, 
     } finally {
       setLoading(false);
     }
-  }, [repoRoot, limit, appliedQuery, allBranches, pathFilter]);
+  }, [repoRoot, limit, appliedQuery, branchFilter, pathFilter]);
 
   useEffect(() => {
     void loadEntries();
@@ -188,8 +198,20 @@ export function CommitLog({ repoRoot, headOid, busy, onContextMenu, pathFilter, 
             />
           </div>
           <label className="flex items-center gap-1 text-[12px] select-none whitespace-nowrap">
-            <input type="checkbox" checked={allBranches} onChange={(e) => setAllBranches(e.target.checked)} />
-            All branches
+            Branch
+            <select
+              className="taomni-input h-7 w-40"
+              value={branchFilter}
+              onChange={(event) => setBranchFilter(event.target.value)}
+            >
+              <option value="__current__">Current branch</option>
+              <option value="__all__">All branches</option>
+              {branches.map((branch) => (
+                <option key={branch.fullName} value={branch.name}>
+                  {branch.name}{branch.current ? " (current)" : ""}
+                </option>
+              ))}
+            </select>
           </label>
           {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
         </div>

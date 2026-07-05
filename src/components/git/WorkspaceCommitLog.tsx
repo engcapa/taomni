@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, GitCommitHorizontal, Loader2, Search } from "lucide-react";
+import { ChevronDown, Loader2, Search } from "lucide-react";
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
 import {
   gitBlobPair,
@@ -8,11 +8,42 @@ import {
   type GitBlobPair,
   type GitChange,
   type GitLogEntry,
+  type GitSnapshot,
 } from "../../lib/git";
+import { buildGraph, graphColor, type GraphRow } from "../../lib/gitGraph";
 import type { GitWorkspaceRootInfo } from "../../types";
 import { DiffViewer } from "./DiffViewer";
 
+const ROW_H = 88;
+const LANE_W = 14;
 const AUTO_PREVIEW_FILE_LIMIT = 300;
+
+function GraphCell({ row, maxWidth }: { row: GraphRow; maxWidth: number }) {
+  const width = Math.max(maxWidth, 1) * LANE_W;
+  const cx = (col: number) => col * LANE_W + LANE_W / 2;
+  const mid = ROW_H / 2;
+  return (
+    <svg width={width} height={ROW_H} className="shrink-0" style={{ display: "block" }}>
+      {row.edges.map((e, i) => {
+        const color = graphColor(e.color);
+        const x1 = cx(e.fromColumn);
+        const x2 = cx(e.toColumn);
+        let d: string;
+        if (e.fromColumn === row.column && e.toColumn === row.column) {
+          d = `M ${x1} 0 L ${x1} ${ROW_H}`;
+        } else if (e.toColumn === row.column && e.fromColumn !== row.column) {
+          d = `M ${x1} 0 C ${x1} ${mid}, ${x2} ${mid}, ${x2} ${mid}`;
+        } else if (e.fromColumn === row.column && e.toColumn !== row.column) {
+          d = `M ${x1} ${mid} C ${x2} ${mid}, ${x2} ${mid}, ${x2} ${ROW_H}`;
+        } else {
+          d = `M ${x1} 0 C ${x1} ${mid}, ${x2} ${mid}, ${x2} ${ROW_H}`;
+        }
+        return <path key={i} d={d} stroke={color} strokeWidth={1.5} fill="none" />;
+      })}
+      <circle cx={cx(row.column)} cy={mid} r={4} fill={graphColor(row.color)} stroke="var(--taomni-bg)" strokeWidth={1} />
+    </svg>
+  );
+}
 
 interface WorkspaceCommit extends GitLogEntry {
   repoRoot: string;
@@ -21,16 +52,16 @@ interface WorkspaceCommit extends GitLogEntry {
 
 export interface WorkspaceCommitLogProps {
   roots: GitWorkspaceRootInfo[];
+  snapshots: Record<string, { snapshot: GitSnapshot | null } | undefined>;
   busy: boolean;
 }
 
-export function WorkspaceCommitLog({ roots, busy }: WorkspaceCommitLogProps) {
+export function WorkspaceCommitLog({ roots, snapshots, busy }: WorkspaceCommitLogProps) {
   const [entries, setEntries] = useState<WorkspaceCommit[]>([]);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [appliedQuery, setAppliedQuery] = useState("");
-  const [repoFilter, setRepoFilter] = useState("");
-  const [allBranches, setAllBranches] = useState(false);
+  const [branchFilter, setBranchFilter] = useState("__current__");
   const [limit, setLimit] = useState(120);
   const [error, setError] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -44,9 +75,23 @@ export function WorkspaceCommitLog({ roots, busy }: WorkspaceCommitLogProps) {
     return () => window.clearTimeout(id);
   }, [query]);
 
-  const visibleRoots = useMemo(() => (
-    repoFilter ? roots.filter((root) => root.repoRoot === repoFilter) : roots
-  ), [repoFilter, roots]);
+  const branchOptions = useMemo(
+    () => workspaceBranchOptions(roots, snapshots),
+    [roots, snapshots],
+  );
+  const visibleRoots = useMemo(() => {
+    if (branchFilter === "__current__" || branchFilter === "__all__") return roots;
+    return roots.filter((root) => (
+      snapshots[root.repoRoot]?.snapshot?.branches.some((branch) => branch.name === branchFilter) ?? false
+    ));
+  }, [branchFilter, roots, snapshots]);
+
+  useEffect(() => {
+    if (branchFilter === "__current__" || branchFilter === "__all__") return;
+    if (!branchOptions.some((branch) => branch.name === branchFilter)) {
+      setBranchFilter("__current__");
+    }
+  }, [branchFilter, branchOptions]);
 
   const loadEntries = useCallback(async () => {
     setLoading(true);
@@ -55,7 +100,8 @@ export function WorkspaceCommitLog({ roots, busy }: WorkspaceCommitLogProps) {
       const results = await Promise.allSettled(visibleRoots.map(async (root) => {
         const commits = await gitLog(root.repoRoot, limit, {
           grep: appliedQuery || null,
-          all: allBranches,
+          all: branchFilter === "__all__",
+          branch: branchFilter === "__current__" || branchFilter === "__all__" ? null : branchFilter,
         });
         return commits.map((entry) => ({
           ...entry,
@@ -85,7 +131,7 @@ export function WorkspaceCommitLog({ roots, busy }: WorkspaceCommitLogProps) {
     } finally {
       setLoading(false);
     }
-  }, [allBranches, appliedQuery, limit, visibleRoots]);
+  }, [appliedQuery, branchFilter, limit, visibleRoots]);
 
   useEffect(() => {
     void loadEntries();
@@ -94,6 +140,11 @@ export function WorkspaceCommitLog({ roots, busy }: WorkspaceCommitLogProps) {
   const selected = useMemo(
     () => entries.find((entry) => entryKey(entry) === selectedKey) ?? null,
     [entries, selectedKey],
+  );
+  const graphRows = useMemo(() => workspaceGraphRows(entries, roots), [entries, roots]);
+  const maxGraphWidth = useMemo(
+    () => [...graphRows.values()].reduce((max, row) => Math.max(max, row.width), 1),
+    [graphRows],
   );
 
   useEffect(() => {
@@ -168,18 +219,17 @@ export function WorkspaceCommitLog({ roots, busy }: WorkspaceCommitLogProps) {
             </div>
             <select
               className="taomni-input h-7 w-40"
-              value={repoFilter}
-              onChange={(event) => setRepoFilter(event.target.value)}
+              value={branchFilter}
+              onChange={(event) => setBranchFilter(event.target.value)}
             >
-              <option value="">All repositories</option>
-              {roots.map((root) => (
-                <option key={root.repoRoot} value={root.repoRoot}>{root.name}</option>
+              <option value="__current__">Current branch</option>
+              <option value="__all__">All branches</option>
+              {branchOptions.map((branch) => (
+                <option key={branch.name} value={branch.name}>
+                  {branch.name}{branch.count > 1 ? ` (${branch.count})` : ""}
+                </option>
               ))}
             </select>
-            <label className="flex items-center gap-1 text-[12px] select-none whitespace-nowrap">
-              <input type="checkbox" checked={allBranches} onChange={(event) => setAllBranches(event.target.checked)} />
-              All branches
-            </label>
             {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           </div>
           {error && (
@@ -192,18 +242,28 @@ export function WorkspaceCommitLog({ roots, busy }: WorkspaceCommitLogProps) {
               <div className="h-full min-h-24 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
                 {loading ? "Loading..." : "No commits"}
               </div>
-            ) : entries.map((entry) => (
-              <button
+            ) : entries.map((entry) => {
+              const graphRow = graphRows.get(entryKey(entry)) ?? {
+                oid: entry.oid,
+                column: 0,
+                color: 0,
+                edges: [],
+                width: 1,
+              };
+              return (
+              <div
                 key={entryKey(entry)}
-                type="button"
-                className={`w-full min-h-[82px] px-3 py-2 flex items-start gap-2 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${
+                role="button"
+                tabIndex={0}
+                style={{ height: ROW_H }}
+                className={`w-full flex items-start gap-2 pr-2 text-left overflow-hidden cursor-pointer border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${
                   selectedKey === entryKey(entry) ? "bg-[var(--taomni-hover)]" : ""
                 }`}
                 title={commitTooltip(entry)}
                 onClick={() => setSelectedKey(entryKey(entry))}
               >
-                <GitCommitHorizontal className="mt-0.5 w-4 h-4 shrink-0 text-[var(--taomni-accent)]" />
-                <div className="min-w-0 flex-1">
+                <GraphCell row={graphRow} maxWidth={maxGraphWidth} />
+                <div className="min-w-0 flex-1 py-2">
                   <div className="flex items-start gap-1 min-w-0">
                     <span className="shrink-0 mt-0.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1 text-[10px] text-[var(--taomni-text-muted)]">
                       {entry.repoName}
@@ -227,8 +287,9 @@ export function WorkspaceCommitLog({ roots, busy }: WorkspaceCommitLogProps) {
                     <span className="taomni-mono text-[var(--taomni-accent)]">{entry.shortOid}</span> · {entry.authorName} · {formatDate(entry.date)}
                   </div>
                 </div>
-              </button>
-            ))}
+              </div>
+              );
+            })}
             {entries.length >= limit && (
               <button
                 className="w-full py-2 text-[12px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)] inline-flex items-center justify-center gap-1"
@@ -305,6 +366,43 @@ export function WorkspaceCommitLog({ roots, busy }: WorkspaceCommitLogProps) {
 
 function entryKey(entry: WorkspaceCommit): string {
   return `${entry.repoRoot}\u0000${entry.oid}`;
+}
+
+interface WorkspaceBranchOption {
+  name: string;
+  count: number;
+}
+
+function workspaceBranchOptions(
+  roots: GitWorkspaceRootInfo[],
+  snapshots: Record<string, { snapshot: GitSnapshot | null } | undefined>,
+): WorkspaceBranchOption[] {
+  const counts = new Map<string, number>();
+  for (const root of roots) {
+    const branches = snapshots[root.repoRoot]?.snapshot?.branches ?? [];
+    const seenInRepo = new Set<string>();
+    for (const branch of branches) {
+      if (seenInRepo.has(branch.name)) continue;
+      seenInRepo.add(branch.name);
+      counts.set(branch.name, (counts.get(branch.name) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function workspaceGraphRows(entries: WorkspaceCommit[], roots: GitWorkspaceRootInfo[]): Map<string, GraphRow> {
+  const rows = new Map<string, GraphRow>();
+  for (const root of roots) {
+    const repoEntries = entries.filter((entry) => entry.repoRoot === root.repoRoot);
+    const graph = buildGraph(repoEntries);
+    repoEntries.forEach((entry, index) => {
+      const row = graph[index];
+      if (row) rows.set(entryKey(entry), row);
+    });
+  }
+  return rows;
 }
 
 function commitTime(value: string): number {
