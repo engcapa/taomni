@@ -12,7 +12,6 @@ import {
   Braces,
   Check,
   ChevronDown,
-  ChevronRight,
   Circle,
   Download,
   Ellipsis,
@@ -22,8 +21,6 @@ import {
   GitFork,
   GitMerge,
   Loader2,
-  PanelLeftClose,
-  PanelLeft,
   Plus,
   RefreshCcw,
   RefreshCw,
@@ -78,7 +75,10 @@ interface RepoSnapshotState {
 
 type BatchResult = "completed" | "skipped";
 
-const ALL_REPOSITORIES = "__taomni_all_repositories__";
+type RepoScope =
+  | { mode: "all" }
+  | { mode: "single"; repoRoot: string }
+  | { mode: "custom"; repoRoots: string[] };
 
 export function WorkspaceGitManager({
   workspaceName,
@@ -91,21 +91,10 @@ export function WorkspaceGitManager({
   const normalizedRoots = useMemo(() => dedupeRoots(roots), [roots]);
   const rootsKey = useMemo(() => workspaceRootsKey(normalizedRoots), [normalizedRoots]);
   const [selectedRepoRoot, setSelectedRepoRoot] = useState(activeRepoRoot ?? normalizedRoots[0]?.repoRoot ?? "");
-  const [repoScope, setRepoScope] = useState(() => (
-    normalizedRoots.length > 1 ? ALL_REPOSITORIES : activeRepoRoot ?? normalizedRoots[0]?.repoRoot ?? ""
+  const [repoScope, setRepoScope] = useState<RepoScope>(() => (
+    loadRepoScope(workspaceRootsKey(normalizedRoots), normalizedRoots)
+      ?? initialRepoScope(normalizedRoots, activeRepoRoot)
   ));
-  const [checkedRepoRoots, setCheckedRepoRoots] = useState<Set<string>>(() => (
-    includedRepoSet(normalizedRoots, loadExcludedRepos(workspaceRootsKey(normalizedRoots)))
-  ));
-  const [railCollapsed, setRailCollapsed] = useState(() => {
-    try {
-      const saved = localStorage.getItem(WORKSPACE_RAIL_KEY);
-      return saved === null ? true : saved === "1";
-    } catch {
-      return true;
-    }
-  });
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
   const [repoCommitMessages, setRepoCommitMessages] = useState<Record<string, string>>({});
   const [snapshots, setSnapshots] = useState<Record<string, RepoSnapshotState>>({});
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
@@ -117,8 +106,6 @@ export function WorkspaceGitManager({
   const [changeMenu, setChangeMenu] = useState<{ x: number; y: number } | null>(null);
   const [pair, setPair] = useState<GitBlobPair | null>(null);
   const [pairLoading, setPairLoading] = useState(false);
-  const [repoFilter, setRepoFilter] = useState("");
-  const [showCleanRepos, setShowCleanRepos] = useState(true);
   const [repoRemoteNames, setRepoRemoteNames] = useState<Record<string, string>>({});
   const [headerMenu, setHeaderMenu] = useState<{ x: number; y: number } | null>(null);
   const [treeMode, setTreeMode] = useState(() => {
@@ -134,18 +121,15 @@ export function WorkspaceGitManager({
     () => normalizedRoots.find((root) => root.repoRoot === selectedRepoRoot) ?? normalizedRoots[0] ?? null,
     [normalizedRoots, selectedRepoRoot],
   );
-  const checkedRoots = useMemo(
-    () => normalizedRoots.filter((root) => checkedRepoRoots.has(root.repoRoot)),
-    [checkedRepoRoots, normalizedRoots],
-  );
-  const repoScopeIsAll = repoScope === ALL_REPOSITORIES;
   const scopedRoots = useMemo(
-    () => (repoScopeIsAll ? normalizedRoots : selectedRoot ? [selectedRoot] : []),
-    [normalizedRoots, repoScopeIsAll, selectedRoot],
+    () => rootsForScope(normalizedRoots, repoScope),
+    [normalizedRoots, repoScope],
   );
+  const repoScopeIsAll = repoScope.mode === "all";
+  const repoScopeIsMulti = repoScope.mode !== "single";
   const operationRoots = useMemo(
-    () => (repoScopeIsAll ? checkedRoots : selectedRoot ? [selectedRoot] : []),
-    [checkedRoots, repoScopeIsAll, selectedRoot],
+    () => scopedRoots,
+    [scopedRoots],
   );
   const allChanges = useMemo(
     () => scopedRoots.flatMap((root) => (
@@ -211,24 +195,8 @@ export function WorkspaceGitManager({
     [allChanges, selectedOperationKeys],
   );
   const totalChangedFiles = allChanges.length;
-  const allChecked = normalizedRoots.length > 0 && checkedRoots.length === normalizedRoots.length;
   const title = workspaceName?.trim() || "Code Workspace";
   const singleRepoMode = normalizedRoots.length === 1;
-  const filteredSidebarRoots = useMemo(() => {
-    const query = repoFilter.trim().toLowerCase();
-    return normalizedRoots.filter((root) => {
-      const snapshot = snapshots[root.repoRoot]?.snapshot ?? null;
-      const hasChanges = (snapshot?.changes.length ?? 0) > 0;
-      if (!showCleanRepos && !hasChanges) return false;
-      if (!query) return true;
-      return (
-        root.name.toLowerCase().includes(query) ||
-        root.repoRoot.toLowerCase().includes(query) ||
-        (snapshot?.currentBranch ?? "").toLowerCase().includes(query) ||
-        (snapshot?.upstream ?? "").toLowerCase().includes(query)
-      );
-    });
-  }, [normalizedRoots, repoFilter, showCleanRepos, snapshots]);
 
   useEffect(() => {
     try {
@@ -252,35 +220,21 @@ export function WorkspaceGitManager({
 
   useEffect(() => {
     setSelectedRepoRoot((current) => {
-      if (normalizedRoots.some((root) => root.repoRoot === current)) return current;
-      if (activeRepoRoot && normalizedRoots.some((root) => root.repoRoot === activeRepoRoot)) {
+      const validActiveRoots = scopedRoots.length > 0 ? scopedRoots : normalizedRoots;
+      if (validActiveRoots.some((root) => root.repoRoot === current)) return current;
+      if (activeRepoRoot && validActiveRoots.some((root) => root.repoRoot === activeRepoRoot)) {
         return activeRepoRoot;
       }
-      return normalizedRoots[0]?.repoRoot ?? "";
+      return validActiveRoots[0]?.repoRoot ?? "";
     });
     setRepoScope((current) => {
-      if (normalizedRoots.length > 1 && current === ALL_REPOSITORIES) return current;
-      if (normalizedRoots.some((root) => root.repoRoot === current)) return current;
-      return normalizedRoots.length > 1 ? ALL_REPOSITORIES : normalizedRoots[0]?.repoRoot ?? "";
+      return normalizeRepoScope(current, normalizedRoots, activeRepoRoot);
     });
-    setCheckedRepoRoots(() => includedRepoSet(normalizedRoots, loadExcludedRepos(rootsKey)));
-  }, [activeRepoRoot, normalizedRoots, rootsKey]);
+  }, [activeRepoRoot, normalizedRoots, scopedRoots]);
 
   useEffect(() => {
-    if (normalizedRoots.length === 0) return;
-    const excluded = new Set(
-      normalizedRoots.filter((root) => !checkedRepoRoots.has(root.repoRoot)).map((root) => root.repoRoot),
-    );
-    saveExcludedRepos(rootsKey, excluded);
-  }, [checkedRepoRoots, normalizedRoots, rootsKey]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(WORKSPACE_RAIL_KEY, railCollapsed ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-  }, [railCollapsed]);
+    saveRepoScope(rootsKey, repoScope, normalizedRoots);
+  }, [normalizedRoots, repoScope, rootsKey]);
 
   const refreshRepo = useCallback(async (repoRoot: string) => {
     setSnapshots((current) => ({
@@ -356,19 +310,6 @@ export function WorkspaceGitManager({
       cancelled = true;
     };
   }, [focusedChange, setStatusMessage]);
-
-  const toggleChecked = useCallback((repoRoot: string, checked: boolean) => {
-    setCheckedRepoRoots((current) => {
-      const next = new Set(current);
-      if (checked) next.add(repoRoot);
-      else next.delete(repoRoot);
-      return next;
-    });
-  }, []);
-
-  const setAllChecked = useCallback((checked: boolean) => {
-    setCheckedRepoRoots(checked ? new Set(normalizedRoots.map((root) => root.repoRoot)) : new Set());
-  }, [normalizedRoots]);
 
   const toggleChangeChecked = useCallback((repoRoot: string, paths: string[], checked: boolean) => {
     setUncheckedChangeKeys((current) => {
@@ -753,20 +694,6 @@ export function WorkspaceGitManager({
     return { ahead, behind };
   }, [scopedRoots, snapshots]);
 
-  const toggleGroupCollapsed = useCallback((groupKey: string) => {
-    setCollapsedGroups((current) => {
-      const next = new Set(current);
-      if (next.has(groupKey)) next.delete(groupKey);
-      else next.add(groupKey);
-      return next;
-    });
-  }, []);
-
-  const railGroups = useMemo(
-    () => buildRailGroups(filteredSidebarRoots),
-    [filteredSidebarRoots],
-  );
-
   const busy = busyLabel !== null;
   const refreshOperationRoots = useCallback(async () => {
     if (operationRoots.length === 0) return;
@@ -781,9 +708,10 @@ export function WorkspaceGitManager({
   }, [operationRoots, refreshRepos, setStatusMessage]);
 
   const currentSnapshot = selectedRoot ? snapshots[selectedRoot.repoRoot]?.snapshot ?? null : null;
-  const currentRemoteName = repoScopeIsAll ? "" : remoteNameForSnapshot(currentSnapshot);
+  const currentRemoteName = repoScopeIsMulti ? "" : remoteNameForSnapshot(currentSnapshot);
   const operationDisabled = busy || operationRoots.length === 0;
-  const scopeSummary = `${repoScopeIsAll ? normalizedRoots.length : scopedRoots.length} repositor${(repoScopeIsAll ? normalizedRoots.length : scopedRoots.length) === 1 ? "y" : "ies"} · ${totalChangedFiles} changed files`;
+  const scopeRepoCount = scopedRoots.length;
+  const scopeSummary = `${scopeRepoCount} repositor${scopeRepoCount === 1 ? "y" : "ies"} · ${totalChangedFiles} changed files`;
 
   if (singleRepoMode && selectedRoot) {
     return (
@@ -800,109 +728,6 @@ export function WorkspaceGitManager({
       data-testid="workspace-git-manager"
       className="h-full w-full min-h-0 flex bg-[var(--taomni-bg)] text-[var(--taomni-text)]"
     >
-      {!railCollapsed && (
-        <aside
-          data-testid="workspace-git-sidebar"
-          className="w-[240px] min-w-[220px] max-w-[34%] shrink-0 border-r border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] flex flex-col"
-        >
-          <div className="h-9 shrink-0 flex items-center gap-2 border-b border-[var(--taomni-divider)] px-3">
-            <label className="inline-flex items-center gap-2 text-[12px]">
-              <input
-                type="checkbox"
-                className="accent-[var(--taomni-accent)]"
-                checked={allChecked}
-                disabled={normalizedRoots.length === 0}
-                onChange={(event) => setAllChecked(event.target.checked)}
-              />
-              <span>Repositories</span>
-              <span className="text-[11px] text-[var(--taomni-text-muted)]">
-                {checkedRoots.length}/{normalizedRoots.length}
-              </span>
-            </label>
-            <div className="flex-1" />
-            {busyLabel && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-accent)]" />}
-            <button
-              type="button"
-              className="taomni-btn h-6 w-6 flex items-center justify-center"
-              title="Hide repositories"
-              aria-label="Hide repositories"
-              onClick={() => setRailCollapsed(true)}
-            >
-              <PanelLeftClose className="w-3.5 h-3.5" />
-            </button>
-          </div>
-          <div className="h-9 shrink-0 flex items-center gap-1.5 border-b border-[var(--taomni-divider)] px-2">
-            <div className="relative min-w-0 flex-1">
-              <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
-              <input
-                className="taomni-input h-7 w-full pl-7"
-                value={repoFilter}
-                placeholder="Filter repositories"
-                onChange={(event) => setRepoFilter(event.target.value)}
-              />
-            </div>
-            <button
-              type="button"
-              className={`taomni-btn h-7 px-2 text-[11px] ${showCleanRepos ? "" : "bg-[var(--taomni-hover)]"}`}
-              title={showCleanRepos ? "Hide clean repositories" : "Show clean repositories"}
-              onClick={() => setShowCleanRepos((current) => !current)}
-            >
-              Changed
-            </button>
-          </div>
-          <div className="flex-1 min-h-0 overflow-auto">
-            {normalizedRoots.length === 0 ? (
-              <EmptyState title="No Git repositories detected" />
-            ) : filteredSidebarRoots.length === 0 ? (
-              <EmptyState title="No repositories match the filter" />
-            ) : railGroups.map((group) => {
-              const showGroupHeader = railGroups.length > 1;
-              const collapsed = collapsedGroups.has(group.key);
-              return (
-                <div key={group.key}>
-                  {showGroupHeader && (
-                    <button
-                      type="button"
-                      className="w-full flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
-                      onClick={() => toggleGroupCollapsed(group.key)}
-                    >
-                      {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                      <FolderGit2 className="w-3.5 h-3.5" />
-                      <span className="truncate">{group.name}</span>
-                      <span className="ml-auto">{group.rows.length}</span>
-                    </button>
-                  )}
-                  {!collapsed && group.rows.map(({ root, depth }) => {
-                    const state = snapshots[root.repoRoot];
-                    const snapshot = state?.snapshot ?? null;
-                    const selected = selectedRoot?.repoRoot === root.repoRoot;
-                    const checked = checkedRepoRoots.has(root.repoRoot);
-                    return (
-                      <RepoRow
-                        key={root.repoRoot}
-                        root={root}
-                        snapshot={snapshot}
-                        loading={!!state?.loading}
-                        error={state?.error ?? null}
-                        selected={selected}
-                        checked={checked}
-                        workspacePath={root.path}
-                        depth={depth}
-                        onChecked={(next) => toggleChecked(root.repoRoot, next)}
-                        onSelect={() => {
-                          setSelectedRepoRoot(root.repoRoot);
-                          setRepoScope(root.repoRoot);
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        </aside>
-      )}
-
       <main className="flex-1 min-w-0 min-h-0">
         {selectedRoot ? (
           <GitPanel
@@ -920,19 +745,22 @@ export function WorkspaceGitManager({
                 <RepoSelector
                   roots={normalizedRoots}
                   snapshots={snapshots}
-                  value={repoScope}
+                  scope={repoScope}
                   selectedRoot={selectedRoot}
-                  onOpenPanel={() => setRailCollapsed(false)}
-                  onSelect={(value) => {
-                    setRepoScope(value);
-                    if (value !== ALL_REPOSITORIES) setSelectedRepoRoot(value);
+                  scopedRoots={scopedRoots}
+                  onScopeChange={(next) => {
+                    setRepoScope(next);
+                    if (next.mode === "single") setSelectedRepoRoot(next.repoRoot);
+                    if (next.mode === "custom" && !next.repoRoots.includes(selectedRepoRoot)) {
+                      setSelectedRepoRoot(next.repoRoots[0] ?? "");
+                    }
                   }}
                 />
               ),
-              branchBadge: repoScopeIsAll ? (
+              branchBadge: repoScopeIsMulti ? (
                 <span className="inline-flex items-center gap-1 h-6 px-2 rounded bg-[var(--taomni-hover)] text-[12px]">
                   <GitCommitHorizontal className="w-3.5 h-3.5" />
-                  All Repositories
+                  {repoScopeIsAll ? "All Repositories" : `${scopeRepoCount} Repositories`}
                 </span>
               ) : undefined,
               changeSummary: (
@@ -945,7 +773,7 @@ export function WorkspaceGitManager({
                 <>
                   <select
                     className="taomni-input h-7 w-32"
-                    value={repoScopeIsAll ? "__default__" : currentRemoteName}
+                    value={repoScopeIsMulti ? "__default__" : currentRemoteName}
                     onChange={(event) => {
                       if (!selectedRoot) return;
                       setRepoRemoteNames((current) => ({
@@ -953,10 +781,10 @@ export function WorkspaceGitManager({
                         [selectedRoot.repoRoot]: event.target.value,
                       }));
                     }}
-                    disabled={repoScopeIsAll || !currentSnapshot?.remotes.length}
-                    title={repoScopeIsAll ? "All repositories use their default remotes" : undefined}
+                    disabled={repoScopeIsMulti || !currentSnapshot?.remotes.length}
+                    title={repoScopeIsMulti ? "Multiple repositories use their default remotes" : undefined}
                   >
-                    {repoScopeIsAll ? (
+                    {repoScopeIsMulti ? (
                       <option value="__default__">Default remotes</option>
                     ) : currentSnapshot?.remotes.length ? currentSnapshot.remotes.map((remote) => (
                       <option key={remote.name} value={remote.name}>{remote.name}</option>
@@ -1008,21 +836,28 @@ export function WorkspaceGitManager({
                 busy={busy}
               />
             )}
-            workspaceBranchesView={repoScopeIsAll ? (
+            workspaceBranchesView={repoScopeIsMulti ? (
               <WorkspaceBranchesView
                 roots={scopedRoots}
                 snapshots={snapshots}
               />
             ) : undefined}
-            workspaceTagsView={repoScopeIsAll ? (
+            workspaceTagsView={repoScopeIsMulti ? (
               <WorkspaceTagsView
                 roots={scopedRoots}
                 snapshots={snapshots}
               />
             ) : undefined}
-            workspaceSettingsView={repoScopeIsAll ? (
-              <WorkspaceSettingsNotice roots={scopedRoots} />
-            ) : undefined}
+            workspaceSettingsAggregateView={scopedRoots.length > 1 ? ((showCurrent) => (
+              <WorkspaceSettingsAggregateView
+                roots={scopedRoots}
+                snapshots={snapshots}
+                onSelectRepo={(repoRoot) => {
+                  setSelectedRepoRoot(repoRoot);
+                  showCurrent();
+                }}
+              />
+            )) : undefined}
             changesView={(
               <WorkspaceChangesView
                 roots={scopedRoots}
@@ -1090,11 +925,6 @@ export function WorkspaceGitManager({
               icon: <Plus className="w-3.5 h-3.5" />,
               disabled: operationDisabled,
               onClick: () => batchCreateBranch(),
-            },
-            {
-              label: railCollapsed ? "Show Repository Panel" : "Hide Repository Panel",
-              icon: railCollapsed ? <PanelLeft className="w-3.5 h-3.5" /> : <PanelLeftClose className="w-3.5 h-3.5" />,
-              onClick: () => setRailCollapsed((current) => !current),
             },
             {
               label: "Open code workspace",
@@ -1263,26 +1093,129 @@ function WorkspaceTagsView({
   );
 }
 
-function WorkspaceSettingsNotice({ roots }: { roots: GitWorkspaceRootInfo[] }) {
+const WORKSPACE_SETTING_FIELDS: Array<{ key: keyof GitSnapshot["settings"]; label: string }> = [
+  { key: "userName", label: "user.name" },
+  { key: "userEmail", label: "user.email" },
+  { key: "httpProxy", label: "http.proxy" },
+  { key: "httpsProxy", label: "https.proxy" },
+  { key: "pullRebase", label: "pull.rebase" },
+  { key: "pushDefault", label: "push.default" },
+  { key: "coreAutocrlf", label: "core.autocrlf" },
+  { key: "coreFilemode", label: "core.filemode" },
+  { key: "commitGpgsign", label: "commit.gpgsign" },
+];
+
+function WorkspaceSettingsAggregateView({
+  roots,
+  snapshots,
+  onSelectRepo,
+}: {
+  roots: GitWorkspaceRootInfo[];
+  snapshots: Record<string, RepoSnapshotState>;
+  onSelectRepo: (repoRoot: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const rows = roots.filter((root) => {
+    if (!normalizedQuery) return true;
+    const snapshot = snapshots[root.repoRoot]?.snapshot ?? null;
+    const haystack = [
+      root.name,
+      root.repoRoot,
+      ...WORKSPACE_SETTING_FIELDS.map((field) => snapshot?.settings[field.key] ?? ""),
+      ...(snapshot?.remotes ?? []).flatMap((remote) => [
+        remote.name,
+        remote.fetchUrl,
+        remote.pushUrl ?? "",
+        remote.username ?? "",
+        remote.tokenRef ? "token stored" : "no token",
+      ]),
+    ].join("\n").toLowerCase();
+    return haystack.includes(normalizedQuery);
+  });
+
   return (
     <div className="h-full min-h-0 flex flex-col">
-      <div className="h-9 shrink-0 flex items-center px-3 border-b border-[var(--taomni-divider)] text-[12px] text-[var(--taomni-text-muted)]">
-        Git settings are repository-specific. Select a repository above to edit settings.
+      <div className="h-9 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)]">
+        <div className="relative w-72 max-w-full min-w-44">
+          <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
+          <input
+            className="taomni-input h-7 w-full pl-7"
+            placeholder="Search settings"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
+        <span className="text-[11px] text-[var(--taomni-text-muted)]">
+          {rows.length}/{roots.length} repositories
+        </span>
       </div>
       <div className="flex-1 min-h-0 overflow-auto">
-        {roots.map((root) => (
-          <div
-            key={root.repoRoot}
-            className="px-3 py-2 border-b border-[var(--taomni-divider)]"
-            title={root.repoRoot}
-          >
-            <div className="text-[12px] font-medium truncate">{root.name}</div>
-            <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">{root.repoRoot}</div>
-          </div>
-        ))}
+        {rows.length === 0 ? (
+          <EmptyState title="No repositories match" />
+        ) : (
+          <table className="min-w-[1120px] w-full border-collapse text-[12px]">
+            <thead className="sticky top-0 z-10 bg-[var(--taomni-quick-bg)]">
+              <tr className="border-b border-[var(--taomni-divider)] text-left">
+                <th className="w-52 px-3 py-2 font-medium">Repository</th>
+                {WORKSPACE_SETTING_FIELDS.map((field) => (
+                  <th key={field.key} className="px-2 py-2 font-medium">{field.label}</th>
+                ))}
+                <th className="w-72 px-2 py-2 font-medium">Remotes</th>
+                <th className="w-20 px-2 py-2 font-medium" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((root) => {
+                const state = snapshots[root.repoRoot];
+                const snapshot = state?.snapshot ?? null;
+                return (
+                  <tr key={root.repoRoot} className="border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]">
+                    <td className="px-3 py-2 align-top">
+                      <div className="font-medium truncate" title={root.repoRoot}>{root.name}</div>
+                      <div className="text-[11px] text-[var(--taomni-text-muted)] truncate" title={root.repoRoot}>
+                        {root.repoRoot}
+                      </div>
+                    </td>
+                    {WORKSPACE_SETTING_FIELDS.map((field) => (
+                      <td key={field.key} className="px-2 py-2 align-top">
+                        <div className="max-w-40 truncate" title={snapshot?.settings[field.key] ?? "(unset)"}>
+                          {snapshot ? snapshot.settings[field.key] ?? "(unset)" : state?.loading ? "Loading..." : "(unknown)"}
+                        </div>
+                      </td>
+                    ))}
+                    <td className="px-2 py-2 align-top">
+                      <div className="max-w-72 truncate" title={snapshot ? workspaceRemoteSummary(snapshot) : ""}>
+                        {snapshot ? workspaceRemoteSummary(snapshot) : state?.loading ? "Loading..." : "(unknown)"}
+                      </div>
+                    </td>
+                    <td className="px-2 py-2 align-top text-right">
+                      <button
+                        type="button"
+                        className="taomni-btn h-7 px-2 text-[12px]"
+                        onClick={() => onSelectRepo(root.repoRoot)}
+                      >
+                        Select
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
+}
+
+function workspaceRemoteSummary(snapshot: GitSnapshot): string {
+  if (snapshot.remotes.length === 0) return "No remotes";
+  return snapshot.remotes.map((remote) => {
+    const push = remote.pushUrl ? ` -> ${remote.pushUrl}` : "";
+    const auth = remote.tokenRef ? " (token stored)" : remote.username ? ` (${remote.username})` : "";
+    return `${remote.name}: ${remote.fetchUrl}${push}${auth}`;
+  }).join(" | ");
 }
 
 function workspaceBranchMatchesQuery(
@@ -1319,20 +1252,23 @@ function workspaceTagMatchesQuery(
 function RepoSelector({
   roots,
   snapshots,
-  value,
+  scope,
   selectedRoot,
-  onSelect,
-  onOpenPanel,
+  scopedRoots,
+  onScopeChange,
 }: {
   roots: GitWorkspaceRootInfo[];
   snapshots: Record<string, RepoSnapshotState>;
-  value: string;
+  scope: RepoScope;
   selectedRoot: GitWorkspaceRootInfo | null;
-  onSelect: (value: string) => void;
-  onOpenPanel: () => void;
+  scopedRoots: GitWorkspaceRootInfo[];
+  onScopeChange: (scope: RepoScope) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
+  const [draftRoots, setDraftRoots] = useState<Set<string>>(() => (
+    new Set(scopedRoots.map((root) => root.repoRoot))
+  ));
   const ref = useRef<HTMLDivElement | null>(null);
   const query = filter.trim().toLowerCase();
   const filteredRoots = useMemo(() => (
@@ -1350,12 +1286,18 @@ function RepoSelector({
   ), [query, roots, snapshots]);
   const groups = useMemo(() => buildRailGroups(filteredRoots), [filteredRoots]);
   const totalChanges = roots.reduce((total, root) => total + (snapshots[root.repoRoot]?.snapshot?.changes.length ?? 0), 0);
-  const label = value === ALL_REPOSITORIES
-    ? `All Repositories (${roots.length})`
-    : selectedRoot?.name ?? "Repository";
+  const scopedRootSet = useMemo(
+    () => new Set(scopedRoots.map((root) => root.repoRoot)),
+    [scopedRoots],
+  );
+  const label = repoScopeLabel(scope, scopedRoots, selectedRoot, roots.length);
+  const title = scope.mode === "all"
+    ? "All repositories"
+    : scopedRoots.map((root) => root.repoRoot).join("\n");
 
   useEffect(() => {
     if (!open) return;
+    setDraftRoots(new Set(scopedRoots.map((root) => root.repoRoot)));
     const close = (event: MouseEvent) => {
       const target = event.target as Node | null;
       if (target && ref.current?.contains(target)) return;
@@ -1363,31 +1305,46 @@ function RepoSelector({
     };
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
-  }, [open]);
+  }, [open, scopedRoots]);
 
-  const choose = (next: string) => {
-    onSelect(next);
+  const closeMenu = () => {
     setOpen(false);
     setFilter("");
   };
 
+  const chooseAll = () => {
+    onScopeChange({ mode: "all" });
+    closeMenu();
+  };
+
+  const chooseSingle = (repoRoot: string) => {
+    onScopeChange({ mode: "single", repoRoot });
+    closeMenu();
+  };
+
+  const toggleDraftRoot = (repoRoot: string, checked: boolean) => {
+    setDraftRoots((current) => {
+      const next = new Set(current);
+      if (checked) next.add(repoRoot);
+      else next.delete(repoRoot);
+      return next;
+    });
+  };
+
+  const applyDraft = () => {
+    if (draftRoots.size === 0) return;
+    onScopeChange(scopeFromRepoRoots(draftRoots, roots));
+    closeMenu();
+  };
+
   return (
     <div className="flex items-center gap-1 min-w-0">
-      <button
-        type="button"
-        className="taomni-btn h-7 w-7 inline-flex items-center justify-center"
-        title="Show Repository Panel"
-        aria-label="Show Repository Panel"
-        onClick={onOpenPanel}
-      >
-        <PanelLeft className="w-3.5 h-3.5 text-[var(--taomni-text)]" />
-      </button>
       <div ref={ref} className="relative min-w-0">
         <button
           type="button"
           data-testid="workspace-repo-selector"
           className="taomni-btn h-7 max-w-[260px] min-w-[180px] px-2 inline-flex items-center gap-2"
-          title={value === ALL_REPOSITORIES ? "All repositories" : selectedRoot?.repoRoot}
+          title={title}
           aria-expanded={open}
           onClick={() => setOpen((current) => !current)}
         >
@@ -1416,8 +1373,8 @@ function RepoSelector({
             <div className="max-h-[420px] overflow-auto py-1">
               <button
                 type="button"
-                className={`w-full px-2 py-1.5 flex items-center gap-2 text-left hover:bg-[var(--taomni-hover)] ${value === ALL_REPOSITORIES ? "bg-[var(--taomni-hover)]" : ""}`}
-                onClick={() => choose(ALL_REPOSITORIES)}
+                className={`w-full px-2 py-1.5 flex items-center gap-2 text-left hover:bg-[var(--taomni-hover)] ${scope.mode === "all" ? "bg-[var(--taomni-hover)]" : ""}`}
+                onClick={chooseAll}
               >
                 <GitBranch className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
                 <div className="min-w-0 flex-1">
@@ -1443,15 +1400,32 @@ function RepoSelector({
                     const snapshot = state?.snapshot ?? null;
                     const changes = snapshot?.changes.length ?? 0;
                     const branch = snapshot?.detached ? `detached ${snapshot.headOid ?? ""}` : snapshot?.currentBranch ?? "No branch";
+                    const checked = draftRoots.has(root.repoRoot);
+                    const inScope = scopedRootSet.has(root.repoRoot);
                     return (
-                      <button
+                      <div
                         key={root.repoRoot}
-                        type="button"
-                        className={`w-full px-2 py-1.5 flex items-center gap-2 text-left hover:bg-[var(--taomni-hover)] ${value === root.repoRoot ? "bg-[var(--taomni-hover)]" : ""}`}
+                        role="button"
+                        tabIndex={0}
+                        className={`w-full px-2 py-1.5 flex items-center gap-2 text-left cursor-pointer hover:bg-[var(--taomni-hover)] ${inScope ? "bg-[var(--taomni-hover)]" : ""}`}
                         style={depth > 0 ? { paddingLeft: `${8 + depth * 16}px` } : undefined}
                         title={root.repoRoot}
-                        onClick={() => choose(root.repoRoot)}
+                        onClick={() => chooseSingle(root.repoRoot)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            chooseSingle(root.repoRoot);
+                          }
+                        }}
                       >
+                        <input
+                          type="checkbox"
+                          className="shrink-0 accent-[var(--taomni-accent)]"
+                          checked={checked}
+                          aria-label={`Include ${root.name}`}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={(event) => toggleDraftRoot(root.repoRoot, event.target.checked)}
+                        />
                         <RepoStatusIcon loading={!!state?.loading} error={state?.error ?? null} changes={changes} />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
@@ -1467,11 +1441,27 @@ function RepoSelector({
                         <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] ${changes ? "bg-[var(--taomni-accent)] text-white" : "bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"}`}>
                           {changes}
                         </span>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
               ))}
+            </div>
+            <div className="h-9 flex items-center gap-2 px-2 border-t border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
+              <span className="min-w-0 flex-1 truncate text-[11px] text-[var(--taomni-text-muted)]">
+                {draftRoots.size} selected
+              </span>
+              <button type="button" className="taomni-btn h-7 px-2 text-[12px]" onClick={closeMenu}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="taomni-btn h-7 px-2 text-[12px]"
+                disabled={draftRoots.size === 0}
+                onClick={applyDraft}
+              >
+                Apply
+              </button>
             </div>
           </div>
         )}
@@ -1485,101 +1475,6 @@ function RepoStatusIcon({ loading, error, changes }: { loading: boolean; error: 
   if (error) return <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-500" />;
   if (changes) return <Circle className="w-2.5 h-2.5 shrink-0 fill-current text-[var(--taomni-accent)]" />;
   return <Check className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />;
-}
-
-function RepoRow({
-  root,
-  snapshot,
-  loading,
-  error,
-  selected,
-  checked,
-  workspacePath,
-  depth = 0,
-  onChecked,
-  onSelect,
-}: {
-  root: GitWorkspaceRootInfo;
-  snapshot: GitSnapshot | null;
-  loading: boolean;
-  error: string | null;
-  selected: boolean;
-  checked: boolean;
-  workspacePath: string;
-  depth?: number;
-  onChecked: (checked: boolean) => void;
-  onSelect: () => void;
-}) {
-  const branch = snapshot?.detached ? `detached ${snapshot.headOid ?? ""}` : snapshot?.currentBranch ?? "";
-  const changes = snapshot?.changes ?? [];
-  const relation = repoRelationLabel(root.repoRoot, workspacePath);
-  return (
-    <div
-      className={`group border-b border-[var(--taomni-divider)] ${selected ? "bg-[var(--taomni-hover)]" : "hover:bg-[var(--taomni-hover)]"}`}
-    >
-      <div
-        className="flex items-start gap-2 px-2 py-1.5"
-        style={depth > 0 ? { paddingLeft: `${12 + depth * 16}px` } : undefined}
-      >
-        <input
-          type="checkbox"
-          className="mt-1 accent-[var(--taomni-accent)]"
-          checked={checked}
-          onChange={(event) => onChecked(event.target.checked)}
-          onClick={(event) => event.stopPropagation()}
-          aria-label={`Select ${root.name}`}
-        />
-        <button
-          type="button"
-          className="min-w-0 flex-1 text-left"
-          title={root.repoRoot}
-          onClick={onSelect}
-        >
-          <div className="flex items-center gap-2">
-            <span className="min-w-0 truncate text-[13px] font-medium">{root.name || gitRepoName(root.repoRoot)}</span>
-            {root.isSubmodule && (
-              <span className="shrink-0 rounded border border-[var(--taomni-divider)] px-1 text-[9px] uppercase text-[var(--taomni-text-muted)]">
-                sub
-              </span>
-            )}
-            {loading && <Loader2 className="w-3 h-3 shrink-0 animate-spin text-[var(--taomni-accent)]" />}
-            {error && <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-500" />}
-          </div>
-          <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
-            <GitCommitHorizontal className="w-3 h-3 shrink-0" />
-            <span className="min-w-0 truncate">{branch || "No branch"}</span>
-          </div>
-          {relation ? (
-            <div className="mt-0.5 truncate text-[10px] text-[var(--taomni-text-muted)]">{relation}</div>
-          ) : null}
-          {error && (
-            <div className="mt-1 truncate text-[11px] text-red-500" title={error}>
-              {error}
-            </div>
-          )}
-        </button>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <span className={`rounded px-1.5 py-0.5 text-[11px] ${changes.length > 0 ? "bg-[var(--taomni-accent)] text-white" : "bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"}`}>
-            {changes.length}
-          </span>
-          {snapshot && (snapshot.ahead > 0 || snapshot.behind > 0) && (
-            <span className="text-[10px] text-[var(--taomni-text-muted)]">
-              ↑{snapshot.ahead} ↓{snapshot.behind}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function repoRelationLabel(repoRoot: string, workspacePath: string): string | null {
-  const repo = normalizePath(repoRoot);
-  const workspace = normalizePath(workspacePath);
-  if (!repo || !workspace || repo === workspace) return null;
-  if (repo.startsWith(`${workspace}/`)) return `inside ${repo.slice(workspace.length + 1)}`;
-  if (workspace.startsWith(`${repo}/`)) return `root ${workspace.slice(repo.length + 1)}`;
-  return null;
 }
 
 function normalizePath(path: string): string {
@@ -1663,40 +1558,104 @@ function EmptyState({ title }: { title: string }) {
   );
 }
 
-const WORKSPACE_EXCLUDED_KEY = "taomni.git.workspace.excluded.v1";
-const WORKSPACE_RAIL_KEY = "taomni.git.workspace.rail.collapsed";
+const WORKSPACE_SCOPE_KEY = "taomni.git.workspace.scope.v1";
 
 function workspaceRootsKey(roots: readonly GitWorkspaceRootInfo[]): string {
   return roots.map((root) => root.repoRoot).sort((a, b) => a.localeCompare(b)).join("\n");
 }
 
-function includedRepoSet(roots: readonly GitWorkspaceRootInfo[], excluded: Set<string>): Set<string> {
-  return new Set(roots.filter((root) => !excluded.has(root.repoRoot)).map((root) => root.repoRoot));
+function initialRepoScope(roots: readonly GitWorkspaceRootInfo[], activeRepoRoot?: string | null): RepoScope {
+  if (roots.length === 0) return { mode: "all" };
+  if (roots.length === 1) return { mode: "single", repoRoot: roots[0].repoRoot };
+  if (activeRepoRoot && !roots.some((root) => root.repoRoot === activeRepoRoot)) {
+    return { mode: "all" };
+  }
+  return { mode: "all" };
 }
 
-function loadExcludedRepos(key: string): Set<string> {
-  if (!key) return new Set();
+function loadRepoScope(key: string, roots: readonly GitWorkspaceRootInfo[]): RepoScope | null {
+  if (!key) return null;
   try {
-    const raw = localStorage.getItem(WORKSPACE_EXCLUDED_KEY);
-    if (!raw) return new Set();
-    const map = JSON.parse(raw) as Record<string, string[]>;
-    return new Set(map[key] ?? []);
+    const raw = localStorage.getItem(WORKSPACE_SCOPE_KEY);
+    if (!raw) return null;
+    const map = JSON.parse(raw) as Record<string, RepoScope>;
+    const saved = map[key];
+    return saved ? normalizeRepoScope(saved, roots) : null;
   } catch {
-    return new Set();
+    return null;
   }
 }
 
-function saveExcludedRepos(key: string, excluded: Set<string>): void {
+function saveRepoScope(key: string, scope: RepoScope, roots: readonly GitWorkspaceRootInfo[]): void {
   if (!key) return;
   try {
-    const raw = localStorage.getItem(WORKSPACE_EXCLUDED_KEY);
-    const map = raw ? (JSON.parse(raw) as Record<string, string[]>) : {};
-    if (excluded.size === 0) delete map[key];
-    else map[key] = [...excluded];
-    localStorage.setItem(WORKSPACE_EXCLUDED_KEY, JSON.stringify(map));
+    const raw = localStorage.getItem(WORKSPACE_SCOPE_KEY);
+    const map = raw ? (JSON.parse(raw) as Record<string, RepoScope>) : {};
+    const normalized = normalizeRepoScope(scope, roots);
+    if (normalized.mode === "all") delete map[key];
+    else map[key] = normalized;
+    localStorage.setItem(WORKSPACE_SCOPE_KEY, JSON.stringify(map));
   } catch {
     /* ignore */
   }
+}
+
+function normalizeRepoScope(
+  scope: RepoScope,
+  roots: readonly GitWorkspaceRootInfo[],
+  fallbackRepoRoot?: string | null,
+): RepoScope {
+  if (roots.length === 0) return { mode: "all" };
+  const validRoots = new Set(roots.map((root) => root.repoRoot));
+  if (scope.mode === "all") return scope;
+  if (scope.mode === "single" && validRoots.has(scope.repoRoot)) return scope;
+  if (scope.mode === "custom") {
+    const ordered = orderedRepoRoots(scope.repoRoots, roots);
+    if (ordered.length === roots.length) return { mode: "all" };
+    if (ordered.length === 1) return { mode: "single", repoRoot: ordered[0] };
+    if (ordered.length > 1 && sameStringArray(ordered, scope.repoRoots)) return scope;
+    if (ordered.length > 1) return { mode: "custom", repoRoots: ordered };
+  }
+  if (fallbackRepoRoot && validRoots.has(fallbackRepoRoot)) {
+    return { mode: "single", repoRoot: fallbackRepoRoot };
+  }
+  return roots.length > 1 ? { mode: "all" } : { mode: "single", repoRoot: roots[0].repoRoot };
+}
+
+function rootsForScope(roots: readonly GitWorkspaceRootInfo[], scope: RepoScope): GitWorkspaceRootInfo[] {
+  if (scope.mode === "all") return [...roots];
+  if (scope.mode === "single") return roots.filter((root) => root.repoRoot === scope.repoRoot);
+  const selected = new Set(scope.repoRoots);
+  return roots.filter((root) => selected.has(root.repoRoot));
+}
+
+function scopeFromRepoRoots(repoRoots: Iterable<string>, roots: readonly GitWorkspaceRootInfo[]): RepoScope {
+  const ordered = orderedRepoRoots([...repoRoots], roots);
+  if (ordered.length === 0) return initialRepoScope(roots);
+  if (ordered.length === roots.length) return { mode: "all" };
+  if (ordered.length === 1) return { mode: "single", repoRoot: ordered[0] };
+  return { mode: "custom", repoRoots: ordered };
+}
+
+function orderedRepoRoots(repoRoots: readonly string[], roots: readonly GitWorkspaceRootInfo[]): string[] {
+  const selected = new Set(repoRoots);
+  return roots.filter((root) => selected.has(root.repoRoot)).map((root) => root.repoRoot);
+}
+
+function sameStringArray(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((entry, index) => entry === b[index]);
+}
+
+function repoScopeLabel(
+  scope: RepoScope,
+  scopedRoots: readonly GitWorkspaceRootInfo[],
+  selectedRoot: GitWorkspaceRootInfo | null,
+  totalRoots: number,
+): string {
+  if (scope.mode === "all") return `All Repositories (${totalRoots})`;
+  if (scope.mode === "single") return scopedRoots[0]?.name ?? selectedRoot?.name ?? "Repository";
+  const first = scopedRoots[0]?.name ?? "Repositories";
+  return scopedRoots.length > 1 ? `${first} +${scopedRoots.length - 1}` : first;
 }
 
 export interface RailGroup {

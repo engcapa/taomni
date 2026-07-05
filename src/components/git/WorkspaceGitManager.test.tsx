@@ -44,8 +44,12 @@ vi.mock("./GitPanel", () => ({
   ),
 }));
 
-function snapshot(repoRoot: string, changes: GitSnapshot["changes"] = []): GitSnapshot {
-  return {
+function snapshot(
+  repoRoot: string,
+  changes: GitSnapshot["changes"] = [],
+  overrides: Partial<GitSnapshot> = {},
+): GitSnapshot {
+  const base: GitSnapshot = {
     repoRoot,
     currentBranch: "main",
     headOid: "abc123",
@@ -70,6 +74,14 @@ function snapshot(repoRoot: string, changes: GitSnapshot["changes"] = []): GitSn
       commitGpgsign: null,
     },
   };
+  return {
+    ...base,
+    ...overrides,
+    settings: {
+      ...base.settings,
+      ...(overrides.settings ?? {}),
+    },
+  };
 }
 
 function change(path: string): GitSnapshot["changes"][number] {
@@ -81,6 +93,18 @@ function change(path: string): GitSnapshot["changes"][number] {
     unstaged: true,
     conflict: false,
   };
+}
+
+function originSnapshot(repoRoot: string, changes: GitSnapshot["changes"] = []): GitSnapshot {
+  return snapshot(repoRoot, changes, {
+    remotes: [{
+      name: "origin",
+      fetchUrl: `git@example.com:${repoRoot.split("/").pop()}.git`,
+      pushUrl: null,
+      username: null,
+      tokenRef: null,
+    }],
+  });
 }
 
 describe("WorkspaceGitManager", () => {
@@ -106,6 +130,20 @@ describe("WorkspaceGitManager", () => {
     });
     gitMocks.gitCommit.mockReset();
     gitMocks.gitCommit.mockResolvedValue(undefined);
+    gitMocks.gitFetch.mockReset();
+    gitMocks.gitFetch.mockResolvedValue(undefined);
+    gitMocks.gitPull.mockReset();
+    gitMocks.gitPull.mockResolvedValue(undefined);
+    gitMocks.gitPush.mockReset();
+    gitMocks.gitPush.mockResolvedValue(undefined);
+    gitMocks.gitStage.mockReset();
+    gitMocks.gitStage.mockResolvedValue(undefined);
+    gitMocks.gitUnstage.mockReset();
+    gitMocks.gitUnstage.mockResolvedValue(undefined);
+    gitMocks.gitDiscard.mockReset();
+    gitMocks.gitDiscard.mockResolvedValue(undefined);
+    gitMocks.gitCleanUntracked.mockReset();
+    gitMocks.gitCleanUntracked.mockResolvedValue(undefined);
     gitMocks.gitSnapshot.mockReset();
     gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
       repoRoot === "/repo/app"
@@ -150,7 +188,7 @@ describe("WorkspaceGitManager", () => {
     expect(screen.queryByTestId("workspace-git-sidebar")).not.toBeInTheDocument();
   });
 
-  it("uses a header repo selector by default and keeps file-level changes out of the optional repo panel", async () => {
+  it("uses only the header repo selector for multi-repo scope changes", async () => {
     render(
       <WorkspaceGitManager
         workspaceName="Workspace"
@@ -164,20 +202,14 @@ describe("WorkspaceGitManager", () => {
 
     await waitFor(() => expect(gitMocks.gitSnapshot).toHaveBeenCalledWith("/repo/app"));
     expect(screen.queryByTestId("workspace-git-sidebar")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show Repository Panel" })).not.toBeInTheDocument();
     expect(screen.getByTestId("workspace-repo-selector")).toHaveTextContent("All Repositories (2)");
     expect(screen.getByTestId("git-panel")).toHaveAttribute("data-repo-root", "/repo/service");
     expect(screen.getByText("src/App.tsx")).toBeInTheDocument();
     expect(screen.getByText("src/ignored.ts")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Show Repository Panel" }));
-    const sidebar = screen.getByTestId("workspace-git-sidebar");
-    expect(within(sidebar).getByText("Repositories")).toBeInTheDocument();
-    expect(within(sidebar).getByText("2/2")).toBeInTheDocument();
-    expect(within(sidebar).getByRole("checkbox", { name: "Select app" })).toBeInTheDocument();
-    expect(within(sidebar).queryByText("src/ignored.ts")).not.toBeInTheDocument();
-    expect(within(sidebar).queryByPlaceholderText("Commit message")).not.toBeInTheDocument();
-
-    fireEvent.click(within(sidebar).getByText("app"));
+    fireEvent.click(screen.getByTestId("workspace-repo-selector"));
+    fireEvent.click(within(screen.getByTestId("workspace-repo-selector-menu")).getByTitle("/repo/app"));
     expect(screen.getByTestId("git-panel")).toHaveAttribute("data-repo-root", "/repo/app");
     expect(screen.getByTestId("workspace-repo-selector")).toHaveTextContent("app");
 
@@ -235,5 +267,129 @@ describe("WorkspaceGitManager", () => {
       );
     });
     expect(gitMocks.gitCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it("filters workspace changes to the custom repository scope from the header selector", async () => {
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => {
+      if (repoRoot === "/repo/app") return snapshot(repoRoot, [change("src/app.ts")]);
+      if (repoRoot === "/repo/api") return snapshot(repoRoot, [change("src/api.ts")]);
+      return snapshot(repoRoot, [change("src/service.ts")]);
+    });
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "api", name: "api", path: "/repo", repoRoot: "/repo/api", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText("src/service.ts")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId("workspace-repo-selector"));
+    const menu = screen.getByTestId("workspace-repo-selector-menu");
+    fireEvent.click(within(menu).getByRole("checkbox", { name: "Include service" }));
+    fireEvent.click(within(menu).getByRole("button", { name: "Apply" }));
+
+    await waitFor(() => expect(screen.queryByText("src/service.ts")).not.toBeInTheDocument());
+    expect(screen.getByText("src/app.ts")).toBeInTheDocument();
+    expect(screen.getByText("src/api.ts")).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-repo-selector")).toHaveTextContent("api +1");
+  });
+
+  it("runs header fetch only for repositories in a custom scope", async () => {
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => {
+      if (repoRoot === "/repo/app") return originSnapshot(repoRoot, [change("src/app.ts")]);
+      if (repoRoot === "/repo/api") return originSnapshot(repoRoot, [change("src/api.ts")]);
+      return originSnapshot(repoRoot, [change("src/service.ts")]);
+    });
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "api", name: "api", path: "/repo", repoRoot: "/repo/api", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText("src/service.ts")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId("workspace-repo-selector"));
+    const menu = screen.getByTestId("workspace-repo-selector-menu");
+    fireEvent.click(within(menu).getByRole("checkbox", { name: "Include service" }));
+    fireEvent.click(within(menu).getByRole("button", { name: "Apply" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fetch" }));
+
+    await waitFor(() => expect(gitMocks.gitFetch).toHaveBeenCalledTimes(2));
+    expect(gitMocks.gitFetch).toHaveBeenCalledWith("/repo/app", "origin");
+    expect(gitMocks.gitFetch).toHaveBeenCalledWith("/repo/api", "origin");
+    expect(gitMocks.gitFetch).not.toHaveBeenCalledWith("/repo/service", "origin");
+  });
+
+  it("does not stage or commit outside the custom repository scope", async () => {
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => {
+      if (repoRoot === "/repo/app") return snapshot(repoRoot, [change("src/app.ts")]);
+      if (repoRoot === "/repo/api") return snapshot(repoRoot, [change("src/api.ts")]);
+      return snapshot(repoRoot, [change("src/service.ts")]);
+    });
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "api", name: "api", path: "/repo", repoRoot: "/repo/api", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText("src/service.ts")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByTestId("workspace-repo-selector"));
+    const menu = screen.getByTestId("workspace-repo-selector-menu");
+    fireEvent.click(within(menu).getByRole("checkbox", { name: "Include service" }));
+    fireEvent.click(within(menu).getByRole("button", { name: "Apply" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Stage all" }));
+    await waitFor(() => expect(gitMocks.gitStage).toHaveBeenCalledTimes(2));
+    expect(gitMocks.gitStage).toHaveBeenCalledWith("/repo/app", ["src/app.ts"]);
+    expect(gitMocks.gitStage).toHaveBeenCalledWith("/repo/api", ["src/api.ts"]);
+    expect(gitMocks.gitStage).not.toHaveBeenCalledWith("/repo/service", ["src/service.ts"]);
+
+    fireEvent.change(screen.getByPlaceholderText("Commit message"), {
+      target: { value: "scoped commit" },
+    });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Commit" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Commit" }));
+
+    await waitFor(() => expect(gitMocks.gitCommit).toHaveBeenCalledTimes(2));
+    expect(gitMocks.gitCommit).toHaveBeenCalledWith(
+      "/repo/app",
+      "scoped commit",
+      false,
+      ["src/app.ts"],
+    );
+    expect(gitMocks.gitCommit).toHaveBeenCalledWith(
+      "/repo/api",
+      "scoped commit",
+      false,
+      ["src/api.ts"],
+    );
+    expect(gitMocks.gitCommit).not.toHaveBeenCalledWith(
+      "/repo/service",
+      "scoped commit",
+      false,
+      ["src/service.ts"],
+    );
   });
 });

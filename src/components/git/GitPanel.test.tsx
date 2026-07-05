@@ -166,6 +166,32 @@ describe("GitPanel", () => {
     expect(screen.queryByText("Git · repo")).not.toBeInTheDocument();
   });
 
+  it("keeps current repository settings as the default and can switch to aggregate settings", async () => {
+    render(
+      <GitPanel
+        repoRoot="D:\\repo"
+        workspaceSettingsAggregateView={(showCurrent) => (
+          <div>
+            <div>Aggregate settings body</div>
+            <button type="button" onClick={showCurrent}>Back to current</button>
+          </div>
+        )}
+      />,
+    );
+
+    await waitFor(() => expect(gitMocks.gitSnapshot).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "settings" }));
+
+    expect(screen.getByText("Repository config")).toBeInTheDocument();
+    expect(screen.queryByText("Aggregate settings body")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Aggregate" }));
+    expect(screen.getByText("Aggregate settings body")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Back to current" }));
+    expect(screen.getByText("Repository config")).toBeInTheDocument();
+  });
+
   it("keeps the visited log view mounted across Git sub-tab switches", async () => {
     gitMocks.gitLog.mockResolvedValue([
       {
