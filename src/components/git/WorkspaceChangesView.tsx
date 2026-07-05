@@ -2,17 +2,15 @@ import { useMemo, useRef, type MouseEvent as ReactMouseEvent } from "react";
 import {
   AlertTriangle,
   GitBranch,
-  GitCommitHorizontal,
-  List,
-  ListTree,
   Loader2,
-  Upload,
 } from "lucide-react";
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
 import type { GitBlobPair, GitSnapshot } from "../../lib/git";
 import type { GitWorkspaceRootInfo } from "../../types";
 import { ChangesTree } from "./ChangesTree";
-import { DiffViewer } from "./DiffViewer";
+import { ChangesListToolbar } from "./shared/ChangesListToolbar";
+import { CommitBar } from "./shared/CommitBar";
+import { DiffPane } from "./shared/DiffPane";
 import { parseWorkspaceChangeKey, workspaceChangeKey } from "./workspaceGitKeys";
 
 type TriState = "all" | "none" | "some";
@@ -101,22 +99,17 @@ export function WorkspaceChangesView({
   return (
     <PanelGroup orientation="horizontal" id="workspace-git-changes-layout">
       <Panel id="workspace-changes-list" defaultSize={38} minSize={26} className="min-w-0 min-h-0 flex flex-col border-r border-[var(--taomni-divider)]">
-        <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)]">
-          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || totalChanges === 0} onClick={stageAll}>Stage all</button>
-          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !hasStaged} onClick={unstageAll}>Unstage all</button>
-          <div className="flex-1" />
-          <span className="text-[11px] text-[var(--taomni-text-muted)]">
-            {checkedCount}/{totalChanges}
-          </span>
-          <button
-            className="taomni-btn h-7 px-2"
-            type="button"
-            title={treeMode ? "Switch to flat list" : "Switch to directory tree"}
-            onClick={() => setTreeMode(!treeMode)}
-          >
-            {treeMode ? <ListTree className="w-3.5 h-3.5" /> : <List className="w-3.5 h-3.5" />}
-          </button>
-        </div>
+        <ChangesListToolbar
+          busy={busy}
+          checkedCount={checkedCount}
+          totalCount={totalChanges}
+          treeMode={treeMode}
+          canStageAll={totalChanges > 0}
+          canUnstageAll={hasStaged}
+          onStageAll={stageAll}
+          onUnstageAll={unstageAll}
+          onToggleTreeMode={() => setTreeMode(!treeMode)}
+        />
 
         <div className="flex-1 min-h-0 overflow-auto">
           {!hasVisibleGroups ? (
@@ -142,53 +135,30 @@ export function WorkspaceChangesView({
           ))}
         </div>
 
-        <div className="shrink-0 border-t border-[var(--taomni-divider)] p-2 space-y-2">
-          <textarea
-            className="taomni-input w-full min-h-20 resize-none"
-            value={commitMessage}
-            placeholder="Commit message"
-            onChange={(event) => setCommitMessage(event.target.value)}
-          />
-          <div className="flex items-center gap-2">
-            <span className="min-w-0 flex-1 truncate text-[11px] text-[var(--taomni-text-muted)]">
-              {checkedCount} files in {checkedRepoCount} repos
-            </span>
-            <button
-              className="taomni-btn h-7 px-2 inline-flex items-center gap-1"
-              type="button"
-              disabled={!canCommit}
-              onClick={commit}
-            >
-              <GitCommitHorizontal className="w-3.5 h-3.5" />
-              <span>Commit</span>
-            </button>
-            <button
-              className="taomni-btn h-7 px-2 inline-flex items-center gap-1"
-              type="button"
-              disabled={!canCommit}
-              onClick={commitAndPush}
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>Commit and Push</span>
-            </button>
-          </div>
-        </div>
+        <CommitBar
+          message={commitMessage}
+          onMessageChange={setCommitMessage}
+          canCommit={canCommit}
+          canCommitAndPush={canCommit}
+          onCommit={commit}
+          onCommitAndPush={commitAndPush}
+          summary={`${checkedCount} files in ${checkedRepoCount} repos`}
+        />
       </Panel>
 
       <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] cursor-col-resize" />
 
       <Panel id="workspace-changes-diff" defaultSize={62} minSize={35} className="min-w-0 min-h-0 flex flex-col">
-        <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)]">
-          <span className="font-semibold truncate text-[12px]">
-            {active ? `${active.root.name} / ${active.change.path}` : "Diff"}
-            {selectedCount > 1 ? ` (+${selectedCount - 1} selected)` : ""}
-          </span>
-          <div className="flex-1" />
-          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || selectedCount === 0} onClick={stageSelected}>Stage</button>
-          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || selectedCount === 0} onClick={unstageSelected}>Unstage</button>
-          <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy || selectedCount === 0} onClick={discardSelected}>Discard</button>
-        </div>
-        <DiffViewer pair={pair} loading={pairLoading} emptyLabel="Select a file to preview its diff" />
+        <DiffPane
+          title={`${active ? `${active.root.name} / ${active.change.path}` : "Diff"}${selectedCount > 1 ? ` (+${selectedCount - 1} selected)` : ""}`}
+          busy={busy}
+          selectedCount={selectedCount}
+          pair={pair}
+          pairLoading={pairLoading}
+          onStage={stageSelected}
+          onUnstage={unstageSelected}
+          onDiscard={discardSelected}
+        />
       </Panel>
     </PanelGroup>
   );

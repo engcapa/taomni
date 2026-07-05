@@ -14,8 +14,6 @@ import {
   GitCommitHorizontal,
   GitFork,
   GitMerge,
-  List,
-  ListTree,
   Loader2,
   Plus,
   RefreshCw,
@@ -83,7 +81,9 @@ import { ContextMenu, type MenuItem } from "../ContextMenu";
 import { ChangesTree } from "./ChangesTree";
 import { CommitLog } from "./CommitLog";
 import { CompareView } from "./CompareView";
-import { DiffViewer } from "./DiffViewer";
+import { ChangesListToolbar } from "./shared/ChangesListToolbar";
+import { CommitBar } from "./shared/CommitBar";
+import { DiffPane as ChangesDiffPane } from "./shared/DiffPane";
 import { useAppStore } from "../../stores/appStore";
 
 interface GitPanelProps {
@@ -869,20 +869,17 @@ function ChangesView({
   return (
     <PanelGroup orientation="horizontal" id="git-changes-layout">
       <Panel id="changes-list" defaultSize={36} minSize={24} className="min-w-0 min-h-0 flex flex-col border-r border-[var(--taomni-divider)]">
-        <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)]">
-          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || changes.length === 0} onClick={stageAll}>Stage all</button>
-          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !changes.some((c) => c.staged)} onClick={unstageAll}>Unstage all</button>
-          <div className="flex-1" />
-          <span className="text-[11px] text-[var(--taomni-text-muted)]">{checkedCount}/{changes.length}</span>
-          <button
-            className="taomni-btn h-7 px-2"
-            type="button"
-            title={treeMode ? "Switch to flat list" : "Switch to directory tree"}
-            onClick={() => setTreeMode(!treeMode)}
-          >
-            {treeMode ? <ListTree className="w-3.5 h-3.5" /> : <List className="w-3.5 h-3.5" />}
-          </button>
-        </div>
+        <ChangesListToolbar
+          busy={busy}
+          checkedCount={checkedCount}
+          totalCount={changes.length}
+          treeMode={treeMode}
+          canStageAll={changes.length > 0}
+          canUnstageAll={changes.some((change) => change.staged)}
+          onStageAll={stageAll}
+          onUnstageAll={unstageAll}
+          onToggleTreeMode={() => setTreeMode(!treeMode)}
+        />
         <ChangesTree
           changes={changes}
           treeMode={treeMode}
@@ -893,41 +890,29 @@ function ChangesView({
           onSelect={onSelect}
           onContextMenu={onContextMenu}
         />
-        <div className="shrink-0 border-t border-[var(--taomni-divider)] p-2 space-y-2">
-          <textarea
-            className="taomni-input w-full min-h-20 resize-none"
-            value={commitMessage}
-            placeholder="Commit message"
-            onChange={(event) => setCommitMessage(event.target.value)}
-          />
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1 text-[12px] select-none">
-              <input type="checkbox" checked={amendChecked} onChange={(e) => setAmendChecked(e.target.checked)} />
-              Amend
-            </label>
-            <div className="flex-1" />
-            <button className="taomni-btn h-7 px-2" type="button" disabled={!canCommit} onClick={commit}>
-              Commit{checkedCount ? ` (${checkedCount})` : ""}
-            </button>
-            <button className="taomni-btn h-7 px-2" type="button" disabled={!canCommit || !hasRemote} onClick={commitAndPush}>
-              Commit and Push
-            </button>
-          </div>
-        </div>
+        <CommitBar
+          message={commitMessage}
+          onMessageChange={setCommitMessage}
+          canCommit={canCommit}
+          canCommitAndPush={canCommit && hasRemote}
+          onCommit={commit}
+          onCommitAndPush={commitAndPush}
+          commitLabel={`Commit${checkedCount ? ` (${checkedCount})` : ""}`}
+          amend={{ checked: amendChecked, onChange: setAmendChecked }}
+        />
       </Panel>
       <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] cursor-col-resize" />
       <Panel id="changes-diff" defaultSize={64} minSize={35} className="min-w-0 min-h-0 flex flex-col">
-        <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)]">
-          <span className="font-semibold truncate text-[12px]">
-            {active?.path ?? "Diff"}
-            {opCount > 1 ? ` (+${opCount - 1} selected)` : ""}
-          </span>
-          <div className="flex-1" />
-          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || opCount === 0} onClick={stageSelected}>Stage</button>
-          <button className="taomni-btn h-7 px-2" type="button" disabled={busy || opCount === 0} onClick={unstageSelected}>Unstage</button>
-          <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy || opCount === 0} onClick={discardSelected}>Discard</button>
-        </div>
-        <DiffViewer pair={pair} loading={pairLoading} emptyLabel="Select a file to preview its diff" />
+        <ChangesDiffPane
+          title={`${active?.path ?? "Diff"}${opCount > 1 ? ` (+${opCount - 1} selected)` : ""}`}
+          busy={busy}
+          selectedCount={opCount}
+          pair={pair}
+          pairLoading={pairLoading}
+          onStage={stageSelected}
+          onUnstage={unstageSelected}
+          onDiscard={discardSelected}
+        />
       </Panel>
     </PanelGroup>
   );
