@@ -59,6 +59,8 @@ describe("FloatingNotesPanel", () => {
     expect(await screen.findByTestId("floating-notes-panel")).toBeInTheDocument();
     // Exactly one notes panel exists (no duplicate hub instance).
     expect(screen.getAllByTestId("floating-notes-panel")).toHaveLength(1);
+    expect(screen.getByTestId("floating-notes-dock")).toBeInTheDocument();
+    expect(screen.queryByTestId("notes-floating-toggle")).not.toBeInTheDocument();
   });
 
   it("adds a floating panel without removing the hub notes panel", async () => {
@@ -81,6 +83,22 @@ describe("FloatingNotesPanel", () => {
     fireEvent.click(screen.getByTestId("floating-notes-dock"));
     expect(useNotesStore.getState().panelMode).toBe("hub");
     await waitFor(() => expect(screen.queryByTestId("floating-notes-panel")).not.toBeInTheDocument());
+  });
+
+  it("persists the current floating position when docking", async () => {
+    useNotesStore.setState({
+      panelMode: "floating",
+      panelPosition: { x: 40, y: 50, width: 280, height: 340 },
+    });
+    render(<FloatingNotesPanel />);
+    const drag = await screen.findByTestId("floating-notes-drag");
+
+    fireEvent.pointerDown(drag, { button: 0, clientX: 40, clientY: 50, pointerId: 1 });
+    fireEvent.pointerMove(drag, { clientX: 90, clientY: 110, pointerId: 1 });
+    fireEvent.click(screen.getByTestId("floating-notes-dock"));
+
+    expect(useNotesStore.getState().panelPosition).toMatchObject({ x: 90, y: 110, width: 280, height: 340 });
+    expect(useNotesStore.getState().panelMode).toBe("hub");
   });
 
   it("raises z-index when always-on-top is enabled", async () => {
@@ -111,6 +129,8 @@ describe("FloatingNotesPanel", () => {
         kind: "notes",
         sessionId: "panel",
         title: "Notes",
+        x: DEFAULT_NOTES_PANEL_POSITION.x,
+        y: DEFAULT_NOTES_PANEL_POSITION.y,
         width: DEFAULT_NOTES_PANEL_POSITION.width,
         height: DEFAULT_NOTES_PANEL_POSITION.height,
       }),

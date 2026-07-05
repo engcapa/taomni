@@ -17,6 +17,7 @@ import { WindowResizeHandles } from "../window/WindowResizeHandles";
 export function NotesDetachedWindow() {
   const t = useT();
   const setPanelMode = useNotesStore((s) => s.setPanelMode);
+  const setPanelPosition = useNotesStore((s) => s.setPanelPosition);
   const theme = useNotesStore((s) => s.theme);
   const font = useNotesStore((s) => s.font);
   const fontSize = useNotesStore((s) => s.fontSize);
@@ -42,6 +43,28 @@ export function NotesDetachedWindow() {
     });
   }, []);
 
+  const persistWindowGeometry = useCallback(async () => {
+    if (!isTauriRuntime()) return;
+    try {
+      const currentWindow = getCurrentWindow();
+      const [position, size, scaleFactor] = await Promise.all([
+        currentWindow.outerPosition(),
+        currentWindow.innerSize(),
+        currentWindow.scaleFactor(),
+      ]);
+      const logicalPosition = position.toLogical(scaleFactor);
+      const logicalSize = size.toLogical(scaleFactor);
+      setPanelPosition({
+        x: Math.max(0, Math.round(logicalPosition.x)),
+        y: Math.max(0, Math.round(logicalPosition.y)),
+        width: Math.max(220, Math.round(logicalSize.width)),
+        height: Math.max(220, Math.round(logicalSize.height)),
+      });
+    } catch {
+      /* best effort: geometry is persisted for the next notes popup */
+    }
+  }, [setPanelPosition]);
+
   useEffect(() => {
     return subscribeNotesDockSignal(closeDetachedNotesWindow);
   }, [closeDetachedNotesWindow]);
@@ -53,9 +76,12 @@ export function NotesDetachedWindow() {
     void getCurrentWindow()
       .onCloseRequested((event) => {
         event.preventDefault();
-        setPanelMode("hub");
-        emitNotesDockSignal();
-        closeDetachedNotesWindow();
+        void (async () => {
+          await persistWindowGeometry();
+          setPanelMode("hub");
+          emitNotesDockSignal();
+          closeDetachedNotesWindow();
+        })();
       })
       .then((next) => {
         if (disposed) next();
@@ -68,12 +94,15 @@ export function NotesDetachedWindow() {
       disposed = true;
       unlisten?.();
     };
-  }, [closeDetachedNotesWindow, setPanelMode]);
+  }, [closeDetachedNotesWindow, persistWindowGeometry, setPanelMode]);
 
   const dockToHub = () => {
-    setPanelMode("hub");
-    emitNotesDockSignal();
-    closeDetachedNotesWindow();
+    void (async () => {
+      await persistWindowGeometry();
+      setPanelMode("hub");
+      emitNotesDockSignal();
+      closeDetachedNotesWindow();
+    })();
   };
 
   const startDrag = (event: ReactMouseEvent) => {
@@ -118,7 +147,7 @@ export function NotesDetachedWindow() {
         </button>
       </div>
       <div className="flex-1 min-h-0 flex flex-col">
-        <NotesPanel />
+        <NotesPanel showPanelModeToggle={false} />
       </div>
       <WindowResizeHandles className="absolute inset-0 z-20" edgeSize={5} cornerSize={10} />
       <div className="notes-sticky-fold" aria-hidden="true" />

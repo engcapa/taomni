@@ -350,6 +350,7 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
               type="button"
               className="taomni-btn h-6 w-6 p-0"
               onClick={() => setMonth((current) => addMonths(current, -1))}
+              title={t("notes.dateTimePreviousMonth")}
               aria-label={t("notes.dateTimePreviousMonth")}
             >
               <ChevronLeft className="w-3.5 h-3.5" />
@@ -359,6 +360,7 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
               type="button"
               className="taomni-btn h-6 w-6 p-0"
               onClick={() => setMonth((current) => addMonths(current, 1))}
+              title={t("notes.dateTimeNextMonth")}
               aria-label={t("notes.dateTimeNextMonth")}
             >
               <ChevronRight className="w-3.5 h-3.5" />

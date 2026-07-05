@@ -537,10 +537,18 @@ body.notes-detached-document,
   width: 34px;
   height: 34px;
   pointer-events: none;
+  overflow: hidden;
+  border-bottom-right-radius: 14px;
+  background: var(--taomni-sidebar-bg);
+}
+.notes-sticky-fold::after {
+  content: "";
+  position: absolute;
+  inset: 0;
   clip-path: polygon(100% 0, 0 100%, 100% 100%);
   background:
-    linear-gradient(135deg, transparent 0 46%, rgba(0, 0, 0, 0.14) 47% 49%, rgba(255, 255, 255, 0.55) 50% 100%),
-    linear-gradient(135deg, color-mix(in srgb, var(--taomni-panel-bg) 76%, white), var(--taomni-card-bg));
+    linear-gradient(135deg, transparent 0 46%, rgba(0, 0, 0, 0.14) 47% 49%, color-mix(in srgb, var(--taomni-panel-bg) 82%, var(--taomni-sidebar-bg)) 50% 100%),
+    linear-gradient(135deg, var(--taomni-panel-bg), var(--taomni-sidebar-bg));
   box-shadow: -3px -3px 7px rgba(0, 0, 0, 0.14);
 }
 
