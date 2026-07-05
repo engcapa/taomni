@@ -2,7 +2,9 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
 import {
@@ -16,18 +18,28 @@ import {
   Upload,
 } from "lucide-react";
 import {
+  GIT_REF_WORKTREE,
+  gitBlobPair,
+  gitCleanUntracked,
+  gitCommit,
+  gitDiscard,
   gitFetch,
   gitPull,
   gitPush,
   gitRepoName,
   gitSnapshot,
+  gitStage,
+  gitUnstage,
   selectedRemote,
+  type GitBlobPair,
   type GitSnapshot,
 } from "../../lib/git";
-import { alertAppDialog } from "../../lib/appDialogs";
+import { alertAppDialog, confirmAppDialog } from "../../lib/appDialogs";
 import { useAppStore } from "../../stores/appStore";
 import type { GitWorkspaceRootInfo } from "../../types";
 import { GitPanel } from "./GitPanel";
+import { WorkspaceChangesView } from "./WorkspaceChangesView";
+import { parseWorkspaceChangeKey, workspaceChangeKey } from "./workspaceGitKeys";
 
 interface WorkspaceGitManagerProps {
   workspaceName?: string | null;
@@ -61,6 +73,20 @@ export function WorkspaceGitManager({
   const [snapshots, setSnapshots] = useState<Record<string, RepoSnapshotState>>({});
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
   const [panelVersion, setPanelVersion] = useState(0);
+  const [commitMessage, setCommitMessage] = useState("");
+  const [uncheckedChangeKeys, setUncheckedChangeKeys] = useState<Set<string>>(() => new Set());
+  const [selectedChangeKeys, setSelectedChangeKeys] = useState<Set<string>>(() => new Set());
+  const [focusedChangeKey, setFocusedChangeKey] = useState<string | null>(null);
+  const [pair, setPair] = useState<GitBlobPair | null>(null);
+  const [pairLoading, setPairLoading] = useState(false);
+  const [treeMode, setTreeMode] = useState(() => {
+    try {
+      return localStorage.getItem("taomni.git.workspace.changes.tree") !== "flat";
+    } catch {
+      return true;
+    }
+  });
+  const anchorChangeKeyRef = useRef<string | null>(null);
 
   const selectedRoot = useMemo(
     () => normalizedRoots.find((root) => root.repoRoot === selectedRepoRoot) ?? normalizedRoots[0] ?? null,
@@ -70,12 +96,76 @@ export function WorkspaceGitManager({
     () => normalizedRoots.filter((root) => checkedRepoRoots.has(root.repoRoot)),
     [checkedRepoRoots, normalizedRoots],
   );
-  const totalChangedFiles = useMemo(
-    () => normalizedRoots.reduce((total, root) => total + (snapshots[root.repoRoot]?.snapshot?.changes.length ?? 0), 0),
+  const allChanges = useMemo(
+    () => normalizedRoots.flatMap((root) => (
+      (snapshots[root.repoRoot]?.snapshot?.changes ?? []).map((change) => ({
+        key: workspaceChangeKey(root.repoRoot, change.path),
+        repoRoot: root.repoRoot,
+        repoName: root.name,
+        change,
+      }))
+    )),
     [normalizedRoots, snapshots],
   );
+  const allChangeKeys = useMemo(() => allChanges.map((entry) => entry.key), [allChanges]);
+  const validChangeKeys = useMemo(() => new Set(allChangeKeys), [allChangeKeys]);
+  const checkedChangeKeys = useMemo(
+    () => new Set(allChanges.filter((entry) => !uncheckedChangeKeys.has(entry.key)).map((entry) => entry.key)),
+    [allChanges, uncheckedChangeKeys],
+  );
+  const checkedChangePathsByRepo = useMemo(() => {
+    const byRepo: Record<string, string[]> = {};
+    for (const entry of allChanges) {
+      if (!checkedChangeKeys.has(entry.key)) continue;
+      (byRepo[entry.repoRoot] ??= []).push(entry.change.path);
+    }
+    return byRepo;
+  }, [allChanges, checkedChangeKeys]);
+  const checkedRepoCount = useMemo(
+    () => Object.values(checkedChangePathsByRepo).filter((paths) => paths.length > 0).length,
+    [checkedChangePathsByRepo],
+  );
+  const focusedChange = useMemo(
+    () => allChanges.find((entry) => entry.key === focusedChangeKey) ?? null,
+    [allChanges, focusedChangeKey],
+  );
+  const orderedChangeKeys = useMemo(
+    () => [...allChanges]
+      .sort((a, b) => {
+        const repoCompare = a.repoName.localeCompare(b.repoName);
+        return repoCompare || a.change.path.localeCompare(b.change.path);
+      })
+      .map((entry) => entry.key),
+    [allChanges],
+  );
+  const selectedOperationKeys = useMemo(() => {
+    const retainedSelected = [...selectedChangeKeys].filter((key) => validChangeKeys.has(key));
+    if (retainedSelected.length > 0) return retainedSelected;
+    return focusedChangeKey && validChangeKeys.has(focusedChangeKey) ? [focusedChangeKey] : [];
+  }, [focusedChangeKey, selectedChangeKeys, validChangeKeys]);
+  const totalChangedFiles = allChanges.length;
   const allChecked = normalizedRoots.length > 0 && checkedRoots.length === normalizedRoots.length;
   const title = workspaceName?.trim() || "Code Workspace";
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("taomni.git.workspace.changes.tree", treeMode ? "tree" : "flat");
+    } catch {
+      /* ignore */
+    }
+  }, [treeMode]);
+
+  useEffect(() => {
+    setUncheckedChangeKeys((current) => retainKeys(current, validChangeKeys));
+    setSelectedChangeKeys((current) => retainKeys(current, validChangeKeys));
+    setFocusedChangeKey((current) => {
+      if (current && validChangeKeys.has(current)) return current;
+      return allChangeKeys[0] ?? null;
+    });
+    if (anchorChangeKeyRef.current && !validChangeKeys.has(anchorChangeKeyRef.current)) {
+      anchorChangeKeyRef.current = null;
+    }
+  }, [allChangeKeys, validChangeKeys]);
 
   useEffect(() => {
     setSelectedRepoRoot((current) => {
@@ -135,6 +225,38 @@ export function WorkspaceGitManager({
     void refreshRepos(normalizedRoots);
   }, [normalizedRoots, refreshRepos, visible]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPair() {
+      if (!focusedChange) {
+        setPair(null);
+        return;
+      }
+      setPairLoading(true);
+      try {
+        const next = await gitBlobPair(
+          focusedChange.repoRoot,
+          focusedChange.change.path,
+          "HEAD",
+          GIT_REF_WORKTREE,
+          focusedChange.change.oldPath,
+        );
+        if (!cancelled) setPair(next);
+      } catch (err) {
+        if (!cancelled) {
+          setPair(null);
+          setStatusMessage(errorMessage(err));
+        }
+      } finally {
+        if (!cancelled) setPairLoading(false);
+      }
+    }
+    void loadPair();
+    return () => {
+      cancelled = true;
+    };
+  }, [focusedChange, setStatusMessage]);
+
   const toggleChecked = useCallback((repoRoot: string, checked: boolean) => {
     setCheckedRepoRoots((current) => {
       const next = new Set(current);
@@ -147,6 +269,208 @@ export function WorkspaceGitManager({
   const setAllChecked = useCallback((checked: boolean) => {
     setCheckedRepoRoots(checked ? new Set(normalizedRoots.map((root) => root.repoRoot)) : new Set());
   }, [normalizedRoots]);
+
+  const toggleRepoChangeChecked = useCallback((repoRoot: string, checked: boolean) => {
+    const changes = snapshots[repoRoot]?.snapshot?.changes ?? [];
+    setUncheckedChangeKeys((current) => {
+      const next = new Set(current);
+      for (const change of changes) {
+        const key = workspaceChangeKey(repoRoot, change.path);
+        if (checked) next.delete(key);
+        else next.add(key);
+      }
+      return next;
+    });
+  }, [snapshots]);
+
+  const toggleChangeChecked = useCallback((repoRoot: string, paths: string[], checked: boolean) => {
+    setUncheckedChangeKeys((current) => {
+      const next = new Set(current);
+      for (const path of paths) {
+        const key = workspaceChangeKey(repoRoot, path);
+        if (checked) next.delete(key);
+        else next.add(key);
+      }
+      return next;
+    });
+  }, []);
+
+  const selectWorkspaceChange = useCallback((repoRoot: string, path: string, mods: { ctrl: boolean; shift: boolean }) => {
+    const key = workspaceChangeKey(repoRoot, path);
+    setSelectedRepoRoot(repoRoot);
+    setFocusedChangeKey(key);
+    setSelectedChangeKeys((current) => {
+      if (mods.ctrl) {
+        const next = new Set(current);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        anchorChangeKeyRef.current = key;
+        return next;
+      }
+      if (mods.shift && anchorChangeKeyRef.current) {
+        const from = orderedChangeKeys.indexOf(anchorChangeKeyRef.current);
+        const to = orderedChangeKeys.indexOf(key);
+        if (from !== -1 && to !== -1) {
+          const [lo, hi] = from <= to ? [from, to] : [to, from];
+          return new Set(orderedChangeKeys.slice(lo, hi + 1));
+        }
+      }
+      anchorChangeKeyRef.current = key;
+      return new Set([key]);
+    });
+  }, [orderedChangeKeys]);
+
+  const openWorkspaceChangeMenu = useCallback((
+    repoRoot: string,
+    path: string,
+    event: ReactMouseEvent,
+  ) => {
+    event.preventDefault();
+    selectWorkspaceChange(repoRoot, path, { ctrl: false, shift: false });
+  }, [selectWorkspaceChange]);
+
+  const runChangeAction = useCallback(async (
+    label: string,
+    targets: GitWorkspaceRootInfo[],
+    action: (root: GitWorkspaceRootInfo, snapshot: GitSnapshot) => Promise<BatchResult>,
+  ) => {
+    if (targets.length === 0) return;
+    setBusyLabel(label);
+    const failures: string[] = [];
+    let completed = 0;
+    let skipped = 0;
+    try {
+      for (const root of targets) {
+        try {
+          const snapshot = await refreshRepo(root.repoRoot);
+          const result = await action(root, snapshot);
+          if (result === "completed") {
+            completed += 1;
+            await refreshRepo(root.repoRoot);
+          } else {
+            skipped += 1;
+          }
+        } catch (err) {
+          failures.push(`${root.name}: ${errorMessage(err)}`);
+        }
+      }
+      const summary = `${label}: ${completed} completed${skipped ? `, ${skipped} skipped` : ""}`;
+      setStatusMessage(failures.length ? `${summary}, ${failures.length} failed` : summary);
+      if (failures.length) {
+        await alertAppDialog({
+          title: label,
+          message: failures.join("\n"),
+        });
+      }
+    } finally {
+      setPanelVersion((current) => current + 1);
+      setBusyLabel(null);
+    }
+  }, [refreshRepo, setStatusMessage]);
+
+  const stageAllChanges = useCallback(() => {
+    const targets = normalizedRoots.filter((root) => (snapshots[root.repoRoot]?.snapshot?.changes.length ?? 0) > 0);
+    void runChangeAction("Stage all", targets, async (_root, snapshot) => {
+      const paths = snapshot.changes.map((change) => change.path);
+      if (paths.length === 0) return "skipped";
+      await gitStage(snapshot.repoRoot, paths);
+      return "completed";
+    });
+  }, [normalizedRoots, runChangeAction, snapshots]);
+
+  const unstageAllChanges = useCallback(() => {
+    const targets = normalizedRoots.filter((root) => (
+      snapshots[root.repoRoot]?.snapshot?.changes.some((change) => change.staged) ?? false
+    ));
+    void runChangeAction("Unstage all", targets, async (_root, snapshot) => {
+      const paths = snapshot.changes.filter((change) => change.staged).map((change) => change.path);
+      if (paths.length === 0) return "skipped";
+      await gitUnstage(snapshot.repoRoot, paths);
+      return "completed";
+    });
+  }, [normalizedRoots, runChangeAction, snapshots]);
+
+  const stageSelectedChanges = useCallback(() => {
+    const pathsByRepo = pathsByRepoFromKeys(selectedOperationKeys);
+    const targets = normalizedRoots.filter((root) => (pathsByRepo[root.repoRoot]?.length ?? 0) > 0);
+    void runChangeAction("Stage", targets, async (root) => {
+      const paths = pathsByRepo[root.repoRoot] ?? [];
+      if (paths.length === 0) return "skipped";
+      await gitStage(root.repoRoot, paths);
+      return "completed";
+    });
+  }, [normalizedRoots, runChangeAction, selectedOperationKeys]);
+
+  const unstageSelectedChanges = useCallback(() => {
+    const pathsByRepo = pathsByRepoFromKeys(selectedOperationKeys);
+    const targets = normalizedRoots.filter((root) => (pathsByRepo[root.repoRoot]?.length ?? 0) > 0);
+    void runChangeAction("Unstage", targets, async (root) => {
+      const paths = pathsByRepo[root.repoRoot] ?? [];
+      if (paths.length === 0) return "skipped";
+      await gitUnstage(root.repoRoot, paths);
+      return "completed";
+    });
+  }, [normalizedRoots, runChangeAction, selectedOperationKeys]);
+
+  const discardSelectedChanges = useCallback(() => {
+    const pathsByRepo = pathsByRepoFromKeys(selectedOperationKeys);
+    const targets = normalizedRoots.filter((root) => (pathsByRepo[root.repoRoot]?.length ?? 0) > 0);
+    const count = Object.values(pathsByRepo).reduce((total, paths) => total + paths.length, 0);
+    if (count === 0) return;
+    void (async () => {
+      const confirmed = await confirmAppDialog({
+        title: "Discard changes",
+        message: `Discard changes in ${count} file(s)? This cannot be undone.`,
+        confirmLabel: "Discard",
+        danger: true,
+      });
+      if (!confirmed) return;
+      await runChangeAction("Discard", targets, async (root, snapshot) => {
+        const selectedPaths = new Set(pathsByRepo[root.repoRoot] ?? []);
+        if (selectedPaths.size === 0) return "skipped";
+        const untracked = snapshot.changes
+          .filter((change) => selectedPaths.has(change.path) && change.status === "untracked")
+          .map((change) => change.path);
+        const tracked = snapshot.changes
+          .filter((change) => selectedPaths.has(change.path) && change.status !== "untracked")
+          .map((change) => change.path);
+        if (tracked.length === 0 && untracked.length === 0) return "skipped";
+        if (tracked.length > 0) await gitDiscard(root.repoRoot, tracked);
+        if (untracked.length > 0) await gitCleanUntracked(root.repoRoot, untracked);
+        return "completed";
+      });
+    })();
+  }, [normalizedRoots, runChangeAction, selectedOperationKeys]);
+
+  const commitWorkspaceChanges = useCallback((push: boolean) => {
+    const message = commitMessage.trim();
+    if (!message || checkedChangeKeys.size === 0) return;
+    const targets = normalizedRoots.filter((root) => (checkedChangePathsByRepo[root.repoRoot]?.length ?? 0) > 0);
+    void (async () => {
+      await runChangeAction(push ? "Commit and Push" : "Commit", targets, async (_root, snapshot) => {
+        const paths = snapshot.changes
+          .filter((change) => !uncheckedChangeKeys.has(workspaceChangeKey(snapshot.repoRoot, change.path)))
+          .map((change) => change.path);
+        if (paths.length === 0) return "skipped";
+        await gitCommit(snapshot.repoRoot, message, false, paths);
+        if (push) {
+          const remote = selectedRemote(snapshot);
+          if (remote && snapshot.currentBranch) {
+            await gitPush(snapshot.repoRoot, remote.name, snapshot.currentBranch, !snapshot.upstream);
+          }
+        }
+        return "completed";
+      });
+      setCommitMessage("");
+    })();
+  }, [
+    checkedChangeKeys.size,
+    checkedChangePathsByRepo,
+    commitMessage,
+    normalizedRoots,
+    runChangeAction,
+    uncheckedChangeKeys,
+  ]);
 
   const runBatch = useCallback(async (
     label: string,
@@ -261,7 +585,10 @@ export function WorkspaceGitManager({
       </header>
 
       <div className="flex-1 min-h-0 flex">
-        <aside className="w-[340px] min-w-[260px] max-w-[45%] shrink-0 border-r border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] flex flex-col">
+        <aside
+          data-testid="workspace-git-sidebar"
+          className="w-[340px] min-w-[260px] max-w-[45%] shrink-0 border-r border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] flex flex-col"
+        >
           <div className="h-9 shrink-0 flex items-center gap-2 border-b border-[var(--taomni-divider)] px-3">
             <label className="inline-flex items-center gap-2 text-[12px]">
               <input
@@ -311,6 +638,37 @@ export function WorkspaceGitManager({
               repoRoot={selectedRoot.repoRoot}
               visible={visible}
               onOpenWorkspace={onOpenWorkspace}
+              changeCountOverride={totalChangedFiles}
+              changesView={(
+                <WorkspaceChangesView
+                  roots={normalizedRoots}
+                  snapshots={snapshots}
+                  busy={busy}
+                  treeMode={treeMode}
+                  setTreeMode={setTreeMode}
+                  checkedKeys={checkedChangeKeys}
+                  checkedCount={checkedChangeKeys.size}
+                  checkedRepoCount={checkedRepoCount}
+                  selectedKeys={selectedChangeKeys}
+                  selectedCount={selectedOperationKeys.length}
+                  focusedKey={focusedChangeKey}
+                  pair={pair}
+                  pairLoading={pairLoading}
+                  commitMessage={commitMessage}
+                  setCommitMessage={setCommitMessage}
+                  stageAll={stageAllChanges}
+                  unstageAll={unstageAllChanges}
+                  stageSelected={stageSelectedChanges}
+                  unstageSelected={unstageSelectedChanges}
+                  discardSelected={discardSelectedChanges}
+                  commit={() => commitWorkspaceChanges(false)}
+                  commitAndPush={() => commitWorkspaceChanges(true)}
+                  onToggleRepoChecked={toggleRepoChangeChecked}
+                  onToggleChecked={toggleChangeChecked}
+                  onSelect={selectWorkspaceChange}
+                  onContextMenu={openWorkspaceChangeMenu}
+                />
+              )}
             />
           ) : (
             <EmptyState title="No Git repositories detected" />
@@ -454,6 +812,25 @@ function pullBranchForRemote(snapshot: GitSnapshot, remoteName: string): string 
     return snapshot.upstream.slice(prefix.length) || snapshot.currentBranch;
   }
   return snapshot.currentBranch;
+}
+
+function retainKeys(current: Set<string>, valid: Set<string>): Set<string> {
+  const next = new Set([...current].filter((key) => valid.has(key)));
+  if (next.size !== current.size) return next;
+  for (const key of next) {
+    if (!current.has(key)) return next;
+  }
+  return current;
+}
+
+function pathsByRepoFromKeys(keys: string[]): Record<string, string[]> {
+  const byRepo: Record<string, string[]> = {};
+  for (const key of keys) {
+    const parsed = parseWorkspaceChangeKey(key);
+    if (!parsed) continue;
+    (byRepo[parsed.repoRoot] ??= []).push(parsed.path);
+  }
+  return byRepo;
 }
 
 function errorMessage(err: unknown): string {

@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
 } from "react";
 import {
   AlertTriangle,
@@ -90,6 +91,8 @@ interface GitPanelProps {
   visible?: boolean;
   embedded?: boolean;
   onOpenWorkspace?: (repoRoot: string) => void;
+  changesView?: ReactNode;
+  changeCountOverride?: number | null;
 }
 
 type GitView = "changes" | "log" | "branches" | "tags" | "stash" | "settings";
@@ -106,7 +109,14 @@ const EMPTY_SETTINGS: GitRepoSettings = {
   commitGpgsign: null,
 };
 
-export function GitPanel({ repoRoot, visible = true, embedded = false, onOpenWorkspace }: GitPanelProps) {
+export function GitPanel({
+  repoRoot,
+  visible = true,
+  embedded = false,
+  onOpenWorkspace,
+  changesView,
+  changeCountOverride = null,
+}: GitPanelProps) {
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const setUiFontSize = useAppStore((s) => s.setUiFontSize);
   const [view, setView] = useState<GitView>("changes");
@@ -160,6 +170,7 @@ export function GitPanel({ repoRoot, visible = true, embedded = false, onOpenWor
     [selectedPath, snapshot],
   );
   const hasConflicts = !!snapshot?.changes.some((change) => change.conflict);
+  const displayedChangeCount = changeCountOverride ?? snapshot?.changes.length ?? null;
   const setGitUiFontSize = useCallback(
     (size: number) => {
       const next = Math.min(18, Math.max(10, Math.round(size)));
@@ -492,10 +503,10 @@ export function GitPanel({ repoRoot, visible = true, embedded = false, onOpenWor
           </>
         )}
         <BranchBadge snapshot={snapshot} />
-        {snapshot && (
+        {displayedChangeCount !== null && (
           <span className="text-[11px] text-[var(--taomni-text-muted)]">
-            {snapshot.changes.length} changes
-            {snapshot.ahead || snapshot.behind ? ` · ↑${snapshot.ahead} ↓${snapshot.behind}` : ""}
+            {displayedChangeCount} changes
+            {snapshot && (snapshot.ahead || snapshot.behind) ? ` · ↑${snapshot.ahead} ↓${snapshot.behind}` : ""}
           </span>
         )}
         <div className="flex-1" />
@@ -602,34 +613,36 @@ export function GitPanel({ repoRoot, visible = true, embedded = false, onOpenWor
         <>
         {mountedViews.has("changes") && (
           <div className="h-full min-h-0" style={{ display: view === "changes" ? "block" : "none" }}>
-          <ChangesView
-            changes={changesList}
-            treeMode={treeMode}
-            setTreeMode={setTreeMode}
-            checked={checked}
-            checkedCount={checkedPaths.length}
-            selected={selected}
-            opCount={opPaths.length}
-            activePath={selectedPath}
-            onToggleChecked={toggleChecked}
-            onSelect={handleSelect}
-            onContextMenu={openMenu}
-            pair={pair}
-            pairLoading={pairLoading}
-            commitMessage={commitMessage}
-            setCommitMessage={setCommitMessage}
-            amendChecked={amendChecked}
-            setAmendChecked={setAmendChecked}
-            busy={busy}
-            hasRemote={!!remoteName}
-            stageAll={stageAll}
-            unstageAll={unstageAll}
-            stageSelected={stageSelected}
-            unstageSelected={unstageSelected}
-            discardSelected={discardSelected}
-            commit={() => doCommit(false)}
-            commitAndPush={() => doCommit(true)}
-          />
+          {changesView ?? (
+            <ChangesView
+              changes={changesList}
+              treeMode={treeMode}
+              setTreeMode={setTreeMode}
+              checked={checked}
+              checkedCount={checkedPaths.length}
+              selected={selected}
+              opCount={opPaths.length}
+              activePath={selectedPath}
+              onToggleChecked={toggleChecked}
+              onSelect={handleSelect}
+              onContextMenu={openMenu}
+              pair={pair}
+              pairLoading={pairLoading}
+              commitMessage={commitMessage}
+              setCommitMessage={setCommitMessage}
+              amendChecked={amendChecked}
+              setAmendChecked={setAmendChecked}
+              busy={busy}
+              hasRemote={!!remoteName}
+              stageAll={stageAll}
+              unstageAll={unstageAll}
+              stageSelected={stageSelected}
+              unstageSelected={unstageSelected}
+              discardSelected={discardSelected}
+              commit={() => doCommit(false)}
+              commitAndPush={() => doCommit(true)}
+            />
+          )}
           </div>
         )}
         {mountedViews.has("log") && (
