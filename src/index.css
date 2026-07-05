@@ -322,7 +322,7 @@ html.notes-detached-document,
 html.notes-detached-document body,
 body.notes-detached-document,
 #root.notes-detached-root {
-  background: transparent;
+  background: transparent !important;
 }
 
 #root {
