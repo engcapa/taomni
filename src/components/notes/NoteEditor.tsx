@@ -12,6 +12,8 @@ import type { NoteItem, StepInput, UpdateNoteInput } from "../../lib/notes";
 import { useNotesStore } from "../../stores/notesStore";
 import { confirmAppDialog } from "../../lib/appDialogs";
 import { useT } from "../../lib/i18n";
+import { notesThemeStyle } from "../../lib/notes/notesTheme";
+import { NotesSelect } from "./NotesSelect";
 import { NoteDateTimeField } from "./NoteDateTimeField";
 import { extractNoteUrls, findNoteUrlAtIndex } from "../../lib/notes/noteLinks";
 import { isTauriRuntime } from "../../lib/runtime";
@@ -119,6 +121,11 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
   const setSteps = useNotesStore((s) => s.setSteps);
   const upsertTags = useNotesStore((s) => s.upsertTags);
   const allTags = useNotesStore((s) => s.tags);
+  const theme = useNotesStore((s) => s.theme);
+  const themeStyle = notesThemeStyle(theme);
+  const selectBg = themeStyle["--taomni-input-bg" as keyof typeof themeStyle] as string | undefined;
+  const selectColor = themeStyle["--taomni-text" as keyof typeof themeStyle] as string | undefined;
+  const selectBorder = themeStyle["--taomni-input-border" as keyof typeof themeStyle] as string | undefined;
 
   const [title, setTitle] = useState(note.title);
   const [body, setBody] = useState(note.body);
@@ -385,19 +392,20 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
         <div className="flex flex-wrap items-center gap-2 text-[11px]">
           <label className="inline-flex items-center gap-1">
             <span className="text-[var(--taomni-text-muted)]">{t("notes.priority")}</span>
-            <select
-              className="taomni-input h-6 text-[11px] px-1"
+            <NotesSelect
+              className="w-[90px]"
               value={note.priority}
-              onChange={(e) => commit({ priority: Number(e.target.value) })}
-              data-testid="note-editor-priority"
-              aria-label={t("notes.priority")}
-            >
-              {PRIORITIES.map((p) => (
-                <option key={p} value={p}>
-                  {t(`notes.priority_${p}`)}
-                </option>
-              ))}
-            </select>
+              options={PRIORITIES.map((p) => ({
+                value: p,
+                label: t(`notes.priority_${p}`),
+              }))}
+              onChange={(val) => commit({ priority: Number(val) })}
+              testId="note-editor-priority"
+              ariaLabel={t("notes.priority")}
+              selectBg={selectBg}
+              selectColor={selectColor}
+              selectBorder={selectBorder}
+            />
           </label>
           <NoteDateTimeField
             label={t("notes.dueAt")}

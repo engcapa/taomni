@@ -1,9 +1,10 @@
 import { Pin, Type } from "lucide-react";
 import { useNotesStore, type NotesFont, type NotesTheme } from "../../stores/notesStore";
-import { NOTES_FONTS, NOTES_THEMES } from "../../lib/notes/notesTheme";
+import { NOTES_FONTS, NOTES_THEMES, notesFontStyle, notesThemeStyle } from "../../lib/notes/notesTheme";
 import { useT } from "../../lib/i18n";
 import { ThemePreviewSelect } from "../theme/ThemePreviewSelect";
 import { NotesThemeLinePreview } from "../theme/themePreviews";
+import { NotesSelect } from "./NotesSelect";
 
 /**
  * NoteThemeSettings — theme picker + in-app always-on-top, surfaced from the
@@ -14,6 +15,11 @@ export function NoteThemeSettings() {
   const t = useT();
   const theme = useNotesStore((s) => s.theme);
   const setTheme = useNotesStore((s) => s.setTheme);
+  const themeStyle = notesThemeStyle(theme);
+  const selectBg = themeStyle["--taomni-input-bg" as keyof typeof themeStyle] as string | undefined;
+  const selectColor = themeStyle["--taomni-text" as keyof typeof themeStyle] as string | undefined;
+  const selectBorder = themeStyle["--taomni-input-border" as keyof typeof themeStyle] as string | undefined;
+
   const font = useNotesStore((s) => s.font);
   const setFont = useNotesStore((s) => s.setFont);
   const fontSize = useNotesStore((s) => s.fontSize);
@@ -51,20 +57,22 @@ export function NoteThemeSettings() {
           <Type className="w-3 h-3" />
           {t("notes.font")}
         </span>
-        <select
-          className="taomni-input h-6 flex-1 min-w-0 text-[11px]"
+        <NotesSelect
+          className="flex-1 min-w-0"
           value={font}
-          onChange={(event) => setFont(event.target.value as NotesFont)}
-          data-testid="note-font-select"
-          aria-label={t("notes.font")}
+          options={NOTES_FONTS.map((val) => ({
+            value: val,
+            label: t(`notes.font_${val}`),
+            style: notesFontStyle(val),
+          }))}
+          onChange={(val) => setFont(val as NotesFont)}
+          testId="note-font-select"
+          ariaLabel={t("notes.font")}
           title={t("notes.font")}
-        >
-          {NOTES_FONTS.map((value: NotesFont) => (
-            <option key={value} value={value}>
-              {t(`notes.font_${value}`)}
-            </option>
-          ))}
-        </select>
+          selectBg={selectBg}
+          selectColor={selectColor}
+          selectBorder={selectBorder}
+        />
       </label>
 
       {/* Font size */}
