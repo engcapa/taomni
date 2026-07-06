@@ -104,13 +104,18 @@ interface QueryResultGridProps {
 
 interface ResolvedGeneratedSql {
   key: string;
-  sql: string;
-  mode: "inline" | "derived" | null;
+  sql: string | null;
+  mode: "inline" | "unsupported" | null;
   reason: string | null;
   pending: boolean;
 }
 
 type SortDir = "asc" | "desc" | null;
+type ActiveSortDir = Exclude<SortDir, null>;
+interface SortRule {
+  columnIndex: number;
+  dir: ActiveSortDir;
+}
 type ViewMode = "table" | "list" | "chart";
 type RowStatus = "clean" | "inserted" | "updated" | "deleted";
 type ExportTarget = "all" | "selection";
@@ -167,8 +172,7 @@ interface GeneratedResultSqlOptions {
   visibleColumnIndexes: number[];
   globalFilterText: string;
   columnFilters: ActiveColumnFilter[];
-  sortCol: number | null;
-  sortDir: SortDir;
+  sorts: SortRule[];
 }
 
 interface OpenColumnFilter {
@@ -444,10 +448,6 @@ function sqlWithTerminator(sql: string): string {
   return `${stripSqlTerminator(sql)};`;
 }
 
-function indentSql(sql: string): string {
-  return sql.split(/\r?\n/).map((line) => `  ${line}`).join("\n");
-}
-
 function sqlTextExpression(engine: SqlEngine, expression: string): string {
   switch (engine) {
     case "MySQL":
@@ -669,15 +669,6 @@ function selectListContainsTopLevelStar(sql: string, clauses: Record<string, num
   return false;
 }
 
-function withoutTopLevelOrderBy(sql: string, clauses: Record<string, number>): string {
-  const orderStart = clauses.orderBy;
-  if (orderStart === undefined) return sql;
-  const orderEnd = firstClauseAfter(clauses, ["limit", "offset", "fetch", "for"], orderStart) ?? sql.length;
-  const before = sql.slice(0, orderStart).trimEnd();
-  const after = sql.slice(orderEnd).trimStart();
-  return after ? `${before}\n${after}` : before;
-}
-
 function tryBuildInlineResultSql(baseSql: string, whereClauses: string[], orderBy: string): string | null {
   let sql = stripSqlTerminator(baseSql);
   if (!/^\s*select\b/i.test(sql) || /^\s*with\b/i.test(sql)) return null;
@@ -695,11 +686,6 @@ function tryBuildInlineResultSql(baseSql: string, whereClauses: string[], orderB
     return null;
   }
 
-  if (orderBy) {
-    sql = withoutTopLevelOrderBy(sql, clauses);
-    clauses = topLevelSqlClauses(sql);
-  }
-
   if (whereClauses.length > 0) {
     const tailStart = firstClauseAfter(clauses, ["orderBy", "limit", "offset", "fetch", "for"]);
     const whereSql = whereClauses.join("\n  AND ");
@@ -714,6 +700,9 @@ function tryBuildInlineResultSql(baseSql: string, whereClauses: string[], orderB
   }
 
   if (orderBy) {
+    if (clauses.orderBy !== undefined) {
+      return null;
+    }
     const insertAt = firstClauseAfter(clauses, ["limit", "offset", "fetch", "for"]) ?? sql.length;
     sql = `${sql.slice(0, insertAt).trimEnd()}\n${orderBy}${insertAt < sql.length ? `\n${sql.slice(insertAt).trimStart()}` : ""}`;
   }
@@ -723,18 +712,15 @@ function tryBuildInlineResultSql(baseSql: string, whereClauses: string[], orderB
 
 function buildGeneratedResultSql({
   sourceSql,
-  currentSql,
   sqlEngine,
   columns,
   visibleColumnIndexes,
   globalFilterText,
   columnFilters,
-  sortCol,
-  sortDir,
+  sorts,
 }: GeneratedResultSqlOptions): string | null {
   const baseSql = stripSqlTerminator(sourceSql ?? "");
   if (!baseSql || !sqlEngine) return null;
-  const currentBaseSql = stripSqlTerminator(currentSql ?? sourceSql ?? "");
   const engine = asSqlEngine(sqlEngine);
   const whereClauses: string[] = [];
   const columnSql = (columnIndex: number) =>
@@ -760,17 +746,16 @@ function buildGeneratedResultSql({
       );
     }
   }
-  const orderBy = sortCol !== null && sortDir ? `ORDER BY ${columnSql(sortCol)} ${sortDir.toUpperCase()}` : "";
+  const orderBy =
+    sorts.length > 0
+      ? `ORDER BY ${sorts.map((sort) => `${columnSql(sort.columnIndex)} ${sort.dir.toUpperCase()}`).join(", ")}`
+      : "";
   if (whereClauses.length === 0 && !orderBy) {
-    return currentBaseSql && currentBaseSql !== baseSql ? sqlWithTerminator(baseSql) : null;
+    return null;
   }
   const inlineSql = tryBuildInlineResultSql(baseSql, whereClauses, orderBy);
   if (inlineSql) return inlineSql;
-  const alias = engine === "Oracle" ? ") taomni_result" : ") AS taomni_result";
-  const lines = ["SELECT *", "FROM (", indentSql(baseSql), alias];
-  if (whereClauses.length > 0) lines.push(`WHERE ${whereClauses.join("\n  AND ")}`);
-  if (orderBy) lines.push(orderBy);
-  return `${lines.join("\n")};`;
+  return sqlWithTerminator(baseSql);
 }
 
 function buildResultSqlRewriteRequest({
@@ -780,11 +765,11 @@ function buildResultSqlRewriteRequest({
   visibleColumnIndexes,
   globalFilterText,
   columnFilters,
-  sortCol,
-  sortDir,
+  sorts,
 }: GeneratedResultSqlOptions): DbResultSqlRewriteRequest | null {
   const baseSql = stripSqlTerminator(sourceSql ?? "");
   if (!baseSql || !sqlEngine) return null;
+  if (!globalFilterText.trim() && columnFilters.length === 0 && sorts.length === 0) return null;
   return {
     engine: sqlEngine,
     sourceSql: baseSql,
@@ -797,7 +782,7 @@ function buildResultSqlRewriteRequest({
       mode: filter.mode,
       selectedValues: filter.selectedValues,
     })),
-    sort: sortCol !== null && sortDir ? { columnIndex: sortCol, dir: sortDir } : null,
+    sorts,
   };
 }
 
@@ -1242,8 +1227,7 @@ export function QueryResultGrid({
   const [scrollTop, setScrollTop] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [viewportH, setViewportH] = useState(400);
-  const [sortCol, setSortCol] = useState<number | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>(null);
+  const [sorts, setSorts] = useState<SortRule[]>([]);
   const [autoFit, setAutoFit] = useState(true);
   const [columnWidths, setColumnWidths] = useState<Record<number, number>>({});
   const [visibleColumns, setVisibleColumns] = useState<Set<number>>(
@@ -1365,10 +1349,9 @@ export function QueryResultGrid({
         visibleColumnIndexes,
         globalFilterText: filterText,
         columnFilters: activeColumnFilters,
-        sortCol,
-        sortDir,
+        sorts,
       }),
-    [activeColumnFilters, baseSql, filterText, result.columns, sortCol, sortDir, sourceSql, sqlEngine, visibleColumnIndexes],
+    [activeColumnFilters, baseSql, filterText, result.columns, sorts, sourceSql, sqlEngine, visibleColumnIndexes],
   );
   const generatedSqlRewriteRequest = useMemo(
     () =>
@@ -1380,10 +1363,9 @@ export function QueryResultGrid({
         visibleColumnIndexes,
         globalFilterText: filterText,
         columnFilters: activeColumnFilters,
-        sortCol,
-        sortDir,
+        sorts,
       }),
-    [activeColumnFilters, baseSql, filterText, result.columns, sortCol, sortDir, sourceSql, sqlEngine, visibleColumnIndexes],
+    [activeColumnFilters, baseSql, filterText, result.columns, sorts, sourceSql, sqlEngine, visibleColumnIndexes],
   );
   const generatedSqlRewriteKey = useMemo(
     () => resultSqlRewriteKey(generatedSqlRewriteRequest),
@@ -1420,26 +1402,34 @@ export function QueryResultGrid({
       })
       .catch((err) => {
         if (cancelled) return;
+        const reason = `SQL rewrite preview failed: ${String(err)}`;
         setResolvedGeneratedSql({
           key: generatedSqlRewriteKey,
-          sql: generatedSql,
-          mode: null,
-          reason: null,
+          sql: null,
+          mode: "unsupported",
+          reason,
           pending: false,
         });
-        setLocalNotice(`SQL rewrite preview failed; using legacy generated SQL. ${String(err)}`);
+        setLocalNotice(reason);
       });
     return () => {
       cancelled = true;
     };
   }, [generatedSql, generatedSqlRewriteKey, generatedSqlRewriteRequest]);
 
+  const currentRewrite = resolvedGeneratedSql?.key === generatedSqlRewriteKey ? resolvedGeneratedSql : null;
+  const rewriteUnsupported = currentRewrite?.mode === "unsupported";
+  const rewritePending = currentRewrite?.pending ?? false;
   const displayGeneratedSql =
-    generatedSql && resolvedGeneratedSql?.key === generatedSqlRewriteKey ? resolvedGeneratedSql.sql : generatedSql;
+    generatedSql && currentRewrite && !rewriteUnsupported ? currentRewrite.sql ?? generatedSql : generatedSql;
+  const generatedSqlUnavailableReason =
+    rewriteUnsupported ? currentRewrite?.reason ?? "SQL rewrite is not available for this result." : null;
   const displayGeneratedSqlTitle =
-    displayGeneratedSql && resolvedGeneratedSql?.key === generatedSqlRewriteKey && resolvedGeneratedSql.reason
-      ? `${displayGeneratedSql}\n\nRewrite fallback: ${resolvedGeneratedSql.reason}`
-      : displayGeneratedSql;
+    generatedSqlUnavailableReason ?? displayGeneratedSql;
+  const generatedSqlActionsDisabled =
+    rewritePending || rewriteUnsupported || !displayGeneratedSql || !generatedSqlRewriteRequest;
+  const generatedSqlBarText =
+    generatedSqlUnavailableReason ?? (displayGeneratedSql ? compactSqlForDisplay(displayGeneratedSql) : "Rewriting SQL...");
 
   const rowMatchesFilter = useCallback(
     (row: GridRow) => {
@@ -1464,19 +1454,29 @@ export function QueryResultGrid({
 
   const order = useMemo(() => {
     const indexes = rows.map((_, index) => index).filter((index) => rowMatchesFilter(rows[index]));
-    if (sortCol === null || sortDir === null) return indexes;
-    const numeric = indexes.every((index) => isNumeric(rows[index].values[sortCol]));
+    if (sorts.length === 0) return indexes;
+    const numericByColumn = new Map(
+      sorts.map((sort) => [sort.columnIndex, indexes.every((index) => isNumeric(rows[index].values[sort.columnIndex]))]),
+    );
     indexes.sort((a, b) => {
-      const va = rows[a].values[sortCol];
-      const vb = rows[b].values[sortCol];
-      if (va === null && vb === null) return 0;
-      if (va === null) return 1;
-      if (vb === null) return -1;
-      const cmp = numeric ? Number(va) - Number(vb) : va.localeCompare(vb);
-      return sortDir === "asc" ? cmp : -cmp;
+      for (const sort of sorts) {
+        const va = rows[a].values[sort.columnIndex];
+        const vb = rows[b].values[sort.columnIndex];
+        let cmp = 0;
+        if (va === null && vb === null) cmp = 0;
+        else if (va === null) cmp = 1;
+        else if (vb === null) cmp = -1;
+        else {
+          cmp = numericByColumn.get(sort.columnIndex)
+            ? Number(va) - Number(vb)
+            : va.localeCompare(vb);
+        }
+        if (cmp !== 0) return sort.dir === "asc" ? cmp : -cmp;
+      }
+      return a - b;
     });
     return indexes;
-  }, [rowMatchesFilter, rows, sortCol, sortDir]);
+  }, [rowMatchesFilter, rows, sorts]);
 
   const orderedRows = useMemo(() => order.map((index) => rows[index]), [order, rows]);
   const selectedRows = useMemo(
@@ -1532,16 +1532,20 @@ export function QueryResultGrid({
     return count;
   }, [orderedRows, searchText, visibleColumnIndexes]);
 
-  const toggleSort = (col: number) => {
-    if (sortCol !== col) {
-      setSortCol(col);
-      setSortDir("asc");
-    } else if (sortDir === "asc") {
-      setSortDir("desc");
-    } else {
-      setSortCol(null);
-      setSortDir(null);
-    }
+  const nextSortDir = (dir: ActiveSortDir): ActiveSortDir | null => (dir === "asc" ? "desc" : null);
+  const toggleSort = (col: number, additive: boolean) => {
+    setSorts((current) => {
+      const index = current.findIndex((sort) => sort.columnIndex === col);
+      if (!additive) {
+        if (index < 0) return [{ columnIndex: col, dir: "asc" }];
+        const dir = nextSortDir(current[index].dir);
+        return dir ? [{ columnIndex: col, dir }] : [];
+      }
+      if (index < 0) return [...current, { columnIndex: col, dir: "asc" }];
+      const dir = nextSortDir(current[index].dir);
+      if (!dir) return current.filter((_, sortIndex) => sortIndex !== index);
+      return current.map((sort, sortIndex) => (sortIndex === index ? { ...sort, dir } : sort));
+    });
   };
 
   const setStatus = (message: string) => {
@@ -2018,7 +2022,9 @@ export function QueryResultGrid({
     if (!sql) return null;
     const key = resultSqlRewriteKey(request);
     if (key && resolvedGeneratedSql?.key === key && !resolvedGeneratedSql.pending) {
-      return resolvedGeneratedSql.sql;
+      if (resolvedGeneratedSql.mode === "inline" && resolvedGeneratedSql.sql) return resolvedGeneratedSql.sql;
+      setStatus(resolvedGeneratedSql.reason ?? "SQL rewrite is not available for this result.");
+      return null;
     }
     if (!request) return sql;
     try {
@@ -2030,17 +2036,19 @@ export function QueryResultGrid({
         reason: rewritten.reason,
         pending: false,
       });
-      return rewritten.sql;
+      if (rewritten.mode === "inline" && rewritten.sql) return rewritten.sql;
+      setStatus(rewritten.reason ?? "SQL rewrite is not available for this result.");
+      return null;
     } catch (err) {
       setResolvedGeneratedSql({
         key,
-        sql,
+        sql: null,
         mode: null,
         reason: null,
         pending: false,
       });
-      setStatus(`SQL rewrite failed; using legacy generated SQL. ${String(err)}`);
-      return sql;
+      setStatus(`SQL rewrite failed: ${String(err)}`);
+      return null;
     }
   };
 
@@ -2055,36 +2063,8 @@ export function QueryResultGrid({
     }
   };
 
-  const generatedSqlForFilters = (filters: Record<number, ColumnFilterConfig>): string | null => {
-    const activeFilters = activeColumnFiltersFor(filters);
-    return buildGeneratedResultSql({
-      sourceSql: baseSql ?? sourceSql,
-      currentSql: sourceSql,
-      sqlEngine,
-      columns: result.columns,
-      visibleColumnIndexes,
-      globalFilterText: filterText,
-      columnFilters: activeFilters,
-      sortCol,
-      sortDir,
-    });
-  };
-
-  const rewriteRequestForFilters = (filters: Record<number, ColumnFilterConfig>): DbResultSqlRewriteRequest | null =>
-    buildResultSqlRewriteRequest({
-      sourceSql: baseSql ?? sourceSql,
-      currentSql: sourceSql,
-      sqlEngine,
-      columns: result.columns,
-      visibleColumnIndexes,
-      globalFilterText: filterText,
-      columnFilters: activeColumnFiltersFor(filters),
-      sortCol,
-      sortDir,
-    });
-
   const queryGeneratedSql = (
-    sql = generatedSql,
+    sql = displayGeneratedSql,
     request: DbResultSqlRewriteRequest | null = generatedSqlRewriteRequest,
   ) => {
     if (!sql) {
@@ -2102,7 +2082,7 @@ export function QueryResultGrid({
 
   const syncGeneratedSql = async (
     mode: QueryGeneratedSqlSyncMode,
-    sql = generatedSql,
+    sql = displayGeneratedSql,
     request: DbResultSqlRewriteRequest | null = generatedSqlRewriteRequest,
   ) => {
     const resolvedSql = await resolveGeneratedSql(sql, request);
@@ -2256,16 +2236,6 @@ export function QueryResultGrid({
     if (openFilterColumnIndex === null) return;
     applyColumnFilter(openFilterColumnIndex, draftColumnFilter);
     setOpenColumnFilter(null);
-  };
-  const queryColumnFilter = () => {
-    if (openFilterColumnIndex === null) return;
-    const nextFilters = { ...columnFilters };
-    if (isColumnFilterActive(draftColumnFilter)) nextFilters[openFilterColumnIndex] = draftColumnFilter;
-    else delete nextFilters[openFilterColumnIndex];
-    setColumnFilters(nextFilters);
-    setOpenColumnFilter(null);
-    const sql = generatedSqlForFilters(nextFilters);
-    queryGeneratedSql(sql, sql ? rewriteRequestForFilters(nextFilters) : null);
   };
 
   const stats = useMemo(() => {
@@ -2526,7 +2496,7 @@ export function QueryResultGrid({
         )}
       </div>
 
-      {displayGeneratedSql && (
+      {generatedSql && (
         <div
           data-testid="query-result-generated-sql-bar"
           className="min-h-7 shrink-0 flex items-center gap-1.5 px-2 py-1 text-[11px]"
@@ -2540,7 +2510,7 @@ export function QueryResultGrid({
             style={{ background: "var(--taomni-quick-bg)", border: "1px solid var(--taomni-divider)" }}
             title={displayGeneratedSqlTitle ?? undefined}
           >
-            {compactSqlForDisplay(displayGeneratedSql)}
+            {generatedSqlBarText}
           </code>
           <button
             type="button"
@@ -2549,7 +2519,7 @@ export function QueryResultGrid({
             data-primary="true"
             title="Apply local filters and sort as a database query"
             aria-label="Query generated SQL"
-            disabled={running || cancelling}
+            disabled={running || cancelling || generatedSqlActionsDisabled}
             onClick={() => queryGeneratedSql()}
           >
             <Check className="w-3.5 h-3.5" />
@@ -2561,6 +2531,7 @@ export function QueryResultGrid({
             className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
             title="Copy generated SQL"
             aria-label="Copy generated SQL"
+            disabled={generatedSqlActionsDisabled}
             onClick={() => void copyGeneratedSql()}
           >
             <Copy className="w-3.5 h-3.5" />
@@ -2572,6 +2543,7 @@ export function QueryResultGrid({
             className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
             title="Sync generated SQL to a query editor"
             aria-label="Sync generated SQL"
+            disabled={generatedSqlActionsDisabled}
             onClick={() => void syncGeneratedSql("sync")}
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -2626,6 +2598,8 @@ export function QueryResultGrid({
                 const col = result.columns[columnIndex];
                 const columnFilter = columnFilters[columnIndex] ?? DEFAULT_COLUMN_FILTER;
                 const columnFiltered = isColumnFilterActive(columnFilter);
+                const sortIndex = sorts.findIndex((sort) => sort.columnIndex === columnIndex);
+                const columnSort = sortIndex >= 0 ? sorts[sortIndex] : null;
                 return (
                   <div
                     key={columnIndex}
@@ -2636,11 +2610,16 @@ export function QueryResultGrid({
                     <button
                       type="button"
                       className="min-w-0 flex flex-1 items-center gap-1 bg-transparent p-0 text-left"
-                      onClick={() => toggleSort(columnIndex)}
+                      onClick={(event) => toggleSort(columnIndex, event.shiftKey)}
                     >
                       <span className="truncate flex-1">{col.name}</span>
-                      {sortCol === columnIndex && sortDir === "asc" && <ArrowUp className="w-3 h-3" />}
-                      {sortCol === columnIndex && sortDir === "desc" && <ArrowDown className="w-3 h-3" />}
+                      {columnSort?.dir === "asc" && <ArrowUp className="w-3 h-3" />}
+                      {columnSort?.dir === "desc" && <ArrowDown className="w-3 h-3" />}
+                      {sorts.length > 1 && sortIndex >= 0 && (
+                        <span className="inline-flex h-4 min-w-4 items-center justify-center rounded px-1 text-[9px] text-[var(--taomni-accent)]" style={{ background: "var(--taomni-selected)" }}>
+                          {sortIndex + 1}
+                        </span>
+                      )}
                     </button>
                     <button
                       type="button"
@@ -2982,10 +2961,7 @@ export function QueryResultGrid({
               Clear
             </button>
             <button type="button" className="taomni-btn h-7 px-2" onClick={applyLocalColumnFilter}>
-              Local
-            </button>
-            <button type="button" className="taomni-btn h-7 px-2" data-primary="true" onClick={queryColumnFilter} disabled={running || cancelling}>
-              Query
+              Apply
             </button>
           </div>
         </div>

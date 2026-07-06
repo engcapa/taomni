@@ -90,7 +90,7 @@ const dbChildProps = vi.hoisted(() => ({
   schemaTree: null as null | { metadataCache?: unknown },
   sqlEditor: null as null | { metadataCache?: unknown },
   editorInitialDocFallback: "select 1",
-  generatedSql: "SELECT *\nFROM (\n  select 1\n) AS taomni_result\nORDER BY \"one\" DESC;",
+  generatedSql: "select 1\nORDER BY \"one\" DESC;",
   generatedRequest: null as null | {
     engine: string;
     sourceSql: string;
@@ -98,7 +98,7 @@ const dbChildProps = vi.hoisted(() => ({
     visibleColumnIndexes: number[];
     globalFilterText: string;
     filters: unknown[];
-    sort: null | { columnIndex: number; dir: "asc" | "desc" };
+    sorts: Array<{ columnIndex: number; dir: "asc" | "desc" }>;
   },
 }));
 
@@ -229,7 +229,7 @@ describe("DbClientTab connection lifecycle", () => {
     dbChildProps.schemaTree = null;
     dbChildProps.sqlEditor = null;
     dbChildProps.editorInitialDocFallback = "select 1";
-    dbChildProps.generatedSql = "SELECT *\nFROM (\n  select 1\n) AS taomni_result\nORDER BY \"one\" DESC;";
+    dbChildProps.generatedSql = "select 1\nORDER BY \"one\" DESC;";
     dbChildProps.generatedRequest = null;
   });
 
@@ -385,6 +385,7 @@ describe("DbClientTab connection lifecycle", () => {
 
   it("queries generated SQL by replacing the source statement and refreshing the current sheet", async () => {
     ipcMock.dbConnect.mockResolvedValue({ ok: true });
+    dbChildProps.editorInitialDocFallback = "select 1;";
     dbChildProps.generatedRequest = {
       engine: "PostgreSQL",
       sourceSql: "select 1",
@@ -392,7 +393,7 @@ describe("DbClientTab connection lifecycle", () => {
       visibleColumnIndexes: [0],
       globalFilterText: "",
       filters: [],
-      sort: { columnIndex: 0, dir: "desc" },
+      sorts: [{ columnIndex: 0, dir: "desc" }],
     };
     ipcMock.dbRewriteResultSql.mockResolvedValueOnce({
       sql: dbChildProps.generatedSql,
@@ -415,6 +416,7 @@ describe("DbClientTab connection lifecycle", () => {
     await waitFor(() => {
       const calls = ipcMock.dbExecuteStream.mock.calls as Array<[string, string, number, unknown]>;
       expect(calls.at(-1)?.[1]).toContain("ORDER BY \"one\" DESC");
+      expect(calls.at(-1)?.[1]).not.toContain(";;");
     });
 
     fireEvent.click(screen.getByTitle("Run (F5)"));
@@ -422,6 +424,7 @@ describe("DbClientTab connection lifecycle", () => {
     await waitFor(() => {
       const calls = ipcMock.dbExecuteStream.mock.calls as Array<[string, string, number, unknown]>;
       expect(calls.at(-1)?.[1]).toContain("ORDER BY \"one\" DESC");
+      expect(calls.at(-1)?.[1]).not.toContain(";;");
     });
   });
 

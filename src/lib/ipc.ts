@@ -1069,12 +1069,12 @@ export interface DbResultSqlRewriteRequest {
   visibleColumnIndexes: number[];
   globalFilterText: string;
   filters: DbResultSqlFilter[];
-  sort: DbResultSqlSort | null;
+  sorts: DbResultSqlSort[];
 }
 
 export interface DbResultSqlRewriteResponse {
-  sql: string;
-  mode: "inline" | "derived";
+  sql: string | null;
+  mode: "inline" | "unsupported";
   reason: string | null;
   warnings: string[];
 }

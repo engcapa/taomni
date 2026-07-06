@@ -21,7 +21,7 @@ pub struct ResultSqlRewriteRequest {
     #[serde(default)]
     pub filters: Vec<ResultSqlFilter>,
     #[serde(default)]
-    pub sort: Option<ResultSqlSort>,
+    pub sorts: Vec<ResultSqlSort>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -59,7 +59,7 @@ pub enum ResultSqlSortDir {
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ResultSqlRewriteResponse {
-    pub sql: String,
+    pub sql: Option<String>,
     pub mode: ResultSqlRewriteMode,
     pub reason: Option<String>,
     pub warnings: Vec<String>,
@@ -69,7 +69,7 @@ pub struct ResultSqlRewriteResponse {
 #[serde(rename_all = "camelCase")]
 pub enum ResultSqlRewriteMode {
     Inline,
-    Derived,
+    Unsupported,
 }
 
 #[derive(Debug, Clone)]
@@ -126,14 +126,6 @@ impl ResultSqlEngine {
             Self::Presto => format!("CAST({expression} AS VARCHAR)"),
         }
     }
-
-    fn derived_alias(self) -> &'static str {
-        if self == Self::Oracle {
-            ") taomni_result"
-        } else {
-            ") AS taomni_result"
-        }
-    }
 }
 
 #[tauri::command]
@@ -147,17 +139,17 @@ pub fn rewrite_result_sql(request: ResultSqlRewriteRequest) -> ResultSqlRewriteR
     let engine = ResultSqlEngine::parse(&request.engine);
     let base_sql = strip_sql_terminator(&request.source_sql);
     if base_sql.trim().is_empty() {
-        return derived_response(&request, engine, "source SQL is empty");
+        return unsupported_response("source SQL is empty");
     }
 
     match try_inline_rewrite(&request, engine, &base_sql) {
         Ok(sql) => ResultSqlRewriteResponse {
-            sql,
+            sql: Some(sql),
             mode: ResultSqlRewriteMode::Inline,
             reason: None,
             warnings: Vec::new(),
         },
-        Err(reason) => derived_response(&request, engine, &reason),
+        Err(reason) => unsupported_response(reason),
     }
 }
 
@@ -178,12 +170,12 @@ fn try_inline_rewrite(
     let select = analyze_query_shape(query)?;
     let mappings = projection_mappings(select, request, engine)?;
     let where_clauses = build_where_clauses(request, engine, &mappings, true)?;
-    let order_by = build_order_by(request, &mappings, true)?;
-    if where_clauses.is_empty() && order_by.is_none() {
+    let order_items = build_order_items(request, &mappings, true)?;
+    if where_clauses.is_empty() && order_items.is_empty() {
         return Err("no result filter or sort requested".to_string());
     }
 
-    patch_inline_sql(base_sql, &where_clauses, order_by.as_deref())
+    patch_inline_sql(base_sql, &where_clauses, &order_items)
 }
 
 fn analyze_query_shape(query: &Query) -> Result<&Select, String> {
@@ -382,22 +374,25 @@ fn build_where_clauses(
     Ok(clauses)
 }
 
-fn build_order_by(
+fn build_order_items(
     request: &ResultSqlRewriteRequest,
     engine_mappings: &[ProjectionMapping],
     inline: bool,
-) -> Result<Option<String>, String> {
-    let Some(sort) = &request.sort else {
-        return Ok(None);
-    };
+) -> Result<Vec<String>, String> {
     let engine = ResultSqlEngine::parse(&request.engine);
-    let expression =
-        column_expression(request, engine, engine_mappings, sort.column_index, inline)?;
-    let dir = match sort.dir {
-        ResultSqlSortDir::Asc => "ASC",
-        ResultSqlSortDir::Desc => "DESC",
-    };
-    Ok(Some(format!("ORDER BY {expression} {dir}")))
+    request
+        .sorts
+        .iter()
+        .map(|sort| {
+            let expression =
+                column_expression(request, engine, engine_mappings, sort.column_index, inline)?;
+            let dir = match sort.dir {
+                ResultSqlSortDir::Asc => "ASC",
+                ResultSqlSortDir::Desc => "DESC",
+            };
+            Ok(format!("{expression} {dir}"))
+        })
+        .collect()
 }
 
 fn column_expression(
@@ -492,17 +487,12 @@ fn sql_like_condition(expression: &str, value: &str) -> String {
 fn patch_inline_sql(
     base_sql: &str,
     where_clauses: &[String],
-    order_by: Option<&str>,
+    order_items: &[String],
 ) -> Result<String, String> {
     let mut sql = base_sql.to_string();
     let mut clauses = top_level_sql_clauses(&sql);
     if !clauses.contains_key("select") || !clauses.contains_key("from") {
         return Err("top-level SELECT/FROM clauses were not found".to_string());
-    }
-
-    if order_by.is_some() {
-        sql = without_top_level_order_by(&sql, &clauses);
-        clauses = top_level_sql_clauses(&sql);
     }
 
     if !where_clauses.is_empty() {
@@ -528,33 +518,34 @@ fn patch_inline_sql(
         clauses = top_level_sql_clauses(&sql);
     }
 
-    if let Some(order_by) = order_by {
-        let insert_at = first_clause_after(&clauses, &["limit", "offset", "fetch", "for"], 0)
-            .unwrap_or(sql.len());
-        sql = format!(
-            "{}\n{}{}",
-            sql[..insert_at].trim_end(),
-            order_by,
-            tail_suffix(&sql, insert_at)
-        );
+    if !order_items.is_empty() {
+        let order_sql = order_items.join(", ");
+        if let Some(&order_start) = clauses.get("orderBy") {
+            let order_end =
+                first_clause_after(&clauses, &["limit", "offset", "fetch", "for"], order_start)
+                    .unwrap_or(sql.len());
+            if contains_sql_comment(&sql[order_start..order_end]) {
+                return Err("ORDER BY contains comments; SQL rewrite is not available without changing original formatting".to_string());
+            }
+            sql = format!(
+                "{}, {}{}",
+                sql[..order_end].trim_end(),
+                order_sql,
+                tail_suffix(&sql, order_end)
+            );
+        } else {
+            let insert_at = first_clause_after(&clauses, &["limit", "offset", "fetch", "for"], 0)
+                .unwrap_or(sql.len());
+            sql = format!(
+                "{}\nORDER BY {}{}",
+                sql[..insert_at].trim_end(),
+                order_sql,
+                tail_suffix(&sql, insert_at)
+            );
+        }
     }
 
     Ok(sql_with_terminator(&sql))
-}
-
-fn without_top_level_order_by(sql: &str, clauses: &HashMap<&'static str, usize>) -> String {
-    let Some(&order_start) = clauses.get("orderBy") else {
-        return sql.to_string();
-    };
-    let order_end = first_clause_after(clauses, &["limit", "offset", "fetch", "for"], order_start)
-        .unwrap_or(sql.len());
-    let before = sql[..order_start].trim_end();
-    let after = sql[order_end..].trim_start();
-    if after.is_empty() {
-        before.to_string()
-    } else {
-        format!("{before}\n{after}")
-    }
 }
 
 fn tail_suffix(sql: &str, insert_at: usize) -> String {
@@ -565,36 +556,81 @@ fn tail_suffix(sql: &str, insert_at: usize) -> String {
     }
 }
 
-fn derived_response(
-    request: &ResultSqlRewriteRequest,
-    engine: ResultSqlEngine,
-    reason: impl Into<String>,
-) -> ResultSqlRewriteResponse {
-    let reason = reason.into();
-    let base_sql = strip_sql_terminator(&request.source_sql);
-    let mappings = request
-        .result_columns
-        .iter()
-        .map(|column| ProjectionMapping::Source(engine.quote_ident(column)))
-        .collect::<Vec<_>>();
-    let where_clauses = build_where_clauses(request, engine, &mappings, false).unwrap_or_default();
-    let order_by = build_order_by(request, &mappings, false).ok().flatten();
-    let mut lines = vec![
-        "SELECT *".to_string(),
-        "FROM (".to_string(),
-        indent_sql(&base_sql),
-        engine.derived_alias().to_string(),
-    ];
-    if !where_clauses.is_empty() {
-        lines.push(format!("WHERE {}", where_clauses.join("\n  AND ")));
+fn contains_sql_comment(sql: &str) -> bool {
+    let bytes = sql.as_bytes();
+    let mut i = 0;
+    let mut single_quoted = false;
+    let mut double_quoted = false;
+    let mut backtick_quoted = false;
+    let mut bracket_quoted = false;
+
+    while i < bytes.len() {
+        let byte = bytes[i];
+        let next = bytes.get(i + 1).copied();
+
+        if single_quoted {
+            if byte == b'\'' && next == Some(b'\'') {
+                i += 2;
+                continue;
+            }
+            if byte == b'\'' {
+                single_quoted = false;
+            }
+            i += 1;
+            continue;
+        }
+        if double_quoted {
+            if byte == b'"' && next == Some(b'"') {
+                i += 2;
+                continue;
+            }
+            if byte == b'"' {
+                double_quoted = false;
+            }
+            i += 1;
+            continue;
+        }
+        if backtick_quoted {
+            if byte == b'`' && next == Some(b'`') {
+                i += 2;
+                continue;
+            }
+            if byte == b'`' {
+                backtick_quoted = false;
+            }
+            i += 1;
+            continue;
+        }
+        if bracket_quoted {
+            if byte == b']' && next == Some(b']') {
+                i += 2;
+                continue;
+            }
+            if byte == b']' {
+                bracket_quoted = false;
+            }
+            i += 1;
+            continue;
+        }
+
+        match (byte, next) {
+            (b'-', Some(b'-')) | (b'/', Some(b'*')) => return true,
+            (b'\'', _) => single_quoted = true,
+            (b'"', _) => double_quoted = true,
+            (b'`', _) => backtick_quoted = true,
+            (b'[', _) => bracket_quoted = true,
+            _ => {}
+        }
+        i += 1;
     }
-    if let Some(order_by) = order_by {
-        lines.push(order_by);
-    }
+    false
+}
+
+fn unsupported_response(reason: impl Into<String>) -> ResultSqlRewriteResponse {
     ResultSqlRewriteResponse {
-        sql: format!("{};", lines.join("\n")),
-        mode: ResultSqlRewriteMode::Derived,
-        reason: Some(reason),
+        sql: None,
+        mode: ResultSqlRewriteMode::Unsupported,
+        reason: Some(reason.into()),
         warnings: Vec::new(),
     }
 }
@@ -617,13 +653,6 @@ fn strip_sql_terminator(sql: &str) -> String {
 
 fn sql_with_terminator(sql: &str) -> String {
     format!("{};", strip_sql_terminator(sql))
-}
-
-fn indent_sql(sql: &str) -> String {
-    sql.lines()
-        .map(|line| format!("  {line}"))
-        .collect::<Vec<_>>()
-        .join("\n")
 }
 
 fn top_level_sql_clauses(sql: &str) -> HashMap<&'static str, usize> {
@@ -821,7 +850,7 @@ mod tests {
             visible_column_indexes: vec![0, 1, 2],
             global_filter_text: String::new(),
             filters: Vec::new(),
-            sort: None,
+            sorts: Vec::new(),
         }
     }
 
@@ -844,8 +873,10 @@ mod tests {
 
         assert_eq!(res.mode, ResultSqlRewriteMode::Inline);
         assert_eq!(
-            res.sql,
-            "SELECT id, name, status\nFROM users\nWHERE deleted = 0\n  AND status = 'active'\nLIMIT 1000;"
+            res.sql.as_deref(),
+            Some(
+                "SELECT id, name, status\nFROM users\nWHERE deleted = 0\n  AND status = 'active'\nLIMIT 1000;"
+            )
         );
     }
 
@@ -863,23 +894,31 @@ mod tests {
                 mode: ResultSqlFilterMode::Fuzzy,
                 selected_values: vec![Some("7".to_string())],
             }],
-            sort: None,
+            sorts: Vec::new(),
         };
 
         let res = rewrite_result_sql(req.clone());
         assert_eq!(res.mode, ResultSqlRewriteMode::Inline);
-        assert!(res.sql.contains("WHERE u.id = '7'"));
+        assert!(
+            res.sql
+                .as_deref()
+                .is_some_and(|sql| sql.contains("WHERE u.id = '7'"))
+        );
 
-        req.sort = Some(ResultSqlSort {
+        req.sorts = vec![ResultSqlSort {
             column_index: 1,
             dir: ResultSqlSortDir::Desc,
-        });
+        }];
         let res = rewrite_result_sql(req);
-        assert!(res.sql.contains("ORDER BY u.name DESC"));
+        assert!(
+            res.sql
+                .as_deref()
+                .is_some_and(|sql| sql.contains("ORDER BY u.name DESC"))
+        );
     }
 
     #[test]
-    fn derives_computed_projection_filter() {
+    fn rejects_computed_projection_filter() {
         let req = ResultSqlRewriteRequest {
             engine: "MySQL".to_string(),
             source_sql:
@@ -894,42 +933,58 @@ mod tests {
                 mode: ResultSqlFilterMode::Fuzzy,
                 selected_values: Vec::new(),
             }],
-            sort: None,
+            sorts: Vec::new(),
         };
 
         let res = rewrite_result_sql(req);
 
-        assert_eq!(res.mode, ResultSqlRewriteMode::Derived);
+        assert_eq!(res.mode, ResultSqlRewriteMode::Unsupported);
+        assert_eq!(res.sql, None);
         assert_eq!(
             res.reason,
             Some("projection \"full_name\" is a computed expression".to_string())
         );
-        assert!(res.sql.contains("FROM (\n  SELECT concat"));
-        assert!(
-            res.sql
-                .contains("WHERE CAST(`full_name` AS CHAR) LIKE '%Ann%' ESCAPE '!'")
-        );
     }
 
     #[test]
-    fn replaces_existing_order_by() {
+    fn appends_existing_order_by() {
         let mut req = request("SELECT * FROM users WHERE deleted = 0 ORDER BY id ASC LIMIT 1000");
-        req.sort = Some(ResultSqlSort {
+        req.sorts = vec![ResultSqlSort {
             column_index: 2,
             dir: ResultSqlSortDir::Desc,
-        });
+        }];
 
         let res = rewrite_result_sql(req);
 
         assert_eq!(res.mode, ResultSqlRewriteMode::Inline);
         assert_eq!(
-            res.sql,
-            "SELECT * FROM users WHERE deleted = 0\nORDER BY `status` DESC\nLIMIT 1000;"
+            res.sql.as_deref(),
+            Some(
+                "SELECT * FROM users WHERE deleted = 0 ORDER BY id ASC, `status` DESC\nLIMIT 1000;"
+            )
         );
     }
 
     #[test]
-    fn derives_unqualified_wildcard_join() {
+    fn rejects_order_by_with_comments() {
+        let mut req = request("SELECT * FROM users ORDER BY id ASC -- keep comment\nLIMIT 1000");
+        req.sorts = vec![ResultSqlSort {
+            column_index: 2,
+            dir: ResultSqlSortDir::Desc,
+        }];
+
+        let res = rewrite_result_sql(req);
+
+        assert_eq!(res.mode, ResultSqlRewriteMode::Unsupported);
+        assert_eq!(res.sql, None);
+        assert_eq!(
+            res.reason,
+            Some("ORDER BY contains comments; SQL rewrite is not available without changing original formatting".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_unqualified_wildcard_join() {
         let mut req = ResultSqlRewriteRequest {
             engine: "MySQL".to_string(),
             source_sql: "SELECT * FROM users u JOIN orders o ON u.id = o.user_id LIMIT 1000"
@@ -943,16 +998,17 @@ mod tests {
                 mode: ResultSqlFilterMode::Exact,
                 selected_values: vec![Some("7".to_string())],
             }],
-            sort: None,
+            sorts: Vec::new(),
         };
-        req.sort = Some(ResultSqlSort {
+        req.sorts = vec![ResultSqlSort {
             column_index: 2,
             dir: ResultSqlSortDir::Asc,
-        });
+        }];
 
         let res = rewrite_result_sql(req);
 
-        assert_eq!(res.mode, ResultSqlRewriteMode::Derived);
+        assert_eq!(res.mode, ResultSqlRewriteMode::Unsupported);
+        assert_eq!(res.sql, None);
         assert_eq!(
             res.reason,
             Some(
@@ -960,12 +1016,6 @@ mod tests {
                     .to_string()
             )
         );
-        assert!(
-            res.sql
-                .contains("FROM (\n  SELECT * FROM users u JOIN orders o")
-        );
-        assert!(res.sql.contains("WHERE `id` = '7'"));
-        assert!(res.sql.contains("ORDER BY `status` ASC"));
     }
 
     #[test]
@@ -983,22 +1033,34 @@ mod tests {
                 mode: ResultSqlFilterMode::Exact,
                 selected_values: vec![Some("7".to_string())],
             }],
-            sort: Some(ResultSqlSort {
+            sorts: vec![ResultSqlSort {
                 column_index: 1,
                 dir: ResultSqlSortDir::Desc,
-            }),
+            }],
         };
 
         let res = rewrite_result_sql(req);
 
         assert_eq!(res.mode, ResultSqlRewriteMode::Inline);
-        assert!(res.sql.contains("WHERE u.`id` = '7'"));
-        assert!(res.sql.contains("ORDER BY u.`name` DESC"));
-        assert!(!res.sql.contains("FROM (\n"));
+        assert!(
+            res.sql
+                .as_deref()
+                .is_some_and(|sql| sql.contains("WHERE u.`id` = '7'"))
+        );
+        assert!(
+            res.sql
+                .as_deref()
+                .is_some_and(|sql| sql.contains("ORDER BY u.`name` DESC"))
+        );
+        assert!(
+            !res.sql
+                .as_deref()
+                .is_some_and(|sql| sql.contains("FROM (\n"))
+        );
     }
 
     #[test]
-    fn derives_duplicate_wildcard_result_columns() {
+    fn rejects_duplicate_wildcard_result_columns() {
         let mut req = request("SELECT * FROM users LIMIT 1000");
         req.result_columns = vec!["id".to_string(), "id".to_string(), "status".to_string()];
         req.filters.push(ResultSqlFilter {
@@ -1010,7 +1072,8 @@ mod tests {
 
         let res = rewrite_result_sql(req);
 
-        assert_eq!(res.mode, ResultSqlRewriteMode::Derived);
+        assert_eq!(res.mode, ResultSqlRewriteMode::Unsupported);
+        assert_eq!(res.sql, None);
         assert_eq!(
             res.reason,
             Some("duplicate wildcard result columns are not inline-rewritable in v1".to_string())
@@ -1018,7 +1081,7 @@ mod tests {
     }
 
     #[test]
-    fn derives_group_by_query() {
+    fn rejects_group_by_query() {
         let mut req = ResultSqlRewriteRequest {
             engine: "MySQL".to_string(),
             source_sql: "SELECT status, count(*) AS c FROM users GROUP BY status".to_string(),
@@ -1031,21 +1094,20 @@ mod tests {
                 mode: ResultSqlFilterMode::Exact,
                 selected_values: vec![Some("active".to_string())],
             }],
-            sort: None,
+            sorts: Vec::new(),
         };
-        req.sort = Some(ResultSqlSort {
+        req.sorts = vec![ResultSqlSort {
             column_index: 1,
             dir: ResultSqlSortDir::Desc,
-        });
+        }];
 
         let res = rewrite_result_sql(req);
 
-        assert_eq!(res.mode, ResultSqlRewriteMode::Derived);
+        assert_eq!(res.mode, ResultSqlRewriteMode::Unsupported);
+        assert_eq!(res.sql, None);
         assert_eq!(
             res.reason,
             Some("GROUP BY query is not inline-rewritable in v1".to_string())
         );
-        assert!(res.sql.contains("WHERE `status` = 'active'"));
-        assert!(res.sql.contains("ORDER BY `c` DESC"));
     }
 }

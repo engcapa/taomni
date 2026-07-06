@@ -302,6 +302,12 @@ function hashSqlText(sql: string): string {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
+function replacementEndWithExistingTerminator(sourceDoc: string, to: number, replacementSql: string): number {
+  if (!replacementSql.trimEnd().endsWith(";")) return to;
+  const trailingTerminator = /^[ \t]*;/.exec(sourceDoc.slice(to));
+  return trailingTerminator ? to + trailingTerminator[0].length : to;
+}
+
 function sourceRefForRange(
   panelId: string,
   range: SqlStatementRange,
@@ -1838,9 +1844,10 @@ export default function DbClientTab({
       return false;
     }
 
-    const nextDoc = `${sourceDoc.slice(0, from)}${generatedSql}${sourceDoc.slice(to)}`;
-    const delta = generatedSql.length - (to - from);
-    editor?.replaceRange(from, to, generatedSql, { focus });
+    const replaceTo = replacementEndWithExistingTerminator(sourceDoc, to, generatedSql);
+    const nextDoc = `${sourceDoc.slice(0, from)}${generatedSql}${sourceDoc.slice(replaceTo)}`;
+    const delta = generatedSql.length - (replaceTo - from);
+    editor?.replaceRange(from, replaceTo, generatedSql, { focus });
     const nextPanels = livePanels.map((panel) => {
       const patchedPanel =
         panel.id === sourcePanel.id ? { ...panel, doc: nextDoc, dirty: true } : panel;
@@ -1861,7 +1868,7 @@ export default function DbClientTab({
               exactHash: hashSqlText(generatedSql),
               parentSheetId: sheetId,
             };
-          } else if (candidateRef.from >= to) {
+          } else if (candidateRef.from >= replaceTo) {
             nextRef = {
               ...candidateRef,
               from: candidateRef.from + delta,
@@ -1871,6 +1878,9 @@ export default function DbClientTab({
         }
         return {
           ...candidate,
+          baseSql: updateSheetSql && panel.id === resultPanelId && candidate.id === sheetId
+            ? generatedSql
+            : candidate.baseSql,
           sql: updateSheetSql && panel.id === resultPanelId && candidate.id === sheetId
             ? generatedSql
             : candidate.sql,
@@ -1893,16 +1903,17 @@ export default function DbClientTab({
     rewriteRequest?: DbResultSqlRewriteRequest,
   ) => {
     let sql = generatedSql;
-    let rewriteMode: "inline" | "derived" | null = null;
-    let rewriteReason: string | null = null;
     if (rewriteRequest) {
       try {
         const rewritten = await dbRewriteResultSql(rewriteRequest);
+        if (rewritten.mode !== "inline" || !rewritten.sql) {
+          setStatusMessage(rewritten.reason ?? "SQL rewrite is not available for this result.");
+          return;
+        }
         sql = rewritten.sql;
-        rewriteMode = rewritten.mode;
-        rewriteReason = rewritten.reason;
       } catch (err) {
-        setStatusMessage(`SQL rewrite failed; using legacy generated SQL. ${String(err)}`);
+        setStatusMessage(`SQL rewrite failed: ${String(err)}`);
+        return;
       }
     }
 
@@ -1913,11 +1924,7 @@ export default function DbClientTab({
       updateSheetSql: true,
     });
     if (!replaced) return;
-    setStatusMessage(
-      rewriteMode === "derived" && rewriteReason
-        ? `Applied result filters as derived SQL (${rewriteReason}); refreshing result.`
-        : "Applied result filters to SQL; refreshing result.",
-    );
+    setStatusMessage("Applied result filters to SQL; refreshing result.");
     await refreshSheet(resultPanelId, sheetId, "clearView", sql);
   };
 

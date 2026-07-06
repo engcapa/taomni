@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryResultGrid } from "./QueryResultGrid";
+import { dbRewriteResultSql } from "../../lib/ipc";
 import type { DbQueryResult } from "../../lib/ipc";
 import { writeText } from "../../lib/clipboard";
 
@@ -14,7 +15,7 @@ vi.mock("../../lib/ipc", () => ({
       mode: "fuzzy" | "exact";
       selectedValues: (string | null)[];
     }>;
-    sort: null | { columnIndex: number; dir: "asc" | "desc" };
+    sorts: Array<{ columnIndex: number; dir: "asc" | "desc" }>;
   }) => {
     const quoteColumn = (index: number) => `\`${request.resultColumns[index]}\``;
     const clauses = request.filters.flatMap((filter) => {
@@ -28,8 +29,8 @@ vi.mock("../../lib/ipc", () => ({
         ? [`${quoteColumn(filter.columnIndex)} = '${filter.text}'`]
         : [`CAST(${quoteColumn(filter.columnIndex)} AS CHAR) LIKE '%${filter.text}%' ESCAPE '!'`];
     });
-    const orderBy = request.sort
-      ? `ORDER BY ${quoteColumn(request.sort.columnIndex)} ${request.sort.dir.toUpperCase()}`
+    const orderBy = request.sorts.length > 0
+      ? `ORDER BY ${request.sorts.map((sort) => `${quoteColumn(sort.columnIndex)} ${sort.dir.toUpperCase()}`).join(", ")}`
       : "";
     let sql = request.sourceSql.trim().replace(/;$/, "");
     const limitMatch = /\s+limit\b/i.exec(sql);
@@ -147,7 +148,7 @@ describe("QueryResultGrid", () => {
 
     fireEvent.click(screen.getByLabelText("Filter column name"));
     fireEvent.change(screen.getByLabelText("Filter name"), { target: { value: "Ann" } });
-    fireEvent.click(screen.getByRole("button", { name: "Local" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
     const body = within(screen.getByTestId("query-result-grid-scroll"));
     expect(body.getByText("Ann")).toBeInTheDocument();
@@ -156,13 +157,13 @@ describe("QueryResultGrid", () => {
 
     fireEvent.click(screen.getByLabelText("Filter column name"));
     fireEvent.click(screen.getByRole("button", { name: "Exact" }));
-    fireEvent.click(screen.getByRole("button", { name: "Local" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
     expect(body.getByText("Ann")).toBeInTheDocument();
     expect(body.queryByText("Anne")).not.toBeInTheDocument();
   });
 
-  it("filters by distinct column values and previews the generated SQL", () => {
+  it("filters by distinct column values and previews the generated SQL", async () => {
     render(
       <QueryResultGrid
         result={filterResult()}
@@ -175,21 +176,25 @@ describe("QueryResultGrid", () => {
 
     expect(screen.getByText("Distinct values")).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("Select active for status"));
-    fireEvent.click(screen.getByRole("button", { name: "Local" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
     const body = within(screen.getByTestId("query-result-grid-scroll"));
     expect(body.getByText("Ann")).toBeInTheDocument();
     expect(body.getByText("Bob")).toBeInTheDocument();
     expect(body.queryByText("Anne")).not.toBeInTheDocument();
-    expect(screen.getByTestId("query-result-generated-sql")).toHaveTextContent("WHERE `status` = 'active'");
+    await waitFor(() => {
+      expect(screen.getByTestId("query-result-generated-sql")).toHaveTextContent("WHERE `status` = 'active'");
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "status" }));
     fireEvent.click(screen.getByRole("button", { name: "status" }));
 
-    expect(screen.getByTestId("query-result-generated-sql")).toHaveTextContent("ORDER BY `status` DESC");
+    await waitFor(() => {
+      expect(screen.getByTestId("query-result-generated-sql")).toHaveTextContent("ORDER BY `status` DESC");
+    });
   });
 
-  it("submits local sorting as an explicit query", () => {
+  it("submits local sorting as an explicit query", async () => {
     const onGeneratedSqlQuery = vi.fn();
     render(
       <QueryResultGrid
@@ -202,12 +207,15 @@ describe("QueryResultGrid", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "status" }));
     fireEvent.click(screen.getByRole("button", { name: "status" }));
-    expect(screen.getByTestId("query-result-generated-sql")).toHaveTextContent("ORDER BY `status` DESC");
+    await waitFor(() => {
+      expect(screen.getByTestId("query-result-generated-sql")).toHaveTextContent("ORDER BY `status` DESC");
+      expect(screen.getByTestId("query-result-generated-sql-query")).not.toBeDisabled();
+    });
     expect(screen.getByTestId("query-result-generated-sql")).not.toHaveTextContent("FROM (");
 
     fireEvent.click(screen.getByTestId("query-result-generated-sql-query"));
 
-    expect(onGeneratedSqlQuery).toHaveBeenCalledWith(
+    await waitFor(() => expect(onGeneratedSqlQuery).toHaveBeenCalledWith(
       "select * from users\nORDER BY `status` DESC\nlimit 100;",
       {
         engine: "MySQL",
@@ -216,9 +224,75 @@ describe("QueryResultGrid", () => {
         visibleColumnIndexes: [0, 1, 2],
         globalFilterText: "",
         filters: [],
-        sort: { columnIndex: 2, dir: "desc" },
+        sorts: [{ columnIndex: 2, dir: "desc" }],
       },
+    ));
+  });
+
+  it("submits multi-column sorting in the clicked order", async () => {
+    const onGeneratedSqlQuery = vi.fn();
+    render(
+      <QueryResultGrid
+        result={filterResult()}
+        sourceSql="select * from users limit 100"
+        sqlEngine="MySQL"
+        onGeneratedSqlQuery={onGeneratedSqlQuery}
+      />,
     );
+
+    fireEvent.click(screen.getByRole("button", { name: "status" }));
+    fireEvent.click(screen.getByRole("button", { name: "name" }), { shiftKey: true });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("query-result-generated-sql")).toHaveTextContent("ORDER BY `status` ASC, `name` ASC");
+      expect(screen.getByTestId("query-result-generated-sql-query")).not.toBeDisabled();
+    });
+
+    fireEvent.click(screen.getByTestId("query-result-generated-sql-query"));
+
+    await waitFor(() => expect(onGeneratedSqlQuery).toHaveBeenCalledWith(
+      "select * from users\nORDER BY `status` ASC, `name` ASC\nlimit 100;",
+      {
+        engine: "MySQL",
+        sourceSql: "select * from users limit 100",
+        resultColumns: ["id", "name", "status"],
+        visibleColumnIndexes: [0, 1, 2],
+        globalFilterText: "",
+        filters: [],
+        sorts: [
+          { columnIndex: 2, dir: "asc" },
+          { columnIndex: 1, dir: "asc" },
+        ],
+      },
+    ));
+  });
+
+  it("disables database query when SQL rewrite is unsupported", async () => {
+    const onGeneratedSqlQuery = vi.fn();
+    vi.mocked(dbRewriteResultSql).mockResolvedValueOnce({
+      sql: null,
+      mode: "unsupported",
+      reason: "ORDER BY contains comments; SQL rewrite is not available without changing original formatting",
+      warnings: [],
+    });
+    render(
+      <QueryResultGrid
+        result={filterResult()}
+        sourceSql="select * from users order by id -- keep\nlimit 100"
+        sqlEngine="MySQL"
+        onGeneratedSqlQuery={onGeneratedSqlQuery}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "status" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("query-result-generated-sql")).toHaveTextContent("ORDER BY contains comments");
+      expect(screen.getByTestId("query-result-generated-sql-query")).toBeDisabled();
+    });
+
+    fireEvent.click(screen.getByTestId("query-result-generated-sql-query"));
+    expect(onGeneratedSqlQuery).not.toHaveBeenCalled();
   });
 
   it("copies the backend rewritten generated SQL", async () => {
@@ -232,7 +306,7 @@ describe("QueryResultGrid", () => {
 
     fireEvent.click(screen.getByLabelText("Filter column status"));
     fireEvent.click(screen.getByLabelText("Select active for status"));
-    fireEvent.click(screen.getByRole("button", { name: "Local" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
     await waitFor(() => {
       expect(screen.getByTestId("query-result-generated-sql")).toHaveTextContent("WHERE `status` = 'active'");
