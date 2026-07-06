@@ -12,6 +12,7 @@ export interface ChangesTreeProps {
   changes: GitChange[];
   treeMode: boolean;
   grouped?: boolean;
+  showSectionActions?: boolean;
   busy?: boolean;
   checked: Set<string>;
   onToggleChecked: (paths: string[], value: boolean) => void;
@@ -75,6 +76,7 @@ export function ChangesTree({
   changes,
   treeMode,
   grouped = true,
+  showSectionActions = true,
   busy = false,
   checked,
   onToggleChecked,
@@ -213,7 +215,7 @@ export function ChangesTree({
             {section.title} ({section.changes.length})
           </span>
           <div className="flex-1" />
-          {action.run ? (
+          {showSectionActions && action.run ? (
             <button
               type="button"
               className="taomni-btn h-6 px-1.5 text-[10px]"

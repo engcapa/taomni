@@ -1,22 +1,39 @@
-import { useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
   AlertTriangle,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
+  CircleDashed,
+  CircleMinus,
+  CirclePlus,
+  FilePenLine,
+  FileQuestion,
+  FileSymlink,
+  FileX,
   GitBranch,
+  List,
+  ListChecks,
+  ListFilter,
+  ListTree,
+  ListX,
   Loader2,
   Search,
+  SquareCheckBig,
+  TriangleAlert,
 } from "lucide-react";
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
-import { gitChangeLabel, type GitBlobPair, type GitChange, type GitSnapshot } from "../../lib/git";
+import { type GitBlobPair, type GitChange, type GitSnapshot } from "../../lib/git";
+import { useT, type TranslateFn } from "../../lib/i18n";
 import type { GitWorkspaceRootInfo } from "../../types";
 import { ChangesTree } from "./ChangesTree";
-import { ChangesListToolbar } from "./shared/ChangesListToolbar";
 import { CommitBar } from "./shared/CommitBar";
 import { DiffPane } from "./shared/DiffPane";
 import { parseWorkspaceChangeKey, workspaceChangeKey } from "./workspaceGitKeys";
 
 type TriState = "all" | "none" | "some";
+type WorkspaceStageFilter = "staged" | "unstaged";
+type WorkspaceStatusFilter = "modified" | "untracked" | "deleted" | "renamed" | "conflict";
 
 interface WorkspaceChangeRow {
   root: GitWorkspaceRootInfo;
@@ -38,7 +55,6 @@ export interface WorkspaceChangesViewProps {
   checkedCount: number;
   checkedRepoCount: number;
   selectedKeys: Set<string>;
-  selectedCount: number;
   focusedKey: string | null;
   pair: GitBlobPair | null;
   pairLoading: boolean;
@@ -46,8 +62,8 @@ export interface WorkspaceChangesViewProps {
   setCommitMessage: (message: string) => void;
   canCommitAndPush: boolean;
   scopeSummary: string;
-  stageAll: () => void;
-  unstageAll: () => void;
+  stageVisible: (pathsByRepo: Record<string, string[]>) => void;
+  unstageVisible: (pathsByRepo: Record<string, string[]>) => void;
   stagePaths: (repoRoot: string, paths: string[]) => void;
   unstagePaths: (repoRoot: string, paths: string[]) => void;
   stageSelected: () => void;
@@ -58,12 +74,6 @@ export interface WorkspaceChangesViewProps {
   onToggleChecked: (repoRoot: string, paths: string[], value: boolean) => void;
   onSelect: (repoRoot: string, path: string, mods: { ctrl: boolean; shift: boolean }) => void;
   onContextMenu: (repoRoot: string, path: string, event: ReactMouseEvent) => void;
-  repoCommitMessages: Record<string, string>;
-  setRepoCommitMessage: (repoRoot: string, message: string) => void;
-  commitRepo: (repoRoot: string) => void;
-  commitRepoAndPush: (repoRoot: string) => void;
-  checkedChangePathsByRepo: Record<string, string[]>;
-  pushableRepoRoots: Set<string>;
 }
 
 export function WorkspaceChangesView({
@@ -76,7 +86,6 @@ export function WorkspaceChangesView({
   checkedCount,
   checkedRepoCount,
   selectedKeys,
-  selectedCount,
   focusedKey,
   pair,
   pairLoading,
@@ -84,8 +93,8 @@ export function WorkspaceChangesView({
   setCommitMessage,
   canCommitAndPush,
   scopeSummary,
-  stageAll,
-  unstageAll,
+  stageVisible,
+  unstageVisible,
   stagePaths,
   unstagePaths,
   stageSelected,
@@ -96,30 +105,34 @@ export function WorkspaceChangesView({
   onToggleChecked,
   onSelect,
   onContextMenu,
-  repoCommitMessages,
-  setRepoCommitMessage,
-  commitRepo,
-  commitRepoAndPush,
-  checkedChangePathsByRepo,
-  pushableRepoRoots,
 }: WorkspaceChangesViewProps) {
+  const t = useT();
   const [filter, setFilter] = useState("");
+  const [checkedOnlyFilter, setCheckedOnlyFilter] = useState(false);
+  const [stageFilters, setStageFilters] = useState<Set<WorkspaceStageFilter>>(() => new Set());
+  const [statusFilters, setStatusFilters] = useState<Set<WorkspaceStatusFilter>>(() => new Set());
   const normalizedFilter = filter.trim().toLowerCase();
-  const groups = roots.map((root) => ({
-    root,
-    state: snapshots[root.repoRoot],
-    snapshot: snapshots[root.repoRoot]?.snapshot ?? null,
-    visibleChanges: (snapshots[root.repoRoot]?.snapshot?.changes ?? []).filter((change) => (
-      !normalizedFilter ||
-      root.name.toLowerCase().includes(normalizedFilter) ||
-      root.repoRoot.toLowerCase().includes(normalizedFilter) ||
-      change.path.toLowerCase().includes(normalizedFilter) ||
-      (change.oldPath ?? "").toLowerCase().includes(normalizedFilter) ||
-      change.status.toLowerCase().includes(normalizedFilter) ||
-      (change.conflict ? "conflict conflicted" : "").includes(normalizedFilter) ||
-      (change.staged ? "staged" : "unstaged").includes(normalizedFilter)
-    )),
-  }));
+  const groups = roots.map((root) => {
+    const state = snapshots[root.repoRoot];
+    const snapshot = state?.snapshot ?? null;
+    return {
+      root,
+      state,
+      snapshot,
+      visibleChanges: (snapshot?.changes ?? []).filter((change) => {
+        const key = workspaceChangeKey(root.repoRoot, change.path);
+        return workspaceChangeMatchesFilters({
+          root,
+          change,
+          normalizedFilter,
+          checked: checkedKeys.has(key),
+          checkedOnlyFilter,
+          stageFilters,
+          statusFilters,
+        });
+      }),
+    };
+  });
   const flatRows = groups.flatMap((group) => (
     group.visibleChanges.map((change) => ({
       root: group.root,
@@ -132,10 +145,17 @@ export function WorkspaceChangesView({
   });
   const totalChanges = groups.reduce((total, group) => total + (group.snapshot?.changes.length ?? 0), 0);
   const visibleChangeCount = groups.reduce((total, group) => total + group.visibleChanges.length, 0);
+  const visibleStagedChangeCount = groups.reduce(
+    (total, group) => total + group.visibleChanges.filter((change) => change.staged).length,
+    0,
+  );
+  const visiblePathsByRepo = useMemo(() => pathsByRepoFromGroups(groups), [groups]);
+  const visibleStagedPathsByRepo = useMemo(() => pathsByRepoFromGroups(groups, (change) => change.staged), [groups]);
   const hasVisibleGroups = groups.some((group) => (
     group.visibleChanges.length > 0 || group.state?.loading || group.state?.error
   ));
-  const hasStaged = groups.some((group) => group.snapshot?.changes.some((change) => change.staged));
+  const hasStagedVisible = groups.some((group) => group.visibleChanges.some((change) => change.staged));
+  const hasButtonFilters = checkedOnlyFilter || stageFilters.size > 0 || statusFilters.size > 0;
   const active = useMemo(() => {
     const parsed = focusedKey ? parseWorkspaceChangeKey(focusedKey) : null;
     if (!parsed) return null;
@@ -146,6 +166,23 @@ export function WorkspaceChangesView({
   }, [focusedKey, roots, snapshots]);
   const canCommit = !busy && checkedCount > 0 && commitMessage.trim().length > 0;
   const [collapsedRepos, setCollapsedRepos] = useState<Set<string>>(() => new Set());
+  const toggleStageFilter = (filterKey: WorkspaceStageFilter) => {
+    setStageFilters((current) => toggleSetValue(current, filterKey));
+  };
+  const toggleStatusFilter = (filterKey: WorkspaceStatusFilter) => {
+    setStatusFilters((current) => toggleSetValue(current, filterKey));
+  };
+  const clearChangeFilters = () => {
+    setCheckedOnlyFilter(false);
+    setStageFilters(new Set());
+    setStatusFilters(new Set());
+  };
+  const selectVisible = (value: boolean) => {
+    for (const group of groups) {
+      const paths = group.visibleChanges.map((change) => change.path);
+      if (paths.length > 0) onToggleChecked(group.root.repoRoot, paths, value);
+    }
+  };
   const toggleRepoCollapsed = (repoRoot: string) => {
     setCollapsedRepos((current) => {
       const next = new Set(current);
@@ -160,41 +197,119 @@ export function WorkspaceChangesView({
       <Panel id="workspace-changes-list" defaultSize={38} minSize={26} className="min-w-0 min-h-0 flex flex-col border-r border-[var(--taomni-divider)]">
         <div className="h-8 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
           <GitBranch className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
-          <span className="font-semibold text-[12px]">Workspace changes</span>
+          <span className="font-semibold text-[12px]">{t("git.workspaceChanges.title")}</span>
           <span className="min-w-0 truncate text-[11px] text-[var(--taomni-text-muted)]">{scopeSummary}</span>
         </div>
-        <ChangesListToolbar
-          busy={busy}
-          checkedCount={checkedCount}
-          totalCount={totalChanges}
-          treeMode={treeMode}
-          canStageAll={totalChanges > 0}
-          canUnstageAll={hasStaged}
-          onStageAll={stageAll}
-          onUnstageAll={unstageAll}
-          onToggleTreeMode={() => setTreeMode(!treeMode)}
-        />
-        <div className="h-9 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)]">
-          <div className="relative min-w-0 flex-1">
+        <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)] overflow-x-auto">
+          <div className="relative min-w-28 flex-1">
             <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
             <input
               className="taomni-input h-7 w-full pl-7"
               value={filter}
-              placeholder="Filter changes"
+              placeholder={t("git.workspaceChanges.filterPlaceholder")}
               onChange={(event) => setFilter(event.target.value)}
             />
           </div>
-          {filter.trim() ? (
-            <span className="shrink-0 text-[11px] text-[var(--taomni-text-muted)]">
-              {visibleChangeCount}/{totalChanges}
+          <div className="shrink-0 flex items-center gap-0.5 overflow-x-auto">
+            <WorkspaceToolButton
+              label={t("git.workspaceChanges.showAll")}
+              active={!hasButtonFilters}
+              disabled={!hasButtonFilters}
+              onClick={clearChangeFilters}
+              icon={<ListFilter className="w-3.5 h-3.5" />}
+            />
+            <WorkspaceToolButton
+              label={t("git.workspaceChanges.showSelected")}
+              active={checkedOnlyFilter}
+              onClick={() => setCheckedOnlyFilter((current) => !current)}
+              icon={<SquareCheckBig className="w-3.5 h-3.5" />}
+            />
+            <WorkspaceToolButton
+              label={t("git.workspaceChanges.showUnstaged")}
+              active={stageFilters.has("unstaged")}
+              onClick={() => toggleStageFilter("unstaged")}
+              icon={<CircleDashed className="w-3.5 h-3.5" />}
+            />
+            <WorkspaceToolButton
+              label={t("git.workspaceChanges.showStaged")}
+              active={stageFilters.has("staged")}
+              onClick={() => toggleStageFilter("staged")}
+              icon={<CheckCircle2 className="w-3.5 h-3.5" />}
+            />
+            <WorkspaceToolButton
+              label={t("git.workspaceChanges.filterModified")}
+              active={statusFilters.has("modified")}
+              onClick={() => toggleStatusFilter("modified")}
+              icon={<FilePenLine className="w-3.5 h-3.5" />}
+            />
+            <WorkspaceToolButton
+              label={t("git.workspaceChanges.filterUntracked")}
+              active={statusFilters.has("untracked")}
+              onClick={() => toggleStatusFilter("untracked")}
+              icon={<FileQuestion className="w-3.5 h-3.5" />}
+            />
+            <WorkspaceToolButton
+              label={t("git.workspaceChanges.filterDeleted")}
+              active={statusFilters.has("deleted")}
+              onClick={() => toggleStatusFilter("deleted")}
+              icon={<FileX className="w-3.5 h-3.5" />}
+            />
+            <WorkspaceToolButton
+              label={t("git.workspaceChanges.filterRenamed")}
+              active={statusFilters.has("renamed")}
+              onClick={() => toggleStatusFilter("renamed")}
+              icon={<FileSymlink className="w-3.5 h-3.5" />}
+            />
+            <WorkspaceToolButton
+              label={t("git.workspaceChanges.filterConflicted")}
+              active={statusFilters.has("conflict")}
+              onClick={() => toggleStatusFilter("conflict")}
+              icon={<TriangleAlert className="w-3.5 h-3.5" />}
+            />
+            <ToolbarDivider />
+            <WorkspaceToolButton
+              label={t("git.workspaceChanges.selectVisible", { count: visibleChangeCount })}
+              disabled={visibleChangeCount === 0}
+              onClick={() => selectVisible(true)}
+              icon={<ListChecks className="w-3.5 h-3.5" />}
+            />
+            <WorkspaceToolButton
+              label={t("git.workspaceChanges.unselectVisible", { count: visibleChangeCount })}
+              disabled={visibleChangeCount === 0}
+              onClick={() => selectVisible(false)}
+              icon={<ListX className="w-3.5 h-3.5" />}
+            />
+            <ToolbarDivider />
+            <WorkspaceToolButton
+              label={t("git.workspaceChanges.stageVisible", { count: visibleChangeCount })}
+              disabled={busy || visibleChangeCount === 0}
+              onClick={() => stageVisible(visiblePathsByRepo)}
+              icon={<CirclePlus className="w-3.5 h-3.5" />}
+            />
+            <WorkspaceToolButton
+              label={t("git.workspaceChanges.unstageVisible", { count: visibleStagedChangeCount })}
+              disabled={busy || !hasStagedVisible}
+              onClick={() => unstageVisible(visibleStagedPathsByRepo)}
+              icon={<CircleMinus className="w-3.5 h-3.5" />}
+            />
+            <ToolbarDivider />
+            <span className="shrink-0 min-w-10 text-center text-[11px] text-[var(--taomni-text-muted)]">
+              {checkedCount}/{totalChanges}
             </span>
-          ) : null}
+            <WorkspaceToolButton
+              label={treeMode ? t("git.workspaceChanges.switchToFlatList") : t("git.workspaceChanges.switchToDirectoryTree")}
+              onClick={() => setTreeMode(!treeMode)}
+              icon={treeMode ? <List className="w-3.5 h-3.5" /> : <ListTree className="w-3.5 h-3.5" />}
+            />
+          </div>
         </div>
 
         <div className="flex-1 min-h-0 overflow-auto">
           {!hasVisibleGroups ? (
             <div className="h-full min-h-24 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
-              {filter.trim() ? "No matching changes" : "No local changes"}
+              {normalizedFilter || hasButtonFilters
+                ? t("git.workspaceChanges.noMatchingChanges")
+                : t("git.workspaceChanges.noLocalChanges")}
             </div>
           ) : treeMode ? (
             groups.map(({ root, state, snapshot, visibleChanges }) => (
@@ -212,12 +327,6 @@ export function WorkspaceChangesView({
                 collapsed={collapsedRepos.has(root.repoRoot)}
                 onToggleCollapsed={() => toggleRepoCollapsed(root.repoRoot)}
                 busy={busy}
-                commitMessage={repoCommitMessages[root.repoRoot] ?? ""}
-                onCommitMessageChange={(value) => setRepoCommitMessage(root.repoRoot, value)}
-                onCommit={() => commitRepo(root.repoRoot)}
-                onCommitAndPush={() => commitRepoAndPush(root.repoRoot)}
-                checkedRepoPathCount={checkedChangePathsByRepo[root.repoRoot]?.length ?? 0}
-                canPush={pushableRepoRoots.has(root.repoRoot)}
                 onToggleChecked={onToggleChecked}
                 onStagePaths={stagePaths}
                 onUnstagePaths={unstagePaths}
@@ -254,9 +363,9 @@ export function WorkspaceChangesView({
 
       <Panel id="workspace-changes-diff" defaultSize={62} minSize={35} className="min-w-0 min-h-0 flex flex-col">
         <DiffPane
-          title={`${active ? `${active.root.name} / ${active.change.path}` : "Diff"}${selectedCount > 1 ? ` (+${selectedCount - 1} selected)` : ""}`}
+          title={active ? `${active.root.name} / ${active.change.path}` : t("git.workspaceChanges.diffTitle")}
           busy={busy}
-          selectedCount={selectedCount}
+          selectedCount={active ? 1 : 0}
           pair={pair}
           pairLoading={pairLoading}
           onStage={stageSelected}
@@ -266,6 +375,39 @@ export function WorkspaceChangesView({
       </Panel>
     </PanelGroup>
   );
+}
+
+function WorkspaceToolButton({
+  label,
+  icon,
+  active = false,
+  disabled = false,
+  onClick,
+}: {
+  label: string;
+  icon: ReactNode;
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`taomni-btn h-7 w-7 shrink-0 inline-flex items-center justify-center px-0 ${
+        active ? "bg-[var(--taomni-accent)] text-white border-[var(--taomni-accent)]" : ""
+      }`}
+      title={label}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {icon}
+    </button>
+  );
+}
+
+function ToolbarDivider() {
+  return <span className="mx-0.5 h-5 w-px shrink-0 bg-[var(--taomni-divider)]" aria-hidden="true" />;
 }
 
 function WorkspaceFlatChangesList({
@@ -338,16 +480,17 @@ function WorkspaceFlatChangeRow({
   onContextMenu: (event: ReactMouseEvent) => void;
 }) {
   const { root, change } = row;
+  const t = useT();
   const repoColor = repoColorFor(root.repoRoot);
-  const pathDir = directoryName(change.path);
-  const oldPathDir = change.oldPath ? directoryName(change.oldPath) : "";
-  const status = workspaceStatusMeta(change);
+  const pathDir = workspaceDirectoryLabel(root.name, change.path);
+  const oldPathLabel = change.oldPath ? workspacePathLabel(root.name, change.oldPath) : "";
+  const status = workspaceStatusMeta(change, t);
   return (
     <div
       role="button"
       tabIndex={0}
       data-testid="workspace-change-row"
-      aria-label={`${root.name} ${change.path} ${status.actionLabel}`}
+      aria-label={`${root.name} ${change.path} ${status.statusLabel}`}
       title={`${root.repoRoot}\n${change.path}`}
       className={`group relative w-full min-h-[48px] pr-2 py-1.5 flex items-center gap-2 text-left cursor-pointer border-b border-[var(--taomni-divider)] ${
         active ? "bg-[var(--taomni-hover)]" : selected ? "bg-[var(--taomni-accent)]/10" : "hover:bg-[var(--taomni-hover)]"
@@ -366,7 +509,7 @@ function WorkspaceFlatChangeRow({
         type="checkbox"
         className="ml-1 shrink-0 accent-[var(--taomni-accent)]"
         checked={checked}
-        aria-label={`Select ${root.name} ${change.path}`}
+        aria-label={t("git.workspaceChanges.selectFile", { repo: root.name, path: change.path })}
         onClick={(event) => event.stopPropagation()}
         onChange={(event) => onToggleChecked(event.target.checked)}
       />
@@ -381,19 +524,20 @@ function WorkspaceFlatChangeRow({
       >
         {repoAbbr(root.name || root.repoRoot)}
       </span>
-      <span className={`shrink-0 w-6 rounded px-1 py-0.5 text-center text-[10px] font-semibold ${status.kindClass}`}>
+      <span
+        className={`shrink-0 w-6 rounded px-1 py-0.5 text-center text-[10px] font-semibold ${status.kindClass}`}
+        title={status.statusLabel}
+        aria-label={status.statusLabel}
+      >
         {status.kindLabel}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="min-w-0 truncate text-[12px] font-medium">{fileName(change.path)}</span>
-          <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${status.actionClass}`}>
-            {status.actionLabel}
-          </span>
+        <div className="min-w-0">
+          <span className="block min-w-0 truncate text-[12px] font-semibold">{fileName(change.path)}</span>
         </div>
         <div className="truncate text-[11px] text-[var(--taomni-text-muted)]">
-          {pathDir || "."} / {gitChangeLabel(change)}
-          {change.oldPath ? ` · from ${oldPathDir || "."} / ${fileName(change.oldPath)}` : ""}
+          {pathDir}
+          {change.oldPath ? ` · ${t("git.workspaceChanges.fromPath", { path: oldPathLabel })}` : ""}
         </div>
       </div>
     </div>
@@ -409,6 +553,7 @@ function RepoFlatStatusRow({
   loading: boolean;
   error: string | null;
 }) {
+  const t = useT();
   const color = repoColorFor(root.repoRoot);
   return (
     <div
@@ -424,7 +569,7 @@ function RepoFlatStatusRow({
       {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-accent)]" /> : null}
       {error ? <AlertTriangle className="w-3.5 h-3.5 text-red-500" /> : null}
       <span className={error ? "truncate text-red-500" : "truncate text-[var(--taomni-text-muted)]"}>
-        {error ?? "Loading changes..."}
+        {error ?? t("git.workspaceChanges.loadingChanges")}
       </span>
     </div>
   );
@@ -443,12 +588,6 @@ function RepoChangeGroup({
   collapsed,
   onToggleCollapsed,
   busy,
-  commitMessage,
-  onCommitMessageChange,
-  onCommit,
-  onCommitAndPush,
-  checkedRepoPathCount,
-  canPush,
   onToggleChecked,
   onStagePaths,
   onUnstagePaths,
@@ -467,18 +606,13 @@ function RepoChangeGroup({
   collapsed: boolean;
   onToggleCollapsed: () => void;
   busy: boolean;
-  commitMessage: string;
-  onCommitMessageChange: (value: string) => void;
-  onCommit: () => void;
-  onCommitAndPush: () => void;
-  checkedRepoPathCount: number;
-  canPush: boolean;
   onToggleChecked: (repoRoot: string, paths: string[], value: boolean) => void;
   onStagePaths: (repoRoot: string, paths: string[]) => void;
   onUnstagePaths: (repoRoot: string, paths: string[]) => void;
   onSelect: (repoRoot: string, path: string, mods: { ctrl: boolean; shift: boolean }) => void;
   onContextMenu: (repoRoot: string, path: string, event: ReactMouseEvent) => void;
 }) {
+  const t = useT();
   if (changes.length === 0 && !loading && !error) return null;
 
   const branch = snapshot?.detached ? `detached ${snapshot.headOid ?? ""}` : snapshot?.currentBranch ?? "No branch";
@@ -495,7 +629,6 @@ function RepoChangeGroup({
   );
   const parsedFocus = focusedKey ? parseWorkspaceChangeKey(focusedKey) : null;
   const activePath = parsedFocus?.repoRoot === root.repoRoot ? parsedFocus.path : null;
-  const canCommitRepo = !busy && checkedRepoPathCount > 0 && commitMessage.trim().length > 0;
 
   return (
     <section className="border-b border-[var(--taomni-divider)]">
@@ -503,7 +636,9 @@ function RepoChangeGroup({
         <button
           type="button"
           className="shrink-0 flex items-center justify-center text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"
-          aria-label={collapsed ? `Expand ${root.name}` : `Collapse ${root.name}`}
+          aria-label={collapsed
+            ? t("git.workspaceChanges.expandRepository", { repo: root.name })
+            : t("git.workspaceChanges.collapseRepository", { repo: root.name })}
           onClick={onToggleCollapsed}
         >
           {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -511,7 +646,7 @@ function RepoChangeGroup({
         <TriCheckbox
           state={checkState(checkedCount, changes.length)}
           disabled={changes.length === 0}
-          ariaLabel={`Select changes in ${root.name}`}
+          ariaLabel={t("git.workspaceChanges.selectRepoChanges", { repo: root.name })}
           onChange={(value) => onToggleChecked(root.repoRoot, changes.map((change) => change.path), value)}
         />
         <GitBranch className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
@@ -533,6 +668,7 @@ function RepoChangeGroup({
           <ChangesTree
             changes={changes}
             treeMode={treeMode}
+            showSectionActions={false}
             checked={checkedPaths}
             onToggleChecked={(paths, value) => onToggleChecked(root.repoRoot, paths, value)}
             busy={busy}
@@ -543,36 +679,10 @@ function RepoChangeGroup({
             onSelect={(path, mods) => onSelect(root.repoRoot, path, mods)}
             onContextMenu={(path, event) => onContextMenu(root.repoRoot, path, event)}
           />
-          <div className="flex items-center gap-1.5 px-2 py-1.5 border-t border-[var(--taomni-divider)]">
-            <input
-              className="taomni-input h-7 min-w-0 flex-1 text-[12px]"
-              value={commitMessage}
-              placeholder={`Message for ${root.name}`}
-              onChange={(event) => onCommitMessageChange(event.target.value)}
-            />
-            <button
-              type="button"
-              className="taomni-btn h-7 px-2 text-[11px]"
-              aria-label={`Commit ${root.name}`}
-              disabled={!canCommitRepo}
-              onClick={onCommit}
-            >
-              Commit
-            </button>
-            <button
-              type="button"
-              className="taomni-btn h-7 px-2 text-[11px]"
-              aria-label={`Commit and push ${root.name}`}
-              disabled={!canCommitRepo || !canPush}
-              onClick={onCommitAndPush}
-            >
-              Commit &amp; Push
-            </button>
-          </div>
         </>
       ) : loading ? (
         <div className="px-8 py-2 text-[11px] text-[var(--taomni-text-muted)]">
-          Loading changes...
+          {t("git.workspaceChanges.loadingChanges")}
         </div>
       ) : null}
     </section>
@@ -618,10 +728,14 @@ function fileName(path: string): string {
   return parts[parts.length - 1] ?? path;
 }
 
-function directoryName(path: string): string {
+function workspaceDirectoryLabel(repoName: string, path: string): string {
   const parts = path.split("/").filter(Boolean);
   parts.pop();
-  return parts.join("/");
+  return [repoName || "repo", ...parts].join(" / ") + " /";
+}
+
+function workspacePathLabel(repoName: string, path: string): string {
+  return [repoName || "repo", ...path.split("/").filter(Boolean)].join(" / ");
 }
 
 function repoAbbr(name: string): string {
@@ -635,42 +749,44 @@ function repoAbbr(name: string): string {
   return (compact.slice(0, 3) || "repo").toUpperCase();
 }
 
-function workspaceStatusMeta(change: GitChange): {
+function workspaceStatusMeta(change: GitChange, t: TranslateFn): {
   kindLabel: string;
   kindClass: string;
-  actionLabel: string;
-  actionClass: string;
+  statusLabel: string;
 } {
   if (change.conflict) {
     return {
       kindLabel: "!",
       kindClass: "bg-red-500/15 text-red-500",
-      actionLabel: "Resolve",
-      actionClass: "bg-red-500/15 text-red-500",
+      statusLabel: t("git.workspaceChanges.statusConflict"),
     };
   }
   if (change.staged) {
     return {
       kindLabel: shortChangeKind(change),
       kindClass: "bg-emerald-500/15 text-emerald-600",
-      actionLabel: "Commit",
-      actionClass: "bg-emerald-500/15 text-emerald-600",
+      statusLabel: t("git.workspaceChanges.statusStaged"),
     };
   }
   if (change.status === "untracked") {
     return {
       kindLabel: "?",
       kindClass: "bg-amber-500/15 text-amber-600",
-      actionLabel: "Add",
-      actionClass: "bg-amber-500/15 text-amber-600",
+      statusLabel: t("git.workspaceChanges.statusUntracked"),
     };
   }
   return {
     kindLabel: shortChangeKind(change),
     kindClass: "bg-blue-500/15 text-blue-500",
-    actionLabel: "Add",
-    actionClass: "bg-blue-500/15 text-blue-500",
+    statusLabel: statusLabelForChange(change, t),
   };
+}
+
+function statusLabelForChange(change: GitChange, t: TranslateFn): string {
+  if (change.status === "renamed") return t("git.workspaceChanges.statusRenamed");
+  if (change.status === "deleted") return t("git.workspaceChanges.statusDeleted");
+  if (change.status === "added") return t("git.workspaceChanges.statusAdded");
+  return t("git.workspaceChanges.statusModified");
 }
 
 function shortChangeKind(change: GitChange): string {
@@ -697,4 +813,77 @@ function repoColorFor(repoRoot: string): { bg: string; border: string; text: str
     hash = (hash * 31 + repoRoot.charCodeAt(i)) >>> 0;
   }
   return palette[hash % palette.length];
+}
+
+function toggleSetValue<T>(current: Set<T>, value: T): Set<T> {
+  const next = new Set(current);
+  if (next.has(value)) next.delete(value);
+  else next.add(value);
+  return next;
+}
+
+function pathsByRepoFromGroups(
+  groups: Array<{
+    root: GitWorkspaceRootInfo;
+    visibleChanges: GitSnapshot["changes"];
+  }>,
+  predicate: (change: GitChange) => boolean = () => true,
+): Record<string, string[]> {
+  const byRepo: Record<string, string[]> = {};
+  for (const group of groups) {
+    const paths = group.visibleChanges.filter(predicate).map((change) => change.path);
+    if (paths.length > 0) byRepo[group.root.repoRoot] = paths;
+  }
+  return byRepo;
+}
+
+function workspaceChangeMatchesFilters({
+  root,
+  change,
+  normalizedFilter,
+  checked,
+  checkedOnlyFilter,
+  stageFilters,
+  statusFilters,
+}: {
+  root: GitWorkspaceRootInfo;
+  change: GitChange;
+  normalizedFilter: string;
+  checked: boolean;
+  checkedOnlyFilter: boolean;
+  stageFilters: Set<WorkspaceStageFilter>;
+  statusFilters: Set<WorkspaceStatusFilter>;
+}): boolean {
+  if (checkedOnlyFilter && !checked) return false;
+  if (stageFilters.size > 0 && !matchesStageFilters(change, stageFilters)) return false;
+  if (statusFilters.size > 0 && !matchesStatusFilters(change, statusFilters)) return false;
+  if (!normalizedFilter) return true;
+  return (
+    root.name.toLowerCase().includes(normalizedFilter) ||
+    root.repoRoot.toLowerCase().includes(normalizedFilter) ||
+    change.path.toLowerCase().includes(normalizedFilter) ||
+    (change.oldPath ?? "").toLowerCase().includes(normalizedFilter) ||
+    change.status.toLowerCase().includes(normalizedFilter) ||
+    (change.conflict ? "conflict conflicted" : "").includes(normalizedFilter) ||
+    (change.staged ? "staged" : "").includes(normalizedFilter) ||
+    (change.unstaged ? "unstaged" : "").includes(normalizedFilter)
+  );
+}
+
+function matchesStageFilters(change: GitChange, filters: Set<WorkspaceStageFilter>): boolean {
+  if (filters.size === 2) return true;
+  if (filters.has("staged") && change.staged) return true;
+  if (filters.has("unstaged") && (change.unstaged || !change.staged)) return true;
+  return false;
+}
+
+function matchesStatusFilters(change: GitChange, filters: Set<WorkspaceStatusFilter>): boolean {
+  if (filters.has("conflict") && change.conflict) return true;
+  if (filters.has("untracked") && change.status === "untracked") return true;
+  if (filters.has("deleted") && change.status === "deleted") return true;
+  if (filters.has("renamed") && change.status === "renamed") return true;
+  if (filters.has("modified") && !change.conflict && change.status === "modified") {
+    return true;
+  }
+  return false;
 }

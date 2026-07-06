@@ -96,7 +96,6 @@ export function WorkspaceGitManager({
     loadRepoScope(workspaceRootsKey(normalizedRoots), normalizedRoots)
       ?? initialRepoScope(normalizedRoots, activeRepoRoot)
   ));
-  const [repoCommitMessages, setRepoCommitMessages] = useState<Record<string, string>>({});
   const [snapshots, setSnapshots] = useState<Record<string, RepoSnapshotState>>({});
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
   const [panelVersion, setPanelVersion] = useState(0);
@@ -194,6 +193,10 @@ export function WorkspaceGitManager({
       .map((key) => allChanges.find((entry) => entry.key === key))
       .filter((entry): entry is (typeof allChanges)[number] => !!entry),
     [allChanges, selectedOperationKeys],
+  );
+  const focusedOperationKeys = useMemo(
+    () => focusedChangeKey && validChangeKeys.has(focusedChangeKey) ? [focusedChangeKey] : [],
+    [focusedChangeKey, validChangeKeys],
   );
   const totalChangedFiles = allChanges.length;
   const title = workspaceName?.trim() || "Code Workspace";
@@ -406,27 +409,31 @@ export function WorkspaceGitManager({
     }
   }, [refreshRepo, setStatusMessage]);
 
-  const stageAllChanges = useCallback(() => {
-    const targets = scopedRoots.filter((root) => (snapshots[root.repoRoot]?.snapshot?.changes.length ?? 0) > 0);
-    void runChangeAction("Stage all", targets, async (_root, snapshot) => {
-      const paths = snapshot.changes.map((change) => change.path);
+  const stageVisibleChanges = useCallback((pathsByRepo: Record<string, string[]>) => {
+    const targets = scopedRoots.filter((root) => (pathsByRepo[root.repoRoot]?.length ?? 0) > 0);
+    void runChangeAction("Stage visible changes", targets, async (root, snapshot) => {
+      const visiblePaths = new Set(pathsByRepo[root.repoRoot] ?? []);
+      const paths = snapshot.changes
+        .filter((change) => visiblePaths.has(change.path))
+        .map((change) => change.path);
       if (paths.length === 0) return "skipped";
       await gitStage(snapshot.repoRoot, paths);
       return "completed";
     });
-  }, [runChangeAction, scopedRoots, snapshots]);
+  }, [runChangeAction, scopedRoots]);
 
-  const unstageAllChanges = useCallback(() => {
-    const targets = scopedRoots.filter((root) => (
-      snapshots[root.repoRoot]?.snapshot?.changes.some((change) => change.staged) ?? false
-    ));
-    void runChangeAction("Unstage all", targets, async (_root, snapshot) => {
-      const paths = snapshot.changes.filter((change) => change.staged).map((change) => change.path);
+  const unstageVisibleChanges = useCallback((pathsByRepo: Record<string, string[]>) => {
+    const targets = scopedRoots.filter((root) => (pathsByRepo[root.repoRoot]?.length ?? 0) > 0);
+    void runChangeAction("Unstage visible changes", targets, async (root, snapshot) => {
+      const visiblePaths = new Set(pathsByRepo[root.repoRoot] ?? []);
+      const paths = snapshot.changes
+        .filter((change) => visiblePaths.has(change.path) && change.staged)
+        .map((change) => change.path);
       if (paths.length === 0) return "skipped";
       await gitUnstage(snapshot.repoRoot, paths);
       return "completed";
     });
-  }, [runChangeAction, scopedRoots, snapshots]);
+  }, [runChangeAction, scopedRoots]);
 
   const stagePathsInRepo = useCallback((repoRoot: string, paths: string[]) => {
     const root = normalizedRoots.find((entry) => entry.repoRoot === repoRoot);
@@ -446,8 +453,8 @@ export function WorkspaceGitManager({
     });
   }, [normalizedRoots, runChangeAction]);
 
-  const stageSelectedChanges = useCallback(() => {
-    const pathsByRepo = workspacePathsByRepoFromKeys(selectedOperationKeys);
+  const stageChangesByKeys = useCallback((keys: string[]) => {
+    const pathsByRepo = workspacePathsByRepoFromKeys(keys);
     const targets = normalizedRoots.filter((root) => (pathsByRepo[root.repoRoot]?.length ?? 0) > 0);
     void runChangeAction("Stage", targets, async (root) => {
       const paths = pathsByRepo[root.repoRoot] ?? [];
@@ -455,10 +462,10 @@ export function WorkspaceGitManager({
       await gitStage(root.repoRoot, paths);
       return "completed";
     });
-  }, [normalizedRoots, runChangeAction, selectedOperationKeys]);
+  }, [normalizedRoots, runChangeAction]);
 
-  const unstageSelectedChanges = useCallback(() => {
-    const pathsByRepo = workspacePathsByRepoFromKeys(selectedOperationKeys);
+  const unstageChangesByKeys = useCallback((keys: string[]) => {
+    const pathsByRepo = workspacePathsByRepoFromKeys(keys);
     const targets = normalizedRoots.filter((root) => (pathsByRepo[root.repoRoot]?.length ?? 0) > 0);
     void runChangeAction("Unstage", targets, async (root) => {
       const paths = pathsByRepo[root.repoRoot] ?? [];
@@ -466,17 +473,38 @@ export function WorkspaceGitManager({
       await gitUnstage(root.repoRoot, paths);
       return "completed";
     });
-  }, [normalizedRoots, runChangeAction, selectedOperationKeys]);
+  }, [normalizedRoots, runChangeAction]);
 
-  const discardSelectedChanges = useCallback(() => {
-    const pathsByRepo = workspacePathsByRepoFromKeys(selectedOperationKeys);
+  const stageSelectedChanges = useCallback(() => {
+    stageChangesByKeys(selectedOperationKeys);
+  }, [selectedOperationKeys, stageChangesByKeys]);
+
+  const unstageSelectedChanges = useCallback(() => {
+    unstageChangesByKeys(selectedOperationKeys);
+  }, [selectedOperationKeys, unstageChangesByKeys]);
+
+  const stageFocusedChange = useCallback(() => {
+    stageChangesByKeys(focusedOperationKeys);
+  }, [focusedOperationKeys, stageChangesByKeys]);
+
+  const unstageFocusedChange = useCallback(() => {
+    unstageChangesByKeys(focusedOperationKeys);
+  }, [focusedOperationKeys, unstageChangesByKeys]);
+
+  const discardChangesByKeys = useCallback((keys: string[]) => {
+    const entries = keys
+      .map((key) => allChanges.find((entry) => entry.key === key))
+      .filter((entry): entry is (typeof allChanges)[number] => !!entry);
+    const pathsByRepo = workspacePathsByRepoFromKeys(keys);
     const targets = normalizedRoots.filter((root) => (pathsByRepo[root.repoRoot]?.length ?? 0) > 0);
     const count = Object.values(pathsByRepo).reduce((total, paths) => total + paths.length, 0);
     if (count === 0) return;
     void (async () => {
+      const untrackedCount = entries.filter((entry) => entry.change.status === "untracked").length;
+      const message = discardConfirmMessage(entries, count, untrackedCount);
       const confirmed = await confirmAppDialog({
         title: "Discard changes",
-        message: `Discard changes in ${count} file(s)? This cannot be undone.`,
+        message,
         confirmLabel: "Discard",
         danger: true,
       });
@@ -496,7 +524,15 @@ export function WorkspaceGitManager({
         return "completed";
       });
     })();
-  }, [normalizedRoots, runChangeAction, selectedOperationKeys]);
+  }, [allChanges, normalizedRoots, runChangeAction]);
+
+  const discardSelectedChanges = useCallback(() => {
+    discardChangesByKeys(selectedOperationKeys);
+  }, [discardChangesByKeys, selectedOperationKeys]);
+
+  const discardFocusedChange = useCallback(() => {
+    discardChangesByKeys(focusedOperationKeys);
+  }, [discardChangesByKeys, focusedOperationKeys]);
 
   const commitWorkspaceChanges = useCallback((push: boolean) => {
     const message = commitMessage.trim();
@@ -694,52 +730,6 @@ export function WorkspaceGitManager({
     })();
   }, [operationRoots.length, runBatch]);
 
-  const setRepoCommitMessage = useCallback((repoRoot: string, message: string) => {
-    setRepoCommitMessages((current) => ({ ...current, [repoRoot]: message }));
-  }, []);
-
-  const commitRepoChanges = useCallback((repoRoot: string, push: boolean) => {
-    const message = (repoCommitMessages[repoRoot] ?? "").trim();
-    const root = normalizedRoots.find((entry) => entry.repoRoot === repoRoot);
-    if (!message || !root) return;
-    if ((checkedChangePathsByRepo[repoRoot]?.length ?? 0) === 0) return;
-    void (async () => {
-      const decision = await confirmCommitOperation({
-        message,
-        push,
-        targets: [root],
-        checkedChangePathsByRepo,
-        snapshots,
-      });
-      if (!decision) return;
-      await runChangeAction(decision === "commit-and-push" ? "Commit and Push" : "Commit", [root], async (_r, snapshot) => {
-        const selectedPaths = new Set(checkedChangePathsByRepo[snapshot.repoRoot] ?? []);
-        const paths = snapshot.changes
-          .filter((change) => selectedPaths.has(change.path))
-          .map((change) => change.path);
-        if (paths.length === 0) return "skipped";
-        await gitCommit(snapshot.repoRoot, message, false, paths);
-        if (decision === "commit-and-push") {
-          const remote = selectedRemote(snapshot);
-          if (remote && snapshot.currentBranch) {
-            await gitPush(snapshot.repoRoot, remote.name, snapshot.currentBranch, !snapshot.upstream);
-          }
-        }
-        return "completed";
-      });
-      setRepoCommitMessages((current) => ({ ...current, [repoRoot]: "" }));
-    })();
-  }, [checkedChangePathsByRepo, normalizedRoots, repoCommitMessages, runChangeAction, snapshots]);
-
-  const pushableRepoRoots = useMemo(() => {
-    const set = new Set<string>();
-    for (const root of normalizedRoots) {
-      const snapshot = snapshots[root.repoRoot]?.snapshot;
-      if (snapshot?.currentBranch && selectedRemote(snapshot)) set.add(root.repoRoot);
-    }
-    return set;
-  }, [normalizedRoots, snapshots]);
-
   const aggregate = useMemo(() => {
     let ahead = 0;
     let behind = 0;
@@ -927,7 +917,6 @@ export function WorkspaceGitManager({
                 checkedCount={checkedChangeKeys.size}
                 checkedRepoCount={checkedRepoCount}
                 selectedKeys={selectedChangeKeys}
-                selectedCount={selectedOperationKeys.length}
                 focusedKey={focusedChangeKey}
                 pair={pair}
                 pairLoading={pairLoading}
@@ -935,24 +924,18 @@ export function WorkspaceGitManager({
                 setCommitMessage={setCommitMessage}
                 canCommitAndPush={canPushCheckedChanges}
                 scopeSummary={scopeSummary}
-                stageAll={stageAllChanges}
-                unstageAll={unstageAllChanges}
+                stageVisible={stageVisibleChanges}
+                unstageVisible={unstageVisibleChanges}
                 stagePaths={stagePathsInRepo}
                 unstagePaths={unstagePathsInRepo}
-                stageSelected={stageSelectedChanges}
-                unstageSelected={unstageSelectedChanges}
-                discardSelected={discardSelectedChanges}
+                stageSelected={stageFocusedChange}
+                unstageSelected={unstageFocusedChange}
+                discardSelected={discardFocusedChange}
                 commit={() => commitWorkspaceChanges(false)}
                 commitAndPush={() => commitWorkspaceChanges(true)}
                 onToggleChecked={toggleChangeChecked}
                 onSelect={selectWorkspaceChange}
                 onContextMenu={openWorkspaceChangeMenu}
-                repoCommitMessages={repoCommitMessages}
-                setRepoCommitMessage={setRepoCommitMessage}
-                commitRepo={(repoRoot) => commitRepoChanges(repoRoot, false)}
-                commitRepoAndPush={(repoRoot) => commitRepoChanges(repoRoot, true)}
-                checkedChangePathsByRepo={checkedChangePathsByRepo}
-                pushableRepoRoots={pushableRepoRoots}
               />
             )}
           />
@@ -1773,6 +1756,27 @@ function pullBranchForRemote(snapshot: GitSnapshot, remoteName: string): string 
     return snapshot.upstream.slice(prefix.length) || snapshot.currentBranch;
   }
   return snapshot.currentBranch;
+}
+
+function discardConfirmMessage(
+  entries: Array<{
+    repoName: string;
+    change: { path: string; status: string };
+  }>,
+  count: number,
+  untrackedCount: number,
+): string {
+  if (count === 1) {
+    const entry = entries[0];
+    if (entry?.change.status === "untracked") {
+      return `Delete untracked file ${entry.repoName}: ${entry.change.path}? This cannot be undone.`;
+    }
+    if (entry) return `Discard changes in ${entry.repoName}: ${entry.change.path}? This cannot be undone.`;
+  }
+  if (untrackedCount > 0) {
+    return `Discard changes in ${count} file(s)? ${untrackedCount} untracked file(s) will be deleted. This cannot be undone.`;
+  }
+  return `Discard changes in ${count} file(s)? This cannot be undone.`;
 }
 
 type CommitDecision = "commit" | "commit-and-push";
