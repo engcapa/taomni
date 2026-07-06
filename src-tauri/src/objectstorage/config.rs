@@ -63,6 +63,7 @@ pub struct S3Endpoint {
     pub url: Url,
     pub style: UrlStyle,
     pub region: String,
+    pub default_bucket: Option<String>,
 }
 
 impl ObjectStorageConfig {
@@ -83,7 +84,7 @@ impl ObjectStorageConfig {
                 return Err(format!(
                     "endpoint is required for provider '{}'",
                     self.provider
-                ))
+                ));
             }
         };
         let endpoint = if endpoint.contains("://") {
@@ -91,7 +92,8 @@ impl ObjectStorageConfig {
         } else {
             format!("https://{endpoint}")
         };
-        let url = Url::parse(&endpoint).map_err(|e| format!("invalid endpoint url: {e}"))?;
+        let mut url = Url::parse(&endpoint).map_err(|e| format!("invalid endpoint url: {e}"))?;
+        let inferred_bucket = normalize_bucket_endpoint(self.provider.as_str(), &mut url);
 
         // Path-style by explicit override, else by provider default. MinIO,
         // Ceph and "custom" default to path-style; everything else uses
@@ -103,17 +105,59 @@ impl ObjectStorageConfig {
             .as_ref()
             .map(|n| n.uses_jump_host())
             .unwrap_or(false);
-        let path_style = self.path_style.unwrap_or_else(|| {
-            matches!(self.provider.as_str(), "minio" | "ceph" | "custom")
-        }) || jump;
+        let path_style = self
+            .path_style
+            .unwrap_or_else(|| matches!(self.provider.as_str(), "minio" | "ceph" | "custom"))
+            || jump;
         let style = if path_style {
             UrlStyle::Path
         } else {
             UrlStyle::VirtualHost
         };
 
-        Ok(S3Endpoint { url, style, region })
+        let default_bucket = self
+            .default_bucket
+            .as_deref()
+            .map(str::trim)
+            .filter(|b| !b.is_empty())
+            .map(ToOwned::to_owned)
+            .or(inferred_bucket);
+
+        Ok(S3Endpoint {
+            url,
+            style,
+            region,
+            default_bucket,
+        })
     }
+}
+
+fn normalize_bucket_endpoint(provider: &str, url: &mut Url) -> Option<String> {
+    let host = url.host_str()?.to_ascii_lowercase();
+    let markers: &[&str] = match provider {
+        "tencent-cos" => &[".cos."],
+        "alibaba-oss" => &[".oss-", ".oss."],
+        _ => return None,
+    };
+
+    for marker in markers {
+        if let Some(idx) = host.find(marker) {
+            if idx == 0 {
+                continue;
+            }
+            let bucket = host[..idx].to_string();
+            let service_host = &host[idx + 1..];
+            if url.set_host(Some(service_host)).is_err() {
+                return None;
+            }
+            url.set_path("/");
+            url.set_query(None);
+            url.set_fragment(None);
+            return Some(bucket);
+        }
+    }
+
+    None
 }
 
 #[cfg(test)]
@@ -155,11 +199,58 @@ mod tests {
 
     #[test]
     fn bare_host_endpoint_gets_https_scheme() {
-        let e = cfg("alibaba-oss", Some("oss-cn-hangzhou.aliyuncs.com"), Some("oss-cn-hangzhou"))
-            .resolve_s3_endpoint()
-            .unwrap();
+        let e = cfg(
+            "alibaba-oss",
+            Some("oss-cn-hangzhou.aliyuncs.com"),
+            Some("oss-cn-hangzhou"),
+        )
+        .resolve_s3_endpoint()
+        .unwrap();
         assert_eq!(e.url.scheme(), "https");
         assert!(matches!(e.style, UrlStyle::VirtualHost));
+    }
+
+    #[test]
+    fn tencent_cos_bucket_endpoint_infers_default_bucket() {
+        let e = cfg(
+            "tencent-cos",
+            Some("https://photos-1234567890.cos.ap-beijing.myqcloud.com"),
+            Some("ap-beijing"),
+        )
+        .resolve_s3_endpoint()
+        .unwrap();
+
+        assert_eq!(e.url.as_str(), "https://cos.ap-beijing.myqcloud.com/");
+        assert_eq!(e.default_bucket.as_deref(), Some("photos-1234567890"));
+    }
+
+    #[test]
+    fn alibaba_oss_bucket_endpoint_infers_default_bucket() {
+        let e = cfg(
+            "alibaba-oss",
+            Some("archive.oss-cn-hangzhou.aliyuncs.com"),
+            Some("oss-cn-hangzhou"),
+        )
+        .resolve_s3_endpoint()
+        .unwrap();
+
+        assert_eq!(e.url.as_str(), "https://oss-cn-hangzhou.aliyuncs.com/");
+        assert_eq!(e.default_bucket.as_deref(), Some("archive"));
+    }
+
+    #[test]
+    fn explicit_default_bucket_wins_over_bucket_endpoint() {
+        let c = ObjectStorageConfig {
+            provider: "tencent-cos".into(),
+            endpoint: Some("https://endpoint-bucket.cos.ap-beijing.myqcloud.com".into()),
+            region: Some("ap-beijing".into()),
+            default_bucket: Some("configured-bucket".into()),
+            ..Default::default()
+        };
+        let e = c.resolve_s3_endpoint().unwrap();
+
+        assert_eq!(e.url.as_str(), "https://cos.ap-beijing.myqcloud.com/");
+        assert_eq!(e.default_bucket.as_deref(), Some("configured-bucket"));
     }
 
     #[test]

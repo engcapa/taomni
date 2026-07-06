@@ -7,6 +7,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { withVaultLockedNotice, type SessionConfig } from "./ipc";
 import { parseSessionOptions } from "./terminalProfile";
 import { normalizeNetworkSettings, toNetworkSettingsPayload } from "./networkSettings";
+import { normalizeObjectStorageConfig } from "../types/objectStorage";
 import type {
   BucketEntry,
   ObjectListPage,
@@ -44,7 +45,7 @@ export function sessionToObjectStorageConfig(session: SessionConfig): ObjectStor
   const ns = normalizeNetworkSettings(o.networkSettings);
   const network =
     ns.proxyKind && ns.proxyKind !== "none" ? toNetworkSettingsPayload(ns) : null;
-  return {
+  return normalizeObjectStorageConfig({
     provider,
     endpoint: str("endpoint"),
     region: str("region"),
@@ -65,7 +66,7 @@ export function sessionToObjectStorageConfig(session: SessionConfig): ObjectStor
     azureBearerToken: str("azureBearerToken"),
     network,
     storageClass: str("storageClass"),
-  };
+  });
 }
 
 /** True if any object-storage secret in the session is a locked `vault:` ref. */
@@ -79,7 +80,7 @@ export async function storageAttach(
   config: ObjectStorageConfig,
 ): Promise<void> {
   return withVaultLockedNotice(() =>
-    invoke("storage_attach", { sessionId, config }),
+    invoke("storage_attach", { sessionId, config: normalizeObjectStorageConfig(config) }),
   );
 }
 
@@ -95,7 +96,7 @@ export async function storageTestConnection(
   config: ObjectStorageConfig,
 ): Promise<void> {
   return withVaultLockedNotice(() =>
-    invoke("storage_test_connection", { config }),
+    invoke("storage_test_connection", { config: normalizeObjectStorageConfig(config) }),
   );
 }
 

@@ -103,11 +103,12 @@ async fn build_session(
             let ep = config.resolve_s3_endpoint()?;
             let (http, forward_task) =
                 build_http_client(state, config.network.as_ref(), &ep.url).await?;
+            let default_location = ep.default_bucket.clone();
             let client = S3Client::new(http, creds, ep.url, ep.region, ep.style);
             Ok(ObjectStorageSession {
                 session_id,
                 handle: OssHandle::S3(client),
-                default_location: config.default_bucket.clone(),
+                default_location,
                 cancel: CancellationToken::new(),
                 forward_task,
                 default_storage_class: config.storage_class.clone(),

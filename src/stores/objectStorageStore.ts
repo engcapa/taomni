@@ -11,7 +11,12 @@ import {
   storageListBuckets,
   storageListObjects,
 } from "../lib/objectStorage";
-import type { ObjectEntry, ObjectStorageConfig, BucketEntry } from "../types/objectStorage";
+import {
+  normalizeObjectStorageConfig,
+  type ObjectEntry,
+  type ObjectStorageConfig,
+  type BucketEntry,
+} from "../types/objectStorage";
 import { WINDOWS_DRIVES_ROOT, type PaneSide, type PaneState } from "./sftpStore";
 
 // Remote path scheme: "/" is the bucket-list root; "/{bucket}/{prefix...}"
@@ -171,6 +176,7 @@ export const useObjectStorageStore = create<ObjStorageStoreState>((set, get) => 
   },
 
   attach: async (sessionId, config) => {
+    const effectiveConfig = normalizeObjectStorageConfig(config);
     refCounts.set(sessionId, (refCounts.get(sessionId) ?? 0) + 1);
     const pending = inFlight.get(sessionId);
     if (pending) {
@@ -189,14 +195,14 @@ export const useObjectStorageStore = create<ObjStorageStoreState>((set, get) => 
     set((state) => ({
       sessions: {
         ...state.sessions,
-        [sessionId]: { ...(state.sessions[sessionId] ?? freshSession(sessionId)), attaching: true, error: null, config },
+        [sessionId]: { ...(state.sessions[sessionId] ?? freshSession(sessionId)), attaching: true, error: null, config: effectiveConfig },
       },
     }));
 
     const attachPromise = (async () => {
       try {
-        await storageAttach(sessionId, config);
-        const home = config.defaultBucket || config.defaultContainer;
+        await storageAttach(sessionId, effectiveConfig);
+        const home = effectiveConfig.defaultBucket || effectiveConfig.defaultContainer;
         const remotePath = home ? `/${home}` : OBJ_ROOT;
         const localHome = await sftpLocalHome().catch(() => "");
         const remoteEntries = await listSide(sessionId, "remote", remotePath).catch(() => []);
@@ -211,7 +217,7 @@ export const useObjectStorageStore = create<ObjStorageStoreState>((set, get) => 
               attached: true,
               attaching: false,
               homeDir: remotePath,
-              config,
+              config: effectiveConfig,
               remote: { ...emptyPane(), path: remotePath, entries: remoteEntries, history: [remotePath], historyIndex: 0 },
               local: { ...emptyPane(), path: localHome, entries: localEntries, history: localHome ? [localHome] : [], historyIndex: localHome ? 0 : -1 },
             },

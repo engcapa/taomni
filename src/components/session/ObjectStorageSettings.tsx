@@ -3,6 +3,7 @@ import {
   PROVIDER_PRESETS,
   presetFor,
   engineForProvider,
+  normalizeObjectStorageConfig,
   type ObjectStorageConfig,
   type ObjectStorageProvider,
   type AwsAuthSource,
@@ -101,7 +102,7 @@ export function ossFormFromOptions(optionsJson: string | null | undefined): OssF
 /** Build the wire config from form state (secrets as-is — plaintext or refs). */
 export function ossFormToConfig(f: OssFormState): ObjectStorageConfig {
   const isAzure = engineForProvider(f.provider) === "azure";
-  return {
+  return normalizeObjectStorageConfig({
     provider: f.provider,
     endpoint: f.endpoint || null,
     region: f.region || null,
@@ -121,7 +122,7 @@ export function ossFormToConfig(f: OssFormState): ObjectStorageConfig {
     azureAuth: isAzure ? f.azureAuth : null,
     azureBearerToken: isAzure && f.azureAuth === "bearer" ? f.azureBearerToken || null : null,
     storageClass: f.storageClass || null,
-  };
+  });
 }
 
 // PLACEHOLDER_FORM_COMPONENT
@@ -320,4 +321,3 @@ export function ObjectStorageSettings({ value, onChange, saveInVault, setSaveInV
     </div>
   );
 }
-
