@@ -39,7 +39,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import type { DbColumn, DbQueryResult } from "../../lib/ipc";
+import type { DbColumn, DbQueryResult, DbResultSqlRewriteRequest } from "../../lib/ipc";
 import {
   readFileBytes,
   selectFilePath,
@@ -97,7 +97,7 @@ interface QueryResultGridProps {
   onCancel?: () => void;
   onCommitChanges?: (payload: QueryGridCommitPayload) => Promise<void>;
   onGeneratedSqlSync?: (sql: string, mode: QueryGeneratedSqlSyncMode) => void;
-  onGeneratedSqlQuery?: (sql: string) => void | Promise<void>;
+  onGeneratedSqlQuery?: (sql: string, request?: DbResultSqlRewriteRequest) => void | Promise<void>;
   onStatus?: (message: string) => void;
 }
 
@@ -764,6 +764,34 @@ function buildGeneratedResultSql({
   return `${lines.join("\n")};`;
 }
 
+function buildResultSqlRewriteRequest({
+  sourceSql,
+  sqlEngine,
+  columns,
+  visibleColumnIndexes,
+  globalFilterText,
+  columnFilters,
+  sortCol,
+  sortDir,
+}: GeneratedResultSqlOptions): DbResultSqlRewriteRequest | null {
+  const baseSql = stripSqlTerminator(sourceSql ?? "");
+  if (!baseSql || !sqlEngine) return null;
+  return {
+    engine: sqlEngine,
+    sourceSql: baseSql,
+    resultColumns: columns.map((column) => column.name),
+    visibleColumnIndexes,
+    globalFilterText,
+    filters: columnFilters.map((filter) => ({
+      columnIndex: filter.columnIndex,
+      text: filter.text,
+      mode: filter.mode,
+      selectedValues: filter.selectedValues,
+    })),
+    sort: sortCol !== null && sortDir ? { columnIndex: sortCol, dir: sortDir } : null,
+  };
+}
+
 function compactSqlForDisplay(sql: string): string {
   return sql.replace(/\s+/g, " ").trim();
 }
@@ -1288,9 +1316,9 @@ export function QueryResultGrid({
     setViewportH(e.currentTarget.clientHeight);
   }, []);
 
-  const activeColumnFilters = useMemo(
-    () =>
-      Object.entries(columnFilters)
+  const activeColumnFiltersFor = useCallback(
+    (filters: Record<number, ColumnFilterConfig>): ActiveColumnFilter[] =>
+      Object.entries(filters)
         .map(([rawIndex, config]) => ({
           columnIndex: Number(rawIndex),
           text: config.text.trim(),
@@ -1304,13 +1332,33 @@ export function QueryResultGrid({
             filter.columnIndex < result.columns.length &&
             (filter.text.length > 0 || filter.selectedValues.length > 0),
         ),
-    [columnFilters, result.columns.length],
+    [result.columns.length],
+  );
+
+  const activeColumnFilters = useMemo(
+    () => activeColumnFiltersFor(columnFilters),
+    [activeColumnFiltersFor, columnFilters],
   );
 
   const activeColumnFilterCount = activeColumnFilters.length;
   const generatedSql = useMemo(
     () =>
       buildGeneratedResultSql({
+        sourceSql: baseSql ?? sourceSql,
+        currentSql: sourceSql,
+        sqlEngine,
+        columns: result.columns,
+        visibleColumnIndexes,
+        globalFilterText: filterText,
+        columnFilters: activeColumnFilters,
+        sortCol,
+        sortDir,
+      }),
+    [activeColumnFilters, baseSql, filterText, result.columns, sortCol, sortDir, sourceSql, sqlEngine, visibleColumnIndexes],
+  );
+  const generatedSqlRewriteRequest = useMemo(
+    () =>
+      buildResultSqlRewriteRequest({
         sourceSql: baseSql ?? sourceSql,
         currentSql: sourceSql,
         sqlEngine,
@@ -1905,20 +1953,7 @@ export function QueryResultGrid({
   };
 
   const generatedSqlForFilters = (filters: Record<number, ColumnFilterConfig>): string | null => {
-    const activeFilters = Object.entries(filters)
-      .map(([rawIndex, config]) => ({
-        columnIndex: Number(rawIndex),
-        text: config.text.trim(),
-        mode: config.mode,
-        selectedValues: config.selectedValues,
-      }))
-      .filter(
-        (filter) =>
-          Number.isInteger(filter.columnIndex) &&
-          filter.columnIndex >= 0 &&
-          filter.columnIndex < result.columns.length &&
-          (filter.text.length > 0 || filter.selectedValues.length > 0),
-      );
+    const activeFilters = activeColumnFiltersFor(filters);
     return buildGeneratedResultSql({
       sourceSql: baseSql ?? sourceSql,
       currentSql: sourceSql,
@@ -1932,13 +1967,29 @@ export function QueryResultGrid({
     });
   };
 
-  const queryGeneratedSql = (sql = generatedSql) => {
+  const rewriteRequestForFilters = (filters: Record<number, ColumnFilterConfig>): DbResultSqlRewriteRequest | null =>
+    buildResultSqlRewriteRequest({
+      sourceSql: baseSql ?? sourceSql,
+      currentSql: sourceSql,
+      sqlEngine,
+      columns: result.columns,
+      visibleColumnIndexes,
+      globalFilterText: filterText,
+      columnFilters: activeColumnFiltersFor(filters),
+      sortCol,
+      sortDir,
+    });
+
+  const queryGeneratedSql = (
+    sql = generatedSql,
+    request: DbResultSqlRewriteRequest | null = generatedSqlRewriteRequest,
+  ) => {
     if (!sql) {
       setStatus("No local filter or sort changes to query.");
       return;
     }
     if (onGeneratedSqlQuery) {
-      void Promise.resolve(onGeneratedSqlQuery(sql)).catch((err) => {
+      void Promise.resolve(onGeneratedSqlQuery(sql, request ?? undefined)).catch((err) => {
         setStatus(`Query generated SQL failed: ${String(err)}`);
       });
       return;
@@ -2105,7 +2156,8 @@ export function QueryResultGrid({
     else delete nextFilters[openFilterColumnIndex];
     setColumnFilters(nextFilters);
     setOpenColumnFilter(null);
-    queryGeneratedSql(generatedSqlForFilters(nextFilters));
+    const sql = generatedSqlForFilters(nextFilters);
+    queryGeneratedSql(sql, sql ? rewriteRequestForFilters(nextFilters) : null);
   };
 
   const stats = useMemo(() => {

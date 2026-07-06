@@ -43,6 +43,7 @@ import {
   dbDeleteHistory,
   dbDescribeTable,
   dbListHistory,
+  dbRewriteResultSql,
   readFileBytes,
   selectSaveFilePath,
   temporaryFilePath,
@@ -52,6 +53,7 @@ import {
   writeStreamOpen,
   type DbColumnDescription,
   type DbQueryResult,
+  type DbResultSqlRewriteRequest,
   type DbSqlHistoryEntry,
 } from "../../lib/ipc";
 import { SchemaTree, type SchemaTreeSelectedObject } from "./SchemaTree";
@@ -1884,16 +1886,39 @@ export default function DbClientTab({
     return true;
   };
 
-  const queryGeneratedSqlFromSheet = async (resultPanelId: string, sheetId: string, generatedSql: string) => {
-    const replaced = replaceGeneratedSqlSource(resultPanelId, sheetId, generatedSql, {
+  const queryGeneratedSqlFromSheet = async (
+    resultPanelId: string,
+    sheetId: string,
+    generatedSql: string,
+    rewriteRequest?: DbResultSqlRewriteRequest,
+  ) => {
+    let sql = generatedSql;
+    let rewriteMode: "inline" | "derived" | null = null;
+    let rewriteReason: string | null = null;
+    if (rewriteRequest) {
+      try {
+        const rewritten = await dbRewriteResultSql(rewriteRequest);
+        sql = rewritten.sql;
+        rewriteMode = rewritten.mode;
+        rewriteReason = rewritten.reason;
+      } catch (err) {
+        setStatusMessage(`SQL rewrite failed; using legacy generated SQL. ${String(err)}`);
+      }
+    }
+
+    const replaced = replaceGeneratedSqlSource(resultPanelId, sheetId, sql, {
       activate: false,
       focus: false,
       status: null,
       updateSheetSql: true,
     });
     if (!replaced) return;
-    setStatusMessage("Applied result filters to SQL; refreshing result.");
-    await refreshSheet(resultPanelId, sheetId, "clearView", generatedSql);
+    setStatusMessage(
+      rewriteMode === "derived" && rewriteReason
+        ? `Applied result filters as derived SQL (${rewriteReason}); refreshing result.`
+        : "Applied result filters to SQL; refreshing result.",
+    );
+    await refreshSheet(resultPanelId, sheetId, "clearView", sql);
   };
 
   const syncGeneratedSqlFromSheet = (
@@ -2470,8 +2495,8 @@ export default function DbClientTab({
                     onGeneratedSqlSync={(sheetId, sql, mode) =>
                       syncGeneratedSqlFromSheet(activePanel.id, sheetId, sql, mode)
                     }
-                    onGeneratedSqlQuery={(sheetId, sql) =>
-                      queryGeneratedSqlFromSheet(activePanel.id, sheetId, sql)
+                    onGeneratedSqlQuery={(sheetId, sql, rewriteRequest) =>
+                      queryGeneratedSqlFromSheet(activePanel.id, sheetId, sql, rewriteRequest)
                     }
                     onCancel={() => cancelQuery(activePanel.id)}
                     onStatus={setStatusMessage}
@@ -2810,7 +2835,11 @@ function ResultArea({
   onRefreshSheet: (sheetId: string, mode: QueryRefreshMode) => void;
   onCommitGridChanges: (sheetId: string, payload: QueryGridCommitPayload) => Promise<void>;
   onGeneratedSqlSync: (sheetId: string, sql: string, mode: QueryGeneratedSqlSyncMode) => void;
-  onGeneratedSqlQuery: (sheetId: string, sql: string) => void | Promise<void>;
+  onGeneratedSqlQuery: (
+    sheetId: string,
+    sql: string,
+    rewriteRequest?: DbResultSqlRewriteRequest,
+  ) => void | Promise<void>;
   onCancel: () => void;
   onStatus: (message: string) => void;
 }) {
@@ -2929,7 +2958,7 @@ function ResultArea({
                 onCancel={onCancel}
                 onCommitChanges={(payload) => onCommitGridChanges(sheet.id, payload)}
                 onGeneratedSqlSync={(sql, mode) => onGeneratedSqlSync(sheet.id, sql, mode)}
-                onGeneratedSqlQuery={(sql) => onGeneratedSqlQuery(sheet.id, sql)}
+                onGeneratedSqlQuery={(sql, rewriteRequest) => onGeneratedSqlQuery(sheet.id, sql, rewriteRequest)}
                 onStatus={onStatus}
               />
             </div>

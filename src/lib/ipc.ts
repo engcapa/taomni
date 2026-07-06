@@ -1050,6 +1050,35 @@ export interface DbQueryResult {
   warnings: string[];
 }
 
+export interface DbResultSqlFilter {
+  columnIndex: number;
+  text: string;
+  mode: "fuzzy" | "exact";
+  selectedValues: (string | null)[];
+}
+
+export interface DbResultSqlSort {
+  columnIndex: number;
+  dir: "asc" | "desc";
+}
+
+export interface DbResultSqlRewriteRequest {
+  engine: string;
+  sourceSql: string;
+  resultColumns: string[];
+  visibleColumnIndexes: number[];
+  globalFilterText: string;
+  filters: DbResultSqlFilter[];
+  sort: DbResultSqlSort | null;
+}
+
+export interface DbResultSqlRewriteResponse {
+  sql: string;
+  mode: "inline" | "derived";
+  reason: string | null;
+  warnings: string[];
+}
+
 export type DbQueryStreamEvent =
   | { kind: "columns"; columns: DbColumn[] }
   | { kind: "rows"; rows: (string | null)[][] }
@@ -1144,6 +1173,12 @@ export async function dbTableStats(
 
 export async function dbExecute(sessionId: string, sql: string): Promise<DbQueryResult> {
   return invoke<DbQueryResult>("db_execute", { sessionId, sql });
+}
+
+export async function dbRewriteResultSql(
+  request: DbResultSqlRewriteRequest,
+): Promise<DbResultSqlRewriteResponse> {
+  return invoke<DbResultSqlRewriteResponse>("db_rewrite_result_sql", { request });
 }
 
 export async function dbExecuteStream(

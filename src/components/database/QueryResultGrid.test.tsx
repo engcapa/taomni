@@ -167,6 +167,15 @@ describe("QueryResultGrid", () => {
 
     expect(onGeneratedSqlQuery).toHaveBeenCalledWith(
       "select * from users\nORDER BY `status` DESC\nlimit 100;",
+      {
+        engine: "MySQL",
+        sourceSql: "select * from users limit 100",
+        resultColumns: ["id", "name", "status"],
+        visibleColumnIndexes: [0, 1, 2],
+        globalFilterText: "",
+        filters: [],
+        sort: { columnIndex: 2, dir: "desc" },
+      },
     );
   });
 
