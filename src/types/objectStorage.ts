@@ -137,3 +137,71 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
 export function presetFor(provider: ObjectStorageProvider): ProviderPreset {
   return PROVIDER_PRESETS.find((p) => p.id === provider) ?? PROVIDER_PRESETS[0];
 }
+
+interface BucketEndpointParts {
+  bucket: string;
+  endpoint: string;
+}
+
+function s3BucketEndpointMarkers(provider: ObjectStorageProvider): string[] {
+  switch (provider) {
+    case "tencent-cos":
+      return [".cos."];
+    case "alibaba-oss":
+      return [".oss-", ".oss."];
+    default:
+      return [];
+  }
+}
+
+function parseEndpointUrl(endpoint: string): URL | null {
+  try {
+    return new URL(endpoint.includes("://") ? endpoint : `https://${endpoint}`);
+  } catch {
+    return null;
+  }
+}
+
+function splitBucketEndpoint(provider: ObjectStorageProvider, endpoint: string): BucketEndpointParts | null {
+  const markers = s3BucketEndpointMarkers(provider);
+  if (!markers.length) return null;
+
+  const url = parseEndpointUrl(endpoint);
+  if (!url) return null;
+  const host = url.hostname.toLowerCase();
+
+  for (const marker of markers) {
+    const idx = host.indexOf(marker);
+    if (idx <= 0) continue;
+    const bucket = host.slice(0, idx);
+    const serviceHost = host.slice(idx + 1);
+    url.hostname = serviceHost;
+    url.pathname = "/";
+    url.search = "";
+    url.hash = "";
+    return { bucket, endpoint: url.toString() };
+  }
+
+  return null;
+}
+
+function nonEmpty(value: string | null | undefined): string | null {
+  const trimmed = value?.trim() ?? "";
+  return trimmed ? trimmed : null;
+}
+
+export function normalizeObjectStorageConfig(config: ObjectStorageConfig): ObjectStorageConfig {
+  if (engineForProvider(config.provider) !== "s3") return config;
+
+  const endpoint = nonEmpty(config.endpoint);
+  if (!endpoint) return config;
+
+  const parts = splitBucketEndpoint(config.provider, endpoint);
+  if (!parts) return config;
+
+  return {
+    ...config,
+    endpoint: parts.endpoint,
+    defaultBucket: nonEmpty(config.defaultBucket) ?? parts.bucket,
+  };
+}
