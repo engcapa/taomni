@@ -80,7 +80,8 @@ export function ThemePreviewSelect({
       {open && (
         <div
           data-testid={testId ? `${testId}-menu` : undefined}
-          className={`absolute left-0 right-0 z-50 mt-1 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] shadow-lg max-h-[320px] overflow-auto p-1 ${menuClassName}`}
+          className={`absolute left-0 right-0 z-50 mt-1 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] text-[var(--taomni-text)] shadow-lg max-h-[320px] overflow-auto p-1 ${menuClassName}`}
+          style={{ colorScheme: "var(--taomni-color-scheme, light)" }}
         >
           <ThemePreviewList
             value={value}
