@@ -1556,7 +1556,7 @@ export default function DbClientTab({
 
   const formatPanel = (panel: PanelState) => {
     const handle = editorHandles.current[panel.id];
-    const formatted = formatSql(handle?.getValue() ?? panel.doc);
+    const formatted = formatSql(handle?.getValue() ?? panel.doc, info.engine);
     if (handle) {
       handle.setValue(formatted);
     } else {

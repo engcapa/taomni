@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 use sqlparser::ast::{Expr, GroupByExpr, Query, Select, SelectItem, SetExpr, Statement};
@@ -243,17 +243,39 @@ fn projection_mappings(
     request: &ResultSqlRewriteRequest,
     engine: ResultSqlEngine,
 ) -> Result<Vec<ProjectionMapping>, String> {
-    if select.projection.len() == 1
-        && matches!(
-            select.projection.first(),
-            Some(SelectItem::Wildcard(_)) | Some(SelectItem::QualifiedWildcard(_, _))
-        )
-    {
-        return Ok(request
-            .result_columns
-            .iter()
-            .map(|column| ProjectionMapping::Source(engine.quote_ident(column)))
-            .collect());
+    if select.projection.len() == 1 {
+        if let Some(SelectItem::Wildcard(_)) = select.projection.first() {
+            if select.from.len() != 1
+                || select
+                    .from
+                    .first()
+                    .is_some_and(|table| !table.joins.is_empty())
+            {
+                return Err("unqualified wildcard projection with multiple tables is not inline-rewritable in v1".to_string());
+            }
+            ensure_unique_result_columns(&request.result_columns)?;
+            return Ok(request
+                .result_columns
+                .iter()
+                .map(|column| ProjectionMapping::Source(engine.quote_ident(column)))
+                .collect());
+        }
+
+        if let Some(SelectItem::QualifiedWildcard(prefix, _)) = select.projection.first() {
+            ensure_unique_result_columns(&request.result_columns)?;
+            let qualifier = prefix.to_string();
+            let qualifier = qualifier
+                .strip_suffix(".*")
+                .unwrap_or(&qualifier)
+                .to_string();
+            return Ok(request
+                .result_columns
+                .iter()
+                .map(|column| {
+                    ProjectionMapping::Source(format!("{qualifier}.{}", engine.quote_ident(column)))
+                })
+                .collect());
+        }
     }
 
     if select.projection.iter().any(|item| {
@@ -287,6 +309,19 @@ fn projection_mappings(
             }
         })
         .collect()
+}
+
+fn ensure_unique_result_columns(columns: &[String]) -> Result<(), String> {
+    let mut seen = HashSet::new();
+    if columns
+        .iter()
+        .any(|column| !seen.insert(column.to_ascii_lowercase()))
+    {
+        return Err(
+            "duplicate wildcard result columns are not inline-rewritable in v1".to_string(),
+        );
+    }
+    Ok(())
 }
 
 fn simple_source_expr(expr: &Expr) -> Option<String> {
@@ -890,6 +925,95 @@ mod tests {
         assert_eq!(
             res.sql,
             "SELECT * FROM users WHERE deleted = 0\nORDER BY `status` DESC\nLIMIT 1000;"
+        );
+    }
+
+    #[test]
+    fn derives_unqualified_wildcard_join() {
+        let mut req = ResultSqlRewriteRequest {
+            engine: "MySQL".to_string(),
+            source_sql: "SELECT * FROM users u JOIN orders o ON u.id = o.user_id LIMIT 1000"
+                .to_string(),
+            result_columns: vec!["id".to_string(), "id".to_string(), "status".to_string()],
+            visible_column_indexes: vec![0, 1, 2],
+            global_filter_text: String::new(),
+            filters: vec![ResultSqlFilter {
+                column_index: 0,
+                text: String::new(),
+                mode: ResultSqlFilterMode::Exact,
+                selected_values: vec![Some("7".to_string())],
+            }],
+            sort: None,
+        };
+        req.sort = Some(ResultSqlSort {
+            column_index: 2,
+            dir: ResultSqlSortDir::Asc,
+        });
+
+        let res = rewrite_result_sql(req);
+
+        assert_eq!(res.mode, ResultSqlRewriteMode::Derived);
+        assert_eq!(
+            res.reason,
+            Some(
+                "unqualified wildcard projection with multiple tables is not inline-rewritable in v1"
+                    .to_string()
+            )
+        );
+        assert!(
+            res.sql
+                .contains("FROM (\n  SELECT * FROM users u JOIN orders o")
+        );
+        assert!(res.sql.contains("WHERE `id` = '7'"));
+        assert!(res.sql.contains("ORDER BY `status` ASC"));
+    }
+
+    #[test]
+    fn inlines_qualified_wildcard_join() {
+        let req = ResultSqlRewriteRequest {
+            engine: "MySQL".to_string(),
+            source_sql: "SELECT u.* FROM users u JOIN orders o ON u.id = o.user_id LIMIT 1000"
+                .to_string(),
+            result_columns: vec!["id".to_string(), "name".to_string()],
+            visible_column_indexes: vec![0, 1],
+            global_filter_text: String::new(),
+            filters: vec![ResultSqlFilter {
+                column_index: 0,
+                text: String::new(),
+                mode: ResultSqlFilterMode::Exact,
+                selected_values: vec![Some("7".to_string())],
+            }],
+            sort: Some(ResultSqlSort {
+                column_index: 1,
+                dir: ResultSqlSortDir::Desc,
+            }),
+        };
+
+        let res = rewrite_result_sql(req);
+
+        assert_eq!(res.mode, ResultSqlRewriteMode::Inline);
+        assert!(res.sql.contains("WHERE u.`id` = '7'"));
+        assert!(res.sql.contains("ORDER BY u.`name` DESC"));
+        assert!(!res.sql.contains("FROM (\n"));
+    }
+
+    #[test]
+    fn derives_duplicate_wildcard_result_columns() {
+        let mut req = request("SELECT * FROM users LIMIT 1000");
+        req.result_columns = vec!["id".to_string(), "id".to_string(), "status".to_string()];
+        req.filters.push(ResultSqlFilter {
+            column_index: 0,
+            text: String::new(),
+            mode: ResultSqlFilterMode::Exact,
+            selected_values: vec![Some("7".to_string())],
+        });
+
+        let res = rewrite_result_sql(req);
+
+        assert_eq!(res.mode, ResultSqlRewriteMode::Derived);
+        assert_eq!(
+            res.reason,
+            Some("duplicate wildcard result columns are not inline-rewritable in v1".to_string())
         );
     }
 

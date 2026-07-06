@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import type { DbColumn, DbQueryResult, DbResultSqlRewriteRequest } from "../../lib/ipc";
 import {
+  dbRewriteResultSql,
   readFileBytes,
   selectFilePath,
   selectSaveFilePath,
@@ -99,6 +100,14 @@ interface QueryResultGridProps {
   onGeneratedSqlSync?: (sql: string, mode: QueryGeneratedSqlSyncMode) => void;
   onGeneratedSqlQuery?: (sql: string, request?: DbResultSqlRewriteRequest) => void | Promise<void>;
   onStatus?: (message: string) => void;
+}
+
+interface ResolvedGeneratedSql {
+  key: string;
+  sql: string;
+  mode: "inline" | "derived" | null;
+  reason: string | null;
+  pending: boolean;
 }
 
 type SortDir = "asc" | "desc" | null;
@@ -792,6 +801,10 @@ function buildResultSqlRewriteRequest({
   };
 }
 
+function resultSqlRewriteKey(request: DbResultSqlRewriteRequest | null): string {
+  return request ? JSON.stringify(request) : "";
+}
+
 function compactSqlForDisplay(sql: string): string {
   return sql.replace(/\s+/g, " ").trim();
 }
@@ -1257,6 +1270,7 @@ export function QueryResultGrid({
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [cellValueViewer, setCellValueViewer] = useState<CellValueViewer | null>(null);
   const [localNotice, setLocalNotice] = useState("");
+  const [resolvedGeneratedSql, setResolvedGeneratedSql] = useState<ResolvedGeneratedSql | null>(null);
   const { show: openCellMenu, showAt: openMenuAt, render: menu } = useContextMenu();
 
   useEffect(() => {
@@ -1371,6 +1385,61 @@ export function QueryResultGrid({
       }),
     [activeColumnFilters, baseSql, filterText, result.columns, sortCol, sortDir, sourceSql, sqlEngine, visibleColumnIndexes],
   );
+  const generatedSqlRewriteKey = useMemo(
+    () => resultSqlRewriteKey(generatedSqlRewriteRequest),
+    [generatedSqlRewriteRequest],
+  );
+
+  useEffect(() => {
+    if (!generatedSql || !generatedSqlRewriteRequest || !generatedSqlRewriteKey) {
+      setResolvedGeneratedSql(null);
+      return;
+    }
+    let cancelled = false;
+    setResolvedGeneratedSql((current) =>
+      current?.key === generatedSqlRewriteKey
+        ? current
+        : {
+            key: generatedSqlRewriteKey,
+            sql: generatedSql,
+            mode: null,
+            reason: null,
+            pending: true,
+          },
+    );
+    void dbRewriteResultSql(generatedSqlRewriteRequest)
+      .then((rewritten) => {
+        if (cancelled) return;
+        setResolvedGeneratedSql({
+          key: generatedSqlRewriteKey,
+          sql: rewritten.sql,
+          mode: rewritten.mode,
+          reason: rewritten.reason,
+          pending: false,
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setResolvedGeneratedSql({
+          key: generatedSqlRewriteKey,
+          sql: generatedSql,
+          mode: null,
+          reason: null,
+          pending: false,
+        });
+        setLocalNotice(`SQL rewrite preview failed; using legacy generated SQL. ${String(err)}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [generatedSql, generatedSqlRewriteKey, generatedSqlRewriteRequest]);
+
+  const displayGeneratedSql =
+    generatedSql && resolvedGeneratedSql?.key === generatedSqlRewriteKey ? resolvedGeneratedSql.sql : generatedSql;
+  const displayGeneratedSqlTitle =
+    displayGeneratedSql && resolvedGeneratedSql?.key === generatedSqlRewriteKey && resolvedGeneratedSql.reason
+      ? `${displayGeneratedSql}\n\nRewrite fallback: ${resolvedGeneratedSql.reason}`
+      : displayGeneratedSql;
 
   const rowMatchesFilter = useCallback(
     (row: GridRow) => {
@@ -1942,10 +2011,44 @@ export function QueryResultGrid({
     }
   };
 
-  const copyGeneratedSql = async () => {
-    if (!generatedSql) return;
+  const resolveGeneratedSql = async (
+    sql: string | null = generatedSql,
+    request: DbResultSqlRewriteRequest | null = generatedSqlRewriteRequest,
+  ): Promise<string | null> => {
+    if (!sql) return null;
+    const key = resultSqlRewriteKey(request);
+    if (key && resolvedGeneratedSql?.key === key && !resolvedGeneratedSql.pending) {
+      return resolvedGeneratedSql.sql;
+    }
+    if (!request) return sql;
     try {
-      await writeText(generatedSql);
+      const rewritten = await dbRewriteResultSql(request);
+      setResolvedGeneratedSql({
+        key,
+        sql: rewritten.sql,
+        mode: rewritten.mode,
+        reason: rewritten.reason,
+        pending: false,
+      });
+      return rewritten.sql;
+    } catch (err) {
+      setResolvedGeneratedSql({
+        key,
+        sql,
+        mode: null,
+        reason: null,
+        pending: false,
+      });
+      setStatus(`SQL rewrite failed; using legacy generated SQL. ${String(err)}`);
+      return sql;
+    }
+  };
+
+  const copyGeneratedSql = async () => {
+    const sql = await resolveGeneratedSql();
+    if (!sql) return;
+    try {
+      await writeText(sql);
       setStatus("Copied generated SQL.");
     } catch (err) {
       setStatus(`Copy generated SQL failed: ${String(err)}`);
@@ -1994,13 +2097,18 @@ export function QueryResultGrid({
       });
       return;
     }
-    syncGeneratedSql("sync", sql);
+    void syncGeneratedSql("sync", sql, request);
   };
 
-  const syncGeneratedSql = (mode: QueryGeneratedSqlSyncMode, sql = generatedSql) => {
-    if (!sql) return;
+  const syncGeneratedSql = async (
+    mode: QueryGeneratedSqlSyncMode,
+    sql = generatedSql,
+    request: DbResultSqlRewriteRequest | null = generatedSqlRewriteRequest,
+  ) => {
+    const resolvedSql = await resolveGeneratedSql(sql, request);
+    if (!resolvedSql) return;
     if (onGeneratedSqlSync) {
-      onGeneratedSqlSync(sql, mode);
+      onGeneratedSqlSync(resolvedSql, mode);
       return;
     }
     const targetTab = getActiveQueryTab() ?? listQueryTabs().find((entry) => entry.engine === sqlEngine);
@@ -2008,7 +2116,7 @@ export function QueryResultGrid({
       setStatus("No SQL Commander editor is available.");
       return;
     }
-    targetTab.insertQuery(sql, { destination: "current", position: "last" });
+    targetTab.insertQuery(resolvedSql, { destination: "current", position: "last" });
     setStatus("Inserted generated SQL in SQL Commander.");
   };
 
@@ -2418,7 +2526,7 @@ export function QueryResultGrid({
         )}
       </div>
 
-      {generatedSql && (
+      {displayGeneratedSql && (
         <div
           data-testid="query-result-generated-sql-bar"
           className="min-h-7 shrink-0 flex items-center gap-1.5 px-2 py-1 text-[11px]"
@@ -2430,9 +2538,9 @@ export function QueryResultGrid({
             data-testid="query-result-generated-sql"
             className="min-w-0 flex-1 truncate rounded px-1.5 py-0.5 font-mono text-[10px]"
             style={{ background: "var(--taomni-quick-bg)", border: "1px solid var(--taomni-divider)" }}
-            title={generatedSql}
+            title={displayGeneratedSqlTitle ?? undefined}
           >
-            {compactSqlForDisplay(generatedSql)}
+            {compactSqlForDisplay(displayGeneratedSql)}
           </code>
           <button
             type="button"
@@ -2464,7 +2572,7 @@ export function QueryResultGrid({
             className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
             title="Sync generated SQL to a query editor"
             aria-label="Sync generated SQL"
-            onClick={() => syncGeneratedSql("sync")}
+            onClick={() => void syncGeneratedSql("sync")}
           >
             <RefreshCw className="w-3.5 h-3.5" />
             Sync

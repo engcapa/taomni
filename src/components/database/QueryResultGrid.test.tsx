@@ -1,10 +1,52 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryResultGrid } from "./QueryResultGrid";
 import type { DbQueryResult } from "../../lib/ipc";
 import { writeText } from "../../lib/clipboard";
 
 vi.mock("../../lib/ipc", () => ({
+  dbRewriteResultSql: vi.fn(async (request: {
+    sourceSql: string;
+    resultColumns: string[];
+    filters: Array<{
+      columnIndex: number;
+      text: string;
+      mode: "fuzzy" | "exact";
+      selectedValues: (string | null)[];
+    }>;
+    sort: null | { columnIndex: number; dir: "asc" | "desc" };
+  }) => {
+    const quoteColumn = (index: number) => `\`${request.resultColumns[index]}\``;
+    const clauses = request.filters.flatMap((filter) => {
+      if (filter.selectedValues.length > 0) {
+        return filter.selectedValues.map((value) =>
+          value === null ? `${quoteColumn(filter.columnIndex)} IS NULL` : `${quoteColumn(filter.columnIndex)} = '${value}'`,
+        );
+      }
+      if (!filter.text) return [];
+      return filter.mode === "exact"
+        ? [`${quoteColumn(filter.columnIndex)} = '${filter.text}'`]
+        : [`CAST(${quoteColumn(filter.columnIndex)} AS CHAR) LIKE '%${filter.text}%' ESCAPE '!'`];
+    });
+    const orderBy = request.sort
+      ? `ORDER BY ${quoteColumn(request.sort.columnIndex)} ${request.sort.dir.toUpperCase()}`
+      : "";
+    let sql = request.sourceSql.trim().replace(/;$/, "");
+    const limitMatch = /\s+limit\b/i.exec(sql);
+    const tail = limitMatch ? sql.slice(limitMatch.index).trimStart() : "";
+    sql = limitMatch ? sql.slice(0, limitMatch.index).trimEnd() : sql;
+    if (clauses.length > 0) {
+      sql = /\bwhere\b/i.test(sql) ? `${sql}\n  AND ${clauses.join("\n  AND ")}` : `${sql}\nWHERE ${clauses.join("\n  AND ")}`;
+    }
+    if (orderBy) sql = `${sql}\n${orderBy}`;
+    if (tail) sql = `${sql}\n${tail}`;
+    return {
+      sql: `${sql};`,
+      mode: "inline",
+      reason: null,
+      warnings: [],
+    };
+  }),
   readFileBytes: vi.fn(),
   selectFilePath: vi.fn(),
   selectSaveFilePath: vi.fn(),
@@ -177,6 +219,30 @@ describe("QueryResultGrid", () => {
         sort: { columnIndex: 2, dir: "desc" },
       },
     );
+  });
+
+  it("copies the backend rewritten generated SQL", async () => {
+    render(
+      <QueryResultGrid
+        result={filterResult()}
+        sourceSql="select id, name, status from users"
+        sqlEngine="MySQL"
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText("Filter column status"));
+    fireEvent.click(screen.getByLabelText("Select active for status"));
+    fireEvent.click(screen.getByRole("button", { name: "Local" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("query-result-generated-sql")).toHaveTextContent("WHERE `status` = 'active'");
+    });
+    fireEvent.click(screen.getByTestId("query-result-generated-sql-copy"));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+    const copiedSql = vi.mocked(writeText).mock.calls.at(-1)?.[0] as string;
+    expect(copiedSql).toContain("WHERE `status` = 'active'");
+    expect(copiedSql).not.toContain("FROM (");
   });
 
   it("copies only the rectangular cell block selected with Alt drag", () => {
