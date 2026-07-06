@@ -365,7 +365,8 @@ describe("WorkspaceGitManager", () => {
 
     await waitFor(() => expect(screen.getByRole("button", { name: /service src\/service\.ts Modified/i })).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole("button", { name: "Show untracked files" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change filters" }));
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Show untracked files" }));
 
     expect(screen.getByRole("button", { name: /app scratch\.txt Untracked/i })).toBeInTheDocument();
     expect(screen.getByText("app /")).toBeInTheDocument();

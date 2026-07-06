@@ -13,6 +13,7 @@ export interface ChangesTreeProps {
   treeMode: boolean;
   grouped?: boolean;
   showSectionActions?: boolean;
+  emptyLabel?: string;
   busy?: boolean;
   checked: Set<string>;
   onToggleChecked: (paths: string[], value: boolean) => void;
@@ -77,6 +78,7 @@ export function ChangesTree({
   treeMode,
   grouped = true,
   showSectionActions = true,
+  emptyLabel = "No local changes",
   busy = false,
   checked,
   onToggleChecked,
@@ -237,7 +239,7 @@ export function ChangesTree({
   if (changes.length === 0) {
     return (
       <div className="h-full min-h-24 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
-        No local changes
+        {emptyLabel}
       </div>
     );
   }

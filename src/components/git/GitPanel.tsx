@@ -85,10 +85,19 @@ import { ContextMenu, type MenuItem } from "../ContextMenu";
 import { ChangesTree } from "./ChangesTree";
 import { CommitLog } from "./CommitLog";
 import { CompareView } from "./CompareView";
-import { ChangesListToolbar } from "./shared/ChangesListToolbar";
+import {
+  ChangesListToolbar,
+  emptyGitChangeFilters,
+  gitChangeMatchesFilters,
+  hasActiveGitChangeFilters,
+  type GitChangeFilters,
+  type GitStageFilter,
+  type GitStatusFilter,
+} from "./shared/ChangesListToolbar";
 import { CommitBar } from "./shared/CommitBar";
 import { DiffPane as ChangesDiffPane } from "./shared/DiffPane";
 import { useAppStore } from "../../stores/appStore";
+import { useT } from "../../lib/i18n";
 
 interface GitPanelProps {
   repoRoot: string;
@@ -465,20 +474,16 @@ export function GitPanel({
     [orderedPaths],
   );
 
-  const stageAll = () =>
-    runAction("Stage all", () => gitStage(repoRoot, changesList.map((c) => c.path)));
-  const unstageAll = () =>
-    runAction("Unstage all", () => gitUnstage(repoRoot, changesList.filter((c) => c.staged).map((c) => c.path)));
   const stageSelected = () => opPaths.length && runAction("Stage", () => gitStage(repoRoot, opPaths));
   const unstageSelected = () => opPaths.length && runAction("Unstage", () => gitUnstage(repoRoot, opPaths));
-  const discardSelected = () => {
-    if (opPaths.length === 0) return;
-    const set = new Set(opPaths);
+  const discardPaths = (paths: string[]) => {
+    if (paths.length === 0) return;
+    const set = new Set(paths);
     const untracked = changesList.filter((c) => set.has(c.path) && c.status === "untracked").map((c) => c.path);
     const tracked = changesList.filter((c) => set.has(c.path) && c.status !== "untracked").map((c) => c.path);
     void confirmAndRun(
       "Discard changes",
-      `Discard changes in ${opPaths.length} file(s)? This cannot be undone.`,
+      `Discard changes in ${paths.length} file(s)? This cannot be undone.`,
       true,
       () =>
         runAction("Discard", async () => {
@@ -487,6 +492,7 @@ export function GitPanel({
         }),
     );
   };
+  const discardSelected = () => discardPaths(opPaths);
   const doCommit = (push: boolean) => {
     if (checkedPaths.length === 0 || !commitMessage.trim()) return;
     void runAction(
@@ -733,7 +739,6 @@ export function GitPanel({
               checked={checked}
               checkedCount={checkedPaths.length}
               selected={selected}
-              opCount={opPaths.length}
               activePath={selectedPath}
               onToggleChecked={toggleChecked}
               onSelect={handleSelect}
@@ -746,17 +751,13 @@ export function GitPanel({
               setAmendChecked={setAmendChecked}
               busy={busy}
               hasRemote={!!remoteName}
-              stageAll={stageAll}
-              unstageAll={unstageAll}
               stagePaths={(paths) => {
                 if (paths.length) void runAction("Stage", () => gitStage(repoRoot, paths));
               }}
               unstagePaths={(paths) => {
                 if (paths.length) void runAction("Unstage", () => gitUnstage(repoRoot, paths));
               }}
-              stageSelected={stageSelected}
-              unstageSelected={unstageSelected}
-              discardSelected={discardSelected}
+              discardPaths={discardPaths}
               commit={() => doCommit(false)}
               commitAndPush={() => doCommit(true)}
             />
@@ -981,7 +982,6 @@ function ChangesView({
   checked,
   checkedCount,
   selected,
-  opCount,
   activePath,
   onToggleChecked,
   onSelect,
@@ -994,13 +994,9 @@ function ChangesView({
   setAmendChecked,
   busy,
   hasRemote,
-  stageAll,
-  unstageAll,
   stagePaths,
   unstagePaths,
-  stageSelected,
-  unstageSelected,
-  discardSelected,
+  discardPaths,
   commit,
   commitAndPush,
 }: {
@@ -1010,7 +1006,6 @@ function ChangesView({
   checked: Set<string>;
   checkedCount: number;
   selected: Set<string>;
-  opCount: number;
   activePath: string | null;
   onToggleChecked: (paths: string[], value: boolean) => void;
   onSelect: (path: string, mods: { ctrl: boolean; shift: boolean }) => void;
@@ -1023,16 +1018,43 @@ function ChangesView({
   setAmendChecked: (value: boolean) => void;
   busy: boolean;
   hasRemote: boolean;
-  stageAll: () => void;
-  unstageAll: () => void;
   stagePaths: (paths: string[]) => void;
   unstagePaths: (paths: string[]) => void;
-  stageSelected: () => void;
-  unstageSelected: () => void;
-  discardSelected: () => void;
+  discardPaths: (paths: string[]) => void;
   commit: () => void;
   commitAndPush: () => void;
 }) {
+  const t = useT();
+  const [filter, setFilter] = useState("");
+  const [changeFilters, setChangeFilters] = useState<GitChangeFilters>(() => emptyGitChangeFilters());
+  const normalizedFilter = filter.trim().toLowerCase();
+  const visibleChanges = useMemo(() => (
+    changes.filter((change) => (
+      gitChangeMatchesFilters(change, changeFilters)
+      && gitChangeMatchesSearch(change, normalizedFilter)
+    ))
+  ), [changeFilters, changes, normalizedFilter]);
+  const visiblePaths = useMemo(() => visibleChanges.map((change) => change.path), [visibleChanges]);
+  const visibleStagedPaths = useMemo(
+    () => visibleChanges.filter((change) => change.staged).map((change) => change.path),
+    [visibleChanges],
+  );
+  const hasActiveFilters = hasActiveGitChangeFilters(changeFilters);
+  const toggleStageFilter = (filterKey: GitStageFilter) => {
+    setChangeFilters((current) => ({
+      ...current,
+      stage: toggleSetValue(current.stage, filterKey),
+    }));
+  };
+  const toggleStatusFilter = (filterKey: GitStatusFilter) => {
+    setChangeFilters((current) => ({
+      ...current,
+      status: toggleSetValue(current.status, filterKey),
+    }));
+  };
+  const clearChangeFilters = () => {
+    setChangeFilters(emptyGitChangeFilters());
+  };
   const active = changes.find((change) => change.path === activePath) ?? null;
   const canCommit = !busy && checkedCount > 0 && !!commitMessage.trim();
   return (
@@ -1040,18 +1062,29 @@ function ChangesView({
       <Panel id="changes-list" defaultSize={36} minSize={24} className="min-w-0 min-h-0 flex flex-col border-r border-[var(--taomni-divider)]">
         <ChangesListToolbar
           busy={busy}
+          filter={filter}
+          onFilterChange={setFilter}
+          filters={changeFilters}
+          onToggleStageFilter={toggleStageFilter}
+          onToggleStatusFilter={toggleStatusFilter}
+          onClearFilters={clearChangeFilters}
           checkedCount={checkedCount}
           totalCount={changes.length}
+          visibleCount={visibleChanges.length}
+          visibleStagedCount={visibleStagedPaths.length}
           treeMode={treeMode}
-          canStageAll={changes.length > 0}
-          canUnstageAll={changes.some((change) => change.staged)}
-          onStageAll={stageAll}
-          onUnstageAll={unstageAll}
+          onCheckVisible={() => onToggleChecked(visiblePaths, true)}
+          onUncheckVisible={() => onToggleChecked(visiblePaths, false)}
+          onStageVisible={() => stagePaths(visiblePaths)}
+          onUnstageVisible={() => unstagePaths(visibleStagedPaths)}
           onToggleTreeMode={() => setTreeMode(!treeMode)}
         />
         <ChangesTree
-          changes={changes}
+          changes={visibleChanges}
           treeMode={treeMode}
+          emptyLabel={normalizedFilter || hasActiveFilters
+            ? t("git.workspaceChanges.noMatchingChanges")
+            : t("git.workspaceChanges.noLocalChanges")}
           checked={checked}
           onToggleChecked={onToggleChecked}
           busy={busy}
@@ -1076,18 +1109,43 @@ function ChangesView({
       <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] cursor-col-resize" />
       <Panel id="changes-diff" defaultSize={64} minSize={35} className="min-w-0 min-h-0 flex flex-col">
         <ChangesDiffPane
-          title={`${active?.path ?? "Diff"}${opCount > 1 ? ` (+${opCount - 1} selected)` : ""}`}
+          title={active?.path ?? t("git.workspaceChanges.diffTitle")}
           busy={busy}
-          selectedCount={opCount}
+          selectedCount={active ? 1 : 0}
           pair={pair}
           pairLoading={pairLoading}
-          onStage={stageSelected}
-          onUnstage={unstageSelected}
-          onDiscard={discardSelected}
+          onStage={() => {
+            if (activePath) stagePaths([activePath]);
+          }}
+          onUnstage={() => {
+            if (activePath) unstagePaths([activePath]);
+          }}
+          onDiscard={() => {
+            if (activePath) discardPaths([activePath]);
+          }}
         />
       </Panel>
     </PanelGroup>
   );
+}
+
+function gitChangeMatchesSearch(change: GitChange, normalizedFilter: string): boolean {
+  if (!normalizedFilter) return true;
+  return (
+    change.path.toLowerCase().includes(normalizedFilter) ||
+    (change.oldPath ?? "").toLowerCase().includes(normalizedFilter) ||
+    change.status.toLowerCase().includes(normalizedFilter) ||
+    (change.conflict ? "conflict conflicted" : "").includes(normalizedFilter) ||
+    (change.staged ? "staged" : "").includes(normalizedFilter) ||
+    (change.unstaged ? "unstaged" : "").includes(normalizedFilter)
+  );
+}
+
+function toggleSetValue<T>(current: Set<T>, value: T): Set<T> {
+  const next = new Set(current);
+  if (next.has(value)) next.delete(value);
+  else next.add(value);
+  return next;
 }
 
 function BranchesView({

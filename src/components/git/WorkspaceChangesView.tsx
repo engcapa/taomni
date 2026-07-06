@@ -1,26 +1,10 @@
-import { useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import {
   AlertTriangle,
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
-  CircleDashed,
-  CircleMinus,
-  CirclePlus,
-  FilePenLine,
-  FileQuestion,
-  FileSymlink,
-  FileX,
   GitBranch,
-  List,
-  ListChecks,
-  ListFilter,
-  ListTree,
-  ListX,
   Loader2,
-  Search,
-  SquareCheckBig,
-  TriangleAlert,
 } from "lucide-react";
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
 import { type GitBlobPair, type GitChange, type GitSnapshot } from "../../lib/git";
@@ -28,12 +12,19 @@ import { useT, type TranslateFn } from "../../lib/i18n";
 import type { GitWorkspaceRootInfo } from "../../types";
 import { ChangesTree } from "./ChangesTree";
 import { CommitBar } from "./shared/CommitBar";
+import {
+  ChangesListToolbar,
+  emptyGitChangeFilters,
+  gitChangeMatchesFilters,
+  hasActiveGitChangeFilters,
+  type GitChangeFilters,
+  type GitStageFilter,
+  type GitStatusFilter,
+} from "./shared/ChangesListToolbar";
 import { DiffPane } from "./shared/DiffPane";
 import { parseWorkspaceChangeKey, workspaceChangeKey } from "./workspaceGitKeys";
 
 type TriState = "all" | "none" | "some";
-type WorkspaceStageFilter = "staged" | "unstaged";
-type WorkspaceStatusFilter = "modified" | "untracked" | "deleted" | "renamed" | "conflict";
 
 interface WorkspaceChangeRow {
   root: GitWorkspaceRootInfo;
@@ -108,9 +99,7 @@ export function WorkspaceChangesView({
 }: WorkspaceChangesViewProps) {
   const t = useT();
   const [filter, setFilter] = useState("");
-  const [checkedOnlyFilter, setCheckedOnlyFilter] = useState(false);
-  const [stageFilters, setStageFilters] = useState<Set<WorkspaceStageFilter>>(() => new Set());
-  const [statusFilters, setStatusFilters] = useState<Set<WorkspaceStatusFilter>>(() => new Set());
+  const [changeFilters, setChangeFilters] = useState<GitChangeFilters>(() => emptyGitChangeFilters());
   const normalizedFilter = filter.trim().toLowerCase();
   const groups = roots.map((root) => {
     const state = snapshots[root.repoRoot];
@@ -120,16 +109,8 @@ export function WorkspaceChangesView({
       state,
       snapshot,
       visibleChanges: (snapshot?.changes ?? []).filter((change) => {
-        const key = workspaceChangeKey(root.repoRoot, change.path);
-        return workspaceChangeMatchesFilters({
-          root,
-          change,
-          normalizedFilter,
-          checked: checkedKeys.has(key),
-          checkedOnlyFilter,
-          stageFilters,
-          statusFilters,
-        });
+        return gitChangeMatchesFilters(change, changeFilters)
+          && workspaceChangeMatchesSearch(root, change, normalizedFilter);
       }),
     };
   });
@@ -154,8 +135,7 @@ export function WorkspaceChangesView({
   const hasVisibleGroups = groups.some((group) => (
     group.visibleChanges.length > 0 || group.state?.loading || group.state?.error
   ));
-  const hasStagedVisible = groups.some((group) => group.visibleChanges.some((change) => change.staged));
-  const hasButtonFilters = checkedOnlyFilter || stageFilters.size > 0 || statusFilters.size > 0;
+  const hasActiveFilters = hasActiveGitChangeFilters(changeFilters);
   const active = useMemo(() => {
     const parsed = focusedKey ? parseWorkspaceChangeKey(focusedKey) : null;
     if (!parsed) return null;
@@ -166,16 +146,20 @@ export function WorkspaceChangesView({
   }, [focusedKey, roots, snapshots]);
   const canCommit = !busy && checkedCount > 0 && commitMessage.trim().length > 0;
   const [collapsedRepos, setCollapsedRepos] = useState<Set<string>>(() => new Set());
-  const toggleStageFilter = (filterKey: WorkspaceStageFilter) => {
-    setStageFilters((current) => toggleSetValue(current, filterKey));
+  const toggleStageFilter = (filterKey: GitStageFilter) => {
+    setChangeFilters((current) => ({
+      ...current,
+      stage: toggleSetValue(current.stage, filterKey),
+    }));
   };
-  const toggleStatusFilter = (filterKey: WorkspaceStatusFilter) => {
-    setStatusFilters((current) => toggleSetValue(current, filterKey));
+  const toggleStatusFilter = (filterKey: GitStatusFilter) => {
+    setChangeFilters((current) => ({
+      ...current,
+      status: toggleSetValue(current.status, filterKey),
+    }));
   };
   const clearChangeFilters = () => {
-    setCheckedOnlyFilter(false);
-    setStageFilters(new Set());
-    setStatusFilters(new Set());
+    setChangeFilters(emptyGitChangeFilters());
   };
   const selectVisible = (value: boolean) => {
     for (const group of groups) {
@@ -200,114 +184,30 @@ export function WorkspaceChangesView({
           <span className="font-semibold text-[12px]">{t("git.workspaceChanges.title")}</span>
           <span className="min-w-0 truncate text-[11px] text-[var(--taomni-text-muted)]">{scopeSummary}</span>
         </div>
-        <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)] overflow-x-auto">
-          <div className="relative min-w-28 flex-1">
-            <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
-            <input
-              className="taomni-input h-7 w-full pl-7"
-              value={filter}
-              placeholder={t("git.workspaceChanges.filterPlaceholder")}
-              onChange={(event) => setFilter(event.target.value)}
-            />
-          </div>
-          <div className="shrink-0 flex items-center gap-0.5 overflow-x-auto">
-            <WorkspaceToolButton
-              label={t("git.workspaceChanges.showAll")}
-              active={!hasButtonFilters}
-              disabled={!hasButtonFilters}
-              onClick={clearChangeFilters}
-              icon={<ListFilter className="w-3.5 h-3.5" />}
-            />
-            <WorkspaceToolButton
-              label={t("git.workspaceChanges.showSelected")}
-              active={checkedOnlyFilter}
-              onClick={() => setCheckedOnlyFilter((current) => !current)}
-              icon={<SquareCheckBig className="w-3.5 h-3.5" />}
-            />
-            <WorkspaceToolButton
-              label={t("git.workspaceChanges.showUnstaged")}
-              active={stageFilters.has("unstaged")}
-              onClick={() => toggleStageFilter("unstaged")}
-              icon={<CircleDashed className="w-3.5 h-3.5" />}
-            />
-            <WorkspaceToolButton
-              label={t("git.workspaceChanges.showStaged")}
-              active={stageFilters.has("staged")}
-              onClick={() => toggleStageFilter("staged")}
-              icon={<CheckCircle2 className="w-3.5 h-3.5" />}
-            />
-            <WorkspaceToolButton
-              label={t("git.workspaceChanges.filterModified")}
-              active={statusFilters.has("modified")}
-              onClick={() => toggleStatusFilter("modified")}
-              icon={<FilePenLine className="w-3.5 h-3.5" />}
-            />
-            <WorkspaceToolButton
-              label={t("git.workspaceChanges.filterUntracked")}
-              active={statusFilters.has("untracked")}
-              onClick={() => toggleStatusFilter("untracked")}
-              icon={<FileQuestion className="w-3.5 h-3.5" />}
-            />
-            <WorkspaceToolButton
-              label={t("git.workspaceChanges.filterDeleted")}
-              active={statusFilters.has("deleted")}
-              onClick={() => toggleStatusFilter("deleted")}
-              icon={<FileX className="w-3.5 h-3.5" />}
-            />
-            <WorkspaceToolButton
-              label={t("git.workspaceChanges.filterRenamed")}
-              active={statusFilters.has("renamed")}
-              onClick={() => toggleStatusFilter("renamed")}
-              icon={<FileSymlink className="w-3.5 h-3.5" />}
-            />
-            <WorkspaceToolButton
-              label={t("git.workspaceChanges.filterConflicted")}
-              active={statusFilters.has("conflict")}
-              onClick={() => toggleStatusFilter("conflict")}
-              icon={<TriangleAlert className="w-3.5 h-3.5" />}
-            />
-            <ToolbarDivider />
-            <WorkspaceToolButton
-              label={t("git.workspaceChanges.selectVisible", { count: visibleChangeCount })}
-              disabled={visibleChangeCount === 0}
-              onClick={() => selectVisible(true)}
-              icon={<ListChecks className="w-3.5 h-3.5" />}
-            />
-            <WorkspaceToolButton
-              label={t("git.workspaceChanges.unselectVisible", { count: visibleChangeCount })}
-              disabled={visibleChangeCount === 0}
-              onClick={() => selectVisible(false)}
-              icon={<ListX className="w-3.5 h-3.5" />}
-            />
-            <ToolbarDivider />
-            <WorkspaceToolButton
-              label={t("git.workspaceChanges.stageVisible", { count: visibleChangeCount })}
-              disabled={busy || visibleChangeCount === 0}
-              onClick={() => stageVisible(visiblePathsByRepo)}
-              icon={<CirclePlus className="w-3.5 h-3.5" />}
-            />
-            <WorkspaceToolButton
-              label={t("git.workspaceChanges.unstageVisible", { count: visibleStagedChangeCount })}
-              disabled={busy || !hasStagedVisible}
-              onClick={() => unstageVisible(visibleStagedPathsByRepo)}
-              icon={<CircleMinus className="w-3.5 h-3.5" />}
-            />
-            <ToolbarDivider />
-            <span className="shrink-0 min-w-10 text-center text-[11px] text-[var(--taomni-text-muted)]">
-              {checkedCount}/{totalChanges}
-            </span>
-            <WorkspaceToolButton
-              label={treeMode ? t("git.workspaceChanges.switchToFlatList") : t("git.workspaceChanges.switchToDirectoryTree")}
-              onClick={() => setTreeMode(!treeMode)}
-              icon={treeMode ? <List className="w-3.5 h-3.5" /> : <ListTree className="w-3.5 h-3.5" />}
-            />
-          </div>
-        </div>
+        <ChangesListToolbar
+          busy={busy}
+          filter={filter}
+          onFilterChange={setFilter}
+          filters={changeFilters}
+          onToggleStageFilter={toggleStageFilter}
+          onToggleStatusFilter={toggleStatusFilter}
+          onClearFilters={clearChangeFilters}
+          checkedCount={checkedCount}
+          totalCount={totalChanges}
+          visibleCount={visibleChangeCount}
+          visibleStagedCount={visibleStagedChangeCount}
+          treeMode={treeMode}
+          onCheckVisible={() => selectVisible(true)}
+          onUncheckVisible={() => selectVisible(false)}
+          onStageVisible={() => stageVisible(visiblePathsByRepo)}
+          onUnstageVisible={() => unstageVisible(visibleStagedPathsByRepo)}
+          onToggleTreeMode={() => setTreeMode(!treeMode)}
+        />
 
         <div className="flex-1 min-h-0 overflow-auto">
           {!hasVisibleGroups ? (
             <div className="h-full min-h-24 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
-              {normalizedFilter || hasButtonFilters
+              {normalizedFilter || hasActiveFilters
                 ? t("git.workspaceChanges.noMatchingChanges")
                 : t("git.workspaceChanges.noLocalChanges")}
             </div>
@@ -375,39 +275,6 @@ export function WorkspaceChangesView({
       </Panel>
     </PanelGroup>
   );
-}
-
-function WorkspaceToolButton({
-  label,
-  icon,
-  active = false,
-  disabled = false,
-  onClick,
-}: {
-  label: string;
-  icon: ReactNode;
-  active?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={`taomni-btn h-7 w-7 shrink-0 inline-flex items-center justify-center px-0 ${
-        active ? "bg-[var(--taomni-accent)] text-white border-[var(--taomni-accent)]" : ""
-      }`}
-      title={label}
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      {icon}
-    </button>
-  );
-}
-
-function ToolbarDivider() {
-  return <span className="mx-0.5 h-5 w-px shrink-0 bg-[var(--taomni-divider)]" aria-hidden="true" />;
 }
 
 function WorkspaceFlatChangesList({
@@ -837,26 +704,11 @@ function pathsByRepoFromGroups(
   return byRepo;
 }
 
-function workspaceChangeMatchesFilters({
-  root,
-  change,
-  normalizedFilter,
-  checked,
-  checkedOnlyFilter,
-  stageFilters,
-  statusFilters,
-}: {
-  root: GitWorkspaceRootInfo;
-  change: GitChange;
-  normalizedFilter: string;
-  checked: boolean;
-  checkedOnlyFilter: boolean;
-  stageFilters: Set<WorkspaceStageFilter>;
-  statusFilters: Set<WorkspaceStatusFilter>;
-}): boolean {
-  if (checkedOnlyFilter && !checked) return false;
-  if (stageFilters.size > 0 && !matchesStageFilters(change, stageFilters)) return false;
-  if (statusFilters.size > 0 && !matchesStatusFilters(change, statusFilters)) return false;
+function workspaceChangeMatchesSearch(
+  root: GitWorkspaceRootInfo,
+  change: GitChange,
+  normalizedFilter: string,
+): boolean {
   if (!normalizedFilter) return true;
   return (
     root.name.toLowerCase().includes(normalizedFilter) ||
@@ -868,22 +720,4 @@ function workspaceChangeMatchesFilters({
     (change.staged ? "staged" : "").includes(normalizedFilter) ||
     (change.unstaged ? "unstaged" : "").includes(normalizedFilter)
   );
-}
-
-function matchesStageFilters(change: GitChange, filters: Set<WorkspaceStageFilter>): boolean {
-  if (filters.size === 2) return true;
-  if (filters.has("staged") && change.staged) return true;
-  if (filters.has("unstaged") && (change.unstaged || !change.staged)) return true;
-  return false;
-}
-
-function matchesStatusFilters(change: GitChange, filters: Set<WorkspaceStatusFilter>): boolean {
-  if (filters.has("conflict") && change.conflict) return true;
-  if (filters.has("untracked") && change.status === "untracked") return true;
-  if (filters.has("deleted") && change.status === "deleted") return true;
-  if (filters.has("renamed") && change.status === "renamed") return true;
-  if (filters.has("modified") && !change.conflict && change.status === "modified") {
-    return true;
-  }
-  return false;
 }
