@@ -9,14 +9,18 @@ import {
 } from "react";
 import {
   AlertDialog,
+  ChoiceDialog,
   ConfirmDialog,
   TextInputDialog,
+  type ChoiceDialogOptions,
+  type ChoiceDialogValue,
   type ConfirmDialogOptions,
   type TextInputDialogOptions,
 } from "../components/sidebar/ConfirmDialog";
 
 export type AppConfirmDialogOptions = ConfirmDialogOptions;
 export type AppPromptDialogOptions = TextInputDialogOptions;
+export type AppChoiceDialogOptions = ChoiceDialogOptions;
 
 export interface AppAlertDialogOptions {
   title?: string;
@@ -24,16 +28,18 @@ export interface AppAlertDialogOptions {
   okLabel?: string;
 }
 
-type DialogValue = boolean | string | null | undefined;
+type DialogValue = boolean | string | ChoiceDialogValue | undefined;
 
 type PendingAppDialog =
   | ({ id: number; kind: "confirm"; resolve: (value: DialogValue) => void } & AppConfirmDialogOptions)
   | ({ id: number; kind: "prompt"; resolve: (value: DialogValue) => void } & AppPromptDialogOptions)
+  | ({ id: number; kind: "choice"; resolve: (value: DialogValue) => void } & AppChoiceDialogOptions)
   | ({ id: number; kind: "alert"; resolve: (value: DialogValue) => void } & AppAlertDialogOptions);
 
 export interface AppDialogsApi {
   confirm: (options: AppConfirmDialogOptions) => Promise<boolean>;
   prompt: (options: AppPromptDialogOptions) => Promise<string | null>;
+  choice: (options: AppChoiceDialogOptions) => Promise<ChoiceDialogValue>;
   alert: (options: AppAlertDialogOptions) => Promise<void>;
 }
 
@@ -66,6 +72,10 @@ export function promptAppDialog(options: AppPromptDialogOptions): Promise<string
   return enqueueDialog<string | null>({ kind: "prompt", ...options });
 }
 
+export function choiceAppDialog(options: AppChoiceDialogOptions): Promise<ChoiceDialogValue> {
+  return enqueueDialog<ChoiceDialogValue>({ kind: "choice", ...options });
+}
+
 export async function alertAppDialog(options: AppAlertDialogOptions): Promise<void> {
   await enqueueDialog<undefined>({ kind: "alert", ...options });
 }
@@ -73,6 +83,7 @@ export async function alertAppDialog(options: AppAlertDialogOptions): Promise<vo
 const AppDialogsContext = createContext<AppDialogsApi>({
   confirm: confirmAppDialog,
   prompt: promptAppDialog,
+  choice: choiceAppDialog,
   alert: alertAppDialog,
 });
 
@@ -109,6 +120,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
     () => ({
       confirm: confirmAppDialog,
       prompt: promptAppDialog,
+      choice: choiceAppDialog,
       alert: alertAppDialog,
     }),
     [],
@@ -141,6 +153,19 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
           cancelLabel={active.cancelLabel}
           onCancel={() => resolveDialog(active, null)}
           onConfirm={(value) => resolveDialog(active, value)}
+        />
+      )}
+      {active?.kind === "choice" && (
+        <ChoiceDialog
+          title={active.title}
+          message={active.message}
+          primaryLabel={active.primaryLabel}
+          secondaryLabel={active.secondaryLabel}
+          cancelLabel={active.cancelLabel}
+          danger={active.danger}
+          onCancel={() => resolveDialog(active, null)}
+          onPrimary={() => resolveDialog(active, "primary")}
+          onSecondary={() => resolveDialog(active, "secondary")}
         />
       )}
       {active?.kind === "alert" && (

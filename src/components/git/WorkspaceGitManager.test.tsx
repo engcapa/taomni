@@ -25,6 +25,7 @@ const gitMocks = vi.hoisted(() => ({
 
 const dialogMocks = vi.hoisted(() => ({
   alertAppDialog: vi.fn(),
+  choiceAppDialog: vi.fn(),
   confirmAppDialog: vi.fn(),
 }));
 
@@ -89,6 +90,17 @@ function change(path: string): GitSnapshot["changes"][number] {
     path,
     oldPath: null,
     status: "modified",
+    staged: false,
+    unstaged: true,
+    conflict: false,
+  };
+}
+
+function untrackedChange(path: string): GitSnapshot["changes"][number] {
+  return {
+    path,
+    oldPath: null,
+    status: "untracked",
     staged: false,
     unstaged: true,
     conflict: false,
@@ -164,7 +176,11 @@ describe("WorkspaceGitManager", () => {
         }])
         : snapshot(repoRoot)
     ));
+    gitMocks.selectedRemote.mockReset();
+    gitMocks.selectedRemote.mockReturnValue(null);
     dialogMocks.alertAppDialog.mockReset();
+    dialogMocks.choiceAppDialog.mockReset();
+    dialogMocks.choiceAppDialog.mockResolvedValue("primary");
     dialogMocks.confirmAppDialog.mockReset();
     dialogMocks.confirmAppDialog.mockResolvedValue(true);
   });
@@ -205,17 +221,17 @@ describe("WorkspaceGitManager", () => {
     expect(screen.queryByRole("button", { name: "Show Repository Panel" })).not.toBeInTheDocument();
     expect(screen.getByTestId("workspace-repo-selector")).toHaveTextContent("All Repositories (2)");
     expect(screen.getByTestId("git-panel")).toHaveAttribute("data-repo-root", "/repo/service");
-    expect(screen.getByText("src/App.tsx")).toBeInTheDocument();
-    expect(screen.getByText("src/ignored.ts")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /app src\/App\.tsx Modified/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /app src\/ignored\.ts Modified/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("workspace-repo-selector"));
     fireEvent.click(within(screen.getByTestId("workspace-repo-selector-menu")).getByTitle("/repo/app"));
     expect(screen.getByTestId("git-panel")).toHaveAttribute("data-repo-root", "/repo/app");
     expect(screen.getByTestId("workspace-repo-selector")).toHaveTextContent("app");
 
-    const ignoredRow = screen.getByText("src/ignored.ts").closest("[role='button']");
+    const ignoredRow = screen.getByRole("button", { name: /app src\/ignored\.ts Modified/i });
     expect(ignoredRow).not.toBeNull();
-    fireEvent.click(within(ignoredRow as HTMLElement).getByRole("checkbox"));
+    fireEvent.click(within(ignoredRow).getByRole("checkbox"));
     fireEvent.change(screen.getByPlaceholderText("Commit message"), {
       target: { value: "batch commit" },
     });
@@ -230,6 +246,7 @@ describe("WorkspaceGitManager", () => {
       );
     });
     expect(gitMocks.gitCommit).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Commit: 1 completed"));
   });
 
   it("falls back the active repository when updated roots remove it", async () => {
@@ -280,7 +297,7 @@ describe("WorkspaceGitManager", () => {
 
     await waitFor(() => expect(screen.getAllByText("README.md")).toHaveLength(2));
 
-    fireEvent.click(screen.getByRole("checkbox", { name: "Select changes in app" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Check app README.md" }));
     fireEvent.change(screen.getByPlaceholderText("Commit message"), {
       target: { value: "commit service only" },
     });
@@ -316,17 +333,50 @@ describe("WorkspaceGitManager", () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByText("src/service.ts")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: /service src\/service\.ts Modified/i })).toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId("workspace-repo-selector"));
     const menu = screen.getByTestId("workspace-repo-selector-menu");
     fireEvent.click(within(menu).getByRole("checkbox", { name: "Include service" }));
     fireEvent.click(within(menu).getByRole("button", { name: "Apply" }));
 
-    await waitFor(() => expect(screen.queryByText("src/service.ts")).not.toBeInTheDocument());
-    expect(screen.getByText("src/app.ts")).toBeInTheDocument();
-    expect(screen.getByText("src/api.ts")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("button", { name: /service src\/service\.ts Modified/i })).not.toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /app src\/app\.ts Modified/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /api src\/api\.ts Modified/i })).toBeInTheDocument();
     expect(screen.getByTestId("workspace-repo-selector")).toHaveTextContent("api +1");
+  });
+
+  it("filters by file status and stages only visible changes", async () => {
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => {
+      if (repoRoot === "/repo/app") return snapshot(repoRoot, [change("src/app.ts"), untrackedChange("scratch.txt")]);
+      return snapshot(repoRoot, [change("src/service.ts")]);
+    });
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /service src\/service\.ts Modified/i })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Change filters" }));
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Show untracked files" }));
+
+    expect(screen.getByRole("button", { name: /app scratch\.txt Untracked/i })).toBeInTheDocument();
+    expect(screen.getByText("app /")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /app src\/app\.ts Modified/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /service src\/service\.ts Modified/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Stage visible changes/i }));
+
+    await waitFor(() => expect(gitMocks.gitStage).toHaveBeenCalledWith("/repo/app", ["scratch.txt"]));
+    expect(gitMocks.gitStage).not.toHaveBeenCalledWith("/repo/service", ["src/service.ts"]);
   });
 
   it("runs header fetch only for repositories in a custom scope", async () => {
@@ -348,7 +398,7 @@ describe("WorkspaceGitManager", () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByText("src/service.ts")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: /service src\/service\.ts Modified/i })).toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId("workspace-repo-selector"));
     const menu = screen.getByTestId("workspace-repo-selector-menu");
@@ -381,14 +431,14 @@ describe("WorkspaceGitManager", () => {
       />,
     );
 
-    await waitFor(() => expect(screen.getByText("src/service.ts")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: /service src\/service\.ts Modified/i })).toBeInTheDocument());
 
     fireEvent.click(screen.getByTestId("workspace-repo-selector"));
     const menu = screen.getByTestId("workspace-repo-selector-menu");
     fireEvent.click(within(menu).getByRole("checkbox", { name: "Include service" }));
     fireEvent.click(within(menu).getByRole("button", { name: "Apply" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Stage all" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Stage visible changes/i }));
     await waitFor(() => expect(gitMocks.gitStage).toHaveBeenCalledTimes(2));
     expect(gitMocks.gitStage).toHaveBeenCalledWith("/repo/app", ["src/app.ts"]);
     expect(gitMocks.gitStage).toHaveBeenCalledWith("/repo/api", ["src/api.ts"]);
@@ -419,5 +469,62 @@ describe("WorkspaceGitManager", () => {
       false,
       ["src/service.ts"],
     );
+  });
+
+  it("lets commit and push fall back to commit only from the confirmation dialog", async () => {
+    gitMocks.selectedRemote.mockImplementation((snapshotArg: GitSnapshot) => snapshotArg.remotes[0] ?? null);
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => originSnapshot(repoRoot, [change("src/app.ts")]));
+    dialogMocks.choiceAppDialog.mockResolvedValue("secondary");
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "api", name: "api", path: "/repo", repoRoot: "/repo/api", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /app src\/app\.ts Modified/i })).toBeInTheDocument());
+    fireEvent.change(screen.getByPlaceholderText("Commit message"), {
+      target: { value: "commit without push" },
+    });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Commit and Push" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Commit and Push" }));
+
+    await waitFor(() => expect(dialogMocks.choiceAppDialog).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Confirm Commit and Push",
+      primaryLabel: "Commit and Push",
+      secondaryLabel: "Commit only",
+    })));
+    await waitFor(() => expect(gitMocks.gitCommit).toHaveBeenCalledTimes(2));
+    expect(gitMocks.gitPush).not.toHaveBeenCalled();
+  });
+
+  it("requires confirmation before pushing workspace repositories", async () => {
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => originSnapshot(repoRoot, [change("src/app.ts")]));
+    dialogMocks.confirmAppDialog.mockResolvedValue(false);
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "api", name: "api", path: "/repo", repoRoot: "/repo/api", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /app src\/app\.ts Modified/i })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Push" }));
+
+    await waitFor(() => expect(dialogMocks.confirmAppDialog).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Confirm Push",
+      confirmLabel: "Push",
+    })));
+    expect(gitMocks.gitPush).not.toHaveBeenCalled();
   });
 });

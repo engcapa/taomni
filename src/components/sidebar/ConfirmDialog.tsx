@@ -16,6 +16,25 @@ export type ConfirmDialogOptions = Pick<
   "title" | "message" | "confirmLabel" | "cancelLabel" | "danger"
 >;
 
+export type ChoiceDialogValue = "primary" | "secondary" | null;
+
+export interface ChoiceDialogProps {
+  title?: string;
+  message: string;
+  primaryLabel: string;
+  secondaryLabel: string;
+  cancelLabel?: string;
+  danger?: boolean;
+  onCancel: () => void;
+  onPrimary: () => void;
+  onSecondary: () => void;
+}
+
+export type ChoiceDialogOptions = Pick<
+  ChoiceDialogProps,
+  "title" | "message" | "primaryLabel" | "secondaryLabel" | "cancelLabel" | "danger"
+>;
+
 type PendingConfirmDialog = ConfirmDialogOptions & {
   resolve: (confirmed: boolean) => void;
 };
@@ -197,6 +216,97 @@ export function ConfirmDialog({
             onClick={onConfirm}
           >
             {resolvedConfirm}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ChoiceDialog({
+  title,
+  message,
+  primaryLabel,
+  secondaryLabel,
+  cancelLabel,
+  danger = false,
+  onCancel,
+  onPrimary,
+  onSecondary,
+}: ChoiceDialogProps) {
+  const t = useT();
+  const primaryRef = useRef<HTMLButtonElement>(null);
+  const resolvedTitle = title ?? t("common.confirm");
+  const resolvedCancel = cancelLabel ?? t("common.cancel");
+
+  useEffect(() => {
+    primaryRef.current?.focus();
+  }, []);
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      onCancel();
+    } else if (event.key === "Enter") {
+      const target = event.target as HTMLElement;
+      if (target.tagName !== "BUTTON") {
+        event.preventDefault();
+        onPrimary();
+      }
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[950] flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.4)" }}
+      onClick={onCancel}
+      onKeyDown={handleKeyDown}
+    >
+      <div
+        role="dialog"
+        aria-label={resolvedTitle}
+        aria-modal="true"
+        data-testid="choice-dialog"
+        className="w-[460px] rounded shadow-lg p-4"
+        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="text-sm font-semibold mb-3">{resolvedTitle}</div>
+        <div
+          data-testid="choice-dialog-message"
+          className="text-[12px] mb-4 whitespace-pre-line"
+          style={{ color: "var(--taomni-text)" }}
+        >
+          {message}
+        </div>
+        <div className="flex gap-2 justify-end">
+          <button
+            type="button"
+            data-testid="choice-dialog-cancel"
+            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
+            onClick={onCancel}
+          >
+            {resolvedCancel}
+          </button>
+          <button
+            type="button"
+            data-testid="choice-dialog-secondary"
+            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
+            style={{ border: "1px solid var(--taomni-divider)" }}
+            onClick={onSecondary}
+          >
+            {secondaryLabel}
+          </button>
+          <button
+            ref={primaryRef}
+            type="button"
+            data-testid="choice-dialog-primary"
+            className="px-3 py-1 text-[12px] rounded text-white"
+            style={{ background: danger ? "#b22222" : "var(--taomni-accent)" }}
+            onClick={onPrimary}
+          >
+            {primaryLabel}
           </button>
         </div>
       </div>

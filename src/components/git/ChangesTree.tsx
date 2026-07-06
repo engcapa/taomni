@@ -12,6 +12,8 @@ export interface ChangesTreeProps {
   changes: GitChange[];
   treeMode: boolean;
   grouped?: boolean;
+  showSectionActions?: boolean;
+  emptyLabel?: string;
   busy?: boolean;
   checked: Set<string>;
   onToggleChecked: (paths: string[], value: boolean) => void;
@@ -75,6 +77,8 @@ export function ChangesTree({
   changes,
   treeMode,
   grouped = true,
+  showSectionActions = true,
+  emptyLabel = "No local changes",
   busy = false,
   checked,
   onToggleChecked,
@@ -213,7 +217,7 @@ export function ChangesTree({
             {section.title} ({section.changes.length})
           </span>
           <div className="flex-1" />
-          {action.run ? (
+          {showSectionActions && action.run ? (
             <button
               type="button"
               className="taomni-btn h-6 px-1.5 text-[10px]"
@@ -235,7 +239,7 @@ export function ChangesTree({
   if (changes.length === 0) {
     return (
       <div className="h-full min-h-24 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
-        No local changes
+        {emptyLabel}
       </div>
     );
   }
