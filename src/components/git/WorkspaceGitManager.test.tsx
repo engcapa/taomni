@@ -472,7 +472,7 @@ describe("WorkspaceGitManager", () => {
   });
 
   it("lets commit and push fall back to commit only from the confirmation dialog", async () => {
-    gitMocks.selectedRemote.mockImplementation((snapshotArg: GitSnapshot) => snapshotArg.remotes[0] ?? null);
+    gitMocks.selectedRemote.mockImplementation((snapshotArg) => snapshotArg?.remotes[0] ?? null);
     gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => originSnapshot(repoRoot, [change("src/app.ts")]));
     dialogMocks.choiceAppDialog.mockResolvedValue("secondary");
 
