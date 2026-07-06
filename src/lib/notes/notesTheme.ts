@@ -381,8 +381,9 @@ export function notesFontStyle(font: NotesFont): CSSProperties {
     case "mono":
       return { fontFamily: 'var(--taomni-code-font-family)' };
     case "inherit":
-    default:
       return { fontFamily: "var(--taomni-ui-font-family)" };
+    default:
+      return { fontFamily: font };
   }
 }
 

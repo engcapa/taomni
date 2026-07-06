@@ -1,10 +1,11 @@
 import { Pin, Type } from "lucide-react";
 import { useNotesStore, type NotesFont, type NotesTheme } from "../../stores/notesStore";
-import { NOTES_FONTS, NOTES_THEMES, notesFontStyle, notesThemeStyle } from "../../lib/notes/notesTheme";
+import { NOTES_THEMES, notesFontStyle, notesThemeStyle } from "../../lib/notes/notesTheme";
 import { useT } from "../../lib/i18n";
 import { ThemePreviewSelect } from "../theme/ThemePreviewSelect";
 import { NotesThemeLinePreview } from "../theme/themePreviews";
 import { NotesSelect } from "./NotesSelect";
+import { useSystemFonts } from "../../lib/systemFonts";
 
 /**
  * NoteThemeSettings — theme picker + in-app always-on-top, surfaced from the
@@ -26,12 +27,55 @@ export function NoteThemeSettings() {
   const setFontSize = useNotesStore((s) => s.setFontSize);
   const alwaysOnTop = useNotesStore((s) => s.alwaysOnTopInApp);
   const setAlwaysOnTop = useNotesStore((s) => s.setAlwaysOnTop);
+  const fontState = useSystemFonts();
+
   const themeOptions = NOTES_THEMES.map((th: NotesTheme) => ({
     value: th,
     label: t(`notes.theme_${th}`),
     preview: <NotesThemeLinePreview theme={th} />,
     testId: `note-theme-${th}`,
   }));
+
+  const curatedUiFonts = [
+    { value: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', label: "Inter (Default UI - Highly Recommended)", style: { fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' } },
+    { value: '"Outfit", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', label: "Outfit (Geometric Elegant)", style: { fontFamily: '"Outfit", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' } },
+    { value: '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif', label: "Segoe UI (Windows Default)", style: { fontFamily: '"Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif' } },
+    { value: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', label: "SF Pro / San Francisco (macOS Default)", style: { fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' } },
+    { value: '"Ubuntu", "DejaVu Sans", sans-serif', label: "Ubuntu (Linux Default)", style: { fontFamily: '"Ubuntu", "DejaVu Sans", sans-serif' } },
+    { value: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif', label: "System UI Default", style: { fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif' } },
+  ];
+
+  const notesPresets = [
+    { value: "inherit", label: t("notes.font_inherit"), style: notesFontStyle("inherit") },
+    { value: "system", label: t("notes.font_system"), style: notesFontStyle("system") },
+    { value: "rounded", label: t("notes.font_rounded"), style: notesFontStyle("rounded") },
+    { value: "serif", label: t("notes.font_serif"), style: notesFontStyle("serif") },
+    { value: "songti", label: t("notes.font_songti"), style: notesFontStyle("songti") },
+    { value: "kaiti", label: t("notes.font_kaiti"), style: notesFontStyle("kaiti") },
+    { value: "handwriting", label: t("notes.font_handwriting"), style: notesFontStyle("handwriting") },
+    { value: "mono", label: t("notes.font_mono"), style: notesFontStyle("mono") },
+  ];
+
+  const fontOptions = [
+    ...notesPresets.map((f) => ({
+      value: f.value,
+      label: f.label,
+      group: t("settings.fontFamilyCurated"),
+      style: f.style,
+    })),
+    ...curatedUiFonts.map((f) => ({
+      value: f.value,
+      label: f.label,
+      group: t("settings.fontFamilyCurated"),
+      style: f.style,
+    })),
+    ...fontState.fonts.map((f) => ({
+      value: `"${f}", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`,
+      label: f,
+      group: t("settings.fontFamilySystem"),
+      style: { fontFamily: `"${f}"` },
+    })),
+  ];
 
   return (
     <div
@@ -60,11 +104,7 @@ export function NoteThemeSettings() {
         <NotesSelect
           className="flex-1 min-w-0"
           value={font}
-          options={NOTES_FONTS.map((val) => ({
-            value: val,
-            label: t(`notes.font_${val}`),
-            style: notesFontStyle(val),
-          }))}
+          options={fontOptions}
           onChange={(val) => setFont(val as NotesFont)}
           testId="note-font-select"
           ariaLabel={t("notes.font")}

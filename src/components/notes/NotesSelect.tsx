@@ -4,6 +4,7 @@ import { ChevronDown } from "lucide-react";
 interface Option {
   value: string | number;
   label: string;
+  group?: string;
   style?: CSSProperties;
 }
 
@@ -55,6 +56,18 @@ export function NotesSelect({
     };
   }, [open]);
 
+  // Group options if any option has a group defined
+  const groupedOptions: Array<{ group: string | null; options: Option[] }> = [];
+  for (const option of options) {
+    const groupName = option.group ?? null;
+    const existingGroup = groupedOptions.find((g) => g.group === groupName);
+    if (existingGroup) {
+      existingGroup.options.push(option);
+    } else {
+      groupedOptions.push({ group: groupName, options: [option] });
+    }
+  }
+
   return (
     <div ref={rootRef} className={`relative inline-flex flex-col min-w-0 ${className}`}>
       <button
@@ -89,29 +102,38 @@ export function NotesSelect({
             borderColor: selectBorder || "var(--taomni-divider)",
           }}
         >
-          {options.map((option) => {
-            const isSelected = option.value === value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                role="option"
-                aria-selected={isSelected}
-                className="w-full h-6 px-1.5 text-left text-[11px] rounded flex items-center select-none cursor-pointer hover:bg-[var(--taomni-hover)] focus:bg-[var(--taomni-hover)] outline-none"
-                style={{
-                  backgroundColor: isSelected ? "var(--taomni-selected)" : "transparent",
-                  color: isSelected ? "var(--taomni-accent)" : selectColor,
-                  ...option.style,
-                }}
-                onClick={() => {
-                  onChange(option.value);
-                  setOpen(false);
-                }}
-              >
-                <span className="truncate">{option.label}</span>
-              </button>
-            );
-          })}
+          {groupedOptions.map((group, groupIdx) => (
+            <div key={group.group ?? `__ungrouped_${groupIdx}`} className="flex flex-col gap-0.5">
+              {group.group && (
+                <div className="px-2 pt-1 pb-0.5 text-[9px] font-semibold uppercase opacity-60 tracking-wider text-[var(--taomni-text-muted)]">
+                  {group.group}
+                </div>
+              )}
+              {group.options.map((option) => {
+                const isSelected = option.value === value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    className="w-full h-6 px-1.5 text-left text-[11px] rounded flex items-center select-none cursor-pointer hover:bg-[var(--taomni-hover)] focus:bg-[var(--taomni-hover)] outline-none"
+                    style={{
+                      backgroundColor: isSelected ? "var(--taomni-selected)" : "transparent",
+                      color: isSelected ? "var(--taomni-accent)" : selectColor,
+                      ...option.style,
+                    }}
+                    onClick={() => {
+                      onChange(option.value);
+                      setOpen(false);
+                    }}
+                  >
+                    <span className="truncate">{option.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
       )}
     </div>
