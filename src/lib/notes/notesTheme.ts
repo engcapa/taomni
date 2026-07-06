@@ -12,6 +12,7 @@ import type { NotesFont, NotesTheme } from "../../stores/notesStore";
 type NotesPalette = Record<string, string>;
 
 const LIGHT: NotesPalette = {
+  "--taomni-color-scheme": "light",
   "--taomni-bg": "#ffffff",
   "--taomni-chrome-bg": "#f8fafc",
   "--taomni-sidebar-bg": "#f8fafc",
@@ -40,9 +41,11 @@ const LIGHT: NotesPalette = {
   "--taomni-shadow-sm": "0 1px 2px rgba(15, 23, 42, 0.05)",
   "--taomni-shadow-md": "0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 2px 4px -1px rgba(15, 23, 42, 0.02)",
   "--taomni-shadow-lg": "0 16px 24px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.04)",
+  colorScheme: "light",
 };
 
 const DARK: NotesPalette = {
+  "--taomni-color-scheme": "dark",
   "--taomni-bg": "#0f172a",
   "--taomni-chrome-bg": "#111827",
   "--taomni-sidebar-bg": "#111827",
@@ -71,9 +74,11 @@ const DARK: NotesPalette = {
   "--taomni-shadow-sm": "0 1px 2px rgba(0, 0, 0, 0.24)",
   "--taomni-shadow-md": "0 4px 16px -2px rgba(0, 0, 0, 0.36), 0 2px 4px -1px rgba(0, 0, 0, 0.18)",
   "--taomni-shadow-lg": "0 16px 24px -4px rgba(0, 0, 0, 0.46), 0 4px 8px -2px rgba(0, 0, 0, 0.24)",
+  colorScheme: "dark",
 };
 
 const PAPER: NotesPalette = {
+  "--taomni-color-scheme": "light",
   "--taomni-bg": "#fdf6e3",
   "--taomni-chrome-bg": "#f8efd9",
   "--taomni-sidebar-bg": "#f5ecd7",
@@ -102,9 +107,11 @@ const PAPER: NotesPalette = {
   "--taomni-shadow-sm": "0 1px 2px rgba(74, 63, 47, 0.08)",
   "--taomni-shadow-md": "0 4px 16px -2px rgba(74, 63, 47, 0.12), 0 2px 4px -1px rgba(74, 63, 47, 0.06)",
   "--taomni-shadow-lg": "0 16px 24px -4px rgba(74, 63, 47, 0.16), 0 4px 8px -2px rgba(74, 63, 47, 0.08)",
+  colorScheme: "light",
 };
 
 const STICKY: NotesPalette = {
+  "--taomni-color-scheme": "light",
   "--taomni-bg": "#fff4a8",
   "--taomni-chrome-bg": "#ffe66d",
   "--taomni-sidebar-bg": "#fff199",
@@ -133,9 +140,11 @@ const STICKY: NotesPalette = {
   "--taomni-shadow-sm": "0 1px 2px rgba(80, 52, 0, 0.10)",
   "--taomni-shadow-md": "0 6px 18px -3px rgba(80, 52, 0, 0.18), 0 2px 4px rgba(80, 52, 0, 0.08)",
   "--taomni-shadow-lg": "0 18px 34px -8px rgba(80, 52, 0, 0.25), 0 5px 12px rgba(80, 52, 0, 0.12)",
+  colorScheme: "light",
 };
 
 const STICKY_BRIGHT: NotesPalette = {
+  "--taomni-color-scheme": "light",
   "--taomni-bg": "#fbff8f",
   "--taomni-chrome-bg": "#effa00",
   "--taomni-sidebar-bg": "#fbff98",
@@ -165,9 +174,11 @@ const STICKY_BRIGHT: NotesPalette = {
   "--taomni-shadow-sm": "0 1px 2px rgba(54, 59, 0, 0.12)",
   "--taomni-shadow-md": "0 6px 18px -3px rgba(54, 59, 0, 0.18), 0 2px 5px rgba(54, 59, 0, 0.08)",
   "--taomni-shadow-lg": "0 16px 32px -10px rgba(25, 26, 5, 0.34), 0 8px 18px -8px rgba(25, 26, 5, 0.24)",
+  colorScheme: "light",
 };
 
 const MINT: NotesPalette = {
+  "--taomni-color-scheme": "light",
   "--taomni-bg": "#edfdf6",
   "--taomni-chrome-bg": "#d8f7e8",
   "--taomni-sidebar-bg": "#e3faef",
@@ -196,9 +207,11 @@ const MINT: NotesPalette = {
   "--taomni-shadow-sm": "0 1px 2px rgba(18, 54, 43, 0.07)",
   "--taomni-shadow-md": "0 5px 18px -4px rgba(18, 54, 43, 0.13), 0 2px 5px rgba(18, 54, 43, 0.05)",
   "--taomni-shadow-lg": "0 18px 32px -8px rgba(18, 54, 43, 0.18), 0 5px 12px rgba(18, 54, 43, 0.08)",
+  colorScheme: "light",
 };
 
 const SKY: NotesPalette = {
+  "--taomni-color-scheme": "light",
   "--taomni-bg": "#eff7ff",
   "--taomni-chrome-bg": "#d9ecff",
   "--taomni-sidebar-bg": "#e6f3ff",
@@ -227,9 +240,11 @@ const SKY: NotesPalette = {
   "--taomni-shadow-sm": "0 1px 2px rgba(16, 42, 67, 0.07)",
   "--taomni-shadow-md": "0 5px 18px -4px rgba(16, 42, 67, 0.14), 0 2px 5px rgba(16, 42, 67, 0.05)",
   "--taomni-shadow-lg": "0 18px 32px -8px rgba(16, 42, 67, 0.20), 0 5px 12px rgba(16, 42, 67, 0.08)",
+  colorScheme: "light",
 };
 
 const ROSE: NotesPalette = {
+  "--taomni-color-scheme": "light",
   "--taomni-bg": "#fff1f5",
   "--taomni-chrome-bg": "#ffe1ea",
   "--taomni-sidebar-bg": "#ffe9f0",
@@ -258,9 +273,11 @@ const ROSE: NotesPalette = {
   "--taomni-shadow-sm": "0 1px 2px rgba(67, 21, 37, 0.07)",
   "--taomni-shadow-md": "0 5px 18px -4px rgba(67, 21, 37, 0.14), 0 2px 5px rgba(67, 21, 37, 0.05)",
   "--taomni-shadow-lg": "0 18px 32px -8px rgba(67, 21, 37, 0.20), 0 5px 12px rgba(67, 21, 37, 0.08)",
+  colorScheme: "light",
 };
 
 const GRAPHITE: NotesPalette = {
+  "--taomni-color-scheme": "dark",
   "--taomni-bg": "#202124",
   "--taomni-chrome-bg": "#2b2d31",
   "--taomni-sidebar-bg": "#26282c",
@@ -289,12 +306,13 @@ const GRAPHITE: NotesPalette = {
   "--taomni-shadow-sm": "0 1px 2px rgba(0, 0, 0, 0.28)",
   "--taomni-shadow-md": "0 5px 18px -4px rgba(0, 0, 0, 0.38), 0 2px 5px rgba(0, 0, 0, 0.20)",
   "--taomni-shadow-lg": "0 18px 32px -8px rgba(0, 0, 0, 0.48), 0 5px 12px rgba(0, 0, 0, 0.26)",
+  colorScheme: "dark",
 };
 
 /**
- * CSS-variable overrides for a notes theme, applied as inline style on the notes
- * root. Returns an empty object for "taomni" and "compact" (they inherit the
- * app theme); "compact" additionally signals density via [data-density] below.
+ * Style overrides for a notes theme, applied inline on the notes root. Returns
+ * an empty object for "taomni" and "compact" (they inherit the app theme);
+ * "compact" additionally signals density via [data-density] below.
  */
 export function notesThemeStyle(theme: NotesTheme): CSSProperties {
   switch (theme) {
@@ -363,8 +381,9 @@ export function notesFontStyle(font: NotesFont): CSSProperties {
     case "mono":
       return { fontFamily: 'var(--taomni-code-font-family)' };
     case "inherit":
-    default:
       return { fontFamily: "var(--taomni-ui-font-family)" };
+    default:
+      return { fontFamily: font };
   }
 }
 

@@ -319,6 +319,7 @@ function mailAppearanceStyle(profile: TerminalProfile | undefined, fontSize: num
     ? mixColor(foreground, background, 5)
     : mixColor(foreground, background, 6);
   return {
+    "--taomni-color-scheme": darkBackground ? "dark" : "light",
     "--taomni-bg": background,
     "--taomni-panel-bg": mixColor(foreground, background, 5),
     "--taomni-sidebar-bg": mixColor(foreground, background, 8),
@@ -339,6 +340,7 @@ function mailAppearanceStyle(profile: TerminalProfile | undefined, fontSize: num
     "--taomni-button-disabled": buttonDisabled,
     "--taomni-text": foreground,
     "--taomni-text-muted": mixColor(foreground, background, 62),
+    colorScheme: darkBackground ? "dark" : "light",
     fontFamily: terminalProfile.fontFamily || DEFAULT_MAIL_TERMINAL_PROFILE.fontFamily,
     zoom: clampMailFontSize(fontSize) / MAIL_BASE_FONT_SIZE,
   } as CSSProperties;

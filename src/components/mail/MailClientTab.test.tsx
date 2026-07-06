@@ -281,6 +281,28 @@ describe("MailClientTab", () => {
     expect(root.style.getPropertyValue("--taomni-button-from")).not.toBe("");
     expect(root.style.getPropertyValue("--taomni-button-hover-to")).not.toBe("");
     expect(root.style.getPropertyValue("--taomni-button-disabled")).not.toBe("");
+    expect(root.style.getPropertyValue("--taomni-color-scheme")).toBe("dark");
+    expect(root.style.colorScheme).toBe("dark");
+  });
+
+  it("uses a light color scheme for light mail themes", async () => {
+    render(
+      <MailClientTab
+        tabId="mail-tab"
+        info={{
+          ...info,
+          terminalProfile: {
+            ...DEFAULT_TERMINAL_PROFILE,
+            theme: "code:github-light",
+          },
+        }}
+        visible
+      />,
+    );
+
+    const root = await screen.findByTestId("mail-client-tab");
+    expect(root.style.getPropertyValue("--taomni-color-scheme")).toBe("light");
+    expect(root.style.colorScheme).toBe("light");
   });
 
   it("does not force borders onto HTML email layout tables", async () => {

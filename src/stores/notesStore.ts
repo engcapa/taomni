@@ -38,17 +38,7 @@ export type NotesTheme =
   | "rose"
   | "graphite"
   | "compact";
-export type NotesFont =
-  | "inherit"
-  | "inter"
-  | "outfit"
-  | "system"
-  | "rounded"
-  | "serif"
-  | "songti"
-  | "kaiti"
-  | "handwriting"
-  | "mono";
+export type NotesFont = string;
 
 export interface NotesPanelPosition {
   x: number;
@@ -99,17 +89,7 @@ function coerceTheme(value: unknown): NotesTheme {
 }
 
 function coerceFont(value: unknown): NotesFont {
-  return value === "inter" ||
-    value === "outfit" ||
-    value === "system" ||
-    value === "rounded" ||
-    value === "serif" ||
-    value === "songti" ||
-    value === "kaiti" ||
-    value === "handwriting" ||
-    value === "mono"
-    ? value
-    : "inherit";
+  return typeof value === "string" ? value : "inherit";
 }
 
 function clampNotesFontSize(value: unknown): number {

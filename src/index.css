@@ -13,6 +13,7 @@
 @import "tailwindcss";
 
 :root {
+  --taomni-color-scheme: light;
   --taomni-bg: #f8fafc;
   --taomni-chrome-bg: #f1f5f9;
   --taomni-chrome-border: #cbd5e1;
@@ -179,6 +180,7 @@ button, input, select, textarea, optgroup {
 }
 
 html[data-app-theme="dark"] {
+  --taomni-color-scheme: dark;
   --taomni-bg: #1e1f22;
   --taomni-chrome-bg: #191a1c;
   --taomni-chrome-border: #303238;
@@ -391,9 +393,35 @@ body.notes-detached-document,
   border: 1px solid var(--taomni-input-border);
   background: var(--taomni-input-bg);
   color: var(--taomni-text);
+  color-scheme: var(--taomni-color-scheme, light);
   border-radius: 2px;
   outline: none;
   transition: var(--taomni-transition);
+}
+select.taomni-input {
+  background-color: var(--taomni-input-bg);
+}
+select.taomni-input:not(.appearance-none):not([multiple]) {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: max(1.25rem, 20px);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--taomni-text-muted) 50%),
+    linear-gradient(135deg, var(--taomni-text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 11px) calc(50% + 1px),
+    calc(100% - 7px) calc(50% + 1px);
+  background-repeat: no-repeat;
+  background-size: 4px 4px, 4px 4px;
+}
+.taomni-input option,
+.taomni-input optgroup {
+  background-color: var(--taomni-input-bg);
+  color: var(--taomni-text);
+}
+.taomni-input option:checked {
+  background-color: var(--taomni-selected);
+  color: var(--taomni-text);
 }
 .taomni-input:focus {
   border-color: var(--taomni-accent);

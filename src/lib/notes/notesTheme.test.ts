@@ -30,10 +30,17 @@ describe("notesTheme", () => {
     expect(sky["--taomni-bg"]).toBe("#eff7ff");
     expect(rose["--taomni-bg"]).toBe("#fff1f5");
     expect(graphite["--taomni-bg"]).toBe("#202124");
+    expect(light["--taomni-color-scheme"]).toBe("light");
+    expect(light.colorScheme).toBe("light");
+    expect(dark["--taomni-color-scheme"]).toBe("dark");
+    expect(dark.colorScheme).toBe("dark");
+    expect(graphite["--taomni-color-scheme"]).toBe("dark");
+    expect(graphite.colorScheme).toBe("dark");
     // The local theme must cover generic controls inside the Tao pane too.
     for (const p of [light, dark, paper, sticky, stickyBright, mint, sky, rose, graphite]) {
       expect(p["--taomni-text"]).toBeTruthy();
       expect(p["--taomni-bg"]).toBeTruthy();
+      expect(p["--taomni-color-scheme"]).toBeTruthy();
       expect(p["--taomni-input-bg"]).toBeTruthy();
       expect(p["--taomni-input-border"]).toBeTruthy();
       expect(p["--taomni-button-from"]).toBeTruthy();
