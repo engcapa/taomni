@@ -8,7 +8,7 @@ import {
   Search,
 } from "lucide-react";
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
-import type { GitBlobPair, GitSnapshot } from "../../lib/git";
+import { gitChangeLabel, type GitBlobPair, type GitChange, type GitSnapshot } from "../../lib/git";
 import type { GitWorkspaceRootInfo } from "../../types";
 import { ChangesTree } from "./ChangesTree";
 import { ChangesListToolbar } from "./shared/ChangesListToolbar";
@@ -17,6 +17,12 @@ import { DiffPane } from "./shared/DiffPane";
 import { parseWorkspaceChangeKey, workspaceChangeKey } from "./workspaceGitKeys";
 
 type TriState = "all" | "none" | "some";
+
+interface WorkspaceChangeRow {
+  root: GitWorkspaceRootInfo;
+  change: GitChange;
+  key: string;
+}
 
 export interface WorkspaceChangesViewProps {
   roots: GitWorkspaceRootInfo[];
@@ -114,6 +120,16 @@ export function WorkspaceChangesView({
       (change.staged ? "staged" : "unstaged").includes(normalizedFilter)
     )),
   }));
+  const flatRows = groups.flatMap((group) => (
+    group.visibleChanges.map((change) => ({
+      root: group.root,
+      change,
+      key: workspaceChangeKey(group.root.repoRoot, change.path),
+    }))
+  )).sort((a, b) => {
+    const repoCompare = a.root.name.localeCompare(b.root.name);
+    return repoCompare || a.change.path.localeCompare(b.change.path);
+  });
   const totalChanges = groups.reduce((total, group) => total + (group.snapshot?.changes.length ?? 0), 0);
   const visibleChangeCount = groups.reduce((total, group) => total + group.visibleChanges.length, 0);
   const hasVisibleGroups = groups.some((group) => (
@@ -180,34 +196,47 @@ export function WorkspaceChangesView({
             <div className="h-full min-h-24 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
               {filter.trim() ? "No matching changes" : "No local changes"}
             </div>
-          ) : groups.map(({ root, state, snapshot, visibleChanges }) => (
-            <RepoChangeGroup
-              key={root.repoRoot}
-              root={root}
-              snapshot={snapshot}
-              changes={visibleChanges}
-              loading={!!state?.loading}
-              error={state?.error ?? null}
-              treeMode={treeMode}
+          ) : treeMode ? (
+            groups.map(({ root, state, snapshot, visibleChanges }) => (
+              <RepoChangeGroup
+                key={root.repoRoot}
+                root={root}
+                snapshot={snapshot}
+                changes={visibleChanges}
+                loading={!!state?.loading}
+                error={state?.error ?? null}
+                treeMode={treeMode}
+                checkedKeys={checkedKeys}
+                selectedKeys={selectedKeys}
+                focusedKey={focusedKey}
+                collapsed={collapsedRepos.has(root.repoRoot)}
+                onToggleCollapsed={() => toggleRepoCollapsed(root.repoRoot)}
+                busy={busy}
+                commitMessage={repoCommitMessages[root.repoRoot] ?? ""}
+                onCommitMessageChange={(value) => setRepoCommitMessage(root.repoRoot, value)}
+                onCommit={() => commitRepo(root.repoRoot)}
+                onCommitAndPush={() => commitRepoAndPush(root.repoRoot)}
+                checkedRepoPathCount={checkedChangePathsByRepo[root.repoRoot]?.length ?? 0}
+                canPush={pushableRepoRoots.has(root.repoRoot)}
+                onToggleChecked={onToggleChecked}
+                onStagePaths={stagePaths}
+                onUnstagePaths={unstagePaths}
+                onSelect={onSelect}
+                onContextMenu={onContextMenu}
+              />
+            ))
+          ) : (
+            <WorkspaceFlatChangesList
+              groups={groups}
+              rows={flatRows}
               checkedKeys={checkedKeys}
               selectedKeys={selectedKeys}
               focusedKey={focusedKey}
-              collapsed={collapsedRepos.has(root.repoRoot)}
-              onToggleCollapsed={() => toggleRepoCollapsed(root.repoRoot)}
-              busy={busy}
-              commitMessage={repoCommitMessages[root.repoRoot] ?? ""}
-              onCommitMessageChange={(value) => setRepoCommitMessage(root.repoRoot, value)}
-              onCommit={() => commitRepo(root.repoRoot)}
-              onCommitAndPush={() => commitRepoAndPush(root.repoRoot)}
-              checkedRepoPathCount={checkedChangePathsByRepo[root.repoRoot]?.length ?? 0}
-              canPush={pushableRepoRoots.has(root.repoRoot)}
               onToggleChecked={onToggleChecked}
-              onStagePaths={stagePaths}
-              onUnstagePaths={unstagePaths}
               onSelect={onSelect}
               onContextMenu={onContextMenu}
             />
-          ))}
+          )}
         </div>
 
         <CommitBar
@@ -236,6 +265,168 @@ export function WorkspaceChangesView({
         />
       </Panel>
     </PanelGroup>
+  );
+}
+
+function WorkspaceFlatChangesList({
+  groups,
+  rows,
+  checkedKeys,
+  selectedKeys,
+  focusedKey,
+  onToggleChecked,
+  onSelect,
+  onContextMenu,
+}: {
+  groups: Array<{
+    root: GitWorkspaceRootInfo;
+    state: WorkspaceChangesViewProps["snapshots"][string] | undefined;
+    snapshot: GitSnapshot | null;
+    visibleChanges: GitSnapshot["changes"];
+  }>;
+  rows: WorkspaceChangeRow[];
+  checkedKeys: Set<string>;
+  selectedKeys: Set<string>;
+  focusedKey: string | null;
+  onToggleChecked: (repoRoot: string, paths: string[], value: boolean) => void;
+  onSelect: (repoRoot: string, path: string, mods: { ctrl: boolean; shift: boolean }) => void;
+  onContextMenu: (repoRoot: string, path: string, event: ReactMouseEvent) => void;
+}) {
+  const statusRows = groups.filter((group) => group.state?.loading || group.state?.error);
+
+  return (
+    <div className="min-h-full">
+      {rows.map((row) => (
+        <WorkspaceFlatChangeRow
+          key={row.key}
+          row={row}
+          checked={checkedKeys.has(row.key)}
+          selected={selectedKeys.has(row.key)}
+          active={focusedKey === row.key}
+          onToggleChecked={(value) => onToggleChecked(row.root.repoRoot, [row.change.path], value)}
+          onSelect={(mods) => onSelect(row.root.repoRoot, row.change.path, mods)}
+          onContextMenu={(event) => onContextMenu(row.root.repoRoot, row.change.path, event)}
+        />
+      ))}
+      {statusRows.map((group) => (
+        <RepoFlatStatusRow
+          key={group.root.repoRoot}
+          root={group.root}
+          loading={!!group.state?.loading}
+          error={group.state?.error ?? null}
+        />
+      ))}
+    </div>
+  );
+}
+
+function WorkspaceFlatChangeRow({
+  row,
+  checked,
+  selected,
+  active,
+  onToggleChecked,
+  onSelect,
+  onContextMenu,
+}: {
+  row: WorkspaceChangeRow;
+  checked: boolean;
+  selected: boolean;
+  active: boolean;
+  onToggleChecked: (value: boolean) => void;
+  onSelect: (mods: { ctrl: boolean; shift: boolean }) => void;
+  onContextMenu: (event: ReactMouseEvent) => void;
+}) {
+  const { root, change } = row;
+  const repoColor = repoColorFor(root.repoRoot);
+  const pathDir = directoryName(change.path);
+  const oldPathDir = change.oldPath ? directoryName(change.oldPath) : "";
+  const status = workspaceStatusMeta(change);
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      data-testid="workspace-change-row"
+      aria-label={`${root.name} ${change.path} ${status.actionLabel}`}
+      title={`${root.repoRoot}\n${change.path}`}
+      className={`group relative w-full min-h-[48px] pr-2 py-1.5 flex items-center gap-2 text-left cursor-pointer border-b border-[var(--taomni-divider)] ${
+        active ? "bg-[var(--taomni-hover)]" : selected ? "bg-[var(--taomni-accent)]/10" : "hover:bg-[var(--taomni-hover)]"
+      }`}
+      style={{ borderLeft: `3px solid ${repoColor.border}` }}
+      onClick={(event) => onSelect({ ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey })}
+      onContextMenu={onContextMenu}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect({ ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey });
+        }
+      }}
+    >
+      <input
+        type="checkbox"
+        className="ml-1 shrink-0 accent-[var(--taomni-accent)]"
+        checked={checked}
+        aria-label={`Select ${root.name} ${change.path}`}
+        onClick={(event) => event.stopPropagation()}
+        onChange={(event) => onToggleChecked(event.target.checked)}
+      />
+      <span
+        className="shrink-0 w-12 rounded px-1.5 py-0.5 text-center text-[10px] font-semibold uppercase"
+        style={{
+          background: repoColor.bg,
+          border: `1px solid ${repoColor.border}`,
+          color: repoColor.text,
+        }}
+        title={root.repoRoot}
+      >
+        {repoAbbr(root.name || root.repoRoot)}
+      </span>
+      <span className={`shrink-0 w-6 rounded px-1 py-0.5 text-center text-[10px] font-semibold ${status.kindClass}`}>
+        {status.kindLabel}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="min-w-0 truncate text-[12px] font-medium">{fileName(change.path)}</span>
+          <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${status.actionClass}`}>
+            {status.actionLabel}
+          </span>
+        </div>
+        <div className="truncate text-[11px] text-[var(--taomni-text-muted)]">
+          {pathDir || "."} / {gitChangeLabel(change)}
+          {change.oldPath ? ` · from ${oldPathDir || "."} / ${fileName(change.oldPath)}` : ""}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RepoFlatStatusRow({
+  root,
+  loading,
+  error,
+}: {
+  root: GitWorkspaceRootInfo;
+  loading: boolean;
+  error: string | null;
+}) {
+  const color = repoColorFor(root.repoRoot);
+  return (
+    <div
+      className="min-h-[36px] px-2 py-2 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-[12px]"
+      style={{ borderLeft: `3px solid ${color.border}` }}
+    >
+      <span
+        className="shrink-0 w-12 rounded px-1.5 py-0.5 text-center text-[10px] font-semibold uppercase"
+        style={{ background: color.bg, border: `1px solid ${color.border}`, color: color.text }}
+      >
+        {repoAbbr(root.name || root.repoRoot)}
+      </span>
+      {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-accent)]" /> : null}
+      {error ? <AlertTriangle className="w-3.5 h-3.5 text-red-500" /> : null}
+      <span className={error ? "truncate text-red-500" : "truncate text-[var(--taomni-text-muted)]"}>
+        {error ?? "Loading changes..."}
+      </span>
+    </div>
   );
 }
 
@@ -420,4 +611,90 @@ function checkState(checkedCount: number, totalCount: number): TriState {
   if (totalCount === 0 || checkedCount === 0) return "none";
   if (checkedCount === totalCount) return "all";
   return "some";
+}
+
+function fileName(path: string): string {
+  const parts = path.split("/").filter(Boolean);
+  return parts[parts.length - 1] ?? path;
+}
+
+function directoryName(path: string): string {
+  const parts = path.split("/").filter(Boolean);
+  parts.pop();
+  return parts.join("/");
+}
+
+function repoAbbr(name: string): string {
+  const words = name
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length >= 2) return words.slice(0, 2).map((word) => word[0]).join("").toUpperCase();
+  const compact = (words[0] ?? name).replace(/[^a-zA-Z0-9]/g, "");
+  return (compact.slice(0, 3) || "repo").toUpperCase();
+}
+
+function workspaceStatusMeta(change: GitChange): {
+  kindLabel: string;
+  kindClass: string;
+  actionLabel: string;
+  actionClass: string;
+} {
+  if (change.conflict) {
+    return {
+      kindLabel: "!",
+      kindClass: "bg-red-500/15 text-red-500",
+      actionLabel: "Resolve",
+      actionClass: "bg-red-500/15 text-red-500",
+    };
+  }
+  if (change.staged) {
+    return {
+      kindLabel: shortChangeKind(change),
+      kindClass: "bg-emerald-500/15 text-emerald-600",
+      actionLabel: "Commit",
+      actionClass: "bg-emerald-500/15 text-emerald-600",
+    };
+  }
+  if (change.status === "untracked") {
+    return {
+      kindLabel: "?",
+      kindClass: "bg-amber-500/15 text-amber-600",
+      actionLabel: "Add",
+      actionClass: "bg-amber-500/15 text-amber-600",
+    };
+  }
+  return {
+    kindLabel: shortChangeKind(change),
+    kindClass: "bg-blue-500/15 text-blue-500",
+    actionLabel: "Add",
+    actionClass: "bg-blue-500/15 text-blue-500",
+  };
+}
+
+function shortChangeKind(change: GitChange): string {
+  if (change.status === "renamed") return "R";
+  if (change.status === "deleted") return "D";
+  if (change.status === "added") return "A";
+  if (change.status === "untracked") return "?";
+  return "M";
+}
+
+function repoColorFor(repoRoot: string): { bg: string; border: string; text: string } {
+  const palette = [
+    { bg: "#DBEAFE", border: "#2563EB", text: "#1D4ED8" },
+    { bg: "#DCFCE7", border: "#16A34A", text: "#15803D" },
+    { bg: "#FEF3C7", border: "#D97706", text: "#B45309" },
+    { bg: "#FCE7F3", border: "#DB2777", text: "#BE185D" },
+    { bg: "#E0F2FE", border: "#0284C7", text: "#0369A1" },
+    { bg: "#EDE9FE", border: "#7C3AED", text: "#6D28D9" },
+    { bg: "#CCFBF1", border: "#0D9488", text: "#0F766E" },
+    { bg: "#FFE4E6", border: "#E11D48", text: "#BE123C" },
+  ];
+  let hash = 0;
+  for (let i = 0; i < repoRoot.length; i += 1) {
+    hash = (hash * 31 + repoRoot.charCodeAt(i)) >>> 0;
+  }
+  return palette[hash % palette.length];
 }

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   AppDialogProvider,
   alertAppDialog,
+  choiceAppDialog,
   confirmAppDialog,
   promptAppDialog,
 } from "./appDialogs";
@@ -65,6 +66,36 @@ describe("appDialogs", () => {
     expect(screen.getByTestId("text-input-dialog-confirm")).not.toBeDisabled();
     fireEvent.click(screen.getByTestId("text-input-dialog-confirm"));
     await waitFor(() => expect(result).toBe(""));
+  });
+
+  it("resolves choice dialogs through the app modal host", async () => {
+    let result: "primary" | "secondary" | null | undefined;
+    render(
+      <AppDialogProvider>
+        <button
+          type="button"
+          onClick={() => {
+            void choiceAppDialog({
+              title: "Confirm Commit and Push",
+              message: "Commit two repositories?",
+              primaryLabel: "Commit and Push",
+              secondaryLabel: "Commit only",
+            }).then((value) => {
+              result = value;
+            });
+          }}
+        >
+          Choose
+        </button>
+      </AppDialogProvider>,
+    );
+
+    fireEvent.click(screen.getByText("Choose"));
+    expect(screen.getByTestId("choice-dialog-message")).toHaveTextContent("Commit two repositories?");
+
+    fireEvent.click(screen.getByTestId("choice-dialog-secondary"));
+    await waitFor(() => expect(result).toBe("secondary"));
+    expect(screen.queryByTestId("choice-dialog")).not.toBeInTheDocument();
   });
 
   it("resolves alert dialogs without using browser alerts", async () => {
