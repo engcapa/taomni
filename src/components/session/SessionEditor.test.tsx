@@ -372,6 +372,38 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     });
   });
 
+  it.each(["SSH", "SFTP"] as const)("uses saved vault password ref when testing a %s session", async (sessionType) => {
+    const user = userEvent.setup();
+    const session = {
+      id: `${sessionType.toLowerCase()}-saved-password`,
+      name: `${sessionType} saved password`,
+      session_type: sessionType,
+      group_path: null,
+      host: "saved.example.com",
+      port: 22,
+      username: "deploy",
+      auth_method: "Password" as const,
+      options_json: JSON.stringify({ passwordRef: "vault:pwd" }),
+      created_at: 1,
+      updated_at: 1,
+      last_connected_at: null,
+      sort_order: 0,
+    };
+    renderEditor(session);
+
+    await user.click(screen.getByRole("button", { name: "Test connection" }));
+
+    await waitFor(() => expect(ipcMocks.testSshConnection).toHaveBeenCalledTimes(1));
+    expect(ipcMocks.testSshConnection).toHaveBeenCalledWith(
+      "saved.example.com",
+      22,
+      "deploy",
+      "Password",
+      "vault:pwd",
+      expect.any(String),
+    );
+  });
+
   it("persists Bookmark settings through the session store save path", async () => {
     const user = userEvent.setup();
     const { onClose } = renderEditor();

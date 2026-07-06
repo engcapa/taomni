@@ -3109,7 +3109,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       setTestResult({ ok: false, msg: t("sessionEditor2.testHostUserRequired") });
       return;
     }
-    if (authMethod === "Password" && !password) {
+    const passwordAuthData = password || passwordRef;
+    if (authMethod === "Password" && !passwordAuthData) {
       setTestResult({ ok: false, msg: t("sessionEditor2.testEnterPassword") });
       return;
     }
@@ -3117,7 +3118,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setTestResult(null);
     try {
       let authData: string | null = null;
-      if (authMethod === "Password") authData = password;
+      if (authMethod === "Password") authData = passwordAuthData;
       else if (authMethod === "PrivateKey")
         authData = keyPath || "~/.ssh/id_ed25519";
       const msg = await testSshConnection(
