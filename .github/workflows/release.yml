@@ -104,6 +104,7 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Build and upload release bundles
+        id: tauri_release
         if: steps.version.outputs.tag != ''
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
@@ -116,11 +117,26 @@ jobs:
           releaseBody: Desktop bundles for Taomni v${{ steps.version.outputs.version }}.
           generateReleaseNotes: true
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
-          uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: "[name]-[version]-[platform]-[arch]-[bundle]"
           args: ${{ matrix.args }}
 
+      - name: Collect release workflow artifacts
+        if: steps.version.outputs.tag != ''
+        shell: bash
+        env:
+          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_release.outputs.artifactPaths }}
+          TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/${{ matrix.platform }}
+        run: node scripts/collect-tauri-action-artifacts.mjs
+
+      - name: Upload release workflow artifacts
+        if: steps.version.outputs.tag != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: taomni-${{ steps.version.outputs.version }}-${{ matrix.platform }}
+          path: tauri-artifacts/${{ matrix.platform }}
+          if-no-files-found: error
+
       - name: Build workflow bundles
+        id: tauri_workflow
         if: steps.version.outputs.tag == ''
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
@@ -128,9 +144,23 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: "[name]-[version]-[platform]-[arch]-[bundle]"
           args: ${{ matrix.args }}
+
+      - name: Collect workflow artifacts
+        if: steps.version.outputs.tag == ''
+        shell: bash
+        env:
+          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_workflow.outputs.artifactPaths }}
+          TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/${{ matrix.platform }}
+        run: node scripts/collect-tauri-action-artifacts.mjs
+
+      - name: Upload workflow artifacts
+        if: steps.version.outputs.tag == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: taomni-${{ steps.version.outputs.version }}-${{ matrix.platform }}
+          path: tauri-artifacts/${{ matrix.platform }}
+          if-no-files-found: error
 
   # ---------------------------------------------------------------------------
   # macOS – single arm64 runner, cross-compiles both architectures
@@ -219,6 +249,7 @@ jobs:
 
       # ---------- aarch64-apple-darwin (native) ----------
       - name: Build and upload release bundle (aarch64)
+        id: tauri_macos_aarch64_release
         if: steps.version.outputs.tag != ''
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
@@ -235,11 +266,26 @@ jobs:
           releaseBody: Desktop bundles for Taomni v${{ steps.version.outputs.version }}.
           generateReleaseNotes: true
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
-          uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: "[name]-[version]-[platform]-[arch]-[bundle]"
           args: --target aarch64-apple-darwin
 
+      - name: Collect release workflow artifacts (aarch64)
+        if: steps.version.outputs.tag != ''
+        shell: bash
+        env:
+          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos_aarch64_release.outputs.artifactPaths }}
+          TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/macos-aarch64
+        run: node scripts/collect-tauri-action-artifacts.mjs
+
+      - name: Upload release workflow artifacts (aarch64)
+        if: steps.version.outputs.tag != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: taomni-${{ steps.version.outputs.version }}-macos-aarch64
+          path: tauri-artifacts/macos-aarch64
+          if-no-files-found: error
+
       - name: Build workflow bundle (aarch64)
+        id: tauri_macos_aarch64_workflow
         if: steps.version.outputs.tag == ''
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
@@ -250,12 +296,27 @@ jobs:
           LIBGSSAPI_PREFIX: /opt/homebrew/opt/krb5
           PKG_CONFIG_PATH: /opt/homebrew/opt/krb5/lib/pkgconfig
         with:
-          uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: "[name]-[version]-[platform]-[arch]-[bundle]"
           args: --target aarch64-apple-darwin
+
+      - name: Collect workflow artifacts (aarch64)
+        if: steps.version.outputs.tag == ''
+        shell: bash
+        env:
+          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos_aarch64_workflow.outputs.artifactPaths }}
+          TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/macos-aarch64
+        run: node scripts/collect-tauri-action-artifacts.mjs
+
+      - name: Upload workflow artifacts (aarch64)
+        if: steps.version.outputs.tag == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: taomni-${{ steps.version.outputs.version }}-macos-aarch64
+          path: tauri-artifacts/macos-aarch64
+          if-no-files-found: error
 
       # ---------- x86_64-apple-darwin (cross-compile) ----------
       - name: Build and upload release bundle (x86_64)
+        id: tauri_macos_x86_64_release
         if: steps.version.outputs.tag != ''
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
@@ -273,11 +334,26 @@ jobs:
           releaseBody: Desktop bundles for Taomni v${{ steps.version.outputs.version }}.
           generateReleaseNotes: true
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
-          uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: "[name]-[version]-[platform]-[arch]-[bundle]"
           args: --target x86_64-apple-darwin
 
+      - name: Collect release workflow artifacts (x86_64)
+        if: steps.version.outputs.tag != ''
+        shell: bash
+        env:
+          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos_x86_64_release.outputs.artifactPaths }}
+          TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/macos-x86_64
+        run: node scripts/collect-tauri-action-artifacts.mjs
+
+      - name: Upload release workflow artifacts (x86_64)
+        if: steps.version.outputs.tag != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: taomni-${{ steps.version.outputs.version }}-macos-x86_64
+          path: tauri-artifacts/macos-x86_64
+          if-no-files-found: error
+
       - name: Build workflow bundle (x86_64)
+        id: tauri_macos_x86_64_workflow
         if: steps.version.outputs.tag == ''
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
@@ -289,9 +365,23 @@ jobs:
           PKG_CONFIG_PATH: /usr/local/opt/krb5/lib/pkgconfig
           PKG_CONFIG_ALLOW_CROSS: "1"
         with:
-          uploadWorkflowArtifacts: true
-          workflowArtifactNamePattern: "[name]-[version]-[platform]-[arch]-[bundle]"
           args: --target x86_64-apple-darwin
+
+      - name: Collect workflow artifacts (x86_64)
+        if: steps.version.outputs.tag == ''
+        shell: bash
+        env:
+          TAURI_ACTION_ARTIFACT_PATHS: ${{ steps.tauri_macos_x86_64_workflow.outputs.artifactPaths }}
+          TAURI_ACTION_ARTIFACT_OUT_DIR: tauri-artifacts/macos-x86_64
+        run: node scripts/collect-tauri-action-artifacts.mjs
+
+      - name: Upload workflow artifacts (x86_64)
+        if: steps.version.outputs.tag == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: taomni-${{ steps.version.outputs.version }}-macos-x86_64
+          path: tauri-artifacts/macos-x86_64
+          if-no-files-found: error
 
   # ---------------------------------------------------------------------------
   # Compose a single, complete latest.json for tauri-plugin-updater.

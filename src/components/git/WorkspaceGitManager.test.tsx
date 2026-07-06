@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../../stores/appStore";
-import type { GitSnapshot } from "../../lib/git";
+import type { GitRemote, GitSnapshot } from "../../lib/git";
 import { WorkspaceGitManager } from "./WorkspaceGitManager";
 
 const gitMocks = vi.hoisted(() => ({
@@ -20,7 +20,7 @@ const gitMocks = vi.hoisted(() => ({
   gitSnapshot: vi.fn(),
   gitStage: vi.fn(),
   gitUnstage: vi.fn(),
-  selectedRemote: vi.fn(() => null),
+  selectedRemote: vi.fn<(snapshot: GitSnapshot | null) => GitRemote | null>(() => null),
 }));
 
 const dialogMocks = vi.hoisted(() => ({
