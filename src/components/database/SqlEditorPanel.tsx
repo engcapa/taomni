@@ -161,7 +161,7 @@ export interface SqlEditorHandle {
   getSelectionRange: () => { from: number; to: number } | null;
   setValue: (text: string) => void;
   selectRange: (from: number, to: number) => void;
-  replaceRange: (from: number, to: number, text: string) => void;
+  replaceRange: (from: number, to: number, text: string, options?: { focus?: boolean }) => void;
   insertText: (text: string) => void;
   focus: () => void;
 }
@@ -372,7 +372,7 @@ export function SqlEditorPanel({
         view.dispatch({ selection: { anchor: start, head: end }, scrollIntoView: true });
         view.focus();
       },
-      replaceRange: (from: number, to: number, text: string) => {
+      replaceRange: (from: number, to: number, text: string, options) => {
         const start = Math.max(0, Math.min(from, view.state.doc.length));
         const end = Math.max(0, Math.min(to, view.state.doc.length));
         const rangeFrom = Math.min(start, end);
@@ -381,7 +381,7 @@ export function SqlEditorPanel({
           selection: { anchor: rangeFrom + text.length },
           scrollIntoView: true,
         });
-        view.focus();
+        if (options?.focus !== false) view.focus();
       },
       insertText: (text: string) => {
         const pos = view.state.selection.main.to;

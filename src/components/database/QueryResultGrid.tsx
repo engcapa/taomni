@@ -39,8 +39,9 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import type { DbColumn, DbQueryResult } from "../../lib/ipc";
+import type { DbColumn, DbQueryResult, DbResultSqlRewriteRequest } from "../../lib/ipc";
 import {
+  dbRewriteResultSql,
   readFileBytes,
   selectFilePath,
   selectSaveFilePath,
@@ -89,18 +90,32 @@ export interface QueryGridCommitPayload {
 interface QueryResultGridProps {
   result: DbQueryResult;
   sourceSql?: string;
+  baseSql?: string;
   sqlEngine?: string;
   running?: boolean;
   cancelling?: boolean;
   onRefresh?: (mode: QueryRefreshMode) => void;
   onCancel?: () => void;
   onCommitChanges?: (payload: QueryGridCommitPayload) => Promise<void>;
-  onGeneratedSqlChange?: (sql: string | null) => void;
   onGeneratedSqlSync?: (sql: string, mode: QueryGeneratedSqlSyncMode) => void;
+  onGeneratedSqlQuery?: (sql: string, request?: DbResultSqlRewriteRequest) => void | Promise<void>;
   onStatus?: (message: string) => void;
 }
 
+interface ResolvedGeneratedSql {
+  key: string;
+  sql: string | null;
+  mode: "inline" | "unsupported" | null;
+  reason: string | null;
+  pending: boolean;
+}
+
 type SortDir = "asc" | "desc" | null;
+type ActiveSortDir = Exclude<SortDir, null>;
+interface SortRule {
+  columnIndex: number;
+  dir: ActiveSortDir;
+}
 type ViewMode = "table" | "list" | "chart";
 type RowStatus = "clean" | "inserted" | "updated" | "deleted";
 type ExportTarget = "all" | "selection";
@@ -151,13 +166,13 @@ interface DistinctColumnSummary {
 
 interface GeneratedResultSqlOptions {
   sourceSql?: string;
+  currentSql?: string;
   sqlEngine?: string;
   columns: DbColumn[];
   visibleColumnIndexes: number[];
   globalFilterText: string;
   columnFilters: ActiveColumnFilter[];
-  sortCol: number | null;
-  sortDir: SortDir;
+  sorts: SortRule[];
 }
 
 interface OpenColumnFilter {
@@ -429,8 +444,8 @@ function stripSqlTerminator(sql: string): string {
   return sql.trim().replace(/;+\s*$/, "");
 }
 
-function indentSql(sql: string): string {
-  return sql.split(/\r?\n/).map((line) => `  ${line}`).join("\n");
+function sqlWithTerminator(sql: string): string {
+  return `${stripSqlTerminator(sql)};`;
 }
 
 function sqlTextExpression(engine: SqlEngine, expression: string): string {
@@ -486,6 +501,215 @@ function selectedValuesCondition(columnSql: string, values: (string | null)[]): 
   return clauses.length === 1 ? clauses[0] : `(${clauses.join(" OR ")})`;
 }
 
+function isIdentChar(char: string | undefined): boolean {
+  return !!char && /[A-Za-z0-9_$]/.test(char);
+}
+
+function keywordMatchAt(sql: string, index: number, pattern: RegExp): number {
+  if (isIdentChar(sql[index - 1])) return 0;
+  const match = sql.slice(index).match(pattern);
+  if (!match) return 0;
+  const end = index + match[0].length;
+  return isIdentChar(sql[end]) ? 0 : match[0].length;
+}
+
+function topLevelSqlClauses(sql: string): Record<string, number> {
+  const clauses: Record<string, number> = {};
+  let depth = 0;
+  let singleQuoted = false;
+  let doubleQuoted = false;
+  let backtickQuoted = false;
+  let bracketQuoted = false;
+  let lineComment = false;
+  let blockComment = false;
+
+  for (let i = 0; i < sql.length; i += 1) {
+    const ch = sql[i];
+    const next = sql[i + 1];
+
+    if (lineComment) {
+      if (ch === "\n") lineComment = false;
+      continue;
+    }
+    if (blockComment) {
+      if (ch === "*" && next === "/") {
+        blockComment = false;
+        i += 1;
+      }
+      continue;
+    }
+    if (singleQuoted) {
+      if (ch === "'" && next === "'") i += 1;
+      else if (ch === "'") singleQuoted = false;
+      continue;
+    }
+    if (doubleQuoted) {
+      if (ch === "\"" && next === "\"") i += 1;
+      else if (ch === "\"") doubleQuoted = false;
+      continue;
+    }
+    if (backtickQuoted) {
+      if (ch === "`" && next === "`") i += 1;
+      else if (ch === "`") backtickQuoted = false;
+      continue;
+    }
+    if (bracketQuoted) {
+      if (ch === "]" && next === "]") i += 1;
+      else if (ch === "]") bracketQuoted = false;
+      continue;
+    }
+
+    if (ch === "-" && next === "-") {
+      lineComment = true;
+      i += 1;
+      continue;
+    }
+    if (ch === "/" && next === "*") {
+      blockComment = true;
+      i += 1;
+      continue;
+    }
+    if (ch === "'") {
+      singleQuoted = true;
+      continue;
+    }
+    if (ch === "\"") {
+      doubleQuoted = true;
+      continue;
+    }
+    if (ch === "`") {
+      backtickQuoted = true;
+      continue;
+    }
+    if (ch === "[") {
+      bracketQuoted = true;
+      continue;
+    }
+    if (ch === "(") {
+      depth += 1;
+      continue;
+    }
+    if (ch === ")") {
+      depth = Math.max(0, depth - 1);
+      continue;
+    }
+
+    if (depth !== 0) continue;
+    const checks: Array<[string, RegExp]> = [
+      ["select", /^select\b/i],
+      ["from", /^from\b/i],
+      ["where", /^where\b/i],
+      ["groupBy", /^group\s+by\b/i],
+      ["having", /^having\b/i],
+      ["orderBy", /^order\s+by\b/i],
+      ["limit", /^limit\b/i],
+      ["offset", /^offset\b/i],
+      ["fetch", /^fetch\b/i],
+      ["for", /^for\b/i],
+      ["union", /^union\b/i],
+      ["intersect", /^intersect\b/i],
+      ["except", /^except\b/i],
+    ];
+    for (const [name, pattern] of checks) {
+      if (clauses[name] !== undefined) continue;
+      if (keywordMatchAt(sql, i, pattern) > 0) clauses[name] = i;
+    }
+  }
+  return clauses;
+}
+
+function firstClauseAfter(clauses: Record<string, number>, names: string[], after = -1): number | null {
+  const indexes = names
+    .map((name) => clauses[name])
+    .filter((index): index is number => index !== undefined && index > after);
+  return indexes.length > 0 ? Math.min(...indexes) : null;
+}
+
+function selectListContainsTopLevelStar(sql: string, clauses: Record<string, number>): boolean {
+  const selectStart = clauses.select;
+  const fromStart = clauses.from;
+  if (selectStart === undefined || fromStart === undefined || fromStart <= selectStart) return false;
+  const list = sql.slice(selectStart + "select".length, fromStart);
+  let depth = 0;
+  let singleQuoted = false;
+  let doubleQuoted = false;
+  let backtickQuoted = false;
+  let bracketQuoted = false;
+  for (let i = 0; i < list.length; i += 1) {
+    const ch = list[i];
+    const next = list[i + 1];
+    if (singleQuoted) {
+      if (ch === "'" && next === "'") i += 1;
+      else if (ch === "'") singleQuoted = false;
+      continue;
+    }
+    if (doubleQuoted) {
+      if (ch === "\"" && next === "\"") i += 1;
+      else if (ch === "\"") doubleQuoted = false;
+      continue;
+    }
+    if (backtickQuoted) {
+      if (ch === "`" && next === "`") i += 1;
+      else if (ch === "`") backtickQuoted = false;
+      continue;
+    }
+    if (bracketQuoted) {
+      if (ch === "]" && next === "]") i += 1;
+      else if (ch === "]") bracketQuoted = false;
+      continue;
+    }
+    if (ch === "'") singleQuoted = true;
+    else if (ch === "\"") doubleQuoted = true;
+    else if (ch === "`") backtickQuoted = true;
+    else if (ch === "[") bracketQuoted = true;
+    else if (ch === "(") depth += 1;
+    else if (ch === ")") depth = Math.max(0, depth - 1);
+    else if (depth === 0 && ch === "*") return true;
+  }
+  return false;
+}
+
+function tryBuildInlineResultSql(baseSql: string, whereClauses: string[], orderBy: string): string | null {
+  let sql = stripSqlTerminator(baseSql);
+  if (!/^\s*select\b/i.test(sql) || /^\s*with\b/i.test(sql)) return null;
+  let clauses = topLevelSqlClauses(sql);
+  if (
+    clauses.select === undefined ||
+    clauses.from === undefined ||
+    clauses.union !== undefined ||
+    clauses.intersect !== undefined ||
+    clauses.except !== undefined ||
+    clauses.groupBy !== undefined ||
+    clauses.having !== undefined ||
+    !selectListContainsTopLevelStar(sql, clauses)
+  ) {
+    return null;
+  }
+
+  if (whereClauses.length > 0) {
+    const tailStart = firstClauseAfter(clauses, ["orderBy", "limit", "offset", "fetch", "for"]);
+    const whereSql = whereClauses.join("\n  AND ");
+    if (clauses.where !== undefined) {
+      const insertAt = tailStart ?? sql.length;
+      sql = `${sql.slice(0, insertAt).trimEnd()}\n  AND ${whereSql}${insertAt < sql.length ? `\n${sql.slice(insertAt).trimStart()}` : ""}`;
+    } else {
+      const insertAt = tailStart ?? sql.length;
+      sql = `${sql.slice(0, insertAt).trimEnd()}\nWHERE ${whereSql}${insertAt < sql.length ? `\n${sql.slice(insertAt).trimStart()}` : ""}`;
+    }
+    clauses = topLevelSqlClauses(sql);
+  }
+
+  if (orderBy) {
+    if (clauses.orderBy !== undefined) {
+      return null;
+    }
+    const insertAt = firstClauseAfter(clauses, ["limit", "offset", "fetch", "for"]) ?? sql.length;
+    sql = `${sql.slice(0, insertAt).trimEnd()}\n${orderBy}${insertAt < sql.length ? `\n${sql.slice(insertAt).trimStart()}` : ""}`;
+  }
+
+  return sqlWithTerminator(sql);
+}
+
 function buildGeneratedResultSql({
   sourceSql,
   sqlEngine,
@@ -493,8 +717,7 @@ function buildGeneratedResultSql({
   visibleColumnIndexes,
   globalFilterText,
   columnFilters,
-  sortCol,
-  sortDir,
+  sorts,
 }: GeneratedResultSqlOptions): string | null {
   const baseSql = stripSqlTerminator(sourceSql ?? "");
   if (!baseSql || !sqlEngine) return null;
@@ -512,23 +735,59 @@ function buildGeneratedResultSql({
   }
   for (const filter of columnFilters) {
     const column = columnSql(filter.columnIndex);
-    if (filter.text) {
+    const selectedCondition = selectedValuesCondition(column, filter.selectedValues);
+    if (selectedCondition) {
+      whereClauses.push(selectedCondition);
+    } else if (filter.text) {
       whereClauses.push(
         filter.mode === "exact"
           ? `${column} = ${dialectSqlLiteral(filter.text)}`
           : sqlLikeCondition(sqlTextExpression(engine, column), filter.text),
       );
     }
-    const selectedCondition = selectedValuesCondition(column, filter.selectedValues);
-    if (selectedCondition) whereClauses.push(selectedCondition);
   }
-  const orderBy = sortCol !== null && sortDir ? `ORDER BY ${columnSql(sortCol)} ${sortDir.toUpperCase()}` : "";
-  if (whereClauses.length === 0 && !orderBy) return null;
-  const alias = engine === "Oracle" ? ") taomni_result" : ") AS taomni_result";
-  const lines = ["SELECT *", "FROM (", indentSql(baseSql), alias];
-  if (whereClauses.length > 0) lines.push(`WHERE ${whereClauses.join("\n  AND ")}`);
-  if (orderBy) lines.push(orderBy);
-  return `${lines.join("\n")};`;
+  const orderBy =
+    sorts.length > 0
+      ? `ORDER BY ${sorts.map((sort) => `${columnSql(sort.columnIndex)} ${sort.dir.toUpperCase()}`).join(", ")}`
+      : "";
+  if (whereClauses.length === 0 && !orderBy) {
+    return null;
+  }
+  const inlineSql = tryBuildInlineResultSql(baseSql, whereClauses, orderBy);
+  if (inlineSql) return inlineSql;
+  return sqlWithTerminator(baseSql);
+}
+
+function buildResultSqlRewriteRequest({
+  sourceSql,
+  sqlEngine,
+  columns,
+  visibleColumnIndexes,
+  globalFilterText,
+  columnFilters,
+  sorts,
+}: GeneratedResultSqlOptions): DbResultSqlRewriteRequest | null {
+  const baseSql = stripSqlTerminator(sourceSql ?? "");
+  if (!baseSql || !sqlEngine) return null;
+  if (!globalFilterText.trim() && columnFilters.length === 0 && sorts.length === 0) return null;
+  return {
+    engine: sqlEngine,
+    sourceSql: baseSql,
+    resultColumns: columns.map((column) => column.name),
+    visibleColumnIndexes,
+    globalFilterText,
+    filters: columnFilters.map((filter) => ({
+      columnIndex: filter.columnIndex,
+      text: filter.text,
+      mode: filter.mode,
+      selectedValues: filter.selectedValues,
+    })),
+    sorts,
+  };
+}
+
+function resultSqlRewriteKey(request: DbResultSqlRewriteRequest | null): string {
+  return request ? JSON.stringify(request) : "";
 }
 
 function compactSqlForDisplay(sql: string): string {
@@ -951,14 +1210,15 @@ function isGridBlockSelectionMouseEvent(event: Pick<MouseEvent<HTMLElement>, "bu
 export function QueryResultGrid({
   result,
   sourceSql,
+  baseSql,
   sqlEngine,
   running = false,
   cancelling = false,
   onRefresh,
   onCancel,
   onCommitChanges,
-  onGeneratedSqlChange,
   onGeneratedSqlSync,
+  onGeneratedSqlQuery,
   onStatus,
 }: QueryResultGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -967,8 +1227,7 @@ export function QueryResultGrid({
   const [scrollTop, setScrollTop] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [viewportH, setViewportH] = useState(400);
-  const [sortCol, setSortCol] = useState<number | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>(null);
+  const [sorts, setSorts] = useState<SortRule[]>([]);
   const [autoFit, setAutoFit] = useState(true);
   const [columnWidths, setColumnWidths] = useState<Record<number, number>>({});
   const [visibleColumns, setVisibleColumns] = useState<Set<number>>(
@@ -984,6 +1243,7 @@ export function QueryResultGrid({
   const [filterOpen, setFilterOpen] = useState(false);
   const [columnFilters, setColumnFilters] = useState<Record<number, ColumnFilterConfig>>({});
   const [openColumnFilter, setOpenColumnFilter] = useState<OpenColumnFilter | null>(null);
+  const [draftColumnFilter, setDraftColumnFilter] = useState<ColumnFilterConfig>(DEFAULT_COLUMN_FILTER);
   const [searchText, setSearchText] = useState("");
   const [showStats, setShowStats] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("table");
@@ -994,12 +1254,8 @@ export function QueryResultGrid({
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [cellValueViewer, setCellValueViewer] = useState<CellValueViewer | null>(null);
   const [localNotice, setLocalNotice] = useState("");
-  const generatedSqlChangeRef = useRef(onGeneratedSqlChange);
+  const [resolvedGeneratedSql, setResolvedGeneratedSql] = useState<ResolvedGeneratedSql | null>(null);
   const { show: openCellMenu, showAt: openMenuAt, render: menu } = useContextMenu();
-
-  useEffect(() => {
-    generatedSqlChangeRef.current = onGeneratedSqlChange;
-  }, [onGeneratedSqlChange]);
 
   useEffect(() => {
     setRows(makeRows(result));
@@ -1016,6 +1272,7 @@ export function QueryResultGrid({
     setColumnWidths({});
     setColumnFilters({});
     setOpenColumnFilter(null);
+    setDraftColumnFilter(DEFAULT_COLUMN_FILTER);
     setCellBlockSelection(null);
     setExportColumns(defaultExportColumns(result.columns));
   }, [result.columns]);
@@ -1057,9 +1314,9 @@ export function QueryResultGrid({
     setViewportH(e.currentTarget.clientHeight);
   }, []);
 
-  const activeColumnFilters = useMemo(
-    () =>
-      Object.entries(columnFilters)
+  const activeColumnFiltersFor = useCallback(
+    (filters: Record<number, ColumnFilterConfig>): ActiveColumnFilter[] =>
+      Object.entries(filters)
         .map(([rawIndex, config]) => ({
           columnIndex: Number(rawIndex),
           text: config.text.trim(),
@@ -1073,31 +1330,106 @@ export function QueryResultGrid({
             filter.columnIndex < result.columns.length &&
             (filter.text.length > 0 || filter.selectedValues.length > 0),
         ),
-    [columnFilters, result.columns.length],
+    [result.columns.length],
+  );
+
+  const activeColumnFilters = useMemo(
+    () => activeColumnFiltersFor(columnFilters),
+    [activeColumnFiltersFor, columnFilters],
   );
 
   const activeColumnFilterCount = activeColumnFilters.length;
   const generatedSql = useMemo(
     () =>
       buildGeneratedResultSql({
-        sourceSql,
+        sourceSql: baseSql ?? sourceSql,
+        currentSql: sourceSql,
         sqlEngine,
         columns: result.columns,
         visibleColumnIndexes,
         globalFilterText: filterText,
         columnFilters: activeColumnFilters,
-        sortCol,
-        sortDir,
+        sorts,
       }),
-    [activeColumnFilters, filterText, result.columns, sortCol, sortDir, sourceSql, sqlEngine, visibleColumnIndexes],
+    [activeColumnFilters, baseSql, filterText, result.columns, sorts, sourceSql, sqlEngine, visibleColumnIndexes],
+  );
+  const generatedSqlRewriteRequest = useMemo(
+    () =>
+      buildResultSqlRewriteRequest({
+        sourceSql: baseSql ?? sourceSql,
+        currentSql: sourceSql,
+        sqlEngine,
+        columns: result.columns,
+        visibleColumnIndexes,
+        globalFilterText: filterText,
+        columnFilters: activeColumnFilters,
+        sorts,
+      }),
+    [activeColumnFilters, baseSql, filterText, result.columns, sorts, sourceSql, sqlEngine, visibleColumnIndexes],
+  );
+  const generatedSqlRewriteKey = useMemo(
+    () => resultSqlRewriteKey(generatedSqlRewriteRequest),
+    [generatedSqlRewriteRequest],
   );
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      generatedSqlChangeRef.current?.(generatedSql);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [generatedSql]);
+    if (!generatedSql || !generatedSqlRewriteRequest || !generatedSqlRewriteKey) {
+      setResolvedGeneratedSql(null);
+      return;
+    }
+    let cancelled = false;
+    setResolvedGeneratedSql((current) =>
+      current?.key === generatedSqlRewriteKey
+        ? current
+        : {
+            key: generatedSqlRewriteKey,
+            sql: generatedSql,
+            mode: null,
+            reason: null,
+            pending: true,
+          },
+    );
+    void dbRewriteResultSql(generatedSqlRewriteRequest)
+      .then((rewritten) => {
+        if (cancelled) return;
+        setResolvedGeneratedSql({
+          key: generatedSqlRewriteKey,
+          sql: rewritten.sql,
+          mode: rewritten.mode,
+          reason: rewritten.reason,
+          pending: false,
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        const reason = `SQL rewrite preview failed: ${String(err)}`;
+        setResolvedGeneratedSql({
+          key: generatedSqlRewriteKey,
+          sql: null,
+          mode: "unsupported",
+          reason,
+          pending: false,
+        });
+        setLocalNotice(reason);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [generatedSql, generatedSqlRewriteKey, generatedSqlRewriteRequest]);
+
+  const currentRewrite = resolvedGeneratedSql?.key === generatedSqlRewriteKey ? resolvedGeneratedSql : null;
+  const rewriteUnsupported = currentRewrite?.mode === "unsupported";
+  const rewritePending = currentRewrite?.pending ?? false;
+  const displayGeneratedSql =
+    generatedSql && currentRewrite && !rewriteUnsupported ? currentRewrite.sql ?? generatedSql : generatedSql;
+  const generatedSqlUnavailableReason =
+    rewriteUnsupported ? currentRewrite?.reason ?? "SQL rewrite is not available for this result." : null;
+  const displayGeneratedSqlTitle =
+    generatedSqlUnavailableReason ?? displayGeneratedSql;
+  const generatedSqlActionsDisabled =
+    rewritePending || rewriteUnsupported || !displayGeneratedSql || !generatedSqlRewriteRequest;
+  const generatedSqlBarText =
+    generatedSqlUnavailableReason ?? (displayGeneratedSql ? compactSqlForDisplay(displayGeneratedSql) : "Rewriting SQL...");
 
   const rowMatchesFilter = useCallback(
     (row: GridRow) => {
@@ -1109,7 +1441,7 @@ export function QueryResultGrid({
         const rawValue = row.values[filter.columnIndex] ?? null;
         if (filter.selectedValues.length > 0) {
           const selected = new Set(filter.selectedValues.map(filterValueKey));
-          if (!selected.has(filterValueKey(rawValue))) return false;
+          return selected.has(filterValueKey(rawValue));
         }
         if (!filter.text) return true;
         const value = (rawValue ?? "").toLowerCase();
@@ -1122,19 +1454,29 @@ export function QueryResultGrid({
 
   const order = useMemo(() => {
     const indexes = rows.map((_, index) => index).filter((index) => rowMatchesFilter(rows[index]));
-    if (sortCol === null || sortDir === null) return indexes;
-    const numeric = indexes.every((index) => isNumeric(rows[index].values[sortCol]));
+    if (sorts.length === 0) return indexes;
+    const numericByColumn = new Map(
+      sorts.map((sort) => [sort.columnIndex, indexes.every((index) => isNumeric(rows[index].values[sort.columnIndex]))]),
+    );
     indexes.sort((a, b) => {
-      const va = rows[a].values[sortCol];
-      const vb = rows[b].values[sortCol];
-      if (va === null && vb === null) return 0;
-      if (va === null) return 1;
-      if (vb === null) return -1;
-      const cmp = numeric ? Number(va) - Number(vb) : va.localeCompare(vb);
-      return sortDir === "asc" ? cmp : -cmp;
+      for (const sort of sorts) {
+        const va = rows[a].values[sort.columnIndex];
+        const vb = rows[b].values[sort.columnIndex];
+        let cmp = 0;
+        if (va === null && vb === null) cmp = 0;
+        else if (va === null) cmp = 1;
+        else if (vb === null) cmp = -1;
+        else {
+          cmp = numericByColumn.get(sort.columnIndex)
+            ? Number(va) - Number(vb)
+            : va.localeCompare(vb);
+        }
+        if (cmp !== 0) return sort.dir === "asc" ? cmp : -cmp;
+      }
+      return a - b;
     });
     return indexes;
-  }, [rowMatchesFilter, rows, sortCol, sortDir]);
+  }, [rowMatchesFilter, rows, sorts]);
 
   const orderedRows = useMemo(() => order.map((index) => rows[index]), [order, rows]);
   const selectedRows = useMemo(
@@ -1190,16 +1532,20 @@ export function QueryResultGrid({
     return count;
   }, [orderedRows, searchText, visibleColumnIndexes]);
 
-  const toggleSort = (col: number) => {
-    if (sortCol !== col) {
-      setSortCol(col);
-      setSortDir("asc");
-    } else if (sortDir === "asc") {
-      setSortDir("desc");
-    } else {
-      setSortCol(null);
-      setSortDir(null);
-    }
+  const nextSortDir = (dir: ActiveSortDir): ActiveSortDir | null => (dir === "asc" ? "desc" : null);
+  const toggleSort = (col: number, additive: boolean) => {
+    setSorts((current) => {
+      const index = current.findIndex((sort) => sort.columnIndex === col);
+      if (!additive) {
+        if (index < 0) return [{ columnIndex: col, dir: "asc" }];
+        const dir = nextSortDir(current[index].dir);
+        return dir ? [{ columnIndex: col, dir }] : [];
+      }
+      if (index < 0) return [...current, { columnIndex: col, dir: "asc" }];
+      const dir = nextSortDir(current[index].dir);
+      if (!dir) return current.filter((_, sortIndex) => sortIndex !== index);
+      return current.map((sort, sortIndex) => (sortIndex === index ? { ...sort, dir } : sort));
+    });
   };
 
   const setStatus = (message: string) => {
@@ -1212,29 +1558,26 @@ export function QueryResultGrid({
     openMenuAt(rect.left, rect.bottom + 4, items);
   };
 
-  const updateColumnFilter = (columnIndex: number, patch: Partial<ColumnFilterConfig>) => {
-    setColumnFilters((current) => {
-      const previous = current[columnIndex] ?? DEFAULT_COLUMN_FILTER;
-      return { ...current, [columnIndex]: { ...previous, ...patch } };
-    });
-  };
-
-  const toggleColumnFilterValue = (columnIndex: number, value: string | null) => {
-    setColumnFilters((current) => {
-      const previous = current[columnIndex] ?? DEFAULT_COLUMN_FILTER;
-      const key = filterValueKey(value);
-      const selected = previous.selectedValues.some((item) => filterValueKey(item) === key)
-        ? previous.selectedValues.filter((item) => filterValueKey(item) !== key)
-        : [...previous.selectedValues, value];
-      return { ...current, [columnIndex]: { ...previous, selectedValues: selected } };
-    });
-  };
-
-  const clearColumnFilter = (columnIndex: number) => {
+  const applyColumnFilter = (columnIndex: number, config: ColumnFilterConfig) => {
     setColumnFilters((current) => {
       const next = { ...current };
-      delete next[columnIndex];
+      if (isColumnFilterActive(config)) next[columnIndex] = config;
+      else delete next[columnIndex];
       return next;
+    });
+  };
+
+  const updateDraftColumnFilter = (patch: Partial<ColumnFilterConfig>) => {
+    setDraftColumnFilter((current) => ({ ...current, ...patch }));
+  };
+
+  const toggleDraftColumnFilterValue = (value: string | null) => {
+    setDraftColumnFilter((current) => {
+      const key = filterValueKey(value);
+      const selected = current.selectedValues.some((item) => filterValueKey(item) === key)
+        ? current.selectedValues.filter((item) => filterValueKey(item) !== key)
+        : [...current.selectedValues, value];
+      return { ...current, selectedValues: selected };
     });
   };
 
@@ -1250,6 +1593,12 @@ export function QueryResultGrid({
     const width = 280;
     const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
     const top = Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 360));
+    const current = columnFilters[columnIndex] ?? DEFAULT_COLUMN_FILTER;
+    setDraftColumnFilter({
+      text: current.text,
+      mode: current.mode,
+      selectedValues: [...current.selectedValues],
+    });
     setOpenColumnFilter({ columnIndex, left, top });
   };
 
@@ -1666,20 +2015,80 @@ export function QueryResultGrid({
     }
   };
 
-  const copyGeneratedSql = async () => {
-    if (!generatedSql) return;
+  const resolveGeneratedSql = async (
+    sql: string | null = generatedSql,
+    request: DbResultSqlRewriteRequest | null = generatedSqlRewriteRequest,
+  ): Promise<string | null> => {
+    if (!sql) return null;
+    const key = resultSqlRewriteKey(request);
+    if (key && resolvedGeneratedSql?.key === key && !resolvedGeneratedSql.pending) {
+      if (resolvedGeneratedSql.mode === "inline" && resolvedGeneratedSql.sql) return resolvedGeneratedSql.sql;
+      setStatus(resolvedGeneratedSql.reason ?? "SQL rewrite is not available for this result.");
+      return null;
+    }
+    if (!request) return sql;
     try {
-      await writeText(generatedSql);
+      const rewritten = await dbRewriteResultSql(request);
+      setResolvedGeneratedSql({
+        key,
+        sql: rewritten.sql,
+        mode: rewritten.mode,
+        reason: rewritten.reason,
+        pending: false,
+      });
+      if (rewritten.mode === "inline" && rewritten.sql) return rewritten.sql;
+      setStatus(rewritten.reason ?? "SQL rewrite is not available for this result.");
+      return null;
+    } catch (err) {
+      setResolvedGeneratedSql({
+        key,
+        sql: null,
+        mode: null,
+        reason: null,
+        pending: false,
+      });
+      setStatus(`SQL rewrite failed: ${String(err)}`);
+      return null;
+    }
+  };
+
+  const copyGeneratedSql = async () => {
+    const sql = await resolveGeneratedSql();
+    if (!sql) return;
+    try {
+      await writeText(sql);
       setStatus("Copied generated SQL.");
     } catch (err) {
       setStatus(`Copy generated SQL failed: ${String(err)}`);
     }
   };
 
-  const syncGeneratedSql = (mode: QueryGeneratedSqlSyncMode) => {
-    if (!generatedSql) return;
+  const queryGeneratedSql = (
+    sql = displayGeneratedSql,
+    request: DbResultSqlRewriteRequest | null = generatedSqlRewriteRequest,
+  ) => {
+    if (!sql) {
+      setStatus("No local filter or sort changes to query.");
+      return;
+    }
+    if (onGeneratedSqlQuery) {
+      void Promise.resolve(onGeneratedSqlQuery(sql, request ?? undefined)).catch((err) => {
+        setStatus(`Query generated SQL failed: ${String(err)}`);
+      });
+      return;
+    }
+    void syncGeneratedSql("sync", sql, request);
+  };
+
+  const syncGeneratedSql = async (
+    mode: QueryGeneratedSqlSyncMode,
+    sql = displayGeneratedSql,
+    request: DbResultSqlRewriteRequest | null = generatedSqlRewriteRequest,
+  ) => {
+    const resolvedSql = await resolveGeneratedSql(sql, request);
+    if (!resolvedSql) return;
     if (onGeneratedSqlSync) {
-      onGeneratedSqlSync(generatedSql, mode);
+      onGeneratedSqlSync(resolvedSql, mode);
       return;
     }
     const targetTab = getActiveQueryTab() ?? listQueryTabs().find((entry) => entry.engine === sqlEngine);
@@ -1687,7 +2096,7 @@ export function QueryResultGrid({
       setStatus("No SQL Commander editor is available.");
       return;
     }
-    targetTab.insertQuery(generatedSql, { destination: "current", position: "last" });
+    targetTab.insertQuery(resolvedSql, { destination: "current", position: "last" });
     setStatus("Inserted generated SQL in SQL Commander.");
   };
 
@@ -1799,14 +2208,20 @@ export function QueryResultGrid({
   const openFilterColumnIndex = openColumnFilter?.columnIndex ?? null;
   const openFilterColumn = openFilterColumnIndex !== null ? result.columns[openFilterColumnIndex] : null;
   const openFilterConfig = openFilterColumnIndex !== null
-    ? columnFilters[openFilterColumnIndex] ?? DEFAULT_COLUMN_FILTER
+    ? draftColumnFilter
     : DEFAULT_COLUMN_FILTER;
   const openFilterDistinctValues = useMemo(
-    () =>
-      openFilterColumnIndex === null
-        ? { values: [], total: 0, truncated: false }
-        : distinctValuesForColumn(rows, openFilterColumnIndex),
-    [openFilterColumnIndex, rows],
+    () => {
+      if (openFilterColumnIndex === null) return { values: [], total: 0, truncated: false };
+      const summary = distinctValuesForColumn(rows, openFilterColumnIndex);
+      const needle = draftColumnFilter.text.trim().toLowerCase();
+      if (!needle) return summary;
+      return {
+        ...summary,
+        values: summary.values.filter((item) => item.label.toLowerCase().includes(needle)),
+      };
+    },
+    [draftColumnFilter.text, openFilterColumnIndex, rows],
   );
   const openFilterSelectedKeys = new Set(openFilterConfig.selectedValues.map(filterValueKey));
   const filterModeButtonStyle = (active: boolean): CSSProperties | undefined =>
@@ -1817,6 +2232,11 @@ export function QueryResultGrid({
           color: "var(--taomni-accent)",
         }
       : undefined;
+  const applyLocalColumnFilter = () => {
+    if (openFilterColumnIndex === null) return;
+    applyColumnFilter(openFilterColumnIndex, draftColumnFilter);
+    setOpenColumnFilter(null);
+  };
 
   const stats = useMemo(() => {
     return visibleColumnIndexes.map((columnIndex) => {
@@ -2088,16 +2508,30 @@ export function QueryResultGrid({
             data-testid="query-result-generated-sql"
             className="min-w-0 flex-1 truncate rounded px-1.5 py-0.5 font-mono text-[10px]"
             style={{ background: "var(--taomni-quick-bg)", border: "1px solid var(--taomni-divider)" }}
-            title={generatedSql}
+            title={displayGeneratedSqlTitle ?? undefined}
           >
-            {compactSqlForDisplay(generatedSql)}
+            {generatedSqlBarText}
           </code>
+          <button
+            type="button"
+            data-testid="query-result-generated-sql-query"
+            className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
+            data-primary="true"
+            title="Apply local filters and sort as a database query"
+            aria-label="Query generated SQL"
+            disabled={running || cancelling || generatedSqlActionsDisabled}
+            onClick={() => queryGeneratedSql()}
+          >
+            <Check className="w-3.5 h-3.5" />
+            Query
+          </button>
           <button
             type="button"
             data-testid="query-result-generated-sql-copy"
             className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
             title="Copy generated SQL"
             aria-label="Copy generated SQL"
+            disabled={generatedSqlActionsDisabled}
             onClick={() => void copyGeneratedSql()}
           >
             <Copy className="w-3.5 h-3.5" />
@@ -2109,21 +2543,11 @@ export function QueryResultGrid({
             className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
             title="Sync generated SQL to a query editor"
             aria-label="Sync generated SQL"
-            onClick={() => syncGeneratedSql("sync")}
+            disabled={generatedSqlActionsDisabled}
+            onClick={() => void syncGeneratedSql("sync")}
           >
             <RefreshCw className="w-3.5 h-3.5" />
             Sync
-          </button>
-          <button
-            type="button"
-            data-testid="query-result-generated-sql-replace"
-            className="taomni-btn h-6 px-2 inline-flex items-center gap-1 text-[11px]"
-            title="Replace the source SQL when it still matches this result"
-            aria-label="Replace source SQL"
-            onClick={() => syncGeneratedSql("replaceSource")}
-          >
-            <Edit3 className="w-3.5 h-3.5" />
-            Replace
           </button>
         </div>
       )}
@@ -2174,6 +2598,8 @@ export function QueryResultGrid({
                 const col = result.columns[columnIndex];
                 const columnFilter = columnFilters[columnIndex] ?? DEFAULT_COLUMN_FILTER;
                 const columnFiltered = isColumnFilterActive(columnFilter);
+                const sortIndex = sorts.findIndex((sort) => sort.columnIndex === columnIndex);
+                const columnSort = sortIndex >= 0 ? sorts[sortIndex] : null;
                 return (
                   <div
                     key={columnIndex}
@@ -2184,11 +2610,16 @@ export function QueryResultGrid({
                     <button
                       type="button"
                       className="min-w-0 flex flex-1 items-center gap-1 bg-transparent p-0 text-left"
-                      onClick={() => toggleSort(columnIndex)}
+                      onClick={(event) => toggleSort(columnIndex, event.shiftKey)}
                     >
                       <span className="truncate flex-1">{col.name}</span>
-                      {sortCol === columnIndex && sortDir === "asc" && <ArrowUp className="w-3 h-3" />}
-                      {sortCol === columnIndex && sortDir === "desc" && <ArrowDown className="w-3 h-3" />}
+                      {columnSort?.dir === "asc" && <ArrowUp className="w-3 h-3" />}
+                      {columnSort?.dir === "desc" && <ArrowDown className="w-3 h-3" />}
+                      {sorts.length > 1 && sortIndex >= 0 && (
+                        <span className="inline-flex h-4 min-w-4 items-center justify-center rounded px-1 text-[9px] text-[var(--taomni-accent)]" style={{ background: "var(--taomni-selected)" }}>
+                          {sortIndex + 1}
+                        </span>
+                      )}
                     </button>
                     <button
                       type="button"
@@ -2446,7 +2877,7 @@ export function QueryResultGrid({
               className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
               title="Clear column filter"
               aria-label={`Clear filter for ${openFilterColumn.name}`}
-              onClick={() => clearColumnFilter(openColumnFilter.columnIndex)}
+              onClick={() => setDraftColumnFilter(DEFAULT_COLUMN_FILTER)}
             >
               <Ban className="w-3.5 h-3.5" />
             </button>
@@ -2454,9 +2885,9 @@ export function QueryResultGrid({
           <input
             autoFocus
             value={openFilterConfig.text}
-            onChange={(event) => updateColumnFilter(openColumnFilter.columnIndex, { text: event.target.value })}
+            onChange={(event) => updateDraftColumnFilter({ text: event.target.value })}
             onKeyDown={(event) => {
-              if (event.key === "Enter") setOpenColumnFilter(null);
+              if (event.key === "Enter") applyLocalColumnFilter();
               if (event.key === "Escape") setOpenColumnFilter(null);
             }}
             className="taomni-input h-7 w-full text-[12px]"
@@ -2468,7 +2899,7 @@ export function QueryResultGrid({
               type="button"
               className="taomni-btn h-7"
               style={filterModeButtonStyle(openFilterConfig.mode === "fuzzy")}
-              onClick={() => updateColumnFilter(openColumnFilter.columnIndex, { mode: "fuzzy" })}
+              onClick={() => updateDraftColumnFilter({ mode: "fuzzy" })}
             >
               Fuzzy
             </button>
@@ -2476,7 +2907,7 @@ export function QueryResultGrid({
               type="button"
               className="taomni-btn h-7"
               style={filterModeButtonStyle(openFilterConfig.mode === "exact")}
-              onClick={() => updateColumnFilter(openColumnFilter.columnIndex, { mode: "exact" })}
+              onClick={() => updateDraftColumnFilter({ mode: "exact" })}
             >
               Exact
             </button>
@@ -2508,7 +2939,7 @@ export function QueryResultGrid({
                     type="checkbox"
                     className="h-3 w-3 shrink-0"
                     checked={openFilterSelectedKeys.has(item.key)}
-                    onChange={() => toggleColumnFilterValue(openColumnFilter.columnIndex, item.value)}
+                    onChange={() => toggleDraftColumnFilterValue(item.value)}
                     aria-label={`Select ${item.label} for ${openFilterColumn.name}`}
                   />
                   <span className="min-w-0 flex-1 truncate font-mono">{item.label}</span>
@@ -2523,20 +2954,14 @@ export function QueryResultGrid({
             </div>
           )}
           <div className="mt-2 flex items-center justify-end gap-1">
-            {openFilterConfig.selectedValues.length > 0 && (
-              <button
-                type="button"
-                className="taomni-btn h-7 px-2"
-                onClick={() => updateColumnFilter(openColumnFilter.columnIndex, { selectedValues: [] })}
-              >
-                Clear values
-              </button>
-            )}
-            <button type="button" className="taomni-btn h-7 px-2" onClick={() => clearColumnFilter(openColumnFilter.columnIndex)}>
+            <button type="button" className="taomni-btn h-7 px-2" onClick={() => setOpenColumnFilter(null)}>
+              Close
+            </button>
+            <button type="button" className="taomni-btn h-7 px-2" onClick={() => setDraftColumnFilter(DEFAULT_COLUMN_FILTER)}>
               Clear
             </button>
-            <button type="button" className="taomni-btn h-7 px-2" data-primary="true" onClick={() => setOpenColumnFilter(null)}>
-              Done
+            <button type="button" className="taomni-btn h-7 px-2" onClick={applyLocalColumnFilter}>
+              Apply
             </button>
           </div>
         </div>

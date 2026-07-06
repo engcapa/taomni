@@ -9,6 +9,12 @@ const ipcMock = vi.hoisted(() => ({
   dbConnect: vi.fn(),
   dbDisconnect: vi.fn(async () => undefined),
   dbExecute: vi.fn(async () => ({ columns: [], rows: [], rowsAffected: 0, durationMs: 1, warnings: [] })),
+  dbRewriteResultSql: vi.fn(async (request: { sourceSql: string }) => ({
+    sql: request.sourceSql,
+    mode: "inline",
+    reason: null,
+    warnings: [],
+  })),
   dbExecuteStream: vi.fn(async (
     _sessionId: string,
     _sql: string,
@@ -57,6 +63,7 @@ vi.mock("../../lib/ipc", () => ({
   dbConnect: ipcMock.dbConnect,
   dbDisconnect: ipcMock.dbDisconnect,
   dbExecute: ipcMock.dbExecute,
+  dbRewriteResultSql: ipcMock.dbRewriteResultSql,
   dbExecuteStream: ipcMock.dbExecuteStream,
   dbCancel: ipcMock.dbCancel,
   dbAppendHistory: ipcMock.dbAppendHistory,
@@ -83,7 +90,16 @@ const dbChildProps = vi.hoisted(() => ({
   schemaTree: null as null | { metadataCache?: unknown },
   sqlEditor: null as null | { metadataCache?: unknown },
   editorInitialDocFallback: "select 1",
-  generatedSql: "SELECT *\nFROM (\n  select 1\n) AS taomni_result\nORDER BY \"one\" DESC;",
+  generatedSql: "select 1\nORDER BY \"one\" DESC;",
+  generatedRequest: null as null | {
+    engine: string;
+    sourceSql: string;
+    resultColumns: string[];
+    visibleColumnIndexes: number[];
+    globalFilterText: string;
+    filters: unknown[];
+    sorts: Array<{ columnIndex: number; dir: "asc" | "desc" }>;
+  },
 }));
 
 vi.mock("./SchemaTree", () => ({
@@ -136,25 +152,19 @@ vi.mock("./SqlEditorPanel", () => ({
 
 vi.mock("./QueryResultGrid", () => ({
   QueryResultGrid: ({
-    onGeneratedSqlChange,
     onGeneratedSqlSync,
+    onGeneratedSqlQuery,
   }: {
-    onGeneratedSqlChange?: (sql: string | null) => void;
     onGeneratedSqlSync?: (sql: string, mode: "sync" | "replaceSource") => void;
+    onGeneratedSqlQuery?: (sql: string, request?: typeof dbChildProps.generatedRequest) => void;
   }) => {
-    useEffect(() => {
-      const timer = window.setTimeout(() => onGeneratedSqlChange?.(dbChildProps.generatedSql), 0);
-      return () => window.clearTimeout(timer);
-      // The real grid only emits when generatedSql changes; keep this mock to one mount emission.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
     return (
       <div data-testid="query-result-grid">
         <button type="button" data-testid="sync-generated-sql" onClick={() => onGeneratedSqlSync?.(dbChildProps.generatedSql, "sync")}>
           sync generated
         </button>
-        <button type="button" data-testid="replace-source-sql" onClick={() => onGeneratedSqlSync?.(dbChildProps.generatedSql, "replaceSource")}>
-          replace source
+        <button type="button" data-testid="query-generated-sql" onClick={() => onGeneratedSqlQuery?.(dbChildProps.generatedSql, dbChildProps.generatedRequest ?? undefined)}>
+          query generated
         </button>
       </div>
     );
@@ -219,7 +229,8 @@ describe("DbClientTab connection lifecycle", () => {
     dbChildProps.schemaTree = null;
     dbChildProps.sqlEditor = null;
     dbChildProps.editorInitialDocFallback = "select 1";
-    dbChildProps.generatedSql = "SELECT *\nFROM (\n  select 1\n) AS taomni_result\nORDER BY \"one\" DESC;";
+    dbChildProps.generatedSql = "select 1\nORDER BY \"one\" DESC;";
+    dbChildProps.generatedRequest = null;
   });
 
   it("keeps queries on the latest runtime connection when a stale StrictMode connect resolves late", async () => {
@@ -355,7 +366,7 @@ describe("DbClientTab connection lifecycle", () => {
     });
   });
 
-  it("auto-creates one generated SQL query panel and reuses it on manual sync", async () => {
+  it("creates one generated SQL query panel only after manual sync", async () => {
     ipcMock.dbConnect.mockResolvedValue({ ok: true });
 
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
@@ -364,7 +375,7 @@ describe("DbClientTab connection lifecycle", () => {
     fireEvent.click(screen.getByTitle("Run (F5)"));
 
     await waitFor(() => expect(screen.getByTestId("query-result-grid")).toBeInTheDocument());
-    await waitFor(() => expect(screen.getAllByTitle("Generated SQL")).toHaveLength(1));
+    expect(screen.queryAllByTitle("Generated SQL")).toHaveLength(0);
     expect(screen.getByTestId("query-result-grid")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("sync-generated-sql"));
@@ -372,8 +383,24 @@ describe("DbClientTab connection lifecycle", () => {
     await waitFor(() => expect(screen.getAllByTitle("Generated SQL")).toHaveLength(1));
   });
 
-  it("replaces the matching source statement with generated SQL", async () => {
+  it("queries generated SQL by replacing the source statement and refreshing the current sheet", async () => {
     ipcMock.dbConnect.mockResolvedValue({ ok: true });
+    dbChildProps.editorInitialDocFallback = "select 1;";
+    dbChildProps.generatedRequest = {
+      engine: "PostgreSQL",
+      sourceSql: "select 1",
+      resultColumns: ["one"],
+      visibleColumnIndexes: [0],
+      globalFilterText: "",
+      filters: [],
+      sorts: [{ columnIndex: 0, dir: "desc" }],
+    };
+    ipcMock.dbRewriteResultSql.mockResolvedValueOnce({
+      sql: dbChildProps.generatedSql,
+      mode: "inline",
+      reason: null,
+      warnings: [],
+    });
 
     render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
 
@@ -381,12 +408,23 @@ describe("DbClientTab connection lifecycle", () => {
     fireEvent.click(screen.getByTitle("Run (F5)"));
     await waitFor(() => expect(screen.getByTestId("query-result-grid")).toBeInTheDocument());
 
-    fireEvent.click(screen.getByTestId("replace-source-sql"));
+    fireEvent.click(screen.getByTestId("query-generated-sql"));
+
+    await waitFor(() => {
+      expect(ipcMock.dbRewriteResultSql).toHaveBeenCalledWith(dbChildProps.generatedRequest);
+    });
+    await waitFor(() => {
+      const calls = ipcMock.dbExecuteStream.mock.calls as Array<[string, string, number, unknown]>;
+      expect(calls.at(-1)?.[1]).toContain("ORDER BY \"one\" DESC");
+      expect(calls.at(-1)?.[1]).not.toContain(";;");
+    });
+
     fireEvent.click(screen.getByTitle("Run (F5)"));
 
     await waitFor(() => {
       const calls = ipcMock.dbExecuteStream.mock.calls as Array<[string, string, number, unknown]>;
       expect(calls.at(-1)?.[1]).toContain("ORDER BY \"one\" DESC");
+      expect(calls.at(-1)?.[1]).not.toContain(";;");
     });
   });
 

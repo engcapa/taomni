@@ -486,6 +486,7 @@ pub fn run() {
             database::db_execute,
             database::db_execute_stream,
             database::db_cancel,
+            database::sql_rewrite::db_rewrite_result_sql,
             database::db_list_bookmarks,
             database::db_save_bookmark,
             database::db_delete_bookmark,

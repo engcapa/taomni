@@ -18,6 +18,7 @@ pub mod redis_ops;
 pub mod sql;
 pub mod bookmarks;
 pub mod history;
+pub mod sql_rewrite;
 
 pub use bookmarks::*;
 pub use history::*;
