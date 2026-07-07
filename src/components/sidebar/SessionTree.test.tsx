@@ -257,6 +257,25 @@ describe("SessionTree multi-select batch operations", () => {
     ]);
   });
 
+  it("exposes SSH connection command copy presets from the context menu", async () => {
+    render(<SessionTree />);
+    fireEvent.click(screen.getByText("ipy"));
+
+    fireEvent.contextMenu(sessionRow("ipy-145"));
+    const copyCommand = screen.getByTestId("context-menu-item-copy-connection-command");
+    fireEvent.mouseEnter(copyCommand.parentElement!);
+
+    const posix = await screen.findByTestId("context-menu-item-copy-command-posix");
+    expect(posix).toBeInTheDocument();
+    expect(screen.getByTestId("context-menu-item-copy-command-powershell")).toBeInTheDocument();
+
+    fireEvent.mouseEnter(posix.parentElement!);
+    expect(await screen.findByTestId("context-menu-item-copy-command-posix-basic")).toBeInTheDocument();
+    expect(screen.getByTestId("context-menu-item-copy-command-posix-jump")).toBeInTheDocument();
+    expect(screen.getByTestId("context-menu-item-copy-command-posix-forwards")).toBeInTheDocument();
+    expect(screen.getByTestId("context-menu-item-copy-command-posix-full")).toBeInTheDocument();
+  });
+
   it("sets a terminal theme for the selected sessions from the context menu", async () => {
     render(<SessionTree />);
     selectBothIpySessions();

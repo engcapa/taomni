@@ -95,6 +95,7 @@ import {
 } from "../../lib/sessionPaths";
 import { SessionImportPreview } from "../session/SessionImportPreview";
 import { buildSessionTerminalThemeMenuItem } from "../session/SessionTerminalThemeMenu";
+import { buildSessionConnectionCommandMenuItem } from "../session/SessionConnectionCommandMenu";
 import { ExternalVaultUnlockDialog } from "../session/ExternalVaultUnlockDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useT } from "../../lib/i18n";
@@ -1400,6 +1401,12 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
         },
       })),
     ];
+    const copyCommandItem = buildSessionConnectionCommandMenuItem({
+      session,
+      allSessions: sessions,
+      t,
+      setStatusMessage,
+    });
 
     const items: MenuItem[] = [
       ...(hasMultiSelection ? [
@@ -1413,6 +1420,7 @@ export function SessionTree({ onNewSession, onConnectSession, onEditSession }: S
         { label: "", separator: true },
       ] satisfies MenuItem[] : []),
       { label: t("sessionTree.contextConnect"), icon: <Play className="w-3 h-3" />, onClick: () => onConnectSession?.(session), disabled: !onConnectSession },
+      ...(copyCommandItem ? [copyCommandItem] : []),
       { label: t("sessionTree.contextEdit"), icon: <Edit3 className="w-3 h-3" />, onClick: () => onEditSession?.(session), disabled: !onEditSession },
       {
         label: hasMultiSelection ? t("sessionTree.contextDuplicateCount", { count: targetIds.length }) : t("sessionTree.contextDuplicate"),

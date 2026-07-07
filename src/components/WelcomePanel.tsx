@@ -44,6 +44,7 @@ import type { SessionTerminalAppearancePatch } from "../lib/sessionTerminalTheme
 import { useContextMenu, type MenuItem } from "./ContextMenu";
 import { useConfirmDialog } from "./sidebar/ConfirmDialog";
 import { buildSessionTerminalThemeMenuItem } from "./session/SessionTerminalThemeMenu";
+import { buildSessionConnectionCommandMenuItem } from "./session/SessionConnectionCommandMenu";
 
 interface WelcomePanelProps {
   onStartLocalTerminal: (shell?: LocalShellSelection, cwd?: string) => void;
@@ -1211,7 +1212,9 @@ function RecentSessionsPanel({
                       t,
                       session,
                       targetSessions,
+                      allSessions,
                       folderPaths,
+                      setStatusMessage,
                       onOpenSession,
                       onOpenSessions,
                       onEditSession,
@@ -1279,7 +1282,9 @@ function recentSessionMenuItems({
   t,
   session,
   targetSessions,
+  allSessions,
   folderPaths,
+  setStatusMessage,
   onOpenSession,
   onOpenSessions,
   onEditSession,
@@ -1292,7 +1297,9 @@ function recentSessionMenuItems({
   t: TranslateFn;
   session: SessionConfig;
   targetSessions: readonly SessionConfig[];
+  allSessions: readonly SessionConfig[];
   folderPaths: string[];
+  setStatusMessage: (message: string) => void;
   onOpenSession?: (session: SessionConfig) => void;
   onOpenSessions?: (sessions: SessionConfig[]) => void;
   onEditSession?: (session: SessionConfig) => void;
@@ -1317,6 +1324,12 @@ function recentSessionMenuItems({
       onClick: () => void onMoveSessionsToGroup(targetIds, path),
     })),
   ];
+  const copyCommandItem = buildSessionConnectionCommandMenuItem({
+    session,
+    allSessions,
+    t,
+    setStatusMessage,
+  });
 
   return [
     ...(hasMultiSelection ? [
@@ -1335,6 +1348,7 @@ function recentSessionMenuItems({
       disabled: !onOpenSession,
       onClick: () => onOpenSession?.(session),
     },
+    ...(copyCommandItem ? [copyCommandItem] : []),
     {
       label: t("sessionTree.contextEdit"),
       icon: <Edit3 className="w-3 h-3" />,
