@@ -106,8 +106,8 @@
 - `[data-testid="query-result-grid"]` — display [optional] — F-DB-1.query-result-grid
 - `[data-testid="query-result-generated-sql"]` — display [optional] — F-DB-1.query-result-generated-sql
 - `[data-testid="query-result-generated-sql-copy"]` — interactive [optional] — F-DB-1.query-result-generated-sql-copy
+- `[data-testid="query-result-generated-sql-query"]` — interactive [optional] — F-DB-1.query-result-generated-sql-query
 - `[data-testid="query-result-generated-sql-sync"]` — interactive [optional] — F-DB-1.query-result-generated-sql-sync
-- `[data-testid="query-result-generated-sql-replace"]` — interactive [optional] — F-DB-1.query-result-generated-sql-replace
 - `[data-testid="db-query-history-panel"]` — display [optional] — F-DB-1.query-history-panel
 - `[data-testid="db-query-history-refresh"]` — interactive [optional] — F-DB-1.query-history-refresh
 - `[data-testid="db-query-history-clear"]` — interactive [optional] — F-DB-1.query-history-clear
@@ -316,6 +316,14 @@
 
 - `[data-testid="tao-hub-tab-chat"]` — interactive [optional] — F-TAO-1.tao-hub-tab-chat
 - `[data-testid="tao-hub-tab-notes"]` — interactive [optional] — F-TAO-1.tao-hub-tab-notes
+- `[data-testid="tao-hub-tab-notifications"]` — interactive [optional] — F-TAO-1.tao-hub-tab-notifications
+- `[data-testid="tao-alert-inbox"]` — display [optional] — F-TAO-1.tao-alert-inbox
+- `[data-testid="tao-alert-inbox-item"]` — display [optional] — F-TAO-1.tao-alert-inbox-item
+- `[data-testid="tao-alert-history-search"]` — interactive [optional] — F-TAO-1.tao-alert-history-search
+- `[data-testid="tao-alert-history-clear"]` — interactive [optional] — F-TAO-1.tao-alert-history-clear
+- `[data-testid="tao-alert-history-limit-30"]` — interactive [optional] — F-TAO-1.tao-alert-history-limit-30
+- `[data-testid="tao-alert-history-limit-300"]` — interactive [optional] — F-TAO-1.tao-alert-history-limit-300
+- `[data-testid="tao-alert-history-result"]` — display [optional] — F-TAO-1.tao-alert-history-result
 - `[data-testid="notes-panel"]` — display [optional] — F-TAO-1.notes-panel
 - `[data-testid="notes-new"]` — interactive [optional] — F-TAO-1.notes-new
 - `[data-testid="notes-search"]` — interactive [optional] — F-TAO-1.notes-search

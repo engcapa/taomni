@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ClipboardEvent } from "react";
 import { useModalDraggableAndResizable } from "../../hooks/useModalDraggableAndResizable";
 import { useModalShortcuts, getShortcutSuffixes } from "../../hooks/useModalShortcuts";
 import {
@@ -50,13 +50,14 @@ import {
 import type { DbConnectInfo, HBaseConnectInfo } from "../../types";
 import { getAppPlatform } from "../../lib/runtime";
 import {
+  DEFAULT_NETWORK_SETTINGS,
   getSessionNetworkSettings,
   toNetworkSettingsPayload,
   type IpVersion,
   type NetworkSettings as NetworkSettingsValue,
   type ProxyKind,
 } from "../../lib/networkSettings";
-import { parseUserHostPort } from "../../lib/quickConnect";
+import { parseSshConnectionCommand, parseUserHostPort } from "../../lib/quickConnect";
 import {
   SESSION_ROOT_LABEL,
   collectFolderPaths,
@@ -252,6 +253,13 @@ function stripTerminalProfileOption(options: Record<string, unknown>): Record<st
   const next = { ...options };
   delete next.terminalProfile;
   return next;
+}
+
+function cloneNetworkSettings(settings: NetworkSettingsValue): NetworkSettingsValue {
+  return {
+    ...settings,
+    localForwards: settings.localForwards.map((forward) => ({ ...forward })),
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -3020,7 +3028,46 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setTestResult(null);
   };
 
+  const applySshCommandText = (value: string): boolean => {
+    const parsed = parseSshConnectionCommand(value);
+    if (!parsed) return false;
+
+    setProto("SSH");
+    setSection("advanced");
+    setHost(parsed.host);
+    setPort(String(parsed.port || DEFAULT_PORTS.SSH));
+    setUsername(parsed.username ?? "");
+    setSpecifyUser(!!parsed.username);
+    setName((current) => current || `ssh://${parsed.username ? `${parsed.username}@` : ""}${parsed.host}:${parsed.port || DEFAULT_PORTS.SSH}`);
+    setPassword("");
+    setPasswordRef("");
+    setSaveInVault(false);
+    setX11(parsed.options.x11);
+    setX11Trusted(parsed.options.x11Trusted);
+    setCompression(parsed.options.compression ?? false);
+    setStartupCmd(parsed.options.startupCmd ?? "");
+    setDoNotExit(parsed.options.doNotExit ?? true);
+    setRemoteEnv("Interactive shell");
+    if (parsed.keyPath) {
+      setAuthMethod("PrivateKey");
+      setAuthRadio("privatekey");
+      setUsePrivKey(true);
+      setKeyPath(parsed.keyPath);
+    } else {
+      setAuthMethod("Password");
+      setAuthRadio("password");
+      setUsePrivKey(false);
+      setKeyPath("");
+    }
+    setNetworkSettings(cloneNetworkSettings(parsed.options.networkSettings ?? DEFAULT_NETWORK_SETTINGS));
+    setSaveError(null);
+    setTestResult({ ok: true, msg: t("sessionEditor2.sshCommandImported") });
+    return true;
+  };
+
   const handleHostLookup = () => {
+    if (applySshCommandText(host)) return;
+
     let parsed: ReturnType<typeof parseUserHostPort> = null;
     try {
       parsed = parseUserHostPort(host);
@@ -3034,6 +3081,12 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       setSpecifyUser(true);
     }
     if (parsed.port) setPort(String(parsed.port));
+  };
+
+  const handleHostPaste = (event: ClipboardEvent<HTMLInputElement>) => {
+    const text = event.clipboardData.getData("text/plain");
+    if (!text || !applySshCommandText(text)) return;
+    event.preventDefault();
   };
 
   const handleBrowseKey = async () => {
@@ -3553,6 +3606,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                   className="taomni-input flex-1"
                   value={host}
                   onChange={(e) => setHost(e.target.value)}
+                  onPaste={proto === "Browser" ? undefined : handleHostPaste}
                   onBlur={proto === "Browser" ? undefined : handleHostLookup}
                   aria-label={proto === "Browser" ? t("sessionEditor2.browserUrl") : t("sessionEditor2.remoteHostAria")}
                   placeholder={proto === "Browser" ? t("sessionEditor2.browserUrlPlaceholder") : t("sessionEditor2.remoteHostPlaceholder")}
@@ -3599,7 +3653,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                         className="taomni-mono px-1 border rounded"
                         style={{ background: "var(--taomni-input-bg)", borderColor: "var(--taomni-divider)" }}
                       >
-                        user@host:port
+                        ssh -p 2222 user@host
                       </span>
                       {after}
                     </>

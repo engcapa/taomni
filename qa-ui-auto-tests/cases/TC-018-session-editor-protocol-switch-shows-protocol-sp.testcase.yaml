@@ -55,4 +55,9 @@ steps:
   - assert_not_visible: "[data-testid=\"session-planned-client-note\"]"
   - click: "[data-testid=\"session-proto-ssh\"]"
   - assert_visible: "[data-testid=\"advanced-ssh-settings\"]"
+  - fill:
+      selector: "[data-testid=\"session-host\"]"
+      value: "ssh -p 2202 qa@ssh-import.example.test"
+  - click: "[data-testid=\"session-port\"]"
+  - assert_visible: "text=\"SSH command imported into this session.\""
   - screenshot: 018-session-protocol-switch.png

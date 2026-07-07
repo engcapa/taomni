@@ -6,6 +6,7 @@ import {
   normalizeGroupPath,
   toStoredGroupPath,
 } from "./sessionPaths";
+import { parseSshConnectionCommand } from "./quickConnect";
 import { normalizeTerminalProfile, parseSessionOptions } from "./terminalProfile";
 
 const TAOMNI_FORMAT = "taomni.sessions";
@@ -1557,7 +1558,7 @@ export function parseExceedSessions(text: string, options: SessionImportOptions 
       getIni(section, "startup"),
       getIni(section, "remotecommand"),
     );
-    const sshTarget = parseSshCommand(command);
+    const sshTarget = parseSshConnectionCommand(command);
     const host = cleanText(firstNonEmptyString(hostFromField, sshTarget?.host), MAX_HOST_LENGTH);
     if (!host) continue;
 
@@ -2418,7 +2419,7 @@ function sshCommandProfilesToImportResult(
       profile["Custom Command"],
       profile["custom command"],
     );
-    const parsed = parseSshCommand(command);
+    const parsed = parseSshConnectionCommand(command);
     if (!parsed) {
       skipped += 1;
       continue;
@@ -2439,86 +2440,6 @@ function sshCommandProfilesToImportResult(
   }
 
   return finalizeImportResult(sessions, skipped, warnings, options.existingSessions);
-}
-
-function parseSshCommand(command: string): { host: string; port: number; username: string | null } | null {
-  const tokens = shellSplit(command);
-  const sshIndex = tokens.findIndex((token) => token === "ssh" || token.endsWith("/ssh") || token.endsWith("\\ssh.exe"));
-  if (sshIndex < 0) return null;
-
-  let port = 22;
-  let username: string | null = null;
-  let host = "";
-  for (let i = sshIndex + 1; i < tokens.length; i += 1) {
-    const token = tokens[i];
-    if (!token) continue;
-    if (token === "-p" && tokens[i + 1]) {
-      port = sanitizePort(tokens[i + 1], 22);
-      i += 1;
-      continue;
-    }
-    if (token.startsWith("-p") && token.length > 2) {
-      port = sanitizePort(token.slice(2), 22);
-      continue;
-    }
-    if (token === "-l" && tokens[i + 1]) {
-      username = cleanText(tokens[i + 1], MAX_NAME_LENGTH) || null;
-      i += 1;
-      continue;
-    }
-    if (token.startsWith("-")) {
-      if (/^-[bcDeFIiJmOoQSRSWw]$/.test(token) && tokens[i + 1]) i += 1;
-      continue;
-    }
-    host = token;
-    break;
-  }
-
-  if (!host) return null;
-  if (host.includes("@")) {
-    const [user, rawHost] = host.split("@");
-    username = cleanText(user, MAX_NAME_LENGTH) || username;
-    host = rawHost;
-  }
-  host = cleanText(host, MAX_HOST_LENGTH);
-  return host ? { host, port, username } : null;
-}
-
-function shellSplit(command: string): string[] {
-  const tokens: string[] = [];
-  let token = "";
-  let quote: string | null = null;
-  let escaped = false;
-  for (const char of command.trim()) {
-    if (escaped) {
-      token += char;
-      escaped = false;
-      continue;
-    }
-    if (char === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (quote) {
-      if (char === quote) quote = null;
-      else token += char;
-      continue;
-    }
-    if (char === "\"" || char === "'") {
-      quote = char;
-      continue;
-    }
-    if (/\s/.test(char)) {
-      if (token) {
-        tokens.push(token);
-        token = "";
-      }
-      continue;
-    }
-    token += char;
-  }
-  if (token) tokens.push(token);
-  return tokens;
 }
 
 function parsePlistDicts(text: string): Array<Record<string, unknown>> {
