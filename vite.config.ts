@@ -28,11 +28,11 @@ export default defineConfig({
     // core exports the stub intentionally omits).
     exclude: isTauriBuild ? [] : ["@tauri-apps/plugin-notification", "@tauri-apps/plugin-shell", "@tauri-apps/plugin-dialog"],
   },
-  // Tauri 2 targets modern WebView2 / WebKitGTK / WKWebView, all of which
-  // support ES2022. Keep the production transform target explicit so xterm's
-  // modern syntax is not down-leveled into older parser paths.
+  // Tauri ships with the system WebView. macOS 13.2.x uses a WKWebView roughly
+  // equivalent to Safari 16.3, which can white-screen on untransformed ES2022
+  // syntax such as class static initialization blocks emitted by dependencies.
   build: {
-    target: "es2022",
+    target: ["es2020", "safari16"],
   },
   resolve: {
     alias: isTauriBuild
