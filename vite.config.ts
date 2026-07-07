@@ -31,6 +31,8 @@ export default defineConfig({
   // Tauri ships with the system WebView. macOS 13.2.x uses a WKWebView roughly
   // equivalent to Safari 16.3, which can white-screen on untransformed ES2022
   // syntax such as class static initialization blocks emitted by dependencies.
+  // Keep this no lower than ES2020: older down-leveling previously broke xterm's
+  // DECRQM/requestMode path used by `vi` on some SSH servers.
   build: {
     target: ["es2020", "safari16"],
   },
