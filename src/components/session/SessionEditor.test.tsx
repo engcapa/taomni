@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -301,6 +301,63 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     expect(screen.getByDisplayValue("127.0.0.1:5432")).toBeInTheDocument();
     expect(screen.getByDisplayValue("db.lan:5432")).toBeInTheDocument();
   }, 10_000);
+
+  it("imports an OpenSSH command pasted into the host field", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor();
+    const hostInput = screen.getByTestId("session-host");
+
+    fireEvent.paste(hostInput, {
+      clipboardData: {
+        getData: () =>
+          "ssh -p 2222 -i ~/.ssh/prod_key -J ops@bastion.example.test:2200 " +
+          "-L 127.0.0.1:15432:127.0.0.1:5432 -C -X -4 -o ServerAliveInterval=45 " +
+          "deploy@app.example.test tmux new -A -s main",
+      },
+    });
+
+    expect(hostInput).toHaveValue("app.example.test");
+    expect(screen.getByTestId("session-port")).toHaveValue("2222");
+    expect(screen.getByTestId("session-user")).toHaveValue("deploy");
+    expect(screen.getByLabelText("Private key path")).toHaveValue("~/.ssh/prod_key");
+    expect(screen.getByLabelText("Execute command")).toHaveValue("tmux new -A -s main");
+    expect(screen.getByText("SSH command imported into this session.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    const saved = ipcMocks.saveSession.mock.calls[0][0];
+    expect(saved).toMatchObject({
+      session_type: "SSH",
+      host: "app.example.test",
+      port: 2222,
+      username: "deploy",
+      auth_method: { PrivateKey: { key_path: "~/.ssh/prod_key" } },
+    });
+    const options = JSON.parse(saved.options_json);
+    expect(options).toMatchObject({
+      x11: true,
+      x11Trusted: false,
+      compression: true,
+      startupCmd: "tmux new -A -s main",
+      doNotExit: false,
+      networkSettings: {
+        proxyKind: "ssh-tunnel",
+        jumpHost: "bastion.example.test",
+        jumpPort: "2200",
+        jumpUser: "ops",
+        keepAlive: true,
+        keepAliveIntervalSecs: "45",
+        ipVersion: "ipv4",
+      },
+    });
+    expect(options.networkSettings.localForwards).toEqual([
+      expect.objectContaining({
+        local: "127.0.0.1:15432",
+        remote: "127.0.0.1:5432",
+      }),
+    ]);
+  });
 
   it("persists localized Local SSH tunnel selection as a stable proxy kind", async () => {
     setLocale("zh-CN");

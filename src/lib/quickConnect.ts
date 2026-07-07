@@ -1,4 +1,10 @@
 import type { AuthMethod, SessionConfig } from "./ipc";
+import {
+  DEFAULT_NETWORK_SETTINGS,
+  type IpVersion,
+  type NetworkForward,
+  type NetworkSettings,
+} from "./networkSettings";
 
 const DEFAULT_PORTS: Record<string, number> = {
   SSH: 22,
@@ -42,6 +48,22 @@ export interface ParsedQuickConnect {
   transient: boolean;
 }
 
+export interface ParsedSshConnectionCommand {
+  host: string;
+  port: number;
+  username: string | null;
+  authMethod: AuthMethod;
+  keyPath: string;
+  options: {
+    x11: boolean;
+    x11Trusted: boolean;
+    compression?: boolean;
+    startupCmd?: string;
+    doNotExit?: boolean;
+    networkSettings?: NetworkSettings;
+  };
+}
+
 export function parseQuickConnectInput(input: string): ParsedQuickConnect {
   const raw = input.trim();
   if (!raw) {
@@ -49,6 +71,9 @@ export function parseQuickConnectInput(input: string): ParsedQuickConnect {
   }
 
   const now = Math.floor(Date.now() / 1000);
+  const sshCommand = parseSshConnectionCommand(raw);
+  if (sshCommand) return sshCommandToQuickConnect(sshCommand, now);
+
   const { sessionType, target } = splitProtocol(raw);
 
   if (sessionType === "LocalShell") {
@@ -151,6 +176,217 @@ export function parseQuickConnectInput(input: string): ParsedQuickConnect {
       last_connected_at: null,
       sort_order: 0,
     },
+  };
+}
+
+export function parseSshConnectionCommand(command: string): ParsedSshConnectionCommand | null {
+  const tokens = shellSplit(command);
+  const sshIndex = tokens.findIndex(isSshExecutable);
+  if (sshIndex < 0) return null;
+
+  let port = 22;
+  let explicitPort = false;
+  let username: string | null = null;
+  let keyPath = "";
+  let hostOverride = "";
+  let hostToken = "";
+  let startupTokens: string[] = [];
+  let compression = false;
+  let x11 = false;
+  let x11Trusted = true;
+  let ipVersion: IpVersion = "auto";
+  let keepAliveIntervalSecs = "";
+  let jumpSpec = "";
+  const localForwards: NetworkForward[] = [];
+
+  const readValue = (index: number, attached = ""): { value: string; nextIndex: number } | null => {
+    if (attached) return { value: attached, nextIndex: index };
+    const value = tokens[index + 1];
+    return value ? { value, nextIndex: index + 1 } : null;
+  };
+
+  for (let i = sshIndex + 1; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    if (!token) continue;
+
+    if (token === "--") {
+      hostToken = tokens[i + 1] ?? "";
+      startupTokens = tokens.slice(i + 2);
+      break;
+    }
+
+    if (!hostToken && token.startsWith("-") && token !== "-") {
+      if (token === "-p" || token.startsWith("-p")) {
+        const value = readValue(i, token.length > 2 ? token.slice(2) : "");
+        if (value) {
+          port = parseNumber(value.value, 22);
+          explicitPort = true;
+          i = value.nextIndex;
+        }
+        continue;
+      }
+      if (token === "-l" || token.startsWith("-l")) {
+        const value = readValue(i, token.length > 2 ? token.slice(2) : "");
+        if (value) {
+          username = value.value.trim() || username;
+          i = value.nextIndex;
+        }
+        continue;
+      }
+      if (token === "-i" || token.startsWith("-i")) {
+        const value = readValue(i, token.length > 2 ? token.slice(2) : "");
+        if (value) {
+          keyPath = value.value.trim();
+          i = value.nextIndex;
+        }
+        continue;
+      }
+      if (token === "-J" || token.startsWith("-J")) {
+        const value = readValue(i, token.length > 2 ? token.slice(2) : "");
+        if (value) {
+          jumpSpec = value.value.trim();
+          i = value.nextIndex;
+        }
+        continue;
+      }
+      if (token === "-L" || token.startsWith("-L")) {
+        const value = readValue(i, token.length > 2 ? token.slice(2) : "");
+        if (value) {
+          const forward = parseLocalForward(value.value);
+          if (forward) localForwards.push(forward);
+          i = value.nextIndex;
+        }
+        continue;
+      }
+      if (token === "-o" || token.startsWith("-o")) {
+        const value = readValue(i, token.length > 2 ? token.slice(2) : "");
+        if (value) {
+          const option = parseOpenSshOption(value.value);
+          if (option) {
+            switch (option.key) {
+              case "compression":
+                compression = option.value === "yes" || option.value === "true";
+                break;
+              case "forwardx11":
+                x11 = option.value === "yes" || option.value === "true";
+                break;
+              case "forwardx11trusted":
+                x11 = true;
+                x11Trusted = option.value !== "no" && option.value !== "false";
+                break;
+              case "hostname":
+                hostOverride = option.value;
+                break;
+              case "identityfile":
+                keyPath = option.value;
+                break;
+              case "localforward": {
+                const forward = parseLocalForward(option.value);
+                if (forward) localForwards.push(forward);
+                break;
+              }
+              case "port":
+                port = parseNumber(option.value, 22);
+                explicitPort = true;
+                break;
+              case "proxyjump":
+                jumpSpec = option.value;
+                break;
+              case "serveraliveinterval": {
+                const interval = parseNumber(option.value, 0);
+                keepAliveIntervalSecs = interval > 0 ? String(interval) : "";
+                break;
+              }
+              case "user":
+                username = option.value || username;
+                break;
+              case "addressfamily":
+                if (option.value === "inet") ipVersion = "ipv4";
+                else if (option.value === "inet6") ipVersion = "ipv6";
+                else ipVersion = "auto";
+                break;
+            }
+          }
+          i = value.nextIndex;
+        }
+        continue;
+      }
+      if (token === "-C" || token.includes("C")) {
+        compression = true;
+      }
+      if (token === "-X") {
+        x11 = true;
+        x11Trusted = false;
+      } else if (token === "-Y") {
+        x11 = true;
+        x11Trusted = true;
+      } else if (token === "-4") {
+        ipVersion = "ipv4";
+      } else if (token === "-6") {
+        ipVersion = "ipv6";
+      }
+      if (optionConsumesValue(token)) i += 1;
+      continue;
+    }
+
+    hostToken = token;
+    startupTokens = tokens.slice(i + 1);
+    break;
+  }
+
+  if (!hostToken) return null;
+
+  let target: ReturnType<typeof parseTarget>;
+  try {
+    target = parseTarget(hostToken);
+  } catch {
+    return null;
+  }
+  if (!target.host) return null;
+  if (target.username) username = target.username;
+  if (target.port && !explicitPort) port = target.port;
+
+  const jump = firstJumpTarget(jumpSpec);
+  const needsNetworkSettings =
+    !!jump ||
+    localForwards.length > 0 ||
+    !!keepAliveIntervalSecs ||
+    ipVersion !== "auto";
+
+  const options: ParsedSshConnectionCommand["options"] = {
+    x11,
+    x11Trusted,
+  };
+  if (compression) options.compression = true;
+  if (startupTokens.length > 0) {
+    options.startupCmd = startupTokens.map(quoteCommandToken).join(" ");
+    options.doNotExit = false;
+  }
+  if (needsNetworkSettings) {
+    options.networkSettings = cloneNetworkSettings({
+      ...DEFAULT_NETWORK_SETTINGS,
+      ...(jump
+        ? {
+            proxyKind: "ssh-tunnel",
+            jumpHost: jump.host,
+            jumpPort: String(jump.port ?? 22),
+            jumpUser: jump.username ?? "",
+            jumpSessionId: "",
+          }
+        : {}),
+      ...(keepAliveIntervalSecs ? { keepAlive: true, keepAliveIntervalSecs } : {}),
+      ipVersion,
+      localForwards,
+    });
+  }
+
+  return {
+    host: hostOverride || target.host,
+    port,
+    username,
+    authMethod: keyPath ? { PrivateKey: { key_path: keyPath } } : "Password",
+    keyPath,
+    options,
   };
 }
 
@@ -291,4 +527,146 @@ function parseNumber(value: string | undefined, fallback: number | undefined): n
 
 function stripQuotes(value: string): string {
   return value.replace(/^["']|["']$/g, "");
+}
+
+function sshCommandToQuickConnect(parsed: ParsedSshConnectionCommand, now: number): ParsedQuickConnect {
+  const titlePrefix = parsed.username ? `${parsed.username}@` : "";
+  return {
+    transient: true,
+    authData: null,
+    config: {
+      id: `quick-ssh-${Date.now()}`,
+      name: `ssh://${titlePrefix}${parsed.host}${parsed.port ? `:${parsed.port}` : ""}`,
+      session_type: "SSH",
+      group_path: null,
+      host: parsed.host,
+      port: parsed.port,
+      username: parsed.username,
+      auth_method: parsed.authMethod,
+      options_json: JSON.stringify(parsed.options),
+      created_at: now,
+      updated_at: now,
+      last_connected_at: null,
+      sort_order: 0,
+    },
+  };
+}
+
+function shellSplit(command: string): string[] {
+  const tokens: string[] = [];
+  let token = "";
+  let quote: string | null = null;
+  let escaped = false;
+
+  for (const char of command.trim()) {
+    if (escaped) {
+      token += char;
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (char === quote) quote = null;
+      else token += char;
+      continue;
+    }
+    if (char === "\"" || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (/\s/.test(char)) {
+      if (token) {
+        tokens.push(token);
+        token = "";
+      }
+      continue;
+    }
+    token += char;
+  }
+  if (token) tokens.push(token);
+  return tokens;
+}
+
+function isSshExecutable(token: string): boolean {
+  const normalized = token.toLowerCase();
+  return normalized === "ssh" ||
+    normalized === "ssh.exe" ||
+    normalized.endsWith("/ssh") ||
+    normalized.endsWith("\\ssh.exe");
+}
+
+function optionConsumesValue(token: string): boolean {
+  return /^-[bcDeFIimOoQRSWw]$/.test(token);
+}
+
+function parseOpenSshOption(value: string): { key: string; value: string } | null {
+  const equals = value.indexOf("=");
+  if (equals < 0) return null;
+  const key = value.slice(0, equals).trim().toLowerCase();
+  const optionValue = stripQuotes(value.slice(equals + 1).trim());
+  return key ? { key, value: optionValue } : null;
+}
+
+function parseLocalForward(value: string): NetworkForward | null {
+  const parts = splitColonOutsideBrackets(value.trim());
+  if (parts.length < 3) return null;
+  const remote = parts.slice(-2).join(":").trim();
+  const rawLocal = parts.slice(0, -2).join(":").trim();
+  const local = /^\d+$/.test(rawLocal) ? `127.0.0.1:${rawLocal}` : rawLocal;
+  if (!local || !remote) return null;
+  return {
+    id: createId("ssh-forward"),
+    local,
+    remote,
+    desc: "",
+  };
+}
+
+function firstJumpTarget(value: string): { username?: string; host: string; port?: number } | null {
+  const first = value.split(",")[0]?.trim();
+  if (!first) return null;
+  try {
+    const parsed = parseTarget(first);
+    return parsed.host ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function splitColonOutsideBrackets(value: string): string[] {
+  const parts: string[] = [];
+  let part = "";
+  let bracketDepth = 0;
+  for (const char of value) {
+    if (char === "[") bracketDepth += 1;
+    if (char === "]" && bracketDepth > 0) bracketDepth -= 1;
+    if (char === ":" && bracketDepth === 0) {
+      parts.push(part);
+      part = "";
+      continue;
+    }
+    part += char;
+  }
+  parts.push(part);
+  return parts.map((item) => item.trim()).filter(Boolean);
+}
+
+function quoteCommandToken(value: string): string {
+  return /^[A-Za-z0-9_@%+=:,./~\-[\]]+$/.test(value)
+    ? value
+    : `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+function cloneNetworkSettings(settings: NetworkSettings): NetworkSettings {
+  return {
+    ...settings,
+    localForwards: settings.localForwards.map((forward) => ({ ...forward })),
+  };
+}
+
+function createId(prefix: string): string {
+  return globalThis.crypto?.randomUUID?.() ?? `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }

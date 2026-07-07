@@ -1434,7 +1434,7 @@ controls:
 -->
 
 - 协议选择：SSH、SFTP、RDP、VNC、Browser、FTP、Telnet、Rlogin、Mosh、Serial、Shell（SSH/SFTP 原生；VNC/RDP 接入基础 client；Browser 打开系统浏览器；FTP/Telnet/Rlogin/Mosh/Serial 启动本地命令行 client；Shell 启动本地终端）
-- 基础设置：host、port、username、auth method
+- 基础设置：host、port、username、auth method；远程主机框可粘贴 `ssh -p 2222 user@host` 这类 OpenSSH 命令并填充会话草稿
 - Advanced SSH：SSH-browser type、Auto-inject OSC 7、Execute command、跳板机/代理
 - Terminal：复用 `TerminalAppearanceSettings` 全套外观控件；Mail 使用独立的邮件外观控件
 - Network：Keep-alive、proxy 配置、隧道转发列表（local/remote/dynamic 添加）
