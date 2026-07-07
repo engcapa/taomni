@@ -2137,6 +2137,32 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "mail_test_connection": {
       return { imapOk: true, smtpOk: true, folderCount: MAIL_STUB_FOLDERS.length } as T;
     }
+    case "mail_oauth_authorize": {
+      return {
+        tokenRef: "vault:stub-mail-oauth-token",
+        expiresAt: Math.floor(Date.now() / 1000) + 3600,
+        scope: "stub-mail-scope",
+        tokenType: "Bearer",
+      } as T;
+    }
+    case "mail_oauth_device_start": {
+      return {
+        deviceCode: "stub-device-code",
+        userCode: "ABCD-EFGH",
+        verificationUri: "https://microsoft.com/devicelogin",
+        message: "Open the verification URL and enter code ABCD-EFGH.",
+        expiresIn: 900,
+        interval: 1,
+      } as T;
+    }
+    case "mail_oauth_device_complete": {
+      return {
+        tokenRef: "vault:stub-mail-oauth-token",
+        expiresAt: Math.floor(Date.now() / 1000) + 3600,
+        scope: "stub-mail-scope",
+        tokenType: "Bearer",
+      } as T;
+    }
     case "mail_clear_cache": {
       return undefined as T;
     }

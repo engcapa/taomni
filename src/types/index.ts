@@ -244,6 +244,8 @@ export interface ObjectStorageTabInfo {
 }
 
 export type MailConnectionSecurity = "tls" | "starttls" | "none";
+export type MailProvider = "custom" | "gmail" | "outlook";
+export type MailAuthMode = "password" | "oauth2";
 
 export interface MailCacheSettings {
   enabled: boolean;
@@ -263,6 +265,8 @@ export interface MailAiSettings {
 export interface MailTabInfo {
   sessionId: string;
   emailAddress: string;
+  provider: MailProvider;
+  authMode: MailAuthMode;
   displayName?: string | null;
   replyTo?: string | null;
   signature?: string | null;
@@ -282,6 +286,15 @@ export interface MailTabInfo {
     security: MailConnectionSecurity;
     useImapAuth: boolean;
   };
+  oauth: {
+    clientId?: string | null;
+    clientSecret?: string;
+    tokenRef?: string | null;
+    refreshTokenRef?: string | null;
+    expiresAt?: number | null;
+    scope?: string | null;
+  };
+  networkSettings?: NetworkSettingsPayload | null;
   sync: {
     onOpen: boolean;
     intervalMinutes: number;

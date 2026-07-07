@@ -57,6 +57,8 @@ vi.mock("../../stores/chatStore", () => {
 const info: MailTabInfo = {
   sessionId: "mail-account-1",
   emailAddress: "me@example.com",
+  provider: "custom",
+  authMode: "password",
   displayName: "Me",
   replyTo: null,
   signature: null,
@@ -74,6 +76,12 @@ const info: MailTabInfo = {
     password: "secret",
     security: "tls",
     useImapAuth: true,
+  },
+  oauth: {
+    clientId: null,
+    tokenRef: null,
+    expiresAt: null,
+    scope: null,
   },
   sync: {
     onOpen: false,
@@ -358,6 +366,33 @@ describe("MailClientTab", () => {
     });
 
     await waitFor(() => expect(screen.queryByTestId("mail-body-warming-progress")).not.toBeInTheDocument());
+  });
+
+  it("prompts to reauthorize when OAuth refresh is no longer valid", async () => {
+    const oauthInfo: MailTabInfo = {
+      ...info,
+      provider: "outlook",
+      authMode: "oauth2",
+      oauth: {
+        clientId: "client-id",
+        tokenRef: "vault:mail-oauth-token",
+        expiresAt: 1,
+        scope: "offline_access https://outlook.office.com/IMAP.AccessAsUser.All",
+      },
+    };
+    mailMocks.mailSyncAllFolders.mockRejectedValueOnce(
+      new Error("OAuth2 authorization expired or was revoked. Reauthorize this mail account in session settings. Detail: invalid_grant"),
+    );
+    const onEditSession = vi.fn();
+
+    render(<MailClientTab tabId="mail-tab" info={oauthInfo} visible onEditSession={onEditSession} />);
+
+    await screen.findByText(/Second line stays visible/);
+    fireEvent.click(screen.getByTestId("mail-sync-button"));
+
+    expect(await screen.findByText("OAuth authorization expired or was revoked. Reauthorize this mail account.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /reauthorize/i }));
+    expect(onEditSession).toHaveBeenCalledWith(oauthInfo.sessionId);
   });
 
   it("defers auto-sync UI refresh and body warming while hidden", async () => {

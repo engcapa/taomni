@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { MailTabInfo } from "../types";
+import type { NetworkSettingsPayload } from "./networkSettings";
 import { withVaultLockedNotice } from "./ipc";
 
 export interface MailAddress {
@@ -113,6 +114,50 @@ export interface MailTestConnectionResult {
   imapOk: boolean;
   smtpOk: boolean;
   folderCount: number;
+}
+
+export interface MailOAuthAuthorizeRequest {
+  sessionId: string;
+  provider: "gmail" | "outlook";
+  emailAddress: string;
+  clientId: string;
+  clientSecret?: string | null;
+  networkSettings?: NetworkSettingsPayload | null;
+}
+
+export interface MailOAuthAuthorizeResult {
+  tokenRef: string;
+  expiresAt?: number | null;
+  scope?: string | null;
+  tokenType?: string | null;
+}
+
+export interface MailOAuthDeviceStartRequest {
+  sessionId: string;
+  provider: "outlook";
+  emailAddress: string;
+  clientId: string;
+  networkSettings?: NetworkSettingsPayload | null;
+}
+
+export interface MailOAuthDeviceStartResult {
+  deviceCode: string;
+  userCode: string;
+  verificationUri: string;
+  message: string;
+  expiresIn: number;
+  interval: number;
+}
+
+export interface MailOAuthDeviceCompleteRequest {
+  sessionId: string;
+  provider: "outlook";
+  emailAddress: string;
+  clientId: string;
+  deviceCode: string;
+  interval?: number | null;
+  expiresIn?: number | null;
+  networkSettings?: NetworkSettingsPayload | null;
 }
 
 export interface MailSendRequest {
@@ -332,6 +377,30 @@ export function mailSearchContacts(
 export function mailTestConnection(config: MailTabInfo): Promise<MailTestConnectionResult> {
   return withVaultLockedNotice(() =>
     invoke<MailTestConnectionResult>("mail_test_connection", { config }),
+  );
+}
+
+export function mailOAuthAuthorize(
+  request: MailOAuthAuthorizeRequest,
+): Promise<MailOAuthAuthorizeResult> {
+  return withVaultLockedNotice(() =>
+    invoke<MailOAuthAuthorizeResult>("mail_oauth_authorize", { request }),
+  );
+}
+
+export function mailOAuthDeviceStart(
+  request: MailOAuthDeviceStartRequest,
+): Promise<MailOAuthDeviceStartResult> {
+  return withVaultLockedNotice(() =>
+    invoke<MailOAuthDeviceStartResult>("mail_oauth_device_start", { request }),
+  );
+}
+
+export function mailOAuthDeviceComplete(
+  request: MailOAuthDeviceCompleteRequest,
+): Promise<MailOAuthAuthorizeResult> {
+  return withVaultLockedNotice(() =>
+    invoke<MailOAuthAuthorizeResult>("mail_oauth_device_complete", { request }),
   );
 }
 
