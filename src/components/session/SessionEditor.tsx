@@ -102,6 +102,11 @@ import { WslOptionsForm } from "./forms/WslOptionsForm";
 import { LocalShellOptionsForm } from "./forms/LocalShellOptionsForm";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 import { MailAppearanceSettings } from "../mail/MailAppearanceSettings";
+import {
+  mailOAuthAuthorize,
+  mailOAuthDeviceComplete,
+  mailOAuthDeviceStart,
+} from "../../lib/mail";
 import { useT, type TranslateFn } from "../../lib/i18n";
 import {
   PathMappingsEditor,
@@ -121,6 +126,63 @@ type Proto =
 
 type SectionTab = "advanced" | "terminal" | "appearance" | "network" | "bookmark" | "rdp" | "database" | "mappings" | "proxy" | "objectstorage" | "mail";
 type MailSecurityMode = "TLS" | "STARTTLS" | "None";
+type MailProvider = "custom" | "gmail" | "outlook";
+type MailAuthMode = "password" | "oauth2";
+type MailOAuthFlow = "browser" | "device";
+
+interface MailOAuthDeviceInfo {
+  userCode: string;
+  verificationUri: string;
+  message: string;
+  expiresIn: number;
+}
+
+interface MailProviderPreset {
+  imapHost: string;
+  imapPort: string;
+  imapSecurity: MailSecurityMode;
+  smtpHost: string;
+  smtpPort: string;
+  smtpSecurity: MailSecurityMode;
+  smtpUseImapAuth: boolean;
+}
+
+const MAIL_PROVIDER_PRESETS: Partial<Record<MailProvider, MailProviderPreset>> = {
+  gmail: {
+    imapHost: "imap.gmail.com",
+    imapPort: "993",
+    imapSecurity: "TLS",
+    smtpHost: "smtp.gmail.com",
+    smtpPort: "587",
+    smtpSecurity: "STARTTLS",
+    smtpUseImapAuth: true,
+  },
+  outlook: {
+    imapHost: "outlook.office365.com",
+    imapPort: "993",
+    imapSecurity: "TLS",
+    smtpHost: "smtp-mail.outlook.com",
+    smtpPort: "587",
+    smtpSecurity: "STARTTLS",
+    smtpUseImapAuth: true,
+  },
+};
+
+const MAIL_PROVIDER_OPTIONS: SelectOption[] = [
+  { value: "custom", label: "Custom IMAP/SMTP" },
+  { value: "gmail", label: "Gmail" },
+  { value: "outlook", label: "Outlook.com" },
+];
+
+const MAIL_AUTH_MODE_OPTIONS: SelectOption[] = [
+  { value: "oauth2", label: "OAuth2 / Modern Auth" },
+  { value: "password", label: "Password / app password" },
+];
+
+const MAIL_OAUTH_FLOW_OPTIONS: SelectOption[] = [
+  { value: "device", label: "Device code" },
+  { value: "browser", label: "Browser callback" },
+];
 
 const PROTOS: { id: Proto; icon: React.ReactNode; color: string }[] = [
   { id: "SSH",     icon: <TerminalIcon className="w-7 h-7" />, color: "#2b5d8b" },
@@ -214,6 +276,41 @@ function optionBoolean(options: Record<string, unknown>, key: string, fallback: 
 
 function optionString(options: Record<string, unknown>, key: string, fallback: string): string {
   return typeof options[key] === "string" ? options[key] : fallback;
+}
+
+function optionStringOrNumber(options: Record<string, unknown>, key: string, fallback: string): string {
+  const value = options[key];
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return fallback;
+}
+
+function normalizeMailProvider(value: unknown): MailProvider | null {
+  if (value === "gmail" || value === "outlook" || value === "custom") return value;
+  return null;
+}
+
+function normalizeMailAuthMode(value: unknown): MailAuthMode {
+  return value === "oauth2" ? "oauth2" : "password";
+}
+
+function normalizeMailOAuthFlow(value: unknown): MailOAuthFlow | null {
+  if (value === "browser" || value === "device") return value;
+  return null;
+}
+
+function initialMailOAuthFlow(options: Record<string, unknown>, provider: MailProvider): MailOAuthFlow {
+  return normalizeMailOAuthFlow(options.mailOauthFlow) ?? (provider === "outlook" ? "device" : "browser");
+}
+
+function initialMailProvider(options: Record<string, unknown>, imapHost: string | undefined): MailProvider {
+  const explicit = normalizeMailProvider(options.mailProvider);
+  if (explicit) return explicit;
+
+  const host = (imapHost ?? "").trim().toLowerCase();
+  if (host === MAIL_PROVIDER_PRESETS.gmail?.imapHost) return "gmail";
+  if (host === MAIL_PROVIDER_PRESETS.outlook?.imapHost) return "outlook";
+  return "custom";
 }
 
 function stripDeprecatedCwdOptions(options: Record<string, unknown>): Record<string, unknown> {
@@ -311,16 +408,19 @@ function Select({
   options,
   onChange,
   className = "",
+  ariaLabel,
 }: {
   value: string;
   options: SelectOption[];
   onChange?: (v: string) => void;
   className?: string;
+  ariaLabel?: string;
 }) {
   return (
     <span className="relative inline-flex items-center">
       <select
         className={`taomni-input pr-6 appearance-none ${className || "w-[260px]"}`}
+        aria-label={ariaLabel}
         value={value}
         onChange={(e) => onChange?.(e.target.value)}
       >
@@ -1182,6 +1282,8 @@ function BookmarkSettings({
 }
 
 function MailSettings({
+  provider, setProvider,
+  authMode, setAuthMode,
   imapHost, setImapHost,
   imapPort, setImapPort,
   username, setUsername,
@@ -1200,6 +1302,18 @@ function MailSettings({
   smtpPassword, setSmtpPassword,
   smtpPasswordRef, clearSmtpPasswordRef,
   smtpSaveInVault, setSmtpSaveInVault,
+  oauthClientId, setOauthClientId,
+  oauthClientSecret, setOauthClientSecret,
+  oauthClientSecretRef, clearOauthClientSecretRef,
+  oauthClientSecretSaveInVault, setOauthClientSecretSaveInVault,
+  oauthFlow, setOauthFlow,
+  oauthDeviceInfo,
+  oauthTokenRef,
+  oauthExpiresAt,
+  oauthScope,
+  oauthConnecting,
+  oauthStatus,
+  onOAuthConnect,
   cacheEnabled, setCacheEnabled,
   saveDirectory, setSaveDirectory,
   onBrowseSaveDirectory,
@@ -1215,6 +1329,8 @@ function MailSettings({
   aiSkipBodyConfirm, setAiSkipBodyConfirm,
   vaultState,
 }: {
+  provider: MailProvider; setProvider: (v: MailProvider) => void;
+  authMode: MailAuthMode; setAuthMode: (v: MailAuthMode) => void;
   imapHost: string; setImapHost: (v: string) => void;
   imapPort: string; setImapPort: (v: string) => void;
   username: string; setUsername: (v: string) => void;
@@ -1233,6 +1349,18 @@ function MailSettings({
   smtpPassword: string; setSmtpPassword: (v: string) => void;
   smtpPasswordRef: string; clearSmtpPasswordRef: () => void;
   smtpSaveInVault: boolean; setSmtpSaveInVault: (v: boolean) => void;
+  oauthClientId: string; setOauthClientId: (v: string) => void;
+  oauthClientSecret: string; setOauthClientSecret: (v: string) => void;
+  oauthClientSecretRef: string; clearOauthClientSecretRef: () => void;
+  oauthClientSecretSaveInVault: boolean; setOauthClientSecretSaveInVault: (v: boolean) => void;
+  oauthFlow: MailOAuthFlow; setOauthFlow: (v: MailOAuthFlow) => void;
+  oauthDeviceInfo: MailOAuthDeviceInfo | null;
+  oauthTokenRef: string;
+  oauthExpiresAt: string;
+  oauthScope: string;
+  oauthConnecting: boolean;
+  oauthStatus: { ok: boolean; msg: string } | null;
+  onOAuthConnect: () => void;
   cacheEnabled: boolean; setCacheEnabled: (v: boolean) => void;
   saveDirectory: string; setSaveDirectory: (v: string) => void;
   onBrowseSaveDirectory: () => void;
@@ -1248,8 +1376,45 @@ function MailSettings({
   aiSkipBodyConfirm: boolean; setAiSkipBodyConfirm: (v: boolean) => void;
   vaultState: "empty" | "locked" | "unlocked";
 }) {
+  const isOAuth = authMode === "oauth2";
+  const oauthSupported = provider === "gmail" || provider === "outlook";
+  const usesDeviceCode = provider === "outlook" && oauthFlow === "device";
+  const oauthConnectLabel = usesDeviceCode
+    ? (oauthConnecting ? "Waiting for approval..." : oauthTokenRef ? "Reconnect device code" : "Start device code")
+    : (oauthConnecting ? "Connecting..." : oauthTokenRef ? "Reconnect OAuth2" : "Connect OAuth2");
+  const oauthExpiresLabel = (() => {
+    const seconds = Number.parseInt(oauthExpiresAt, 10);
+    if (!Number.isFinite(seconds) || seconds <= 0) return "";
+    return new Date(seconds * 1000).toLocaleString();
+  })();
+
   return (
     <div data-testid="mail-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
+      <Field label="Provider">
+        <Select
+          value={provider}
+          className="w-44"
+          ariaLabel="Mail provider"
+          options={MAIL_PROVIDER_OPTIONS}
+          onChange={(value) => setProvider((normalizeMailProvider(value) ?? "custom"))}
+        />
+      </Field>
+
+      <Field label="Auth mode">
+        <Select
+          value={authMode}
+          className="w-52"
+          ariaLabel="Mail auth mode"
+          options={MAIL_AUTH_MODE_OPTIONS}
+          onChange={(value) => setAuthMode(normalizeMailAuthMode(value))}
+        />
+        {isOAuth && !oauthSupported && (
+          <span className="ml-2 text-[var(--taomni-text-muted)]">
+            OAuth2 is available for Gmail and Outlook presets.
+          </span>
+        )}
+      </Field>
+
       <Field label="IMAP server">
         <input
           className="taomni-input w-72"
@@ -1275,6 +1440,111 @@ function MailSettings({
           onChange={(e) => setUsername(e.target.value)}
         />
       </Field>
+
+      {isOAuth && (
+        <>
+          {provider === "outlook" && (
+            <Field label="OAuth flow">
+              <Select
+                value={oauthFlow}
+                className="w-44"
+                ariaLabel="OAuth flow"
+                options={MAIL_OAUTH_FLOW_OPTIONS}
+                onChange={(value) => setOauthFlow(normalizeMailOAuthFlow(value) ?? "device")}
+              />
+            </Field>
+          )}
+          <Field label="OAuth client ID">
+            <input
+              className="taomni-input w-[420px]"
+              value={oauthClientId}
+              aria-label="OAuth client ID"
+              placeholder={provider === "outlook" ? "Azure app client ID" : "Google OAuth client ID"}
+              onChange={(e) => setOauthClientId(e.target.value)}
+            />
+          </Field>
+          {!usesDeviceCode && (
+            <Field label="OAuth client secret">
+              <input
+                className="taomni-input w-64"
+                type="password"
+                value={oauthClientSecret}
+                aria-label="OAuth client secret"
+                placeholder={oauthClientSecretRef ? "Saved in vault" : "Optional for public clients"}
+                onChange={(e) => {
+                  setOauthClientSecret(e.target.value);
+                  if (oauthClientSecretRef) clearOauthClientSecretRef();
+                }}
+              />
+              <label
+                className="ml-2 inline-flex items-center gap-1 text-[11px] cursor-pointer"
+                title={vaultState === "empty" ? "Set up the vault to save this secret" : "Save this secret in the encrypted vault"}
+              >
+                <input
+                  type="checkbox"
+                  className="taomni-checkbox"
+                  data-testid="mail-oauth-client-secret-save-in-vault"
+                  checked={oauthClientSecretSaveInVault}
+                  onChange={(e) => setOauthClientSecretSaveInVault(e.target.checked)}
+                />
+                Save in vault
+              </label>
+            </Field>
+          )}
+          <Field label="OAuth token">
+            <button
+              type="button"
+              className="taomni-btn flex items-center gap-1.5"
+              data-testid="mail-oauth-connect"
+              disabled={!oauthSupported || oauthConnecting}
+              onClick={onOAuthConnect}
+              aria-label="Connect OAuth2"
+            >
+              <Shield className="w-3.5 h-3.5" />
+              {oauthConnectLabel}
+            </button>
+            {usesDeviceCode && oauthDeviceInfo && (
+              <span className="ml-2 taomni-pill" data-testid="mail-oauth-device-code">
+                Code {oauthDeviceInfo.userCode}
+              </span>
+            )}
+            {usesDeviceCode && oauthDeviceInfo && (
+              <span className="ml-2 text-[var(--taomni-text-muted)]">
+                {oauthDeviceInfo.verificationUri}
+              </span>
+            )}
+            {oauthTokenRef && (
+              <span className="ml-2 taomni-pill">
+                <Shield className="w-3 h-3" /> Token saved
+              </span>
+            )}
+            {oauthExpiresLabel && (
+              <span className="ml-2 text-[var(--taomni-text-muted)]">
+                Expires {oauthExpiresLabel}
+              </span>
+            )}
+            {oauthScope && (
+              <span className="ml-2 text-[var(--taomni-text-muted)]">
+                Scope saved
+              </span>
+            )}
+            {oauthStatus && (
+              <span
+                className="ml-2"
+                style={{ color: oauthStatus.ok ? "#2f8a3e" : "#b22222" }}
+              >
+                {oauthStatus.msg}
+              </span>
+            )}
+            {usesDeviceCode && oauthDeviceInfo && (
+              <span className="ml-2 text-[var(--taomni-text-muted)]">
+                {oauthDeviceInfo.message}
+              </span>
+            )}
+          </Field>
+        </>
+      )}
+
       <Field label="Sender name">
         <input
           className="taomni-input w-72"
@@ -1311,32 +1581,34 @@ function MailSettings({
           onChange={(value) => setImapSecurity(value as MailSecurityMode)}
         />
       </Field>
-      <Field label="IMAP password">
-        <input
-          className="taomni-input w-64"
-          type="password"
-          value={password}
-          aria-label="Mail password or app password token"
-          placeholder={passwordRef ? "Saved in vault" : "Password / app password token"}
-          onChange={(e) => {
-            setPassword(e.target.value);
-            if (passwordRef) clearPasswordRef();
-          }}
-        />
-        <label
-          className="ml-2 inline-flex items-center gap-1 text-[11px] cursor-pointer"
-          title={vaultState === "empty" ? "Set up the vault to save this secret" : "Save this secret in the encrypted vault"}
-        >
+      {!isOAuth && (
+        <Field label="IMAP password">
           <input
-            type="checkbox"
-            className="taomni-checkbox"
-            data-testid="session-save-in-vault"
-            checked={saveInVault}
-            onChange={(e) => setSaveInVault(e.target.checked)}
+            className="taomni-input w-64"
+            type="password"
+            value={password}
+            aria-label="Mail password or app password token"
+            placeholder={passwordRef ? "Saved in vault" : "Password / app password token"}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (passwordRef) clearPasswordRef();
+            }}
           />
-          Save in vault
-        </label>
-      </Field>
+          <label
+            className="ml-2 inline-flex items-center gap-1 text-[11px] cursor-pointer"
+            title={vaultState === "empty" ? "Set up the vault to save this secret" : "Save this secret in the encrypted vault"}
+          >
+            <input
+              type="checkbox"
+              className="taomni-checkbox"
+              data-testid="session-save-in-vault"
+              checked={saveInVault}
+              onChange={(e) => setSaveInVault(e.target.checked)}
+            />
+            Save in vault
+          </label>
+        </Field>
+      )}
 
       <Field label="SMTP server">
         <input
@@ -1367,7 +1639,7 @@ function MailSettings({
       <Field label="SMTP auth">
         <label className="flex items-center gap-1.5">
           <Checkbox checked={smtpUseImapAuth} onChange={setSmtpUseImapAuth} />
-          Reuse IMAP username and app password token
+          {isOAuth ? "Reuse IMAP username and OAuth2 token" : "Reuse IMAP username and app password token"}
         </label>
       </Field>
 
@@ -1382,35 +1654,37 @@ function MailSettings({
               onChange={(e) => setSmtpUsername(e.target.value)}
             />
           </Field>
-          <Field label="SMTP password">
-            <input
-              className="taomni-input w-64"
-              type="password"
-              value={smtpPassword}
-              aria-label="SMTP password or app password token"
-              placeholder={smtpPasswordRef ? "saved in vault" : "Password / app password token"}
-              onChange={(e) => {
-                setSmtpPassword(e.target.value);
-                if (smtpPasswordRef) clearSmtpPasswordRef();
-              }}
-            />
-            <label
-              className="flex items-center gap-1 text-[11px] cursor-pointer ml-2"
-              title={vaultState === "empty" ? "Set up the vault on save to store this token" : "Encrypt and store this token in the vault"}
-            >
+          {!isOAuth && (
+            <Field label="SMTP password">
               <input
-                type="checkbox"
-                className="taomni-checkbox"
-                data-testid="mail-smtp-save-in-vault"
-                checked={smtpSaveInVault}
-                onChange={(e) => setSmtpSaveInVault(e.target.checked)}
+                className="taomni-input w-64"
+                type="password"
+                value={smtpPassword}
+                aria-label="SMTP password or app password token"
+                placeholder={smtpPasswordRef ? "saved in vault" : "Password / app password token"}
+                onChange={(e) => {
+                  setSmtpPassword(e.target.value);
+                  if (smtpPasswordRef) clearSmtpPasswordRef();
+                }}
               />
-              Save in vault
-            </label>
-            <span className="taomni-pill">
-              <Shield className="w-3 h-3" /> Encrypted
-            </span>
-          </Field>
+              <label
+                className="flex items-center gap-1 text-[11px] cursor-pointer ml-2"
+                title={vaultState === "empty" ? "Set up the vault on save to store this token" : "Encrypt and store this token in the vault"}
+              >
+                <input
+                  type="checkbox"
+                  className="taomni-checkbox"
+                  data-testid="mail-smtp-save-in-vault"
+                  checked={smtpSaveInVault}
+                  onChange={(e) => setSmtpSaveInVault(e.target.checked)}
+                />
+                Save in vault
+              </label>
+              <span className="taomni-pill">
+                <Shield className="w-3 h-3" /> Encrypted
+              </span>
+            </Field>
+          )}
         </>
       )}
 
@@ -2200,6 +2474,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [proxyTestUrl, setProxyTestUrl] = useState(() => optionString(initialOptions, "testUrl", "www.google.com:443"));
 
   /* --- mail session options (generic IMAP + SMTP) --- */
+  const [mailProvider, setMailProvider] = useState<MailProvider>(() => initialMailProvider(initialOptions, session?.host));
+  const [mailAuthMode, setMailAuthMode] = useState<MailAuthMode>(() => normalizeMailAuthMode(initialOptions.mailAuthMode));
   const [mailDisplayName, setMailDisplayName] = useState(() => optionString(initialOptions, "mailDisplayName", ""));
   const [mailReplyTo, setMailReplyTo] = useState(() => optionString(initialOptions, "mailReplyTo", ""));
   const [mailSignature, setMailSignature] = useState(() => optionString(initialOptions, "mailSignature", ""));
@@ -2220,6 +2496,21 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [mailSmtpSaveInVault, setMailSmtpSaveInVault] = useState(() =>
     !!optionString(initialOptions, "mailSmtpPasswordRef", "") || initialProtoValue === "Mail",
   );
+  const [mailOauthClientId, setMailOauthClientId] = useState(() => optionString(initialOptions, "mailOauthClientId", ""));
+  const [mailOauthClientSecret, setMailOauthClientSecret] = useState("");
+  const [mailOauthClientSecretRef, setMailOauthClientSecretRef] = useState(() => optionString(initialOptions, "mailOauthClientSecretRef", ""));
+  const [mailOauthClientSecretSaveInVault, setMailOauthClientSecretSaveInVault] = useState(() =>
+    !!optionString(initialOptions, "mailOauthClientSecretRef", "") || initialProtoValue === "Mail",
+  );
+  const [mailOauthFlow, setMailOauthFlow] = useState<MailOAuthFlow>(() =>
+    initialMailOAuthFlow(initialOptions, initialMailProvider(initialOptions, session?.host)),
+  );
+  const [mailOauthDeviceInfo, setMailOauthDeviceInfo] = useState<MailOAuthDeviceInfo | null>(null);
+  const [mailOauthTokenRef, setMailOauthTokenRef] = useState(() => optionString(initialOptions, "mailOauthTokenRef", ""));
+  const [mailOauthExpiresAt, setMailOauthExpiresAt] = useState(() => optionStringOrNumber(initialOptions, "mailOauthExpiresAt", ""));
+  const [mailOauthScope, setMailOauthScope] = useState(() => optionString(initialOptions, "mailOauthScope", ""));
+  const [mailOauthConnecting, setMailOauthConnecting] = useState(false);
+  const [mailOauthStatus, setMailOauthStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [mailCacheEnabled, setMailCacheEnabled] = useState(() => optionBoolean(initialOptions, "mailCacheEnabled", true));
   const [mailSaveDirectory, setMailSaveDirectory] = useState(() => optionString(initialOptions, "mailSaveDirectory", ""));
   const [mailHeaderRetentionDays, setMailHeaderRetentionDays] = useState(() => optionString(initialOptions, "mailHeaderRetentionDays", "30"));
@@ -2395,6 +2686,24 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     if (p === "S3") setSection("objectstorage");
   };
 
+  const handleMailProviderChange = (provider: MailProvider) => {
+    setMailProvider(provider);
+    setMailAuthMode(provider === "custom" ? "password" : "oauth2");
+    setMailOauthFlow(provider === "outlook" ? "device" : "browser");
+    setMailOauthDeviceInfo(null);
+    setMailOauthStatus(null);
+    const preset = MAIL_PROVIDER_PRESETS[provider];
+    if (!preset) return;
+
+    setHost(preset.imapHost);
+    setPort(preset.imapPort);
+    setMailImapSecurity(preset.imapSecurity);
+    setMailSmtpHost(preset.smtpHost);
+    setMailSmtpPort(preset.smtpPort);
+    setMailSmtpSecurity(preset.smtpSecurity);
+    setMailSmtpUseImapAuth(preset.smtpUseImapAuth);
+  };
+
   /* Keep authMethod in sync with the radio group */
   const handleAuthRadio = (v: string) => {
     setAuthRadio(v);
@@ -2419,6 +2728,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     proxyPassValue = networkSettings.proxyPass,
     jumpPasswordValue = networkSettings.jumpPassword,
     mailSmtpPasswordRefValue = mailSmtpPasswordRef,
+    mailOauthClientSecretRefValue = mailOauthClientSecretRef,
+    mailOauthTokenRefValue = mailOauthTokenRef,
+    mailOauthExpiresAtValue = mailOauthExpiresAt,
+    mailOauthScopeValue = mailOauthScope,
     ossConfigValue,
   }: {
     passwordRefValue?: string;
@@ -2426,6 +2739,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     proxyPassValue?: string;
     jumpPasswordValue?: string;
     mailSmtpPasswordRefValue?: string;
+    mailOauthClientSecretRefValue?: string;
+    mailOauthTokenRefValue?: string;
+    mailOauthExpiresAtValue?: string;
+    mailOauthScopeValue?: string;
     /** Resolved object-storage option map (secrets already swapped for vault
      *  refs by handleSave). Falls back to current form state when omitted. */
     ossConfigValue?: Record<string, unknown>;
@@ -2476,8 +2793,21 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     const proxyOverrides: Record<string, unknown> = isProxy
       ? { proxyKind, testUrl: proxyTestUrl }
       : {};
+    const mailOauthExpiresAtNumber = Number.parseInt(mailOauthExpiresAtValue, 10);
+    const effectiveMailOauthFlow = mailProvider === "outlook" && mailOauthFlow === "device" ? "device" : "browser";
     const mailOverrides: Record<string, unknown> = isMail
       ? {
+          mailProvider,
+          mailAuthMode,
+          mailOauthFlow: mailAuthMode === "oauth2" ? effectiveMailOauthFlow : "browser",
+          mailOauthClientId: mailAuthMode === "oauth2" ? mailOauthClientId : "",
+          mailOauthClientSecretRef:
+            mailAuthMode === "oauth2" && effectiveMailOauthFlow !== "device"
+              ? mailOauthClientSecretRefValue
+              : "",
+          mailOauthTokenRef: mailAuthMode === "oauth2" ? mailOauthTokenRefValue : "",
+          mailOauthExpiresAt: mailAuthMode === "oauth2" && Number.isFinite(mailOauthExpiresAtNumber) ? mailOauthExpiresAtNumber : 0,
+          mailOauthScope: mailAuthMode === "oauth2" ? mailOauthScopeValue : "",
           mailDisplayName,
           mailReplyTo,
           mailSignature,
@@ -2556,7 +2886,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       ...terminalProfileOverrides,
       // SSH password vault reference (vault:<id>). Empty string means no
       // saved password; the user types it on connect.
-      passwordRef: passwordRefValue || "",
+      passwordRef: isMail && mailAuthMode === "oauth2" ? "" : passwordRefValue || "",
       // Strip the proxy password unless the user explicitly opted into
       // "Save in vault". `options_json` lands in the SQLite session row
       // in plaintext, so this is the gate keeping secrets out at rest.
@@ -2646,11 +2976,17 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       if (!username.trim()) return "Mail email or username is required.";
       if (!host.trim()) return "IMAP host is required.";
       if (!mailSmtpHost.trim()) return "SMTP host is required.";
-      if (!saveInVault) return "Mail credentials must be saved in the vault.";
-      if (!passwordRef && !password) return "Mail password or app password token is required.";
-      if (!mailSmtpUseImapAuth && !mailSmtpSaveInVault) return "SMTP credentials must be saved in the vault.";
-      if (!mailSmtpUseImapAuth && !mailSmtpPasswordRef && !mailSmtpPassword) {
-        return "SMTP password or app password token is required.";
+      if (mailAuthMode === "oauth2") {
+        if (mailProvider === "custom") return "OAuth2 mail auth requires Gmail or Outlook provider.";
+        if (!mailOauthClientId.trim()) return "OAuth2 client ID is required.";
+        if (!mailOauthTokenRef.trim()) return "OAuth2 token is required. Use Connect OAuth2 first.";
+      } else {
+        if (!saveInVault) return "Mail credentials must be saved in the vault.";
+        if (!passwordRef && !password) return "Mail password or app password token is required.";
+        if (!mailSmtpUseImapAuth && !mailSmtpSaveInVault) return "SMTP credentials must be saved in the vault.";
+        if (!mailSmtpUseImapAuth && !mailSmtpPasswordRef && !mailSmtpPassword) {
+          return "SMTP password or app password token is required.";
+        }
       }
     }
     if (isSSH && specifyUser && !username.trim()) return t("sessionEditor2.errUsernameEmpty");
@@ -2684,6 +3020,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     if (
       (isSSH || isDb || isHBase || proto === "RDP" || proto === "VNC" || isProxy || isMail) &&
       (isDb || isHBase || proto === "RDP" || proto === "VNC" || isProxy || isMail || authMethod === "Password") &&
+      (!isMail || mailAuthMode === "password") &&
       saveInVault &&
       password.length > 0
     ) {
@@ -2726,6 +3063,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     } else if (!saveInVault) {
       // User unchecked Save in vault: forget any previous reference.
       nextPasswordRef = "";
+    }
+    if (isMail && mailAuthMode === "oauth2") {
+      nextPasswordRef = "";
+      setPasswordRef("");
+      setPassword("");
     }
 
     // Same dance for the proxy password when proxySaveAuth is enabled and
@@ -2790,7 +3132,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setPasswordRef(nextPasswordRef);
 
     let nextMailSmtpPasswordRef = mailSmtpPasswordRef;
-    if (isMail && !mailSmtpUseImapAuth) {
+    if (isMail && mailAuthMode === "password" && !mailSmtpUseImapAuth) {
       if (mailSmtpSaveInVault && mailSmtpPassword.length > 0) {
         const ready = await ensureVaultReady(t("vault.gateReasonSession"));
         if (!ready) {
@@ -2814,10 +3156,44 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       } else if (!mailSmtpSaveInVault) {
         nextMailSmtpPasswordRef = "";
       }
-    } else if (isMail && mailSmtpUseImapAuth) {
+    } else if (isMail && (mailAuthMode === "oauth2" || mailSmtpUseImapAuth)) {
       nextMailSmtpPasswordRef = "";
       setMailSmtpPasswordRef("");
       setMailSmtpPassword("");
+    }
+
+    let nextMailOauthClientSecretRef = mailOauthClientSecretRef;
+    if (isMail && mailAuthMode === "oauth2" && mailProvider === "outlook" && mailOauthFlow === "device") {
+      nextMailOauthClientSecretRef = "";
+      setMailOauthClientSecretRef("");
+      setMailOauthClientSecret("");
+    } else if (isMail && mailAuthMode === "oauth2") {
+      if (mailOauthClientSecretSaveInVault && mailOauthClientSecret.length > 0) {
+        const ready = await ensureVaultReady(t("vault.gateReasonSession"));
+        if (!ready) {
+          setSaveError(t("sessionEditor2.errVaultLockedSave"));
+          return;
+        }
+        try {
+          const label = `${username || "mail"} OAuth client secret`;
+          const result = await vaultPut("mail-oauth-client-secret", label, mailOauthClientSecret);
+          nextMailOauthClientSecretRef = result.reference;
+          setMailOauthClientSecretRef(result.reference);
+          setMailOauthClientSecret("");
+        } catch (err) {
+          if (isVaultLockedError(err)) {
+            setSaveError(t("sessionEditor2.errVaultLockedSave"));
+          } else {
+            setSaveError(err instanceof Error ? err.message : String(err));
+          }
+          return;
+        }
+      } else if (!mailOauthClientSecretSaveInVault) {
+        nextMailOauthClientSecretRef = "";
+      }
+    } else if (isMail) {
+      nextMailOauthClientSecretRef = "";
+      setMailOauthClientSecret("");
     }
 
     // Object-storage secrets: swap freshly-typed plaintext for vault refs when
@@ -2890,6 +3266,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         proxyPassValue: nextProxyPass,
         jumpPasswordValue: nextJumpPass,
         mailSmtpPasswordRefValue: nextMailSmtpPasswordRef,
+        mailOauthClientSecretRefValue: nextMailOauthClientSecretRef,
+        mailOauthTokenRefValue: mailAuthMode === "oauth2" ? mailOauthTokenRef : "",
+        mailOauthExpiresAtValue: mailAuthMode === "oauth2" ? mailOauthExpiresAt : "",
+        mailOauthScopeValue: mailAuthMode === "oauth2" ? mailOauthScope : "",
         ossConfigValue,
       }),
     });
@@ -2984,6 +3364,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setWslOptions(parseWslOptions(session?.options_json));
     setRdpOptions(parseRdpOptions(session?.options_json));
     setPathMappings(parsePathMappingsFromOptions(session?.options_json));
+    const restoredMailProvider = initialMailProvider(nextOptions, session?.host);
+    setMailProvider(restoredMailProvider);
+    setMailAuthMode(normalizeMailAuthMode(nextOptions.mailAuthMode));
     setMailDisplayName(optionString(nextOptions, "mailDisplayName", ""));
     setMailReplyTo(optionString(nextOptions, "mailReplyTo", ""));
     setMailSignature(optionString(nextOptions, "mailSignature", ""));
@@ -3003,6 +3386,17 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     const restoredSmtpRef = optionString(nextOptions, "mailSmtpPasswordRef", "");
     setMailSmtpPasswordRef(restoredSmtpRef);
     setMailSmtpSaveInVault(!!restoredSmtpRef || nextProto === "Mail");
+    setMailOauthClientId(optionString(nextOptions, "mailOauthClientId", ""));
+    setMailOauthClientSecret("");
+    const restoredOauthSecretRef = optionString(nextOptions, "mailOauthClientSecretRef", "");
+    setMailOauthClientSecretRef(restoredOauthSecretRef);
+    setMailOauthClientSecretSaveInVault(!!restoredOauthSecretRef || nextProto === "Mail");
+    setMailOauthFlow(initialMailOAuthFlow(nextOptions, restoredMailProvider));
+    setMailOauthDeviceInfo(null);
+    setMailOauthTokenRef(optionString(nextOptions, "mailOauthTokenRef", ""));
+    setMailOauthExpiresAt(optionStringOrNumber(nextOptions, "mailOauthExpiresAt", ""));
+    setMailOauthScope(optionString(nextOptions, "mailOauthScope", ""));
+    setMailOauthStatus(null);
     setMailCacheEnabled(optionBoolean(nextOptions, "mailCacheEnabled", true));
     setMailSaveDirectory(optionString(nextOptions, "mailSaveDirectory", ""));
     setMailHeaderRetentionDays(optionString(nextOptions, "mailHeaderRetentionDays", "30"));
@@ -3076,6 +3470,85 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       if (selected) setMailSaveDirectory(selected.trim());
     } catch (err) {
       setSaveError(`Failed to choose mail save directory: ${String(err)}`);
+    }
+  };
+
+  const handleMailOAuthConnect = async () => {
+    setMailOauthStatus(null);
+    if (mailProvider !== "gmail" && mailProvider !== "outlook") {
+      setMailOauthStatus({ ok: false, msg: "Select Gmail or Outlook first." });
+      return;
+    }
+    if (!username.trim()) {
+      setMailOauthStatus({ ok: false, msg: "Enter the mail email address first." });
+      return;
+    }
+    if (!mailOauthClientId.trim()) {
+      setMailOauthStatus({ ok: false, msg: "Enter the OAuth2 client ID first." });
+      return;
+    }
+    const ready = await ensureVaultReady(t("vault.gateReasonSession"));
+    if (!ready) {
+      setMailOauthStatus({ ok: false, msg: t("sessionEditor2.errVaultLockedSave") });
+      return;
+    }
+
+    setMailOauthConnecting(true);
+    setMailOauthDeviceInfo(null);
+    try {
+      const sessionId = session?.id ?? (username.trim() || "mail-editor");
+      const networkPayload =
+        networkSettings.proxyKind !== "none"
+          ? toNetworkSettingsPayload(networkSettings)
+          : null;
+      const result = mailProvider === "outlook" && mailOauthFlow === "device"
+        ? await (async () => {
+            const device = await mailOAuthDeviceStart({
+              sessionId,
+              provider: "outlook",
+              emailAddress: username.trim(),
+              clientId: mailOauthClientId.trim(),
+              networkSettings: networkPayload,
+            });
+            setMailOauthDeviceInfo({
+              userCode: device.userCode,
+              verificationUri: device.verificationUri,
+              message: device.message,
+              expiresIn: device.expiresIn,
+            });
+            setMailOauthStatus({
+              ok: true,
+              msg: `Enter code ${device.userCode} to approve Outlook access.`,
+            });
+            return mailOAuthDeviceComplete({
+              sessionId,
+              provider: "outlook",
+              emailAddress: username.trim(),
+              clientId: mailOauthClientId.trim(),
+              deviceCode: device.deviceCode,
+              interval: device.interval,
+              expiresIn: device.expiresIn,
+              networkSettings: networkPayload,
+            });
+          })()
+        : await mailOAuthAuthorize({
+            sessionId,
+            provider: mailProvider,
+            emailAddress: username.trim(),
+            clientId: mailOauthClientId.trim(),
+            clientSecret: mailOauthClientSecret || mailOauthClientSecretRef || null,
+            networkSettings: networkPayload,
+          });
+      setMailAuthMode("oauth2");
+      setMailOauthTokenRef(result.tokenRef);
+      setMailOauthExpiresAt(result.expiresAt ? String(result.expiresAt) : "");
+      setMailOauthScope(result.scope ?? "");
+      setMailOauthDeviceInfo(null);
+      setMailOauthStatus({ ok: true, msg: "OAuth2 connected." });
+    } catch (err) {
+      setMailOauthStatus({ ok: false, msg: err instanceof Error ? err.message : String(err) });
+    } finally {
+      setMailOauthConnecting(false);
     }
   };
 
@@ -3373,6 +3846,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     : isMail
     ? [
         { id: "mail", label: "Mail account", icon: <Mail className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+        { id: "network", label: t("sessionEditor2.sectionNetwork"), icon: <Network className="w-3 h-3 inline -mt-0.5 mr-1" /> },
         { id: "appearance", label: "Appearance", icon: <Palette className="w-3 h-3 inline -mt-0.5 mr-1" /> },
         { id: "bookmark", label: t("sessionEditor2.sectionBookmark"), icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
       ]
@@ -3414,7 +3888,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         : isObjectStorage
         ? (section === "objectstorage" || section === "bookmark" || section === "network" ? section : "objectstorage")
         : isMail
-        ? (section === "mail" || section === "bookmark" || section === "appearance" ? section : "mail")
+        ? (section === "mail" || section === "network" || section === "bookmark" || section === "appearance" ? section : "mail")
         : isDb || isHBase
         ? (section === "database" || section === "bookmark" || (isDb && section === "network") ? section : "database")
         : section === "advanced" && !isSSH
@@ -3901,6 +4375,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           {activeSection === "mail" && isMail && (
             <div data-testid="session-mail-section">
               <MailSettings
+                provider={mailProvider} setProvider={handleMailProviderChange}
+                authMode={mailAuthMode} setAuthMode={setMailAuthMode}
                 imapHost={host} setImapHost={setHost}
                 imapPort={port} setImapPort={setPort}
                 username={username} setUsername={(value) => { setUsername(value); setSpecifyUser(true); }}
@@ -3919,6 +4395,22 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 smtpPassword={mailSmtpPassword} setSmtpPassword={setMailSmtpPassword}
                 smtpPasswordRef={mailSmtpPasswordRef} clearSmtpPasswordRef={() => setMailSmtpPasswordRef("")}
                 smtpSaveInVault={mailSmtpSaveInVault} setSmtpSaveInVault={setMailSmtpSaveInVault}
+                oauthClientId={mailOauthClientId} setOauthClientId={setMailOauthClientId}
+                oauthClientSecret={mailOauthClientSecret} setOauthClientSecret={setMailOauthClientSecret}
+                oauthClientSecretRef={mailOauthClientSecretRef} clearOauthClientSecretRef={() => setMailOauthClientSecretRef("")}
+                oauthClientSecretSaveInVault={mailOauthClientSecretSaveInVault} setOauthClientSecretSaveInVault={setMailOauthClientSecretSaveInVault}
+                oauthFlow={mailOauthFlow} setOauthFlow={(value) => {
+                  setMailOauthFlow(value);
+                  setMailOauthDeviceInfo(null);
+                  setMailOauthStatus(null);
+                }}
+                oauthDeviceInfo={mailOauthDeviceInfo}
+                oauthTokenRef={mailOauthTokenRef}
+                oauthExpiresAt={mailOauthExpiresAt}
+                oauthScope={mailOauthScope}
+                oauthConnecting={mailOauthConnecting}
+                oauthStatus={mailOauthStatus}
+                onOAuthConnect={() => void handleMailOAuthConnect()}
                 cacheEnabled={mailCacheEnabled} setCacheEnabled={setMailCacheEnabled}
                 saveDirectory={mailSaveDirectory} setSaveDirectory={setMailSaveDirectory}
                 onBrowseSaveDirectory={() => void handleBrowseMailSaveDirectory()}

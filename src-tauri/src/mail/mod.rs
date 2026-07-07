@@ -8,24 +8,33 @@ use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::path::Path;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
+use base64::{
+    Engine as _,
+    engine::general_purpose::{STANDARD as BASE64_STANDARD, URL_SAFE_NO_PAD},
+};
 use lettre::message::{Attachment, Mailbox, MultiPart, SinglePart, header::ContentType};
-use lettre::transport::smtp::authentication::Credentials;
+use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 use lettre::transport::smtp::client::{Tls, TlsParameters};
 use lettre::{Message, SmtpTransport, Transport};
 use mail_parser::{Address as ParsedAddress, MessageParser, MimeHeaders, PartType};
 use native_tls::TlsConnector;
 use rusqlite::{Connection, OptionalExtension, Result as SqlResult, params};
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use sha2::{Digest, Sha256};
+use tauri::{AppHandle, State};
+use tauri_plugin_shell::ShellExt;
+use tokio::task::JoinHandle;
 
 use crate::state::AppState;
+use crate::terminal::network::NetworkSettings;
 
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
 const DEFAULT_MESSAGE_LIMIT: usize = 200;
 const DEFAULT_BODY_MAX_BYTES: usize = 256 * 1024;
+const OAUTH_REFRESH_SKEW_SECS: i64 = 300;
+const OAUTH_REAUTHORIZE_REQUIRED: &str = "OAuth2 authorization expired or was revoked. Reauthorize this mail account in session settings.";
 const IMAP_LOGIN_RETRY_DELAYS_MS: [u64; 2] = [500, 1500];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -41,6 +50,36 @@ pub enum MailConnectionSecurity {
 impl Default for MailConnectionSecurity {
     fn default() -> Self {
         Self::Tls
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MailProvider {
+    #[serde(rename = "custom", alias = "Custom")]
+    Custom,
+    #[serde(rename = "gmail", alias = "Gmail")]
+    Gmail,
+    #[serde(rename = "outlook", alias = "Outlook", alias = "outlook.com")]
+    Outlook,
+}
+
+impl Default for MailProvider {
+    fn default() -> Self {
+        Self::Custom
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MailAuthMode {
+    #[serde(rename = "password", alias = "Password")]
+    Password,
+    #[serde(rename = "oauth2", alias = "OAuth2", alias = "oauth")]
+    OAuth2,
+}
+
+impl Default for MailAuthMode {
+    fn default() -> Self {
+        Self::Password
     }
 }
 
@@ -70,6 +109,137 @@ pub struct MailSmtpConfig {
     pub security: MailConnectionSecurity,
     #[serde(default = "default_true")]
     pub use_imap_auth: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MailOAuthSettings {
+    #[serde(default)]
+    pub client_id: Option<String>,
+    #[serde(default)]
+    pub client_secret: Option<String>,
+    #[serde(default)]
+    pub token_ref: Option<String>,
+    #[serde(default)]
+    pub refresh_token_ref: Option<String>,
+    #[serde(default)]
+    pub expires_at: Option<i64>,
+    #[serde(default)]
+    pub scope: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MailOAuthTokenBundle {
+    access_token: String,
+    #[serde(default)]
+    refresh_token: Option<String>,
+    #[serde(default)]
+    expires_at: Option<i64>,
+    #[serde(default)]
+    token_type: Option<String>,
+    #[serde(default)]
+    scope: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OAuthTokenResponse {
+    #[serde(default)]
+    access_token: String,
+    #[serde(default)]
+    refresh_token: Option<String>,
+    #[serde(default)]
+    expires_in: Option<i64>,
+    #[serde(default)]
+    token_type: Option<String>,
+    #[serde(default)]
+    scope: Option<String>,
+    #[serde(default)]
+    error: Option<String>,
+    #[serde(default)]
+    error_description: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OAuthDeviceCodeResponse {
+    #[serde(default)]
+    device_code: String,
+    #[serde(default)]
+    user_code: String,
+    #[serde(default)]
+    verification_uri: String,
+    #[serde(default)]
+    expires_in: Option<i64>,
+    #[serde(default)]
+    interval: Option<i64>,
+    #[serde(default)]
+    message: Option<String>,
+    #[serde(default)]
+    error: Option<String>,
+    #[serde(default)]
+    error_description: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MailOAuthAuthorizeRequest {
+    pub session_id: String,
+    pub provider: MailProvider,
+    pub email_address: String,
+    pub client_id: String,
+    #[serde(default)]
+    pub client_secret: Option<String>,
+    #[serde(default)]
+    pub network_settings: Option<NetworkSettings>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MailOAuthDeviceStartRequest {
+    pub provider: MailProvider,
+    pub client_id: String,
+    #[serde(default)]
+    pub network_settings: Option<NetworkSettings>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MailOAuthDeviceStartResult {
+    pub device_code: String,
+    pub user_code: String,
+    pub verification_uri: String,
+    pub message: String,
+    pub expires_in: i64,
+    pub interval: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MailOAuthDeviceCompleteRequest {
+    pub session_id: String,
+    pub provider: MailProvider,
+    pub email_address: String,
+    pub client_id: String,
+    pub device_code: String,
+    #[serde(default)]
+    pub interval: Option<i64>,
+    #[serde(default)]
+    pub expires_in: Option<i64>,
+    #[serde(default)]
+    pub network_settings: Option<NetworkSettings>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MailOAuthAuthorizeResult {
+    pub token_ref: String,
+    pub expires_at: Option<i64>,
+    pub scope: Option<String>,
+    pub token_type: Option<String>,
+}
+
+struct OAuthCallback {
+    code: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -150,6 +320,10 @@ pub struct MailAccountConfig {
     pub session_id: String,
     pub email_address: String,
     #[serde(default)]
+    pub provider: MailProvider,
+    #[serde(default)]
+    pub auth_mode: MailAuthMode,
+    #[serde(default)]
     pub display_name: Option<String>,
     #[serde(default)]
     pub reply_to: Option<String>,
@@ -157,6 +331,10 @@ pub struct MailAccountConfig {
     pub signature: Option<String>,
     pub imap: MailServerConfig,
     pub smtp: MailSmtpConfig,
+    #[serde(default)]
+    pub oauth: MailOAuthSettings,
+    #[serde(default)]
+    pub network_settings: Option<NetworkSettings>,
     #[serde(default)]
     pub sync: MailSyncSettings,
     #[serde(default)]
@@ -168,6 +346,8 @@ pub struct MailAccountConfig {
 #[derive(Debug, Clone)]
 struct ResolvedMailAccount {
     config: MailAccountConfig,
+    auth_mode: MailAuthMode,
+    network_settings: Option<NetworkSettings>,
     imap_username: String,
     imap_password: String,
     smtp_username: String,
@@ -466,15 +646,21 @@ pub struct MailDeleteResult {
 }
 
 enum ActiveImapSession {
-    Tls(imap::Session<native_tls::TlsStream<TcpStream>>),
-    Plain(imap::Session<TcpStream>),
+    Tls {
+        session: imap::Session<native_tls::TlsStream<TcpStream>>,
+        forward_task: Option<JoinHandle<()>>,
+    },
+    Plain {
+        session: imap::Session<TcpStream>,
+        forward_task: Option<JoinHandle<()>>,
+    },
 }
 
 impl ActiveImapSession {
     fn list_folders(&mut self, account_id: &str) -> Result<Vec<MailFolder>, String> {
         match self {
-            Self::Tls(session) => imap_list_folders(session, account_id),
-            Self::Plain(session) => imap_list_folders(session, account_id),
+            Self::Tls { session, .. } => imap_list_folders(session, account_id),
+            Self::Plain { session, .. } => imap_list_folders(session, account_id),
         }
     }
 
@@ -487,10 +673,10 @@ impl ActiveImapSession {
         include_bodies: bool,
     ) -> Result<(MailFolder, Vec<MailMessageCached>, bool), String> {
         match self {
-            Self::Tls(session) => {
+            Self::Tls { session, .. } => {
                 imap_sync_folder(session, account, folder, offset, limit, include_bodies)
             }
-            Self::Plain(session) => {
+            Self::Plain { session, .. } => {
                 imap_sync_folder(session, account, folder, offset, limit, include_bodies)
             }
         }
@@ -505,10 +691,10 @@ impl ActiveImapSession {
         include_bodies: bool,
     ) -> Result<(MailFolder, Vec<MailMessageCached>), String> {
         match self {
-            Self::Tls(session) => {
+            Self::Tls { session, .. } => {
                 imap_sync_folder_incremental(session, account, folder, state, limit, include_bodies)
             }
-            Self::Plain(session) => {
+            Self::Plain { session, .. } => {
                 imap_sync_folder_incremental(session, account, folder, state, limit, include_bodies)
             }
         }
@@ -521,15 +707,15 @@ impl ActiveImapSession {
         uid: u32,
     ) -> Result<MailMessageCached, String> {
         match self {
-            Self::Tls(session) => imap_fetch_body(session, account, folder, uid),
-            Self::Plain(session) => imap_fetch_body(session, account, folder, uid),
+            Self::Tls { session, .. } => imap_fetch_body(session, account, folder, uid),
+            Self::Plain { session, .. } => imap_fetch_body(session, account, folder, uid),
         }
     }
 
     fn mark_read(&mut self, folder: &str, uids: &[u32]) -> Result<usize, String> {
         match self {
-            Self::Tls(session) => imap_mark_read(session, folder, uids),
-            Self::Plain(session) => imap_mark_read(session, folder, uids),
+            Self::Tls { session, .. } => imap_mark_read(session, folder, uids),
+            Self::Plain { session, .. } => imap_mark_read(session, folder, uids),
         }
     }
 
@@ -542,7 +728,7 @@ impl ActiveImapSession {
         target_path: &str,
     ) -> Result<MailDownloadAttachmentResult, String> {
         match self {
-            Self::Tls(session) => imap_download_attachment(
+            Self::Tls { session, .. } => imap_download_attachment(
                 session,
                 account,
                 folder,
@@ -550,7 +736,7 @@ impl ActiveImapSession {
                 attachment_index,
                 target_path,
             ),
-            Self::Plain(session) => imap_download_attachment(
+            Self::Plain { session, .. } => imap_download_attachment(
                 session,
                 account,
                 folder,
@@ -569,45 +755,45 @@ impl ActiveImapSession {
         remove: &[String],
     ) -> Result<usize, String> {
         match self {
-            Self::Tls(session) => imap_set_flags(session, folder, uids, add, remove),
-            Self::Plain(session) => imap_set_flags(session, folder, uids, add, remove),
+            Self::Tls { session, .. } => imap_set_flags(session, folder, uids, add, remove),
+            Self::Plain { session, .. } => imap_set_flags(session, folder, uids, add, remove),
         }
     }
 
     fn move_messages(&mut self, folder: &str, uids: &[u32], target: &str) -> Result<usize, String> {
         match self {
-            Self::Tls(session) => imap_move_messages(session, folder, uids, target),
-            Self::Plain(session) => imap_move_messages(session, folder, uids, target),
+            Self::Tls { session, .. } => imap_move_messages(session, folder, uids, target),
+            Self::Plain { session, .. } => imap_move_messages(session, folder, uids, target),
         }
     }
 
     fn copy_messages(&mut self, folder: &str, uids: &[u32], target: &str) -> Result<usize, String> {
         match self {
-            Self::Tls(session) => imap_copy_messages(session, folder, uids, target),
-            Self::Plain(session) => imap_copy_messages(session, folder, uids, target),
+            Self::Tls { session, .. } => imap_copy_messages(session, folder, uids, target),
+            Self::Plain { session, .. } => imap_copy_messages(session, folder, uids, target),
         }
     }
 
     fn delete_messages(&mut self, folder: &str, uids: &[u32], all: bool) -> Result<usize, String> {
         match self {
-            Self::Tls(session) => imap_delete_messages(session, folder, uids, all),
-            Self::Plain(session) => imap_delete_messages(session, folder, uids, all),
+            Self::Tls { session, .. } => imap_delete_messages(session, folder, uids, all),
+            Self::Plain { session, .. } => imap_delete_messages(session, folder, uids, all),
         }
     }
 
     fn fetch_raw(&mut self, folder: &str, uid: u32) -> Result<Vec<u8>, String> {
         match self {
-            Self::Tls(session) => imap_fetch_raw(session, folder, uid),
-            Self::Plain(session) => imap_fetch_raw(session, folder, uid),
+            Self::Tls { session, .. } => imap_fetch_raw(session, folder, uid),
+            Self::Plain { session, .. } => imap_fetch_raw(session, folder, uid),
         }
     }
 
     fn create_folder(&mut self, name: &str) -> Result<(), String> {
         match self {
-            Self::Tls(session) => session
+            Self::Tls { session, .. } => session
                 .create(name)
                 .map_err(|e| format!("IMAP CREATE {name} failed: {e}")),
-            Self::Plain(session) => session
+            Self::Plain { session, .. } => session
                 .create(name)
                 .map_err(|e| format!("IMAP CREATE {name} failed: {e}")),
         }
@@ -615,10 +801,10 @@ impl ActiveImapSession {
 
     fn rename_folder(&mut self, from: &str, to: &str) -> Result<(), String> {
         match self {
-            Self::Tls(session) => session
+            Self::Tls { session, .. } => session
                 .rename(from, to)
                 .map_err(|e| format!("IMAP RENAME {from} -> {to} failed: {e}")),
-            Self::Plain(session) => session
+            Self::Plain { session, .. } => session
                 .rename(from, to)
                 .map_err(|e| format!("IMAP RENAME {from} -> {to} failed: {e}")),
         }
@@ -626,10 +812,10 @@ impl ActiveImapSession {
 
     fn delete_folder(&mut self, name: &str) -> Result<(), String> {
         match self {
-            Self::Tls(session) => session
+            Self::Tls { session, .. } => session
                 .delete(name)
                 .map_err(|e| format!("IMAP DELETE {name} failed: {e}")),
-            Self::Plain(session) => session
+            Self::Plain { session, .. } => session
                 .delete(name)
                 .map_err(|e| format!("IMAP DELETE {name} failed: {e}")),
         }
@@ -637,12 +823,51 @@ impl ActiveImapSession {
 
     fn logout(&mut self) {
         let result = match self {
-            Self::Tls(session) => session.logout(),
-            Self::Plain(session) => session.logout(),
+            Self::Tls { session, .. } => session.logout(),
+            Self::Plain { session, .. } => session.logout(),
         };
         if let Err(e) = result {
             tracing::debug!("mail imap logout failed: {e}");
         }
+    }
+}
+
+impl Drop for ActiveImapSession {
+    fn drop(&mut self) {
+        let task = match self {
+            Self::Tls { forward_task, .. } | Self::Plain { forward_task, .. } => {
+                forward_task.take()
+            }
+        };
+        if let Some(task) = task {
+            task.abort();
+        }
+    }
+}
+
+struct MailSmtpTransport {
+    mailer: SmtpTransport,
+    forward_task: Option<JoinHandle<()>>,
+}
+
+impl Drop for MailSmtpTransport {
+    fn drop(&mut self) {
+        if let Some(task) = self.forward_task.take() {
+            task.abort();
+        }
+    }
+}
+
+struct Xoauth2Authenticator {
+    username: String,
+    access_token: String,
+}
+
+impl imap::Authenticator for Xoauth2Authenticator {
+    type Response = String;
+
+    fn process(&self, _challenge: &[u8]) -> Self::Response {
+        xoauth2_sasl_response(&self.username, &self.access_token)
     }
 }
 
@@ -759,6 +984,160 @@ pub async fn mail_test_connection(
     })
     .await
     .map_err(|e| format!("mail test task failed: {e}"))?
+}
+
+#[tauri::command]
+pub async fn mail_oauth_authorize(
+    request: MailOAuthAuthorizeRequest,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<MailOAuthAuthorizeResult, String> {
+    let client_id = request.client_id.trim().to_string();
+    if client_id.is_empty() {
+        return Err("OAuth2 client ID is required".into());
+    }
+    if request.provider == MailProvider::Custom {
+        return Err("OAuth2 mail auth requires Gmail or Outlook provider".into());
+    }
+
+    let listener = std::net::TcpListener::bind(("127.0.0.1", 0))
+        .map_err(|e| format!("OAuth callback listener failed: {e}"))?;
+    listener
+        .set_nonblocking(true)
+        .map_err(|e| format!("OAuth callback timeout setup failed: {e}"))?;
+    let port = listener
+        .local_addr()
+        .map_err(|e| format!("OAuth callback address failed: {e}"))?
+        .port();
+    let redirect_uri = format!("http://127.0.0.1:{port}/mail/oauth/callback");
+    let state_token = random_urlsafe_token(32);
+    let verifier = random_urlsafe_token(48);
+    let challenge = pkce_challenge(&verifier);
+    let auth_url = build_oauth_authorize_url(
+        request.provider,
+        &client_id,
+        &redirect_uri,
+        &state_token,
+        &challenge,
+    )?;
+
+    #[allow(deprecated)]
+    app.shell()
+        .open(auth_url, None)
+        .map_err(|e| format!("failed to open OAuth authorization URL: {e}"))?;
+
+    let callback_state = state_token.clone();
+    let callback =
+        tokio::task::spawn_blocking(move || wait_for_oauth_callback(listener, &callback_state))
+            .await
+            .map_err(|e| format!("OAuth callback task failed: {e}"))??;
+
+    let provider = request.provider;
+    let client_secret =
+        resolve_secret(&state, request.client_secret.as_deref())?.and_then(non_empty);
+    let network_settings = prepare_mail_network(&state, request.network_settings.clone())?;
+    let token = tokio::task::spawn_blocking(move || {
+        exchange_oauth_code_blocking(
+            provider,
+            &client_id,
+            client_secret.as_deref(),
+            &redirect_uri,
+            &callback.code,
+            &verifier,
+            network_settings.as_ref(),
+        )
+    })
+    .await
+    .map_err(|e| format!("OAuth token exchange task failed: {e}"))??;
+
+    persist_new_oauth_token(
+        &state,
+        provider,
+        &request.email_address,
+        &request.session_id,
+        token,
+    )
+}
+
+#[tauri::command]
+pub async fn mail_oauth_device_start(
+    request: MailOAuthDeviceStartRequest,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<MailOAuthDeviceStartResult, String> {
+    let client_id = request.client_id.trim().to_string();
+    if client_id.is_empty() {
+        return Err("OAuth2 client ID is required".into());
+    }
+    if request.provider != MailProvider::Outlook {
+        return Err("Device code authorization is currently supported for Outlook only".into());
+    }
+    let network_settings = prepare_mail_network(&state, request.network_settings.clone())?;
+    let provider = request.provider;
+    let device = tokio::task::spawn_blocking(move || {
+        start_oauth_device_code_blocking(provider, &client_id, network_settings.as_ref())
+    })
+    .await
+    .map_err(|e| format!("OAuth device code task failed: {e}"))??;
+
+    #[allow(deprecated)]
+    app.shell()
+        .open(device.verification_uri.clone(), None)
+        .map_err(|e| format!("failed to open OAuth device login URL: {e}"))?;
+
+    Ok(MailOAuthDeviceStartResult {
+        device_code: device.device_code,
+        user_code: device.user_code,
+        verification_uri: device.verification_uri,
+        message: device.message.unwrap_or_else(|| {
+            "Open the verification URL and enter the device code to authorize this mail account."
+                .into()
+        }),
+        expires_in: device.expires_in.unwrap_or(900),
+        interval: device.interval.unwrap_or(5).max(1),
+    })
+}
+
+#[tauri::command]
+pub async fn mail_oauth_device_complete(
+    request: MailOAuthDeviceCompleteRequest,
+    state: State<'_, AppState>,
+) -> Result<MailOAuthAuthorizeResult, String> {
+    let client_id = request.client_id.trim().to_string();
+    if client_id.is_empty() {
+        return Err("OAuth2 client ID is required".into());
+    }
+    if request.provider != MailProvider::Outlook {
+        return Err("Device code authorization is currently supported for Outlook only".into());
+    }
+    let device_code = request.device_code.trim().to_string();
+    if device_code.is_empty() {
+        return Err("OAuth2 device code is required".into());
+    }
+    let network_settings = prepare_mail_network(&state, request.network_settings.clone())?;
+    let provider = request.provider;
+    let interval = request.interval.unwrap_or(5).max(1);
+    let expires_in = request.expires_in.unwrap_or(900).max(1);
+    let token = tokio::task::spawn_blocking(move || {
+        complete_oauth_device_code_blocking(
+            provider,
+            &client_id,
+            &device_code,
+            interval,
+            expires_in,
+            network_settings.as_ref(),
+        )
+    })
+    .await
+    .map_err(|e| format!("OAuth device polling task failed: {e}"))??;
+
+    persist_new_oauth_token(
+        &state,
+        provider,
+        &request.email_address,
+        &request.session_id,
+        token,
+    )
 }
 
 #[tauri::command]
@@ -1495,6 +1874,7 @@ fn resolve_config(
     state: &State<'_, AppState>,
     config: MailAccountConfig,
 ) -> Result<ResolvedMailAccount, String> {
+    let network_settings = prepare_mail_network(state, config.network_settings.clone())?;
     let imap_host = config.imap.host.trim();
     if imap_host.is_empty() {
         return Err("IMAP host is required".into());
@@ -1509,25 +1889,48 @@ fn resolve_config(
         .and_then(non_empty)
         .or_else(|| non_empty(config.email_address.clone()))
         .ok_or_else(|| "IMAP username is required".to_string())?;
-    let imap_password = resolve_secret(state, config.imap.password.as_deref())?
-        .ok_or_else(|| "IMAP password or app password token is required".to_string())?;
+    let (imap_password, smtp_username, smtp_password) = match config.auth_mode {
+        MailAuthMode::Password => {
+            let imap_password = resolve_secret(state, config.imap.password.as_deref())?
+                .ok_or_else(|| "IMAP password or app password token is required".to_string())?;
 
-    let (smtp_username, smtp_password) = if config.smtp.use_imap_auth {
-        (imap_username.clone(), imap_password.clone())
-    } else {
-        let username = config
-            .smtp
-            .username
-            .clone()
-            .and_then(non_empty)
-            .or_else(|| non_empty(config.email_address.clone()))
-            .ok_or_else(|| "SMTP username is required".to_string())?;
-        let password = resolve_secret(state, config.smtp.password.as_deref())?
-            .ok_or_else(|| "SMTP password or app password token is required".to_string())?;
-        (username, password)
+            let (smtp_username, smtp_password) = if config.smtp.use_imap_auth {
+                (imap_username.clone(), imap_password.clone())
+            } else {
+                let username = config
+                    .smtp
+                    .username
+                    .clone()
+                    .and_then(non_empty)
+                    .or_else(|| non_empty(config.email_address.clone()))
+                    .ok_or_else(|| "SMTP username is required".to_string())?;
+                let password = resolve_secret(state, config.smtp.password.as_deref())?
+                    .ok_or_else(|| "SMTP password or app password token is required".to_string())?;
+                (username, password)
+            };
+            (imap_password, smtp_username, smtp_password)
+        }
+        MailAuthMode::OAuth2 => {
+            let access_token =
+                resolve_oauth_access_token(state, &config, network_settings.as_ref())?;
+            let smtp_username = if config.smtp.use_imap_auth {
+                imap_username.clone()
+            } else {
+                config
+                    .smtp
+                    .username
+                    .clone()
+                    .and_then(non_empty)
+                    .or_else(|| non_empty(config.email_address.clone()))
+                    .ok_or_else(|| "SMTP username is required".to_string())?
+            };
+            (access_token.clone(), smtp_username, access_token)
+        }
     };
 
     Ok(ResolvedMailAccount {
+        auth_mode: config.auth_mode,
+        network_settings,
         config,
         imap_username,
         imap_password,
@@ -1549,12 +1952,672 @@ fn resolve_secret(
     }
 }
 
+fn prepare_mail_network(
+    state: &State<'_, AppState>,
+    network: Option<NetworkSettings>,
+) -> Result<Option<NetworkSettings>, String> {
+    let Some(mut net) = network else {
+        return Ok(None);
+    };
+    if matches!(net.proxy_kind.as_str(), "" | "none") {
+        return Ok(None);
+    }
+    crate::terminal::resolve_proxy_session(state, &mut net)?;
+    net.resolve_proxy_pass(&state.vault)?;
+    crate::terminal::resolve_jump_credentials(state, &mut net)?;
+    Ok(Some(net))
+}
+
+fn resolve_oauth_access_token(
+    state: &State<'_, AppState>,
+    config: &MailAccountConfig,
+    network: Option<&NetworkSettings>,
+) -> Result<String, String> {
+    if config.provider == MailProvider::Custom {
+        return Err("OAuth2 mail auth requires Gmail or Outlook provider".into());
+    }
+
+    let token_ref = config
+        .oauth
+        .token_ref
+        .as_deref()
+        .and_then(non_empty_str)
+        .ok_or_else(|| "OAuth2 token is required. Reconnect this mail account.".to_string())?;
+    let mut bundle = read_oauth_token_bundle(state, token_ref, config)?;
+    if !oauth_token_expired(bundle.expires_at) {
+        return Ok(bundle.access_token);
+    }
+
+    let refresh_token = match bundle.refresh_token.clone().and_then(non_empty) {
+        Some(value) => value,
+        None => match config
+            .oauth
+            .refresh_token_ref
+            .as_deref()
+            .and_then(non_empty_str)
+        {
+            Some(value) => resolve_secret(state, Some(value))?
+                .and_then(non_empty)
+                .ok_or_else(oauth_reauthorize_required_message)?,
+            None => {
+                return Err(oauth_reauthorize_required_message());
+            }
+        },
+    };
+    let client_id = config
+        .oauth
+        .client_id
+        .as_deref()
+        .and_then(non_empty_str)
+        .ok_or_else(|| "OAuth2 client ID is required to refresh this mail account".to_string())?;
+    let client_secret = resolve_secret(state, config.oauth.client_secret.as_deref())?;
+    let refresh_scope = oauth_refresh_scope(config.provider, &bundle, &config.oauth);
+    let refreshed = refresh_oauth_token_blocking(
+        config.provider,
+        client_id,
+        client_secret.as_deref(),
+        &refresh_token,
+        refresh_scope.as_deref(),
+        network,
+    )
+    .map_err(|e| oauth_refresh_error_message(&e))?;
+    bundle.access_token = refreshed.access_token;
+    if let Some(refresh_token) = refreshed.refresh_token.and_then(non_empty) {
+        bundle.refresh_token = Some(refresh_token);
+    }
+    bundle.expires_at = refreshed
+        .expires_in
+        .map(|seconds| now_ts() + seconds.max(0));
+    bundle.token_type = refreshed.token_type.and_then(non_empty);
+    bundle.scope = refreshed.scope.and_then(non_empty).or(refresh_scope);
+    persist_oauth_token_bundle(state, token_ref, &bundle)?;
+    tracing::info!(
+        provider = ?config.provider,
+        session_id = %config.session_id,
+        "refreshed mail OAuth2 access token"
+    );
+    Ok(bundle.access_token)
+}
+
+fn persist_new_oauth_token(
+    state: &State<'_, AppState>,
+    provider: MailProvider,
+    email_address: &str,
+    session_id: &str,
+    token: OAuthTokenResponse,
+) -> Result<MailOAuthAuthorizeResult, String> {
+    if let Some(error) = token.error.as_deref() {
+        let detail = token.error_description.as_deref().unwrap_or("");
+        return Err(format!("OAuth token exchange failed: {error} {detail}"));
+    }
+    if token.access_token.trim().is_empty() {
+        return Err("OAuth token response did not include an access token".into());
+    }
+    let refresh_token = token
+        .refresh_token
+        .clone()
+        .and_then(non_empty)
+        .ok_or_else(|| {
+            "OAuth token response did not include a refresh token. Ensure offline access is allowed and reconnect.".to_string()
+        })?;
+    let expires_at = token.expires_in.map(|seconds| now_ts() + seconds.max(0));
+    let scope = token
+        .scope
+        .clone()
+        .and_then(non_empty)
+        .or_else(|| oauth_scope(provider).ok().map(str::to_string));
+    let token_type = token.token_type.clone().and_then(non_empty);
+    let bundle = MailOAuthTokenBundle {
+        access_token: token.access_token,
+        refresh_token: Some(refresh_token),
+        expires_at,
+        token_type: token_type.clone(),
+        scope: scope.clone(),
+    };
+    let json = serde_json::to_string(&bundle).map_err(|e| e.to_string())?;
+    let label_owner =
+        non_empty(email_address.to_string()).unwrap_or_else(|| session_id.to_string());
+    let saved = state.vault.put(
+        "mail-oauth-token",
+        &format!("{label_owner} OAuth2 token"),
+        &json,
+    )?;
+    Ok(MailOAuthAuthorizeResult {
+        token_ref: saved.reference,
+        expires_at,
+        scope,
+        token_type,
+    })
+}
+
+fn read_oauth_token_bundle(
+    state: &State<'_, AppState>,
+    token_ref: &str,
+    config: &MailAccountConfig,
+) -> Result<MailOAuthTokenBundle, String> {
+    let raw = resolve_secret(state, Some(token_ref))?
+        .ok_or_else(|| "OAuth2 token is required. Reconnect this mail account.".to_string())?;
+    if let Ok(bundle) = serde_json::from_str::<MailOAuthTokenBundle>(&raw) {
+        if !bundle.access_token.trim().is_empty() {
+            return Ok(bundle);
+        }
+    }
+
+    // Backwards-compatible fallback: treat a non-JSON token entry as an access
+    // token and use the separate refresh ref / expiresAt fields if present.
+    let refresh_token = match config
+        .oauth
+        .refresh_token_ref
+        .as_deref()
+        .and_then(non_empty_str)
+    {
+        Some(value) => resolve_secret(state, Some(value))?.and_then(non_empty),
+        None => None,
+    };
+    Ok(MailOAuthTokenBundle {
+        access_token: raw,
+        refresh_token,
+        expires_at: config.oauth.expires_at,
+        token_type: Some("Bearer".into()),
+        scope: config.oauth.scope.clone(),
+    })
+}
+
+fn persist_oauth_token_bundle(
+    state: &State<'_, AppState>,
+    token_ref: &str,
+    bundle: &MailOAuthTokenBundle,
+) -> Result<(), String> {
+    let id = token_ref
+        .strip_prefix(crate::vault::VAULT_REF_PREFIX)
+        .ok_or_else(|| "OAuth2 token must be stored in the credential vault".to_string())?;
+    let json = serde_json::to_string(bundle).map_err(|e| e.to_string())?;
+    state.vault.update(id, &json)
+}
+
+fn oauth_refresh_scope(
+    provider: MailProvider,
+    bundle: &MailOAuthTokenBundle,
+    settings: &MailOAuthSettings,
+) -> Option<String> {
+    bundle
+        .scope
+        .clone()
+        .and_then(non_empty)
+        .or_else(|| settings.scope.clone().and_then(non_empty))
+        .or_else(|| oauth_scope(provider).ok().map(str::to_string))
+}
+
+fn oauth_reauthorize_required_message() -> String {
+    OAUTH_REAUTHORIZE_REQUIRED.to_string()
+}
+
+fn oauth_refresh_error_message(error: &str) -> String {
+    let lower = error.to_ascii_lowercase();
+    if lower.contains("invalid_grant")
+        || lower.contains("interaction_required")
+        || lower.contains("consent_required")
+        || lower.contains("unauthorized_client")
+        || lower.contains("aadsts70008")
+        || lower.contains("aadsts700082")
+    {
+        format!("{OAUTH_REAUTHORIZE_REQUIRED} Detail: {error}")
+    } else {
+        format!(
+            "OAuth2 access token expired and refresh failed: {error}. Reauthorize this mail account if the refresh token has expired."
+        )
+    }
+}
+
+fn oauth_token_expired(expires_at: Option<i64>) -> bool {
+    match expires_at {
+        Some(ts) => ts <= now_ts() + OAUTH_REFRESH_SKEW_SECS,
+        None => false,
+    }
+}
+
+fn refresh_oauth_token_blocking(
+    provider: MailProvider,
+    client_id: &str,
+    client_secret: Option<&str>,
+    refresh_token: &str,
+    scope: Option<&str>,
+    network: Option<&NetworkSettings>,
+) -> Result<OAuthTokenResponse, String> {
+    let token_url = oauth_token_url(provider)?;
+    let mut params = vec![
+        ("client_id", client_id.to_string()),
+        ("grant_type", "refresh_token".to_string()),
+        ("refresh_token", refresh_token.to_string()),
+    ];
+    if let Some(secret) = client_secret.and_then(non_empty_str) {
+        params.push(("client_secret", secret.to_string()));
+    }
+    if let Some(scope) = scope.and_then(non_empty_str) {
+        params.push(("scope", scope.to_string()));
+    }
+
+    let client = build_oauth_http_client_blocking(network)?;
+    let response = client
+        .post(token_url)
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded",
+        )
+        .body(oauth_form_body(&params))
+        .send()
+        .map_err(|e| format!("OAuth token refresh failed: {e}"))?;
+    parse_oauth_token_response(response, "refresh")
+}
+
+fn exchange_oauth_code_blocking(
+    provider: MailProvider,
+    client_id: &str,
+    client_secret: Option<&str>,
+    redirect_uri: &str,
+    code: &str,
+    verifier: &str,
+    network: Option<&NetworkSettings>,
+) -> Result<OAuthTokenResponse, String> {
+    let token_url = oauth_token_url(provider)?;
+    let mut params = vec![
+        ("client_id", client_id.to_string()),
+        ("grant_type", "authorization_code".to_string()),
+        ("code", code.to_string()),
+        ("redirect_uri", redirect_uri.to_string()),
+        ("code_verifier", verifier.to_string()),
+    ];
+    if let Some(secret) = client_secret.and_then(non_empty_str) {
+        params.push(("client_secret", secret.to_string()));
+    }
+
+    let client = build_oauth_http_client_blocking(network)?;
+    let response = client
+        .post(token_url)
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded",
+        )
+        .body(oauth_form_body(&params))
+        .send()
+        .map_err(|e| format!("OAuth token exchange failed: {e}"))?;
+    parse_oauth_token_response(response, "exchange")
+}
+
+fn start_oauth_device_code_blocking(
+    provider: MailProvider,
+    client_id: &str,
+    network: Option<&NetworkSettings>,
+) -> Result<OAuthDeviceCodeResponse, String> {
+    let device_url = oauth_device_code_url(provider)?;
+    let params = vec![
+        ("client_id", client_id.to_string()),
+        ("scope", oauth_scope(provider)?.to_string()),
+    ];
+
+    let client = build_oauth_http_client_blocking(network)?;
+    let response = client
+        .post(device_url)
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded",
+        )
+        .body(oauth_form_body(&params))
+        .send()
+        .map_err(|e| format!("OAuth device code request failed: {e}"))?;
+    parse_oauth_device_code_response(response)
+}
+
+fn complete_oauth_device_code_blocking(
+    provider: MailProvider,
+    client_id: &str,
+    device_code: &str,
+    interval: i64,
+    expires_in: i64,
+    network: Option<&NetworkSettings>,
+) -> Result<OAuthTokenResponse, String> {
+    let token_url = oauth_token_url(provider)?;
+    let client = build_oauth_http_client_blocking(network)?;
+    let deadline = Instant::now() + Duration::from_secs(expires_in.clamp(1, 3600) as u64);
+    let mut poll_interval = Duration::from_secs(interval.clamp(1, 30) as u64);
+
+    loop {
+        if Instant::now() >= deadline {
+            return Err("OAuth device code expired before authorization completed".into());
+        }
+
+        let params = vec![
+            ("client_id", client_id.to_string()),
+            (
+                "grant_type",
+                "urn:ietf:params:oauth:grant-type:device_code".to_string(),
+            ),
+            ("device_code", device_code.to_string()),
+        ];
+        let response = client
+            .post(token_url)
+            .header(
+                reqwest::header::CONTENT_TYPE,
+                "application/x-www-form-urlencoded",
+            )
+            .body(oauth_form_body(&params))
+            .send()
+            .map_err(|e| format!("OAuth device token polling failed: {e}"))?;
+        let status = response.status();
+        let text = response
+            .text()
+            .map_err(|e| format!("OAuth device token response read failed: {e}"))?;
+        let token = serde_json::from_str::<OAuthTokenResponse>(&text).map_err(|e| {
+            format!("OAuth device token response parse failed ({status}): {e}; {text}")
+        })?;
+
+        if status.is_success() && token.error.is_none() {
+            if token.access_token.trim().is_empty() {
+                return Err("OAuth device token response did not include an access token".into());
+            }
+            return Ok(token);
+        }
+
+        let error = token.error.as_deref().unwrap_or(if status.is_success() {
+            "invalid_response"
+        } else {
+            "http_error"
+        });
+        let detail = token.error_description.as_deref().unwrap_or("");
+        match error {
+            "authorization_pending" => {
+                std::thread::sleep(poll_interval);
+            }
+            "slow_down" => {
+                poll_interval =
+                    (poll_interval + Duration::from_secs(5)).min(Duration::from_secs(30));
+                std::thread::sleep(poll_interval);
+            }
+            "authorization_declined" => {
+                return Err("OAuth device authorization was declined".into());
+            }
+            "bad_verification_code" => {
+                return Err("OAuth device authorization failed: bad verification code".into());
+            }
+            "expired_token" => {
+                return Err("OAuth device code expired before authorization completed".into());
+            }
+            _ => {
+                return Err(format!(
+                    "OAuth device authorization failed ({status}): {error} {detail}"
+                ));
+            }
+        }
+    }
+}
+
+fn build_oauth_http_client_blocking(
+    network: Option<&NetworkSettings>,
+) -> Result<reqwest::blocking::Client, String> {
+    let mut builder =
+        reqwest::blocking::Client::builder().timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECS));
+    if let Some(net) = network {
+        match net.proxy_kind.as_str() {
+            "" | "none" => {}
+            "http" => {
+                let url = format!("http://{}:{}", net.proxy_host, net.proxy_port);
+                let mut proxy = reqwest::Proxy::all(&url)
+                    .map_err(|e| format!("OAuth HTTP proxy config failed: {e}"))?;
+                if !net.proxy_user.is_empty() {
+                    proxy = proxy.basic_auth(&net.proxy_user, &net.proxy_pass);
+                }
+                builder = builder.proxy(proxy);
+            }
+            "socks5" => {
+                let url = format!("socks5h://{}:{}", net.proxy_host, net.proxy_port);
+                let mut proxy = reqwest::Proxy::all(&url)
+                    .map_err(|e| format!("OAuth SOCKS5 proxy config failed: {e}"))?;
+                if !net.proxy_user.is_empty() {
+                    proxy = proxy.basic_auth(&net.proxy_user, &net.proxy_pass);
+                }
+                builder = builder.proxy(proxy);
+            }
+            "ssh-tunnel" => {
+                return Err("OAuth2 token requests through SSH tunnel are not supported yet; use HTTP or SOCKS5 proxy for this Mail session.".into());
+            }
+            "system" => {
+                return Err("System proxy is not supported for Mail OAuth yet; use HTTP or SOCKS5 proxy in this session's Network tab.".into());
+            }
+            other => return Err(format!("Unsupported Mail OAuth proxy type: {other}")),
+        }
+    }
+    builder
+        .build()
+        .map_err(|e| format!("failed to build OAuth client: {e}"))
+}
+
+fn parse_oauth_token_response(
+    response: reqwest::blocking::Response,
+    action: &str,
+) -> Result<OAuthTokenResponse, String> {
+    let status = response.status();
+    let text = response
+        .text()
+        .map_err(|e| format!("OAuth token {action} response read failed: {e}"))?;
+    if !status.is_success() {
+        return Err(format!("OAuth token {action} failed ({status}): {text}"));
+    }
+    let token = serde_json::from_str::<OAuthTokenResponse>(&text)
+        .map_err(|e| format!("OAuth token {action} response parse failed: {e}"))?;
+    if let Some(error) = token.error.as_deref() {
+        let detail = token.error_description.as_deref().unwrap_or("");
+        return Err(format!("OAuth token {action} failed: {error} {detail}"));
+    }
+    if token.access_token.trim().is_empty() {
+        return Err(format!(
+            "OAuth token {action} response did not include an access token"
+        ));
+    }
+    Ok(token)
+}
+
+fn parse_oauth_device_code_response(
+    response: reqwest::blocking::Response,
+) -> Result<OAuthDeviceCodeResponse, String> {
+    let status = response.status();
+    let text = response
+        .text()
+        .map_err(|e| format!("OAuth device code response read failed: {e}"))?;
+    let device = serde_json::from_str::<OAuthDeviceCodeResponse>(&text)
+        .map_err(|e| format!("OAuth device code response parse failed ({status}): {e}; {text}"))?;
+    if !status.is_success() {
+        let error = device.error.as_deref().unwrap_or("request_failed");
+        let detail = device.error_description.as_deref().unwrap_or("");
+        return Err(format!(
+            "OAuth device code request failed ({status}): {error} {detail}"
+        ));
+    }
+    if let Some(error) = device.error.as_deref() {
+        let detail = device.error_description.as_deref().unwrap_or("");
+        return Err(format!(
+            "OAuth device code request failed: {error} {detail}"
+        ));
+    }
+    if device.device_code.trim().is_empty()
+        || device.user_code.trim().is_empty()
+        || device.verification_uri.trim().is_empty()
+    {
+        return Err("OAuth device code response was missing required fields".into());
+    }
+    Ok(device)
+}
+
+fn oauth_form_body(params: &[(&str, String)]) -> String {
+    let mut serializer = url::form_urlencoded::Serializer::new(String::new());
+    for (key, value) in params {
+        serializer.append_pair(key, value);
+    }
+    serializer.finish()
+}
+
+fn build_oauth_authorize_url(
+    provider: MailProvider,
+    client_id: &str,
+    redirect_uri: &str,
+    state: &str,
+    challenge: &str,
+) -> Result<String, String> {
+    let mut url = url::Url::parse(oauth_authorize_url(provider)?)
+        .map_err(|e| format!("OAuth authorize URL parse failed: {e}"))?;
+    {
+        let mut query = url.query_pairs_mut();
+        query
+            .append_pair("client_id", client_id)
+            .append_pair("redirect_uri", redirect_uri)
+            .append_pair("response_type", "code")
+            .append_pair("scope", oauth_scope(provider)?)
+            .append_pair("state", state)
+            .append_pair("code_challenge", challenge)
+            .append_pair("code_challenge_method", "S256");
+        if provider == MailProvider::Gmail {
+            query
+                .append_pair("access_type", "offline")
+                .append_pair("prompt", "consent");
+        }
+    }
+    Ok(url.to_string())
+}
+
+fn wait_for_oauth_callback(
+    listener: std::net::TcpListener,
+    expected_state: &str,
+) -> Result<OAuthCallback, String> {
+    let deadline = Instant::now() + Duration::from_secs(300);
+    let (mut stream, _) = loop {
+        match listener.accept() {
+            Ok(value) => break value,
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                if Instant::now() >= deadline {
+                    return Err("OAuth callback timed out".into());
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            Err(e) => return Err(format!("OAuth callback failed: {e}")),
+        }
+    };
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
+    let mut buf = [0u8; 8192];
+    let n = stream
+        .read(&mut buf)
+        .map_err(|e| format!("OAuth callback read failed: {e}"))?;
+    let request = String::from_utf8_lossy(&buf[..n]);
+    let line = request
+        .lines()
+        .next()
+        .ok_or_else(|| "OAuth callback request was empty".to_string())?;
+    let path = line
+        .split_whitespace()
+        .nth(1)
+        .ok_or_else(|| "OAuth callback request was malformed".to_string())?;
+    let url = url::Url::parse(&format!("http://127.0.0.1{path}"))
+        .map_err(|e| format!("OAuth callback URL parse failed: {e}"))?;
+    let mut code = None;
+    let mut state = None;
+    let mut error = None;
+    let mut error_description = None;
+    for (key, value) in url.query_pairs() {
+        match key.as_ref() {
+            "code" => code = Some(value.into_owned()),
+            "state" => state = Some(value.into_owned()),
+            "error" => error = Some(value.into_owned()),
+            "error_description" => error_description = Some(value.into_owned()),
+            _ => {}
+        }
+    }
+
+    let result = if let Some(error) = error {
+        let detail = error_description.unwrap_or_default();
+        Err(format!("OAuth authorization failed: {error} {detail}"))
+    } else if state.as_deref() != Some(expected_state) {
+        Err("OAuth callback state did not match; authorization was rejected".into())
+    } else {
+        let code = code.ok_or_else(|| "OAuth callback did not include a code".to_string())?;
+        Ok(OAuthCallback { code })
+    };
+
+    let body = if result.is_ok() {
+        "Taomni Mail authorization complete. You can close this window."
+    } else {
+        "Taomni Mail authorization failed. You can close this window and retry."
+    };
+    let response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        body.len(),
+        body
+    );
+    let _ = stream.write_all(response.as_bytes());
+    result
+}
+
+fn oauth_authorize_url(provider: MailProvider) -> Result<&'static str, String> {
+    match provider {
+        MailProvider::Gmail => Ok("https://accounts.google.com/o/oauth2/v2/auth"),
+        MailProvider::Outlook => {
+            Ok("https://login.microsoftonline.com/common/oauth2/v2.0/authorize")
+        }
+        MailProvider::Custom => Err("OAuth2 mail auth requires Gmail or Outlook provider".into()),
+    }
+}
+
+fn oauth_token_url(provider: MailProvider) -> Result<&'static str, String> {
+    match provider {
+        MailProvider::Gmail => Ok("https://oauth2.googleapis.com/token"),
+        MailProvider::Outlook => Ok("https://login.microsoftonline.com/common/oauth2/v2.0/token"),
+        MailProvider::Custom => Err("OAuth2 mail auth requires Gmail or Outlook provider".into()),
+    }
+}
+
+fn oauth_device_code_url(provider: MailProvider) -> Result<&'static str, String> {
+    match provider {
+        MailProvider::Outlook => {
+            Ok("https://login.microsoftonline.com/common/oauth2/v2.0/devicecode")
+        }
+        _ => Err("Device code authorization is currently supported for Outlook only".into()),
+    }
+}
+
+fn oauth_scope(provider: MailProvider) -> Result<&'static str, String> {
+    match provider {
+        MailProvider::Gmail => Ok("https://mail.google.com/"),
+        MailProvider::Outlook => Ok(
+            "offline_access https://outlook.office.com/IMAP.AccessAsUser.All https://outlook.office.com/SMTP.Send",
+        ),
+        MailProvider::Custom => Err("OAuth2 mail auth requires Gmail or Outlook provider".into()),
+    }
+}
+
+fn non_empty_str(value: &str) -> Option<&str> {
+    let value = value.trim();
+    if value.is_empty() { None } else { Some(value) }
+}
+
+fn xoauth2_sasl_response(username: &str, access_token: &str) -> String {
+    format!("user={username}\x01auth=Bearer {access_token}\x01\x01")
+}
+
+fn random_urlsafe_token(bytes: usize) -> String {
+    let mut buf = vec![0u8; bytes];
+    rand::fill(buf.as_mut_slice());
+    URL_SAFE_NO_PAD.encode(buf)
+}
+
+fn pkce_challenge(verifier: &str) -> String {
+    let digest = Sha256::digest(verifier.as_bytes());
+    URL_SAFE_NO_PAD.encode(digest)
+}
+
 fn connect_imap(account: &ResolvedMailAccount) -> Result<ActiveImapSession, String> {
     let host = account.config.imap.host.trim();
     let port = account.config.imap.port;
+    let (connect_host, connect_port, forward_task) = mail_effective_endpoint(account, host, port)?;
     match account.config.imap.security {
         MailConnectionSecurity::Tls => {
-            let stream = tcp_connect(host, port)?;
+            let stream = tcp_connect(&connect_host, connect_port)?;
             let connector = TlsConnector::builder()
                 .build()
                 .map_err(|e| format!("failed to build IMAP TLS connector: {e}"))?;
@@ -1565,14 +2628,13 @@ fn connect_imap(account: &ResolvedMailAccount) -> Result<ActiveImapSession, Stri
             client
                 .read_greeting()
                 .map_err(|e| format!("IMAP greeting failed: {e}"))?;
-            Ok(ActiveImapSession::Tls(login_imap_client(
-                client,
-                &account.imap_username,
-                &account.imap_password,
-            )?))
+            Ok(ActiveImapSession::Tls {
+                session: authenticate_imap_client(client, account)?,
+                forward_task,
+            })
         }
         MailConnectionSecurity::Starttls => {
-            let stream = tcp_connect(host, port)?;
+            let stream = tcp_connect(&connect_host, connect_port)?;
             let mut client = imap::Client::new(stream);
             client
                 .read_greeting()
@@ -1583,24 +2645,85 @@ fn connect_imap(account: &ResolvedMailAccount) -> Result<ActiveImapSession, Stri
             let client = client
                 .secure(host, &connector)
                 .map_err(|e| format!("IMAP STARTTLS failed: {e}"))?;
-            Ok(ActiveImapSession::Tls(login_imap_client(
-                client,
-                &account.imap_username,
-                &account.imap_password,
-            )?))
+            Ok(ActiveImapSession::Tls {
+                session: authenticate_imap_client(client, account)?,
+                forward_task,
+            })
         }
         MailConnectionSecurity::None => {
-            let stream = tcp_connect(host, port)?;
+            let stream = tcp_connect(&connect_host, connect_port)?;
             let mut client = imap::Client::new(stream);
             client
                 .read_greeting()
                 .map_err(|e| format!("IMAP greeting failed: {e}"))?;
-            Ok(ActiveImapSession::Plain(login_imap_client(
-                client,
-                &account.imap_username,
-                &account.imap_password,
-            )?))
+            Ok(ActiveImapSession::Plain {
+                session: authenticate_imap_client(client, account)?,
+                forward_task,
+            })
         }
+    }
+}
+
+fn mail_effective_endpoint(
+    account: &ResolvedMailAccount,
+    host: &str,
+    port: u16,
+) -> Result<(String, u16, Option<JoinHandle<()>>), String> {
+    let Some(network) = account.network_settings.clone() else {
+        return Ok((host.to_string(), port, None));
+    };
+    let handle = tokio::runtime::Handle::try_current()
+        .map_err(|_| "Mail proxy forwarding requires an active Tokio runtime".to_string())?;
+    let forward = handle.block_on(crate::database::forward::start(
+        host.to_string(),
+        port,
+        network,
+    ))?;
+    Ok((
+        "127.0.0.1".to_string(),
+        forward.local_port,
+        Some(forward.task),
+    ))
+}
+
+fn authenticate_imap_client<T: Read + Write>(
+    client: imap::Client<T>,
+    account: &ResolvedMailAccount,
+) -> Result<imap::Session<T>, String> {
+    match account.auth_mode {
+        MailAuthMode::Password => {
+            login_imap_client(client, &account.imap_username, &account.imap_password)
+        }
+        MailAuthMode::OAuth2 => {
+            let auth = Xoauth2Authenticator {
+                username: account.imap_username.clone(),
+                access_token: account.imap_password.clone(),
+            };
+            if account.config.provider == MailProvider::Outlook {
+                let initial_response = BASE64_STANDARD
+                    .encode(xoauth2_sasl_response(&auth.username, &auth.access_token));
+                client
+                    .authenticate(format!("XOAUTH2 {initial_response}"), &auth)
+                    .map_err(|(e, _)| imap_xoauth2_auth_error(account.config.provider, e))
+            } else {
+                client
+                    .authenticate("XOAUTH2", &auth)
+                    .map_err(|(e, _)| imap_xoauth2_auth_error(account.config.provider, e))
+            }
+        }
+    }
+}
+
+fn imap_xoauth2_auth_error(provider: MailProvider, error: imap::Error) -> String {
+    let detail = error.to_string();
+    if provider == MailProvider::Outlook
+        && detail.contains("User is authenticated but not connected")
+    {
+        format!(
+            "IMAP XOAUTH2 authentication failed: {detail}. Outlook accepted the OAuth token, but the mailbox was not connected. Enable IMAP in Outlook.com Settings > Mail > Forwarding and IMAP, then retry. If it still fails, approve the recent IMAP sign-in activity at account.live.com/activity."
+        )
+    } else {
+        format!("IMAP XOAUTH2 authentication failed: {detail}")
     }
 }
 
@@ -2398,8 +3521,9 @@ fn send_smtp(
     request: &MailSendRequest,
 ) -> Result<MailSendResult, String> {
     let message = build_send_message(account, request)?;
-    let mailer = build_smtp_transport(account)?;
-    let response = mailer
+    let transport = build_smtp_transport(account)?;
+    let response = transport
+        .mailer
         .send(&message)
         .map_err(|e| format!("SMTP send failed: {e}"))?;
     Ok(MailSendResult {
@@ -2409,8 +3533,9 @@ fn send_smtp(
 }
 
 fn test_smtp(account: &ResolvedMailAccount) -> Result<(), String> {
-    let mailer = build_smtp_transport(account)?;
-    let connected = mailer
+    let transport = build_smtp_transport(account)?;
+    let connected = transport
+        .mailer
         .test_connection()
         .map_err(|e| format!("SMTP test failed: {e}"))?;
     if connected {
@@ -2420,15 +3545,20 @@ fn test_smtp(account: &ResolvedMailAccount) -> Result<(), String> {
     }
 }
 
-fn build_smtp_transport(account: &ResolvedMailAccount) -> Result<SmtpTransport, String> {
+fn build_smtp_transport(account: &ResolvedMailAccount) -> Result<MailSmtpTransport, String> {
     let host = account.config.smtp.host.trim();
-    let mut builder = SmtpTransport::builder_dangerous(host)
-        .port(account.config.smtp.port)
+    let (connect_host, connect_port, forward_task) =
+        mail_effective_endpoint(account, host, account.config.smtp.port)?;
+    let mut builder = SmtpTransport::builder_dangerous(connect_host)
+        .port(connect_port)
         .timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))
         .credentials(Credentials::new(
             account.smtp_username.clone(),
             account.smtp_password.clone(),
         ));
+    if account.auth_mode == MailAuthMode::OAuth2 {
+        builder = builder.authentication(vec![Mechanism::Xoauth2]);
+    }
     builder = match account.config.smtp.security {
         MailConnectionSecurity::Tls => {
             let params = TlsParameters::new(host.to_string())
@@ -2442,7 +3572,10 @@ fn build_smtp_transport(account: &ResolvedMailAccount) -> Result<SmtpTransport, 
         }
         MailConnectionSecurity::None => builder.tls(Tls::None),
     };
-    Ok(builder.build())
+    Ok(MailSmtpTransport {
+        mailer: builder.build(),
+        forward_task,
+    })
 }
 
 fn build_send_message(
@@ -3803,11 +4936,76 @@ mod tests {
             .to_vec()
     }
 
+    #[test]
+    fn oauth_token_expired_refreshes_before_expiry() {
+        let now = now_ts();
+        assert!(oauth_token_expired(Some(now - 1)));
+        assert!(oauth_token_expired(Some(
+            now + OAUTH_REFRESH_SKEW_SECS.saturating_sub(1)
+        )));
+        assert!(!oauth_token_expired(Some(
+            now + OAUTH_REFRESH_SKEW_SECS + 60
+        )));
+        assert!(!oauth_token_expired(None));
+    }
+
+    #[test]
+    fn oauth_refresh_scope_prefers_saved_scope_then_provider_default() {
+        let bundle = MailOAuthTokenBundle {
+            access_token: "access".into(),
+            refresh_token: Some("refresh".into()),
+            expires_at: None,
+            token_type: None,
+            scope: Some(" saved.scope ".into()),
+        };
+        let settings = MailOAuthSettings {
+            scope: Some("settings.scope".into()),
+            ..MailOAuthSettings::default()
+        };
+        assert_eq!(
+            oauth_refresh_scope(MailProvider::Outlook, &bundle, &settings).as_deref(),
+            Some("saved.scope")
+        );
+
+        let bundle_without_scope = MailOAuthTokenBundle {
+            scope: None,
+            ..bundle
+        };
+        assert_eq!(
+            oauth_refresh_scope(MailProvider::Outlook, &bundle_without_scope, &settings).as_deref(),
+            Some("settings.scope")
+        );
+
+        let settings_without_scope = MailOAuthSettings::default();
+        assert_eq!(
+            oauth_refresh_scope(
+                MailProvider::Outlook,
+                &bundle_without_scope,
+                &settings_without_scope,
+            )
+            .as_deref(),
+            Some(
+                "offline_access https://outlook.office.com/IMAP.AccessAsUser.All https://outlook.office.com/SMTP.Send"
+            )
+        );
+    }
+
+    #[test]
+    fn oauth_refresh_invalid_grant_prompts_reauthorization() {
+        let message = oauth_refresh_error_message(
+            "OAuth token refresh failed: invalid_grant refresh token expired",
+        );
+        assert!(message.starts_with(OAUTH_REAUTHORIZE_REQUIRED));
+        assert!(message.contains("invalid_grant"));
+    }
+
     fn sample_resolved_account() -> ResolvedMailAccount {
         ResolvedMailAccount {
             config: MailAccountConfig {
                 session_id: "acct".into(),
                 email_address: "sender@example.com".into(),
+                provider: MailProvider::Custom,
+                auth_mode: MailAuthMode::Password,
                 display_name: Some("Sender".into()),
                 reply_to: None,
                 signature: None,
@@ -3826,14 +5024,404 @@ mod tests {
                     security: MailConnectionSecurity::Tls,
                     use_imap_auth: true,
                 },
+                oauth: MailOAuthSettings::default(),
+                network_settings: None,
                 sync: MailSyncSettings::default(),
                 cache: MailCacheSettings::default(),
                 ai: MailAiSettings::default(),
             },
+            auth_mode: MailAuthMode::Password,
+            network_settings: None,
             imap_username: "sender@example.com".into(),
             imap_password: "secret".into(),
             smtp_username: "sender@example.com".into(),
             smtp_password: "secret".into(),
+        }
+    }
+
+    #[test]
+    #[ignore = "requires TAOMNI_VAULT_PASSWORD and live Outlook network access"]
+    fn live_saved_outlook_oauth2_probe() {
+        let session_name = std::env::var("TAOMNI_LIVE_MAIL_SESSION")
+            .expect("TAOMNI_LIVE_MAIL_SESSION must name the saved mail session to probe");
+        let vault_password = std::env::var("TAOMNI_VAULT_PASSWORD")
+            .expect("TAOMNI_VAULT_PASSWORD must be set for this ignored live test");
+        let app_data = live_app_data_dir();
+        let db_path = app_data.join("taomni.db");
+        let vault_path = app_data.join("vault.db");
+        println!("appData={}", app_data.display());
+
+        let db = Connection::open(&db_path).expect("open taomni.db");
+        let sessions = crate::session::db::list_sessions(&db, None).expect("list sessions");
+        let session = sessions
+            .into_iter()
+            .find(|candidate| candidate.name == session_name || candidate.id == session_name)
+            .unwrap_or_else(|| panic!("saved mail session `{session_name}` not found"));
+        let options = serde_json::from_str::<serde_json::Value>(&session.options_json)
+            .expect("parse session options");
+        let email = session
+            .username
+            .clone()
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| session.name.clone());
+        let token_ref = options
+            .get("mailOauthTokenRef")
+            .and_then(serde_json::Value::as_str)
+            .expect("mailOauthTokenRef missing");
+        let client_id = options
+            .get("mailOauthClientId")
+            .and_then(serde_json::Value::as_str)
+            .expect("mailOauthClientId missing");
+        let imap_host = session.host.clone();
+        let imap_port = session.port;
+        let smtp_host = options
+            .get("mailSmtpHost")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("smtp-mail.outlook.com")
+            .to_string();
+        let smtp_port = options
+            .get("mailSmtpPort")
+            .and_then(serde_json::Value::as_str)
+            .and_then(|value| value.parse::<u16>().ok())
+            .unwrap_or(587);
+
+        println!("sessionId={}", session.id);
+        println!("email={email}");
+        println!("clientId={client_id}");
+        println!("imap={imap_host}:{imap_port}");
+        println!("smtp={smtp_host}:{smtp_port}");
+
+        let vault = crate::vault::Vault::open(&vault_path).expect("open vault.db");
+        vault.unlock(&vault_password).expect("unlock vault");
+        let token_json = vault
+            .resolve(token_ref)
+            .expect("resolve OAuth token ref")
+            .expect("OAuth token ref not found");
+        let mut bundle =
+            serde_json::from_str::<MailOAuthTokenBundle>(&token_json).expect("parse token bundle");
+        println!("storedExpiresAt={:?}", bundle.expires_at);
+        println!("storedScope={:?}", bundle.scope);
+
+        if oauth_token_expired(bundle.expires_at) {
+            let refresh_token = bundle
+                .refresh_token
+                .as_deref()
+                .and_then(non_empty_str)
+                .expect("refresh token missing");
+            let refresh_scope = oauth_refresh_scope(
+                MailProvider::Outlook,
+                &bundle,
+                &MailOAuthSettings {
+                    client_id: Some(client_id.into()),
+                    client_secret: None,
+                    token_ref: Some(token_ref.into()),
+                    refresh_token_ref: None,
+                    expires_at: bundle.expires_at,
+                    scope: bundle.scope.clone(),
+                },
+            );
+            let refreshed = refresh_oauth_token_blocking(
+                MailProvider::Outlook,
+                client_id,
+                None,
+                refresh_token,
+                refresh_scope.as_deref(),
+                None,
+            )
+            .expect("refresh OAuth token");
+            bundle.access_token = refreshed.access_token;
+            bundle.expires_at = refreshed
+                .expires_in
+                .map(|seconds| now_ts() + seconds.max(0));
+            bundle.scope = refreshed.scope.and_then(non_empty).or(refresh_scope);
+            println!("tokenRefreshedInMemory=true");
+            println!("refreshedExpiresAt={:?}", bundle.expires_at);
+            println!("refreshedScope={:?}", bundle.scope);
+        }
+
+        match jwt_claims_summary(&bundle.access_token) {
+            Ok(claims) => println!(
+                "jwtClaims={}",
+                serde_json::to_string_pretty(&claims).expect("format claims")
+            ),
+            Err(error) => println!("jwtClaims=unavailable:{error}"),
+        }
+
+        let account = live_oauth_account(
+            &session.id,
+            &email,
+            &imap_host,
+            imap_port,
+            &smtp_host,
+            smtp_port,
+            client_id,
+            token_ref,
+            &bundle,
+        );
+        match connect_imap(&account) {
+            Ok(mut session) => {
+                println!("imapCrateAuth=ok");
+                let folders = session
+                    .list_folders(&account.config.session_id)
+                    .unwrap_or_default();
+                println!("imapCrateFolderCount={}", folders.len());
+                session.logout();
+            }
+            Err(error) => {
+                println!("imapCrateAuth=err:{error}");
+            }
+        }
+
+        let raw_initial =
+            raw_imap_xoauth2_probe(&imap_host, imap_port, &email, &bundle.access_token, true)
+                .expect("raw IMAP initial-response probe");
+        println!("rawImapInitial={}", raw_initial.join(" | "));
+
+        let raw_challenge =
+            raw_imap_xoauth2_probe(&imap_host, imap_port, &email, &bundle.access_token, false)
+                .expect("raw IMAP challenge-response probe");
+        println!("rawImapChallenge={}", raw_challenge.join(" | "));
+
+        let raw_smtp = raw_smtp_xoauth2_probe(&smtp_host, smtp_port, &email, &bundle.access_token)
+            .expect("raw SMTP XOAUTH2 probe");
+        println!("rawSmtp={}", raw_smtp.join(" | "));
+    }
+
+    fn live_app_data_dir() -> std::path::PathBuf {
+        std::env::var("TAOMNI_APP_DATA_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| {
+                dirs::data_dir()
+                    .expect("resolve data dir")
+                    .join("com.taomni.app")
+            })
+    }
+
+    fn live_oauth_account(
+        session_id: &str,
+        email: &str,
+        imap_host: &str,
+        imap_port: u16,
+        smtp_host: &str,
+        smtp_port: u16,
+        client_id: &str,
+        token_ref: &str,
+        bundle: &MailOAuthTokenBundle,
+    ) -> ResolvedMailAccount {
+        ResolvedMailAccount {
+            config: MailAccountConfig {
+                session_id: session_id.into(),
+                email_address: email.into(),
+                provider: MailProvider::Outlook,
+                auth_mode: MailAuthMode::OAuth2,
+                display_name: None,
+                reply_to: None,
+                signature: None,
+                imap: MailServerConfig {
+                    host: imap_host.into(),
+                    port: imap_port,
+                    username: Some(email.into()),
+                    password: None,
+                    security: MailConnectionSecurity::Tls,
+                },
+                smtp: MailSmtpConfig {
+                    host: smtp_host.into(),
+                    port: smtp_port,
+                    username: Some(email.into()),
+                    password: None,
+                    security: MailConnectionSecurity::Starttls,
+                    use_imap_auth: true,
+                },
+                oauth: MailOAuthSettings {
+                    client_id: Some(client_id.into()),
+                    client_secret: None,
+                    token_ref: Some(token_ref.into()),
+                    refresh_token_ref: None,
+                    expires_at: bundle.expires_at,
+                    scope: bundle.scope.clone(),
+                },
+                network_settings: None,
+                sync: MailSyncSettings::default(),
+                cache: MailCacheSettings::default(),
+                ai: MailAiSettings::default(),
+            },
+            auth_mode: MailAuthMode::OAuth2,
+            network_settings: None,
+            imap_username: email.into(),
+            imap_password: bundle.access_token.clone(),
+            smtp_username: email.into(),
+            smtp_password: bundle.access_token.clone(),
+        }
+    }
+
+    fn jwt_claims_summary(access_token: &str) -> Result<serde_json::Value, String> {
+        let parts = access_token.split('.').collect::<Vec<_>>();
+        if parts.len() < 2 {
+            return Err("access token is opaque, not a JWT".into());
+        }
+        let claims_bytes = URL_SAFE_NO_PAD
+            .decode(parts[1])
+            .map_err(|e| format!("decode JWT claims: {e}"))?;
+        let claims = serde_json::from_slice::<serde_json::Value>(&claims_bytes)
+            .map_err(|e| format!("parse JWT claims: {e}"))?;
+        let mut summary = serde_json::Map::new();
+        for key in [
+            "aud",
+            "iss",
+            "tid",
+            "azp",
+            "appid",
+            "scp",
+            "upn",
+            "preferred_username",
+            "email",
+            "unique_name",
+            "exp",
+            "nbf",
+            "iat",
+        ] {
+            if let Some(value) = claims.get(key) {
+                summary.insert(key.into(), value.clone());
+            }
+        }
+        Ok(serde_json::Value::Object(summary))
+    }
+
+    fn raw_imap_xoauth2_probe(
+        host: &str,
+        port: u16,
+        username: &str,
+        access_token: &str,
+        initial_response: bool,
+    ) -> Result<Vec<String>, String> {
+        let mut stream = tls_connect(host, port)?;
+        let mut transcript = Vec::new();
+        transcript.push(format!("S: {}", read_protocol_line(&mut stream)?));
+        write_protocol_line(&mut stream, "A001 CAPABILITY")?;
+        transcript.extend(tagged_response(&mut stream, "A001")?);
+        let sasl = BASE64_STANDARD.encode(xoauth2_sasl_response(username, access_token));
+        if initial_response {
+            write_protocol_line(&mut stream, &format!("A002 AUTHENTICATE XOAUTH2 {sasl}"))?;
+            transcript.extend(tagged_response(&mut stream, "A002")?);
+        } else {
+            write_protocol_line(&mut stream, "A002 AUTHENTICATE XOAUTH2")?;
+            let line = read_protocol_line(&mut stream)?;
+            transcript.push(format!("S: {line}"));
+            if line.starts_with('+') {
+                write_protocol_line(&mut stream, &sasl)?;
+                transcript.extend(tagged_response(&mut stream, "A002")?);
+            }
+        }
+        if transcript
+            .iter()
+            .any(|line| line.starts_with("S: A002 OK") || line.contains(" A002 OK "))
+        {
+            write_protocol_line(&mut stream, "A003 SELECT INBOX")?;
+            transcript.extend(tagged_response(&mut stream, "A003")?);
+        }
+        let _ = write_protocol_line(&mut stream, "A004 LOGOUT");
+        Ok(transcript)
+    }
+
+    fn raw_smtp_xoauth2_probe(
+        host: &str,
+        port: u16,
+        username: &str,
+        access_token: &str,
+    ) -> Result<Vec<String>, String> {
+        let tcp = std::net::TcpStream::connect((host, port))
+            .map_err(|e| format!("SMTP TCP connect {host}:{port}: {e}"))?;
+        tcp.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))
+            .map_err(|e| format!("SMTP read timeout setup: {e}"))?;
+        tcp.set_write_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))
+            .map_err(|e| format!("SMTP write timeout setup: {e}"))?;
+        let mut tcp = tcp;
+        let mut transcript = Vec::new();
+        transcript.extend(smtp_response(&mut tcp)?);
+        write_protocol_line(&mut tcp, "EHLO taomni.local")?;
+        transcript.extend(smtp_response(&mut tcp)?);
+        write_protocol_line(&mut tcp, "STARTTLS")?;
+        transcript.extend(smtp_response(&mut tcp)?);
+        let connector = TlsConnector::builder()
+            .build()
+            .map_err(|e| format!("SMTP TLS connector: {e}"))?;
+        let mut tls = connector
+            .connect(host, tcp)
+            .map_err(|e| format!("SMTP STARTTLS handshake: {e}"))?;
+        write_protocol_line(&mut tls, "EHLO taomni.local")?;
+        transcript.extend(smtp_response(&mut tls)?);
+        let sasl = BASE64_STANDARD.encode(xoauth2_sasl_response(username, access_token));
+        write_protocol_line(&mut tls, &format!("AUTH XOAUTH2 {sasl}"))?;
+        transcript.extend(smtp_response(&mut tls)?);
+        let _ = write_protocol_line(&mut tls, "QUIT");
+        Ok(transcript)
+    }
+
+    fn tls_connect(
+        host: &str,
+        port: u16,
+    ) -> Result<native_tls::TlsStream<std::net::TcpStream>, String> {
+        let tcp = std::net::TcpStream::connect((host, port))
+            .map_err(|e| format!("TCP connect {host}:{port}: {e}"))?;
+        tcp.set_read_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))
+            .map_err(|e| format!("read timeout setup: {e}"))?;
+        tcp.set_write_timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))
+            .map_err(|e| format!("write timeout setup: {e}"))?;
+        let connector = TlsConnector::builder()
+            .build()
+            .map_err(|e| format!("TLS connector: {e}"))?;
+        connector
+            .connect(host, tcp)
+            .map_err(|e| format!("TLS handshake {host}:{port}: {e}"))
+    }
+
+    fn write_protocol_line(stream: &mut impl Write, line: &str) -> Result<(), String> {
+        stream
+            .write_all(format!("{line}\r\n").as_bytes())
+            .map_err(|e| format!("write protocol line: {e}"))?;
+        stream
+            .flush()
+            .map_err(|e| format!("flush protocol line: {e}"))
+    }
+
+    fn read_protocol_line(stream: &mut impl Read) -> Result<String, String> {
+        let mut buf = Vec::new();
+        let mut byte = [0u8; 1];
+        loop {
+            stream
+                .read_exact(&mut byte)
+                .map_err(|e| format!("read protocol line: {e}"))?;
+            buf.push(byte[0]);
+            if byte[0] == b'\n' {
+                break;
+            }
+        }
+        Ok(String::from_utf8_lossy(&buf)
+            .trim_end_matches(['\r', '\n'])
+            .to_string())
+    }
+
+    fn tagged_response(stream: &mut impl Read, tag: &str) -> Result<Vec<String>, String> {
+        let mut lines = Vec::new();
+        loop {
+            let line = read_protocol_line(stream)?;
+            let done = line.starts_with(&format!("{tag} "));
+            lines.push(format!("S: {line}"));
+            if done {
+                return Ok(lines);
+            }
+        }
+    }
+
+    fn smtp_response(stream: &mut impl Read) -> Result<Vec<String>, String> {
+        let mut lines = Vec::new();
+        loop {
+            let line = read_protocol_line(stream)?;
+            let complete = line.len() >= 4 && line.as_bytes().get(3) == Some(&b' ');
+            lines.push(format!("S: {line}"));
+            if complete {
+                return Ok(lines);
+            }
         }
     }
 

@@ -25,8 +25,35 @@ const ipcMocks = vi.hoisted(() => ({
   isVaultLockedError: (_err: any) => false,
 }));
 
+const mailMocks = vi.hoisted(() => ({
+  mailOAuthAuthorize: vi.fn(async () => ({
+    tokenRef: "vault:oauth-token",
+    expiresAt: 1_800_000_000,
+    scope: "mail.scope",
+    tokenType: "Bearer",
+  })),
+  mailOAuthDeviceStart: vi.fn(async () => ({
+    deviceCode: "device-code",
+    userCode: "ABCD-EFGH",
+    verificationUri: "https://microsoft.com/devicelogin",
+    message: "Use code ABCD-EFGH",
+    expiresIn: 900,
+    interval: 1,
+  })),
+  mailOAuthDeviceComplete: vi.fn(async () => ({
+    tokenRef: "vault:oauth-token",
+    expiresAt: 1_800_000_000,
+    scope: "mail.scope",
+    tokenType: "Bearer",
+  })),
+}));
+
 vi.mock("../../lib/ipc", () => ({
   ...ipcMocks,
+}));
+
+vi.mock("../../lib/mail", () => ({
+  ...mailMocks,
 }));
 
 vi.mock("../../lib/runtime", () => ({
@@ -60,6 +87,11 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
         (mock as any).mockReset();
       }
     });
+    Object.values(mailMocks).forEach((mock) => {
+      if (typeof mock === "function" && "mockReset" in mock) {
+        (mock as any).mockReset();
+      }
+    });
     window.localStorage.clear();
     ipcMocks.listSessions.mockResolvedValue([]);
     ipcMocks.listSessionGroups.mockResolvedValue([]);
@@ -84,6 +116,26 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
       { name: "Ubuntu", isDefault: true, state: "Stopped", version: 2 },
     ]);
     ipcMocks.vaultPut.mockResolvedValue({ id: "vault-pwd", reference: "vault:pwd" });
+    mailMocks.mailOAuthAuthorize.mockResolvedValue({
+      tokenRef: "vault:oauth-token",
+      expiresAt: 1_800_000_000,
+      scope: "mail.scope",
+      tokenType: "Bearer",
+    });
+    mailMocks.mailOAuthDeviceStart.mockResolvedValue({
+      deviceCode: "device-code",
+      userCode: "ABCD-EFGH",
+      verificationUri: "https://microsoft.com/devicelogin",
+      message: "Use code ABCD-EFGH",
+      expiresIn: 900,
+      interval: 1,
+    });
+    mailMocks.mailOAuthDeviceComplete.mockResolvedValue({
+      tokenRef: "vault:oauth-token",
+      expiresAt: 1_800_000_000,
+      scope: "mail.scope",
+      tokenType: "Bearer",
+    });
   });
 
   afterEach(() => {
@@ -1144,6 +1196,164 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
       theme: "code:dracula",
     });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("applies Gmail and Outlook mail provider presets", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "Mail" });
+
+    await user.selectOptions(screen.getByLabelText("Mail provider"), "gmail");
+    expect(screen.getByLabelText("Mail auth mode")).toHaveValue("oauth2");
+    expect(screen.getByLabelText("IMAP server")).toHaveValue("imap.gmail.com");
+    expect(screen.getByLabelText("IMAP port")).toHaveValue("993");
+    expect(screen.getByLabelText("SMTP server")).toHaveValue("smtp.gmail.com");
+    expect(screen.getByLabelText("SMTP port")).toHaveValue("587");
+
+    await user.selectOptions(screen.getByLabelText("Mail provider"), "outlook");
+    expect(screen.getByLabelText("IMAP server")).toHaveValue("outlook.office365.com");
+    expect(screen.getByLabelText("SMTP server")).toHaveValue("smtp-mail.outlook.com");
+    expect(screen.getByLabelText("OAuth flow")).toHaveValue("device");
+    expect(screen.queryByLabelText("OAuth client secret")).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText("Mail provider"), "gmail");
+    await user.selectOptions(screen.getByLabelText("Mail auth mode"), "password");
+    await user.type(screen.getByLabelText("Mail email or username"), "me@gmail.com");
+    await user.type(screen.getByLabelText("Mail password or app password token"), "gmail-app-secret");
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(ipcMocks.saveSession).toHaveBeenCalledTimes(1);
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    const savedOptions = JSON.parse(savedConfig.options_json);
+
+    expect(savedConfig).toMatchObject({
+      session_type: "Mail",
+      host: "imap.gmail.com",
+      port: 993,
+      username: "me@gmail.com",
+    });
+    expect(savedOptions.mailProvider).toBe("gmail");
+    expect(savedOptions.mailAuthMode).toBe("password");
+    expect(savedOptions.mailSmtpHost).toBe("smtp.gmail.com");
+    expect(savedOptions.mailSmtpPort).toBe("587");
+    expect(savedOptions.mailSmtpSecurity).toBe("STARTTLS");
+    expect(savedOptions.passwordRef).toBe("vault:pwd");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves mail session Network tab proxy settings", async () => {
+    const user = userEvent.setup();
+    const { onClose } = renderEditor(undefined, { initialProto: "Mail" });
+
+    await user.selectOptions(screen.getByLabelText("Mail provider"), "gmail");
+    await user.selectOptions(screen.getByLabelText("Mail auth mode"), "password");
+    await user.type(screen.getByLabelText("Mail email or username"), "me@gmail.com");
+    await user.type(screen.getByLabelText("Mail password or app password token"), "gmail-app-secret");
+
+    await user.click(screen.getByRole("button", { name: /network settings/i }));
+    const proxySelect = screen.getByDisplayValue("None — direct connection");
+    await user.selectOptions(proxySelect, "HTTP CONNECT");
+    await user.type(screen.getByLabelText("Proxy host"), "proxy.mail.corp");
+    await user.type(screen.getByLabelText("Proxy port"), "8080");
+    await user.type(screen.getByLabelText("Proxy username"), "mail-user");
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    const savedConfig = ipcMocks.saveSession.mock.calls[0][0];
+    const savedOptions = JSON.parse(savedConfig.options_json);
+    expect(savedConfig.session_type).toBe("Mail");
+    expect(savedOptions.networkSettings).toMatchObject({
+      proxyKind: "http",
+      proxyHost: "proxy.mail.corp",
+      proxyPort: "8080",
+      proxyUser: "mail-user",
+    });
+    expect(savedOptions.mailProvider).toBe("gmail");
+    expect(savedOptions.mailAuthMode).toBe("password");
+  });
+
+  it("authorizes Gmail OAuth using the Mail Network tab settings", async () => {
+    const user = userEvent.setup();
+    renderEditor(undefined, { initialProto: "Mail" });
+
+    await user.selectOptions(screen.getByLabelText("Mail provider"), "gmail");
+    await user.type(screen.getByLabelText("Mail email or username"), "me@gmail.com");
+    await user.type(screen.getByLabelText("OAuth client ID"), "google-client-id");
+
+    await user.click(screen.getByRole("button", { name: /network settings/i }));
+    const proxySelect = screen.getByDisplayValue("None — direct connection");
+    await user.selectOptions(proxySelect, "SOCKS 5");
+    await user.type(screen.getByLabelText("Proxy host"), "socks.mail.corp");
+    await user.type(screen.getByLabelText("Proxy port"), "1080");
+
+    await user.click(screen.getByRole("button", { name: /mail account/i }));
+    await user.click(screen.getByTestId("mail-oauth-connect"));
+
+    await waitFor(() => expect(mailMocks.mailOAuthAuthorize).toHaveBeenCalledTimes(1));
+    const oauthRequest = (mailMocks.mailOAuthAuthorize.mock.calls[0] as unknown[])[0];
+    expect(oauthRequest).toMatchObject({
+      provider: "gmail",
+      emailAddress: "me@gmail.com",
+      clientId: "google-client-id",
+      networkSettings: {
+        proxyKind: "socks5",
+        proxyHost: "socks.mail.corp",
+        proxyPort: 1080,
+      },
+    });
+    expect(screen.getByText("OAuth2 connected.")).toBeInTheDocument();
+  });
+
+  it("authorizes Outlook OAuth with device code using the Mail Network tab settings", async () => {
+    const user = userEvent.setup();
+    renderEditor(undefined, { initialProto: "Mail" });
+
+    await user.selectOptions(screen.getByLabelText("Mail provider"), "outlook");
+    await user.type(screen.getByLabelText("Mail email or username"), "me@outlook.com");
+    await user.type(screen.getByLabelText("OAuth client ID"), "azure-client-id");
+    expect(screen.getByLabelText("OAuth flow")).toHaveValue("device");
+    expect(screen.queryByLabelText("OAuth client secret")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /network settings/i }));
+    const proxySelect = screen.getByDisplayValue("None — direct connection");
+    await user.selectOptions(proxySelect, "SOCKS 5");
+    await user.type(screen.getByLabelText("Proxy host"), "socks.mail.corp");
+    await user.type(screen.getByLabelText("Proxy port"), "1080");
+
+    await user.click(screen.getByRole("button", { name: /mail account/i }));
+    await user.click(screen.getByTestId("mail-oauth-connect"));
+
+    await waitFor(() => expect(mailMocks.mailOAuthDeviceStart).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mailMocks.mailOAuthDeviceComplete).toHaveBeenCalledTimes(1));
+    expect(mailMocks.mailOAuthAuthorize).not.toHaveBeenCalled();
+
+    const startRequest = (mailMocks.mailOAuthDeviceStart.mock.calls[0] as unknown[])[0];
+    expect(startRequest).toMatchObject({
+      provider: "outlook",
+      emailAddress: "me@outlook.com",
+      clientId: "azure-client-id",
+      networkSettings: {
+        proxyKind: "socks5",
+        proxyHost: "socks.mail.corp",
+        proxyPort: 1080,
+      },
+    });
+    const completeRequest = (mailMocks.mailOAuthDeviceComplete.mock.calls[0] as unknown[])[0];
+    expect(completeRequest).toMatchObject({
+      provider: "outlook",
+      emailAddress: "me@outlook.com",
+      clientId: "azure-client-id",
+      deviceCode: "device-code",
+      interval: 1,
+      expiresIn: 900,
+      networkSettings: {
+        proxyKind: "socks5",
+        proxyHost: "socks.mail.corp",
+        proxyPort: 1080,
+      },
+    });
+    expect(screen.getByText("OAuth2 connected.")).toBeInTheDocument();
   });
 
   it("defaults new mail sessions to follow the application theme", async () => {

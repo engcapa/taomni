@@ -122,6 +122,7 @@ interface MailClientTabProps {
   tabId: string;
   info: MailTabInfo;
   visible: boolean;
+  onEditSession?: (sessionId: string) => void;
 }
 
 interface ComposeDraft {
@@ -172,6 +173,25 @@ interface MailDraggableDialogProps {
 
 type AiAction = "summarize" | "reply" | "tasks";
 type SyncIndicator = "sync" | "more" | "none";
+
+function isOAuthReauthRequired(message: string | null | undefined): boolean {
+  if (!message) return false;
+  const normalized = message.toLowerCase();
+  return normalized.includes("oauth authorization expired or was revoked")
+    || normalized.includes("oauth2 authorization expired or was revoked")
+    || normalized.includes("oauth2 refresh token is missing")
+    || normalized.includes("invalid_grant")
+    || normalized.includes("aadsts70008")
+    || normalized.includes("aadsts700082");
+}
+
+function mailClientErrorMessage(error: unknown): string {
+  const message = String(error);
+  if (isOAuthReauthRequired(message)) {
+    return "OAuth authorization expired or was revoked. Reauthorize this mail account.";
+  }
+  return message;
+}
 
 interface SyncFolderOptions {
   limit?: number;
@@ -772,7 +792,7 @@ function aiPrompt(action: AiAction, message: MailMessageHeader, body: MailMessag
   return `Summarize this email for a busy operator. Include the purpose, key facts, urgency, and suggested next step.\n\n${header}\n\nEmail body:\n${bodyText}`;
 }
 
-export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
+export function MailClientTab({ tabId, info, visible, onEditSession }: MailClientTabProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [folders, setFolders] = useState<MailFolder[]>([]);
   const [selectedFolder, setSelectedFolder] = useState("INBOX");
@@ -845,6 +865,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
   const pushMailNew = useTaoAlertStore((s) => s.pushMailNew);
 
   const displayFolders = folders.length > 0 ? folders : [{ ...DEFAULT_FOLDER, accountId: info.sessionId }];
+  const oauthReauthRequired = isOAuthReauthRequired(error);
   const pageSize = useMemo(() => messagePageSize(info), [info.sync.maxFetchPerSync]);
   const batchSize = useMemo(() => refreshBatchSize(info), [info.sync.maxFetchPerSync]);
   const defaultMailDomain = useMemo(
@@ -1117,7 +1138,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
           : current,
       );
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
     } finally {
       setLoadingFolders(false);
     }
@@ -1155,7 +1176,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       }
       return { page, hasMore };
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
       return { page: [] as MailMessageHeader[], hasMore: false };
     } finally {
       if (append) {
@@ -1346,7 +1367,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       }
       return result;
     } catch (e) {
-      if (indicator !== "none") setError(String(e));
+      if (indicator !== "none") setError(mailClientErrorMessage(e));
       return null;
     } finally {
       syncInFlightRef.current = false;
@@ -1413,7 +1434,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       void warmRecentBodies(result.folders, nextFolder);
       return result;
     } catch (e) {
-      if (indicator !== "none") setError(String(e));
+      if (indicator !== "none") setError(mailClientErrorMessage(e));
       return null;
     } finally {
       syncInFlightRef.current = false;
@@ -1441,7 +1462,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       }
       return nextBody;
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
       return null;
     } finally {
       setBodyLoadingKey((current) => (current === key ? null : current));
@@ -1494,7 +1515,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       });
       setStatus(marked > 0 ? `Marked ${marked} selected messages as read` : "No selected unread messages");
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
     } finally {
       setMarkingRead(false);
     }
@@ -1509,7 +1530,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       setCheckedMessageKeys(new Set());
       setStatus(result.marked > 0 ? `Marked ${result.marked} cached messages as read` : "No unread cached messages");
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
     } finally {
       setMarkingRead(false);
     }
@@ -1593,7 +1614,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       markMessagesReadLocally(message.folder, [message.uid], result.marked);
       setStatus(result.marked > 0 ? "Marked message as read" : "Message was already read");
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
     } finally {
       setMarkingRead(false);
     }
@@ -1712,7 +1733,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
           markMessagesReadLocally(selectedMessage.folder, [selectedMessage.uid], result.marked);
         }
       } catch (e) {
-        if (!cancelled) setError(String(e));
+        if (!cancelled) setError(mailClientErrorMessage(e));
       }
     })();
     return () => {
@@ -1746,7 +1767,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       const result = await mailTestConnection(info);
       setStatus(`IMAP ${result.imapOk ? "ok" : "failed"}, SMTP ${result.smtpOk ? "ok" : "failed"}, ${result.folderCount} folders`);
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
     } finally {
       setTesting(false);
     }
@@ -1776,7 +1797,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       setLoadingMoreMessages(false);
       setStatus("Mail cache cleared");
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
     } finally {
       setClearing(false);
     }
@@ -1818,7 +1839,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     try {
       setDrafts(await mailListDrafts(info.sessionId));
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
     } finally {
       setDraftsLoading(false);
     }
@@ -1855,7 +1876,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       if (mode === "manual") setStatus("Draft saved");
       return saved;
     } catch (e) {
-      if (mode === "manual") setError(String(e));
+      if (mode === "manual") setError(mailClientErrorMessage(e));
       return null;
     } finally {
       setSavingDraft(false);
@@ -1878,7 +1899,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       if (draft.id === saved.id) setDraft(emptyComposeDraft());
       setStatus("Draft deleted");
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
     }
   };
 
@@ -2001,7 +2022,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       setComposeOpen(false);
       setDraft(emptyComposeDraft());
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
     } finally {
       setSending(false);
     }
@@ -2028,7 +2049,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
         return { ...current, attachments: [...current.attachments, ...nextAttachments] };
       });
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
     }
   };
 
@@ -2060,7 +2081,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       }));
       return `<img src="cid:${escapeHtml(contentId)}" alt="${escapeHtml(name)}">`;
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
       return null;
     }
   };
@@ -2097,7 +2118,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       setDrafts((current) => current.filter((item) => item.id !== draftId));
       setStatus("Draft discarded");
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
     }
   };
 
@@ -2151,7 +2172,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       await sendMessageToAi(threadId, aiPrompt(action, selectedMessage, currentBody));
       setStatus("Sent mail context to AI");
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
     }
   };
 
@@ -2172,7 +2193,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       const result = await mailDownloadAttachment(info, message.folder, message.uid, index, targetPath);
       setStatus(`Saved attachment to ${result.path}`);
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
     } finally {
       setDownloadingAttachmentIndex(null);
     }
@@ -2188,7 +2209,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       await openLocalPath(result.path);
       setStatus(`Opened attachment ${result.name || defaultPath}`);
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
     } finally {
       setDownloadingAttachmentIndex(null);
     }
@@ -2221,7 +2242,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       }
       setStatus(`Saved ${saved} attachment${saved === 1 ? "" : "s"} to ${targetDir}`);
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
     } finally {
       setDownloadingAttachmentIndex(null);
     }
@@ -2277,7 +2298,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     if (!text) return;
     void navigator.clipboard.writeText(text)
       .then(() => setStatus(`Copied ${label}`))
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(mailClientErrorMessage(e)));
   };
 
   const applyFlagsLocally = (folder: string, uids: number[], add: string[], remove: string[], unreadDelta: number) => {
@@ -2320,7 +2341,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
     try {
       await action();
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
     } finally {
       setBusyAction(false);
     }
@@ -2504,7 +2525,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
         iframe.contentWindow?.focus();
         iframe.contentWindow?.print();
       } catch (e) {
-        setError(String(e));
+        setError(mailClientErrorMessage(e));
       } finally {
         cleanup();
       }
@@ -2614,7 +2635,7 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       const { open } = await import("@tauri-apps/plugin-shell");
       await open(url);
     } catch (e) {
-      setError(String(e));
+      setError(mailClientErrorMessage(e));
     }
   };
 
@@ -3114,7 +3135,22 @@ export function MailClientTab({ tabId, info, visible }: MailClientTabProps) {
       {(error || status) && (
         <div className="h-7 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-[11px] bg-[var(--taomni-sidebar-bg)]">
           {error ? <AlertTriangle className="w-3.5 h-3.5 text-red-500" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
-          <span className={error ? "text-red-500 truncate" : "text-[var(--taomni-text-muted)] truncate"}>{error ?? status}</span>
+          <span
+            className={error ? "text-red-500 truncate" : "text-[var(--taomni-text-muted)] truncate"}
+            title={error ?? status ?? undefined}
+          >
+            {error ?? status}
+          </span>
+          {error && oauthReauthRequired && onEditSession && (
+            <button
+              type="button"
+              className="ml-auto h-5 px-2 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)]"
+              onClick={() => onEditSession(info.sessionId)}
+            >
+              <ShieldCheck className="w-3 h-3" />
+              Reauthorize
+            </button>
+          )}
         </div>
       )}
 

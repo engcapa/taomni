@@ -71,7 +71,7 @@ import {
 } from "../lib/detachedSession";
 import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams, DetachedDbParams } from "../components/detached/DetachedSessionWindow";
 import { Columns2, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
-import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo, MailConnectionSecurity, MailTabInfo, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, GitWorkspaceRootInfo, RecentWorkspace } from "../types";
+import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo, MailConnectionSecurity, MailTabInfo, MailAuthMode, MailProvider, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, GitWorkspaceRootInfo, RecentWorkspace } from "../types";
 import { computeNewTerminalTitle, newWorkspaceInstanceId, recentWorkspaceIdFromParts, useAppStore, type TerminalSplitLayout } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { WelcomePanel } from "../components/WelcomePanel";
@@ -428,6 +428,18 @@ function mailSecurityFromOptions(value: unknown, fallback: MailConnectionSecurit
   return fallback;
 }
 
+function mailProviderFromOptions(value: unknown, imapHost: string): MailProvider {
+  if (value === "gmail" || value === "outlook" || value === "custom") return value;
+  const host = imapHost.trim().toLowerCase();
+  if (host === "imap.gmail.com") return "gmail";
+  if (host === "outlook.office365.com") return "outlook";
+  return "custom";
+}
+
+function mailAuthModeFromOptions(value: unknown): MailAuthMode {
+  return value === "oauth2" ? "oauth2" : "password";
+}
+
 function mailNumberOption(
   options: Record<string, unknown>,
   key: string,
@@ -450,9 +462,15 @@ function sessionToMailTabInfo(
     typeof opts[key] === "string" ? (opts[key] as string) : fallback;
   const smtpUseImapAuth = opts.mailSmtpUseImapAuth !== false;
   const emailAddress = session.username || str("mailEmailAddress");
+  const provider = mailProviderFromOptions(opts.mailProvider, session.host);
+  const authMode = mailAuthModeFromOptions(opts.mailAuthMode);
+  const ns = getSessionNetworkSettings(session.options_json);
+  const networkSettings = ns.proxyKind !== "none" ? toNetworkSettingsPayload(ns) : null;
   return {
     sessionId: session.id,
     emailAddress,
+    provider,
+    authMode,
     displayName: str("mailDisplayName") || null,
     replyTo: str("mailReplyTo") || null,
     signature: str("mailSignature") || null,
@@ -472,6 +490,15 @@ function sessionToMailTabInfo(
       security: mailSecurityFromOptions(opts.mailSmtpSecurity, "tls"),
       useImapAuth: smtpUseImapAuth,
     },
+    oauth: {
+      clientId: str("mailOauthClientId") || null,
+      clientSecret: str("mailOauthClientSecretRef") || undefined,
+      tokenRef: str("mailOauthTokenRef") || null,
+      refreshTokenRef: str("mailOauthRefreshTokenRef") || null,
+      expiresAt: mailNumberOption(opts, "mailOauthExpiresAt", 0, 0) || null,
+      scope: str("mailOauthScope") || null,
+    },
+    networkSettings,
     sync: {
       onOpen: opts.mailSyncOnOpen !== false,
       intervalMinutes: mailNumberOption(opts, "mailSyncIntervalMinutes", 5, 1),
@@ -1532,6 +1559,11 @@ export function MainLayout() {
     setNewSessionGroupPath(null);
     setShowSessionEditor(true);
   }, []);
+
+  const handleEditSessionById = useCallback((sessionId: string) => {
+    const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
+    if (session) handleEditSession(session);
+  }, [handleEditSession]);
 
   const openSftpTab = useCallback((session: SessionConfig, authMethod: string, authData: string | null) => {
     const tabId = `sftp-${session.id}-${Date.now()}`;
@@ -3798,7 +3830,12 @@ export function MainLayout() {
                       className="absolute inset-0"
                       style={{ display: isActive ? "block" : "none" }}
                     >
-                      <MailClientTab tabId={tab.id} info={tab.mail} visible={isActive} />
+                      <MailClientTab
+                        tabId={tab.id}
+                        info={tab.mail}
+                        visible={isActive}
+                        onEditSession={handleEditSessionById}
+                      />
                     </div>
                   );
                 })}
