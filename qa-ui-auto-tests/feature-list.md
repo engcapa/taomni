@@ -1106,7 +1106,9 @@ components: [SessionTree, Sidebar]
 files:
   - src/components/sidebar/SessionTree.tsx
   - src/components/sidebar/Sidebar.tsx
+  - src/components/session/SessionConnectionCommandMenu.tsx
   - src/lib/customDnD.ts
+  - src/lib/sessionConnectionCommand.ts
 controls:
   - id: sidebar
     selector: '[data-testid="sidebar"]'
@@ -1136,6 +1138,50 @@ controls:
     selector: '[data-testid="context-menu-item-set-terminal-theme"]'
     kind: interactive
     optional: true       # visible from a saved session context menu
+  - id: context-copy-connection-command
+    selector: '[data-testid="context-menu-item-copy-connection-command"]'
+    kind: interactive
+    optional: true       # visible from a command-capable saved session context menu
+  - id: context-copy-command-posix
+    selector: '[data-testid="context-menu-item-copy-command-posix"]'
+    kind: interactive
+    optional: true       # visible from the copy connection command flyout
+  - id: context-copy-command-powershell
+    selector: '[data-testid="context-menu-item-copy-command-powershell"]'
+    kind: interactive
+    optional: true       # visible from the copy connection command flyout
+  - id: context-copy-command-posix-basic
+    selector: '[data-testid="context-menu-item-copy-command-posix-basic"]'
+    kind: interactive
+    optional: true       # visible for SSH sessions under Linux/macOS
+  - id: context-copy-command-posix-jump
+    selector: '[data-testid="context-menu-item-copy-command-posix-jump"]'
+    kind: interactive
+    optional: true       # visible for SSH sessions under Linux/macOS
+  - id: context-copy-command-posix-forwards
+    selector: '[data-testid="context-menu-item-copy-command-posix-forwards"]'
+    kind: interactive
+    optional: true       # visible for SSH sessions under Linux/macOS
+  - id: context-copy-command-posix-full
+    selector: '[data-testid="context-menu-item-copy-command-posix-full"]'
+    kind: interactive
+    optional: true       # visible for SSH sessions under Linux/macOS
+  - id: context-copy-command-powershell-basic
+    selector: '[data-testid="context-menu-item-copy-command-powershell-basic"]'
+    kind: interactive
+    optional: true       # visible for SSH sessions under Windows PowerShell
+  - id: context-copy-command-powershell-jump
+    selector: '[data-testid="context-menu-item-copy-command-powershell-jump"]'
+    kind: interactive
+    optional: true       # visible for SSH sessions under Windows PowerShell
+  - id: context-copy-command-powershell-forwards
+    selector: '[data-testid="context-menu-item-copy-command-powershell-forwards"]'
+    kind: interactive
+    optional: true       # visible for SSH sessions under Windows PowerShell
+  - id: context-copy-command-powershell-full
+    selector: '[data-testid="context-menu-item-copy-command-powershell-full"]'
+    kind: interactive
+    optional: true       # visible for SSH sessions under Windows PowerShell
   - id: context-terminal-theme-options
     selector: '[data-testid^="session-terminal-theme-option-"]'
     kind: interactive
@@ -1145,7 +1191,7 @@ controls:
 - 分组树（展开 / 折叠 / 拖拽到分组）
 - 搜索框 `session-search`
 - 双击 → 触发连接
-- 右键菜单：Connect / Edit / Duplicate / Move to folder / Set terminal theme / Delete
+- 右键菜单：Connect / Copy connection command / Edit / Duplicate / Move to folder / Set terminal theme / Delete
 - 「最近连接」区域
 
 ### 6.3 会话编辑器 `SessionEditor` ✅
