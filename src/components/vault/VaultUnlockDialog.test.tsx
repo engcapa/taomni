@@ -50,6 +50,23 @@ describe("VaultUnlockDialog", () => {
     expect(onCancel).toHaveBeenCalled();
   });
 
+  it("can be made non-cancellable", async () => {
+    const onCancel = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <VaultUnlockDialog
+        cancellable={false}
+        onCancel={onCancel}
+        onSubmit={async () => undefined}
+      />,
+    );
+
+    expect(screen.queryByTestId("vault-unlock-cancel")).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(screen.getByTestId("vault-unlock-dialog")).toBeInTheDocument();
+  });
+
   it("does not cancel when the backdrop is clicked", async () => {
     const onCancel = vi.fn();
     const user = userEvent.setup();

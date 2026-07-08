@@ -1,54 +1,75 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useT } from "../../lib/i18n";
 import { useAppStore } from "../../stores/appStore";
 import { useVaultStore } from "../../stores/vaultStore";
 import { VaultUnlockDialog } from "./VaultUnlockDialog";
 
+type StartupVaultGateState = "checking" | "locked" | "ready";
+
 export function StartupVaultUnlockGate({ children }: { children: ReactNode }) {
   const t = useT();
   const unlockMode = useAppStore((s) => s.vaultUnlockMode);
-  const state = useVaultStore((s) => s.state);
   const refresh = useVaultStore((s) => s.refresh);
   const unlock = useVaultStore((s) => s.unlock);
-  const checkedRef = useRef(false);
-  const [promptOpen, setPromptOpen] = useState(false);
+  const [gateState, setGateState] = useState<StartupVaultGateState>(
+    unlockMode === "startup" ? "checking" : "ready",
+  );
 
   useEffect(() => {
-    if (checkedRef.current) return;
-    checkedRef.current = true;
-    if (unlockMode !== "startup") return;
+    if (unlockMode !== "startup") {
+      setGateState("ready");
+      return;
+    }
 
+    setGateState("checking");
     let disposed = false;
     void refresh()
       .then(() => {
-        if (!disposed && useVaultStore.getState().state === "locked") {
-          setPromptOpen(true);
-        }
+        if (disposed) return;
+        setGateState(useVaultStore.getState().state === "locked" ? "locked" : "ready");
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!disposed) setGateState("ready");
+      });
 
     return () => {
       disposed = true;
     };
   }, [refresh, unlockMode]);
 
-  useEffect(() => {
-    if (state === "unlocked") setPromptOpen(false);
-  }, [state]);
-
   return (
     <>
       {children}
-      {promptOpen && state === "locked" && (
+      {gateState === "checking" && <StartupVaultCheckOverlay />}
+      {gateState === "locked" && (
         <VaultUnlockDialog
           reason={t("vault.startupUnlockReason")}
-          onCancel={() => setPromptOpen(false)}
+          cancellable={false}
+          zIndex={10001}
           onSubmit={async (pw) => {
             await unlock(pw);
-            setPromptOpen(false);
+            setGateState("ready");
           }}
         />
       )}
     </>
+  );
+}
+
+function StartupVaultCheckOverlay() {
+  const t = useT();
+
+  return (
+    <div
+      data-testid="startup-vault-check"
+      className="fixed inset-0 flex items-center justify-center"
+      style={{
+        background: "rgba(0,0,0,0.4)",
+        color: "white",
+        zIndex: 10001,
+      }}
+    >
+      <div className="text-[12px]">{t("common.loading")}</div>
+    </div>
   );
 }

@@ -8,10 +8,14 @@ import {
 import { useT } from "../../lib/i18n";
 
 export interface VaultUnlockDialogProps {
-  onCancel: () => void;
+  onCancel?: () => void;
   onSubmit: (masterPassword: string) => Promise<void>;
   /** Optional context line shown below the title (e.g. why we're prompting). */
   reason?: string;
+  /** When false, the dialog cannot be dismissed without unlocking. */
+  cancellable?: boolean;
+  /** Override stacking for app-level locks that must sit above all app chrome. */
+  zIndex?: number;
 }
 
 const FOCUSABLE_SELECTOR = [
@@ -23,7 +27,13 @@ const FOCUSABLE_SELECTOR = [
   "[tabindex]:not([tabindex='-1'])",
 ].join(", ");
 
-export function VaultUnlockDialog({ onCancel, onSubmit, reason }: VaultUnlockDialogProps) {
+export function VaultUnlockDialog({
+  onCancel,
+  onSubmit,
+  reason,
+  cancellable = true,
+  zIndex = 50,
+}: VaultUnlockDialogProps) {
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +72,8 @@ export function VaultUnlockDialog({ onCancel, onSubmit, reason }: VaultUnlockDia
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
       event.stopPropagation();
-      onCancel();
+      event.preventDefault();
+      if (cancellable) onCancel?.();
     } else if (event.key === "Enter") {
       const target = event.target as HTMLElement;
       if (target.tagName !== "BUTTON") {
@@ -101,8 +112,8 @@ export function VaultUnlockDialog({ onCancel, onSubmit, reason }: VaultUnlockDia
   return (
     <div
       data-testid="vault-unlock-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.4)" }}
+      className="fixed inset-0 flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.4)", zIndex }}
       onMouseDown={handleBackdropMouseDown}
       onKeyDown={handleKeyDown}
     >
@@ -152,15 +163,17 @@ export function VaultUnlockDialog({ onCancel, onSubmit, reason }: VaultUnlockDia
         )}
 
         <div className="flex gap-2 justify-end mt-4">
-          <button
-            type="button"
-            data-testid="vault-unlock-cancel"
-            className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
-            onClick={onCancel}
-            disabled={busy}
-          >
-            {t("vault.cancel")}
-          </button>
+          {cancellable && (
+            <button
+              type="button"
+              data-testid="vault-unlock-cancel"
+              className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
+              onClick={onCancel}
+              disabled={busy}
+            >
+              {t("vault.cancel")}
+            </button>
+          )}
           <button
             type="button"
             data-testid="vault-unlock-confirm"

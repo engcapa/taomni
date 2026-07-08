@@ -2128,7 +2128,7 @@ export const zhCN: DeepPartial<typeof en> = {
     unlockModeDescription: "选择 Taomni 启动后何时要求输入主密码。",
     unlockModeStartup: "启动时",
     unlockModeOnDemand: "按需解锁",
-    unlockModeStartupHint: "默认选项。若凭据库已锁定，Taomni 启动时会要求输入主密码。",
+    unlockModeStartupHint: "默认选项。若凭据库已锁定，Taomni 会阻塞启动，直到输入主密码。",
     unlockModeOnDemandHint: "Taomni 会等到需要使用已保存凭据时，再提示解锁。",
     setMasterPassword: "设置主密码",
     unlock: "解锁",
