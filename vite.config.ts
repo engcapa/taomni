@@ -27,6 +27,14 @@ export default defineConfig({
     // optimizer from pre-bundling the real packages (whose imports reference
     // core exports the stub intentionally omits).
     exclude: isTauriBuild ? [] : ["@tauri-apps/plugin-notification", "@tauri-apps/plugin-shell", "@tauri-apps/plugin-dialog"],
+    // Match the production floor for dependency pre-bundles. xterm's
+    // DECRQM/requestMode path is exercised by `vi`, so dev output needs the
+    // same parser-safe target as packaged builds.
+    rolldownOptions: {
+      transform: {
+        target: "es2020",
+      },
+    },
   },
   // Tauri ships with the system WebView. macOS 13.2.x uses a WKWebView roughly
   // equivalent to Safari 16.3, which can white-screen on untransformed ES2022
