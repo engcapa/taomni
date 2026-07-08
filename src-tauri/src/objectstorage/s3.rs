@@ -3,6 +3,7 @@
 //! Service-level ListBuckets — which rusty-s3 has no action for — is signed
 //! directly via `rusty_s3::signing::sign`.
 
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -10,7 +11,7 @@ use std::time::Instant;
 
 use jiff::Timestamp;
 use reqwest::Client;
-use rusty_s3::actions::{CreateMultipartUpload, ListObjectsV2};
+use rusty_s3::actions::{CreateMultipartUpload, ListObjectsV2, ListObjectsV2Response};
 use rusty_s3::{Bucket, Credentials, Method, S3Action, UrlStyle};
 use serde::Deserialize;
 use tauri::{AppHandle, Runtime};
@@ -39,7 +40,13 @@ impl S3Client {
         region: String,
         style: UrlStyle,
     ) -> Self {
-        Self { http, creds, endpoint, region, style }
+        Self {
+            http,
+            creds,
+            endpoint,
+            region,
+            style,
+        }
     }
 
     fn bucket(&self, name: &str) -> Result<Bucket, String> {
@@ -68,8 +75,8 @@ impl S3Client {
             std::iter::empty::<(&str, &str)>(),
         );
         let body = self.get_text(signed).await?;
-        let parsed: ListAllMyBucketsResult =
-            quick_xml::de::from_str(&body).map_err(|e| format!("parse ListBuckets response: {e}"))?;
+        let parsed: ListAllMyBucketsResult = quick_xml::de::from_str(&body)
+            .map_err(|e| format!("parse ListBuckets response: {e}"))?;
         Ok(parsed
             .buckets
             .bucket
@@ -107,40 +114,7 @@ impl S3Client {
         let resp = ListObjectsV2::parse_response(body.as_bytes())
             .map_err(|e| format!("parse ListObjectsV2 response: {e}"))?;
 
-        let mut entries = Vec::with_capacity(resp.common_prefixes.len() + resp.contents.len());
-        for cp in resp.common_prefixes {
-            let trimmed = cp.prefix.trim_end_matches('/');
-            let name = trimmed.rsplit('/').next().unwrap_or(trimmed).to_string();
-            entries.push(ObjectEntry {
-                name,
-                key: cp.prefix,
-                is_dir: true,
-                size: 0,
-                last_modified: None,
-                etag: None,
-                storage_class: None,
-            });
-        }
-        for c in resp.contents {
-            // Skip the zero-byte folder marker that equals the prefix itself.
-            if c.key == prefix {
-                continue;
-            }
-            let name = c.key.strip_prefix(prefix).unwrap_or(&c.key).to_string();
-            entries.push(ObjectEntry {
-                name,
-                key: c.key,
-                is_dir: false,
-                size: c.size,
-                last_modified: parse_iso8601(&c.last_modified),
-                etag: Some(c.etag.trim_matches('"').to_string()),
-                storage_class: c.storage_class,
-            });
-        }
-        Ok(ObjectListPage {
-            entries,
-            next_token: resp.next_continuation_token,
-        })
+        Ok(entries_from_list_objects_response(prefix, resp))
     }
     pub async fn get_object_bytes(&self, bucket: &str, key: &str) -> Result<Vec<u8>, String> {
         let b = self.bucket(bucket)?;
@@ -172,7 +146,9 @@ impl S3Client {
         }
         Ok(ObjectMetadata {
             key: key.to_string(),
-            size: get("content-length").and_then(|s| s.parse().ok()).unwrap_or(0),
+            size: get("content-length")
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0),
             content_type: get("content-type"),
             etag: get("etag").map(|e| e.trim_matches('"').to_string()),
             last_modified: get("last-modified").as_deref().and_then(parse_http_date),
@@ -192,7 +168,13 @@ impl S3Client {
     ) -> Result<(), String> {
         let b = self.bucket(bucket)?;
         let url = b.put_object(Some(&self.creds), key).sign(SIGN_TTL);
-        let resp = self.http.put(url).body(body).send().await.map_err(net_err)?;
+        let resp = self
+            .http
+            .put(url)
+            .body(body)
+            .send()
+            .await
+            .map_err(net_err)?;
         self.check(resp).await?;
         Ok(())
     }
@@ -365,7 +347,7 @@ impl S3Client {
         handle: &Arc<TransferHandle>,
         app: &AppHandle<R>,
     ) -> Result<(), String> {
-        use super::transfer::{emit_progress, MULTIPART_THRESHOLD};
+        use super::transfer::{MULTIPART_THRESHOLD, emit_progress};
         let total = tokio::fs::metadata(local)
             .await
             .map_err(|e| format!("stat {}: {e}", local.display()))?
@@ -380,7 +362,8 @@ impl S3Client {
                 .map_err(|e| format!("read {}: {e}", local.display()))?;
             let mut put = b.put_object(Some(&self.creds), key);
             if let Some(sc) = storage_class {
-                put.headers_mut().insert("x-amz-storage-class", sc.to_string());
+                put.headers_mut()
+                    .insert("x-amz-storage-class", sc.to_string());
             }
             let url = put.sign(SIGN_TTL);
             let mut req = self.http.put(url).body(data);
@@ -395,7 +378,9 @@ impl S3Client {
 
         let mut create = b.create_multipart_upload(Some(&self.creds), key);
         if let Some(sc) = storage_class {
-            create.headers_mut().insert("x-amz-storage-class", sc.to_string());
+            create
+                .headers_mut()
+                .insert("x-amz-storage-class", sc.to_string());
         }
         let create_url = create.sign(SIGN_TTL);
         let mut create_req = self.http.post(create_url);
@@ -411,7 +396,17 @@ impl S3Client {
             .to_string();
 
         match self
-            .upload_parts(&b, key, &upload_id, local, total, transfer_id, handle, app, started)
+            .upload_parts(
+                &b,
+                key,
+                &upload_id,
+                local,
+                total,
+                transfer_id,
+                handle,
+                app,
+                started,
+            )
             .await
         {
             Ok(etags) => {
@@ -424,7 +419,13 @@ impl S3Client {
                 );
                 let curl = complete.sign(SIGN_TTL);
                 let cbody = complete.body();
-                let resp = self.http.post(curl).body(cbody).send().await.map_err(net_err)?;
+                let resp = self
+                    .http
+                    .post(curl)
+                    .body(cbody)
+                    .send()
+                    .await
+                    .map_err(net_err)?;
                 let resp = self.check(resp).await?;
                 let txt = resp.text().await.unwrap_or_default();
                 if txt.contains("<Error") {
@@ -459,7 +460,7 @@ impl S3Client {
         app: &AppHandle<R>,
         started: Instant,
     ) -> Result<Vec<String>, String> {
-        use super::transfer::{emit_paused, emit_progress, read_full, PART_SIZE};
+        use super::transfer::{PART_SIZE, emit_paused, emit_progress, read_full};
         let mut file = tokio::fs::File::open(local)
             .await
             .map_err(|e| format!("open {}: {e}", local.display()))?;
@@ -539,6 +540,75 @@ impl S3Client {
     }
 }
 
+fn entries_from_list_objects_response(prefix: &str, resp: ListObjectsV2Response) -> ObjectListPage {
+    let mut entries = Vec::with_capacity(resp.common_prefixes.len() + resp.contents.len());
+    let mut folder_keys = BTreeSet::new();
+
+    for cp in resp.common_prefixes {
+        push_folder_entry(&mut entries, &mut folder_keys, cp.prefix);
+    }
+    for c in resp.contents {
+        // Skip the zero-byte folder marker that equals the prefix itself.
+        if c.key == prefix {
+            continue;
+        }
+
+        if is_direct_folder_marker(prefix, &c.key, c.size) {
+            push_folder_entry(&mut entries, &mut folder_keys, c.key);
+            continue;
+        }
+
+        let name = c.key.strip_prefix(prefix).unwrap_or(&c.key).to_string();
+        entries.push(ObjectEntry {
+            name,
+            key: c.key,
+            is_dir: false,
+            size: c.size,
+            last_modified: parse_iso8601(&c.last_modified),
+            etag: Some(c.etag.trim_matches('"').to_string()),
+            storage_class: c.storage_class,
+        });
+    }
+
+    ObjectListPage {
+        entries,
+        next_token: resp.next_continuation_token,
+    }
+}
+
+fn push_folder_entry(
+    entries: &mut Vec<ObjectEntry>,
+    folder_keys: &mut BTreeSet<String>,
+    key: String,
+) {
+    if !folder_keys.insert(key.clone()) {
+        return;
+    }
+    let trimmed = key.trim_end_matches('/');
+    let name = trimmed.rsplit('/').next().unwrap_or(trimmed).to_string();
+    entries.push(ObjectEntry {
+        name,
+        key,
+        is_dir: true,
+        size: 0,
+        last_modified: None,
+        etag: None,
+        storage_class: None,
+    });
+}
+
+fn is_direct_folder_marker(prefix: &str, key: &str, size: u64) -> bool {
+    if size != 0 || !key.ends_with('/') {
+        return false;
+    }
+
+    let Some(relative) = key.strip_prefix(prefix) else {
+        return false;
+    };
+    let child = relative.trim_end_matches('/');
+    !child.is_empty() && !child.contains('/')
+}
+
 fn net_err(e: reqwest::Error) -> String {
     format!("request failed: {e}")
 }
@@ -613,6 +683,92 @@ mod it {
     use super::*;
     use rusty_s3::UrlStyle;
 
+    fn parse_list(xml: &str) -> ListObjectsV2Response {
+        quick_xml::de::from_str(xml).expect("parse list response")
+    }
+
+    #[test]
+    fn zero_byte_trailing_slash_content_surfaces_as_folder() {
+        let resp = parse_list(
+            r#"
+            <ListBucketResult>
+              <Contents>
+                <Key>test/</Key>
+                <LastModified>2026-07-08T13:59:16.000Z</LastModified>
+                <ETag>&quot;d41d8cd98f00b204e9800998ecf8427e&quot;</ETag>
+                <Size>0</Size>
+                <StorageClass>STANDARD</StorageClass>
+              </Contents>
+            </ListBucketResult>
+            "#,
+        );
+
+        let page = entries_from_list_objects_response("", resp);
+
+        assert_eq!(page.entries.len(), 1);
+        let entry = &page.entries[0];
+        assert_eq!(entry.name, "test");
+        assert_eq!(entry.key, "test/");
+        assert!(entry.is_dir);
+        assert_eq!(entry.size, 0);
+    }
+
+    #[test]
+    fn content_folder_marker_dedupes_against_common_prefix() {
+        let resp = parse_list(
+            r#"
+            <ListBucketResult>
+              <CommonPrefixes>
+                <Prefix>test/</Prefix>
+              </CommonPrefixes>
+              <Contents>
+                <Key>test/</Key>
+                <LastModified>2026-07-08T13:59:16.000Z</LastModified>
+                <ETag>&quot;d41d8cd98f00b204e9800998ecf8427e&quot;</ETag>
+                <Size>0</Size>
+                <StorageClass>STANDARD</StorageClass>
+              </Contents>
+            </ListBucketResult>
+            "#,
+        );
+
+        let page = entries_from_list_objects_response("", resp);
+
+        assert_eq!(page.entries.len(), 1);
+        assert_eq!(page.entries[0].name, "test");
+        assert!(page.entries[0].is_dir);
+    }
+
+    #[test]
+    fn current_prefix_folder_marker_is_hidden() {
+        let resp = parse_list(
+            r#"
+            <ListBucketResult>
+              <Contents>
+                <Key>test/</Key>
+                <LastModified>2026-07-08T13:59:16.000Z</LastModified>
+                <ETag>&quot;d41d8cd98f00b204e9800998ecf8427e&quot;</ETag>
+                <Size>0</Size>
+                <StorageClass>STANDARD</StorageClass>
+              </Contents>
+              <Contents>
+                <Key>test/file.txt</Key>
+                <LastModified>2026-07-08T14:00:00.000Z</LastModified>
+                <ETag>&quot;49f68a5c8493ec2c0bf489821c21fc3b&quot;</ETag>
+                <Size>5</Size>
+                <StorageClass>STANDARD</StorageClass>
+              </Contents>
+            </ListBucketResult>
+            "#,
+        );
+
+        let page = entries_from_list_objects_response("test/", resp);
+
+        assert_eq!(page.entries.len(), 1);
+        assert_eq!(page.entries[0].name, "file.txt");
+        assert!(!page.entries[0].is_dir);
+    }
+
     /// End-to-end round trip against a live S3-compatible endpoint (MinIO in
     /// CI/dev). Skipped unless `TAOMNI_S3_IT_ENDPOINT` is set, so the normal
     /// `cargo test` run stays offline. Exercises bucket/object signing, XML
@@ -638,15 +794,24 @@ mod it {
         client.create_bucket(&bucket).await.expect("create_bucket");
 
         let buckets = client.list_buckets().await.expect("list_buckets");
-        assert!(buckets.iter().any(|b| b.name == bucket), "new bucket listed");
+        assert!(
+            buckets.iter().any(|b| b.name == bucket),
+            "new bucket listed"
+        );
 
         client
             .put_object_bytes(&bucket, "dir/hello.txt", b"hi there".to_vec())
             .await
             .expect("put_object");
-        client.create_folder(&bucket, "emptydir").await.expect("create_folder");
+        client
+            .create_folder(&bucket, "emptydir")
+            .await
+            .expect("create_folder");
 
-        let root = client.list_objects(&bucket, "", None, 1000).await.expect("list root");
+        let root = client
+            .list_objects(&bucket, "", None, 1000)
+            .await
+            .expect("list root");
         assert!(
             root.entries.iter().any(|e| e.is_dir && e.name == "dir"),
             "dir/ surfaces as a folder"
@@ -656,16 +821,29 @@ mod it {
             "root has only folders, no loose files"
         );
 
-        let inside = client.list_objects(&bucket, "dir/", None, 1000).await.expect("list dir/");
-        let file = inside.entries.iter().find(|e| !e.is_dir).expect("file under dir/");
+        let inside = client
+            .list_objects(&bucket, "dir/", None, 1000)
+            .await
+            .expect("list dir/");
+        let file = inside
+            .entries
+            .iter()
+            .find(|e| !e.is_dir)
+            .expect("file under dir/");
         assert_eq!(file.name, "hello.txt");
         assert_eq!(file.size, 8);
 
-        let bytes = client.get_object_bytes(&bucket, "dir/hello.txt").await.expect("get");
+        let bytes = client
+            .get_object_bytes(&bucket, "dir/hello.txt")
+            .await
+            .expect("get");
         assert_eq!(bytes, b"hi there");
 
         // --- P3 management ops ---
-        let meta = client.head_object(&bucket, "dir/hello.txt").await.expect("head");
+        let meta = client
+            .head_object(&bucket, "dir/hello.txt")
+            .await
+            .expect("head");
         assert_eq!(meta.size, 8);
 
         // Server-side copy (same bucket) then verify the copy's bytes.
@@ -673,22 +851,47 @@ mod it {
             .copy_object(&bucket, "dir/hello.txt", &bucket, "dir2/copy.txt")
             .await
             .expect("copy");
-        let copied = client.get_object_bytes(&bucket, "dir2/copy.txt").await.expect("get copy");
+        let copied = client
+            .get_object_bytes(&bucket, "dir2/copy.txt")
+            .await
+            .expect("get copy");
         assert_eq!(copied, b"hi there");
 
         // Presigned GET should be fetchable with no further credentials.
-        let url = client.presign_get(&bucket, "dir/hello.txt", 300).expect("presign");
-        let presigned = reqwest::get(&url).await.expect("fetch presigned").bytes().await.expect("bytes");
+        let url = client
+            .presign_get(&bucket, "dir/hello.txt", 300)
+            .expect("presign");
+        let presigned = reqwest::get(&url)
+            .await
+            .expect("fetch presigned")
+            .bytes()
+            .await
+            .expect("bytes");
         assert_eq!(&presigned[..], b"hi there");
 
         // Recursive delete removes everything under the prefix.
-        client.delete_prefix(&bucket, "dir/").await.expect("delete_prefix");
-        let after = client.list_objects(&bucket, "", None, 1000).await.expect("relist");
-        assert!(!after.entries.iter().any(|e| e.name == "dir"), "dir/ gone after delete_prefix");
+        client
+            .delete_prefix(&bucket, "dir/")
+            .await
+            .expect("delete_prefix");
+        let after = client
+            .list_objects(&bucket, "", None, 1000)
+            .await
+            .expect("relist");
+        assert!(
+            !after.entries.iter().any(|e| e.name == "dir"),
+            "dir/ gone after delete_prefix"
+        );
 
         // cleanup
-        client.delete_object(&bucket, "dir2/copy.txt").await.expect("del copy");
-        client.delete_object(&bucket, "emptydir/").await.expect("del marker");
+        client
+            .delete_object(&bucket, "dir2/copy.txt")
+            .await
+            .expect("del copy");
+        client
+            .delete_object(&bucket, "emptydir/")
+            .await
+            .expect("del marker");
         client.delete_bucket(&bucket).await.expect("del bucket");
     }
 
