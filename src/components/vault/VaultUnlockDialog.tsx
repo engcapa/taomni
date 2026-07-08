@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { useT } from "../../lib/i18n";
 
 export interface VaultUnlockDialogProps {
@@ -8,10 +14,20 @@ export interface VaultUnlockDialogProps {
   reason?: string;
 }
 
+const FOCUSABLE_SELECTOR = [
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "a[href]",
+  "[tabindex]:not([tabindex='-1'])",
+].join(", ");
+
 export function VaultUnlockDialog({ onCancel, onSubmit, reason }: VaultUnlockDialogProps) {
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const t = useT();
 
@@ -37,7 +53,13 @@ export function VaultUnlockDialog({ onCancel, onSubmit, reason }: VaultUnlockDia
     }
   };
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+  const handleBackdropMouseDown = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return;
+    event.preventDefault();
+    inputRef.current?.focus();
+  };
+
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
       event.stopPropagation();
       onCancel();
@@ -47,20 +69,49 @@ export function VaultUnlockDialog({ onCancel, onSubmit, reason }: VaultUnlockDia
         event.preventDefault();
         void handleSubmit();
       }
+    } else if (event.key === "Tab") {
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      ).filter((element) => element.getAttribute("aria-hidden") !== "true");
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialog.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (!active || !dialog.contains(active)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
   };
 
   return (
     <div
+      data-testid="vault-unlock-backdrop"
       className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ background: "rgba(0,0,0,0.4)" }}
-      onClick={onCancel}
+      onMouseDown={handleBackdropMouseDown}
       onKeyDown={handleKeyDown}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-label={t("vault.unlockTitle")}
         aria-modal="true"
+        tabIndex={-1}
         data-testid="vault-unlock-dialog"
         className="w-[420px] rounded shadow-lg p-4"
         style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
