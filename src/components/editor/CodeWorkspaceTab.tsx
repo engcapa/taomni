@@ -10,7 +10,6 @@ import {
   type ReactNode,
 } from "react";
 import DOMPurify from "dompurify";
-import mermaid from "mermaid";
 import { EditorState, Compartment, type Extension, type Text } from "@codemirror/state";
 import {
   Decoration,
@@ -220,7 +219,10 @@ const CODE_WORKSPACE_MAX_FONT_SIZE = 32;
 const CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE = 12;
 const CODE_WORKSPACE_MIN_TREE_FONT_SIZE = 10;
 const CODE_WORKSPACE_MAX_TREE_FONT_SIZE = 20;
+type MermaidApi = typeof import("mermaid").default;
+
 let mermaidReady = false;
+let mermaidPromise: Promise<MermaidApi> | null = null;
 
 interface LspCustomCommandConfig {
   command: string;
@@ -274,14 +276,26 @@ function hashString(value: string): string {
   return Math.abs(hash).toString(36);
 }
 
-function ensureMermaidReady(): void {
-  if (mermaidReady) return;
+function loadMermaid(): Promise<MermaidApi> {
+  mermaidPromise ??= import("mermaid")
+    .then((mod) => mod.default)
+    .catch((err) => {
+      mermaidPromise = null;
+      throw err;
+    });
+  return mermaidPromise;
+}
+
+async function ensureMermaidReady(): Promise<MermaidApi> {
+  const mermaid = await loadMermaid();
+  if (mermaidReady) return mermaid;
   mermaid.initialize({
     startOnLoad: false,
     securityLevel: "strict",
     theme: "default",
   });
   mermaidReady = true;
+  return mermaid;
 }
 
 function downloadBlob(blob: Blob, fileName: string): void {
@@ -3112,8 +3126,23 @@ function MarkdownPreview({
     const blocks = Array.from(root.querySelectorAll("pre > code.language-mermaid, pre > code.lang-mermaid"));
     if (blocks.length === 0) return;
     let cancelled = false;
-    ensureMermaidReady();
-    blocks.forEach((block, index) => {
+
+    const renderError = (block: Element, index: number, message: string) => {
+      const pre = block.parentElement;
+      if (!pre) return;
+      const wrapper = document.createElement("div");
+      wrapper.className = "my-3 border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)]";
+      const label = document.createElement("div");
+      label.className = "h-8 flex items-center border-b border-[var(--taomni-code-border)] px-2 text-[11px] font-semibold text-[var(--taomni-code-muted)]";
+      label.textContent = `Mermaid ${index + 1}`;
+      const error = document.createElement("div");
+      error.className = "p-3 text-[12px] text-red-500";
+      error.textContent = message;
+      wrapper.append(label, error);
+      pre.replaceWith(wrapper);
+    };
+
+    const renderBlock = (mermaid: MermaidApi, block: Element, index: number) => {
       const source = block.textContent ?? "";
       const pre = block.parentElement;
       if (!pre) return;
@@ -3156,7 +3185,18 @@ function MarkdownPreview({
           diagram.className = "p-3 text-[12px] text-red-500";
           diagram.textContent = errorMessage(err);
         });
-    });
+    };
+
+    void ensureMermaidReady()
+      .then((mermaid) => {
+        if (cancelled) return;
+        blocks.forEach((block, index) => renderBlock(mermaid, block, index));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        blocks.forEach((block, index) => renderError(block, index, errorMessage(err)));
+      });
+
     return () => {
       cancelled = true;
     };
