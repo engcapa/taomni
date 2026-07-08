@@ -49,4 +49,16 @@ describe("VaultUnlockDialog", () => {
     await user.keyboard("{Escape}");
     expect(onCancel).toHaveBeenCalled();
   });
+
+  it("does not cancel when the backdrop is clicked", async () => {
+    const onCancel = vi.fn();
+    const user = userEvent.setup();
+    render(<VaultUnlockDialog onCancel={onCancel} onSubmit={async () => undefined} />);
+
+    await user.click(screen.getByTestId("vault-unlock-backdrop"));
+
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(screen.getByTestId("vault-unlock-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("vault-unlock-pw")).toHaveFocus();
+  });
 });
