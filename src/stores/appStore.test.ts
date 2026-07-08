@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { computeNewTerminalTitle, recentWorkspaceIdFromParts, useAppStore, type CodeWorkspaceContext } from "./appStore";
+import {
+  VAULT_UNLOCK_MODE_KEY,
+  computeNewTerminalTitle,
+  recentWorkspaceIdFromParts,
+  useAppStore,
+  type CodeWorkspaceContext,
+} from "./appStore";
 import type { RecentWorkspace, Tab } from "../types";
 
 const tab = (id: string, overrides: Partial<Tab> = {}): Tab => ({
@@ -288,6 +294,19 @@ describe("appStore.uiAppearance", () => {
 
     useAppStore.getState().setWelcomeRecentSessionLimit(-5);
     expect(useAppStore.getState().welcomeRecentSessionLimit).toBe(1);
+  });
+
+  it("allows setting and persisting the vault unlock mode", () => {
+    useAppStore.setState({ vaultUnlockMode: "startup" });
+    window.localStorage.removeItem(VAULT_UNLOCK_MODE_KEY);
+
+    useAppStore.getState().setVaultUnlockMode("on-demand");
+    expect(useAppStore.getState().vaultUnlockMode).toBe("on-demand");
+    expect(window.localStorage.getItem(VAULT_UNLOCK_MODE_KEY)).toBe("on-demand");
+
+    useAppStore.getState().setVaultUnlockMode("startup");
+    expect(useAppStore.getState().vaultUnlockMode).toBe("startup");
+    expect(window.localStorage.getItem(VAULT_UNLOCK_MODE_KEY)).toBe("startup");
   });
 });
 
