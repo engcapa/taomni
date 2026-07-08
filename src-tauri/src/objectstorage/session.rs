@@ -13,6 +13,10 @@ use super::s3::S3Client;
 use super::types::{BucketEntry, ObjectListPage, ObjectMetadata};
 use crate::filebrowser::transfer::TransferHandle;
 
+fn clean_storage_class(value: Option<&str>) -> Option<&str> {
+    value.map(str::trim).filter(|v| !v.is_empty())
+}
+
 /// Per-engine client handle.
 pub enum OssHandle {
     S3(S3Client),
@@ -71,7 +75,12 @@ impl ObjectStorageSession {
         }
     }
 
-    pub async fn put_object_bytes(&self, bucket: &str, key: &str, data: Vec<u8>) -> Result<(), String> {
+    pub async fn put_object_bytes(
+        &self,
+        bucket: &str,
+        key: &str,
+        data: Vec<u8>,
+    ) -> Result<(), String> {
         match &self.handle {
             OssHandle::S3(c) => c.put_object_bytes(bucket, key, data).await,
             OssHandle::Azure(c) => c.put_object_bytes(bucket, key, data).await,
@@ -108,8 +117,14 @@ impl ObjectStorageSession {
         dst_key: &str,
     ) -> Result<(), String> {
         match &self.handle {
-            OssHandle::S3(c) => c.copy_object(src_bucket, src_key, dst_bucket, dst_key).await,
-            OssHandle::Azure(c) => c.copy_object(src_bucket, src_key, dst_bucket, dst_key).await,
+            OssHandle::S3(c) => {
+                c.copy_object(src_bucket, src_key, dst_bucket, dst_key)
+                    .await
+            }
+            OssHandle::Azure(c) => {
+                c.copy_object(src_bucket, src_key, dst_bucket, dst_key)
+                    .await
+            }
         }
     }
 
@@ -121,7 +136,8 @@ impl ObjectStorageSession {
         dst_bucket: &str,
         dst_key: &str,
     ) -> Result<(), String> {
-        self.copy_object(src_bucket, src_key, dst_bucket, dst_key).await?;
+        self.copy_object(src_bucket, src_key, dst_bucket, dst_key)
+            .await?;
         self.delete_object(src_bucket, src_key).await
     }
 
@@ -144,10 +160,12 @@ impl ObjectStorageSession {
     ) -> Result<(), String> {
         match &self.handle {
             OssHandle::S3(c) => {
-                c.download_to_file(bucket, key, dest, transfer_id, handle, app).await
+                c.download_to_file(bucket, key, dest, transfer_id, handle, app)
+                    .await
             }
             OssHandle::Azure(c) => {
-                c.download_to_file(bucket, key, dest, transfer_id, handle, app).await
+                c.download_to_file(bucket, key, dest, transfer_id, handle, app)
+                    .await
             }
         }
     }
@@ -163,13 +181,16 @@ impl ObjectStorageSession {
         app: &AppHandle<R>,
     ) -> Result<(), String> {
         // Per-upload override, else the session's configured default.
-        let sc = storage_class.or(self.default_storage_class.as_deref());
+        let sc = clean_storage_class(storage_class)
+            .or_else(|| clean_storage_class(self.default_storage_class.as_deref()));
         match &self.handle {
             OssHandle::S3(c) => {
-                c.upload_from_file(local, bucket, key, sc, transfer_id, handle, app).await
+                c.upload_from_file(local, bucket, key, sc, transfer_id, handle, app)
+                    .await
             }
             OssHandle::Azure(c) => {
-                c.upload_from_file(local, bucket, key, sc, transfer_id, handle, app).await
+                c.upload_from_file(local, bucket, key, sc, transfer_id, handle, app)
+                    .await
             }
         }
     }
@@ -201,5 +222,18 @@ impl ObjectStorageSession {
             OssHandle::S3(c) => c.ping(default).await,
             OssHandle::Azure(c) => c.ping(default).await,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clean_storage_class_ignores_empty_values() {
+        assert_eq!(clean_storage_class(None), None);
+        assert_eq!(clean_storage_class(Some("")), None);
+        assert_eq!(clean_storage_class(Some("   ")), None);
+        assert_eq!(clean_storage_class(Some(" STANDARD ")), Some("STANDARD"));
     }
 }

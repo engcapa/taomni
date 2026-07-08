@@ -96,6 +96,7 @@ import { RdpOptionsForm } from "./forms/RdpOptionsForm";
 import {
   ObjectStorageSettings,
   ossFormFromOptions,
+  ossFormToConfig,
   type OssFormState,
 } from "./ObjectStorageSettings";
 import { engineForProvider } from "../../types/objectStorage";
@@ -2870,27 +2871,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       : {};
     const ossOverrides: Record<string, unknown> =
       proto === "S3"
-        ? (ossConfigValue ?? {
-            provider: oss.provider,
-            endpoint: oss.endpoint,
-            region: oss.region,
-            pathStyle: oss.pathStyle,
-            accessKeyId: oss.accessKeyId,
-            secretAccessKey: oss.secretAccessKey,
-            sessionToken: oss.sessionToken,
-            defaultBucket: oss.defaultBucket,
-            awsAuth: oss.awsAuth,
-            awsProfile: oss.awsProfile,
-            accountName: oss.accountName,
-            accountKey: oss.accountKey,
-            connectionString: oss.connectionString,
-            sasToken: oss.sasToken,
-            endpointSuffix: oss.endpointSuffix,
-            defaultContainer: oss.defaultContainer,
-            azureAuth: oss.azureAuth,
-            azureBearerToken: oss.azureBearerToken,
-            storageClass: oss.storageClass,
-          })
+        ? (ossConfigValue ?? { ...ossFormToConfig(oss) })
         : {};
     const hbaseOverrides: Record<string, unknown> = isHBase
       ? {
@@ -3282,27 +3263,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       }
       const next: OssFormState = { ...oss, ...(resolved as Partial<OssFormState>) };
       setOss(next);
-      ossConfigValue = {
-        provider: next.provider,
-        endpoint: next.endpoint,
-        region: next.region,
-        pathStyle: next.pathStyle,
-        accessKeyId: next.accessKeyId,
-        secretAccessKey: next.secretAccessKey,
-        sessionToken: next.sessionToken,
-        defaultBucket: next.defaultBucket,
-        awsAuth: next.awsAuth,
-        awsProfile: next.awsProfile,
-        accountName: next.accountName,
-        accountKey: next.accountKey,
-        connectionString: next.connectionString,
-        sasToken: next.sasToken,
-        endpointSuffix: next.endpointSuffix,
-        defaultContainer: next.defaultContainer,
-        azureAuth: next.azureAuth,
-        azureBearerToken: next.azureBearerToken,
-        storageClass: next.storageClass,
-      };
+      ossConfigValue = { ...ossFormToConfig(next) };
     }
 
     const config = buildConfig({
