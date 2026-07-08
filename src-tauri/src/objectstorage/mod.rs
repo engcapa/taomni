@@ -51,6 +51,14 @@ fn resolve(state: &State<'_, AppState>, value: &Option<String>) -> Result<Option
     }
 }
 
+fn clean_storage_class(value: &Option<String>) -> Option<String> {
+    value
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(ToOwned::to_owned)
+}
+
 /// Build a live session from a connection config (credential resolution +
 /// client construction). Does not insert it into the registry.
 async fn build_session(
@@ -67,7 +75,7 @@ async fn build_session(
                 default_location: config.default_container.clone(),
                 cancel: CancellationToken::new(),
                 forward_task,
-                default_storage_class: config.storage_class.clone(),
+                default_storage_class: clean_storage_class(&config.storage_class),
             })
         }
         _ => {
@@ -75,9 +83,7 @@ async fn build_session(
             // (vault-resolved), environment, or a shared-config profile.
             let creds = match config.aws_auth.as_deref() {
                 Some("environment") => credentials::from_environment()?,
-                Some("profile") => {
-                    credentials::from_profile(config.aws_profile.as_deref()).await?
-                }
+                Some("profile") => credentials::from_profile(config.aws_profile.as_deref()).await?,
                 _ => {
                     let key = resolve(state, &config.access_key_id)?
                         .ok_or("access key id is required")?;
@@ -111,7 +117,7 @@ async fn build_session(
                 default_location,
                 cancel: CancellationToken::new(),
                 forward_task,
-                default_storage_class: config.storage_class.clone(),
+                default_storage_class: clean_storage_class(&config.storage_class),
             })
         }
     }
@@ -304,8 +310,13 @@ pub async fn storage_list_objects(
     state: State<'_, AppState>,
 ) -> Result<ObjectListPage, String> {
     let sess = get_session(&state, &session_id).await?;
-    sess.list_objects(&bucket, prefix.as_deref().unwrap_or(""), continuation.as_deref(), 1000)
-        .await
+    sess.list_objects(
+        &bucket,
+        prefix.as_deref().unwrap_or(""),
+        continuation.as_deref(),
+        1000,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -367,7 +378,10 @@ pub async fn storage_create_bucket(
     bucket: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    get_session(&state, &session_id).await?.create_bucket(&bucket).await
+    get_session(&state, &session_id)
+        .await?
+        .create_bucket(&bucket)
+        .await
 }
 
 #[tauri::command]
@@ -376,7 +390,10 @@ pub async fn storage_delete_bucket(
     bucket: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    get_session(&state, &session_id).await?.delete_bucket(&bucket).await
+    get_session(&state, &session_id)
+        .await?
+        .delete_bucket(&bucket)
+        .await
 }
 
 /// Recursively delete a "folder" (everything under `prefix`).
@@ -400,7 +417,10 @@ pub async fn storage_head_object(
     key: String,
     state: State<'_, AppState>,
 ) -> Result<ObjectMetadata, String> {
-    get_session(&state, &session_id).await?.head_object(&bucket, &key).await
+    get_session(&state, &session_id)
+        .await?
+        .head_object(&bucket, &key)
+        .await
 }
 
 #[tauri::command]
@@ -473,7 +493,10 @@ pub async fn storage_download(
         Ok(_) => ft::CompletePayload::ok(Some(final_path)),
         Err(e) => ft::CompletePayload::err(e),
     };
-    let _ = app_handle.emit(&format!("storage-transfer-complete-{}", transfer_id), payload);
+    let _ = app_handle.emit(
+        &format!("storage-transfer-complete-{}", transfer_id),
+        payload,
+    );
     result
 }
 
@@ -509,24 +532,36 @@ pub async fn storage_upload(
         Ok(_) => ft::CompletePayload::ok(Some(key.clone())),
         Err(e) => ft::CompletePayload::err(e),
     };
-    let _ = app_handle.emit(&format!("storage-transfer-complete-{}", transfer_id), payload);
+    let _ = app_handle.emit(
+        &format!("storage-transfer-complete-{}", transfer_id),
+        payload,
+    );
     result
 }
 
 #[tauri::command]
-pub async fn storage_cancel_transfer(transfer_id: String, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn storage_cancel_transfer(
+    transfer_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     ft::cancel(&state, &transfer_id).await;
     Ok(())
 }
 
 #[tauri::command]
-pub async fn storage_pause_transfer(transfer_id: String, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn storage_pause_transfer(
+    transfer_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     ft::pause(&state, &transfer_id).await;
     Ok(())
 }
 
 #[tauri::command]
-pub async fn storage_resume_transfer(transfer_id: String, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn storage_resume_transfer(
+    transfer_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     ft::resume(&state, &transfer_id).await;
     Ok(())
 }
