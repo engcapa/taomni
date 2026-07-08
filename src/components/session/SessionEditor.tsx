@@ -300,8 +300,28 @@ function normalizeMailOAuthFlow(value: unknown): MailOAuthFlow | null {
   return null;
 }
 
+function defaultMailOAuthFlow(provider: MailProvider): MailOAuthFlow {
+  return provider === "outlook" ? "device" : "browser";
+}
+
+function supportsMailOAuthProvider(provider: MailProvider): provider is "gmail" | "outlook" {
+  return provider === "gmail" || provider === "outlook";
+}
+
+function effectiveMailOAuthFlow(provider: MailProvider, flow: MailOAuthFlow): MailOAuthFlow {
+  return supportsMailOAuthProvider(provider) && flow === "device" ? "device" : "browser";
+}
+
+function mailOAuthClientSecretVisible(provider: MailProvider, flow: MailOAuthFlow): boolean {
+  return !(provider === "outlook" && effectiveMailOAuthFlow(provider, flow) === "device");
+}
+
+function mailOAuthClientSecretRequired(provider: MailProvider, flow: MailOAuthFlow): boolean {
+  return provider === "gmail" && effectiveMailOAuthFlow(provider, flow) === "device";
+}
+
 function initialMailOAuthFlow(options: Record<string, unknown>, provider: MailProvider): MailOAuthFlow {
-  return normalizeMailOAuthFlow(options.mailOauthFlow) ?? (provider === "outlook" ? "device" : "browser");
+  return normalizeMailOAuthFlow(options.mailOauthFlow) ?? defaultMailOAuthFlow(provider);
 }
 
 function initialMailProvider(options: Record<string, unknown>, imapHost: string | undefined): MailProvider {
@@ -1385,11 +1405,18 @@ function MailSettings({
   vaultState: "empty" | "locked" | "unlocked";
 }) {
   const isOAuth = authMode === "oauth2";
-  const oauthSupported = provider === "gmail" || provider === "outlook";
-  const usesDeviceCode = provider === "outlook" && oauthFlow === "device";
+  const oauthSupported = supportsMailOAuthProvider(provider);
+  const effectiveOauthFlow = effectiveMailOAuthFlow(provider, oauthFlow);
+  const usesDeviceCode = oauthSupported && effectiveOauthFlow === "device";
+  const showClientSecret = mailOAuthClientSecretVisible(provider, effectiveOauthFlow);
   const oauthConnectLabel = usesDeviceCode
     ? (oauthConnecting ? "Waiting for approval..." : oauthTokenRef ? "Reconnect device code" : "Start device code")
     : (oauthConnecting ? "Connecting..." : oauthTokenRef ? "Reconnect OAuth2" : "Connect OAuth2");
+  const oauthClientSecretPlaceholder = (() => {
+    if (oauthClientSecretRef) return "Saved in vault";
+    if (mailOAuthClientSecretRequired(provider, effectiveOauthFlow)) return "Google device client secret";
+    return "Optional for public clients";
+  })();
   const oauthExpiresLabel = (() => {
     const seconds = Number.parseInt(oauthExpiresAt, 10);
     if (!Number.isFinite(seconds) || seconds <= 0) return "";
@@ -1451,14 +1478,14 @@ function MailSettings({
 
       {isOAuth && (
         <>
-          {provider === "outlook" && (
+          {oauthSupported && (
             <Field label="OAuth flow">
               <Select
                 value={oauthFlow}
                 className="w-44"
                 ariaLabel="OAuth flow"
                 options={MAIL_OAUTH_FLOW_OPTIONS}
-                onChange={(value) => setOauthFlow(normalizeMailOAuthFlow(value) ?? "device")}
+                onChange={(value) => setOauthFlow(normalizeMailOAuthFlow(value) ?? defaultMailOAuthFlow(provider))}
               />
             </Field>
           )}
@@ -1471,14 +1498,14 @@ function MailSettings({
               onChange={(e) => setOauthClientId(e.target.value)}
             />
           </Field>
-          {!usesDeviceCode && (
+          {showClientSecret && (
             <Field label="OAuth client secret">
               <input
                 className="taomni-input w-64"
                 type="password"
                 value={oauthClientSecret}
                 aria-label="OAuth client secret"
-                placeholder={oauthClientSecretRef ? "Saved in vault" : "Optional for public clients"}
+                placeholder={oauthClientSecretPlaceholder}
                 onChange={(e) => {
                   setOauthClientSecret(e.target.value);
                   if (oauthClientSecretRef) clearOauthClientSecretRef();
@@ -2697,7 +2724,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const handleMailProviderChange = (provider: MailProvider) => {
     setMailProvider(provider);
     setMailAuthMode(provider === "custom" ? "password" : "oauth2");
-    setMailOauthFlow(provider === "outlook" ? "device" : "browser");
+    setMailOauthFlow(defaultMailOAuthFlow(provider));
     setMailOauthDeviceInfo(null);
     setMailOauthStatus(null);
     const preset = MAIL_PROVIDER_PRESETS[provider];
@@ -2802,7 +2829,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       ? { proxyKind, testUrl: proxyTestUrl }
       : {};
     const mailOauthExpiresAtNumber = Number.parseInt(mailOauthExpiresAtValue, 10);
-    const effectiveMailOauthFlow = mailProvider === "outlook" && mailOauthFlow === "device" ? "device" : "browser";
+    const effectiveMailOauthFlow = effectiveMailOAuthFlow(mailProvider, mailOauthFlow);
+    const persistMailOauthClientSecret = mailOAuthClientSecretVisible(mailProvider, effectiveMailOauthFlow);
     const mailOverrides: Record<string, unknown> = isMail
       ? {
           mailProvider,
@@ -2810,7 +2838,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           mailOauthFlow: mailAuthMode === "oauth2" ? effectiveMailOauthFlow : "browser",
           mailOauthClientId: mailAuthMode === "oauth2" ? mailOauthClientId : "",
           mailOauthClientSecretRef:
-            mailAuthMode === "oauth2" && effectiveMailOauthFlow !== "device"
+            mailAuthMode === "oauth2" && persistMailOauthClientSecret
               ? mailOauthClientSecretRefValue
               : "",
           mailOauthTokenRef: mailAuthMode === "oauth2" ? mailOauthTokenRefValue : "",
@@ -2987,6 +3015,14 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       if (mailAuthMode === "oauth2") {
         if (mailProvider === "custom") return "OAuth2 mail auth requires Gmail or Outlook provider.";
         if (!mailOauthClientId.trim()) return "OAuth2 client ID is required.";
+        if (mailOAuthClientSecretRequired(mailProvider, mailOauthFlow)) {
+          if (!mailOauthClientSecretRef.trim() && !mailOauthClientSecret.trim()) {
+            return "Gmail device code requires an OAuth2 client secret.";
+          }
+          if (!mailOauthClientSecretRef.trim() && mailOauthClientSecret.trim() && !mailOauthClientSecretSaveInVault) {
+            return "Gmail device code client secret must be saved in the vault.";
+          }
+        }
         if (!mailOauthTokenRef.trim()) return "OAuth2 token is required. Use Connect OAuth2 first.";
       } else {
         if (!saveInVault) return "Mail credentials must be saved in the vault.";
@@ -3171,7 +3207,8 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     }
 
     let nextMailOauthClientSecretRef = mailOauthClientSecretRef;
-    if (isMail && mailAuthMode === "oauth2" && mailProvider === "outlook" && mailOauthFlow === "device") {
+    const effectiveMailOauthFlowForSave = effectiveMailOAuthFlow(mailProvider, mailOauthFlow);
+    if (isMail && mailAuthMode === "oauth2" && !mailOAuthClientSecretVisible(mailProvider, effectiveMailOauthFlowForSave)) {
       nextMailOauthClientSecretRef = "";
       setMailOauthClientSecretRef("");
       setMailOauthClientSecret("");
@@ -3528,16 +3565,24 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
   const handleMailOAuthConnect = async () => {
     setMailOauthStatus(null);
-    if (mailProvider !== "gmail" && mailProvider !== "outlook") {
+    if (!supportsMailOAuthProvider(mailProvider)) {
       setMailOauthStatus({ ok: false, msg: "Select Gmail or Outlook first." });
       return;
     }
+    const oauthProvider = mailProvider;
+    const oauthProviderLabel = oauthProvider === "gmail" ? "Gmail" : "Outlook";
+    const selectedMailOauthFlow = effectiveMailOAuthFlow(oauthProvider, mailOauthFlow);
     if (!username.trim()) {
       setMailOauthStatus({ ok: false, msg: "Enter the mail email address first." });
       return;
     }
     if (!mailOauthClientId.trim()) {
       setMailOauthStatus({ ok: false, msg: "Enter the OAuth2 client ID first." });
+      return;
+    }
+    const oauthClientSecretValue = mailOauthClientSecret || mailOauthClientSecretRef || null;
+    if (mailOAuthClientSecretRequired(oauthProvider, selectedMailOauthFlow) && !oauthClientSecretValue) {
+      setMailOauthStatus({ ok: false, msg: "Enter the OAuth2 client secret first." });
       return;
     }
     const ready = await ensureVaultReady(t("vault.gateReasonSession"));
@@ -3554,11 +3599,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         networkSettings.proxyKind !== "none"
           ? toNetworkSettingsPayload(networkSettings)
           : null;
-      const result = mailProvider === "outlook" && mailOauthFlow === "device"
+      const result = selectedMailOauthFlow === "device"
         ? await (async () => {
             const device = await mailOAuthDeviceStart({
               sessionId,
-              provider: "outlook",
+              provider: oauthProvider,
               emailAddress: username.trim(),
               clientId: mailOauthClientId.trim(),
               networkSettings: networkPayload,
@@ -3571,25 +3616,26 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
             });
             setMailOauthStatus({
               ok: true,
-              msg: `Enter code ${device.userCode} to approve Outlook access.`,
+              msg: `Enter code ${device.userCode} to approve ${oauthProviderLabel} access.`,
             });
             return mailOAuthDeviceComplete({
               sessionId,
-              provider: "outlook",
+              provider: oauthProvider,
               emailAddress: username.trim(),
               clientId: mailOauthClientId.trim(),
+              clientSecret: oauthProvider === "gmail" ? oauthClientSecretValue : null,
               deviceCode: device.deviceCode,
               interval: device.interval,
               expiresIn: device.expiresIn,
               networkSettings: networkPayload,
             });
-          })()
+        })()
         : await mailOAuthAuthorize({
             sessionId,
-            provider: mailProvider,
+            provider: oauthProvider,
             emailAddress: username.trim(),
             clientId: mailOauthClientId.trim(),
-            clientSecret: mailOauthClientSecret || mailOauthClientSecretRef || null,
+            clientSecret: oauthClientSecretValue,
             networkSettings: networkPayload,
           });
       setMailAuthMode("oauth2");

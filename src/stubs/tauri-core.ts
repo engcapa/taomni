@@ -2146,10 +2146,12 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       } as T;
     }
     case "mail_oauth_device_start": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const provider = (invokeArgs?.request as { provider?: string } | undefined)?.provider;
       return {
         deviceCode: "stub-device-code",
         userCode: "ABCD-EFGH",
-        verificationUri: "https://microsoft.com/devicelogin",
+        verificationUri: provider === "gmail" ? "https://www.google.com/device" : "https://microsoft.com/devicelogin",
         message: "Open the verification URL and enter code ABCD-EFGH.",
         expiresIn: 900,
         interval: 1,
