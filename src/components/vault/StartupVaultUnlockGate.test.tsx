@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -52,6 +53,8 @@ describe("StartupVaultUnlockGate", () => {
     render(<StartupVaultUnlockGate>app</StartupVaultUnlockGate>);
 
     expect(await screen.findByTestId("vault-unlock-dialog")).toBeInTheDocument();
+    expect(screen.getByText("app")).toBeInTheDocument();
+    expect(screen.queryByTestId("vault-unlock-cancel")).not.toBeInTheDocument();
     expect(screen.getByTestId("vault-unlock-reason")).toHaveTextContent(
       /saved passwords available/i,
     );
@@ -63,6 +66,7 @@ describe("StartupVaultUnlockGate", () => {
     await waitFor(() =>
       expect(screen.queryByTestId("vault-unlock-dialog")).not.toBeInTheDocument(),
     );
+    expect(screen.getByText("app")).toBeInTheDocument();
   });
 
   it("does not prompt on startup when on-demand mode is selected", async () => {
@@ -73,6 +77,7 @@ describe("StartupVaultUnlockGate", () => {
 
     expect(vaultMock.refresh).not.toHaveBeenCalled();
     expect(screen.queryByTestId("vault-unlock-dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("app")).toBeInTheDocument();
   });
 
   it("does not force first-time setup when the vault is empty", async () => {
@@ -84,5 +89,53 @@ describe("StartupVaultUnlockGate", () => {
     await waitFor(() => expect(vaultMock.refresh).toHaveBeenCalled());
     expect(screen.queryByTestId("vault-unlock-dialog")).not.toBeInTheDocument();
     expect(screen.queryByTestId("vault-setup-dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("app")).toBeInTheDocument();
+  });
+
+  it("blocks the app while startup vault status is being checked", async () => {
+    appMock.vaultUnlockMode = "startup";
+    vaultMock.state = "unlocked";
+    let resolveRefresh: (() => void) | undefined;
+    vaultMock.refresh.mockImplementation(
+      () =>
+        new Promise<undefined>((resolve) => {
+          resolveRefresh = () => resolve(undefined);
+        }),
+    );
+
+    render(<StartupVaultUnlockGate>app</StartupVaultUnlockGate>);
+
+    expect(screen.getByTestId("startup-vault-check")).toBeInTheDocument();
+    expect(screen.getByText("app")).toBeInTheDocument();
+
+    resolveRefresh?.();
+    await waitFor(() => expect(screen.getByText("app")).toBeInTheDocument());
+    expect(screen.queryByTestId("startup-vault-check")).not.toBeInTheDocument();
+  });
+
+  it("does not get stuck on the loading screen under React StrictMode", async () => {
+    appMock.vaultUnlockMode = "startup";
+    vaultMock.state = "empty";
+    const resolveRefreshes: Array<() => void> = [];
+    vaultMock.refresh.mockImplementation(
+      () =>
+        new Promise<undefined>((resolve) => {
+          resolveRefreshes.push(() => resolve(undefined));
+        }),
+    );
+
+    render(
+      <StrictMode>
+        <StartupVaultUnlockGate>app</StartupVaultUnlockGate>
+      </StrictMode>,
+    );
+
+    expect(screen.getByTestId("startup-vault-check")).toBeInTheDocument();
+    expect(screen.getByText("app")).toBeInTheDocument();
+    await waitFor(() => expect(resolveRefreshes.length).toBeGreaterThanOrEqual(2));
+    resolveRefreshes.forEach((resolve) => resolve());
+
+    await waitFor(() => expect(screen.getByText("app")).toBeInTheDocument());
+    expect(screen.queryByTestId("startup-vault-check")).not.toBeInTheDocument();
   });
 });
