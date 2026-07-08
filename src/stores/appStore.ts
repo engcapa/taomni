@@ -14,6 +14,7 @@ import type { TabFilter } from "../lib/tabFilter";
 
 export type SideTab = "sessions" | "tools" | "macros";
 export type TerminalSplitLayout = "horizontal" | "vertical" | "grid";
+export type VaultUnlockMode = "startup" | "on-demand";
 
 export type DbObjectKind =
   | "table"
@@ -110,6 +111,7 @@ const SQL_ECHO_KEY = "taomni.sqlEcho";
 const SIDEBAR_COLLAPSED_KEY = "taomni.sidebarCollapsed";
 const WELCOME_RECENT_SESSION_LIMIT_KEY = "taomni.welcomeRecentSessionLimit";
 const RECENT_WORKSPACES_KEY = "taomni.recentWorkspaces.v1";
+export const VAULT_UNLOCK_MODE_KEY = "taomni.vaultUnlockMode";
 
 const DEFAULT_WELCOME_RECENT_SESSION_LIMIT = 20;
 const MIN_WELCOME_RECENT_SESSION_LIMIT = 1;
@@ -139,6 +141,7 @@ interface AppState {
   terminalSplitInputLockedTabIds: Set<string>;
   uiFontFamily: string;
   uiFontSize: number;
+  vaultUnlockMode: VaultUnlockMode;
   welcomeRecentSessionLimit: number;
   recentWorkspaces: RecentWorkspace[];
   recentWorkspaceIdByWorkspaceInstance: Record<string, string>;
@@ -232,6 +235,7 @@ interface AppState {
   setTabHasNewOutput: (tabId: string, hasNewOutput: boolean) => void;
   setUiFontFamily: (font: string) => void;
   setUiFontSize: (size: number) => void;
+  setVaultUnlockMode: (mode: VaultUnlockMode) => void;
   setWelcomeRecentSessionLimit: (limit: number) => void;
   upsertRecentWorkspace: (workspace: RecentWorkspace) => void;
   recordCodeWorkspaceTab: (tabId: string) => void;
@@ -332,6 +336,24 @@ function writeSqlEcho(enabled: boolean) {
     window.localStorage.setItem(SQL_ECHO_KEY, enabled ? "true" : "false");
   } catch {
     // Ignore storage failures; the toggle still applies for this run.
+  }
+}
+
+function readVaultUnlockMode(): VaultUnlockMode {
+  try {
+    const value = window.localStorage.getItem(VAULT_UNLOCK_MODE_KEY);
+    if (value === "on-demand") return "on-demand";
+    return "startup";
+  } catch {
+    return "startup";
+  }
+}
+
+function writeVaultUnlockMode(mode: VaultUnlockMode) {
+  try {
+    window.localStorage.setItem(VAULT_UNLOCK_MODE_KEY, mode);
+  } catch {
+    // Ignore storage failures; the current session still reflects the change.
   }
 }
 
@@ -826,6 +848,7 @@ export const useAppStore = create<AppState>((set) => ({
   terminalSplitInputLockedTabIds: new Set(),
   uiFontFamily: readUiFontFamily(),
   uiFontSize: readUiFontSize(),
+  vaultUnlockMode: readVaultUnlockMode(),
   welcomeRecentSessionLimit: initialWelcomeRecentSessionLimit,
   recentWorkspaces: readRecentWorkspaces(initialWelcomeRecentSessionLimit),
   recentWorkspaceIdByWorkspaceInstance: {},
@@ -1226,6 +1249,12 @@ export const useAppStore = create<AppState>((set) => ({
       const next = clampUiFontSize(size);
       writeUiFontSize(next);
       return { uiFontSize: next };
+    }),
+
+  setVaultUnlockMode: (mode) =>
+    set(() => {
+      writeVaultUnlockMode(mode);
+      return { vaultUnlockMode: mode };
     }),
 
   setWelcomeRecentSessionLimit: (limit) =>

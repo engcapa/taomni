@@ -37,7 +37,7 @@ describe("SettingsPanel", () => {
     ipcMocks.listSessions.mockReset();
     ipcMocks.listSessions.mockResolvedValue([]);
     window.localStorage.clear();
-    useAppStore.setState({ welcomeRecentSessionLimit: 20 });
+    useAppStore.setState({ vaultUnlockMode: "startup", welcomeRecentSessionLimit: 20 });
     setAppThemeMode("system");
     // jsdom has no layout engine; search scroll-to-match calls this.
     Element.prototype.scrollIntoView = vi.fn();
@@ -142,6 +142,22 @@ describe("SettingsPanel", () => {
 
     expect(useAppStore.getState().welcomeRecentSessionLimit).toBe(35);
     expect(window.localStorage.getItem("taomni.welcomeRecentSessionLimit")).toBe("35");
+  });
+
+  it("persists the credential vault unlock prompt mode", async () => {
+    const user = userEvent.setup();
+    render(<SettingsPanel />);
+
+    expect(screen.getByTestId("vault-unlock-mode-startup")).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByTestId("vault-unlock-mode-on-demand"));
+    expect(useAppStore.getState().vaultUnlockMode).toBe("on-demand");
+    expect(window.localStorage.getItem("taomni.vaultUnlockMode")).toBe("on-demand");
+    expect(screen.getByTestId("vault-unlock-mode-on-demand")).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByTestId("vault-unlock-mode-startup"));
+    expect(useAppStore.getState().vaultUnlockMode).toBe("startup");
+    expect(window.localStorage.getItem("taomni.vaultUnlockMode")).toBe("startup");
   });
 
   it("highlights settings matching the search query", async () => {

@@ -60,7 +60,7 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
   {
     id: "vault",
     titleKeys: ["vaultSettings.sectionTitle"],
-    terms: ["vault", "password", "secret", "master password", "credentials", "credential vault", "encryption", "密钥库", "保险库", "密码", "凭据", "主密码", "加密"],
+    terms: ["vault", "password", "secret", "master password", "credentials", "credential vault", "encryption", "unlock", "startup unlock", "on demand unlock", "密钥库", "保险库", "密码", "凭据", "主密码", "加密", "解锁", "启动解锁", "按需解锁"],
   },
   {
     id: "app-proxy",

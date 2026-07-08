@@ -17,6 +17,7 @@ import { isTauriRuntime, getAppPlatform } from "./lib/runtime";
 import { useAppStore } from "./stores/appStore";
 import { AppDialogProvider } from "./lib/appDialogs";
 import { VaultGateProvider } from "./lib/vaultGate";
+import { StartupVaultUnlockGate } from "./components/vault/StartupVaultUnlockGate";
 import { DEFAULT_TERMINAL_PROFILE } from "./lib/terminalProfile";
 
 function App() {
@@ -161,7 +162,9 @@ function App() {
 
   return (
     <AppDialogProvider>
-      <VaultGateProvider>{content}</VaultGateProvider>
+      <VaultGateProvider>
+        <StartupVaultUnlockGate>{content}</StartupVaultUnlockGate>
+      </VaultGateProvider>
     </AppDialogProvider>
   );
 }

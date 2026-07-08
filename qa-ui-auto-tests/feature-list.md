@@ -2252,11 +2252,12 @@ controls:
 id: F12.1
 status: done
 area: vault
-components: [VaultSettings, VaultSetupDialog, VaultUnlockDialog]
+components: [VaultSettings, VaultSetupDialog, VaultUnlockDialog, StartupVaultUnlockGate]
 files:
   - src/components/vault/VaultSettings.tsx
   - src/components/vault/VaultSetupDialog.tsx
   - src/components/vault/VaultUnlockDialog.tsx
+  - src/components/vault/StartupVaultUnlockGate.tsx
   - src/stores/vaultStore.ts
   - src-tauri/src/vault/
 controls:
@@ -2265,6 +2266,18 @@ controls:
     kind: display
   - id: state-badge
     selector: '[data-testid="vault-state-badge"]'
+    kind: display
+  - id: unlock-mode-setting
+    selector: '[data-testid="vault-unlock-mode-setting"]'
+    kind: display
+  - id: unlock-mode-startup
+    selector: '[data-testid="vault-unlock-mode-startup"]'
+    kind: interactive
+  - id: unlock-mode-on-demand
+    selector: '[data-testid="vault-unlock-mode-on-demand"]'
+    kind: interactive
+  - id: unlock-mode-hint
+    selector: '[data-testid="vault-unlock-mode-hint"]'
     kind: display
   - id: init-button
     selector: '[data-testid="vault-init-button"]'
@@ -2373,6 +2386,7 @@ controls:
 - **锁定**：一键锁定，从内存中清除密钥
 - **修改主密码**：输入旧密码 + 新密码（≥8 字符，二次确认）
 - **条目管理**：解锁后展示已保存条目列表，支持删除
+- **解锁提示时机**：Settings 中可选择启动时解锁（默认）或按需解锁
 - 会话编辑器 / 隧道编辑器中 "Save in vault" 复选框将密码加密存入保险库
 - 打开已保存密码的会话时自动触发解锁流程
 

@@ -4,6 +4,7 @@ import { VaultSetupDialog } from "./VaultSetupDialog";
 import { VaultUnlockDialog } from "./VaultUnlockDialog";
 import { VaultEntriesDialog } from "./VaultEntriesDialog";
 import { useT } from "../../lib/i18n";
+import { useAppStore } from "../../stores/appStore";
 
 type Action = null | "init" | "unlock" | "change-master";
 
@@ -19,6 +20,8 @@ export function VaultSettings() {
     changeMaster,
     reloadEntries,
   } = useVaultStore();
+  const vaultUnlockMode = useAppStore((s) => s.vaultUnlockMode);
+  const setVaultUnlockMode = useAppStore((s) => s.setVaultUnlockMode);
 
   const [action, setAction] = useState<Action>(null);
   const [oldPw, setOldPw] = useState("");
@@ -96,6 +99,56 @@ export function VaultSettings() {
 
       <div className="text-[12px] mb-4" style={{ color: "var(--taomni-text-muted)" }}>
         {t("vaultSettings.description")}
+      </div>
+
+      <div className="mb-4" data-testid="vault-unlock-mode-setting">
+        <div className="text-[12px] font-semibold mb-1">{t("vaultSettings.unlockModeTitle")}</div>
+        <div className="text-[11px] mb-2" style={{ color: "var(--taomni-text-muted)" }}>
+          {t("vaultSettings.unlockModeDescription")}
+        </div>
+        <div
+          role="group"
+          aria-label={t("vaultSettings.unlockModeTitle")}
+          className="inline-flex overflow-hidden rounded border"
+          style={{ borderColor: "var(--taomni-card-border)" }}
+        >
+          <button
+            type="button"
+            data-testid="vault-unlock-mode-startup"
+            aria-pressed={vaultUnlockMode === "startup"}
+            className="min-w-[116px] px-3 py-1.5 text-[12px] transition-colors"
+            style={{
+              background: vaultUnlockMode === "startup" ? "var(--taomni-accent)" : "transparent",
+              color: vaultUnlockMode === "startup" ? "white" : "var(--taomni-text)",
+            }}
+            onClick={() => setVaultUnlockMode("startup")}
+          >
+            {t("vaultSettings.unlockModeStartup")}
+          </button>
+          <button
+            type="button"
+            data-testid="vault-unlock-mode-on-demand"
+            aria-pressed={vaultUnlockMode === "on-demand"}
+            className="min-w-[116px] border-l px-3 py-1.5 text-[12px] transition-colors"
+            style={{
+              borderColor: "var(--taomni-card-border)",
+              background: vaultUnlockMode === "on-demand" ? "var(--taomni-accent)" : "transparent",
+              color: vaultUnlockMode === "on-demand" ? "white" : "var(--taomni-text)",
+            }}
+            onClick={() => setVaultUnlockMode("on-demand")}
+          >
+            {t("vaultSettings.unlockModeOnDemand")}
+          </button>
+        </div>
+        <div
+          className="mt-2 text-[11px]"
+          style={{ color: "var(--taomni-text-muted)" }}
+          data-testid="vault-unlock-mode-hint"
+        >
+          {vaultUnlockMode === "startup"
+            ? t("vaultSettings.unlockModeStartupHint")
+            : t("vaultSettings.unlockModeOnDemandHint")}
+        </div>
       </div>
 
       <div className="flex gap-2 mb-4">
