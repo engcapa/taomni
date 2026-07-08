@@ -134,7 +134,7 @@ export interface MailOAuthAuthorizeResult {
 
 export interface MailOAuthDeviceStartRequest {
   sessionId: string;
-  provider: "outlook";
+  provider: "gmail" | "outlook";
   emailAddress: string;
   clientId: string;
   networkSettings?: NetworkSettingsPayload | null;
@@ -151,9 +151,10 @@ export interface MailOAuthDeviceStartResult {
 
 export interface MailOAuthDeviceCompleteRequest {
   sessionId: string;
-  provider: "outlook";
+  provider: "gmail" | "outlook";
   emailAddress: string;
   clientId: string;
+  clientSecret?: string | null;
   deviceCode: string;
   interval?: number | null;
   expiresIn?: number | null;

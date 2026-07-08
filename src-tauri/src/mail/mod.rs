@@ -166,7 +166,7 @@ struct OAuthDeviceCodeResponse {
     device_code: String,
     #[serde(default)]
     user_code: String,
-    #[serde(default)]
+    #[serde(default, alias = "verification_url")]
     verification_uri: String,
     #[serde(default)]
     expires_in: Option<i64>,
@@ -220,6 +220,8 @@ pub struct MailOAuthDeviceCompleteRequest {
     pub provider: MailProvider,
     pub email_address: String,
     pub client_id: String,
+    #[serde(default)]
+    pub client_secret: Option<String>,
     pub device_code: String,
     #[serde(default)]
     pub interval: Option<i64>,
@@ -1000,7 +1002,8 @@ pub async fn mail_oauth_authorize(
         return Err("OAuth2 mail auth requires Gmail or Outlook provider".into());
     }
 
-    let listener = std::net::TcpListener::bind(("127.0.0.1", 0))
+    let bind_host = oauth_loopback_bind_host(request.provider)?;
+    let listener = std::net::TcpListener::bind((bind_host, 0))
         .map_err(|e| format!("OAuth callback listener failed: {e}"))?;
     listener
         .set_nonblocking(true)
@@ -1009,7 +1012,7 @@ pub async fn mail_oauth_authorize(
         .local_addr()
         .map_err(|e| format!("OAuth callback address failed: {e}"))?
         .port();
-    let redirect_uri = format!("http://127.0.0.1:{port}/mail/oauth/callback");
+    let redirect_uri = oauth_loopback_redirect_uri(request.provider, port)?;
     let state_token = random_urlsafe_token(32);
     let verifier = random_urlsafe_token(48);
     let challenge = pkce_challenge(&verifier);
@@ -1069,8 +1072,8 @@ pub async fn mail_oauth_device_start(
     if client_id.is_empty() {
         return Err("OAuth2 client ID is required".into());
     }
-    if request.provider != MailProvider::Outlook {
-        return Err("Device code authorization is currently supported for Outlook only".into());
+    if request.provider == MailProvider::Custom {
+        return Err("Device code authorization requires Gmail or Outlook provider".into());
     }
     let network_settings = prepare_mail_network(&state, request.network_settings.clone())?;
     let provider = request.provider;
@@ -1107,13 +1110,15 @@ pub async fn mail_oauth_device_complete(
     if client_id.is_empty() {
         return Err("OAuth2 client ID is required".into());
     }
-    if request.provider != MailProvider::Outlook {
-        return Err("Device code authorization is currently supported for Outlook only".into());
+    if request.provider == MailProvider::Custom {
+        return Err("Device code authorization requires Gmail or Outlook provider".into());
     }
     let device_code = request.device_code.trim().to_string();
     if device_code.is_empty() {
         return Err("OAuth2 device code is required".into());
     }
+    let client_secret =
+        resolve_secret(&state, request.client_secret.as_deref())?.and_then(non_empty);
     let network_settings = prepare_mail_network(&state, request.network_settings.clone())?;
     let provider = request.provider;
     let interval = request.interval.unwrap_or(5).max(1);
@@ -1122,6 +1127,7 @@ pub async fn mail_oauth_device_complete(
         complete_oauth_device_code_blocking(
             provider,
             &client_id,
+            client_secret.as_deref(),
             &device_code,
             interval,
             expires_in,
@@ -2271,12 +2277,20 @@ fn start_oauth_device_code_blocking(
 fn complete_oauth_device_code_blocking(
     provider: MailProvider,
     client_id: &str,
+    client_secret: Option<&str>,
     device_code: &str,
     interval: i64,
     expires_in: i64,
     network: Option<&NetworkSettings>,
 ) -> Result<OAuthTokenResponse, String> {
     let token_url = oauth_token_url(provider)?;
+    let client_secret = client_secret.and_then(non_empty_str);
+    if provider == MailProvider::Gmail && client_secret.is_none() {
+        return Err(
+            "Gmail device code authorization requires the OAuth client secret from a Google TV and Limited Input OAuth client"
+                .into(),
+        );
+    }
     let client = build_oauth_http_client_blocking(network)?;
     let deadline = Instant::now() + Duration::from_secs(expires_in.clamp(1, 3600) as u64);
     let mut poll_interval = Duration::from_secs(interval.clamp(1, 30) as u64);
@@ -2286,7 +2300,7 @@ fn complete_oauth_device_code_blocking(
             return Err("OAuth device code expired before authorization completed".into());
         }
 
-        let params = vec![
+        let mut params = vec![
             ("client_id", client_id.to_string()),
             (
                 "grant_type",
@@ -2294,6 +2308,9 @@ fn complete_oauth_device_code_blocking(
             ),
             ("device_code", device_code.to_string()),
         ];
+        if let Some(secret) = client_secret {
+            params.push(("client_secret", secret.to_string()));
+        }
         let response = client
             .post(token_url)
             .header(
@@ -2455,6 +2472,22 @@ fn oauth_form_body(params: &[(&str, String)]) -> String {
     serializer.finish()
 }
 
+fn oauth_loopback_bind_host(provider: MailProvider) -> Result<&'static str, String> {
+    match provider {
+        MailProvider::Gmail => Ok("127.0.0.1"),
+        MailProvider::Outlook => Ok("localhost"),
+        MailProvider::Custom => Err("OAuth2 mail auth requires Gmail or Outlook provider".into()),
+    }
+}
+
+fn oauth_loopback_redirect_uri(provider: MailProvider, port: u16) -> Result<String, String> {
+    match provider {
+        MailProvider::Gmail => Ok(format!("http://127.0.0.1:{port}")),
+        MailProvider::Outlook => Ok(format!("http://localhost:{port}")),
+        MailProvider::Custom => Err("OAuth2 mail auth requires Gmail or Outlook provider".into()),
+    }
+}
+
 fn build_oauth_authorize_url(
     provider: MailProvider,
     client_id: &str,
@@ -2574,10 +2607,13 @@ fn oauth_token_url(provider: MailProvider) -> Result<&'static str, String> {
 
 fn oauth_device_code_url(provider: MailProvider) -> Result<&'static str, String> {
     match provider {
+        MailProvider::Gmail => Ok("https://oauth2.googleapis.com/device/code"),
         MailProvider::Outlook => {
             Ok("https://login.microsoftonline.com/common/oauth2/v2.0/devicecode")
         }
-        _ => Err("Device code authorization is currently supported for Outlook only".into()),
+        MailProvider::Custom => {
+            Err("Device code authorization requires Gmail or Outlook provider".into())
+        }
     }
 }
 
@@ -4997,6 +5033,34 @@ mod tests {
         );
         assert!(message.starts_with(OAUTH_REAUTHORIZE_REQUIRED));
         assert!(message.contains("invalid_grant"));
+    }
+
+    #[test]
+    fn oauth_loopback_redirect_uri_is_provider_specific() {
+        assert_eq!(
+            oauth_loopback_redirect_uri(MailProvider::Gmail, 49152).as_deref(),
+            Ok("http://127.0.0.1:49152")
+        );
+        assert_eq!(
+            oauth_loopback_redirect_uri(MailProvider::Outlook, 49152).as_deref(),
+            Ok("http://localhost:49152")
+        );
+    }
+
+    #[test]
+    fn oauth_device_code_response_accepts_google_verification_url() {
+        let device = serde_json::from_str::<OAuthDeviceCodeResponse>(
+            r#"{
+                "device_code": "device",
+                "user_code": "ABCD-EFGH",
+                "verification_url": "https://www.google.com/device",
+                "expires_in": 900,
+                "interval": 5
+            }"#,
+        )
+        .expect("parse Google device code response");
+
+        assert_eq!(device.verification_uri, "https://www.google.com/device");
     }
 
     fn sample_resolved_account() -> ResolvedMailAccount {
