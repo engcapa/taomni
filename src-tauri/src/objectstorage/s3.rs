@@ -139,6 +139,12 @@ impl S3Client {
             if key == prefix {
                 continue;
             }
+            if let Some(entry) = folder_marker_entry(prefix, &key, c.size) {
+                if !entries.iter().any(|e| e.is_dir && e.key == entry.key) {
+                    entries.push(entry);
+                }
+                continue;
+            }
             let name = key.strip_prefix(prefix).unwrap_or(&key).to_string();
             entries.push(ObjectEntry {
                 name,
@@ -205,15 +211,28 @@ impl S3Client {
         key: &str,
         body: Vec<u8>,
     ) -> Result<(), String> {
-        let b = self.bucket(bucket)?;
-        let url = b.put_object(Some(&self.creds), key).sign(SIGN_TTL);
-        let resp = self
-            .http
-            .put(url)
-            .body(body)
-            .send()
+        self.put_object_bytes_with_headers(bucket, key, body, &[])
             .await
-            .map_err(net_err)?;
+    }
+
+    async fn put_object_bytes_with_headers(
+        &self,
+        bucket: &str,
+        key: &str,
+        body: Vec<u8>,
+        headers: &[(&str, &str)],
+    ) -> Result<(), String> {
+        let b = self.bucket(bucket)?;
+        let mut action = b.put_object(Some(&self.creds), key);
+        for (name, value) in headers {
+            action.headers_mut().insert(*name, (*value).to_string());
+        }
+        let url = action.sign(SIGN_TTL);
+        let mut req = self.http.put(url).body(body);
+        for (name, value) in headers {
+            req = req.header(*name, *value);
+        }
+        let resp = req.send().await.map_err(net_err)?;
         self.check(resp).await?;
         Ok(())
     }
@@ -276,7 +295,13 @@ impl S3Client {
     /// DeleteObjects API.
     pub async fn delete_prefix(&self, bucket: &str, prefix: &str) -> Result<(), String> {
         use futures::stream::{self, StreamExt};
-        let keys = self.list_all_keys(bucket, prefix).await?;
+        let marker = folder_marker_key(prefix);
+        let mut keys = self.list_all_keys(bucket, &marker).await?;
+        if !marker.is_empty() && !keys.iter().any(|k| k == &marker) {
+            keys.push(marker);
+        }
+        keys.sort();
+        keys.dedup();
         let results: Vec<Result<(), String>> = stream::iter(keys.into_iter().map(|k| {
             let bucket = bucket.to_string();
             async move { self.delete_object(&bucket, &k).await }
@@ -320,12 +345,14 @@ impl S3Client {
 
     /// Create a folder by writing a zero-byte object whose key ends in '/'.
     pub async fn create_folder(&self, bucket: &str, prefix: &str) -> Result<(), String> {
-        let key = if prefix.ends_with('/') {
-            prefix.to_string()
-        } else {
-            format!("{prefix}/")
-        };
-        self.put_object_bytes(bucket, &key, Vec::new()).await
+        let key = folder_marker_key(prefix);
+        self.put_object_bytes_with_headers(
+            bucket,
+            &key,
+            Vec::new(),
+            &[("content-type", "application/x-directory")],
+        )
+        .await
     }
 
     pub async fn create_bucket(&self, bucket: &str) -> Result<(), String> {
@@ -592,6 +619,36 @@ fn encode_key_path(key: &str) -> String {
         .join("/")
 }
 
+fn folder_marker_key(prefix: &str) -> String {
+    if prefix.is_empty() || prefix.ends_with('/') {
+        prefix.to_string()
+    } else {
+        format!("{prefix}/")
+    }
+}
+
+fn folder_marker_entry(prefix: &str, key: &str, size: u64) -> Option<ObjectEntry> {
+    if size != 0 || !key.ends_with('/') {
+        return None;
+    }
+    let name = key
+        .strip_prefix(prefix)
+        .unwrap_or(key)
+        .trim_end_matches('/');
+    if name.is_empty() || name.contains('/') {
+        return None;
+    }
+    Some(ObjectEntry {
+        name: name.to_string(),
+        key: key.to_string(),
+        is_dir: true,
+        size: 0,
+        last_modified: None,
+        etag: None,
+        storage_class: None,
+    })
+}
+
 fn decode_list_value(value: &str) -> String {
     urlencoding::decode(value)
         .map(|decoded| decoded.into_owned())
@@ -698,6 +755,88 @@ mod it {
             .expect("folder entry");
         assert_eq!(folder.key, "report/子目录/");
         assert_eq!(folder.name, "子目录");
+    }
+
+    #[test]
+    fn list_objects_treats_zero_byte_folder_markers_as_dirs() {
+        let input = r#"
+        <?xml version="1.0" encoding="UTF-8"?>
+        <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+            <Name>bucket</Name>
+            <Prefix></Prefix>
+            <KeyCount>2</KeyCount>
+            <MaxKeys>1000</MaxKeys>
+            <Delimiter>/</Delimiter>
+            <IsTruncated>false</IsTruncated>
+            <CommonPrefixes>
+                <Prefix>existing/</Prefix>
+            </CommonPrefixes>
+            <Contents>
+                <Key>empty/</Key>
+                <LastModified>2026-07-07T12:00:00.000Z</LastModified>
+                <ETag>"d41d8cd98f00b204e9800998ecf8427e"</ETag>
+                <Size>0</Size>
+                <StorageClass>STANDARD</StorageClass>
+            </Contents>
+            <Contents>
+                <Key>existing/</Key>
+                <LastModified>2026-07-07T12:00:00.000Z</LastModified>
+                <ETag>"d41d8cd98f00b204e9800998ecf8427e"</ETag>
+                <Size>0</Size>
+                <StorageClass>STANDARD</StorageClass>
+            </Contents>
+        </ListBucketResult>
+        "#;
+
+        let parsed = ListObjectsV2::parse_response(input).expect("parse list response");
+        let page = S3Client::list_response_to_page("", parsed);
+
+        let empty = page
+            .entries
+            .iter()
+            .find(|e| e.key == "empty/")
+            .expect("folder marker entry");
+        assert!(empty.is_dir);
+        assert_eq!(empty.name, "empty");
+        assert_eq!(
+            page.entries.iter().filter(|e| e.key == "existing/").count(),
+            1,
+            "common-prefix folder should not be duplicated by its marker object"
+        );
+    }
+
+    #[test]
+    fn list_objects_skips_current_folder_marker() {
+        let input = r#"
+        <?xml version="1.0" encoding="UTF-8"?>
+        <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+            <Name>bucket</Name>
+            <Prefix>empty/</Prefix>
+            <KeyCount>1</KeyCount>
+            <MaxKeys>1000</MaxKeys>
+            <Delimiter>/</Delimiter>
+            <IsTruncated>false</IsTruncated>
+            <Contents>
+                <Key>empty/</Key>
+                <LastModified>2026-07-07T12:00:00.000Z</LastModified>
+                <ETag>"d41d8cd98f00b204e9800998ecf8427e"</ETag>
+                <Size>0</Size>
+                <StorageClass>STANDARD</StorageClass>
+            </Contents>
+        </ListBucketResult>
+        "#;
+
+        let parsed = ListObjectsV2::parse_response(input).expect("parse list response");
+        let page = S3Client::list_response_to_page("empty/", parsed);
+
+        assert!(page.entries.is_empty());
+    }
+
+    #[test]
+    fn folder_marker_key_normalizes_trailing_slash() {
+        assert_eq!(folder_marker_key(""), "");
+        assert_eq!(folder_marker_key("empty"), "empty/");
+        assert_eq!(folder_marker_key("empty/"), "empty/");
     }
 
     /// End-to-end round trip against a live S3-compatible endpoint (MinIO in

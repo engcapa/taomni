@@ -39,8 +39,42 @@ function parentPrefix(key: string): string {
   return i < 0 ? "" : trimmed.slice(0, i + 1);
 }
 
+function folderMarkerKey(key: string): string {
+  return key.endsWith("/") ? key : `${key}/`;
+}
+
+function firstFolderSegment(name: string): string {
+  return name.trim().replace(/^[/\\]+/, "").split(/[\\/]/).filter(Boolean)[0] ?? "";
+}
+
+function remoteDirEntry(bucket: string, key: string, name: string): FileEntry {
+  return {
+    name,
+    path: `/${bucket}/${key}`,
+    size: 0,
+    mtime: Math.floor(Date.now() / 1000),
+    mode: 0,
+    fileType: "dir",
+    isHidden: false,
+  };
+}
+
+function remoteBucketEntry(name: string): FileEntry {
+  return {
+    name,
+    path: `/${name}`,
+    size: 0,
+    mtime: Math.floor(Date.now() / 1000),
+    mode: 0,
+    fileType: "dir",
+    isHidden: false,
+  };
+}
+
 export function useObjectStorageController(sessionId: string) {
   const refreshPane = useObjectStorageStore((s) => s.refreshPane);
+  const upsertRemoteEntry = useObjectStorageStore((s) => s.upsertRemoteEntry);
+  const removeRemoteEntries = useObjectStorageStore((s) => s.removeRemoteEntries);
   const setStatus = useAppStore((s) => s.setStatusMessage);
   const addTransfer = useTransferStore((s) => s.add);
   const patchTransfer = useTransferStore((s) => s.patch);
@@ -211,18 +245,32 @@ export function useObjectStorageController(sessionId: string) {
   const mkdir = useCallback(
     async (remoteParent: string, name: string) => {
       const { bucket, key: prefix } = splitRemote(remoteParent);
+      const cleanName = name.trim();
+      const folderName = cleanName.replace(/^[/\\]+|[/\\]+$/g, "");
+      const visibleName = firstFolderSegment(folderName);
+      if (!cleanName || (!bucket && !visibleName)) return;
       try {
         if (!bucket) {
-          await storageCreateBucket(sessionId, name);
+          await storageCreateBucket(sessionId, cleanName);
+          await refreshPane(sessionId, "remote");
+          upsertRemoteEntry(sessionId, remoteBucketEntry(cleanName));
         } else {
-          await storageCreateFolder(sessionId, bucket, `${prefix}${name}`);
+          if (!folderName) return;
+          const markerKey = folderMarkerKey(`${prefix}${folderName}`);
+          await storageCreateFolder(sessionId, bucket, markerKey);
+          await refreshPane(sessionId, "remote");
+          if (visibleName) {
+            upsertRemoteEntry(
+              sessionId,
+              remoteDirEntry(bucket, folderMarkerKey(`${prefix}${visibleName}`), visibleName),
+            );
+          }
         }
-        await refreshPane(sessionId, "remote");
       } catch (err) {
         setStatus(`Create failed: ${err instanceof Error ? err.message : err}`);
       }
     },
-    [refreshPane, sessionId, setStatus],
+    [refreshPane, sessionId, setStatus, upsertRemoteEntry],
   );
 
   const remove = useCallback(
@@ -237,11 +285,12 @@ export function useObjectStorageController(sessionId: string) {
           await storageDeleteObject(sessionId, bucket, key);
         }
         await refreshPane(sessionId, "remote");
+        removeRemoteEntries(sessionId, [entry.path]);
       } catch (err) {
         setStatus(`Delete failed: ${err instanceof Error ? err.message : err}`);
       }
     },
-    [refreshPane, sessionId, setStatus],
+    [refreshPane, removeRemoteEntries, sessionId, setStatus],
   );
 
   const rename = useCallback(

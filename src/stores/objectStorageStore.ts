@@ -121,6 +121,8 @@ interface ObjStorageStoreState {
   navigateHome: (sessionId: string, side: PaneSide) => Promise<void>;
   setSelection: (sessionId: string, side: PaneSide, selection: string[]) => void;
   toggleHidden: (sessionId: string, side: PaneSide) => void;
+  upsertRemoteEntry: (sessionId: string, entry: FileEntry) => void;
+  removeRemoteEntries: (sessionId: string, paths: string[]) => void;
 }
 
 function emptyPane(): PaneState {
@@ -154,6 +156,25 @@ function pushHistory(pane: PaneState, path: string): PaneState {
   const trimmed = pane.history.slice(0, pane.historyIndex + 1);
   trimmed.push(path);
   return { ...pane, history: trimmed, historyIndex: trimmed.length - 1 };
+}
+
+function upsertPaneEntry(pane: PaneState, entry: FileEntry): PaneState {
+  const idx = pane.entries.findIndex((e) => e.path === entry.path);
+  const entries =
+    idx >= 0
+      ? pane.entries.map((e, i) => (i === idx ? entry : e))
+      : [...pane.entries, entry];
+  return { ...pane, entries, error: null };
+}
+
+function removePaneEntries(pane: PaneState, paths: string[]): PaneState {
+  const remove = new Set(paths);
+  return {
+    ...pane,
+    entries: pane.entries.filter((e) => !remove.has(e.path)),
+    selection: pane.selection.filter((path) => !remove.has(path)),
+    error: null,
+  };
 }
 
 function errMsg(err: unknown): string {
@@ -412,6 +433,32 @@ export const useObjectStorageStore = create<ObjStorageStoreState>((set, get) => 
         sessions: {
           ...state.sessions,
           [sessionId]: { ...cur, [side]: { ...cur[side], showHidden: !cur[side].showHidden } },
+        },
+      };
+    });
+  },
+
+  upsertRemoteEntry: (sessionId, entry) => {
+    set((state) => {
+      const cur = state.sessions[sessionId];
+      if (!cur) return state;
+      return {
+        sessions: {
+          ...state.sessions,
+          [sessionId]: { ...cur, remote: upsertPaneEntry(cur.remote, entry) },
+        },
+      };
+    });
+  },
+
+  removeRemoteEntries: (sessionId, paths) => {
+    set((state) => {
+      const cur = state.sessions[sessionId];
+      if (!cur) return state;
+      return {
+        sessions: {
+          ...state.sessions,
+          [sessionId]: { ...cur, remote: removePaneEntries(cur.remote, paths) },
         },
       };
     });
