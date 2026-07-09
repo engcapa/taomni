@@ -211,28 +211,17 @@ impl S3Client {
         key: &str,
         body: Vec<u8>,
     ) -> Result<(), String> {
-        self.put_object_bytes_with_headers(bucket, key, body, &[])
-            .await
-    }
-
-    async fn put_object_bytes_with_headers(
-        &self,
-        bucket: &str,
-        key: &str,
-        body: Vec<u8>,
-        headers: &[(&str, &str)],
-    ) -> Result<(), String> {
+        let content_length = body.len();
         let b = self.bucket(bucket)?;
-        let mut action = b.put_object(Some(&self.creds), key);
-        for (name, value) in headers {
-            action.headers_mut().insert(*name, (*value).to_string());
-        }
-        let url = action.sign(SIGN_TTL);
-        let mut req = self.http.put(url).body(body);
-        for (name, value) in headers {
-            req = req.header(*name, *value);
-        }
-        let resp = req.send().await.map_err(net_err)?;
+        let url = b.put_object(Some(&self.creds), key).sign(SIGN_TTL);
+        let resp = self
+            .http
+            .put(url)
+            .header(reqwest::header::CONTENT_LENGTH, content_length.to_string())
+            .body(body)
+            .send()
+            .await
+            .map_err(net_err)?;
         self.check(resp).await?;
         Ok(())
     }
@@ -346,13 +335,7 @@ impl S3Client {
     /// Create a folder by writing a zero-byte object whose key ends in '/'.
     pub async fn create_folder(&self, bucket: &str, prefix: &str) -> Result<(), String> {
         let key = folder_marker_key(prefix);
-        self.put_object_bytes_with_headers(
-            bucket,
-            &key,
-            Vec::new(),
-            &[("content-type", "application/x-directory")],
-        )
-        .await
+        self.put_object_bytes(bucket, &key, Vec::new()).await
     }
 
     pub async fn create_bucket(&self, bucket: &str) -> Result<(), String> {
