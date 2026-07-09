@@ -160,7 +160,12 @@ export function FileTransferQueue({
           </div>
         )}
         {filtered.map((it) => {
-          const pct = it.size > 0 ? Math.min(100, (it.bytes / it.size) * 100) : 0;
+          const pct =
+            it.state === "done"
+              ? 100
+              : it.size > 0
+                ? Math.min(100, (it.bytes / it.size) * 100)
+                : 0;
           const isInFlight = it.state === "running" || it.state === "queued";
           const canPause = onPause && it.state === "running";
           const canResume = onResume && it.state === "paused";

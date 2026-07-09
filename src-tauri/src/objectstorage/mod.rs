@@ -179,8 +179,7 @@ async fn resolve_azure_auth(
 /// routing (P7):
 /// - per-session HTTP/SOCKS5 proxy → native `reqwest` proxy;
 /// - per-session SSH jump host → a loopback forwarder to the endpoint plus a
-///   `reqwest` DNS override so TLS SNI / cert / Host stay correct;
-/// - otherwise the app-level global proxy, like every other outbound module.
+///   `reqwest` DNS override so TLS SNI / cert / Host stay correct.
 ///
 /// Returns the client and, for the jump path, the forwarder task (kept alive
 /// for the session's lifetime).
@@ -189,7 +188,12 @@ async fn build_http_client(
     network: Option<&NetworkSettings>,
     endpoint: &Url,
 ) -> Result<(reqwest::Client, Option<JoinHandle<()>>), String> {
-    let mut builder = reqwest::Client::builder();
+    // Reqwest installs environment proxies (HTTP_PROXY/HTTPS_PROXY/ALL_PROXY)
+    // by default. Object-storage routing is explicit below: a per-session
+    // proxy is applied if configured, otherwise no proxy (direct connection) is
+    // used. Disable the implicit layer so an unrelated shell proxy cannot silently
+    // throttle uploads or terminate long PUT requests.
+    let mut builder = reqwest::Client::builder().no_proxy();
     let mut forward_task = None;
 
     let uses_proxy = network
@@ -221,8 +225,6 @@ async fn build_http_client(
             };
             builder = proxy.apply_to(builder);
         }
-    } else if let Some(p) = crate::proxy::resolve_default(state).ok().flatten() {
-        builder = p.apply_to(builder);
     }
 
     let client = builder
@@ -451,6 +453,22 @@ pub async fn storage_move_object(
     get_session(&state, &session_id)
         .await?
         .move_object(&src_bucket, &src_key, &dst_bucket, &dst_key)
+        .await
+}
+
+/// Rename a virtual folder by moving every object under its prefix, including
+/// a zero-byte marker used to represent an empty folder.
+#[tauri::command]
+pub async fn storage_move_prefix(
+    session_id: String,
+    bucket: String,
+    old_prefix: String,
+    new_prefix: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    get_session(&state, &session_id)
+        .await?
+        .move_prefix(&bucket, &old_prefix, &new_prefix)
         .await
 }
 

@@ -50,7 +50,7 @@ pub struct ObjectStorageConfig {
     pub azure_bearer_token: Option<String>,
     // --- Network routing (P7) ---
     /// Proxy / SSH-jump routing. When absent (or with no proxy_kind) the engine
-    /// falls back to the app-level global proxy.
+    /// connects directly (does not fall back to the app-level global proxy).
     pub network: Option<NetworkSettings>,
     // --- Defaults (P8) ---
     /// Default storage class / access tier applied to uploads when the caller

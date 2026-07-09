@@ -14,6 +14,7 @@ import {
   storageDownload,
   storageListObjects,
   storageMoveObject,
+  storageMovePrefix,
   storagePauseTransfer,
   storageResumeTransfer,
   storageShareUrl,
@@ -114,6 +115,7 @@ export function useObjectStorageController(sessionId: string) {
       unlistenProgress = p;
       unlistenPaused = pa;
       unlistenComplete = c;
+      patchTransfer(transferId, { state: "running" });
     },
     [patchTransfer, refreshPane, sessionId, setTransferState],
   );
@@ -138,11 +140,15 @@ export function useObjectStorageController(sessionId: string) {
       await startTracking(transferId, "local");
       try {
         await storageDownload(sessionId, transferId, bucket, key, localPath);
+        setTransferState(transferId, "done");
+        await refreshPane(sessionId, "local");
       } catch (err) {
-        setStatus(`Download failed: ${err instanceof Error ? err.message : err}`);
+        const message = err instanceof Error ? err.message : String(err);
+        setTransferState(transferId, "error", message);
+        setStatus(`Download failed: ${message}`);
       }
     },
-    [addTransfer, sessionId, setStatus, startTracking],
+    [addTransfer, refreshPane, sessionId, setStatus, setTransferState, startTracking],
   );
 
   const uploadFile = useCallback(
@@ -165,11 +171,15 @@ export function useObjectStorageController(sessionId: string) {
       await startTracking(transferId, "remote");
       try {
         await storageUpload(sessionId, transferId, bucket, key, localPath);
+        setTransferState(transferId, "done");
+        await refreshPane(sessionId, "remote");
       } catch (err) {
-        setStatus(`Upload failed: ${err instanceof Error ? err.message : err}`);
+        const message = err instanceof Error ? err.message : String(err);
+        setTransferState(transferId, "error", message);
+        setStatus(`Upload failed: ${message}`);
       }
     },
-    [addTransfer, sessionId, setStatus, startTracking],
+    [addTransfer, refreshPane, sessionId, setStatus, setTransferState, startTracking],
   );
 
   // Recursively download every object under `prefix` into `localBase`,
@@ -303,36 +313,27 @@ export function useObjectStorageController(sessionId: string) {
       try {
         const prefix = parentPrefix(key);
         if (entry.fileType === "dir") {
-          // Move every object under the old prefix to the new prefix.
           const oldPrefix = key.endsWith("/") ? key : `${key}/`;
           const newPrefix = `${prefix}${newName}/`;
-          let token: string | null = null;
-          const moves: Array<{ from: string; to: string }> = [];
-          const walk = async (p: string): Promise<void> => {
-            let tk: string | null = null;
-            do {
-              const page = await storageListObjects(sessionId, bucket, p, tk);
-              for (const e of page.entries) {
-                if (e.isDir) await walk(e.key);
-                else moves.push({ from: e.key, to: newPrefix + e.key.slice(oldPrefix.length) });
-              }
-              tk = page.nextToken ?? null;
-            } while (tk);
-          };
-          await walk(oldPrefix);
-          void token;
-          for (const m of moves) {
-            await storageMoveObject(sessionId, bucket, m.from, bucket, m.to);
-          }
+          await storageMovePrefix(sessionId, bucket, oldPrefix, newPrefix);
+          removeRemoteEntries(sessionId, [entry.path]);
+          upsertRemoteEntry(sessionId, remoteDirEntry(bucket, newPrefix, newName));
         } else {
-          await storageMoveObject(sessionId, bucket, key, bucket, `${prefix}${newName}`);
+          const newKey = `${prefix}${newName}`;
+          await storageMoveObject(sessionId, bucket, key, bucket, newKey);
+          removeRemoteEntries(sessionId, [entry.path]);
+          upsertRemoteEntry(sessionId, {
+            ...entry,
+            name: newName,
+            path: `/${bucket}/${newKey}`,
+          });
         }
         await refreshPane(sessionId, "remote");
       } catch (err) {
         setStatus(`Rename failed: ${err instanceof Error ? err.message : err}`);
       }
     },
-    [refreshPane, sessionId, setStatus],
+    [refreshPane, removeRemoteEntries, sessionId, setStatus, upsertRemoteEntry],
   );
 
   const copyTo = useCallback(

@@ -527,6 +527,36 @@ impl AzureClient {
         Ok(())
     }
 
+    /// Rename a virtual folder while preserving empty-folder marker blobs.
+    pub async fn move_prefix(
+        &self,
+        container: &str,
+        old_prefix: &str,
+        new_prefix: &str,
+    ) -> Result<(), String> {
+        let old_prefix = folder_marker_key(old_prefix);
+        let new_prefix = folder_marker_key(new_prefix);
+        if old_prefix.is_empty() || new_prefix.is_empty() {
+            return Err("folder prefixes must not be empty".into());
+        }
+        if old_prefix == new_prefix {
+            return Ok(());
+        }
+        let keys = self.list_all_keys(container, &old_prefix).await?;
+        if keys.is_empty() {
+            return Err(format!("folder prefix '{old_prefix}' does not exist"));
+        }
+
+        let plan = move_prefix_plan(&old_prefix, &new_prefix, keys)?;
+        for (src, dst) in &plan {
+            self.copy_object(container, src, container, dst).await?;
+        }
+        for (src, _) in &plan {
+            self.delete_object(container, src).await?;
+        }
+        Ok(())
+    }
+
     /// Page through every blob name under `prefix` (no delimiter).
     async fn list_all_keys(&self, container: &str, prefix: &str) -> Result<Vec<String>, String> {
         let mut keys = Vec::new();
@@ -560,11 +590,7 @@ impl AzureClient {
     }
 
     pub async fn create_folder(&self, container: &str, prefix: &str) -> Result<(), String> {
-        let key = if prefix.ends_with('/') {
-            prefix.to_string()
-        } else {
-            format!("{prefix}/")
-        };
+        let key = folder_marker_key(prefix);
         self.put_object_bytes(container, &key, Vec::new()).await
     }
 
@@ -770,6 +796,30 @@ impl AzureClient {
     }
 }
 
+fn folder_marker_key(prefix: &str) -> String {
+    if prefix.is_empty() || prefix.ends_with('/') {
+        prefix.to_string()
+    } else {
+        format!("{prefix}/")
+    }
+}
+
+fn move_prefix_plan(
+    old_prefix: &str,
+    new_prefix: &str,
+    keys: Vec<String>,
+) -> Result<Vec<(String, String)>, String> {
+    keys.into_iter()
+        .map(|key| {
+            let suffix = key
+                .strip_prefix(old_prefix)
+                .ok_or_else(|| format!("blob '{key}' is outside prefix '{old_prefix}'"))?
+                .to_string();
+            Ok((key, format!("{new_prefix}{suffix}")))
+        })
+        .collect()
+}
+
 #[derive(Debug, Default, Deserialize)]
 struct EnumerationResults {
     #[serde(rename = "Containers")]
@@ -904,6 +954,5 @@ mod it {
         client.delete_bucket(&container).await.expect("del container");
     }
 }
-
 
 

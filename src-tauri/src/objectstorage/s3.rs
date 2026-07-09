@@ -10,7 +10,7 @@ use std::time::Instant;
 
 use jiff::Timestamp;
 use reqwest::Client;
-use rusty_s3::actions::{CreateMultipartUpload, ListObjectsV2, ListObjectsV2Response};
+use rusty_s3::actions::{CreateMultipartUpload, ListObjectsV2, ListObjectsV2Response, ListParts};
 use rusty_s3::{Bucket, Credentials, Method, S3Action, UrlStyle};
 use serde::Deserialize;
 use tauri::{AppHandle, Runtime};
@@ -22,6 +22,8 @@ use crate::filebrowser::transfer::TransferHandle;
 /// Presign lifetime for one-shot signed requests. Requests are issued
 /// immediately, so a short window is plenty.
 const SIGN_TTL: Duration = Duration::from_secs(300);
+const UPLOAD_SEND_ATTEMPTS: u32 = 3;
+const UPLOAD_RETRY_BASE_DELAY: Duration = Duration::from_millis(200);
 
 pub struct S3Client {
     http: Client,
@@ -211,28 +213,17 @@ impl S3Client {
         key: &str,
         body: Vec<u8>,
     ) -> Result<(), String> {
-        self.put_object_bytes_with_headers(bucket, key, body, &[])
-            .await
-    }
-
-    async fn put_object_bytes_with_headers(
-        &self,
-        bucket: &str,
-        key: &str,
-        body: Vec<u8>,
-        headers: &[(&str, &str)],
-    ) -> Result<(), String> {
+        let content_length = body.len();
         let b = self.bucket(bucket)?;
-        let mut action = b.put_object(Some(&self.creds), key);
-        for (name, value) in headers {
-            action.headers_mut().insert(*name, (*value).to_string());
-        }
-        let url = action.sign(SIGN_TTL);
-        let mut req = self.http.put(url).body(body);
-        for (name, value) in headers {
-            req = req.header(*name, *value);
-        }
-        let resp = req.send().await.map_err(net_err)?;
+        let url = b.put_object(Some(&self.creds), key).sign(SIGN_TTL);
+        let resp = self
+            .http
+            .put(url)
+            .header(reqwest::header::CONTENT_LENGTH, content_length.to_string())
+            .body(body)
+            .send()
+            .await
+            .map_err(net_err)?;
         self.check(resp).await?;
         Ok(())
     }
@@ -315,6 +306,38 @@ impl S3Client {
         Ok(())
     }
 
+    /// Rename a virtual folder by copying every object under the old prefix,
+    /// including its zero-byte folder marker, then deleting the originals.
+    /// Copies are completed first so a failed copy never removes source data.
+    pub async fn move_prefix(
+        &self,
+        bucket: &str,
+        old_prefix: &str,
+        new_prefix: &str,
+    ) -> Result<(), String> {
+        let old_prefix = folder_marker_key(old_prefix);
+        let new_prefix = folder_marker_key(new_prefix);
+        if old_prefix.is_empty() || new_prefix.is_empty() {
+            return Err("folder prefixes must not be empty".into());
+        }
+        if old_prefix == new_prefix {
+            return Ok(());
+        }
+        let keys = self.list_all_keys(bucket, &old_prefix).await?;
+        if keys.is_empty() {
+            return Err(format!("folder prefix '{old_prefix}' does not exist"));
+        }
+
+        let plan = move_prefix_plan(&old_prefix, &new_prefix, keys)?;
+        for (src, dst) in &plan {
+            self.copy_object(bucket, src, bucket, dst).await?;
+        }
+        for (src, _) in &plan {
+            self.delete_object(bucket, src).await?;
+        }
+        Ok(())
+    }
+
     /// Page through every object key under `prefix` (no delimiter, so nested
     /// keys are included).
     async fn list_all_keys(&self, bucket: &str, prefix: &str) -> Result<Vec<String>, String> {
@@ -346,13 +369,7 @@ impl S3Client {
     /// Create a folder by writing a zero-byte object whose key ends in '/'.
     pub async fn create_folder(&self, bucket: &str, prefix: &str) -> Result<(), String> {
         let key = folder_marker_key(prefix);
-        self.put_object_bytes_with_headers(
-            bucket,
-            &key,
-            Vec::new(),
-            &[("content-type", "application/x-directory")],
-        )
-        .await
+        self.put_object_bytes(bucket, &key, Vec::new()).await
     }
 
     pub async fn create_bucket(&self, bucket: &str) -> Result<(), String> {
@@ -426,18 +443,8 @@ impl S3Client {
             let data = tokio::fs::read(local)
                 .await
                 .map_err(|e| format!("read {}: {e}", local.display()))?;
-            let mut put = b.put_object(Some(&self.creds), key);
-            if let Some(sc) = storage_class {
-                put.headers_mut()
-                    .insert("x-amz-storage-class", sc.to_string());
-            }
-            let url = put.sign(SIGN_TTL);
-            let mut req = self.http.put(url).body(data);
-            if let Some(sc) = storage_class {
-                req = req.header("x-amz-storage-class", sc);
-            }
-            let resp = req.send().await.map_err(net_err)?;
-            self.check(resp).await?;
+            self.upload_small_object(&b, bucket, key, &data, storage_class, handle)
+                .await?;
             emit_progress(app, transfer_id, total, total, started);
             return Ok(());
         }
@@ -476,28 +483,8 @@ impl S3Client {
             .await
         {
             Ok(etags) => {
-                let etag_refs: Vec<&str> = etags.iter().map(String::as_str).collect();
-                let complete = b.complete_multipart_upload(
-                    Some(&self.creds),
-                    key,
-                    &upload_id,
-                    etag_refs.iter().copied(),
-                );
-                let curl = complete.sign(SIGN_TTL);
-                let cbody = complete.body();
-                let resp = self
-                    .http
-                    .post(curl)
-                    .body(cbody)
-                    .send()
-                    .await
-                    .map_err(net_err)?;
-                let resp = self.check(resp).await?;
-                let txt = resp.text().await.unwrap_or_default();
-                if txt.contains("<Error") {
-                    let msg = parse_s3_error(&txt).unwrap_or_else(|| "complete failed".into());
-                    return Err(format!("S3 complete multipart error: {msg}"));
-                }
+                self.complete_multipart_with_recovery(&b, bucket, key, &upload_id, &etags, total)
+                    .await?;
                 emit_progress(app, transfer_id, total, total, started);
                 Ok(())
             }
@@ -549,29 +536,255 @@ impl S3Client {
             if n == 0 {
                 break;
             }
-            let purl = b
-                .upload_part(Some(&self.creds), key, part_number, upload_id)
-                .sign(SIGN_TTL);
-            let resp = self
-                .http
-                .put(purl)
-                .body(buf[..n].to_vec())
-                .send()
+            let etag = self
+                .upload_part_with_recovery(b, key, upload_id, part_number, &buf[..n], handle)
                 .await
-                .map_err(net_err)?;
-            let resp = self.check(resp).await?;
-            let etag = resp
-                .headers()
-                .get("etag")
-                .and_then(|v| v.to_str().ok())
-                .map(|s| s.to_string())
-                .ok_or("uploaded part missing ETag")?;
+                .map_err(|e| format!("upload part {part_number}: {e}"))?;
             etags.push(etag);
             uploaded += n as u64;
+            // Multipart progress is server-confirmed. Reporting bytes while
+            // reqwest consumes the body only measures client-side buffering
+            // and can jump to a full part before anything reaches the server.
             emit_progress(app, transfer_id, uploaded, total, started);
             part_number += 1;
         }
         Ok(etags)
+    }
+
+    async fn upload_small_object(
+        &self,
+        b: &Bucket,
+        bucket: &str,
+        key: &str,
+        data: &[u8],
+        storage_class: Option<&str>,
+        handle: &Arc<TransferHandle>,
+    ) -> Result<(), String> {
+        let before = self.head_object(bucket, key).await.ok();
+        for attempt in 1..=UPLOAD_SEND_ATTEMPTS {
+            if handle.is_cancelled() {
+                return Err("transfer cancelled".to_string());
+            }
+            let mut put = b.put_object(Some(&self.creds), key);
+            if let Some(sc) = storage_class {
+                put.headers_mut()
+                    .insert("x-amz-storage-class", sc.to_string());
+            }
+            let mut request = self
+                .http
+                .put(put.sign(SIGN_TTL))
+                .header(reqwest::header::CONTENT_LENGTH, data.len())
+                .body(data.to_vec());
+            if let Some(sc) = storage_class {
+                request = request.header("x-amz-storage-class", sc);
+            }
+            match request.send().await {
+                Ok(response) => {
+                    self.check(response).await?;
+                    return Ok(());
+                }
+                Err(error) => {
+                    let safe_error = net_err(error);
+                    if self
+                        .object_put_was_committed(bucket, key, data.len() as u64, before.as_ref())
+                        .await
+                    {
+                        tracing::warn!(
+                            attempt,
+                            "object PUT response was lost, but HEAD confirmed the upload"
+                        );
+                        return Ok(());
+                    }
+                    if attempt == UPLOAD_SEND_ATTEMPTS || handle.is_cancelled() {
+                        return Err(format!(
+                            "upload transport failed after {attempt} attempts: {safe_error}"
+                        ));
+                    }
+                    let delay = UPLOAD_RETRY_BASE_DELAY * attempt;
+                    tracing::warn!(
+                        attempt,
+                        max_attempts = UPLOAD_SEND_ATTEMPTS,
+                        delay_ms = delay.as_millis(),
+                        error = %safe_error,
+                        "retrying object-storage upload after transport failure"
+                    );
+                    tokio::time::sleep(delay).await;
+                }
+            }
+        }
+        unreachable!("upload retry loop always returns")
+    }
+
+    async fn object_put_was_committed(
+        &self,
+        bucket: &str,
+        key: &str,
+        expected_size: u64,
+        before: Option<&ObjectMetadata>,
+    ) -> bool {
+        let Ok(after) = self.head_object(bucket, key).await else {
+            return false;
+        };
+        if after.size != expected_size {
+            return false;
+        }
+        match before {
+            None => true,
+            Some(previous) => {
+                after.etag != previous.etag || after.last_modified != previous.last_modified
+            }
+        }
+    }
+
+    async fn upload_part_with_recovery(
+        &self,
+        b: &Bucket,
+        key: &str,
+        upload_id: &str,
+        part_number: u16,
+        data: &[u8],
+        handle: &Arc<TransferHandle>,
+    ) -> Result<String, String> {
+        for attempt in 1..=UPLOAD_SEND_ATTEMPTS {
+            if handle.is_cancelled() {
+                return Err("transfer cancelled".to_string());
+            }
+            let url = b
+                .upload_part(Some(&self.creds), key, part_number, upload_id)
+                .sign(SIGN_TTL);
+            match self
+                .http
+                .put(url)
+                .header(reqwest::header::CONTENT_LENGTH, data.len())
+                .body(data.to_vec())
+                .send()
+                .await
+            {
+                Ok(response) => {
+                    let response = self.check(response).await?;
+                    return response
+                        .headers()
+                        .get("etag")
+                        .and_then(|v| v.to_str().ok())
+                        .map(str::to_string)
+                        .ok_or_else(|| "uploaded part missing ETag".to_string());
+                }
+                Err(error) => {
+                    let safe_error = net_err(error);
+                    if let Some(etag) = self
+                        .confirmed_part_etag(b, key, upload_id, part_number, data.len() as u64)
+                        .await
+                    {
+                        tracing::warn!(
+                            attempt,
+                            part_number,
+                            "UploadPart response was lost, but ListParts confirmed the part"
+                        );
+                        return Ok(etag);
+                    }
+                    if attempt == UPLOAD_SEND_ATTEMPTS || handle.is_cancelled() {
+                        return Err(format!(
+                            "upload transport failed after {attempt} attempts: {safe_error}"
+                        ));
+                    }
+                    let delay = UPLOAD_RETRY_BASE_DELAY * attempt;
+                    tracing::warn!(
+                        attempt,
+                        max_attempts = UPLOAD_SEND_ATTEMPTS,
+                        part_number,
+                        delay_ms = delay.as_millis(),
+                        error = %safe_error,
+                        "retrying UploadPart after transport failure"
+                    );
+                    tokio::time::sleep(delay).await;
+                }
+            }
+        }
+        unreachable!("upload retry loop always returns")
+    }
+
+    async fn confirmed_part_etag(
+        &self,
+        b: &Bucket,
+        key: &str,
+        upload_id: &str,
+        part_number: u16,
+        expected_size: u64,
+    ) -> Option<String> {
+        let mut list = ListParts::new(b, Some(&self.creds), key, upload_id);
+        list.set_max_parts(1);
+        if part_number > 1 {
+            list.set_part_number_marker(part_number - 1);
+        }
+        let body = self.get_text(list.sign(SIGN_TTL)).await.ok()?;
+        confirmed_part_etag_from_xml(&body, part_number, expected_size)
+    }
+
+    async fn complete_multipart_with_recovery(
+        &self,
+        b: &Bucket,
+        bucket: &str,
+        key: &str,
+        upload_id: &str,
+        etags: &[String],
+        expected_size: u64,
+    ) -> Result<(), String> {
+        for attempt in 1..=UPLOAD_SEND_ATTEMPTS {
+            let etag_refs: Vec<&str> = etags.iter().map(String::as_str).collect();
+            let complete = b.complete_multipart_upload(
+                Some(&self.creds),
+                key,
+                upload_id,
+                etag_refs.iter().copied(),
+            );
+            let response = self
+                .http
+                .post(complete.sign(SIGN_TTL))
+                .body(complete.body())
+                .send()
+                .await;
+            match response {
+                Ok(response) => {
+                    let response = self.check(response).await?;
+                    let text = response.text().await.unwrap_or_default();
+                    if text.contains("<Error") {
+                        let message =
+                            parse_s3_error(&text).unwrap_or_else(|| "complete failed".into());
+                        return Err(format!("S3 complete multipart error: {message}"));
+                    }
+                    return Ok(());
+                }
+                Err(error) => {
+                    let safe_error = net_err(error);
+                    if self
+                        .head_object(bucket, key)
+                        .await
+                        .is_ok_and(|object| object.size == expected_size)
+                    {
+                        tracing::warn!(
+                            attempt,
+                            "CompleteMultipartUpload response was lost, but HEAD confirmed the object"
+                        );
+                        return Ok(());
+                    }
+                    if attempt == UPLOAD_SEND_ATTEMPTS {
+                        return Err(format!(
+                            "complete multipart failed after {attempt} attempts: {safe_error}"
+                        ));
+                    }
+                    let delay = UPLOAD_RETRY_BASE_DELAY * attempt;
+                    tracing::warn!(
+                        attempt,
+                        max_attempts = UPLOAD_SEND_ATTEMPTS,
+                        delay_ms = delay.as_millis(),
+                        error = %safe_error,
+                        "retrying CompleteMultipartUpload after transport failure"
+                    );
+                    tokio::time::sleep(delay).await;
+                }
+            }
+        }
+        unreachable!("complete retry loop always returns")
     }
 
     /// Cheap connectivity check: HEAD the default bucket if one is configured,
@@ -607,7 +820,42 @@ impl S3Client {
 }
 
 fn net_err(e: reqwest::Error) -> String {
-    format!("request failed: {e}")
+    use std::error::Error;
+
+    let category = if e.is_timeout() {
+        "timeout"
+    } else if e.is_connect() {
+        "connection"
+    } else if e.is_body() {
+        "request body"
+    } else {
+        "network"
+    };
+    let mut causes = Vec::new();
+    let mut source = e.source();
+    while let Some(cause) = source {
+        causes.push(cause.to_string());
+        source = cause.source();
+    }
+    let safe = e.without_url();
+    if causes.is_empty() {
+        format!("request failed ({category}): {safe}")
+    } else {
+        format!("request failed ({category}): {safe}; {}", causes.join("; "))
+    }
+}
+
+fn confirmed_part_etag_from_xml(
+    body: &str,
+    part_number: u16,
+    expected_size: u64,
+) -> Option<String> {
+    let response = ListParts::parse_response(body.as_bytes()).ok()?;
+    response
+        .parts
+        .into_iter()
+        .find(|part| part.number == part_number && part.size == expected_size)
+        .map(|part| part.etag)
 }
 
 /// Percent-encode each path segment of a key while preserving `/` separators
@@ -625,6 +873,22 @@ fn folder_marker_key(prefix: &str) -> String {
     } else {
         format!("{prefix}/")
     }
+}
+
+fn move_prefix_plan(
+    old_prefix: &str,
+    new_prefix: &str,
+    keys: Vec<String>,
+) -> Result<Vec<(String, String)>, String> {
+    keys.into_iter()
+        .map(|key| {
+            let suffix = key
+                .strip_prefix(old_prefix)
+                .ok_or_else(|| format!("object '{key}' is outside prefix '{old_prefix}'"))?
+                .to_string();
+            Ok((key, format!("{new_prefix}{suffix}")))
+        })
+        .collect()
 }
 
 fn folder_marker_entry(prefix: &str, key: &str, size: u64) -> Option<ObjectEntry> {
@@ -837,6 +1101,58 @@ mod it {
         assert_eq!(folder_marker_key(""), "");
         assert_eq!(folder_marker_key("empty"), "empty/");
         assert_eq!(folder_marker_key("empty/"), "empty/");
+    }
+
+    #[test]
+    fn move_prefix_plan_includes_marker_and_nested_objects() {
+        let plan = move_prefix_plan(
+            "old/",
+            "new/",
+            vec![
+                "old/".to_string(),
+                "old/a.txt".to_string(),
+                "old/nested/b.txt".to_string(),
+            ],
+        )
+        .expect("plan");
+
+        assert_eq!(
+            plan,
+            vec![
+                ("old/".to_string(), "new/".to_string()),
+                ("old/a.txt".to_string(), "new/a.txt".to_string()),
+                (
+                    "old/nested/b.txt".to_string(),
+                    "new/nested/b.txt".to_string(),
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn list_parts_confirmation_requires_matching_number_and_size() {
+        let input = r#"
+        <ListPartsResult>
+            <MaxParts>1</MaxParts>
+            <IsTruncated>false</IsTruncated>
+            <Part>
+                <PartNumber>2</PartNumber>
+                <LastModified>2026-07-09T10:00:00.000Z</LastModified>
+                <ETag>"part-etag"</ETag>
+                <Size>8388608</Size>
+            </Part>
+        </ListPartsResult>
+        "#;
+
+        assert_eq!(
+            confirmed_part_etag_from_xml(input, 2, 8 * 1024 * 1024).as_deref(),
+            Some("\"part-etag\"")
+        );
+        assert_eq!(
+            confirmed_part_etag_from_xml(input, 1, 8 * 1024 * 1024),
+            None
+        );
+        assert_eq!(confirmed_part_etag_from_xml(input, 2, 1024), None);
     }
 
     /// End-to-end round trip against a live S3-compatible endpoint (MinIO in
