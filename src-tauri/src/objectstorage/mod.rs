@@ -189,7 +189,12 @@ async fn build_http_client(
     network: Option<&NetworkSettings>,
     endpoint: &Url,
 ) -> Result<(reqwest::Client, Option<JoinHandle<()>>), String> {
-    let mut builder = reqwest::Client::builder();
+    // Reqwest installs environment proxies (HTTP_PROXY/HTTPS_PROXY/ALL_PROXY)
+    // by default. Object-storage routing is explicit below: a per-session
+    // proxy wins, otherwise Taomni's configured global proxy is used. Disable
+    // the implicit layer so an unrelated shell proxy cannot silently throttle
+    // uploads or terminate long PUT requests.
+    let mut builder = reqwest::Client::builder().no_proxy();
     let mut forward_task = None;
 
     let uses_proxy = network
