@@ -178,6 +178,15 @@ export async function storageMoveObject(
   return invoke("storage_move_object", { sessionId, srcBucket, srcKey, dstBucket, dstKey });
 }
 
+export async function storageMovePrefix(
+  sessionId: string,
+  bucket: string,
+  oldPrefix: string,
+  newPrefix: string,
+): Promise<void> {
+  return invoke("storage_move_prefix", { sessionId, bucket, oldPrefix, newPrefix });
+}
+
 export async function storageShareUrl(
   sessionId: string,
   bucket: string,

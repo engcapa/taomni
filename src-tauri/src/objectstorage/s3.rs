@@ -304,6 +304,38 @@ impl S3Client {
         Ok(())
     }
 
+    /// Rename a virtual folder by copying every object under the old prefix,
+    /// including its zero-byte folder marker, then deleting the originals.
+    /// Copies are completed first so a failed copy never removes source data.
+    pub async fn move_prefix(
+        &self,
+        bucket: &str,
+        old_prefix: &str,
+        new_prefix: &str,
+    ) -> Result<(), String> {
+        let old_prefix = folder_marker_key(old_prefix);
+        let new_prefix = folder_marker_key(new_prefix);
+        if old_prefix.is_empty() || new_prefix.is_empty() {
+            return Err("folder prefixes must not be empty".into());
+        }
+        if old_prefix == new_prefix {
+            return Ok(());
+        }
+        let keys = self.list_all_keys(bucket, &old_prefix).await?;
+        if keys.is_empty() {
+            return Err(format!("folder prefix '{old_prefix}' does not exist"));
+        }
+
+        let plan = move_prefix_plan(&old_prefix, &new_prefix, keys)?;
+        for (src, dst) in &plan {
+            self.copy_object(bucket, src, bucket, dst).await?;
+        }
+        for (src, _) in &plan {
+            self.delete_object(bucket, src).await?;
+        }
+        Ok(())
+    }
+
     /// Page through every object key under `prefix` (no delimiter, so nested
     /// keys are included).
     async fn list_all_keys(&self, bucket: &str, prefix: &str) -> Result<Vec<String>, String> {
@@ -414,8 +446,16 @@ impl S3Client {
                 put.headers_mut()
                     .insert("x-amz-storage-class", sc.to_string());
             }
+            let content_length = data.len();
             let url = put.sign(SIGN_TTL);
-            let mut req = self.http.put(url).body(data);
+            let body = super::transfer::progress_body(
+                data, 0, total, transfer_id, handle, app, started,
+            );
+            let mut req = self
+                .http
+                .put(url)
+                .header(reqwest::header::CONTENT_LENGTH, content_length)
+                .body(body);
             if let Some(sc) = storage_class {
                 req = req.header("x-amz-storage-class", sc);
             }
@@ -538,7 +578,16 @@ impl S3Client {
             let resp = self
                 .http
                 .put(purl)
-                .body(buf[..n].to_vec())
+                .header(reqwest::header::CONTENT_LENGTH, n)
+                .body(super::transfer::progress_body(
+                    buf[..n].to_vec(),
+                    uploaded,
+                    total,
+                    transfer_id,
+                    handle,
+                    app,
+                    started,
+                ))
                 .send()
                 .await
                 .map_err(net_err)?;
@@ -590,7 +639,29 @@ impl S3Client {
 }
 
 fn net_err(e: reqwest::Error) -> String {
-    format!("request failed: {e}")
+    use std::error::Error;
+
+    let category = if e.is_timeout() {
+        "timeout"
+    } else if e.is_connect() {
+        "connection"
+    } else if e.is_body() {
+        "request body"
+    } else {
+        "network"
+    };
+    let mut causes = Vec::new();
+    let mut source = e.source();
+    while let Some(cause) = source {
+        causes.push(cause.to_string());
+        source = cause.source();
+    }
+    let safe = e.without_url();
+    if causes.is_empty() {
+        format!("request failed ({category}): {safe}")
+    } else {
+        format!("request failed ({category}): {safe}; {}", causes.join("; "))
+    }
 }
 
 /// Percent-encode each path segment of a key while preserving `/` separators
@@ -608,6 +679,22 @@ fn folder_marker_key(prefix: &str) -> String {
     } else {
         format!("{prefix}/")
     }
+}
+
+fn move_prefix_plan(
+    old_prefix: &str,
+    new_prefix: &str,
+    keys: Vec<String>,
+) -> Result<Vec<(String, String)>, String> {
+    keys.into_iter()
+        .map(|key| {
+            let suffix = key
+                .strip_prefix(old_prefix)
+                .ok_or_else(|| format!("object '{key}' is outside prefix '{old_prefix}'"))?
+                .to_string();
+            Ok((key, format!("{new_prefix}{suffix}")))
+        })
+        .collect()
 }
 
 fn folder_marker_entry(prefix: &str, key: &str, size: u64) -> Option<ObjectEntry> {
@@ -820,6 +907,32 @@ mod it {
         assert_eq!(folder_marker_key(""), "");
         assert_eq!(folder_marker_key("empty"), "empty/");
         assert_eq!(folder_marker_key("empty/"), "empty/");
+    }
+
+    #[test]
+    fn move_prefix_plan_includes_marker_and_nested_objects() {
+        let plan = move_prefix_plan(
+            "old/",
+            "new/",
+            vec![
+                "old/".to_string(),
+                "old/a.txt".to_string(),
+                "old/nested/b.txt".to_string(),
+            ],
+        )
+        .expect("plan");
+
+        assert_eq!(
+            plan,
+            vec![
+                ("old/".to_string(), "new/".to_string()),
+                ("old/a.txt".to_string(), "new/a.txt".to_string()),
+                (
+                    "old/nested/b.txt".to_string(),
+                    "new/nested/b.txt".to_string(),
+                ),
+            ]
+        );
     }
 
     /// End-to-end round trip against a live S3-compatible endpoint (MinIO in

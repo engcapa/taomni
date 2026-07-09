@@ -141,6 +141,18 @@ impl ObjectStorageSession {
         self.delete_object(src_bucket, src_key).await
     }
 
+    pub async fn move_prefix(
+        &self,
+        bucket: &str,
+        old_prefix: &str,
+        new_prefix: &str,
+    ) -> Result<(), String> {
+        match &self.handle {
+            OssHandle::S3(c) => c.move_prefix(bucket, old_prefix, new_prefix).await,
+            OssHandle::Azure(c) => c.move_prefix(bucket, old_prefix, new_prefix).await,
+        }
+    }
+
     /// Build a shareable read-only URL (presigned for S3, service SAS for Azure).
     pub fn presign_get(&self, bucket: &str, key: &str, ttl_secs: u64) -> Result<String, String> {
         match &self.handle {

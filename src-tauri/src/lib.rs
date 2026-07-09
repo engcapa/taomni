@@ -524,6 +524,7 @@ pub fn run() {
             objectstorage::storage_head_object,
             objectstorage::storage_copy_object,
             objectstorage::storage_move_object,
+            objectstorage::storage_move_prefix,
             objectstorage::storage_share_url,
             objectstorage::storage_download,
             objectstorage::storage_upload,

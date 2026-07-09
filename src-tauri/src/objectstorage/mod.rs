@@ -454,6 +454,22 @@ pub async fn storage_move_object(
         .await
 }
 
+/// Rename a virtual folder by moving every object under its prefix, including
+/// a zero-byte marker used to represent an empty folder.
+#[tauri::command]
+pub async fn storage_move_prefix(
+    session_id: String,
+    bucket: String,
+    old_prefix: String,
+    new_prefix: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    get_session(&state, &session_id)
+        .await?
+        .move_prefix(&bucket, &old_prefix, &new_prefix)
+        .await
+}
+
 /// Generate a shareable read-only URL (presigned GET for S3, service SAS for
 /// Azure), valid for `ttl_secs` seconds.
 #[tauri::command]

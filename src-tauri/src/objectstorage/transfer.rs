@@ -9,6 +9,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 
+use bytes::Bytes;
 use futures::StreamExt;
 use tauri::{AppHandle, Emitter, Runtime};
 use tokio::io::AsyncWriteExt;
@@ -22,6 +23,10 @@ pub const PART_SIZE: usize = 8 * 1024 * 1024;
 /// Files at or below this size upload in a single request; larger files use the
 /// engine's chunked path (S3 multipart / Azure block list).
 pub const MULTIPART_THRESHOLD: u64 = PART_SIZE as u64;
+
+/// Granularity for outbound progress events. Keep this much smaller than an
+/// S3/Azure part so the UI advances while a request body is being sent.
+const UPLOAD_PROGRESS_CHUNK_SIZE: usize = 256 * 1024;
 
 pub fn emit_progress<R: Runtime>(
     app: &AppHandle<R>,
@@ -45,6 +50,51 @@ pub fn emit_paused<R: Runtime>(app: &AppHandle<R>, transfer_id: &str, bytes: u64
         &format!("storage-paused-{}", transfer_id),
         ProgressPayload { bytes, total, rate: 0.0, eta: 0.0 },
     );
+}
+
+/// Build a fixed-length request body that reports progress as reqwest consumes
+/// it. Callers must also set `Content-Length`; COS requires it for Upload Part
+/// and an explicit length avoids chunked-transfer incompatibilities in other
+/// S3-compatible providers.
+pub fn progress_body<R: Runtime>(
+    data: Vec<u8>,
+    offset: u64,
+    total: u64,
+    transfer_id: &str,
+    handle: &Arc<TransferHandle>,
+    app: &AppHandle<R>,
+    started: Instant,
+) -> reqwest::Body {
+    let transfer_id = transfer_id.to_string();
+    let handle = Arc::clone(handle);
+    let app = app.clone();
+    let stream = async_stream::stream! {
+        let mut sent = 0_u64;
+        for chunk in data.chunks(UPLOAD_PROGRESS_CHUNK_SIZE) {
+            if handle.is_cancelled() {
+                yield Err::<Bytes, std::io::Error>(std::io::Error::new(
+                    std::io::ErrorKind::Interrupted,
+                    "transfer cancelled",
+                ));
+                return;
+            }
+            if handle.is_paused() {
+                emit_paused(&app, &transfer_id, offset + sent, total);
+                handle.wait_while_paused().await;
+                if handle.is_cancelled() {
+                    yield Err::<Bytes, std::io::Error>(std::io::Error::new(
+                        std::io::ErrorKind::Interrupted,
+                        "transfer cancelled",
+                    ));
+                    return;
+                }
+            }
+            sent += chunk.len() as u64;
+            emit_progress(&app, &transfer_id, offset + sent, total, started);
+            yield Ok::<Bytes, std::io::Error>(Bytes::copy_from_slice(chunk));
+        }
+    };
+    reqwest::Body::wrap_stream(stream)
 }
 
 /// Stream a checked HTTP response body to `dest`, emitting progress and honoring
