@@ -19,12 +19,8 @@ import {
 } from "@codemirror/commands";
 import {
   sql,
-  MySQL,
-  PostgreSQL,
-  StandardSQL,
   keywordCompletionSource,
   schemaCompletionSource,
-  type SQLDialect,
   type SQLNamespace,
 } from "@codemirror/lang-sql";
 import {
@@ -36,6 +32,7 @@ import {
 import { bracketMatching, HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 import type { DbMetadataCache } from "../../lib/dbMetadataCache";
+import { codeMirrorSqlDialect } from "../../lib/sqlEditorDialect";
 import { createSqlMetadataCompletionSource } from "../../lib/sqlMetadataCompletions";
 
 interface SqlEditorPanelProps {
@@ -122,28 +119,12 @@ const sqlHighlightStyle = HighlightStyle.define([
   },
 ]);
 
-function dialectFor(engine: string): SQLDialect {
-  switch (engine) {
-    case "MySQL":
-    case "StarRocks":
-      return MySQL;
-    case "PostgreSQL":
-    case "PanWeiDB":
-      return PostgreSQL;
-    case "Oracle":
-    case "SQLServer":
-      return StandardSQL;
-    default:
-      return StandardSQL;
-  }
-}
-
 function defaultCompletionSources(
   engine: string,
   schema?: SQLNamespace,
   extraSources: readonly CompletionSource[] = [],
 ): readonly CompletionSource[] {
-  const dialect = dialectFor(engine);
+  const dialect = codeMirrorSqlDialect(engine);
   const sources: CompletionSource[] = [
     keywordCompletionSource(dialect, true),
   ];
@@ -263,7 +244,7 @@ export function SqlEditorPanel({
         autocompleteCompartment.current.of(autocompleteFor(completionSources, defaultSources)),
         syntaxHighlighting(sqlHighlightStyle),
         langCompartment.current.of(
-          sql({ dialect: dialectFor(engine), upperCaseKeywords: true }),
+          sql({ dialect: codeMirrorSqlDialect(engine), upperCaseKeywords: true }),
         ),
         keymap.of([
           { key: "F5", run: () => (runHandler(), true) },
@@ -407,7 +388,7 @@ export function SqlEditorPanel({
     view.dispatch({
       effects: langCompartment.current.reconfigure(
         sql({
-          dialect: dialectFor(engine),
+          dialect: codeMirrorSqlDialect(engine),
           upperCaseKeywords: true,
           schema: schema && Object.keys(schema).length > 0 ? schema : undefined,
         }),
