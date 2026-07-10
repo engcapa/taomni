@@ -35,6 +35,7 @@ import { tags } from "@lezer/highlight";
 import type { DbMetadataCache } from "../../lib/dbMetadataCache";
 import { codeMirrorSqlDialect } from "../../lib/sqlEditorDialect";
 import { createSqlMetadataCompletionSource } from "../../lib/sqlMetadataCompletions";
+import { createSqlStructuredCompletionSource } from "../../lib/sqlStructuredCompletions";
 
 const DOC_CHANGE_DEBOUNCE_MS = 200;
 
@@ -247,14 +248,20 @@ export function SqlEditorPanel({
       onMetadataResult,
     ],
   );
+  const structuredCompletionSource = useMemo(
+    () => createSqlStructuredCompletionSource({ engine }),
+    [engine],
+  );
   const defaultSources = useMemo(
     () =>
       defaultCompletionSources(
         engine,
         schema,
-        metadataCompletionSource ? [metadataCompletionSource] : [],
+        metadataCompletionSource
+          ? [structuredCompletionSource, metadataCompletionSource]
+          : [structuredCompletionSource],
       ),
-    [engine, metadataCompletionSource, schema],
+    [engine, metadataCompletionSource, schema, structuredCompletionSource],
   );
 
   // Build editor once on mount.

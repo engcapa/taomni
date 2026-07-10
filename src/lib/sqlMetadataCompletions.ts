@@ -13,6 +13,7 @@ import {
 } from "./dbMetadataCache";
 import type { DbColumnDescription, DbTable } from "./ipc";
 import { sqlIdentifierCompletionApply } from "./sqlEditorDialect";
+import { sqlLocalRelations } from "./sqlLocalRelations";
 
 interface TableRef {
   catalog: string | null;
@@ -388,6 +389,11 @@ export function createSqlMetadataCompletionSource(
     const prefix = completionPrefix(match[2], context.pos);
     const parts = splitSqlQualifiedName(qualifier);
     if (parts.length === 0 || parts.length > 3) return null;
+    if (parts.length === 1) {
+      const localRelation = sqlLocalRelations(currentStatement(context, doc))
+        .get(parts[0].toLocaleLowerCase());
+      if (localRelation) return null;
+    }
     context.addEventListener("abort", () => undefined, { onDocChange: true });
 
     options.onLoadingChange?.(true);

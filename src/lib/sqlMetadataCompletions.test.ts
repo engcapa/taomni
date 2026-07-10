@@ -300,6 +300,20 @@ describe("createSqlMetadataCompletionSource", () => {
     expect(ipcMock.dbDescribeTable).toHaveBeenCalledWith("s1", "sales", "orders", null);
   });
 
+  it("leaves CTE column completion to the local structured source", async () => {
+    const result = await complete(`
+      WITH recent AS (SELECT id, total FROM orders)
+      SELECT recent.‸ FROM recent
+    `, {
+      engine: "PostgreSQL",
+      activeSchema: "public",
+    });
+
+    expect(result).toBeNull();
+    expect(ipcMock.dbSearchTables).not.toHaveBeenCalled();
+    expect(ipcMock.dbDescribeTable).not.toHaveBeenCalled();
+  });
+
   it("deduplicates metadata requests across concurrent completions", async () => {
     const cache = createDbMetadataCache({ sessionId: "s1" });
 
