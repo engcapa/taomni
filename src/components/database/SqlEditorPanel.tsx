@@ -35,6 +35,8 @@ import type { DbMetadataCache } from "../../lib/dbMetadataCache";
 import { codeMirrorSqlDialect } from "../../lib/sqlEditorDialect";
 import { createSqlMetadataCompletionSource } from "../../lib/sqlMetadataCompletions";
 
+const DOC_CHANGE_DEBOUNCE_MS = 200;
+
 interface SqlEditorPanelProps {
   engine: string;
   /** Initial document; the editor owns its content thereafter. */
@@ -208,6 +210,23 @@ export function SqlEditorPanel({
   // Build editor once on mount.
   useEffect(() => {
     if (!hostRef.current) return;
+    let pendingDoc: EditorState["doc"] | null = null;
+    let docChangeTimer: ReturnType<typeof setTimeout> | null = null;
+    const flushPendingDocChange = () => {
+      if (docChangeTimer !== null) {
+        clearTimeout(docChangeTimer);
+        docChangeTimer = null;
+      }
+      if (!pendingDoc) return;
+      const doc = pendingDoc;
+      pendingDoc = null;
+      onDocChangeRef.current?.(doc.toString());
+    };
+    const scheduleDocChange = (doc: EditorState["doc"]) => {
+      pendingDoc = doc;
+      if (docChangeTimer !== null) clearTimeout(docChangeTimer);
+      docChangeTimer = setTimeout(flushPendingDocChange, DOC_CHANGE_DEBOUNCE_MS);
+    };
     const runHandler = () => {
       const view = viewRef.current;
       if (!view) return;
@@ -257,11 +276,15 @@ export function SqlEditorPanel({
           indentWithTab,
         ]),
         EditorView.updateListener.of((u) => {
-          if (u.docChanged) onDocChangeRef.current?.(u.state.doc.toString());
+          if (u.docChanged) scheduleDocChange(u.state.doc);
         }),
         EditorView.domEventHandlers({
           focus: () => {
             onFocusRef.current?.();
+            return false;
+          },
+          blur: () => {
+            flushPendingDocChange();
             return false;
           },
         }),
@@ -374,6 +397,7 @@ export function SqlEditorPanel({
     handleRef?.(handle);
 
     return () => {
+      flushPendingDocChange();
       handleRef?.(null);
       view.destroy();
       viewRef.current = null;

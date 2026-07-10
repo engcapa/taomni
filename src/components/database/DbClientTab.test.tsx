@@ -90,7 +90,10 @@ vi.mock("../../lib/ipc", () => ({
 
 const dbChildProps = vi.hoisted(() => ({
   schemaTree: null as null | { metadataCache?: unknown },
-  sqlEditor: null as null | { metadataCache?: unknown },
+  sqlEditor: null as null | {
+    metadataCache?: unknown;
+    onDocChange?: (doc: string) => void;
+  },
   editorInitialDocFallback: "select 1",
   generatedSql: "select 1\nORDER BY \"one\" DESC;",
   generatedRequest: null as null | {
@@ -115,15 +118,17 @@ vi.mock("./SqlEditorPanel", () => ({
   SqlEditorPanel: ({
     handleRef,
     onRun,
+    onDocChange,
     metadataCache,
     initialDoc,
   }: {
     handleRef: (handle: unknown | null) => void;
     onRun: (sql: string) => void;
+    onDocChange?: (doc: string) => void;
     metadataCache?: unknown;
     initialDoc?: string;
   }) => {
-    dbChildProps.sqlEditor = { metadataCache };
+    dbChildProps.sqlEditor = { metadataCache, onDocChange };
     useEffect(() => {
       let doc = initialDoc || dbChildProps.editorInitialDocFallback;
       const handle = {
@@ -300,6 +305,21 @@ describe("DbClientTab connection lifecycle", () => {
       expect(dbChildProps.schemaTree?.metadataCache).toBeTruthy();
       expect(dbChildProps.sqlEditor?.metadataCache).toBe(dbChildProps.schemaTree?.metadataCache);
     });
+  });
+
+  it("does not rewrite workspace metadata for document-only changes", async () => {
+    ipcMock.dbConnect.mockResolvedValue({ ok: true });
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+
+    render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
+    await waitFor(() => expect(dbChildProps.sqlEditor?.onDocChange).toBeTypeOf("function"));
+    setItem.mockClear();
+
+    act(() => dbChildProps.sqlEditor?.onDocChange?.("select 2"));
+
+    expect(
+      setItem.mock.calls.some(([key]) => String(key).startsWith("taomni.db.queryWorkspace.v1.")),
+    ).toBe(false);
   });
 
   it("uses PanWeiDB schema metadata instead of treating the connection database as the schema", async () => {
