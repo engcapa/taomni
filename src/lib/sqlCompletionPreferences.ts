@@ -100,6 +100,18 @@ function platformShortcut(shortcut: string, isMac: boolean): string {
     .join("-");
 }
 
+/**
+ * Multi-cursor bindings stay hard-reserved in CodeMirror. The execution shortcuts
+ * (F5 / Mod-Enter / Mod-Shift-Enter) are user-configurable, so they are validated
+ * as conflicts in the execution-preferences layer rather than as hard reserved.
+ */
+const HARD_RESERVED_SHORTCUTS = new Set(
+  [
+    "Shift-Alt-ArrowUp",
+    "Shift-Alt-ArrowDown",
+  ].map((candidate) => platformShortcut(normalizeSqlShortcut(candidate) ?? candidate, typeof navigator !== "undefined" && /mac/i.test(navigator.platform))),
+);
+
 export function sqlShortcutValidationError(
   value: unknown,
   isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform),
@@ -108,13 +120,42 @@ export function sqlShortcutValidationError(
   const shortcut = normalizeSqlShortcut(value);
   if (!shortcut) return "invalid";
   const platformValue = platformShortcut(shortcut, isMac);
-  const reserved = new Set([
-    "F5",
-    isMac ? "Meta-Enter" : "Ctrl-Enter",
-    "Shift-Alt-ArrowUp",
-    "Shift-Alt-ArrowDown",
-  ].map((candidate) => platformShortcut(normalizeSqlShortcut(candidate) ?? candidate, isMac)));
-  return reserved.has(platformValue) ? "reserved" : null;
+  // Hard reserved are only multi-cursor bindings; execution keys are soft conflicts
+  // reported via completion ↔ execution cross-check, not hard-blocked here.
+  const reserved = new Set(
+    [...HARD_RESERVED_SHORTCUTS].map((candidate) => platformShortcut(candidate, isMac)),
+  );
+  if (reserved.has(platformValue)) return "reserved";
+  // Soft cross-check: completion shortcut must not collide with execution shortcuts.
+  // When nothing is persisted yet, fall back to the execution defaults so F5 /
+  // Mod-Enter / Mod-Shift-Enter stay blocked for completion out of the box.
+  try {
+    if (typeof window !== "undefined") {
+      const raw = window.localStorage.getItem("taomni.sqlExecutionPreferences.v1");
+      const defaults = ["F5", "Mod-Enter", "Mod-Shift-Enter"];
+      const candidates: string[] = [];
+      if (raw) {
+        const parsed = JSON.parse(raw) as { runAll?: unknown; runSelection?: unknown; runCurrent?: unknown };
+        for (const key of ["runAll", "runSelection", "runCurrent"] as const) {
+          const value = parsed[key];
+          if (typeof value === "string") {
+            const norm = normalizeSqlShortcut(value);
+            if (norm) candidates.push(platformShortcut(norm, isMac));
+          }
+        }
+      }
+      if (candidates.length === 0) {
+        for (const value of defaults) {
+          const norm = normalizeSqlShortcut(value);
+          if (norm) candidates.push(platformShortcut(norm, isMac));
+        }
+      }
+      if (candidates.includes(platformValue)) return "reserved";
+    }
+  } catch {
+    // ignore
+  }
+  return null;
 }
 
 function eventKey(event: KeyboardEvent): string | null {

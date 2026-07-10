@@ -40,6 +40,7 @@ import { matchingIds } from "./settingsSearch";
 import { CodeViewAppearanceSettings } from "./CodeViewAppearanceSettings";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 import { SqlCompletionSettings } from "./SqlCompletionSettings";
+import { SqlExecutionSettings } from "./SqlExecutionSettings";
 
 const UI_FONTS = [
   { value: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', label: "Inter (Default UI - Highly Recommended)" },
@@ -445,6 +446,10 @@ export function SettingsPanel() {
 
           <SettingsAnchor id="sql-completion">
             <SqlCompletionSettings />
+          </SettingsAnchor>
+
+          <SettingsAnchor id="sql-execution">
+            <SqlExecutionSettings />
           </SettingsAnchor>
 
           <SettingsAnchor id="terminal-defaults">

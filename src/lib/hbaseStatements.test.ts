@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { splitHBaseStatements } from "./hbaseStatements";
+import {
+  hbaseStatementRangeAt,
+  splitHBaseStatementRanges,
+  splitHBaseStatements,
+} from "./hbaseStatements";
 
 describe("splitHBaseStatements", () => {
   it("returns a single statement unchanged", () => {
@@ -79,3 +83,33 @@ describe("splitHBaseStatements", () => {
     expect(splitHBaseStatements("   \n  \n")).toEqual([]);
   });
 });
+
+describe("splitHBaseStatementRanges / hbaseStatementRangeAt", () => {
+  it("returns ranges with from/to offsets for multi-line input", () => {
+    const input = "list\nstatus";
+    expect(splitHBaseStatementRanges(input)).toEqual([
+      { sql: "list", from: 0, to: 4 },
+      { sql: "status", from: 5, to: 11 },
+    ]);
+  });
+
+  it("locates the statement under the cursor", () => {
+    const input = "list\nstatus\nversion";
+    expect(hbaseStatementRangeAt(input, 0)?.sql).toBe("list");
+    expect(hbaseStatementRangeAt(input, 6)?.sql).toBe("status");
+    expect(hbaseStatementRangeAt(input, input.length)?.sql).toBe("version");
+  });
+
+  it("hits statement edges and falls back for a single-statement document", () => {
+    const multi = "list;\nstatus";
+    expect(hbaseStatementRangeAt(multi, 0)?.sql).toBe("list");
+    expect(hbaseStatementRangeAt(multi, 4)?.sql).toBe("list");
+    expect(hbaseStatementRangeAt(multi, multi.length)?.sql).toBe("status");
+
+    const single = "  list  ";
+    // Cursor in leading whitespace still returns the only statement.
+    expect(hbaseStatementRangeAt(single, 0)?.sql).toBe("list");
+  });
+});
+
+

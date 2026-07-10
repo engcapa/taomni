@@ -208,6 +208,18 @@ describe("SettingsPanel", () => {
     expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 1");
   });
 
+  it("finds SQL execution shortcut settings", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<SettingsPanel />);
+
+    await user.type(screen.getByTestId("settings-search-input"), "run current");
+
+    expect(container.querySelector('[data-search-id="sql-execution"]'))
+      .toHaveAttribute("data-search-match", "true");
+    expect(screen.getByTestId("sql-execution-settings")).toBeInTheDocument();
+  });
+
+
   it("shows an empty state when no setting matches", async () => {
     const user = userEvent.setup();
     render(<SettingsPanel />);

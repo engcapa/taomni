@@ -13,8 +13,23 @@
  * parser (src-tauri/src/hbase/mod.rs) so splitting never breaks a statement the
  * backend would otherwise parse as a unit.
  */
-export function splitHBaseStatements(input: string): string[] {
-  const statements: string[] = [];
+export interface HBaseStatementRange {
+  sql: string;
+  from: number;
+  to: number;
+}
+
+function trimHBaseRange(input: string, from: number, to: number): { from: number; to: number; text: string } {
+  let start = from;
+  let end = to;
+  while (start < end && /\s/.test(input[start])) start += 1;
+  while (end > start && /\s/.test(input[end - 1])) end -= 1;
+  return { from: start, to: end, text: input.slice(start, end) };
+}
+
+function splitHBaseInputImpl(input: string): HBaseStatementRange[] {
+  const statements: HBaseStatementRange[] = [];
+  let currentStart = 0;
   let current = "";
   let single = false;
   let double = false;
@@ -22,9 +37,15 @@ export function splitHBaseStatements(input: string): string[] {
   let bracket = 0;
   let i = 0;
 
-  const push = () => {
-    const trimmed = current.trim();
-    if (trimmed) statements.push(trimmed);
+  const pushRange = (to: number) => {
+    // `current` may collapse line-continuation newlines/backslashes into spaces
+    // (matching the historical string splitter). from/to still refer to the
+    // original source span so cursor-hit testing stays accurate.
+    const text = current.trim();
+    if (text) {
+      const { from, to: trimmedTo } = trimHBaseRange(input, currentStart, to);
+      statements.push({ sql: text, from, to: trimmedTo });
+    }
     current = "";
   };
 
@@ -88,8 +109,6 @@ export function splitHBaseStatements(input: string): string[] {
 
     if (topLevel && (ch === "\n" || ch === "\r")) {
       // Line continuation: a trailing comma or backslash joins the next line.
-      // Collapse the join (drop the newline and the next line's indent) to a
-      // single space so the reassembled statement reads cleanly.
       const trimmedEnd = current.replace(/[ \t]+$/, "");
       const continuesComma = trimmedEnd.endsWith(",");
       const continuesBackslash = !continuesComma && trimmedEnd.endsWith("\\");
@@ -104,14 +123,18 @@ export function splitHBaseStatements(input: string): string[] {
         current += " ";
         continue;
       }
-      push();
-      i += 1;
+      pushRange(i);
+      // skip the newline character(s)
+      const newlineLen = ch === "\r" && input[i + 1] === "\n" ? 2 : 1;
+      i += newlineLen;
+      currentStart = i;
       continue;
     }
 
     if (topLevel && ch === ";") {
-      push();
+      pushRange(i);
       i += 1;
+      currentStart = i;
       continue;
     }
 
@@ -119,6 +142,24 @@ export function splitHBaseStatements(input: string): string[] {
     i += 1;
   }
 
-  push();
+  pushRange(input.length);
   return statements;
+}
+
+export function splitHBaseStatementRanges(input: string): HBaseStatementRange[] {
+  return splitHBaseInputImpl(input);
+}
+
+export function splitHBaseStatements(input: string): string[] {
+  return splitHBaseInputImpl(input).map((r) => r.sql);
+}
+
+export function hbaseStatementRangeAt(input: string, position: number): HBaseStatementRange | null {
+  const ranges = splitHBaseStatementRanges(input);
+  if (ranges.length === 0) return null;
+  const clamped = Math.max(0, Math.min(position, input.length));
+  const containing = ranges.find((r) => r.from <= clamped && clamped <= r.to);
+  if (containing) return containing;
+  // If cursor is in whitespace between statements, return null; if only one statement, return it
+  return ranges.length === 1 ? ranges[0] : null;
 }

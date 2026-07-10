@@ -45,6 +45,11 @@ import {
   subscribeSqlCompletionPreferences,
   type SqlCompletionPreferences,
 } from "../../lib/sqlCompletionPreferences";
+import {
+  loadSqlExecutionPreferences,
+  subscribeSqlExecutionPreferences,
+  type SqlExecutionPreferences,
+} from "../../lib/sqlExecutionPreferences";
 
 const DOC_CHANGE_DEBOUNCE_MS = 200;
 
@@ -71,6 +76,8 @@ interface SqlEditorPanelProps {
   onDocChange?: (doc: string) => void;
   /** Run callback receives selection if any text is selected, else full doc. */
   onRun?: (sql: string, context: SqlEditorRunContext) => void;
+  /** Run the statement at the cursor position. */
+  onRunCurrent?: (context: SqlEditorRunContext) => void;
   onFocus?: () => void;
 }
 
@@ -197,6 +204,29 @@ export interface SqlEditorRunContext {
  * `handleRef` callback so the parent toolbar (Run / Run selection / Format)
  * can drive it without re-rendering the view.
  */
+function buildExecutionKeymap(
+  preferences: SqlExecutionPreferences,
+  runHandler: () => void,
+  runCurrentHandler: () => void,
+): readonly KeyBinding[] {
+  // runHandler handles both Run All and Run Selection depending on selection state
+  // When selection exists, existing runHandler already returns selection.
+  // We map both runAll and runSelection to the same handler for backward compat;
+  // the parent can still distinguish via context but for editor keymap it's unified.
+  const bindings: KeyBinding[] = [
+    { key: preferences.runAll, run: () => (runHandler(), true) },
+    { key: preferences.runCurrent, run: () => (runCurrentHandler(), true) },
+  ];
+  // Avoid duplicate key if runSelection equals runAll/runCurrent (after dedup, we keep one)
+  if (
+    preferences.runSelection !== preferences.runAll &&
+    preferences.runSelection !== preferences.runCurrent
+  ) {
+    bindings.push({ key: preferences.runSelection, run: () => (runHandler(), true) });
+  }
+  return bindings;
+}
+
 export function SqlEditorPanel({
   engine,
   initialDoc = "",
@@ -208,6 +238,7 @@ export function SqlEditorPanel({
   completionSources,
   onDocChange,
   onRun,
+  onRunCurrent,
   onFocus,
   handleRef,
 }: SqlEditorPanelProps & { handleRef?: (h: SqlEditorHandle | null) => void }) {
@@ -216,18 +247,26 @@ export function SqlEditorPanel({
   const langCompartment = useRef(new Compartment());
   const autocompleteCompartment = useRef(new Compartment());
   const completionKeymapCompartment = useRef(new Compartment());
+  const executionKeymapCompartment = useRef(new Compartment());
   const onRunRef = useRef(onRun);
+  const onRunCurrentRef = useRef(onRunCurrent);
   const onDocChangeRef = useRef(onDocChange);
   const onFocusRef = useRef(onFocus);
   onRunRef.current = onRun;
+  onRunCurrentRef.current = onRunCurrent;
   onDocChangeRef.current = onDocChange;
   onFocusRef.current = onFocus;
   const [metadataPending, setMetadataPending] = useState(0);
   const [metadataLoadingVisible, setMetadataLoadingVisible] = useState(false);
   const [metadataHint, setMetadataHint] = useState<string | null>(null);
   const [completionPreferences, setCompletionPreferences] = useState(loadSqlCompletionPreferences);
+  const [executionPreferences, setExecutionPreferences] = useState(loadSqlExecutionPreferences);
   useEffect(
     () => subscribeSqlCompletionPreferences(setCompletionPreferences),
+    [],
+  );
+  useEffect(
+    () => subscribeSqlExecutionPreferences(setExecutionPreferences),
     [],
   );
   const onMetadataLoadingChange = useCallback((loading: boolean) => {
@@ -331,6 +370,22 @@ export function SqlEditorPanel({
         selectionRange: sel.empty ? null : { from: sel.from, to: sel.to },
       });
     };
+    const runCurrentHandler = () => {
+      const view = viewRef.current;
+      if (!view) return;
+      const sel = view.state.selection.main;
+      onRunCurrentRef.current?.({
+        doc: view.state.doc.toString(),
+        cursorPosition: sel.head,
+        selectionRange: sel.empty ? null : { from: sel.from, to: sel.to },
+      });
+    };
+
+    const executionKeymap = buildExecutionKeymap(
+      loadSqlExecutionPreferences(),
+      runHandler,
+      runCurrentHandler,
+    );
 
     const state = EditorState.create({
       doc: initialDoc,
@@ -357,13 +412,14 @@ export function SqlEditorPanel({
         completionKeymapCompartment.current.of(
           Prec.highest(keymap.of(sqlCompletionKeymapFor(completionPreferences))),
         ),
+        executionKeymapCompartment.current.of(
+          Prec.high(keymap.of(executionKeymap)),
+        ),
         syntaxHighlighting(sqlHighlightStyle),
         langCompartment.current.of(
           sql({ dialect: codeMirrorSqlDialect(engine), upperCaseKeywords: true }),
         ),
         keymap.of([
-          { key: "F5", run: () => (runHandler(), true) },
-          { key: "Mod-Enter", run: () => (runHandler(), true) },
           { key: "Shift-Alt-ArrowUp", run: addCursorAbove },
           { key: "Shift-Alt-ArrowDown", run: addCursorBelow },
           ...closeBracketsKeymap,
@@ -536,6 +592,35 @@ export function SqlEditorPanel({
       ),
     });
   }, [completionPreferences]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    const runHandler = () => {
+      const sel = view.state.selection.main;
+      const text = sel.empty
+        ? view.state.doc.toString()
+        : view.state.sliceDoc(sel.from, sel.to);
+      onRunRef.current?.(text, {
+        doc: view.state.doc.toString(),
+        cursorPosition: sel.head,
+        selectionRange: sel.empty ? null : { from: sel.from, to: sel.to },
+      });
+    };
+    const runCurrentHandler = () => {
+      const sel = view.state.selection.main;
+      onRunCurrentRef.current?.({
+        doc: view.state.doc.toString(),
+        cursorPosition: sel.head,
+        selectionRange: sel.empty ? null : { from: sel.from, to: sel.to },
+      });
+    };
+    view.dispatch({
+      effects: executionKeymapCompartment.current.reconfigure(
+        Prec.high(keymap.of(buildExecutionKeymap(executionPreferences, runHandler, runCurrentHandler))),
+      ),
+    });
+  }, [executionPreferences]);
 
   return (
     <div className="h-full w-full overflow-hidden relative" data-testid="sql-editor">

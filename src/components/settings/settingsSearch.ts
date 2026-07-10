@@ -56,6 +56,19 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     ],
   },
   {
+    id: "sql-execution",
+    titleKeys: [
+      "settings.sqlExecutionTitle",
+      "settings.sqlExecutionRunAll",
+      "settings.sqlExecutionRunSelection",
+      "settings.sqlExecutionRunCurrent",
+    ],
+    terms: [
+      "sql execution", "run all", "run selection", "run current", "current statement", "execute", "shortcut",
+      "执行全部", "执行选区", "当前语句", "执行光标", "快捷键", "sql 执行",
+    ],
+  },
+  {
     id: "terminal-defaults",
     titleKeys: ["settings.terminalDefaultsTitle", "terminalAppearance.behaviorHeading"],
     terms: [
