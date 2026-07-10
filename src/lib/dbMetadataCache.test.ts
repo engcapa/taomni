@@ -85,6 +85,31 @@ describe("DbMetadataCache", () => {
     expect(ipcMock.dbListTables).not.toHaveBeenCalled();
   });
 
+  it("limits concurrent table searches", async () => {
+    type Table = { name: string; kind: "table"; rowCount: null };
+    const first = deferred<Table[]>();
+    const second = deferred<Table[]>();
+    const third = deferred<Table[]>();
+    ipcMock.dbSearchTables
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+      .mockReturnValueOnce(third.promise);
+    const cache = createDbMetadataCache({ sessionId: "s1", searchConcurrency: 2 });
+
+    const firstRequest = cache.searchTables("public", "a");
+    const secondRequest = cache.searchTables("public", "b");
+    const thirdRequest = cache.searchTables("public", "c");
+
+    expect(ipcMock.dbSearchTables).toHaveBeenCalledTimes(2);
+    first.resolve([{ name: "accounts", kind: "table", rowCount: null }]);
+    await expect(firstRequest).resolves.toHaveLength(1);
+    await vi.waitFor(() => expect(ipcMock.dbSearchTables).toHaveBeenCalledTimes(3));
+
+    second.resolve([]);
+    third.resolve([]);
+    await expect(Promise.all([secondRequest, thirdRequest])).resolves.toEqual([[], []]);
+  });
+
   it("filters a cached full schema listing without another IPC request", async () => {
     ipcMock.dbListTables.mockResolvedValueOnce([
       { name: "orders", kind: "table", rowCount: null },

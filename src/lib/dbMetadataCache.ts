@@ -23,6 +23,7 @@ export interface DbMetadataCacheOptions {
   defaultCatalog?: string | null;
   ttlMs?: number;
   now?: () => number;
+  searchConcurrency?: number;
 }
 
 export interface DbMetadataTarget {
@@ -180,15 +181,22 @@ export class DbMetadataCache {
   private readonly defaultCatalog: string | null;
   private readonly ttlMs: number;
   private readonly now: () => number;
+  private readonly searchConcurrency: number;
   private readonly entries = new Map<string, CacheEntry<unknown>>();
   private readonly inFlight = new Map<string, Promise<unknown>>();
   private readonly listeners = new Set<Listener>();
+  private readonly searchQueue: Array<() => void> = [];
+  private activeSearches = 0;
 
   constructor(options: DbMetadataCacheOptions) {
     this.sessionId = options.sessionId;
     this.defaultCatalog = truthy(options.defaultCatalog);
     this.ttlMs = options.ttlMs ?? DB_METADATA_TTL_MS;
     this.now = options.now ?? (() => Date.now());
+    const requestedSearchConcurrency = options.searchConcurrency ?? 2;
+    this.searchConcurrency = Number.isFinite(requestedSearchConcurrency)
+      ? Math.max(1, Math.round(requestedSearchConcurrency))
+      : 2;
   }
 
   subscribe(listener: Listener): () => void {
@@ -240,12 +248,14 @@ export class DbMetadataCache {
     }
     return this.cached(
       this.key("tableSearch", resolvedCatalog, resolvedSchema, normalizedPrefix.toLowerCase(), String(boundedLimit)),
-      () => dbSearchTables(
-        this.sessionId,
-        resolvedSchema || null,
-        resolvedCatalog || null,
-        normalizedPrefix,
-        boundedLimit,
+      () => this.runBoundedSearch(
+        () => dbSearchTables(
+          this.sessionId,
+          resolvedSchema || null,
+          resolvedCatalog || null,
+          normalizedPrefix,
+          boundedLimit,
+        ),
       ),
       false,
     );
@@ -395,6 +405,29 @@ export class DbMetadataCache {
 
   private resolveCatalog(catalog?: string | null): string {
     return normalize(catalog ?? this.defaultCatalog);
+  }
+
+  private runBoundedSearch<T>(fetcher: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const start = () => {
+        this.activeSearches += 1;
+        const release = () => {
+          this.activeSearches -= 1;
+          this.searchQueue.shift()?.();
+        };
+        try {
+          fetcher().then(resolve, reject).finally(release);
+        } catch (error) {
+          release();
+          reject(error);
+        }
+      };
+      if (this.activeSearches < this.searchConcurrency) {
+        start();
+      } else {
+        this.searchQueue.push(start);
+      }
+    });
   }
 
   private key(kind: CacheKind, ...parts: string[]): string {

@@ -38,6 +38,7 @@ const IDENT_PATTERN = String.raw`(?:"(?:[^"]|"")*"|` + "`(?:[^`]|``)*`" + String
 const QUALIFIED_PATTERN = `${IDENT_PATTERN}(?:\\s*\\.\\s*${IDENT_PATTERN}){0,2}`;
 const WORD_PREFIX_PATTERN = String.raw`[A-Za-z_][\w$]*`;
 const DOT_CONTEXT_RE = new RegExp(`(${QUALIFIED_PATTERN})\\.(${WORD_PREFIX_PATTERN})?$`);
+const RELATION_CONTEXT_RE = new RegExp(`\\b(?:from|join|update|into)\\s+(${WORD_PREFIX_PATTERN})?$`, "i");
 const RESERVED_AFTER_RELATION = new Set([
   "on",
   "using",
@@ -235,10 +236,37 @@ export function createSqlMetadataCompletionSource(
   options: SqlMetadataCompletionOptions,
 ): CompletionSource {
   return async (context: CompletionContext): Promise<CompletionResult | null> => {
+    context.addEventListener("abort", () => undefined, { onDocChange: true });
     const doc = context.state.doc.toString();
     const before = doc.slice(0, context.pos);
     const match = before.match(DOT_CONTEXT_RE);
-    if (!match) return null;
+    const maxOptions = options.maxOptions ?? DB_METADATA_COMPLETION_LIMIT;
+    if (!match) {
+      const relationMatch = before.match(RELATION_CONTEXT_RE);
+      const activeSchema = truthy(options.activeSchema);
+      if (!relationMatch || !activeSchema) return null;
+      const prefix = relationMatch[1] ?? "";
+      const catalog = options.engine === "Presto"
+        ? truthy(options.catalog) ?? options.cache.getDefaultCatalog()
+        : null;
+      try {
+        const completions = tableOptions(
+          await options.cache.searchTables(activeSchema, prefix, catalog, maxOptions),
+        );
+        if (context.aborted) return null;
+        const filtered = filterOptions(completions, prefix, maxOptions);
+        return filtered.length === 0
+          ? null
+          : {
+              from: context.pos - prefix.length,
+              options: filtered,
+              validFor: /^[A-Za-z_][\w$]*$/,
+            };
+      } catch (error) {
+        if (!context.aborted) options.onError?.(String(error));
+        return null;
+      }
+    }
 
     const qualifier = match[1];
     const prefix = match[2] ?? "";
@@ -246,7 +274,6 @@ export function createSqlMetadataCompletionSource(
     if (parts.length === 0 || parts.length > 3) return null;
 
     try {
-      const maxOptions = options.maxOptions ?? DB_METADATA_COMPLETION_LIMIT;
       const aliases = aliasMapFor(
         currentStatement(doc, context.pos),
         options.engine,
@@ -254,6 +281,7 @@ export function createSqlMetadataCompletionSource(
         options.catalog,
       );
       const completions = await completionsForParts(parts, aliases, prefix, maxOptions, options);
+      if (context.aborted) return null;
       const filtered = filterOptions(
         completions,
         prefix,
@@ -267,7 +295,7 @@ export function createSqlMetadataCompletionSource(
             validFor: /^[A-Za-z_][\w$]*$/,
           };
     } catch (error) {
-      options.onError?.(String(error));
+      if (!context.aborted) options.onError?.(String(error));
       return null;
     }
   };

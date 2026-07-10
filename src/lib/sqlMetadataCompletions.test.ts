@@ -46,6 +46,14 @@ const ipcMock = vi.hoisted(() => ({
 
 vi.mock("./ipc", () => ipcMock);
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 async function complete(
   doc: string,
   opts: {
@@ -82,6 +90,67 @@ afterEach(() => {
 });
 
 describe("createSqlMetadataCompletionSource", () => {
+  it("suggests active-schema tables in relation positions without loading the full schema", async () => {
+    const result = await complete("select * from ord‸", {
+      engine: "PostgreSQL",
+      activeSchema: "public",
+    });
+
+    expect(labels(result)).toEqual(["orders"]);
+    expect(ipcMock.dbSearchTables).toHaveBeenCalledWith("s1", "public", null, "ord", 500);
+    expect(ipcMock.dbListTables).not.toHaveBeenCalled();
+  });
+
+  it("does not query relation metadata without an active schema", async () => {
+    const result = await complete("select * from ord‸", {
+      engine: "PostgreSQL",
+      activeSchema: null,
+    });
+
+    expect(result).toBeNull();
+    expect(ipcMock.dbSearchTables).not.toHaveBeenCalled();
+  });
+
+  it("drops metadata results after a document-change abort", async () => {
+    const pending = deferred<Array<{ name: string; kind: "table"; rowCount: null }>>();
+    ipcMock.dbSearchTables.mockReturnValueOnce(pending.promise);
+    const state = EditorState.create({ doc: "select * from ord" });
+    let aborted = false;
+    let abortOnDocChange = false;
+    let abort = () => undefined;
+    const context = {
+      state,
+      pos: state.doc.length,
+      explicit: true,
+      get aborted() {
+        return aborted;
+      },
+      addEventListener: (
+        _type: "abort",
+        listener: () => void,
+        options?: { onDocChange: boolean },
+      ) => {
+        abortOnDocChange = options?.onDocChange ?? false;
+        abort = () => {
+          aborted = true;
+          listener();
+        };
+      },
+    } as unknown as CompletionContext;
+    const source = createSqlMetadataCompletionSource({
+      cache: createDbMetadataCache({ sessionId: "s1" }),
+      engine: "PostgreSQL",
+      activeSchema: "public",
+    });
+
+    const resultPromise = source(context);
+    expect(abortOnDocChange).toBe(true);
+    abort();
+    pending.resolve([{ name: "orders", kind: "table", rowCount: null }]);
+
+    await expect(resultPromise).resolves.toBeNull();
+  });
+
   it("suggests tables after schema dot", async () => {
     const result = await complete("select * from sales.‸", {
       engine: "PostgreSQL",

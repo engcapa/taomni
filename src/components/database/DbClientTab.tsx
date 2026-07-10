@@ -1364,19 +1364,6 @@ export default function DbClientTab({
     };
   }, [info.catalog, metadataCache, onSchemasLoaded, setStatusMessage]);
 
-  useEffect(() => {
-    if (!metadataCache || !activeSchema) return;
-    let cancelled = false;
-    void metadataCache
-      .listTables(activeSchema, info.catalog)
-      .catch((error) => {
-        if (!cancelled) setStatusMessage(`Table metadata failed: ${String(error)}`);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeSchema, info.catalog, metadataCache, setStatusMessage]);
-
   const metadataSchema = useMemo(
     () =>
       metadataCache

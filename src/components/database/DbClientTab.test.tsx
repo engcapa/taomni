@@ -310,15 +310,11 @@ describe("DbClientTab connection lifecycle", () => {
 
     const schemaSelect = await screen.findByLabelText("Schema");
     await waitFor(() => expect(schemaSelect).toHaveValue("panwei_omm"));
-    await waitFor(() =>
-      expect(ipcMock.dbListTables).toHaveBeenCalledWith(
-        expect.stringMatching(/^saved-panwei::/),
-        "panwei_omm",
-        null,
-      ),
+    expect(ipcMock.dbListSchemas).toHaveBeenCalledWith(
+      expect.stringMatching(/^saved-panwei::/),
+      null,
     );
-    const tableCalls = ipcMock.dbListTables.mock.calls as unknown as Array<[string, string | null, string | null]>;
-    expect(tableCalls.some(([, schema]) => schema === "panweidb")).toBe(false);
+    expect(ipcMock.dbListTables).not.toHaveBeenCalled();
   });
 
   it("appends echoed agent SQL with comments and semicolons into one query panel", async () => {
