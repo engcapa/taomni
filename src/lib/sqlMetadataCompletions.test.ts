@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
 import { createDbMetadataCache, DB_METADATA_COMPLETION_LIMIT } from "./dbMetadataCache";
+import { codeMirrorSqlDialect } from "./sqlEditorDialect";
 import { createSqlMetadataCompletionSource } from "./sqlMetadataCompletions";
 
 const ipcMock = vi.hoisted(() => ({
@@ -65,7 +66,10 @@ async function complete(
 ): Promise<CompletionResult | null> {
   const pos = doc.indexOf("‸");
   const text = doc.replace("‸", "");
-  const state = EditorState.create({ doc: text });
+  const state = EditorState.create({
+    doc: text,
+    extensions: [codeMirrorSqlDialect(opts.engine).extension],
+  });
   const context = new CompletionContext(state, pos < 0 ? text.length : pos, true);
   const cache =
     opts.cache ??
@@ -109,6 +113,57 @@ describe("createSqlMetadataCompletionSource", () => {
 
     expect(result).toBeNull();
     expect(ipcMock.dbSearchTables).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "select 'from ord‸'",
+    "select 1 -- from ord‸",
+    "select /* join ord‸ */ 1",
+    'select "from ord‸"',
+  ])("does not offer metadata inside strings or comments: %s", async (doc) => {
+    const result = await complete(doc, {
+      engine: "MySQL",
+      activeSchema: "public",
+    });
+
+    expect(result).toBeNull();
+    expect(ipcMock.dbSearchTables).not.toHaveBeenCalled();
+  });
+
+  it("supports quoted identifier prefixes and inserts a complete quoted name", async () => {
+    ipcMock.dbSearchTables.mockResolvedValueOnce([
+      { name: "Order Items", kind: "table", rowCount: null },
+    ]);
+
+    const result = await complete('select * from "Order I‸', {
+      engine: "PostgreSQL",
+      activeSchema: "public",
+    });
+
+    expect(labels(result)).toEqual(["Order Items"]);
+    expect(result?.from).toBe("select * from ".length);
+    expect(result?.options[0]?.apply).toBe('"Order Items"');
+    expect(ipcMock.dbSearchTables).toHaveBeenCalledWith(
+      "s1",
+      "public",
+      null,
+      "Order I",
+      500,
+    );
+  });
+
+  it("supports Unicode identifier prefixes", async () => {
+    ipcMock.dbSearchTables.mockResolvedValueOnce([
+      { name: "订单", kind: "table", rowCount: null },
+    ]);
+
+    const result = await complete("select * from 订‸", {
+      engine: "PostgreSQL",
+      activeSchema: "public",
+    });
+
+    expect(labels(result)).toEqual(["订单"]);
+    expect(result?.options[0]?.apply).toBeUndefined();
   });
 
   it("drops metadata results after a document-change abort", async () => {
