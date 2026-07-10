@@ -29,6 +29,7 @@ import {
   MessageSquare,
   RefreshCw,
   Trash2,
+  Crosshair,
 } from "lucide-react";
 import type { DbConnectInfo } from "../../types";
 import {
@@ -66,6 +67,11 @@ import {
   type QueryRefreshMode,
 } from "./QueryResultGrid";
 import { formatSql } from "./formatSql";
+import {
+  displaySqlShortcut,
+  loadSqlExecutionPreferences,
+  subscribeSqlExecutionPreferences,
+} from "../../lib/sqlExecutionPreferences";
 import { useAppStore } from "../../stores/appStore";
 import { TabActions } from "../tabbar/TabActionSlot";
 import { useCaptureStore, type CaptureSource } from "../../stores/captureStore";
@@ -573,6 +579,7 @@ export default function DbClientTab({
   const [metadataVersion, setMetadataVersion] = useState(0);
   const [historyPanelId, setHistoryPanelId] = useState<string | null>(null);
   const [statementAction, setStatementAction] = useState<EditorStatementAction | null>(null);
+  const [executionPreferences, setExecutionPreferences] = useState(loadSqlExecutionPreferences);
   const [historyEntries, setHistoryEntries] = useState<DbSqlHistoryEntry[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [leftPanelTab, setLeftPanelTab] = useState<"schema" | "bookmarks">("schema");
@@ -1586,6 +1593,15 @@ export default function DbClientTab({
         disabled: running || !hasEditor,
       },
       {
+        label: "Run current statement",
+        icon: <Crosshair className="w-3 h-3" />,
+        onClick: () => {
+          setActivePanelId(panel.id);
+          runCurrentStatement(panel.id);
+        },
+        disabled: running || !hasEditor,
+      },
+      {
         label: "Format SQL",
         icon: <Sparkles className="w-3 h-3" />,
         onClick: () => formatPanel(panel),
@@ -1967,9 +1983,15 @@ export default function DbClientTab({
     }
   };
 
-  const currentEditorStatement = (): EditorStatementAction | null => {
-    const handle = editorHandles.current[activePanel.id];
-    const doc = handle?.getValue() ?? activePanel.doc;
+  useEffect(
+    () => subscribeSqlExecutionPreferences(setExecutionPreferences),
+    [],
+  );
+
+  const currentEditorStatement = (panelId: string = activePanel.id): EditorStatementAction | null => {
+    const panel = panels.find((p) => p.id === panelId) ?? activePanel;
+    const handle = editorHandles.current[panel.id];
+    const doc = handle?.getValue() ?? panel.doc;
     const selection = handle?.getSelectionRange() ?? null;
     const position = selection && selection.from !== selection.to
       ? selection.from
@@ -1982,7 +2004,7 @@ export default function DbClientTab({
       setStatusMessage("No SQL statement at the current cursor.");
       return null;
     }
-    return { panelId: activePanel.id, doc, range };
+    return { panelId: panel.id, doc, range };
   };
 
   const toggleStatementPanel = () => {
@@ -2005,6 +2027,12 @@ export default function DbClientTab({
       },
     });
     setStatementAction(null);
+  };
+
+  const runCurrentStatement = (panelId: string = activePanel.id) => {
+    const action = currentEditorStatement(panelId);
+    if (!action) return;
+    runEditorStatement(action);
   };
 
   const selectEditorStatement = (action: EditorStatementAction) => {
@@ -2406,6 +2434,9 @@ export default function DbClientTab({
                 schemas={schemas}
                 activeSchema={activeSchema}
                 running={activePanel.sheets.some((sheet) => sheet.running)}
+                runAllTitle={`Run (${displaySqlShortcut(executionPreferences.runAll)})`}
+                runSelectionTitle={`Run selection (${displaySqlShortcut(executionPreferences.runSelection)})`}
+                runCurrentTitle={`Run current statement (${displaySqlShortcut(executionPreferences.runCurrent)})`}
                 onRun={() => {
                   const payload = editorRunPayload(activePanel, false);
                   void runQuery(activePanel.id, payload.sql, { context: payload.context });
@@ -2414,6 +2445,7 @@ export default function DbClientTab({
                   const payload = editorRunPayload(activePanel, true);
                   void runQuery(activePanel.id, payload.sql, { context: payload.context });
                 }}
+                onRunCurrent={runCurrentStatement}
                 onCancel={() => cancelQuery(activePanel.id)}
                 onFormat={() => formatPanel(activePanel)}
                 onToggleStatement={toggleStatementPanel}
@@ -2477,6 +2509,7 @@ export default function DbClientTab({
                       onDocChange={(doc) => patchPanel(activePanel.id, { doc, dirty: true })}
                       onFocus={() => setActivePanelId(activePanel.id)}
                       onRun={(sql, context) => void runQuery(activePanel.id, sql, { context })}
+                      onRunCurrent={() => runCurrentStatement()}
                     />
                   </div>
                 </Panel>
@@ -2515,8 +2548,12 @@ function EditorToolbar({
   schemas,
   activeSchema,
   running,
+  runAllTitle,
+  runSelectionTitle,
+  runCurrentTitle,
   onRun,
   onRunSelection,
+  onRunCurrent,
   onCancel,
   onFormat,
   onToggleStatement,
@@ -2533,8 +2570,12 @@ function EditorToolbar({
   schemas: string[];
   activeSchema: string | null;
   running: boolean;
+  runAllTitle: string;
+  runSelectionTitle: string;
+  runCurrentTitle: string;
   onRun: () => void;
   onRunSelection: () => void;
+  onRunCurrent: () => void;
   onCancel: () => void;
   onFormat: () => void;
   onToggleStatement: () => void;
@@ -2554,11 +2595,21 @@ function EditorToolbar({
       className="h-8 shrink-0 flex items-center gap-1 px-2"
       style={{ background: "var(--taomni-quick-bg)", borderBottom: "1px solid var(--taomni-divider)" }}
     >
-      <button type="button" className={btn} onClick={onRun} disabled={running} title="Run (F5)">
+      <button type="button" className={btn} onClick={onRun} disabled={running} title={runAllTitle}>
         <Play className="w-3.5 h-3.5" style={{ color: "#62d36f" }} /> Run
       </button>
-      <button type="button" className={btn} onClick={onRunSelection} disabled={running} title="Run selection">
+      <button type="button" className={btn} onClick={onRunSelection} disabled={running} title={runSelectionTitle}>
         <SquareDashedMousePointer className="w-3.5 h-3.5" /> Selection
+      </button>
+      <button
+        type="button"
+        className={btn}
+        onClick={onRunCurrent}
+        disabled={running}
+        title={runCurrentTitle}
+        data-testid="db-run-current-statement"
+      >
+        <Crosshair className="w-3.5 h-3.5" /> Current
       </button>
       <button type="button" className={btn} onClick={onCancel} disabled={!running} title="Cancel query">
         <Ban className="w-3.5 h-3.5" style={{ color: "#d9534f" }} /> Cancel

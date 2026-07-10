@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronUp, ChevronDown, Trash2, Radio } from "lucide-react";
+import { ChevronUp, ChevronDown, Crosshair, Trash2, Radio } from "lucide-react";
 import { redisExec } from "../../lib/ipc";
+import {
+  displaySqlShortcut,
+  loadSqlExecutionPreferences,
+  subscribeSqlExecutionPreferences,
+} from "../../lib/sqlExecutionPreferences";
 
 interface RedisCliProps {
   sessionId: string;
@@ -26,6 +31,7 @@ export function RedisCli({ sessionId, collapsed, onToggleCollapse }: RedisCliPro
   const [input, setInput] = useState("");
   const [lines, setLines] = useState<CliLine[]>([]);
   const [monitoring, setMonitoring] = useState(false);
+  const [executionPreferences, setExecutionPreferences] = useState(loadSqlExecutionPreferences);
   const historyRef = useRef<string[]>([]);
   const historyIdx = useRef(-1);
   const outputRef = useRef<HTMLDivElement>(null);
@@ -40,6 +46,11 @@ export function RedisCli({ sessionId, collapsed, onToggleCollapse }: RedisCliPro
       if (monitorTimer.current) clearInterval(monitorTimer.current);
     };
   }, []);
+
+  useEffect(
+    () => subscribeSqlExecutionPreferences(setExecutionPreferences),
+    [],
+  );
 
   const append = (line: CliLine) => setLines((prev) => [...prev, line].slice(-500));
 
@@ -116,6 +127,19 @@ export function RedisCli({ sessionId, collapsed, onToggleCollapse }: RedisCliPro
       >
         <button type="button" className="inline-flex items-center gap-1" onClick={onToggleCollapse}>
           <ChevronDown className="w-3.5 h-3.5" /> Redis CLI
+        </button>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 px-1.5 rounded hover:bg-[var(--taomni-hover)] disabled:opacity-40"
+          data-testid="redis-run-current"
+          title={`Run current command (${displaySqlShortcut(executionPreferences.runCurrent)})`}
+          disabled={!input.trim()}
+          onClick={() => {
+            void runCommand(input);
+            setInput("");
+          }}
+        >
+          <Crosshair className="w-3.5 h-3.5" /> Current
         </button>
         <div className="flex-1" />
         <button

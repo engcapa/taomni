@@ -464,4 +464,21 @@ describe("DbClientTab connection lifecycle", () => {
       expect(calls.at(-1)?.[1]).toBe("select 2");
     });
   });
+
+  it("runs the current statement from the Current toolbar button", async () => {
+    ipcMock.dbConnect.mockResolvedValue({ ok: true });
+    dbChildProps.editorInitialDocFallback = "select 1;\nselect 2";
+
+    render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
+
+    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+    expect(screen.getByTestId("db-run-current-statement")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("db-run-current-statement"));
+
+    await waitFor(() => {
+      const calls = ipcMock.dbExecuteStream.mock.calls as Array<[string, string, number, unknown]>;
+      expect(calls.at(-1)?.[1]).toBe("select 2");
+    });
+  });
 });
+

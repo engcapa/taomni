@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
+  Crosshair,
   HelpCircle,
   Loader2,
   Play,
@@ -21,7 +22,12 @@ import {
 } from "react-resizable-panels";
 import type { HBaseConnectInfo } from "../../types";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
-import { splitHBaseStatements } from "../../lib/hbaseStatements";
+import { hbaseStatementRangeAt, splitHBaseStatements } from "../../lib/hbaseStatements";
+import {
+  displaySqlShortcut,
+  loadSqlExecutionPreferences,
+  subscribeSqlExecutionPreferences,
+} from "../../lib/sqlExecutionPreferences";
 import {
   HBASE_COMMANDS,
   commandSupported,
@@ -391,9 +397,15 @@ export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabPro
   const [showCommands, setShowCommands] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [executionPreferences, setExecutionPreferences] = useState(loadSqlExecutionPreferences);
 
   const editorHandles = useRef<Record<string, SqlEditorHandle | null>>({});
   const historyRef = useRef<Record<string, string[]>>({});
+
+  useEffect(
+    () => subscribeSqlExecutionPreferences(setExecutionPreferences),
+    [],
+  );
 
   const activePanel = useMemo(
     () => panels.find((p) => p.id === activePanelId) ?? panels[0],
@@ -535,6 +547,26 @@ export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabPro
       if (mutated) setRefreshSignal((s) => s + 1);
     },
     [connectionSessionId, panels, confirmWrite, executeIntoSheet],
+  );
+
+  const runCurrentStatement = useCallback(
+    (panelId: string) => {
+      const panel = panels.find((p) => p.id === panelId);
+      if (!panel) return;
+      const handle = editorHandles.current[panelId];
+      const doc = handle?.getValue() ?? panel.doc;
+      const selection = handle?.getSelectionRange() ?? null;
+      const position = selection && selection.from !== selection.to
+        ? selection.from
+        : handle?.getCursorPosition() ?? doc.length;
+      const range = hbaseStatementRangeAt(doc, position);
+      if (!range) {
+        setStatusMessage("No HBase statement at the current cursor.");
+        return;
+      }
+      void runStatements(panelId, range.sql);
+    },
+    [panels, runStatements],
   );
 
   const cancelQuery = useCallback(
@@ -766,13 +798,33 @@ export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabPro
             <div key={activePanel.id} className="flex-1 min-h-0 h-full flex flex-col min-w-0 relative">
               {/* editor toolbar */}
               <div className="h-8 shrink-0 flex items-center gap-1 px-2 relative" style={{ background: "var(--taomni-quick-bg)", borderBottom: "1px solid var(--taomni-divider)" }}>
-                <button type="button" className={btn} disabled={!connectionSessionId || panelRunning} title="Run (Ctrl+Enter)"
-                  onClick={() => void runStatements(activePanel.id, editorHandles.current[activePanel.id]?.getValue() ?? activePanel.doc)}>
+                <button
+                  type="button"
+                  className={btn}
+                  disabled={!connectionSessionId || panelRunning}
+                  title={`Run (${displaySqlShortcut(executionPreferences.runAll)})`}
+                  onClick={() => void runStatements(activePanel.id, editorHandles.current[activePanel.id]?.getValue() ?? activePanel.doc)}
+                >
                   <Play className="w-3.5 h-3.5" style={{ color: "#62d36f" }} /> Run
                 </button>
-                <button type="button" className={btn} disabled={!connectionSessionId || panelRunning} title="Run selection"
-                  onClick={() => void runStatements(activePanel.id, editorHandles.current[activePanel.id]?.getSelectionOrAll() ?? activePanel.doc)}>
+                <button
+                  type="button"
+                  className={btn}
+                  disabled={!connectionSessionId || panelRunning}
+                  title={`Run selection (${displaySqlShortcut(executionPreferences.runSelection)})`}
+                  onClick={() => void runStatements(activePanel.id, editorHandles.current[activePanel.id]?.getSelectionOrAll() ?? activePanel.doc)}
+                >
                   <SquareDashedMousePointer className="w-3.5 h-3.5" /> Selection
+                </button>
+                <button
+                  type="button"
+                  className={btn}
+                  disabled={!connectionSessionId || panelRunning}
+                  title={`Run current statement (${displaySqlShortcut(executionPreferences.runCurrent)})`}
+                  data-testid="hbase-run-current-statement"
+                  onClick={() => runCurrentStatement(activePanel.id)}
+                >
+                  <Crosshair className="w-3.5 h-3.5" /> Current
                 </button>
                 <button type="button" className={btn} disabled={!panelRunning} title="Cancel query" onClick={() => cancelQuery(activePanel.id)}>
                   <Ban className="w-3.5 h-3.5" style={{ color: "#d9534f" }} /> Cancel
@@ -814,6 +866,7 @@ export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabPro
                     onDocChange={(doc) => patchPanel(activePanel.id, { doc })}
                     onFocus={() => setActivePanelId(activePanel.id)}
                     onRun={(sql) => void runStatements(activePanel.id, sql)}
+                    onRunCurrent={() => runCurrentStatement(activePanel.id)}
                   />
                 </Panel>
                 <PanelResizeHandle className="h-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-row-resize" />

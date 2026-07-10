@@ -6,6 +6,10 @@ import {
   saveSqlCompletionPreferences,
 } from "../../lib/sqlCompletionPreferences";
 import {
+  DEFAULT_SQL_EXECUTION_PREFERENCES,
+  saveSqlExecutionPreferences,
+} from "../../lib/sqlExecutionPreferences";
+import {
   SqlEditorPanel,
   sqlCompletionKeymapFor,
   type SqlEditorHandle,
@@ -238,3 +242,81 @@ describe("SqlEditorPanel document updates", () => {
     expect(view.queryByTestId("sql-completion-status")).toBeNull();
   });
 });
+
+describe("SqlEditorPanel execution shortcuts", () => {
+  it("fires onRun for runAll and onRunCurrent for runCurrent", () => {
+    const onRun = vi.fn();
+    const onRunCurrent = vi.fn();
+    const doc = "select 1;\nselect 2";
+    const handleBox: { current: SqlEditorHandle | null } = { current: null };
+    const view = render(
+      <SqlEditorPanel
+        engine="MySQL"
+        initialDoc={doc}
+        handleRef={(next) => {
+          handleBox.current = next;
+        }}
+        onRun={onRun}
+        onRunCurrent={onRunCurrent}
+      />,
+    );
+    const content = view.container.querySelector<HTMLElement>(".cm-content");
+    expect(content).not.toBeNull();
+    expect(handleBox.current).not.toBeNull();
+
+    act(() => handleBox.current?.selectRange(doc.length, doc.length));
+
+    fireEvent.keyDown(content!, { key: "F5", code: "F5" });
+    expect(onRun).toHaveBeenCalledTimes(1);
+    // CodeMirror may normalize line endings; compare against live editor value.
+    expect(onRun.mock.calls[0]?.[0]).toBe(handleBox.current?.getValue());
+
+    fireEvent.keyDown(content!, {
+      key: "Enter",
+      code: "Enter",
+      ctrlKey: true,
+      shiftKey: true,
+    });
+    expect(onRunCurrent).toHaveBeenCalledTimes(1);
+    expect(onRunCurrent.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        doc: handleBox.current?.getValue(),
+        cursorPosition: handleBox.current?.getCursorPosition(),
+      }),
+    );
+  });
+
+  it("rebinds execution shortcuts when preferences change", () => {
+    const onRun = vi.fn();
+    const onRunCurrent = vi.fn();
+    const view = render(
+      <SqlEditorPanel
+        engine="MySQL"
+        initialDoc="select 1"
+        onRun={onRun}
+        onRunCurrent={onRunCurrent}
+      />,
+    );
+    const content = view.container.querySelector<HTMLElement>(".cm-content");
+
+    act(() => {
+      saveSqlExecutionPreferences({
+        ...DEFAULT_SQL_EXECUTION_PREFERENCES,
+        runCurrent: "F8",
+      });
+    });
+
+    fireEvent.keyDown(content!, { key: "F8", code: "F8" });
+    expect(onRunCurrent).toHaveBeenCalledTimes(1);
+
+    fireEvent.keyDown(content!, {
+      key: "Enter",
+      code: "Enter",
+      ctrlKey: true,
+      shiftKey: true,
+    });
+    // Old default should no longer trigger after rebind
+    expect(onRunCurrent).toHaveBeenCalledTimes(1);
+  });
+});
+
