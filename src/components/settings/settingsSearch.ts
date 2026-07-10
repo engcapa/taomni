@@ -48,6 +48,14 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     ],
   },
   {
+    id: "sql-completion",
+    titleKeys: ["settings.sqlCompletionTitle", "settings.sqlCompletionTriggerShortcut"],
+    terms: [
+      "sql", "database", "query editor", "autocomplete", "completion", "suggestions", "shortcut", "key binding",
+      "数据库", "查询编辑器", "自动完成", "自动补全", "补全", "建议", "快捷键", "按键绑定",
+    ],
+  },
+  {
     id: "terminal-defaults",
     titleKeys: ["settings.terminalDefaultsTitle", "terminalAppearance.behaviorHeading"],
     terms: [

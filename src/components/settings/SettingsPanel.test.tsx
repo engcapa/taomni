@@ -196,6 +196,18 @@ describe("SettingsPanel", () => {
     expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 1");
   });
 
+  it("finds SQL completion and shortcut settings", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<SettingsPanel />);
+
+    await user.type(screen.getByTestId("settings-search-input"), "autocomplete");
+
+    expect(container.querySelector('[data-search-id="sql-completion"]'))
+      .toHaveAttribute("data-search-match", "true");
+    expect(screen.getByTestId("sql-completion-settings")).toBeInTheDocument();
+    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 1");
+  });
+
   it("shows an empty state when no setting matches", async () => {
     const user = userEvent.setup();
     render(<SettingsPanel />);
