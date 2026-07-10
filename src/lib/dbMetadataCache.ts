@@ -298,7 +298,7 @@ export class DbMetadataCache {
         (target.schema && (key === this.key("tables", catalog, schema) || key.startsWith(`${this.key("columns", catalog, schema)}|`))) ||
         (target.catalog && (key === this.key("schemas", catalog) || key.startsWith(`${this.key("tables", catalog)}|`) || key.startsWith(`${this.key("columns", catalog)}|`)))
       ) {
-        this.inFlight.delete(key);
+        changed = this.inFlight.delete(key) || changed;
       }
     }
 
@@ -319,12 +319,14 @@ export class DbMetadataCache {
 
     const promise = fetcher()
       .then((value) => {
-        this.entries.set(key, { value, expiresAt: this.now() + this.ttlMs });
-        this.notify();
+        if (this.inFlight.get(key) === promise) {
+          this.entries.set(key, { value, expiresAt: this.now() + this.ttlMs });
+          this.notify();
+        }
         return value;
       })
       .catch((error) => {
-        if (existing) return existing.value;
+        if (existing && this.inFlight.get(key) === promise) return existing.value;
         throw error;
       })
       .finally(() => {
@@ -337,7 +339,8 @@ export class DbMetadataCache {
   }
 
   private peek<T>(key: string): T | null {
-    return (this.entries.get(key)?.value as T | undefined) ?? null;
+    const entry = this.entries.get(key) as CacheEntry<T> | undefined;
+    return entry && entry.expiresAt > this.now() ? entry.value : null;
   }
 
   private resolveCatalog(catalog?: string | null): string {

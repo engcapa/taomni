@@ -42,6 +42,21 @@ describe("DbMetadataCache", () => {
     expect(ipcMock.dbListSchemas).toHaveBeenCalledTimes(2);
   });
 
+  it("does not expose expired entries through synchronous peeks", async () => {
+    let now = 1000;
+    const cache = createDbMetadataCache({
+      sessionId: "s1",
+      ttlMs: 100,
+      now: () => now,
+    });
+
+    await cache.listSchemas();
+    expect(cache.peekSchemas()).toEqual(["public"]);
+
+    now = 1101;
+    expect(cache.peekSchemas()).toBeNull();
+  });
+
   it("deduplicates in-flight metadata requests", async () => {
     const pending = deferred<Array<{ name: string; kind: "table"; rowCount: null }>>();
     ipcMock.dbListTables.mockReturnValueOnce(pending.promise);
@@ -68,6 +83,50 @@ describe("DbMetadataCache", () => {
     await cache.describeTable("public", "orders");
     expect(ipcMock.dbListTables).toHaveBeenCalledTimes(2);
     expect(ipcMock.dbDescribeTable).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not let an invalidated request overwrite replacement metadata", async () => {
+    const pending = deferred<Array<{ name: string; kind: "table"; rowCount: null }>>();
+    ipcMock.dbListTables
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValueOnce([{ name: "orders_v2", kind: "table", rowCount: null }]);
+    const cache = createDbMetadataCache({ sessionId: "s1" });
+
+    const staleRequest = cache.listTables("public");
+    cache.invalidate({ schema: "public" });
+    await expect(cache.listTables("public")).resolves.toEqual([
+      { name: "orders_v2", kind: "table", rowCount: null },
+    ]);
+
+    pending.resolve([{ name: "orders_v1", kind: "table", rowCount: null }]);
+    await expect(staleRequest).resolves.toEqual([
+      { name: "orders_v1", kind: "table", rowCount: null },
+    ]);
+
+    expect(cache.peekTables("public")).toEqual([
+      { name: "orders_v2", kind: "table", rowCount: null },
+    ]);
+    await cache.listTables("public");
+    expect(ipcMock.dbListTables).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not let an in-flight request repopulate a cleared cache", async () => {
+    const pending = deferred<Array<{ name: string }>>();
+    ipcMock.dbListSchemas
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValueOnce([{ name: "reporting" }]);
+    const cache = createDbMetadataCache({ sessionId: "s1" });
+
+    const staleRequest = cache.listSchemas();
+    cache.clearAll();
+    await expect(cache.listSchemas()).resolves.toEqual(["reporting"]);
+
+    pending.resolve([{ name: "public" }]);
+    await expect(staleRequest).resolves.toEqual(["public"]);
+
+    expect(cache.peekSchemas()).toEqual(["reporting"]);
+    await cache.listSchemas();
+    expect(ipcMock.dbListSchemas).toHaveBeenCalledTimes(2);
   });
 
   it("parses DDL statements into targeted metadata invalidations", () => {
