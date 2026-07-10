@@ -27,8 +27,9 @@ use tokio_opengauss::{
 use tokio_util::sync::CancellationToken;
 
 use super::{
-    emit_query_result_stream, ColumnDescription, ColumnInfo, DbConfig, DbHandle, DbObject,
-    IndexInfo, QueryResult, QueryStreamChannel, SchemaInfo, TableInfo,
+    emit_query_result_stream, group_foreign_keys, ColumnDescription, ColumnInfo, DbConfig,
+    DbHandle, DbObject, ForeignKeyInfo, IndexInfo, QueryResult, QueryStreamChannel, SchemaInfo,
+    TableInfo,
 };
 
 const DEFAULT_TIMEOUT_SECS: u64 = 15;
@@ -666,6 +667,50 @@ pub async fn describe_table(
             })
         })
         .collect())
+}
+
+pub async fn list_foreign_keys(
+    client: &PanWeiClient,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Vec<ForeignKeyInfo>, String> {
+    let schema = resolve_schema(client, schema).await?;
+    let schema_ref = schema.as_str();
+    let rows = fetch(
+        client,
+        "SELECT fk.constraint_name, fk.column_name, pk.table_schema, \
+                pk.table_name, pk.column_name \
+         FROM information_schema.table_constraints tc \
+         JOIN information_schema.key_column_usage fk \
+           ON fk.constraint_catalog = tc.constraint_catalog \
+          AND fk.constraint_schema = tc.constraint_schema \
+          AND fk.constraint_name = tc.constraint_name \
+         JOIN information_schema.referential_constraints rc \
+           ON rc.constraint_catalog = tc.constraint_catalog \
+          AND rc.constraint_schema = tc.constraint_schema \
+          AND rc.constraint_name = tc.constraint_name \
+         JOIN information_schema.key_column_usage pk \
+           ON pk.constraint_catalog = rc.unique_constraint_catalog \
+          AND pk.constraint_schema = rc.unique_constraint_schema \
+          AND pk.constraint_name = rc.unique_constraint_name \
+          AND pk.ordinal_position = fk.position_in_unique_constraint \
+         WHERE tc.constraint_type = 'FOREIGN KEY' \
+           AND tc.table_schema = $1 AND tc.table_name = $2 \
+         ORDER BY fk.constraint_name, fk.ordinal_position",
+        &[&schema_ref, &table],
+    )
+    .await
+    .map_err(|error| format!("list foreign keys failed: {error}"))?;
+
+    Ok(group_foreign_keys(rows.iter().filter_map(|row| {
+        Some((
+            row.try_get(0).ok()?,
+            row.try_get(1).ok()?,
+            row.try_get(2).ok(),
+            row.try_get(3).ok()?,
+            row.try_get(4).ok()?,
+        ))
+    })))
 }
 
 async fn describe_table_pg_catalog(

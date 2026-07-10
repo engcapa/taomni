@@ -212,6 +212,44 @@ pub struct ColumnDescription {
     pub primary_key: bool,
 }
 
+/// A foreign-key constraint and its ordered local/referenced columns.
+#[derive(Debug, Clone, Serialize)]
+pub struct ForeignKeyInfo {
+    pub name: String,
+    pub columns: Vec<String>,
+    #[serde(rename = "referencedSchema")]
+    pub referenced_schema: Option<String>,
+    #[serde(rename = "referencedTable")]
+    pub referenced_table: String,
+    #[serde(rename = "referencedColumns")]
+    pub referenced_columns: Vec<String>,
+}
+
+pub(crate) fn group_foreign_keys(
+    rows: impl Iterator<Item = (String, String, Option<String>, String, String)>,
+) -> Vec<ForeignKeyInfo> {
+    let mut result: Vec<ForeignKeyInfo> = Vec::new();
+    for (name, column, referenced_schema, referenced_table, referenced_column) in rows {
+        if let Some(existing) = result.last_mut().filter(|foreign_key| {
+            foreign_key.name == name
+                && foreign_key.referenced_schema == referenced_schema
+                && foreign_key.referenced_table == referenced_table
+        }) {
+            existing.columns.push(column);
+            existing.referenced_columns.push(referenced_column);
+        } else {
+            result.push(ForeignKeyInfo {
+                name,
+                columns: vec![column],
+                referenced_schema,
+                referenced_table,
+                referenced_columns: vec![referenced_column],
+            });
+        }
+    }
+    result
+}
+
 /// Index metadata.
 #[derive(Debug, Clone, Serialize)]
 pub struct IndexInfo {
@@ -749,6 +787,39 @@ pub async fn db_describe_table(
 }
 
 #[tauri::command]
+pub async fn db_list_foreign_keys(
+    state: State<'_, AppState>,
+    session_id: String,
+    schema: Option<String>,
+    table: String,
+    catalog: Option<String>,
+) -> Result<Vec<ForeignKeyInfo>, String> {
+    let session = get_session(&state, &session_id).await?;
+    match &session.handle {
+        DbHandle::MySql(pool) => {
+            sql::list_foreign_keys_mysql(pool, schema.as_deref(), &table).await
+        }
+        DbHandle::Postgres(pool) => {
+            sql::list_foreign_keys_postgres(pool, schema.as_deref(), &table).await
+        }
+        DbHandle::PanWeiDB(client) => {
+            panwei::list_foreign_keys(client, schema.as_deref(), &table).await
+        }
+        DbHandle::Oracle(client) => {
+            oracle::list_foreign_keys(client, schema.as_deref(), &table).await
+        }
+        DbHandle::SqlServer(client) => {
+            sql::list_foreign_keys_sqlserver(client, schema.as_deref(), &table).await
+        }
+        DbHandle::StarRocks(_) | DbHandle::ClickHouse(_) | DbHandle::Presto(_) => {
+            let _ = catalog;
+            Ok(Vec::new())
+        }
+        DbHandle::Redis(_) => Err("Redis has no foreign keys".into()),
+    }
+}
+
+#[tauri::command]
 pub async fn db_list_indexes(
     state: State<'_, AppState>,
     session_id: String,
@@ -1065,7 +1136,10 @@ pub async fn redis_exec(
 
 #[cfg(test)]
 mod tests {
-    use super::{metadata_search_limit, DEFAULT_METADATA_SEARCH_LIMIT, MAX_METADATA_SEARCH_LIMIT};
+    use super::{
+        group_foreign_keys, metadata_search_limit, DEFAULT_METADATA_SEARCH_LIMIT,
+        MAX_METADATA_SEARCH_LIMIT,
+    };
 
     #[test]
     fn metadata_search_limits_are_bounded() {
@@ -1076,6 +1150,33 @@ mod tests {
             metadata_search_limit(Some(u32::MAX)),
             MAX_METADATA_SEARCH_LIMIT
         );
+    }
+
+    #[test]
+    fn groups_composite_foreign_key_columns_in_order() {
+        let foreign_keys = group_foreign_keys(
+            vec![
+                (
+                    "orders_account_fk".to_string(),
+                    "account_id".to_string(),
+                    Some("public".to_string()),
+                    "accounts".to_string(),
+                    "id".to_string(),
+                ),
+                (
+                    "orders_account_fk".to_string(),
+                    "tenant_id".to_string(),
+                    Some("public".to_string()),
+                    "accounts".to_string(),
+                    "tenant_id".to_string(),
+                ),
+            ]
+            .into_iter(),
+        );
+
+        assert_eq!(foreign_keys.len(), 1);
+        assert_eq!(foreign_keys[0].columns, ["account_id", "tenant_id"]);
+        assert_eq!(foreign_keys[0].referenced_columns, ["id", "tenant_id"]);
     }
 }
 

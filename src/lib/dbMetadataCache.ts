@@ -1,17 +1,19 @@
 import {
   dbDescribeTable,
   dbListCatalogs,
+  dbListForeignKeys,
   dbListSchemas,
   dbListTables,
   dbSearchTables,
   type DbColumnDescription,
+  type DbForeignKey,
   type DbTable,
 } from "./ipc";
 
 export const DB_METADATA_TTL_MS = 10 * 60 * 1000;
 export const DB_METADATA_COMPLETION_LIMIT = 500;
 
-type CacheKind = "catalogs" | "schemas" | "tables" | "tableSearch" | "columns";
+type CacheKind = "catalogs" | "schemas" | "tables" | "tableSearch" | "columns" | "foreignKeys";
 
 interface CacheEntry<T> {
   value: T;
@@ -274,6 +276,24 @@ export class DbMetadataCache {
     );
   }
 
+  async listForeignKeys(
+    schema: string | null,
+    table: string,
+    catalog?: string | null,
+  ): Promise<DbForeignKey[]> {
+    const resolvedCatalog = this.resolveCatalog(catalog);
+    const resolvedSchema = normalize(schema);
+    const resolvedTable = normalize(table);
+    return this.cached(this.key("foreignKeys", resolvedCatalog, resolvedSchema, resolvedTable), () =>
+      dbListForeignKeys(
+        this.sessionId,
+        resolvedSchema || null,
+        resolvedTable,
+        resolvedCatalog || null,
+      ),
+    );
+  }
+
   peekCatalogs(): string[] | null {
     return this.peek(this.key("catalogs"));
   }
@@ -292,6 +312,16 @@ export class DbMetadataCache {
     catalog?: string | null,
   ): DbColumnDescription[] | null {
     return this.peek(this.key("columns", this.resolveCatalog(catalog), normalize(schema), normalize(table)));
+  }
+
+  peekForeignKeys(
+    schema: string | null,
+    table: string,
+    catalog?: string | null,
+  ): DbForeignKey[] | null {
+    return this.peek(
+      this.key("foreignKeys", this.resolveCatalog(catalog), normalize(schema), normalize(table)),
+    );
   }
 
   clearAll(): void {
@@ -314,6 +344,7 @@ export class DbMetadataCache {
       if (target.table) {
         if (
           key === this.key("columns", catalog, schema, table) ||
+          key === this.key("foreignKeys", catalog, schema, table) ||
           key === this.key("tables", catalog, schema) ||
           key.startsWith(`${this.key("tableSearch", catalog, schema)}|`)
         ) {
@@ -323,7 +354,8 @@ export class DbMetadataCache {
         if (
           key === this.key("tables", catalog, schema) ||
           key.startsWith(`${this.key("tableSearch", catalog, schema)}|`) ||
-          key.startsWith(`${this.key("columns", catalog, schema)}|`)
+          key.startsWith(`${this.key("columns", catalog, schema)}|`) ||
+          key.startsWith(`${this.key("foreignKeys", catalog, schema)}|`)
         ) {
           changed = this.entries.delete(key) || changed;
         }
@@ -332,7 +364,8 @@ export class DbMetadataCache {
           key === this.key("schemas", catalog) ||
           key.startsWith(`${this.key("tables", catalog)}|`) ||
           key.startsWith(`${this.key("tableSearch", catalog)}|`) ||
-          key.startsWith(`${this.key("columns", catalog)}|`)
+          key.startsWith(`${this.key("columns", catalog)}|`) ||
+          key.startsWith(`${this.key("foreignKeys", catalog)}|`)
         ) {
           changed = this.entries.delete(key) || changed;
         }
@@ -343,19 +376,22 @@ export class DbMetadataCache {
       if (
         (target.table && (
           key === this.key("columns", catalog, schema, table) ||
+          key === this.key("foreignKeys", catalog, schema, table) ||
           key === this.key("tables", catalog, schema) ||
           key.startsWith(`${this.key("tableSearch", catalog, schema)}|`)
         )) ||
         (target.schema && (
           key === this.key("tables", catalog, schema) ||
           key.startsWith(`${this.key("tableSearch", catalog, schema)}|`) ||
-          key.startsWith(`${this.key("columns", catalog, schema)}|`)
+          key.startsWith(`${this.key("columns", catalog, schema)}|`) ||
+          key.startsWith(`${this.key("foreignKeys", catalog, schema)}|`)
         )) ||
         (target.catalog && (
           key === this.key("schemas", catalog) ||
           key.startsWith(`${this.key("tables", catalog)}|`) ||
           key.startsWith(`${this.key("tableSearch", catalog)}|`) ||
-          key.startsWith(`${this.key("columns", catalog)}|`)
+          key.startsWith(`${this.key("columns", catalog)}|`) ||
+          key.startsWith(`${this.key("foreignKeys", catalog)}|`)
         ))
       ) {
         changed = this.inFlight.delete(key) || changed;

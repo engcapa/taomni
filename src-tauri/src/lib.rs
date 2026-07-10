@@ -480,6 +480,7 @@ pub fn run() {
             database::db_list_tables,
             database::db_search_tables,
             database::db_describe_table,
+            database::db_list_foreign_keys,
             database::db_list_indexes,
             database::db_list_objects,
             database::db_object_ddl,

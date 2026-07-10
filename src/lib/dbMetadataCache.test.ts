@@ -6,6 +6,13 @@ const ipcMock = vi.hoisted(() => ({
   dbListSchemas: vi.fn(async () => [{ name: "public" }]),
   dbListTables: vi.fn(async () => [{ name: "orders", kind: "table", rowCount: null }]),
   dbSearchTables: vi.fn(async () => [{ name: "orders", kind: "table", rowCount: null }]),
+  dbListForeignKeys: vi.fn(async () => [{
+    name: "orders_customer_fk",
+    columns: ["customer_id"],
+    referencedSchema: "public",
+    referencedTable: "customers",
+    referencedColumns: ["id"],
+  }]),
   dbDescribeTable: vi.fn(async () => [
     { name: "id", type: "int", nullable: false, default: null, primaryKey: true },
   ]),
@@ -136,6 +143,19 @@ describe("DbMetadataCache", () => {
     await cache.describeTable("public", "orders");
     expect(ipcMock.dbListTables).toHaveBeenCalledTimes(2);
     expect(ipcMock.dbDescribeTable).toHaveBeenCalledTimes(2);
+  });
+
+  it("caches and invalidates foreign-key metadata with its table", async () => {
+    const cache = createDbMetadataCache({ sessionId: "s1" });
+
+    await cache.listForeignKeys("public", "orders");
+    await cache.listForeignKeys("public", "orders");
+    expect(ipcMock.dbListForeignKeys).toHaveBeenCalledTimes(1);
+    expect(cache.peekForeignKeys("public", "orders")?.[0]?.referencedTable).toBe("customers");
+
+    cache.invalidate({ schema: "public", table: "orders" });
+    await cache.listForeignKeys("public", "orders");
+    expect(ipcMock.dbListForeignKeys).toHaveBeenCalledTimes(2);
   });
 
   it("does not let an invalidated request overwrite replacement metadata", async () => {

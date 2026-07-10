@@ -11,7 +11,7 @@ import {
   type DbMetadataCache,
   splitSqlQualifiedName,
 } from "./dbMetadataCache";
-import type { DbColumnDescription, DbTable } from "./ipc";
+import type { DbColumnDescription, DbForeignKey, DbTable } from "./ipc";
 import { sqlIdentifierCompletionApply } from "./sqlEditorDialect";
 import { sqlLocalRelations } from "./sqlLocalRelations";
 
@@ -384,17 +384,13 @@ function joinPredicateOptions(
   engine: string,
   left: NamedTableRef,
   leftColumns: DbColumnDescription[],
+  leftForeignKeys: DbForeignKey[],
   right: NamedTableRef,
   rightColumns: DbColumnDescription[],
+  rightForeignKeys: DbForeignKey[],
 ): Completion[] {
   const suggestions = new Map<string, Completion>();
-  const add = (
-    leftColumn: DbColumnDescription,
-    rightColumn: DbColumnDescription,
-    boost: number,
-    detail: string,
-  ) => {
-    const predicate = `${identifierText(engine, left.qualifier)}.${identifierText(engine, leftColumn.name)} = ${identifierText(engine, right.qualifier)}.${identifierText(engine, rightColumn.name)}`;
+  const addPredicate = (predicate: string, boost: number, detail: string) => {
     const existing = suggestions.get(predicate);
     if (!existing || (existing.boost ?? 0) < boost) {
       suggestions.set(predicate, {
@@ -406,6 +402,42 @@ function joinPredicateOptions(
       });
     }
   };
+  const add = (
+    leftColumn: DbColumnDescription,
+    rightColumn: DbColumnDescription,
+    boost: number,
+    detail: string,
+  ) => {
+    const predicate = `${identifierText(engine, left.qualifier)}.${identifierText(engine, leftColumn.name)} = ${identifierText(engine, right.qualifier)}.${identifierText(engine, rightColumn.name)}`;
+    addPredicate(predicate, boost, detail);
+  };
+
+  const referencesTable = (foreignKey: DbForeignKey, target: TableRef) =>
+    equalsName(foreignKey.referencedTable, target.table)
+    && (!foreignKey.referencedSchema || !target.schema
+      || equalsName(foreignKey.referencedSchema, target.schema));
+  for (const foreignKey of leftForeignKeys.filter((candidate) => referencesTable(candidate, right.ref))) {
+    const predicates = foreignKey.columns.flatMap((column, index) => {
+      const referencedColumn = foreignKey.referencedColumns[index];
+      return referencedColumn
+        ? [`${identifierText(engine, left.qualifier)}.${identifierText(engine, column)} = ${identifierText(engine, right.qualifier)}.${identifierText(engine, referencedColumn)}`]
+        : [];
+    });
+    if (predicates.length > 0) {
+      addPredicate(predicates.join(" AND "), 220, `Foreign key ${foreignKey.name}`);
+    }
+  }
+  for (const foreignKey of rightForeignKeys.filter((candidate) => referencesTable(candidate, left.ref))) {
+    const predicates = foreignKey.columns.flatMap((column, index) => {
+      const referencedColumn = foreignKey.referencedColumns[index];
+      return referencedColumn
+        ? [`${identifierText(engine, left.qualifier)}.${identifierText(engine, referencedColumn)} = ${identifierText(engine, right.qualifier)}.${identifierText(engine, column)}`]
+        : [];
+    });
+    if (predicates.length > 0) {
+      addPredicate(predicates.join(" AND "), 220, `Foreign key ${foreignKey.name}`);
+    }
+  }
 
   const leftTable = singularTableName(left.ref.table);
   const rightTable = singularTableName(right.ref.table);
@@ -596,13 +628,23 @@ async function joinOnCompletions(
   context.addEventListener("abort", () => undefined, { onDocChange: true });
   options.onLoadingChange?.(true);
   try {
-    const [leftColumns, rightColumns] = await Promise.all([
+    const [leftColumns, leftForeignKeys, rightColumns, rightForeignKeys] = await Promise.all([
       options.cache.describeTable(left.ref.schema, left.ref.table, left.ref.catalog),
+      options.cache.listForeignKeys(left.ref.schema, left.ref.table, left.ref.catalog),
       options.cache.describeTable(right.ref.schema, right.ref.table, right.ref.catalog),
+      options.cache.listForeignKeys(right.ref.schema, right.ref.table, right.ref.catalog),
     ]);
     if (context.aborted) return null;
     const filtered = filterOptions(
-      joinPredicateOptions(options.engine, left, leftColumns, right, rightColumns),
+      joinPredicateOptions(
+        options.engine,
+        left,
+        leftColumns,
+        leftForeignKeys,
+        right,
+        rightColumns,
+        rightForeignKeys,
+      ),
       prefix,
       Math.min(maxOptions, 50),
     );

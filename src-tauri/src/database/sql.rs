@@ -30,8 +30,9 @@ use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use tokio_util::sync::CancellationToken;
 
 use super::{
-    send_query_stream_event, ColumnDescription, ColumnInfo, DbConfig, DbHandle, DbObject,
-    IndexInfo, QueryResult, QueryStreamChannel, QueryStreamEvent, SchemaInfo, TableInfo,
+    group_foreign_keys, send_query_stream_event, ColumnDescription, ColumnInfo, DbConfig,
+    DbHandle, DbObject, ForeignKeyInfo, IndexInfo, QueryResult, QueryStreamChannel,
+    QueryStreamEvent, SchemaInfo, TableInfo,
 };
 
 const DEFAULT_TIMEOUT_SECS: u64 = 15;
@@ -1282,6 +1283,36 @@ pub async fn describe_table_mysql(
         .collect())
 }
 
+pub async fn list_foreign_keys_mysql(
+    pool: &Pool<MySql>,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Vec<ForeignKeyInfo>, String> {
+    let rows = query(
+        "SELECT constraint_name, column_name, referenced_table_schema, \
+                referenced_table_name, referenced_column_name \
+         FROM information_schema.key_column_usage \
+         WHERE table_schema = COALESCE(?, DATABASE()) AND table_name = ? \
+           AND referenced_table_name IS NOT NULL \
+         ORDER BY constraint_name, ordinal_position",
+    )
+    .bind(schema)
+    .bind(table)
+    .fetch_all(pool)
+    .await
+    .map_err(|error| format!("list foreign keys failed: {error}"))?;
+
+    Ok(group_foreign_keys(rows.iter().filter_map(|row| {
+        Some((
+            mysql_value_to_string(row, 0)?,
+            mysql_value_to_string(row, 1)?,
+            mysql_value_to_string(row, 2),
+            mysql_value_to_string(row, 3)?,
+            mysql_value_to_string(row, 4)?,
+        ))
+    })))
+}
+
 pub async fn list_indexes_mysql(
     pool: &Pool<MySql>,
     schema: Option<&str>,
@@ -1516,6 +1547,49 @@ pub async fn describe_table_sqlserver(
         .collect())
 }
 
+pub async fn list_foreign_keys_sqlserver(
+    client: &AsyncMutex<SqlServerClient>,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Vec<ForeignKeyInfo>, String> {
+    let schema = sqlserver_default_schema(schema);
+    let schema_ref = schema.as_str();
+    let table_ref = table;
+    let params: [&dyn TdsToSql; 2] = [&schema_ref, &table_ref];
+    let rows = sqlserver_fetch(
+        client,
+        "SELECT fk.name, parent_column.name, referenced_schema.name, \
+                referenced_table.name, referenced_column.name \
+         FROM sys.foreign_keys fk \
+         JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id \
+         JOIN sys.tables parent_table ON parent_table.object_id = fk.parent_object_id \
+         JOIN sys.schemas parent_schema ON parent_schema.schema_id = parent_table.schema_id \
+         JOIN sys.columns parent_column \
+           ON parent_column.object_id = parent_table.object_id \
+          AND parent_column.column_id = fkc.parent_column_id \
+         JOIN sys.tables referenced_table ON referenced_table.object_id = fk.referenced_object_id \
+         JOIN sys.schemas referenced_schema ON referenced_schema.schema_id = referenced_table.schema_id \
+         JOIN sys.columns referenced_column \
+           ON referenced_column.object_id = referenced_table.object_id \
+          AND referenced_column.column_id = fkc.referenced_column_id \
+         WHERE parent_schema.name = @P1 AND parent_table.name = @P2 \
+         ORDER BY fk.name, fkc.constraint_column_id",
+        &params,
+    )
+    .await
+    .map_err(|error| format!("list foreign keys failed: {error}"))?;
+
+    Ok(group_foreign_keys(rows.iter().filter_map(|row| {
+        Some((
+            sqlserver_text(row, 0)?,
+            sqlserver_text(row, 1)?,
+            sqlserver_text(row, 2),
+            sqlserver_text(row, 3)?,
+            sqlserver_text(row, 4)?,
+        ))
+    })))
+}
+
 pub async fn list_indexes_sqlserver(
     client: &AsyncMutex<SqlServerClient>,
     schema: Option<&str>,
@@ -1705,6 +1779,50 @@ pub async fn describe_table_postgres(
             })
         })
         .collect())
+}
+
+pub async fn list_foreign_keys_postgres(
+    pool: &Pool<Postgres>,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Vec<ForeignKeyInfo>, String> {
+    let schema = schema.unwrap_or("public");
+    let rows = query(
+        "SELECT fk.constraint_name, fk.column_name, pk.table_schema, \
+                pk.table_name, pk.column_name \
+         FROM information_schema.table_constraints tc \
+         JOIN information_schema.key_column_usage fk \
+           ON fk.constraint_catalog = tc.constraint_catalog \
+          AND fk.constraint_schema = tc.constraint_schema \
+          AND fk.constraint_name = tc.constraint_name \
+         JOIN information_schema.referential_constraints rc \
+           ON rc.constraint_catalog = tc.constraint_catalog \
+          AND rc.constraint_schema = tc.constraint_schema \
+          AND rc.constraint_name = tc.constraint_name \
+         JOIN information_schema.key_column_usage pk \
+           ON pk.constraint_catalog = rc.unique_constraint_catalog \
+          AND pk.constraint_schema = rc.unique_constraint_schema \
+          AND pk.constraint_name = rc.unique_constraint_name \
+          AND pk.ordinal_position = fk.position_in_unique_constraint \
+         WHERE tc.constraint_type = 'FOREIGN KEY' \
+           AND tc.table_schema = $1 AND tc.table_name = $2 \
+         ORDER BY fk.constraint_name, fk.ordinal_position",
+    )
+    .bind(schema)
+    .bind(table)
+    .fetch_all(pool)
+    .await
+    .map_err(|error| format!("list foreign keys failed: {error}"))?;
+
+    Ok(group_foreign_keys(rows.iter().filter_map(|row| {
+        Some((
+            row.try_get(0).ok()?,
+            row.try_get(1).ok()?,
+            row.try_get(2).ok(),
+            row.try_get(3).ok()?,
+            row.try_get(4).ok()?,
+        ))
+    })))
 }
 
 pub async fn list_indexes_postgres(

@@ -39,6 +39,13 @@ const ipcMock = vi.hoisted(() => ({
       .filter((table) => table.name.toLowerCase().startsWith(prefix.toLowerCase()))
       .slice(0, limit);
   }),
+  dbListForeignKeys: vi.fn(async (): Promise<Array<{
+    name: string;
+    columns: string[];
+    referencedSchema: string | null;
+    referencedTable: string;
+    referencedColumns: string[];
+  }>> => []),
   dbDescribeTable: vi.fn(async () => [
     { name: "id", type: "bigint", nullable: false, default: null, primaryKey: true },
     { name: "total", type: "decimal", nullable: true, default: null, primaryKey: false },
@@ -388,6 +395,37 @@ describe("createSqlMetadataCompletionSource", () => {
     );
 
     expect(labels(result)).toEqual(["orders.customer_id = customers.id"]);
+  });
+
+  it("prioritizes exact composite foreign-key JOIN predicates", async () => {
+    ipcMock.dbDescribeTable
+      .mockResolvedValueOnce([
+        { name: "account_id", type: "bigint", nullable: false, default: null, primaryKey: false },
+        { name: "tenant_id", type: "bigint", nullable: false, default: null, primaryKey: false },
+      ])
+      .mockResolvedValueOnce([
+        { name: "id", type: "bigint", nullable: false, default: null, primaryKey: true },
+        { name: "tenant_id", type: "bigint", nullable: false, default: null, primaryKey: true },
+      ]);
+    ipcMock.dbListForeignKeys
+      .mockResolvedValueOnce([{
+        name: "orders_account_fk",
+        columns: ["account_id", "tenant_id"],
+        referencedSchema: "public",
+        referencedTable: "accounts",
+        referencedColumns: ["id", "tenant_id"],
+      }])
+      .mockResolvedValueOnce([]);
+
+    const result = await complete(
+      "select * from orders o join accounts a on ‸",
+      { engine: "PostgreSQL", activeSchema: "public" },
+    );
+
+    expect(labels(result)[0]).toBe(
+      "o.account_id = a.id AND o.tenant_id = a.tenant_id",
+    );
+    expect(result?.options[0]?.detail).toBe("Foreign key orders_account_fk");
   });
 
   it("leaves CTE column completion to the local structured source", async () => {
