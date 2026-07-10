@@ -156,6 +156,44 @@ describe("SqlEditorPanel document updates", () => {
     ]));
   });
 
+  it("opens downstream SELECT-list columns with the configured completion shortcut", async () => {
+    vi.useFakeTimers();
+    const metadataCache = {
+      describeTable: vi.fn(async () => [
+        { name: "id", type: "bigint", nullable: false, default: null, primaryKey: true },
+        { name: "total", type: "decimal", nullable: true, default: null, primaryKey: false },
+      ]),
+      getDefaultCatalog: vi.fn(() => null),
+    } as unknown as DbMetadataCache;
+    let handle: SqlEditorHandle | null = null;
+    const view = render(
+      <SqlEditorPanel
+        engine="PostgreSQL"
+        initialDoc="select  from orders"
+        activeSchema="public"
+        metadataCache={metadataCache}
+        handleRef={(next) => {
+          handle = next;
+        }}
+      />,
+    );
+    const content = view.container.querySelector<HTMLElement>(".cm-content");
+    act(() => handle?.selectRange("select ".length, "select ".length));
+
+    fireEvent.keyDown(content!, { key: " ", code: "Space", ctrlKey: true });
+    await act(async () => {
+      await Promise.resolve();
+      vi.advanceTimersByTime(100);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(metadataCache.describeTable).toHaveBeenCalledWith("public", "orders", null);
+    const labels = Array.from(view.container.querySelectorAll(".cm-completionLabel"))
+      .map((node) => node.textContent);
+    expect(labels).toEqual(expect.arrayContaining(["id", "total"]));
+  });
+
   it("shows a delayed loading state for slow metadata completion", async () => {
     vi.useFakeTimers();
     const pending = deferred<Array<{ name: string; kind: "table"; rowCount: null }>>();
