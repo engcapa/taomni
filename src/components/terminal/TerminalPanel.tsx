@@ -3048,13 +3048,13 @@ export function TerminalPanel({
       if (Date.now() < suppressNativePasteUntilRef.current) {
         return;
       }
+      const text = event.clipboardData?.getData("text/plain") ?? "";
       if (!isLocal && onUploadLocalPathsRef.current) {
         void clipboardReadFiles()
           .then((paths) => {
             if (paths.length > 0) {
               return handleLocalFilePaths(paths);
             }
-            const text = event.clipboardData?.getData("text/plain") ?? "";
             void pasteTextIntoTerminal(text);
             return undefined;
           })
@@ -3063,7 +3063,6 @@ export function TerminalPanel({
           });
         return;
       }
-      const text = event.clipboardData?.getData("text/plain") ?? "";
       void pasteTextIntoTerminal(text);
     };
     el.addEventListener("paste", onPaste, { capture: true });
