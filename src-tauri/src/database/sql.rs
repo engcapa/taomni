@@ -1194,6 +1194,49 @@ pub async fn list_tables_mysql(
     Ok(tables.into_values().collect())
 }
 
+pub async fn search_tables_mysql(
+    pool: &Pool<MySql>,
+    schema: Option<&str>,
+    prefix: &str,
+    limit: usize,
+) -> Result<Vec<TableInfo>, String> {
+    let sql = if schema.is_some() {
+        "SELECT table_name, table_type FROM information_schema.tables \
+         WHERE table_schema = ? \
+           AND LEFT(LOWER(table_name), CHAR_LENGTH(?)) = LOWER(?) \
+         ORDER BY table_name LIMIT ?"
+    } else {
+        "SELECT table_name, table_type FROM information_schema.tables \
+         WHERE table_schema = DATABASE() \
+           AND LEFT(LOWER(table_name), CHAR_LENGTH(?)) = LOWER(?) \
+         ORDER BY table_name LIMIT ?"
+    };
+    let mut statement = query(sql);
+    if let Some(schema) = schema {
+        statement = statement.bind(schema);
+    }
+    let rows = statement
+        .bind(prefix)
+        .bind(prefix)
+        .bind(limit as i64)
+        .fetch_all(pool)
+        .await
+        .map_err(|error| format!("search tables failed: {error}"))?;
+
+    Ok(rows
+        .iter()
+        .filter_map(|row| {
+            let name = mysql_value_to_string(row, 0)?;
+            let table_type = mysql_value_to_string(row, 1).unwrap_or_default();
+            Some(TableInfo {
+                name,
+                kind: mysql_table_kind(&table_type),
+                row_count: None,
+            })
+        })
+        .collect())
+}
+
 pub async fn describe_table_mysql(
     pool: &Pool<MySql>,
     schema: Option<&str>,
@@ -1376,6 +1419,45 @@ pub async fn list_tables_sqlserver(
         .collect())
 }
 
+pub async fn search_tables_sqlserver(
+    client: &AsyncMutex<SqlServerClient>,
+    schema: Option<&str>,
+    prefix: &str,
+    limit: usize,
+) -> Result<Vec<TableInfo>, String> {
+    let schema = sqlserver_default_schema(schema);
+    let schema_ref = schema.as_str();
+    let prefix_ref = prefix;
+    let limit = i32::try_from(limit).unwrap_or(i32::MAX);
+    let params: [&dyn TdsToSql; 3] = [&schema_ref, &prefix_ref, &limit];
+    let rows = sqlserver_fetch(
+        client,
+        "SELECT TOP (@P3) o.name, \
+                CASE WHEN o.type = 'V' THEN N'view' ELSE N'table' END AS kind \
+         FROM sys.objects o \
+         JOIN sys.schemas s ON s.schema_id = o.schema_id \
+         WHERE s.name = @P1 AND o.type IN ('U','V') \
+           AND LEFT(LOWER(o.name), LEN(@P2)) = LOWER(@P2) \
+         ORDER BY o.name",
+        &params,
+    )
+    .await
+    .map_err(|error| format!("search tables failed: {error}"))?;
+
+    Ok(rows
+        .iter()
+        .filter_map(|row| {
+            let name = sqlserver_text(row, 0)?;
+            let kind = sqlserver_text(row, 1).unwrap_or_else(|| "table".to_string());
+            Some(TableInfo {
+                name,
+                kind,
+                row_count: None,
+            })
+        })
+        .collect())
+}
+
 pub async fn describe_table_sqlserver(
     client: &AsyncMutex<SqlServerClient>,
     schema: Option<&str>,
@@ -1540,6 +1622,43 @@ pub async fn list_tables_postgres(
     }
     out.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(out)
+}
+
+pub async fn search_tables_postgres(
+    pool: &Pool<Postgres>,
+    schema: Option<&str>,
+    prefix: &str,
+    limit: usize,
+) -> Result<Vec<TableInfo>, String> {
+    let schema = schema.unwrap_or("public");
+    let rows = query(
+        "SELECT c.relname, \
+                CASE c.relkind WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized_view' ELSE 'table' END AS kind \
+         FROM pg_catalog.pg_class c \
+         JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+         WHERE n.nspname = $1 AND c.relkind IN ('r','p','f','v','m') \
+           AND LEFT(LOWER(c.relname), char_length($2)) = LOWER($2) \
+         ORDER BY c.relname LIMIT $3",
+    )
+    .bind(schema)
+    .bind(prefix)
+    .bind(limit as i64)
+    .fetch_all(pool)
+    .await
+    .map_err(|error| format!("search tables failed: {error}"))?;
+
+    Ok(rows
+        .iter()
+        .filter_map(|row| {
+            let name: String = row.try_get(0).ok()?;
+            let kind: String = row.try_get(1).unwrap_or_else(|_| "table".to_string());
+            Some(TableInfo {
+                name,
+                kind,
+                row_count: None,
+            })
+        })
+        .collect())
 }
 
 pub async fn describe_table_postgres(

@@ -579,6 +579,44 @@ pub async fn list_tables(
     Ok(tables.into_values().collect())
 }
 
+pub async fn search_tables(
+    client: &PanWeiClient,
+    schema: Option<&str>,
+    prefix: &str,
+    limit: usize,
+) -> Result<Vec<TableInfo>, String> {
+    let schema = resolve_schema(client, schema).await?;
+    let schema_ref = schema.as_str();
+    let prefix_ref = prefix;
+    let limit = i64::try_from(limit).unwrap_or(i64::MAX);
+    let rows = fetch(
+        client,
+        "SELECT c.relname, c.relkind::text \
+         FROM pg_catalog.pg_class c \
+         JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+         WHERE n.nspname = $1 AND c.relkind IN ('r','p','f','v','m') \
+           AND LEFT(LOWER(c.relname), char_length($2)) = LOWER($2) \
+         ORDER BY c.relname LIMIT $3",
+        &[&schema_ref, &prefix_ref, &limit],
+    )
+    .await
+    .map_err(|error| format!("search tables failed: {error}"))?;
+
+    Ok(rows
+        .iter()
+        .filter_map(|row| {
+            let name = row.try_get::<usize, String>(0).ok()?;
+            let relkind: String = row.try_get(1).unwrap_or_default();
+            let kind = panwei_relkind_to_kind(&relkind)?;
+            Some(TableInfo {
+                name,
+                kind: kind.to_string(),
+                row_count: None,
+            })
+        })
+        .collect())
+}
+
 pub async fn describe_table(
     client: &PanWeiClient,
     schema: Option<&str>,

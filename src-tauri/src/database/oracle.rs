@@ -358,6 +358,50 @@ pub async fn list_tables(
     .await
 }
 
+pub async fn search_tables(
+    client: &OracleClient,
+    schema: Option<&str>,
+    prefix: &str,
+    limit: usize,
+) -> Result<Vec<TableInfo>, String> {
+    let owner = oracle_owner_sql(schema);
+    let prefix = prefix.replace('\'', "''");
+    let prefix_filter = if prefix.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "AND SUBSTR(UPPER(o.object_name), 1, LENGTH('{prefix}')) = UPPER('{prefix}')"
+        )
+    };
+    let sql = format!(
+        "SELECT object_name, object_type FROM ( \
+           SELECT o.object_name, o.object_type \
+           FROM all_objects o \
+           WHERE o.owner = {owner} \
+             AND o.object_type IN ('TABLE','VIEW','MATERIALIZED VIEW') \
+             AND o.object_name NOT LIKE 'BIN$%' \
+             {prefix_filter} \
+           ORDER BY o.object_name \
+         ) WHERE ROWNUM <= {limit}"
+    );
+    oracle_blocking(client.clone(), None, move |conn| {
+        let (_, rows, _) = oracle_rows(&conn, &sql, None)?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|row| {
+                let name = row.first().and_then(Clone::clone)?;
+                let object_type = row.get(1).and_then(Clone::clone).unwrap_or_default();
+                Some(TableInfo {
+                    name,
+                    kind: oracle_table_kind(&object_type),
+                    row_count: None,
+                })
+            })
+            .collect())
+    })
+    .await
+}
+
 pub async fn describe_table(
     client: &OracleClient,
     schema: Option<&str>,

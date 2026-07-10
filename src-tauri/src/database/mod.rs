@@ -38,6 +38,15 @@ use tokio_util::sync::CancellationToken;
 
 use crate::state::AppState;
 
+const DEFAULT_METADATA_SEARCH_LIMIT: usize = 100;
+const MAX_METADATA_SEARCH_LIMIT: usize = 500;
+
+fn metadata_search_limit(limit: Option<u32>) -> usize {
+    usize::try_from(limit.unwrap_or(DEFAULT_METADATA_SEARCH_LIMIT as u32))
+        .unwrap_or(MAX_METADATA_SEARCH_LIMIT)
+        .clamp(1, MAX_METADATA_SEARCH_LIMIT)
+}
+
 /// Connection parameters supplied by the frontend. Mirrors the
 /// `DbConnectInfo` TypeScript interface (camelCase over the IPC boundary).
 #[derive(Debug, Clone, Deserialize)]
@@ -657,6 +666,53 @@ pub async fn db_list_tables(
 }
 
 #[tauri::command]
+pub async fn db_search_tables(
+    state: State<'_, AppState>,
+    session_id: String,
+    schema: Option<String>,
+    catalog: Option<String>,
+    prefix: String,
+    limit: Option<u32>,
+) -> Result<Vec<TableInfo>, String> {
+    let session = get_session(&state, &session_id).await?;
+    let limit = metadata_search_limit(limit);
+    match &session.handle {
+        DbHandle::MySql(pool) => {
+            sql::search_tables_mysql(pool, schema.as_deref(), &prefix, limit).await
+        }
+        DbHandle::StarRocks(pool) => {
+            sql::search_tables_mysql(pool, schema.as_deref(), &prefix, limit).await
+        }
+        DbHandle::Postgres(pool) => {
+            sql::search_tables_postgres(pool, schema.as_deref(), &prefix, limit).await
+        }
+        DbHandle::PanWeiDB(client) => {
+            panwei::search_tables(client, schema.as_deref(), &prefix, limit).await
+        }
+        DbHandle::Oracle(client) => {
+            oracle::search_tables(client, schema.as_deref(), &prefix, limit).await
+        }
+        DbHandle::SqlServer(client) => {
+            sql::search_tables_sqlserver(client, schema.as_deref(), &prefix, limit).await
+        }
+        DbHandle::ClickHouse(client) => {
+            clickhouse::search_tables(client, schema.as_deref(), &prefix, limit).await
+        }
+        DbHandle::Presto(client) => {
+            presto::search_tables(
+                client,
+                catalog.as_deref(),
+                schema.as_deref(),
+                &prefix,
+                limit,
+            )
+            .await
+        }
+        DbHandle::Redis(_) => Err("Redis has no tables".into()),
+    }
+}
+
+#[tauri::command]
 pub async fn db_describe_table(
     state: State<'_, AppState>,
     session_id: String,
@@ -1004,6 +1060,22 @@ pub async fn redis_exec(
     match &session.handle {
         DbHandle::Redis(conn) => redis_ops::exec(conn, &raw_command).await,
         _ => Err("redis_exec requires a Redis session".into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{metadata_search_limit, DEFAULT_METADATA_SEARCH_LIMIT, MAX_METADATA_SEARCH_LIMIT};
+
+    #[test]
+    fn metadata_search_limits_are_bounded() {
+        assert_eq!(metadata_search_limit(None), DEFAULT_METADATA_SEARCH_LIMIT);
+        assert_eq!(metadata_search_limit(Some(0)), 1);
+        assert_eq!(metadata_search_limit(Some(25)), 25);
+        assert_eq!(
+            metadata_search_limit(Some(u32::MAX)),
+            MAX_METADATA_SEARCH_LIMIT
+        );
     }
 }
 
