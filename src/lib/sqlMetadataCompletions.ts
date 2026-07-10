@@ -21,6 +21,11 @@ interface TableRef {
   table: string;
 }
 
+interface NamedTableRef {
+  ref: TableRef;
+  qualifier: string;
+}
+
 export interface SqlMetadataCompletionOptions {
   cache: DbMetadataCache;
   engine: string;
@@ -46,6 +51,15 @@ const QUOTED_PREFIX_PATTERN = String.raw`(?:"(?:[^"]|"")*|` + "`(?:[^`]|``)*" + 
 const COMPLETION_PREFIX_PATTERN = `(?:${WORD_PREFIX_PATTERN}|${QUOTED_PREFIX_PATTERN})`;
 const DOT_CONTEXT_RE = new RegExp(`(${QUALIFIED_PATTERN})\\.(${COMPLETION_PREFIX_PATTERN})?$`, "u");
 const RELATION_CONTEXT_RE = new RegExp(`\\b(?:from|join|update|into)\\s+(${COMPLETION_PREFIX_PATTERN})?$`, "iu");
+const INSERT_COLUMNS_CONTEXT_RE = new RegExp(
+  `\\binsert\\s+into\\s+(${QUALIFIED_PATTERN})\\s*\\(([^)]*)$`,
+  "iu",
+);
+const JOIN_ON_CONTEXT_RE = new RegExp(
+  `\\bjoin\\s+(${QUALIFIED_PATTERN})(?:\\s+(?:as\\s+)?(${IDENT_PATTERN}))?\\s+on\\s+(${WORD_PREFIX_PATTERN})?$`,
+  "iu",
+);
+const COMPLETION_PREFIX_FULL_RE = new RegExp(`^(?:${COMPLETION_PREFIX_PATTERN})?$`, "u");
 const BARE_IDENTIFIER_VALID_FOR = /^[\p{L}_][\p{L}\p{N}\p{M}_$]*$/u;
 const QUOTED_IDENTIFIER_VALID_FOR = /^(?:"(?:[^"]|"")*|`(?:[^`]|``)*|\[(?:[^\]]|\]\])*)$/u;
 const COMPLETION_BLOCKED_NODES = new Set(["String", "LineComment", "BlockComment"]);
@@ -96,6 +110,15 @@ function currentStatement(context: CompletionContext, doc: string): string {
   return `${start >= 0 ? before.slice(start + 1) : before}${end >= 0 ? after.slice(0, end) : after}`;
 }
 
+function currentStatementBefore(context: CompletionContext): string {
+  let node = syntaxTree(context.state).resolveInner(context.pos, -1);
+  while (true) {
+    if (node.name === "Statement") return context.state.sliceDoc(node.from, context.pos);
+    if (!node.parent) return context.state.sliceDoc(0, context.pos);
+    node = node.parent;
+  }
+}
+
 function completionIsBlocked(context: CompletionContext): boolean {
   let node = syntaxTree(context.state).resolveInner(context.pos, -1);
   while (true) {
@@ -126,6 +149,46 @@ function completionPrefix(raw: string | undefined, pos: number): CompletionPrefi
     return { from: pos - value.length, text: value.slice(1).replace(/\]\]/g, "]"), quoted: true };
   }
   return { from: pos - value.length, text: value, quoted: false };
+}
+
+function lastUnquotedComma(value: string): number {
+  let quote: '"' | "`" | "]" | null = null;
+  let last = -1;
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    if (quote) {
+      const closes = (quote === '"' && char === '"')
+        || (quote === "`" && char === "`")
+        || (quote === "]" && char === "]");
+      if (closes && value[index + 1] === char) {
+        index += 1;
+      } else if (closes) {
+        quote = null;
+      }
+      continue;
+    }
+    if (char === '"' || char === "`") quote = char;
+    else if (char === "[") quote = "]";
+    else if (char === ",") last = index;
+  }
+  return last;
+}
+
+function identifierList(value: string): string[] {
+  const result: string[] = [];
+  let rest = value;
+  while (rest.trim()) {
+    const separator = lastUnquotedComma(rest);
+    if (separator < 0) {
+      const identifier = unquoteIdent(rest.trim());
+      if (identifier) result.unshift(identifier);
+      break;
+    }
+    const identifier = unquoteIdent(rest.slice(separator + 1).trim());
+    if (identifier) result.unshift(identifier);
+    rest = rest.slice(0, separator);
+  }
+  return result;
 }
 
 function stripCommentsAndStrings(sql: string): string {
@@ -164,9 +227,25 @@ function aliasMapFor(
   catalog?: string | null,
 ): Map<string, TableRef> {
   const aliases = new Map<string, TableRef>();
+  for (const relation of relationRefsFor(sql, engine, activeSchema, catalog)) {
+    if (!equalsName(relation.qualifier, relation.ref.table)) {
+      aliases.set(relation.qualifier.toLowerCase(), relation.ref);
+    }
+  }
+  return aliases;
+}
+
+function relationRefsFor(
+  sql: string,
+  engine: string,
+  activeSchema?: string | null,
+  catalog?: string | null,
+): NamedTableRef[] {
+  const relations: NamedTableRef[] = [];
   const cleaned = stripCommentsAndStrings(sql);
+  const reservedAliasPattern = Array.from(RESERVED_AFTER_RELATION).join("|");
   const relationRe = new RegExp(
-    String.raw`\b(?:from|join)\s+(${QUALIFIED_PATTERN})(?:\s+(?:as\s+)?(${IDENT_PATTERN}))?`,
+    String.raw`\b(?:from|join)\s+(${QUALIFIED_PATTERN})(?:\s+(?:as\s+)?((?!(?:${reservedAliasPattern})\b)${IDENT_PATTERN}))?`,
     "giu",
   );
   let match: RegExpExecArray | null;
@@ -175,11 +254,12 @@ function aliasMapFor(
     const ref = tableRefFromParts(parts, engine, activeSchema, catalog);
     if (!ref) continue;
     const alias = match[2] ? unquoteIdent(match[2]) : null;
-    if (!alias || RESERVED_AFTER_RELATION.has(alias.toLowerCase())) continue;
-    if (equalsName(alias, ref.table)) continue;
-    aliases.set(alias.toLowerCase(), ref);
+    const qualifier = alias && !RESERVED_AFTER_RELATION.has(alias.toLowerCase())
+      ? alias
+      : ref.table;
+    relations.push({ ref, qualifier });
   }
-  return aliases;
+  return relations;
 }
 
 function filterOptions(options: Completion[], prefix: string, maxOptions: number): Completion[] {
@@ -253,6 +333,113 @@ function columnOptions(
     ...identifierOption(column.name, "property", engine, forceQuote),
     detail: column.type,
   }));
+}
+
+function identifierText(engine: string, name: string): string {
+  return sqlIdentifierCompletionApply(engine, name) ?? name;
+}
+
+function allColumnsOption(
+  engine: string,
+  rawQualifier: string,
+  qualifierFrom: number,
+  columns: Completion[],
+): Completion {
+  return {
+    label: "* — expand all columns",
+    type: "text",
+    detail: `${columns.length} columns`,
+    boost: 10,
+    apply: (view, _completion, _from, to) => {
+      const expanded = columns
+        .map((column) => `${rawQualifier}.${identifierText(engine, column.label)}`)
+        .join(", ");
+      view.dispatch({
+        changes: { from: qualifierFrom, to, insert: expanded },
+        selection: { anchor: qualifierFrom + expanded.length },
+      });
+    },
+  };
+}
+
+function insertAllColumnsOption(engine: string, columns: DbColumnDescription[]): Completion {
+  return {
+    label: "All columns — insert column list",
+    type: "text",
+    detail: `${columns.length} columns`,
+    boost: 70,
+    apply: columns.map((column) => identifierText(engine, column.name)).join(", "),
+  };
+}
+
+function singularTableName(name: string): string {
+  const lower = name.toLocaleLowerCase();
+  if (lower.endsWith("ies") && lower.length > 3) return `${lower.slice(0, -3)}y`;
+  if (lower.endsWith("ses") && lower.length > 3) return lower.slice(0, -2);
+  if (lower.endsWith("s") && lower.length > 1) return lower.slice(0, -1);
+  return lower;
+}
+
+function joinPredicateOptions(
+  engine: string,
+  left: NamedTableRef,
+  leftColumns: DbColumnDescription[],
+  right: NamedTableRef,
+  rightColumns: DbColumnDescription[],
+): Completion[] {
+  const suggestions = new Map<string, Completion>();
+  const add = (
+    leftColumn: DbColumnDescription,
+    rightColumn: DbColumnDescription,
+    boost: number,
+    detail: string,
+  ) => {
+    const predicate = `${identifierText(engine, left.qualifier)}.${identifierText(engine, leftColumn.name)} = ${identifierText(engine, right.qualifier)}.${identifierText(engine, rightColumn.name)}`;
+    const existing = suggestions.get(predicate);
+    if (!existing || (existing.boost ?? 0) < boost) {
+      suggestions.set(predicate, {
+        label: predicate,
+        apply: predicate,
+        type: "text",
+        detail,
+        boost,
+      });
+    }
+  };
+
+  const leftTable = singularTableName(left.ref.table);
+  const rightTable = singularTableName(right.ref.table);
+  for (const rightPrimary of rightColumns.filter((column) => column.primaryKey)) {
+    const expected = new Set([
+      `${rightTable}_${rightPrimary.name.toLocaleLowerCase()}`,
+      `${right.ref.table.toLocaleLowerCase()}_${rightPrimary.name.toLocaleLowerCase()}`,
+    ]);
+    for (const leftColumn of leftColumns) {
+      if (expected.has(leftColumn.name.toLocaleLowerCase())) {
+        add(leftColumn, rightPrimary, 130, "Primary-key join suggestion");
+      }
+    }
+  }
+  for (const leftPrimary of leftColumns.filter((column) => column.primaryKey)) {
+    const expected = new Set([
+      `${leftTable}_${leftPrimary.name.toLocaleLowerCase()}`,
+      `${left.ref.table.toLocaleLowerCase()}_${leftPrimary.name.toLocaleLowerCase()}`,
+    ]);
+    for (const rightColumn of rightColumns) {
+      if (expected.has(rightColumn.name.toLocaleLowerCase())) {
+        add(leftPrimary, rightColumn, 130, "Primary-key join suggestion");
+      }
+    }
+  }
+  for (const leftColumn of leftColumns) {
+    const rightColumn = rightColumns.find((column) => equalsName(column.name, leftColumn.name));
+    if (!rightColumn || (leftColumn.primaryKey && rightColumn.primaryKey)) continue;
+    add(leftColumn, rightColumn, 80, "Matching-column join suggestion");
+  }
+  return Array.from(suggestions.values())
+    .sort((leftOption, rightOption) =>
+      (rightOption.boost ?? 0) - (leftOption.boost ?? 0)
+      || leftOption.label.localeCompare(rightOption.label));
 }
 
 async function isPrestoCatalog(name: string, options: SqlMetadataCompletionOptions): Promise<boolean> {
@@ -342,6 +529,99 @@ async function completionsForParts(
   return listColumnsFor({ catalog: null, schema: first, table: second }, options, forceQuote);
 }
 
+async function insertColumnCompletions(
+  context: CompletionContext,
+  match: RegExpMatchArray,
+  maxOptions: number,
+  options: SqlMetadataCompletionOptions,
+): Promise<CompletionResult | null> {
+  const parts = splitSqlQualifiedName(match[1]);
+  const ref = tableRefFromParts(parts, options.engine, options.activeSchema, options.catalog);
+  if (!ref) return null;
+  const content = match[2];
+  const separator = lastUnquotedComma(content);
+  const rawPrefix = content.slice(separator + 1).trimStart();
+  if (!COMPLETION_PREFIX_FULL_RE.test(rawPrefix)) return null;
+  const prefix = completionPrefix(rawPrefix, context.pos);
+  const usedColumns = new Set(
+    identifierList(separator >= 0 ? content.slice(0, separator + 1) : "")
+      .map((column) => column.toLocaleLowerCase()),
+  );
+
+  context.addEventListener("abort", () => undefined, { onDocChange: true });
+  options.onLoadingChange?.(true);
+  try {
+    const columns = await options.cache.describeTable(ref.schema, ref.table, ref.catalog);
+    if (context.aborted) return null;
+    const available = columns.filter((column) => !usedColumns.has(column.name.toLocaleLowerCase()));
+    const completions = columnOptions(available, options.engine, prefix.quoted);
+    if (!content.trim() && columns.length > 0) {
+      completions.unshift(insertAllColumnsOption(options.engine, columns));
+    }
+    const filtered = filterOptions(completions, prefix.text, maxOptions);
+    reportResult(filtered, maxOptions, options);
+    return filtered.length > 0
+      ? {
+          from: prefix.from,
+          options: filtered,
+          validFor: prefix.quoted ? QUOTED_IDENTIFIER_VALID_FOR : BARE_IDENTIFIER_VALID_FOR,
+        }
+      : null;
+  } catch (error) {
+    if (!context.aborted) options.onError?.(String(error));
+    return null;
+  } finally {
+    options.onLoadingChange?.(false);
+  }
+}
+
+async function joinOnCompletions(
+  context: CompletionContext,
+  match: RegExpMatchArray,
+  statementBefore: string,
+  maxOptions: number,
+  options: SqlMetadataCompletionOptions,
+): Promise<CompletionResult | null> {
+  const relations = relationRefsFor(
+    statementBefore,
+    options.engine,
+    options.activeSchema,
+    options.catalog,
+  );
+  const right = relations.at(-1);
+  const left = relations.at(-2);
+  if (!left || !right) return null;
+  const prefix = match[3] ?? "";
+
+  context.addEventListener("abort", () => undefined, { onDocChange: true });
+  options.onLoadingChange?.(true);
+  try {
+    const [leftColumns, rightColumns] = await Promise.all([
+      options.cache.describeTable(left.ref.schema, left.ref.table, left.ref.catalog),
+      options.cache.describeTable(right.ref.schema, right.ref.table, right.ref.catalog),
+    ]);
+    if (context.aborted) return null;
+    const filtered = filterOptions(
+      joinPredicateOptions(options.engine, left, leftColumns, right, rightColumns),
+      prefix,
+      Math.min(maxOptions, 50),
+    );
+    reportResult(filtered, Math.min(maxOptions, 50), options);
+    return filtered.length > 0
+      ? {
+          from: context.pos - prefix.length,
+          options: filtered,
+          validFor: BARE_IDENTIFIER_VALID_FOR,
+        }
+      : null;
+  } catch (error) {
+    if (!context.aborted) options.onError?.(String(error));
+    return null;
+  } finally {
+    options.onLoadingChange?.(false);
+  }
+}
+
 export function createSqlMetadataCompletionSource(
   options: SqlMetadataCompletionOptions,
 ): CompletionSource {
@@ -349,8 +629,18 @@ export function createSqlMetadataCompletionSource(
     if (completionIsBlocked(context)) return null;
     const doc = context.state.doc.toString();
     const before = doc.slice(0, context.pos);
-    const match = before.match(DOT_CONTEXT_RE);
     const maxOptions = options.maxOptions ?? DB_METADATA_COMPLETION_LIMIT;
+    const statementBefore = currentStatementBefore(context);
+    const insertMatch = statementBefore.match(INSERT_COLUMNS_CONTEXT_RE);
+    if (insertMatch) {
+      return insertColumnCompletions(context, insertMatch, maxOptions, options);
+    }
+    const joinOnMatch = statementBefore.match(JOIN_ON_CONTEXT_RE);
+    if (joinOnMatch) {
+      return joinOnCompletions(context, joinOnMatch, statementBefore, maxOptions, options);
+    }
+
+    const match = before.match(DOT_CONTEXT_RE);
     if (!match) {
       const relationMatch = before.match(RELATION_CONTEXT_RE);
       const activeSchema = truthy(options.activeSchema);
@@ -404,7 +694,7 @@ export function createSqlMetadataCompletionSource(
         options.activeSchema,
         options.catalog,
       );
-      const completions = await completionsForParts(
+      let completions = await completionsForParts(
         parts,
         aliases,
         prefix.text,
@@ -413,6 +703,18 @@ export function createSqlMetadataCompletionSource(
         options,
       );
       if (context.aborted) return null;
+      if (!prefix.text && completions.length > 0
+        && completions.every((completion) => completion.type === "property")) {
+        completions = [
+          allColumnsOption(
+            options.engine,
+            qualifier,
+            match.index ?? context.pos,
+            completions,
+          ),
+          ...completions,
+        ];
+      }
       const filtered = filterOptions(
         completions,
         prefix.text,

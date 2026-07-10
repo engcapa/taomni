@@ -39,6 +39,7 @@ describe("codeMirrorSqlDialect", () => {
 
   it("quotes unsafe and reserved metadata identifiers for each engine", () => {
     expect(sqlIdentifierCompletionApply("PostgreSQL", "orders")).toBeUndefined();
+    expect(sqlIdentifierCompletionApply("PostgreSQL", "id")).toBeUndefined();
     expect(sqlIdentifierCompletionApply("PostgreSQL", "订单")).toBeUndefined();
     expect(sqlIdentifierCompletionApply("PostgreSQL", "Order Items")).toBe('"Order Items"');
     expect(sqlIdentifierCompletionApply("PostgreSQL", "order")).toBe('"order"');

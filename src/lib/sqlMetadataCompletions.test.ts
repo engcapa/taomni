@@ -264,7 +264,9 @@ describe("createSqlMetadataCompletionSource", () => {
       activeSchema: "public",
     });
 
-    expect(labels(result)).toEqual(["id", "total"]);
+    expect(labels(result)).toEqual(["* — expand all columns", "id", "total"]);
+    expect(result?.options[0]?.detail).toBe("2 columns");
+    expect(typeof result?.options[0]?.apply).toBe("function");
     expect(ipcMock.dbDescribeTable).toHaveBeenCalledWith("s1", "public", "orders", null);
   });
 
@@ -275,7 +277,7 @@ describe("createSqlMetadataCompletionSource", () => {
       catalog: "hive",
     });
 
-    expect(labels(result)).toEqual(["id", "total"]);
+    expect(labels(result)).toEqual(["* — expand all columns", "id", "total"]);
     expect(ipcMock.dbDescribeTable).toHaveBeenCalledWith("s1", "sales", "orders", "hive");
   });
 
@@ -296,8 +298,96 @@ describe("createSqlMetadataCompletionSource", () => {
       activeSchema: "public",
     });
 
-    expect(labels(result)).toEqual(["id", "total"]);
+    expect(labels(result)).toEqual(["* — expand all columns", "id", "total"]);
     expect(ipcMock.dbDescribeTable).toHaveBeenCalledWith("s1", "sales", "orders", null);
+  });
+
+  it("expands a qualified wildcard into fully qualified columns", async () => {
+    const result = await complete("select orders.‸ from orders", {
+      engine: "PostgreSQL",
+      activeSchema: "public",
+    });
+    const expansion = result?.options[0];
+    const apply = expansion?.apply;
+    let dispatched: unknown = null;
+
+    expect(typeof apply).toBe("function");
+    if (typeof apply === "function" && expansion && result) {
+      apply(
+        { dispatch: (transaction: unknown) => { dispatched = transaction; } } as never,
+        expansion,
+        result.from,
+        "select orders.".length,
+      );
+    }
+
+    expect(dispatched).toMatchObject({
+      changes: {
+        from: "select ".length,
+        to: "select orders.".length,
+        insert: "orders.id, orders.total",
+      },
+    });
+  });
+
+  it("completes and expands INSERT column lists", async () => {
+    const allColumns = await complete("insert into orders (‸", {
+      engine: "PostgreSQL",
+      activeSchema: "public",
+    });
+
+    expect(labels(allColumns)).toEqual(["All columns — insert column list", "id", "total"]);
+    expect(allColumns?.options[0]?.apply).toBe("id, total");
+
+    const remaining = await complete("insert into orders (id, to‸", {
+      engine: "PostgreSQL",
+      activeSchema: "public",
+    });
+    expect(labels(remaining)).toEqual(["total"]);
+    expect(remaining?.from).toBe("insert into orders (id, ".length);
+    expect(ipcMock.dbDescribeTable).toHaveBeenCalledWith("s1", "public", "orders", null);
+  });
+
+  it("suggests JOIN predicates from primary-key naming conventions", async () => {
+    ipcMock.dbDescribeTable
+      .mockResolvedValueOnce([
+        { name: "id", type: "bigint", nullable: false, default: null, primaryKey: true },
+        { name: "customer_id", type: "bigint", nullable: false, default: null, primaryKey: false },
+      ])
+      .mockResolvedValueOnce([
+        { name: "id", type: "bigint", nullable: false, default: null, primaryKey: true },
+        { name: "name", type: "text", nullable: false, default: null, primaryKey: false },
+      ]);
+
+    const result = await complete(
+      "select * from orders o join customers c on ‸",
+      { engine: "PostgreSQL", activeSchema: "public" },
+    );
+
+    expect(labels(result)).toEqual(["o.customer_id = c.id"]);
+    expect(result?.options[0]).toMatchObject({
+      apply: "o.customer_id = c.id",
+      detail: "Primary-key join suggestion",
+    });
+    expect(ipcMock.dbDescribeTable).toHaveBeenNthCalledWith(1, "s1", "public", "orders", null);
+    expect(ipcMock.dbDescribeTable).toHaveBeenNthCalledWith(2, "s1", "public", "customers", null);
+  });
+
+  it("keeps JOIN keywords out of alias parsing when aliases are omitted", async () => {
+    ipcMock.dbDescribeTable
+      .mockResolvedValueOnce([
+        { name: "customer_id", type: "bigint", nullable: false, default: null, primaryKey: false },
+      ])
+      .mockResolvedValueOnce([
+        { name: "id", type: "bigint", nullable: false, default: null, primaryKey: true },
+      ]);
+
+    const result = await complete(
+      "select * from orders join customers on ‸",
+      { engine: "PostgreSQL", activeSchema: "public" },
+    );
+
+    expect(labels(result)).toEqual(["orders.customer_id = customers.id"]);
   });
 
   it("leaves CTE column completion to the local structured source", async () => {
@@ -330,8 +420,8 @@ describe("createSqlMetadataCompletionSource", () => {
       }),
     ]);
 
-    expect(labels(first)).toEqual(["id", "total"]);
-    expect(labels(second)).toEqual(["id", "total"]);
+    expect(labels(first)).toEqual(["* — expand all columns", "id", "total"]);
+    expect(labels(second)).toEqual(["* — expand all columns", "id", "total"]);
     expect(ipcMock.dbSearchTables).toHaveBeenCalledTimes(1);
     expect(ipcMock.dbDescribeTable).toHaveBeenCalledTimes(1);
   });
