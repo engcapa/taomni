@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorState, Compartment } from "@codemirror/state";
 import {
   EditorView,
@@ -24,6 +24,7 @@ import {
   type SQLNamespace,
 } from "@codemirror/lang-sql";
 import {
+  acceptCompletion,
   autocompletion,
   closeBrackets,
   closeBracketsKeymap,
@@ -72,11 +73,18 @@ function autocompleteFor(
   sources?: readonly CompletionSource[],
   defaultSources?: readonly CompletionSource[],
 ) {
-  if (sources && sources.length > 0) return autocompletion({ override: [...sources] });
-  if (defaultSources && defaultSources.length > 0) {
-    return autocompletion({ override: [...defaultSources] });
+  const config = {
+    activateOnTypingDelay: 75,
+    updateSyncTime: 80,
+    maxRenderedOptions: 80,
+  };
+  if (sources && sources.length > 0) {
+    return autocompletion({ ...config, override: [...sources] });
   }
-  return autocompletion();
+  if (defaultSources && defaultSources.length > 0) {
+    return autocompletion({ ...config, override: [...defaultSources] });
+  }
+  return autocompletion(config);
 }
 
 const sqlHighlightStyle = HighlightStyle.define([
@@ -184,6 +192,38 @@ export function SqlEditorPanel({
   onRunRef.current = onRun;
   onDocChangeRef.current = onDocChange;
   onFocusRef.current = onFocus;
+  const [metadataPending, setMetadataPending] = useState(0);
+  const [metadataLoadingVisible, setMetadataLoadingVisible] = useState(false);
+  const [metadataHint, setMetadataHint] = useState<string | null>(null);
+  const onMetadataLoadingChange = useCallback((loading: boolean) => {
+    if (loading) setMetadataHint(null);
+    setMetadataPending((current) => Math.max(0, current + (loading ? 1 : -1)));
+  }, []);
+  const onMetadataError = useCallback((message: string) => {
+    const status = `Metadata autocomplete failed: ${message}`;
+    setMetadataHint(status);
+    onMetadataStatus?.(status);
+  }, [onMetadataStatus]);
+  const onMetadataResult = useCallback((result: { count: number; limitReached: boolean }) => {
+    setMetadataHint(
+      result.limitReached
+        ? `Showing the first ${result.count} metadata matches. Keep typing to narrow the list.`
+        : null,
+    );
+  }, []);
+  useEffect(() => {
+    if (metadataPending === 0) {
+      setMetadataLoadingVisible(false);
+      return;
+    }
+    const timer = setTimeout(() => setMetadataLoadingVisible(true), 120);
+    return () => clearTimeout(timer);
+  }, [metadataPending]);
+  useEffect(() => {
+    if (!metadataHint) return;
+    const timer = setTimeout(() => setMetadataHint(null), 4_000);
+    return () => clearTimeout(timer);
+  }, [metadataHint]);
   const metadataCompletionSource = useMemo(
     () =>
       metadataCache
@@ -192,10 +232,20 @@ export function SqlEditorPanel({
             engine,
             activeSchema,
             catalog,
-            onError: (message) => onMetadataStatus?.(`Metadata autocomplete failed: ${message}`),
+            onError: onMetadataError,
+            onLoadingChange: onMetadataLoadingChange,
+            onResult: onMetadataResult,
           })
         : null,
-    [activeSchema, catalog, engine, metadataCache, onMetadataStatus],
+    [
+      activeSchema,
+      catalog,
+      engine,
+      metadataCache,
+      onMetadataError,
+      onMetadataLoadingChange,
+      onMetadataResult,
+    ],
   );
   const defaultSources = useMemo(
     () =>
@@ -268,6 +318,7 @@ export function SqlEditorPanel({
         keymap.of([
           { key: "F5", run: () => (runHandler(), true) },
           { key: "Mod-Enter", run: () => (runHandler(), true) },
+          { key: "Tab", run: acceptCompletion },
           { key: "Shift-Alt-ArrowUp", run: addCursorAbove },
           { key: "Shift-Alt-ArrowDown", run: addCursorBelow },
           ...closeBracketsKeymap,
@@ -431,5 +482,24 @@ export function SqlEditorPanel({
     });
   }, [completionSources, defaultSources]);
 
-  return <div ref={hostRef} className="h-full w-full overflow-hidden" data-testid="sql-editor" />;
+  return (
+    <div className="h-full w-full overflow-hidden relative" data-testid="sql-editor">
+      <div ref={hostRef} className="h-full w-full overflow-hidden" />
+      {(metadataLoadingVisible || metadataHint) && (
+        <div
+          className="absolute right-2 bottom-2 max-w-[min(420px,calc(100%-1rem))] rounded px-2 py-1 text-[11px] pointer-events-none"
+          style={{
+            color: metadataHint ? "var(--taomni-warning, #b45309)" : "var(--taomni-text-muted)",
+            background: "var(--taomni-panel-bg)",
+            border: "1px solid var(--taomni-divider)",
+            boxShadow: "var(--taomni-shadow-sm)",
+          }}
+          data-testid="sql-completion-status"
+          aria-live="polite"
+        >
+          {metadataHint ?? "Loading metadata completions…"}
+        </div>
+      )}
+    </div>
+  );
 }

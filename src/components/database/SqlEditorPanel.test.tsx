@@ -1,6 +1,15 @@
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { DbMetadataCache } from "../../lib/dbMetadataCache";
 import { SqlEditorPanel, type SqlEditorHandle } from "./SqlEditorPanel";
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
 
 afterEach(() => {
   cleanup();
@@ -39,5 +48,81 @@ describe("SqlEditorPanel document updates", () => {
     act(() => view.unmount());
     expect(onDocChange).toHaveBeenCalledTimes(2);
     expect(onDocChange).toHaveBeenLastCalledWith("select 3");
+  });
+
+  it("accepts an open completion with Tab", async () => {
+    vi.useFakeTimers();
+    let handle: SqlEditorHandle | null = null;
+    const view = render(
+      <SqlEditorPanel
+        engine="PostgreSQL"
+        initialDoc="sel"
+        handleRef={(next) => {
+          handle = next;
+        }}
+        completionSources={[
+          () => ({ from: 0, options: [{ label: "SELECT", type: "keyword" }] }),
+        ]}
+      />,
+    );
+    const content = view.container.querySelector<HTMLElement>(".cm-content");
+    expect(content).not.toBeNull();
+
+    act(() => handle?.selectRange(3, 3));
+    fireEvent.keyDown(content!, { key: " ", code: "Space", ctrlKey: true });
+    await act(async () => {
+      await Promise.resolve();
+      vi.advanceTimersByTime(100);
+      await Promise.resolve();
+    });
+    expect(view.container.querySelector(".cm-tooltip-autocomplete")).not.toBeNull();
+    act(() => vi.advanceTimersByTime(80));
+
+    fireEvent.keyDown(content!, { key: "Tab", code: "Tab" });
+    expect((handle as SqlEditorHandle | null)?.getValue()).toBe("SELECT");
+  });
+
+  it("shows a delayed loading state for slow metadata completion", async () => {
+    vi.useFakeTimers();
+    const pending = deferred<Array<{ name: string; kind: "table"; rowCount: null }>>();
+    const metadataCache = {
+      searchTables: vi.fn(() => pending.promise),
+      getDefaultCatalog: vi.fn(() => null),
+    } as unknown as DbMetadataCache;
+    let handle: SqlEditorHandle | null = null;
+    const view = render(
+      <SqlEditorPanel
+        engine="PostgreSQL"
+        initialDoc="select * from ord"
+        activeSchema="public"
+        metadataCache={metadataCache}
+        handleRef={(next) => {
+          handle = next;
+        }}
+      />,
+    );
+    const content = view.container.querySelector<HTMLElement>(".cm-content");
+
+    act(() => handle?.selectRange("select * from ord".length, "select * from ord".length));
+    fireEvent.keyDown(content!, { key: " ", code: "Space", ctrlKey: true });
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(metadataCache.searchTables).toHaveBeenCalled();
+    expect(view.queryByTestId("sql-completion-status")).toBeNull();
+
+    act(() => vi.advanceTimersByTime(120));
+    expect(view.getByTestId("sql-completion-status")).toHaveTextContent(
+      "Loading metadata completions",
+    );
+
+    await act(async () => {
+      pending.resolve([{ name: "orders", kind: "table", rowCount: null }]);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(view.queryByTestId("sql-completion-status")).toBeNull();
   });
 });

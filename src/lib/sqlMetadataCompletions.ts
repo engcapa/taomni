@@ -27,6 +27,8 @@ export interface SqlMetadataCompletionOptions {
   catalog?: string | null;
   maxOptions?: number;
   onError?: (message: string) => void;
+  onLoadingChange?: (loading: boolean) => void;
+  onResult?: (result: { count: number; limitReached: boolean }) => void;
 }
 
 export interface SqlMetadataNamespaceOptions {
@@ -183,7 +185,38 @@ function filterOptions(options: Completion[], prefix: string, maxOptions: number
   const lower = prefix.toLowerCase();
   return options
     .filter((option) => option.label.toLowerCase().startsWith(lower))
+    .map((option) => {
+      const label = option.label;
+      const lowerLabel = label.toLowerCase();
+      const matchBoost = label === prefix
+        ? 100
+        : lowerLabel === lower
+          ? 90
+          : label.startsWith(prefix)
+            ? 40
+            : 30;
+      const typeBoost = option.type === "table"
+        ? 8
+        : option.type === "view"
+          ? 6
+          : option.type === "property"
+            ? 4
+            : 2;
+      return { ...option, boost: (option.boost ?? 0) + matchBoost + typeBoost };
+    })
+    .sort((a, b) => (b.boost ?? 0) - (a.boost ?? 0) || a.label.localeCompare(b.label))
     .slice(0, maxOptions);
+}
+
+function reportResult(
+  completions: Completion[],
+  maxOptions: number,
+  options: SqlMetadataCompletionOptions,
+): void {
+  options.onResult?.({
+    count: completions.length,
+    limitReached: completions.length >= maxOptions,
+  });
 }
 
 function identifierOption(
@@ -326,6 +359,7 @@ export function createSqlMetadataCompletionSource(
       const catalog = options.engine === "Presto"
         ? truthy(options.catalog) ?? options.cache.getDefaultCatalog()
         : null;
+      options.onLoadingChange?.(true);
       try {
         const completions = tableOptions(
           await options.cache.searchTables(activeSchema, prefix.text, catalog, maxOptions),
@@ -334,6 +368,7 @@ export function createSqlMetadataCompletionSource(
         );
         if (context.aborted) return null;
         const filtered = filterOptions(completions, prefix.text, maxOptions);
+        reportResult(filtered, maxOptions, options);
         return filtered.length === 0
           ? null
           : {
@@ -344,6 +379,8 @@ export function createSqlMetadataCompletionSource(
       } catch (error) {
         if (!context.aborted) options.onError?.(String(error));
         return null;
+      } finally {
+        options.onLoadingChange?.(false);
       }
     }
 
@@ -353,6 +390,7 @@ export function createSqlMetadataCompletionSource(
     if (parts.length === 0 || parts.length > 3) return null;
     context.addEventListener("abort", () => undefined, { onDocChange: true });
 
+    options.onLoadingChange?.(true);
     try {
       const aliases = aliasMapFor(
         currentStatement(context, doc),
@@ -374,6 +412,7 @@ export function createSqlMetadataCompletionSource(
         prefix.text,
         maxOptions,
       );
+      reportResult(filtered, maxOptions, options);
       return filtered.length === 0
         ? null
         : {
@@ -384,6 +423,8 @@ export function createSqlMetadataCompletionSource(
     } catch (error) {
       if (!context.aborted) options.onError?.(String(error));
       return null;
+    } finally {
+      options.onLoadingChange?.(false);
     }
   };
 }

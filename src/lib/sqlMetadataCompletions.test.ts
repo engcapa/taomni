@@ -62,6 +62,9 @@ async function complete(
     activeSchema?: string | null;
     catalog?: string | null;
     cache?: ReturnType<typeof createDbMetadataCache>;
+    onError?: (message: string) => void;
+    onLoadingChange?: (loading: boolean) => void;
+    onResult?: (result: { count: number; limitReached: boolean }) => void;
   },
 ): Promise<CompletionResult | null> {
   const pos = doc.indexOf("‸");
@@ -82,6 +85,9 @@ async function complete(
     engine: opts.engine,
     activeSchema: opts.activeSchema,
     catalog: opts.catalog,
+    onError: opts.onError,
+    onLoadingChange: opts.onLoadingChange,
+    onResult: opts.onResult,
   });
   return (await source(context)) as CompletionResult | null;
 }
@@ -95,14 +101,17 @@ afterEach(() => {
 
 describe("createSqlMetadataCompletionSource", () => {
   it("suggests active-schema tables in relation positions without loading the full schema", async () => {
+    const onLoadingChange = vi.fn();
     const result = await complete("select * from ord‸", {
       engine: "PostgreSQL",
       activeSchema: "public",
+      onLoadingChange,
     });
 
     expect(labels(result)).toEqual(["orders"]);
     expect(ipcMock.dbSearchTables).toHaveBeenCalledWith("s1", "public", null, "ord", 500);
     expect(ipcMock.dbListTables).not.toHaveBeenCalled();
+    expect(onLoadingChange.mock.calls.flat()).toEqual([true, false]);
   });
 
   it("does not query relation metadata without an active schema", async () => {
@@ -164,6 +173,39 @@ describe("createSqlMetadataCompletionSource", () => {
 
     expect(labels(result)).toEqual(["订单"]);
     expect(result?.options[0]?.apply).toBeUndefined();
+  });
+
+  it("ranks an exact table match ahead of longer prefixes", async () => {
+    ipcMock.dbSearchTables.mockResolvedValueOnce([
+      { name: "orders_archive", kind: "table", rowCount: null },
+      { name: "orders", kind: "table", rowCount: null },
+      { name: "orders_view", kind: "view", rowCount: null },
+    ]);
+
+    const result = await complete("select * from orders‸", {
+      engine: "PostgreSQL",
+      activeSchema: "public",
+    });
+
+    expect(labels(result)).toEqual(["orders", "orders_archive", "orders_view"]);
+    expect(result?.options[0]?.boost).toBeGreaterThan(result?.options[1]?.boost ?? 0);
+  });
+
+  it("reports metadata errors and always clears loading state", async () => {
+    ipcMock.dbSearchTables.mockRejectedValueOnce(new Error("offline"));
+    const onError = vi.fn();
+    const onLoadingChange = vi.fn();
+
+    const result = await complete("select * from ord‸", {
+      engine: "PostgreSQL",
+      activeSchema: "public",
+      onError,
+      onLoadingChange,
+    });
+
+    expect(result).toBeNull();
+    expect(onError).toHaveBeenCalledWith("Error: offline");
+    expect(onLoadingChange.mock.calls.flat()).toEqual([true, false]);
   });
 
   it("drops metadata results after a document-change abort", async () => {
@@ -281,6 +323,7 @@ describe("createSqlMetadataCompletionSource", () => {
   });
 
   it("caps object completion results at 500 entries", async () => {
+    const onResult = vi.fn();
     ipcMock.dbSearchTables.mockResolvedValueOnce(
       Array.from({ length: 650 }, (_, index) => ({
         name: `tbl_${String(index).padStart(3, "0")}`,
@@ -292,11 +335,13 @@ describe("createSqlMetadataCompletionSource", () => {
     const result = await complete("select bulk.tbl‸", {
       engine: "MySQL",
       activeSchema: null,
+      onResult,
     });
 
     expect(result?.options).toHaveLength(DB_METADATA_COMPLETION_LIMIT);
     expect(labels(result).at(0)).toBe("tbl_000");
     expect(labels(result).at(-1)).toBe("tbl_499");
     expect(ipcMock.dbSearchTables).toHaveBeenCalledWith("s1", "bulk", null, "tbl", 500);
+    expect(onResult).toHaveBeenCalledWith({ count: 500, limitReached: true });
   });
 });
