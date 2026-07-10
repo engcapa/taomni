@@ -33,6 +33,7 @@ const ipcMock = vi.hoisted(() => ({
   dbListCatalogs: vi.fn(async () => []),
   dbListSchemas: vi.fn(async () => [{ name: "cdp" }]),
   dbListTables: vi.fn(async () => []),
+  dbSearchTables: vi.fn(async () => []),
   dbDescribeTable: vi.fn(async () => []),
 }));
 
@@ -73,6 +74,7 @@ vi.mock("../../lib/ipc", () => ({
   dbListCatalogs: ipcMock.dbListCatalogs,
   dbListSchemas: ipcMock.dbListSchemas,
   dbListTables: ipcMock.dbListTables,
+  dbSearchTables: ipcMock.dbSearchTables,
   dbDescribeTable: ipcMock.dbDescribeTable,
   dbListBookmarks: vi.fn(async () => []),
   dbSaveBookmark: vi.fn(async () => undefined),

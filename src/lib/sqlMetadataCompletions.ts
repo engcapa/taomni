@@ -171,9 +171,11 @@ async function listColumnsFor(ref: TableRef, options: SqlMetadataCompletionOptio
 async function listTablesFor(
   schema: string | null,
   catalog: string | null,
+  prefix: string,
+  maxOptions: number,
   options: SqlMetadataCompletionOptions,
 ): Promise<Completion[]> {
-  return tableOptions(await options.cache.listTables(schema, catalog));
+  return tableOptions(await options.cache.searchTables(schema, prefix, catalog, maxOptions));
 }
 
 async function activeSchemaHasTable(
@@ -183,15 +185,16 @@ async function activeSchemaHasTable(
   const schema = truthy(options.activeSchema);
   if (!schema) return null;
   const catalog = options.engine === "Presto" ? truthy(options.catalog) ?? options.cache.getDefaultCatalog() : null;
-  const tables = await options.cache.listTables(schema, catalog);
-  return tables.some((candidate) => equalsName(candidate.name, table))
-    ? { catalog, schema, table }
-    : null;
+  const tables = await options.cache.searchTables(schema, table, catalog, 2);
+  const candidate = tables.find((entry) => equalsName(entry.name, table));
+  return candidate ? { catalog, schema, table: candidate.name } : null;
 }
 
 async function completionsForParts(
   parts: string[],
   aliases: Map<string, TableRef>,
+  prefix: string,
+  maxOptions: number,
   options: SqlMetadataCompletionOptions,
 ): Promise<Completion[]> {
   const [first, second, third] = parts;
@@ -209,13 +212,13 @@ async function completionsForParts(
     if (activeRef) return listColumnsFor(activeRef, options);
 
     const catalog = options.engine === "Presto" ? truthy(options.catalog) ?? options.cache.getDefaultCatalog() : null;
-    return listTablesFor(first, catalog, options);
+    return listTablesFor(first, catalog, prefix, maxOptions, options);
   }
 
   if (options.engine === "Presto") {
     if (parts.length === 2) {
       if (await isPrestoCatalog(first, options)) {
-        return listTablesFor(second, first, options);
+        return listTablesFor(second, first, prefix, maxOptions, options);
       }
       return listColumnsFor(
         { catalog: truthy(options.catalog) ?? options.cache.getDefaultCatalog(), schema: first, table: second },
@@ -243,17 +246,18 @@ export function createSqlMetadataCompletionSource(
     if (parts.length === 0 || parts.length > 3) return null;
 
     try {
+      const maxOptions = options.maxOptions ?? DB_METADATA_COMPLETION_LIMIT;
       const aliases = aliasMapFor(
         currentStatement(doc, context.pos),
         options.engine,
         options.activeSchema,
         options.catalog,
       );
-      const completions = await completionsForParts(parts, aliases, options);
+      const completions = await completionsForParts(parts, aliases, prefix, maxOptions, options);
       const filtered = filterOptions(
         completions,
         prefix,
-        options.maxOptions ?? DB_METADATA_COMPLETION_LIMIT,
+        maxOptions,
       );
       return filtered.length === 0
         ? null

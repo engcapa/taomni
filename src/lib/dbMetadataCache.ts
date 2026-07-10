@@ -3,6 +3,7 @@ import {
   dbListCatalogs,
   dbListSchemas,
   dbListTables,
+  dbSearchTables,
   type DbColumnDescription,
   type DbTable,
 } from "./ipc";
@@ -10,7 +11,7 @@ import {
 export const DB_METADATA_TTL_MS = 10 * 60 * 1000;
 export const DB_METADATA_COMPLETION_LIMIT = 500;
 
-type CacheKind = "catalogs" | "schemas" | "tables" | "columns";
+type CacheKind = "catalogs" | "schemas" | "tables" | "tableSearch" | "columns";
 
 interface CacheEntry<T> {
   value: T;
@@ -220,6 +221,36 @@ export class DbMetadataCache {
     );
   }
 
+  async searchTables(
+    schema: string | null,
+    prefix: string,
+    catalog?: string | null,
+    limit = DB_METADATA_COMPLETION_LIMIT,
+  ): Promise<DbTable[]> {
+    const resolvedCatalog = this.resolveCatalog(catalog);
+    const resolvedSchema = normalize(schema);
+    const normalizedPrefix = prefix.trim();
+    const boundedLimit = Math.min(DB_METADATA_COMPLETION_LIMIT, Math.max(1, Math.round(limit)));
+    const cachedTables = this.peekTables(resolvedSchema, resolvedCatalog);
+    if (cachedTables) {
+      const lowerPrefix = normalizedPrefix.toLowerCase();
+      return cachedTables
+        .filter((table) => table.name.toLowerCase().startsWith(lowerPrefix))
+        .slice(0, boundedLimit);
+    }
+    return this.cached(
+      this.key("tableSearch", resolvedCatalog, resolvedSchema, normalizedPrefix.toLowerCase(), String(boundedLimit)),
+      () => dbSearchTables(
+        this.sessionId,
+        resolvedSchema || null,
+        resolvedCatalog || null,
+        normalizedPrefix,
+        boundedLimit,
+      ),
+      false,
+    );
+  }
+
   async describeTable(
     schema: string | null,
     table: string,
@@ -271,12 +302,17 @@ export class DbMetadataCache {
 
     for (const key of Array.from(this.entries.keys())) {
       if (target.table) {
-        if (key === this.key("columns", catalog, schema, table) || key === this.key("tables", catalog, schema)) {
+        if (
+          key === this.key("columns", catalog, schema, table) ||
+          key === this.key("tables", catalog, schema) ||
+          key.startsWith(`${this.key("tableSearch", catalog, schema)}|`)
+        ) {
           changed = this.entries.delete(key) || changed;
         }
       } else if (target.schema) {
         if (
           key === this.key("tables", catalog, schema) ||
+          key.startsWith(`${this.key("tableSearch", catalog, schema)}|`) ||
           key.startsWith(`${this.key("columns", catalog, schema)}|`)
         ) {
           changed = this.entries.delete(key) || changed;
@@ -285,6 +321,7 @@ export class DbMetadataCache {
         if (
           key === this.key("schemas", catalog) ||
           key.startsWith(`${this.key("tables", catalog)}|`) ||
+          key.startsWith(`${this.key("tableSearch", catalog)}|`) ||
           key.startsWith(`${this.key("columns", catalog)}|`)
         ) {
           changed = this.entries.delete(key) || changed;
@@ -294,9 +331,22 @@ export class DbMetadataCache {
 
     for (const key of Array.from(this.inFlight.keys())) {
       if (
-        (target.table && (key === this.key("columns", catalog, schema, table) || key === this.key("tables", catalog, schema))) ||
-        (target.schema && (key === this.key("tables", catalog, schema) || key.startsWith(`${this.key("columns", catalog, schema)}|`))) ||
-        (target.catalog && (key === this.key("schemas", catalog) || key.startsWith(`${this.key("tables", catalog)}|`) || key.startsWith(`${this.key("columns", catalog)}|`)))
+        (target.table && (
+          key === this.key("columns", catalog, schema, table) ||
+          key === this.key("tables", catalog, schema) ||
+          key.startsWith(`${this.key("tableSearch", catalog, schema)}|`)
+        )) ||
+        (target.schema && (
+          key === this.key("tables", catalog, schema) ||
+          key.startsWith(`${this.key("tableSearch", catalog, schema)}|`) ||
+          key.startsWith(`${this.key("columns", catalog, schema)}|`)
+        )) ||
+        (target.catalog && (
+          key === this.key("schemas", catalog) ||
+          key.startsWith(`${this.key("tables", catalog)}|`) ||
+          key.startsWith(`${this.key("tableSearch", catalog)}|`) ||
+          key.startsWith(`${this.key("columns", catalog)}|`)
+        ))
       ) {
         changed = this.inFlight.delete(key) || changed;
       }
@@ -310,7 +360,7 @@ export class DbMetadataCache {
     if (target) this.invalidate(target);
   }
 
-  private async cached<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+  private async cached<T>(key: string, fetcher: () => Promise<T>, notifyListeners = true): Promise<T> {
     const existing = this.entries.get(key) as CacheEntry<T> | undefined;
     if (existing && existing.expiresAt > this.now()) return existing.value;
 
@@ -321,7 +371,7 @@ export class DbMetadataCache {
       .then((value) => {
         if (this.inFlight.get(key) === promise) {
           this.entries.set(key, { value, expiresAt: this.now() + this.ttlMs });
-          this.notify();
+          if (notifyListeners) this.notify();
         }
         return value;
       })

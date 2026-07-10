@@ -5,6 +5,7 @@ const ipcMock = vi.hoisted(() => ({
   dbListCatalogs: vi.fn(async () => [{ name: "hive" }]),
   dbListSchemas: vi.fn(async () => [{ name: "public" }]),
   dbListTables: vi.fn(async () => [{ name: "orders", kind: "table", rowCount: null }]),
+  dbSearchTables: vi.fn(async () => [{ name: "orders", kind: "table", rowCount: null }]),
   dbDescribeTable: vi.fn(async () => [
     { name: "id", type: "int", nullable: false, default: null, primaryKey: true },
   ]),
@@ -69,6 +70,33 @@ describe("DbMetadataCache", () => {
     await expect(first).resolves.toHaveLength(1);
     await expect(second).resolves.toHaveLength(1);
     expect(ipcMock.dbListTables).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses bounded table search when a full schema listing is not cached", async () => {
+    const cache = createDbMetadataCache({ sessionId: "s1" });
+
+    await expect(cache.searchTables("public", "ord", null, 25)).resolves.toEqual([
+      { name: "orders", kind: "table", rowCount: null },
+    ]);
+    await cache.searchTables("public", "ord", null, 25);
+
+    expect(ipcMock.dbSearchTables).toHaveBeenCalledTimes(1);
+    expect(ipcMock.dbSearchTables).toHaveBeenCalledWith("s1", "public", null, "ord", 25);
+    expect(ipcMock.dbListTables).not.toHaveBeenCalled();
+  });
+
+  it("filters a cached full schema listing without another IPC request", async () => {
+    ipcMock.dbListTables.mockResolvedValueOnce([
+      { name: "orders", kind: "table", rowCount: null },
+      { name: "customers", kind: "table", rowCount: null },
+    ]);
+    const cache = createDbMetadataCache({ sessionId: "s1" });
+    await cache.listTables("public");
+
+    await expect(cache.searchTables("public", "ord", null, 10)).resolves.toEqual([
+      { name: "orders", kind: "table", rowCount: null },
+    ]);
+    expect(ipcMock.dbSearchTables).not.toHaveBeenCalled();
   });
 
   it("clears schema and column entries on manual invalidation", async () => {

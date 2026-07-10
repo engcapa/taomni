@@ -18,6 +18,26 @@ const ipcMock = vi.hoisted(() => ({
           { name: "orders_v", kind: "view", rowCount: null },
         ],
   ),
+  dbSearchTables: vi.fn(async (
+    _sessionId: string,
+    schema: string | null,
+    _catalog: string | null,
+    prefix: string,
+    limit: number,
+  ) => {
+    const tables = schema === "public"
+      ? [
+          { name: "orders", kind: "table", rowCount: null },
+          { name: "customers", kind: "table", rowCount: null },
+        ]
+      : [
+          { name: "orders", kind: "table", rowCount: null },
+          { name: "orders_v", kind: "view", rowCount: null },
+        ];
+    return tables
+      .filter((table) => table.name.toLowerCase().startsWith(prefix.toLowerCase()))
+      .slice(0, limit);
+  }),
   dbDescribeTable: vi.fn(async () => [
     { name: "id", type: "bigint", nullable: false, default: null, primaryKey: true },
     { name: "total", type: "decimal", nullable: true, default: null, primaryKey: false },
@@ -69,7 +89,7 @@ describe("createSqlMetadataCompletionSource", () => {
     });
 
     expect(labels(result)).toEqual(["orders", "orders_v"]);
-    expect(ipcMock.dbListTables).toHaveBeenCalledWith("s1", "sales", null);
+    expect(ipcMock.dbSearchTables).toHaveBeenCalledWith("s1", "sales", null, "", 500);
   });
 
   it("suggests columns after table dot in the active schema", async () => {
@@ -101,7 +121,7 @@ describe("createSqlMetadataCompletionSource", () => {
     });
 
     expect(labels(result)).toEqual(["orders", "orders_v"]);
-    expect(ipcMock.dbListTables).toHaveBeenCalledWith("s1", "sales", "hive");
+    expect(ipcMock.dbSearchTables).toHaveBeenCalledWith("s1", "sales", "hive", "o", 500);
   });
 
   it("resolves simple FROM/JOIN aliases to table columns", async () => {
@@ -132,12 +152,12 @@ describe("createSqlMetadataCompletionSource", () => {
 
     expect(labels(first)).toEqual(["id", "total"]);
     expect(labels(second)).toEqual(["id", "total"]);
-    expect(ipcMock.dbListTables).toHaveBeenCalledTimes(1);
+    expect(ipcMock.dbSearchTables).toHaveBeenCalledTimes(1);
     expect(ipcMock.dbDescribeTable).toHaveBeenCalledTimes(1);
   });
 
   it("caps object completion results at 500 entries", async () => {
-    ipcMock.dbListTables.mockResolvedValueOnce(
+    ipcMock.dbSearchTables.mockResolvedValueOnce(
       Array.from({ length: 650 }, (_, index) => ({
         name: `tbl_${String(index).padStart(3, "0")}`,
         kind: "table",
@@ -153,5 +173,6 @@ describe("createSqlMetadataCompletionSource", () => {
     expect(result?.options).toHaveLength(DB_METADATA_COMPLETION_LIMIT);
     expect(labels(result).at(0)).toBe("tbl_000");
     expect(labels(result).at(-1)).toBe("tbl_499");
+    expect(ipcMock.dbSearchTables).toHaveBeenCalledWith("s1", "bulk", null, "tbl", 500);
   });
 });

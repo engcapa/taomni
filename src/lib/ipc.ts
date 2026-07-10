@@ -1107,6 +1107,22 @@ export async function dbListTables(
   });
 }
 
+export async function dbSearchTables(
+  sessionId: string,
+  schema: string | null,
+  catalog: string | null,
+  prefix: string,
+  limit: number,
+): Promise<DbTable[]> {
+  return invoke<DbTable[]>("db_search_tables", {
+    sessionId,
+    schema,
+    catalog,
+    prefix,
+    limit,
+  });
+}
+
 export async function dbDescribeTable(
   sessionId: string,
   schema: string | null,
