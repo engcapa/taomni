@@ -103,6 +103,7 @@
 - `[data-testid="db-save-in-vault"]` — interactive [optional] — F-DB-1.db-save-in-vault
 - `[data-testid="schema-tree"]` — display [optional] — F-DB-1.schema-tree
 - `[data-testid="sql-editor"]` — display [optional] — F-DB-1.sql-editor
+- `[data-testid="sql-completion-status"]` — display [optional] — F-DB-1.sql-completion-status
 - `[data-testid="query-result-grid"]` — display [optional] — F-DB-1.query-result-grid
 - `[data-testid="query-result-generated-sql"]` — display [optional] — F-DB-1.query-result-generated-sql
 - `[data-testid="query-result-generated-sql-copy"]` — interactive [optional] — F-DB-1.query-result-generated-sql-copy
@@ -111,6 +112,7 @@
 - `[data-testid="db-query-history-panel"]` — display [optional] — F-DB-1.query-history-panel
 - `[data-testid="db-query-history-refresh"]` — interactive [optional] — F-DB-1.query-history-refresh
 - `[data-testid="db-query-history-clear"]` — interactive [optional] — F-DB-1.query-history-clear
+- `[data-testid="db-query-history-entry"]` — display [optional] — F-DB-1.query-history-entry
 - `[data-testid="db-query-history-run"]` — interactive [optional] — F-DB-1.query-history-run
 - `[data-testid="db-query-history-select"]` — interactive [optional] — F-DB-1.query-history-select
 - `[data-testid="db-query-history-open-tab"]` — interactive [optional] — F-DB-1.query-history-open-tab
@@ -129,9 +131,7 @@
 - `[data-testid="query-cell-value-wrap"]` — interactive [optional] — F-DB-1.query-cell-value-wrap
 - `select[aria-label="Schema"]` — interactive [optional] — F-DB-1.schema-select
 - `[data-testid="db-schema-drawer-handle"]` — interactive [optional] — F-DB-1.schema-drawer-handle
-- `[data-testid="db-floating-toolbar"]` — display [optional] — F-DB-1.floating-toolbar
 - `[data-testid="db-chat-toggle"]` — interactive [optional] — F-DB-1.chat-toggle
-- `[data-testid="db-maximize"]` — interactive [optional] — F-DB-1.maximize
 - `[data-testid="db-detach"]` — interactive [optional] — F-DB-1.detach
 
 ## mail/compose (F-MAIL-1)
@@ -783,6 +783,10 @@
 
 - `[data-testid="vault-settings"]` — display — F12.1.settings-root
 - `[data-testid="vault-state-badge"]` — display — F12.1.state-badge
+- `[data-testid="vault-unlock-mode-setting"]` — display — F12.1.unlock-mode-setting
+- `[data-testid="vault-unlock-mode-startup"]` — interactive — F12.1.unlock-mode-startup
+- `[data-testid="vault-unlock-mode-on-demand"]` — interactive — F12.1.unlock-mode-on-demand
+- `[data-testid="vault-unlock-mode-hint"]` — display — F12.1.unlock-mode-hint
 - `[data-testid="vault-init-button"]` — interactive [optional] — F12.1.init-button
 - `[data-testid="vault-unlock-button"]` — interactive [optional] — F12.1.unlock-button
 - `[data-testid="vault-lock-button"]` — interactive [optional] — F12.1.lock-button

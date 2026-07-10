@@ -8,6 +8,8 @@ const ipcMock = vi.hoisted(() => ({
     { name: "orders", kind: "table", rowCount: 2_800_000 },
     { name: "report_v", kind: "view", rowCount: null },
   ]),
+  dbSearchTables: vi.fn(async () => []),
+  dbListForeignKeys: vi.fn(async () => []),
   dbListObjects: vi.fn(async (_s: string, _schema: string | null, kind: string) =>
     kind === "procedure" ? [{ name: "sp_sync", kind: "procedure" }] : [],
   ),

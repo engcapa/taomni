@@ -452,6 +452,43 @@ pub async fn list_tables(
         .collect())
 }
 
+pub async fn search_tables(
+    client: &ClickHouseClient,
+    schema: Option<&str>,
+    prefix: &str,
+    limit: usize,
+) -> Result<Vec<TableInfo>, String> {
+    let database = schema.unwrap_or(&client.database).replace('\'', "''");
+    let prefix = prefix.replace('\\', "\\\\").replace('\'', "''");
+    let sql = format!(
+        "SELECT name, engine FROM system.tables \
+         WHERE database = '{database}' AND positionCaseInsensitive(name, '{prefix}') = 1 \
+         ORDER BY name LIMIT {limit}"
+    );
+    let token = CancellationToken::new();
+    let result = execute(client, &sql, &token).await?;
+    Ok(result
+        .rows
+        .into_iter()
+        .filter_map(|row| {
+            let name = row.first().cloned().flatten()?;
+            let engine = row.get(1).cloned().flatten().unwrap_or_default();
+            let kind = if engine.contains("MaterializedView") {
+                "materialized_view"
+            } else if engine.contains("View") {
+                "view"
+            } else {
+                "table"
+            };
+            Some(TableInfo {
+                name,
+                kind: kind.to_string(),
+                row_count: None,
+            })
+        })
+        .collect())
+}
+
 /// List ClickHouse dictionaries. Views / materialized views are surfaced via
 /// `list_tables`; other object kinds do not exist in ClickHouse.
 pub async fn list_objects(

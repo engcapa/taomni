@@ -746,10 +746,14 @@ export default function DbClientTab({
     writeIntSetting(info.engine, "maxResultSheets", maxResultSheets);
   }, [info.engine, maxResultSheets]);
 
+  const workspaceCacheSignature = JSON.stringify(
+    panels.map(({ id, filePath, fileName, cachePath }) => ({ id, filePath, fileName, cachePath })),
+  );
+
   useEffect(() => {
     if (!workspaceReady) return;
-    writeWorkspaceCache(workspaceSessionId, panels, activePanelId);
-  }, [activePanelId, panels, workspaceReady, workspaceSessionId]);
+    writeWorkspaceCache(workspaceSessionId, panelsRef.current, activePanelId);
+  }, [activePanelId, workspaceCacheSignature, workspaceReady, workspaceSessionId]);
 
   const patchPanel = useCallback((id: string, patch: Partial<PanelState>) => {
     setPanels((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
@@ -1363,19 +1367,6 @@ export default function DbClientTab({
       cancelled = true;
     };
   }, [info.catalog, metadataCache, onSchemasLoaded, setStatusMessage]);
-
-  useEffect(() => {
-    if (!metadataCache || !activeSchema) return;
-    let cancelled = false;
-    void metadataCache
-      .listTables(activeSchema, info.catalog)
-      .catch((error) => {
-        if (!cancelled) setStatusMessage(`Table metadata failed: ${String(error)}`);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeSchema, info.catalog, metadataCache, setStatusMessage]);
 
   const metadataSchema = useMemo(
     () =>

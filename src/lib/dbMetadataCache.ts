@@ -1,16 +1,19 @@
 import {
   dbDescribeTable,
   dbListCatalogs,
+  dbListForeignKeys,
   dbListSchemas,
   dbListTables,
+  dbSearchTables,
   type DbColumnDescription,
+  type DbForeignKey,
   type DbTable,
 } from "./ipc";
 
 export const DB_METADATA_TTL_MS = 10 * 60 * 1000;
 export const DB_METADATA_COMPLETION_LIMIT = 500;
 
-type CacheKind = "catalogs" | "schemas" | "tables" | "columns";
+type CacheKind = "catalogs" | "schemas" | "tables" | "tableSearch" | "columns" | "foreignKeys";
 
 interface CacheEntry<T> {
   value: T;
@@ -22,6 +25,7 @@ export interface DbMetadataCacheOptions {
   defaultCatalog?: string | null;
   ttlMs?: number;
   now?: () => number;
+  searchConcurrency?: number;
 }
 
 export interface DbMetadataTarget {
@@ -179,15 +183,22 @@ export class DbMetadataCache {
   private readonly defaultCatalog: string | null;
   private readonly ttlMs: number;
   private readonly now: () => number;
+  private readonly searchConcurrency: number;
   private readonly entries = new Map<string, CacheEntry<unknown>>();
   private readonly inFlight = new Map<string, Promise<unknown>>();
   private readonly listeners = new Set<Listener>();
+  private readonly searchQueue: Array<() => void> = [];
+  private activeSearches = 0;
 
   constructor(options: DbMetadataCacheOptions) {
     this.sessionId = options.sessionId;
     this.defaultCatalog = truthy(options.defaultCatalog);
     this.ttlMs = options.ttlMs ?? DB_METADATA_TTL_MS;
     this.now = options.now ?? (() => Date.now());
+    const requestedSearchConcurrency = options.searchConcurrency ?? 2;
+    this.searchConcurrency = Number.isFinite(requestedSearchConcurrency)
+      ? Math.max(1, Math.round(requestedSearchConcurrency))
+      : 2;
   }
 
   subscribe(listener: Listener): () => void {
@@ -220,6 +231,38 @@ export class DbMetadataCache {
     );
   }
 
+  async searchTables(
+    schema: string | null,
+    prefix: string,
+    catalog?: string | null,
+    limit = DB_METADATA_COMPLETION_LIMIT,
+  ): Promise<DbTable[]> {
+    const resolvedCatalog = this.resolveCatalog(catalog);
+    const resolvedSchema = normalize(schema);
+    const normalizedPrefix = prefix.trim();
+    const boundedLimit = Math.min(DB_METADATA_COMPLETION_LIMIT, Math.max(1, Math.round(limit)));
+    const cachedTables = this.peekTables(resolvedSchema, resolvedCatalog);
+    if (cachedTables) {
+      const lowerPrefix = normalizedPrefix.toLowerCase();
+      return cachedTables
+        .filter((table) => table.name.toLowerCase().startsWith(lowerPrefix))
+        .slice(0, boundedLimit);
+    }
+    return this.cached(
+      this.key("tableSearch", resolvedCatalog, resolvedSchema, normalizedPrefix.toLowerCase(), String(boundedLimit)),
+      () => this.runBoundedSearch(
+        () => dbSearchTables(
+          this.sessionId,
+          resolvedSchema || null,
+          resolvedCatalog || null,
+          normalizedPrefix,
+          boundedLimit,
+        ),
+      ),
+      false,
+    );
+  }
+
   async describeTable(
     schema: string | null,
     table: string,
@@ -230,6 +273,24 @@ export class DbMetadataCache {
     const resolvedTable = normalize(table);
     return this.cached(this.key("columns", resolvedCatalog, resolvedSchema, resolvedTable), () =>
       dbDescribeTable(this.sessionId, resolvedSchema || null, resolvedTable, resolvedCatalog || null),
+    );
+  }
+
+  async listForeignKeys(
+    schema: string | null,
+    table: string,
+    catalog?: string | null,
+  ): Promise<DbForeignKey[]> {
+    const resolvedCatalog = this.resolveCatalog(catalog);
+    const resolvedSchema = normalize(schema);
+    const resolvedTable = normalize(table);
+    return this.cached(this.key("foreignKeys", resolvedCatalog, resolvedSchema, resolvedTable), () =>
+      dbListForeignKeys(
+        this.sessionId,
+        resolvedSchema || null,
+        resolvedTable,
+        resolvedCatalog || null,
+      ),
     );
   }
 
@@ -253,6 +314,16 @@ export class DbMetadataCache {
     return this.peek(this.key("columns", this.resolveCatalog(catalog), normalize(schema), normalize(table)));
   }
 
+  peekForeignKeys(
+    schema: string | null,
+    table: string,
+    catalog?: string | null,
+  ): DbForeignKey[] | null {
+    return this.peek(
+      this.key("foreignKeys", this.resolveCatalog(catalog), normalize(schema), normalize(table)),
+    );
+  }
+
   clearAll(): void {
     this.entries.clear();
     this.inFlight.clear();
@@ -271,13 +342,20 @@ export class DbMetadataCache {
 
     for (const key of Array.from(this.entries.keys())) {
       if (target.table) {
-        if (key === this.key("columns", catalog, schema, table) || key === this.key("tables", catalog, schema)) {
+        if (
+          key === this.key("columns", catalog, schema, table) ||
+          key === this.key("foreignKeys", catalog, schema, table) ||
+          key === this.key("tables", catalog, schema) ||
+          key.startsWith(`${this.key("tableSearch", catalog, schema)}|`)
+        ) {
           changed = this.entries.delete(key) || changed;
         }
       } else if (target.schema) {
         if (
           key === this.key("tables", catalog, schema) ||
-          key.startsWith(`${this.key("columns", catalog, schema)}|`)
+          key.startsWith(`${this.key("tableSearch", catalog, schema)}|`) ||
+          key.startsWith(`${this.key("columns", catalog, schema)}|`) ||
+          key.startsWith(`${this.key("foreignKeys", catalog, schema)}|`)
         ) {
           changed = this.entries.delete(key) || changed;
         }
@@ -285,7 +363,9 @@ export class DbMetadataCache {
         if (
           key === this.key("schemas", catalog) ||
           key.startsWith(`${this.key("tables", catalog)}|`) ||
-          key.startsWith(`${this.key("columns", catalog)}|`)
+          key.startsWith(`${this.key("tableSearch", catalog)}|`) ||
+          key.startsWith(`${this.key("columns", catalog)}|`) ||
+          key.startsWith(`${this.key("foreignKeys", catalog)}|`)
         ) {
           changed = this.entries.delete(key) || changed;
         }
@@ -294,11 +374,27 @@ export class DbMetadataCache {
 
     for (const key of Array.from(this.inFlight.keys())) {
       if (
-        (target.table && (key === this.key("columns", catalog, schema, table) || key === this.key("tables", catalog, schema))) ||
-        (target.schema && (key === this.key("tables", catalog, schema) || key.startsWith(`${this.key("columns", catalog, schema)}|`))) ||
-        (target.catalog && (key === this.key("schemas", catalog) || key.startsWith(`${this.key("tables", catalog)}|`) || key.startsWith(`${this.key("columns", catalog)}|`)))
+        (target.table && (
+          key === this.key("columns", catalog, schema, table) ||
+          key === this.key("foreignKeys", catalog, schema, table) ||
+          key === this.key("tables", catalog, schema) ||
+          key.startsWith(`${this.key("tableSearch", catalog, schema)}|`)
+        )) ||
+        (target.schema && (
+          key === this.key("tables", catalog, schema) ||
+          key.startsWith(`${this.key("tableSearch", catalog, schema)}|`) ||
+          key.startsWith(`${this.key("columns", catalog, schema)}|`) ||
+          key.startsWith(`${this.key("foreignKeys", catalog, schema)}|`)
+        )) ||
+        (target.catalog && (
+          key === this.key("schemas", catalog) ||
+          key.startsWith(`${this.key("tables", catalog)}|`) ||
+          key.startsWith(`${this.key("tableSearch", catalog)}|`) ||
+          key.startsWith(`${this.key("columns", catalog)}|`) ||
+          key.startsWith(`${this.key("foreignKeys", catalog)}|`)
+        ))
       ) {
-        this.inFlight.delete(key);
+        changed = this.inFlight.delete(key) || changed;
       }
     }
 
@@ -310,7 +406,7 @@ export class DbMetadataCache {
     if (target) this.invalidate(target);
   }
 
-  private async cached<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+  private async cached<T>(key: string, fetcher: () => Promise<T>, notifyListeners = true): Promise<T> {
     const existing = this.entries.get(key) as CacheEntry<T> | undefined;
     if (existing && existing.expiresAt > this.now()) return existing.value;
 
@@ -319,12 +415,14 @@ export class DbMetadataCache {
 
     const promise = fetcher()
       .then((value) => {
-        this.entries.set(key, { value, expiresAt: this.now() + this.ttlMs });
-        this.notify();
+        if (this.inFlight.get(key) === promise) {
+          this.entries.set(key, { value, expiresAt: this.now() + this.ttlMs });
+          if (notifyListeners) this.notify();
+        }
         return value;
       })
       .catch((error) => {
-        if (existing) return existing.value;
+        if (existing && this.inFlight.get(key) === promise) return existing.value;
         throw error;
       })
       .finally(() => {
@@ -337,11 +435,35 @@ export class DbMetadataCache {
   }
 
   private peek<T>(key: string): T | null {
-    return (this.entries.get(key)?.value as T | undefined) ?? null;
+    const entry = this.entries.get(key) as CacheEntry<T> | undefined;
+    return entry && entry.expiresAt > this.now() ? entry.value : null;
   }
 
   private resolveCatalog(catalog?: string | null): string {
     return normalize(catalog ?? this.defaultCatalog);
+  }
+
+  private runBoundedSearch<T>(fetcher: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const start = () => {
+        this.activeSearches += 1;
+        const release = () => {
+          this.activeSearches -= 1;
+          this.searchQueue.shift()?.();
+        };
+        try {
+          fetcher().then(resolve, reject).finally(release);
+        } catch (error) {
+          release();
+          reject(error);
+        }
+      };
+      if (this.activeSearches < this.searchConcurrency) {
+        start();
+      } else {
+        this.searchQueue.push(start);
+      }
+    });
   }
 
   private key(kind: CacheKind, ...parts: string[]): string {

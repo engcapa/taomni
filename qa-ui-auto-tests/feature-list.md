@@ -3311,7 +3311,15 @@ files:
   - src/components/database/formatSql.ts
   - src/lib/sqlStatements.ts
   - src/lib/queryRegistry.ts
+  - src/lib/dbMetadataCache.ts
+  - src/lib/sqlEditorDialect.ts
+  - src/lib/sqlLocalRelations.ts
+  - src/lib/sqlMetadataCompletions.ts
   - src/lib/ipc.ts
+  - src-tauri/src/database/mod.rs
+  - src-tauri/src/database/sql.rs
+  - src-tauri/src/database/oracle.rs
+  - src-tauri/src/database/panwei.rs
   - src-tauri/src/database/history.rs
   - src/components/session/SessionEditor.tsx
 controls:
@@ -3351,6 +3359,10 @@ controls:
     selector: '[data-testid="sql-editor"]'
     kind: display
     optional: true
+  - id: sql-completion-status
+    selector: '[data-testid="sql-completion-status"]'
+    kind: display
+    optional: true       # transient loading/truncation/error feedback inside a live SQL tab
   - id: query-result-grid
     selector: '[data-testid="query-result-grid"]'
     kind: display
@@ -3382,6 +3394,10 @@ controls:
   - id: query-history-clear
     selector: '[data-testid="db-query-history-clear"]'
     kind: interactive
+    optional: true
+  - id: query-history-entry
+    selector: '[data-testid="db-query-history-entry"]'
+    kind: display
     optional: true
   - id: query-history-run
     selector: '[data-testid="db-query-history-run"]'
@@ -3455,17 +3471,9 @@ controls:
     selector: '[data-testid="db-schema-drawer-handle"]'
     kind: interactive
     optional: true
-  # Floating toolbar (shared FloatingToolbar infra, F10.1) — chat / maximize / detach.
-  - id: floating-toolbar
-    selector: '[data-testid="db-floating-toolbar"]'
-    kind: display
-    optional: true
+  # Shared tab actions — chat / detach.
   - id: chat-toggle
     selector: '[data-testid="db-chat-toggle"]'
-    kind: interactive
-    optional: true
-  - id: maximize
-    selector: '[data-testid="db-maximize"]'
     kind: interactive
     optional: true
   - id: detach
@@ -3480,11 +3488,11 @@ controls:
 
 - DB 会话（MySQL/PostgreSQL/PanWeiDB/Oracle/SQLServer/StarRocks/ClickHouse/Presto）经 `SessionEditor` 创建（proto 选择器 + database section 由 F6.3 拥有），打开后 `MainLayout.openDbTab` 挂载 `DbClientTab`（`type:"database"`），与 SFTP/VNC 一样常驻挂载以便查询跨标签存活
 - 左侧 `SchemaTree`：懒加载 schema→table→column/index 展开（`db-schema-drawer-handle` 抽屉折叠）；右侧查询工作区为多 query 面板（最多 4 个）的 tab 布局
-- `SqlEditorPanel` 封装 CodeMirror 6：按引擎选 dialect、schema-aware 自动补全（`SQLNamespace`），暴露命令式 `SqlEditorHandle`；工具条 Run (F5) / Run selection / Cancel / Format / History / Save / Rows / Sheets / Schema 选择；执行时按 SQL 语句范围拆分并给每个 result sheet 绑定 `sourceRef`
+- `SqlEditorPanel` 封装 CodeMirror 6：按引擎选 dialect，提供语法上下文感知的本地 CTE/函数补全与有界、可缓存的远端元数据补全，覆盖表/列、通配符展开、`INSERT` 列和外键优先的 `JOIN ON`；加载、截断与错误会通过 `sql-completion-status` 反馈；同时暴露命令式 `SqlEditorHandle`，工具条支持 Run (F5) / Run selection / Cancel / Format / History / Save / Rows / Sheets / Schema 选择
 - SQL 历史持久化到 SQLite `sql_history`，按 workspace/session + engine 查询；History 面板支持 Run / Select / +Tab / JSON / Ask AI / Refresh / Clear / Delete；当前 editor 语句面板用 cursor/selection 定位多 SQL 文档中的单条语句，并提供同一套 Run / Select / +Tab / JSON / Ask AI 交互
 - `QueryResultGrid` 为手写虚拟化网格（行高 24 + overscan）：NULL 徽标、数值右对齐、排序、CSV/单元格复制、完整值查看（Ctrl+Enter / 右键菜单，保留长文本和换行）、列显隐、聚合统计、行筛选、Table/List/Chart 视图、增删改行 + 提交/撤销；过滤/排序先本地生效，显式 `Query` 后优先把 `WHERE` / `ORDER BY` 原位写回仍匹配的来源语句并刷新当前 result sheet，复杂 SQL fallback 为包裹源 SQL 的 derived SQL，`Sync` 可创建/复用 `Generated SQL` query 面板作为草稿
 - 查询工作区跨会话持久化（`queryRegistry` + `ef0b686`），结果可经 Export Grid 对话框导出
-- 浮动工具条复用共享 `FloatingToolbar`（F10.1，`db-floating-toolbar`）：Chat 入口 / 最大化 / 分离到独立窗口（`db-detach`，分离/重挂载行为属 F-Detach-1）
+- 顶部共享 `TabActions`：Chat 入口 / 分离到独立窗口（`db-detach`，分离/重挂载行为属 F-Detach-1）
 - **e2e 测试限制**：实际查询需活的 MySQL/PostgreSQL/PanWeiDB/Oracle/SQLServer/StarRocks/ClickHouse/Presto fixture，浏览器冒烟无法连接；smoke 只覆盖「SessionEditor 选 DB proto → 填 host/port → 保存 → 打开标签 → schema-tree / sql-editor / query-result-grid 挂载」的路由路径（参照 TC-111 RDP scaffold 模式），真实查询/编辑留待配置 DB fixture 的手动/native 回归
 
 ---

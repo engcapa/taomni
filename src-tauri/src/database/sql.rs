@@ -30,8 +30,9 @@ use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use tokio_util::sync::CancellationToken;
 
 use super::{
-    send_query_stream_event, ColumnDescription, ColumnInfo, DbConfig, DbHandle, DbObject,
-    IndexInfo, QueryResult, QueryStreamChannel, QueryStreamEvent, SchemaInfo, TableInfo,
+    group_foreign_keys, send_query_stream_event, ColumnDescription, ColumnInfo, DbConfig,
+    DbHandle, DbObject, ForeignKeyInfo, IndexInfo, QueryResult, QueryStreamChannel,
+    QueryStreamEvent, SchemaInfo, TableInfo,
 };
 
 const DEFAULT_TIMEOUT_SECS: u64 = 15;
@@ -1194,6 +1195,49 @@ pub async fn list_tables_mysql(
     Ok(tables.into_values().collect())
 }
 
+pub async fn search_tables_mysql(
+    pool: &Pool<MySql>,
+    schema: Option<&str>,
+    prefix: &str,
+    limit: usize,
+) -> Result<Vec<TableInfo>, String> {
+    let sql = if schema.is_some() {
+        "SELECT table_name, table_type FROM information_schema.tables \
+         WHERE table_schema = ? \
+           AND LEFT(LOWER(table_name), CHAR_LENGTH(?)) = LOWER(?) \
+         ORDER BY table_name LIMIT ?"
+    } else {
+        "SELECT table_name, table_type FROM information_schema.tables \
+         WHERE table_schema = DATABASE() \
+           AND LEFT(LOWER(table_name), CHAR_LENGTH(?)) = LOWER(?) \
+         ORDER BY table_name LIMIT ?"
+    };
+    let mut statement = query(sql);
+    if let Some(schema) = schema {
+        statement = statement.bind(schema);
+    }
+    let rows = statement
+        .bind(prefix)
+        .bind(prefix)
+        .bind(limit as i64)
+        .fetch_all(pool)
+        .await
+        .map_err(|error| format!("search tables failed: {error}"))?;
+
+    Ok(rows
+        .iter()
+        .filter_map(|row| {
+            let name = mysql_value_to_string(row, 0)?;
+            let table_type = mysql_value_to_string(row, 1).unwrap_or_default();
+            Some(TableInfo {
+                name,
+                kind: mysql_table_kind(&table_type),
+                row_count: None,
+            })
+        })
+        .collect())
+}
+
 pub async fn describe_table_mysql(
     pool: &Pool<MySql>,
     schema: Option<&str>,
@@ -1237,6 +1281,36 @@ pub async fn describe_table_mysql(
             })
         })
         .collect())
+}
+
+pub async fn list_foreign_keys_mysql(
+    pool: &Pool<MySql>,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Vec<ForeignKeyInfo>, String> {
+    let rows = query(
+        "SELECT constraint_name, column_name, referenced_table_schema, \
+                referenced_table_name, referenced_column_name \
+         FROM information_schema.key_column_usage \
+         WHERE table_schema = COALESCE(?, DATABASE()) AND table_name = ? \
+           AND referenced_table_name IS NOT NULL \
+         ORDER BY constraint_name, ordinal_position",
+    )
+    .bind(schema)
+    .bind(table)
+    .fetch_all(pool)
+    .await
+    .map_err(|error| format!("list foreign keys failed: {error}"))?;
+
+    Ok(group_foreign_keys(rows.iter().filter_map(|row| {
+        Some((
+            mysql_value_to_string(row, 0)?,
+            mysql_value_to_string(row, 1)?,
+            mysql_value_to_string(row, 2),
+            mysql_value_to_string(row, 3)?,
+            mysql_value_to_string(row, 4)?,
+        ))
+    })))
 }
 
 pub async fn list_indexes_mysql(
@@ -1376,6 +1450,45 @@ pub async fn list_tables_sqlserver(
         .collect())
 }
 
+pub async fn search_tables_sqlserver(
+    client: &AsyncMutex<SqlServerClient>,
+    schema: Option<&str>,
+    prefix: &str,
+    limit: usize,
+) -> Result<Vec<TableInfo>, String> {
+    let schema = sqlserver_default_schema(schema);
+    let schema_ref = schema.as_str();
+    let prefix_ref = prefix;
+    let limit = i32::try_from(limit).unwrap_or(i32::MAX);
+    let params: [&dyn TdsToSql; 3] = [&schema_ref, &prefix_ref, &limit];
+    let rows = sqlserver_fetch(
+        client,
+        "SELECT TOP (@P3) o.name, \
+                CASE WHEN o.type = 'V' THEN N'view' ELSE N'table' END AS kind \
+         FROM sys.objects o \
+         JOIN sys.schemas s ON s.schema_id = o.schema_id \
+         WHERE s.name = @P1 AND o.type IN ('U','V') \
+           AND LEFT(LOWER(o.name), LEN(@P2)) = LOWER(@P2) \
+         ORDER BY o.name",
+        &params,
+    )
+    .await
+    .map_err(|error| format!("search tables failed: {error}"))?;
+
+    Ok(rows
+        .iter()
+        .filter_map(|row| {
+            let name = sqlserver_text(row, 0)?;
+            let kind = sqlserver_text(row, 1).unwrap_or_else(|| "table".to_string());
+            Some(TableInfo {
+                name,
+                kind,
+                row_count: None,
+            })
+        })
+        .collect())
+}
+
 pub async fn describe_table_sqlserver(
     client: &AsyncMutex<SqlServerClient>,
     schema: Option<&str>,
@@ -1432,6 +1545,49 @@ pub async fn describe_table_sqlserver(
             })
         })
         .collect())
+}
+
+pub async fn list_foreign_keys_sqlserver(
+    client: &AsyncMutex<SqlServerClient>,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Vec<ForeignKeyInfo>, String> {
+    let schema = sqlserver_default_schema(schema);
+    let schema_ref = schema.as_str();
+    let table_ref = table;
+    let params: [&dyn TdsToSql; 2] = [&schema_ref, &table_ref];
+    let rows = sqlserver_fetch(
+        client,
+        "SELECT fk.name, parent_column.name, referenced_schema.name, \
+                referenced_table.name, referenced_column.name \
+         FROM sys.foreign_keys fk \
+         JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id \
+         JOIN sys.tables parent_table ON parent_table.object_id = fk.parent_object_id \
+         JOIN sys.schemas parent_schema ON parent_schema.schema_id = parent_table.schema_id \
+         JOIN sys.columns parent_column \
+           ON parent_column.object_id = parent_table.object_id \
+          AND parent_column.column_id = fkc.parent_column_id \
+         JOIN sys.tables referenced_table ON referenced_table.object_id = fk.referenced_object_id \
+         JOIN sys.schemas referenced_schema ON referenced_schema.schema_id = referenced_table.schema_id \
+         JOIN sys.columns referenced_column \
+           ON referenced_column.object_id = referenced_table.object_id \
+          AND referenced_column.column_id = fkc.referenced_column_id \
+         WHERE parent_schema.name = @P1 AND parent_table.name = @P2 \
+         ORDER BY fk.name, fkc.constraint_column_id",
+        &params,
+    )
+    .await
+    .map_err(|error| format!("list foreign keys failed: {error}"))?;
+
+    Ok(group_foreign_keys(rows.iter().filter_map(|row| {
+        Some((
+            sqlserver_text(row, 0)?,
+            sqlserver_text(row, 1)?,
+            sqlserver_text(row, 2),
+            sqlserver_text(row, 3)?,
+            sqlserver_text(row, 4)?,
+        ))
+    })))
 }
 
 pub async fn list_indexes_sqlserver(
@@ -1542,6 +1698,43 @@ pub async fn list_tables_postgres(
     Ok(out)
 }
 
+pub async fn search_tables_postgres(
+    pool: &Pool<Postgres>,
+    schema: Option<&str>,
+    prefix: &str,
+    limit: usize,
+) -> Result<Vec<TableInfo>, String> {
+    let schema = schema.unwrap_or("public");
+    let rows = query(
+        "SELECT c.relname, \
+                CASE c.relkind WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized_view' ELSE 'table' END AS kind \
+         FROM pg_catalog.pg_class c \
+         JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+         WHERE n.nspname = $1 AND c.relkind IN ('r','p','f','v','m') \
+           AND LEFT(LOWER(c.relname), char_length($2)) = LOWER($2) \
+         ORDER BY c.relname LIMIT $3",
+    )
+    .bind(schema)
+    .bind(prefix)
+    .bind(limit as i64)
+    .fetch_all(pool)
+    .await
+    .map_err(|error| format!("search tables failed: {error}"))?;
+
+    Ok(rows
+        .iter()
+        .filter_map(|row| {
+            let name: String = row.try_get(0).ok()?;
+            let kind: String = row.try_get(1).unwrap_or_else(|_| "table".to_string());
+            Some(TableInfo {
+                name,
+                kind,
+                row_count: None,
+            })
+        })
+        .collect())
+}
+
 pub async fn describe_table_postgres(
     pool: &Pool<Postgres>,
     schema: Option<&str>,
@@ -1586,6 +1779,50 @@ pub async fn describe_table_postgres(
             })
         })
         .collect())
+}
+
+pub async fn list_foreign_keys_postgres(
+    pool: &Pool<Postgres>,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Vec<ForeignKeyInfo>, String> {
+    let schema = schema.unwrap_or("public");
+    let rows = query(
+        "SELECT fk.constraint_name, fk.column_name, pk.table_schema, \
+                pk.table_name, pk.column_name \
+         FROM information_schema.table_constraints tc \
+         JOIN information_schema.key_column_usage fk \
+           ON fk.constraint_catalog = tc.constraint_catalog \
+          AND fk.constraint_schema = tc.constraint_schema \
+          AND fk.constraint_name = tc.constraint_name \
+         JOIN information_schema.referential_constraints rc \
+           ON rc.constraint_catalog = tc.constraint_catalog \
+          AND rc.constraint_schema = tc.constraint_schema \
+          AND rc.constraint_name = tc.constraint_name \
+         JOIN information_schema.key_column_usage pk \
+           ON pk.constraint_catalog = rc.unique_constraint_catalog \
+          AND pk.constraint_schema = rc.unique_constraint_schema \
+          AND pk.constraint_name = rc.unique_constraint_name \
+          AND pk.ordinal_position = fk.position_in_unique_constraint \
+         WHERE tc.constraint_type = 'FOREIGN KEY' \
+           AND tc.table_schema = $1 AND tc.table_name = $2 \
+         ORDER BY fk.constraint_name, fk.ordinal_position",
+    )
+    .bind(schema)
+    .bind(table)
+    .fetch_all(pool)
+    .await
+    .map_err(|error| format!("list foreign keys failed: {error}"))?;
+
+    Ok(group_foreign_keys(rows.iter().filter_map(|row| {
+        Some((
+            row.try_get(0).ok()?,
+            row.try_get(1).ok()?,
+            row.try_get(2).ok(),
+            row.try_get(3).ok()?,
+            row.try_get(4).ok()?,
+        ))
+    })))
 }
 
 pub async fn list_indexes_postgres(

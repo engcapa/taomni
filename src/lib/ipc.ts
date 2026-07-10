@@ -1022,6 +1022,14 @@ export interface DbColumnDescription {
   primaryKey: boolean;
 }
 
+export interface DbForeignKey {
+  name: string;
+  columns: string[];
+  referencedSchema: string | null;
+  referencedTable: string;
+  referencedColumns: string[];
+}
+
 export interface DbIndex {
   name: string;
   columns: string[];
@@ -1107,6 +1115,22 @@ export async function dbListTables(
   });
 }
 
+export async function dbSearchTables(
+  sessionId: string,
+  schema: string | null,
+  catalog: string | null,
+  prefix: string,
+  limit: number,
+): Promise<DbTable[]> {
+  return invoke<DbTable[]>("db_search_tables", {
+    sessionId,
+    schema,
+    catalog,
+    prefix,
+    limit,
+  });
+}
+
 export async function dbDescribeTable(
   sessionId: string,
   schema: string | null,
@@ -1114,6 +1138,20 @@ export async function dbDescribeTable(
   catalog?: string | null,
 ): Promise<DbColumnDescription[]> {
   return invoke<DbColumnDescription[]>("db_describe_table", {
+    sessionId,
+    schema: schema ?? null,
+    table,
+    catalog: catalog ?? null,
+  });
+}
+
+export async function dbListForeignKeys(
+  sessionId: string,
+  schema: string | null,
+  table: string,
+  catalog?: string | null,
+): Promise<DbForeignKey[]> {
+  return invoke<DbForeignKey[]>("db_list_foreign_keys", {
     sessionId,
     schema: schema ?? null,
     table,

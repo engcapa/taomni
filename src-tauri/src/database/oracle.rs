@@ -11,8 +11,9 @@ use tokio::task::JoinError;
 use tokio_util::sync::CancellationToken;
 
 use super::{
-    send_query_stream_event, ColumnDescription, ColumnInfo, DbConfig, DbHandle, DbObject,
-    IndexInfo, QueryResult, QueryStreamChannel, QueryStreamEvent, SchemaInfo, TableInfo,
+    group_foreign_keys, send_query_stream_event, ColumnDescription, ColumnInfo, DbConfig,
+    DbHandle, DbObject, ForeignKeyInfo, IndexInfo, QueryResult, QueryStreamChannel,
+    QueryStreamEvent, SchemaInfo, TableInfo,
 };
 
 const DEFAULT_TIMEOUT_SECS: u64 = 15;
@@ -358,6 +359,50 @@ pub async fn list_tables(
     .await
 }
 
+pub async fn search_tables(
+    client: &OracleClient,
+    schema: Option<&str>,
+    prefix: &str,
+    limit: usize,
+) -> Result<Vec<TableInfo>, String> {
+    let owner = oracle_owner_sql(schema);
+    let prefix = prefix.replace('\'', "''");
+    let prefix_filter = if prefix.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "AND SUBSTR(UPPER(o.object_name), 1, LENGTH('{prefix}')) = UPPER('{prefix}')"
+        )
+    };
+    let sql = format!(
+        "SELECT object_name, object_type FROM ( \
+           SELECT o.object_name, o.object_type \
+           FROM all_objects o \
+           WHERE o.owner = {owner} \
+             AND o.object_type IN ('TABLE','VIEW','MATERIALIZED VIEW') \
+             AND o.object_name NOT LIKE 'BIN$%' \
+             {prefix_filter} \
+           ORDER BY o.object_name \
+         ) WHERE ROWNUM <= {limit}"
+    );
+    oracle_blocking(client.clone(), None, move |conn| {
+        let (_, rows, _) = oracle_rows(&conn, &sql, None)?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|row| {
+                let name = row.first().and_then(Clone::clone)?;
+                let object_type = row.get(1).and_then(Clone::clone).unwrap_or_default();
+                Some(TableInfo {
+                    name,
+                    kind: oracle_table_kind(&object_type),
+                    row_count: None,
+                })
+            })
+            .collect())
+    })
+    .await
+}
+
 pub async fn describe_table(
     client: &OracleClient,
     schema: Option<&str>,
@@ -408,6 +453,46 @@ pub async fn describe_table(
                 })
             })
             .collect())
+    })
+    .await
+}
+
+pub async fn list_foreign_keys(
+    client: &OracleClient,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Vec<ForeignKeyInfo>, String> {
+    let owner = oracle_owner_sql(schema);
+    let table = table.replace('\'', "''").to_uppercase();
+    let sql = format!(
+        "SELECT child.constraint_name, child_col.column_name, parent.owner, \
+                parent.table_name, parent_col.column_name \
+         FROM all_constraints child \
+         JOIN all_cons_columns child_col \
+           ON child_col.owner = child.owner \
+          AND child_col.constraint_name = child.constraint_name \
+         JOIN all_constraints parent \
+           ON parent.owner = child.r_owner \
+          AND parent.constraint_name = child.r_constraint_name \
+         JOIN all_cons_columns parent_col \
+           ON parent_col.owner = parent.owner \
+          AND parent_col.constraint_name = parent.constraint_name \
+          AND parent_col.position = child_col.position \
+         WHERE child.constraint_type = 'R' \
+           AND child.owner = {owner} AND child.table_name = '{table}' \
+         ORDER BY child.constraint_name, child_col.position"
+    );
+    oracle_blocking(client.clone(), None, move |conn| {
+        let (_, rows, _) = oracle_rows(&conn, &sql, None)?;
+        Ok(group_foreign_keys(rows.into_iter().filter_map(|row| {
+            Some((
+                row.first().and_then(Clone::clone)?,
+                row.get(1).and_then(Clone::clone)?,
+                row.get(2).and_then(Clone::clone),
+                row.get(3).and_then(Clone::clone)?,
+                row.get(4).and_then(Clone::clone)?,
+            ))
+        })))
     })
     .await
 }

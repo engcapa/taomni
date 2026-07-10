@@ -923,6 +923,63 @@ pub async fn list_tables(
         .collect())
 }
 
+pub async fn search_tables(
+    client: &PrestoClient,
+    catalog: Option<&str>,
+    schema: Option<&str>,
+    prefix: &str,
+    limit: usize,
+) -> Result<Vec<TableInfo>, String> {
+    let catalog = match catalog.filter(|value| !value.is_empty()) {
+        Some(catalog) => catalog.to_string(),
+        None => current_catalog(client).await?,
+    };
+    let schema = match schema.filter(|value| !value.is_empty()) {
+        Some(schema) => schema.to_string(),
+        None => client.schema.lock().await.clone().ok_or_else(|| {
+            "Presto schema is required for table completion. Select a schema first.".to_string()
+        })?,
+    };
+    let prefix = sql_literal(prefix);
+    let sql = format!(
+        "SELECT table_name, table_type FROM information_schema.tables \
+         WHERE table_schema = {} \
+           AND substr(lower(table_name), 1, length(lower({prefix}))) = lower({prefix}) \
+         ORDER BY table_name LIMIT {limit}",
+        sql_literal(&schema),
+    );
+    let token = CancellationToken::new();
+    let result = run_statement_with_context(
+        client,
+        &sql,
+        None,
+        &token,
+        false,
+        Some(&catalog),
+        Some(&schema),
+    )
+    .await?
+    .result;
+    Ok(result
+        .rows
+        .into_iter()
+        .filter_map(|row| {
+            let name = row.first().cloned().flatten()?;
+            let kind = row
+                .get(1)
+                .cloned()
+                .flatten()
+                .map(|value| table_kind(&value))
+                .unwrap_or_else(|| "table".to_string());
+            Some(TableInfo {
+                name,
+                kind,
+                row_count: None,
+            })
+        })
+        .collect())
+}
+
 pub async fn describe_table(
     client: &PrestoClient,
     catalog: Option<&str>,

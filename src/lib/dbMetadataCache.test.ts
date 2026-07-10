@@ -5,6 +5,14 @@ const ipcMock = vi.hoisted(() => ({
   dbListCatalogs: vi.fn(async () => [{ name: "hive" }]),
   dbListSchemas: vi.fn(async () => [{ name: "public" }]),
   dbListTables: vi.fn(async () => [{ name: "orders", kind: "table", rowCount: null }]),
+  dbSearchTables: vi.fn(async () => [{ name: "orders", kind: "table", rowCount: null }]),
+  dbListForeignKeys: vi.fn(async () => [{
+    name: "orders_customer_fk",
+    columns: ["customer_id"],
+    referencedSchema: "public",
+    referencedTable: "customers",
+    referencedColumns: ["id"],
+  }]),
   dbDescribeTable: vi.fn(async () => [
     { name: "id", type: "int", nullable: false, default: null, primaryKey: true },
   ]),
@@ -42,6 +50,21 @@ describe("DbMetadataCache", () => {
     expect(ipcMock.dbListSchemas).toHaveBeenCalledTimes(2);
   });
 
+  it("does not expose expired entries through synchronous peeks", async () => {
+    let now = 1000;
+    const cache = createDbMetadataCache({
+      sessionId: "s1",
+      ttlMs: 100,
+      now: () => now,
+    });
+
+    await cache.listSchemas();
+    expect(cache.peekSchemas()).toEqual(["public"]);
+
+    now = 1101;
+    expect(cache.peekSchemas()).toBeNull();
+  });
+
   it("deduplicates in-flight metadata requests", async () => {
     const pending = deferred<Array<{ name: string; kind: "table"; rowCount: null }>>();
     ipcMock.dbListTables.mockReturnValueOnce(pending.promise);
@@ -56,6 +79,58 @@ describe("DbMetadataCache", () => {
     expect(ipcMock.dbListTables).toHaveBeenCalledTimes(1);
   });
 
+  it("uses bounded table search when a full schema listing is not cached", async () => {
+    const cache = createDbMetadataCache({ sessionId: "s1" });
+
+    await expect(cache.searchTables("public", "ord", null, 25)).resolves.toEqual([
+      { name: "orders", kind: "table", rowCount: null },
+    ]);
+    await cache.searchTables("public", "ord", null, 25);
+
+    expect(ipcMock.dbSearchTables).toHaveBeenCalledTimes(1);
+    expect(ipcMock.dbSearchTables).toHaveBeenCalledWith("s1", "public", null, "ord", 25);
+    expect(ipcMock.dbListTables).not.toHaveBeenCalled();
+  });
+
+  it("limits concurrent table searches", async () => {
+    type Table = { name: string; kind: "table"; rowCount: null };
+    const first = deferred<Table[]>();
+    const second = deferred<Table[]>();
+    const third = deferred<Table[]>();
+    ipcMock.dbSearchTables
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+      .mockReturnValueOnce(third.promise);
+    const cache = createDbMetadataCache({ sessionId: "s1", searchConcurrency: 2 });
+
+    const firstRequest = cache.searchTables("public", "a");
+    const secondRequest = cache.searchTables("public", "b");
+    const thirdRequest = cache.searchTables("public", "c");
+
+    expect(ipcMock.dbSearchTables).toHaveBeenCalledTimes(2);
+    first.resolve([{ name: "accounts", kind: "table", rowCount: null }]);
+    await expect(firstRequest).resolves.toHaveLength(1);
+    await vi.waitFor(() => expect(ipcMock.dbSearchTables).toHaveBeenCalledTimes(3));
+
+    second.resolve([]);
+    third.resolve([]);
+    await expect(Promise.all([secondRequest, thirdRequest])).resolves.toEqual([[], []]);
+  });
+
+  it("filters a cached full schema listing without another IPC request", async () => {
+    ipcMock.dbListTables.mockResolvedValueOnce([
+      { name: "orders", kind: "table", rowCount: null },
+      { name: "customers", kind: "table", rowCount: null },
+    ]);
+    const cache = createDbMetadataCache({ sessionId: "s1" });
+    await cache.listTables("public");
+
+    await expect(cache.searchTables("public", "ord", null, 10)).resolves.toEqual([
+      { name: "orders", kind: "table", rowCount: null },
+    ]);
+    expect(ipcMock.dbSearchTables).not.toHaveBeenCalled();
+  });
+
   it("clears schema and column entries on manual invalidation", async () => {
     const cache = createDbMetadataCache({ sessionId: "s1" });
     await cache.listTables("public");
@@ -68,6 +143,63 @@ describe("DbMetadataCache", () => {
     await cache.describeTable("public", "orders");
     expect(ipcMock.dbListTables).toHaveBeenCalledTimes(2);
     expect(ipcMock.dbDescribeTable).toHaveBeenCalledTimes(2);
+  });
+
+  it("caches and invalidates foreign-key metadata with its table", async () => {
+    const cache = createDbMetadataCache({ sessionId: "s1" });
+
+    await cache.listForeignKeys("public", "orders");
+    await cache.listForeignKeys("public", "orders");
+    expect(ipcMock.dbListForeignKeys).toHaveBeenCalledTimes(1);
+    expect(cache.peekForeignKeys("public", "orders")?.[0]?.referencedTable).toBe("customers");
+
+    cache.invalidate({ schema: "public", table: "orders" });
+    await cache.listForeignKeys("public", "orders");
+    expect(ipcMock.dbListForeignKeys).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not let an invalidated request overwrite replacement metadata", async () => {
+    const pending = deferred<Array<{ name: string; kind: "table"; rowCount: null }>>();
+    ipcMock.dbListTables
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValueOnce([{ name: "orders_v2", kind: "table", rowCount: null }]);
+    const cache = createDbMetadataCache({ sessionId: "s1" });
+
+    const staleRequest = cache.listTables("public");
+    cache.invalidate({ schema: "public" });
+    await expect(cache.listTables("public")).resolves.toEqual([
+      { name: "orders_v2", kind: "table", rowCount: null },
+    ]);
+
+    pending.resolve([{ name: "orders_v1", kind: "table", rowCount: null }]);
+    await expect(staleRequest).resolves.toEqual([
+      { name: "orders_v1", kind: "table", rowCount: null },
+    ]);
+
+    expect(cache.peekTables("public")).toEqual([
+      { name: "orders_v2", kind: "table", rowCount: null },
+    ]);
+    await cache.listTables("public");
+    expect(ipcMock.dbListTables).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not let an in-flight request repopulate a cleared cache", async () => {
+    const pending = deferred<Array<{ name: string }>>();
+    ipcMock.dbListSchemas
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValueOnce([{ name: "reporting" }]);
+    const cache = createDbMetadataCache({ sessionId: "s1" });
+
+    const staleRequest = cache.listSchemas();
+    cache.clearAll();
+    await expect(cache.listSchemas()).resolves.toEqual(["reporting"]);
+
+    pending.resolve([{ name: "public" }]);
+    await expect(staleRequest).resolves.toEqual(["public"]);
+
+    expect(cache.peekSchemas()).toEqual(["reporting"]);
+    await cache.listSchemas();
+    expect(ipcMock.dbListSchemas).toHaveBeenCalledTimes(2);
   });
 
   it("parses DDL statements into targeted metadata invalidations", () => {

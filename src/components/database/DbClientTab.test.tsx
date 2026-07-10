@@ -33,6 +33,8 @@ const ipcMock = vi.hoisted(() => ({
   dbListCatalogs: vi.fn(async () => []),
   dbListSchemas: vi.fn(async () => [{ name: "cdp" }]),
   dbListTables: vi.fn(async () => []),
+  dbSearchTables: vi.fn(async () => []),
+  dbListForeignKeys: vi.fn(async () => []),
   dbDescribeTable: vi.fn(async () => []),
 }));
 
@@ -73,6 +75,8 @@ vi.mock("../../lib/ipc", () => ({
   dbListCatalogs: ipcMock.dbListCatalogs,
   dbListSchemas: ipcMock.dbListSchemas,
   dbListTables: ipcMock.dbListTables,
+  dbSearchTables: ipcMock.dbSearchTables,
+  dbListForeignKeys: ipcMock.dbListForeignKeys,
   dbDescribeTable: ipcMock.dbDescribeTable,
   dbListBookmarks: vi.fn(async () => []),
   dbSaveBookmark: vi.fn(async () => undefined),
@@ -88,7 +92,10 @@ vi.mock("../../lib/ipc", () => ({
 
 const dbChildProps = vi.hoisted(() => ({
   schemaTree: null as null | { metadataCache?: unknown },
-  sqlEditor: null as null | { metadataCache?: unknown },
+  sqlEditor: null as null | {
+    metadataCache?: unknown;
+    onDocChange?: (doc: string) => void;
+  },
   editorInitialDocFallback: "select 1",
   generatedSql: "select 1\nORDER BY \"one\" DESC;",
   generatedRequest: null as null | {
@@ -113,15 +120,17 @@ vi.mock("./SqlEditorPanel", () => ({
   SqlEditorPanel: ({
     handleRef,
     onRun,
+    onDocChange,
     metadataCache,
     initialDoc,
   }: {
     handleRef: (handle: unknown | null) => void;
     onRun: (sql: string) => void;
+    onDocChange?: (doc: string) => void;
     metadataCache?: unknown;
     initialDoc?: string;
   }) => {
-    dbChildProps.sqlEditor = { metadataCache };
+    dbChildProps.sqlEditor = { metadataCache, onDocChange };
     useEffect(() => {
       let doc = initialDoc || dbChildProps.editorInitialDocFallback;
       const handle = {
@@ -300,6 +309,21 @@ describe("DbClientTab connection lifecycle", () => {
     });
   });
 
+  it("does not rewrite workspace metadata for document-only changes", async () => {
+    ipcMock.dbConnect.mockResolvedValue({ ok: true });
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+
+    render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
+    await waitFor(() => expect(dbChildProps.sqlEditor?.onDocChange).toBeTypeOf("function"));
+    setItem.mockClear();
+
+    act(() => dbChildProps.sqlEditor?.onDocChange?.("select 2"));
+
+    expect(
+      setItem.mock.calls.some(([key]) => String(key).startsWith("taomni.db.queryWorkspace.v1.")),
+    ).toBe(false);
+  });
+
   it("uses PanWeiDB schema metadata instead of treating the connection database as the schema", async () => {
     ipcMock.dbConnect.mockResolvedValue({ ok: true });
     ipcMock.dbListSchemas.mockResolvedValueOnce([{ name: "panwei_omm" }, { name: "public" }]);
@@ -308,15 +332,11 @@ describe("DbClientTab connection lifecycle", () => {
 
     const schemaSelect = await screen.findByLabelText("Schema");
     await waitFor(() => expect(schemaSelect).toHaveValue("panwei_omm"));
-    await waitFor(() =>
-      expect(ipcMock.dbListTables).toHaveBeenCalledWith(
-        expect.stringMatching(/^saved-panwei::/),
-        "panwei_omm",
-        null,
-      ),
+    expect(ipcMock.dbListSchemas).toHaveBeenCalledWith(
+      expect.stringMatching(/^saved-panwei::/),
+      null,
     );
-    const tableCalls = ipcMock.dbListTables.mock.calls as unknown as Array<[string, string | null, string | null]>;
-    expect(tableCalls.some(([, schema]) => schema === "panweidb")).toBe(false);
+    expect(ipcMock.dbListTables).not.toHaveBeenCalled();
   });
 
   it("appends echoed agent SQL with comments and semicolons into one query panel", async () => {
