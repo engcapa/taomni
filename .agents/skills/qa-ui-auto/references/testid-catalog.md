@@ -530,6 +530,18 @@
 
 - `[data-testid="settings-panel"]` — display — F11.1.panel-root
 - `[data-testid="settings-welcome-recent-session-limit"]` — interactive — F11.1.welcome-recent-session-limit
+- `[data-testid="settings-search-input"]` — interactive — F11.1.search-input
+- `[data-testid="settings-search-count"]` — display — F11.1.search-count
+- `[data-testid="settings-search-empty"]` — display — F11.1.search-empty
+- `[data-testid="settings-reset-code-view-profile"]` — interactive — F11.1.reset-code-view-profile
+- `[data-testid="settings-reset-terminal-default-profile"]` — interactive — F11.1.reset-terminal-default-profile
+- `[data-testid="sql-completion-settings"]` — display — F11.1.sql-completion-settings
+- `[data-testid="sql-completion-activate-on-typing"]` — interactive — F11.1.sql-completion-activate-on-typing
+- `[data-testid="sql-completion-trigger-shortcut"]` — interactive — F11.1.sql-completion-trigger-shortcut
+- `[data-testid="sql-completion-shortcut-error"]` — display [optional] — F11.1.sql-completion-shortcut-error
+- `[data-testid="sql-completion-accept-tab"]` — interactive — F11.1.sql-completion-accept-tab
+- `[data-testid="sql-completion-accept-enter"]` — interactive — F11.1.sql-completion-accept-enter
+- `[data-testid="sql-completion-reset"]` — interactive — F11.1.sql-completion-reset
 
 ## sftp (F7.2)
 

@@ -1,0 +1,57 @@
+id: TC-auto-F11-1-sql-completion-settings
+title: SQL completion preferences persist and reset
+description: |
+  Covers the searchable global settings surface and the SQL completion controls.
+  Records a non-conflicting completion shortcut, changes automatic/accept behavior,
+  verifies persistence, then restores the defaults. This does not require a live
+  database because completion preferences are browser-local editor settings.
+covers: [F11.1]
+tags: [auto-generated, smoke, needs-review, settings, database, sql]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 30
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="ribbon-settings"]'
+  - click: '[data-testid="ribbon-settings"]'
+  - wait_for: '[data-testid="settings-panel"]'
+
+  # Settings search exposes both match-count and no-match states.
+  - fill: {selector: '[data-testid="settings-search-input"]', value: autocomplete}
+  - assert_visible: '[data-testid="settings-search-count"]'
+  - fill: {selector: '[data-testid="settings-search-input"]', value: no-such-setting}
+  - assert_visible: '[data-testid="settings-search-empty"]'
+  - fill: {selector: '[data-testid="settings-search-input"]', value: ''}
+
+  # Existing global reset controls remain reachable after adding the SQL section.
+  - click: '[data-testid="settings-reset-code-view-profile"]'
+  - click: '[data-testid="settings-reset-terminal-default-profile"]'
+
+  - assert_visible: '[data-testid="sql-completion-settings"]'
+  - set_check: {selector: '[data-testid="sql-completion-activate-on-typing"]', checked: false}
+
+  # A reserved editor key is rejected, while Alt+i is recorded and persisted.
+  - click: '[data-testid="sql-completion-trigger-shortcut"]'
+  - press: {selector: '[data-testid="sql-completion-trigger-shortcut"]', key: F5}
+  - assert_visible: '[data-testid="sql-completion-shortcut-error"]'
+  - press: {selector: '[data-testid="sql-completion-trigger-shortcut"]', key: 'Alt+i'}
+
+  # Touch both accept controls, ending with Tab enabled and Enter disabled.
+  - set_check: {selector: '[data-testid="sql-completion-accept-tab"]', checked: false}
+  - set_check: {selector: '[data-testid="sql-completion-accept-tab"]', checked: true}
+  - set_check: {selector: '[data-testid="sql-completion-accept-enter"]', checked: false}
+  - assert_localstorage:
+      key: taomni.sqlCompletionPreferences.v1
+      contains: '"triggerShortcut":"Alt-i"'
+  - assert_localstorage:
+      key: taomni.sqlCompletionPreferences.v1
+      contains: '"activateOnTyping":false'
+  - assert_localstorage:
+      key: taomni.sqlCompletionPreferences.v1
+      contains: '"acceptWithEnter":false'
+
+  - click: '[data-testid="sql-completion-reset"]'
+  - assert_localstorage:
+      key: taomni.sqlCompletionPreferences.v1
+      equals: '{"activateOnTyping":true,"triggerShortcut":"Ctrl-Space","acceptWithTab":true,"acceptWithEnter":true}'
+  - screenshot: F11.1-sql-completion-settings.png
