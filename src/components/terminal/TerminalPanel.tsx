@@ -105,6 +105,7 @@ import {
   isVaultLockedError,
 } from "../../lib/ipc";
 import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
+import { extractTerminalCommand } from "../../lib/terminalCommand";
 import { normalizeLocalStartCwd } from "../../lib/terminalCwd";
 import { buildSshCwdIntegration } from "../../lib/terminalShellIntegration";
 import { registerTerminal, consumeTerminalDetachPending } from "../../lib/terminal/terminalRegistry";
@@ -3998,20 +3999,7 @@ function captureBufferCommand(term: Terminal): string {
     }
   }
 
-  const trimmed = text.replace(/\s+$/, "");
-
-  // Heuristic prompt removal: take the tail after the last common shell
-  // prompt terminator. Covers bash/zsh ("$ "/"# "), fish/tcsh ("% "),
-  // PowerShell ("> "). If no terminator is found, return the whole line.
-  const markers = ["$ ", "# ", "> ", "% "];
-  let best = -1;
-  for (const marker of markers) {
-    const idx = trimmed.lastIndexOf(marker);
-    if (idx > best) best = idx + marker.length;
-  }
-
-  const command = best >= 0 ? trimmed.slice(best) : trimmed;
-  return command.trim();
+  return extractTerminalCommand(text);
 }
 
 // Heuristic: does the terminal currently show an idle shell prompt waiting for
