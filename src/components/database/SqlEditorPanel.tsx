@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { EditorState, Compartment } from "@codemirror/state";
+import { EditorState, Compartment, Prec } from "@codemirror/state";
 import {
   EditorView,
   keymap,
@@ -8,6 +8,7 @@ import {
   drawSelection,
   rectangularSelection,
   crosshairCursor,
+  type KeyBinding,
 } from "@codemirror/view";
 import {
   addCursorAbove,
@@ -28,6 +29,9 @@ import {
   autocompletion,
   closeBrackets,
   closeBracketsKeymap,
+  closeCompletion,
+  moveCompletionSelection,
+  startCompletion,
   type CompletionSource,
 } from "@codemirror/autocomplete";
 import { bracketMatching, HighlightStyle, syntaxHighlighting } from "@codemirror/language";
@@ -36,6 +40,11 @@ import type { DbMetadataCache } from "../../lib/dbMetadataCache";
 import { codeMirrorSqlDialect } from "../../lib/sqlEditorDialect";
 import { createSqlMetadataCompletionSource } from "../../lib/sqlMetadataCompletions";
 import { createSqlStructuredCompletionSource } from "../../lib/sqlStructuredCompletions";
+import {
+  loadSqlCompletionPreferences,
+  subscribeSqlCompletionPreferences,
+  type SqlCompletionPreferences,
+} from "../../lib/sqlCompletionPreferences";
 
 const DOC_CHANGE_DEBOUNCE_MS = 200;
 
@@ -73,11 +82,14 @@ interface SqlEditorPanelProps {
 function autocompleteFor(
   sources?: readonly CompletionSource[],
   defaultSources?: readonly CompletionSource[],
+  preferences: SqlCompletionPreferences = loadSqlCompletionPreferences(),
 ) {
   const config = {
+    activateOnTyping: preferences.activateOnTyping,
     activateOnTypingDelay: 75,
     updateSyncTime: 80,
     maxRenderedOptions: 80,
+    defaultKeymap: false,
   };
   if (sources && sources.length > 0) {
     return autocompletion({ ...config, override: [...sources] });
@@ -86,6 +98,22 @@ function autocompleteFor(
     return autocompletion({ ...config, override: [...defaultSources] });
   }
   return autocompletion(config);
+}
+
+export function sqlCompletionKeymapFor(
+  preferences: SqlCompletionPreferences,
+): readonly KeyBinding[] {
+  const bindings: KeyBinding[] = [
+    { key: preferences.triggerShortcut, run: startCompletion },
+    { key: "Escape", run: closeCompletion },
+    { key: "ArrowDown", run: moveCompletionSelection(true) },
+    { key: "ArrowUp", run: moveCompletionSelection(false) },
+    { key: "PageDown", run: moveCompletionSelection(true, "page") },
+    { key: "PageUp", run: moveCompletionSelection(false, "page") },
+  ];
+  if (preferences.acceptWithEnter) bindings.push({ key: "Enter", run: acceptCompletion });
+  if (preferences.acceptWithTab) bindings.push({ key: "Tab", run: acceptCompletion });
+  return bindings;
 }
 
 const sqlHighlightStyle = HighlightStyle.define([
@@ -187,6 +215,7 @@ export function SqlEditorPanel({
   const viewRef = useRef<EditorView | null>(null);
   const langCompartment = useRef(new Compartment());
   const autocompleteCompartment = useRef(new Compartment());
+  const completionKeymapCompartment = useRef(new Compartment());
   const onRunRef = useRef(onRun);
   const onDocChangeRef = useRef(onDocChange);
   const onFocusRef = useRef(onFocus);
@@ -196,6 +225,11 @@ export function SqlEditorPanel({
   const [metadataPending, setMetadataPending] = useState(0);
   const [metadataLoadingVisible, setMetadataLoadingVisible] = useState(false);
   const [metadataHint, setMetadataHint] = useState<string | null>(null);
+  const [completionPreferences, setCompletionPreferences] = useState(loadSqlCompletionPreferences);
+  useEffect(
+    () => subscribeSqlCompletionPreferences(setCompletionPreferences),
+    [],
+  );
   const onMetadataLoadingChange = useCallback((loading: boolean) => {
     if (loading) setMetadataHint(null);
     setMetadataPending((current) => Math.max(0, current + (loading ? 1 : -1)));
@@ -317,7 +351,12 @@ export function SqlEditorPanel({
         history(),
         bracketMatching(),
         closeBrackets(),
-        autocompleteCompartment.current.of(autocompleteFor(completionSources, defaultSources)),
+        autocompleteCompartment.current.of(
+          autocompleteFor(completionSources, defaultSources, completionPreferences),
+        ),
+        completionKeymapCompartment.current.of(
+          Prec.highest(keymap.of(sqlCompletionKeymapFor(completionPreferences))),
+        ),
         syntaxHighlighting(sqlHighlightStyle),
         langCompartment.current.of(
           sql({ dialect: codeMirrorSqlDialect(engine), upperCaseKeywords: true }),
@@ -325,7 +364,6 @@ export function SqlEditorPanel({
         keymap.of([
           { key: "F5", run: () => (runHandler(), true) },
           { key: "Mod-Enter", run: () => (runHandler(), true) },
-          { key: "Tab", run: acceptCompletion },
           { key: "Shift-Alt-ArrowUp", run: addCursorAbove },
           { key: "Shift-Alt-ArrowDown", run: addCursorBelow },
           ...closeBracketsKeymap,
@@ -484,10 +522,20 @@ export function SqlEditorPanel({
     if (!view) return;
     view.dispatch({
       effects: autocompleteCompartment.current.reconfigure(
-        autocompleteFor(completionSources, defaultSources),
+        autocompleteFor(completionSources, defaultSources, completionPreferences),
       ),
     });
-  }, [completionSources, defaultSources]);
+  }, [completionPreferences, completionSources, defaultSources]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: completionKeymapCompartment.current.reconfigure(
+        Prec.highest(keymap.of(sqlCompletionKeymapFor(completionPreferences))),
+      ),
+    });
+  }, [completionPreferences]);
 
   return (
     <div className="h-full w-full overflow-hidden relative" data-testid="sql-editor">

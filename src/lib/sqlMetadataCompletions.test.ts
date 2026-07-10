@@ -3,7 +3,10 @@ import { EditorState } from "@codemirror/state";
 import { CompletionContext, type CompletionResult } from "@codemirror/autocomplete";
 import { createDbMetadataCache, DB_METADATA_COMPLETION_LIMIT } from "./dbMetadataCache";
 import { codeMirrorSqlDialect } from "./sqlEditorDialect";
-import { createSqlMetadataCompletionSource } from "./sqlMetadataCompletions";
+import {
+  createSqlMetadataCompletionSource,
+  SQL_SELECT_RELATION_LIMIT,
+} from "./sqlMetadataCompletions";
 
 const ipcMock = vi.hoisted(() => ({
   dbListCatalogs: vi.fn(async () => [{ name: "hive" }, { name: "iceberg" }]),
@@ -275,6 +278,116 @@ describe("createSqlMetadataCompletionSource", () => {
     expect(result?.options[0]?.detail).toBe("2 columns");
     expect(typeof result?.options[0]?.apply).toBe("function");
     expect(ipcMock.dbDescribeTable).toHaveBeenCalledWith("s1", "public", "orders", null);
+  });
+
+  it("suggests downstream table columns at an unqualified SELECT-list cursor", async () => {
+    const result = await complete("select ‸ from orders", {
+      engine: "PostgreSQL",
+      activeSchema: "public",
+    });
+
+    expect(labels(result)).toEqual(["id", "total", "* — expand all columns"]);
+    expect(result?.options[0]).toMatchObject({
+      apply: "id",
+      detail: "orders · bigint · PK",
+    });
+    expect(result?.options[2]?.apply).toBe("id, total");
+    expect(ipcMock.dbDescribeTable).toHaveBeenCalledWith("s1", "public", "orders", null);
+  });
+
+  it("filters SELECT-list columns by the word before the cursor", async () => {
+    const result = await complete("select to‸ from orders", {
+      engine: "PostgreSQL",
+      activeSchema: "public",
+    });
+
+    expect(labels(result)).toEqual(["total"]);
+    expect(result?.from).toBe("select ".length);
+  });
+
+  it("qualifies columns when the SELECT scope contains multiple relations", async () => {
+    ipcMock.dbDescribeTable
+      .mockResolvedValueOnce([
+        { name: "id", type: "bigint", nullable: false, default: null, primaryKey: true },
+        { name: "customer_id", type: "bigint", nullable: false, default: null, primaryKey: false },
+      ])
+      .mockResolvedValueOnce([
+        { name: "id", type: "bigint", nullable: false, default: null, primaryKey: true },
+        { name: "name", type: "text", nullable: false, default: null, primaryKey: false },
+      ]);
+
+    const result = await complete(
+      "select ‸ from orders o join customers c on c.id = o.customer_id",
+      { engine: "PostgreSQL", activeSchema: "public" },
+    );
+    const orderId = result?.options.find((option) => option.displayLabel === "o.id");
+    const customerId = result?.options.find((option) => option.displayLabel === "c.id");
+    const customerName = result?.options.find((option) => option.displayLabel === "c.name");
+
+    expect(orderId?.apply).toBe("o.id");
+    expect(customerId?.apply).toBe("c.id");
+    expect(customerName).toMatchObject({ label: "name", apply: "c.name" });
+    expect(result?.options.find((option) => option.label.startsWith("o.*"))?.apply)
+      .toBe("o.id, o.customer_id");
+  });
+
+  it("completes CTE and derived-table columns without metadata I/O", async () => {
+    const cte = await complete(`
+      WITH recent AS (SELECT id, total AS amount FROM orders)
+      SELECT ‸ FROM recent r
+    `, { engine: "PostgreSQL", activeSchema: "public" });
+    const derived = await complete(`
+      SELECT ‸ FROM (SELECT id, name AS customer_name FROM customers) d
+    `, { engine: "PostgreSQL", activeSchema: "public" });
+
+    expect(labels(cte)).toEqual(["amount", "id", "* — expand all columns"]);
+    expect(cte?.options[0]?.detail).toBe("CTE r");
+    expect(labels(derived)).toEqual(["customer_name", "id", "* — expand all columns"]);
+    expect(derived?.options[0]?.detail).toBe("Derived table d");
+    expect(ipcMock.dbDescribeTable).not.toHaveBeenCalled();
+  });
+
+  it("uses only the innermost query's relations for SELECT-list completion", async () => {
+    const result = await complete(
+      "select id, (select ‸ from line_items li) from orders o",
+      { engine: "PostgreSQL", activeSchema: "public" },
+    );
+
+    expect(labels(result)).toEqual(["id", "total", "* — expand all columns"]);
+    expect(ipcMock.dbDescribeTable).toHaveBeenCalledTimes(1);
+    expect(ipcMock.dbDescribeTable).toHaveBeenCalledWith("s1", "public", "line_items", null);
+  });
+
+  it("keeps successful SELECT-list sources when another relation metadata request fails", async () => {
+    ipcMock.dbDescribeTable
+      .mockRejectedValueOnce(new Error("orders unavailable"))
+      .mockResolvedValueOnce([
+        { name: "name", type: "text", nullable: false, default: null, primaryKey: false },
+      ]);
+    const onError = vi.fn();
+
+    const result = await complete(
+      "select na‸ from orders o join customers c on c.id = o.customer_id",
+      { engine: "PostgreSQL", activeSchema: "public", onError },
+    );
+
+    expect(labels(result)).toEqual(["name"]);
+    expect(result?.options[0]?.apply).toBe("c.name");
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("bounds metadata fan-out for very large SELECT scopes", async () => {
+    const joins = Array.from(
+      { length: SQL_SELECT_RELATION_LIMIT + 3 },
+      (_, index) => `${index === 0 ? "from" : "join"} table_${index} t${index}`,
+    ).join(" ");
+
+    await complete(`select ‸ ${joins}`, {
+      engine: "PostgreSQL",
+      activeSchema: "public",
+    });
+
+    expect(ipcMock.dbDescribeTable).toHaveBeenCalledTimes(SQL_SELECT_RELATION_LIMIT);
   });
 
   it("supports Presto catalog.schema.table column completion", async () => {

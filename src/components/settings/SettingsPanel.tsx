@@ -39,6 +39,7 @@ import { useAiStore } from "../../stores/aiStore";
 import { matchingIds } from "./settingsSearch";
 import { CodeViewAppearanceSettings } from "./CodeViewAppearanceSettings";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
+import { SqlCompletionSettings } from "./SqlCompletionSettings";
 
 const UI_FONTS = [
   { value: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', label: "Inter (Default UI - Highly Recommended)" },
@@ -440,6 +441,10 @@ export function SettingsPanel() {
               terminalProfile={DEFAULT_TERMINAL_PROFILE}
               onProfileChange={setCodeViewProfile}
             />
+          </SettingsAnchor>
+
+          <SettingsAnchor id="sql-completion">
+            <SqlCompletionSettings />
           </SettingsAnchor>
 
           <SettingsAnchor id="terminal-defaults">
