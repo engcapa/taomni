@@ -389,6 +389,24 @@ describe("sftpController.download empty-local-dir fallback", () => {
 });
 
 describe("PathBreadcrumb Windows drives root", () => {
+  it("uses the compact horizontal scroller for a long path", () => {
+    const { getByTestId, getByText } = render(
+      <PathBreadcrumb
+        testId="long-path"
+        path="/home/me/projects/taomni/deeply/nested/directory"
+        onNavigate={vi.fn()}
+      />,
+    );
+
+    const breadcrumb = getByTestId("long-path");
+    expect(breadcrumb).toHaveClass(
+      "taomni-path-breadcrumb",
+      "overflow-x-auto",
+      "leading-none",
+    );
+    expect(getByText("directory")).toBeVisible();
+  });
+
   it("renders the virtual drives root as a single 'Drives' segment", () => {
     const onNavigate = vi.fn();
     const { getByText, queryByTestId } = render(

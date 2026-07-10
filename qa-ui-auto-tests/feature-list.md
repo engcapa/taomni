@@ -452,6 +452,7 @@ components: [TerminalPanel]
 files:
   - src/components/terminal/TerminalPanel.tsx
   - src/components/ContextMenu.tsx
+  - src/lib/terminalCommand.ts
 controls:
   - id: terminal-pane
     selector: '[data-testid="terminal-pane"]'

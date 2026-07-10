@@ -89,7 +89,7 @@ export function PathBreadcrumb({
   return (
     <div
       data-testid={testId}
-      className="flex-1 h-6 flex items-center gap-0.5 px-1.5 overflow-x-auto text-[12px] cursor-text"
+      className="taomni-path-breadcrumb flex-1 h-6 flex items-center gap-0.5 px-1.5 overflow-x-auto text-[12px] leading-none cursor-text"
       style={{ background: "var(--taomni-input-bg)", border: "1px solid var(--taomni-input-border)", borderRadius: 2 }}
       onClick={() => setEditing(true)}
       onContextMenu={(e) => {

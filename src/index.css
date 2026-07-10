@@ -386,6 +386,23 @@ body.notes-detached-document,
 .taomni-scroll-y::-webkit-scrollbar-thumb { background: var(--taomni-scrollbar-thumb); border: 2px solid var(--taomni-scrollbar-track); border-radius: 2px; }
 .taomni-scroll-y::-webkit-scrollbar-thumb:hover { background: var(--taomni-scrollbar-thumb-hover); }
 
+/* Keep the compact SFTP breadcrumb readable when classic scrollbars consume
+   layout space (notably Windows WebView2). WebKit/Blink expose an exact-size
+   hook; other engines fall back to their platform-defined thin scrollbar. */
+.taomni-path-breadcrumb::-webkit-scrollbar { height: 4px; }
+.taomni-path-breadcrumb::-webkit-scrollbar-track { background: transparent; }
+.taomni-path-breadcrumb::-webkit-scrollbar-thumb {
+  background: var(--taomni-scrollbar-thumb);
+  border-radius: 9999px;
+}
+.taomni-path-breadcrumb::-webkit-scrollbar-thumb:hover { background: var(--taomni-scrollbar-thumb-hover); }
+@supports not selector(::-webkit-scrollbar) {
+  .taomni-path-breadcrumb {
+    scrollbar-color: var(--taomni-scrollbar-thumb) transparent;
+    scrollbar-width: thin;
+  }
+}
+
 /* Form inputs */
 .taomni-input {
   height: 22px;
