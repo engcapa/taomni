@@ -2,7 +2,7 @@
 
 > 目标：在现有 Code Workspace 基础上做功能与交互完善，达到"日常代码开发够用"的 IntelliJ IDEA 级体验（非全量对标）。本文档为设计稿，不含实现代码。
 >
-> 日期：2026-07-11 · 版本：v2.3（实现状态复核，见 §8.1–8.2）· 状态：**实施中**（分支 `feat/code-workspace-ide`）
+> 日期：2026-07-11 · 版本：v2.4（P0/M0–M2 收口复核，见 §8.1–8.2）· 状态：**实施中**（分支 `feat/code-workspace-ide`；P0 主体已交付，进入 M0 还债 + M3）
 
 ---
 
@@ -583,14 +583,14 @@ src/stores/
 
 ### 8.1 进度明细（勾选清单）
 
-> 更新于 2026-07-11，分支 `feat/code-workspace-ide`。状态已按当前代码、测试与提交历史复核；完成度仅按本节拆分条目计数，已完成的实现项附提交号。
+> 更新于 2026-07-11（v2.4），分支 `feat/code-workspace-ide`。P0（M1/M2）已按代码与提交复核收口；M0 仅剩壳拆分/store 技术债。完成度按本节拆分条目计数，已完成项附提交号。
 
 **M0 前置重构 — 🔶 6/7，部分完成**
 
 - [x] CodeMirror host 抽取（`CodeMirrorHost.tsx`）— `042d03f`
 - [x] 底部 dock 容器 + References 面板迁入 — `09108e2`（`4766f43` 起改为面板常驻挂载）
 - [x] `FileTreePane` 展示边界抽取（工具栏、视图/缩放控制、语言服务器面板）+ 组件测试 — `acff8cf`
-- [ ] 剩余组件拆分（树数据/菜单控制器、EditorGroup、弹窗群 → §6.1 目录结构）+ `codeWorkspaceStore` — **⚠ 技术债：`CodeWorkspaceTab.tsx` 仍为上帝组件，M3 分屏前必须补课**
+- [ ] 剩余组件拆分（树数据/菜单控制器、EditorGroup、弹窗群 → §6.1 目录结构）+ `codeWorkspaceStore` — **⚠ 技术债：`CodeWorkspaceTab.tsx` 约 4.6k 行上帝组件，M3 分屏前必须补课**
 - [x] `workspaceCommands.ts` 注册表、when 判定与统一快捷键分发；Search Everywhere 增加 Files / Actions 双入口 + 测试 — `b3c3d35`
 - [x] 活跃工作区命令注册桥 + Windows/Linux 应用菜单动态子菜单 + macOS 原生菜单动态子菜单 — `26b2763`
 - [x] 命令系统收尾：树右键/工具栏复用 command id，terminalFocus 上下文接入 — `2312ef8`
@@ -603,7 +603,7 @@ src/stores/
 - [x] capability 摘要下发（§5.2.0，initialize 握手升级 + `LspDocumentStatus.capabilities`）— `fa8ce88`
 - [x] LSP 补全（kind 图标、snippet 转换、auto-import via resolve、触发字符、词级回退）— `fa8ce88`
 - [x] 签名帮助（触发字符自动弹出 / Ctrl+Shift+Space，活动参数加粗）— `fa8ce88`
-- [x] 快速文档升级（Ctrl+Q 显式弹出 + pin 到右栏）— `c4e1435`
+- [x] 快速文档升级（Ctrl+Q / F1 显式弹出 + pin 到右栏 Documentation）— `c4e1435`
 - [x] 格式化（`lsp_formatting` / `lsp_range_formatting`，Ctrl+Alt+L）— `e210694`（保存时格式化开关仍可后续加）
 - [x] 诊断呈现收尾（gutter 图标、overview ruler 色条、灯泡入口）— `b049952`
 
@@ -611,18 +611,18 @@ src/stores/
 
 - [x] Find in Files 后端（ignore + grep-searcher 流式搜索、取消、截断）— `65ac601`
 - [x] Find in Files 面板（Ctrl+Shift+F、大小写/整词/正则、include/exclude glob）— `4766f43`
-- [x] Go to File（双 Shift / Ctrl+Shift+N / Ctrl+P，camelCase 模糊匹配）— `972ad00`；SE 现为六分组（All/Classes/Files/Symbols/Actions/Text）— `4040d6f`
+- [x] Go to File（双 Shift / Ctrl+Shift+N / Ctrl+P，camelCase 模糊匹配）— `972ad00`；SE 六分组（All/Classes/Files/Symbols/Actions/Text）— `4040d6f`
 - [x] 文件树右键菜单基础项（新建/重命名/删除/复制路径/Find in Directory）— `6be92f5`
 - [x] Recent Files（Ctrl+E，最近优先、连按推进、上一文件预选）— `f5ae894`
 - [x] 导航历史（Ctrl+Alt+←/→ + 头部按钮，100 条上限）— `f5ae894`
 - [x] 文件结构弹窗（Ctrl+F12，documentSymbol 层级/扁平双格式）— `5939c76`
-- [x] 文件树右键菜单补齐（剪切/复制/粘贴、资源管理器打开；终端打开与 Git ignore 仍可增强）— `1d8fa2f`
+- [x] 文件树右键菜单补齐（剪切/复制/粘贴、资源管理器打开；「终端中打开」与 Git ignore 仍可增强）— `1d8fa2f`
 - [x] Go to Class / Go to Symbol（`lsp_workspace_symbols` + SE Classes/Symbols）— `4040d6f`
 - [x] 类型声明/实现跳转 + 多结果 peek — `e373d0d`
-- [x] 重命名（prepareRename + rename + WorkspaceEdit 应用规则）— `e7873ef`
-- [x] Code Actions / Alt+Enter（WorkspaceEdit 应用；server 回推 applyEdit oneshot 仍可增强）— `b049952`
-- [x] 树键盘导航（↑↓←→/Enter/F2）；拖拽仍为 P1 — `1d8fa2f`
-- [x] 替换（Replace in Files via shared WorkspaceEdit applier）— `e7873ef`
+- [x] 重命名（prepareRename + rename + §5.2.9 WorkspaceEdit 应用规则）— `e7873ef`；open-clean 保存路径 — `5d87203`
+- [x] Code Actions / Alt+Enter（客户端 WorkspaceEdit 应用；server 回推 applyEdit oneshot 仍可增强）— `b049952` + `5d87203`
+- [x] 树键盘导航（↑↓←→/Enter/F2/Delete）；拖拽仍为 P1 — `1d8fa2f`
+- [x] 替换（Replace in Files via shared WorkspaceEdit applier）— `e7873ef` + `5d87203`
 
 **M3 布局与终端（P1）— ⬜ 0/5，未开始**
 
@@ -657,19 +657,33 @@ src/stores/
 
 - [x] 交互原型交付（`claudedocs/prototype/code-workspace-prototype.html`）
 - [x] 签名帮助键位决策：Ctrl+Shift+Space（Ctrl+P 已作 Go to File 别名）— `f4d9c15`
-- [x] 代码与自动化复核（2026-07-11）：`pnpm build` 通过；Code Workspace 定向 Vitest 13 个文件 / 68 项通过；LSP 定向 Rust 6 项、全文搜索定向 Rust 5 项通过
-- [ ] **⚠ 真机验证欠账**：`65ac601` 起的功能均为测试级验证，需 `pnpm tauri dev` 人工过一遍（重点：补全/auto-import、签名帮助、Ctrl+F12、Ctrl+Shift+F、双 Shift、Ctrl+E、树右键）
-- [ ] ⚠ 后端既有测试失败 8 例（2026-07-11 复核：717 通过 / 8 失败 / 11 ignored；config 剪贴板 URI ×4、terminal pushd ×1、workspace git 根检测 ×3），与本特性无关，合并前需处理或建立基线豁免
+- [x] 代码与自动化复核（2026-07-11 v2.4）：`pnpm build` / `tsc -b` 通过；Code Workspace 定向 Vitest **22 文件 / 101 项**通过；LSP 定向 Rust **9** 项、`workspace_search` **5** 项通过
+- [x] WorkspaceEdit §5.2.9 三态规则收口（open-clean 应用后保存、open-dirty 保持 dirty、未打开写盘 + hash 预检）— `workspaceEditApply` + `5d87203`
+- [ ] **⚠ 真机验证欠账**：P0 新能力（格式化、Ctrl+Q、灯泡/Alt+Enter、SE Classes/Symbols、typeDef/impl peek、重命名、Replace All、树 Cut/Paste/键盘）仍以单测/构建为主，需 `pnpm tauri dev` 人工过一遍并记录缺陷
+- [ ] ⚠ 后端既有测试失败 8 例（2026-07-11 早前复核：config 剪贴板 URI ×4、terminal pushd ×1、workspace git 根检测 ×3），与本特性无关，合并前需处理或建立基线豁免
+- [ ] ⚠ 下列 P0 增强项可选收口（不阻塞 M3，但影响体验完整度）：保存时格式化开关；server 回推 `workspace/applyEdit` oneshot；树「终端中打开」/ Git ignore；树拖拽（P1）
 
 ### 8.2 下一步待办（建议顺序）
 
-1. **先做真机冒烟并记录缺陷**：用 `pnpm tauri dev` 覆盖已交付的补全/auto-import、签名帮助、结构弹窗、Find in Files、Go to File、Recent Files、导航历史和树右键，避免在未验证的基础上继续扩建。
-2. **补齐 M0 硬前提**：继续拆出树控制器 / `EditorGroup` / 弹窗群，引入按 `workspaceInstanceId` 分片的 `codeWorkspaceStore`；完成 `workspaceCommands.ts` 的右键/工具栏复用和 terminalFocus 上下文。
-3. **收口 M1**：依次实现格式化、诊断 gutter/overview ruler/灯泡、Ctrl+Q 快速文档与右栏 pin；其中灯泡和 Problems Quick Fix 复用 Code Actions 通道。
-4. **完成 M2 只读语义导航**：先补 `workspace/symbol` 与 Classes/Symbols 分组，再补 typeDefinition/implementation 和多结果 peek；这批能力不涉及跨文件写入，适合作为下一阶段低风险交付。
-5. **完成 M2 写操作链路**：先实现统一 `WorkspaceEdit` 应用器及 hash 预检，再接重命名、Code Actions / applyEdit、Replace in Files，避免三套写盘逻辑分叉。
-6. **补齐文件树交互**：完成剩余右键动作、键盘导航与拖拽；之后进入 M3 的分屏/tab/面包屑/终端/Run Tasks。
-7. **处理合并门禁债务**：修复或显式豁免 8 个既有 Rust 失败用例，并把本轮真机冒烟结果补回本节。
+> P0（M1/M2）功能主体已交付。下一阶段优先 **真机冒烟 + M0 还债**，再进入 **M3 布局/终端**；不要在 4.6k 行壳上直接堆分屏。
+
+1. **真机冒烟并记缺陷（门禁）**  
+   `pnpm tauri dev` 覆盖已交付 P0：补全/auto-import、签名帮助、Ctrl+F12、Find in Files + Replace All、双 Shift SE 六分组、Ctrl+E、导航历史、树右键/键盘、Ctrl+Alt+L、Ctrl+Q pin、Alt+Enter/灯泡、Shift+F6 重命名、typeDef/impl peek。结果回填 §8.1 横切「真机验证」项。
+
+2. **补齐 M0 硬前提（M3 阻塞项）**  
+   拆出树控制器 / `EditorGroup` / 弹窗群，引入按 `workspaceInstanceId` 分片的 `codeWorkspaceStore`，把 `CodeWorkspaceTab` 压到可维护体量（目标壳 <400 行）。**未完成前不要开 M3 分屏。**
+
+3. **合并门禁债务**  
+   修复或显式豁免既有 8 个无关 Rust 失败用例；确认 CI 绿后再合入主干。
+
+4. **（可选）P0 体验补丁**  
+   保存时格式化开关；server 回推 applyEdit oneshot；树「在终端中打开」/ Git ignore（可与 M3 终端 dock 一并做）。
+
+5. **进入 M3 布局与终端（P1）**  
+   预览/固定 tab → 面包屑 → 二分屏（共享 buffer）→ 底部集成终端（cwd 联动）→ Run/Tasks。
+
+6. **再排 M4 / M5**  
+   调用/类型层级、用法高亮、inlay hints、Git gutter/blame、状态栏分段、持久化；其后本地历史 / AI 入口 / 语义高亮 / 远程 spike。
 
 ---
 
