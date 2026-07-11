@@ -53,6 +53,12 @@ thiserror = "2"
 reqwest = { version = "0.13", features = ["rustls", "json", "stream", "query", "socks", "blocking"], default-features = false }
 heck = "0.5"
 regex = "1"
+# Code Workspace Find in Files. These are the same traversal and matching
+# primitives used by ripgrep, including gitignore support and binary detection.
+ignore = "0.4"
+grep-matcher = "0.1"
+grep-regex = "0.1"
+grep-searcher = "0.1"
 # Pure-Rust jq engine for the `read_capture` `jq` op — no external `jq` binary,
 # so it works on the Windows Taomni host too. Versions are mutually compatible
 # (the embedding chains defs/funs from all three; see agent/capture/reduce.rs).

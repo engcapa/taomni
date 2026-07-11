@@ -34,6 +34,7 @@ mod vnc;
 mod voice;
 mod windowing;
 mod workspace;
+mod workspace_search;
 mod wsl;
 
 use state::AppState;
@@ -119,6 +120,7 @@ pub fn run() {
                 ai_ctx,
                 lanchat_state,
             ));
+            app.manage(workspace_search::WorkspaceSearchState::default());
 
             let handle_for_reaper = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -414,6 +416,8 @@ pub fn run() {
             workspace::workspace_create_dir,
             workspace::workspace_delete_path,
             workspace::workspace_rename_path,
+            workspace_search::workspace_search_start,
+            workspace_search::workspace_search_cancel,
             lsp::lsp_list_presets,
             lsp::lsp_detect_servers,
             lsp::lsp_document_status,
