@@ -147,6 +147,26 @@ pub struct LspLocationsResult {
     pub locations: Vec<LspLocation>,
 }
 
+/// One entry of a flattened `textDocument/documentSymbol` tree; `depth`
+/// preserves the hierarchy for indented rendering.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspDocumentSymbol {
+    pub name: String,
+    pub detail: Option<String>,
+    pub kind: u32,
+    pub depth: u32,
+    pub range: LspRange,
+    pub selection_range: LspRange,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspDocumentSymbolsResult {
+    pub status: LspDocumentStatus,
+    pub symbols: Vec<LspDocumentSymbol>,
+}
+
 #[derive(Clone, Debug)]
 struct DetectedLanguage {
     preset_id: String,
@@ -1096,6 +1116,62 @@ async fn lsp_location_request(
     })
 }
 
+#[tauri::command]
+pub async fn lsp_document_symbols(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspDocumentSymbolsResult, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let session = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session,
+        None => {
+            let status = state
+                .lsp
+                .document_status(
+                    &document,
+                    server_command_id.as_deref(),
+                    custom_server_command.as_ref(),
+                )
+                .await;
+            return Ok(LspDocumentSymbolsResult {
+                status,
+                symbols: Vec::new(),
+            });
+        }
+    };
+    let result = session
+        .request(
+            "textDocument/documentSymbol",
+            json!({ "textDocument": { "uri": document.uri } }),
+        )
+        .await
+        .unwrap_or(Value::Null);
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    let mut symbols = Vec::new();
+    collect_document_symbols(&result, 0, &mut symbols);
+    Ok(LspDocumentSymbolsResult { status, symbols })
+}
+
 fn resolve_document(
     workspace_id: String,
     root_path: Option<String>,
@@ -1387,6 +1463,65 @@ fn markup_to_string(value: &Value) -> Option<String> {
         return Some(format!("```{text}\n{value}\n```"));
     }
     None
+}
+
+/// Flattens a `textDocument/documentSymbol` response. Servers reply with
+/// either hierarchical `DocumentSymbol[]` (has `selectionRange`/`children`)
+/// or flat `SymbolInformation[]` (has `location`); both collapse into the
+/// same depth-annotated list.
+fn collect_document_symbols(value: &Value, depth: u32, out: &mut Vec<LspDocumentSymbol>) {
+    let Some(items) = value.as_array() else {
+        return;
+    };
+    for item in items {
+        let Some(name) = item.get("name").and_then(Value::as_str) else {
+            continue;
+        };
+        let kind = item
+            .get("kind")
+            .and_then(Value::as_u64)
+            .and_then(|kind| u32::try_from(kind).ok())
+            .unwrap_or(0);
+        if item.get("selectionRange").is_some() {
+            let Some(range) = item.get("range").and_then(parse_range) else {
+                continue;
+            };
+            let Some(selection_range) = item.get("selectionRange").and_then(parse_range) else {
+                continue;
+            };
+            out.push(LspDocumentSymbol {
+                name: name.to_string(),
+                detail: item
+                    .get("detail")
+                    .and_then(Value::as_str)
+                    .filter(|detail| !detail.is_empty())
+                    .map(ToString::to_string),
+                kind,
+                depth,
+                range,
+                selection_range,
+            });
+            if let Some(children) = item.get("children") {
+                collect_document_symbols(children, depth + 1, out);
+            }
+        } else if let Some(location) = item.get("location") {
+            let Some(range) = location.get("range").and_then(parse_range) else {
+                continue;
+            };
+            out.push(LspDocumentSymbol {
+                name: name.to_string(),
+                detail: item
+                    .get("containerName")
+                    .and_then(Value::as_str)
+                    .filter(|container| !container.is_empty())
+                    .map(ToString::to_string),
+                kind,
+                depth,
+                range: range.clone(),
+                selection_range: range,
+            });
+        }
+    }
 }
 
 fn parse_locations(value: &Value) -> Vec<LspLocation> {
@@ -1685,4 +1820,77 @@ pub fn lsp_presets() -> Vec<LspServerPreset> {
             )],
         },
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn flattens_hierarchical_document_symbols_with_depth() {
+        let response = json!([
+            {
+                "name": "OpenFileState",
+                "detail": "",
+                "kind": 11,
+                "range": { "start": { "line": 4, "character": 0 }, "end": { "line": 8, "character": 1 } },
+                "selectionRange": { "start": { "line": 4, "character": 10 }, "end": { "line": 4, "character": 23 } },
+                "children": [
+                    {
+                        "name": "path",
+                        "detail": "string",
+                        "kind": 7,
+                        "range": { "start": { "line": 5, "character": 2 }, "end": { "line": 5, "character": 15 } },
+                        "selectionRange": { "start": { "line": 5, "character": 2 }, "end": { "line": 5, "character": 6 } }
+                    }
+                ]
+            }
+        ]);
+
+        let mut symbols = Vec::new();
+        collect_document_symbols(&response, 0, &mut symbols);
+
+        assert_eq!(symbols.len(), 2);
+        assert_eq!(symbols[0].name, "OpenFileState");
+        assert_eq!(symbols[0].depth, 0);
+        assert_eq!(symbols[0].detail, None);
+        assert_eq!(symbols[0].selection_range.start.character, 10);
+        assert_eq!(symbols[1].name, "path");
+        assert_eq!(symbols[1].depth, 1);
+        assert_eq!(symbols[1].detail.as_deref(), Some("string"));
+    }
+
+    #[test]
+    fn accepts_flat_symbol_information_responses() {
+        let response = json!([
+            {
+                "name": "workspace_read_file",
+                "kind": 12,
+                "containerName": "workspace",
+                "location": {
+                    "uri": "file:///repo/src/workspace.rs",
+                    "range": { "start": { "line": 3, "character": 0 }, "end": { "line": 12, "character": 1 } }
+                }
+            },
+            { "name": "missing range" }
+        ]);
+
+        let mut symbols = Vec::new();
+        collect_document_symbols(&response, 0, &mut symbols);
+
+        assert_eq!(symbols.len(), 1);
+        assert_eq!(symbols[0].name, "workspace_read_file");
+        assert_eq!(symbols[0].kind, 12);
+        assert_eq!(symbols[0].detail.as_deref(), Some("workspace"));
+        assert_eq!(symbols[0].selection_range.start.line, 3);
+    }
+
+    #[test]
+    fn ignores_null_and_non_array_responses() {
+        let mut symbols = Vec::new();
+        collect_document_symbols(&Value::Null, 0, &mut symbols);
+        collect_document_symbols(&json!({ "unexpected": true }), 0, &mut symbols);
+        assert!(symbols.is_empty());
+    }
 }

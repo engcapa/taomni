@@ -429,6 +429,7 @@ pub fn run() {
             lsp::lsp_hover,
             lsp::lsp_definition,
             lsp::lsp_references,
+            lsp::lsp_document_symbols,
             windowing::open_detached_window,
             windowing::close_current_detached_window,
             appearance::list_system_fonts,

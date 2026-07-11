@@ -66,6 +66,7 @@ import {
   lspChangeDocument,
   lspCloseDocument,
   lspDetectServers,
+  lspDocumentSymbols,
   lspGetDiagnostics,
   lspDefinition,
   lspHover,
@@ -76,6 +77,7 @@ import {
   type LspDiagnostic,
   type LspDocumentDescriptor,
   type LspDocumentStatus,
+  type LspDocumentSymbol,
   type LspLocation,
   type LspPosition,
   type LspServerStatus,
@@ -110,6 +112,7 @@ import {
 import { FindInFilesPanel } from "./workspace/panels/FindInFilesPanel";
 import { SearchEverywhere, type GoToFileItem } from "./workspace/SearchEverywhere";
 import { RecentFilesPopup, type RecentFileEntry } from "./workspace/RecentFilesPopup";
+import { StructurePopup } from "./workspace/StructurePopup";
 import { createDoubleShiftDetector } from "./workspace/doubleShift";
 import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
 import type {
@@ -775,6 +778,10 @@ export function CodeWorkspaceTab({
   const [recentEntries, setRecentEntries] = useState<RecentFileEntry[]>([]);
   const [recentAdvanceNonce, setRecentAdvanceNonce] = useState(0);
   const [navCan, setNavCan] = useState({ back: false, forward: false });
+  const [structureOpen, setStructureOpen] = useState(false);
+  const [structureSymbols, setStructureSymbols] = useState<LspDocumentSymbol[]>([]);
+  const [structureLoading, setStructureLoading] = useState(false);
+  const [structureUnavailable, setStructureUnavailable] = useState<string | null>(null);
   const [lspCommandPrefs, setLspCommandPrefs] = useState<Record<string, string>>(() => readLspCommandPrefs());
   const [lspCustomCommands, setLspCustomCommands] = useState<Record<string, LspCustomCommandConfig>>(() => readLspCustomCommands());
   const [revealTarget, setRevealTarget] = useState<EditorRevealTarget | null>(null);
@@ -2355,6 +2362,61 @@ export function CodeWorkspaceTab({
     [openFile, revealEditorLocation],
   );
 
+  const structureFileRef = useRef<string | null>(null);
+
+  const openStructurePopup = useCallback(async () => {
+    const file = activeKey ? openFilesRef.current[activeKey] : null;
+    if (!file || file.loading) return;
+    structureFileRef.current = file.key;
+    setStructureSymbols([]);
+    setStructureUnavailable(null);
+    setStructureLoading(true);
+    setStructureOpen(true);
+    const descriptor = lspDescriptorForFile(file);
+    if (!descriptor) {
+      setStructureLoading(false);
+      setStructureUnavailable("No language service for this file");
+      return;
+    }
+    try {
+      const result = await lspDocumentSymbols(descriptor);
+      updateLspStatusForFile(file, result.status);
+      if (structureFileRef.current !== file.key) return;
+      setStructureSymbols(result.symbols);
+      setStructureUnavailable(
+        result.symbols.length === 0 && !result.status.active
+          ? result.status.error ?? "Language server is not running for this file"
+          : null,
+      );
+    } catch (err) {
+      if (structureFileRef.current === file.key) setStructureUnavailable(errorMessage(err));
+    } finally {
+      if (structureFileRef.current === file.key) setStructureLoading(false);
+    }
+  }, [activeKey, lspDescriptorForFile, updateLspStatusForFile]);
+
+  const pickStructureSymbol = useCallback(
+    (symbol: LspDocumentSymbol) => {
+      setStructureOpen(false);
+      const key = structureFileRef.current;
+      if (key) revealEditorLocation(key, symbol.selectionRange);
+    },
+    [revealEditorLocation],
+  );
+
+  useEffect(() => {
+    if (!visible) return;
+    const handleStructureKey = (event: KeyboardEvent) => {
+      if (!event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) return;
+      if (event.key !== "F12") return;
+      event.preventDefault();
+      event.stopPropagation();
+      void openStructurePopup();
+    };
+    window.addEventListener("keydown", handleStructureKey, true);
+    return () => window.removeEventListener("keydown", handleStructureKey, true);
+  }, [openStructurePopup, visible]);
+
   const getLspHover = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
       const descriptor = lspDescriptorForFile(file);
@@ -3303,6 +3365,15 @@ export function CodeWorkspaceTab({
         advanceNonce={recentAdvanceNonce}
         onClose={() => setRecentFilesOpen(false)}
         onPick={pickRecentFile}
+      />
+      <StructurePopup
+        open={structureOpen}
+        fileTitle={activeFile?.title ?? null}
+        symbols={structureSymbols}
+        loading={structureLoading}
+        unavailableReason={structureUnavailable}
+        onClose={() => setStructureOpen(false)}
+        onPick={pickStructureSymbol}
       />
       {treeContextMenu.render}
     </div>

@@ -37,6 +37,7 @@ const lspMocks = vi.hoisted(() => ({
   lspHover: vi.fn(),
   lspDefinition: vi.fn(),
   lspReferences: vi.fn(),
+  lspDocumentSymbols: vi.fn(),
 }));
 
 const ipcMocks = vi.hoisted(() => ({
@@ -186,6 +187,8 @@ describe("CodeWorkspaceTab", () => {
     lspMocks.lspHover.mockReset();
     lspMocks.lspDefinition.mockReset();
     lspMocks.lspReferences.mockReset();
+    lspMocks.lspDocumentSymbols.mockReset();
+    lspMocks.lspDocumentSymbols.mockResolvedValue({ status: documentStatus(), symbols: [] });
     ipcMocks.selectFilePath.mockReset();
     ipcMocks.selectFolderPath.mockReset();
     gitMocks.gitSnapshot.mockReset();
@@ -820,6 +823,47 @@ describe("CodeWorkspaceTab", () => {
     await waitFor(() =>
       expect(screen.getByTitle("app / a.ts").closest("div")).toHaveAttribute("data-active"));
     expect(screen.queryByTestId("code-workspace-recent-files")).not.toBeInTheDocument();
+  });
+
+  it("opens the file structure popup with Ctrl+F12 and jumps to a symbol", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-structure",
+      workspaceInstanceId: "instance-structure",
+      name: "Structure",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "a.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("a.ts", "a.ts")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("a.ts", "const x = 1;"));
+    lspMocks.lspDocumentSymbols.mockResolvedValue({
+      status: documentStatus({ active: true, available: true }),
+      symbols: [
+        {
+          name: "openFile",
+          detail: "(path: string) => Promise<void>",
+          kind: 12,
+          depth: 0,
+          range: { start: { line: 13, character: 0 }, end: { line: 16, character: 1 } },
+          selectionRange: { start: { line: 13, character: 8 }, end: { line: 13, character: 16 } },
+        },
+      ],
+    });
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / a.ts");
+    // The tab strip renders while the file is still loading; wait for the
+    // loaded file header (size text) before invoking the structure popup.
+    await screen.findByText("12 B");
+
+    fireEvent.keyDown(window, { key: "F12", ctrlKey: true });
+    const popup = await screen.findByTestId("code-workspace-structure-popup");
+    expect(await within(popup).findByText("openFile")).toBeInTheDocument();
+    expect(lspMocks.lspDocumentSymbols).toHaveBeenCalled();
+
+    fireEvent.keyDown(screen.getByLabelText("File structure"), { key: "Enter" });
+    expect(screen.queryByTestId("code-workspace-structure-popup")).not.toBeInTheDocument();
   });
 
   it("offers tree context menu actions: copy path and scoped search", async () => {

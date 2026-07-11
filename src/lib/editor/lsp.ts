@@ -95,6 +95,20 @@ export interface LspLocationsResult {
   locations: LspLocation[];
 }
 
+export interface LspDocumentSymbol {
+  name: string;
+  detail: string | null;
+  kind: number;
+  depth: number;
+  range: LspRange;
+  selectionRange: LspRange;
+}
+
+export interface LspDocumentSymbolsResult {
+  status: LspDocumentStatus;
+  symbols: LspDocumentSymbol[];
+}
+
 export interface LspDocumentDescriptor {
   workspaceId: string;
   rootPath?: string | null;
@@ -175,6 +189,12 @@ export function lspGetDiagnostics(
   descriptor: LspDocumentDescriptor,
 ): Promise<LspDiagnosticsResult> {
   return invoke<LspDiagnosticsResult>("lsp_get_diagnostics", documentArgs(descriptor));
+}
+
+export function lspDocumentSymbols(
+  descriptor: LspDocumentDescriptor,
+): Promise<LspDocumentSymbolsResult> {
+  return invoke<LspDocumentSymbolsResult>("lsp_document_symbols", documentArgs(descriptor));
 }
 
 export function lspHover(
