@@ -28,6 +28,7 @@ import {
   closeBracketsKeymap,
 } from "@codemirror/autocomplete";
 import { bracketMatching, foldGutter, indentOnInput } from "@codemirror/language";
+import { openSearchPanel, search, searchKeymap } from "@codemirror/search";
 import { renderFormatted } from "../../../lib/chat/renderFormatted";
 import { codeViewExtensions } from "../../../lib/codeViewTheme";
 import type {
@@ -35,6 +36,7 @@ import type {
   LspPosition,
 } from "../../../lib/editor/lsp";
 import { languageForPath } from "../../git/diffLanguage";
+import { createWorkspaceSearchPanel, WORKSPACE_SEARCH_STYLE } from "./editorSearchPanel";
 
 interface EditorRevealTarget {
   line: number;
@@ -213,6 +215,15 @@ export function CodeMirrorHost({
       onSaveRef.current();
       return true;
     };
+    const openReplacePanel = (view: EditorView) => {
+      openSearchPanel(view);
+      window.requestAnimationFrame(() => {
+        const field = view.dom.querySelector<HTMLInputElement>('.cm-workspace-search-input[name="replace"]');
+        field?.focus();
+        field?.select();
+      });
+      return true;
+    };
     const state = EditorState.create({
       doc,
       extensions: [
@@ -232,16 +243,20 @@ export function CodeMirrorHost({
         closeBrackets(),
         indentOnInput(),
         autocompletion(),
+        search({ top: true, createPanel: createWorkspaceSearchPanel }),
         languageCompartment.current.of([]),
         diagnosticsCompartment.current.of(lspDiagnosticsExtension(diagnostics)),
         ...lspInteractionExtensions(onHoverRef, onDefinitionRef, onReferencesRef),
         ...codeViewExtensions(),
         WORKSPACE_EDITOR_STYLE,
         LSP_EDITOR_STYLE,
+        WORKSPACE_SEARCH_STYLE,
         keymap.of([
           { key: "Mod-s", run: saveHandler },
+          { key: "Mod-r", run: openReplacePanel },
           { key: "Shift-Alt-ArrowUp", run: addCursorAbove },
           { key: "Shift-Alt-ArrowDown", run: addCursorBelow },
+          ...searchKeymap,
           ...closeBracketsKeymap,
           ...defaultKeymap,
           ...historyKeymap,

@@ -1,0 +1,96 @@
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { CodeMirrorHost } from "./CodeMirrorHost";
+
+function renderEditor(doc: string, onChange = vi.fn()) {
+  const result = render(
+    <CodeMirrorHost
+      path="src/example.ts"
+      doc={doc}
+      visible
+      diagnostics={[]}
+      reveal={null}
+      onChange={onChange}
+      onSave={vi.fn()}
+      onHover={vi.fn(async () => null)}
+      onDefinition={vi.fn(async () => false)}
+      onReferences={vi.fn(async () => undefined)}
+    />,
+  );
+  const content = result.container.querySelector<HTMLElement>(".cm-content");
+  expect(content).not.toBeNull();
+  return { ...result, content: content!, onChange };
+}
+
+describe("CodeMirrorHost search", () => {
+  afterEach(() => cleanup());
+
+  it("opens the themed find panel and navigates matches", async () => {
+    const { content } = renderEditor("alpha beta alpha");
+
+    fireEvent.keyDown(content, { key: "f", code: "KeyF", ctrlKey: true });
+
+    const search = await screen.findByRole("textbox", { name: "Find" });
+    fireEvent.input(search, { target: { value: "alpha" } });
+    expect(screen.getByText("2 matches")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next match" }));
+    expect(screen.getByText("1 / 2")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous match" }));
+    expect(screen.getByText("2 / 2")).toBeInTheDocument();
+  });
+
+  it("applies case, whole-word, and regular-expression search options", async () => {
+    const { content } = renderEditor("Alpha alpha alphabet ALPHA");
+    fireEvent.keyDown(content, { key: "f", code: "KeyF", ctrlKey: true });
+
+    const search = await screen.findByRole("textbox", { name: "Find" });
+    fireEvent.input(search, { target: { value: "alpha" } });
+    expect(screen.getByText("4 matches")).toBeInTheDocument();
+
+    const wholeWord = screen.getByRole("button", { name: "Match whole word" });
+    fireEvent.click(wholeWord);
+    expect(wholeWord).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("3 matches")).toBeInTheDocument();
+
+    const matchCase = screen.getByRole("button", { name: "Match case" });
+    fireEvent.click(matchCase);
+    expect(matchCase).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("1 matches")).toBeInTheDocument();
+
+    const regexp = screen.getByRole("button", { name: "Use regular expression" });
+    fireEvent.click(regexp);
+    fireEvent.input(search, { target: { value: "[" } });
+    expect(screen.getByText("Invalid pattern")).toBeInTheDocument();
+  });
+
+  it("replaces all matches and reports the updated buffer", async () => {
+    const onChange = vi.fn();
+    const { content } = renderEditor("alpha beta alpha", onChange);
+    fireEvent.keyDown(content, { key: "f", code: "KeyF", ctrlKey: true });
+
+    fireEvent.input(await screen.findByRole("textbox", { name: "Find" }), {
+      target: { value: "alpha" },
+    });
+    fireEvent.input(screen.getByRole("textbox", { name: "Replace" }), {
+      target: { value: "omega" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Replace all matches" }));
+
+    await waitFor(() => {
+      expect(onChange).toHaveBeenLastCalledWith("omega beta omega");
+    });
+    expect(screen.getByText("0 matches")).toBeInTheDocument();
+  });
+
+  it("opens replacement mode with Ctrl+R and closes with Escape", async () => {
+    const { content } = renderEditor("alpha");
+    fireEvent.keyDown(content, { key: "r", code: "KeyR", ctrlKey: true });
+
+    const replace = await screen.findByRole("textbox", { name: "Replace" });
+    await waitFor(() => expect(replace).toHaveFocus());
+    fireEvent.keyDown(replace, { key: "Escape" });
+    expect(screen.queryByTestId("code-workspace-editor-search")).not.toBeInTheDocument();
+  });
+});
