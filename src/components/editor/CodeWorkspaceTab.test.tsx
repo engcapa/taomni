@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import mermaid from "mermaid";
 import type { ComponentProps } from "react";
 import { useAppStore } from "../../stores/appStore";
+import { selectCodeWorkspaceUi, useCodeWorkspaceStore } from "../../stores/codeWorkspaceStore";
 import { DEFAULT_CODE_VIEW_PROFILE, saveCodeViewProfile } from "../../lib/codeViewProfile";
 import type { CodeWorkspaceTabInfo } from "../../types";
 import type {
@@ -1107,5 +1108,35 @@ describe("CodeWorkspaceTab", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Find in Directory..." }));
     expect(screen.getByRole("tab", { name: /Search/, selected: true })).toBeInTheDocument();
     expect(screen.getByLabelText("Include globs")).toHaveValue("src/**");
+  });
+
+  it("opens a shared buffer in a resizable editor split and collapses it", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-split",
+      workspaceInstanceId: "instance-split",
+      name: "Split",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "export const value = 1;"));
+
+    renderWorkspace(workspace);
+    await screen.findAllByText("main.ts");
+    fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-split").splitOrientation,
+    ).toBe("vertical"));
+    expect(await screen.findByTestId("code-workspace-editor-split")).toBeInTheDocument();
+    expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2);
+    const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-split");
+    expect(ui.editorGroups.primary.activeKey).toBe(ui.editorGroups.secondary.activeKey);
+    expect(Object.keys(ui.openFiles)).toHaveLength(1);
+
+    fireEvent.click(screen.getByTestId("code-workspace-split-close"));
+    await waitFor(() => expect(screen.queryByTestId("code-workspace-editor-split")).not.toBeInTheDocument());
+    expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(1);
   });
 });

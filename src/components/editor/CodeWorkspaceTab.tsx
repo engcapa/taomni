@@ -20,6 +20,8 @@ import {
   Save,
   BookOpen,
   PanelRight,
+  Columns2,
+  Rows2,
   Search,
   X,
   ZoomIn,
@@ -89,6 +91,7 @@ import {
   type BottomDockTabId,
   type CodeWorkspaceEditorGroupState,
   type EditorGroupId,
+  type EditorSplitOrientation,
 } from "../../stores/codeWorkspaceStore";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { writeText } from "../../lib/clipboard";
@@ -159,6 +162,33 @@ export interface CodeWorkspaceGitManagerPayload {
     workspaceId?: string;
     roots: WorkspaceGitRoot[];
     activeRepoRoot: string | null;
+}
+
+function breadcrumbSegmentsForFile(
+  file: OpenFileState,
+  roots: CodeWorkspaceRootInfo[],
+): BreadcrumbPathSegment[] {
+  if (file.ref.kind === "root") {
+    const rootId = file.ref.rootId;
+    const root = roots.find((candidate) => candidate.id === rootId);
+    if (!root) return [{ label: file.title, path: file.ref.path, kind: "file" }];
+    const parts = file.ref.path.split("/").filter(Boolean);
+    let path = "";
+    return [
+      { label: root.name, path: "", kind: "root" },
+      ...parts.map((part, index): BreadcrumbPathSegment => {
+        path = path ? `${path}/${part}` : part;
+        return { label: part, path, kind: index === parts.length - 1 ? "file" : "directory" };
+      }),
+    ];
+  }
+  const normalized = normalizeFsPath(file.ref.path);
+  const parts = normalized.split("/").filter(Boolean);
+  let path = normalized.startsWith("/") ? "/" : "";
+  return parts.map((part, index): BreadcrumbPathSegment => {
+    path = path === "/" ? `/${part}` : path ? `${path}/${part}` : part;
+    return { label: part, path, kind: index === parts.length - 1 ? "file" : "directory" };
+  });
 }
 
 import {
@@ -244,6 +274,7 @@ export function CodeWorkspaceTab({
   const updateStoreExpandedDirKeys = useCodeWorkspaceStore((s) => s.updateExpandedDirKeys);
   const updateStoreEditorGroup = useCodeWorkspaceStore((s) => s.updateEditorGroup);
   const setStoreActiveEditorGroup = useCodeWorkspaceStore((s) => s.setActiveEditorGroup);
+  const setStoreSplitOrientation = useCodeWorkspaceStore((s) => s.setSplitOrientation);
   const seedTreeExpandIfEmpty = useCodeWorkspaceStore((s) => s.seedTreeExpandIfEmpty);
   // Ensure before first read so the selector always hits a real map entry.
   ensureWorkspaceUi(workspaceInstanceId);
@@ -294,6 +325,7 @@ export function CodeWorkspaceTab({
     activeKey,
     editorGroups,
     activeEditorGroupId,
+    splitOrientation,
     markdownModes,
     treeFilter,
     treeViewMode,
@@ -484,8 +516,14 @@ export function CodeWorkspaceTab({
   const [gitSnapshots, setGitSnapshots] = useState<Record<string, WorkspaceGitSnapshotState>>({});
   const [navCan, setNavCan] = useState({ back: false, forward: false });
   const [revealTarget, setRevealTarget] = useState<EditorRevealTarget | null>(null);
-  const [cursorPosition, setCursorPosition] = useState<LspPosition>({ line: 0, character: 0 });
-  const [breadcrumbSymbols, setBreadcrumbSymbols] = useState<LspDocumentSymbol[]>([]);
+  const [cursorPositions, setCursorPositions] = useState<Record<EditorGroupId, LspPosition>>({
+    primary: { line: 0, character: 0 },
+    secondary: { line: 0, character: 0 },
+  });
+  const [breadcrumbSymbolsByGroup, setBreadcrumbSymbolsByGroup] = useState<Record<EditorGroupId, LspDocumentSymbol[]>>({
+    primary: [],
+    secondary: [],
+  });
   const [referencesResult, setReferencesResult] = useState<ReferencesResultState>({
     loading: false,
     origin: null,
@@ -517,6 +555,7 @@ export function CodeWorkspaceTab({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const treePaneRef = useRef<HTMLElement | null>(null);
   const editorPaneRef = useRef<HTMLElement | null>(null);
+  const inactiveEditorPaneRef = useRef<HTMLElement | null>(null);
   const {
     serverStatuses: lspServerStatuses,
     commandPrefs: lspCommandPrefs,
@@ -1789,41 +1828,77 @@ export function CodeWorkspaceTab({
     for (const key of keys) await closeFile(key, groupId);
   }, [closeFile]);
 
+  const splitEditor = useCallback((
+    orientation: EditorSplitOrientation,
+    key = activeKey,
+    sourceGroupId = activeEditorGroupId,
+  ) => {
+    if (!key) return;
+    const file = openFilesRef.current[key];
+    if (!file) return;
+    const targetGroupId: EditorGroupId = sourceGroupId === "primary" ? "secondary" : "primary";
+    void openFile(file.ref, { groupId: targetGroupId });
+    setStoreSplitOrientation(workspaceInstanceId, orientation);
+  }, [activeEditorGroupId, activeKey, openFile, setStoreSplitOrientation, workspaceInstanceId]);
+
+  const closeSplit = useCallback(() => {
+    const current = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+    const primary = current.editorGroups.primary;
+    const secondary = current.editorGroups.secondary;
+    const mergedOrder = [...primary.openOrder];
+    for (const key of secondary.openOrder) {
+      if (!mergedOrder.includes(key)) mergedOrder.push(key);
+    }
+    updateEditorGroup("primary", {
+      ...primary,
+      openOrder: mergedOrder,
+      activeKey: current.activeEditorGroupId === "secondary"
+        ? secondary.activeKey ?? primary.activeKey
+        : primary.activeKey,
+      pinnedKeys: [...new Set([...primary.pinnedKeys, ...secondary.pinnedKeys])],
+      previewKey: primary.previewKey ?? secondary.previewKey,
+    });
+    updateEditorGroup("secondary", {
+      id: "secondary",
+      openOrder: [],
+      activeKey: null,
+      previewKey: null,
+      pinnedKeys: [],
+    });
+    setStoreSplitOrientation(workspaceInstanceId, null);
+    activateEditorGroup("primary");
+  }, [activateEditorGroup, setStoreSplitOrientation, updateEditorGroup, workspaceInstanceId]);
+
+  useEffect(() => {
+    if (!splitOrientation) return;
+    const primary = editorGroups.primary;
+    const secondary = editorGroups.secondary;
+    if (primary.openOrder.length > 0 && secondary.openOrder.length > 0) return;
+    if (primary.openOrder.length === 0 && secondary.openOrder.length > 0) {
+      updateEditorGroup("primary", { ...secondary, id: "primary" });
+      updateEditorGroup("secondary", {
+        id: "secondary",
+        openOrder: [],
+        activeKey: null,
+        previewKey: null,
+        pinnedKeys: [],
+      });
+    }
+    setStoreSplitOrientation(workspaceInstanceId, null);
+    activateEditorGroup("primary");
+  }, [activateEditorGroup, editorGroups, setStoreSplitOrientation, splitOrientation, updateEditorGroup, workspaceInstanceId]);
+
   const activeFile = activeKey ? openFiles[activeKey] ?? null : null;
   const activeLspState = activeKey ? lspFiles[activeKey] ?? null : null;
   const activeCapabilities = activeLspState?.status?.capabilities ?? null;
-  const activeMarkdownMode = activeFile && isMarkdownPath(activeFile.languagePath)
-    ? markdownModes[activeFile.key] ?? "edit"
-    : "edit";
   const breadcrumbPathSegments = useMemo<BreadcrumbPathSegment[]>(() => {
-    if (!activeFile) return [];
-    if (activeFile.ref.kind === "root") {
-      const rootId = activeFile.ref.rootId;
-      const root = roots.find((candidate) => candidate.id === rootId);
-      if (!root) return [{ label: activeFile.title, path: activeFile.ref.path, kind: "file" }];
-      const parts = activeFile.ref.path.split("/").filter(Boolean);
-      let path = "";
-      return [
-        { label: root.name, path: "", kind: "root" },
-        ...parts.map((part, index): BreadcrumbPathSegment => {
-          path = path ? `${path}/${part}` : part;
-          return { label: part, path, kind: index === parts.length - 1 ? "file" : "directory" };
-        }),
-      ];
-    }
-    const normalized = normalizeFsPath(activeFile.ref.path);
-    const parts = normalized.split("/").filter(Boolean);
-    let path = normalized.startsWith("/") ? "/" : "";
-    return parts.map((part, index): BreadcrumbPathSegment => {
-      path = path === "/" ? `/${part}` : path ? `${path}/${part}` : part;
-      return { label: part, path, kind: index === parts.length - 1 ? "file" : "directory" };
-    });
+    return activeFile ? breadcrumbSegmentsForFile(activeFile, roots) : [];
   }, [activeFile, roots]);
 
   useEffect(() => {
     let cancelled = false;
     if (!activeFile || activeFile.loading || !activeCapabilities?.documentSymbol) {
-      setBreadcrumbSymbols([]);
+      setBreadcrumbSymbolsByGroup((current) => ({ ...current, [activeEditorGroupId]: [] }));
       return () => { cancelled = true; };
     }
     const descriptor = lspDescriptorForFile(activeFile);
@@ -1832,17 +1907,22 @@ export function CodeWorkspaceTab({
       void lspDocumentSymbols(descriptor).then((result) => {
         if (!cancelled) {
           updateLspStatusForFile(activeFile, result.status);
-          setBreadcrumbSymbols(result.symbols);
+          setBreadcrumbSymbolsByGroup((current) => ({
+            ...current,
+            [activeEditorGroupId]: result.symbols,
+          }));
         }
       }).catch(() => {
-        if (!cancelled) setBreadcrumbSymbols([]);
+        if (!cancelled) {
+          setBreadcrumbSymbolsByGroup((current) => ({ ...current, [activeEditorGroupId]: [] }));
+        }
       });
     }, 200);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [activeCapabilities?.documentSymbol, activeFile, lspDescriptorForFile, updateLspStatusForFile]);
+  }, [activeCapabilities?.documentSymbol, activeEditorGroupId, activeFile, lspDescriptorForFile, updateLspStatusForFile]);
   const activeRootId = activeFile?.ref.kind === "root" ? activeFile.ref.rootId : null;
   const activeRoot = activeRootId ? roots.find((root) => root.id === activeRootId) ?? null : null;
   const activeGitRoot = activeRoot && activeFile?.ref.kind === "root"
@@ -1892,10 +1972,6 @@ export function CodeWorkspaceTab({
     return () => window.clearTimeout(timer);
   }, [activeFile, syncLspDocument, visible]);
 
-  const setActiveMarkdownMode = useCallback((mode: MarkdownViewMode) => {
-    if (!activeFile) return;
-    setMarkdownModes((current) => ({ ...current, [activeFile.key]: mode }));
-  }, [activeFile]);
   const openMarkdownHref = useCallback(
     (href: string) => {
       if (!activeFile || isExternalHref(href)) return false;
@@ -2936,7 +3012,6 @@ export function CodeWorkspaceTab({
     () => openOrder.map((key) => openFiles[key]).filter((file): file is OpenFileState => !!file?.dirty),
     [openFiles, openOrder],
   );
-  const activeDiagnostics = activeLspState?.diagnostics ?? [];
   const problemFiles = useMemo<ProblemFileGroup[]>(
     () => openOrder.flatMap((key) => {
       const file = openFiles[key];
@@ -3049,6 +3124,120 @@ export function CodeWorkspaceTab({
     return () => setTabCodeWorkspaceContext(tabId, null);
   }, [setTabCodeWorkspaceContext, tabId]);
 
+  const renderEditorGroup = (groupId: EditorGroupId) => {
+    const group = editorGroups[groupId];
+    const groupFile = group.activeKey ? openFiles[group.activeKey] ?? null : null;
+    const groupLspState = group.activeKey ? lspFiles[group.activeKey] ?? null : null;
+    const groupDiagnostics = groupLspState?.diagnostics ?? [];
+    const groupCapabilities = groupLspState?.status?.capabilities ?? null;
+    const groupMarkdownMode = groupFile && isMarkdownPath(groupFile.languagePath)
+      ? markdownModes[groupFile.key] ?? "edit"
+      : "edit";
+    const groupBreadcrumbSegments = groupId === activeEditorGroupId
+      ? breadcrumbPathSegments
+      : groupFile ? breadcrumbSegmentsForFile(groupFile, roots) : [];
+
+    return (
+      <EditorGroup
+        groupId={groupId}
+        workspaceInstanceId={`${workspaceInstanceId}-${groupId}`}
+        visible={visible}
+        openOrder={group.openOrder}
+        openFiles={openFiles}
+        activeKey={group.activeKey}
+        previewKey={group.previewKey}
+        pinnedKeys={group.pinnedKeys}
+        activeFile={groupFile}
+        activeMarkdownMode={groupMarkdownMode}
+        activeDiagnostics={groupDiagnostics}
+        activeCapabilities={groupCapabilities}
+        activeLspSyncing={!!groupLspState?.syncing}
+        lspStatusPill={<LspStatusPill state={groupLspState} diagnostics={groupDiagnostics} />}
+        breadcrumbs={groupFile ? (
+          <Breadcrumbs
+            pathSegments={groupBreadcrumbSegments}
+            symbols={breadcrumbSymbolsByGroup[groupId]}
+            position={cursorPositions[groupId]}
+            onPathClick={(segment) => {
+              if (groupFile.ref.kind !== "root") return;
+              const rootId = groupFile.ref.rootId;
+              if (segment.kind === "root") {
+                setSelected({ kind: "root", rootId });
+              } else if (segment.kind === "directory") {
+                setSelected({ kind: "dir", rootId, path: segment.path });
+                setExpandedDirs((current) => new Set(current).add(rootDirKey(rootId, segment.path)));
+                void loadDir(rootId, segment.path);
+              } else {
+                setSelected({ kind: "file", ref: groupFile.ref });
+              }
+            }}
+            onSymbolClick={(symbol) => revealEditorLocation(groupFile.key, symbol.selectionRange)}
+          />
+        ) : null}
+        revealTarget={revealTarget}
+        editorPaneRef={groupId === activeEditorGroupId ? editorPaneRef : inactiveEditorPaneRef}
+        editorPaneStyle={editorPaneStyle}
+        onActivate={(key) => {
+          updateEditorGroup(groupId, (current) => ({ ...current, activeKey: key }));
+          activateEditorGroup(groupId);
+        }}
+        onActivateGroup={() => activateEditorGroup(groupId)}
+        onClose={(key) => void closeFile(key, groupId)}
+        onPin={(key, pinned) => setTabPinned(groupId, key, pinned)}
+        onPromotePreview={(key) => promotePreviewTab(groupId, key)}
+        onCloseOthers={(key) => {
+          const latest = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).editorGroups[groupId];
+          void closeGroupFiles(groupId, latest.openOrder.filter(
+            (entry) => entry !== key && !latest.pinnedKeys.includes(entry),
+          ));
+        }}
+        onCloseRight={(key) => {
+          const latest = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).editorGroups[groupId];
+          const index = latest.openOrder.indexOf(key);
+          void closeGroupFiles(groupId, latest.openOrder.slice(index + 1).filter(
+            (entry) => !latest.pinnedKeys.includes(entry),
+          ));
+        }}
+        onCloseUnmodified={() => {
+          const latest = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).editorGroups[groupId];
+          void closeGroupFiles(groupId, latest.openOrder.filter(
+            (entry) => !openFilesRef.current[entry]?.dirty,
+          ));
+        }}
+        onCloseAll={() => {
+          const latest = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).editorGroups[groupId];
+          void closeGroupFiles(groupId, latest.openOrder);
+        }}
+        onSplitRight={(key) => splitEditor("vertical", key, groupId)}
+        onSplitDown={(key) => splitEditor("horizontal", key, groupId)}
+        onMarkdownModeChange={(mode) => {
+          if (!groupFile) return;
+          setMarkdownModes((current) => ({ ...current, [groupFile.key]: mode }));
+        }}
+        onChangeText={updateFileText}
+        onSave={(key) => void saveFile(key)}
+        onHover={getLspHover}
+        onDefinition={goToDefinition}
+        onReferences={findReferences}
+        onComplete={getLspCompletions}
+        onCompleteResolve={resolveLspCompletion}
+        onSignatureHelp={getLspSignatureHelp}
+        onSelectionChange={(selection) => {
+          if (groupId === activeEditorGroupId) editorSelectionRef.current = selection;
+          setCursorPositions((current) => ({ ...current, [groupId]: selection.end }));
+        }}
+        onLightbulb={(line) => void openCodeActionsForLine(line)}
+        onOpenMarkdownHref={openMarkdownHref}
+        formatBytes={formatBytes}
+        formatMtime={formatMtime}
+        isMarkdownPath={isMarkdownPath}
+        renderMarkdownPreview={(file, onOpenHref) => (
+          <MarkdownPreview file={file} onOpenHref={onOpenHref} />
+        )}
+      />
+    );
+  };
+
   return (
     <div
       ref={rootRef}
@@ -3135,6 +3324,30 @@ export function CodeWorkspaceTab({
           onClick={() => executeWorkspaceCommand("workspace.openGit")}
         />
         <IconButton
+          label="Split editor right"
+          testId="code-workspace-split-right"
+          icon={<Columns2 className="h-3.5 w-3.5" />}
+          active={splitOrientation === "vertical"}
+          disabled={!activeFile}
+          onClick={() => splitEditor("vertical")}
+        />
+        <IconButton
+          label="Split editor down"
+          testId="code-workspace-split-down"
+          icon={<Rows2 className="h-3.5 w-3.5" />}
+          active={splitOrientation === "horizontal"}
+          disabled={!activeFile}
+          onClick={() => splitEditor("horizontal")}
+        />
+        {splitOrientation && (
+          <IconButton
+            label="Close editor split"
+            testId="code-workspace-split-close"
+            icon={<X className="h-3.5 w-3.5" />}
+            onClick={closeSplit}
+          />
+        )}
+        <IconButton
           label="Toggle documentation pane"
           testId="code-workspace-right-pane-toggle"
           icon={<PanelRight className="w-3.5 h-3.5" />}
@@ -3207,98 +3420,27 @@ export function CodeWorkspaceTab({
         </Panel>
         <PanelResizeHandle className="w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
         <Panel id="editor" defaultSize={rightPaneOpen ? "56%" : "76%"} minSize="35%" className="min-w-0">
-          <EditorGroup
-            groupId={activeEditorGroupId}
-            workspaceInstanceId={workspaceInstanceId}
-            visible={visible}
-            openOrder={openOrder}
-            openFiles={openFiles}
-            activeKey={activeKey}
-            previewKey={editorGroups[activeEditorGroupId].previewKey}
-            pinnedKeys={editorGroups[activeEditorGroupId].pinnedKeys}
-            activeFile={activeFile}
-            activeMarkdownMode={activeMarkdownMode}
-            activeDiagnostics={activeDiagnostics}
-            activeCapabilities={activeCapabilities}
-            activeLspSyncing={!!activeLspState?.syncing}
-            lspStatusPill={<LspStatusPill state={activeLspState} diagnostics={activeDiagnostics} />}
-            breadcrumbs={activeFile ? (
-              <Breadcrumbs
-                pathSegments={breadcrumbPathSegments}
-                symbols={breadcrumbSymbols}
-                position={cursorPosition}
-                onPathClick={(segment) => {
-                  if (activeFile.ref.kind !== "root") return;
-                  const rootId = activeFile.ref.rootId;
-                  if (segment.kind === "root") {
-                    setSelected({ kind: "root", rootId });
-                  } else if (segment.kind === "directory") {
-                    setSelected({ kind: "dir", rootId, path: segment.path });
-                    setExpandedDirs((current) => new Set(current).add(rootDirKey(rootId, segment.path)));
-                    void loadDir(rootId, segment.path);
-                  } else {
-                    setSelected({ kind: "file", ref: activeFile.ref });
-                  }
-                }}
-                onSymbolClick={(symbol) => revealEditorLocation(activeFile.key, symbol.selectionRange)}
-              />
-            ) : null}
-            revealTarget={revealTarget}
-            editorPaneRef={editorPaneRef}
-            editorPaneStyle={editorPaneStyle}
-            onActivate={(key) => {
-              activateEditorGroup(activeEditorGroupId);
-              setActiveKey(key);
-            }}
-            onActivateGroup={() => activateEditorGroup(activeEditorGroupId)}
-            onClose={(key) => void closeFile(key, activeEditorGroupId)}
-            onPin={(key, pinned) => setTabPinned(activeEditorGroupId, key, pinned)}
-            onPromotePreview={(key) => promotePreviewTab(activeEditorGroupId, key)}
-            onCloseOthers={(key) => {
-              const group = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).editorGroups[activeEditorGroupId];
-              void closeGroupFiles(activeEditorGroupId, group.openOrder.filter(
-                (entry) => entry !== key && !group.pinnedKeys.includes(entry),
-              ));
-            }}
-            onCloseRight={(key) => {
-              const group = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).editorGroups[activeEditorGroupId];
-              const index = group.openOrder.indexOf(key);
-              void closeGroupFiles(activeEditorGroupId, group.openOrder.slice(index + 1).filter(
-                (entry) => !group.pinnedKeys.includes(entry),
-              ));
-            }}
-            onCloseUnmodified={() => {
-              const group = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).editorGroups[activeEditorGroupId];
-              void closeGroupFiles(activeEditorGroupId, group.openOrder.filter(
-                (entry) => !openFilesRef.current[entry]?.dirty,
-              ));
-            }}
-            onCloseAll={() => {
-              const group = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).editorGroups[activeEditorGroupId];
-              void closeGroupFiles(activeEditorGroupId, group.openOrder);
-            }}
-            onMarkdownModeChange={setActiveMarkdownMode}
-            onChangeText={updateFileText}
-            onSave={(key) => void saveFile(key)}
-            onHover={getLspHover}
-            onDefinition={goToDefinition}
-            onReferences={findReferences}
-            onComplete={getLspCompletions}
-            onCompleteResolve={resolveLspCompletion}
-            onSignatureHelp={getLspSignatureHelp}
-            onSelectionChange={(selection) => {
-              editorSelectionRef.current = selection;
-              setCursorPosition(selection.end);
-            }}
-            onLightbulb={(line) => void openCodeActionsForLine(line)}
-            onOpenMarkdownHref={openMarkdownHref}
-            formatBytes={formatBytes}
-            formatMtime={formatMtime}
-            isMarkdownPath={isMarkdownPath}
-            renderMarkdownPreview={(file, onOpenHref) => (
-              <MarkdownPreview file={file} onOpenHref={onOpenHref} />
-            )}
-          />
+          {splitOrientation ? (
+            <div data-testid="code-workspace-editor-split" className="h-full min-h-0">
+              <PanelGroup
+                orientation={splitOrientation === "vertical" ? "horizontal" : "vertical"}
+                id={`code-workspace-editor-split-${workspaceInstanceId}`}
+                className="h-full min-h-0"
+              >
+                <Panel id="editor-primary" defaultSize="50%" minSize="20%" className="min-h-0 min-w-0">
+                  {renderEditorGroup("primary")}
+                </Panel>
+                <PanelResizeHandle
+                  className={splitOrientation === "vertical"
+                    ? "w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)]"
+                    : "h-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)]"}
+                />
+                <Panel id="editor-secondary" defaultSize="50%" minSize="20%" className="min-h-0 min-w-0">
+                  {renderEditorGroup("secondary")}
+                </Panel>
+              </PanelGroup>
+            </div>
+          ) : renderEditorGroup("primary")}
         </Panel>
         {rightPaneOpen && (
           <>

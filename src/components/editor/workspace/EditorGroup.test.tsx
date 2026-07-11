@@ -61,6 +61,8 @@ function props(overrides: Partial<ComponentProps<typeof EditorGroup>> = {}): Com
     onCloseRight: vi.fn(),
     onCloseUnmodified: vi.fn(),
     onCloseAll: vi.fn(),
+    onSplitRight: vi.fn(),
+    onSplitDown: vi.fn(),
     onMarkdownModeChange: vi.fn(),
     onChangeText: vi.fn(),
     onSave: vi.fn(),

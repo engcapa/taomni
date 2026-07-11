@@ -57,6 +57,8 @@ interface EditorGroupProps {
   onCloseRight: (key: string) => void;
   onCloseUnmodified: () => void;
   onCloseAll: () => void;
+  onSplitRight: (key: string) => void;
+  onSplitDown: (key: string) => void;
   onMarkdownModeChange: (mode: MarkdownViewMode) => void;
   onChangeText: (key: string, text: string) => void;
   onSave: (key: string) => void;
@@ -116,6 +118,8 @@ export function EditorGroup({
   onCloseRight,
   onCloseUnmodified,
   onCloseAll,
+  onSplitRight,
+  onSplitDown,
   onMarkdownModeChange,
   onChangeText,
   onSave,
@@ -143,6 +147,9 @@ export function EditorGroup({
     const pinned = pinnedSet.has(key);
     tabMenu.show(event, [
       { label: pinned ? "Unpin Tab" : "Pin Tab", onClick: () => onPin(key, !pinned) },
+      { label: "Open in Split Right", onClick: () => onSplitRight(key) },
+      { label: "Open in Split Down", onClick: () => onSplitDown(key) },
+      { separator: true, label: "" },
       { label: "Close", shortcut: "Ctrl+F4", onClick: () => onClose(key) },
       { label: "Close Others", onClick: () => onCloseOthers(key) },
       { label: "Close Tabs to the Right", onClick: () => onCloseRight(key) },
