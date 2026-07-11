@@ -305,7 +305,12 @@ fn expand_common_directory_path(raw: &str, home: Option<&Path>) -> Option<PathBu
     }
 
     let candidate = PathBuf::from(path);
-    if candidate.is_absolute() || looks_like_windows_absolute_path(path) {
+    // `/tmp/...` is absolute on Unix; on Windows Path::is_absolute is false for
+    // that form, but history lines from remote shells still use it.
+    if candidate.is_absolute()
+        || looks_like_windows_absolute_path(path)
+        || path.starts_with('/')
+    {
         Some(candidate)
     } else {
         None

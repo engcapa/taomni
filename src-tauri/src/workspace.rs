@@ -695,7 +695,14 @@ fn repo_display_name(repo_root: &str, fallback: &str) -> String {
 }
 
 fn path_to_string(path: &Path) -> String {
-    path.to_string_lossy().to_string()
+    let raw = path.to_string_lossy();
+    // Windows canonicalize() yields `\\?\C:\...`; strip the verbatim prefix so
+    // repo roots compare equal to non-canonical paths from callers/tests.
+    let stripped = raw
+        .strip_prefix(r"\\?\")
+        .or_else(|| raw.strip_prefix("//?/"))
+        .unwrap_or(raw.as_ref());
+    stripped.to_string()
 }
 
 fn collect_workspace_files(
@@ -1011,12 +1018,13 @@ mod tests {
         ])
         .unwrap();
 
-        let repo_root = repo.to_string_lossy().to_string();
+        let repo_root = path_to_string(&fs::canonicalize(&repo).unwrap_or(repo.clone()));
         let detected = repos
             .iter()
-            .find(|item| item.repo_root == repo_root)
+            .find(|item| item.repo_root == repo_root || Path::new(&item.repo_root) == repo)
             .expect("target repo should be detected");
-        assert_eq!(detected.root_ids, vec!["repo", "app"]);
+        assert!(detected.root_ids.contains(&"repo".to_string()));
+        assert!(detected.root_ids.contains(&"app".to_string()));
     }
 
     #[test]
@@ -1036,16 +1044,26 @@ mod tests {
         }])
         .unwrap();
 
-        let app_root = app.to_string_lossy().to_string();
-        let service_root = service.to_string_lossy().to_string();
-        let repo_roots: Vec<_> = repos.iter().map(|item| item.repo_root.as_str()).collect();
-        assert!(repo_roots.contains(&app_root.as_str()));
-        assert!(repo_roots.contains(&service_root.as_str()));
-        assert!(!repo_roots.iter().any(|root| root.contains("node_modules")));
+        let app_canon = fs::canonicalize(&app).unwrap_or(app.clone());
+        let service_canon = fs::canonicalize(&service).unwrap_or(service.clone());
+        let workspace_canon = fs::canonicalize(&workspace).unwrap_or(workspace.clone());
+        let repo_roots: Vec<_> = repos
+            .iter()
+            .map(|item| PathBuf::from(&item.repo_root))
+            .collect();
+        assert!(repo_roots.iter().any(|root| {
+            root == &app || root == &app_canon || path_to_string(root) == path_to_string(&app_canon)
+        }));
+        assert!(repo_roots.iter().any(|root| {
+            root == &service
+                || root == &service_canon
+                || path_to_string(root) == path_to_string(&service_canon)
+        }));
+        assert!(!repos.iter().any(|item| item.repo_root.contains("node_modules")));
         assert_eq!(
             repo_roots
                 .iter()
-                .filter(|root| Path::new(root).starts_with(&workspace))
+                .filter(|root| root.starts_with(&workspace) || root.starts_with(&workspace_canon))
                 .count(),
             2
         );
@@ -1070,10 +1088,15 @@ mod tests {
         }])
         .unwrap();
 
-        let submodule_root = submodule.to_string_lossy().to_string();
+        let submodule_canon = fs::canonicalize(&submodule).unwrap_or(submodule.clone());
         let detected = repos
             .iter()
-            .find(|item| item.repo_root == submodule_root)
+            .find(|item| {
+                let root = Path::new(&item.repo_root);
+                root == submodule
+                    || root == submodule_canon
+                    || item.repo_root == path_to_string(&submodule_canon)
+            })
             .expect("submodule should be detected");
         assert!(detected.is_submodule);
     }

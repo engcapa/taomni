@@ -352,7 +352,14 @@ fn clipboard_paths_from_uri_text(text: &str) -> Vec<String> {
         {
             continue;
         }
-        if PathBuf::from(value).is_absolute() && !out.iter().any(|path| path == value) {
+        // Treat Unix absolute paths as absolute even on Windows (clipboard
+        // content from remote/WSL/file managers often uses /home/... form).
+        let is_abs = PathBuf::from(value).is_absolute()
+            || value.starts_with('/')
+            || (value.len() >= 3
+                && value.as_bytes()[1] == b':'
+                && value.as_bytes()[0].is_ascii_alphabetic());
+        if is_abs && !out.iter().any(|path| path == value) {
             out.push(value.to_string());
         }
     }

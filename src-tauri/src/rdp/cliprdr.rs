@@ -399,8 +399,19 @@ pub fn uri_list_to_paths(text: &str) -> Vec<PathBuf> {
             let decoded = percent_decode(rest);
             // Re-anchor to absolute path on Unix; on Windows, drive letters
             // are already in place after the leading slash strip.
+            // Unix-style absolute URIs (file:///tmp/foo) still need a leading
+            // slash on Windows so path strings match host/remote expectations.
             let path = if cfg!(windows) {
-                PathBuf::from(decoded)
+                let looks_like_drive = decoded
+                    .as_bytes()
+                    .get(1)
+                    .copied()
+                    .is_some_and(|b| b == b':');
+                if looks_like_drive {
+                    PathBuf::from(decoded)
+                } else {
+                    PathBuf::from(format!("/{decoded}"))
+                }
             } else {
                 let mut p = PathBuf::from("/");
                 p.push(decoded);
