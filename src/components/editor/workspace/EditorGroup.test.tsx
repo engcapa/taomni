@@ -63,6 +63,10 @@ function props(overrides: Partial<ComponentProps<typeof EditorGroup>> = {}): Com
     onCloseAll: vi.fn(),
     onSplitRight: vi.fn(),
     onSplitDown: vi.fn(),
+    onCopyPath: vi.fn(),
+    onRevealInTree: vi.fn(),
+    onRevealInSystem: vi.fn(),
+    onOpenInTerminal: vi.fn(),
     onMarkdownModeChange: vi.fn(),
     onChangeText: vi.fn(),
     onSave: vi.fn(),
@@ -113,5 +117,34 @@ describe("EditorGroup tabs", () => {
     fireEvent.contextMenu(screen.getByTitle("repo / b.ts"), { clientX: 10, clientY: 10 });
     fireEvent.click(screen.getByRole("button", { name: "Close Others" }));
     expect(onCloseOthers).toHaveBeenCalledWith("b");
+  });
+
+  it("exposes path, tree, explorer, and terminal actions from the tab menu", () => {
+    const onCopyPath = vi.fn();
+    const onRevealInTree = vi.fn();
+    const onRevealInSystem = vi.fn();
+    const onOpenInTerminal = vi.fn();
+    render(<EditorGroup {...props({
+      onCopyPath,
+      onRevealInTree,
+      onRevealInSystem,
+      onOpenInTerminal,
+    })} />);
+
+    const openMenuAndClick = (label: string) => {
+      fireEvent.contextMenu(screen.getByTitle("repo / b.ts"), { clientX: 10, clientY: 10 });
+      fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${label}`) }));
+    };
+    openMenuAndClick("Copy Path");
+    openMenuAndClick("Copy Relative Path");
+    openMenuAndClick("Reveal in Project Tree");
+    openMenuAndClick("Reveal in Explorer");
+    openMenuAndClick("Open in Terminal");
+
+    expect(onCopyPath).toHaveBeenNthCalledWith(1, "b", true);
+    expect(onCopyPath).toHaveBeenNthCalledWith(2, "b", false);
+    expect(onRevealInTree).toHaveBeenCalledWith("b");
+    expect(onRevealInSystem).toHaveBeenCalledWith("b");
+    expect(onOpenInTerminal).toHaveBeenCalledWith("b");
   });
 });

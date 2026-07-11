@@ -72,6 +72,12 @@ describe("SearchEverywhere", () => {
     expect(onOpenFile).toHaveBeenCalledTimes(1);
   });
 
+  it("requests a split open with Ctrl+Enter", () => {
+    const { onOpenFile } = renderPopup();
+    fireEvent.keyDown(screen.getByLabelText("Go to file"), { key: "Enter", ctrlKey: true });
+    expect(onOpenFile).toHaveBeenCalledWith(expect.objectContaining({ rootId: expect.any(String) }), { split: true });
+  });
+
   it("closes on Escape and on backdrop clicks", () => {
     const { onClose } = renderPopup();
     fireEvent.keyDown(screen.getByLabelText("Go to file"), { key: "Escape" });

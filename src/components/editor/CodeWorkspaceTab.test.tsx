@@ -1181,4 +1181,51 @@ describe("CodeWorkspaceTab", () => {
     await waitFor(() => expect(screen.queryByTestId("code-workspace-editor-split")).not.toBeInTheDocument());
     expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(1);
   });
+
+  it("closes the active editor tab with Ctrl+F4", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-close-tab",
+      workspaceInstanceId: "instance-close-tab",
+      name: "Close Tab",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "export const value = 1;"));
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    fireEvent.keyDown(window, { key: "F4", ctrlKey: true });
+
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-close-tab")
+        .editorGroups.primary.openOrder,
+    ).toHaveLength(0));
+  });
+
+  it("opens the selected tree file in a split with Ctrl+Enter", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-tree-split",
+      workspaceInstanceId: "instance-tree-split",
+      name: "Tree Split",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("README.md", "README.md")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("README.md", "# Readme"));
+
+    renderWorkspace(workspace);
+    const row = await screen.findByTestId("code-workspace-tree-file");
+    fireEvent.click(row);
+    fireEvent.keyDown(screen.getByTestId("code-workspace-tree-pane"), {
+      key: "Enter",
+      ctrlKey: true,
+    });
+
+    expect(await screen.findByTestId("code-workspace-editor-split")).toBeInTheDocument();
+    const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-split");
+    expect(ui.editorGroups.secondary.activeKey).toBe("root:app:README.md");
+  });
 });

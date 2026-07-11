@@ -59,6 +59,10 @@ interface EditorGroupProps {
   onCloseAll: () => void;
   onSplitRight: (key: string) => void;
   onSplitDown: (key: string) => void;
+  onCopyPath: (key: string, absolute: boolean) => void;
+  onRevealInTree: (key: string) => void;
+  onRevealInSystem: (key: string) => void;
+  onOpenInTerminal: (key: string) => void;
   onMarkdownModeChange: (mode: MarkdownViewMode) => void;
   onChangeText: (key: string, text: string) => void;
   onSave: (key: string) => void;
@@ -120,6 +124,10 @@ export function EditorGroup({
   onCloseAll,
   onSplitRight,
   onSplitDown,
+  onCopyPath,
+  onRevealInTree,
+  onRevealInSystem,
+  onOpenInTerminal,
   onMarkdownModeChange,
   onChangeText,
   onSave,
@@ -156,6 +164,12 @@ export function EditorGroup({
       { label: "Close Unmodified", onClick: onCloseUnmodified },
       { separator: true, label: "" },
       { label: "Close All", onClick: onCloseAll },
+      { separator: true, label: "" },
+      { label: "Copy Path", onClick: () => onCopyPath(key, true) },
+      { label: "Copy Relative Path", onClick: () => onCopyPath(key, false) },
+      { label: "Reveal in Project Tree", shortcut: "Alt+F1", onClick: () => onRevealInTree(key) },
+      { label: "Reveal in Explorer", onClick: () => onRevealInSystem(key) },
+      { label: "Open in Terminal", onClick: () => onOpenInTerminal(key) },
     ]);
   };
   return (

@@ -983,11 +983,21 @@ export function CodeWorkspaceTab({
   );
 
   const openGoToFileItem = useCallback(
-    (item: GoToFileItem) => {
+    (item: GoToFileItem, options?: { split: boolean }) => {
       setSearchEverywhereOpen(false);
-      void openFile({ kind: "root", rootId: item.rootId, path: item.path });
+      const ref: CodeWorkspaceFileRef = { kind: "root", rootId: item.rootId, path: item.path };
+      if (options?.split) {
+        const current = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+        const targetGroupId: EditorGroupId = current.activeEditorGroupId === "primary"
+          ? "secondary"
+          : "primary";
+        setStoreSplitOrientation(workspaceInstanceId, "vertical");
+        void openFile(ref, { groupId: targetGroupId });
+        return;
+      }
+      void openFile(ref, { preview: true });
     },
-    [openFile],
+    [openFile, setStoreSplitOrientation, workspaceInstanceId],
   );
 
   // Track file activations for Recent Files (Ctrl+E) and the back/forward
@@ -1437,6 +1447,69 @@ export function CodeWorkspaceTab({
     }
   }, [findRoot, setStatusMessage]);
 
+  const copyEditorTabPath = useCallback(async (key: string, absolute: boolean) => {
+    const file = openFilesRef.current[key];
+    if (!file) return;
+    if (file.ref.kind === "root") {
+      await copyTreePath(file.ref.rootId, file.ref.path, absolute);
+      return;
+    }
+    const text = absolute ? normalizeFsPath(file.ref.path) : basename(file.ref.path);
+    try {
+      await writeText(text);
+      setStatusMessage(`Copied ${text}`);
+    } catch (err) {
+      setStatusMessage(errorMessage(err));
+    }
+  }, [copyTreePath, setStatusMessage]);
+
+  const revealEditorTabInTree = useCallback((key: string) => {
+    const file = openFilesRef.current[key];
+    if (!file) return;
+    setSelected({ kind: "file", ref: file.ref });
+    if (file.ref.kind !== "root") return;
+    const rootId = file.ref.rootId;
+    setExpandedRoots((current) => new Set(current).add(rootId));
+    const directories = file.ref.path.split("/").filter(Boolean).slice(0, -1);
+    setExpandedDirs((current) => {
+      const next = new Set(current);
+      let path = "";
+      for (const directory of directories) {
+        path = path ? `${path}/${directory}` : directory;
+        next.add(rootDirKey(rootId, path));
+        void loadDir(rootId, path);
+      }
+      return next;
+    });
+    treePaneRef.current?.focus();
+  }, [loadDir]);
+
+  const revealEditorTabInExplorer = useCallback((key: string) => {
+    const file = openFilesRef.current[key];
+    if (!file) return;
+    if (file.ref.kind === "root") {
+      void revealInExplorer(file.ref.rootId, file.ref.path);
+      return;
+    }
+    const absolute = normalizeFsPath(file.ref.path);
+    void invoke("sftp_open_path", { path: absolute })
+      .then(() => setStatusMessage(`Opened ${absolute}`))
+      .catch((err) => setStatusMessage(errorMessage(err)));
+  }, [revealInExplorer, setStatusMessage]);
+
+  const openEditorTabInTerminal = useCallback((key: string) => {
+    const file = openFilesRef.current[key];
+    if (!file) return;
+    if (file.ref.kind === "root") {
+      openTerminalAt(file.ref.rootId, file.ref.path, true);
+      return;
+    }
+    const cwd = parentPath(normalizeFsPath(file.ref.path));
+    setBottomDockTab("terminal");
+    setBottomDockOpen(true);
+    terminalDockRef.current?.openAt(cwd, basename(cwd));
+  }, [openTerminalAt]);
+
   const handleTreeKeyDown = useCallback((event: React.KeyboardEvent<HTMLElement>) => {
     const pane = treePaneRef.current;
     if (!pane) return;
@@ -1458,7 +1531,14 @@ export function CodeWorkspaceTab({
     }
     if (event.key === "Enter") {
       event.preventDefault();
-      if (selected?.kind === "file") void openFile(selected.ref);
+      if (selected?.kind === "file" && (event.ctrlKey || event.metaKey)) {
+        const current = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+        const targetGroupId: EditorGroupId = current.activeEditorGroupId === "primary"
+          ? "secondary"
+          : "primary";
+        setStoreSplitOrientation(workspaceInstanceId, "vertical");
+        void openFile(selected.ref, { groupId: targetGroupId });
+      } else if (selected?.kind === "file") void openFile(selected.ref);
       else rows[selectedIndex]?.click();
       return;
     }
@@ -1481,7 +1561,7 @@ export function CodeWorkspaceTab({
         row.click();
       }
     }
-  }, [openFile, selected]);
+  }, [openFile, selected, setStoreSplitOrientation, workspaceInstanceId]);
 
   const pasteTreeClipboard = useCallback(async (target: { rootId: string; path: string }) => {
     const clip = treeClipboardRef.current;
@@ -2022,7 +2102,10 @@ export function CodeWorkspaceTab({
   }, []);
 
   const openLspLocation = useCallback(
-    async (location: LspLocation) => {
+    async (
+      location: LspLocation,
+      options: { groupId?: EditorGroupId; preview?: boolean } = {},
+    ) => {
       const path = location.path;
       if (!path) return false;
       for (const root of rootsRef.current) {
@@ -2030,14 +2113,14 @@ export function CodeWorkspaceTab({
         if (relative === null) continue;
         const ref: CodeWorkspaceFileRef = { kind: "root", rootId: root.id, path: relative };
         revealEditorLocation(fileKey(ref), location.range);
-        await openFile(ref);
+        await openFile(ref, options);
         return true;
       }
       const loose = makeLooseFile(path);
       const ref: CodeWorkspaceFileRef = { kind: "loose", id: loose.id, path: loose.path };
       setLooseFiles((current) => current.some((item) => item.path === loose.path) ? current : [...current, loose]);
       revealEditorLocation(fileKey(ref), location.range);
-      await openFile(ref);
+      await openFile(ref, options);
       return true;
     },
     [openFile, revealEditorLocation],
@@ -2065,8 +2148,17 @@ export function CodeWorkspaceTab({
     }
   }, [activeFile, lspDescriptorForFile, updateLspStatusForFile]);
 
-  const openWorkspaceSymbol = useCallback(async (symbol: GoToSymbolItem) => {
+  const openWorkspaceSymbol = useCallback(async (
+    symbol: GoToSymbolItem,
+    options?: { split: boolean },
+  ) => {
     setSearchEverywhereOpen(false);
+    let groupId: EditorGroupId | undefined;
+    if (options?.split) {
+      const current = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+      groupId = current.activeEditorGroupId === "primary" ? "secondary" : "primary";
+      setStoreSplitOrientation(workspaceInstanceId, "vertical");
+    }
     await openLspLocation({
       uri: symbol.uri,
       path: symbol.path,
@@ -2074,8 +2166,8 @@ export function CodeWorkspaceTab({
         start: { line: symbol.line, character: symbol.character },
         end: { line: symbol.line, character: symbol.character },
       },
-    });
-  }, [openLspLocation]);
+    }, { groupId, preview: !options?.split });
+  }, [openLspLocation, setStoreSplitOrientation, workspaceInstanceId]);
 
   const seSymbolsAvailable = !!(
     activeCapabilities?.workspaceSymbol
@@ -2083,7 +2175,7 @@ export function CodeWorkspaceTab({
   );
 
   const openSearchMatch = useCallback(
-    (match: WorkspaceSearchMatch) => {
+    (match: WorkspaceSearchMatch, options: { preview: boolean }) => {
       const ref: CodeWorkspaceFileRef = { kind: "root", rootId: match.rootId, path: match.path };
       // Backend line numbers are 1-based; reveal targets follow LSP 0-based.
       const line = Math.max(0, match.lineNumber - 1);
@@ -2091,7 +2183,7 @@ export function CodeWorkspaceTab({
         start: { line, character: match.matchStart },
         end: { line, character: match.matchEnd },
       });
-      void openFile(ref);
+      void openFile(ref, { preview: options.preview });
     },
     [openFile, revealEditorLocation],
   );
@@ -2615,6 +2707,26 @@ export function CodeWorkspaceTab({
       run: () => void saveFile(),
     },
     {
+      id: "workspace.closeActiveEditorTab",
+      title: "Close Active Editor Tab",
+      category: "File",
+      keybinding: "Ctrl+F4",
+      when: () => !!activeKey,
+      run: () => {
+        if (activeKey) void closeFile(activeKey, activeEditorGroupId);
+      },
+    },
+    {
+      id: "workspace.revealActiveFileInTree",
+      title: "Reveal Active File in Project Tree",
+      category: "Navigation",
+      keybinding: "Alt+F1",
+      when: () => !!activeKey,
+      run: () => {
+        if (activeKey) revealEditorTabInTree(activeKey);
+      },
+    },
+    {
       id: "workspace.reload",
       title: "Reload Active File",
       category: "File",
@@ -2735,8 +2847,11 @@ export function CodeWorkspaceTab({
     },
   ], [
     activeCapabilities,
+    activeEditorGroupId,
     activeFile,
+    activeKey,
     addRoot,
+    closeFile,
     copyTreePath,
     createDir,
     createFile,
@@ -2761,6 +2876,7 @@ export function CodeWorkspaceTab({
     recentFilesOpen,
     refreshTree,
     reloadFile,
+    revealEditorTabInTree,
     renameSelected,
     saveFile,
     seSymbolsAvailable,
@@ -3269,6 +3385,10 @@ export function CodeWorkspaceTab({
         }}
         onSplitRight={(key) => splitEditor("vertical", key, groupId)}
         onSplitDown={(key) => splitEditor("horizontal", key, groupId)}
+        onCopyPath={(key, absolute) => void copyEditorTabPath(key, absolute)}
+        onRevealInTree={revealEditorTabInTree}
+        onRevealInSystem={revealEditorTabInExplorer}
+        onOpenInTerminal={openEditorTabInTerminal}
         onMarkdownModeChange={(mode) => {
           if (!groupFile) return;
           setMarkdownModes((current) => ({ ...current, [groupFile.key]: mode }));

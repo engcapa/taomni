@@ -19,7 +19,7 @@ interface QuickPickOverlayProps<T> {
   header?: ReactNode;
   footer?: ReactNode;
   onClose: () => void;
-  onPick: (item: T) => void;
+  onPick: (item: T, options?: { split: boolean }) => void;
   /** Called when Enter is pressed with no selectable results (e.g. Text search). */
   onEnterEmpty?: (query: string) => void;
   /** Notified whenever the filter query changes. */
@@ -104,7 +104,11 @@ export function QuickPickOverlay<T>({
     } else if (event.key === "Enter") {
       event.preventDefault();
       const item = results[selected];
-      if (item) onPick(item);
+      if (item) {
+        const split = event.ctrlKey || event.metaKey;
+        if (split) onPick(item, { split: true });
+        else onPick(item);
+      }
       else onEnterEmpty?.(query);
     }
   };

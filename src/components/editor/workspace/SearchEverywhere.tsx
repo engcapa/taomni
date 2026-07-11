@@ -34,8 +34,8 @@ interface SearchEverywhereProps {
   symbolsAvailable?: boolean;
   fetchSymbols?: (query: string) => Promise<GoToSymbolItem[]>;
   onClose: () => void;
-  onOpenFile: (item: GoToFileItem) => void;
-  onOpenSymbol?: (item: GoToSymbolItem) => void;
+  onOpenFile: (item: GoToFileItem, options?: { split: boolean }) => void;
+  onOpenSymbol?: (item: GoToSymbolItem, options?: { split: boolean }) => void;
   onRunCommand?: (commandId: string) => void;
   /** Text tab: hand query to Find in Files. */
   onSearchText?: (query: string) => void;
@@ -286,6 +286,9 @@ export function SearchEverywhere({
                   : "open"
             }
           </span>
+          {(mode === "all" || mode === "files" || mode === "classes" || mode === "symbols") && (
+            <span>Ctrl+Enter split</span>
+          )}
           <span>Esc close</span>
           <span className="ml-auto">
             {mode === "files" && (
@@ -300,9 +303,13 @@ export function SearchEverywhere({
         </>
       }
       onClose={onClose}
-      onPick={(item) => {
-        if (item.kind === "file") onOpenFile(item.value);
+      onPick={(item, options) => {
+        if (item.kind === "file") {
+          if (options) onOpenFile(item.value, options);
+          else onOpenFile(item.value);
+        }
         else if (item.kind === "action") onRunCommand?.(item.value.id);
+        else if (options) onOpenSymbol?.(item.value, options);
         else onOpenSymbol?.(item.value);
       }}
       onEnterEmpty={(q) => {

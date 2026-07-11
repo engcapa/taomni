@@ -100,7 +100,10 @@ describe("FindInFilesPanel", () => {
     expect(screen.getByText("3 results · 2 files")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /12:7/ }));
-    expect(onOpenMatch).toHaveBeenCalledWith(searchMatch());
+    expect(onOpenMatch).toHaveBeenCalledWith(searchMatch(), { preview: true });
+
+    fireEvent.doubleClick(screen.getByTitle("app/src/a.ts:12:7"));
+    expect(onOpenMatch).toHaveBeenLastCalledWith(searchMatch(), { preview: false });
   });
 
   it("passes search options and globs through to the backend", async () => {

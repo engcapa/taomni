@@ -11,7 +11,7 @@ import type { CodeWorkspaceRootInfo } from "../../../../types";
 
 interface FindInFilesPanelProps {
   roots: CodeWorkspaceRootInfo[];
-  onOpenMatch: (match: WorkspaceSearchMatch) => void;
+  onOpenMatch: (match: WorkspaceSearchMatch, options: { preview: boolean }) => void;
   /** Apply replacements for the current result set via the shared WorkspaceEdit path. */
   onReplaceMatches?: (matches: WorkspaceSearchMatch[], replacement: string) => void | Promise<void>;
   /** Bump to move focus into the query input (Ctrl+Shift+F). */
@@ -377,7 +377,8 @@ export function FindInFilesPanel({
                   type="button"
                   className="h-6 w-full min-w-0 flex items-center gap-2 px-4 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
                   title={`${group.title}:${match.lineNumber}:${match.column}`}
-                  onClick={() => onOpenMatch(match)}
+                  onClick={() => onOpenMatch(match, { preview: true })}
+                  onDoubleClick={() => onOpenMatch(match, { preview: false })}
                 >
                   <span className="shrink-0 font-mono text-[10px] text-[var(--taomni-code-muted)]">
                     {match.lineNumber}:{match.column}
