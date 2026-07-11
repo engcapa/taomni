@@ -549,7 +549,7 @@ src/stores/
 | 调用层级 | Ctrl+Alt+H | — |
 | 类型层级 | Ctrl+H | editorFocus 时截获 |
 | 快速文档 | Ctrl+Q / 悬停 | Linux 下若与系统冲突提供 F1 别名 |
-| 参数信息 | Ctrl+P | 提供 VS Code 用户提示（Ctrl+P 在 VS Code 是文件跳转）|
+| 参数信息 | Ctrl+Shift+Space（实现决策：Ctrl+P 已作为 Go to File 的 VS Code 别名） | 触发字符（`(`、`,`）自动弹出 |
 | 重命名 | Shift+F6 | 树聚焦=重命名文件；编辑器聚焦=重命名符号 |
 | 格式化 | Ctrl+Alt+L | — |
 | Quick Fix | Alt+Enter | — |
