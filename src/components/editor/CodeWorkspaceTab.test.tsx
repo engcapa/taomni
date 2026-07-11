@@ -1045,7 +1045,7 @@ describe("CodeWorkspaceTab", () => {
       },
     }));
     lspMocks.lspFormatting.mockResolvedValue({
-      status: documentStatus({ active: true, available: true, formatting: undefined } as LspDocumentStatus),
+      status: documentStatus({ active: true, available: true }),
       edits: [{
         range: {
           start: { line: 0, character: 7 },

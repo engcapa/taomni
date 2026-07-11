@@ -4,9 +4,8 @@ import {
   gutter,
   GutterMarker,
   type DecorationSet,
-  type Extension,
 } from "@codemirror/view";
-import { RangeSetBuilder } from "@codemirror/state";
+import { RangeSetBuilder, type Extension } from "@codemirror/state";
 import type { LspDiagnostic } from "../../../lib/editor/lsp";
 import { offsetFromLspPosition } from "./lspPositions";
 
