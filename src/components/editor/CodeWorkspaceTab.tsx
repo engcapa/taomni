@@ -12,6 +12,8 @@ import DOMPurify from "dompurify";
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
 import {
   AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
   Braces,
   ChevronDown,
   ChevronRight,
@@ -107,6 +109,7 @@ import {
 } from "./workspace/panels/ProblemsPanel";
 import { FindInFilesPanel } from "./workspace/panels/FindInFilesPanel";
 import { SearchEverywhere, type GoToFileItem } from "./workspace/SearchEverywhere";
+import { RecentFilesPopup, type RecentFileEntry } from "./workspace/RecentFilesPopup";
 import { createDoubleShiftDetector } from "./workspace/doubleShift";
 import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
 import type {
@@ -187,6 +190,8 @@ const TREE_FONT_SIZE_KEY = "taomni.codeWorkspace.treeFontSize.v1";
 const TREE_VIEW_MODE_KEY = "taomni.codeWorkspace.treeViewMode.v1";
 const FLAT_VIEW_MAX_FILES = 2_000;
 const FLAT_VIEW_MAX_DEPTH = 25;
+const NAV_HISTORY_LIMIT = 100;
+const RECENT_FILES_LIMIT = 50;
 const CODE_WORKSPACE_MIN_FONT_SIZE = 8;
 const CODE_WORKSPACE_MAX_FONT_SIZE = 32;
 const CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE = 12;
@@ -766,6 +771,10 @@ export function CodeWorkspaceTab({
   const [searchFocusNonce, setSearchFocusNonce] = useState(0);
   const [searchIncludePreset, setSearchIncludePreset] = useState<{ value: string; nonce: number }>({ value: "", nonce: 0 });
   const [searchEverywhereOpen, setSearchEverywhereOpen] = useState(false);
+  const [recentFilesOpen, setRecentFilesOpen] = useState(false);
+  const [recentEntries, setRecentEntries] = useState<RecentFileEntry[]>([]);
+  const [recentAdvanceNonce, setRecentAdvanceNonce] = useState(0);
+  const [navCan, setNavCan] = useState({ back: false, forward: false });
   const [lspCommandPrefs, setLspCommandPrefs] = useState<Record<string, string>>(() => readLspCommandPrefs());
   const [lspCustomCommands, setLspCustomCommands] = useState<Record<string, LspCustomCommandConfig>>(() => readLspCustomCommands());
   const [revealTarget, setRevealTarget] = useState<EditorRevealTarget | null>(null);
@@ -786,6 +795,12 @@ export function CodeWorkspaceTab({
   const flatFilesRef = useRef(flatFiles);
   const gitRootsRef = useRef(gitRoots);
   const lspVersionRef = useRef<Record<string, number>>({});
+  const navHistoryRef = useRef<{ stack: CodeWorkspaceFileRef[]; index: number; suppress: boolean }>({
+    stack: [],
+    index: -1,
+    suppress: false,
+  });
+  const recentFilesRef = useRef<CodeWorkspaceFileRef[]>([]);
   const revealNonceRef = useRef(0);
   const initialOpenedKeyRef = useRef<string | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -1527,29 +1542,6 @@ export function CodeWorkspaceTab({
     setSearchEverywhereOpen(true);
   }, [loadFlatFiles]);
 
-  useEffect(() => {
-    if (!visible) return;
-    const detector = createDoubleShiftDetector(openSearchEverywhere);
-    const handleKeyDown = (event: KeyboardEvent) => {
-      detector.handleKeyDown(event);
-      const key = event.key.toLowerCase();
-      const goToFile =
-        (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && key === "n") ||
-        (event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey && key === "p");
-      if (!goToFile) return;
-      event.preventDefault();
-      event.stopPropagation();
-      openSearchEverywhere();
-    };
-    const handleKeyUp = (event: KeyboardEvent) => detector.handleKeyUp(event);
-    window.addEventListener("keydown", handleKeyDown, true);
-    window.addEventListener("keyup", handleKeyUp, true);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown, true);
-      window.removeEventListener("keyup", handleKeyUp, true);
-    };
-  }, [openSearchEverywhere, visible]);
-
   const goToFileItems = useMemo<GoToFileItem[]>(() => {
     const items: GoToFileItem[] = [];
     for (const root of roots) {
@@ -1578,6 +1570,101 @@ export function CodeWorkspaceTab({
     },
     [openFile],
   );
+
+  // Track file activations for Recent Files (Ctrl+E) and the back/forward
+  // navigation history.
+  useEffect(() => {
+    if (!activeKey) return;
+    const ref = openFilesRef.current[activeKey]?.ref;
+    if (!ref) return;
+    recentFilesRef.current = [
+      ref,
+      ...recentFilesRef.current.filter((item) => fileKey(item) !== activeKey),
+    ].slice(0, RECENT_FILES_LIMIT);
+    const nav = navHistoryRef.current;
+    if (nav.suppress) {
+      nav.suppress = false;
+      setNavCan({ back: nav.index > 0, forward: nav.index < nav.stack.length - 1 });
+      return;
+    }
+    if (nav.index >= 0 && nav.stack[nav.index] && fileKey(nav.stack[nav.index]) === activeKey) return;
+    nav.stack = [...nav.stack.slice(0, nav.index + 1), ref].slice(-NAV_HISTORY_LIMIT);
+    nav.index = nav.stack.length - 1;
+    setNavCan({ back: nav.index > 0, forward: false });
+  }, [activeKey]);
+
+  const navigateHistory = useCallback(
+    (delta: -1 | 1) => {
+      const nav = navHistoryRef.current;
+      const nextIndex = nav.index + delta;
+      if (nextIndex < 0 || nextIndex >= nav.stack.length) return;
+      nav.index = nextIndex;
+      nav.suppress = true;
+      setNavCan({ back: nextIndex > 0, forward: nextIndex < nav.stack.length - 1 });
+      void openFile(nav.stack[nextIndex]);
+    },
+    [openFile],
+  );
+
+  const openRecentFiles = useCallback(() => {
+    const entries: RecentFileEntry[] = recentFilesRef.current.map((ref) => {
+      const key = fileKey(ref);
+      const meta = fileMeta(ref, rootsRef.current, looseFilesRef.current);
+      return {
+        key,
+        ref,
+        title: meta.title,
+        subtitle: meta.subtitle,
+        open: !!openFilesRef.current[key],
+      };
+    });
+    setRecentEntries(entries);
+    setRecentFilesOpen(true);
+  }, []);
+
+  const pickRecentFile = useCallback(
+    (entry: RecentFileEntry) => {
+      setRecentFilesOpen(false);
+      void openFile(entry.ref);
+    },
+    [openFile],
+  );
+
+  useEffect(() => {
+    if (!visible) return;
+    const detector = createDoubleShiftDetector(openSearchEverywhere);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      detector.handleKeyDown(event);
+      const key = event.key.toLowerCase();
+      const plainCtrl = event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey;
+      const ctrlShift = event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey;
+      const ctrlAlt = event.ctrlKey && !event.shiftKey && event.altKey && !event.metaKey;
+      const run = (action: () => void) => {
+        event.preventDefault();
+        event.stopPropagation();
+        action();
+      };
+      if ((ctrlShift && key === "n") || (plainCtrl && key === "p")) {
+        run(openSearchEverywhere);
+      } else if (plainCtrl && key === "e") {
+        run(() => {
+          if (recentFilesOpen) setRecentAdvanceNonce((nonce) => nonce + 1);
+          else openRecentFiles();
+        });
+      } else if (ctrlAlt && event.key === "ArrowLeft") {
+        run(() => navigateHistory(-1));
+      } else if (ctrlAlt && event.key === "ArrowRight") {
+        run(() => navigateHistory(1));
+      }
+    };
+    const handleKeyUp = (event: KeyboardEvent) => detector.handleKeyUp(event);
+    window.addEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("keyup", handleKeyUp, true);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, true);
+      window.removeEventListener("keyup", handleKeyUp, true);
+    };
+  }, [navigateHistory, openRecentFiles, openSearchEverywhere, recentFilesOpen, visible]);
 
   const findInDirectory = useCallback((path: string) => {
     setBottomDockOpen(true);
@@ -2770,6 +2857,20 @@ export function CodeWorkspaceTab({
           </span>
         )}
         <div className="flex-1" />
+        <IconButton
+          label="Back"
+          testId="code-workspace-nav-back"
+          icon={<ArrowLeft className="w-3.5 h-3.5" />}
+          disabled={!navCan.back}
+          onClick={() => navigateHistory(-1)}
+        />
+        <IconButton
+          label="Forward"
+          testId="code-workspace-nav-forward"
+          icon={<ArrowRight className="w-3.5 h-3.5" />}
+          disabled={!navCan.forward}
+          onClick={() => navigateHistory(1)}
+        />
         <div className="flex items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1">
           <IconButton
             label="Editor zoom out"
@@ -3195,6 +3296,13 @@ export function CodeWorkspaceTab({
         truncated={goToFileTruncated}
         onClose={() => setSearchEverywhereOpen(false)}
         onOpenFile={openGoToFileItem}
+      />
+      <RecentFilesPopup
+        open={recentFilesOpen}
+        entries={recentEntries}
+        advanceNonce={recentAdvanceNonce}
+        onClose={() => setRecentFilesOpen(false)}
+        onPick={pickRecentFile}
       />
       {treeContextMenu.render}
     </div>

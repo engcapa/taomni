@@ -776,6 +776,52 @@ describe("CodeWorkspaceTab", () => {
     expect(screen.getByRole("button", { name: "Show error diagnostics" })).toHaveTextContent("1");
   });
 
+  it("tracks navigation history and reopens recent files from Ctrl+E", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-nav",
+      workspaceInstanceId: "instance-nav",
+      name: "Nav",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([
+      entry("a.ts", "a.ts"),
+      entry("b.ts", "b.ts"),
+    ]);
+    workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) =>
+      file(path, `// ${path}`));
+
+    renderWorkspace(workspace);
+
+    const treeFiles = await screen.findAllByTestId("code-workspace-tree-file");
+    fireEvent.click(treeFiles[0]);
+    await screen.findByTitle("app / a.ts");
+    fireEvent.click(treeFiles[1]);
+    await screen.findByTitle("app / b.ts");
+    await waitFor(() =>
+      expect(screen.getByTitle("app / b.ts").closest("div")).toHaveAttribute("data-active"));
+
+    fireEvent.click(screen.getByTestId("code-workspace-nav-back"));
+    await waitFor(() =>
+      expect(screen.getByTitle("app / a.ts").closest("div")).toHaveAttribute("data-active"));
+    expect(screen.getByTestId("code-workspace-nav-back")).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("code-workspace-nav-forward"));
+    await waitFor(() =>
+      expect(screen.getByTitle("app / b.ts").closest("div")).toHaveAttribute("data-active"));
+    expect(screen.getByTestId("code-workspace-nav-forward")).toBeDisabled();
+
+    // Ctrl+E preselects the previously active file; Enter flips back to it.
+    fireEvent.keyDown(window, { key: "e", ctrlKey: true });
+    const popup = await screen.findByTestId("code-workspace-recent-files");
+    expect(within(popup).getAllByRole("button")[0]).toHaveTextContent("b.ts");
+    fireEvent.keyDown(screen.getByLabelText("Recent files"), { key: "Enter" });
+    await waitFor(() =>
+      expect(screen.getByTitle("app / a.ts").closest("div")).toHaveAttribute("data-active"));
+    expect(screen.queryByTestId("code-workspace-recent-files")).not.toBeInTheDocument();
+  });
+
   it("offers tree context menu actions: copy path and scoped search", async () => {
     clipboardMocks.writeText.mockClear();
     const workspace: CodeWorkspaceTabInfo = {
