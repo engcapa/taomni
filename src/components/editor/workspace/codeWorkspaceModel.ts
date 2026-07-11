@@ -23,7 +23,12 @@ export interface DirectoryState {
   error: string | null;
 }
 
-
+export interface CompactChainState {
+  path: string;
+  entries: WorkspaceEntry[];
+  loading: boolean;
+  error: string | null;
+}
 
 export interface LspFileState {
   status: LspDocumentStatus | null;
@@ -335,6 +340,49 @@ export function formatMtime(mtime: number): string {
 
 export function shouldHideEntry(entry: WorkspaceEntry): boolean {
   return entry.path === ".git" || entry.path.startsWith(".git/");
+}
+
+/** Compact-tree display name: `src` → `src/main` when a single-child chain is folded. */
+export function compactEntryName(
+  entry: WorkspaceEntry,
+  chain: { path: string } | undefined,
+): string {
+  if (!chain || chain.path === entry.path) return entry.name;
+  const suffix = chain.path.startsWith(`${entry.path}/`)
+    ? chain.path.slice(entry.path.length + 1)
+    : "";
+  return suffix ? `${entry.name}/${suffix}` : entry.name;
+}
+
+/** Flat-view group key by file extension (lowercase, including the dot). */
+export function flatExtensionGroup(path: string): string {
+  const name = basename(path);
+  const dot = name.lastIndexOf(".");
+  if (dot <= 0 || dot === name.length - 1) return "No extension";
+  return name.slice(dot).toLowerCase();
+}
+
+/** Lookup a git change in the precomputed `rootId:workspacePath` map. */
+export function gitChangeForPath(
+  gitChangeByRootPath: Map<string, GitChange> | ReadonlyMap<string, GitChange>,
+  rootId: string,
+  path: string,
+): GitChange | undefined {
+  return gitChangeByRootPath.get(`${rootId}:${path}`);
+}
+
+/** Count git changes under a directory (or whole root when path is empty). */
+export function gitDirectoryChangeCount(
+  gitChangeByRootPath: Map<string, GitChange> | ReadonlyMap<string, GitChange>,
+  rootId: string,
+  path: string,
+): number {
+  const prefix = path ? `${rootId}:${path}/` : `${rootId}:`;
+  let count = 0;
+  for (const key of gitChangeByRootPath.keys()) {
+    if (key.startsWith(prefix)) count += 1;
+  }
+  return count;
 }
 
 export function isRootRef(ref: CodeWorkspaceFileRef, rootId: string, path: string): boolean {
