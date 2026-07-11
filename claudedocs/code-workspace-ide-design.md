@@ -2,7 +2,7 @@
 
 > 目标：在现有 Code Workspace 基础上做功能与交互完善，达到"日常代码开发够用"的 IntelliJ IDEA 级体验（非全量对标）。本文档为设计稿，不含实现代码。
 >
-> 日期：2026-07-11 · 版本：v2.5（M0 抽取 + 合并门禁，见 §8.1–8.2）· 状态：**实施中**（分支 `feat/code-workspace-ide`；P0 已交付，M0 壳抽取进行中，真机冒烟人工待办）
+> 日期：2026-07-11 · 版本：v2.6（M0 buffer/tree 入 store + ProjectTree，见 §8.1–8.2）· 状态：**实施中**（分支 `feat/code-workspace-ide`；P0 已交付，M0 继续瘦壳，真机冒烟人工待办）
 
 ---
 
@@ -572,7 +572,7 @@ src/stores/
 
 | 里程碑 | 内容 | 规模 | 状态 |
 |--------|------|------|------|
-| **M0 前置重构** | 组件拆分 + codeWorkspaceStore + 命令系统骨架 + 底部 dock 容器（References 迁入） | M | 🔶 7/7 骨架可用；壳体仍 >400 行，buffer/tree/LSP 待继续迁入 store |
+| **M0 前置重构** | 组件拆分 + codeWorkspaceStore + 命令系统骨架 + 底部 dock 容器（References 迁入） | M | 🔶 7/7 骨架 + ProjectTree/buffer 入 store；壳体 ~3.6k 行，目录缓存/命令注册/LSP I/O 仍在壳内 |
 | **M1 编辑器智能·上（P0）** | 查找替换、LSP 补全（含 auto-import）/签名/快速文档/格式化、诊断呈现升级、Problems 面板 | L | ✅ 9/9 |
 | **M2 导航与搜索（P0）** | Find in Files（后端搜索模块 + 面板）、Search Everywhere（含 Classes/Symbols）、Go to File/Class/Symbol、Recent Files、导航历史、Outline + 结构弹窗、类型/实现跳转 + peek、重命名、Code Actions、树右键/键盘 | L | ✅ 14/14（拖拽仍为 P1） |
 | **M3 布局与终端（P1）** | 分屏、tab 管理/预览 tab、面包屑、集成终端、Run/Tasks | L | ⬜ 0/5，未开始 |
@@ -583,14 +583,16 @@ src/stores/
 
 ### 8.1 进度明细（勾选清单）
 
-> 更新于 2026-07-11（v2.4），分支 `feat/code-workspace-ide`。P0（M1/M2）已按代码与提交复核收口；M0 仅剩壳拆分/store 技术债。完成度按本节拆分条目计数，已完成项附提交号。
+> 更新于 2026-07-11（v2.6），分支 `feat/code-workspace-ide`。P0（M1/M2）已按代码与提交复核收口；M0 壳拆分/store 技术债继续消化。完成度按本节拆分条目计数，已完成项附提交号。
 
 **M0 前置重构 — 🔶 清单项齐，壳体继续瘦身中**
 
 - [x] CodeMirror host 抽取（`CodeMirrorHost.tsx`）— `042d03f`
 - [x] 底部 dock 容器 + References 面板迁入 — `09108e2`（`4766f43` 起改为面板常驻挂载）
 - [x] `FileTreePane` 展示边界抽取（工具栏、视图/缩放控制、语言服务器面板）+ 组件测试 — `acff8cf`
-- [x] `codeWorkspaceStore`（按 `workspaceInstanceId` 分片 UI chrome / openOrder / activeKey / markdownModes）+ `EditorGroup` + `WorkspacePopupsHost` + `codeWorkspaceModel` 纯函数抽取 — `3ddab1b`；**壳体 4674→4113 行**，openFiles/树数据/LSP 会话仍在壳内，M3 分屏前继续迁
+- [x] `codeWorkspaceStore`（按 `workspaceInstanceId` 分片 UI chrome / openOrder / activeKey / markdownModes）+ `EditorGroup` + `WorkspacePopupsHost` + `codeWorkspaceModel` 纯函数抽取 — `3ddab1b`；**壳体 4674→4113 行**
+- [x] `ProjectTree` 控制器抽取（`renderEntries`/`renderFlatEntries`/根与 loose 行/git 徽标）+ 纯函数入 model — `43e5deb`
+- [x] buffer / tree chrome / LSP file map 入 store（`openFiles`、`lspFiles`、filter/view/selection/expand keys）+ `MarkdownPreview`/`workspaceChrome` 剥离 — `eb7997b`；**壳体 4113→~3659 行**；目录 listing 缓存（directories/compact/flat）与命令注册表仍在壳内
 - [x] `workspaceCommands.ts` 注册表、when 判定与统一快捷键分发；Search Everywhere 增加 Files / Actions 双入口 + 测试 — `b3c3d35`
 - [x] 活跃工作区命令注册桥 + Windows/Linux 应用菜单动态子菜单 + macOS 原生菜单动态子菜单 — `26b2763`
 - [x] 命令系统收尾：树右键/工具栏复用 command id，terminalFocus 上下文接入 — `2312ef8`
@@ -657,22 +659,22 @@ src/stores/
 
 - [x] 交互原型交付（`claudedocs/prototype/code-workspace-prototype.html`）
 - [x] 签名帮助键位决策：Ctrl+Shift+Space（Ctrl+P 已作 Go to File 别名）— `f4d9c15`
-- [x] 代码与自动化复核（2026-07-11 v2.5）：Code Workspace 定向 Vitest **23 文件 / 105 项**通过；`codeWorkspaceStore` 单测通过；LSP/`workspace_search` 定向 Rust 先前已绿
+- [x] 代码与自动化复核（2026-07-11 v2.6）：Code Workspace 定向 Vitest **24 文件 / 110 项**通过；`codeWorkspaceStore` 含 openFiles/tree chrome 单测；LSP/`workspace_search` 定向 Rust 先前已绿
 - [x] WorkspaceEdit §5.2.9 三态规则收口（open-clean 应用后保存、open-dirty 保持 dirty、未打开写盘 + hash 预检）— `workspaceEditApply` + `5d87203`
 - [x] 合并门禁 8 例 Windows 失败已修复（clipboard URI ×4、pushd ×1、git 根 ×3）— `f6c1f36`
 - [ ] **⚠ 真机验证欠账（人工）**：P0 能力仍以单测/构建为主；`pnpm tauri dev` 冒烟留待人工，结果回填本节
-- [ ] ⚠ M0 继续瘦身：将 `openFiles` / 树目录状态 / LSP 会话迁入 store；树控制器从壳内 `renderEntries` 抽出；目标壳 <400 行后再开 M3 分屏
+- [ ] ⚠ M0 继续瘦身：目录 listing 缓存（`directories`/`compactChains`/`flatFiles`）与 load 流程抽 hook/控制器；Git 快照/导航/命令注册大段继续下沉；目标壳 <400 行后再开 M3 分屏
 - [ ] ⚠ 下列 P0 增强项可选收口（不阻塞 M3）：保存时格式化开关；server 回推 `workspace/applyEdit` oneshot；树「终端中打开」/ Git ignore；树拖拽（P1）
 
 ### 8.2 下一步待办（建议顺序）
 
-> P0 已交付；M0 已引入 instance store + EditorGroup/Popups 边界（壳 4674→4113）。**真机冒烟仍为人工待办。** 下一编码优先级：继续 M0 瘦身 → 合入主干 → M3。
+> P0 已交付；M0 已完成 ProjectTree + buffer/tree/LSP map 入 store（壳 ~4113→~3659）。**真机冒烟仍为人工待办。** 下一编码优先级：继续 M0 瘦身 → 合入主干 → M3。
 
 1. **（人工）真机冒烟并记缺陷**  
    `pnpm tauri dev` 覆盖 P0 快捷键与面板；不作为自动化门禁。
 
-2. **继续 M0：buffer/tree/LSP 入 store + 树控制器抽取**  
-   把 `openFiles` 与目录展开状态迁入 `codeWorkspaceStore`；`renderEntries`/`renderFlatEntries` 抽到 ProjectTree 控制器；目标壳 <400 行。**未完成前不要开 M3 分屏。**
+2. **继续 M0 瘦身（目标壳 <400）**  
+   抽 `useWorkspaceTreeData`（loadDir/compact/flat + directories 缓存）；抽 `useWorkspaceLspSession`（open/change/save 管道）；命令注册表与 header 工具条组件化。**未完成前不要开 M3 分屏。**
 
 3. **合入主干**  
    8 例门禁 Rust 已绿；确认全量 `cargo test` / CI 后 merge。
