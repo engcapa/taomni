@@ -17,25 +17,17 @@ import {
   Braces,
   ChevronDown,
   ChevronRight,
-  File,
-  FilePlus,
-  Folder,
-  FolderOpen,
-  FolderPlus,
-  GitBranch,
-  Info,
-  List,
-  ListTree,
   Columns2,
+  File,
+  Folder,
+  GitBranch,
   Eye,
+  ListTree,
   Loader2,
-  Pencil,
   RefreshCw,
   RotateCcw,
   Save,
   Search,
-  Server,
-  Trash2,
   X,
   ZoomIn,
   ZoomOut,
@@ -120,6 +112,11 @@ import { SearchEverywhere, type GoToFileItem } from "./workspace/SearchEverywher
 import { RecentFilesPopup, type RecentFileEntry } from "./workspace/RecentFilesPopup";
 import { StructurePopup } from "./workspace/StructurePopup";
 import { createDoubleShiftDetector } from "./workspace/doubleShift";
+import {
+  FileTreePane,
+  type FileTreeViewMode,
+  type LspCustomCommandConfig,
+} from "./workspace/FileTreePane";
 import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
 import type {
   CodeWorkspaceFileRef,
@@ -190,7 +187,7 @@ type TreeSelection =
   | { kind: "file"; ref: CodeWorkspaceFileRef };
 
 type MarkdownViewMode = "edit" | "preview" | "split";
-type TreeViewMode = "tree" | "compact" | "flat";
+type TreeViewMode = FileTreeViewMode;
 
 const LSP_COMMAND_PREFS_KEY = "taomni.codeWorkspace.lspCommandPrefs.v1";
 const LSP_CUSTOM_COMMANDS_KEY = "taomni.codeWorkspace.lspCustomCommands.v1";
@@ -210,11 +207,6 @@ type MermaidApi = typeof import("mermaid").default;
 
 let mermaidReady = false;
 let mermaidPromise: Promise<MermaidApi> | null = null;
-
-interface LspCustomCommandConfig {
-  command: string;
-  args: string;
-}
 
 const DEFAULT_DIR_STATE: DirectoryState = {
   entries: [],
@@ -3049,82 +3041,39 @@ export function CodeWorkspaceTab({
         className="flex-1 min-h-0"
       >
         <Panel id="project" defaultSize="24%" minSize="15%" maxSize="45%" className="min-w-0">
-          <aside
-            ref={treePaneRef}
-            data-testid="code-workspace-tree-pane"
-            className="h-full min-h-0 flex flex-col border-r border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]"
+          <FileTreePane
+            paneRef={treePaneRef}
             style={treePaneStyle}
+            filter={treeFilter}
+            onFilterChange={setTreeFilter}
+            viewMode={treeViewMode}
+            onViewModeChange={setTreeViewMode}
+            fontSize={treeFontSize}
+            minFontSize={CODE_WORKSPACE_MIN_TREE_FONT_SIZE}
+            maxFontSize={CODE_WORKSPACE_MAX_TREE_FONT_SIZE}
+            defaultFontSize={CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE}
+            onFontSizeChange={setTreeFontSize}
+            onOpenFile={() => void openLooseFile()}
+            onAddFolder={() => void addRoot()}
+            canCreate={!!selectedRootDirectory}
+            canMutateSelection={!!selected}
+            onCreateFile={() => void createFile()}
+            onCreateDirectory={() => void createDir()}
+            onRename={() => void renameSelected()}
+            onDelete={() => void deleteSelected()}
+            languageServers={{
+              open: languagePanelOpen,
+              statuses: lspServerStatuses,
+              activeStatus: activeLspState?.status ?? null,
+              commandPrefs: lspCommandPrefs,
+              customCommands: lspCustomCommands,
+              customCommandId: CUSTOM_LSP_COMMAND_ID,
+              onToggle: () => setLanguagePanelOpen((value) => !value),
+              onRefresh: () => void refreshLspServerStatuses(),
+              onCommandChange: updateLspCommandPref,
+              onCustomCommandChange: updateLspCustomCommand,
+            }}
           >
-            <div className="h-9 shrink-0 flex items-center gap-2 overflow-x-auto px-2 border-b border-[var(--taomni-code-border)]">
-              <Search className="w-3.5 h-3.5 text-[var(--taomni-code-muted)]" />
-              <input
-                value={treeFilter}
-                onChange={(event) => setTreeFilter(event.target.value)}
-                placeholder="Filter"
-                className="min-w-0 flex-1 bg-transparent outline-none text-[var(--taomni-code-text)] placeholder:text-[var(--taomni-code-muted)]"
-                style={{ fontSize: "var(--taomni-code-tree-font-size)" }}
-              />
-              <div className="flex shrink-0 items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1">
-                <IconButton
-                  label="Tree view"
-                  testId="code-workspace-view-tree"
-                  icon={<ListTree className="w-3.5 h-3.5" />}
-                  active={treeViewMode === "tree"}
-                  onClick={() => setTreeViewMode("tree")}
-                />
-                <IconButton
-                  label="Compact tree view"
-                  testId="code-workspace-view-compact"
-                  icon={<Columns2 className="w-3.5 h-3.5" />}
-                  active={treeViewMode === "compact"}
-                  onClick={() => setTreeViewMode("compact")}
-                />
-                <IconButton
-                  label="Flat file view"
-                  testId="code-workspace-view-flat"
-                  icon={<List className="w-3.5 h-3.5" />}
-                  active={treeViewMode === "flat"}
-                  onClick={() => setTreeViewMode("flat")}
-                />
-              </div>
-              <div className="flex shrink-0 items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1">
-                <IconButton
-                  label="Tree zoom out"
-                  testId="code-workspace-tree-zoom-out"
-                  icon={<ZoomOut className="w-3.5 h-3.5" />}
-                  disabled={treeFontSize <= CODE_WORKSPACE_MIN_TREE_FONT_SIZE}
-                  onClick={() => stepTreeFontSize(-1)}
-                />
-                <button
-                  type="button"
-                  data-testid="code-workspace-tree-zoom-reset"
-                  title="Reset tree zoom"
-                  aria-label="Reset tree zoom"
-                  className="h-6 min-w-10 rounded px-1.5 text-[11px] tabular-nums text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
-                  onClick={() => setTreeFontSize(CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE)}
-                >
-                  {treeFontSize}px
-                </button>
-                <IconButton
-                  label="Tree zoom in"
-                  testId="code-workspace-tree-zoom-in"
-                  icon={<ZoomIn className="w-3.5 h-3.5" />}
-                  disabled={treeFontSize >= CODE_WORKSPACE_MAX_TREE_FONT_SIZE}
-                  onClick={() => stepTreeFontSize(1)}
-                />
-              </div>
-              <IconButton label="Open file" icon={<File className="w-3.5 h-3.5" />} onClick={() => void openLooseFile()} />
-              <IconButton label="Add folder" icon={<FolderOpen className="w-3.5 h-3.5" />} onClick={() => void addRoot()} />
-              <IconButton label="New file" icon={<FilePlus className="w-3.5 h-3.5" />} disabled={!selectedRootDirectory} onClick={() => void createFile()} />
-              <IconButton label="New directory" icon={<FolderPlus className="w-3.5 h-3.5" />} disabled={!selectedRootDirectory} onClick={() => void createDir()} />
-              <IconButton label="Rename" icon={<Pencil className="w-3.5 h-3.5" />} disabled={!selected} onClick={() => void renameSelected()} />
-              <IconButton label="Delete or remove" icon={<Trash2 className="w-3.5 h-3.5" />} disabled={!selected} onClick={() => void deleteSelected()} />
-            </div>
-            <div
-              data-testid="code-workspace-tree"
-              className="flex-1 min-h-0 overflow-auto py-1"
-              style={{ fontSize: "var(--taomni-code-tree-font-size)" }}
-            >
               {roots.length === 0 && looseFiles.length === 0 && (
                 <div className="px-3 py-2 text-[var(--taomni-code-muted)]">
                   Open a file or add a folder
@@ -3208,19 +3157,7 @@ export function CodeWorkspaceTab({
                   })}
                 </div>
               )}
-            </div>
-            <LanguageServersPanel
-              open={languagePanelOpen}
-              statuses={lspServerStatuses}
-              activeStatus={activeLspState?.status ?? null}
-              commandPrefs={lspCommandPrefs}
-              customCommands={lspCustomCommands}
-              onToggle={() => setLanguagePanelOpen((value) => !value)}
-              onRefresh={() => void refreshLspServerStatuses()}
-              onCommandChange={updateLspCommandPref}
-              onCustomCommandChange={updateLspCustomCommand}
-            />
-          </aside>
+          </FileTreePane>
         </Panel>
         <PanelResizeHandle className="w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
         <Panel id="editor" defaultSize="76%" minSize="35%" className="min-w-0">
@@ -3617,128 +3554,6 @@ function LspStatusPill({
     >
       {label}
     </span>
-  );
-}
-
-function LanguageServersPanel({
-  open,
-  statuses,
-  activeStatus,
-  commandPrefs,
-  customCommands,
-  onToggle,
-  onRefresh,
-  onCommandChange,
-  onCustomCommandChange,
-}: {
-  open: boolean;
-  statuses: LspServerStatus[];
-  activeStatus: LspDocumentStatus | null;
-  commandPrefs: Record<string, string>;
-  customCommands: Record<string, LspCustomCommandConfig>;
-  onToggle: () => void;
-  onRefresh: () => void;
-  onCommandChange: (presetId: string, commandId: string) => void;
-  onCustomCommandChange: (presetId: string, patch: Partial<LspCustomCommandConfig>) => void;
-}) {
-  const missingCount = statuses.filter((status) => !status.available).length;
-  return (
-    <section className="shrink-0 border-t border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]">
-      <div className="h-7 flex items-center text-[11px] font-semibold">
-        <button
-          type="button"
-          className="min-w-0 flex-1 h-full flex items-center gap-1.5 px-2 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
-          onClick={onToggle}
-        >
-          {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-          <Server className="w-3.5 h-3.5 text-[var(--taomni-code-muted)]" />
-          <span className="min-w-0 flex-1 truncate">Language Servers</span>
-          {missingCount > 0 && (
-            <span className="shrink-0 text-[10px] text-amber-500">{missingCount} missing</span>
-          )}
-        </button>
-        <button
-          type="button"
-          title="Refresh language servers"
-          aria-label="Refresh language servers"
-          className="mr-1 h-5 w-5 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)]"
-          onClick={onRefresh}
-        >
-          <RefreshCw className="w-3 h-3" />
-        </button>
-      </div>
-      {open && (
-        <div className="max-h-56 overflow-auto pb-1">
-          {activeStatus && (
-            <div className="px-2 py-1 border-b border-[var(--taomni-code-border)] text-[11px]">
-              <div className="flex items-center gap-1.5">
-                <Info className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-                <span className="min-w-0 flex-1 truncate">
-                  Active: {activeStatus.displayName ?? "None"}
-                </span>
-              </div>
-              {!activeStatus.active && activeStatus.installHint && (
-                <div className="mt-1 truncate font-mono text-[10px] text-amber-500" title={activeStatus.installHint}>
-                  {activeStatus.installHint}
-                </div>
-              )}
-            </div>
-          )}
-          {statuses.map((status) => {
-            const custom = customCommands[status.presetId] ?? { command: "", args: "" };
-            const selected = commandPrefs[status.presetId] ?? status.selectedCommandId ?? status.commands[0]?.id ?? "";
-            return (
-              <div key={status.presetId} className="px-2 py-1.5 text-[11px]">
-                <div className="flex items-center gap-1.5">
-                  <span
-                    data-available={status.available || undefined}
-                    className="h-2 w-2 shrink-0 rounded-full bg-amber-500 data-[available=true]:bg-[var(--taomni-accent)]"
-                  />
-                  <span className="min-w-0 flex-1 truncate">{status.displayName}</span>
-                  {status.active && <span className="shrink-0 text-[10px] text-[var(--taomni-accent)]">active</span>}
-                </div>
-                <select
-                  value={selected}
-                  className="mt-1 h-6 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-[11px] text-[var(--taomni-code-text)] outline-none"
-                  onChange={(event) => onCommandChange(status.presetId, event.target.value)}
-                  aria-label={`${status.displayName} language server command`}
-                >
-                  {status.commands.map((command) => (
-                    <option key={command.id} value={command.id}>
-                      {command.label}{command.fallback ? " fallback" : ""}
-                    </option>
-                  ))}
-                  <option value={CUSTOM_LSP_COMMAND_ID}>Custom command</option>
-                </select>
-                {selected === CUSTOM_LSP_COMMAND_ID && (
-                  <div className="mt-1 grid grid-cols-1 gap-1">
-                    <input
-                      value={custom.command}
-                      className="h-6 min-w-0 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 font-mono text-[11px] text-[var(--taomni-code-text)] outline-none"
-                      placeholder="Command or absolute path"
-                      aria-label={`${status.displayName} custom command`}
-                      onChange={(event) => onCustomCommandChange(status.presetId, { command: event.target.value })}
-                    />
-                    <input
-                      value={custom.args}
-                      className="h-6 min-w-0 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 font-mono text-[11px] text-[var(--taomni-code-text)] outline-none"
-                      placeholder="Args"
-                      aria-label={`${status.displayName} custom args`}
-                      onChange={(event) => onCustomCommandChange(status.presetId, { args: event.target.value })}
-                    />
-                  </div>
-                )}
-                {!status.available && (
-                  <div className="mt-1 truncate font-mono text-[10px] text-amber-500" title={status.installHint}>
-                    {status.installHint}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
   );
 }
 
