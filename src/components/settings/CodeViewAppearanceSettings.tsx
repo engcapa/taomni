@@ -15,6 +15,7 @@ import {
   isMonospaceFont,
   makeTerminalFontFamily,
   resolveSelectedFontName,
+  type SystemFontState,
   useSystemFonts,
   useTerminalFontOptions,
 } from "../../lib/systemFonts";
@@ -24,15 +25,28 @@ interface CodeViewAppearanceSettingsProps {
   profile: CodeViewProfile;
   terminalProfile: TerminalProfile;
   onProfileChange: (profile: CodeViewProfile) => void;
+  fontState?: SystemFontState;
 }
 
-export function CodeViewAppearanceSettings({
+export function CodeViewAppearanceSettings(props: CodeViewAppearanceSettingsProps) {
+  if (props.fontState) {
+    return <CodeViewAppearanceSettingsContent {...props} fontState={props.fontState} />;
+  }
+  return <CodeViewAppearanceSettingsWithFonts {...props} />;
+}
+
+function CodeViewAppearanceSettingsWithFonts(props: CodeViewAppearanceSettingsProps) {
+  const fontState = useSystemFonts();
+  return <CodeViewAppearanceSettingsContent {...props} fontState={fontState} />;
+}
+
+function CodeViewAppearanceSettingsContent({
   profile,
   terminalProfile,
   onProfileChange,
-}: CodeViewAppearanceSettingsProps) {
+  fontState,
+}: CodeViewAppearanceSettingsProps & { fontState: SystemFontState }) {
   const t = useT();
-  const fontState = useSystemFonts();
   const fontOptions = useTerminalFontOptions(fontState.fonts);
   const selectedFont = resolveSelectedFontName(profile.fontFamily, fontOptions);
   const showFontWarning = selectedFont ? !isMonospaceFont(selectedFont) : false;

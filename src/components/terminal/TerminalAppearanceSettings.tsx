@@ -19,6 +19,7 @@ import {
   isMonospaceFont,
   makeTerminalFontFamily,
   resolveSelectedFontName,
+  type SystemFontState,
   useSystemFonts,
   useTerminalFontOptions,
 } from "../../lib/systemFonts";
@@ -35,6 +36,7 @@ interface TerminalAppearanceSettingsProps {
   showPreview?: boolean;
   allowSystemTheme?: boolean;
   className?: string;
+  fontState?: SystemFontState;
 }
 
 function buildCursorOptions(t: TranslateFn): Array<{ label: string; style: TerminalCursorStyle; blink: boolean }> {
@@ -56,18 +58,30 @@ function buildRightClickOptions(t: TranslateFn): Array<{ label: string; value: T
   ];
 }
 
-export function TerminalAppearanceSettings({
+export function TerminalAppearanceSettings(props: TerminalAppearanceSettingsProps) {
+  if (props.fontState) {
+    return <TerminalAppearanceSettingsContent {...props} fontState={props.fontState} />;
+  }
+  return <TerminalAppearanceSettingsWithFonts {...props} />;
+}
+
+function TerminalAppearanceSettingsWithFonts(props: TerminalAppearanceSettingsProps) {
+  const fontState = useSystemFonts();
+  return <TerminalAppearanceSettingsContent {...props} fontState={fontState} />;
+}
+
+function TerminalAppearanceSettingsContent({
   profile,
   onProfileChange,
   showCustomColors = false,
   showPreview = true,
   allowSystemTheme = false,
   className = "",
-}: TerminalAppearanceSettingsProps) {
+  fontState,
+}: TerminalAppearanceSettingsProps & { fontState: SystemFontState }) {
   const t = useT();
   const cursorOptions = useMemo(() => buildCursorOptions(t), [t]);
   const rightClickOptions = useMemo(() => buildRightClickOptions(t), [t]);
-  const fontState = useSystemFonts();
   const isWindows = getAppPlatform() === "windows";
   const fontOptions = useTerminalFontOptions(fontState.fonts);
   const partitionedFonts = useMemo(() => {

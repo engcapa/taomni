@@ -441,6 +441,7 @@ export function SettingsPanel() {
               profile={codeViewProfile}
               terminalProfile={DEFAULT_TERMINAL_PROFILE}
               onProfileChange={setCodeViewProfile}
+              fontState={systemFonts}
             />
           </SettingsAnchor>
 
@@ -477,6 +478,7 @@ export function SettingsPanel() {
               onProfileChange={handleTerminalDefaultProfileChange}
               showCustomColors
               allowSystemTheme
+              fontState={systemFonts}
             />
           </SettingsAnchor>
 
