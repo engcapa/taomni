@@ -44,6 +44,12 @@ const ipcMocks = vi.hoisted(() => ({
   selectFolderPath: vi.fn(),
 }));
 
+const clipboardMocks = vi.hoisted(() => ({
+  writeText: vi.fn(async () => {}),
+}));
+
+vi.mock("../../lib/clipboard", () => clipboardMocks);
+
 const gitMocks = vi.hoisted(() => ({
   gitSnapshot: vi.fn(),
   gitChangeLabel: vi.fn((change: { conflict?: boolean; status: string }) => (
@@ -768,5 +774,38 @@ describe("CodeWorkspaceTab", () => {
     fireEvent.click(screen.getByRole("tab", { name: /Problems/ }));
     expect(await screen.findByText("Identifier expected")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Show error diagnostics" })).toHaveTextContent("1");
+  });
+
+  it("offers tree context menu actions: copy path and scoped search", async () => {
+    clipboardMocks.writeText.mockClear();
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-menu",
+      workspaceInstanceId: "instance-menu",
+      name: "Menu",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([
+      entry("src", "src", "dir"),
+      entry("README.md", "README.md"),
+    ]);
+
+    renderWorkspace(workspace);
+
+    const fileRow = await screen.findByTestId("code-workspace-tree-file");
+    fireEvent.contextMenu(fileRow);
+    fireEvent.click(await screen.findByRole("button", { name: "Copy Relative Path" }));
+    await waitFor(() => expect(clipboardMocks.writeText).toHaveBeenCalledWith("README.md"));
+
+    fireEvent.contextMenu(fileRow);
+    fireEvent.click(await screen.findByRole("button", { name: "Copy Path" }));
+    await waitFor(() => expect(clipboardMocks.writeText).toHaveBeenCalledWith("/repo/app/README.md"));
+
+    const dirRow = await screen.findByTestId("code-workspace-tree-dir");
+    fireEvent.contextMenu(dirRow);
+    fireEvent.click(await screen.findByRole("button", { name: "Find in Directory..." }));
+    expect(screen.getByRole("tab", { name: /Search/, selected: true })).toBeInTheDocument();
+    expect(screen.getByLabelText("Include globs")).toHaveValue("src/**");
   });
 });

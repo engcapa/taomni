@@ -93,6 +93,8 @@ import { DEFAULT_TERMINAL_PROFILE } from "../../lib/terminalProfile";
 import { renderFormatted } from "../../lib/chat/renderFormatted";
 import { useAppStore } from "../../stores/appStore";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
+import { writeText } from "../../lib/clipboard";
+import { useContextMenu } from "../ContextMenu";
 import { CodeMirrorHost } from "./workspace/CodeMirrorHost";
 import { BottomDock } from "./workspace/panels/BottomDock";
 import {
@@ -762,6 +764,7 @@ export function CodeWorkspaceTab({
   const [bottomDockOpen, setBottomDockOpen] = useState(true);
   const [bottomDockTab, setBottomDockTab] = useState<"problems" | "search" | "references">("references");
   const [searchFocusNonce, setSearchFocusNonce] = useState(0);
+  const [searchIncludePreset, setSearchIncludePreset] = useState<{ value: string; nonce: number }>({ value: "", nonce: 0 });
   const [searchEverywhereOpen, setSearchEverywhereOpen] = useState(false);
   const [lspCommandPrefs, setLspCommandPrefs] = useState<Record<string, string>>(() => readLspCommandPrefs());
   const [lspCustomCommands, setLspCustomCommands] = useState<Record<string, LspCustomCommandConfig>>(() => readLspCustomCommands());
@@ -1576,6 +1579,32 @@ export function CodeWorkspaceTab({
     [openFile],
   );
 
+  const findInDirectory = useCallback((path: string) => {
+    setBottomDockOpen(true);
+    setBottomDockTab("search");
+    setSearchIncludePreset((current) => ({
+      value: path ? `${path}/**` : "",
+      nonce: current.nonce + 1,
+    }));
+  }, []);
+
+  const copyTreePath = useCallback(
+    async (rootId: string, path: string, absolute: boolean) => {
+      const root = findRoot(rootId);
+      if (!root) return;
+      const text = absolute
+        ? (path ? `${normalizeFsPath(root.path)}/${path}` : normalizeFsPath(root.path))
+        : path || normalizeFsPath(root.path);
+      try {
+        await writeText(text);
+        setStatusMessage(`Copied ${text}`);
+      } catch (err) {
+        setStatusMessage(errorMessage(err));
+      }
+    },
+    [findRoot, setStatusMessage],
+  );
+
   useEffect(() => {
     const ref = initialFileRef(workspace, roots, looseFiles);
     if (!ref) return;
@@ -1668,22 +1697,23 @@ export function CodeWorkspaceTab({
     return roots[0] ? { rootId: roots[0].id, path: "" } : null;
   }, [activeKey, openFiles, roots, selected]);
 
-  const createFile = useCallback(async () => {
-    if (!selectedRootDirectory) {
+  const createFile = useCallback(async (target?: { rootId: string; path: string }) => {
+    const directory = target ?? selectedRootDirectory;
+    if (!directory) {
       setStatusMessage("Add a folder before creating files");
       return;
     }
     const name = await promptAppDialog({
       title: "New file",
       label: "File name",
-      initialValue: selectedRootDirectory.path ? `${selectedRootDirectory.path}/` : "",
+      initialValue: directory.path ? `${directory.path}/` : "",
     });
     if (!name) return;
-    const root = findRoot(selectedRootDirectory.rootId);
+    const root = findRoot(directory.rootId);
     if (!root) return;
     const path = name.includes("/") || name.includes("\\")
       ? name.trim().replace(/\\/g, "/").replace(/^\/+/, "")
-      : joinRelativePath(selectedRootDirectory.path, name);
+      : joinRelativePath(directory.path, name);
     try {
       const file = await workspaceCreateFile(root.path, path);
       await loadDir(root.id, parentPath(file.path));
@@ -1697,22 +1727,23 @@ export function CodeWorkspaceTab({
     }
   }, [findRoot, loadDir, notifyWorkspacePathGitChanged, openFile, selectedRootDirectory, setStatusMessage]);
 
-  const createDir = useCallback(async () => {
-    if (!selectedRootDirectory) {
+  const createDir = useCallback(async (target?: { rootId: string; path: string }) => {
+    const directory = target ?? selectedRootDirectory;
+    if (!directory) {
       setStatusMessage("Add a folder before creating directories");
       return;
     }
     const name = await promptAppDialog({
       title: "New directory",
       label: "Directory name",
-      initialValue: selectedRootDirectory.path ? `${selectedRootDirectory.path}/` : "",
+      initialValue: directory.path ? `${directory.path}/` : "",
     });
     if (!name) return;
-    const root = findRoot(selectedRootDirectory.rootId);
+    const root = findRoot(directory.rootId);
     if (!root) return;
     const path = name.includes("/") || name.includes("\\")
       ? name.trim().replace(/\\/g, "/").replace(/^\/+/, "")
-      : joinRelativePath(selectedRootDirectory.path, name);
+      : joinRelativePath(directory.path, name);
     try {
       const entry = await workspaceCreateDir(root.path, path);
       await loadDir(root.id, parentPath(entry.path));
@@ -1725,18 +1756,19 @@ export function CodeWorkspaceTab({
     }
   }, [findRoot, loadDir, notifyWorkspacePathGitChanged, selectedRootDirectory, setStatusMessage]);
 
-  const renameSelected = useCallback(async () => {
-    if (!selected) return;
-    if (selected.kind === "root") {
-      const root = findRoot(selected.rootId);
+  const renameSelected = useCallback(async (target?: TreeSelection) => {
+    const selection = target ?? selected;
+    if (!selection) return;
+    if (selection.kind === "root") {
+      const root = findRoot(selection.rootId);
       if (!root) return;
       const name = await promptAppDialog({ title: "Rename root", label: "Display name", initialValue: root.name });
       if (!name || name === root.name) return;
       setRoots((current) => current.map((item) => item.id === root.id ? { ...item, name } : item));
       return;
     }
-    if (selected.kind === "file" && selected.ref.kind === "loose") {
-      const ref = selected.ref;
+    if (selection.kind === "file" && selection.ref.kind === "loose") {
+      const ref = selection.ref;
       const loose = looseFilesRef.current.find((item) => item.id === ref.id);
       if (!loose) return;
       const name = await promptAppDialog({ title: "Rename loose file", label: "Display name", initialValue: loose.name });
@@ -1744,10 +1776,10 @@ export function CodeWorkspaceTab({
       setLooseFiles((current) => current.map((item) => item.id === loose.id ? { ...item, name } : item));
       return;
     }
-    const rootTarget = selected.kind === "dir"
-      ? { rootId: selected.rootId, path: selected.path }
-      : selected.ref.kind === "root"
-        ? { rootId: selected.ref.rootId, path: selected.ref.path }
+    const rootTarget = selection.kind === "dir"
+      ? { rootId: selection.rootId, path: selection.path }
+      : selection.ref.kind === "root"
+        ? { rootId: selection.ref.rootId, path: selection.ref.path }
         : null;
     if (!rootTarget) return;
     const rootId = rootTarget.rootId;
@@ -1801,10 +1833,11 @@ export function CodeWorkspaceTab({
     }
   }, [findRoot, loadDir, notifyWorkspacePathGitChanged, selected, setStatusMessage]);
 
-  const deleteSelected = useCallback(async () => {
-    if (!selected) return;
-    if (selected.kind === "root") {
-      const root = findRoot(selected.rootId);
+  const deleteSelected = useCallback(async (target?: TreeSelection) => {
+    const selection = target ?? selected;
+    if (!selection) return;
+    if (selection.kind === "root") {
+      const root = findRoot(selection.rootId);
       if (!root) return;
       const confirmed = await confirmAppDialog({
         title: "Remove folder",
@@ -1825,8 +1858,8 @@ export function CodeWorkspaceTab({
       setSelected(null);
       return;
     }
-    if (selected.kind === "file" && selected.ref.kind === "loose") {
-      const ref = selected.ref;
+    if (selection.kind === "file" && selection.ref.kind === "loose") {
+      const ref = selection.ref;
       const confirmed = await confirmAppDialog({
         title: "Remove loose file",
         message: `Remove ${ref.path} from this workspace? The file on disk is not deleted.`,
@@ -1846,10 +1879,10 @@ export function CodeWorkspaceTab({
       setSelected(null);
       return;
     }
-    const rootTarget = selected.kind === "dir"
-      ? { rootId: selected.rootId, path: selected.path }
-      : selected.ref.kind === "root"
-        ? { rootId: selected.ref.rootId, path: selected.ref.path }
+    const rootTarget = selection.kind === "dir"
+      ? { rootId: selection.rootId, path: selection.path }
+      : selection.ref.kind === "root"
+        ? { rootId: selection.ref.rootId, path: selection.ref.path }
         : null;
     if (!rootTarget) return;
     const rootId = rootTarget.rootId;
@@ -1864,7 +1897,7 @@ export function CodeWorkspaceTab({
     });
     if (!confirmed) return;
     try {
-      await workspaceDeletePath(root.path, selectedPath, selected.kind === "dir");
+      await workspaceDeletePath(root.path, selectedPath, selection.kind === "dir");
       await loadDir(root.id, parentPath(selectedPath));
       setExpandedDirs((current) => {
         const next = new Set<string>();
@@ -1891,6 +1924,56 @@ export function CodeWorkspaceTab({
       setStatusMessage(errorMessage(err));
     }
   }, [findRoot, loadDir, notifyWorkspacePathGitChanged, selected, setStatusMessage]);
+
+  const treeContextMenu = useContextMenu();
+
+  const showTreeContextMenu = useCallback(
+    (event: React.MouseEvent, selection: TreeSelection) => {
+      setSelected(selection);
+      if (selection.kind === "file" && selection.ref.kind === "root") {
+        const ref = selection.ref;
+        const dir = parentPath(ref.path);
+        treeContextMenu.show(event, [
+          { label: "Open", onClick: () => void openFile(ref) },
+          { separator: true, label: "" },
+          { label: "New File...", onClick: () => void createFile({ rootId: ref.rootId, path: dir }) },
+          { label: "New Directory...", onClick: () => void createDir({ rootId: ref.rootId, path: dir }) },
+          { label: "Rename...", onClick: () => void renameSelected(selection) },
+          { label: "Delete", danger: true, onClick: () => void deleteSelected(selection) },
+          { separator: true, label: "" },
+          { label: "Copy Path", onClick: () => void copyTreePath(ref.rootId, ref.path, true) },
+          { label: "Copy Relative Path", onClick: () => void copyTreePath(ref.rootId, ref.path, false) },
+        ]);
+        return;
+      }
+      if (selection.kind === "dir") {
+        treeContextMenu.show(event, [
+          { label: "New File...", onClick: () => void createFile({ rootId: selection.rootId, path: selection.path }) },
+          { label: "New Directory...", onClick: () => void createDir({ rootId: selection.rootId, path: selection.path }) },
+          { label: "Rename...", onClick: () => void renameSelected(selection) },
+          { label: "Delete", danger: true, onClick: () => void deleteSelected(selection) },
+          { separator: true, label: "" },
+          { label: "Find in Directory...", onClick: () => findInDirectory(selection.path) },
+          { separator: true, label: "" },
+          { label: "Copy Path", onClick: () => void copyTreePath(selection.rootId, selection.path, true) },
+          { label: "Copy Relative Path", onClick: () => void copyTreePath(selection.rootId, selection.path, false) },
+        ]);
+        return;
+      }
+      if (selection.kind === "root") {
+        treeContextMenu.show(event, [
+          { label: "New File...", onClick: () => void createFile({ rootId: selection.rootId, path: "" }) },
+          { label: "New Directory...", onClick: () => void createDir({ rootId: selection.rootId, path: "" }) },
+          { label: "Rename Root...", onClick: () => void renameSelected(selection) },
+          { separator: true, label: "" },
+          { label: "Copy Path", onClick: () => void copyTreePath(selection.rootId, "", true) },
+          { separator: true, label: "" },
+          { label: "Remove from Workspace", danger: true, onClick: () => void deleteSelected(selection) },
+        ]);
+      }
+    },
+    [copyTreePath, createDir, createFile, deleteSelected, findInDirectory, openFile, renameSelected, treeContextMenu],
+  );
 
   const updateFileText = useCallback((key: string, text: string) => {
     setOpenFiles((current) => {
@@ -2528,6 +2611,7 @@ export function CodeWorkspaceTab({
                     setSelected({ kind: "file", ref });
                     void openFile(ref);
                   }}
+                  onContextMenu={(event) => showTreeContextMenu(event, { kind: "file", ref })}
                 >
                   <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
                   <span className="truncate">{entry.path}</span>
@@ -2603,6 +2687,7 @@ export function CodeWorkspaceTab({
                 setSelected({ kind: "dir", rootId: root.id, path: displayPath });
                 toggleDir(root.id, displayPath);
               }}
+              onContextMenu={(event) => showTreeContextMenu(event, { kind: "dir", rootId: root.id, path: displayPath })}
             >
               {isExpanded ? (
                 <ChevronDown className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
@@ -2648,6 +2733,7 @@ export function CodeWorkspaceTab({
             setSelected({ kind: "file", ref });
             void openFile(ref);
           }}
+          onContextMenu={(event) => showTreeContextMenu(event, { kind: "file", ref })}
         >
           <span className="w-3.5 shrink-0" />
           <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
@@ -2837,6 +2923,7 @@ export function CodeWorkspaceTab({
                       className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 px-2 text-left font-semibold hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
                       title={root.path}
                       onClick={() => toggleRoot(root.id)}
+                      onContextMenu={(event) => showTreeContextMenu(event, { kind: "root", rootId: root.id })}
                     >
                       {expanded ? (
                         <ChevronDown className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
@@ -3079,6 +3166,7 @@ export function CodeWorkspaceTab({
               <FindInFilesPanel
                 roots={roots}
                 focusNonce={searchFocusNonce}
+                includePreset={searchIncludePreset}
                 onOpenMatch={openSearchMatch}
               />
             ),
@@ -3108,6 +3196,7 @@ export function CodeWorkspaceTab({
         onClose={() => setSearchEverywhereOpen(false)}
         onOpenFile={openGoToFileItem}
       />
+      {treeContextMenu.render}
     </div>
   );
 }

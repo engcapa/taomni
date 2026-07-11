@@ -14,6 +14,8 @@ interface FindInFilesPanelProps {
   onOpenMatch: (match: WorkspaceSearchMatch) => void;
   /** Bump to move focus into the query input (Ctrl+Shift+F). */
   focusNonce?: number;
+  /** Bump the nonce to overwrite the include globs ("Find in Directory..."). */
+  includePreset?: { value: string; nonce: number };
 }
 
 interface MatchGroup {
@@ -72,7 +74,7 @@ function groupTitle(match: WorkspaceSearchMatch): string {
   return `${match.rootName}/${match.path}`;
 }
 
-export function FindInFilesPanel({ roots, onOpenMatch, focusNonce = 0 }: FindInFilesPanelProps) {
+export function FindInFilesPanel({ roots, onOpenMatch, focusNonce = 0, includePreset }: FindInFilesPanelProps) {
   const [query, setQuery] = useState("");
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [wholeWord, setWholeWord] = useState(false);
@@ -93,6 +95,16 @@ export function FindInFilesPanel({ roots, onOpenMatch, focusNonce = 0 }: FindInF
     inputRef.current?.focus();
     inputRef.current?.select();
   }, [focusNonce]);
+
+  const appliedPresetNonceRef = useRef(0);
+  useEffect(() => {
+    if (!includePreset || includePreset.nonce === 0) return;
+    if (includePreset.nonce === appliedPresetNonceRef.current) return;
+    appliedPresetNonceRef.current = includePreset.nonce;
+    setIncludeGlobs(includePreset.value);
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [includePreset]);
 
   const teardownSearch = useCallback(() => {
     unlistenRef.current?.();
