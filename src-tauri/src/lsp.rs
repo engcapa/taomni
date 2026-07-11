@@ -1567,11 +1567,12 @@ pub async fn lsp_prepare_rename(
                 .get("placeholder")
                 .and_then(Value::as_str)
                 .map(ToString::to_string);
+            let allowed = range.is_some() || placeholder.is_some();
             Ok(LspPrepareRenameResult {
                 status,
                 range,
                 placeholder,
-                allowed: range.is_some() || placeholder.is_some(),
+                allowed,
                 message: None,
             })
         }
@@ -2540,6 +2541,7 @@ fn parse_workspace_symbol(value: &Value) -> Option<LspWorkspaceSymbol> {
         .get("selectionRange")
         .and_then(parse_range)
         .unwrap_or_else(|| range.clone());
+    let path = path_from_uri(&uri);
     Some(LspWorkspaceSymbol {
         name,
         kind,
@@ -2549,7 +2551,7 @@ fn parse_workspace_symbol(value: &Value) -> Option<LspWorkspaceSymbol> {
             .filter(|name| !name.is_empty())
             .map(ToString::to_string),
         uri,
-        path: path_from_uri(&uri),
+        path,
         range,
         selection_range,
     })

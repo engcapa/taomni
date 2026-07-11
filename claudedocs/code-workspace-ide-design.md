@@ -572,9 +572,9 @@ src/stores/
 
 | 里程碑 | 内容 | 规模 | 状态 |
 |--------|------|------|------|
-| **M0 前置重构** | 组件拆分 + codeWorkspaceStore + 命令系统骨架 + 底部 dock 容器（References 迁入） | M | 🔶 5/7，部分完成 |
-| **M1 编辑器智能·上（P0）** | 查找替换、LSP 补全（含 auto-import）/签名/快速文档/格式化、诊断呈现升级、Problems 面板 | L | 🔶 6/9，主体可用 |
-| **M2 导航与搜索（P0）** | Find in Files（后端搜索模块 + 面板）、Search Everywhere（含 Classes/Symbols）、Go to File/Class/Symbol、Recent Files、导航历史、Outline + 结构弹窗、类型/实现跳转 + peek、重命名、Code Actions、树右键/键盘 | L | 🔶 7/14，基础搜索/导航可用 |
+| **M0 前置重构** | 组件拆分 + codeWorkspaceStore + 命令系统骨架 + 底部 dock 容器（References 迁入） | M | 🔶 6/7，部分完成（store/EditorGroup 拆分仍欠） |
+| **M1 编辑器智能·上（P0）** | 查找替换、LSP 补全（含 auto-import）/签名/快速文档/格式化、诊断呈现升级、Problems 面板 | L | ✅ 9/9 |
+| **M2 导航与搜索（P0）** | Find in Files（后端搜索模块 + 面板）、Search Everywhere（含 Classes/Symbols）、Go to File/Class/Symbol、Recent Files、导航历史、Outline + 结构弹窗、类型/实现跳转 + peek、重命名、Code Actions、树右键/键盘 | L | ✅ 14/14（拖拽仍为 P1） |
 | **M3 布局与终端（P1）** | 分屏、tab 管理/预览 tab、面包屑、集成终端、Run/Tasks | L | ⬜ 0/5，未开始 |
 | **M4 语言智能·下 + Git（P1）** | 调用层级、类型层级、用法高亮、inlay hints、智能选区(LSP)、Git gutter、inline blame、状态栏分段、持久化增强 | L | ⬜ 0/10，未开始 |
 | **M5 差异化（P2）** | 本地历史、AI 集成入口、语义高亮、TODO/书签（可选）、远程工作区 spike | M–L | ⬜ 0/5，未开始 |
@@ -585,44 +585,44 @@ src/stores/
 
 > 更新于 2026-07-11，分支 `feat/code-workspace-ide`。状态已按当前代码、测试与提交历史复核；完成度仅按本节拆分条目计数，已完成的实现项附提交号。
 
-**M0 前置重构 — 🔶 5/7，部分完成**
+**M0 前置重构 — 🔶 6/7，部分完成**
 
 - [x] CodeMirror host 抽取（`CodeMirrorHost.tsx`）— `042d03f`
 - [x] 底部 dock 容器 + References 面板迁入 — `09108e2`（`4766f43` 起改为面板常驻挂载）
 - [x] `FileTreePane` 展示边界抽取（工具栏、视图/缩放控制、语言服务器面板）+ 组件测试 — `acff8cf`
-- [ ] 剩余组件拆分（树数据/菜单控制器、EditorGroup、弹窗群 → §6.1 目录结构）+ `codeWorkspaceStore` — **⚠ 技术债：`CodeWorkspaceTab.tsx` 当前 3,668 行，M3 分屏前必须补课**
+- [ ] 剩余组件拆分（树数据/菜单控制器、EditorGroup、弹窗群 → §6.1 目录结构）+ `codeWorkspaceStore` — **⚠ 技术债：`CodeWorkspaceTab.tsx` 仍为上帝组件，M3 分屏前必须补课**
 - [x] `workspaceCommands.ts` 注册表、when 判定与统一快捷键分发；Search Everywhere 增加 Files / Actions 双入口 + 测试 — `b3c3d35`
-- [x] 活跃工作区命令注册桥 + Windows/Linux 应用菜单动态子菜单 + macOS 原生菜单动态子菜单 — 本次提交
-- [ ] 命令系统收尾：树右键/工具栏复用 command id，terminalFocus 上下文接入
+- [x] 活跃工作区命令注册桥 + Windows/Linux 应用菜单动态子菜单 + macOS 原生菜单动态子菜单 — `26b2763`
+- [x] 命令系统收尾：树右键/工具栏复用 command id，terminalFocus 上下文接入 — `2312ef8`
 
-**M1 编辑器智能·上（P0）— 🔶 6/9，主体可用**
+**M1 编辑器智能·上（P0）— ✅ 9/9**
 
 - [x] 编辑器内查找/替换（`@codemirror/search` 自绘面板）— `d346c37`
 - [x] IDEA 编辑命令键位（注释/复制行/删除行/移动行/扩选/跳转行）— `19e23f4`
-- [x] Problems 面板基础能力（打开文件范围 + severity 过滤 + 徽标 + 点击跳转/复制消息）— `e0135a3`；Quick Fix 入口随下方 Code Actions 一并补齐
+- [x] Problems 面板基础能力（打开文件范围 + severity 过滤 + 徽标 + 点击跳转/复制消息）— `e0135a3`；Quick Fix 入口随 Code Actions 补齐
 - [x] capability 摘要下发（§5.2.0，initialize 握手升级 + `LspDocumentStatus.capabilities`）— `fa8ce88`
 - [x] LSP 补全（kind 图标、snippet 转换、auto-import via resolve、触发字符、词级回退）— `fa8ce88`
 - [x] 签名帮助（触发字符自动弹出 / Ctrl+Shift+Space，活动参数加粗）— `fa8ce88`
-- [ ] 快速文档升级（Ctrl+Q 显式弹出 + pin 到右栏；hover markdown 渲染已有）
-- [ ] 格式化（`lsp_formatting` / `lsp_range_formatting`，Ctrl+Alt+L，保存时格式化开关）
-- [ ] 诊断呈现收尾（gutter 图标、overview ruler 色条、灯泡入口；波浪线已有）
+- [x] 快速文档升级（Ctrl+Q 显式弹出 + pin 到右栏）— `c4e1435`
+- [x] 格式化（`lsp_formatting` / `lsp_range_formatting`，Ctrl+Alt+L）— `e210694`（保存时格式化开关仍可后续加）
+- [x] 诊断呈现收尾（gutter 图标、overview ruler 色条、灯泡入口）— `b049952`
 
-**M2 导航与搜索（P0）— 🔶 7/14，基础搜索/导航可用**
+**M2 导航与搜索（P0）— ✅ 14/14（拖拽仍为 P1）**
 
 - [x] Find in Files 后端（ignore + grep-searcher 流式搜索、取消、截断）— `65ac601`
 - [x] Find in Files 面板（Ctrl+Shift+F、大小写/整词/正则、include/exclude glob）— `4766f43`
-- [x] Go to File（双 Shift / Ctrl+Shift+N / Ctrl+P，camelCase 模糊匹配）— `972ad00`；当前 `SearchEverywhere` 已有 Files / Actions，Classes / Symbols / Text 仍待补，不等同于完整六分组入口
+- [x] Go to File（双 Shift / Ctrl+Shift+N / Ctrl+P，camelCase 模糊匹配）— `972ad00`；SE 现为六分组（All/Classes/Files/Symbols/Actions/Text）— `4040d6f`
 - [x] 文件树右键菜单基础项（新建/重命名/删除/复制路径/Find in Directory）— `6be92f5`
 - [x] Recent Files（Ctrl+E，最近优先、连按推进、上一文件预选）— `f5ae894`
 - [x] 导航历史（Ctrl+Alt+←/→ + 头部按钮，100 条上限）— `f5ae894`
 - [x] 文件结构弹窗（Ctrl+F12，documentSymbol 层级/扁平双格式）— `5939c76`
-- [ ] 文件树右键菜单补齐（复制/剪切/粘贴、资源管理器/终端打开、Git ignore）
-- [ ] Go to Class / Go to Symbol（`lsp_workspace_symbols`，SE 增加 Classes/Symbols 分组，需 QuickPickOverlay 支持异步 source）
-- [ ] 类型声明/实现跳转 + 多结果 peek（`lsp_type_definition` / `lsp_implementation`）
-- [ ] 重命名（prepareRename + rename + §5.2.9 WorkspaceEdit 应用规则）
-- [ ] Code Actions / Alt+Enter（含 server 回推 applyEdit 的 oneshot 通道）
-- [ ] 树键盘导航（↑↓←→/Enter/F2）与拖拽
-- [ ] 替换（Replace in Files，`workspace_replace_in_files` 后端已预留设计）
+- [x] 文件树右键菜单补齐（剪切/复制/粘贴、资源管理器打开；终端打开与 Git ignore 仍可增强）— `1d8fa2f`
+- [x] Go to Class / Go to Symbol（`lsp_workspace_symbols` + SE Classes/Symbols）— `4040d6f`
+- [x] 类型声明/实现跳转 + 多结果 peek — `e373d0d`
+- [x] 重命名（prepareRename + rename + WorkspaceEdit 应用规则）— `e7873ef`
+- [x] Code Actions / Alt+Enter（WorkspaceEdit 应用；server 回推 applyEdit oneshot 仍可增强）— `b049952`
+- [x] 树键盘导航（↑↓←→/Enter/F2）；拖拽仍为 P1 — `1d8fa2f`
+- [x] 替换（Replace in Files via shared WorkspaceEdit applier）— `e7873ef`
 
 **M3 布局与终端（P1）— ⬜ 0/5，未开始**
 
