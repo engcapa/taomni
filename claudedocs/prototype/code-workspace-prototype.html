@@ -1,0 +1,1322 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Taomni Code Workspace 交互原型</title>
+<style>
+  :root{
+    --bg:#1e1f22; --panel:#2b2d30; --panel2:#26282b; --border:#393b40;
+    --fg:#bcbec4; --fg-dim:#7a7e85; --fg-bright:#dfe1e5;
+    --accent:#3574f0; --accent-dim:#25324d;
+    --err:#f75464; --warn:#d6ae58; --ok:#5fad65;
+    --git-add:#5fad65; --git-mod:#4a88c7; --git-del:#f75464;
+    --sel:#2e436e; --hover:#35373b;
+    --mono:"JetBrains Mono","Cascadia Code",Consolas,ui-monospace,monospace;
+    --ui:"Segoe UI",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:var(--ui);font-size:13px;color:var(--fg);background:var(--bg);overflow:hidden;user-select:none}
+  .app{display:flex;flex-direction:column;height:100vh}
+
+  /* ============ 工具条 ============ */
+  .toolbar{display:flex;align-items:center;gap:8px;height:38px;padding:0 10px;background:var(--panel);border-bottom:1px solid var(--border);flex:none}
+  .proto-badge{font-size:10px;padding:2px 6px;border-radius:4px;background:var(--accent-dim);color:#9ebcf5;letter-spacing:1px}
+  .ws-chip{display:flex;align-items:center;gap:6px;padding:3px 10px;border-radius:6px;background:var(--panel2);border:1px solid var(--border);color:var(--fg-bright);font-weight:600}
+  .ws-chip small{color:var(--fg-dim);font-weight:400}
+  .se-box{flex:1;max-width:420px;margin:0 auto;display:flex;align-items:center;gap:8px;height:26px;padding:0 10px;border-radius:13px;background:var(--panel2);border:1px solid var(--border);color:var(--fg-dim);cursor:pointer}
+  .se-box:hover{border-color:var(--accent)}
+  .se-box kbd{margin-left:auto}
+  .tb-group{display:flex;gap:2px}
+  .tb-btn{display:flex;align-items:center;justify-content:center;width:28px;height:26px;border:none;border-radius:6px;background:transparent;color:var(--fg);cursor:pointer;font-size:14px}
+  .tb-btn:hover{background:var(--hover)}
+  .tb-btn.on{background:var(--accent-dim);color:#9ebcf5}
+  .tb-btn:disabled{opacity:.35;cursor:default}
+  kbd{font-family:var(--ui);font-size:10px;color:var(--fg-dim);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 5px;white-space:nowrap}
+
+  /* ============ 主区 ============ */
+  .main{display:flex;flex:1;min-height:0}
+  .side{background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;flex:none;overflow:hidden}
+  .side.right{border-right:none;border-left:1px solid var(--border)}
+  .side.left{width:235px}
+  .side.right{width:265px}
+  body.hide-left .side.left,body.hide-right .side.right,body.hide-bottom .dock{display:none}
+  .side-head{display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;font-weight:600;color:var(--fg-bright);border-bottom:1px solid var(--border);flex:none}
+  .side-head .spacer{flex:1}
+  .side-tabs{display:flex;gap:2px;padding:4px 6px;border-bottom:1px solid var(--border)}
+  .side-tabs button{border:none;background:transparent;color:var(--fg-dim);padding:4px 8px;border-radius:5px;cursor:pointer;font-size:12px}
+  .side-tabs button.on{background:var(--hover);color:var(--fg-bright)}
+  .scroll{overflow:auto;flex:1;min-height:0}
+
+  /* ---- 文件树 ---- */
+  .tree{padding:4px 0;font-size:12.5px}
+  .node{display:flex;align-items:center;gap:5px;height:24px;padding-right:8px;cursor:pointer;white-space:nowrap}
+  .node:hover{background:var(--hover)}
+  .node.sel{background:var(--sel)}
+  .node .tw{width:14px;text-align:center;color:var(--fg-dim);font-size:9px;flex:none}
+  .node .ic{flex:none}
+  .node.git-mod .nm{color:#6897d4}
+  .node.git-add .nm{color:#78b878}
+  .kids{display:none}
+  .kids.open{display:block}
+
+  /* ---- 编辑区 ---- */
+  .center{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+  .panes{flex:1;display:flex;min-height:0}
+  .pane{flex:1;display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--border)}
+  .pane:last-child{border-right:none}
+  .pane.inactive .tabs{opacity:.75}
+  .tabs{display:flex;align-items:flex-end;height:32px;background:var(--panel);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;flex:none}
+  .tab{display:flex;align-items:center;gap:6px;height:31px;padding:0 10px;border-right:1px solid var(--border);cursor:pointer;color:var(--fg-dim);white-space:nowrap;font-size:12.5px}
+  .tab:hover{background:var(--hover)}
+  .tab.on{background:var(--bg);color:var(--fg-bright);box-shadow:inset 0 2px 0 var(--accent)}
+  .tab.preview .nm{font-style:italic}
+  .tab .dot{width:7px;height:7px;border-radius:50%;background:var(--fg-dim);display:none}
+  .tab.dirty .dot{display:block;background:#d5b778}
+  .tab .pin{display:none;font-size:10px}
+  .tab.pinned .pin{display:inline}
+  .tab .x{border:none;background:none;color:var(--fg-dim);cursor:pointer;font-size:12px;padding:0 2px;border-radius:3px}
+  .tab .x:hover{background:var(--border);color:var(--fg-bright)}
+  .crumbs{display:flex;align-items:center;gap:4px;height:24px;padding:0 12px;font-size:11.5px;color:var(--fg-dim);border-bottom:1px solid var(--border);flex:none;overflow:hidden;white-space:nowrap}
+  .crumbs .seg{cursor:pointer;padding:1px 4px;border-radius:4px}
+  .crumbs .seg:hover{background:var(--hover);color:var(--fg-bright)}
+  .crumbs .sym-seg{color:#d5b778}
+
+  /* ---- 代码 ---- */
+  .editor{flex:1;overflow:auto;font-family:var(--mono);font-size:12.5px;line-height:1.65;position:relative}
+  .findbar{display:none;position:sticky;top:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--border);padding:5px 10px;align-items:center;gap:8px;font-family:var(--ui)}
+  .findbar.open{display:flex}
+  .findbar input{width:220px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--fg-bright);padding:3px 8px;font-size:12px;outline:none}
+  .findbar input:focus{border-color:var(--accent)}
+  .findbar .cnt{color:var(--fg-dim);font-size:11px;min-width:50px}
+  .line{display:flex}
+  .line:hover{background:#26282e}
+  .line.active-line{background:#26282e;box-shadow:inset 2px 0 0 var(--accent)}
+  .line.flash{animation:flash 1.4s}
+  @keyframes flash{0%,60%{background:#3a4a2a}100%{background:transparent}}
+  .gut{display:flex;align-items:center;justify-content:flex-end;gap:4px;width:74px;flex:none;padding-right:8px;color:#5b5e63;position:relative}
+  .gut .gitm{position:absolute;left:2px;top:2px;bottom:2px;width:3px;border-radius:2px}
+  .gitm.add{background:var(--git-add)} .gitm.mod{background:var(--git-mod)}
+  .gitm.del{top:auto;bottom:-1px;height:0;width:0;border-left:6px solid var(--git-del);border-top:4px solid transparent;border-bottom:4px solid transparent;background:none}
+  .gut .bulb{display:none;cursor:pointer;font-size:11px}
+  .line.has-diag .bulb{display:inline}
+  .code{flex:1;padding-right:24px;white-space:pre}
+  .kw{color:#cf8e6d}.str{color:#6aab73}.cmt{color:#7a7e85;font-style:italic}.num{color:#2aacb8}
+  .fn{color:#d5b778}.type{color:#c77dbb}.attr{color:#b3ae60}
+  .sym{border-bottom:1px dotted #6f7580;cursor:pointer}
+  .sym:hover{border-bottom-color:var(--accent);color:var(--fg-bright)}
+  .sym.usage{background:#373b45;border-radius:2px}
+  .sym.usage.usage-w{background:#42383c}
+  .u-err{text-decoration:underline wavy var(--err) 1px;text-underline-offset:3px}
+  .u-warn{text-decoration:underline wavy var(--warn) 1px;text-underline-offset:3px}
+  .find-hit{background:#4a3f22;outline:1px solid #7a6a35;border-radius:2px}
+  .blame{display:none;color:#5b5e63;font-size:11px;margin-left:24px;font-family:var(--ui)}
+  body.show-blame .blame{display:inline}
+  .ro-banner{display:none;background:#3a3325;color:#d6ae58;padding:4px 12px;font-size:11.5px;border-bottom:1px solid var(--border)}
+  .pane.readonly .ro-banner{display:block}
+
+  /* ============ 底部 dock ============ */
+  .dock{height:225px;flex:none;display:flex;flex-direction:column;background:var(--panel);border-top:1px solid var(--border)}
+  .dock-tabs{display:flex;gap:2px;padding:3px 8px 0;border-bottom:1px solid var(--border);flex:none}
+  .dock-tab{display:flex;align-items:center;gap:6px;border:none;background:transparent;color:var(--fg-dim);padding:5px 10px;cursor:pointer;font-size:12px;border-radius:6px 6px 0 0}
+  .dock-tab:hover{color:var(--fg-bright)}
+  .dock-tab.on{color:var(--fg-bright);box-shadow:inset 0 -2px 0 var(--accent)}
+  .badge{font-size:10px;padding:0 5px;border-radius:8px;background:var(--border);color:var(--fg)}
+  .badge.e{background:#4d2b30;color:#f09099}
+  .dock-body{flex:1;overflow:auto;display:none;padding:6px 0}
+  .dock-body.on{display:block}
+  .dk-row{display:flex;align-items:center;gap:8px;padding:3px 14px;cursor:pointer;white-space:nowrap}
+  .dk-row:hover{background:var(--hover)}
+  .dk-row .loc{color:var(--fg-dim);font-size:11.5px}
+  .dk-group{padding:4px 10px;color:var(--fg-bright);font-weight:600;cursor:pointer}
+  .dk-group:hover{background:var(--hover)}
+  .dk-sub{margin-left:10px}
+  .dock-toolbar{display:flex;align-items:center;gap:8px;padding:4px 12px;border-bottom:1px solid var(--border)}
+  .dock-toolbar input{background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--fg-bright);padding:3px 8px;font-size:12px;outline:none;width:200px}
+  .dock-toolbar input.short{width:120px}
+  .dock-toolbar input:focus{border-color:var(--accent)}
+  .seg-btns{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+  .seg-btns button{border:none;background:transparent;color:var(--fg-dim);padding:3px 10px;cursor:pointer;font-size:12px}
+  .seg-btns button.on{background:var(--accent-dim);color:#9ebcf5}
+  .term{font-family:var(--mono);font-size:12.5px;padding:8px 14px;line-height:1.6;user-select:text}
+  .term .p{color:#6aab73}
+  .caret{display:inline-block;width:7px;height:14px;background:var(--fg);vertical-align:middle;animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .htree .hnode{display:flex;align-items:center;gap:6px;height:24px;padding-right:10px;cursor:pointer;white-space:nowrap}
+  .htree .hnode:hover{background:var(--hover)}
+  .htree .tw{width:14px;text-align:center;color:var(--fg-dim);font-size:9px;flex:none}
+  .htree .hloc{color:var(--fg-dim);font-size:11.5px}
+  .htree .cyc{color:var(--warn)}
+
+  /* ---- Outline / 右栏 ---- */
+  .ol-row{display:flex;align-items:center;gap:7px;height:24px;padding:0 12px;cursor:pointer;white-space:nowrap}
+  .ol-row:hover{background:var(--hover)}
+  .ol-row .k{width:16px;height:16px;border-radius:4px;font-size:9px;display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+  .k.f{background:#3b3223;color:#d5b778}.k.c{background:#33273a;color:#c77dbb}.k.i{background:#23343b;color:#5fb2c9}
+  .doc-pane{padding:12px;font-size:12.5px;line-height:1.7;user-select:text}
+  .doc-pane code{font-family:var(--mono);background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
+  .doc-pane .sig{display:block;font-family:var(--mono);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-bottom:10px;color:var(--fg-bright);white-space:pre-wrap}
+  .doc-pane .muted{color:var(--fg-dim)}
+  .ai-msg{margin:8px 12px;padding:8px 10px;border-radius:8px;background:var(--panel2);font-size:12.5px;line-height:1.6}
+  .ai-msg.user{background:var(--accent-dim)}
+
+  /* ============ 状态栏 ============ */
+  .status{display:flex;align-items:center;gap:2px;height:24px;padding:0 10px;background:var(--panel);border-top:1px solid var(--border);font-size:11.5px;color:var(--fg-dim);flex:none}
+  .st{padding:2px 8px;border-radius:4px;cursor:pointer}
+  .st:hover{background:var(--hover);color:var(--fg-bright)}
+  .st .lsp-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:5px}
+  .st.right{margin-left:auto}
+
+  /* ============ 浮层 ============ */
+  .overlay-dim{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:40;display:none}
+  .overlay-dim.open{display:block}
+  .se{position:fixed;left:50%;top:12%;transform:translateX(-50%);width:640px;max-height:70vh;background:var(--panel);border:1px solid var(--border);border-radius:10px;z-index:50;display:none;flex-direction:column;box-shadow:0 16px 48px rgba(0,0,0,.5)}
+  .se.open{display:flex}
+  .se-tabs{display:flex;gap:2px;padding:8px 10px 0}
+  .se-tab{border:none;background:transparent;color:var(--fg-dim);padding:5px 12px;cursor:pointer;font-size:12.5px;border-radius:6px 6px 0 0}
+  .se-tab.on{color:var(--fg-bright);box-shadow:inset 0 -2px 0 var(--accent)}
+  .se input{margin:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--fg-bright);padding:7px 10px;font-size:13px;outline:none}
+  .se input:focus{border-color:var(--accent)}
+  .se-list{overflow:auto;padding:2px 6px 8px;min-height:120px}
+  .se-row{display:flex;align-items:center;gap:9px;padding:5px 10px;border-radius:6px;cursor:pointer;white-space:nowrap}
+  .se-row.sel,.se-row:hover{background:var(--sel)}
+  .se-row .k{width:16px;height:16px;border-radius:4px;font-size:9px;display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+  .se-row .loc{margin-left:auto;color:var(--fg-dim);font-size:11.5px}
+  .se-hint{padding:10px 14px;color:var(--fg-dim);font-size:12px}
+  .se-foot{display:flex;gap:14px;padding:6px 12px;border-top:1px solid var(--border);color:var(--fg-dim);font-size:11px}
+
+  .menu{position:fixed;z-index:60;min-width:210px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:4px;display:none;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  .menu.open{display:block}
+  .menu .mi{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:5px;cursor:pointer;white-space:nowrap}
+  .menu .mi:hover{background:var(--sel)}
+  .menu .mi kbd{margin-left:auto}
+  .menu hr{border:none;border-top:1px solid var(--border);margin:4px 6px}
+  .menu .mi.danger{color:#f09099}
+
+  .qdoc{position:fixed;z-index:55;width:380px;max-height:300px;overflow:auto;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:none;box-shadow:0 10px 30px rgba(0,0,0,.5);font-size:12.5px;line-height:1.7;user-select:text}
+  .qdoc.open{display:block}
+  .qdoc .sig{display:block;font-family:var(--mono);font-size:12px;color:var(--fg-bright);background:var(--bg);border-radius:6px;padding:6px 8px;margin-bottom:8px;white-space:pre-wrap}
+  .qdoc .muted{color:var(--fg-dim)}
+  .qdoc .qd-bar{display:flex;justify-content:flex-end;gap:4px;margin:-4px -6px 4px 0}
+  .qdoc .qd-bar button{border:none;background:transparent;color:var(--fg-dim);cursor:pointer;border-radius:4px;padding:2px 6px;font-size:11px}
+  .qdoc .qd-bar button:hover{background:var(--hover);color:var(--fg-bright)}
+
+  .rename-box{position:fixed;z-index:60;display:none}
+  .rename-box input{font-family:var(--mono);font-size:12.5px;background:var(--bg);border:1px solid var(--accent);border-radius:4px;color:var(--fg-bright);padding:2px 6px;outline:none}
+
+  .toast{position:fixed;left:50%;bottom:44px;transform:translateX(-50%);background:#3c3f44;color:var(--fg-bright);padding:8px 16px;border-radius:8px;z-index:70;display:none;box-shadow:0 6px 20px rgba(0,0,0,.4);font-size:12.5px;max-width:70vw}
+  .toast.open{display:block}
+
+  .help{position:fixed;right:14px;top:46px;width:330px;max-height:78vh;overflow:auto;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;z-index:65;display:none;box-shadow:0 12px 36px rgba(0,0,0,.5);font-size:12.5px;line-height:1.8}
+  .help.open{display:block}
+  .help h3{color:var(--fg-bright);font-size:13px;margin-bottom:6px}
+  .help li{margin-left:16px;margin-bottom:2px}
+  .help .sub{color:var(--fg-dim);font-size:11.5px;margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 工具条 -->
+  <div class="toolbar">
+    <span class="proto-badge">原型</span>
+    <div class="ws-chip">📁 taomni-demo <small>(2 个根)</small></div>
+    <div class="tb-group">
+      <button class="tb-btn" id="navBack" title="后退 Ctrl+Alt+←">←</button>
+      <button class="tb-btn" id="navFwd" title="前进 Ctrl+Alt+→">→</button>
+    </div>
+    <div class="se-box" id="seOpenBtn"><span>🔍</span><span>Search Everywhere</span><kbd>双击 Shift</kbd></div>
+    <div class="tb-group">
+      <button class="tb-btn" id="btnSplit" title="分屏">◫</button>
+      <button class="tb-btn" id="btnBlame" title="Inline Blame">👤</button>
+    </div>
+    <div class="tb-group">
+      <button class="tb-btn on" id="btnLeft" title="项目树">⬅</button>
+      <button class="tb-btn on" id="btnBottom" title="底部工具窗 Alt+F12">⬇</button>
+      <button class="tb-btn on" id="btnRight" title="右侧工具窗">➡</button>
+      <button class="tb-btn" id="btnHelp" title="操作指南">?</button>
+    </div>
+  </div>
+
+  <!-- 主区 -->
+  <div class="main">
+    <aside class="side left">
+      <div class="side-head">项目 <span class="spacer"></span><span title="定位当前文件" class="tb-btn" style="cursor:pointer" id="btnLocate">◎</span></div>
+      <div class="scroll"><div class="tree" id="tree"></div></div>
+    </aside>
+
+    <section class="center">
+      <div class="panes" id="panes">
+        <div class="pane" data-pane="0">
+          <div class="tabs" data-role="tabs"></div>
+          <div class="crumbs" data-role="crumbs"></div>
+          <div class="ro-banner">📚 库文件（只读）</div>
+          <div class="editor" data-role="editor">
+            <div class="findbar" data-role="findbar">
+              <span>🔍</span><input placeholder="查找… (Enter 下一个)" data-role="findinput">
+              <span class="cnt" data-role="findcnt"></span>
+              <kbd>Aa</kbd><kbd>W</kbd><kbd>.*</kbd>
+              <button class="tb-btn" data-role="findclose">✕</button>
+            </div>
+            <div data-role="lines"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="side right">
+      <div class="side-tabs" id="rightTabs">
+        <button class="on" data-rt="outline">Outline</button>
+        <button data-rt="doc">文档</button>
+        <button data-rt="ai">AI 助手</button>
+      </div>
+      <div class="scroll" id="rightBody"></div>
+    </aside>
+  </div>
+
+  <!-- 底部 dock -->
+  <div class="dock" id="dock">
+    <div class="dock-tabs" id="dockTabs"></div>
+    <div id="dockBodies" style="flex:1;min-height:0;display:flex;flex-direction:column"></div>
+  </div>
+
+  <!-- 状态栏 -->
+  <div class="status">
+    <span class="st" id="stBranch">⎇ main ↑2</span>
+    <span class="st" id="stPath"></span>
+    <span class="st right" id="stPos">Ln 1, Col 1</span>
+    <span class="st">UTF-8</span><span class="st">LF</span>
+    <span class="st" id="stLang"><span class="lsp-dot"></span>TypeScript</span>
+    <span class="st">100%</span>
+  </div>
+</div>
+
+<!-- 浮层 -->
+<div class="overlay-dim" id="dim"></div>
+
+<div class="se" id="se">
+  <div class="se-tabs" id="seTabs"></div>
+  <input id="seInput" placeholder="输入以搜索（支持 camelCase 缩写，如 CWT）">
+  <div class="se-list" id="seList"></div>
+  <div class="se-foot"><span><kbd>↑↓</kbd> 选择</span><span><kbd>Enter</kbd> 打开</span><span><kbd>Ctrl+Enter</kbd> 分屏打开</span><span><kbd>Tab</kbd> 切换分组</span><span><kbd>Esc</kbd> 关闭</span></div>
+</div>
+
+<div class="menu" id="menu"></div>
+<div class="qdoc" id="qdoc"></div>
+<div class="rename-box" id="renameBox"><input id="renameInput"></div>
+<div class="toast" id="toast"></div>
+
+<div class="help" id="help">
+  <h3>操作指南（评审清单）</h3>
+  <div class="sub">对应设计文档 §3.1，逐项体验。面板尺寸固定为演示值。</div>
+  <ul>
+    <li><b>布局</b>：工具条右侧 ⬅⬇➡ 折叠三区</li>
+    <li><b>文件树</b>：单击=预览打开（斜体 tab），双击=固定；右键菜单</li>
+    <li><b>编辑器 tab</b>：右键菜单（固定/关闭其他…），✕ 关闭</li>
+    <li><b>Search Everywhere</b>：双击 Shift 或点顶部搜索框；Tab 切分组；输入 <code>cwt</code> 试 camelCase 匹配</li>
+    <li><b>编辑器内查找</b>：Ctrl+F，输入即高亮计数</li>
+    <li><b>语言智能</b>（虚线下划线的标识符）：
+      <ul>
+        <li>悬停 → 快速文档（右上可 pin 到右栏）</li>
+        <li>单击 → 同符号用法高亮</li>
+        <li>右键 → 跳转声明/查找用法/调用层级/类型层级/重命名/快速文档</li>
+      </ul>
+    </li>
+    <li><b>Quick Fix</b>：波浪线所在行 → 行首 💡 或点击行后 Alt+Enter</li>
+    <li><b>点击代码行</b>：活动行高亮 + 状态栏行列 + 面包屑符号联动</li>
+    <li><b>底部面板</b>：Problems/Find in Files（可真实搜索假数据）/Terminal/Run/References/调用层级（方向切换+懒展开）/类型层级</li>
+    <li><b>Git</b>：gutter 绿/蓝色条与红三角；工具条 👤 开关 inline blame</li>
+    <li><b>分屏</b>：工具条 ◫；<b>导航历史</b>：←/→</li>
+    <li><b>快捷键</b>：Alt+F12 底部开关，Esc 关闭浮层</li>
+  </ul>
+</div>
+
+<script>
+/* ================================================================
+   假数据
+================================================================ */
+const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const S = (name, extra="") => `<span class="sym" data-sym="${name}" ${extra}>${name}</span>`;
+
+const FILES = {
+  cwt: {
+    name:"CodeWorkspaceTab.tsx", path:"src/components/editor/CodeWorkspaceTab.tsx",
+    lang:"TypeScript", branch:"main", dirty:true,
+    symbols:[
+      {name:"OpenFileState", kind:"i", line:5},
+      {name:"CodeWorkspaceTab", kind:"f", line:11},
+      {name:"openFile", kind:"f", line:14},
+      {name:"goToDefinition", kind:"f", line:19},
+    ],
+    lines:[
+      {h:`<span class="kw">import</span> { useCallback, useState } <span class="kw">from</span> <span class="str">"react"</span>;`},
+      {h:`<span class="kw">import</span> { ${S("lspDefinition")}, lspHover } <span class="kw">from</span> <span class="str">"../../lib/editor/lsp"</span>;`},
+      {h:`<span class="kw">import</span> { ${S("workspaceReadFile")} } <span class="kw">from</span> <span class="str">"../../lib/editor/workspace"</span>;`},
+      {h:``},
+      {h:`<span class="kw">interface</span> <span class="type">${S("OpenFileState")}</span> {`, blame:"debra · 2 周前 · feat: workspace 文件模型"},
+      {h:`  path: <span class="type">string</span>;`},
+      {h:`  text: <span class="type">string</span>;`},
+      {h:`  dirty: <span class="type">boolean</span>;`},
+      {h:`}`},
+      {h:``},
+      {h:`<span class="kw">export function</span> <span class="fn">${S("CodeWorkspaceTab")}</span>({ tabId }: <span class="type">Props</span>) {`, blame:"debra · 2 周前 · feat: workspace shell"},
+      {h:`  <span class="kw">const</span> [openFiles, setOpenFiles] = <span class="fn">useState</span>&lt;<span class="type">OpenFileState</span>[]&gt;([]);`, git:"add"},
+      {h:``},
+      {h:`  <span class="kw">const</span> <span class="fn">${S("openFile")}</span> = <span class="fn">useCallback</span>(<span class="kw">async</span> (path: <span class="type">string</span>) =&gt; {`, git:"add", blame:"debra · 3 天前 · feat: open file pipeline"},
+      {h:`    <span class="kw">const</span> file = <span class="kw">await</span> ${S("workspaceReadFile")}(root.path, path);`, git:"add"},
+      {h:`    <span class="fn">setOpenFiles</span>((cur) =&gt; [...cur, <span class="u-warn">toState</span>(file)]);`, git:"add", diag:"warn"},
+      {h:`  }, [root]);`, git:"add"},
+      {h:``},
+      {h:`  <span class="kw">const</span> <span class="fn">${S("goToDefinition")}</span> = <span class="fn">useCallback</span>(<span class="kw">async</span> (pos: <span class="type">Position</span>) =&gt; {`, git:"mod"},
+      {h:`    <span class="kw">const</span> result = <span class="kw">await</span> ${S("lspDefinition")}(descriptor, pos);`, git:"mod", blame:"cass · 5 小时前 · fix: definition jump"},
+      {h:`    <span class="kw">if</span> (result.locations.length) <span class="u-err">reveal</span>(result.locations[<span class="num">0</span>]);`, git:"mod", diag:"err"},
+      {h:`  }, [descriptor]);`},
+      {h:``, git:"del"},
+      {h:`  <span class="kw">return</span> &lt;<span class="type">EditorGroup</span> files={openFiles} onOpen={${S("openFile")}} /&gt;;`},
+      {h:`}`},
+    ],
+  },
+  lsp: {
+    name:"lsp.ts", path:"src/lib/editor/lsp.ts", lang:"TypeScript", branch:"main",
+    symbols:[
+      {name:"LspLocationsResult", kind:"i", line:3},
+      {name:"lspDefinition", kind:"f", line:9},
+    ],
+    lines:[
+      {h:`<span class="kw">import</span> { invoke } <span class="kw">from</span> <span class="str">"@tauri-apps/api/core"</span>;`},
+      {h:``},
+      {h:`<span class="kw">export interface</span> <span class="type">${S("LspLocationsResult")}</span> {`, git:"add"},
+      {h:`  status: <span class="type">LspDocumentStatus</span>;`, git:"add"},
+      {h:`  locations: <span class="type">LspLocation</span>[];`, git:"add"},
+      {h:`}`, git:"add"},
+      {h:``},
+      {h:`<span class="cmt">/** 向语言服务器请求 textDocument/definition。 */</span>`, git:"add"},
+      {h:`<span class="kw">export function</span> <span class="fn">${S("lspDefinition")}</span>(`, git:"add", blame:"debra · 1 周前 · feat: lsp definition"},
+      {h:`  descriptor: <span class="type">LspDocumentDescriptor</span>,`, git:"add"},
+      {h:`  position: <span class="type">LspPosition</span>,`, git:"add"},
+      {h:`): <span class="type">Promise</span>&lt;<span class="type">LspLocationsResult</span>&gt; {`, git:"add"},
+      {h:`  <span class="kw">return</span> <span class="fn">invoke</span>(<span class="str">"lsp_definition"</span>, { ...documentArgs(descriptor), position });`, git:"add"},
+      {h:`}`, git:"add"},
+    ],
+  },
+  wsrs: {
+    name:"workspace.rs", path:"src-tauri/src/workspace.rs", lang:"Rust", branch:"main",
+    symbols:[{name:"workspace_read_file", kind:"f", line:4}],
+    lines:[
+      {h:`<span class="kw">use</span> std::path::Path;`},
+      {h:``},
+      {h:`<span class="attr">#[tauri::command]</span>`},
+      {h:`<span class="kw">pub fn</span> <span class="fn">${S("workspace_read_file")}</span>(`, blame:"debra · 1 个月前 · feat: workspace fs commands"},
+      {h:`    repo_root: <span class="type">String</span>,`},
+      {h:`    path: <span class="type">String</span>,`},
+      {h:`    max_bytes: <span class="type">Option</span>&lt;<span class="type">u64</span>&gt;,`},
+      {h:`) -&gt; <span class="type">Result</span>&lt;<span class="type">WorkspaceFile</span>, <span class="type">String</span>&gt; {`},
+      {h:`    <span class="kw">let</span> root = resolve_root(&amp;repo_root)?;`},
+      {h:`    <span class="kw">let</span> file = read_utf8_file(&amp;root, &amp;path, max_bytes)?;`, git:"mod"},
+      {h:`    <span class="type">Ok</span>(file)`},
+      {h:`}`},
+    ],
+  },
+  readme: {
+    name:"README.md", path:"README.md", lang:"Markdown", branch:"main",
+    symbols:[],
+    lines:[
+      {h:`<span class="kw"># taomni-demo</span>`},
+      {h:``},
+      {h:`Code Workspace 交互原型的演示项目。`},
+      {h:``},
+      {h:`<span class="kw">## 开发</span>`},
+      {h:``},
+      {h:`<span class="str">pnpm dev</span>`},
+    ],
+  },
+};
+
+const DOCS = {
+  lspDefinition:{sig:`lspDefinition(descriptor: LspDocumentDescriptor,\n  position: LspPosition): Promise<LspLocationsResult>`,
+    body:`向语言服务器发送 <code>textDocument/definition</code> 请求，返回符号声明位置列表。<br><br><span class="muted">@param</span> descriptor — LSP 文档描述符（工作区/根/文件）<br><span class="muted">@param</span> position — 光标位置（行/列，0 基）<br><span class="muted">@returns</span> 目标位置列表；无结果时为空数组`},
+  workspaceReadFile:{sig:`workspaceReadFile(repoRoot: string, path: string,\n  maxBytes?: number): Promise<WorkspaceFile>`,
+    body:`读取工作区内文件的 UTF-8 文本内容，附带 <code>hash</code> / <code>mtime</code> 用于写回时的并发预检。`},
+  openFile:{sig:`const openFile: (path: string) => Promise<void>`,
+    body:`打开文件到编辑组：读取内容 → 构造 <code>OpenFileState</code> → 加入打开列表。<br><span class="muted">被 3 处调用 —— 右键"调用层级"查看。</span>`},
+  goToDefinition:{sig:`const goToDefinition: (pos: Position) => Promise<void>`,
+    body:`请求当前光标符号的声明位置并跳转；多结果时展示 peek 列表。`},
+  CodeWorkspaceTab:{sig:`function CodeWorkspaceTab({ tabId }: Props): JSX.Element`,
+    body:`Code Workspace 主组件：文件树 + 编辑组 + 工具窗编排。`},
+  OpenFileState:{sig:`interface OpenFileState`,
+    body:`已打开文件的编辑态模型：路径、文本、dirty 标记。<br><span class="muted">右键"类型层级"查看父/子类型。</span>`},
+  LspLocationsResult:{sig:`interface LspLocationsResult`, body:`LSP 位置类请求（definition/references…）的统一返回结构。`},
+  workspace_read_file:{sig:`pub fn workspace_read_file(repo_root: String, path: String,\n  max_bytes: Option<u64>) -> Result<WorkspaceFile, String>`,
+    body:`Tauri command：读取工作区文件，路径限制在 root 内（防目录穿越）。`},
+};
+
+const TREE = [
+  {t:"root", name:"taomni-demo", open:true, children:[
+    {t:"dir", name:"src", open:true, children:[
+      {t:"dir", name:"components", open:true, children:[
+        {t:"dir", name:"editor", open:true, children:[
+          {t:"file", name:"CodeWorkspaceTab.tsx", key:"cwt", git:"mod"},
+          {t:"file", name:"EditorTabs.tsx"},
+        ]},
+        {t:"dir", name:"git", children:[{t:"file", name:"GitPanel.tsx"}]},
+      ]},
+      {t:"dir", name:"lib", open:true, children:[
+        {t:"dir", name:"editor", open:true, children:[
+          {t:"file", name:"lsp.ts", key:"lsp", git:"add"},
+          {t:"file", name:"workspace.ts"},
+        ]},
+      ]},
+      {t:"dir", name:"stores", children:[{t:"file", name:"appStore.ts"}]},
+    ]},
+    {t:"dir", name:"src-tauri", children:[
+      {t:"dir", name:"src", children:[
+        {t:"file", name:"lsp.rs"},
+        {t:"file", name:"workspace.rs", key:"wsrs", git:"mod"},
+      ]},
+    ]},
+    {t:"file", name:"package.json"},
+    {t:"file", name:"README.md", key:"readme"},
+  ]},
+];
+
+const SE_DATA = {
+  classes:[
+    {name:"OpenFileState", kind:"i", loc:"CodeWorkspaceTab.tsx", key:"cwt", line:5},
+    {name:"LspLocationsResult", kind:"i", loc:"lsp.ts", key:"lsp", line:3},
+    {name:"WorkspaceFile", kind:"c", loc:"workspace.rs", key:"wsrs", line:8},
+    {name:"EditorGroupProps", kind:"i", loc:"EditorGroup.tsx"},
+  ],
+  symbols:[
+    {name:"openFile", kind:"f", loc:"CodeWorkspaceTab.tsx:14", key:"cwt", line:14},
+    {name:"goToDefinition", kind:"f", loc:"CodeWorkspaceTab.tsx:19", key:"cwt", line:19},
+    {name:"lspDefinition", kind:"f", loc:"lsp.ts:9", key:"lsp", line:9},
+    {name:"workspace_read_file", kind:"f", loc:"workspace.rs:4", key:"wsrs", line:4},
+    {name:"CodeWorkspaceTab", kind:"f", loc:"CodeWorkspaceTab.tsx:11", key:"cwt", line:11},
+  ],
+  actions:[
+    {name:"格式化代码", kbd:"Ctrl+Alt+L"},
+    {name:"重命名符号", kbd:"Shift+F6"},
+    {name:"打开/关闭终端", kbd:"Alt+F12", run:()=>{toggleDock(true);dockSelect("terminal");}},
+    {name:"查找类", kbd:"Ctrl+N", run:()=>seSelectTab("classes")},
+    {name:"在文件中查找", kbd:"Ctrl+Shift+F", run:()=>{toggleDock(true);dockSelect("find");}},
+    {name:"切换 Inline Blame", run:()=>document.getElementById("btnBlame").click()},
+    {name:"切换分屏", run:()=>document.getElementById("btnSplit").click()},
+  ],
+};
+
+const CALL_HIER = {
+  openFile:{
+    callers:[
+      {label:"onEntryClick", ctx:"FileTreePane", loc:"FileTreePane.tsx:88", children:[
+        {label:"onClick", ctx:"TreeRow", loc:"TreeRow.tsx:41", children:[]},
+      ]},
+      {label:"onPick", ctx:"SearchEverywhere", loc:"SearchEverywhere.tsx:132", children:[
+        {label:"onKeyDown", ctx:"SearchEverywhere", loc:"SearchEverywhere.tsx:98", children:[]},
+      ]},
+      {label:"onSelect", ctx:"RecentFilesPopup", loc:"RecentFilesPopup.tsx:57", children:[
+        {label:"openFile", ctx:"CodeWorkspaceTab", loc:"CodeWorkspaceTab.tsx:14", cycle:true},
+      ]},
+    ],
+    callees:[
+      {label:"workspaceReadFile", ctx:"workspace.ts", loc:"workspace.ts:84", children:[
+        {label:"invoke", ctx:"@tauri-apps/api", loc:"core.ts:12", children:[]},
+      ]},
+      {label:"toState", ctx:"CodeWorkspaceTab", loc:"CodeWorkspaceTab.tsx:31", children:[]},
+      {label:"setOpenFiles", ctx:"react", loc:"useState", children:[]},
+    ],
+  },
+};
+const TYPE_HIER = {
+  OpenFileState:{
+    supertypes:[{label:"FileStateBase", ctx:"types.ts", loc:"types.ts:12", children:[]}],
+    subtypes:[
+      {label:"MarkdownFileState", ctx:"markdown.ts", loc:"markdown.ts:8", children:[]},
+      {label:"BinaryFileState", ctx:"binary.ts", loc:"binary.ts:5", children:[]},
+    ],
+  },
+};
+
+const PROBLEMS = [
+  {file:"cwt", name:"CodeWorkspaceTab.tsx", items:[
+    {sev:"err", msg:"找不到名称 'reveal'。", src:"ts(2304)", line:21},
+    {sev:"warn", msg:"'toState' 隐式具有 'any' 返回类型。", src:"ts(7010)", line:16},
+  ]},
+  {file:"wsrs", name:"workspace.rs", items:[
+    {sev:"warn", msg:"unused variable: `root`", src:"rustc", line:9},
+  ]},
+];
+
+const REFERENCES = [
+  {key:"cwt", loc:"CodeWorkspaceTab.tsx:2", line:2, text:'import { lspDefinition, lspHover } from "../../lib/editor/lsp"'},
+  {key:"cwt", loc:"CodeWorkspaceTab.tsx:20", line:20, text:"const result = await lspDefinition(descriptor, pos);"},
+  {key:"lsp", loc:"lsp.ts:9", line:9, text:"export function lspDefinition("},
+];
+
+const TASKS = [
+  {group:"taomni-demo (pnpm)", items:["pnpm dev","pnpm test","pnpm build"]},
+  {group:"src-tauri (cargo)", items:["cargo check","cargo clippy","cargo test"]},
+];
+
+/* ================================================================
+   状态
+================================================================ */
+const state = {
+  panes:[{tabs:[{key:"cwt",preview:false,pinned:true}], active:"cwt", preview:null}],
+  activePane:0,
+  split:false,
+  nav:{stack:["cwt"], idx:0},
+  seTab:"all",
+  rightTab:"outline",
+  dockTab:"problems",
+  hierDir:"callers", typeDir:"subtypes",
+  hierSym:"openFile", typeSym:"OpenFileState",
+  pinnedDoc:null,
+  activeLine:{}, // paneIdx -> line number
+};
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+let toastTimer;
+function toast(msg){
+  const t=$("#toast"); t.innerHTML=msg; t.classList.add("open");
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("open"),2600);
+}
+function ensureFile(key,name,path){
+  if(!FILES[key]) FILES[key]={name,path,lang:guessLang(name),branch:"main",symbols:[],
+    lines:[{h:`<span class="cmt">// ${esc(name)} —— 演示占位内容</span>`},{h:``},{h:`<span class="cmt">// （原型中未编写此文件的假数据）</span>`}]};
+  return FILES[key];
+}
+function guessLang(n){
+  if(/\.rs$/.test(n))return"Rust"; if(/\.tsx?$/.test(n))return"TypeScript";
+  if(/\.md$/.test(n))return"Markdown"; if(/\.json$/.test(n))return"JSON"; return"Plain Text";
+}
+
+/* ================================================================
+   文件树
+================================================================ */
+function renderTree(){
+  const root=$("#tree"); root.innerHTML="";
+  const build=(nodes,depth,parent)=>{
+    for(const n of nodes){
+      const row=document.createElement("div");
+      row.className="node"+(n.git?" git-"+n.git:"");
+      row.style.paddingLeft=(8+depth*14)+"px";
+      const isDir=n.t!=="file";
+      row.innerHTML=`<span class="tw">${isDir?(n.open?"▼":"▶"):""}</span>
+        <span class="ic">${n.t==="root"?"📁":isDir?"📂":fileIcon(n.name)}</span>
+        <span class="nm">${esc(n.name)}</span>`;
+      parent.appendChild(row);
+      let kids=null;
+      if(isDir){
+        kids=document.createElement("div");
+        kids.className="kids"+(n.open?" open":"");
+        parent.appendChild(kids);
+        if(n.children)build(n.children,depth+1,kids);
+      }
+      row.addEventListener("click",()=>{
+        if(isDir){n.open=!n.open;row.querySelector(".tw").textContent=n.open?"▼":"▶";kids.classList.toggle("open",n.open);}
+        else{selectTreeRow(row);openFile(fileKeyFor(n),{preview:true});}
+      });
+      row.addEventListener("dblclick",()=>{ if(!isDir) openFile(fileKeyFor(n),{preview:false}); });
+      row.addEventListener("contextmenu",e=>{
+        e.preventDefault(); selectTreeRow(row);
+        showMenu(e.clientX,e.clientY, isDir?[
+          {label:"新建文件…",act:()=>toast("新建文件（演示）")},
+          {label:"新建目录…",act:()=>toast("新建目录（演示）")},
+          {hr:true},
+          {label:"在此目录中查找",kbd:"Ctrl+Shift+F",act:()=>{toggleDock(true);dockSelect("find");toast("查找范围已设为 "+n.name+"/（演示）");}},
+          {label:"在终端中打开",act:()=>{toggleDock(true);dockSelect("terminal");}},
+          {hr:true},
+          {label:"复制路径",act:()=>toast("已复制路径（演示）")},
+          {label:"重命名…",kbd:"Shift+F6",act:()=>toast("目录重命名（演示）")},
+          {label:"删除",danger:true,act:()=>toast("删除（演示，含确认对话框）")},
+        ]:[
+          {label:"打开",act:()=>openFile(fileKeyFor(n),{preview:false})},
+          {label:"在右侧分屏打开",act:()=>{setSplit(true);openFile(fileKeyFor(n),{preview:false,pane:1});}},
+          {hr:true},
+          {label:"复制路径",act:()=>toast("已复制绝对路径（演示）")},
+          {label:"复制相对路径",act:()=>toast("已复制相对路径（演示）")},
+          {hr:true},
+          {label:"在终端中打开",act:()=>{toggleDock(true);dockSelect("terminal");}},
+          {label:"重命名…",kbd:"Shift+F6",act:()=>toast("文件重命名（演示）")},
+          {label:"删除",danger:true,kbd:"Delete",act:()=>toast("删除（演示，含确认对话框）")},
+        ]);
+      });
+      n._row=row;
+    }
+  };
+  build(TREE,0,root);
+}
+function fileIcon(n){
+  if(/\.rs$/.test(n))return"🦀"; if(/\.tsx?$/.test(n))return"🟦";
+  if(/\.md$/.test(n))return"📝"; if(/\.json$/.test(n))return"🧾"; return"📄";
+}
+function fileKeyFor(n){
+  if(n.key)return n.key;
+  n.key="auto_"+n.name.replace(/\W/g,"_");
+  ensureFile(n.key,n.name,n.name);
+  return n.key;
+}
+function selectTreeRow(row){$$(".node.sel").forEach(x=>x.classList.remove("sel"));row.classList.add("sel");}
+function locateInTree(key){
+  const walk=(nodes)=>{for(const n of nodes){if(n.key===key&&n._row){selectTreeRow(n._row);n._row.scrollIntoView({block:"center"});return true;}if(n.children&&walk(n.children))return true;}return false;};
+  if(!walk(TREE))toast("该文件不在树中（演示）");
+}
+
+/* ================================================================
+   编辑器：tabs / 内容 / 面包屑
+================================================================ */
+function paneEl(i){return $(`.pane[data-pane="${i}"]`);}
+
+function openFile(key,{preview=false,pane=state.activePane,line=null,push=true}={}){
+  const p=state.panes[pane]||state.panes[0];
+  const file=FILES[key];if(!file)return;
+  let tab=p.tabs.find(t=>t.key===key);
+  if(!tab){
+    if(preview){
+      const pv=p.tabs.find(t=>t.preview);
+      if(pv){pv.key=key;tab=pv;}
+      else{tab={key,preview:true,pinned:false};p.tabs.push(tab);}
+    }else{tab={key,preview:false,pinned:false};p.tabs.push(tab);}
+  }else if(!preview){tab.preview=false;}
+  p.active=key;
+  state.activePane=pane;
+  if(push&&state.nav.stack[state.nav.idx]!==key){
+    state.nav.stack=state.nav.stack.slice(0,state.nav.idx+1);
+    state.nav.stack.push(key);state.nav.idx++;
+  }
+  renderAll();
+  if(line)flashLine(pane,line);
+}
+function closeTab(paneIdx,key){
+  const p=state.panes[paneIdx];
+  const i=p.tabs.findIndex(t=>t.key===key);if(i<0)return;
+  p.tabs.splice(i,1);
+  if(p.active===key)p.active=p.tabs[Math.min(i,p.tabs.length-1)]?.key||null;
+  if(!p.tabs.length&&paneIdx===1)setSplit(false);
+  renderAll();
+}
+function renderTabs(paneIdx){
+  const p=state.panes[paneIdx],el=paneEl(paneIdx).querySelector("[data-role=tabs]");
+  el.innerHTML="";
+  const ordered=[...p.tabs].sort((a,b)=>(b.pinned?1:0)-(a.pinned?1:0));
+  for(const t of ordered){
+    const f=FILES[t.key];
+    const d=document.createElement("div");
+    d.className="tab"+(p.active===t.key?" on":"")+(t.preview?" preview":"")+(f.dirty?" dirty":"")+(t.pinned?" pinned":"");
+    d.innerHTML=`<span class="pin">📌</span><span>${fileIcon(f.name)}</span><span class="nm">${esc(f.name)}</span><span class="dot"></span><button class="x">✕</button>`;
+    d.addEventListener("click",e=>{if(e.target.classList.contains("x"))return;state.activePane=paneIdx;p.active=t.key;renderAll();});
+    d.addEventListener("dblclick",()=>{t.preview=false;renderAll();});
+    d.querySelector(".x").addEventListener("click",()=>closeTab(paneIdx,t.key));
+    d.addEventListener("contextmenu",e=>{
+      e.preventDefault();
+      showMenu(e.clientX,e.clientY,[
+        {label:t.pinned?"取消固定":"固定标签",act:()=>{t.pinned=!t.pinned;renderAll();}},
+        {label:"关闭",kbd:"Ctrl+F4",act:()=>closeTab(paneIdx,t.key)},
+        {label:"关闭其他",act:()=>{p.tabs=p.tabs.filter(x=>x.key===t.key||x.pinned);p.active=t.key;renderAll();}},
+        {label:"关闭未修改的",act:()=>toast("关闭未修改标签（演示）")},
+        {hr:true},
+        {label:"在右侧分屏打开",act:()=>{setSplit(true);openFile(t.key,{pane:1});}},
+        {label:"在文件树中定位",kbd:"Alt+F1",act:()=>locateInTree(t.key)},
+        {label:"复制路径",act:()=>toast("已复制 "+FILES[t.key].path)},
+        {label:"在终端中打开",act:()=>{toggleDock(true);dockSelect("terminal");}},
+      ]);
+    });
+    el.appendChild(d);
+  }
+}
+function renderEditor(paneIdx){
+  const p=state.panes[paneIdx],host=paneEl(paneIdx).querySelector("[data-role=lines]");
+  host.innerHTML="";
+  if(!p.active){host.innerHTML=`<div style="padding:40px;color:var(--fg-dim);font-family:var(--ui)">没有打开的文件</div>`;return;}
+  const f=FILES[p.active];
+  f.lines.forEach((ln,i)=>{
+    const row=document.createElement("div");
+    row.className="line"+(ln.diag?" has-diag":"")+((state.activeLine[paneIdx]===i+1)?" active-line":"");
+    row.dataset.line=i+1;
+    row.innerHTML=`<div class="gut">${ln.git?`<span class="gitm ${ln.git}"></span>`:""}<span class="bulb" title="Quick Fix (Alt+Enter)">💡</span><span>${i+1}</span></div>
+      <div class="code">${ln.h||"&nbsp;"}${ln.blame?`<span class="blame">${esc(ln.blame)}</span>`:""}</div>`;
+    row.addEventListener("click",e=>{
+      if(e.target.closest(".sym,.bulb"))return;
+      setActiveLine(paneIdx,i+1);
+    });
+    row.querySelector(".bulb")?.addEventListener("click",e=>{e.stopPropagation();showQuickFix(e.clientX,e.clientY,f,i+1);});
+    host.appendChild(row);
+  });
+}
+function setActiveLine(paneIdx,line){
+  state.activeLine[paneIdx]=line;
+  const host=paneEl(paneIdx).querySelector("[data-role=lines]");
+  host.querySelectorAll(".line").forEach(r=>r.classList.toggle("active-line",+r.dataset.line===line));
+  $("#stPos").textContent=`Ln ${line}, Col 1`;
+  renderCrumbs(paneIdx);
+}
+function flashLine(paneIdx,line){
+  setActiveLine(paneIdx,line);
+  const row=paneEl(paneIdx).querySelector(`.line[data-line="${line}"]`);
+  if(row){row.scrollIntoView({block:"center"});row.classList.remove("flash");void row.offsetWidth;row.classList.add("flash");}
+}
+function renderCrumbs(paneIdx){
+  const p=state.panes[paneIdx],el=paneEl(paneIdx).querySelector("[data-role=crumbs]");
+  if(!p.active){el.innerHTML="";return;}
+  const f=FILES[p.active];
+  const segs=f.path.split("/");
+  let html=segs.map((s,i)=>`<span class="seg" data-i="${i}">${esc(s)}</span>`).join(`<span>›</span>`);
+  const line=state.activeLine[paneIdx];
+  if(line&&f.symbols.length){
+    let cur=null;for(const s of f.symbols)if(s.line<=line)cur=s;
+    if(cur)html+=`<span>›</span><span class="seg sym-seg" data-sym-seg="${cur.name}">ƒ ${esc(cur.name)}</span>`;
+  }
+  el.innerHTML=html;
+  el.querySelectorAll(".seg").forEach(seg=>seg.addEventListener("click",e=>{
+    if(seg.dataset.symSeg)showStructureLikePopup(e,f);
+    else toast("目录段下拉：同级文件快速切换（演示）");
+  }));
+}
+function showStructureLikePopup(e,f){
+  showMenu(e.clientX,e.clientY,f.symbols.map(s=>({label:`${s.kind==="i"?"Ⓘ":"ƒ"} ${s.name}`,kbd:":"+s.line,act:()=>flashLine(state.activePane,s.line)})));
+}
+
+/* ================================================================
+   右栏：Outline / 文档 / AI
+================================================================ */
+function renderRight(){
+  const body=$("#rightBody");
+  $$("#rightTabs button").forEach(b=>b.classList.toggle("on",b.dataset.rt===state.rightTab));
+  const f=FILES[state.panes[state.activePane]?.active];
+  if(state.rightTab==="outline"){
+    body.innerHTML="";
+    if(!f||!f.symbols.length){body.innerHTML=`<div style="padding:16px;color:var(--fg-dim)">当前文件无符号（或语言服务不可用）</div>`;return;}
+    const bar=document.createElement("div");
+    bar.className="dock-toolbar";
+    bar.innerHTML=`<input class="short" placeholder="过滤…"><span style="color:var(--fg-dim);font-size:11px">按位置 ▾</span>`;
+    body.appendChild(bar);
+    const list=document.createElement("div");
+    for(const s of f.symbols){
+      const r=document.createElement("div");
+      r.className="ol-row";
+      r.innerHTML=`<span class="k ${s.kind}">${s.kind==="i"?"I":s.kind==="c"?"C":"ƒ"}</span><span>${esc(s.name)}</span><span style="margin-left:auto;color:var(--fg-dim);font-size:11px">:${s.line}</span>`;
+      r.addEventListener("click",()=>flashLine(state.activePane,s.line));
+      list.appendChild(r);
+    }
+    body.appendChild(list);
+    bar.querySelector("input").addEventListener("input",e=>{
+      const q=e.target.value.toLowerCase();
+      list.querySelectorAll(".ol-row").forEach(r=>r.style.display=r.textContent.toLowerCase().includes(q)?"":"none");
+    });
+  }else if(state.rightTab==="doc"){
+    body.innerHTML=state.pinnedDoc
+      ?`<div class="doc-pane"><span class="sig">${esc(state.pinnedDoc.sig)}</span>${state.pinnedDoc.body}<br><br><span class="muted">📌 已固定 —— 光标符号联动刷新（演示为静态）</span></div>`
+      :`<div class="doc-pane muted">悬停符号后，在快速文档浮层点 📌 可固定到此处（Quick Documentation 工具窗形态）。</div>`;
+  }else{
+    body.innerHTML=`<div class="ai-msg user">解释选中的 goToDefinition 函数</div>
+      <div class="ai-msg">该函数向 LSP 请求光标符号的声明位置并跳转…<br><span style="color:var(--fg-dim)">（复用 taomni 既有 AI 会话面板，注入当前文件/选区/诊断上下文 —— 设计文档 §5.12）</span></div>
+      <div class="dock-toolbar" style="border:none"><input placeholder="询问 AI…（演示）" style="flex:1"></div>`;
+  }
+}
+$("#rightTabs").addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;
+  state.rightTab=b.dataset.rt;renderRight();
+});
+
+/* ================================================================
+   底部 dock
+================================================================ */
+const DOCK_TABS=[
+  {id:"problems",label:"Problems"},
+  {id:"find",label:"Find in Files"},
+  {id:"terminal",label:"Terminal"},
+  {id:"run",label:"Run"},
+  {id:"refs",label:"References"},
+  {id:"callhier",label:"调用层级"},
+  {id:"typehier",label:"类型层级"},
+];
+function renderDockTabs(){
+  const el=$("#dockTabs");el.innerHTML="";
+  const errN=PROBLEMS.reduce((a,g)=>a+g.items.filter(i=>i.sev==="err").length,0);
+  const warnN=PROBLEMS.reduce((a,g)=>a+g.items.filter(i=>i.sev==="warn").length,0);
+  for(const t of DOCK_TABS){
+    const b=document.createElement("button");
+    b.className="dock-tab"+(state.dockTab===t.id?" on":"");
+    b.innerHTML=t.label+(t.id==="problems"?` <span class="badge e">${errN}</span> <span class="badge">${warnN}</span>`:"");
+    b.addEventListener("click",()=>dockSelect(t.id));
+    el.appendChild(b);
+  }
+}
+function dockSelect(id){state.dockTab=id;renderDockTabs();renderDockBody();}
+function toggleDock(open){
+  const hidden=document.body.classList.contains("hide-bottom");
+  if(open===undefined)open=hidden;
+  document.body.classList.toggle("hide-bottom",!open);
+  $("#btnBottom").classList.toggle("on",open);
+}
+function renderDockBody(){
+  const host=$("#dockBodies");host.innerHTML="";
+  const body=document.createElement("div");body.className="dock-body on";host.appendChild(body);
+  const id=state.dockTab;
+  if(id==="problems"){
+    body.innerHTML=`<div class="dock-toolbar"><span style="color:var(--fg-dim)">范围：打开的文件</span><span class="seg-btns"><button class="on">全部</button><button>Error</button><button>Warning</button></span></div>`;
+    for(const g of PROBLEMS){
+      const gr=document.createElement("div");gr.className="dk-group";gr.textContent="▾ "+g.name;body.appendChild(gr);
+      for(const it of g.items){
+        const r=document.createElement("div");r.className="dk-row dk-sub";
+        r.innerHTML=`<span>${it.sev==="err"?"🔴":"🟡"}</span><span>${esc(it.msg)}</span><span class="loc">${it.src} · :${it.line}</span>`;
+        r.addEventListener("click",()=>openFile(g.file,{line:it.line}));
+        r.addEventListener("contextmenu",e=>{e.preventDefault();showMenu(e.clientX,e.clientY,[
+          {label:"跳转到问题",act:()=>openFile(g.file,{line:it.line})},
+          {label:"Quick Fix…",kbd:"Alt+Enter",act:()=>{openFile(g.file,{line:it.line});setTimeout(()=>showQuickFix(e.clientX,e.clientY,FILES[g.file],it.line),50);}},
+          {label:"复制消息",act:()=>toast("已复制（演示）")},
+        ]);});
+        body.appendChild(r);
+      }
+    }
+  }
+  else if(id==="find"){
+    body.innerHTML=`<div class="dock-toolbar">
+        <input id="fifQuery" placeholder="查找内容…" value="openFile">
+        <span class="seg-btns"><button title="区分大小写">Aa</button><button title="整词">W</button><button title="正则">.*</button></span>
+        <input class="short" placeholder="include: *.ts"><input class="short" placeholder="exclude: dist/**">
+        <span id="fifCount" style="color:var(--fg-dim);font-size:11.5px;margin-left:auto"></span>
+      </div><div id="fifResults"></div>`;
+    const run=()=>{
+      const q=body.querySelector("#fifQuery").value.trim();
+      const out=body.querySelector("#fifResults");out.innerHTML="";
+      if(q.length<2){body.querySelector("#fifCount").textContent="输入 ≥2 字符";return;}
+      let total=0,files=0;
+      for(const[key,f]of Object.entries(FILES)){
+        const hits=[];
+        f.lines.forEach((ln,i)=>{
+          const div=document.createElement("div");div.innerHTML=ln.h||"";
+          const text=div.textContent;
+          const at=text.toLowerCase().indexOf(q.toLowerCase());
+          if(at>=0)hits.push({line:i+1,text,at});
+        });
+        if(!hits.length)continue;
+        files++;total+=hits.length;
+        const g=document.createElement("div");g.className="dk-group";g.textContent=`▾ ${f.path} (${hits.length})`;out.appendChild(g);
+        for(const h of hits){
+          const r=document.createElement("div");r.className="dk-row dk-sub";
+          const before=esc(h.text.slice(Math.max(0,h.at-30),h.at)),hit=esc(h.text.substr(h.at,q.length)),after=esc(h.text.slice(h.at+q.length,h.at+q.length+50));
+          r.innerHTML=`<span class="loc">${h.line}:</span><span style="font-family:var(--mono);font-size:12px">${before}<span class="find-hit">${hit}</span>${after}</span>`;
+          r.addEventListener("click",()=>openFile(key,{preview:true,line:h.line}));
+          r.addEventListener("dblclick",()=>openFile(key,{preview:false,line:h.line}));
+          out.appendChild(r);
+        }
+      }
+      body.querySelector("#fifCount").textContent=`${total} 个结果 · ${files} 个文件`;
+    };
+    body.querySelector("#fifQuery").addEventListener("input",run);run();
+  }
+  else if(id==="terminal"){
+    body.innerHTML=`<div class="dock-toolbar"><span class="seg-btns"><button class="on">1: pwsh</button><button>+</button></span><span style="color:var(--fg-dim);font-size:11px">cwd: ~/code/taomni-demo（当前根）</span></div>
+      <div class="term"><span class="p">~/code/taomni-demo main ❯</span> pnpm test
+<span style="color:#5fad65">✓</span> src/stores/appStore.test.ts <span style="color:var(--fg-dim)">(12 tests) 841ms</span>
+<span style="color:var(--fg-dim)">Test Files  1 passed (1)</span>
+<span class="p">~/code/taomni-demo main ❯</span> <span class="caret"></span></div>`;
+  }
+  else if(id==="run"){
+    body.innerHTML=`<div class="dock-toolbar"><span style="color:var(--fg-dim)">探测到的任务（package.json / Cargo.toml）</span><button class="tb-btn" title="添加自定义任务" style="margin-left:auto">＋</button></div>`;
+    for(const g of TASKS){
+      const gr=document.createElement("div");gr.className="dk-group";gr.textContent="▾ "+g.group;body.appendChild(gr);
+      for(const t of g.items){
+        const r=document.createElement("div");r.className="dk-row dk-sub";
+        r.innerHTML=`<span style="color:#5fad65">▶</span><span style="font-family:var(--mono);font-size:12px">${esc(t)}</span><span class="loc">上次：退出码 0</span>`;
+        r.addEventListener("click",()=>{dockSelect("terminal");toast(`已在集成终端启动 <b>${esc(t)}</b>（演示）`);});
+        body.appendChild(r);
+      }
+    }
+  }
+  else if(id==="refs"){
+    body.innerHTML=`<div class="dock-toolbar"><span style="color:var(--fg-dim)">'lspDefinition' 的用法 —— ${REFERENCES.length} 处</span></div>`;
+    for(const ref of REFERENCES){
+      const r=document.createElement("div");r.className="dk-row";
+      r.innerHTML=`<span class="loc">${ref.loc}</span><span style="font-family:var(--mono);font-size:12px">${esc(ref.text)}</span>`;
+      r.addEventListener("click",()=>openFile(ref.key,{line:ref.line}));
+      body.appendChild(r);
+    }
+  }
+  else if(id==="callhier"||id==="typehier"){
+    const isCall=id==="callhier";
+    const sym=isCall?state.hierSym:state.typeSym;
+    const data=isCall?CALL_HIER[sym]:TYPE_HIER[sym];
+    const dir=isCall?state.hierDir:state.typeDir;
+    const dirs=isCall?[["callers","Callers ⬅ 谁调用了它"],["callees","Callees ➡ 它调用了谁"]]
+                     :[["supertypes","⬆ 父类型"],["subtypes","⬇ 子类型"]];
+    body.innerHTML=`<div class="dock-toolbar"><span style="font-family:var(--mono);color:var(--fg-bright)">${isCall?"ƒ":"Ⓘ"} ${esc(sym)}</span>
+      <span class="seg-btns" id="hierDirBtns">${dirs.map(([k,l])=>`<button data-d="${k}" class="${dir===k?"on":""}">${l}</button>`).join("")}</span>
+      <span style="color:var(--fg-dim);font-size:11px;margin-left:auto">懒展开 · 深度上限 16 · ↻=环</span></div>
+      <div class="htree" id="hierTree"></div>`;
+    body.querySelector("#hierDirBtns").addEventListener("click",e=>{
+      const b=e.target.closest("button");if(!b)return;
+      if(isCall)state.hierDir=b.dataset.d;else state.typeDir=b.dataset.d;
+      renderDockBody();
+    });
+    const tree=body.querySelector("#hierTree");
+    if(!data){tree.innerHTML=`<div style="padding:14px;color:var(--fg-dim)">该符号无层级数据（演示）</div>`;return;}
+    const buildH=(nodes,depth,parent)=>{
+      for(const n of nodes){
+        const row=document.createElement("div");row.className="hnode";
+        row.style.paddingLeft=(12+depth*18)+"px";
+        const expandable=n.children&&n.children.length&&!n.cycle;
+        row.innerHTML=`<span class="tw">${expandable?"▶":""}</span><span>${n.cycle?'<span class="cyc">↻</span>':"ƒ"}</span>
+          <span>${esc(n.label)}</span><span class="hloc">· ${esc(n.ctx)} — ${esc(n.loc)}</span>
+          ${n.cycle?'<span class="hloc cyc">(递归，不再展开)</span>':""}`;
+        parent.appendChild(row);
+        let kidBox=null,open=false;
+        row.addEventListener("click",()=>{
+          if(!expandable)return;
+          if(!kidBox){kidBox=document.createElement("div");row.after(kidBox);buildH(n.children,depth+1,kidBox);open=true;}
+          else{open=!open;kidBox.style.display=open?"":"none";}
+          row.querySelector(".tw").textContent=open?"▼":"▶";
+        });
+        row.addEventListener("dblclick",()=>toast("跳转到 "+n.loc+"（演示）"));
+      }
+    };
+    buildH(data[dir],0,tree);
+  }
+}
+
+/* ================================================================
+   Search Everywhere
+================================================================ */
+const SE_TABS=[["all","All"],["classes","Classes"],["files","Files"],["symbols","Symbols"],["actions","Actions"],["text","Text"]];
+let seSel=0;
+function seOpen(){$("#se").classList.add("open");$("#dim").classList.add("open");$("#seInput").value="";$("#seInput").focus();seRender();}
+function seClose(){$("#se").classList.remove("open");$("#dim").classList.remove("open");}
+function seSelectTab(t){state.seTab=t;seSel=0;seRender();$("#seInput").focus();}
+function fuzzy(q,s){
+  if(!q)return 1;
+  q=q.toLowerCase();const ls=s.toLowerCase();
+  if(ls.startsWith(q))return 100;
+  const caps=(s.match(/[A-Z]/g)||[]).join("").toLowerCase();
+  if(caps.startsWith(q))return 90; // camelCase 缩写
+  if(ls.includes(q))return 60;
+  let i=0;for(const c of ls){if(c===q[i])i++;if(i===q.length)return 20;}
+  return 0;
+}
+function allFilePaths(){
+  const out=[];const walk=(nodes,pre)=>{for(const n of nodes){const p=n.t==="root"?"":(pre?pre+"/":"")+n.name;
+    if(n.t==="file")out.push({name:n.name,path:p,node:n});else if(n.children)walk(n.children,n.t==="root"?"":p);}};
+  walk(TREE,"");return out;
+}
+function seRender(){
+  const tabsEl=$("#seTabs");tabsEl.innerHTML="";
+  for(const[id,label]of SE_TABS){
+    const b=document.createElement("button");b.className="se-tab"+(state.seTab===id?" on":"");b.textContent=label;
+    b.addEventListener("click",()=>seSelectTab(id));tabsEl.appendChild(b);
+  }
+  const q=$("#seInput").value.trim();
+  const list=$("#seList");list.innerHTML="";
+  if(state.seTab==="text"){
+    list.innerHTML=`<div class="se-hint">按 Enter 将查询词转入底部 <b>Find in Files</b> 面板执行全文搜索。</div>`;
+    return;
+  }
+  const rows=[];
+  const kindBadge=k=>`<span class="k ${k}">${k==="i"?"I":k==="c"?"C":"ƒ"}</span>`;
+  const push=(type,items)=>{for(const it of items)rows.push({type,...it});};
+  if(state.seTab==="all"||state.seTab==="classes")push("class",SE_DATA.classes.filter(c=>fuzzy(q,c.name)>0).map(c=>({...c,score:fuzzy(q,c.name)})));
+  if(state.seTab==="all"||state.seTab==="files")push("file",allFilePaths().filter(f=>fuzzy(q,f.name)>0).map(f=>({name:f.name,loc:f.path,kind:"file",node:f.node,score:fuzzy(q,f.name)})));
+  if(state.seTab==="all"||state.seTab==="symbols")push("symbol",SE_DATA.symbols.filter(s=>fuzzy(q,s.name)>0).map(s=>({...s,score:fuzzy(q,s.name)})));
+  if(state.seTab==="all"||state.seTab==="actions")push("action",SE_DATA.actions.filter(a=>fuzzy(q,a.name)>0).map(a=>({...a,score:fuzzy(q,a.name)})));
+  rows.sort((a,b)=>b.score-a.score);
+  const top=rows.slice(0,30);
+  if(!top.length){list.innerHTML=`<div class="se-hint">无匹配结果</div>`;return;}
+  top.forEach((r,i)=>{
+    const d=document.createElement("div");
+    d.className="se-row"+(i===seSel?" sel":"");
+    d.innerHTML=`${r.kind==="file"?`<span>${fileIcon(r.name)}</span>`:r.type==="action"?"<span>⚡</span>":kindBadge(r.kind)}
+      <span>${esc(r.name)}</span><span class="loc">${r.kbd?`<kbd>${r.kbd}</kbd>`:esc(r.loc||"")}</span>`;
+    d.addEventListener("click",()=>sePick(r,false));
+    list.appendChild(d);
+  });
+  list._rows=top;
+}
+function sePick(r,split){
+  seClose();
+  if(r.type==="action"){r.run?r.run():toast(`执行动作：${r.name}（演示）`);return;}
+  if(split)setSplit(true);
+  const pane=split?1:state.activePane;
+  if(r.type==="file")openFile(fileKeyFor(r.node),{pane});
+  else if(r.key)openFile(r.key,{pane,line:r.line});
+  else toast("目标文件不在演示数据中");
+}
+$("#seInput").addEventListener("input",()=>{seSel=0;seRender();});
+$("#seInput").addEventListener("keydown",e=>{
+  const rows=$("#seList")._rows||[];
+  if(e.key==="ArrowDown"){seSel=Math.min(seSel+1,rows.length-1);seRender();e.preventDefault();}
+  else if(e.key==="ArrowUp"){seSel=Math.max(seSel-1,0);seRender();e.preventDefault();}
+  else if(e.key==="Enter"){
+    if(state.seTab==="text"){const q=$("#seInput").value;seClose();toggleDock(true);dockSelect("find");
+      setTimeout(()=>{const inp=$("#fifQuery");if(inp){inp.value=q;inp.dispatchEvent(new Event("input"));}},30);return;}
+    if(rows[seSel])sePick(rows[seSel],e.ctrlKey);
+  }
+  else if(e.key==="Tab"){e.preventDefault();
+    const ids=SE_TABS.map(t=>t[0]);const i=ids.indexOf(state.seTab);
+    seSelectTab(ids[(i+(e.shiftKey?ids.length-1:1))%ids.length]);}
+  else if(e.key==="Escape")seClose();
+});
+$("#seOpenBtn").addEventListener("click",seOpen);
+$("#dim").addEventListener("click",seClose);
+
+/* ================================================================
+   通用菜单 / 快速文档 / QuickFix / 重命名
+================================================================ */
+function showMenu(x,y,items){
+  const m=$("#menu");m.innerHTML="";
+  for(const it of items){
+    if(it.hr){m.appendChild(document.createElement("hr"));continue;}
+    const d=document.createElement("div");
+    d.className="mi"+(it.danger?" danger":"");
+    d.innerHTML=`<span>${esc(it.label)}</span>${it.kbd?`<kbd>${it.kbd}</kbd>`:""}`;
+    d.addEventListener("click",()=>{hideMenu();it.act&&it.act();});
+    m.appendChild(d);
+  }
+  m.classList.add("open");
+  const r=m.getBoundingClientRect();
+  m.style.left=Math.min(x,innerWidth-r.width-8)+"px";
+  m.style.top=Math.min(y,innerHeight-r.height-8)+"px";
+}
+function hideMenu(){$("#menu").classList.remove("open");}
+document.addEventListener("click",e=>{if(!e.target.closest("#menu"))hideMenu();});
+
+let qdocTimer,qdocHideTimer,qdocCurrent=null;
+function showQdoc(x,y,name){
+  const doc=DOCS[name];if(!doc)return;
+  qdocCurrent=name;
+  const q=$("#qdoc");
+  q.innerHTML=`<div class="qd-bar"><button data-a="pin" title="固定到右栏">📌</button><button data-a="x">✕</button></div>
+    <span class="sig">${esc(doc.sig)}</span>${doc.body}`;
+  q.classList.add("open");
+  q.style.left=Math.min(x+10,innerWidth-400)+"px";
+  q.style.top=Math.min(y+14,innerHeight-260)+"px";
+  q.querySelector('[data-a=pin]').onclick=()=>{state.pinnedDoc=doc;state.rightTab="doc";renderRight();hideQdoc();toast("已固定到右栏「文档」");};
+  q.querySelector('[data-a=x]').onclick=hideQdoc;
+}
+function hideQdoc(){$("#qdoc").classList.remove("open");qdocCurrent=null;}
+$("#qdoc").addEventListener("mouseenter",()=>clearTimeout(qdocHideTimer));
+$("#qdoc").addEventListener("mouseleave",()=>{qdocHideTimer=setTimeout(hideQdoc,250);});
+
+function showQuickFix(x,y,f,line){
+  const fixes=line===16?[
+    {label:"💡 为 'toState' 添加显式返回类型",act:()=>toast("应用 Quick Fix（演示）")},
+    {label:"💡 抑制此警告 (ts-ignore)",act:()=>toast("应用（演示）")},
+    {label:"⚙ 组织导入 (source.organizeImports)",act:()=>toast("应用（演示）")},
+  ]:[
+    {label:"💡 导入 'reveal' 从 './navigation'",act:()=>toast("应用 auto-import（演示）")},
+    {label:"💡 声明局部函数 'reveal'",act:()=>toast("应用（演示）")},
+    {label:"⚙ 在此行禁用检查",act:()=>toast("应用（演示）")},
+  ];
+  showMenu(x,y,fixes);
+}
+
+const renameBox=$("#renameBox"),renameInput=$("#renameInput");
+let renameTarget=null;
+function startRename(symEl){
+  renameTarget=symEl.dataset.sym;
+  const r=symEl.getBoundingClientRect();
+  renameBox.style.display="block";
+  renameBox.style.left=r.left+"px";renameBox.style.top=(r.top-2)+"px";
+  renameInput.value=renameTarget;renameInput.style.width=Math.max(120,r.width+40)+"px";
+  renameInput.focus();renameInput.select();
+}
+renameInput.addEventListener("keydown",e=>{
+  if(e.key==="Enter"){
+    const nv=renameInput.value.trim();
+    if(nv&&nv!==renameTarget){
+      let n=0;
+      $$(`.sym[data-sym="${renameTarget}"]`).forEach(el=>{el.textContent=nv;el.dataset.sym=nv;n++;});
+      toast(`已重命名 ${n} 处（演示；真实实现含跨文件预览确认，见设计 §5.2.9）`);
+    }
+    renameBox.style.display="none";
+  }else if(e.key==="Escape")renameBox.style.display="none";
+});
+
+/* 符号交互（事件委托） */
+document.addEventListener("mouseover",e=>{
+  const s=e.target.closest(".sym");
+  clearTimeout(qdocTimer);
+  if(s){qdocTimer=setTimeout(()=>showQdoc(e.clientX,e.clientY,s.dataset.sym),350);}
+});
+document.addEventListener("mouseout",e=>{
+  if(e.target.closest(".sym")){clearTimeout(qdocTimer);qdocHideTimer=setTimeout(hideQdoc,300);}
+});
+document.addEventListener("click",e=>{
+  const s=e.target.closest(".sym");
+  $$(".sym.usage").forEach(x=>x.classList.remove("usage","usage-w"));
+  if(!s)return;
+  const name=s.dataset.sym;
+  $$(`.sym[data-sym="${name}"]`).forEach((x,i)=>{x.classList.add("usage");if(i===0)x.classList.add("usage-w");});
+});
+document.addEventListener("contextmenu",e=>{
+  const s=e.target.closest(".sym");
+  if(!s)return;
+  e.preventDefault();
+  const name=s.dataset.sym;
+  showMenu(e.clientX,e.clientY,[
+    {label:"跳转到声明",kbd:"Ctrl+B",act:()=>{
+      if(name==="lspDefinition")openFile("lsp",{line:9});
+      else if(name==="workspaceReadFile")toast("跳转 workspace.ts:84（演示：目标为只读库文件时加横幅）");
+      else toast("已在当前位置（演示）");}},
+    {label:"跳转到实现",kbd:"Ctrl+Alt+B",act:()=>toast("多实现时弹 peek 列表（演示）")},
+    {label:"查找用法",kbd:"Alt+F7",act:()=>{toggleDock(true);dockSelect("refs");}},
+    {hr:true},
+    {label:"调用层级",kbd:"Ctrl+Alt+H",act:()=>{state.hierSym=CALL_HIER[name]?name:"openFile";toggleDock(true);dockSelect("callhier");}},
+    {label:"类型层级",kbd:"Ctrl+H",act:()=>{state.typeSym=TYPE_HIER[name]?name:"OpenFileState";toggleDock(true);dockSelect("typehier");}},
+    {hr:true},
+    {label:"重命名…",kbd:"Shift+F6",act:()=>startRename(s)},
+    {label:"快速文档",kbd:"Ctrl+Q",act:()=>showQdoc(e.clientX,e.clientY,name)},
+  ]);
+});
+
+/* ================================================================
+   编辑器内查找 (Ctrl+F)
+================================================================ */
+function activeFindbar(){return paneEl(state.activePane).querySelector("[data-role=findbar]");}
+function clearFindHits(pane){
+  pane.querySelectorAll(".find-hit").forEach(el=>{
+    const t=document.createTextNode(el.textContent);el.replaceWith(t);
+  });
+}
+function runFind(paneIdx){
+  const pane=paneEl(paneIdx);
+  const q=pane.querySelector("[data-role=findinput]").value;
+  clearFindHits(pane);
+  let n=0;
+  if(q.length>=1){
+    pane.querySelectorAll("[data-role=lines] .code").forEach(code=>{
+      const walker=document.createTreeWalker(code,NodeFilter.SHOW_TEXT);
+      const nodes=[];let t;while(t=walker.nextNode())nodes.push(t);
+      for(const node of nodes){
+        if(node.parentElement.classList.contains("blame"))continue;
+        const text=node.textContent;const lower=text.toLowerCase(),lq=q.toLowerCase();
+        let at=lower.indexOf(lq);if(at<0)continue;
+        const frag=document.createDocumentFragment();let pos=0;
+        while(at>=0){
+          frag.appendChild(document.createTextNode(text.slice(pos,at)));
+          const m=document.createElement("span");m.className="find-hit";m.textContent=text.substr(at,q.length);
+          frag.appendChild(m);n++;pos=at+q.length;at=lower.indexOf(lq,pos);
+        }
+        frag.appendChild(document.createTextNode(text.slice(pos)));
+        node.replaceWith(frag);
+      }
+    });
+  }
+  pane.querySelector("[data-role=findcnt]").textContent=q?`${n} 个匹配`:"";
+}
+function openFindbar(){
+  const fb=activeFindbar();fb.classList.add("open");
+  const inp=fb.querySelector("[data-role=findinput]");inp.focus();inp.select();
+}
+$$(".pane").forEach(pane=>{
+  const idx=+pane.dataset.pane;
+  pane.querySelector("[data-role=findinput]").addEventListener("input",()=>runFind(idx));
+  pane.querySelector("[data-role=findclose]").addEventListener("click",()=>{
+    pane.querySelector("[data-role=findbar]").classList.remove("open");clearFindHits(pane);
+    pane.querySelector("[data-role=findcnt]").textContent="";
+  });
+});
+
+/* ================================================================
+   分屏 / 导航 / 布局按钮 / 状态栏
+================================================================ */
+function setSplit(on){
+  if(on===state.split)return;
+  state.split=on;
+  const panes=$("#panes");
+  if(on){
+    const p2=$$(".pane")[0].cloneNode(true);
+    p2.dataset.pane="1";
+    panes.appendChild(p2);
+    state.panes[1]={tabs:[{key:state.panes[0].active,preview:false,pinned:false}],active:state.panes[0].active};
+    p2.querySelector("[data-role=findinput]").addEventListener("input",()=>runFind(1));
+    p2.querySelector("[data-role=findclose]").addEventListener("click",()=>{p2.querySelector("[data-role=findbar]").classList.remove("open");clearFindHits(p2);});
+    p2.addEventListener("mousedown",()=>{state.activePane=1;});
+    toast("分屏：两个编辑组共享同一 buffer（编辑互相同步 —— 设计 §5.6.1）");
+  }else{
+    $$(".pane")[1]?.remove();
+    state.panes.length=1;state.activePane=0;
+  }
+  $("#btnSplit").classList.toggle("on",on);
+  renderAll();
+}
+$("#btnSplit").addEventListener("click",()=>setSplit(!state.split));
+$("#btnBlame").addEventListener("click",()=>{
+  document.body.classList.toggle("show-blame");
+  $("#btnBlame").classList.toggle("on");
+  toast(document.body.classList.contains("show-blame")?"Inline blame 已开启（行尾灰字）":"Inline blame 已关闭");
+});
+$("#btnLeft").addEventListener("click",()=>{document.body.classList.toggle("hide-left");$("#btnLeft").classList.toggle("on");});
+$("#btnRight").addEventListener("click",()=>{document.body.classList.toggle("hide-right");$("#btnRight").classList.toggle("on");});
+$("#btnBottom").addEventListener("click",()=>toggleDock());
+$("#btnHelp").addEventListener("click",()=>$("#help").classList.toggle("open"));
+$("#btnLocate").addEventListener("click",()=>{const k=state.panes[state.activePane]?.active;if(k)locateInTree(k);});
+
+function navTo(idx){
+  if(idx<0||idx>=state.nav.stack.length)return;
+  state.nav.idx=idx;
+  openFile(state.nav.stack[idx],{push:false});
+}
+$("#navBack").addEventListener("click",()=>navTo(state.nav.idx-1));
+$("#navFwd").addEventListener("click",()=>navTo(state.nav.idx+1));
+
+function renderStatus(){
+  const f=FILES[state.panes[state.activePane]?.active];
+  if(!f)return;
+  $("#stPath").textContent=f.path;
+  $("#stLang").innerHTML=`<span class="lsp-dot" style="background:${f.lang==="Markdown"||f.lang==="JSON"||f.lang==="Plain Text"?"var(--fg-dim)":"var(--ok)"}"></span>${f.lang}`;
+  $("#stBranch").textContent=`⎇ ${f.branch||"main"} ↑2`;
+  $("#navBack").disabled=state.nav.idx<=0;
+  $("#navFwd").disabled=state.nav.idx>=state.nav.stack.length-1;
+}
+$("#stLang").addEventListener("click",()=>toast("语言状态段：点击选择/配置 LSP 服务器（复用现有 LSP 预设 UI）"));
+$("#stBranch").addEventListener("click",()=>toast("分支段：点击打开 Git 管理器（现有功能入口）"));
+
+/* ================================================================
+   键盘
+================================================================ */
+let lastShift=0,shiftArmed=true;
+document.addEventListener("keydown",e=>{
+  if(e.key==="Shift"&&!e.repeat){
+    const now=Date.now();
+    if(shiftArmed&&now-lastShift<350&&!$("#se").classList.contains("open")){seOpen();lastShift=0;return;}
+    lastShift=now;shiftArmed=true;return;
+  }
+  if(e.key!=="Shift")shiftArmed=false;
+
+  if(e.ctrlKey&&(e.key==="f"||e.key==="F")&&!e.shiftKey){e.preventDefault();openFindbar();return;}
+  if(e.altKey&&e.key==="F12"){e.preventDefault();toggleDock();dockSelect("terminal");return;}
+  if(e.altKey&&e.key==="Enter"){
+    const ln=state.activeLine[state.activePane];
+    const f=FILES[state.panes[state.activePane]?.active];
+    if(f&&ln&&f.lines[ln-1]?.diag){e.preventDefault();
+      const row=paneEl(state.activePane).querySelector(`.line[data-line="${ln}"]`);
+      const r=row.getBoundingClientRect();showQuickFix(r.left+90,r.bottom,f,ln);}
+    else toast("当前行无可用 Quick Fix（先点击带波浪线的行）");
+    return;
+  }
+  if(e.key==="Escape"){
+    seClose();hideMenu();hideQdoc();renameBox.style.display="none";$("#help").classList.remove("open");
+    const fb=activeFindbar();if(fb.classList.contains("open")){fb.classList.remove("open");clearFindHits(paneEl(state.activePane));}
+  }
+});
+
+/* ================================================================
+   总渲染入口
+================================================================ */
+function renderAll(){
+  for(let i=0;i<state.panes.length;i++){
+    renderTabs(i);renderEditor(i);renderCrumbs(i);
+    paneEl(i)?.classList.toggle("inactive",i!==state.activePane);
+  }
+  renderStatus();renderRight();
+}
+renderTree();
+renderDockTabs();
+renderDockBody();
+renderAll();
+setActiveLine(0,14);
+toast("👋 交互原型已就绪 —— 点右上角 <b>?</b> 查看操作指南");
+</script>
+</body>
+</html>
