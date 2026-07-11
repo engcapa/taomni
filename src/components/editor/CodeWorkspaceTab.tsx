@@ -59,6 +59,7 @@ import { notifyGitRepoChanged, subscribeGitRepoRefresh } from "../../lib/gitRefr
 import {
   lspChangeDocument,
   lspCloseDocument,
+  lspCodeActions,
   lspCompletion,
   lspCompletionResolve,
   lspDetectServers,
@@ -72,6 +73,7 @@ import {
   lspReferences,
   lspSaveDocument,
   lspSignatureHelp,
+  type LspCodeAction,
   type LspCompletionItem,
   type LspCompletionResult,
   type LspCustomServerCommand,
@@ -84,6 +86,7 @@ import {
   type LspRange,
   type LspServerStatus,
   type LspSignatureHelpResult,
+  type LspWorkspaceEdit,
 } from "../../lib/editor/lsp";
 import { selectFilePath, selectFolderPath } from "../../lib/ipc";
 import {
@@ -104,6 +107,10 @@ import { writeText } from "../../lib/clipboard";
 import { useContextMenu } from "../ContextMenu";
 import { CodeMirrorHost, type EditorSelectionRange } from "./workspace/CodeMirrorHost";
 import { applyLspTextEditsToString } from "./workspace/lspTextEdits";
+import {
+  applyWorkspaceEdit,
+  summarizeWorkspaceEditOutcomes,
+} from "./workspace/workspaceEditApply";
 import { BottomDock } from "./workspace/panels/BottomDock";
 import {
   ReferencesPanel,
@@ -2462,6 +2469,191 @@ export function CodeWorkspaceTab({
     }
   }, [activeFile, lspDescriptorForFile, updateFileText]);
 
+  const absolutePathForOpenFile = useCallback((file: OpenFileState): string | null => {
+    if (file.ref.kind === "loose") return normalizeFsPath(file.ref.path);
+    const root = findRoot(file.ref.rootId);
+    if (!root) return null;
+    return absoluteWorkspacePath(root, file.ref.path);
+  }, [findRoot]);
+
+  const applyLspWorkspaceEdit = useCallback(async (edit: LspWorkspaceEdit) => {
+    const outcomes = await applyWorkspaceEdit(edit, {
+      resolvePath: (file) => {
+        if (file.path) return normalizeFsPath(file.path);
+        return null;
+      },
+      getOpenBuffer: (absolutePath) => {
+        const normalized = normalizeFsPath(absolutePath);
+        for (const file of Object.values(openFilesRef.current)) {
+          const path = absolutePathForOpenFile(file);
+          if (path && normalizeFsPath(path) === normalized) {
+            return { text: file.text, dirty: file.dirty, key: file.key };
+          }
+        }
+        return null;
+      },
+      applyToOpenBuffer: (key, nextText) => updateFileText(key, nextText),
+      readDisk: async (absolutePath) => {
+        // Prefer workspace APIs via root-relative path when possible.
+        for (const root of rootsRef.current) {
+          const rel = relativePathWithinRoot(root.path, absolutePath);
+          if (rel === null) continue;
+          try {
+            const disk = await workspaceReadFile(root.path, rel);
+            return { text: disk.text, hash: disk.hash };
+          } catch {
+            return null;
+          }
+        }
+        try {
+          const disk = await workspaceReadLooseFile(absolutePath);
+          return { text: disk.text, hash: disk.hash };
+        } catch {
+          return null;
+        }
+      },
+      writeDisk: async (absolutePath, text, expectedHash) => {
+        for (const root of rootsRef.current) {
+          const rel = relativePathWithinRoot(root.path, absolutePath);
+          if (rel === null) continue;
+          await workspaceWriteFile(root.path, rel, text, expectedHash);
+          return;
+        }
+        await workspaceWriteLooseFile(absolutePath, text, expectedHash);
+      },
+    });
+    setStatusMessage(summarizeWorkspaceEditOutcomes(outcomes));
+    return outcomes;
+  }, [absolutePathForOpenFile, setStatusMessage, updateFileText]);
+
+  const requestCodeActions = useCallback(async (
+    file: OpenFileState,
+    range: LspRange,
+    diagnostics: LspDiagnostic[] = [],
+  ): Promise<LspCodeAction[]> => {
+    const descriptor = lspDescriptorForFile(file);
+    if (!descriptor) return [];
+    const caps = lspFilesRef.current[file.key]?.status?.capabilities;
+    if (caps && !caps.codeAction) return [];
+    try {
+      const result = await lspCodeActions(
+        descriptor,
+        range,
+        diagnostics.map((item) => ({
+          range: item.range,
+          severity: item.severity,
+          code: item.code,
+          source: item.source,
+          message: item.message,
+        })),
+      );
+      updateLspStatusForFile(file, result.status);
+      return result.actions;
+    } catch {
+      return [];
+    }
+  }, [lspDescriptorForFile, updateLspStatusForFile]);
+
+  const runCodeAction = useCallback(async (action: LspCodeAction) => {
+    if (action.edit) {
+      await applyLspWorkspaceEdit(action.edit);
+      return;
+    }
+    if (action.command) {
+      setStatusMessage(`Code action command not yet executed: ${action.command}`);
+      return;
+    }
+    setStatusMessage("Code action had no edit to apply");
+  }, [applyLspWorkspaceEdit, setStatusMessage]);
+
+  const showCodeActionsMenu = useCallback(async (
+    clientX: number,
+    clientY: number,
+    file: OpenFileState,
+    range: LspRange,
+    diagnostics: LspDiagnostic[] = [],
+  ) => {
+    const actions = await requestCodeActions(file, range, diagnostics);
+    if (!actions.length) {
+      setStatusMessage("No code actions available");
+      return;
+    }
+    const sorted = [...actions].sort((a, b) => {
+      const aQuick = a.kind?.includes("quickfix") ? 0 : 1;
+      const bQuick = b.kind?.includes("quickfix") ? 0 : 1;
+      if (aQuick !== bQuick) return aQuick - bQuick;
+      if (a.isPreferred !== b.isPreferred) return a.isPreferred ? -1 : 1;
+      return a.title.localeCompare(b.title);
+    });
+    // Use a synthetic context menu near the caret / lightbulb.
+    const synthetic = {
+      preventDefault() {},
+      stopPropagation() {},
+      clientX,
+      clientY,
+      button: 2,
+    } as unknown as React.MouseEvent;
+    treeContextMenu.show(synthetic, sorted.map((action) => ({
+      label: action.title,
+      onClick: () => void runCodeAction(action),
+    })));
+  }, [requestCodeActions, runCodeAction, treeContextMenu]);
+
+  const openCodeActionsAtCursor = useCallback(async () => {
+    const file = activeFile;
+    if (!file || file.loading) return;
+    const selection = editorSelectionRef.current;
+    const range: LspRange = {
+      start: selection.start,
+      end: selection.empty ? selection.start : selection.end,
+    };
+    const diagnostics = (lspFilesRef.current[file.key]?.diagnostics ?? []).filter((item) => (
+      item.range.start.line === range.start.line
+      || item.range.end.line === range.start.line
+    ));
+    const rect = editorPaneRef.current?.getBoundingClientRect();
+    await showCodeActionsMenu(
+      (rect?.left ?? 0) + 80,
+      (rect?.top ?? 0) + 80,
+      file,
+      range,
+      diagnostics,
+    );
+  }, [activeFile, showCodeActionsMenu]);
+
+  const openCodeActionsForLine = useCallback(async (line: number) => {
+    const file = activeFile;
+    if (!file || file.loading) return;
+    const diagnostics = (lspFilesRef.current[file.key]?.diagnostics ?? []).filter(
+      (item) => item.range.start.line === line || item.range.end.line === line,
+    );
+    const range: LspRange = diagnostics[0]?.range ?? {
+      start: { line, character: 0 },
+      end: { line, character: 0 },
+    };
+    const rect = editorPaneRef.current?.getBoundingClientRect();
+    await showCodeActionsMenu(
+      (rect?.left ?? 0) + 48,
+      (rect?.top ?? 0) + 48 + line * 16,
+      file,
+      range,
+      diagnostics,
+    );
+  }, [activeFile, showCodeActionsMenu]);
+
+  const openQuickFixForProblem = useCallback(async (fileKey: string, diagnostic: LspDiagnostic) => {
+    const file = openFilesRef.current[fileKey];
+    if (!file) return;
+    const rect = editorPaneRef.current?.getBoundingClientRect();
+    await showCodeActionsMenu(
+      (rect?.left ?? 0) + 80,
+      (rect?.top ?? 0) + 120,
+      file,
+      diagnostic.range,
+      [diagnostic],
+    );
+  }, [showCodeActionsMenu]);
+
   const openStructurePopup = useCallback(async () => {
     const file = activeKey ? openFilesRef.current[activeKey] : null;
     if (!file || file.loading) return;
@@ -2582,6 +2774,15 @@ export function CodeWorkspaceTab({
       keywords: ["docs", "hover", "javadoc"],
       when: (context) => context.focus !== "tree" && context.focus !== "terminal" && !!activeFile && !activeFile.loading,
       run: () => void openQuickDocumentation(),
+    },
+    {
+      id: "workspace.codeActions",
+      title: "Show Code Actions / Quick Fix",
+      category: "Code",
+      keybinding: "Alt+Enter",
+      keywords: ["quickfix", "bulb", "intention"],
+      when: (context) => context.focus !== "tree" && context.focus !== "terminal" && !!activeFile && !activeFile.loading,
+      run: () => void openCodeActionsAtCursor(),
     },
     {
       id: "workspace.toggleDocumentationPane",
@@ -2733,6 +2934,7 @@ export function CodeWorkspaceTab({
     navCan.forward,
     navigateHistory,
     onOpenGitManager,
+    openCodeActionsAtCursor,
     openFile,
     openFindInFiles,
     openGitManager,
@@ -3653,6 +3855,7 @@ export function CodeWorkspaceTab({
                               onSelectionChange={(selection) => {
                                 editorSelectionRef.current = selection;
                               }}
+                              onLightbulb={(line) => void openCodeActionsForLine(line)}
                               completionTriggers={activeCapabilities?.completionTriggerCharacters ?? []}
                               signatureTriggers={activeCapabilities?.signatureTriggerCharacters ?? []}
                             />
@@ -3678,6 +3881,7 @@ export function CodeWorkspaceTab({
                           onSelectionChange={(selection) => {
                             editorSelectionRef.current = selection;
                           }}
+                          onLightbulb={(line) => void openCodeActionsForLine(line)}
                           completionTriggers={activeCapabilities?.completionTriggerCharacters ?? []}
                           signatureTriggers={activeCapabilities?.signatureTriggerCharacters ?? []}
                         />
@@ -3755,7 +3959,13 @@ export function CodeWorkspaceTab({
                 {problemCounts.warnings > 0 && <span className="text-amber-500">{problemCounts.warnings}</span>}
               </span>
             ) : undefined,
-            content: <ProblemsPanel files={problemFiles} onOpenProblem={openProblem} />,
+            content: (
+              <ProblemsPanel
+                files={problemFiles}
+                onOpenProblem={openProblem}
+                onQuickFix={(fileKey, diagnostic) => void openQuickFixForProblem(fileKey, diagnostic)}
+              />
+            ),
           },
           {
             id: "search",

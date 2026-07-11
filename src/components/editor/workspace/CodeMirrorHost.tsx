@@ -1,7 +1,6 @@
 import { useEffect, useRef, type MutableRefObject } from "react";
 import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import {
-  Decoration,
   EditorView,
   crosshairCursor,
   drawSelection,
@@ -12,7 +11,6 @@ import {
   lineNumbers,
   rectangularSelection,
   showTooltip,
-  type DecorationSet,
   type Tooltip,
 } from "@codemirror/view";
 import {
@@ -40,6 +38,7 @@ import type {
 import { languageForPath } from "../../git/diffLanguage";
 import { createWorkspaceSearchPanel, WORKSPACE_SEARCH_STYLE } from "./editorSearchPanel";
 import { createLspCompletionSource } from "./lspCompletion";
+import { createDiagnosticChrome } from "./lspDiagnosticChrome";
 import { lspPositionFromOffset, offsetFromLspPosition } from "./lspPositions";
 import { selectionHistoryField, workspaceEditorKeymap } from "./workspaceEditorCommands";
 
@@ -75,6 +74,7 @@ interface CodeMirrorHostProps {
     triggerCharacter: string | null,
   ) => Promise<LspSignatureHelpResult | null>;
   onSelectionChange?: (selection: EditorSelectionRange) => void;
+  onLightbulb?: (line: number) => void;
   completionTriggers?: string[];
   signatureTriggers?: string[];
 }
@@ -156,31 +156,6 @@ function signatureTooltipDom(result: LspSignatureHelpResult): HTMLElement {
   return dom;
 }
 
-function diagnosticClass(severity: number | null): string {
-  if (severity === 1) return "cm-lsp-diagnostic-error";
-  if (severity === 2) return "cm-lsp-diagnostic-warning";
-  return "cm-lsp-diagnostic-info";
-}
-
-function diagnosticDecorations(view: EditorView, diagnostics: LspDiagnostic[]): DecorationSet {
-  const ranges = diagnostics.flatMap((diagnostic) => {
-    const from = offsetFromLspPosition(view.state.doc, diagnostic.range.start);
-    const rawTo = offsetFromLspPosition(view.state.doc, diagnostic.range.end);
-    const to = Math.max(rawTo, Math.min(view.state.doc.length, from + 1));
-    if (from > view.state.doc.length || to < from) return [];
-    return Decoration.mark({
-      class: diagnosticClass(diagnostic.severity),
-      attributes: { title: diagnostic.message },
-    }).range(from, to);
-  });
-  ranges.sort((a, b) => a.from - b.from || a.to - b.to);
-  return Decoration.set(ranges, true);
-}
-
-function lspDiagnosticsExtension(diagnostics: LspDiagnostic[]): Extension {
-  return EditorView.decorations.of((view) => diagnosticDecorations(view, diagnostics));
-}
-
 function lspInteractionExtensions(
   hoverRef: MutableRefObject<(position: LspPosition) => Promise<string | null>>,
   definitionRef: MutableRefObject<(position: LspPosition) => Promise<boolean>>,
@@ -245,6 +220,7 @@ export function CodeMirrorHost({
   onCompleteResolve,
   onSignatureHelp,
   onSelectionChange,
+  onLightbulb,
   completionTriggers,
   signatureTriggers,
 }: CodeMirrorHostProps) {
@@ -263,6 +239,7 @@ export function CodeMirrorHost({
   const onCompleteResolveRef = useRef(onCompleteResolve);
   const onSignatureHelpRef = useRef(onSignatureHelp);
   const onSelectionChangeRef = useRef(onSelectionChange);
+  const onLightbulbRef = useRef(onLightbulb);
   const completionTriggersRef = useRef(completionTriggers ?? []);
   const signatureTriggersRef = useRef(signatureTriggers ?? []);
   onChangeRef.current = onChange;
@@ -274,6 +251,7 @@ export function CodeMirrorHost({
   onCompleteResolveRef.current = onCompleteResolve;
   onSignatureHelpRef.current = onSignatureHelp;
   onSelectionChangeRef.current = onSelectionChange;
+  onLightbulbRef.current = onLightbulb;
   completionTriggersRef.current = completionTriggers ?? [];
   signatureTriggersRef.current = signatureTriggers ?? [];
 
@@ -376,7 +354,10 @@ export function CodeMirrorHost({
         search({ top: true, createPanel: createWorkspaceSearchPanel }),
         selectionHistoryField,
         languageCompartment.current.of([]),
-        diagnosticsCompartment.current.of(lspDiagnosticsExtension(diagnostics)),
+        diagnosticsCompartment.current.of(createDiagnosticChrome(
+          diagnostics,
+          (line) => onLightbulbRef.current?.(line),
+        )),
         signatureCompartment.current.of([]),
         ...lspInteractionExtensions(onHoverRef, onDefinitionRef, onReferencesRef),
         ...codeViewExtensions(),
@@ -454,7 +435,10 @@ export function CodeMirrorHost({
     const view = viewRef.current;
     if (!view) return;
     view.dispatch({
-      effects: diagnosticsCompartment.current.reconfigure(lspDiagnosticsExtension(diagnostics)),
+      effects: diagnosticsCompartment.current.reconfigure(createDiagnosticChrome(
+        diagnostics,
+        (line) => onLightbulbRef.current?.(line),
+      )),
     });
   }, [diagnostics]);
 

@@ -43,6 +43,7 @@ const lspMocks = vi.hoisted(() => ({
   lspSignatureHelp: vi.fn(),
   lspFormatting: vi.fn(),
   lspRangeFormatting: vi.fn(),
+  lspCodeActions: vi.fn(),
 }));
 
 const ipcMocks = vi.hoisted(() => ({
@@ -209,6 +210,8 @@ describe("CodeWorkspaceTab", () => {
     lspMocks.lspFormatting.mockResolvedValue({ status: documentStatus(), edits: [] });
     lspMocks.lspRangeFormatting.mockReset();
     lspMocks.lspRangeFormatting.mockResolvedValue({ status: documentStatus(), edits: [] });
+    lspMocks.lspCodeActions.mockReset();
+    lspMocks.lspCodeActions.mockResolvedValue({ status: documentStatus(), actions: [] });
     ipcMocks.selectFilePath.mockReset();
     ipcMocks.selectFolderPath.mockReset();
     gitMocks.gitSnapshot.mockReset();
@@ -921,6 +924,79 @@ describe("CodeWorkspaceTab", () => {
     expect(screen.queryByTestId("code-workspace-quick-doc")).not.toBeInTheDocument();
     expect(screen.getByTestId("code-workspace-right-pane")).toBeInTheDocument();
     expect(screen.getByTestId("code-workspace-documentation-pane")).toHaveTextContent("Opens");
+  });
+
+  it("requests code actions on Alt+Enter and applies workspace edits", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-actions",
+      workspaceInstanceId: "instance-actions",
+      name: "Actions",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "x=1"));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      available: true,
+      active: true,
+      capabilities: {
+        completion: false,
+        signatureHelp: false,
+        hover: false,
+        definition: false,
+        typeDefinition: false,
+        implementation: false,
+        references: false,
+        documentSymbol: false,
+        workspaceSymbol: false,
+        rename: false,
+        formatting: false,
+        rangeFormatting: false,
+        codeAction: true,
+        documentHighlight: false,
+        callHierarchy: false,
+        typeHierarchy: false,
+        inlayHint: false,
+        completionTriggerCharacters: [],
+        signatureTriggerCharacters: [],
+      },
+    }));
+    lspMocks.lspCodeActions.mockResolvedValue({
+      status: documentStatus({ available: true, active: true }),
+      actions: [{
+        title: "Insert space",
+        kind: "quickfix",
+        isPreferred: true,
+        edit: {
+          documentEdits: [{
+            uri: "file:///repo/app/src/main.ts",
+            path: "/repo/app/src/main.ts",
+            edits: [{
+              range: {
+                start: { line: 0, character: 1 },
+                end: { line: 0, character: 1 },
+              },
+              newText: " ",
+            }],
+          }],
+        },
+        command: null,
+        commandArguments: null,
+        raw: {},
+      }],
+    });
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+    fireEvent.keyDown(window, { key: "Enter", altKey: true });
+    await waitFor(() => expect(lspMocks.lspCodeActions).toHaveBeenCalled());
+    fireEvent.click(await screen.findByRole("button", { name: "Insert space" }));
+    await waitFor(() => expect(screen.getByText(/unsaved|Applied/i)).toBeTruthy());
   });
 
   it("formats the active document through LSP when formatting is advertised", async () => {

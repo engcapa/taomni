@@ -1409,6 +1409,115 @@ pub struct LspFormattingResult {
     pub edits: Vec<LspTextEdit>,
 }
 
+/// One file's worth of TextEdits from a WorkspaceEdit.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspFileTextEdits {
+    pub uri: String,
+    pub path: Option<String>,
+    pub edits: Vec<LspTextEdit>,
+}
+
+/// Normalized workspace edit for clients (rename / code actions / replace).
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspWorkspaceEdit {
+    pub document_edits: Vec<LspFileTextEdits>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspCodeAction {
+    pub title: String,
+    pub kind: Option<String>,
+    pub is_preferred: bool,
+    pub edit: Option<LspWorkspaceEdit>,
+    pub command: Option<String>,
+    pub command_arguments: Option<Value>,
+    /// Original server action for executeCommand / resolve.
+    pub raw: Value,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspCodeActionsResult {
+    pub status: LspDocumentStatus,
+    pub actions: Vec<LspCodeAction>,
+}
+
+#[tauri::command]
+pub async fn lsp_code_actions(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    start_line: u32,
+    start_character: u32,
+    end_line: u32,
+    end_character: u32,
+    diagnostics: Option<Vec<Value>>,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspCodeActionsResult, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let session = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session,
+        None => {
+            let status = state
+                .lsp
+                .document_status(
+                    &document,
+                    server_command_id.as_deref(),
+                    custom_server_command.as_ref(),
+                )
+                .await;
+            return Ok(LspCodeActionsResult {
+                status,
+                actions: Vec::new(),
+            });
+        }
+    };
+    let result = session
+        .request(
+            "textDocument/codeAction",
+            json!({
+                "textDocument": { "uri": document.uri },
+                "range": {
+                    "start": { "line": start_line, "character": start_character },
+                    "end": { "line": end_line, "character": end_character },
+                },
+                "context": {
+                    "diagnostics": diagnostics.unwrap_or_default(),
+                    "only": null,
+                    "triggerKind": 1,
+                },
+            }),
+        )
+        .await
+        .unwrap_or(Value::Null);
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    Ok(LspCodeActionsResult {
+        status,
+        actions: parse_code_actions(&result),
+    })
+}
+
 #[tauri::command]
 pub async fn lsp_formatting(
     state: State<'_, AppState>,
@@ -1989,6 +2098,99 @@ fn parse_text_edits(value: &Value) -> Vec<LspTextEdit> {
     value
         .as_array()
         .map(|items| items.iter().filter_map(parse_text_edit).collect())
+        .unwrap_or_default()
+}
+
+fn parse_workspace_edit(value: &Value) -> LspWorkspaceEdit {
+    let mut document_edits: Vec<LspFileTextEdits> = Vec::new();
+    if let Some(changes) = value.get("changes").and_then(Value::as_object) {
+        for (uri, edits) in changes {
+            document_edits.push(LspFileTextEdits {
+                uri: uri.clone(),
+                path: path_from_uri(uri),
+                edits: parse_text_edits(edits),
+            });
+        }
+    }
+    if let Some(document_changes) = value.get("documentChanges").and_then(Value::as_array) {
+        for change in document_changes {
+            // TextDocumentEdit: { textDocument: { uri }, edits: [...] }
+            // Skip CreateFile/RenameFile/DeleteFile for now.
+            let Some(uri) = change
+                .get("textDocument")
+                .and_then(|doc| doc.get("uri"))
+                .and_then(Value::as_str)
+            else {
+                continue;
+            };
+            let edits = change
+                .get("edits")
+                .map(parse_text_edits)
+                .unwrap_or_default();
+            if edits.is_empty() {
+                continue;
+            }
+            if let Some(existing) = document_edits.iter_mut().find(|item| item.uri == uri) {
+                existing.edits.extend(edits);
+            } else {
+                document_edits.push(LspFileTextEdits {
+                    uri: uri.to_string(),
+                    path: path_from_uri(uri),
+                    edits,
+                });
+            }
+        }
+    }
+    LspWorkspaceEdit { document_edits }
+}
+
+fn parse_code_action(value: &Value) -> Option<LspCodeAction> {
+    // Command-only entries appear as { title, command, arguments }.
+    // Full CodeAction has title + optional edit/command/kind.
+    let title = value
+        .get("title")
+        .and_then(Value::as_str)
+        .filter(|title| !title.is_empty())?
+        .to_string();
+    let command = value
+        .get("command")
+        .and_then(|command| {
+            if let Some(name) = command.as_str() {
+                Some(name.to_string())
+            } else {
+                command
+                    .get("command")
+                    .and_then(Value::as_str)
+                    .map(ToString::to_string)
+            }
+        });
+    let command_arguments = value
+        .get("command")
+        .and_then(|command| command.get("arguments"))
+        .cloned()
+        .or_else(|| value.get("arguments").cloned());
+    let edit = value.get("edit").map(parse_workspace_edit);
+    Some(LspCodeAction {
+        title,
+        kind: value
+            .get("kind")
+            .and_then(Value::as_str)
+            .map(ToString::to_string),
+        is_preferred: value
+            .get("isPreferred")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        edit,
+        command,
+        command_arguments,
+        raw: value.clone(),
+    })
+}
+
+fn parse_code_actions(value: &Value) -> Vec<LspCodeAction> {
+    value
+        .as_array()
+        .map(|items| items.iter().filter_map(parse_code_action).collect())
         .unwrap_or_default()
 }
 
@@ -2670,5 +2872,37 @@ mod tests {
         assert_eq!(edits[1].new_text, "\n");
         assert!(parse_text_edits(&Value::Null).is_empty());
         assert!(parse_text_edits(&json!({ "not": "array" })).is_empty());
+    }
+
+    #[test]
+    fn parses_code_actions_and_workspace_edits() {
+        let actions = parse_code_actions(&json!([
+            {
+                "title": "Add import",
+                "kind": "quickfix",
+                "isPreferred": true,
+                "edit": {
+                    "changes": {
+                        "file:///repo/src/a.ts": [{
+                            "range": {
+                                "start": { "line": 0, "character": 0 },
+                                "end": { "line": 0, "character": 0 }
+                            },
+                            "newText": "import x from 'x';\n"
+                        }]
+                    }
+                }
+            },
+            {
+                "title": "Organize Imports",
+                "command": { "command": "source.organizeImports", "arguments": [] }
+            },
+            { "noTitle": true }
+        ]));
+        assert_eq!(actions.len(), 2);
+        assert_eq!(actions[0].title, "Add import");
+        assert!(actions[0].is_preferred);
+        assert_eq!(actions[0].edit.as_ref().unwrap().document_edits.len(), 1);
+        assert_eq!(actions[1].command.as_deref(), Some("source.organizeImports"));
     }
 }

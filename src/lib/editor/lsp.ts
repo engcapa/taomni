@@ -341,6 +341,46 @@ export function lspRangeFormatting(
   });
 }
 
+export interface LspFileTextEdits {
+  uri: string;
+  path: string | null;
+  edits: LspTextEdit[];
+}
+
+export interface LspWorkspaceEdit {
+  documentEdits: LspFileTextEdits[];
+}
+
+export interface LspCodeAction {
+  title: string;
+  kind: string | null;
+  isPreferred: boolean;
+  edit: LspWorkspaceEdit | null;
+  command: string | null;
+  commandArguments: unknown;
+  raw: unknown;
+}
+
+export interface LspCodeActionsResult {
+  status: LspDocumentStatus;
+  actions: LspCodeAction[];
+}
+
+export function lspCodeActions(
+  descriptor: LspDocumentDescriptor,
+  range: LspRange,
+  diagnostics?: unknown[] | null,
+): Promise<LspCodeActionsResult> {
+  return invoke<LspCodeActionsResult>("lsp_code_actions", {
+    ...documentArgs(descriptor),
+    startLine: range.start.line,
+    startCharacter: range.start.character,
+    endLine: range.end.line,
+    endCharacter: range.end.character,
+    diagnostics: diagnostics ?? null,
+  });
+}
+
 export function lspHover(
   descriptor: LspDocumentDescriptor,
   position: LspPosition,
