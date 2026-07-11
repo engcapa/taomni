@@ -886,6 +886,43 @@ describe("CodeWorkspaceTab", () => {
     expect(screen.queryByTestId("code-workspace-structure-popup")).not.toBeInTheDocument();
   });
 
+  it("opens quick documentation with Ctrl+Q and pins it to the right pane", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-qdoc",
+      workspaceInstanceId: "instance-qdoc",
+      name: "QuickDoc",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "openFile(path)"));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      available: true,
+      active: true,
+    }));
+    lspMocks.lspHover.mockResolvedValue({
+      status: documentStatus({ available: true, active: true }),
+      contents: "**Opens** a workspace file.",
+    });
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(lspMocks.lspOpenDocument).toHaveBeenCalled());
+
+    fireEvent.keyDown(window, { key: "q", ctrlKey: true });
+    const popup = await screen.findByTestId("code-workspace-quick-doc");
+    expect(popup).toHaveTextContent("Opens");
+    expect(lspMocks.lspHover).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId("code-workspace-quick-doc-pin"));
+    expect(screen.queryByTestId("code-workspace-quick-doc")).not.toBeInTheDocument();
+    expect(screen.getByTestId("code-workspace-right-pane")).toBeInTheDocument();
+    expect(screen.getByTestId("code-workspace-documentation-pane")).toHaveTextContent("Opens");
+  });
+
   it("formats the active document through LSP when formatting is advertised", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",

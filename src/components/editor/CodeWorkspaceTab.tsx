@@ -27,6 +27,8 @@ import {
   RefreshCw,
   RotateCcw,
   Save,
+  BookOpen,
+  PanelRight,
   Search,
   X,
   ZoomIn,
@@ -112,6 +114,8 @@ import {
   type ProblemFileGroup,
 } from "./workspace/panels/ProblemsPanel";
 import { FindInFilesPanel } from "./workspace/panels/FindInFilesPanel";
+import { DocumentationPane } from "./workspace/panels/DocumentationPane";
+import { QuickDocPopup, type QuickDocContent } from "./workspace/QuickDocPopup";
 import { SearchEverywhere, type GoToFileItem } from "./workspace/SearchEverywhere";
 import { RecentFilesPopup, type RecentFileEntry } from "./workspace/RecentFilesPopup";
 import { StructurePopup } from "./workspace/StructurePopup";
@@ -791,6 +795,11 @@ export function CodeWorkspaceTab({
   const [languagePanelOpen, setLanguagePanelOpen] = useState(true);
   const [bottomDockOpen, setBottomDockOpen] = useState(true);
   const [bottomDockTab, setBottomDockTab] = useState<"problems" | "search" | "references">("references");
+  const [rightPaneOpen, setRightPaneOpen] = useState(false);
+  const [quickDocOpen, setQuickDocOpen] = useState(false);
+  const [quickDocContent, setQuickDocContent] = useState<QuickDocContent | null>(null);
+  const [pinnedDoc, setPinnedDoc] = useState<QuickDocContent | null>(null);
+  const [pinnedDocLocked, setPinnedDocLocked] = useState(false);
   const [searchFocusNonce, setSearchFocusNonce] = useState(0);
   const [searchIncludePreset, setSearchIncludePreset] = useState<{ value: string; nonce: number }>({ value: "", nonce: 0 });
   const [searchEverywhereOpen, setSearchEverywhereOpen] = useState(false);
@@ -2378,6 +2387,48 @@ export function CodeWorkspaceTab({
 
   const structureFileRef = useRef<string | null>(null);
 
+  const pinQuickDocumentation = useCallback((content: QuickDocContent) => {
+    setPinnedDoc(content);
+    setPinnedDocLocked(true);
+    setRightPaneOpen(true);
+    setQuickDocOpen(false);
+  }, []);
+
+  const openQuickDocumentation = useCallback(async () => {
+    const file = activeFile;
+    if (!file || file.loading) return;
+    const position = editorSelectionRef.current.start;
+    const descriptor = lspDescriptorForFile(file);
+    if (!descriptor) {
+      setStatusMessage("No documentation available");
+      return;
+    }
+    let body: string | null = null;
+    try {
+      const result = await lspHover(descriptor, position);
+      updateLspStatusForFile(file, result.status);
+      body = result.contents;
+    } catch (err) {
+      setStatusMessage(errorMessage(err));
+      return;
+    }
+    if (!body) {
+      setStatusMessage("No documentation available");
+      return;
+    }
+    const lines = file.text.split("\n");
+    const line = lines[position.line] ?? "";
+    const left = line.slice(0, position.character);
+    const right = line.slice(position.character);
+    const start = left.search(/[A-Za-z0-9_$]+$/);
+    const endMatch = right.match(/^[A-Za-z0-9_$]*/);
+    const from = start >= 0 ? start : position.character;
+    const to = position.character + (endMatch?.[0].length ?? 0);
+    const word = line.slice(from, to) || file.title;
+    setQuickDocContent({ title: word, body });
+    setQuickDocOpen(true);
+  }, [activeFile, lspDescriptorForFile, setStatusMessage, updateLspStatusForFile]);
+
   const formatActiveFile = useCallback(async () => {
     const file = activeFile;
     if (!file || file.loading) return;
@@ -2521,6 +2572,23 @@ export function CodeWorkspaceTab({
         return !!(activeCapabilities.formatting || activeCapabilities.rangeFormatting);
       },
       run: () => void formatActiveFile(),
+    },
+    {
+      id: "workspace.quickDocumentation",
+      title: "Quick Documentation",
+      category: "Code",
+      keybinding: "Ctrl+Q",
+      keybindings: ["F1"],
+      keywords: ["docs", "hover", "javadoc"],
+      when: (context) => context.focus !== "tree" && context.focus !== "terminal" && !!activeFile && !activeFile.loading,
+      run: () => void openQuickDocumentation(),
+    },
+    {
+      id: "workspace.toggleDocumentationPane",
+      title: "Toggle Documentation Pane",
+      category: "View",
+      keywords: ["right", "docs", "pin"],
+      run: () => setRightPaneOpen((open) => !open),
     },
     {
       id: "workspace.save",
@@ -2669,6 +2737,7 @@ export function CodeWorkspaceTab({
     openFindInFiles,
     openGitManager,
     openLooseFile,
+    openQuickDocumentation,
     openRecentFiles,
     openSearchEverywhere,
     openStructurePopup,
@@ -3335,6 +3404,13 @@ export function CodeWorkspaceTab({
           disabled={gitRootsLoading || !onOpenGitManager || gitRoots.length === 0}
           onClick={() => executeWorkspaceCommand("workspace.openGit")}
         />
+        <IconButton
+          label="Toggle documentation pane"
+          testId="code-workspace-right-pane-toggle"
+          icon={<PanelRight className="w-3.5 h-3.5" />}
+          active={rightPaneOpen}
+          onClick={() => executeWorkspaceCommand("workspace.toggleDocumentationPane")}
+        />
       </header>
 
       <PanelGroup
@@ -3462,7 +3538,7 @@ export function CodeWorkspaceTab({
           </FileTreePane>
         </Panel>
         <PanelResizeHandle className="w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
-        <Panel id="editor" defaultSize="76%" minSize="35%" className="min-w-0">
+        <Panel id="editor" defaultSize={rightPaneOpen ? "56%" : "76%"} minSize="35%" className="min-w-0">
           <main
             ref={editorPaneRef}
             data-testid="code-workspace-editor-pane"
@@ -3617,7 +3693,54 @@ export function CodeWorkspaceTab({
             </div>
           </main>
         </Panel>
+        {rightPaneOpen && (
+          <>
+            <PanelResizeHandle className="w-1 bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors" />
+            <Panel
+              id="documentation"
+              defaultSize="20%"
+              minSize="12%"
+              maxSize="40%"
+              className="min-w-0"
+            >
+              <aside
+                data-testid="code-workspace-right-pane"
+                className="h-full min-h-0 flex flex-col border-l border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]"
+              >
+                <div className="flex h-8 shrink-0 items-center gap-1 border-b border-[var(--taomni-code-border)] px-2">
+                  <BookOpen className="h-3.5 w-3.5 text-[var(--taomni-code-muted)]" />
+                  <span className="text-[11px] font-semibold text-[var(--taomni-code-text)]">Documentation</span>
+                  <button
+                    type="button"
+                    aria-label="Close documentation pane"
+                    className="ml-auto inline-flex h-6 w-6 items-center justify-center rounded text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+                    onClick={() => setRightPaneOpen(false)}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1">
+                  <DocumentationPane
+                    content={pinnedDoc}
+                    locked={pinnedDocLocked}
+                    onUnlock={() => setPinnedDocLocked(false)}
+                    onClear={() => {
+                      setPinnedDoc(null);
+                      setPinnedDocLocked(false);
+                    }}
+                  />
+                </div>
+              </aside>
+            </Panel>
+          </>
+        )}
       </PanelGroup>
+      <QuickDocPopup
+        open={quickDocOpen}
+        content={quickDocContent}
+        onClose={() => setQuickDocOpen(false)}
+        onPin={pinQuickDocumentation}
+      />
       <BottomDock
         open={bottomDockOpen}
         activeTab={bottomDockTab}
