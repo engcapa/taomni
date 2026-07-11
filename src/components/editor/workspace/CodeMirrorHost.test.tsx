@@ -93,4 +93,38 @@ describe("CodeMirrorHost search", () => {
     fireEvent.keyDown(replace, { key: "Escape" });
     expect(screen.queryByTestId("code-workspace-editor-search")).not.toBeInTheDocument();
   });
+
+  it("duplicates and deletes the current line with IDEA keybindings", async () => {
+    const onChange = vi.fn();
+    const { content } = renderEditor("one\ntwo", onChange);
+
+    fireEvent.keyDown(content, { key: "d", code: "KeyD", ctrlKey: true });
+    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith("one\none\ntwo"));
+
+    fireEvent.keyDown(content, { key: "y", code: "KeyY", ctrlKey: true });
+    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith("one\ntwo"));
+  });
+
+  it("moves selected lines with Alt+Shift+Arrow", async () => {
+    const onChange = vi.fn();
+    const { content } = renderEditor("one\ntwo", onChange);
+
+    fireEvent.keyDown(content, { key: "ArrowDown", code: "ArrowDown", altKey: true, shiftKey: true });
+    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith("two\none"));
+  });
+
+  it("toggles line comments with Ctrl+Slash", async () => {
+    const onChange = vi.fn();
+    const { content } = renderEditor("const value = 1;", onChange);
+    await waitFor(() => expect(content).toHaveAttribute("data-language", "typescript"));
+
+    fireEvent.keyDown(content, { key: "/", code: "Slash", ctrlKey: true });
+    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith("// const value = 1;"));
+  });
+
+  it("opens go to line with Ctrl+G", async () => {
+    const { content } = renderEditor("one\ntwo");
+    fireEvent.keyDown(content, { key: "g", code: "KeyG", ctrlKey: true });
+    expect(await screen.findByRole("textbox", { name: /Go to line/ })).toBeInTheDocument();
+  });
 });

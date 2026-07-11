@@ -15,8 +15,6 @@ import {
   type Tooltip,
 } from "@codemirror/view";
 import {
-  addCursorAbove,
-  addCursorBelow,
   defaultKeymap,
   history,
   historyKeymap,
@@ -37,6 +35,7 @@ import type {
 } from "../../../lib/editor/lsp";
 import { languageForPath } from "../../git/diffLanguage";
 import { createWorkspaceSearchPanel, WORKSPACE_SEARCH_STYLE } from "./editorSearchPanel";
+import { selectionHistoryField, workspaceEditorKeymap } from "./workspaceEditorCommands";
 
 interface EditorRevealTarget {
   line: number;
@@ -244,6 +243,7 @@ export function CodeMirrorHost({
         indentOnInput(),
         autocompletion(),
         search({ top: true, createPanel: createWorkspaceSearchPanel }),
+        selectionHistoryField,
         languageCompartment.current.of([]),
         diagnosticsCompartment.current.of(lspDiagnosticsExtension(diagnostics)),
         ...lspInteractionExtensions(onHoverRef, onDefinitionRef, onReferencesRef),
@@ -254,8 +254,7 @@ export function CodeMirrorHost({
         keymap.of([
           { key: "Mod-s", run: saveHandler },
           { key: "Mod-r", run: openReplacePanel },
-          { key: "Shift-Alt-ArrowUp", run: addCursorAbove },
-          { key: "Shift-Alt-ArrowDown", run: addCursorBelow },
+          ...workspaceEditorKeymap,
           ...searchKeymap,
           ...closeBracketsKeymap,
           ...defaultKeymap,
