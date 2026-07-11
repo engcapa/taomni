@@ -71,6 +71,34 @@ describe("workspaceCommands", () => {
     expect(run).toHaveBeenCalledOnce();
   });
 
+  it("forwards optional payload to the command runner (tree selection / directory targets)", () => {
+    const run = vi.fn();
+    const treeOpen = command({
+      id: "workspace.tree.open",
+      when: (context) => context.focus === "tree",
+      run,
+    });
+    const payload = {
+      selection: { kind: "file" as const, ref: { kind: "root" as const, rootId: "r1", path: "src/a.ts" } },
+    };
+
+    expect(runWorkspaceCommand([treeOpen], "workspace.tree.open", { focus: "tree", payload })).toBe(true);
+    expect(run).toHaveBeenCalledWith({ focus: "tree", payload });
+  });
+
+  it("treats terminal focus as a first-class command context", () => {
+    const run = vi.fn();
+    const terminalOnly = command({
+      id: "workspace.terminal.clear",
+      when: (context) => context.focus === "terminal",
+      run,
+    });
+
+    expect(runWorkspaceCommand([terminalOnly], "workspace.terminal.clear", { focus: "editor" })).toBe(false);
+    expect(runWorkspaceCommand([terminalOnly], "workspace.terminal.clear", { focus: "terminal" })).toBe(true);
+    expect(run).toHaveBeenCalledWith({ focus: "terminal" });
+  });
+
   it("projects command state into menu-safe descriptors", () => {
     expect(workspaceCommandMenuItems([
       command({ id: "always", title: "Always" }),

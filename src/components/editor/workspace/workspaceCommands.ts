@@ -2,6 +2,8 @@ export type WorkspaceCommandFocus = "workspace" | "editor" | "tree" | "terminal"
 
 export interface WorkspaceCommandContext {
   focus: WorkspaceCommandFocus;
+  /** Optional caller-specific target (for example a tree selection or directory). */
+  payload?: unknown;
 }
 
 export interface WorkspaceCommand {

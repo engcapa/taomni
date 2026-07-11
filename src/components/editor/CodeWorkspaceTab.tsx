@@ -123,6 +123,7 @@ import {
   workspaceCommandEnabled,
   workspaceCommandMenuItems,
   type WorkspaceCommand,
+  type WorkspaceCommandContext,
   type WorkspaceCommandFocus,
   type WorkspaceCommandRegistration,
 } from "./workspace/workspaceCommands";
@@ -195,6 +196,12 @@ type TreeSelection =
   | { kind: "root"; rootId: string }
   | { kind: "dir"; rootId: string; path: string }
   | { kind: "file"; ref: CodeWorkspaceFileRef };
+interface WorkspaceTreeCommandPayload {
+  selection?: TreeSelection;
+  directory?: { rootId: string; path: string };
+  rootId?: string;
+  path?: string;
+}
 
 type MarkdownViewMode = "edit" | "preview" | "split";
 type TreeViewMode = FileTreeViewMode;
@@ -818,6 +825,7 @@ export function CodeWorkspaceTab({
   });
   const recentFilesRef = useRef<CodeWorkspaceFileRef[]>([]);
   const revealNonceRef = useRef(0);
+  const workspaceCommandRunnerRef = useRef<(commandId: string, context?: WorkspaceCommandContext) => boolean>(() => false);
   const initialOpenedKeyRef = useRef<string | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const treePaneRef = useRef<HTMLElement | null>(null);
@@ -2001,49 +2009,52 @@ export function CodeWorkspaceTab({
   const showTreeContextMenu = useCallback(
     (event: React.MouseEvent, selection: TreeSelection) => {
       setSelected(selection);
+      const run = (commandId: string, payload: WorkspaceTreeCommandPayload) => () => {
+        workspaceCommandRunnerRef.current(commandId, { focus: "tree", payload });
+      };
       if (selection.kind === "file" && selection.ref.kind === "root") {
         const ref = selection.ref;
         const dir = parentPath(ref.path);
         treeContextMenu.show(event, [
-          { label: "Open", onClick: () => void openFile(ref) },
+          { label: "Open", onClick: run("workspace.tree.open", { selection }) },
           { separator: true, label: "" },
-          { label: "New File...", onClick: () => void createFile({ rootId: ref.rootId, path: dir }) },
-          { label: "New Directory...", onClick: () => void createDir({ rootId: ref.rootId, path: dir }) },
-          { label: "Rename...", onClick: () => void renameSelected(selection) },
-          { label: "Delete", danger: true, onClick: () => void deleteSelected(selection) },
+          { label: "New File...", onClick: run("workspace.tree.newFile", { directory: { rootId: ref.rootId, path: dir } }) },
+          { label: "New Directory...", onClick: run("workspace.tree.newDirectory", { directory: { rootId: ref.rootId, path: dir } }) },
+          { label: "Rename...", onClick: run("workspace.tree.rename", { selection }) },
+          { label: "Delete", danger: true, onClick: run("workspace.tree.delete", { selection }) },
           { separator: true, label: "" },
-          { label: "Copy Path", onClick: () => void copyTreePath(ref.rootId, ref.path, true) },
-          { label: "Copy Relative Path", onClick: () => void copyTreePath(ref.rootId, ref.path, false) },
+          { label: "Copy Path", onClick: run("workspace.tree.copyPath", { rootId: ref.rootId, path: ref.path }) },
+          { label: "Copy Relative Path", onClick: run("workspace.tree.copyRelativePath", { rootId: ref.rootId, path: ref.path }) },
         ]);
         return;
       }
       if (selection.kind === "dir") {
         treeContextMenu.show(event, [
-          { label: "New File...", onClick: () => void createFile({ rootId: selection.rootId, path: selection.path }) },
-          { label: "New Directory...", onClick: () => void createDir({ rootId: selection.rootId, path: selection.path }) },
-          { label: "Rename...", onClick: () => void renameSelected(selection) },
-          { label: "Delete", danger: true, onClick: () => void deleteSelected(selection) },
+          { label: "New File...", onClick: run("workspace.tree.newFile", { directory: { rootId: selection.rootId, path: selection.path } }) },
+          { label: "New Directory...", onClick: run("workspace.tree.newDirectory", { directory: { rootId: selection.rootId, path: selection.path } }) },
+          { label: "Rename...", onClick: run("workspace.tree.rename", { selection }) },
+          { label: "Delete", danger: true, onClick: run("workspace.tree.delete", { selection }) },
           { separator: true, label: "" },
-          { label: "Find in Directory...", onClick: () => findInDirectory(selection.path) },
+          { label: "Find in Directory...", onClick: run("workspace.tree.findInDirectory", { path: selection.path }) },
           { separator: true, label: "" },
-          { label: "Copy Path", onClick: () => void copyTreePath(selection.rootId, selection.path, true) },
-          { label: "Copy Relative Path", onClick: () => void copyTreePath(selection.rootId, selection.path, false) },
+          { label: "Copy Path", onClick: run("workspace.tree.copyPath", { rootId: selection.rootId, path: selection.path }) },
+          { label: "Copy Relative Path", onClick: run("workspace.tree.copyRelativePath", { rootId: selection.rootId, path: selection.path }) },
         ]);
         return;
       }
       if (selection.kind === "root") {
         treeContextMenu.show(event, [
-          { label: "New File...", onClick: () => void createFile({ rootId: selection.rootId, path: "" }) },
-          { label: "New Directory...", onClick: () => void createDir({ rootId: selection.rootId, path: "" }) },
-          { label: "Rename Root...", onClick: () => void renameSelected(selection) },
+          { label: "New File...", onClick: run("workspace.tree.newFile", { directory: { rootId: selection.rootId, path: "" } }) },
+          { label: "New Directory...", onClick: run("workspace.tree.newDirectory", { directory: { rootId: selection.rootId, path: "" } }) },
+          { label: "Rename Root...", onClick: run("workspace.tree.rename", { selection }) },
           { separator: true, label: "" },
-          { label: "Copy Path", onClick: () => void copyTreePath(selection.rootId, "", true) },
+          { label: "Copy Path", onClick: run("workspace.tree.copyPath", { rootId: selection.rootId, path: "" }) },
           { separator: true, label: "" },
-          { label: "Remove from Workspace", danger: true, onClick: () => void deleteSelected(selection) },
+          { label: "Remove from Workspace", danger: true, onClick: run("workspace.tree.delete", { selection }) },
         ]);
       }
     },
-    [copyTreePath, createDir, createFile, deleteSelected, findInDirectory, openFile, renameSelected, treeContextMenu],
+    [treeContextMenu],
   );
 
   const updateFileText = useCallback((key: string, text: string) => {
@@ -2233,6 +2244,22 @@ export function CodeWorkspaceTab({
   const activeGitRoot = activeRoot && activeFile?.ref.kind === "root"
     ? gitRootForWorkspacePath(activeRoot, activeFile.ref.path, gitRoots)
     : null;
+  const title = workspaceTitle(workspace, roots, looseFiles);
+  const gitManagerPayload = useMemo<CodeWorkspaceGitManagerPayload | null>(() => {
+    if (gitRoots.length === 0) return null;
+    return {
+      workspaceName: title,
+      workspaceInstanceId,
+      workspaceId: workspace.workspaceId,
+      roots: gitRoots,
+      activeRepoRoot: activeGitRoot?.repoRoot ?? gitRoots[0]?.repoRoot ?? null,
+    };
+  }, [activeGitRoot, gitRoots, title, workspace.workspaceId, workspaceInstanceId]);
+
+  const openGitManager = useCallback(() => {
+    if (!onOpenGitManager || !gitManagerPayload) return;
+    onOpenGitManager(gitManagerPayload);
+  }, [gitManagerPayload, onOpenGitManager]);
   const gitChangeByRootPath = useMemo(() => {
     const map = new Map<string, GitChange>();
     for (const root of roots) {
@@ -2436,22 +2463,177 @@ export function CodeWorkspaceTab({
       when: () => !!activeFile,
       run: () => void openStructurePopup(),
     },
+    {
+      id: "workspace.save",
+      title: "Save Active File",
+      category: "File",
+      keybinding: "Ctrl+S",
+      when: () => !!activeFile?.dirty && !activeFile.loading && !activeFile.saving,
+      run: () => void saveFile(),
+    },
+    {
+      id: "workspace.reload",
+      title: "Reload Active File",
+      category: "File",
+      when: () => !!activeFile && !activeFile.loading,
+      run: () => void reloadFile(),
+    },
+    {
+      id: "workspace.refreshTree",
+      title: "Refresh Project Tree",
+      category: "File",
+      run: refreshTree,
+    },
+    {
+      id: "workspace.openGit",
+      title: "Open Git Manager",
+      category: "Git",
+      when: () => !gitRootsLoading && !!onOpenGitManager && gitRoots.length > 0,
+      run: openGitManager,
+    },
+    {
+      id: "workspace.tree.openLooseFile",
+      title: "Open Loose File",
+      category: "File",
+      run: () => void openLooseFile(),
+    },
+    {
+      id: "workspace.tree.addFolder",
+      title: "Add Folder to Workspace",
+      category: "File",
+      run: () => void addRoot(),
+    },
+    {
+      id: "workspace.tree.open",
+      title: "Open Selected File",
+      category: "File",
+      when: (context) => context.focus === "tree",
+      run: (context) => {
+        const payload = context.payload as WorkspaceTreeCommandPayload | undefined;
+        const selection = payload?.selection ?? selected;
+        if (selection?.kind === "file") void openFile(selection.ref);
+      },
+    },
+    {
+      id: "workspace.tree.newFile",
+      title: "New File",
+      category: "File",
+      when: (context) => context.focus !== "tree" || !!selectedRootDirectory,
+      run: (context) => {
+        const payload = context.payload as WorkspaceTreeCommandPayload | undefined;
+        void createFile(payload?.directory);
+      },
+    },
+    {
+      id: "workspace.tree.newDirectory",
+      title: "New Directory",
+      category: "File",
+      when: (context) => context.focus !== "tree" || !!selectedRootDirectory,
+      run: (context) => {
+        const payload = context.payload as WorkspaceTreeCommandPayload | undefined;
+        void createDir(payload?.directory);
+      },
+    },
+    {
+      id: "workspace.tree.rename",
+      title: "Rename Tree Selection",
+      category: "Refactor",
+      keybinding: "F2",
+      when: (context) => context.focus === "tree" && !!((context.payload as WorkspaceTreeCommandPayload | undefined)?.selection ?? selected),
+      run: (context) => {
+        const payload = context.payload as WorkspaceTreeCommandPayload | undefined;
+        void renameSelected(payload?.selection);
+      },
+    },
+    {
+      id: "workspace.tree.delete",
+      title: "Delete or Remove Tree Selection",
+      category: "File",
+      keybinding: "Delete",
+      when: (context) => context.focus === "tree" && !!((context.payload as WorkspaceTreeCommandPayload | undefined)?.selection ?? selected),
+      run: (context) => {
+        const payload = context.payload as WorkspaceTreeCommandPayload | undefined;
+        void deleteSelected(payload?.selection);
+      },
+    },
+    {
+      id: "workspace.tree.findInDirectory",
+      title: "Find in Selected Directory",
+      category: "Search",
+      when: (context) => context.focus === "tree",
+      run: (context) => {
+        const payload = context.payload as WorkspaceTreeCommandPayload | undefined;
+        findInDirectory(payload?.path ?? "");
+      },
+    },
+    {
+      id: "workspace.tree.copyPath",
+      title: "Copy Absolute Path",
+      category: "File",
+      when: (context) => context.focus === "tree",
+      run: (context) => {
+        const payload = context.payload as WorkspaceTreeCommandPayload | undefined;
+        if (payload?.rootId !== undefined && payload.path !== undefined) {
+          void copyTreePath(payload.rootId, payload.path, true);
+        }
+      },
+    },
+    {
+      id: "workspace.tree.copyRelativePath",
+      title: "Copy Relative Path",
+      category: "File",
+      when: (context) => context.focus === "tree",
+      run: (context) => {
+        const payload = context.payload as WorkspaceTreeCommandPayload | undefined;
+        if (payload?.rootId !== undefined && payload.path !== undefined) {
+          void copyTreePath(payload.rootId, payload.path, false);
+        }
+      },
+    },
   ], [
     activeFile,
+    addRoot,
+    copyTreePath,
+    createDir,
+    createFile,
+    deleteSelected,
+    findInDirectory,
+    gitRoots.length,
+    gitRootsLoading,
     navCan.back,
     navCan.forward,
     navigateHistory,
+    onOpenGitManager,
+    openFile,
     openFindInFiles,
+    openGitManager,
+    openLooseFile,
     openRecentFiles,
     openSearchEverywhere,
     openStructurePopup,
     recentFilesOpen,
+    refreshTree,
+    reloadFile,
+    renameSelected,
+    saveFile,
+    selected,
+    selectedRootDirectory,
   ]);
+
+  const executeWorkspaceCommand = useCallback((
+    commandId: string,
+    context: WorkspaceCommandContext = { focus: "workspace" },
+  ) => runWorkspaceCommand(workspaceCommands, commandId, context), [workspaceCommands]);
+  workspaceCommandRunnerRef.current = executeWorkspaceCommand;
 
   const commandFocusForTarget = useCallback((target: EventTarget | null): WorkspaceCommandFocus => {
     const node = target instanceof Node ? target : null;
-    if (node && treePaneRef.current?.contains(node)) return "tree";
-    if (node && editorPaneRef.current?.contains(node)) return "editor";
+    if (!node) return "workspace";
+    // Terminal dock (M3) marks itself with data-workspace-focus="terminal".
+    const el = node instanceof Element ? node : node.parentElement;
+    if (el?.closest('[data-workspace-focus="terminal"]')) return "terminal";
+    if (treePaneRef.current?.contains(node)) return "tree";
+    if (editorPaneRef.current?.contains(node)) return "editor";
     return "workspace";
   }, []);
 
@@ -2478,13 +2660,13 @@ export function CodeWorkspaceTab({
 
   const runSearchEverywhereCommand = useCallback((commandId: string) => {
     setSearchEverywhereOpen(false);
-    runWorkspaceCommand(workspaceCommands, commandId, { focus: "workspace" });
-  }, [workspaceCommands]);
+    executeWorkspaceCommand(commandId);
+  }, [executeWorkspaceCommand]);
 
   const commandRegistration = useMemo<WorkspaceCommandRegistration>(() => ({
     items: workspaceCommandMenuItems(workspaceCommands, { focus: "workspace" }),
-    execute: (commandId) => runWorkspaceCommand(workspaceCommands, commandId, { focus: "workspace" }),
-  }), [workspaceCommands]);
+    execute: (commandId) => executeWorkspaceCommand(commandId),
+  }), [executeWorkspaceCommand, workspaceCommands]);
 
   useEffect(() => {
     if (!onCommandsChange) return;
@@ -2662,23 +2844,6 @@ export function CodeWorkspaceTab({
     },
     [openFile, revealEditorLocation],
   );
-  const title = workspaceTitle(workspace, roots, looseFiles);
-  const gitManagerPayload = useMemo<CodeWorkspaceGitManagerPayload | null>(() => {
-    if (gitRoots.length === 0) return null;
-    return {
-      workspaceName: title,
-      workspaceInstanceId,
-      workspaceId: workspace.workspaceId,
-      roots: gitRoots,
-      activeRepoRoot: activeGitRoot?.repoRoot ?? gitRoots[0]?.repoRoot ?? null,
-    };
-  }, [activeGitRoot, gitRoots, title, workspace.workspaceId, workspaceInstanceId]);
-
-  const openGitManager = useCallback(() => {
-    if (!onOpenGitManager || !gitManagerPayload) return;
-    onOpenGitManager(gitManagerPayload);
-  }, [gitManagerPayload, onOpenGitManager]);
-
   useEffect(() => {
     if (!onSyncGitManager || !gitManagerPayload) return;
     onSyncGitManager(gitManagerPayload);
@@ -3050,14 +3215,14 @@ export function CodeWorkspaceTab({
           testId="code-workspace-nav-back"
           icon={<ArrowLeft className="w-3.5 h-3.5" />}
           disabled={!navCan.back}
-          onClick={() => navigateHistory(-1)}
+          onClick={() => executeWorkspaceCommand("workspace.navigateBack")}
         />
         <IconButton
           label="Forward"
           testId="code-workspace-nav-forward"
           icon={<ArrowRight className="w-3.5 h-3.5" />}
           disabled={!navCan.forward}
-          onClick={() => navigateHistory(1)}
+          onClick={() => executeWorkspaceCommand("workspace.navigateForward")}
         />
         <div className="flex items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1">
           <IconButton
@@ -3089,25 +3254,25 @@ export function CodeWorkspaceTab({
           label="Save"
           icon={activeFile?.saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
           disabled={!activeFile || !activeFile.dirty || activeFile.saving || activeFile.loading}
-          onClick={() => void saveFile()}
+          onClick={() => executeWorkspaceCommand("workspace.save", { focus: "editor" })}
         />
         <IconButton
           label="Reload"
           icon={<RotateCcw className="w-3.5 h-3.5" />}
           disabled={!activeFile || activeFile.loading}
-          onClick={() => void reloadFile()}
+          onClick={() => executeWorkspaceCommand("workspace.reload", { focus: "editor" })}
         />
         <IconButton
           label="Refresh tree"
           icon={<RefreshCw className="w-3.5 h-3.5" />}
-          onClick={refreshTree}
+          onClick={() => executeWorkspaceCommand("workspace.refreshTree")}
         />
         <IconButton
           label="Open Git tab"
           testId="code-workspace-git-panel-toggle"
           icon={gitRootsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <GitBranch className="w-3.5 h-3.5" />}
           disabled={gitRootsLoading || !onOpenGitManager || gitRoots.length === 0}
-          onClick={openGitManager}
+          onClick={() => executeWorkspaceCommand("workspace.openGit")}
         />
       </header>
 
@@ -3129,14 +3294,14 @@ export function CodeWorkspaceTab({
             maxFontSize={CODE_WORKSPACE_MAX_TREE_FONT_SIZE}
             defaultFontSize={CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE}
             onFontSizeChange={setTreeFontSize}
-            onOpenFile={() => void openLooseFile()}
-            onAddFolder={() => void addRoot()}
+            onOpenFile={() => executeWorkspaceCommand("workspace.tree.openLooseFile", { focus: "tree" })}
+            onAddFolder={() => executeWorkspaceCommand("workspace.tree.addFolder", { focus: "tree" })}
             canCreate={!!selectedRootDirectory}
             canMutateSelection={!!selected}
-            onCreateFile={() => void createFile()}
-            onCreateDirectory={() => void createDir()}
-            onRename={() => void renameSelected()}
-            onDelete={() => void deleteSelected()}
+            onCreateFile={() => executeWorkspaceCommand("workspace.tree.newFile", { focus: "tree" })}
+            onCreateDirectory={() => executeWorkspaceCommand("workspace.tree.newDirectory", { focus: "tree" })}
+            onRename={() => executeWorkspaceCommand("workspace.tree.rename", { focus: "tree" })}
+            onDelete={() => executeWorkspaceCommand("workspace.tree.delete", { focus: "tree" })}
             languageServers={{
               open: languagePanelOpen,
               statuses: lspServerStatuses,
