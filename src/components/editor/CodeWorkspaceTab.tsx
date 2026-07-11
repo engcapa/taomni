@@ -5,9 +5,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type ReactNode,
 } from "react";
-import DOMPurify from "dompurify";
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
 import {
   AlertTriangle,
@@ -97,7 +95,6 @@ import {
   type CodeViewProfile,
 } from "../../lib/codeViewProfile";
 import { DEFAULT_TERMINAL_PROFILE } from "../../lib/terminalProfile";
-import { renderFormatted } from "../../lib/chat/renderFormatted";
 import { useAppStore } from "../../stores/appStore";
 import {
   selectCodeWorkspaceUi,
@@ -141,6 +138,8 @@ import {
   type LspCustomCommandConfig,
 } from "./workspace/FileTreePane";
 import { ProjectTree } from "./workspace/ProjectTree";
+import { MarkdownPreview } from "./workspace/MarkdownPreview";
+import { IconButton, LspStatusPill } from "./workspace/workspaceChrome";
 import {
   dispatchWorkspaceCommandKeydown,
   runWorkspaceCommand,
@@ -205,8 +204,6 @@ import {
   customServerCommandFromConfig,
   emptyLspFileState,
   errorMessage,
-  exportMermaidPng,
-  exportMermaidSvg,
   fileKey,
   fileMeta,
   fileRefUnder,
@@ -214,14 +211,12 @@ import {
   formatMtime,
   gitRootForWorkspacePath,
   gitRootsForWorkspaceRoot,
-  hashString,
   initialFileRef,
   initialLooseFiles,
   initialRoots,
   isExternalHref,
   isMarkdownPath,
   joinRelativePath,
-  ensureMermaidReady,
   lspPresetIdForPath,
   makeLoadingFile,
   makeLooseFile,
@@ -229,7 +224,6 @@ import {
   normalizeFsPath,
   parentPath,
   readCodeWorkspaceTreeFontSize,
-  readCodeWorkspaceTreeViewMode,
   readLspCommandPrefs,
   readLspCustomCommands,
   relativePathWithinRoot,
@@ -246,7 +240,6 @@ import {
   writeLspCommandPrefs,
   writeLspCustomCommands,
   type CompactChainState,
-  type MermaidApi,
 } from "./workspace/codeWorkspaceModel";
 import type { EditorRevealTarget } from "./workspace/EditorGroup";
 
@@ -269,6 +262,11 @@ export function CodeWorkspaceTab({
   const patchWorkspaceUi = useCodeWorkspaceStore((s) => s.patchInstance);
   const setStoreActiveKey = useCodeWorkspaceStore((s) => s.setActiveKey);
   const setStoreOpenOrder = useCodeWorkspaceStore((s) => s.setOpenOrder);
+  const updateStoreOpenFiles = useCodeWorkspaceStore((s) => s.updateOpenFiles);
+  const updateStoreLspFiles = useCodeWorkspaceStore((s) => s.updateLspFiles);
+  const updateStoreExpandedRootIds = useCodeWorkspaceStore((s) => s.updateExpandedRootIds);
+  const updateStoreExpandedDirKeys = useCodeWorkspaceStore((s) => s.updateExpandedDirKeys);
+  const seedTreeExpandIfEmpty = useCodeWorkspaceStore((s) => s.seedTreeExpandIfEmpty);
   // Ensure before first read so the selector always hits a real map entry.
   ensureWorkspaceUi(workspaceInstanceId);
   const workspaceUi = useCodeWorkspaceStore((s) => selectCodeWorkspaceUi(s, workspaceInstanceId));
@@ -277,6 +275,20 @@ export function CodeWorkspaceTab({
     ensureWorkspaceUi(workspaceInstanceId);
     return () => disposeWorkspaceUi(workspaceInstanceId);
   }, [disposeWorkspaceUi, ensureWorkspaceUi, workspaceInstanceId]);
+
+  // Seed root expand keys once per instance mount (do not re-expand if user collapsed all).
+  const treeExpandSeededRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (treeExpandSeededRef.current === workspaceInstanceId) return;
+    treeExpandSeededRef.current = workspaceInstanceId;
+    const seedRoots = initialRoots(workspace);
+    if (seedRoots.length === 0) return;
+    seedTreeExpandIfEmpty(
+      workspaceInstanceId,
+      seedRoots.map((root) => root.id),
+      seedRoots.map((root) => rootDirKey(root.id, "")),
+    );
+  }, [seedTreeExpandIfEmpty, workspace, workspaceInstanceId]);
 
   const {
     languagePanelOpen,
@@ -303,7 +315,21 @@ export function CodeWorkspaceTab({
     openOrder,
     activeKey,
     markdownModes,
+    treeFilter,
+    treeViewMode,
+    expandedRootIds,
+    expandedDirKeys,
+    treeSelection: selected,
+    openFiles,
+    lspFiles,
   } = workspaceUi;
+
+  const expandedRoots = useMemo(() => new Set(expandedRootIds), [expandedRootIds]);
+  const expandedDirs = useMemo(() => new Set(expandedDirKeys), [expandedDirKeys]);
+  // Refs declared early so store-backed setters can dual-write latest maps synchronously.
+  const openFilesRef = useRef(openFiles);
+  const openOrderRef = useRef(openOrder);
+  const lspFilesRef = useRef(lspFiles);
 
   const setLanguagePanelOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
     const next = typeof open === "function" ? open(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).languagePanelOpen) : open;
@@ -404,9 +430,50 @@ export function CodeWorkspaceTab({
     patchWorkspaceUi(workspaceInstanceId, { markdownModes: next });
   }, [patchWorkspaceUi, workspaceInstanceId]);
 
+  const setTreeFilter = useCallback((value: string) => {
+    patchWorkspaceUi(workspaceInstanceId, { treeFilter: value });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+
+  const setSelected = useCallback((selection: TreeSelection | null) => {
+    patchWorkspaceUi(workspaceInstanceId, { treeSelection: selection });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+
+  const setExpandedRoots = useCallback((
+    updater: Set<string> | ((prev: Set<string>) => Set<string>),
+  ) => {
+    const prev = new Set(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).expandedRootIds);
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    updateStoreExpandedRootIds(workspaceInstanceId, [...next]);
+  }, [updateStoreExpandedRootIds, workspaceInstanceId]);
+
+  const setExpandedDirs = useCallback((
+    updater: Set<string> | ((prev: Set<string>) => Set<string>),
+  ) => {
+    const prev = new Set(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).expandedDirKeys);
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    updateStoreExpandedDirKeys(workspaceInstanceId, [...next]);
+  }, [updateStoreExpandedDirKeys, workspaceInstanceId]);
+
+  const setOpenFiles = useCallback((
+    updater: Record<string, OpenFileState> | ((prev: Record<string, OpenFileState>) => Record<string, OpenFileState>),
+  ) => {
+    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).openFiles;
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    openFilesRef.current = next;
+    updateStoreOpenFiles(workspaceInstanceId, next);
+  }, [updateStoreOpenFiles, workspaceInstanceId]);
+
+  const setLspFiles = useCallback((
+    updater: Record<string, LspFileState> | ((prev: Record<string, LspFileState>) => Record<string, LspFileState>),
+  ) => {
+    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).lspFiles;
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    lspFilesRef.current = next;
+    updateStoreLspFiles(workspaceInstanceId, next);
+  }, [updateStoreLspFiles, workspaceInstanceId]);
+
   const [codeViewProfile, setCodeViewProfileState] = useState<CodeViewProfile>(() => loadCodeViewProfile());
   const [treeFontSize, setTreeFontSizeState] = useState(() => readCodeWorkspaceTreeFontSize());
-  const [treeViewMode, setTreeViewModeState] = useState<TreeViewMode>(() => readCodeWorkspaceTreeViewMode());
   const [roots, setRoots] = useState<CodeWorkspaceRootInfo[]>(() => initialRoots(workspace));
   const [looseFiles, setLooseFiles] = useState<CodeWorkspaceLooseFileInfo[]>(() => initialLooseFiles(workspace));
   const [directories, setDirectories] = useState<Record<string, DirectoryState>>({});
@@ -415,12 +482,6 @@ export function CodeWorkspaceTab({
   const [gitRoots, setGitRoots] = useState<WorkspaceGitRoot[]>([]);
   const [gitRootsLoading, setGitRootsLoading] = useState(false);
   const [gitSnapshots, setGitSnapshots] = useState<Record<string, WorkspaceGitSnapshotState>>({});
-  const [expandedRoots, setExpandedRoots] = useState<Set<string>>(() => new Set(initialRoots(workspace).map((root) => root.id)));
-  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(() => new Set(initialRoots(workspace).map((root) => rootDirKey(root.id, ""))));
-  const [treeFilter, setTreeFilter] = useState("");
-  const [selected, setSelected] = useState<TreeSelection | null>(null);
-  const [openFiles, setOpenFiles] = useState<Record<string, OpenFileState>>({});
-  const [lspFiles, setLspFiles] = useState<Record<string, LspFileState>>({});
   const [lspServerStatuses, setLspServerStatuses] = useState<LspServerStatus[]>([]);
   const [navCan, setNavCan] = useState({ back: false, forward: false });
   const [lspCommandPrefs, setLspCommandPrefs] = useState<Record<string, string>>(() => readLspCommandPrefs());
@@ -434,9 +495,6 @@ export function CodeWorkspaceTab({
   });
   const rootsRef = useRef(roots);
   const looseFilesRef = useRef(looseFiles);
-  const openFilesRef = useRef(openFiles);
-  const openOrderRef = useRef(openOrder);
-  const lspFilesRef = useRef(lspFiles);
   const codeViewProfileRef = useRef(codeViewProfile);
   const treeFontSizeRef = useRef(treeFontSize);
   const compactChainsRef = useRef(compactChains);
@@ -583,10 +641,10 @@ export function CodeWorkspaceTab({
   );
 
   const setTreeViewMode = useCallback((mode: TreeViewMode) => {
-    setTreeViewModeState(mode);
+    patchWorkspaceUi(workspaceInstanceId, { treeViewMode: mode });
     writeCodeWorkspaceTreeViewMode(mode);
     setStatusMessage(`File tree view: ${mode}`);
-  }, [setStatusMessage]);
+  }, [patchWorkspaceUi, setStatusMessage, workspaceInstanceId]);
 
   const zoomTargetForNode = useCallback((target: EventTarget | null): "tree" | "editor" => {
     const node = target instanceof Node ? target : null;
@@ -3596,184 +3654,5 @@ export function CodeWorkspaceTab({
       />
       {treeContextMenu.render}
     </div>
-  );
-}
-
-function MarkdownPreview({
-  file,
-  onOpenHref,
-}: {
-  file: OpenFileState;
-  onOpenHref: (href: string) => boolean;
-}) {
-  const html = useMemo(() => renderFormatted(file.text, "md") ?? "", [file.text]);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-    const blocks = Array.from(root.querySelectorAll("pre > code.language-mermaid, pre > code.lang-mermaid"));
-    if (blocks.length === 0) return;
-    let cancelled = false;
-
-    const renderError = (block: Element, index: number, message: string) => {
-      const pre = block.parentElement;
-      if (!pre) return;
-      const wrapper = document.createElement("div");
-      wrapper.className = "my-3 border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)]";
-      const label = document.createElement("div");
-      label.className = "h-8 flex items-center border-b border-[var(--taomni-code-border)] px-2 text-[11px] font-semibold text-[var(--taomni-code-muted)]";
-      label.textContent = `Mermaid ${index + 1}`;
-      const error = document.createElement("div");
-      error.className = "p-3 text-[12px] text-red-500";
-      error.textContent = message;
-      wrapper.append(label, error);
-      pre.replaceWith(wrapper);
-    };
-
-    const renderBlock = (mermaid: MermaidApi, block: Element, index: number) => {
-      const source = block.textContent ?? "";
-      const pre = block.parentElement;
-      if (!pre) return;
-      const wrapper = document.createElement("div");
-      wrapper.className = "my-3 border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)]";
-      const toolbar = document.createElement("div");
-      toolbar.className = "h-8 flex items-center gap-1 border-b border-[var(--taomni-code-border)] px-2";
-      const label = document.createElement("span");
-      label.className = "min-w-0 flex-1 truncate text-[11px] font-semibold text-[var(--taomni-code-muted)]";
-      label.textContent = `Mermaid ${index + 1}`;
-      const svgButton = document.createElement("button");
-      svgButton.type = "button";
-      svgButton.className = "h-5 px-1.5 rounded text-[10px] hover:bg-[var(--taomni-code-active-line-bg)]";
-      svgButton.textContent = "SVG";
-      const pngButton = document.createElement("button");
-      pngButton.type = "button";
-      pngButton.className = "h-5 px-1.5 rounded text-[10px] hover:bg-[var(--taomni-code-active-line-bg)]";
-      pngButton.textContent = "PNG";
-      const diagram = document.createElement("div");
-      diagram.className = "overflow-auto p-3";
-      toolbar.append(label, svgButton, pngButton);
-      wrapper.append(toolbar, diagram);
-      pre.replaceWith(wrapper);
-
-      void mermaid
-        .render(`taomni-mermaid-${hashString(file.key)}-${hashString(source)}-${index}`, source)
-        .then((result) => {
-          if (cancelled) return;
-          diagram.innerHTML = DOMPurify.sanitize(result.svg, {
-            USE_PROFILES: { svg: true, svgFilters: true },
-          }) as unknown as string;
-          const svg = diagram.querySelector("svg");
-          if (!(svg instanceof SVGSVGElement)) return;
-          svg.classList.add("max-w-full");
-          svgButton.onclick = () => exportMermaidSvg(svg, `${file.title || "diagram"}-${index + 1}.svg`);
-          pngButton.onclick = () => exportMermaidPng(svg, `${file.title || "diagram"}-${index + 1}.png`);
-        })
-        .catch((err) => {
-          if (cancelled) return;
-          diagram.className = "p-3 text-[12px] text-red-500";
-          diagram.textContent = errorMessage(err);
-        });
-    };
-
-    void ensureMermaidReady()
-      .then((mermaid) => {
-        if (cancelled) return;
-        blocks.forEach((block, index) => renderBlock(mermaid, block, index));
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        blocks.forEach((block, index) => renderError(block, index, errorMessage(err)));
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  });
-
-  return (
-    <div
-      ref={rootRef}
-      data-testid="code-workspace-markdown-preview"
-      className="taomni-chat-md h-full min-h-0 overflow-auto bg-[var(--taomni-code-bg)] px-5 py-4 text-[length:var(--taomni-code-font-size)] leading-6 text-[var(--taomni-code-text)]"
-      onClick={(event) => {
-        const target = event.target;
-        if (!(target instanceof HTMLElement)) return;
-        const anchor = target.closest("a");
-        const href = anchor?.getAttribute("href");
-        if (!href) return;
-        if (onOpenHref(href)) {
-          event.preventDefault();
-        }
-      }}
-    >
-      <div dangerouslySetInnerHTML={{ __html: html }} />
-    </div>
-  );
-}
-
-function LspStatusPill({
-  state,
-  diagnostics,
-}: {
-  state: LspFileState | null;
-  diagnostics: LspDiagnostic[];
-}) {
-  if (!state?.status) {
-    return (
-      <span className="shrink-0 text-[10px] text-[var(--taomni-code-muted)]">
-        LSP idle
-      </span>
-    );
-  }
-  const status = state.status;
-  const errors = diagnostics.filter((item) => item.severity === 1).length;
-  const warnings = diagnostics.filter((item) => item.severity === 2).length;
-  const label = status.active
-    ? `${status.displayName ?? "LSP"}${errors || warnings ? ` · ${errors}E ${warnings}W` : ""}`
-    : status.installHint
-      ? `Install: ${status.installHint}`
-      : status.error ?? "No LSP";
-  return (
-    <span
-      title={label}
-      data-active={status.active || undefined}
-      data-error={!!state.error || (!status.active && !!status.error) || undefined}
-      className="max-w-[38%] shrink-0 truncate rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-[10px] bg-[var(--taomni-code-active-line-bg)] text-[var(--taomni-code-muted)] data-[active=true]:text-[var(--taomni-accent)] data-[error=true]:text-amber-500"
-    >
-      {label}
-    </span>
-  );
-}
-
-function IconButton({
-  label,
-  icon,
-  disabled,
-  testId,
-  active,
-  onClick,
-}: {
-  label: string;
-  icon: ReactNode;
-  disabled?: boolean;
-  testId?: string;
-  active?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      aria-pressed={active}
-      data-testid={testId}
-      data-active={active || undefined}
-      disabled={disabled}
-      className="h-7 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[active=true]:text-[var(--taomni-accent)] disabled:opacity-40 disabled:cursor-default"
-      onClick={onClick}
-    >
-      {icon}
-    </button>
   );
 }

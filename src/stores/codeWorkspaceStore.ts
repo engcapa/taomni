@@ -4,16 +4,22 @@ import type { QuickDocContent } from "../components/editor/workspace/QuickDocPop
 import type { LocationPeekState } from "../components/editor/workspace/LocationPeek";
 import type { LspDocumentSymbol } from "../lib/editor/lsp";
 import type { RecentFileEntry } from "../components/editor/workspace/RecentFilesPopup";
+import type {
+  LspFileState,
+  OpenFileState,
+  TreeSelection,
+  TreeViewMode,
+} from "../components/editor/workspace/codeWorkspaceModel";
+import { readCodeWorkspaceTreeViewMode } from "../components/editor/workspace/codeWorkspaceModel";
 
 export type BottomDockTabId = "problems" | "search" | "references";
 
 /**
- * Per-workspace-instance UI / chrome state that multiple presentation
- * boundaries (shell, EditorGroup, dock, popups) need without prop-drilling
- * the entire open-file model through every layer.
+ * Per-workspace-instance UI / chrome + open buffers / LSP file map.
+ * Keyed by workspaceInstanceId so multiple workspace tabs stay isolated.
  *
- * Heavy file I/O and LSP session maps still live in the shell until later
- * extraction slices move them behind the same instance key.
+ * Directory listing caches (directories/compact/flat) stay in the shell until
+ * a later extract; expand keys and buffer text live here.
  */
 export interface CodeWorkspaceInstanceUi {
   languagePanelOpen: boolean;
@@ -37,10 +43,19 @@ export interface CodeWorkspaceInstanceUi {
   searchFocusNonce: number;
   searchIncludePreset: { value: string; nonce: number };
   searchQueryPreset: { value: string; nonce: number };
-  /** Editor tab order / active key (file buffers remain in the shell). */
   openOrder: string[];
   activeKey: string | null;
   markdownModes: Record<string, "edit" | "preview" | "split">;
+  /** Project tree chrome */
+  treeFilter: string;
+  treeViewMode: TreeViewMode;
+  expandedRootIds: string[];
+  expandedDirKeys: string[];
+  treeSelection: TreeSelection | null;
+  /** Open editor buffers keyed by fileKey(ref). */
+  openFiles: Record<string, OpenFileState>;
+  /** Per-open-file LSP sync/diagnostics map. */
+  lspFiles: Record<string, LspFileState>;
 }
 
 export function createDefaultCodeWorkspaceUi(): CodeWorkspaceInstanceUi {
@@ -69,11 +84,24 @@ export function createDefaultCodeWorkspaceUi(): CodeWorkspaceInstanceUi {
     openOrder: [],
     activeKey: null,
     markdownModes: {},
+    treeFilter: "",
+    treeViewMode: readCodeWorkspaceTreeViewMode(),
+    expandedRootIds: [],
+    expandedDirKeys: [],
+    treeSelection: null,
+    openFiles: {},
+    lspFiles: {},
   };
 }
 
 /** Stable fallback so React/zustand getSnapshot does not allocate every render. */
 const EMPTY_UI: CodeWorkspaceInstanceUi = createDefaultCodeWorkspaceUi();
+
+type Updater<T> = T | ((prev: T) => T);
+
+function resolveUpdater<T>(prev: T, updater: Updater<T>): T {
+  return typeof updater === "function" ? (updater as (prev: T) => T)(prev) : updater;
+}
 
 interface CodeWorkspaceStoreState {
   byInstanceId: Record<string, CodeWorkspaceInstanceUi>;
@@ -84,6 +112,11 @@ interface CodeWorkspaceStoreState {
   setActiveKey: (instanceId: string, key: string | null) => void;
   setOpenOrder: (instanceId: string, order: string[]) => void;
   setMarkdownMode: (instanceId: string, fileKey: string, mode: "edit" | "preview" | "split") => void;
+  updateOpenFiles: (instanceId: string, updater: Updater<Record<string, OpenFileState>>) => void;
+  updateLspFiles: (instanceId: string, updater: Updater<Record<string, LspFileState>>) => void;
+  updateExpandedRootIds: (instanceId: string, updater: Updater<string[]>) => void;
+  updateExpandedDirKeys: (instanceId: string, updater: Updater<string[]>) => void;
+  seedTreeExpandIfEmpty: (instanceId: string, rootIds: string[], dirKeys: string[]) => void;
 }
 
 export const useCodeWorkspaceStore = create<CodeWorkspaceStoreState>((set, get) => ({
@@ -144,6 +177,91 @@ export const useCodeWorkspaceStore = create<CodeWorkspaceStoreState>((set, get) 
           [instanceId]: {
             ...current,
             markdownModes: { ...current.markdownModes, [fileKey]: mode },
+          },
+        },
+      };
+    });
+  },
+
+  updateOpenFiles: (instanceId, updater) => {
+    get().ensureInstance(instanceId);
+    set((state) => {
+      const current = state.byInstanceId[instanceId] ?? createDefaultCodeWorkspaceUi();
+      return {
+        byInstanceId: {
+          ...state.byInstanceId,
+          [instanceId]: {
+            ...current,
+            openFiles: resolveUpdater(current.openFiles, updater),
+          },
+        },
+      };
+    });
+  },
+
+  updateLspFiles: (instanceId, updater) => {
+    get().ensureInstance(instanceId);
+    set((state) => {
+      const current = state.byInstanceId[instanceId] ?? createDefaultCodeWorkspaceUi();
+      return {
+        byInstanceId: {
+          ...state.byInstanceId,
+          [instanceId]: {
+            ...current,
+            lspFiles: resolveUpdater(current.lspFiles, updater),
+          },
+        },
+      };
+    });
+  },
+
+  updateExpandedRootIds: (instanceId, updater) => {
+    get().ensureInstance(instanceId);
+    set((state) => {
+      const current = state.byInstanceId[instanceId] ?? createDefaultCodeWorkspaceUi();
+      return {
+        byInstanceId: {
+          ...state.byInstanceId,
+          [instanceId]: {
+            ...current,
+            expandedRootIds: resolveUpdater(current.expandedRootIds, updater),
+          },
+        },
+      };
+    });
+  },
+
+  updateExpandedDirKeys: (instanceId, updater) => {
+    get().ensureInstance(instanceId);
+    set((state) => {
+      const current = state.byInstanceId[instanceId] ?? createDefaultCodeWorkspaceUi();
+      return {
+        byInstanceId: {
+          ...state.byInstanceId,
+          [instanceId]: {
+            ...current,
+            expandedDirKeys: resolveUpdater(current.expandedDirKeys, updater),
+          },
+        },
+      };
+    });
+  },
+
+  seedTreeExpandIfEmpty: (instanceId, rootIds, dirKeys) => {
+    get().ensureInstance(instanceId);
+    set((state) => {
+      const current = state.byInstanceId[instanceId] ?? createDefaultCodeWorkspaceUi();
+      if (current.expandedRootIds.length > 0 || current.expandedDirKeys.length > 0) {
+        return state;
+      }
+      if (rootIds.length === 0) return state;
+      return {
+        byInstanceId: {
+          ...state.byInstanceId,
+          [instanceId]: {
+            ...current,
+            expandedRootIds: rootIds,
+            expandedDirKeys: dirKeys,
           },
         },
       };

@@ -49,10 +49,67 @@ describe("codeWorkspaceStore", () => {
     expect(ui.markdownModes.b).toBe("split");
   });
 
+  it("holds openFiles, lspFiles, and tree expand chrome on the instance slice", () => {
+    const store = useCodeWorkspaceStore.getState();
+    store.ensureInstance("ws");
+    store.updateOpenFiles("ws", {
+      "root:a": {
+        ref: { kind: "root", rootId: "r1", path: "a.ts" },
+        key: "root:a",
+        path: "a.ts",
+        title: "a.ts",
+        subtitle: "",
+        languagePath: "a.ts",
+        text: "x",
+        savedText: "x",
+        hash: "h",
+        mtime: 1,
+        size: 1,
+        loading: false,
+        saving: false,
+        dirty: false,
+        error: null,
+      },
+    });
+    store.updateLspFiles("ws", {
+      "root:a": {
+        status: null,
+        diagnostics: [],
+        syncing: false,
+        syncedText: null,
+        error: null,
+      },
+    });
+    store.updateExpandedRootIds("ws", ["r1"]);
+    store.updateExpandedDirKeys("ws", ["r1:"]);
+    store.patchInstance("ws", {
+      treeFilter: "foo",
+      treeSelection: { kind: "root", rootId: "r1" },
+    });
+    const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "ws");
+    expect(ui.openFiles["root:a"]?.text).toBe("x");
+    expect(ui.lspFiles["root:a"]?.syncing).toBe(false);
+    expect(ui.expandedRootIds).toEqual(["r1"]);
+    expect(ui.expandedDirKeys).toEqual(["r1:"]);
+    expect(ui.treeFilter).toBe("foo");
+    expect(ui.treeSelection).toEqual({ kind: "root", rootId: "r1" });
+  });
+
+  it("seeds tree expand only when still empty", () => {
+    const store = useCodeWorkspaceStore.getState();
+    store.ensureInstance("ws");
+    store.seedTreeExpandIfEmpty("ws", ["r1"], ["r1:"]);
+    expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "ws").expandedRootIds).toEqual(["r1"]);
+    store.seedTreeExpandIfEmpty("ws", ["r2"], ["r2:"]);
+    expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "ws").expandedRootIds).toEqual(["r1"]);
+  });
+
   it("exposes defaults for unknown instances without mutating the map", () => {
     const defaults = createDefaultCodeWorkspaceUi();
     const missing = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "missing");
-    expect(missing).toEqual(defaults);
+    expect(missing.openOrder).toEqual(defaults.openOrder);
+    expect(missing.openFiles).toEqual({});
+    expect(missing.expandedRootIds).toEqual([]);
     expect(useCodeWorkspaceStore.getState().byInstanceId.missing).toBeUndefined();
   });
 });
