@@ -12,8 +12,17 @@ export interface WorkspaceEditApplyHooks {
   resolvePath: (file: LspFileTextEdits) => string | null;
   /** Return open buffer text + dirty flag, or null if not open. */
   getOpenBuffer: (absolutePath: string) => { text: string; dirty: boolean; key: string } | null;
-  /** Apply text to an open buffer (keeps dirty state per design rules). */
+  /**
+   * Apply text to an open buffer.
+   * For dirty buffers this leaves the buffer dirty; for clean buffers the
+   * applier will call `saveOpenBuffer` immediately afterwards (§5.2.9).
+   */
   applyToOpenBuffer: (key: string, nextText: string) => void;
+  /**
+   * Persist an open clean buffer after applying edits.
+   * Must write `nextText` to disk and leave the open buffer clean (dirty=false).
+   */
+  saveOpenBuffer: (key: string, nextText: string) => Promise<void>;
   /** Read disk contents for a closed file. */
   readDisk: (absolutePath: string) => Promise<{ text: string; hash: string } | null>;
   /** Write disk contents for a closed file (with hash precheck when available). */
@@ -22,8 +31,8 @@ export interface WorkspaceEditApplyHooks {
 
 /**
  * Apply a WorkspaceEdit following §5.2.9 rules:
- * - open clean → apply to buffer and leave dirty (caller may save)
- * - open dirty → apply to buffer, keep dirty
+ * - open clean → apply to buffer and save (result dirty=false)
+ * - open dirty → apply to buffer, keep dirty (result dirty=true)
  * - unopened → write disk with hash precheck when provided
  * Failures do not roll back already-applied files.
  */
@@ -46,8 +55,16 @@ export async function applyWorkspaceEdit(
       const open = hooks.getOpenBuffer(path);
       if (open) {
         const next = applyLspTextEditsToString(open.text, file.edits);
-        hooks.applyToOpenBuffer(open.key, next);
-        outcomes.push({ path, status: "applied-open", dirty: true });
+        if (!open.dirty) {
+          // Clean open buffer: apply then save so the user is not left with
+          // an unexpected dirty marker after rename / code action / replace.
+          hooks.applyToOpenBuffer(open.key, next);
+          await hooks.saveOpenBuffer(open.key, next);
+          outcomes.push({ path, status: "applied-open", dirty: false });
+        } else {
+          hooks.applyToOpenBuffer(open.key, next);
+          outcomes.push({ path, status: "applied-open", dirty: true });
+        }
         continue;
       }
       const disk = await hooks.readDisk(path);

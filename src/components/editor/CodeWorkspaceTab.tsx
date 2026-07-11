@@ -2237,74 +2237,109 @@ export function CodeWorkspaceTab({
   );
 
   const updateFileText = useCallback((key: string, text: string) => {
-    setOpenFiles((current) => {
-      const file = current[key];
-      if (!file || file.text === text) return current;
-      return {
+    const file = openFilesRef.current[key];
+    if (!file || file.text === text) return;
+    const next: OpenFileState = {
+      ...file,
+      text,
+      dirty: text !== file.savedText,
+      error: null,
+    };
+    // Sync ref immediately so WorkspaceEdit apply → save sees the new text
+    // without waiting for React to flush setState.
+    openFilesRef.current = { ...openFilesRef.current, [key]: next };
+    setOpenFiles((current) => ({ ...current, [key]: next }));
+  }, []);
+
+  /**
+   * Persist an open buffer with an explicit text payload.
+   * Used by WorkspaceEdit for open-clean files (§5.2.9): apply then save.
+   * Unlike `saveFile`, this does not require the buffer to already be dirty.
+   */
+  const saveOpenBufferText = useCallback(async (key: string, textToSave: string) => {
+    const file = openFilesRef.current[key];
+    if (!file || file.loading) {
+      throw new Error("Open buffer is not available to save");
+    }
+    setOpenFiles((current) => ({
+      ...current,
+      [key]: { ...current[key], text: textToSave, saving: true, error: null },
+    }));
+    openFilesRef.current = {
+      ...openFilesRef.current,
+      [key]: { ...file, text: textToSave, saving: true, error: null },
+    };
+    try {
+      const saved = file.ref.kind === "root"
+        ? await workspaceWriteFile(findRoot(file.ref.rootId)?.path ?? "", file.ref.path, textToSave, file.hash)
+        : await workspaceWriteLooseFile(file.ref.path, textToSave, file.hash);
+      const cleaned: OpenFileState = {
+        ...file,
+        text: saved.text,
+        savedText: saved.text,
+        hash: saved.hash,
+        mtime: saved.mtime,
+        size: saved.size,
+        loading: false,
+        saving: false,
+        dirty: false,
+        error: null,
+      };
+      openFilesRef.current = { ...openFilesRef.current, [key]: cleaned };
+      setOpenFiles((current) => ({
         ...current,
         [key]: {
-          ...file,
-          text,
-          dirty: text !== file.savedText,
+          ...(current[key] ?? cleaned),
+          ...cleaned,
+          // If the user typed while we saved, keep their newer text dirty.
+          text: (current[key]?.text ?? saved.text) !== textToSave && current[key]
+            ? current[key].text
+            : saved.text,
+          dirty: (current[key]?.text ?? saved.text) !== textToSave
+            && (current[key]?.text ?? saved.text) !== saved.text
+            ? true
+            : false,
+          savedText: saved.text,
+          hash: saved.hash,
+          mtime: saved.mtime,
+          size: saved.size,
+          saving: false,
           error: null,
         },
-      };
-    });
-  }, []);
+      }));
+      if (file.ref.kind === "root") {
+        notifyWorkspacePathGitChanged(file.ref.rootId, file.ref.path);
+      }
+      void saveLspDocument(file, textToSave);
+    } catch (err) {
+      const message = errorMessage(err);
+      setOpenFiles((current) => ({
+        ...current,
+        [key]: {
+          ...current[key],
+          text: textToSave,
+          dirty: true,
+          saving: false,
+          error: message,
+        },
+      }));
+      throw err instanceof Error ? err : new Error(message);
+    }
+  }, [findRoot, notifyWorkspacePathGitChanged, saveLspDocument]);
 
   const saveFile = useCallback(
     async (key: string | null = activeKey) => {
       if (!key) return;
       const file = openFilesRef.current[key];
       if (!file || file.loading || file.saving || !file.dirty) return;
-      const textToSave = file.text;
-      setOpenFiles((current) => ({
-        ...current,
-        [key]: { ...current[key], saving: true, error: null },
-      }));
       try {
-        const saved = file.ref.kind === "root"
-          ? await workspaceWriteFile(findRoot(file.ref.rootId)?.path ?? "", file.ref.path, textToSave, file.hash)
-          : await workspaceWriteLooseFile(file.ref.path, textToSave, file.hash);
-        setOpenFiles((current) => {
-          const latest = current[key];
-          const latestText = latest?.text ?? saved.text;
-          const changedWhileSaving = latestText !== textToSave;
-          return {
-            ...current,
-            [key]: {
-              ...file,
-              text: changedWhileSaving ? latestText : saved.text,
-              savedText: saved.text,
-              hash: saved.hash,
-              mtime: saved.mtime,
-              size: saved.size,
-              loading: false,
-              saving: false,
-              dirty: changedWhileSaving,
-              error: null,
-            },
-          };
-        });
+        await saveOpenBufferText(key, file.text);
         setStatusMessage(`Saved ${file.subtitle}`);
-        if (file.ref.kind === "root") {
-          notifyWorkspacePathGitChanged(file.ref.rootId, file.ref.path);
-        }
-        void saveLspDocument(file, textToSave);
       } catch (err) {
-        const message = errorMessage(err);
-        setOpenFiles((current) => ({
-          ...current,
-          [key]: {
-            ...current[key],
-            saving: false,
-            error: message,
-          },
-        }));
-        setStatusMessage(message);
+        setStatusMessage(errorMessage(err));
       }
     },
-    [activeKey, findRoot, notifyWorkspacePathGitChanged, saveLspDocument, setStatusMessage],
+    [activeKey, saveOpenBufferText, setStatusMessage],
   );
 
   const reloadFile = useCallback(
@@ -2686,6 +2721,8 @@ export function CodeWorkspaceTab({
         return null;
       },
       applyToOpenBuffer: (key, nextText) => updateFileText(key, nextText),
+      // §5.2.9 open-clean: apply then save so the buffer is not left dirty.
+      saveOpenBuffer: (key, nextText) => saveOpenBufferText(key, nextText),
       readDisk: async (absolutePath) => {
         // Prefer workspace APIs via root-relative path when possible.
         for (const root of rootsRef.current) {
@@ -2717,7 +2754,7 @@ export function CodeWorkspaceTab({
     });
     setStatusMessage(summarizeWorkspaceEditOutcomes(outcomes));
     return outcomes;
-  }, [absolutePathForOpenFile, setStatusMessage, updateFileText]);
+  }, [absolutePathForOpenFile, saveOpenBufferText, setStatusMessage, updateFileText]);
 
   const requestCodeActions = useCallback(async (
     file: OpenFileState,
