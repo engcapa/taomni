@@ -117,6 +117,13 @@ import {
   type FileTreeViewMode,
   type LspCustomCommandConfig,
 } from "./workspace/FileTreePane";
+import {
+  dispatchWorkspaceCommandKeydown,
+  runWorkspaceCommand,
+  workspaceCommandEnabled,
+  type WorkspaceCommand,
+  type WorkspaceCommandFocus,
+} from "./workspace/workspaceCommands";
 import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
 import type {
   CodeWorkspaceFileRef,
@@ -990,21 +997,6 @@ export function CodeWorkspaceTab({
 
   useEffect(() => {
     if (!visible) return;
-    const handleFindInFiles = (event: KeyboardEvent) => {
-      if (!event.ctrlKey || !event.shiftKey || event.altKey || event.metaKey) return;
-      if (event.key !== "F" && event.key !== "f") return;
-      event.preventDefault();
-      event.stopPropagation();
-      setBottomDockOpen(true);
-      setBottomDockTab("search");
-      setSearchFocusNonce((nonce) => nonce + 1);
-    };
-    window.addEventListener("keydown", handleFindInFiles, true);
-    return () => window.removeEventListener("keydown", handleFindInFiles, true);
-  }, [visible]);
-
-  useEffect(() => {
-    if (!visible) return;
     const el = rootRef.current;
     if (!el) return;
 
@@ -1638,30 +1630,7 @@ export function CodeWorkspaceTab({
   useEffect(() => {
     if (!visible) return;
     const detector = createDoubleShiftDetector(openSearchEverywhere);
-    const handleKeyDown = (event: KeyboardEvent) => {
-      detector.handleKeyDown(event);
-      const key = event.key.toLowerCase();
-      const plainCtrl = event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey;
-      const ctrlShift = event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey;
-      const ctrlAlt = event.ctrlKey && !event.shiftKey && event.altKey && !event.metaKey;
-      const run = (action: () => void) => {
-        event.preventDefault();
-        event.stopPropagation();
-        action();
-      };
-      if ((ctrlShift && key === "n") || (plainCtrl && key === "p")) {
-        run(openSearchEverywhere);
-      } else if (plainCtrl && key === "e") {
-        run(() => {
-          if (recentFilesOpen) setRecentAdvanceNonce((nonce) => nonce + 1);
-          else openRecentFiles();
-        });
-      } else if (ctrlAlt && event.key === "ArrowLeft") {
-        run(() => navigateHistory(-1));
-      } else if (ctrlAlt && event.key === "ArrowRight") {
-        run(() => navigateHistory(1));
-      }
-    };
+    const handleKeyDown = (event: KeyboardEvent) => detector.handleKeyDown(event);
     const handleKeyUp = (event: KeyboardEvent) => detector.handleKeyUp(event);
     window.addEventListener("keydown", handleKeyDown, true);
     window.addEventListener("keyup", handleKeyUp, true);
@@ -1669,7 +1638,13 @@ export function CodeWorkspaceTab({
       window.removeEventListener("keydown", handleKeyDown, true);
       window.removeEventListener("keyup", handleKeyUp, true);
     };
-  }, [navigateHistory, openRecentFiles, openSearchEverywhere, recentFilesOpen, visible]);
+  }, [openSearchEverywhere, visible]);
+
+  const openFindInFiles = useCallback(() => {
+    setBottomDockOpen(true);
+    setBottomDockTab("search");
+    setSearchFocusNonce((nonce) => nonce + 1);
+  }, []);
 
   const findInDirectory = useCallback((path: string) => {
     setBottomDockOpen(true);
@@ -2403,18 +2378,104 @@ export function CodeWorkspaceTab({
     [revealEditorLocation],
   );
 
+  const workspaceCommands = useMemo<WorkspaceCommand[]>(() => [
+    {
+      id: "workspace.goToFile",
+      title: "Go to File",
+      category: "Navigation",
+      keybinding: "Ctrl+Shift+N",
+      keybindings: ["Ctrl+P"],
+      keywords: ["search everywhere", "file", "open"],
+      run: openSearchEverywhere,
+    },
+    {
+      id: "workspace.recentFiles",
+      title: "Recent Files",
+      category: "Navigation",
+      keybinding: "Ctrl+E",
+      keywords: ["previous", "history"],
+      run: () => {
+        if (recentFilesOpen) setRecentAdvanceNonce((nonce) => nonce + 1);
+        else openRecentFiles();
+      },
+    },
+    {
+      id: "workspace.navigateBack",
+      title: "Navigate Back",
+      category: "Navigation",
+      keybinding: "Ctrl+Alt+Left",
+      when: () => navCan.back,
+      run: () => navigateHistory(-1),
+    },
+    {
+      id: "workspace.navigateForward",
+      title: "Navigate Forward",
+      category: "Navigation",
+      keybinding: "Ctrl+Alt+Right",
+      when: () => navCan.forward,
+      run: () => navigateHistory(1),
+    },
+    {
+      id: "workspace.findInFiles",
+      title: "Find in Files",
+      category: "Search",
+      keybinding: "Ctrl+Shift+F",
+      keywords: ["text", "content", "grep"],
+      run: openFindInFiles,
+    },
+    {
+      id: "workspace.fileStructure",
+      title: "File Structure",
+      category: "Navigation",
+      keybinding: "Ctrl+F12",
+      keywords: ["outline", "symbol"],
+      when: () => !!activeFile,
+      run: () => void openStructurePopup(),
+    },
+  ], [
+    activeFile,
+    navCan.back,
+    navCan.forward,
+    navigateHistory,
+    openFindInFiles,
+    openRecentFiles,
+    openSearchEverywhere,
+    openStructurePopup,
+    recentFilesOpen,
+  ]);
+
+  const commandFocusForTarget = useCallback((target: EventTarget | null): WorkspaceCommandFocus => {
+    const node = target instanceof Node ? target : null;
+    if (node && treePaneRef.current?.contains(node)) return "tree";
+    if (node && editorPaneRef.current?.contains(node)) return "editor";
+    return "workspace";
+  }, []);
+
   useEffect(() => {
     if (!visible) return;
-    const handleStructureKey = (event: KeyboardEvent) => {
-      if (!event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) return;
-      if (event.key !== "F12") return;
-      event.preventDefault();
-      event.stopPropagation();
-      void openStructurePopup();
+    const handleWorkspaceCommand = (event: KeyboardEvent) => {
+      dispatchWorkspaceCommandKeydown(
+        workspaceCommands,
+        { focus: commandFocusForTarget(event.target) },
+        event,
+      );
     };
-    window.addEventListener("keydown", handleStructureKey, true);
-    return () => window.removeEventListener("keydown", handleStructureKey, true);
-  }, [openStructurePopup, visible]);
+    window.addEventListener("keydown", handleWorkspaceCommand, true);
+    return () => window.removeEventListener("keydown", handleWorkspaceCommand, true);
+  }, [commandFocusForTarget, visible, workspaceCommands]);
+
+  const searchableWorkspaceCommands = useMemo(
+    () => workspaceCommands.filter((command) => (
+      command.id !== "workspace.goToFile"
+      && workspaceCommandEnabled(command, { focus: "workspace" })
+    )),
+    [workspaceCommands],
+  );
+
+  const runSearchEverywhereCommand = useCallback((commandId: string) => {
+    setSearchEverywhereOpen(false);
+    runWorkspaceCommand(workspaceCommands, commandId, { focus: "workspace" });
+  }, [workspaceCommands]);
 
   const getLspCompletions = useCallback(
     async (
@@ -3361,8 +3422,10 @@ export function CodeWorkspaceTab({
         items={goToFileItems}
         loading={goToFileLoading}
         truncated={goToFileTruncated}
+        commands={searchableWorkspaceCommands}
         onClose={() => setSearchEverywhereOpen(false)}
         onOpenFile={openGoToFileItem}
+        onRunCommand={runSearchEverywhereCommand}
       />
       <RecentFilesPopup
         open={recentFilesOpen}

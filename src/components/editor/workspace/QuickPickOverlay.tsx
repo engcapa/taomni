@@ -16,6 +16,7 @@ interface QuickPickOverlayProps<T> {
   itemKey: (item: T) => string;
   renderItem: (item: T) => ReactNode;
   emptyText: (query: string) => string;
+  header?: ReactNode;
   footer?: ReactNode;
   onClose: () => void;
   onPick: (item: T) => void;
@@ -39,6 +40,7 @@ export function QuickPickOverlay<T>({
   itemKey,
   renderItem,
   emptyText,
+  header,
   footer,
   onClose,
   onPick,
@@ -106,6 +108,7 @@ export function QuickPickOverlay<T>({
       }}
     >
       <div className="h-fit max-h-[70%] w-[560px] max-w-[90%] flex flex-col overflow-hidden rounded-lg border border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] shadow-xl">
+        {header}
         <div className="shrink-0 flex items-center gap-2 border-b border-[var(--taomni-code-border)] px-3 py-2">
           <Search className="h-4 w-4 shrink-0 text-[var(--taomni-code-muted)]" />
           <input

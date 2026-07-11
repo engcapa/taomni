@@ -1,27 +1,41 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SearchEverywhere, type GoToFileItem } from "./SearchEverywhere";
+import type { WorkspaceCommand } from "./workspaceCommands";
 
 const items: GoToFileItem[] = [
   { rootId: "root-1", rootName: "app", path: "src/components/editor/CodeWorkspaceTab.tsx" },
   { rootId: "root-1", rootName: "app", path: "src/lib/editor/workspace.ts" },
   { rootId: "root-2", rootName: "tools", path: "scripts/deploy.sh" },
 ];
+const commands: WorkspaceCommand[] = [
+  {
+    id: "workspace.findInFiles",
+    title: "Find in Files",
+    category: "Search",
+    keybinding: "Ctrl+Shift+F",
+    keywords: ["content", "grep"],
+    run: vi.fn(),
+  },
+];
 
 function renderPopup(overrides: Partial<Parameters<typeof SearchEverywhere>[0]> = {}) {
   const onOpenFile = vi.fn();
   const onClose = vi.fn();
+  const onRunCommand = vi.fn();
   render(
     <SearchEverywhere
       open
       items={items}
       loading={false}
+      commands={commands}
       onClose={onClose}
       onOpenFile={onOpenFile}
+      onRunCommand={onRunCommand}
       {...overrides}
     />,
   );
-  return { onOpenFile, onClose };
+  return { onOpenFile, onClose, onRunCommand };
 }
 
 describe("SearchEverywhere", () => {
@@ -75,5 +89,16 @@ describe("SearchEverywhere", () => {
   it("shows an indexing hint while loading with no results", () => {
     renderPopup({ items: [], loading: true });
     expect(screen.getByText("Indexing workspace files...")).toBeInTheDocument();
+  });
+
+  it("searches and runs commands from the Actions tab", () => {
+    const { onRunCommand } = renderPopup();
+    fireEvent.click(screen.getByRole("tab", { name: "actions" }));
+    const input = screen.getByLabelText("Search actions");
+    fireEvent.change(input, { target: { value: "grep" } });
+    expect(screen.getByText("Find in Files")).toBeInTheDocument();
+    expect(screen.getByText("Ctrl+Shift+F")).toBeInTheDocument();
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onRunCommand).toHaveBeenCalledWith("workspace.findInFiles");
   });
 });
