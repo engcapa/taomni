@@ -104,6 +104,8 @@ import {
   type ProblemFileGroup,
 } from "./workspace/panels/ProblemsPanel";
 import { FindInFilesPanel } from "./workspace/panels/FindInFilesPanel";
+import { SearchEverywhere, type GoToFileItem } from "./workspace/SearchEverywhere";
+import { createDoubleShiftDetector } from "./workspace/doubleShift";
 import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
 import type {
   CodeWorkspaceFileRef,
@@ -760,6 +762,7 @@ export function CodeWorkspaceTab({
   const [bottomDockOpen, setBottomDockOpen] = useState(true);
   const [bottomDockTab, setBottomDockTab] = useState<"problems" | "search" | "references">("references");
   const [searchFocusNonce, setSearchFocusNonce] = useState(0);
+  const [searchEverywhereOpen, setSearchEverywhereOpen] = useState(false);
   const [lspCommandPrefs, setLspCommandPrefs] = useState<Record<string, string>>(() => readLspCommandPrefs());
   const [lspCustomCommands, setLspCustomCommands] = useState<Record<string, LspCustomCommandConfig>>(() => readLspCustomCommands());
   const [revealTarget, setRevealTarget] = useState<EditorRevealTarget | null>(null);
@@ -1513,6 +1516,64 @@ export function CodeWorkspaceTab({
       }
     },
     [findRoot, setStatusMessage],
+  );
+
+  const openSearchEverywhere = useCallback(() => {
+    // Warm the recursive file index for every root; loadFlatFiles caches.
+    rootsRef.current.forEach((root) => void loadFlatFiles(root.id));
+    setSearchEverywhereOpen(true);
+  }, [loadFlatFiles]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const detector = createDoubleShiftDetector(openSearchEverywhere);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      detector.handleKeyDown(event);
+      const key = event.key.toLowerCase();
+      const goToFile =
+        (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && key === "n") ||
+        (event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey && key === "p");
+      if (!goToFile) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openSearchEverywhere();
+    };
+    const handleKeyUp = (event: KeyboardEvent) => detector.handleKeyUp(event);
+    window.addEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("keyup", handleKeyUp, true);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, true);
+      window.removeEventListener("keyup", handleKeyUp, true);
+    };
+  }, [openSearchEverywhere, visible]);
+
+  const goToFileItems = useMemo<GoToFileItem[]>(() => {
+    const items: GoToFileItem[] = [];
+    for (const root of roots) {
+      const state = flatFiles[root.id];
+      if (!state) continue;
+      for (const entry of state.entries) {
+        if (entry.fileType !== "file" || shouldHideEntry(entry)) continue;
+        items.push({ rootId: root.id, rootName: root.name, path: entry.path });
+      }
+    }
+    return items;
+  }, [flatFiles, roots]);
+  const goToFileLoading = useMemo(
+    () => roots.some((root) => flatFiles[root.id]?.loading ?? false),
+    [flatFiles, roots],
+  );
+  const goToFileTruncated = useMemo(
+    () => roots.some((root) => flatFiles[root.id]?.truncated ?? false),
+    [flatFiles, roots],
+  );
+
+  const openGoToFileItem = useCallback(
+    (item: GoToFileItem) => {
+      setSearchEverywhereOpen(false);
+      void openFile({ kind: "root", rootId: item.rootId, path: item.path });
+    },
+    [openFile],
   );
 
   useEffect(() => {
@@ -2606,7 +2667,7 @@ export function CodeWorkspaceTab({
     <div
       ref={rootRef}
       data-testid="code-workspace-tab"
-      className="h-full w-full min-h-0 flex flex-col overflow-hidden bg-[var(--taomni-code-bg)] text-[var(--taomni-code-text)]"
+      className="relative h-full w-full min-h-0 flex flex-col overflow-hidden bg-[var(--taomni-code-bg)] text-[var(--taomni-code-text)]"
     >
       <header className="h-10 shrink-0 flex items-center gap-2 overflow-x-auto px-3 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]">
         <Braces className="w-4 h-4 text-[var(--taomni-accent)]" />
@@ -3038,6 +3099,14 @@ export function CodeWorkspaceTab({
         ]}
         onOpenChange={setBottomDockOpen}
         onActiveTabChange={(tab) => setBottomDockTab(tab as "problems" | "search" | "references")}
+      />
+      <SearchEverywhere
+        open={searchEverywhereOpen}
+        items={goToFileItems}
+        loading={goToFileLoading}
+        truncated={goToFileTruncated}
+        onClose={() => setSearchEverywhereOpen(false)}
+        onOpenFile={openGoToFileItem}
       />
     </div>
   );
