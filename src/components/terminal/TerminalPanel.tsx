@@ -217,6 +217,8 @@ interface TerminalPanelProps {
   onSessionReady?: (sessionId: string) => void;
   /** Called whenever the terminal receives output (for new-output badge). */
   onOutput?: () => void;
+  /** Workspace task terminals report their shell exit marker through OSC 633. */
+  onTaskExit?: (exitCode: number) => void;
   /** SSH-only: upload local OS file paths into the terminal's current remote cwd. */
   onUploadLocalPaths?: (request: TerminalLocalPathUploadRequest) => Promise<void> | void;
   /** Whether MultiExec broadcast mode is active globally. */
@@ -315,6 +317,7 @@ export function TerminalPanel({
   cwdRequestToken = 0,
   onSessionReady,
   onOutput,
+  onTaskExit,
   onUploadLocalPaths,
   multiExecActive,
   isMultiExecTarget,
@@ -330,6 +333,7 @@ export function TerminalPanel({
   const cwdCallbackRef = useRef<typeof onCwdChange>(onCwdChange);
   const onSessionReadyRef = useRef<typeof onSessionReady>(onSessionReady);
   const onOutputRef = useRef<typeof onOutput>(onOutput);
+  const onTaskExitRef = useRef<typeof onTaskExit>(onTaskExit);
   const onUploadLocalPathsRef = useRef<typeof onUploadLocalPaths>(onUploadLocalPaths);
   const onInputBroadcastRef = useRef<typeof onInputBroadcast>(onInputBroadcast);
   const onTerminalProfileChangeRef = useRef<typeof onTerminalProfileChange>(onTerminalProfileChange);
@@ -341,6 +345,7 @@ export function TerminalPanel({
     cwdCallbackRef.current = onCwdChange;
     onSessionReadyRef.current = onSessionReady;
     onOutputRef.current = onOutput;
+    onTaskExitRef.current = onTaskExit;
     onUploadLocalPathsRef.current = onUploadLocalPaths;
     onInputBroadcastRef.current = onInputBroadcast;
     onTerminalProfileChangeRef.current = onTerminalProfileChange;
@@ -351,6 +356,7 @@ export function TerminalPanel({
     onCwdChange,
     onSessionReady,
     onOutput,
+    onTaskExit,
     onUploadLocalPaths,
     onInputBroadcast,
     onTerminalProfileChange,
@@ -2390,6 +2396,16 @@ export function TerminalPanel({
           .catch((err) => {
             setStatusMessage(err instanceof Error ? err.message : "OSC 52 clipboard copy failed");
           });
+        return true;
+      });
+    } catch {
+      /* parser API absent in some xterm builds */
+    }
+
+    try {
+      term.parser.registerOscHandler(633, (data) => {
+        const match = /^TaomniTaskExit=(-?\d+)$/.exec(data.trim());
+        if (match) onTaskExitRef.current?.(Number.parseInt(match[1], 10));
         return true;
       });
     } catch {

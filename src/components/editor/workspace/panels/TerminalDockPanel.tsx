@@ -10,6 +10,7 @@ import {
 import { Plus, TerminalSquare, X } from "lucide-react";
 import { TerminalPanel } from "../../../terminal/TerminalPanel";
 import { getTerminal } from "../../../../lib/terminal/terminalRegistry";
+import { getAppPlatform } from "../../../../lib/runtime";
 import type { CodeWorkspaceRootInfo } from "../../../../types";
 
 interface WorkspaceTerminalInstance {
@@ -18,11 +19,17 @@ interface WorkspaceTerminalInstance {
   initialCwd: string;
   cwd: string;
   pendingCommand: string | null;
+  onTaskExit: ((exitCode: number) => void) | null;
 }
 
 export interface TerminalDockHandle {
   openAt: (cwd: string, title?: string) => string;
-  runCommand: (command: string, cwd: string, title?: string) => string;
+  runCommand: (
+    command: string,
+    cwd: string,
+    title?: string,
+    onExit?: (exitCode: number) => void,
+  ) => string;
   focus: () => void;
 }
 
@@ -50,7 +57,12 @@ export const TerminalDockPanel = forwardRef<TerminalDockHandle, TerminalDockPane
       setSelectedRootId(roots[0]?.id ?? "");
     }, [rootById, roots, selectedRootId]);
 
-    const createInstance = useCallback((cwd: string, title?: string, pendingCommand: string | null = null) => {
+    const createInstance = useCallback((
+      cwd: string,
+      title?: string,
+      pendingCommand: string | null = null,
+      onTaskExit: ((exitCode: number) => void) | null = null,
+    ) => {
       sequenceRef.current += 1;
       const id = terminalId(workspaceInstanceId, sequenceRef.current);
       const next: WorkspaceTerminalInstance = {
@@ -59,6 +71,7 @@ export const TerminalDockPanel = forwardRef<TerminalDockHandle, TerminalDockPane
         initialCwd: cwd,
         cwd,
         pendingCommand,
+        onTaskExit,
       };
       setInstances((current) => [...current, next]);
       setActiveId(id);
@@ -72,7 +85,12 @@ export const TerminalDockPanel = forwardRef<TerminalDockHandle, TerminalDockPane
 
     useImperativeHandle(ref, () => ({
       openAt: (cwd, title) => createInstance(cwd, title),
-      runCommand: (command, cwd, title) => createInstance(cwd, title, command),
+      runCommand: (command, cwd, title, onExit) => createInstance(
+        cwd,
+        title,
+        command,
+        onExit ?? null,
+      ),
       focus: () => {
         if (instances.length > 0) setActiveId((current) => current ?? instances[0].id);
       },
@@ -96,7 +114,10 @@ export const TerminalDockPanel = forwardRef<TerminalDockHandle, TerminalDockPane
         if (!instance?.pendingCommand) return;
         const terminal = getTerminal(id);
         if (terminal) {
-          terminal.writeInput(`${instance.pendingCommand}\n`);
+          const command = getAppPlatform() === "windows"
+            ? `& { ${instance.pendingCommand} }; $taomniStatus=$LASTEXITCODE; [Console]::Write([char]27+']633;TaomniTaskExit='+$taomniStatus+[char]7)\n`
+            : `${instance.pendingCommand}; __taomni_status=$?; printf '\\033]633;TaomniTaskExit=%s\\a' "$__taomni_status"\n`;
+          terminal.writeInput(command);
           setInstances((current) => current.map((item) => item.id === id
             ? { ...item, pendingCommand: null }
             : item));
@@ -186,6 +207,7 @@ export const TerminalDockPanel = forwardRef<TerminalDockHandle, TerminalDockPane
                   ? { ...item, cwd }
                   : item))}
                 onSessionReady={() => deliverPendingCommand(instance.id)}
+                onTaskExit={(exitCode) => instance.onTaskExit?.(exitCode)}
               />
             </div>
           ))}

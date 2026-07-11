@@ -1400,6 +1400,9 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         "Local terminal is not available in browser preview. Use the Quick connect bar or 'New session' to open an SSH connection (e.g. demo@test.rebex.net).",
       );
     }
+    case "workspace_detect_tasks": {
+      return [] as T;
+    }
     case "create_ssh_terminal": {
       const cols = (args?.cols as number) ?? 80;
       const rows = (args?.rows as number) ?? 24;

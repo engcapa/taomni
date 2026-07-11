@@ -23,6 +23,7 @@ import {
   Columns2,
   Rows2,
   TerminalSquare,
+  Play,
   Search,
   X,
   ZoomIn,
@@ -252,6 +253,7 @@ import {
   TerminalDockPanel,
   type TerminalDockHandle,
 } from "./workspace/panels/TerminalDockPanel";
+import { RunPanel, type RunPanelHandle } from "./workspace/panels/RunPanel";
 import type { EditorRevealTarget } from "./workspace/EditorGroup";
 
 export function CodeWorkspaceTab({
@@ -562,6 +564,7 @@ export function CodeWorkspaceTab({
   const editorPaneRef = useRef<HTMLElement | null>(null);
   const inactiveEditorPaneRef = useRef<HTMLElement | null>(null);
   const terminalDockRef = useRef<TerminalDockHandle | null>(null);
+  const runPanelRef = useRef<RunPanelHandle | null>(null);
   const {
     serverStatuses: lspServerStatuses,
     commandPrefs: lspCommandPrefs,
@@ -2584,6 +2587,26 @@ export function CodeWorkspaceTab({
       },
     },
     {
+      id: "workspace.showRunTasks",
+      title: "Show Run Tasks",
+      category: "Run",
+      keywords: ["run", "task", "script"],
+      run: () => {
+        setBottomDockTab("run");
+        setBottomDockOpen(true);
+      },
+    },
+    {
+      id: "workspace.rerunLastTask",
+      title: "Rerun Last Task",
+      category: "Run",
+      keybinding: "Ctrl+F5",
+      keywords: ["run", "rerun", "repeat"],
+      run: () => {
+        if (!runPanelRef.current?.rerunLast()) setStatusMessage("No workspace task has run yet");
+      },
+    },
+    {
       id: "workspace.save",
       title: "Save Active File",
       category: "File",
@@ -3585,6 +3608,29 @@ export function CodeWorkspaceTab({
                 roots={roots}
                 defaultCwd={activeRoot?.path ?? roots[0]?.path ?? ""}
                 active={bottomDockOpen && bottomDockTab === "terminal"}
+              />
+            ),
+          },
+          {
+            id: "run",
+            label: "Run",
+            icon: <Play className="h-3.5 w-3.5" />,
+            content: (
+              <RunPanel
+                ref={runPanelRef}
+                workspaceInstanceId={workspaceInstanceId}
+                roots={roots}
+                active={bottomDockOpen && bottomDockTab === "run"}
+                onRun={(task, onExit) => {
+                  terminalDockRef.current?.runCommand(
+                    task.command,
+                    task.cwd,
+                    `Run: ${task.label}`,
+                    onExit,
+                  );
+                  setBottomDockTab("terminal");
+                  setBottomDockOpen(true);
+                }}
               />
             ),
           },

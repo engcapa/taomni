@@ -18,6 +18,7 @@ const workspaceMocks = vi.hoisted(() => ({
   workspaceCompactChain: vi.fn(),
   workspaceListFilesRecursive: vi.fn(),
   workspaceDetectGitRoots: vi.fn(),
+  workspaceDetectTasks: vi.fn(),
   workspaceReadFile: vi.fn(),
   workspaceReadLooseFile: vi.fn(),
   workspaceWriteFile: vi.fn(),
@@ -184,6 +185,7 @@ describe("CodeWorkspaceTab", () => {
     workspaceMocks.workspaceCompactChain.mockReset();
     workspaceMocks.workspaceListFilesRecursive.mockReset();
     workspaceMocks.workspaceDetectGitRoots.mockReset();
+    workspaceMocks.workspaceDetectTasks.mockReset();
     workspaceMocks.workspaceReadFile.mockReset();
     workspaceMocks.workspaceReadLooseFile.mockReset();
     workspaceMocks.workspaceWriteFile.mockReset();
@@ -241,6 +243,7 @@ describe("CodeWorkspaceTab", () => {
     workspaceMocks.workspaceCompactChain.mockResolvedValue({ path: "", entries: [] });
     workspaceMocks.workspaceListFilesRecursive.mockResolvedValue([]);
     workspaceMocks.workspaceDetectGitRoots.mockResolvedValue([]);
+    workspaceMocks.workspaceDetectTasks.mockResolvedValue([]);
     gitMocks.gitSnapshot.mockResolvedValue({
       repoRoot: "/repo/app",
       currentBranch: "main",
@@ -1119,6 +1122,34 @@ describe("CodeWorkspaceTab", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Open in Terminal" }));
     expect(screen.getByRole("tab", { name: /Terminal/, selected: true })).toBeInTheDocument();
     expect(await screen.findByTestId("mock-workspace-terminal")).toHaveAttribute("data-initial-cwd", "/repo/app");
+  });
+
+  it("detects workspace tasks and launches them in the integrated terminal", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-run",
+      workspaceInstanceId: "instance-run",
+      name: "Run",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+    };
+    workspaceMocks.workspaceDetectTasks.mockResolvedValue([{
+      id: "package.json:test",
+      label: "test",
+      command: "pnpm run test",
+      cwd: "/repo/app",
+      source: "package.json",
+    }]);
+
+    renderWorkspace(workspace);
+    fireEvent.click(await screen.findByRole("tab", { name: /Run/ }));
+    fireEvent.click(await screen.findByTitle("pnpm run test — /repo/app"));
+
+    expect(screen.getByRole("tab", { name: /Terminal/, selected: true })).toBeInTheDocument();
+    expect(await screen.findByTestId("mock-workspace-terminal")).toHaveAttribute(
+      "data-initial-cwd",
+      "/repo/app",
+    );
   });
 
   it("opens a shared buffer in a resizable editor split and collapses it", async () => {

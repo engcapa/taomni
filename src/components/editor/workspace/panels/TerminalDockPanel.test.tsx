@@ -3,9 +3,29 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRef } from "react";
 import { TerminalDockPanel, type TerminalDockHandle } from "./TerminalDockPanel";
 
+const registryMocks = vi.hoisted(() => ({
+  getTerminal: vi.fn(),
+}));
+
+vi.mock("../../../../lib/terminal/terminalRegistry", () => registryMocks);
+vi.mock("../../../../lib/runtime", () => ({ getAppPlatform: () => "linux" }));
+
 vi.mock("../../../terminal/TerminalPanel", () => ({
-  TerminalPanel: ({ tabId, initialCwd }: { tabId?: string; initialCwd?: string }) => (
-    <div data-testid="mock-terminal" data-tab-id={tabId} data-initial-cwd={initialCwd} />
+  TerminalPanel: ({
+    tabId,
+    initialCwd,
+    onSessionReady,
+    onTaskExit,
+  }: {
+    tabId?: string;
+    initialCwd?: string;
+    onSessionReady?: (sessionId: string) => void;
+    onTaskExit?: (exitCode: number) => void;
+  }) => (
+    <div data-testid="mock-terminal" data-tab-id={tabId} data-initial-cwd={initialCwd}>
+      <button type="button" onClick={() => onSessionReady?.(tabId ?? "")}>ready</button>
+      <button type="button" onClick={() => onTaskExit?.(0)}>task-exit</button>
+    </div>
   ),
 }));
 
@@ -60,5 +80,27 @@ describe("TerminalDockPanel", () => {
     expect(screen.getByTestId("mock-terminal")).toHaveAttribute("data-initial-cwd", "/repo/app/src");
     fireEvent.click(screen.getByLabelText("Close src"));
     expect(screen.queryByTestId("mock-terminal")).not.toBeInTheDocument();
+  });
+
+  it("wraps task commands with an exit marker and reports completion", async () => {
+    const writeInput = vi.fn();
+    registryMocks.getTerminal.mockReturnValue({ writeInput });
+    const handle = createRef<TerminalDockHandle>();
+    const onExit = vi.fn();
+    render(
+      <TerminalDockPanel
+        ref={handle}
+        workspaceInstanceId="ws"
+        roots={roots}
+        defaultCwd="/repo/app"
+        active={false}
+      />,
+    );
+    handle.current?.runCommand("pnpm test", "/repo/app", "test", onExit);
+    fireEvent.click(await screen.findByRole("button", { name: "ready" }));
+    await waitFor(() => expect(writeInput).toHaveBeenCalledWith(expect.stringContaining("TaomniTaskExit")));
+    expect(writeInput).toHaveBeenCalledWith(expect.stringContaining("pnpm test"));
+    fireEvent.click(screen.getByRole("button", { name: "task-exit" }));
+    expect(onExit).toHaveBeenCalledWith(0);
   });
 });
