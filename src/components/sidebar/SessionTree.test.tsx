@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useSessionStore } from "../../stores/sessionStore";
 import type { SessionConfig, SessionGroup } from "../../lib/ipc";
 import { SessionTree } from "./SessionTree";
+import { resetSystemFontCacheForTests } from "../../lib/systemFonts";
 
 const ipcMocks = vi.hoisted(() => ({
   deleteSession: vi.fn<(id: string) => Promise<void>>(async () => undefined),
@@ -78,6 +79,7 @@ describe("SessionTree multi-select connect", () => {
   const groups = [makeGroup("ipy"), makeGroup("person")];
 
   beforeEach(() => {
+    resetSystemFontCacheForTests();
     vi.clearAllMocks();
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
       configurable: true,
@@ -301,8 +303,10 @@ describe("SessionTree multi-select batch operations", () => {
     const item = screen.getByTestId("context-menu-item-set-terminal-theme");
     fireEvent.mouseEnter(item.parentElement!);
     const fontSelect = await screen.findByTestId("session-terminal-font-select");
+    expect(ipcMocks.listSystemFonts).not.toHaveBeenCalled();
     fireEvent.click(fontSelect);
     fireEvent.click(await screen.findByRole("option", { name: "JetBrains Mono" }));
+    expect(ipcMocks.listSystemFonts).toHaveBeenCalledTimes(1);
 
     await waitFor(() => expect(ipcMocks.saveSession).toHaveBeenCalledTimes(2));
     const savedOptions = ipcMocks.saveSession.mock.calls.map(([cfg]) => JSON.parse(cfg.options_json));

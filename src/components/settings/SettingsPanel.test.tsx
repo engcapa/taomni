@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setAppThemeMode } from "../../lib/appTheme";
 import { useAppStore } from "../../stores/appStore";
 import { SettingsPanel } from "./SettingsPanel";
+import { resetSystemFontCacheForTests } from "../../lib/systemFonts";
 
 const ipcMocks = vi.hoisted(() => ({
   listSystemFonts: vi.fn(),
@@ -21,6 +22,7 @@ const TERMINAL_DEFAULT_STORAGE_KEY = "taomni.terminalDefaultProfile.v1";
 
 describe("SettingsPanel", () => {
   beforeEach(() => {
+    resetSystemFontCacheForTests();
     ipcMocks.listSystemFonts.mockReset();
     ipcMocks.listSystemFonts.mockResolvedValue(["Consolas", "JetBrains Mono", "Source Code Pro"]);
     ipcMocks.getAppProxyConfig.mockReset();
@@ -41,6 +43,15 @@ describe("SettingsPanel", () => {
     setAppThemeMode("system");
     // jsdom has no layout engine; search scroll-to-match calls this.
     Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  it("defers the system font request until a font picker opens", async () => {
+    const user = userEvent.setup();
+    render(<SettingsPanel />);
+
+    expect(ipcMocks.listSystemFonts).not.toHaveBeenCalled();
+    await user.click(screen.getByLabelText("UI Font Family"));
+    await waitFor(() => expect(ipcMocks.listSystemFonts).toHaveBeenCalledTimes(1));
   });
 
   afterEach(() => {
