@@ -37,11 +37,13 @@ const INITIAL_SYSTEM_FONT_STATE: SystemFontState = {
 
 let cachedSystemFontState: SystemFontState | null = null;
 let pendingSystemFontRequest: Promise<SystemFontState> | null = null;
+const monospaceFontCache = new Map<string, boolean>();
 
 /** @internal Test isolation for the module-level font cache. */
 export function resetSystemFontCacheForTests(): void {
   cachedSystemFontState = null;
   pendingSystemFontRequest = null;
+  monospaceFontCache.clear();
 }
 
 function loadSystemFontsOnce(): Promise<SystemFontState> {
@@ -202,6 +204,10 @@ function sameFont(a: string, b: string): boolean {
 let canvas: HTMLCanvasElement | null = null;
 export function isMonospaceFont(fontName: string): boolean {
   if (typeof document === "undefined") return true;
+  const cacheKey = fontName.trim().toLowerCase();
+  const cached = monospaceFontCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
   try {
     if (!canvas) {
       canvas = document.createElement("canvas");
@@ -218,9 +224,11 @@ export function isMonospaceFont(fontName: string): boolean {
     for (let i = 1; i < testChars.length; i++) {
       const width = context.measureText(testChars[i]).width;
       if (Math.abs(width - firstWidth) > 0.05) {
+        monospaceFontCache.set(cacheKey, false);
         return false;
       }
     }
+    monospaceFontCache.set(cacheKey, true);
     return true;
   } catch (e) {
     console.error("[isMonospaceFont] Failed to measure font:", e);
