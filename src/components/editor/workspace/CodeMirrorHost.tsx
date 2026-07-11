@@ -48,6 +48,12 @@ interface EditorRevealTarget {
   character: number;
 }
 
+export interface EditorSelectionRange {
+  start: LspPosition;
+  end: LspPosition;
+  empty: boolean;
+}
+
 interface CodeMirrorHostProps {
   path: string;
   doc: string;
@@ -68,6 +74,7 @@ interface CodeMirrorHostProps {
     position: LspPosition,
     triggerCharacter: string | null,
   ) => Promise<LspSignatureHelpResult | null>;
+  onSelectionChange?: (selection: EditorSelectionRange) => void;
   completionTriggers?: string[];
   signatureTriggers?: string[];
 }
@@ -237,6 +244,7 @@ export function CodeMirrorHost({
   onComplete,
   onCompleteResolve,
   onSignatureHelp,
+  onSelectionChange,
   completionTriggers,
   signatureTriggers,
 }: CodeMirrorHostProps) {
@@ -254,6 +262,7 @@ export function CodeMirrorHost({
   const onCompleteRef = useRef(onComplete);
   const onCompleteResolveRef = useRef(onCompleteResolve);
   const onSignatureHelpRef = useRef(onSignatureHelp);
+  const onSelectionChangeRef = useRef(onSelectionChange);
   const completionTriggersRef = useRef(completionTriggers ?? []);
   const signatureTriggersRef = useRef(signatureTriggers ?? []);
   onChangeRef.current = onChange;
@@ -264,8 +273,22 @@ export function CodeMirrorHost({
   onCompleteRef.current = onComplete;
   onCompleteResolveRef.current = onCompleteResolve;
   onSignatureHelpRef.current = onSignatureHelp;
+  onSelectionChangeRef.current = onSelectionChange;
   completionTriggersRef.current = completionTriggers ?? [];
   signatureTriggersRef.current = signatureTriggers ?? [];
+
+  const emitSelection = (view: EditorView) => {
+    const handler = onSelectionChangeRef.current;
+    if (!handler) return;
+    const main = view.state.selection.main;
+    const from = Math.min(main.from, main.to);
+    const to = Math.max(main.from, main.to);
+    handler({
+      start: lspPositionFromOffset(view.state.doc, from),
+      end: lspPositionFromOffset(view.state.doc, to),
+      empty: main.empty,
+    });
+  };
 
   useEffect(() => {
     if (!hostRef.current) return;
@@ -392,11 +415,15 @@ export function CodeMirrorHost({
             // A cursor move without an edit (mouse click, jump) dismisses it.
             hideSignature();
           }
+          if (update.selectionSet || update.docChanged) {
+            emitSelection(update.view);
+          }
         }),
       ],
     });
     const view = new EditorView({ state, parent: hostRef.current });
     viewRef.current = view;
+    emitSelection(view);
     return () => {
       view.destroy();
       viewRef.current = null;

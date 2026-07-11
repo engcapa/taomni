@@ -432,6 +432,8 @@ pub fn run() {
             lsp::lsp_document_symbols,
             lsp::lsp_completion,
             lsp::lsp_completion_resolve,
+            lsp::lsp_formatting,
+            lsp::lsp_range_formatting,
             lsp::lsp_signature_help,
             windowing::open_detached_window,
             windowing::close_current_detached_window,

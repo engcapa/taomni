@@ -304,6 +304,43 @@ export function lspSignatureHelp(
   });
 }
 
+export interface LspFormattingResult {
+  status: LspDocumentStatus;
+  edits: LspTextEdit[];
+}
+
+export interface LspFormattingOptions {
+  tabSize?: number;
+  insertSpaces?: boolean;
+}
+
+export function lspFormatting(
+  descriptor: LspDocumentDescriptor,
+  options?: LspFormattingOptions,
+): Promise<LspFormattingResult> {
+  return invoke<LspFormattingResult>("lsp_formatting", {
+    ...documentArgs(descriptor),
+    tabSize: options?.tabSize ?? null,
+    insertSpaces: options?.insertSpaces ?? null,
+  });
+}
+
+export function lspRangeFormatting(
+  descriptor: LspDocumentDescriptor,
+  range: LspRange,
+  options?: LspFormattingOptions,
+): Promise<LspFormattingResult> {
+  return invoke<LspFormattingResult>("lsp_range_formatting", {
+    ...documentArgs(descriptor),
+    startLine: range.start.line,
+    startCharacter: range.start.character,
+    endLine: range.end.line,
+    endCharacter: range.end.character,
+    tabSize: options?.tabSize ?? null,
+    insertSpaces: options?.insertSpaces ?? null,
+  });
+}
+
 export function lspHover(
   descriptor: LspDocumentDescriptor,
   position: LspPosition,

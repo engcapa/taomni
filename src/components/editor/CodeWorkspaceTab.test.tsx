@@ -41,6 +41,8 @@ const lspMocks = vi.hoisted(() => ({
   lspCompletion: vi.fn(),
   lspCompletionResolve: vi.fn(),
   lspSignatureHelp: vi.fn(),
+  lspFormatting: vi.fn(),
+  lspRangeFormatting: vi.fn(),
 }));
 
 const ipcMocks = vi.hoisted(() => ({
@@ -203,6 +205,10 @@ describe("CodeWorkspaceTab", () => {
       activeSignature: 0,
       activeParameter: 0,
     });
+    lspMocks.lspFormatting.mockReset();
+    lspMocks.lspFormatting.mockResolvedValue({ status: documentStatus(), edits: [] });
+    lspMocks.lspRangeFormatting.mockReset();
+    lspMocks.lspRangeFormatting.mockResolvedValue({ status: documentStatus(), edits: [] });
     ipcMocks.selectFilePath.mockReset();
     ipcMocks.selectFolderPath.mockReset();
     gitMocks.gitSnapshot.mockReset();
@@ -878,6 +884,80 @@ describe("CodeWorkspaceTab", () => {
 
     fireEvent.keyDown(screen.getByLabelText("File structure"), { key: "Enter" });
     expect(screen.queryByTestId("code-workspace-structure-popup")).not.toBeInTheDocument();
+  });
+
+  it("formats the active document through LSP when formatting is advertised", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-format",
+      workspaceInstanceId: "instance-format",
+      name: "Format",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "const x=1"));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      presetId: "typescript-javascript",
+      languageId: "typescript",
+      displayName: "TypeScript / JavaScript",
+      available: true,
+      active: true,
+      capabilities: {
+        completion: true,
+        signatureHelp: true,
+        hover: true,
+        definition: true,
+        typeDefinition: false,
+        implementation: false,
+        references: true,
+        documentSymbol: true,
+        workspaceSymbol: false,
+        rename: false,
+        formatting: true,
+        rangeFormatting: true,
+        codeAction: false,
+        documentHighlight: false,
+        callHierarchy: false,
+        typeHierarchy: false,
+        inlayHint: false,
+        completionTriggerCharacters: ["."],
+        signatureTriggerCharacters: ["(", ","],
+      },
+    }));
+    lspMocks.lspFormatting.mockResolvedValue({
+      status: documentStatus({ active: true, available: true, formatting: undefined } as LspDocumentStatus),
+      edits: [{
+        range: {
+          start: { line: 0, character: 7 },
+          end: { line: 0, character: 7 },
+        },
+        newText: " ",
+      }],
+    });
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await screen.findByText("9 B");
+    await waitFor(() => expect(lspMocks.lspOpenDocument).toHaveBeenCalled());
+    // Wait until the LSP status is no longer idle so capabilities are in state.
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+    fireEvent.keyDown(window, { key: "l", ctrlKey: true, altKey: true, shiftKey: false, metaKey: false });
+    await waitFor(() => expect(lspMocks.lspFormatting).toHaveBeenCalled());
+    // Formatting inserts a space into "const x=1" → dirty buffer.
+    await waitFor(() => {
+      expect(screen.getByText(/unsaved/)).toBeInTheDocument();
+    });
+    expect(lspMocks.lspFormatting).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: "instance-format",
+        filePath: "src/main.ts",
+      }),
+    );
   });
 
   it("offers tree context menu actions: copy path and scoped search", async () => {

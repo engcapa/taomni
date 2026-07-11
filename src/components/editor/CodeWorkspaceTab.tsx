@@ -61,10 +61,12 @@ import {
   lspCompletionResolve,
   lspDetectServers,
   lspDocumentSymbols,
+  lspFormatting,
   lspGetDiagnostics,
   lspDefinition,
   lspHover,
   lspOpenDocument,
+  lspRangeFormatting,
   lspReferences,
   lspSaveDocument,
   lspSignatureHelp,
@@ -77,6 +79,7 @@ import {
   type LspDocumentSymbol,
   type LspLocation,
   type LspPosition,
+  type LspRange,
   type LspServerStatus,
   type LspSignatureHelpResult,
 } from "../../lib/editor/lsp";
@@ -97,7 +100,8 @@ import { useAppStore } from "../../stores/appStore";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { writeText } from "../../lib/clipboard";
 import { useContextMenu } from "../ContextMenu";
-import { CodeMirrorHost } from "./workspace/CodeMirrorHost";
+import { CodeMirrorHost, type EditorSelectionRange } from "./workspace/CodeMirrorHost";
+import { applyLspTextEditsToString } from "./workspace/lspTextEdits";
 import { BottomDock } from "./workspace/panels/BottomDock";
 import {
   ReferencesPanel,
@@ -825,6 +829,11 @@ export function CodeWorkspaceTab({
   });
   const recentFilesRef = useRef<CodeWorkspaceFileRef[]>([]);
   const revealNonceRef = useRef(0);
+  const editorSelectionRef = useRef<EditorSelectionRange>({
+    start: { line: 0, character: 0 },
+    end: { line: 0, character: 0 },
+    empty: true,
+  });
   const workspaceCommandRunnerRef = useRef<(commandId: string, context?: WorkspaceCommandContext) => boolean>(() => false);
   const initialOpenedKeyRef = useRef<string | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -2369,6 +2378,39 @@ export function CodeWorkspaceTab({
 
   const structureFileRef = useRef<string | null>(null);
 
+  const formatActiveFile = useCallback(async () => {
+    const file = activeFile;
+    if (!file || file.loading) return;
+    const descriptor = lspDescriptorForFile(file);
+    if (!descriptor) return;
+    const caps = lspFilesRef.current[file.key]?.status?.capabilities ?? null;
+    const selection = editorSelectionRef.current;
+    const hasSelection = !selection.empty
+      && (selection.start.line !== selection.end.line || selection.start.character !== selection.end.character);
+    const useRange = hasSelection && (caps?.rangeFormatting ?? false);
+    // When capabilities are known and neither provider is present, stay silent.
+    if (caps && !useRange && !caps.formatting && !(hasSelection && caps.rangeFormatting)) {
+      return;
+    }
+    if (caps && !caps.formatting && !caps.rangeFormatting) return;
+    try {
+      const range: LspRange = {
+        start: selection.start,
+        end: selection.end,
+      };
+      // Prefer range formatting only when advertised; otherwise format the whole document.
+      // If capabilities are not yet known, attempt full-document formatting.
+      const result = useRange
+        ? await lspRangeFormatting(descriptor, range)
+        : await lspFormatting(descriptor);
+      if (!result.edits.length) return;
+      const next = applyLspTextEditsToString(file.text, result.edits);
+      if (next !== file.text) updateFileText(file.key, next);
+    } catch (error) {
+      console.error("Format document failed", error);
+    }
+  }, [activeFile, lspDescriptorForFile, updateFileText]);
+
   const openStructurePopup = useCallback(async () => {
     const file = activeKey ? openFilesRef.current[activeKey] : null;
     if (!file || file.loading) return;
@@ -2462,6 +2504,23 @@ export function CodeWorkspaceTab({
       keywords: ["outline", "symbol"],
       when: () => !!activeFile,
       run: () => void openStructurePopup(),
+    },
+    {
+      id: "workspace.format",
+      title: "Format Document",
+      category: "Code",
+      keybinding: "Ctrl+Alt+L",
+      keywords: ["format", "prettier", "indent"],
+      when: (context) => {
+        if (context.focus === "tree" || context.focus === "terminal") return false;
+        if (!activeFile || activeFile.loading) return false;
+        // Prefer capability gate when status is known; if LSP has not
+        // reported yet, still allow the command so the shortcut is live
+        // as soon as the buffer is open (formatActiveFile no-ops without a formatter).
+        if (!activeCapabilities) return true;
+        return !!(activeCapabilities.formatting || activeCapabilities.rangeFormatting);
+      },
+      run: () => void formatActiveFile(),
     },
     {
       id: "workspace.save",
@@ -2591,6 +2650,7 @@ export function CodeWorkspaceTab({
       },
     },
   ], [
+    activeCapabilities,
     activeFile,
     addRoot,
     copyTreePath,
@@ -2598,6 +2658,7 @@ export function CodeWorkspaceTab({
     createFile,
     deleteSelected,
     findInDirectory,
+    formatActiveFile,
     gitRoots.length,
     gitRootsLoading,
     navCan.back,
@@ -3513,6 +3574,9 @@ export function CodeWorkspaceTab({
                               onComplete={(position, trigger) => getLspCompletions(activeFile, position, trigger)}
                               onCompleteResolve={(raw) => resolveLspCompletion(activeFile, raw)}
                               onSignatureHelp={(position, trigger) => getLspSignatureHelp(activeFile, position, trigger)}
+                              onSelectionChange={(selection) => {
+                                editorSelectionRef.current = selection;
+                              }}
                               completionTriggers={activeCapabilities?.completionTriggerCharacters ?? []}
                               signatureTriggers={activeCapabilities?.signatureTriggerCharacters ?? []}
                             />
@@ -3535,6 +3599,9 @@ export function CodeWorkspaceTab({
                           onComplete={(position, trigger) => getLspCompletions(activeFile, position, trigger)}
                           onCompleteResolve={(raw) => resolveLspCompletion(activeFile, raw)}
                           onSignatureHelp={(position, trigger) => getLspSignatureHelp(activeFile, position, trigger)}
+                          onSelectionChange={(selection) => {
+                            editorSelectionRef.current = selection;
+                          }}
                           completionTriggers={activeCapabilities?.completionTriggerCharacters ?? []}
                           signatureTriggers={activeCapabilities?.signatureTriggerCharacters ?? []}
                         />

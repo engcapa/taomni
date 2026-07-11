@@ -1402,6 +1402,151 @@ pub async fn lsp_completion_resolve(
     Ok(parse_completion_item(&resolved).or_else(|| parse_completion_item(&item)))
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspFormattingResult {
+    pub status: LspDocumentStatus,
+    pub edits: Vec<LspTextEdit>,
+}
+
+#[tauri::command]
+pub async fn lsp_formatting(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+    tab_size: Option<u32>,
+    insert_spaces: Option<bool>,
+) -> Result<LspFormattingResult, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let session = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session,
+        None => {
+            let status = state
+                .lsp
+                .document_status(
+                    &document,
+                    server_command_id.as_deref(),
+                    custom_server_command.as_ref(),
+                )
+                .await;
+            return Ok(LspFormattingResult {
+                status,
+                edits: Vec::new(),
+            });
+        }
+    };
+    let result = session
+        .request(
+            "textDocument/formatting",
+            json!({
+                "textDocument": { "uri": document.uri },
+                "options": {
+                    "tabSize": tab_size.unwrap_or(2),
+                    "insertSpaces": insert_spaces.unwrap_or(true),
+                },
+            }),
+        )
+        .await
+        .unwrap_or(Value::Null);
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    Ok(LspFormattingResult {
+        status,
+        edits: parse_text_edits(&result),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_range_formatting(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    start_line: u32,
+    start_character: u32,
+    end_line: u32,
+    end_character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+    tab_size: Option<u32>,
+    insert_spaces: Option<bool>,
+) -> Result<LspFormattingResult, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let session = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session,
+        None => {
+            let status = state
+                .lsp
+                .document_status(
+                    &document,
+                    server_command_id.as_deref(),
+                    custom_server_command.as_ref(),
+                )
+                .await;
+            return Ok(LspFormattingResult {
+                status,
+                edits: Vec::new(),
+            });
+        }
+    };
+    let result = session
+        .request(
+            "textDocument/rangeFormatting",
+            json!({
+                "textDocument": { "uri": document.uri },
+                "range": {
+                    "start": { "line": start_line, "character": start_character },
+                    "end": { "line": end_line, "character": end_character },
+                },
+                "options": {
+                    "tabSize": tab_size.unwrap_or(2),
+                    "insertSpaces": insert_spaces.unwrap_or(true),
+                },
+            }),
+        )
+        .await
+        .unwrap_or(Value::Null);
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    Ok(LspFormattingResult {
+        status,
+        edits: parse_text_edits(&result),
+    })
+}
+
 #[tauri::command]
 pub async fn lsp_signature_help(
     state: State<'_, AppState>,
@@ -1838,6 +1983,13 @@ fn parse_text_edit(value: &Value) -> Option<LspTextEdit> {
         .or_else(|| value.get("replace"))
         .and_then(parse_range)?;
     Some(LspTextEdit { range, new_text })
+}
+
+fn parse_text_edits(value: &Value) -> Vec<LspTextEdit> {
+    value
+        .as_array()
+        .map(|items| items.iter().filter_map(parse_text_edit).collect())
+        .unwrap_or_default()
 }
 
 fn parse_completion_item(value: &Value) -> Option<LspCompletionItem> {
@@ -2491,5 +2643,32 @@ mod tests {
         assert_eq!(signature.parameters[1].label, "preview: boolean");
         assert_eq!(signature.parameters[1].label_start, Some(23));
         assert_eq!(signature.parameters[1].documentation.as_deref(), Some("preview flag"));
+    }
+
+    #[test]
+    fn parses_formatting_text_edit_arrays() {
+        let edits = parse_text_edits(&json!([
+            {
+                "range": {
+                    "start": { "line": 0, "character": 0 },
+                    "end": { "line": 0, "character": 4 }
+                },
+                "newText": "  x"
+            },
+            { "newText": "missing range" },
+            {
+                "range": {
+                    "start": { "line": 1, "character": 0 },
+                    "end": { "line": 1, "character": 0 }
+                },
+                "newText": "\n"
+            }
+        ]));
+        assert_eq!(edits.len(), 2);
+        assert_eq!(edits[0].new_text, "  x");
+        assert_eq!(edits[0].range.start.line, 0);
+        assert_eq!(edits[1].new_text, "\n");
+        assert!(parse_text_edits(&Value::Null).is_empty());
+        assert!(parse_text_edits(&json!({ "not": "array" })).is_empty());
     }
 }
