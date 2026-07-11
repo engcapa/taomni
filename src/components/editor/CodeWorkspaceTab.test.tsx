@@ -38,6 +38,9 @@ const lspMocks = vi.hoisted(() => ({
   lspDefinition: vi.fn(),
   lspReferences: vi.fn(),
   lspDocumentSymbols: vi.fn(),
+  lspCompletion: vi.fn(),
+  lspCompletionResolve: vi.fn(),
+  lspSignatureHelp: vi.fn(),
 }));
 
 const ipcMocks = vi.hoisted(() => ({
@@ -189,6 +192,17 @@ describe("CodeWorkspaceTab", () => {
     lspMocks.lspReferences.mockReset();
     lspMocks.lspDocumentSymbols.mockReset();
     lspMocks.lspDocumentSymbols.mockResolvedValue({ status: documentStatus(), symbols: [] });
+    lspMocks.lspCompletion.mockReset();
+    lspMocks.lspCompletion.mockResolvedValue({ status: documentStatus(), isIncomplete: false, items: [] });
+    lspMocks.lspCompletionResolve.mockReset();
+    lspMocks.lspCompletionResolve.mockResolvedValue(null);
+    lspMocks.lspSignatureHelp.mockReset();
+    lspMocks.lspSignatureHelp.mockResolvedValue({
+      status: documentStatus(),
+      signatures: [],
+      activeSignature: 0,
+      activeParameter: 0,
+    });
     ipcMocks.selectFilePath.mockReset();
     ipcMocks.selectFolderPath.mockReset();
     gitMocks.gitSnapshot.mockReset();

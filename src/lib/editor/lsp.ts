@@ -41,6 +41,28 @@ export interface LspServerStatus {
   commands: LspServerCommandStatus[];
 }
 
+export interface LspCapabilitySummary {
+  completion: boolean;
+  signatureHelp: boolean;
+  hover: boolean;
+  definition: boolean;
+  typeDefinition: boolean;
+  implementation: boolean;
+  references: boolean;
+  documentSymbol: boolean;
+  workspaceSymbol: boolean;
+  rename: boolean;
+  formatting: boolean;
+  rangeFormatting: boolean;
+  codeAction: boolean;
+  documentHighlight: boolean;
+  callHierarchy: boolean;
+  typeHierarchy: boolean;
+  inlayHint: boolean;
+  completionTriggerCharacters: string[];
+  signatureTriggerCharacters: string[];
+}
+
 export interface LspDocumentStatus {
   path: string;
   uri: string;
@@ -53,6 +75,7 @@ export interface LspDocumentStatus {
   selectedCommand: string | null;
   installHint: string | null;
   error: string | null;
+  capabilities?: LspCapabilitySummary | null;
 }
 
 export interface LspPosition {
@@ -107,6 +130,54 @@ export interface LspDocumentSymbol {
 export interface LspDocumentSymbolsResult {
   status: LspDocumentStatus;
   symbols: LspDocumentSymbol[];
+}
+
+export interface LspTextEdit {
+  range: LspRange;
+  newText: string;
+}
+
+export interface LspCompletionItem {
+  label: string;
+  kind: number | null;
+  detail: string | null;
+  documentation: string | null;
+  insertText: string | null;
+  /** 1 = plain text, 2 = snippet. */
+  insertTextFormat: number | null;
+  filterText: string | null;
+  sortText: string | null;
+  textEdit: LspTextEdit | null;
+  additionalTextEdits: LspTextEdit[];
+  /** Original server item, passed back verbatim to completionItem/resolve. */
+  raw: unknown;
+}
+
+export interface LspCompletionResult {
+  status: LspDocumentStatus;
+  isIncomplete: boolean;
+  items: LspCompletionItem[];
+}
+
+export interface LspSignatureParameter {
+  label: string;
+  documentation: string | null;
+  labelStart: number | null;
+  labelEnd: number | null;
+}
+
+export interface LspSignatureInfo {
+  label: string;
+  documentation: string | null;
+  parameters: LspSignatureParameter[];
+  activeParameter: number | null;
+}
+
+export interface LspSignatureHelpResult {
+  status: LspDocumentStatus;
+  signatures: LspSignatureInfo[];
+  activeSignature: number;
+  activeParameter: number;
 }
 
 export interface LspDocumentDescriptor {
@@ -195,6 +266,42 @@ export function lspDocumentSymbols(
   descriptor: LspDocumentDescriptor,
 ): Promise<LspDocumentSymbolsResult> {
   return invoke<LspDocumentSymbolsResult>("lsp_document_symbols", documentArgs(descriptor));
+}
+
+export function lspCompletion(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+  triggerCharacter?: string | null,
+): Promise<LspCompletionResult> {
+  return invoke<LspCompletionResult>("lsp_completion", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+    triggerCharacter: triggerCharacter ?? null,
+  });
+}
+
+export function lspCompletionResolve(
+  descriptor: LspDocumentDescriptor,
+  item: unknown,
+): Promise<LspCompletionItem | null> {
+  return invoke<LspCompletionItem | null>("lsp_completion_resolve", {
+    ...documentArgs(descriptor),
+    item,
+  });
+}
+
+export function lspSignatureHelp(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+  triggerCharacter?: string | null,
+): Promise<LspSignatureHelpResult> {
+  return invoke<LspSignatureHelpResult>("lsp_signature_help", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+    triggerCharacter: triggerCharacter ?? null,
+  });
 }
 
 export function lspHover(

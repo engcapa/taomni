@@ -65,6 +65,8 @@ import { notifyGitRepoChanged, subscribeGitRepoRefresh } from "../../lib/gitRefr
 import {
   lspChangeDocument,
   lspCloseDocument,
+  lspCompletion,
+  lspCompletionResolve,
   lspDetectServers,
   lspDocumentSymbols,
   lspGetDiagnostics,
@@ -73,6 +75,9 @@ import {
   lspOpenDocument,
   lspReferences,
   lspSaveDocument,
+  lspSignatureHelp,
+  type LspCompletionItem,
+  type LspCompletionResult,
   type LspCustomServerCommand,
   type LspDiagnostic,
   type LspDocumentDescriptor,
@@ -81,6 +86,7 @@ import {
   type LspLocation,
   type LspPosition,
   type LspServerStatus,
+  type LspSignatureHelpResult,
 } from "../../lib/editor/lsp";
 import { selectFilePath, selectFolderPath } from "../../lib/ipc";
 import {
@@ -2247,6 +2253,7 @@ export function CodeWorkspaceTab({
 
   const activeFile = activeKey ? openFiles[activeKey] ?? null : null;
   const activeLspState = activeKey ? lspFiles[activeKey] ?? null : null;
+  const activeCapabilities = activeLspState?.status?.capabilities ?? null;
   const activeMarkdownMode = activeFile && isMarkdownPath(activeFile.languagePath)
     ? markdownModes[activeFile.key] ?? "edit"
     : "edit";
@@ -2416,6 +2423,57 @@ export function CodeWorkspaceTab({
     window.addEventListener("keydown", handleStructureKey, true);
     return () => window.removeEventListener("keydown", handleStructureKey, true);
   }, [openStructurePopup, visible]);
+
+  const getLspCompletions = useCallback(
+    async (
+      file: OpenFileState,
+      position: LspPosition,
+      triggerCharacter: string | null,
+    ): Promise<LspCompletionResult | null> => {
+      const descriptor = lspDescriptorForFile(file);
+      if (!descriptor) return null;
+      try {
+        const result = await lspCompletion(descriptor, position, triggerCharacter);
+        updateLspStatusForFile(file, result.status);
+        return result;
+      } catch {
+        return null;
+      }
+    },
+    [lspDescriptorForFile, updateLspStatusForFile],
+  );
+
+  const resolveLspCompletion = useCallback(
+    async (file: OpenFileState, raw: unknown): Promise<LspCompletionItem | null> => {
+      const descriptor = lspDescriptorForFile(file);
+      if (!descriptor) return null;
+      try {
+        return await lspCompletionResolve(descriptor, raw);
+      } catch {
+        return null;
+      }
+    },
+    [lspDescriptorForFile],
+  );
+
+  const getLspSignatureHelp = useCallback(
+    async (
+      file: OpenFileState,
+      position: LspPosition,
+      triggerCharacter: string | null,
+    ): Promise<LspSignatureHelpResult | null> => {
+      const descriptor = lspDescriptorForFile(file);
+      if (!descriptor) return null;
+      try {
+        const result = await lspSignatureHelp(descriptor, position, triggerCharacter);
+        updateLspStatusForFile(file, result.status);
+        return result;
+      } catch {
+        return null;
+      }
+    },
+    [lspDescriptorForFile, updateLspStatusForFile],
+  );
 
   const getLspHover = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
@@ -3274,6 +3332,11 @@ export function CodeWorkspaceTab({
                               onHover={(position) => getLspHover(activeFile, position)}
                               onDefinition={(position) => goToDefinition(activeFile, position)}
                               onReferences={(position) => findReferences(activeFile, position)}
+                              onComplete={(position, trigger) => getLspCompletions(activeFile, position, trigger)}
+                              onCompleteResolve={(raw) => resolveLspCompletion(activeFile, raw)}
+                              onSignatureHelp={(position, trigger) => getLspSignatureHelp(activeFile, position, trigger)}
+                              completionTriggers={activeCapabilities?.completionTriggerCharacters ?? []}
+                              signatureTriggers={activeCapabilities?.signatureTriggerCharacters ?? []}
                             />
                           </div>
                           <MarkdownPreview file={activeFile} onOpenHref={openMarkdownHref} />
@@ -3291,6 +3354,11 @@ export function CodeWorkspaceTab({
                           onHover={(position) => getLspHover(activeFile, position)}
                           onDefinition={(position) => goToDefinition(activeFile, position)}
                           onReferences={(position) => findReferences(activeFile, position)}
+                          onComplete={(position, trigger) => getLspCompletions(activeFile, position, trigger)}
+                          onCompleteResolve={(raw) => resolveLspCompletion(activeFile, raw)}
+                          onSignatureHelp={(position, trigger) => getLspSignatureHelp(activeFile, position, trigger)}
+                          completionTriggers={activeCapabilities?.completionTriggerCharacters ?? []}
+                          signatureTriggers={activeCapabilities?.signatureTriggerCharacters ?? []}
                         />
                       )}
                     </div>

@@ -4,7 +4,7 @@ use grep_searcher::{BinaryDetection, SearcherBuilder, sinks::UTF8};
 use ignore::{WalkBuilder, overrides::OverrideBuilder};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},

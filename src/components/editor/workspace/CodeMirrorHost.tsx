@@ -1,5 +1,5 @@
 import { useEffect, useRef, type MutableRefObject } from "react";
-import { Compartment, EditorState, type Extension, type Text } from "@codemirror/state";
+import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import {
   Decoration,
   EditorView,
@@ -11,6 +11,7 @@ import {
   keymap,
   lineNumbers,
   rectangularSelection,
+  showTooltip,
   type DecorationSet,
   type Tooltip,
 } from "@codemirror/view";
@@ -30,11 +31,16 @@ import { openSearchPanel, search, searchKeymap } from "@codemirror/search";
 import { renderFormatted } from "../../../lib/chat/renderFormatted";
 import { codeViewExtensions } from "../../../lib/codeViewTheme";
 import type {
+  LspCompletionItem,
+  LspCompletionResult,
   LspDiagnostic,
   LspPosition,
+  LspSignatureHelpResult,
 } from "../../../lib/editor/lsp";
 import { languageForPath } from "../../git/diffLanguage";
 import { createWorkspaceSearchPanel, WORKSPACE_SEARCH_STYLE } from "./editorSearchPanel";
+import { createLspCompletionSource } from "./lspCompletion";
+import { lspPositionFromOffset, offsetFromLspPosition } from "./lspPositions";
 import { selectionHistoryField, workspaceEditorKeymap } from "./workspaceEditorCommands";
 
 interface EditorRevealTarget {
@@ -53,6 +59,17 @@ interface CodeMirrorHostProps {
   onHover: (position: LspPosition) => Promise<string | null>;
   onDefinition: (position: LspPosition) => Promise<boolean>;
   onReferences: (position: LspPosition) => Promise<void>;
+  onComplete?: (
+    position: LspPosition,
+    triggerCharacter: string | null,
+  ) => Promise<LspCompletionResult | null>;
+  onCompleteResolve?: (raw: unknown) => Promise<LspCompletionItem | null>;
+  onSignatureHelp?: (
+    position: LspPosition,
+    triggerCharacter: string | null,
+  ) => Promise<LspSignatureHelpResult | null>;
+  completionTriggers?: string[];
+  signatureTriggers?: string[];
 }
 
 const WORKSPACE_EDITOR_STYLE = EditorView.theme({
@@ -92,19 +109,44 @@ const LSP_EDITOR_STYLE = EditorView.theme({
   },
 });
 
-function offsetFromLspPosition(doc: Text, position: LspPosition): number {
-  if (doc.lines === 0) return 0;
-  const lineNo = Math.min(doc.lines, Math.max(1, position.line + 1));
-  const line = doc.line(lineNo);
-  return Math.min(line.to, line.from + Math.max(0, position.character));
-}
-
-function lspPositionFromOffset(doc: Text, offset: number): LspPosition {
-  const line = doc.lineAt(Math.max(0, Math.min(doc.length, offset)));
-  return {
-    line: line.number - 1,
-    character: offset - line.from,
-  };
+function signatureTooltipDom(result: LspSignatureHelpResult): HTMLElement {
+  const dom = document.createElement("div");
+  dom.className = "cm-lsp-hover taomni-chat-md";
+  const active = Math.min(result.activeSignature, Math.max(0, result.signatures.length - 1));
+  const signature = result.signatures[active];
+  const label = document.createElement("div");
+  label.style.fontFamily = "var(--taomni-code-font-family, monospace)";
+  label.style.whiteSpace = "pre-wrap";
+  const parameterIndex = signature.activeParameter ?? result.activeParameter;
+  const parameter = signature.parameters[parameterIndex];
+  const start = parameter?.labelStart
+    ?? (parameter ? signature.label.indexOf(parameter.label) : -1);
+  const end = parameter?.labelEnd
+    ?? (parameter && start >= 0 ? start + parameter.label.length : -1);
+  if (parameter && start >= 0 && end > start) {
+    label.append(signature.label.slice(0, start));
+    const bold = document.createElement("b");
+    bold.textContent = signature.label.slice(start, end);
+    label.append(bold, signature.label.slice(end));
+  } else {
+    label.textContent = signature.label;
+  }
+  dom.appendChild(label);
+  if (result.signatures.length > 1) {
+    const counter = document.createElement("div");
+    counter.style.opacity = "0.6";
+    counter.style.fontSize = "11px";
+    counter.textContent = `${active + 1}/${result.signatures.length} overloads`;
+    dom.appendChild(counter);
+  }
+  const documentation = parameter?.documentation ?? signature.documentation;
+  if (documentation) {
+    const doc = document.createElement("div");
+    doc.style.marginTop = "6px";
+    doc.innerHTML = renderFormatted(documentation, "md") ?? "";
+    dom.appendChild(doc);
+  }
+  return dom;
 }
 
 function diagnosticClass(severity: number | null): string {
@@ -192,26 +234,82 @@ export function CodeMirrorHost({
   onHover,
   onDefinition,
   onReferences,
+  onComplete,
+  onCompleteResolve,
+  onSignatureHelp,
+  completionTriggers,
+  signatureTriggers,
 }: CodeMirrorHostProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const languageCompartment = useRef(new Compartment());
   const diagnosticsCompartment = useRef(new Compartment());
+  const signatureCompartment = useRef(new Compartment());
+  const signatureShownRef = useRef(false);
   const onChangeRef = useRef(onChange);
   const onSaveRef = useRef(onSave);
   const onHoverRef = useRef(onHover);
   const onDefinitionRef = useRef(onDefinition);
   const onReferencesRef = useRef(onReferences);
+  const onCompleteRef = useRef(onComplete);
+  const onCompleteResolveRef = useRef(onCompleteResolve);
+  const onSignatureHelpRef = useRef(onSignatureHelp);
+  const completionTriggersRef = useRef(completionTriggers ?? []);
+  const signatureTriggersRef = useRef(signatureTriggers ?? []);
   onChangeRef.current = onChange;
   onSaveRef.current = onSave;
   onHoverRef.current = onHover;
   onDefinitionRef.current = onDefinition;
   onReferencesRef.current = onReferences;
+  onCompleteRef.current = onComplete;
+  onCompleteResolveRef.current = onCompleteResolve;
+  onSignatureHelpRef.current = onSignatureHelp;
+  completionTriggersRef.current = completionTriggers ?? [];
+  signatureTriggersRef.current = signatureTriggers ?? [];
 
   useEffect(() => {
     if (!hostRef.current) return;
     const saveHandler = () => {
       onSaveRef.current();
+      return true;
+    };
+    const hideSignature = () => {
+      if (!signatureShownRef.current) return false;
+      signatureShownRef.current = false;
+      // Deferred: this may run from inside an update listener, where
+      // synchronous dispatches are not allowed.
+      window.queueMicrotask(() => {
+        viewRef.current?.dispatch({
+          effects: signatureCompartment.current.reconfigure([]),
+        });
+      });
+      return true;
+    };
+    const requestSignatureHelp = (view: EditorView, trigger: string | null) => {
+      const handler = onSignatureHelpRef.current;
+      if (!handler) return false;
+      const position = lspPositionFromOffset(view.state.doc, view.state.selection.main.head);
+      void handler(position, trigger)
+        .then((result) => {
+          const current = viewRef.current;
+          if (!current) return;
+          if (!result || result.signatures.length === 0) {
+            hideSignature();
+            return;
+          }
+          signatureShownRef.current = true;
+          const pos = current.state.selection.main.head;
+          current.dispatch({
+            effects: signatureCompartment.current.reconfigure(
+              showTooltip.of({
+                pos,
+                above: true,
+                create: () => ({ dom: signatureTooltipDom(result) }),
+              }),
+            ),
+          });
+        })
+        .catch(() => {});
       return true;
     };
     const openReplacePanel = (view: EditorView) => {
@@ -241,11 +339,22 @@ export function CodeMirrorHost({
         bracketMatching(),
         closeBrackets(),
         indentOnInput(),
-        autocompletion(),
+        autocompletion({
+          override: [
+            createLspCompletionSource({
+              fetch: (position, trigger) =>
+                onCompleteRef.current?.(position, trigger) ?? Promise.resolve(null),
+              resolve: (raw) =>
+                onCompleteResolveRef.current?.(raw) ?? Promise.resolve(null),
+              triggerCharacters: () => completionTriggersRef.current,
+            }),
+          ],
+        }),
         search({ top: true, createPanel: createWorkspaceSearchPanel }),
         selectionHistoryField,
         languageCompartment.current.of([]),
         diagnosticsCompartment.current.of(lspDiagnosticsExtension(diagnostics)),
+        signatureCompartment.current.of([]),
         ...lspInteractionExtensions(onHoverRef, onDefinitionRef, onReferencesRef),
         ...codeViewExtensions(),
         WORKSPACE_EDITOR_STYLE,
@@ -254,6 +363,8 @@ export function CodeMirrorHost({
         keymap.of([
           { key: "Mod-s", run: saveHandler },
           { key: "Mod-r", run: openReplacePanel },
+          { key: "Escape", run: () => hideSignature() },
+          { key: "Mod-Shift-Space", run: (view) => requestSignatureHelp(view, null) },
           ...workspaceEditorKeymap,
           ...searchKeymap,
           ...closeBracketsKeymap,
@@ -264,6 +375,22 @@ export function CodeMirrorHost({
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             onChangeRef.current(update.state.doc.toString());
+            let inserted = "";
+            update.changes.iterChanges((_fromA, _toA, _fromB, _toB, text) => {
+              inserted = text.toString();
+            });
+            const lastChar = inserted.slice(-1);
+            if (lastChar && signatureTriggersRef.current.includes(lastChar)) {
+              requestSignatureHelp(update.view, lastChar);
+            } else if (
+              signatureShownRef.current &&
+              (lastChar === ")" || inserted.includes("\n"))
+            ) {
+              hideSignature();
+            }
+          } else if (update.selectionSet && signatureShownRef.current) {
+            // A cursor move without an edit (mouse click, jump) dismisses it.
+            hideSignature();
           }
         }),
       ],
