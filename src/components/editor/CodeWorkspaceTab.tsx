@@ -43,24 +43,18 @@ import {
 } from "../../lib/git";
 import { notifyGitRepoChanged, subscribeGitRepoRefresh } from "../../lib/gitRefresh";
 import {
-  lspChangeDocument,
-  lspCloseDocument,
   lspCodeActions,
   lspCompletion,
   lspCompletionResolve,
-  lspDetectServers,
   lspDocumentSymbols,
   lspFormatting,
-  lspGetDiagnostics,
   lspDefinition,
   lspHover,
   lspImplementation,
-  lspOpenDocument,
   lspPrepareRename,
   lspRangeFormatting,
   lspReferences,
   lspRename,
-  lspSaveDocument,
   lspSignatureHelp,
   lspTypeDefinition,
   lspWorkspaceSymbols,
@@ -68,13 +62,10 @@ import {
   type LspCompletionItem,
   type LspCompletionResult,
   type LspDiagnostic,
-  type LspDocumentDescriptor,
-  type LspDocumentStatus,
   type LspDocumentSymbol,
   type LspLocation,
   type LspPosition,
   type LspRange,
-  type LspServerStatus,
   type LspSignatureHelpResult,
   type LspWorkspaceEdit,
 } from "../../lib/editor/lsp";
@@ -129,10 +120,7 @@ import { type RecentFileEntry } from "./workspace/RecentFilesPopup";
 import { createDoubleShiftDetector } from "./workspace/doubleShift";
 import { EditorGroup } from "./workspace/EditorGroup";
 import { WorkspacePopupsHost } from "./workspace/WorkspacePopupsHost";
-import {
-  FileTreePane,
-  type LspCustomCommandConfig,
-} from "./workspace/FileTreePane";
+import { FileTreePane } from "./workspace/FileTreePane";
 import { ProjectTree } from "./workspace/ProjectTree";
 import { MarkdownPreview } from "./workspace/MarkdownPreview";
 import { IconButton, LspStatusPill } from "./workspace/workspaceChrome";
@@ -191,7 +179,6 @@ import {
   basename,
   clampCodeWorkspaceFontSize,
   clampCodeWorkspaceTreeFontSize,
-  customServerCommandFromConfig,
   emptyLspFileState,
   errorMessage,
   fileKey,
@@ -207,15 +194,12 @@ import {
   isExternalHref,
   isMarkdownPath,
   joinRelativePath,
-  lspPresetIdForPath,
   makeLoadingFile,
   makeLooseFile,
   makeRoot,
   normalizeFsPath,
   parentPath,
   readCodeWorkspaceTreeFontSize,
-  readLspCommandPrefs,
-  readLspCustomCommands,
   relativePathWithinRoot,
   remapFileRef,
   remapRelativePath,
@@ -227,10 +211,9 @@ import {
   workspaceTitle,
   writeCodeWorkspaceTreeFontSize,
   writeCodeWorkspaceTreeViewMode,
-  writeLspCommandPrefs,
-  writeLspCustomCommands,
 } from "./workspace/codeWorkspaceModel";
 import { useWorkspaceTreeData } from "./workspace/useWorkspaceTreeData";
+import { useWorkspaceLspSession } from "./workspace/useWorkspaceLspSession";
 import type { EditorRevealTarget } from "./workspace/EditorGroup";
 
 export function CodeWorkspaceTab({
@@ -483,10 +466,7 @@ export function CodeWorkspaceTab({
   const [gitRoots, setGitRoots] = useState<WorkspaceGitRoot[]>([]);
   const [gitRootsLoading, setGitRootsLoading] = useState(false);
   const [gitSnapshots, setGitSnapshots] = useState<Record<string, WorkspaceGitSnapshotState>>({});
-  const [lspServerStatuses, setLspServerStatuses] = useState<LspServerStatus[]>([]);
   const [navCan, setNavCan] = useState({ back: false, forward: false });
-  const [lspCommandPrefs, setLspCommandPrefs] = useState<Record<string, string>>(() => readLspCommandPrefs());
-  const [lspCustomCommands, setLspCustomCommands] = useState<Record<string, LspCustomCommandConfig>>(() => readLspCustomCommands());
   const [revealTarget, setRevealTarget] = useState<EditorRevealTarget | null>(null);
   const [referencesResult, setReferencesResult] = useState<ReferencesResultState>({
     loading: false,
@@ -499,7 +479,6 @@ export function CodeWorkspaceTab({
   const codeViewProfileRef = useRef(codeViewProfile);
   const treeFontSizeRef = useRef(treeFontSize);
   const gitRootsRef = useRef(gitRoots);
-  const lspVersionRef = useRef<Record<string, number>>({});
   const navHistoryRef = useRef<{ stack: CodeWorkspaceFileRef[]; index: number; suppress: boolean }>({
     stack: [],
     index: -1,
@@ -520,6 +499,25 @@ export function CodeWorkspaceTab({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const treePaneRef = useRef<HTMLElement | null>(null);
   const editorPaneRef = useRef<HTMLElement | null>(null);
+  const {
+    serverStatuses: lspServerStatuses,
+    commandPrefs: lspCommandPrefs,
+    customCommands: lspCustomCommands,
+    refreshServerStatuses: refreshLspServerStatuses,
+    updateCommandPref: updateLspCommandPref,
+    updateCustomCommand: updateLspCustomCommand,
+    descriptorForFile: lspDescriptorForFile,
+    syncDocument: syncLspDocument,
+    saveDocument: saveLspDocument,
+    closeDocument: closeLspDocument,
+    updateStatus: updateLspStatusForFile,
+  } = useWorkspaceLspSession({
+    workspaceInstanceId,
+    roots,
+    openFilesRef,
+    updateLspFiles: setLspFiles,
+    onError: setStatusMessage,
+  });
   const treePaneStyle = useMemo(() => ({
     "--taomni-code-tree-font-size": `${treeFontSize}px`,
     "--taomni-code-tree-small-font-size": `${Math.max(10, treeFontSize - 1)}px`,
@@ -718,200 +716,6 @@ export function CodeWorkspaceTab({
   }, [stepCodeViewFontSize, stepTreeFontSize, visible, zoomTargetForNode]);
 
   const findRoot = useCallback((rootId: string) => rootsRef.current.find((root) => root.id === rootId) ?? null, []);
-
-  const refreshLspServerStatuses = useCallback(async () => {
-    try {
-      setLspServerStatuses(await lspDetectServers());
-    } catch (err) {
-      setStatusMessage(errorMessage(err));
-    }
-  }, [setStatusMessage]);
-
-  useEffect(() => {
-    void refreshLspServerStatuses();
-  }, [refreshLspServerStatuses]);
-
-  const updateLspCommandPref = useCallback((presetId: string, commandId: string) => {
-    setLspCommandPrefs((current) => {
-      const next = { ...current, [presetId]: commandId };
-      writeLspCommandPrefs(next);
-      return next;
-    });
-    setLspFiles((current) => {
-      const next: Record<string, LspFileState> = {};
-      for (const [key, state] of Object.entries(current)) {
-        next[key] = { ...state, syncedText: null };
-      }
-      return next;
-    });
-  }, []);
-
-  const updateLspCustomCommand = useCallback((presetId: string, patch: Partial<LspCustomCommandConfig>) => {
-    setLspCustomCommands((current) => {
-      const existing = current[presetId] ?? { command: "", args: "" };
-      const nextConfig = { ...existing, ...patch };
-      const next = { ...current };
-      if (nextConfig.command.trim() || nextConfig.args.trim()) next[presetId] = nextConfig;
-      else delete next[presetId];
-      writeLspCustomCommands(next);
-      return next;
-    });
-    setLspFiles((current) => {
-      const next: Record<string, LspFileState> = {};
-      for (const [key, state] of Object.entries(current)) {
-        next[key] = { ...state, syncedText: null };
-      }
-      return next;
-    });
-  }, []);
-
-  const lspDescriptorForFile = useCallback(
-    (file: OpenFileState): LspDocumentDescriptor | null => {
-      const presetId = lspPresetIdForPath(file.languagePath);
-      const commandPref = presetId ? lspCommandPrefs[presetId] ?? null : null;
-      const serverCommandId = commandPref && commandPref !== CUSTOM_LSP_COMMAND_ID ? commandPref : null;
-      const customServerCommand = presetId && commandPref === CUSTOM_LSP_COMMAND_ID
-        ? customServerCommandFromConfig(lspCustomCommands[presetId])
-        : null;
-      if (file.ref.kind === "root") {
-        const root = findRoot(file.ref.rootId);
-        if (!root) return null;
-        return {
-          workspaceId: workspaceInstanceId,
-          rootPath: root.path,
-          filePath: file.ref.path,
-          serverCommandId,
-          customServerCommand,
-        };
-      }
-      return {
-        workspaceId: workspaceInstanceId,
-        rootPath: null,
-        filePath: file.ref.path,
-        serverCommandId,
-        customServerCommand,
-      };
-    },
-    [findRoot, lspCommandPrefs, lspCustomCommands, workspaceInstanceId],
-  );
-
-  const nextLspVersion = useCallback((key: string) => {
-    const next = (lspVersionRef.current[key] ?? 0) + 1;
-    lspVersionRef.current[key] = next;
-    return next;
-  }, []);
-
-  const refreshFileDiagnostics = useCallback(
-    async (file: OpenFileState) => {
-      const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) return;
-      try {
-        const result = await lspGetDiagnostics(descriptor);
-        setLspFiles((current) => ({
-          ...current,
-          [file.key]: {
-            ...(current[file.key] ?? emptyLspFileState()),
-            status: result.status,
-            diagnostics: result.diagnostics,
-            syncing: false,
-            error: null,
-          },
-        }));
-      } catch (err) {
-        setLspFiles((current) => ({
-          ...current,
-          [file.key]: {
-            ...(current[file.key] ?? emptyLspFileState()),
-            syncing: false,
-            error: errorMessage(err),
-          },
-        }));
-      }
-    },
-    [lspDescriptorForFile],
-  );
-
-  const syncLspDocument = useCallback(
-    async (file: OpenFileState, mode: "open" | "change") => {
-      if (file.loading) return;
-      const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) return;
-      const version = nextLspVersion(file.key);
-      setLspFiles((current) => ({
-        ...current,
-        [file.key]: {
-          ...(current[file.key] ?? emptyLspFileState()),
-          syncing: true,
-          error: null,
-        },
-      }));
-      try {
-        const status = mode === "open"
-          ? await lspOpenDocument(descriptor, file.text, version)
-          : await lspChangeDocument(descriptor, file.text, version);
-        setLspFiles((current) => ({
-          ...current,
-          [file.key]: {
-            ...(current[file.key] ?? emptyLspFileState()),
-            status,
-            diagnostics: current[file.key]?.diagnostics ?? [],
-            syncing: false,
-            syncedText: file.text,
-            error: null,
-          },
-        }));
-        window.setTimeout(() => {
-          const latest = openFilesRef.current[file.key];
-          if (latest) void refreshFileDiagnostics(latest);
-        }, 500);
-      } catch (err) {
-        setLspFiles((current) => ({
-          ...current,
-          [file.key]: {
-            ...(current[file.key] ?? emptyLspFileState()),
-            syncing: false,
-            error: errorMessage(err),
-          },
-        }));
-      }
-    },
-    [lspDescriptorForFile, nextLspVersion, refreshFileDiagnostics],
-  );
-
-  const saveLspDocument = useCallback(
-    async (file: OpenFileState, text: string) => {
-      const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) return;
-      try {
-        const status = await lspSaveDocument(descriptor, text, lspVersionRef.current[file.key] ?? 0);
-        setLspFiles((current) => ({
-          ...current,
-          [file.key]: {
-            ...(current[file.key] ?? emptyLspFileState()),
-            status,
-            syncing: false,
-            syncedText: text,
-            error: null,
-          },
-        }));
-        window.setTimeout(() => {
-          const latest = openFilesRef.current[file.key];
-          if (latest) void refreshFileDiagnostics(latest);
-        }, 500);
-      } catch (err) {
-        setLspFiles((current) => ({
-          ...current,
-          [file.key]: {
-            ...(current[file.key] ?? emptyLspFileState()),
-            syncing: false,
-            syncedText: text,
-            error: errorMessage(err),
-          },
-        }));
-      }
-    },
-    [lspDescriptorForFile, refreshFileDiagnostics],
-  );
 
   const refreshWorkspaceGitSnapshots = useCallback(async (targets = gitRootsRef.current) => {
     await Promise.all(targets.map(async (root) => {
@@ -1886,10 +1690,7 @@ export function CodeWorkspaceTab({
       const order = openOrderRef.current;
       const index = order.indexOf(key);
       const nextOrder = order.filter((entry) => entry !== key);
-      if (file) {
-        const descriptor = lspDescriptorForFile(file);
-        if (descriptor) void lspCloseDocument(descriptor);
-      }
+      if (file) closeLspDocument(file);
       setOpenOrder(nextOrder);
       setOpenFiles((current) => {
         const next = { ...current };
@@ -1908,13 +1709,12 @@ export function CodeWorkspaceTab({
         delete next[key];
         return next;
       });
-      delete lspVersionRef.current[key];
       setActiveKey((current) => {
         if (current !== key) return current;
         return nextOrder[Math.min(index, nextOrder.length - 1)] ?? null;
       });
     },
-    [lspDescriptorForFile],
+    [closeLspDocument],
   );
 
   const activeFile = activeKey ? openFiles[activeKey] ?? null : null;
@@ -1992,18 +1792,6 @@ export function CodeWorkspaceTab({
     },
     [activeFile, addLooseFilePath, openFile],
   );
-
-  const updateLspStatusForFile = useCallback((file: OpenFileState, status: LspDocumentStatus) => {
-    setLspFiles((current) => ({
-      ...current,
-      [file.key]: {
-        ...(current[file.key] ?? emptyLspFileState()),
-        status,
-        syncing: false,
-        error: null,
-      },
-    }));
-  }, []);
 
   const revealEditorLocation = useCallback((key: string, range: LspLocation["range"]) => {
     revealNonceRef.current += 1;
