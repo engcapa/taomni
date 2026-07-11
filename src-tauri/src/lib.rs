@@ -428,6 +428,8 @@ pub fn run() {
             lsp::lsp_get_diagnostics,
             lsp::lsp_hover,
             lsp::lsp_definition,
+            lsp::lsp_type_definition,
+            lsp::lsp_implementation,
             lsp::lsp_references,
             lsp::lsp_document_symbols,
             lsp::lsp_completion,

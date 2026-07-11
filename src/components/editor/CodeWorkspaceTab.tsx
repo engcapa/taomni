@@ -68,11 +68,13 @@ import {
   lspGetDiagnostics,
   lspDefinition,
   lspHover,
+  lspImplementation,
   lspOpenDocument,
   lspRangeFormatting,
   lspReferences,
   lspSaveDocument,
   lspSignatureHelp,
+  lspTypeDefinition,
   lspWorkspaceSymbols,
   type LspCodeAction,
   type LspCompletionItem,
@@ -124,6 +126,7 @@ import {
 import { FindInFilesPanel } from "./workspace/panels/FindInFilesPanel";
 import { DocumentationPane } from "./workspace/panels/DocumentationPane";
 import { QuickDocPopup, type QuickDocContent } from "./workspace/QuickDocPopup";
+import { LocationPeek, type LocationPeekState } from "./workspace/LocationPeek";
 import {
   SearchEverywhere,
   type GoToFileItem,
@@ -818,6 +821,7 @@ export function CodeWorkspaceTab({
   const [searchQueryPreset, setSearchQueryPreset] = useState<{ value: string; nonce: number }>({ value: "", nonce: 0 });
   const [searchEverywhereOpen, setSearchEverywhereOpen] = useState(false);
   const [searchEverywhereMode, setSearchEverywhereMode] = useState<SearchEverywhereMode>("files");
+  const [locationPeek, setLocationPeek] = useState<LocationPeekState | null>(null);
   const [recentFilesOpen, setRecentFilesOpen] = useState(false);
   const [recentEntries, setRecentEntries] = useState<RecentFileEntry[]>([]);
   const [recentAdvanceNonce, setRecentAdvanceNonce] = useState(0);
@@ -859,6 +863,8 @@ export function CodeWorkspaceTab({
     empty: true,
   });
   const workspaceCommandRunnerRef = useRef<(commandId: string, context?: WorkspaceCommandContext) => boolean>(() => false);
+  const goToTypeDefinitionRef = useRef<(file: OpenFileState, position: LspPosition) => Promise<boolean>>(async () => false);
+  const goToImplementationRef = useRef<(file: OpenFileState, position: LspPosition) => Promise<boolean>>(async () => false);
   const initialOpenedKeyRef = useRef<string | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const treePaneRef = useRef<HTMLElement | null>(null);
@@ -2858,6 +2864,32 @@ export function CodeWorkspaceTab({
       run: () => void openCodeActionsAtCursor(),
     },
     {
+      id: "workspace.gotoTypeDefinition",
+      title: "Go to Type Definition",
+      category: "Navigation",
+      keybinding: "Ctrl+Shift+B",
+      when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading
+        && (!activeCapabilities || !!activeCapabilities.typeDefinition),
+      run: () => {
+        const file = activeFile;
+        if (!file) return;
+        void goToTypeDefinitionRef.current(file, editorSelectionRef.current.start);
+      },
+    },
+    {
+      id: "workspace.gotoImplementation",
+      title: "Go to Implementation",
+      category: "Navigation",
+      keybinding: "Ctrl+Alt+B",
+      when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading
+        && (!activeCapabilities || !!activeCapabilities.implementation),
+      run: () => {
+        const file = activeFile;
+        if (!file) return;
+        void goToImplementationRef.current(file, editorSelectionRef.current.start);
+      },
+    },
+    {
       id: "workspace.toggleDocumentationPane",
       title: "Toggle Documentation Pane",
       category: "View",
@@ -3153,6 +3185,24 @@ export function CodeWorkspaceTab({
     [lspDescriptorForFile, updateLspStatusForFile],
   );
 
+  const navigateLocations = useCallback(async (
+    title: string,
+    locations: LspLocation[],
+    emptyMessage: string,
+  ) => {
+    if (!locations.length) {
+      setStatusMessage(emptyMessage);
+      return false;
+    }
+    if (locations.length === 1) {
+      setLocationPeek(null);
+      await openLspLocation(locations[0]);
+      return true;
+    }
+    setLocationPeek({ title, locations });
+    return true;
+  }, [openLspLocation, setStatusMessage]);
+
   const goToDefinition = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
       const descriptor = lspDescriptorForFile(file);
@@ -3160,20 +3210,58 @@ export function CodeWorkspaceTab({
       try {
         const result = await lspDefinition(descriptor, position);
         updateLspStatusForFile(file, result.status);
-        const first = result.locations[0];
-        if (!first) {
-          setStatusMessage("No definition found");
-          return false;
-        }
-        await openLspLocation(first);
-        return true;
+        return navigateLocations("Definitions", result.locations, "No definition found");
       } catch (err) {
         setStatusMessage(errorMessage(err));
         return false;
       }
     },
-    [lspDescriptorForFile, openLspLocation, setStatusMessage, updateLspStatusForFile],
+    [lspDescriptorForFile, navigateLocations, setStatusMessage, updateLspStatusForFile],
   );
+
+  const goToTypeDefinition = useCallback(
+    async (file: OpenFileState, position: LspPosition) => {
+      const descriptor = lspDescriptorForFile(file);
+      if (!descriptor) return false;
+      const caps = lspFilesRef.current[file.key]?.status?.capabilities;
+      if (caps && !caps.typeDefinition) {
+        setStatusMessage("Type definition is not supported by this language server");
+        return false;
+      }
+      try {
+        const result = await lspTypeDefinition(descriptor, position);
+        updateLspStatusForFile(file, result.status);
+        return navigateLocations("Type definitions", result.locations, "No type definition found");
+      } catch (err) {
+        setStatusMessage(errorMessage(err));
+        return false;
+      }
+    },
+    [lspDescriptorForFile, navigateLocations, setStatusMessage, updateLspStatusForFile],
+  );
+
+  const goToImplementation = useCallback(
+    async (file: OpenFileState, position: LspPosition) => {
+      const descriptor = lspDescriptorForFile(file);
+      if (!descriptor) return false;
+      const caps = lspFilesRef.current[file.key]?.status?.capabilities;
+      if (caps && !caps.implementation) {
+        setStatusMessage("Go to implementation is not supported by this language server");
+        return false;
+      }
+      try {
+        const result = await lspImplementation(descriptor, position);
+        updateLspStatusForFile(file, result.status);
+        return navigateLocations("Implementations", result.locations, "No implementation found");
+      } catch (err) {
+        setStatusMessage(errorMessage(err));
+        return false;
+      }
+    },
+    [lspDescriptorForFile, navigateLocations, setStatusMessage, updateLspStatusForFile],
+  );
+  goToTypeDefinitionRef.current = goToTypeDefinition;
+  goToImplementationRef.current = goToImplementation;
 
   const findReferences = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
@@ -4018,6 +4106,15 @@ export function CodeWorkspaceTab({
         content={quickDocContent}
         onClose={() => setQuickDocOpen(false)}
         onPin={pinQuickDocumentation}
+      />
+      <LocationPeek
+        open={!!locationPeek}
+        state={locationPeek}
+        onClose={() => setLocationPeek(null)}
+        onOpen={(location) => {
+          setLocationPeek(null);
+          void openLspLocation(location);
+        }}
       />
       <BottomDock
         open={bottomDockOpen}

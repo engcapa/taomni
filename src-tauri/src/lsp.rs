@@ -1466,6 +1466,62 @@ pub struct LspCodeActionsResult {
 }
 
 #[tauri::command]
+pub async fn lsp_type_definition(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspLocationsResult, String> {
+    lsp_location_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        line,
+        character,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "textDocument/typeDefinition",
+        json!({}),
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn lsp_implementation(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspLocationsResult, String> {
+    lsp_location_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        line,
+        character,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "textDocument/implementation",
+        json!({}),
+    )
+    .await
+}
+
+#[tauri::command]
 pub async fn lsp_workspace_symbols(
     state: State<'_, AppState>,
     workspace_id: String,

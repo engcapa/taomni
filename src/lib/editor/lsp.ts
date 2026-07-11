@@ -431,6 +431,28 @@ export function lspDefinition(
   });
 }
 
+export function lspTypeDefinition(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+): Promise<LspLocationsResult> {
+  return invoke<LspLocationsResult>("lsp_type_definition", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+  });
+}
+
+export function lspImplementation(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+): Promise<LspLocationsResult> {
+  return invoke<LspLocationsResult>("lsp_implementation", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+  });
+}
+
 export function lspReferences(
   descriptor: LspDocumentDescriptor,
   position: LspPosition,
