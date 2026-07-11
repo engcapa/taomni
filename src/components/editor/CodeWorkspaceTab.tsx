@@ -17,11 +17,9 @@ import {
   Braces,
   ChevronDown,
   ChevronRight,
-  Columns2,
   File,
   Folder,
   GitBranch,
-  Eye,
   ListTree,
   Loader2,
   RefreshCw,
@@ -81,7 +79,6 @@ import {
   type LspCodeAction,
   type LspCompletionItem,
   type LspCompletionResult,
-  type LspCustomServerCommand,
   type LspDiagnostic,
   type LspDocumentDescriptor,
   type LspDocumentStatus,
@@ -108,10 +105,15 @@ import {
 import { DEFAULT_TERMINAL_PROFILE } from "../../lib/terminalProfile";
 import { renderFormatted } from "../../lib/chat/renderFormatted";
 import { useAppStore } from "../../stores/appStore";
+import {
+  selectCodeWorkspaceUi,
+  useCodeWorkspaceStore,
+  type BottomDockTabId,
+} from "../../stores/codeWorkspaceStore";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { writeText } from "../../lib/clipboard";
 import { useContextMenu } from "../ContextMenu";
-import { CodeMirrorHost, type EditorSelectionRange } from "./workspace/CodeMirrorHost";
+import { type EditorSelectionRange } from "./workspace/CodeMirrorHost";
 import { applyLspTextEditsToString } from "./workspace/lspTextEdits";
 import {
   applyWorkspaceEdit,
@@ -129,20 +131,19 @@ import {
 } from "./workspace/panels/ProblemsPanel";
 import { FindInFilesPanel } from "./workspace/panels/FindInFilesPanel";
 import { DocumentationPane } from "./workspace/panels/DocumentationPane";
-import { QuickDocPopup, type QuickDocContent } from "./workspace/QuickDocPopup";
-import { LocationPeek, type LocationPeekState } from "./workspace/LocationPeek";
+import { type QuickDocContent } from "./workspace/QuickDocPopup";
+import { type LocationPeekState } from "./workspace/LocationPeek";
 import {
-  SearchEverywhere,
   type GoToFileItem,
   type GoToSymbolItem,
   type SearchEverywhereMode,
 } from "./workspace/SearchEverywhere";
-import { RecentFilesPopup, type RecentFileEntry } from "./workspace/RecentFilesPopup";
-import { StructurePopup } from "./workspace/StructurePopup";
+import { type RecentFileEntry } from "./workspace/RecentFilesPopup";
 import { createDoubleShiftDetector } from "./workspace/doubleShift";
+import { EditorGroup } from "./workspace/EditorGroup";
+import { WorkspacePopupsHost } from "./workspace/WorkspacePopupsHost";
 import {
   FileTreePane,
-  type FileTreeViewMode,
   type LspCustomCommandConfig,
 } from "./workspace/FileTreePane";
 import {
@@ -180,606 +181,80 @@ export interface CodeWorkspaceGitManagerPayload {
     activeRepoRoot: string | null;
 }
 
-interface DirectoryState {
-  entries: WorkspaceEntry[];
-  loaded: boolean;
-  loading: boolean;
-  error: string | null;
-}
-
-interface OpenFileState {
-  ref: CodeWorkspaceFileRef;
-  key: string;
-  path: string;
-  title: string;
-  subtitle: string;
-  languagePath: string;
-  text: string;
-  savedText: string;
-  hash: string;
-  mtime: number;
-  size: number;
-  loading: boolean;
-  saving: boolean;
-  dirty: boolean;
-  error: string | null;
-}
-
-interface LspFileState {
-  status: LspDocumentStatus | null;
-  diagnostics: LspDiagnostic[];
-  syncing: boolean;
-  syncedText: string | null;
-  error: string | null;
-}
-
-interface EditorRevealTarget {
-  key: string;
-  line: number;
-  character: number;
-  nonce: number;
-}
-
-type TreeSelection =
-  | { kind: "root"; rootId: string }
-  | { kind: "dir"; rootId: string; path: string }
-  | { kind: "file"; ref: CodeWorkspaceFileRef };
-interface WorkspaceTreeCommandPayload {
-  selection?: TreeSelection;
-  directory?: { rootId: string; path: string };
-  rootId?: string;
-  path?: string;
-}
-
-type MarkdownViewMode = "edit" | "preview" | "split";
-type TreeViewMode = FileTreeViewMode;
-
-const LSP_COMMAND_PREFS_KEY = "taomni.codeWorkspace.lspCommandPrefs.v1";
-const LSP_CUSTOM_COMMANDS_KEY = "taomni.codeWorkspace.lspCustomCommands.v1";
-const CUSTOM_LSP_COMMAND_ID = "__custom__";
-const TREE_FONT_SIZE_KEY = "taomni.codeWorkspace.treeFontSize.v1";
-const TREE_VIEW_MODE_KEY = "taomni.codeWorkspace.treeViewMode.v1";
-const FLAT_VIEW_MAX_FILES = 2_000;
-const FLAT_VIEW_MAX_DEPTH = 25;
-const NAV_HISTORY_LIMIT = 100;
-const RECENT_FILES_LIMIT = 50;
-const CODE_WORKSPACE_MIN_FONT_SIZE = 8;
-const CODE_WORKSPACE_MAX_FONT_SIZE = 32;
-const CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE = 12;
-const CODE_WORKSPACE_MIN_TREE_FONT_SIZE = 10;
-const CODE_WORKSPACE_MAX_TREE_FONT_SIZE = 20;
-type MermaidApi = typeof import("mermaid").default;
-
-let mermaidReady = false;
-let mermaidPromise: Promise<MermaidApi> | null = null;
-
-const DEFAULT_DIR_STATE: DirectoryState = {
-  entries: [],
-  loaded: false,
-  loading: false,
-  error: null,
-};
-
-interface FlatFilesState {
-  entries: WorkspaceEntry[];
-  loading: boolean;
-  loaded: boolean;
-  error: string | null;
-  truncated: boolean;
-}
-
-const DEFAULT_FLAT_FILES_STATE: FlatFilesState = {
-  entries: [],
-  loading: false,
-  loaded: false,
-  error: null,
-  truncated: false,
-};
-
-interface WorkspaceGitSnapshotState {
-  changes: GitChange[];
-  loading: boolean;
-  error: string | null;
-}
-
-
-function hashString(value: string): string {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = ((hash << 5) - hash + value.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash).toString(36);
-}
-
-function loadMermaid(): Promise<MermaidApi> {
-  mermaidPromise ??= import("mermaid")
-    .then((mod) => mod.default)
-    .catch((err) => {
-      mermaidPromise = null;
-      throw err;
-    });
-  return mermaidPromise;
-}
-
-async function ensureMermaidReady(): Promise<MermaidApi> {
-  const mermaid = await loadMermaid();
-  if (mermaidReady) return mermaid;
-  mermaid.initialize({
-    startOnLoad: false,
-    securityLevel: "strict",
-    theme: "default",
-  });
-  mermaidReady = true;
-  return mermaid;
-}
-
-function downloadBlob(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function exportMermaidSvg(svg: SVGSVGElement, fileName: string): void {
-  const text = new XMLSerializer().serializeToString(svg);
-  downloadBlob(new Blob([text], { type: "image/svg+xml;charset=utf-8" }), fileName);
-}
-
-function exportMermaidPng(svg: SVGSVGElement, fileName: string): void {
-  const text = new XMLSerializer().serializeToString(svg);
-  const svgBlob = new Blob([text], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(svgBlob);
-  const image = new Image();
-  image.onload = () => {
-    const box = svg.viewBox.baseVal;
-    const rect = svg.getBoundingClientRect();
-    const width = Math.max(1, Math.ceil(box?.width || rect.width || image.width || 960));
-    const height = Math.max(1, Math.ceil(box?.height || rect.height || image.height || 540));
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      URL.revokeObjectURL(url);
-      return;
-    }
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, width, height);
-    ctx.drawImage(image, 0, 0, width, height);
-    canvas.toBlob((blob) => {
-      URL.revokeObjectURL(url);
-      if (blob) downloadBlob(blob, fileName);
-    }, "image/png");
-  };
-  image.onerror = () => URL.revokeObjectURL(url);
-  image.src = url;
-}
-
-function pathName(path: string, fallback = "Workspace"): string {
-  const normalized = path.replace(/[\\/]+$/, "");
-  const parts = normalized.split(/[\\/]+/);
-  return parts[parts.length - 1] || normalized || fallback;
-}
-
-function rootIdForPath(path: string): string {
-  return `root-${hashString(path)}`;
-}
-
-function looseIdForPath(path: string): string {
-  return `loose-${hashString(path)}`;
-}
-
-function makeRoot(path: string, kind: CodeWorkspaceRootInfo["kind"] = "folder"): CodeWorkspaceRootInfo {
-  const normalized = path.trim();
-  return {
-    id: rootIdForPath(normalized),
-    name: pathName(normalized),
-    path: normalized,
-    kind,
-  };
-}
-
-function makeLooseFile(path: string): CodeWorkspaceLooseFileInfo {
-  const normalized = path.trim();
-  return {
-    id: looseIdForPath(normalized),
-    name: pathName(normalized, "File"),
-    path: normalized,
-  };
-}
-
-function initialRoots(workspace: CodeWorkspaceTabInfo): CodeWorkspaceRootInfo[] {
-  if (workspace.roots?.length) return workspace.roots;
-  const legacy = workspace.repoRoot.trim();
-  return legacy ? [makeRoot(legacy, "git")] : [];
-}
-
-function initialLooseFiles(workspace: CodeWorkspaceTabInfo): CodeWorkspaceLooseFileInfo[] {
-  return workspace.looseFiles ?? [];
-}
-
-function basename(path: string): string {
-  const parts = path.split("/");
-  return parts[parts.length - 1] || path;
-}
-
-function parentPath(path: string): string {
-  const idx = path.lastIndexOf("/");
-  return idx === -1 ? "" : path.slice(0, idx);
-}
-
-function joinRelativePath(parent: string, name: string): string {
-  const cleanName = name.trim().replace(/^[/\\]+/, "").replace(/\\/g, "/");
-  return parent ? `${parent}/${cleanName}` : cleanName;
-}
-
-function remapRelativePath(path: string, fromPath: string, toPath: string): string {
-  if (path === fromPath) return toPath;
-  return path.startsWith(`${fromPath}/`) ? `${toPath}${path.slice(fromPath.length)}` : path;
-}
-
-function normalizeFsPath(path: string): string {
-  return path.replace(/\\/g, "/").replace(/\/+$/, "");
-}
-
-function relativePathWithinRoot(rootPath: string, filePath: string): string | null {
-  const root = normalizeFsPath(rootPath);
-  const file = normalizeFsPath(filePath);
-  if (file === root) return "";
-  return file.startsWith(`${root}/`) ? file.slice(root.length + 1) : null;
-}
-
-function absoluteWorkspacePath(root: CodeWorkspaceRootInfo, workspacePath: string): string {
-  const rootPath = normalizeFsPath(root.path);
-  const cleanPath = normalizeFsPath(workspacePath).replace(/^\/+/, "");
-  return cleanPath ? `${rootPath}/${cleanPath}` : rootPath;
-}
-
-function gitPathForWorkspacePath(
-  root: CodeWorkspaceRootInfo,
-  repo: WorkspaceGitRoot,
-  workspacePath: string,
-): string | null {
-  const repoRoot = normalizeFsPath(repo.repoRoot);
-  const filePath = absoluteWorkspacePath(root, workspacePath);
-  if (filePath === repoRoot) return "";
-  return filePath.startsWith(`${repoRoot}/`) ? filePath.slice(repoRoot.length + 1) : null;
-}
-
-function workspacePathForGitPath(
-  root: CodeWorkspaceRootInfo,
-  repo: WorkspaceGitRoot,
-  gitPath: string,
-): string | null {
-  const rootPath = normalizeFsPath(root.path);
-  const repoRoot = normalizeFsPath(repo.repoRoot);
-  const cleanPath = normalizeFsPath(gitPath).replace(/^\/+/, "");
-  const filePath = cleanPath ? `${repoRoot}/${cleanPath}` : repoRoot;
-  if (filePath === rootPath) return "";
-  return filePath.startsWith(`${rootPath}/`) ? filePath.slice(rootPath.length + 1) : null;
-}
-
-function gitRootsForWorkspaceRoot(root: CodeWorkspaceRootInfo, gitRoots: WorkspaceGitRoot[]): WorkspaceGitRoot[] {
-  return gitRoots
-    .filter((repo) => repo.rootIds.includes(root.id))
-    .sort((a, b) => normalizeFsPath(b.repoRoot).length - normalizeFsPath(a.repoRoot).length);
-}
-
-function gitRootForWorkspacePath(
-  root: CodeWorkspaceRootInfo,
-  workspacePath: string,
-  gitRoots: WorkspaceGitRoot[],
-): WorkspaceGitRoot | null {
-  for (const repo of gitRootsForWorkspaceRoot(root, gitRoots)) {
-    if (gitPathForWorkspacePath(root, repo, workspacePath) !== null) return repo;
-  }
-  return null;
-}
-
-function rootDirKey(rootId: string, path = ""): string {
-  return `${rootId}:${path}`;
-}
-
-function fileKey(ref: CodeWorkspaceFileRef): string {
-  return ref.kind === "root" ? `root:${ref.rootId}:${ref.path}` : `loose:${ref.id}`;
-}
-
-function fileRefEquals(a: CodeWorkspaceFileRef, b: CodeWorkspaceFileRef): boolean {
-  if (a.kind !== b.kind) return false;
-  return a.kind === "root"
-    ? b.kind === "root" && a.rootId === b.rootId && a.path === b.path
-    : b.kind === "loose" && a.id === b.id && a.path === b.path;
-}
-
-function fileRefUnder(ref: CodeWorkspaceFileRef, rootId: string, path: string): boolean {
-  return ref.kind === "root" && ref.rootId === rootId && (ref.path === path || ref.path.startsWith(`${path}/`));
-}
-
-function remapFileRef(ref: CodeWorkspaceFileRef, rootId: string, fromPath: string, toPath: string): CodeWorkspaceFileRef {
-  if (ref.kind !== "root" || ref.rootId !== rootId) return ref;
-  return { ...ref, path: remapRelativePath(ref.path, fromPath, toPath) };
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
-function formatBytes(size: number): string {
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function formatMtime(mtime: number): string {
-  if (!mtime) return "";
-  try {
-    return new Date(mtime * 1000).toLocaleString();
-  } catch {
-    return "";
-  }
-}
-
-function shouldHideEntry(entry: WorkspaceEntry): boolean {
-  return entry.path === ".git" || entry.path.startsWith(".git/");
-}
-
-function isRootRef(ref: CodeWorkspaceFileRef, rootId: string, path: string): boolean {
-  return ref.kind === "root" && ref.rootId === rootId && ref.path === path;
-}
-
-function isMarkdownPath(path: string): boolean {
-  const lower = path.toLowerCase();
-  return lower.endsWith(".md") || lower.endsWith(".markdown");
-}
-
-function lspPresetIdForPath(path: string): string | null {
-  const lower = path.toLowerCase();
-  if (/\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/.test(lower)) return "typescript-javascript";
-  if (lower.endsWith(".rs")) return "rust";
-  if (/\.(py|pyi)$/.test(lower)) return "python";
-  if (lower.endsWith(".go")) return "go";
-  if (lower.endsWith(".java")) return "java";
-  if (/\.(c|h|cc|cpp|cxx|hpp|hh|hxx)$/.test(lower)) return "cpp";
-  if (/\.(kt|kts)$/.test(lower)) return "kotlin";
-  if (/\.(scala|sc)$/.test(lower)) return "scala";
-  if (/\.(cs|csx)$/.test(lower)) return "csharp";
-  if (lower.endsWith(".swift")) return "swift";
-  return null;
-}
-
-function readLspCommandPrefs(): Record<string, string> {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(LSP_COMMAND_PREFS_KEY) ?? "{}");
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeLspCommandPrefs(prefs: Record<string, string>): void {
-  try {
-    window.localStorage.setItem(LSP_COMMAND_PREFS_KEY, JSON.stringify(prefs));
-  } catch {
-    // Ignore storage failures.
-  }
-}
-
-function readLspCustomCommands(): Record<string, LspCustomCommandConfig> {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(LSP_CUSTOM_COMMANDS_KEY) ?? "{}");
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    const out: Record<string, LspCustomCommandConfig> = {};
-    for (const [presetId, value] of Object.entries(parsed)) {
-      if (!value || typeof value !== "object" || Array.isArray(value)) continue;
-      const command = typeof (value as { command?: unknown }).command === "string"
-        ? (value as { command: string }).command
-        : "";
-      const args = typeof (value as { args?: unknown }).args === "string"
-        ? (value as { args: string }).args
-        : "";
-      if (command.trim() || args.trim()) out[presetId] = { command, args };
-    }
-    return out;
-  } catch {
-    return {};
-  }
-}
-
-function writeLspCustomCommands(commands: Record<string, LspCustomCommandConfig>): void {
-  try {
-    window.localStorage.setItem(LSP_CUSTOM_COMMANDS_KEY, JSON.stringify(commands));
-  } catch {
-    // Ignore storage failures.
-  }
-}
-
-function splitCommandArgs(value: string): string[] {
-  const args: string[] = [];
-  let current = "";
-  let quote: "\"" | "'" | null = null;
-  let escaped = false;
-  for (const char of value) {
-    if (escaped) {
-      current += char;
-      escaped = false;
-      continue;
-    }
-    if (char === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (quote) {
-      if (char === quote) quote = null;
-      else current += char;
-      continue;
-    }
-    if (char === "\"" || char === "'") {
-      quote = char;
-      continue;
-    }
-    if (/\s/.test(char)) {
-      if (current) {
-        args.push(current);
-        current = "";
-      }
-      continue;
-    }
-    current += char;
-  }
-  if (escaped) current += "\\";
-  if (current) args.push(current);
-  return args;
-}
-
-function customServerCommandFromConfig(config?: LspCustomCommandConfig): LspCustomServerCommand | null {
-  const command = config?.command.trim() ?? "";
-  if (!command) return null;
-  return {
-    label: "Custom",
-    command,
-    args: splitCommandArgs(config?.args ?? ""),
-  };
-}
-
-function clampCodeWorkspaceFontSize(size: number): number {
-  if (!Number.isFinite(size)) return DEFAULT_CODE_VIEW_PROFILE.fontSize;
-  return Math.min(CODE_WORKSPACE_MAX_FONT_SIZE, Math.max(CODE_WORKSPACE_MIN_FONT_SIZE, Math.round(size)));
-}
-
-function clampCodeWorkspaceTreeFontSize(size: number): number {
-  if (!Number.isFinite(size)) return CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE;
-  return Math.min(CODE_WORKSPACE_MAX_TREE_FONT_SIZE, Math.max(CODE_WORKSPACE_MIN_TREE_FONT_SIZE, Math.round(size)));
-}
-
-function readCodeWorkspaceTreeFontSize(): number {
-  try {
-    const raw = window.localStorage.getItem(TREE_FONT_SIZE_KEY);
-    return raw ? clampCodeWorkspaceTreeFontSize(Number(raw)) : CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE;
-  } catch {
-    return CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE;
-  }
-}
-
-function writeCodeWorkspaceTreeFontSize(size: number): void {
-  try {
-    window.localStorage.setItem(TREE_FONT_SIZE_KEY, String(clampCodeWorkspaceTreeFontSize(size)));
-  } catch {
-    // Ignore storage failures.
-  }
-}
-
-function readCodeWorkspaceTreeViewMode(): TreeViewMode {
-  try {
-    const raw = window.localStorage.getItem(TREE_VIEW_MODE_KEY);
-    return raw === "compact" || raw === "flat" || raw === "tree" ? raw : "tree";
-  } catch {
-    return "tree";
-  }
-}
-
-function writeCodeWorkspaceTreeViewMode(mode: TreeViewMode): void {
-  try {
-    window.localStorage.setItem(TREE_VIEW_MODE_KEY, mode);
-  } catch {
-    // Ignore storage failures.
-  }
-}
-
-function emptyLspFileState(): LspFileState {
-  return {
-    status: null,
-    diagnostics: [],
-    syncing: false,
-    syncedText: null,
-    error: null,
-  };
-}
-
-function isExternalHref(href: string): boolean {
-  return /^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("//") || href.startsWith("#");
-}
-
-function normalizeRelativeLink(path: string): string {
-  const clean = path.split("#", 1)[0].split("?", 1)[0].replace(/\\/g, "/");
-  const parts: string[] = [];
-  for (const part of clean.split("/")) {
-    if (!part || part === ".") continue;
-    if (part === "..") parts.pop();
-    else parts.push(part);
-  }
-  return parts.join("/");
-}
-
-function resolveRootMarkdownLink(currentPath: string, href: string): string {
-  return normalizeRelativeLink(joinRelativePath(parentPath(currentPath), href));
-}
-
-function resolveLooseMarkdownLink(currentPath: string, href: string): string {
-  const normalized = currentPath.replace(/\\/g, "/");
-  return joinRelativePath(parentPath(normalized), href);
-}
-
-function makeLoadingFile(ref: CodeWorkspaceFileRef, roots: CodeWorkspaceRootInfo[], looseFiles: CodeWorkspaceLooseFileInfo[]): OpenFileState {
-  const meta = fileMeta(ref, roots, looseFiles);
-  return {
-    ref,
-    key: fileKey(ref),
-    path: meta.path,
-    title: meta.title,
-    subtitle: meta.subtitle,
-    languagePath: meta.languagePath,
-    text: "",
-    savedText: "",
-    hash: "",
-    mtime: 0,
-    size: 0,
-    loading: true,
-    saving: false,
-    dirty: false,
-    error: null,
-  };
-}
-
-function fileMeta(ref: CodeWorkspaceFileRef, roots: CodeWorkspaceRootInfo[], looseFiles: CodeWorkspaceLooseFileInfo[]) {
-  if (ref.kind === "root") {
-    const root = roots.find((item) => item.id === ref.rootId);
-    const title = basename(ref.path);
-    return {
-      title,
-      path: ref.path,
-      subtitle: root ? `${root.name} / ${ref.path}` : ref.path,
-      languagePath: ref.path,
-    };
-  }
-  const loose = looseFiles.find((item) => item.id === ref.id);
-  const title = loose?.name || pathName(ref.path, "File");
-  return {
-    title,
-    path: ref.path,
-    subtitle: ref.path,
-    languagePath: ref.path,
-  };
-}
-
-function workspaceTitle(workspace: CodeWorkspaceTabInfo, roots: CodeWorkspaceRootInfo[], looseFiles: CodeWorkspaceLooseFileInfo[]): string {
-  if (workspace.name?.trim()) return workspace.name.trim();
-  if (roots.length === 1 && looseFiles.length === 0) return roots[0].name;
-  if (roots.length === 0 && looseFiles.length > 0) return "Editor Workspace";
-  return "Code Workspace";
-}
-
-function initialFileRef(workspace: CodeWorkspaceTabInfo, roots: CodeWorkspaceRootInfo[], looseFiles: CodeWorkspaceLooseFileInfo[]): CodeWorkspaceFileRef | null {
-  if (workspace.initialFile) return workspace.initialFile;
-  const initialPath = workspace.initialPath?.trim();
-  if (initialPath && roots[0]) {
-    return { kind: "root", rootId: roots[0].id, path: initialPath };
-  }
-  return looseFiles[0] ? { kind: "loose", id: looseFiles[0].id, path: looseFiles[0].path } : null;
-}
+import {
+  type DirectoryState,
+  type FlatFilesState,
+  type LspFileState,
+  type MarkdownViewMode,
+  type OpenFileState,
+  type TreeSelection,
+  type TreeViewMode,
+  type WorkspaceGitSnapshotState,
+  type WorkspaceTreeCommandPayload,
+  CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE,
+  CODE_WORKSPACE_MAX_FONT_SIZE,
+  CODE_WORKSPACE_MAX_TREE_FONT_SIZE,
+  CODE_WORKSPACE_MIN_FONT_SIZE,
+  CODE_WORKSPACE_MIN_TREE_FONT_SIZE,
+  CUSTOM_LSP_COMMAND_ID,
+  DEFAULT_DIR_STATE,
+  DEFAULT_FLAT_FILES_STATE,
+  FLAT_VIEW_MAX_DEPTH,
+  FLAT_VIEW_MAX_FILES,
+  NAV_HISTORY_LIMIT,
+  RECENT_FILES_LIMIT,
+  absoluteWorkspacePath,
+  basename,
+  clampCodeWorkspaceFontSize,
+  clampCodeWorkspaceTreeFontSize,
+  customServerCommandFromConfig,
+  emptyLspFileState,
+  errorMessage,
+  exportMermaidPng,
+  exportMermaidSvg,
+  fileKey,
+  fileMeta,
+  fileRefEquals,
+  fileRefUnder,
+  formatBytes,
+  formatMtime,
+  gitRootForWorkspacePath,
+  gitRootsForWorkspaceRoot,
+  hashString,
+  initialFileRef,
+  initialLooseFiles,
+  initialRoots,
+  isExternalHref,
+  isMarkdownPath,
+  isRootRef,
+  joinRelativePath,
+  ensureMermaidReady,
+  lspPresetIdForPath,
+  makeLoadingFile,
+  makeLooseFile,
+  makeRoot,
+  normalizeFsPath,
+  parentPath,
+  readCodeWorkspaceTreeFontSize,
+  readCodeWorkspaceTreeViewMode,
+  readLspCommandPrefs,
+  readLspCustomCommands,
+  relativePathWithinRoot,
+  remapFileRef,
+  remapRelativePath,
+  resolveLooseMarkdownLink,
+  resolveRootMarkdownLink,
+  rootDirKey,
+  shouldHideEntry,
+  workspacePathForGitPath,
+  workspaceTitle,
+  writeCodeWorkspaceTreeFontSize,
+  writeCodeWorkspaceTreeViewMode,
+  writeLspCommandPrefs,
+  writeLspCustomCommands,
+  type MermaidApi,
+} from "./workspace/codeWorkspaceModel";
+import type { EditorRevealTarget } from "./workspace/EditorGroup";
 
 export function CodeWorkspaceTab({
   tabId,
@@ -791,6 +266,150 @@ export function CodeWorkspaceTab({
 }: CodeWorkspaceTabProps) {
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const setTabCodeWorkspaceContext = useAppStore((s) => s.setTabCodeWorkspaceContext);
+  const workspaceInstanceId = useMemo(
+    () => workspace.workspaceInstanceId ?? workspace.workspaceId ?? workspace.repoRoot?.trim() ?? tabId,
+    [tabId, workspace.repoRoot, workspace.workspaceId, workspace.workspaceInstanceId],
+  );
+  const ensureWorkspaceUi = useCodeWorkspaceStore((s) => s.ensureInstance);
+  const disposeWorkspaceUi = useCodeWorkspaceStore((s) => s.disposeInstance);
+  const patchWorkspaceUi = useCodeWorkspaceStore((s) => s.patchInstance);
+  const setStoreActiveKey = useCodeWorkspaceStore((s) => s.setActiveKey);
+  const setStoreOpenOrder = useCodeWorkspaceStore((s) => s.setOpenOrder);
+  // Ensure before first read so the selector always hits a real map entry.
+  ensureWorkspaceUi(workspaceInstanceId);
+  const workspaceUi = useCodeWorkspaceStore((s) => selectCodeWorkspaceUi(s, workspaceInstanceId));
+
+  useEffect(() => {
+    ensureWorkspaceUi(workspaceInstanceId);
+    return () => disposeWorkspaceUi(workspaceInstanceId);
+  }, [disposeWorkspaceUi, ensureWorkspaceUi, workspaceInstanceId]);
+
+  const {
+    languagePanelOpen,
+    bottomDockOpen,
+    bottomDockTab,
+    rightPaneOpen,
+    searchEverywhereOpen,
+    searchEverywhereMode,
+    recentFilesOpen,
+    recentAdvanceNonce,
+    recentEntries,
+    structureOpen,
+    structureLoading,
+    structureUnavailable,
+    structureSymbols,
+    quickDocOpen,
+    quickDocContent,
+    pinnedDoc,
+    pinnedDocLocked,
+    locationPeek,
+    searchFocusNonce,
+    searchIncludePreset,
+    searchQueryPreset,
+    openOrder,
+    activeKey,
+    markdownModes,
+  } = workspaceUi;
+
+  const setLanguagePanelOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
+    const next = typeof open === "function" ? open(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).languagePanelOpen) : open;
+    patchWorkspaceUi(workspaceInstanceId, { languagePanelOpen: next });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setBottomDockOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
+    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).bottomDockOpen;
+    patchWorkspaceUi(workspaceInstanceId, { bottomDockOpen: typeof open === "function" ? open(prev) : open });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setBottomDockTab = useCallback((tab: BottomDockTabId | ((prev: BottomDockTabId) => BottomDockTabId)) => {
+    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).bottomDockTab;
+    patchWorkspaceUi(workspaceInstanceId, { bottomDockTab: typeof tab === "function" ? tab(prev) : tab });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setRightPaneOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
+    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).rightPaneOpen;
+    patchWorkspaceUi(workspaceInstanceId, { rightPaneOpen: typeof open === "function" ? open(prev) : open });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setSearchEverywhereOpen = useCallback((open: boolean) => {
+    patchWorkspaceUi(workspaceInstanceId, { searchEverywhereOpen: open });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setSearchEverywhereMode = useCallback((mode: SearchEverywhereMode) => {
+    patchWorkspaceUi(workspaceInstanceId, { searchEverywhereMode: mode });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setRecentFilesOpen = useCallback((open: boolean) => {
+    patchWorkspaceUi(workspaceInstanceId, { recentFilesOpen: open });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setRecentAdvanceNonce = useCallback((updater: number | ((prev: number) => number)) => {
+    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).recentAdvanceNonce;
+    patchWorkspaceUi(workspaceInstanceId, {
+      recentAdvanceNonce: typeof updater === "function" ? updater(prev) : updater,
+    });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setRecentEntries = useCallback((entries: RecentFileEntry[]) => {
+    patchWorkspaceUi(workspaceInstanceId, { recentEntries: entries });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setStructureOpen = useCallback((open: boolean) => {
+    patchWorkspaceUi(workspaceInstanceId, { structureOpen: open });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setStructureLoading = useCallback((loading: boolean) => {
+    patchWorkspaceUi(workspaceInstanceId, { structureLoading: loading });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setStructureUnavailable = useCallback((reason: string | null) => {
+    patchWorkspaceUi(workspaceInstanceId, { structureUnavailable: reason });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setStructureSymbols = useCallback((symbols: LspDocumentSymbol[]) => {
+    patchWorkspaceUi(workspaceInstanceId, { structureSymbols: symbols });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setQuickDocOpen = useCallback((open: boolean) => {
+    patchWorkspaceUi(workspaceInstanceId, { quickDocOpen: open });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setQuickDocContent = useCallback((content: QuickDocContent | null) => {
+    patchWorkspaceUi(workspaceInstanceId, { quickDocContent: content });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setPinnedDoc = useCallback((content: QuickDocContent | null) => {
+    patchWorkspaceUi(workspaceInstanceId, { pinnedDoc: content });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setPinnedDocLocked = useCallback((locked: boolean) => {
+    patchWorkspaceUi(workspaceInstanceId, { pinnedDocLocked: locked });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setLocationPeek = useCallback((peek: LocationPeekState | null) => {
+    patchWorkspaceUi(workspaceInstanceId, { locationPeek: peek });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setSearchFocusNonce = useCallback((updater: number | ((prev: number) => number)) => {
+    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).searchFocusNonce;
+    patchWorkspaceUi(workspaceInstanceId, {
+      searchFocusNonce: typeof updater === "function" ? updater(prev) : updater,
+    });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setSearchIncludePreset = useCallback((
+    updater: { value: string; nonce: number } | ((prev: { value: string; nonce: number }) => { value: string; nonce: number }),
+  ) => {
+    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).searchIncludePreset;
+    patchWorkspaceUi(workspaceInstanceId, {
+      searchIncludePreset: typeof updater === "function" ? updater(prev) : updater,
+    });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setSearchQueryPreset = useCallback((
+    updater: { value: string; nonce: number } | ((prev: { value: string; nonce: number }) => { value: string; nonce: number }),
+  ) => {
+    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).searchQueryPreset;
+    patchWorkspaceUi(workspaceInstanceId, {
+      searchQueryPreset: typeof updater === "function" ? updater(prev) : updater,
+    });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setOpenOrder = useCallback((order: string[] | ((prev: string[]) => string[])) => {
+    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).openOrder;
+    setStoreOpenOrder(workspaceInstanceId, typeof order === "function" ? order(prev) : order);
+  }, [setStoreOpenOrder, workspaceInstanceId]);
+  const setActiveKey = useCallback((key: string | null | ((prev: string | null) => string | null)) => {
+    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).activeKey;
+    setStoreActiveKey(workspaceInstanceId, typeof key === "function" ? key(prev) : key);
+  }, [setStoreActiveKey, workspaceInstanceId]);
+  const setMarkdownModes = useCallback((
+    updater: Record<string, MarkdownViewMode> | ((prev: Record<string, MarkdownViewMode>) => Record<string, MarkdownViewMode>),
+  ) => {
+    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).markdownModes;
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    patchWorkspaceUi(workspaceInstanceId, { markdownModes: next });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+
   const [codeViewProfile, setCodeViewProfileState] = useState<CodeViewProfile>(() => loadCodeViewProfile());
   const [treeFontSize, setTreeFontSizeState] = useState(() => readCodeWorkspaceTreeFontSize());
   const [treeViewMode, setTreeViewModeState] = useState<TreeViewMode>(() => readCodeWorkspaceTreeViewMode());
@@ -807,33 +426,9 @@ export function CodeWorkspaceTab({
   const [treeFilter, setTreeFilter] = useState("");
   const [selected, setSelected] = useState<TreeSelection | null>(null);
   const [openFiles, setOpenFiles] = useState<Record<string, OpenFileState>>({});
-  const [openOrder, setOpenOrder] = useState<string[]>([]);
-  const [activeKey, setActiveKey] = useState<string | null>(null);
-  const [markdownModes, setMarkdownModes] = useState<Record<string, MarkdownViewMode>>({});
   const [lspFiles, setLspFiles] = useState<Record<string, LspFileState>>({});
   const [lspServerStatuses, setLspServerStatuses] = useState<LspServerStatus[]>([]);
-  const [languagePanelOpen, setLanguagePanelOpen] = useState(true);
-  const [bottomDockOpen, setBottomDockOpen] = useState(true);
-  const [bottomDockTab, setBottomDockTab] = useState<"problems" | "search" | "references">("references");
-  const [rightPaneOpen, setRightPaneOpen] = useState(false);
-  const [quickDocOpen, setQuickDocOpen] = useState(false);
-  const [quickDocContent, setQuickDocContent] = useState<QuickDocContent | null>(null);
-  const [pinnedDoc, setPinnedDoc] = useState<QuickDocContent | null>(null);
-  const [pinnedDocLocked, setPinnedDocLocked] = useState(false);
-  const [searchFocusNonce, setSearchFocusNonce] = useState(0);
-  const [searchIncludePreset, setSearchIncludePreset] = useState<{ value: string; nonce: number }>({ value: "", nonce: 0 });
-  const [searchQueryPreset, setSearchQueryPreset] = useState<{ value: string; nonce: number }>({ value: "", nonce: 0 });
-  const [searchEverywhereOpen, setSearchEverywhereOpen] = useState(false);
-  const [searchEverywhereMode, setSearchEverywhereMode] = useState<SearchEverywhereMode>("files");
-  const [locationPeek, setLocationPeek] = useState<LocationPeekState | null>(null);
-  const [recentFilesOpen, setRecentFilesOpen] = useState(false);
-  const [recentEntries, setRecentEntries] = useState<RecentFileEntry[]>([]);
-  const [recentAdvanceNonce, setRecentAdvanceNonce] = useState(0);
   const [navCan, setNavCan] = useState({ back: false, forward: false });
-  const [structureOpen, setStructureOpen] = useState(false);
-  const [structureSymbols, setStructureSymbols] = useState<LspDocumentSymbol[]>([]);
-  const [structureLoading, setStructureLoading] = useState(false);
-  const [structureUnavailable, setStructureUnavailable] = useState<string | null>(null);
   const [lspCommandPrefs, setLspCommandPrefs] = useState<Record<string, string>>(() => readLspCommandPrefs());
   const [lspCustomCommands, setLspCustomCommands] = useState<Record<string, LspCustomCommandConfig>>(() => readLspCustomCommands());
   const [revealTarget, setRevealTarget] = useState<EditorRevealTarget | null>(null);
@@ -1078,11 +673,6 @@ export function CodeWorkspaceTab({
     el.addEventListener("wheel", handleWheel, { capture: true, passive: false });
     return () => el.removeEventListener("wheel", handleWheel, { capture: true });
   }, [stepCodeViewFontSize, stepTreeFontSize, visible, zoomTargetForNode]);
-
-  const workspaceInstanceId = useMemo(
-    () => workspace.workspaceInstanceId ?? workspace.workspaceId ?? workspace.repoRoot?.trim() ?? tabId,
-    [tabId, workspace.repoRoot, workspace.workspaceId, workspace.workspaceInstanceId],
-  );
 
   const findRoot = useCallback((rootId: string) => rootsRef.current.find((root) => root.id === rootId) ?? null, []);
 
@@ -4157,161 +3747,44 @@ export function CodeWorkspaceTab({
         </Panel>
         <PanelResizeHandle className="w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
         <Panel id="editor" defaultSize={rightPaneOpen ? "56%" : "76%"} minSize="35%" className="min-w-0">
-          <main
-            ref={editorPaneRef}
-            data-testid="code-workspace-editor-pane"
-            className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-bg)]"
-            style={editorPaneStyle}
-          >
-            {openOrder.length > 0 && (
-              <div className="h-8 shrink-0 flex items-end overflow-x-auto border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]">
-                {openOrder.map((key) => {
-                  const file = openFiles[key];
-                  if (!file) return null;
-                  const active = key === activeKey;
-                  return (
-                    <div
-                      key={key}
-                      data-active={active || undefined}
-                      className="h-[var(--taomni-code-editor-tab-height)] min-w-[130px] max-w-[240px] flex items-center border-r border-[var(--taomni-code-border)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
-                    >
-                      <button
-                        type="button"
-                        className="min-w-0 flex-1 h-full flex items-center gap-1.5 px-2 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
-                        title={file.subtitle}
-                        onClick={() => setActiveKey(key)}
-                      >
-                        <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-                        <span className="truncate">{file.title}</span>
-                        {file.dirty && <span className="text-[var(--taomni-accent)]">*</span>}
-                      </button>
-                      <button
-                        type="button"
-                        className="h-full w-6 shrink-0 inline-flex items-center justify-center hover:bg-[var(--taomni-code-active-line-bg)]"
-                        title="Close"
-                        onClick={() => void closeFile(key)}
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+          <EditorGroup
+            workspaceInstanceId={workspaceInstanceId}
+            visible={visible}
+            openOrder={openOrder}
+            openFiles={openFiles}
+            activeKey={activeKey}
+            activeFile={activeFile}
+            activeMarkdownMode={activeMarkdownMode}
+            activeDiagnostics={activeDiagnostics}
+            activeCapabilities={activeCapabilities}
+            activeLspSyncing={!!activeLspState?.syncing}
+            lspStatusPill={<LspStatusPill state={activeLspState} diagnostics={activeDiagnostics} />}
+            revealTarget={revealTarget}
+            editorPaneRef={editorPaneRef}
+            editorPaneStyle={editorPaneStyle}
+            onActivate={setActiveKey}
+            onClose={(key) => void closeFile(key)}
+            onMarkdownModeChange={setActiveMarkdownMode}
+            onChangeText={updateFileText}
+            onSave={(key) => void saveFile(key)}
+            onHover={getLspHover}
+            onDefinition={goToDefinition}
+            onReferences={findReferences}
+            onComplete={getLspCompletions}
+            onCompleteResolve={resolveLspCompletion}
+            onSignatureHelp={getLspSignatureHelp}
+            onSelectionChange={(selection) => {
+              editorSelectionRef.current = selection;
+            }}
+            onLightbulb={(line) => void openCodeActionsForLine(line)}
+            onOpenMarkdownHref={openMarkdownHref}
+            formatBytes={formatBytes}
+            formatMtime={formatMtime}
+            isMarkdownPath={isMarkdownPath}
+            renderMarkdownPreview={(file, onOpenHref) => (
+              <MarkdownPreview file={file} onOpenHref={onOpenHref} />
             )}
-            <div
-              id={`code-workspace-editor-stack-${workspaceInstanceId}`}
-              className="flex-1 min-h-0"
-            >
-              <div className="h-full min-h-0 relative">
-                {activeFile ? (
-                  <div className="absolute inset-0 flex flex-col">
-                    <div className="min-h-7 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)]">
-                      <span className="truncate">{activeFile.subtitle}</span>
-                      <span className="shrink-0">{formatBytes(activeFile.size)}</span>
-                      {formatMtime(activeFile.mtime) && (
-                        <span className="shrink-0">{formatMtime(activeFile.mtime)}</span>
-                      )}
-                      {activeFile.loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                      {activeLspState?.syncing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                      <LspStatusPill state={activeLspState} diagnostics={activeDiagnostics} />
-                      {isMarkdownPath(activeFile.languagePath) && (
-                        <div className="ml-auto flex items-center gap-0.5">
-                          <ModeButton
-                            label="Edit"
-                            active={activeMarkdownMode === "edit"}
-                            icon={<File className="w-3 h-3" />}
-                            onClick={() => setActiveMarkdownMode("edit")}
-                          />
-                          <ModeButton
-                            label="Preview"
-                            active={activeMarkdownMode === "preview"}
-                            icon={<Eye className="w-3 h-3" />}
-                            onClick={() => setActiveMarkdownMode("preview")}
-                          />
-                          <ModeButton
-                            label="Split"
-                            active={activeMarkdownMode === "split"}
-                            icon={<Columns2 className="w-3 h-3" />}
-                            onClick={() => setActiveMarkdownMode("split")}
-                          />
-                        </div>
-                      )}
-                    </div>
-                    {activeFile.error && (
-                      <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-red-500/30 bg-red-500/10 text-[12px] text-red-500">
-                        <AlertTriangle className="w-4 h-4 shrink-0" />
-                        <span className="min-w-0 truncate">{activeFile.error}</span>
-                      </div>
-                    )}
-                    <div data-testid="code-workspace-editor" className="flex-1 min-h-0">
-                      {activeFile.loading ? (
-                        <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-code-muted)]">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        </div>
-                      ) : isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "preview" ? (
-                        <MarkdownPreview file={activeFile} onOpenHref={openMarkdownHref} />
-                      ) : isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "split" ? (
-                        <div className="h-full min-h-0 grid grid-cols-2">
-                          <div className="min-w-0 min-h-0 border-r border-[var(--taomni-code-border)]">
-                            <CodeMirrorHost
-                              key={`${activeFile.key}:edit`}
-                              path={activeFile.languagePath}
-                              doc={activeFile.text}
-                              visible={visible}
-                              diagnostics={activeDiagnostics}
-                              reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
-                              onChange={(doc) => updateFileText(activeFile.key, doc)}
-                              onSave={() => void saveFile(activeFile.key)}
-                              onHover={(position) => getLspHover(activeFile, position)}
-                              onDefinition={(position) => goToDefinition(activeFile, position)}
-                              onReferences={(position) => findReferences(activeFile, position)}
-                              onComplete={(position, trigger) => getLspCompletions(activeFile, position, trigger)}
-                              onCompleteResolve={(raw) => resolveLspCompletion(activeFile, raw)}
-                              onSignatureHelp={(position, trigger) => getLspSignatureHelp(activeFile, position, trigger)}
-                              onSelectionChange={(selection) => {
-                                editorSelectionRef.current = selection;
-                              }}
-                              onLightbulb={(line) => void openCodeActionsForLine(line)}
-                              completionTriggers={activeCapabilities?.completionTriggerCharacters ?? []}
-                              signatureTriggers={activeCapabilities?.signatureTriggerCharacters ?? []}
-                            />
-                          </div>
-                          <MarkdownPreview file={activeFile} onOpenHref={openMarkdownHref} />
-                        </div>
-                      ) : (
-                        <CodeMirrorHost
-                          key={activeFile.key}
-                          path={activeFile.languagePath}
-                          doc={activeFile.text}
-                          visible={visible}
-                          diagnostics={activeDiagnostics}
-                          reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
-                          onChange={(doc) => updateFileText(activeFile.key, doc)}
-                          onSave={() => void saveFile(activeFile.key)}
-                          onHover={(position) => getLspHover(activeFile, position)}
-                          onDefinition={(position) => goToDefinition(activeFile, position)}
-                          onReferences={(position) => findReferences(activeFile, position)}
-                          onComplete={(position, trigger) => getLspCompletions(activeFile, position, trigger)}
-                          onCompleteResolve={(raw) => resolveLspCompletion(activeFile, raw)}
-                          onSignatureHelp={(position, trigger) => getLspSignatureHelp(activeFile, position, trigger)}
-                          onSelectionChange={(selection) => {
-                            editorSelectionRef.current = selection;
-                          }}
-                          onLightbulb={(line) => void openCodeActionsForLine(line)}
-                          completionTriggers={activeCapabilities?.completionTriggerCharacters ?? []}
-                          signatureTriggers={activeCapabilities?.signatureTriggerCharacters ?? []}
-                        />
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-code-muted)]">
-                    No file open
-                  </div>
-                )}
-              </div>
-            </div>
-          </main>
+          />
         </Panel>
         {rightPaneOpen && (
           <>
@@ -4355,21 +3828,6 @@ export function CodeWorkspaceTab({
           </>
         )}
       </PanelGroup>
-      <QuickDocPopup
-        open={quickDocOpen}
-        content={quickDocContent}
-        onClose={() => setQuickDocOpen(false)}
-        onPin={pinQuickDocumentation}
-      />
-      <LocationPeek
-        open={!!locationPeek}
-        state={locationPeek}
-        onClose={() => setLocationPeek(null)}
-        onOpen={(location) => {
-          setLocationPeek(null);
-          void openLspLocation(location);
-        }}
-      />
       <BottomDock
         open={bottomDockOpen}
         activeTab={bottomDockTab}
@@ -4427,17 +3885,17 @@ export function CodeWorkspaceTab({
         onOpenChange={setBottomDockOpen}
         onActiveTabChange={(tab) => setBottomDockTab(tab as "problems" | "search" | "references")}
       />
-      <SearchEverywhere
-        open={searchEverywhereOpen}
-        initialMode={searchEverywhereMode}
-        items={goToFileItems}
-        loading={goToFileLoading}
-        truncated={goToFileTruncated}
-        commands={searchableWorkspaceCommands}
+      <WorkspacePopupsHost
+        searchEverywhereOpen={searchEverywhereOpen}
+        searchEverywhereMode={searchEverywhereMode}
+        goToFileItems={goToFileItems}
+        goToFileLoading={goToFileLoading}
+        goToFileTruncated={goToFileTruncated}
+        searchableCommands={searchableWorkspaceCommands}
         symbolsAvailable={seSymbolsAvailable}
-        fetchSymbols={fetchWorkspaceSymbols}
-        onClose={() => setSearchEverywhereOpen(false)}
-        onOpenFile={openGoToFileItem}
+        fetchWorkspaceSymbols={fetchWorkspaceSymbols}
+        onCloseSearchEverywhere={() => setSearchEverywhereOpen(false)}
+        onOpenFileItem={openGoToFileItem}
         onOpenSymbol={(symbol) => void openWorkspaceSymbol(symbol)}
         onRunCommand={runSearchEverywhereCommand}
         onSearchText={(query) => {
@@ -4447,22 +3905,28 @@ export function CodeWorkspaceTab({
           setSearchFocusNonce((nonce) => nonce + 1);
           setSearchQueryPreset((current) => ({ value: query, nonce: current.nonce + 1 }));
         }}
-      />
-      <RecentFilesPopup
-        open={recentFilesOpen}
-        entries={recentEntries}
-        advanceNonce={recentAdvanceNonce}
-        onClose={() => setRecentFilesOpen(false)}
-        onPick={pickRecentFile}
-      />
-      <StructurePopup
-        open={structureOpen}
-        fileTitle={activeFile?.title ?? null}
-        symbols={structureSymbols}
-        loading={structureLoading}
-        unavailableReason={structureUnavailable}
-        onClose={() => setStructureOpen(false)}
-        onPick={pickStructureSymbol}
+        recentFilesOpen={recentFilesOpen}
+        recentEntries={recentEntries}
+        recentAdvanceNonce={recentAdvanceNonce}
+        onCloseRecent={() => setRecentFilesOpen(false)}
+        onPickRecent={pickRecentFile}
+        structureOpen={structureOpen}
+        structureFileTitle={activeFile?.title ?? null}
+        structureSymbols={structureSymbols}
+        structureLoading={structureLoading}
+        structureUnavailable={structureUnavailable}
+        onCloseStructure={() => setStructureOpen(false)}
+        onPickStructure={pickStructureSymbol}
+        quickDocOpen={quickDocOpen}
+        quickDocContent={quickDocContent}
+        onCloseQuickDoc={() => setQuickDocOpen(false)}
+        onPinQuickDoc={pinQuickDocumentation}
+        locationPeek={locationPeek}
+        onCloseLocationPeek={() => setLocationPeek(null)}
+        onOpenLocation={(location) => {
+          setLocationPeek(null);
+          void openLspLocation(location);
+        }}
       />
       {treeContextMenu.render}
     </div>
@@ -4579,31 +4043,6 @@ function MarkdownPreview({
     >
       <div dangerouslySetInnerHTML={{ __html: html }} />
     </div>
-  );
-}
-
-function ModeButton({
-  label,
-  icon,
-  active,
-  onClick,
-}: {
-  label: string;
-  icon: ReactNode;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      data-active={active || undefined}
-      className="h-5 min-w-5 px-1 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)]"
-      onClick={onClick}
-    >
-      {icon}
-    </button>
   );
 }
 
