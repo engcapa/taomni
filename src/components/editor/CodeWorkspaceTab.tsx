@@ -99,6 +99,10 @@ import {
   ReferencesPanel,
   type ReferencesResultState,
 } from "./workspace/panels/ReferencesPanel";
+import {
+  ProblemsPanel,
+  type ProblemFileGroup,
+} from "./workspace/panels/ProblemsPanel";
 import type {
   CodeWorkspaceFileRef,
   CodeWorkspaceLooseFileInfo,
@@ -751,7 +755,8 @@ export function CodeWorkspaceTab({
   const [lspFiles, setLspFiles] = useState<Record<string, LspFileState>>({});
   const [lspServerStatuses, setLspServerStatuses] = useState<LspServerStatus[]>([]);
   const [languagePanelOpen, setLanguagePanelOpen] = useState(true);
-  const [referencesPanelOpen, setReferencesPanelOpen] = useState(true);
+  const [bottomDockOpen, setBottomDockOpen] = useState(true);
+  const [bottomDockTab, setBottomDockTab] = useState<"problems" | "references">("references");
   const [lspCommandPrefs, setLspCommandPrefs] = useState<Record<string, string>>(() => readLspCommandPrefs());
   const [lspCustomCommands, setLspCustomCommands] = useState<Record<string, LspCustomCommandConfig>>(() => readLspCustomCommands());
   const [revealTarget, setRevealTarget] = useState<EditorRevealTarget | null>(null);
@@ -2135,7 +2140,8 @@ export function CodeWorkspaceTab({
     async (file: OpenFileState, position: LspPosition) => {
       const descriptor = lspDescriptorForFile(file);
       if (!descriptor) return;
-      setReferencesPanelOpen(true);
+      setBottomDockOpen(true);
+      setBottomDockTab("references");
       setReferencesResult({
         loading: true,
         origin: file.subtitle,
@@ -2173,6 +2179,38 @@ export function CodeWorkspaceTab({
     [openFiles, openOrder],
   );
   const activeDiagnostics = activeLspState?.diagnostics ?? [];
+  const problemFiles = useMemo<ProblemFileGroup[]>(
+    () => openOrder.flatMap((key) => {
+      const file = openFiles[key];
+      const diagnostics = lspFiles[key]?.diagnostics ?? [];
+      return file && diagnostics.length > 0
+        ? [{ key, title: file.title, subtitle: file.subtitle, diagnostics }]
+        : [];
+    }),
+    [lspFiles, openFiles, openOrder],
+  );
+  const problemCounts = useMemo(
+    () => problemFiles.reduce(
+      (counts, file) => {
+        for (const diagnostic of file.diagnostics) {
+          if (diagnostic.severity === 1) counts.errors += 1;
+          else if (diagnostic.severity === 2) counts.warnings += 1;
+        }
+        return counts;
+      },
+      { errors: 0, warnings: 0 },
+    ),
+    [problemFiles],
+  );
+  const openProblem = useCallback(
+    (fileKeyValue: string, diagnostic: LspDiagnostic) => {
+      const file = openFilesRef.current[fileKeyValue];
+      if (!file) return;
+      revealEditorLocation(file.key, diagnostic.range);
+      void openFile(file.ref);
+    },
+    [openFile, revealEditorLocation],
+  );
   const title = workspaceTitle(workspace, roots, looseFiles);
   const gitManagerPayload = useMemo<CodeWorkspaceGitManagerPayload | null>(() => {
     if (gitRoots.length === 0) return null;
@@ -2925,9 +2963,21 @@ export function CodeWorkspaceTab({
         </Panel>
       </PanelGroup>
       <BottomDock
-        open={referencesPanelOpen}
-        activeTab="references"
+        open={bottomDockOpen}
+        activeTab={bottomDockTab}
         tabs={[
+          {
+            id: "problems",
+            label: "Problems",
+            icon: <AlertTriangle className="h-3.5 w-3.5" />,
+            badge: problemCounts.errors > 0 || problemCounts.warnings > 0 ? (
+              <span className="inline-flex items-center gap-1">
+                {problemCounts.errors > 0 && <span className="text-red-500">{problemCounts.errors}</span>}
+                {problemCounts.warnings > 0 && <span className="text-amber-500">{problemCounts.warnings}</span>}
+              </span>
+            ) : undefined,
+            content: <ProblemsPanel files={problemFiles} onOpenProblem={openProblem} />,
+          },
           {
             id: "references",
             label: "References",
@@ -2942,8 +2992,8 @@ export function CodeWorkspaceTab({
             ),
           },
         ]}
-        onOpenChange={setReferencesPanelOpen}
-        onActiveTabChange={() => undefined}
+        onOpenChange={setBottomDockOpen}
+        onActiveTabChange={(tab) => setBottomDockTab(tab as "problems" | "references")}
       />
     </div>
   );

@@ -5,7 +5,7 @@ export interface BottomDockTab {
   id: string;
   label: string;
   icon: ReactNode;
-  badge?: number;
+  badge?: ReactNode;
   content: ReactNode;
 }
 
@@ -56,7 +56,7 @@ export function BottomDock({
             >
               {tab.icon}
               <span>{tab.label}</span>
-              {typeof tab.badge === "number" && tab.badge > 0 && (
+              {(typeof tab.badge === "number" ? tab.badge > 0 : !!tab.badge) && (
                 <span className="min-w-4 rounded bg-[var(--taomni-code-active-line-bg)] px-1 text-center text-[10px] tabular-nums text-[var(--taomni-code-text)]">
                   {tab.badge}
                 </span>

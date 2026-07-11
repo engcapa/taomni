@@ -764,5 +764,9 @@ describe("CodeWorkspaceTab", () => {
         },
       });
     });
+
+    fireEvent.click(screen.getByRole("tab", { name: /Problems/ }));
+    expect(await screen.findByText("Identifier expected")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show error diagnostics" })).toHaveTextContent("1");
   });
 });
