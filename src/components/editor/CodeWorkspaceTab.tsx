@@ -38,7 +38,6 @@ import {
   workspaceRenamePath,
   workspaceWriteFile,
   workspaceWriteLooseFile,
-  type WorkspaceEntry,
   type WorkspaceGitRoot,
 } from "../../lib/editor/workspace";
 import {
