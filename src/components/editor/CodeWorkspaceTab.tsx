@@ -93,6 +93,7 @@ import {
   type LspSignatureHelpResult,
   type LspWorkspaceEdit,
 } from "../../lib/editor/lsp";
+import { invoke } from "@tauri-apps/api/core";
 import { selectFilePath, selectFolderPath } from "../../lib/ipc";
 import {
   DEFAULT_CODE_VIEW_PROFILE,
@@ -2049,6 +2050,97 @@ export function CodeWorkspaceTab({
   }, [findRoot, loadDir, notifyWorkspacePathGitChanged, selected, setStatusMessage]);
 
   const treeContextMenu = useContextMenu();
+  const treeClipboardRef = useRef<{ mode: "copy" | "cut"; rootId: string; path: string } | null>(null);
+
+  const revealInExplorer = useCallback(async (rootId: string, path: string) => {
+    const root = findRoot(rootId);
+    if (!root) return;
+    const absolute = path ? absoluteWorkspacePath(root, path) : normalizeFsPath(root.path);
+    try {
+      await invoke("sftp_open_path", { path: absolute });
+      setStatusMessage(`Opened ${absolute}`);
+    } catch (err) {
+      setStatusMessage(errorMessage(err));
+    }
+  }, [findRoot, setStatusMessage]);
+
+  const handleTreeKeyDown = useCallback((event: React.KeyboardEvent<HTMLElement>) => {
+    const pane = treePaneRef.current;
+    if (!pane) return;
+    // Ignore when typing in the filter input.
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+    const rows = Array.from(pane.querySelectorAll<HTMLElement>(
+      "[data-testid='code-workspace-tree-root'], [data-testid='code-workspace-tree-dir'], [data-testid='code-workspace-tree-file'], [data-testid='code-workspace-flat-file']",
+    ));
+    if (rows.length === 0) return;
+    const selectedIndex = Math.max(0, rows.findIndex((row) => row.dataset.selected === "true"));
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const next = event.key === "ArrowDown"
+        ? Math.min(rows.length - 1, selectedIndex + 1)
+        : Math.max(0, selectedIndex - 1);
+      rows[next]?.click();
+      rows[next]?.focus();
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      if (selected?.kind === "file") void openFile(selected.ref);
+      else rows[selectedIndex]?.click();
+      return;
+    }
+    if (event.key === "F2") {
+      event.preventDefault();
+      workspaceCommandRunnerRef.current("workspace.tree.rename", { focus: "tree", payload: { selection: selected ?? undefined } });
+      return;
+    }
+    if (event.key === "Delete") {
+      event.preventDefault();
+      workspaceCommandRunnerRef.current("workspace.tree.delete", { focus: "tree", payload: { selection: selected ?? undefined } });
+      return;
+    }
+    if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
+      // Expand/collapse by re-clicking directory/root rows.
+      const row = rows[selectedIndex];
+      if (!row) return;
+      if (row.dataset.testid === "code-workspace-tree-dir" || row.dataset.testid === "code-workspace-tree-root") {
+        event.preventDefault();
+        row.click();
+      }
+    }
+  }, [openFile, selected]);
+
+  const pasteTreeClipboard = useCallback(async (target: { rootId: string; path: string }) => {
+    const clip = treeClipboardRef.current;
+    if (!clip) {
+      setStatusMessage("Nothing to paste");
+      return;
+    }
+    if (clip.rootId !== target.rootId) {
+      setStatusMessage("Cross-root paste is not supported");
+      return;
+    }
+    const root = findRoot(clip.rootId);
+    if (!root) return;
+    const name = basename(clip.path);
+    const destPath = target.path ? `${target.path}/${name}` : name;
+    try {
+      if (clip.mode === "cut") {
+        await workspaceRenamePath(root.path, clip.path, destPath);
+        treeClipboardRef.current = null;
+        setStatusMessage(`Moved to ${destPath}`);
+      } else {
+        const file = await workspaceReadFile(root.path, clip.path);
+        await workspaceCreateFile(root.path, destPath, file.text);
+        setStatusMessage(`Copied to ${destPath}`);
+      }
+      await loadDir(clip.rootId, parentPath(clip.path) || "");
+      if (target.path) await loadDir(target.rootId, target.path);
+      else await loadDir(target.rootId, "");
+    } catch (err) {
+      setStatusMessage(errorMessage(err));
+    }
+  }, [findRoot, loadDir, setStatusMessage]);
 
   const showTreeContextMenu = useCallback(
     (event: React.MouseEvent, selection: TreeSelection) => {
@@ -2056,6 +2148,27 @@ export function CodeWorkspaceTab({
       const run = (commandId: string, payload: WorkspaceTreeCommandPayload) => () => {
         workspaceCommandRunnerRef.current(commandId, { focus: "tree", payload });
       };
+      const clipboardItems = (rootId: string, path: string, directory: { rootId: string; path: string }) => [
+        {
+          label: "Cut",
+          onClick: () => {
+            treeClipboardRef.current = { mode: "cut", rootId, path };
+            setStatusMessage("Cut to clipboard");
+          },
+        },
+        {
+          label: "Copy",
+          onClick: () => {
+            treeClipboardRef.current = { mode: "copy", rootId, path };
+            setStatusMessage("Copied to clipboard");
+          },
+        },
+        {
+          label: "Paste",
+          disabled: !treeClipboardRef.current,
+          onClick: () => void pasteTreeClipboard(directory),
+        },
+      ];
       if (selection.kind === "file" && selection.ref.kind === "root") {
         const ref = selection.ref;
         const dir = parentPath(ref.path);
@@ -2067,8 +2180,14 @@ export function CodeWorkspaceTab({
           { label: "Rename...", onClick: run("workspace.tree.rename", { selection }) },
           { label: "Delete", danger: true, onClick: run("workspace.tree.delete", { selection }) },
           { separator: true, label: "" },
+          ...clipboardItems(ref.rootId, ref.path, { rootId: ref.rootId, path: dir }),
+          { separator: true, label: "" },
           { label: "Copy Path", onClick: run("workspace.tree.copyPath", { rootId: ref.rootId, path: ref.path }) },
           { label: "Copy Relative Path", onClick: run("workspace.tree.copyRelativePath", { rootId: ref.rootId, path: ref.path }) },
+          {
+            label: "Reveal in Explorer",
+            onClick: () => void revealInExplorer(ref.rootId, ref.path),
+          },
         ]);
         return;
       }
@@ -2079,10 +2198,16 @@ export function CodeWorkspaceTab({
           { label: "Rename...", onClick: run("workspace.tree.rename", { selection }) },
           { label: "Delete", danger: true, onClick: run("workspace.tree.delete", { selection }) },
           { separator: true, label: "" },
+          ...clipboardItems(selection.rootId, selection.path, { rootId: selection.rootId, path: selection.path }),
+          { separator: true, label: "" },
           { label: "Find in Directory...", onClick: run("workspace.tree.findInDirectory", { path: selection.path }) },
           { separator: true, label: "" },
           { label: "Copy Path", onClick: run("workspace.tree.copyPath", { rootId: selection.rootId, path: selection.path }) },
           { label: "Copy Relative Path", onClick: run("workspace.tree.copyRelativePath", { rootId: selection.rootId, path: selection.path }) },
+          {
+            label: "Reveal in Explorer",
+            onClick: () => void revealInExplorer(selection.rootId, selection.path),
+          },
         ]);
         return;
       }
@@ -2092,13 +2217,23 @@ export function CodeWorkspaceTab({
           { label: "New Directory...", onClick: run("workspace.tree.newDirectory", { directory: { rootId: selection.rootId, path: "" } }) },
           { label: "Rename Root...", onClick: run("workspace.tree.rename", { selection }) },
           { separator: true, label: "" },
+          {
+            label: "Paste",
+            disabled: !treeClipboardRef.current,
+            onClick: () => void pasteTreeClipboard({ rootId: selection.rootId, path: "" }),
+          },
+          { separator: true, label: "" },
           { label: "Copy Path", onClick: run("workspace.tree.copyPath", { rootId: selection.rootId, path: "" }) },
+          {
+            label: "Reveal in Explorer",
+            onClick: () => void revealInExplorer(selection.rootId, ""),
+          },
           { separator: true, label: "" },
           { label: "Remove from Workspace", danger: true, onClick: run("workspace.tree.delete", { selection }) },
         ]);
       }
     },
-    [treeContextMenu],
+    [pasteTreeClipboard, revealInExplorer, treeContextMenu],
   );
 
   const updateFileText = useCallback((key: string, text: string) => {
@@ -3867,6 +4002,7 @@ export function CodeWorkspaceTab({
           <FileTreePane
             paneRef={treePaneRef}
             style={treePaneStyle}
+            onKeyDown={handleTreeKeyDown}
             filter={treeFilter}
             onFilterChange={setTreeFilter}
             viewMode={treeViewMode}

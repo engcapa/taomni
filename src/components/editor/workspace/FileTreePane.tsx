@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode, RefObject } from "react";
+import type { CSSProperties, KeyboardEvent, ReactNode, RefObject } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -47,6 +47,7 @@ interface FileTreePaneProps {
   onCreateDirectory: () => void;
   onRename: () => void;
   onDelete: () => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
   children: ReactNode;
   languageServers: {
     open: boolean;
@@ -117,13 +118,16 @@ export function FileTreePane({
   onDelete,
   children,
   languageServers,
+  onKeyDown,
 }: FileTreePaneProps) {
   return (
     <aside
       ref={paneRef}
+      tabIndex={0}
       data-testid="code-workspace-tree-pane"
-      className="h-full min-h-0 flex flex-col border-r border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]"
+      className="h-full min-h-0 flex flex-col border-r border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] outline-none focus-visible:ring-1 focus-visible:ring-[var(--taomni-accent)]"
       style={style}
+      onKeyDown={onKeyDown}
     >
       <div className="h-9 shrink-0 flex items-center gap-2 overflow-x-auto px-2 border-b border-[var(--taomni-code-border)]">
         <Search className="w-3.5 h-3.5 text-[var(--taomni-code-muted)]" />
