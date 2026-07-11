@@ -1,4 +1,5 @@
 import type { AppCommand } from "../components/menubar/commands";
+import type { WorkspaceCommandMenuItem } from "../components/editor/workspace/workspaceCommands";
 import { t as translate } from "./i18n";
 
 /**
@@ -19,7 +20,8 @@ export type MenuActionId =
   | "export-json"
   | "export-moba"
   | "export-csv"
-  | "export-html";
+  | "export-html"
+  | `workspace-command:${string}`;
 
 /** Predefined (OS-provided) menu item kinds we use. */
 export type PredefinedKind =
@@ -76,6 +78,8 @@ export interface BuildAppMenuParams {
   hasSessions: boolean;
   /** Quick-connect toolbar visibility — shown as a checkmark. */
   quickConnectVisible: boolean;
+  /** Commands contributed by the active Code Workspace tab. */
+  workspaceCommands?: WorkspaceCommandMenuItem[];
   /** Translation function (defaults to the module-level `t`). */
   t?: (key: string, vars?: Record<string, string | number>) => string;
 }
@@ -90,6 +94,7 @@ export function buildAppMenuSpec(params: BuildAppMenuParams): AppMenuSpec {
     activeTabClosable,
     hasSessions,
     quickConnectVisible,
+    workspaceCommands = [],
     t = translate,
   } = params;
 
@@ -186,6 +191,24 @@ export function buildAppMenuSpec(params: BuildAppMenuParams): AppMenuSpec {
     { type: "separator" },
     { type: "item", id: "settings", label: t("menu.settings"), action: "settings", accelerator: "CmdOrCtrl+," },
   ];
+  if (workspaceCommands.length > 0) {
+    toolsMenu.splice(toolsMenu.length - 2, 0,
+      { type: "separator" },
+      {
+        type: "submenu",
+        id: "code-workspace-actions",
+        label: "Code Workspace Actions",
+        items: workspaceCommands.map((command): MenuNodeSpec => ({
+          type: "item",
+          id: `workspace-command-${command.id}`,
+          label: command.title,
+          action: `workspace-command:${command.id}`,
+          enabled: command.enabled,
+          ...(command.keybinding ? { accelerator: command.keybinding.replace(/^Ctrl\+/, "CmdOrCtrl+") } : {}),
+        })),
+      },
+    );
+  }
 
   const windowMenu: MenuNodeSpec[] = [
     { type: "predefined", item: "Minimize", label: t("menu.windowMinimize") },

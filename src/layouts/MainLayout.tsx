@@ -34,6 +34,7 @@ import { TerminalPanel, type TerminalLocalPathUploadRequest } from "../component
 import { GitPanel } from "../components/git/GitPanel";
 import { WorkspaceGitManager } from "../components/git/WorkspaceGitManager";
 import { CodeWorkspaceTab, type CodeWorkspaceGitManagerPayload } from "../components/editor/CodeWorkspaceTab";
+import type { WorkspaceCommandRegistration } from "../components/editor/workspace/workspaceCommands";
 import { MultiExecBar } from "../components/terminal/MultiExecBar";
 import { SessionEditor } from "../components/session/SessionEditor";
 import { AuthPrompt } from "../components/session/AuthPrompt";
@@ -757,6 +758,19 @@ export function MainLayout() {
   // The active tab's contextual action toolbar (Capture / Detach / Maximize …)
   // portals into this slot, which lives inside the ControlBar.
   const [tabActionSlot, setTabActionSlot] = useState<HTMLDivElement | null>(null);
+  const [workspaceCommandRegistrations, setWorkspaceCommandRegistrations] = useState<Record<string, WorkspaceCommandRegistration>>({});
+  const handleWorkspaceCommandsChange = useCallback((tabId: string, registration: WorkspaceCommandRegistration | null) => {
+    setWorkspaceCommandRegistrations((current) => {
+      if (registration) return current[tabId] === registration ? current : { ...current, [tabId]: registration };
+      if (!(tabId in current)) return current;
+      const next = { ...current };
+      delete next[tabId];
+      return next;
+    });
+  }, []);
+  const activeWorkspaceCommandRegistration = activeTabId
+    ? workspaceCommandRegistrations[activeTabId] ?? null
+    : null;
   // On macOS we render a native global menu bar instead of the in-app app menu.
   // The native menu lives at the top of the screen, matching standard macOS
   // apps; the in-bar menu button is hidden there.
@@ -2949,6 +2963,10 @@ export function MainLayout() {
   // Route a native-menu activation to the right place: session import/export
   // is handled by the shared hook, everything else reuses handleCommand.
   const dispatchMenuAction = useCallback((action: MenuActionId) => {
+    if (action.startsWith("workspace-command:")) {
+      activeWorkspaceCommandRegistration?.execute(action.slice("workspace-command:".length));
+      return;
+    }
     switch (action) {
       case "import-json": importExport.importJson(); break;
       case "import-moba": importExport.importMoba(); break;
@@ -2960,9 +2978,9 @@ export function MainLayout() {
       case "export-csv": importExport.exportCsv(); break;
       case "export-html": importExport.exportHtml(); break;
       default:
-        handleCommand(action);
+        handleCommand(action as AppCommand);
     }
-  }, [handleCommand, importExport]);
+  }, [activeWorkspaceCommandRegistration, handleCommand, importExport]);
 
   const dispatchMenuActionRef = useRef(dispatchMenuAction);
   useEffect(() => {
@@ -2979,6 +2997,7 @@ export function MainLayout() {
       activeTabClosable: !!activeTab?.closable,
       hasSessions: importExport.hasSessions,
       quickConnectVisible,
+      workspaceCommands: activeWorkspaceCommandRegistration?.items ?? [],
       t,
     });
     void installAppMenu(spec, (action) => dispatchMenuActionRef.current(action)).catch((err) => {
@@ -2992,6 +3011,7 @@ export function MainLayout() {
     activeTab?.closable,
     importExport.hasSessions,
     quickConnectVisible,
+    activeWorkspaceCommandRegistration?.items,
     t,
   ]);
 
@@ -3195,7 +3215,9 @@ export function MainLayout() {
         nativeMenu={nativeMenu}
         xServerEnabled={xServerEnabled}
         quickConnectVisible={quickConnectVisible}
+        workspaceCommands={activeWorkspaceCommandRegistration?.items ?? []}
         onCommand={handleCommand}
+        onWorkspaceCommand={(commandId) => activeWorkspaceCommandRegistration?.execute(commandId)}
         onToggleSidebar={toggleSidebar}
         onStartLocalTerminal={(localShell) =>
           openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell)
@@ -3724,6 +3746,7 @@ export function MainLayout() {
                         visible={isActive}
                         onOpenGitManager={openWorkspaceGitManager}
                         onSyncGitManager={syncWorkspaceGitManager}
+                        onCommandsChange={handleWorkspaceCommandsChange}
                       />
                     </div>
                   );

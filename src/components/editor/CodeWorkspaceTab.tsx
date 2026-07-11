@@ -121,8 +121,10 @@ import {
   dispatchWorkspaceCommandKeydown,
   runWorkspaceCommand,
   workspaceCommandEnabled,
+  workspaceCommandMenuItems,
   type WorkspaceCommand,
   type WorkspaceCommandFocus,
+  type WorkspaceCommandRegistration,
 } from "./workspace/workspaceCommands";
 import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
 import type {
@@ -138,6 +140,7 @@ interface CodeWorkspaceTabProps {
   visible?: boolean;
   onOpenGitManager?: (payload: CodeWorkspaceGitManagerPayload) => void;
   onSyncGitManager?: (payload: CodeWorkspaceGitManagerPayload) => void;
+  onCommandsChange?: (tabId: string, registration: WorkspaceCommandRegistration | null) => void;
 }
 
 export interface CodeWorkspaceGitManagerPayload {
@@ -749,6 +752,7 @@ export function CodeWorkspaceTab({
   visible = true,
   onOpenGitManager,
   onSyncGitManager,
+  onCommandsChange,
 }: CodeWorkspaceTabProps) {
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const setTabCodeWorkspaceContext = useAppStore((s) => s.setTabCodeWorkspaceContext);
@@ -2476,6 +2480,17 @@ export function CodeWorkspaceTab({
     setSearchEverywhereOpen(false);
     runWorkspaceCommand(workspaceCommands, commandId, { focus: "workspace" });
   }, [workspaceCommands]);
+
+  const commandRegistration = useMemo<WorkspaceCommandRegistration>(() => ({
+    items: workspaceCommandMenuItems(workspaceCommands, { focus: "workspace" }),
+    execute: (commandId) => runWorkspaceCommand(workspaceCommands, commandId, { focus: "workspace" }),
+  }), [workspaceCommands]);
+
+  useEffect(() => {
+    if (!onCommandsChange) return;
+    onCommandsChange(tabId, commandRegistration);
+    return () => onCommandsChange(tabId, null);
+  }, [commandRegistration, onCommandsChange, tabId]);
 
   const getLspCompletions = useCallback(
     async (

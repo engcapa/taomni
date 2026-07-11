@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   dispatchWorkspaceCommandKeydown,
   runWorkspaceCommand,
+  workspaceCommandMenuItems,
   workspaceCommandMatchesKeybinding,
   type WorkspaceCommand,
 } from "./workspaceCommands";
@@ -68,5 +69,15 @@ describe("workspaceCommands", () => {
     expect(runWorkspaceCommand([editorOnly], "editor-only", { focus: "tree" })).toBe(false);
     expect(runWorkspaceCommand([editorOnly], "editor-only", { focus: "editor" })).toBe(true);
     expect(run).toHaveBeenCalledOnce();
+  });
+
+  it("projects command state into menu-safe descriptors", () => {
+    expect(workspaceCommandMenuItems([
+      command({ id: "always", title: "Always" }),
+      command({ id: "tree-only", title: "Tree Only", when: (context) => context.focus === "tree" }),
+    ], { focus: "workspace" })).toEqual([
+      expect.objectContaining({ id: "always", title: "Always", enabled: true }),
+      expect.objectContaining({ id: "tree-only", title: "Tree Only", enabled: false }),
+    ]);
   });
 });

@@ -572,7 +572,7 @@ src/stores/
 
 | 里程碑 | 内容 | 规模 | 状态 |
 |--------|------|------|------|
-| **M0 前置重构** | 组件拆分 + codeWorkspaceStore + 命令系统骨架 + 底部 dock 容器（References 迁入） | M | 🔶 4/6，部分完成 |
+| **M0 前置重构** | 组件拆分 + codeWorkspaceStore + 命令系统骨架 + 底部 dock 容器（References 迁入） | M | 🔶 5/7，部分完成 |
 | **M1 编辑器智能·上（P0）** | 查找替换、LSP 补全（含 auto-import）/签名/快速文档/格式化、诊断呈现升级、Problems 面板 | L | 🔶 6/9，主体可用 |
 | **M2 导航与搜索（P0）** | Find in Files（后端搜索模块 + 面板）、Search Everywhere（含 Classes/Symbols）、Go to File/Class/Symbol、Recent Files、导航历史、Outline + 结构弹窗、类型/实现跳转 + peek、重命名、Code Actions、树右键/键盘 | L | 🔶 7/14，基础搜索/导航可用 |
 | **M3 布局与终端（P1）** | 分屏、tab 管理/预览 tab、面包屑、集成终端、Run/Tasks | L | ⬜ 0/5，未开始 |
@@ -585,14 +585,15 @@ src/stores/
 
 > 更新于 2026-07-11，分支 `feat/code-workspace-ide`。状态已按当前代码、测试与提交历史复核；完成度仅按本节拆分条目计数，已完成的实现项附提交号。
 
-**M0 前置重构 — 🔶 4/6，部分完成**
+**M0 前置重构 — 🔶 5/7，部分完成**
 
 - [x] CodeMirror host 抽取（`CodeMirrorHost.tsx`）— `042d03f`
 - [x] 底部 dock 容器 + References 面板迁入 — `09108e2`（`4766f43` 起改为面板常驻挂载）
 - [x] `FileTreePane` 展示边界抽取（工具栏、视图/缩放控制、语言服务器面板）+ 组件测试 — `acff8cf`
-- [ ] 剩余组件拆分（树数据/菜单控制器、EditorGroup、弹窗群 → §6.1 目录结构）+ `codeWorkspaceStore` — **⚠ 技术债：`CodeWorkspaceTab.tsx` 当前 3,650 行，M3 分屏前必须补课**
-- [x] `workspaceCommands.ts` 注册表、when 判定与统一快捷键分发；Search Everywhere 增加 Files / Actions 双入口 + 测试 — 本次提交
-- [ ] 命令系统收尾：应用菜单动态区桥接，树右键/工具栏复用 command id，terminalFocus 上下文接入
+- [ ] 剩余组件拆分（树数据/菜单控制器、EditorGroup、弹窗群 → §6.1 目录结构）+ `codeWorkspaceStore` — **⚠ 技术债：`CodeWorkspaceTab.tsx` 当前 3,668 行，M3 分屏前必须补课**
+- [x] `workspaceCommands.ts` 注册表、when 判定与统一快捷键分发；Search Everywhere 增加 Files / Actions 双入口 + 测试 — `b3c3d35`
+- [x] 活跃工作区命令注册桥 + Windows/Linux 应用菜单动态子菜单 + macOS 原生菜单动态子菜单 — 本次提交
+- [ ] 命令系统收尾：树右键/工具栏复用 command id，terminalFocus 上下文接入
 
 **M1 编辑器智能·上（P0）— 🔶 6/9，主体可用**
 
@@ -663,7 +664,7 @@ src/stores/
 ### 8.2 下一步待办（建议顺序）
 
 1. **先做真机冒烟并记录缺陷**：用 `pnpm tauri dev` 覆盖已交付的补全/auto-import、签名帮助、结构弹窗、Find in Files、Go to File、Recent Files、导航历史和树右键，避免在未验证的基础上继续扩建。
-2. **补齐 M0 硬前提**：继续拆出树控制器 / `EditorGroup` / 弹窗群，引入按 `workspaceInstanceId` 分片的 `codeWorkspaceStore`；完成 `workspaceCommands.ts` 的应用菜单桥接、右键菜单复用和 terminalFocus 上下文。
+2. **补齐 M0 硬前提**：继续拆出树控制器 / `EditorGroup` / 弹窗群，引入按 `workspaceInstanceId` 分片的 `codeWorkspaceStore`；完成 `workspaceCommands.ts` 的右键/工具栏复用和 terminalFocus 上下文。
 3. **收口 M1**：依次实现格式化、诊断 gutter/overview ruler/灯泡、Ctrl+Q 快速文档与右栏 pin；其中灯泡和 Problems Quick Fix 复用 Code Actions 通道。
 4. **完成 M2 只读语义导航**：先补 `workspace/symbol` 与 Classes/Symbols 分组，再补 typeDefinition/implementation 和多结果 peek；这批能力不涉及跨文件写入，适合作为下一阶段低风险交付。
 5. **完成 M2 写操作链路**：先实现统一 `WorkspaceEdit` 应用器及 hash 预检，再接重命名、Code Actions / applyEdit、Replace in Files，避免三套写盘逻辑分叉。

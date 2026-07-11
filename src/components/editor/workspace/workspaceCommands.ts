@@ -15,6 +15,19 @@ export interface WorkspaceCommand {
   run: (context: WorkspaceCommandContext) => void | Promise<void>;
 }
 
+export interface WorkspaceCommandMenuItem {
+  id: string;
+  title: string;
+  category: string;
+  keybinding?: string;
+  enabled: boolean;
+}
+
+export interface WorkspaceCommandRegistration {
+  items: WorkspaceCommandMenuItem[];
+  execute: (commandId: string) => boolean;
+}
+
 interface KeyboardEventLike {
   key: string;
   ctrlKey: boolean;
@@ -103,4 +116,17 @@ export function runWorkspaceCommand(
   if (!command || !workspaceCommandEnabled(command, context)) return false;
   void command.run(context);
   return true;
+}
+
+export function workspaceCommandMenuItems(
+  commands: readonly WorkspaceCommand[],
+  context: WorkspaceCommandContext,
+): WorkspaceCommandMenuItem[] {
+  return commands.map((command) => ({
+    id: command.id,
+    title: command.title,
+    category: command.category,
+    keybinding: command.keybinding,
+    enabled: workspaceCommandEnabled(command, context),
+  }));
 }

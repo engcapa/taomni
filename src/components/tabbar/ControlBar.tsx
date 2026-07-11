@@ -20,6 +20,7 @@ import {
   Wrench,
   X,
   GitBranch,
+  Braces,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -36,6 +37,7 @@ import { useUpdateStore } from "../../stores/updateStore";
 import { useT } from "../../lib/i18n";
 import type { LocalShellSelection } from "../../types";
 import type { SessionConfig } from "../../lib/ipc";
+import type { WorkspaceCommandMenuItem } from "../editor/workspace/workspaceCommands";
 
 const IS_MAC = getAppPlatform() === "macos";
 // Width reserved on the left for the native macOS traffic-light controls when
@@ -49,7 +51,9 @@ interface ControlBarProps {
   nativeMenu: boolean;
   xServerEnabled: boolean;
   quickConnectVisible: boolean;
+  workspaceCommands?: WorkspaceCommandMenuItem[];
   onCommand: (command: AppCommand) => void;
+  onWorkspaceCommand?: (commandId: string) => void;
   onToggleSidebar: () => void;
   onStartLocalTerminal: (localShell?: LocalShellSelection) => void;
   onConnectSession: (session: SessionConfig) => void;
@@ -64,7 +68,9 @@ export function ControlBar({
   nativeMenu,
   xServerEnabled,
   quickConnectVisible,
+  workspaceCommands = [],
   onCommand,
+  onWorkspaceCommand,
   onToggleSidebar,
   onStartLocalTerminal,
   onConnectSession,
@@ -174,6 +180,18 @@ export function ControlBar({
           { label: t("ribbon.tunneling"), icon: <Wrench className="w-3 h-3" />, onClick: () => onCommand("tunneling") },
           { label: "Git Repository...", icon: <GitBranch className="w-3 h-3" />, onClick: () => onCommand("git") },
           { label: "Code Workspace...", icon: <FileText className="w-3 h-3" />, onClick: () => onCommand("code-workspace") },
+          ...(workspaceCommands.length > 0 ? [{
+            label: "Code Workspace Actions",
+            testId: "context-menu-workspace-actions",
+            icon: <Braces className="w-3 h-3" />,
+            children: workspaceCommands.map((command): MenuItem => ({
+              label: command.keybinding ? `${command.title}  ${command.keybinding}` : command.title,
+              testId: `context-menu-workspace-command-${command.id}`,
+              disabled: !command.enabled,
+              onClick: () => onWorkspaceCommand?.(command.id),
+            })),
+            onClick: () => {},
+          } satisfies MenuItem] : []),
           { label: t("tabs.lanChat"), icon: <MessageSquare className="w-3 h-3" />, onClick: () => onCommand("lan-chat") },
           { label: t("tabs.networkTools"), onClick: () => onCommand("tools") },
           { label: t("ribbon.packages"), onClick: () => onCommand("packages") },
