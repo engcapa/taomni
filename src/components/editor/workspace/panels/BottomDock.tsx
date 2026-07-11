@@ -77,11 +77,21 @@ export function BottomDock({
           </button>
         )}
       </div>
-      {open && active && (
-        <div role="tabpanel" aria-label={active.label} className="h-48 min-h-0 overflow-hidden border-t border-[var(--taomni-code-border)]">
-          {active.content}
-        </div>
-      )}
+      {/* Keep every panel mounted so stateful tools (search, terminals)
+          survive tab switches and dock collapse; hide inactive ones. */}
+      <div hidden={!open || !active} className="h-48 min-h-0 overflow-hidden border-t border-[var(--taomni-code-border)]">
+        {tabs.map((tab) => (
+          <div
+            key={tab.id}
+            role="tabpanel"
+            aria-label={tab.label}
+            hidden={tab.id !== active?.id}
+            className="h-full min-h-0"
+          >
+            {tab.content}
+          </div>
+        ))}
+      </div>
     </section>
   );
 }

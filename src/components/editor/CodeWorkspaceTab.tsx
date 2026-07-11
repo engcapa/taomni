@@ -103,6 +103,8 @@ import {
   ProblemsPanel,
   type ProblemFileGroup,
 } from "./workspace/panels/ProblemsPanel";
+import { FindInFilesPanel } from "./workspace/panels/FindInFilesPanel";
+import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
 import type {
   CodeWorkspaceFileRef,
   CodeWorkspaceLooseFileInfo,
@@ -756,7 +758,8 @@ export function CodeWorkspaceTab({
   const [lspServerStatuses, setLspServerStatuses] = useState<LspServerStatus[]>([]);
   const [languagePanelOpen, setLanguagePanelOpen] = useState(true);
   const [bottomDockOpen, setBottomDockOpen] = useState(true);
-  const [bottomDockTab, setBottomDockTab] = useState<"problems" | "references">("references");
+  const [bottomDockTab, setBottomDockTab] = useState<"problems" | "search" | "references">("references");
+  const [searchFocusNonce, setSearchFocusNonce] = useState(0);
   const [lspCommandPrefs, setLspCommandPrefs] = useState<Record<string, string>>(() => readLspCommandPrefs());
   const [lspCustomCommands, setLspCustomCommands] = useState<Record<string, LspCustomCommandConfig>>(() => readLspCustomCommands());
   const [revealTarget, setRevealTarget] = useState<EditorRevealTarget | null>(null);
@@ -958,6 +961,21 @@ export function CodeWorkspaceTab({
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [setCodeViewFontSize, setTreeFontSize, stepCodeViewFontSize, stepTreeFontSize, visible, zoomTargetForNode]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const handleFindInFiles = (event: KeyboardEvent) => {
+      if (!event.ctrlKey || !event.shiftKey || event.altKey || event.metaKey) return;
+      if (event.key !== "F" && event.key !== "f") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setBottomDockOpen(true);
+      setBottomDockTab("search");
+      setSearchFocusNonce((nonce) => nonce + 1);
+    };
+    window.addEventListener("keydown", handleFindInFiles, true);
+    return () => window.removeEventListener("keydown", handleFindInFiles, true);
+  }, [visible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -2092,6 +2110,20 @@ export function CodeWorkspaceTab({
     [openFile, revealEditorLocation],
   );
 
+  const openSearchMatch = useCallback(
+    (match: WorkspaceSearchMatch) => {
+      const ref: CodeWorkspaceFileRef = { kind: "root", rootId: match.rootId, path: match.path };
+      // Backend line numbers are 1-based; reveal targets follow LSP 0-based.
+      const line = Math.max(0, match.lineNumber - 1);
+      revealEditorLocation(fileKey(ref), {
+        start: { line, character: match.matchStart },
+        end: { line, character: match.matchEnd },
+      });
+      void openFile(ref);
+    },
+    [openFile, revealEditorLocation],
+  );
+
   const getLspHover = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
       const descriptor = lspDescriptorForFile(file);
@@ -2979,6 +3011,18 @@ export function CodeWorkspaceTab({
             content: <ProblemsPanel files={problemFiles} onOpenProblem={openProblem} />,
           },
           {
+            id: "search",
+            label: "Search",
+            icon: <Search className="h-3.5 w-3.5" />,
+            content: (
+              <FindInFilesPanel
+                roots={roots}
+                focusNonce={searchFocusNonce}
+                onOpenMatch={openSearchMatch}
+              />
+            ),
+          },
+          {
             id: "references",
             label: "References",
             icon: <ListTree className="h-3.5 w-3.5" />,
@@ -2993,7 +3037,7 @@ export function CodeWorkspaceTab({
           },
         ]}
         onOpenChange={setBottomDockOpen}
-        onActiveTabChange={(tab) => setBottomDockTab(tab as "problems" | "references")}
+        onActiveTabChange={(tab) => setBottomDockTab(tab as "problems" | "search" | "references")}
       />
     </div>
   );

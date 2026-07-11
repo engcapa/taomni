@@ -34,6 +34,42 @@ describe("BottomDock", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it("keeps inactive and collapsed panels mounted but hidden", () => {
+    const twoTabs = [
+      ...tabs,
+      {
+        id: "search",
+        label: "Search",
+        icon: <ListTree aria-hidden="true" />,
+        content: <div>Search results state</div>,
+      },
+    ];
+    const { rerender } = render(
+      <BottomDock
+        open
+        activeTab="references"
+        tabs={twoTabs}
+        onOpenChange={vi.fn()}
+        onActiveTabChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Reference results")).toBeVisible();
+    expect(screen.getByText("Search results state")).not.toBeVisible();
+
+    rerender(
+      <BottomDock
+        open={false}
+        activeTab="references"
+        tabs={twoTabs}
+        onOpenChange={vi.fn()}
+        onActiveTabChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Reference results")).not.toBeVisible();
+    expect(screen.getByText("Search results state")).not.toBeVisible();
+  });
+
   it("activates and expands a closed tab", () => {
     const onOpenChange = vi.fn();
     const onActiveTabChange = vi.fn();
