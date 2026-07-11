@@ -44,6 +44,7 @@ const lspMocks = vi.hoisted(() => ({
   lspFormatting: vi.fn(),
   lspRangeFormatting: vi.fn(),
   lspCodeActions: vi.fn(),
+  lspWorkspaceSymbols: vi.fn(),
 }));
 
 const ipcMocks = vi.hoisted(() => ({
@@ -212,6 +213,8 @@ describe("CodeWorkspaceTab", () => {
     lspMocks.lspRangeFormatting.mockResolvedValue({ status: documentStatus(), edits: [] });
     lspMocks.lspCodeActions.mockReset();
     lspMocks.lspCodeActions.mockResolvedValue({ status: documentStatus(), actions: [] });
+    lspMocks.lspWorkspaceSymbols.mockReset();
+    lspMocks.lspWorkspaceSymbols.mockResolvedValue({ status: documentStatus(), symbols: [] });
     ipcMocks.selectFilePath.mockReset();
     ipcMocks.selectFolderPath.mockReset();
     gitMocks.gitSnapshot.mockReset();

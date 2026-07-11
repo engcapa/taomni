@@ -381,6 +381,34 @@ export function lspCodeActions(
   });
 }
 
+export interface LspWorkspaceSymbol {
+  name: string;
+  kind: number;
+  containerName: string | null;
+  uri: string;
+  path: string | null;
+  range: LspRange;
+  selectionRange: LspRange;
+}
+
+export interface LspWorkspaceSymbolsResult {
+  status: LspDocumentStatus;
+  symbols: LspWorkspaceSymbol[];
+}
+
+export function lspWorkspaceSymbols(
+  descriptor: LspDocumentDescriptor,
+  query: string,
+): Promise<LspWorkspaceSymbolsResult> {
+  return invoke<LspWorkspaceSymbolsResult>("lsp_workspace_symbols", {
+    ...documentArgs(descriptor),
+    query,
+  });
+}
+
+/** LSP SymbolKind values treated as "classes" in Search Everywhere. */
+export const LSP_CLASS_SYMBOL_KINDS = new Set([5, 10, 11, 23, 26]);
+
 export function lspHover(
   descriptor: LspDocumentDescriptor,
   position: LspPosition,

@@ -93,12 +93,44 @@ describe("SearchEverywhere", () => {
 
   it("searches and runs commands from the Actions tab", () => {
     const { onRunCommand } = renderPopup();
-    fireEvent.click(screen.getByRole("tab", { name: "actions" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Actions" }));
     const input = screen.getByLabelText("Search actions");
     fireEvent.change(input, { target: { value: "grep" } });
     expect(screen.getByText("Find in Files")).toBeInTheDocument();
     expect(screen.getByText("Ctrl+Shift+F")).toBeInTheDocument();
     fireEvent.keyDown(input, { key: "Enter" });
     expect(onRunCommand).toHaveBeenCalledWith("workspace.findInFiles");
+  });
+
+  it("shows Classes/Symbols when available and routes Text into Find in Files", async () => {
+    const onSearchText = vi.fn();
+    const onOpenSymbol = vi.fn();
+    const fetchSymbols = vi.fn(async () => [{
+      name: "CodeWorkspaceTab",
+      kind: 5,
+      containerName: "editor",
+      path: "src/CodeWorkspaceTab.tsx",
+      uri: "file:///repo/src/CodeWorkspaceTab.tsx",
+      line: 10,
+      character: 0,
+    }]);
+    renderPopup({
+      symbolsAvailable: true,
+      fetchSymbols,
+      onSearchText,
+      onOpenSymbol,
+      initialMode: "classes",
+    });
+    expect(screen.getByRole("tab", { name: "Classes" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Symbols" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Go to class"), { target: { value: "CWT" } });
+    expect(await screen.findByText("CodeWorkspaceTab")).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByLabelText("Go to class"), { key: "Enter" });
+    expect(onOpenSymbol).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Text" }));
+    fireEvent.change(screen.getByLabelText("Find in files"), { target: { value: "needle" } });
+    fireEvent.keyDown(screen.getByLabelText("Find in files"), { key: "Enter" });
+    expect(onSearchText).toHaveBeenCalledWith("needle");
   });
 });

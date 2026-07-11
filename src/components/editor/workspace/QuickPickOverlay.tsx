@@ -20,6 +20,10 @@ interface QuickPickOverlayProps<T> {
   footer?: ReactNode;
   onClose: () => void;
   onPick: (item: T) => void;
+  /** Called when Enter is pressed with no selectable results (e.g. Text search). */
+  onEnterEmpty?: (query: string) => void;
+  /** Notified whenever the filter query changes. */
+  onQueryChange?: (query: string) => void;
 }
 
 /**
@@ -44,6 +48,8 @@ export function QuickPickOverlay<T>({
   footer,
   onClose,
   onPick,
+  onEnterEmpty,
+  onQueryChange,
 }: QuickPickOverlayProps<T>) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -51,10 +57,13 @@ export function QuickPickOverlay<T>({
   const listRef = useRef<HTMLDivElement>(null);
   const initialIndexRef = useRef(initialIndex);
   initialIndexRef.current = initialIndex;
+  const onQueryChangeRef = useRef(onQueryChange);
+  onQueryChangeRef.current = onQueryChange;
 
   useEffect(() => {
     if (!open) return;
     setQuery("");
+    onQueryChangeRef.current?.("");
     setSelectedIndex(initialIndexRef.current);
     // Focus after the overlay is painted.
     const id = window.setTimeout(() => inputRef.current?.focus(), 0);
@@ -96,6 +105,7 @@ export function QuickPickOverlay<T>({
       event.preventDefault();
       const item = results[selected];
       if (item) onPick(item);
+      else onEnterEmpty?.(query);
     }
   };
 
@@ -118,7 +128,9 @@ export function QuickPickOverlay<T>({
             aria-label={inputLabel}
             className="h-6 w-full bg-transparent text-[12px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
             onChange={(event) => {
-              setQuery(event.target.value);
+              const next = event.target.value;
+              setQuery(next);
+              onQueryChangeRef.current?.(next);
               setSelectedIndex(0);
             }}
             onKeyDown={handleKeyDown}

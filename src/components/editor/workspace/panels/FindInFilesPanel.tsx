@@ -16,6 +16,8 @@ interface FindInFilesPanelProps {
   focusNonce?: number;
   /** Bump the nonce to overwrite the include globs ("Find in Directory..."). */
   includePreset?: { value: string; nonce: number };
+  /** Bump the nonce to seed the query field (Search Everywhere Text tab). */
+  queryPreset?: { value: string; nonce: number };
 }
 
 interface MatchGroup {
@@ -74,7 +76,7 @@ function groupTitle(match: WorkspaceSearchMatch): string {
   return `${match.rootName}/${match.path}`;
 }
 
-export function FindInFilesPanel({ roots, onOpenMatch, focusNonce = 0, includePreset }: FindInFilesPanelProps) {
+export function FindInFilesPanel({ roots, onOpenMatch, focusNonce = 0, includePreset, queryPreset }: FindInFilesPanelProps) {
   const [query, setQuery] = useState("");
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [wholeWord, setWholeWord] = useState(false);
@@ -105,6 +107,16 @@ export function FindInFilesPanel({ roots, onOpenMatch, focusNonce = 0, includePr
     inputRef.current?.focus();
     inputRef.current?.select();
   }, [includePreset]);
+
+  const appliedQueryPresetNonceRef = useRef(0);
+  useEffect(() => {
+    if (!queryPreset || queryPreset.nonce === 0) return;
+    if (queryPreset.nonce === appliedQueryPresetNonceRef.current) return;
+    appliedQueryPresetNonceRef.current = queryPreset.nonce;
+    setQuery(queryPreset.value);
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [queryPreset]);
 
   const teardownSearch = useCallback(() => {
     unlistenRef.current?.();

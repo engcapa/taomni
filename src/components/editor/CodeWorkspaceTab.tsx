@@ -73,6 +73,7 @@ import {
   lspReferences,
   lspSaveDocument,
   lspSignatureHelp,
+  lspWorkspaceSymbols,
   type LspCodeAction,
   type LspCompletionItem,
   type LspCompletionResult,
@@ -123,7 +124,12 @@ import {
 import { FindInFilesPanel } from "./workspace/panels/FindInFilesPanel";
 import { DocumentationPane } from "./workspace/panels/DocumentationPane";
 import { QuickDocPopup, type QuickDocContent } from "./workspace/QuickDocPopup";
-import { SearchEverywhere, type GoToFileItem } from "./workspace/SearchEverywhere";
+import {
+  SearchEverywhere,
+  type GoToFileItem,
+  type GoToSymbolItem,
+  type SearchEverywhereMode,
+} from "./workspace/SearchEverywhere";
 import { RecentFilesPopup, type RecentFileEntry } from "./workspace/RecentFilesPopup";
 import { StructurePopup } from "./workspace/StructurePopup";
 import { createDoubleShiftDetector } from "./workspace/doubleShift";
@@ -809,7 +815,9 @@ export function CodeWorkspaceTab({
   const [pinnedDocLocked, setPinnedDocLocked] = useState(false);
   const [searchFocusNonce, setSearchFocusNonce] = useState(0);
   const [searchIncludePreset, setSearchIncludePreset] = useState<{ value: string; nonce: number }>({ value: "", nonce: 0 });
+  const [searchQueryPreset, setSearchQueryPreset] = useState<{ value: string; nonce: number }>({ value: "", nonce: 0 });
   const [searchEverywhereOpen, setSearchEverywhereOpen] = useState(false);
+  const [searchEverywhereMode, setSearchEverywhereMode] = useState<SearchEverywhereMode>("files");
   const [recentFilesOpen, setRecentFilesOpen] = useState(false);
   const [recentEntries, setRecentEntries] = useState<RecentFileEntry[]>([]);
   const [recentAdvanceNonce, setRecentAdvanceNonce] = useState(0);
@@ -1570,9 +1578,10 @@ export function CodeWorkspaceTab({
     [findRoot, setStatusMessage],
   );
 
-  const openSearchEverywhere = useCallback(() => {
+  const openSearchEverywhere = useCallback((mode: SearchEverywhereMode = "files") => {
     // Warm the recursive file index for every root; loadFlatFiles caches.
     rootsRef.current.forEach((root) => void loadFlatFiles(root.id));
+    setSearchEverywhereMode(mode);
     setSearchEverywhereOpen(true);
   }, [loadFlatFiles]);
 
@@ -1666,7 +1675,7 @@ export function CodeWorkspaceTab({
 
   useEffect(() => {
     if (!visible) return;
-    const detector = createDoubleShiftDetector(openSearchEverywhere);
+    const detector = createDoubleShiftDetector(() => openSearchEverywhere("all"));
     const handleKeyDown = (event: KeyboardEvent) => detector.handleKeyDown(event);
     const handleKeyUp = (event: KeyboardEvent) => detector.handleKeyUp(event);
     window.addEventListener("keydown", handleKeyDown, true);
@@ -2378,6 +2387,45 @@ export function CodeWorkspaceTab({
     [openFile, revealEditorLocation],
   );
 
+  const fetchWorkspaceSymbols = useCallback(async (query: string): Promise<GoToSymbolItem[]> => {
+    const file = activeFile ?? Object.values(openFilesRef.current).find((item) => !item.loading) ?? null;
+    if (!file) return [];
+    const descriptor = lspDescriptorForFile(file);
+    if (!descriptor) return [];
+    try {
+      const result = await lspWorkspaceSymbols(descriptor, query);
+      updateLspStatusForFile(file, result.status);
+      return result.symbols.map((symbol) => ({
+        name: symbol.name,
+        kind: symbol.kind,
+        containerName: symbol.containerName,
+        path: symbol.path ?? symbol.uri,
+        uri: symbol.uri,
+        line: symbol.selectionRange.start.line,
+        character: symbol.selectionRange.start.character,
+      }));
+    } catch {
+      return [];
+    }
+  }, [activeFile, lspDescriptorForFile, updateLspStatusForFile]);
+
+  const openWorkspaceSymbol = useCallback(async (symbol: GoToSymbolItem) => {
+    setSearchEverywhereOpen(false);
+    await openLspLocation({
+      uri: symbol.uri,
+      path: symbol.path,
+      range: {
+        start: { line: symbol.line, character: symbol.character },
+        end: { line: symbol.line, character: symbol.character },
+      },
+    });
+  }, [openLspLocation]);
+
+  const seSymbolsAvailable = !!(
+    activeCapabilities?.workspaceSymbol
+    || Object.values(lspFiles).some((state) => state.status?.capabilities?.workspaceSymbol)
+  );
+
   const openSearchMatch = useCallback(
     (match: WorkspaceSearchMatch) => {
       const ref: CodeWorkspaceFileRef = { kind: "root", rootId: match.rootId, path: match.path };
@@ -2702,7 +2750,32 @@ export function CodeWorkspaceTab({
       keybinding: "Ctrl+Shift+N",
       keybindings: ["Ctrl+P"],
       keywords: ["search everywhere", "file", "open"],
-      run: openSearchEverywhere,
+      run: () => openSearchEverywhere("files"),
+    },
+    {
+      id: "workspace.goToClass",
+      title: "Go to Class",
+      category: "Navigation",
+      keybinding: "Ctrl+N",
+      keywords: ["type", "interface", "struct"],
+      when: () => seSymbolsAvailable,
+      run: () => openSearchEverywhere("classes"),
+    },
+    {
+      id: "workspace.goToSymbol",
+      title: "Go to Symbol",
+      category: "Navigation",
+      keybinding: "Ctrl+Alt+Shift+N",
+      keywords: ["workspace symbol"],
+      when: () => seSymbolsAvailable,
+      run: () => openSearchEverywhere("symbols"),
+    },
+    {
+      id: "workspace.searchEverywhere",
+      title: "Search Everywhere",
+      category: "Navigation",
+      keywords: ["double shift", "all"],
+      run: () => openSearchEverywhere("all"),
     },
     {
       id: "workspace.recentFiles",
@@ -2948,6 +3021,7 @@ export function CodeWorkspaceTab({
     reloadFile,
     renameSelected,
     saveFile,
+    seSymbolsAvailable,
     selected,
     selectedRootDirectory,
   ]);
@@ -3976,6 +4050,7 @@ export function CodeWorkspaceTab({
                 roots={roots}
                 focusNonce={searchFocusNonce}
                 includePreset={searchIncludePreset}
+                queryPreset={searchQueryPreset}
                 onOpenMatch={openSearchMatch}
               />
             ),
@@ -3999,13 +4074,24 @@ export function CodeWorkspaceTab({
       />
       <SearchEverywhere
         open={searchEverywhereOpen}
+        initialMode={searchEverywhereMode}
         items={goToFileItems}
         loading={goToFileLoading}
         truncated={goToFileTruncated}
         commands={searchableWorkspaceCommands}
+        symbolsAvailable={seSymbolsAvailable}
+        fetchSymbols={fetchWorkspaceSymbols}
         onClose={() => setSearchEverywhereOpen(false)}
         onOpenFile={openGoToFileItem}
+        onOpenSymbol={(symbol) => void openWorkspaceSymbol(symbol)}
         onRunCommand={runSearchEverywhereCommand}
+        onSearchText={(query) => {
+          setSearchEverywhereOpen(false);
+          setBottomDockOpen(true);
+          setBottomDockTab("search");
+          setSearchFocusNonce((nonce) => nonce + 1);
+          setSearchQueryPreset((current) => ({ value: query, nonce: current.nonce + 1 }));
+        }}
       />
       <RecentFilesPopup
         open={recentFilesOpen}

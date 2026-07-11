@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
-import { Command as CommandIcon, File } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Box, Braces, Command as CommandIcon, File, Type } from "lucide-react";
 import { QuickPickOverlay } from "./QuickPickOverlay";
 import { rankFuzzy } from "./fuzzyMatch";
+import { isClassSymbolKind, symbolKindLabel } from "./symbolKinds";
 import type { WorkspaceCommand } from "./workspaceCommands";
 
 export interface GoToFileItem {
@@ -10,69 +11,188 @@ export interface GoToFileItem {
   path: string;
 }
 
+export interface GoToSymbolItem {
+  name: string;
+  kind: number;
+  containerName: string | null;
+  path: string;
+  uri: string;
+  line: number;
+  character: number;
+}
+
+export type SearchEverywhereMode = "all" | "classes" | "files" | "symbols" | "actions" | "text";
+
 interface SearchEverywhereProps {
   open: boolean;
+  initialMode?: SearchEverywhereMode;
   items: GoToFileItem[];
   loading: boolean;
   truncated?: boolean;
   commands?: WorkspaceCommand[];
+  /** When true, Classes/Symbols tabs are shown and fetchSymbols is used. */
+  symbolsAvailable?: boolean;
+  fetchSymbols?: (query: string) => Promise<GoToSymbolItem[]>;
   onClose: () => void;
   onOpenFile: (item: GoToFileItem) => void;
+  onOpenSymbol?: (item: GoToSymbolItem) => void;
   onRunCommand?: (commandId: string) => void;
+  /** Text tab: hand query to Find in Files. */
+  onSearchText?: (query: string) => void;
 }
 
 const MAX_RESULTS = 50;
-type SearchMode = "files" | "actions";
+
 type SearchItem =
   | { kind: "file"; value: GoToFileItem }
-  | { kind: "action"; value: WorkspaceCommand };
+  | { kind: "action"; value: WorkspaceCommand }
+  | { kind: "symbol"; value: GoToSymbolItem };
 
 function itemKey(item: SearchItem): string {
-  return item.kind === "file"
-    ? `file:${item.value.rootId}:${item.value.path}`
-    : `action:${item.value.id}`;
+  if (item.kind === "file") return `file:${item.value.rootId}:${item.value.path}`;
+  if (item.kind === "action") return `action:${item.value.id}`;
+  return `symbol:${item.value.uri}:${item.value.name}:${item.value.line}:${item.value.character}`;
 }
+
+const MODE_TABS: { id: SearchEverywhereMode; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "classes", label: "Classes" },
+  { id: "files", label: "Files" },
+  { id: "symbols", label: "Symbols" },
+  { id: "actions", label: "Actions" },
+  { id: "text", label: "Text" },
+];
 
 export function SearchEverywhere({
   open,
+  initialMode = "files",
   items,
   loading,
   truncated = false,
   commands = [],
+  symbolsAvailable = false,
+  fetchSymbols,
   onClose,
   onOpenFile,
+  onOpenSymbol,
   onRunCommand,
+  onSearchText,
 }: SearchEverywhereProps) {
-  const [mode, setMode] = useState<SearchMode>("files");
-  useEffect(() => {
-    if (open) setMode("files");
-  }, [open]);
+  const [mode, setMode] = useState<SearchEverywhereMode>(initialMode);
+  const [query, setQuery] = useState("");
+  const [symbols, setSymbols] = useState<GoToSymbolItem[]>([]);
+  const [symbolsLoading, setSymbolsLoading] = useState(false);
 
-  const searchItems: SearchItem[] = mode === "files"
-    ? items.map((value) => ({ kind: "file", value }))
-    : commands.map((value) => ({ kind: "action", value }));
-  const filterItems = useCallback(
-    (query: string, all: SearchItem[]) => rankFuzzy(
-      query,
-      all,
-      (item) => item.kind === "file"
-        ? `${item.value.rootName}/${item.value.path}`
-        : `${item.value.category} ${item.value.title} ${item.value.keywords?.join(" ") ?? ""}`,
-      MAX_RESULTS,
-    ),
-    [],
+  useEffect(() => {
+    if (!open) return;
+    setMode(initialMode);
+    setQuery("");
+    setSymbols([]);
+  }, [initialMode, open]);
+
+  const visibleTabs = useMemo(
+    () => MODE_TABS.filter((tab) => {
+      if ((tab.id === "classes" || tab.id === "symbols") && !symbolsAvailable) return false;
+      return true;
+    }),
+    [symbolsAvailable],
   );
+
+  // Async workspace symbols for Classes / Symbols / All.
+  useEffect(() => {
+    if (!open || !symbolsAvailable || !fetchSymbols) return;
+    if (mode !== "classes" && mode !== "symbols" && mode !== "all") return;
+    let cancelled = false;
+    const handle = window.setTimeout(() => {
+      setSymbolsLoading(true);
+      void fetchSymbols(query.trim())
+        .then((next) => {
+          if (!cancelled) setSymbols(next);
+        })
+        .catch(() => {
+          if (!cancelled) setSymbols([]);
+        })
+        .finally(() => {
+          if (!cancelled) setSymbolsLoading(false);
+        });
+    }, 120);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [fetchSymbols, mode, open, query, symbolsAvailable]);
+
+  const symbolItems: SearchItem[] = useMemo(() => {
+    const source = mode === "classes"
+      ? symbols.filter((item) => isClassSymbolKind(item.kind))
+      : symbols;
+    return source.map((value) => ({ kind: "symbol" as const, value }));
+  }, [mode, symbols]);
+
+  const searchItems: SearchItem[] = useMemo(() => {
+    if (mode === "files") return items.map((value) => ({ kind: "file", value }));
+    if (mode === "actions") return commands.map((value) => ({ kind: "action", value }));
+    if (mode === "classes" || mode === "symbols") return symbolItems;
+    if (mode === "text") return [];
+    // All: files + symbols + actions, ranked together.
+    return [
+      ...items.map((value) => ({ kind: "file" as const, value })),
+      ...symbolItems,
+      ...commands.map((value) => ({ kind: "action" as const, value })),
+    ];
+  }, [commands, items, mode, symbolItems]);
+
+  const filterItems = useCallback(
+    (q: string, all: SearchItem[]) => {
+      if (mode === "text") return [];
+      return rankFuzzy(
+        q,
+        all,
+        (item) => {
+          if (item.kind === "file") return `${item.value.rootName}/${item.value.path}`;
+          if (item.kind === "action") {
+            return `${item.value.category} ${item.value.title} ${item.value.keywords?.join(" ") ?? ""}`;
+          }
+          return `${item.value.name} ${item.value.containerName ?? ""} ${item.value.path}`;
+        },
+        MAX_RESULTS,
+      );
+    },
+    [mode],
+  );
+
+  const isLoading = mode === "files"
+    ? loading
+    : mode === "classes" || mode === "symbols" || mode === "all"
+      ? symbolsLoading || (mode === "all" && loading)
+      : false;
 
   return (
     <QuickPickOverlay
       open={open}
       testId="code-workspace-search-everywhere"
-      inputLabel={mode === "files" ? "Go to file" : "Search actions"}
-      placeholder={mode === "files" ? "Go to file (supports camelCase abbreviations)" : "Search workspace actions"}
+      inputLabel={
+        mode === "classes" ? "Go to class"
+          : mode === "symbols" ? "Go to symbol"
+            : mode === "actions" ? "Search actions"
+              : mode === "text" ? "Find in files"
+                : mode === "all" ? "Search everywhere"
+                  : "Go to file"
+      }
+      placeholder={
+        mode === "text"
+          ? "Type text and press Enter to search in files"
+          : mode === "classes" || mode === "symbols"
+            ? "Supports camelCase abbreviations"
+            : mode === "actions"
+              ? "Search workspace actions"
+              : "Supports camelCase abbreviations"
+      }
       items={searchItems}
-      loading={mode === "files" && loading}
+      loading={isLoading}
       filterItems={filterItems}
       itemKey={itemKey}
+      onQueryChange={setQuery}
       renderItem={(item) => {
         if (item.kind === "action") {
           return (
@@ -88,6 +208,23 @@ export function SearchEverywhere({
             </>
           );
         }
+        if (item.kind === "symbol") {
+          return (
+            <>
+              {isClassSymbolKind(item.value.kind)
+                ? <Box className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+                : <Braces className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-code-muted)]" />}
+              <span className="shrink-0 text-[var(--taomni-code-text)]">{item.value.name}</span>
+              <span className="min-w-0 flex-1 truncate text-[10px] text-[var(--taomni-code-muted)]">
+                {item.value.containerName ? `${item.value.containerName} · ` : ""}
+                {item.value.path}:{item.value.line + 1}
+              </span>
+              <span className="shrink-0 text-[10px] text-[var(--taomni-code-muted)]">
+                {symbolKindLabel(item.value.kind)}
+              </span>
+            </>
+          );
+        }
         const name = item.value.path.split("/").pop() ?? item.value.path;
         const dir = item.value.path.slice(0, item.value.path.length - name.length).replace(/\/$/, "");
         return (
@@ -100,28 +237,41 @@ export function SearchEverywhere({
           </>
         );
       }}
-      emptyText={() =>
-        mode === "actions"
-          ? commands.length === 0 ? "No available workspace actions" : "No matching actions"
-          : loading
-            ? "Indexing workspace files..."
-            : items.length === 0
-              ? "No files in workspace roots"
-              : "No matching files"
-      }
+      emptyText={(q) => {
+        if (mode === "text") {
+          return q.trim()
+            ? "Press Enter to search this text in files"
+            : "Type a query, then Enter to open Find in Files";
+        }
+        if (mode === "actions") {
+          return commands.length === 0 ? "No available workspace actions" : "No matching actions";
+        }
+        if (mode === "classes" || mode === "symbols") {
+          if (symbolsLoading) return "Querying language server…";
+          if (!symbolsAvailable) return "No language server with workspace symbols";
+          return q.trim() ? "No matching symbols" : "Type to search workspace symbols";
+        }
+        if (mode === "all") {
+          if (isLoading) return "Searching…";
+          return q.trim() ? "No matching results" : "Type to search files, symbols, and actions";
+        }
+        if (loading) return "Indexing workspace files...";
+        if (items.length === 0) return "No files in workspace roots";
+        return "No matching files";
+      }}
       header={
-        <div className="flex h-8 shrink-0 items-end gap-1 border-b border-[var(--taomni-code-border)] px-2">
-          {(["files", "actions"] as const).map((tab) => (
+        <div className="flex h-8 shrink-0 items-end gap-0.5 overflow-x-auto border-b border-[var(--taomni-code-border)] px-2">
+          {visibleTabs.map((tab) => (
             <button
-              key={tab}
+              key={tab.id}
               type="button"
               role="tab"
-              aria-selected={mode === tab}
-              data-active={mode === tab || undefined}
-              className="h-7 rounded-t px-3 text-[11px] capitalize text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
-              onClick={() => setMode(tab)}
+              aria-selected={mode === tab.id}
+              data-active={mode === tab.id || undefined}
+              className="h-7 shrink-0 rounded-t px-2.5 text-[11px] text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
+              onClick={() => setMode(tab.id)}
             >
-              {tab}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -129,21 +279,34 @@ export function SearchEverywhere({
       footer={
         <>
           <span>↑↓ select</span>
-          <span>Enter {mode === "files" ? "open" : "run"}</span>
+          <span>
+            Enter {
+              mode === "actions" ? "run"
+                : mode === "text" ? "search"
+                  : "open"
+            }
+          </span>
           <span>Esc close</span>
           <span className="ml-auto">
-            {mode === "files" ? (
+            {mode === "files" && (
               <>{truncated ? "file index truncated · " : ""}{items.length} file{items.length === 1 ? "" : "s"}</>
-            ) : (
-              <>{commands.length} action{commands.length === 1 ? "" : "s"}</>
             )}
+            {mode === "actions" && <>{commands.length} action{commands.length === 1 ? "" : "s"}</>}
+            {(mode === "classes" || mode === "symbols") && (
+              <>{symbols.length} symbol{symbols.length === 1 ? "" : "s"}</>
+            )}
+            {mode === "text" && <Type className="inline h-3 w-3" />}
           </span>
         </>
       }
       onClose={onClose}
       onPick={(item) => {
         if (item.kind === "file") onOpenFile(item.value);
-        else onRunCommand?.(item.value.id);
+        else if (item.kind === "action") onRunCommand?.(item.value.id);
+        else onOpenSymbol?.(item.value);
+      }}
+      onEnterEmpty={(q) => {
+        if (mode === "text" && q.trim()) onSearchText?.(q.trim());
       }}
     />
   );

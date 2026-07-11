@@ -170,6 +170,26 @@ pub struct LspDocumentSymbolsResult {
     pub symbols: Vec<LspDocumentSymbol>,
 }
 
+/// Workspace-wide symbol hit from `workspace/symbol`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspWorkspaceSymbol {
+    pub name: String,
+    pub kind: u32,
+    pub container_name: Option<String>,
+    pub uri: String,
+    pub path: Option<String>,
+    pub range: LspRange,
+    pub selection_range: LspRange,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspWorkspaceSymbolsResult {
+    pub status: LspDocumentStatus,
+    pub symbols: Vec<LspWorkspaceSymbol>,
+}
+
 /// Feature summary distilled from the server's `initialize` response so the
 /// UI can enable/disable entry points per capability instead of guessing.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -1446,6 +1466,66 @@ pub struct LspCodeActionsResult {
 }
 
 #[tauri::command]
+pub async fn lsp_workspace_symbols(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    query: String,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspWorkspaceSymbolsResult, String> {
+    // Any open document under the workspace is enough to resolve the active
+    // language server session for workspace/symbol.
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let session = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session,
+        None => {
+            let status = state
+                .lsp
+                .document_status(
+                    &document,
+                    server_command_id.as_deref(),
+                    custom_server_command.as_ref(),
+                )
+                .await;
+            return Ok(LspWorkspaceSymbolsResult {
+                status,
+                symbols: Vec::new(),
+            });
+        }
+    };
+    let result = session
+        .request(
+            "workspace/symbol",
+            json!({ "query": query }),
+        )
+        .await
+        .unwrap_or(Value::Null);
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    Ok(LspWorkspaceSymbolsResult {
+        status,
+        symbols: parse_workspace_symbols(&result),
+    })
+}
+
+#[tauri::command]
 pub async fn lsp_code_actions(
     state: State<'_, AppState>,
     workspace_id: String,
@@ -2194,6 +2274,61 @@ fn parse_code_actions(value: &Value) -> Vec<LspCodeAction> {
         .unwrap_or_default()
 }
 
+fn parse_workspace_symbol(value: &Value) -> Option<LspWorkspaceSymbol> {
+    let name = value.get("name")?.as_str()?.to_string();
+    let kind = value
+        .get("kind")
+        .and_then(Value::as_u64)
+        .and_then(|kind| u32::try_from(kind).ok())
+        .unwrap_or(0);
+    // SymbolInformation: location.uri + location.range
+    // WorkspaceSymbol (3.17): location may be { uri } only; range optional.
+    let (uri, range) = if let Some(location) = value.get("location") {
+        let uri = location.get("uri").and_then(Value::as_str)?;
+        let range = location
+            .get("range")
+            .and_then(parse_range)
+            .or_else(|| value.get("range").and_then(parse_range))
+            .unwrap_or(LspRange {
+                start: LspPosition {
+                    line: 0,
+                    character: 0,
+                },
+                end: LspPosition {
+                    line: 0,
+                    character: 0,
+                },
+            });
+        (uri.to_string(), range)
+    } else {
+        return None;
+    };
+    let selection_range = value
+        .get("selectionRange")
+        .and_then(parse_range)
+        .unwrap_or_else(|| range.clone());
+    Some(LspWorkspaceSymbol {
+        name,
+        kind,
+        container_name: value
+            .get("containerName")
+            .and_then(Value::as_str)
+            .filter(|name| !name.is_empty())
+            .map(ToString::to_string),
+        uri,
+        path: path_from_uri(&uri),
+        range,
+        selection_range,
+    })
+}
+
+fn parse_workspace_symbols(value: &Value) -> Vec<LspWorkspaceSymbol> {
+    value
+        .as_array()
+        .map(|items| items.iter().filter_map(parse_workspace_symbol).collect())
+        .unwrap_or_default()
+}
+
 fn parse_completion_item(value: &Value) -> Option<LspCompletionItem> {
     let label = value.get("label")?.as_str()?.to_string();
     Some(LspCompletionItem {
@@ -2872,6 +3007,30 @@ mod tests {
         assert_eq!(edits[1].new_text, "\n");
         assert!(parse_text_edits(&Value::Null).is_empty());
         assert!(parse_text_edits(&json!({ "not": "array" })).is_empty());
+    }
+
+    #[test]
+    fn parses_workspace_symbol_information() {
+        let symbols = parse_workspace_symbols(&json!([
+            {
+                "name": "CodeWorkspaceTab",
+                "kind": 5,
+                "containerName": "editor",
+                "location": {
+                    "uri": "file:///repo/src/CodeWorkspaceTab.tsx",
+                    "range": {
+                        "start": { "line": 10, "character": 0 },
+                        "end": { "line": 40, "character": 1 }
+                    }
+                }
+            },
+            { "name": "no location" }
+        ]));
+        assert_eq!(symbols.len(), 1);
+        assert_eq!(symbols[0].name, "CodeWorkspaceTab");
+        assert_eq!(symbols[0].kind, 5);
+        assert_eq!(symbols[0].container_name.as_deref(), Some("editor"));
+        assert_eq!(symbols[0].range.start.line, 10);
     }
 
     #[test]
