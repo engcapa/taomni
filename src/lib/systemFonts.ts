@@ -28,47 +28,72 @@ export interface SystemFontState {
   error: string | null;
 }
 
+const INITIAL_SYSTEM_FONT_STATE: SystemFontState = {
+  fonts: [],
+  loading: true,
+  source: "system",
+  error: null,
+};
+
+let cachedSystemFontState: SystemFontState | null = null;
+let pendingSystemFontRequest: Promise<SystemFontState> | null = null;
+
+/** @internal Test isolation for the module-level font cache. */
+export function resetSystemFontCacheForTests(): void {
+  cachedSystemFontState = null;
+  pendingSystemFontRequest = null;
+}
+
+function loadSystemFontsOnce(): Promise<SystemFontState> {
+  if (cachedSystemFontState) return Promise.resolve(cachedSystemFontState);
+  if (pendingSystemFontRequest) return pendingSystemFontRequest;
+
+  pendingSystemFontRequest = listSystemFonts()
+    .then((fonts): SystemFontState => {
+      console.log("[useSystemFonts] listSystemFonts() resolved with:", fonts);
+      const normalized = normalizeFontFamilies(fonts);
+      if (normalized.length === 0) {
+        console.log("[useSystemFonts] normalized length is 0, using fallback");
+        return {
+          fonts: SAFE_TERMINAL_FONT_FALLBACKS,
+          loading: false,
+          source: "fallback",
+          error: "No system fonts were returned.",
+        };
+      }
+      console.log("[useSystemFonts] normalized fonts:", normalized);
+      return { fonts: normalized, loading: false, source: "system", error: null };
+    })
+    .catch((err: unknown): SystemFontState => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[useSystemFonts] listSystemFonts() rejected with error:", msg);
+      return {
+        fonts: SAFE_TERMINAL_FONT_FALLBACKS,
+        loading: false,
+        source: "fallback",
+        error: msg,
+      };
+    })
+    .then((state) => {
+      cachedSystemFontState = state;
+      return state;
+    })
+    .finally(() => {
+      pendingSystemFontRequest = null;
+    });
+
+  return pendingSystemFontRequest;
+}
+
 export function useSystemFonts(): SystemFontState {
-  const [state, setState] = useState<SystemFontState>({
-    fonts: [],
-    loading: true,
-    source: "system",
-    error: null,
-  });
+  const [state, setState] = useState<SystemFontState>(() => cachedSystemFontState ?? INITIAL_SYSTEM_FONT_STATE);
 
   useEffect(() => {
     let cancelled = false;
 
-    console.log("[useSystemFonts] Hook mounted, calling listSystemFonts()");
-    listSystemFonts()
-      .then((fonts) => {
-        if (cancelled) return;
-        console.log("[useSystemFonts] listSystemFonts() resolved with:", fonts);
-        const normalized = normalizeFontFamilies(fonts);
-        if (normalized.length === 0) {
-          console.log("[useSystemFonts] normalized length is 0, using fallback");
-          setState({
-            fonts: SAFE_TERMINAL_FONT_FALLBACKS,
-            loading: false,
-            source: "fallback",
-            error: "No system fonts were returned.",
-          });
-          return;
-        }
-        console.log("[useSystemFonts] normalized fonts:", normalized);
-        setState({ fonts: normalized, loading: false, source: "system", error: null });
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error("[useSystemFonts] listSystemFonts() rejected with error:", msg);
-        setState({
-          fonts: SAFE_TERMINAL_FONT_FALLBACKS,
-          loading: false,
-          source: "fallback",
-          error: msg,
-        });
-      });
+    void loadSystemFontsOnce().then((nextState) => {
+      if (!cancelled) setState(nextState);
+    });
 
     return () => {
       cancelled = true;

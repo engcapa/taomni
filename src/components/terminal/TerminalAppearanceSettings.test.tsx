@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TerminalAppearanceSettings } from "./TerminalAppearanceSettings";
 import { setAppThemeMode } from "../../lib/appTheme";
 import { DEFAULT_TERMINAL_PROFILE, SYSTEM_TERMINAL_THEME, type TerminalProfile } from "../../lib/terminalProfile";
+import { resetSystemFontCacheForTests } from "../../lib/systemFonts";
 
 const ipcMocks = vi.hoisted(() => ({
   listSystemFonts: vi.fn(),
@@ -30,6 +31,7 @@ function renderAppearance(profile: TerminalProfile = DEFAULT_TERMINAL_PROFILE) {
 
 describe("TerminalAppearanceSettings", () => {
   beforeEach(() => {
+    resetSystemFontCacheForTests();
     ipcMocks.listSystemFonts.mockReset();
     ipcMocks.listSystemFonts.mockResolvedValue(["Arial", "Cascadia Mono", "Source Code Pro", "JetBrains Mono"]);
     runtimeMocks.getAppPlatform.mockReset();
