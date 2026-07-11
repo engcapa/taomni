@@ -47,6 +47,40 @@ describe("codeWorkspaceStore", () => {
     expect(ui.openOrder).toEqual(["a", "b"]);
     expect(ui.activeKey).toBe("b");
     expect(ui.markdownModes.b).toBe("split");
+    expect(ui.editorGroups.primary.openOrder).toEqual(["a", "b"]);
+    expect(ui.editorGroups.primary.activeKey).toBe("b");
+  });
+
+  it("keeps two editor groups isolated while mirroring the active group", () => {
+    const store = useCodeWorkspaceStore.getState();
+    store.ensureInstance("ws");
+    store.updateEditorGroup("ws", "primary", (group) => ({
+      ...group,
+      openOrder: ["a"],
+      activeKey: "a",
+      previewKey: "a",
+    }));
+    store.updateEditorGroup("ws", "secondary", (group) => ({
+      ...group,
+      openOrder: ["b"],
+      activeKey: "b",
+      pinnedKeys: ["b"],
+    }));
+    store.setSplitOrientation("ws", "vertical");
+    store.setActiveEditorGroup("ws", "secondary");
+
+    let ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "ws");
+    expect(ui.openOrder).toEqual(["b"]);
+    expect(ui.activeKey).toBe("b");
+    expect(ui.editorGroups.primary.previewKey).toBe("a");
+    expect(ui.splitOrientation).toBe("vertical");
+
+    store.setOpenOrder("ws", ["b", "c"]);
+    store.setActiveKey("ws", "c");
+    ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "ws");
+    expect(ui.editorGroups.secondary.openOrder).toEqual(["b", "c"]);
+    expect(ui.editorGroups.secondary.activeKey).toBe("c");
+    expect(ui.editorGroups.primary.openOrder).toEqual(["a"]);
   });
 
   it("holds openFiles, lspFiles, and tree expand chrome on the instance slice", () => {

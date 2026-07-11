@@ -12,7 +12,21 @@ import type {
 } from "../components/editor/workspace/codeWorkspaceModel";
 import { readCodeWorkspaceTreeViewMode } from "../components/editor/workspace/codeWorkspaceModel";
 
-export type BottomDockTabId = "problems" | "search" | "references";
+export type BottomDockTabId = "problems" | "search" | "references" | "terminal" | "run";
+export type EditorGroupId = "primary" | "secondary";
+export type EditorSplitOrientation = "horizontal" | "vertical";
+
+export interface CodeWorkspaceEditorGroupState {
+  id: EditorGroupId;
+  openOrder: string[];
+  activeKey: string | null;
+  previewKey: string | null;
+  pinnedKeys: string[];
+}
+
+function createEditorGroup(id: EditorGroupId): CodeWorkspaceEditorGroupState {
+  return { id, openOrder: [], activeKey: null, previewKey: null, pinnedKeys: [] };
+}
 
 /**
  * Per-workspace-instance UI / chrome + open buffers / LSP file map.
@@ -45,6 +59,9 @@ export interface CodeWorkspaceInstanceUi {
   searchQueryPreset: { value: string; nonce: number };
   openOrder: string[];
   activeKey: string | null;
+  editorGroups: Record<EditorGroupId, CodeWorkspaceEditorGroupState>;
+  activeEditorGroupId: EditorGroupId;
+  splitOrientation: EditorSplitOrientation | null;
   markdownModes: Record<string, "edit" | "preview" | "split">;
   /** Project tree chrome */
   treeFilter: string;
@@ -83,6 +100,12 @@ export function createDefaultCodeWorkspaceUi(): CodeWorkspaceInstanceUi {
     searchQueryPreset: { value: "", nonce: 0 },
     openOrder: [],
     activeKey: null,
+    editorGroups: {
+      primary: createEditorGroup("primary"),
+      secondary: createEditorGroup("secondary"),
+    },
+    activeEditorGroupId: "primary",
+    splitOrientation: null,
     markdownModes: {},
     treeFilter: "",
     treeViewMode: readCodeWorkspaceTreeViewMode(),
@@ -111,6 +134,13 @@ interface CodeWorkspaceStoreState {
   patchInstance: (instanceId: string, patch: Partial<CodeWorkspaceInstanceUi>) => void;
   setActiveKey: (instanceId: string, key: string | null) => void;
   setOpenOrder: (instanceId: string, order: string[]) => void;
+  updateEditorGroup: (
+    instanceId: string,
+    groupId: EditorGroupId,
+    updater: Updater<CodeWorkspaceEditorGroupState>,
+  ) => void;
+  setActiveEditorGroup: (instanceId: string, groupId: EditorGroupId) => void;
+  setSplitOrientation: (instanceId: string, orientation: EditorSplitOrientation | null) => void;
   setMarkdownMode: (instanceId: string, fileKey: string, mode: "edit" | "preview" | "split") => void;
   updateOpenFiles: (instanceId: string, updater: Updater<Record<string, OpenFileState>>) => void;
   updateLspFiles: (instanceId: string, updater: Updater<Record<string, LspFileState>>) => void;
@@ -160,11 +190,90 @@ export const useCodeWorkspaceStore = create<CodeWorkspaceStoreState>((set, get) 
   },
 
   setActiveKey: (instanceId, key) => {
-    get().patchInstance(instanceId, { activeKey: key });
+    get().ensureInstance(instanceId);
+    set((state) => {
+      const current = state.byInstanceId[instanceId] ?? createDefaultCodeWorkspaceUi();
+      const groupId = current.activeEditorGroupId;
+      const group = current.editorGroups[groupId];
+      return {
+        byInstanceId: {
+          ...state.byInstanceId,
+          [instanceId]: {
+            ...current,
+            activeKey: key,
+            editorGroups: {
+              ...current.editorGroups,
+              [groupId]: { ...group, activeKey: key },
+            },
+          },
+        },
+      };
+    });
   },
 
   setOpenOrder: (instanceId, order) => {
-    get().patchInstance(instanceId, { openOrder: order });
+    get().ensureInstance(instanceId);
+    set((state) => {
+      const current = state.byInstanceId[instanceId] ?? createDefaultCodeWorkspaceUi();
+      const groupId = current.activeEditorGroupId;
+      const group = current.editorGroups[groupId];
+      return {
+        byInstanceId: {
+          ...state.byInstanceId,
+          [instanceId]: {
+            ...current,
+            openOrder: order,
+            editorGroups: {
+              ...current.editorGroups,
+              [groupId]: { ...group, openOrder: order },
+            },
+          },
+        },
+      };
+    });
+  },
+
+  updateEditorGroup: (instanceId, groupId, updater) => {
+    get().ensureInstance(instanceId);
+    set((state) => {
+      const current = state.byInstanceId[instanceId] ?? createDefaultCodeWorkspaceUi();
+      const nextGroup = resolveUpdater(current.editorGroups[groupId], updater);
+      const active = current.activeEditorGroupId === groupId;
+      return {
+        byInstanceId: {
+          ...state.byInstanceId,
+          [instanceId]: {
+            ...current,
+            openOrder: active ? nextGroup.openOrder : current.openOrder,
+            activeKey: active ? nextGroup.activeKey : current.activeKey,
+            editorGroups: { ...current.editorGroups, [groupId]: nextGroup },
+          },
+        },
+      };
+    });
+  },
+
+  setActiveEditorGroup: (instanceId, groupId) => {
+    get().ensureInstance(instanceId);
+    set((state) => {
+      const current = state.byInstanceId[instanceId] ?? createDefaultCodeWorkspaceUi();
+      const group = current.editorGroups[groupId];
+      return {
+        byInstanceId: {
+          ...state.byInstanceId,
+          [instanceId]: {
+            ...current,
+            activeEditorGroupId: groupId,
+            openOrder: group.openOrder,
+            activeKey: group.activeKey,
+          },
+        },
+      };
+    });
+  },
+
+  setSplitOrientation: (instanceId, orientation) => {
+    get().patchInstance(instanceId, { splitOrientation: orientation });
   },
 
   setMarkdownMode: (instanceId, fileKey, mode) => {
