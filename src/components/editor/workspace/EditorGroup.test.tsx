@@ -48,6 +48,7 @@ function props(overrides: Partial<ComponentProps<typeof EditorGroup>> = {}): Com
     activeCapabilities: null,
     activeLspSyncing: false,
     lspStatusPill: null,
+    breadcrumbs: null,
     revealTarget: null,
     editorPaneRef: { current: null },
     editorPaneStyle: {},

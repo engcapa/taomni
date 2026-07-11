@@ -216,6 +216,7 @@ import {
 } from "./workspace/codeWorkspaceModel";
 import { useWorkspaceTreeData } from "./workspace/useWorkspaceTreeData";
 import { useWorkspaceLspSession } from "./workspace/useWorkspaceLspSession";
+import { Breadcrumbs, type BreadcrumbPathSegment } from "./workspace/Breadcrumbs";
 import type { EditorRevealTarget } from "./workspace/EditorGroup";
 
 export function CodeWorkspaceTab({
@@ -483,6 +484,8 @@ export function CodeWorkspaceTab({
   const [gitSnapshots, setGitSnapshots] = useState<Record<string, WorkspaceGitSnapshotState>>({});
   const [navCan, setNavCan] = useState({ back: false, forward: false });
   const [revealTarget, setRevealTarget] = useState<EditorRevealTarget | null>(null);
+  const [cursorPosition, setCursorPosition] = useState<LspPosition>({ line: 0, character: 0 });
+  const [breadcrumbSymbols, setBreadcrumbSymbols] = useState<LspDocumentSymbol[]>([]);
   const [referencesResult, setReferencesResult] = useState<ReferencesResultState>({
     loading: false,
     origin: null,
@@ -1792,6 +1795,54 @@ export function CodeWorkspaceTab({
   const activeMarkdownMode = activeFile && isMarkdownPath(activeFile.languagePath)
     ? markdownModes[activeFile.key] ?? "edit"
     : "edit";
+  const breadcrumbPathSegments = useMemo<BreadcrumbPathSegment[]>(() => {
+    if (!activeFile) return [];
+    if (activeFile.ref.kind === "root") {
+      const rootId = activeFile.ref.rootId;
+      const root = roots.find((candidate) => candidate.id === rootId);
+      if (!root) return [{ label: activeFile.title, path: activeFile.ref.path, kind: "file" }];
+      const parts = activeFile.ref.path.split("/").filter(Boolean);
+      let path = "";
+      return [
+        { label: root.name, path: "", kind: "root" },
+        ...parts.map((part, index): BreadcrumbPathSegment => {
+          path = path ? `${path}/${part}` : part;
+          return { label: part, path, kind: index === parts.length - 1 ? "file" : "directory" };
+        }),
+      ];
+    }
+    const normalized = normalizeFsPath(activeFile.ref.path);
+    const parts = normalized.split("/").filter(Boolean);
+    let path = normalized.startsWith("/") ? "/" : "";
+    return parts.map((part, index): BreadcrumbPathSegment => {
+      path = path === "/" ? `/${part}` : path ? `${path}/${part}` : part;
+      return { label: part, path, kind: index === parts.length - 1 ? "file" : "directory" };
+    });
+  }, [activeFile, roots]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeFile || activeFile.loading || !activeCapabilities?.documentSymbol) {
+      setBreadcrumbSymbols([]);
+      return () => { cancelled = true; };
+    }
+    const descriptor = lspDescriptorForFile(activeFile);
+    if (!descriptor) return () => { cancelled = true; };
+    const timer = window.setTimeout(() => {
+      void lspDocumentSymbols(descriptor).then((result) => {
+        if (!cancelled) {
+          updateLspStatusForFile(activeFile, result.status);
+          setBreadcrumbSymbols(result.symbols);
+        }
+      }).catch(() => {
+        if (!cancelled) setBreadcrumbSymbols([]);
+      });
+    }, 200);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [activeCapabilities?.documentSymbol, activeFile, lspDescriptorForFile, updateLspStatusForFile]);
   const activeRootId = activeFile?.ref.kind === "root" ? activeFile.ref.rootId : null;
   const activeRoot = activeRootId ? roots.find((root) => root.id === activeRootId) ?? null : null;
   const activeGitRoot = activeRoot && activeFile?.ref.kind === "root"
@@ -3171,6 +3222,27 @@ export function CodeWorkspaceTab({
             activeCapabilities={activeCapabilities}
             activeLspSyncing={!!activeLspState?.syncing}
             lspStatusPill={<LspStatusPill state={activeLspState} diagnostics={activeDiagnostics} />}
+            breadcrumbs={activeFile ? (
+              <Breadcrumbs
+                pathSegments={breadcrumbPathSegments}
+                symbols={breadcrumbSymbols}
+                position={cursorPosition}
+                onPathClick={(segment) => {
+                  if (activeFile.ref.kind !== "root") return;
+                  const rootId = activeFile.ref.rootId;
+                  if (segment.kind === "root") {
+                    setSelected({ kind: "root", rootId });
+                  } else if (segment.kind === "directory") {
+                    setSelected({ kind: "dir", rootId, path: segment.path });
+                    setExpandedDirs((current) => new Set(current).add(rootDirKey(rootId, segment.path)));
+                    void loadDir(rootId, segment.path);
+                  } else {
+                    setSelected({ kind: "file", ref: activeFile.ref });
+                  }
+                }}
+                onSymbolClick={(symbol) => revealEditorLocation(activeFile.key, symbol.selectionRange)}
+              />
+            ) : null}
             revealTarget={revealTarget}
             editorPaneRef={editorPaneRef}
             editorPaneStyle={editorPaneStyle}
@@ -3216,6 +3288,7 @@ export function CodeWorkspaceTab({
             onSignatureHelp={getLspSignatureHelp}
             onSelectionChange={(selection) => {
               editorSelectionRef.current = selection;
+              setCursorPosition(selection.end);
             }}
             onLightbulb={(line) => void openCodeActionsForLine(line)}
             onOpenMarkdownHref={openMarkdownHref}

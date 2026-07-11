@@ -44,6 +44,7 @@ interface EditorGroupProps {
   activeCapabilities: LspCapabilitySummary | null;
   activeLspSyncing: boolean;
   lspStatusPill: ReactNode;
+  breadcrumbs: ReactNode;
   revealTarget: EditorRevealTarget | null;
   editorPaneRef: MutableRefObject<HTMLElement | null>;
   editorPaneStyle: CSSProperties;
@@ -102,6 +103,7 @@ export function EditorGroup({
   activeCapabilities,
   activeLspSyncing,
   lspStatusPill,
+  breadcrumbs,
   revealTarget,
   editorPaneRef,
   editorPaneStyle,
@@ -227,6 +229,7 @@ export function EditorGroup({
         <div className="h-full min-h-0 relative">
           {activeFile ? (
             <div className="absolute inset-0 flex flex-col">
+              {breadcrumbs}
               <div className="min-h-7 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)]">
                 <span className="truncate">{activeFile.subtitle}</span>
                 <span className="shrink-0">{formatBytes(activeFile.size)}</span>

@@ -291,7 +291,7 @@ describe("CodeWorkspaceTab", () => {
 
     expect(await screen.findByText("Code · Multi Repo")).toBeInTheDocument();
     expect(screen.getByText("2 roots")).toBeInTheDocument();
-    expect(screen.getByText("app")).toBeInTheDocument();
+    expect(screen.getAllByText("app").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("lib")).toBeInTheDocument();
     expect(await screen.findByText("Language Servers")).toBeInTheDocument();
     expect(await screen.findByText("C#")).toBeInTheDocument();
