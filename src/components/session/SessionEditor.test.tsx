@@ -244,8 +244,7 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
 
     await user.click(screen.getByRole("button", { name: /terminal settings/i }));
 
-    await waitFor(() => expect(screen.getByRole("option", { name: "Cascadia Mono" })).toBeInTheDocument());
-    expect(screen.getByLabelText("Terminal font")).toHaveValue("Cascadia Mono");
+    expect(screen.getByLabelText("Terminal font")).toHaveTextContent("Cascadia Mono");
 
     const background = screen.getByLabelText("Terminal background hex");
     await user.clear(background);
@@ -550,8 +549,8 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     await user.type(screen.getByLabelText("Remote host"), "dev.example.com");
     await user.click(screen.getByRole("button", { name: /terminal settings/i }));
 
-    await waitFor(() => expect(screen.getByRole("option", { name: "JetBrains Mono" })).toBeInTheDocument());
-    await user.selectOptions(screen.getByLabelText("Terminal font"), "JetBrains Mono");
+    await user.click(screen.getByLabelText("Terminal font"));
+    await user.click(await screen.findByRole("option", { name: "JetBrains Mono" }));
     const fontSize = screen.getByLabelText("Terminal font size");
     await user.clear(fontSize);
     await user.type(fontSize, "12");
@@ -1179,9 +1178,8 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     const { onClose } = renderEditor(session);
 
     await user.click(screen.getByRole("button", { name: /terminal settings/i }));
-    await waitFor(() => expect(screen.getByRole("option", { name: "JetBrains Mono" })).toBeInTheDocument());
-
-    await user.selectOptions(screen.getByLabelText("Terminal font"), "JetBrains Mono");
+    await user.click(screen.getByLabelText("Terminal font"));
+    await user.click(await screen.findByRole("option", { name: "JetBrains Mono" }));
     const fontSize = screen.getByLabelText("Terminal font size");
     await user.clear(fontSize);
     await user.type(fontSize, "18");

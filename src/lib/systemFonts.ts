@@ -28,52 +28,77 @@ export interface SystemFontState {
   error: string | null;
 }
 
-export function useSystemFonts(): SystemFontState {
-  const [state, setState] = useState<SystemFontState>({
-    fonts: [],
-    loading: true,
-    source: "system",
-    error: null,
-  });
+const INITIAL_SYSTEM_FONT_STATE: SystemFontState = {
+  fonts: [],
+  loading: true,
+  source: "system",
+  error: null,
+};
 
-  useEffect(() => {
-    let cancelled = false;
+let cachedSystemFontState: SystemFontState | null = null;
+let pendingSystemFontRequest: Promise<SystemFontState> | null = null;
+const monospaceFontCache = new Map<string, boolean>();
 
-    console.log("[useSystemFonts] Hook mounted, calling listSystemFonts()");
-    listSystemFonts()
-      .then((fonts) => {
-        if (cancelled) return;
-        console.log("[useSystemFonts] listSystemFonts() resolved with:", fonts);
-        const normalized = normalizeFontFamilies(fonts);
-        if (normalized.length === 0) {
-          console.log("[useSystemFonts] normalized length is 0, using fallback");
-          setState({
-            fonts: SAFE_TERMINAL_FONT_FALLBACKS,
-            loading: false,
-            source: "fallback",
-            error: "No system fonts were returned.",
-          });
-          return;
-        }
-        console.log("[useSystemFonts] normalized fonts:", normalized);
-        setState({ fonts: normalized, loading: false, source: "system", error: null });
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error("[useSystemFonts] listSystemFonts() rejected with error:", msg);
-        setState({
+/** @internal Test isolation for the module-level font cache. */
+export function resetSystemFontCacheForTests(): void {
+  cachedSystemFontState = null;
+  pendingSystemFontRequest = null;
+  monospaceFontCache.clear();
+}
+
+function loadSystemFontsOnce(): Promise<SystemFontState> {
+  if (cachedSystemFontState) return Promise.resolve(cachedSystemFontState);
+  if (pendingSystemFontRequest) return pendingSystemFontRequest;
+
+  pendingSystemFontRequest = listSystemFonts()
+    .then((fonts): SystemFontState => {
+      const normalized = normalizeFontFamilies(fonts);
+      if (normalized.length === 0) {
+        return {
           fonts: SAFE_TERMINAL_FONT_FALLBACKS,
           loading: false,
           source: "fallback",
-          error: msg,
-        });
-      });
+          error: "No system fonts were returned.",
+        };
+      }
+      return { fonts: normalized, loading: false, source: "system", error: null };
+    })
+    .catch((err: unknown): SystemFontState => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[useSystemFonts] listSystemFonts() rejected with error:", msg);
+      return {
+        fonts: SAFE_TERMINAL_FONT_FALLBACKS,
+        loading: false,
+        source: "fallback",
+        error: msg,
+      };
+    })
+    .then((state) => {
+      cachedSystemFontState = state;
+      return state;
+    })
+    .finally(() => {
+      pendingSystemFontRequest = null;
+    });
+
+  return pendingSystemFontRequest;
+}
+
+export function useSystemFonts(enabled = true): SystemFontState {
+  const [state, setState] = useState<SystemFontState>(() => cachedSystemFontState ?? INITIAL_SYSTEM_FONT_STATE);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+
+    void loadSystemFontsOnce().then((nextState) => {
+      if (!cancelled) setState(nextState);
+    });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [enabled]);
 
   return state;
 }
@@ -177,6 +202,10 @@ function sameFont(a: string, b: string): boolean {
 let canvas: HTMLCanvasElement | null = null;
 export function isMonospaceFont(fontName: string): boolean {
   if (typeof document === "undefined") return true;
+  const cacheKey = fontName.trim().toLowerCase();
+  const cached = monospaceFontCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
   try {
     if (!canvas) {
       canvas = document.createElement("canvas");
@@ -193,9 +222,11 @@ export function isMonospaceFont(fontName: string): boolean {
     for (let i = 1; i < testChars.length; i++) {
       const width = context.measureText(testChars[i]).width;
       if (Math.abs(width - firstWidth) > 0.05) {
+        monospaceFontCache.set(cacheKey, false);
         return false;
       }
     }
+    monospaceFontCache.set(cacheKey, true);
     return true;
   } catch (e) {
     console.error("[isMonospaceFont] Failed to measure font:", e);

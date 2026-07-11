@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Minus, Palette, Plus } from "lucide-react";
 import {
   DEFAULT_MAIL_TERMINAL_PROFILE,
@@ -13,12 +13,15 @@ import { useT } from "../../lib/i18n";
 import { ThemePreviewSelect } from "../theme/ThemePreviewSelect";
 import { buildMailThemeOptions } from "../theme/themePreviews";
 import {
+  getPrimaryFontName,
   isMonospaceFont,
   makeTerminalFontFamily,
   resolveSelectedFontName,
+  SAFE_TERMINAL_FONT_FALLBACKS,
   useSystemFonts,
   useTerminalFontOptions,
 } from "../../lib/systemFonts";
+import { FontPickerSelect, type FontPickerOption } from "../terminal/FontPickerPanel";
 
 interface MailAppearanceSettingsProps {
   profile: TerminalProfile;
@@ -30,20 +33,25 @@ export function MailAppearanceSettings({
   onProfileChange,
 }: MailAppearanceSettingsProps) {
   const t = useT();
-  const fontState = useSystemFonts();
-  const fontOptions = useTerminalFontOptions(fontState.fonts);
-  const partitionedFonts = useMemo(() => {
-    const mono: string[] = [];
-    const prop: string[] = [];
-    for (const font of fontOptions) {
-      if (isMonospaceFont(font)) {
-        mono.push(font);
-      } else {
-        prop.push(font);
-      }
-    }
-    return { mono, prop };
-  }, [fontOptions]);
+  const [fontCatalogRequested, setFontCatalogRequested] = useState(false);
+  const fontState = useSystemFonts(fontCatalogRequested);
+  const primaryFont = useMemo(() => getPrimaryFontName(profile.fontFamily), [profile.fontFamily]);
+  const fontOptions = useTerminalFontOptions(
+    [...(fontState.fonts.length > 0 ? fontState.fonts : SAFE_TERMINAL_FONT_FALLBACKS), primaryFont],
+  );
+  const fontPickerOptions = useMemo<FontPickerOption[]>(() => fontOptions.map((font) => ({
+    value: font,
+    label: font,
+    fontFamily: `"${font}", monospace`,
+  })), [fontOptions]);
+  const fontGroupLabels = useMemo(() => ({
+    mono: t("terminalAppearance.fontGroupMonoSystem"),
+    proportional: t("terminalAppearance.fontGroupProportional"),
+  }), [t]);
+  const fontGroupForOption = useCallback(
+    (option: FontPickerOption) => isMonospaceFont(option.label) ? "mono" : "proportional",
+    [],
+  );
   const selectedFont = resolveSelectedFontName(profile.fontFamily, fontOptions);
   const { resolvedTheme: resolvedAppTheme } = useAppTheme();
   const appPrefersDark = resolvedAppTheme === "dark";
@@ -109,32 +117,16 @@ export function MailAppearanceSettings({
         <div className="grid grid-cols-12 gap-3 items-end">
           <label className="col-span-12 md:col-span-8">
             <span className="block text-[12px] font-semibold mb-1">{t("mailAppearance.fontLabel")}</span>
-            <select
-              aria-label={t("mailAppearance.fontAria")}
-              className="taomni-input w-full"
-              value={selectedFont}
-              disabled={fontOptions.length === 0}
-              onChange={(event) => updateProfile({ fontFamily: makeTerminalFontFamily(event.target.value) })}
-            >
-              {partitionedFonts.mono.length > 0 && (
-                <optgroup label={t("terminalAppearance.fontGroupMonoSystem")}>
-                  {partitionedFonts.mono.map((font) => (
-                    <option key={font} value={font}>
-                      {font}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-              {partitionedFonts.prop.length > 0 && (
-                <optgroup label={t("terminalAppearance.fontGroupProportional")}>
-                  {partitionedFonts.prop.map((font) => (
-                    <option key={font} value={font}>
-                      {font}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
+            <FontPickerSelect
+              ariaLabel={t("mailAppearance.fontAria")}
+              options={fontPickerOptions}
+              selectedValue={selectedFont}
+              loading={fontState.loading && fontState.fonts.length === 0}
+              groupForOption={fontGroupForOption}
+              groupLabels={fontGroupLabels}
+              onOpen={() => setFontCatalogRequested(true)}
+              onSelect={(font) => updateProfile({ fontFamily: makeTerminalFontFamily(font) })}
+            />
           </label>
 
           <div className="col-span-12 md:col-span-4">

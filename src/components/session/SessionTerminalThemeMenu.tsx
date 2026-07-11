@@ -9,7 +9,6 @@ import {
 } from "../../lib/sessionTerminalTheme";
 import { isCustomTerminalTheme, resolveTerminalTheme } from "../../lib/terminalProfile";
 import { resolveThemeId } from "../../lib/themes";
-import { useSystemFonts } from "../../lib/systemFonts";
 import type { MenuItem } from "../ContextMenu";
 import { buildTerminalThemeOptions } from "../theme/themePreviews";
 import {
@@ -56,7 +55,6 @@ function SessionTerminalThemeMenuPanel({
   t: TranslateFn;
   onChangeAppearance: (patch: SessionTerminalAppearancePatch) => void;
 }) {
-  const fontState = useSystemFonts();
   const [draftPatch, setDraftPatch] = useState<SessionTerminalAppearancePatch>({});
   const draftPatchRef = useRef<SessionTerminalAppearancePatch>({});
   const profiles = useMemo(
@@ -107,7 +105,6 @@ function SessionTerminalThemeMenuPanel({
     <TerminalAppearanceMenuPanel
       themeValue={listValue}
       themeOptions={options}
-      fonts={fontState.fonts}
       fontFamily={fontFamilyValue}
       fontSize={fontSizeValue}
       labels={labels}

@@ -41,6 +41,7 @@ import { CodeViewAppearanceSettings } from "./CodeViewAppearanceSettings";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 import { SqlCompletionSettings } from "./SqlCompletionSettings";
 import { SqlExecutionSettings } from "./SqlExecutionSettings";
+import { FontPickerSelect, type FontPickerOption } from "../terminal/FontPickerPanel";
 
 const UI_FONTS = [
   { value: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', label: "Inter (Default UI - Highly Recommended)" },
@@ -116,7 +117,8 @@ export function SettingsPanel() {
   const setUiFontFamily = useAppStore((s) => s.setUiFontFamily);
   const setUiFontSize = useAppStore((s) => s.setUiFontSize);
   const setWelcomeRecentSessionLimit = useAppStore((s) => s.setWelcomeRecentSessionLimit);
-  const systemFonts = useSystemFonts();
+  const [fontCatalogRequested, setFontCatalogRequested] = useState(false);
+  const systemFonts = useSystemFonts(fontCatalogRequested);
   const voiceShellEnabled = useAiStore((s) => s.voiceShellEnabled);
   const toggleVoiceShell = useAiStore((s) => s.toggleVoiceShell);
   const t = useT();
@@ -179,6 +181,38 @@ export function SettingsPanel() {
     }
     return uiFontFamily;
   }, [uiFontFamily, systemFonts.fonts]);
+  const uiFontOptions = useMemo<FontPickerOption[]>(() => {
+    const options: FontPickerOption[] = [
+      ...UI_FONTS.map((font) => ({
+        value: font.value,
+        label: font.label,
+        fontFamily: font.value,
+        group: "curated",
+      })),
+      ...systemFonts.fonts.map((font) => ({
+        value: `"${font}", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`,
+        label: font,
+        fontFamily: `"${font}", sans-serif`,
+        group: "system",
+      })),
+    ];
+    if (!options.some((option) => option.value === currentSelectValue)) {
+      const label = currentSelectValue.replace(/["']/g, "").split(",")[0]?.trim() || currentSelectValue;
+      options.unshift({
+        value: currentSelectValue,
+        label,
+        fontFamily: currentSelectValue,
+        group: "current",
+      });
+    }
+    return options;
+  }, [currentSelectValue, systemFonts.fonts]);
+  const uiFontGroupLabels = useMemo(() => ({
+    current: "",
+    curated: t("settings.fontFamilyCurated"),
+    system: t("settings.fontFamilySystem"),
+  }), [t]);
+  const requestSystemFonts = useCallback(() => setFontCatalogRequested(true), []);
 
   useEffect(() => {
     applyCodeViewProfile(codeViewProfile, DEFAULT_TERMINAL_PROFILE, { resolvedAppTheme: resolvedTheme });
@@ -369,32 +403,17 @@ export function SettingsPanel() {
                   <label htmlFor="ui-font-family-select" className="text-[12px] font-medium text-[var(--taomni-text-muted)]">
                     {t("settings.fontFamilyLabel")}
                   </label>
-                  <select
+                  <FontPickerSelect
+                    ariaLabel={t("settings.fontFamilyLabel")}
                     id="ui-font-family-select"
-                    className="taomni-input h-8 w-full"
-                    value={currentSelectValue}
-                    onChange={(e) => setUiFontFamily(e.target.value)}
-                  >
-                    <optgroup label={t("settings.fontFamilyCurated")}>
-                      {UI_FONTS.map((font) => (
-                        <option key={font.value} value={font.value}>
-                          {font.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                    {systemFonts.fonts.length > 0 && (
-                      <optgroup label={t("settings.fontFamilySystem")}>
-                        {systemFonts.fonts.map((font) => {
-                          const fontValue = `"${font}", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-                          return (
-                            <option key={font} value={fontValue}>
-                              {font}
-                            </option>
-                          );
-                        })}
-                      </optgroup>
-                    )}
-                  </select>
+                    testId="ui-font-family-select"
+                    options={uiFontOptions}
+                    selectedValue={currentSelectValue}
+                    groupLabels={uiFontGroupLabels}
+                    loading={fontCatalogRequested && systemFonts.loading}
+                    onOpen={requestSystemFonts}
+                    onSelect={setUiFontFamily}
+                  />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <div className="flex justify-between items-center text-[12px] font-medium text-[var(--taomni-text-muted)]">
@@ -441,6 +460,8 @@ export function SettingsPanel() {
               profile={codeViewProfile}
               terminalProfile={DEFAULT_TERMINAL_PROFILE}
               onProfileChange={setCodeViewProfile}
+              fontState={systemFonts}
+              onRequestSystemFonts={requestSystemFonts}
             />
           </SettingsAnchor>
 
@@ -477,6 +498,8 @@ export function SettingsPanel() {
               onProfileChange={handleTerminalDefaultProfileChange}
               showCustomColors
               allowSystemTheme
+              fontState={systemFonts}
+              onRequestSystemFonts={requestSystemFonts}
             />
           </SettingsAnchor>
 

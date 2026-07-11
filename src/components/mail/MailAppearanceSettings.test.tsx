@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MailAppearanceSettings } from "./MailAppearanceSettings";
@@ -32,8 +32,8 @@ describe("MailAppearanceSettings", () => {
     const user = userEvent.setup();
     const { onProfileChange } = renderAppearance();
 
-    await waitFor(() => expect(screen.getByRole("option", { name: "JetBrains Mono" })).toBeInTheDocument());
-    await user.selectOptions(screen.getByLabelText("Mail font"), "JetBrains Mono");
+    await user.click(screen.getByLabelText("Mail font"));
+    await user.click(await screen.findByRole("option", { name: "JetBrains Mono" }));
     const fontSize = screen.getByLabelText("Mail font size");
     await user.clear(fontSize);
     await user.type(fontSize, "18");

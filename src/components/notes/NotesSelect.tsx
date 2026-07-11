@@ -19,6 +19,7 @@ interface NotesSelectProps {
   selectBg?: string;
   selectColor?: string;
   selectBorder?: string;
+  onOpen?: () => void;
 }
 
 export function NotesSelect({
@@ -32,6 +33,7 @@ export function NotesSelect({
   selectBg,
   selectColor,
   selectBorder,
+  onOpen,
 }: NotesSelectProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -84,7 +86,11 @@ export function NotesSelect({
           borderColor: selectBorder,
           ...selected?.style,
         }}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => setOpen((current) => {
+          const next = !current;
+          if (next) onOpen?.();
+          return next;
+        })}
       >
         <span className="truncate text-[11px] font-medium leading-none">
           {selected?.label}
