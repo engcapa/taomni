@@ -28,11 +28,8 @@ import {
 import {
   workspaceCreateDir,
   workspaceCreateFile,
-  workspaceCompactChain,
   workspaceDeletePath,
   workspaceDetectGitRoots,
-  workspaceListFilesRecursive,
-  workspaceListDir,
   workspaceReadFile,
   workspaceReadLooseFile,
   workspaceRenamePath,
@@ -175,8 +172,6 @@ export interface CodeWorkspaceGitManagerPayload {
 }
 
 import {
-  type DirectoryState,
-  type FlatFilesState,
   type LspFileState,
   type MarkdownViewMode,
   type OpenFileState,
@@ -190,10 +185,6 @@ import {
   CODE_WORKSPACE_MIN_FONT_SIZE,
   CODE_WORKSPACE_MIN_TREE_FONT_SIZE,
   CUSTOM_LSP_COMMAND_ID,
-  DEFAULT_DIR_STATE,
-  DEFAULT_FLAT_FILES_STATE,
-  FLAT_VIEW_MAX_DEPTH,
-  FLAT_VIEW_MAX_FILES,
   NAV_HISTORY_LIMIT,
   RECENT_FILES_LIMIT,
   absoluteWorkspacePath,
@@ -238,8 +229,8 @@ import {
   writeCodeWorkspaceTreeViewMode,
   writeLspCommandPrefs,
   writeLspCustomCommands,
-  type CompactChainState,
 } from "./workspace/codeWorkspaceModel";
+import { useWorkspaceTreeData } from "./workspace/useWorkspaceTreeData";
 import type { EditorRevealTarget } from "./workspace/EditorGroup";
 
 export function CodeWorkspaceTab({
@@ -475,9 +466,20 @@ export function CodeWorkspaceTab({
   const [treeFontSize, setTreeFontSizeState] = useState(() => readCodeWorkspaceTreeFontSize());
   const [roots, setRoots] = useState<CodeWorkspaceRootInfo[]>(() => initialRoots(workspace));
   const [looseFiles, setLooseFiles] = useState<CodeWorkspaceLooseFileInfo[]>(() => initialLooseFiles(workspace));
-  const [directories, setDirectories] = useState<Record<string, DirectoryState>>({});
-  const [compactChains, setCompactChains] = useState<Record<string, CompactChainState>>({});
-  const [flatFiles, setFlatFiles] = useState<Record<string, FlatFilesState>>({});
+  const {
+    directories,
+    compactChains,
+    flatFiles,
+    loadDir,
+    loadFlatFiles,
+    reset: resetTreeData,
+    removeRoot: removeTreeDataRoot,
+  } = useWorkspaceTreeData({
+    roots,
+    expandedRootIds: expandedRoots,
+    treeViewMode,
+    onError: setStatusMessage,
+  });
   const [gitRoots, setGitRoots] = useState<WorkspaceGitRoot[]>([]);
   const [gitRootsLoading, setGitRootsLoading] = useState(false);
   const [gitSnapshots, setGitSnapshots] = useState<Record<string, WorkspaceGitSnapshotState>>({});
@@ -496,8 +498,6 @@ export function CodeWorkspaceTab({
   const looseFilesRef = useRef(looseFiles);
   const codeViewProfileRef = useRef(codeViewProfile);
   const treeFontSizeRef = useRef(treeFontSize);
-  const compactChainsRef = useRef(compactChains);
-  const flatFilesRef = useRef(flatFiles);
   const gitRootsRef = useRef(gitRoots);
   const lspVersionRef = useRef<Record<string, number>>({});
   const navHistoryRef = useRef<{ stack: CodeWorkspaceFileRef[]; index: number; suppress: boolean }>({
@@ -538,14 +538,6 @@ export function CodeWorkspaceTab({
   useEffect(() => {
     looseFilesRef.current = looseFiles;
   }, [looseFiles]);
-
-  useEffect(() => {
-    compactChainsRef.current = compactChains;
-  }, [compactChains]);
-
-  useEffect(() => {
-    flatFilesRef.current = flatFiles;
-  }, [flatFiles]);
 
   useEffect(() => {
     gitRootsRef.current = gitRoots;
@@ -921,143 +913,6 @@ export function CodeWorkspaceTab({
     [lspDescriptorForFile, refreshFileDiagnostics],
   );
 
-  const loadDir = useCallback(
-    async (rootId: string, path: string) => {
-      const root = findRoot(rootId);
-      if (!root) return;
-      const key = rootDirKey(rootId, path);
-      setDirectories((current) => ({
-        ...current,
-        [key]: {
-          ...(current[key] ?? DEFAULT_DIR_STATE),
-          loading: true,
-          error: null,
-        },
-      }));
-      try {
-        const entries = await workspaceListDir(root.path, path);
-        setDirectories((current) => ({
-          ...current,
-          [key]: {
-            entries,
-            loaded: true,
-            loading: false,
-            error: null,
-          },
-        }));
-      } catch (err) {
-        const message = errorMessage(err);
-        setDirectories((current) => ({
-          ...current,
-          [key]: {
-            ...(current[key] ?? DEFAULT_DIR_STATE),
-            loaded: true,
-            loading: false,
-            error: message,
-          },
-        }));
-        setStatusMessage(message);
-      }
-    },
-    [findRoot, setStatusMessage],
-  );
-
-  const loadCompactChain = useCallback(
-    async (rootId: string, path: string) => {
-      const root = findRoot(rootId);
-      if (!root) return;
-      const key = rootDirKey(rootId, path);
-      const cached = compactChainsRef.current[key];
-      if (cached?.loading || (cached && !cached.error)) return;
-      setCompactChains((current) => ({
-        ...current,
-        [key]: {
-          path,
-          entries: current[key]?.entries ?? [],
-          loading: true,
-          error: null,
-        },
-      }));
-      try {
-        const chain = await workspaceCompactChain(root.path, path, 16);
-        setCompactChains((current) => ({
-          ...current,
-          [key]: {
-            path: chain.path,
-            entries: chain.entries,
-            loading: false,
-            error: null,
-          },
-        }));
-        setDirectories((current) => ({
-          ...current,
-          [rootDirKey(rootId, chain.path)]: {
-            entries: chain.entries,
-            loaded: true,
-            loading: false,
-            error: null,
-          },
-        }));
-      } catch (err) {
-        const message = errorMessage(err);
-        setCompactChains((current) => ({
-          ...current,
-          [key]: {
-            path,
-            entries: [],
-            loading: false,
-            error: message,
-          },
-        }));
-      }
-    },
-    [findRoot],
-  );
-
-  const loadFlatFiles = useCallback(
-    async (rootId: string, force = false) => {
-      const root = findRoot(rootId);
-      if (!root) return;
-      const cached = flatFilesRef.current[rootId];
-      if (!force && (cached?.loading || cached?.loaded)) return;
-      setFlatFiles((current) => ({
-        ...current,
-        [rootId]: {
-          ...(current[rootId] ?? DEFAULT_FLAT_FILES_STATE),
-          loading: true,
-          error: null,
-        },
-      }));
-      try {
-        const entries = await workspaceListFilesRecursive(root.path, "", FLAT_VIEW_MAX_DEPTH, FLAT_VIEW_MAX_FILES);
-        setFlatFiles((current) => ({
-          ...current,
-          [rootId]: {
-            entries,
-            loading: false,
-            loaded: true,
-            error: null,
-            truncated: entries.length >= FLAT_VIEW_MAX_FILES,
-          },
-        }));
-      } catch (err) {
-        const message = errorMessage(err);
-        setFlatFiles((current) => ({
-          ...current,
-          [rootId]: {
-            entries: current[rootId]?.entries ?? [],
-            loading: false,
-            loaded: true,
-            error: message,
-            truncated: false,
-          },
-        }));
-        setStatusMessage(message);
-      }
-    },
-    [findRoot, setStatusMessage],
-  );
-
   const refreshWorkspaceGitSnapshots = useCallback(async (targets = gitRootsRef.current) => {
     await Promise.all(targets.map(async (root) => {
       setGitSnapshots((current) => ({
@@ -1090,12 +945,6 @@ export function CodeWorkspaceTab({
       }
     }));
   }, []);
-
-  useEffect(() => {
-    roots.forEach((root) => {
-      if (expandedRoots.has(root.id)) void loadDir(root.id, "");
-    });
-  }, [expandedRoots, loadDir, roots]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1153,24 +1002,6 @@ export function CodeWorkspaceTab({
     const repo = gitRootForWorkspacePath(root, path, gitRootsRef.current);
     if (repo) notifyGitRepoChanged(repo.repoRoot);
   }, [findRoot]);
-
-  useEffect(() => {
-    if (treeViewMode !== "compact") return;
-    for (const [key, state] of Object.entries(directories)) {
-      if (!state.loaded || state.error) continue;
-      const [rootId] = key.split(":", 1);
-      for (const entry of state.entries) {
-        if (entry.fileType === "dir" && !shouldHideEntry(entry)) {
-          void loadCompactChain(rootId, entry.path);
-        }
-      }
-    }
-  }, [directories, loadCompactChain, treeViewMode]);
-
-  useEffect(() => {
-    if (treeViewMode !== "flat") return;
-    roots.forEach((root) => void loadFlatFiles(root.id));
-  }, [loadFlatFiles, roots, treeViewMode]);
 
   const openFile = useCallback(
     async (ref: CodeWorkspaceFileRef) => {
@@ -1409,14 +1240,12 @@ export function CodeWorkspaceTab({
   }, [addLooseFilePath]);
 
   const refreshTree = useCallback(() => {
-    setDirectories({});
-    setCompactChains({});
-    setFlatFiles({});
+    resetTreeData();
     rootsRef.current.forEach((root) => {
       if (expandedRoots.has(root.id)) void loadDir(root.id, "");
       if (treeViewMode === "flat") void loadFlatFiles(root.id, true);
     });
-  }, [expandedRoots, loadDir, loadFlatFiles, treeViewMode]);
+  }, [expandedRoots, loadDir, loadFlatFiles, resetTreeData, treeViewMode]);
 
   const toggleRoot = useCallback(
     (rootId: string) => {
@@ -1612,7 +1441,7 @@ export function CodeWorkspaceTab({
       if (!confirmed) return;
       const removedRootId = root.id;
       setRoots((current) => current.filter((item) => item.id !== removedRootId));
-      setDirectories((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${removedRootId}:`))));
+      removeTreeDataRoot(removedRootId);
       setOpenFiles((current) => Object.fromEntries(Object.entries(current).filter(([, file]) => file.ref.kind !== "root" || file.ref.rootId !== removedRootId)));
       const remaining = openOrderRef.current.filter((key) => {
         const file = openFilesRef.current[key];
@@ -1688,7 +1517,7 @@ export function CodeWorkspaceTab({
     } catch (err) {
       setStatusMessage(errorMessage(err));
     }
-  }, [findRoot, loadDir, notifyWorkspacePathGitChanged, selected, setStatusMessage]);
+  }, [findRoot, loadDir, notifyWorkspacePathGitChanged, removeTreeDataRoot, selected, setStatusMessage]);
 
   const treeContextMenu = useContextMenu();
   const treeClipboardRef = useRef<{ mode: "copy" | "cut"; rootId: string; path: string } | null>(null);
