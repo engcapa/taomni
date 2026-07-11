@@ -44,21 +44,26 @@ describe("TerminalAppearanceSettings", () => {
   });
 
   it("lists OS fonts and selects Cascadia Mono by default when available", async () => {
+    const user = userEvent.setup();
     renderAppearance();
 
-    await waitFor(() => expect(screen.getByRole("option", { name: "Cascadia Mono" })).toBeInTheDocument());
+    const fontPicker = screen.getByLabelText("Terminal font");
+    expect(fontPicker).toHaveTextContent("Cascadia Mono");
+    expect(ipcMocks.listSystemFonts).not.toHaveBeenCalled();
+    await user.click(fontPicker);
 
-    expect(screen.getByLabelText("Terminal font")).toHaveValue("Cascadia Mono");
-    expect(screen.getByRole("option", { name: "Arial" })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "Arial" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Fira Code" })).not.toBeInTheDocument();
   });
 
   it("uses a safe fallback font list when OS font loading fails", async () => {
+    const user = userEvent.setup();
     ipcMocks.listSystemFonts.mockRejectedValueOnce(new Error("font access failed"));
 
     renderAppearance();
+    await user.click(screen.getByLabelText("Terminal font"));
 
-    await waitFor(() => expect(screen.getByRole("option", { name: "Source Code Pro" })).toBeInTheDocument());
+    expect(await screen.findByRole("option", { name: "Source Code Pro" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Fira Code" })).toBeInTheDocument();
   });
 
@@ -90,8 +95,8 @@ describe("TerminalAppearanceSettings", () => {
     const user = userEvent.setup();
     const { onProfileChange } = renderAppearance();
 
-    await waitFor(() => expect(screen.getByRole("option", { name: "JetBrains Mono" })).toBeInTheDocument());
-    await user.selectOptions(screen.getByLabelText("Terminal font"), "JetBrains Mono");
+    await user.click(screen.getByLabelText("Terminal font"));
+    await user.click(await screen.findByRole("option", { name: "JetBrains Mono" }));
     const fontSize = screen.getByLabelText("Terminal font size");
     await user.clear(fontSize);
     await user.type(fontSize, "18");

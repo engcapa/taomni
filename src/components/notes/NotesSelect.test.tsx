@@ -25,6 +25,7 @@ describe("NotesSelect", () => {
   });
 
   it("toggles the dropdown menu on click", () => {
+    const onOpen = vi.fn();
     render(
       <NotesSelect
         value="a"
@@ -32,6 +33,7 @@ describe("NotesSelect", () => {
         onChange={() => {}}
         ariaLabel="Select Option"
         testId="custom-select-toggle"
+        onOpen={onOpen}
       />
     );
     
@@ -40,6 +42,7 @@ describe("NotesSelect", () => {
 
     // Click button to open
     fireEvent.click(screen.getByTestId("custom-select-toggle"));
+    expect(onOpen).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("listbox")).toBeInTheDocument();
     expect(screen.getByText("Option B")).toBeInTheDocument();
 

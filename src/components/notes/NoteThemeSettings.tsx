@@ -6,6 +6,7 @@ import { ThemePreviewSelect } from "../theme/ThemePreviewSelect";
 import { NotesThemeLinePreview } from "../theme/themePreviews";
 import { NotesSelect } from "./NotesSelect";
 import { useSystemFonts } from "../../lib/systemFonts";
+import { useState } from "react";
 
 /**
  * NoteThemeSettings — theme picker + in-app always-on-top, surfaced from the
@@ -27,7 +28,8 @@ export function NoteThemeSettings() {
   const setFontSize = useNotesStore((s) => s.setFontSize);
   const alwaysOnTop = useNotesStore((s) => s.alwaysOnTopInApp);
   const setAlwaysOnTop = useNotesStore((s) => s.setAlwaysOnTop);
-  const fontState = useSystemFonts();
+  const [fontCatalogRequested, setFontCatalogRequested] = useState(false);
+  const fontState = useSystemFonts(fontCatalogRequested);
 
   const themeOptions = NOTES_THEMES.map((th: NotesTheme) => ({
     value: th,
@@ -76,6 +78,14 @@ export function NoteThemeSettings() {
       style: { fontFamily: `"${f}"` },
     })),
   ];
+  if (!fontOptions.some((option) => option.value === font)) {
+    fontOptions.unshift({
+      value: font,
+      label: String(font).replace(/["']/g, "").split(",")[0]?.trim() || String(font),
+      group: t("settings.fontFamilySystem"),
+      style: { fontFamily: String(font) },
+    });
+  }
 
   return (
     <div
@@ -112,6 +122,7 @@ export function NoteThemeSettings() {
           selectBg={selectBg}
           selectColor={selectColor}
           selectBorder={selectBorder}
+          onOpen={() => setFontCatalogRequested(true)}
         />
       </label>
 

@@ -301,7 +301,8 @@ describe("SessionTree multi-select batch operations", () => {
     const item = screen.getByTestId("context-menu-item-set-terminal-theme");
     fireEvent.mouseEnter(item.parentElement!);
     const fontSelect = await screen.findByTestId("session-terminal-font-select");
-    fireEvent.change(fontSelect, { target: { value: "JetBrains Mono" } });
+    fireEvent.click(fontSelect);
+    fireEvent.click(await screen.findByRole("option", { name: "JetBrains Mono" }));
 
     await waitFor(() => expect(ipcMocks.saveSession).toHaveBeenCalledTimes(2));
     const savedOptions = ipcMocks.saveSession.mock.calls.map(([cfg]) => JSON.parse(cfg.options_json));

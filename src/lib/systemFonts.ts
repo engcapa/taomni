@@ -52,10 +52,8 @@ function loadSystemFontsOnce(): Promise<SystemFontState> {
 
   pendingSystemFontRequest = listSystemFonts()
     .then((fonts): SystemFontState => {
-      console.log("[useSystemFonts] listSystemFonts() resolved with:", fonts);
       const normalized = normalizeFontFamilies(fonts);
       if (normalized.length === 0) {
-        console.log("[useSystemFonts] normalized length is 0, using fallback");
         return {
           fonts: SAFE_TERMINAL_FONT_FALLBACKS,
           loading: false,
@@ -63,7 +61,6 @@ function loadSystemFontsOnce(): Promise<SystemFontState> {
           error: "No system fonts were returned.",
         };
       }
-      console.log("[useSystemFonts] normalized fonts:", normalized);
       return { fonts: normalized, loading: false, source: "system", error: null };
     })
     .catch((err: unknown): SystemFontState => {
@@ -87,10 +84,11 @@ function loadSystemFontsOnce(): Promise<SystemFontState> {
   return pendingSystemFontRequest;
 }
 
-export function useSystemFonts(): SystemFontState {
+export function useSystemFonts(enabled = true): SystemFontState {
   const [state, setState] = useState<SystemFontState>(() => cachedSystemFontState ?? INITIAL_SYSTEM_FONT_STATE);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
 
     void loadSystemFontsOnce().then((nextState) => {
@@ -100,7 +98,7 @@ export function useSystemFonts(): SystemFontState {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [enabled]);
 
   return state;
 }

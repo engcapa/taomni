@@ -34,7 +34,6 @@ import {
   getDefaultTerminalFontFamily,
   getPrimaryFontName,
   isMonospaceFont,
-  useSystemFonts,
 } from "../../lib/systemFonts";
 import { TerminalAppearanceSettings } from "./TerminalAppearanceSettings";
 import { TerminalAppearanceMenuPanel } from "./TerminalAppearanceMenuPanel";
@@ -378,7 +377,6 @@ export function TerminalPanel({
   const contextMenu = useContextMenu();
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const updateTabTitle = useAppStore((s) => s.updateTabTitle);
-  const fontState = useSystemFonts();
   const attachToComposer = useChatStore((s) => s.attachToComposer);
   const explainSelection = useChatStore((s) => s.explainSelection);
   const isLocal = !ssh && !commandTerminal;
@@ -1853,7 +1851,6 @@ export function TerminalPanel({
           <TerminalAppearanceMenuPanel
             themeValue={themeMenuValue}
             themeOptions={themeOptions}
-            fonts={fontState.fonts}
             fontFamily={fontFamily}
             fontSize={fontSize}
             fontSelectTestId="terminal-context-font-select"
@@ -1967,7 +1964,6 @@ export function TerminalPanel({
     fontFamily,
     fontLigatures,
     fontSize,
-    fontState.fonts,
     fullscreen,
     getActiveTerminalSelectionText,
     gitState.kind,

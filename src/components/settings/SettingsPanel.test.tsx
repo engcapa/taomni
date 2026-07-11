@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setAppThemeMode } from "../../lib/appTheme";
@@ -75,7 +75,8 @@ describe("SettingsPanel", () => {
 
     // Select alternative UI font
     const fontSelect = screen.getByLabelText("UI Font Family");
-    await user.selectOptions(fontSelect, '"Outfit", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
+    await user.click(fontSelect);
+    await user.click(screen.getByRole("option", { name: "Outfit (Geometric Elegant)" }));
     expect(window.localStorage.getItem("taomni.uiFontFamily")).toContain("Outfit");
 
     // Slider for base size
@@ -96,9 +97,8 @@ describe("SettingsPanel", () => {
     render(<SettingsPanel />);
 
     const codeFontSelect = screen.getByLabelText("Code font");
-    await waitFor(() => expect(within(codeFontSelect).getByRole("option", { name: "JetBrains Mono" })).toBeInTheDocument());
-
-    await user.selectOptions(codeFontSelect, "JetBrains Mono");
+    await user.click(codeFontSelect);
+    await user.click(await screen.findByRole("option", { name: "JetBrains Mono" }));
     const fontSize = screen.getByLabelText("Code font size");
     await user.clear(fontSize);
     await user.type(fontSize, "15");
@@ -120,9 +120,8 @@ describe("SettingsPanel", () => {
     render(<SettingsPanel />);
 
     const terminalFontSelect = screen.getByLabelText("Terminal font");
-    await waitFor(() => expect(within(terminalFontSelect).getByRole("option", { name: "JetBrains Mono" })).toBeInTheDocument());
-
-    await user.selectOptions(terminalFontSelect, "JetBrains Mono");
+    await user.click(terminalFontSelect);
+    await user.click(await screen.findByRole("option", { name: "JetBrains Mono" }));
     fireEvent.change(screen.getByLabelText("Scrollback lines"), { target: { value: "4321" } });
     await user.click(screen.getByLabelText("Read-only terminal"));
 

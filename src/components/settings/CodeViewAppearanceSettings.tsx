@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import {
   CODE_VIEW_TERMINAL_THEME_PREFIX,
@@ -15,17 +15,20 @@ import {
   isMonospaceFont,
   makeTerminalFontFamily,
   resolveSelectedFontName,
+  SAFE_TERMINAL_FONT_FALLBACKS,
   type SystemFontState,
   useSystemFonts,
   useTerminalFontOptions,
 } from "../../lib/systemFonts";
 import { useT } from "../../lib/i18n";
+import { FontPickerSelect, type FontPickerOption } from "../terminal/FontPickerPanel";
 
 interface CodeViewAppearanceSettingsProps {
   profile: CodeViewProfile;
   terminalProfile: TerminalProfile;
   onProfileChange: (profile: CodeViewProfile) => void;
   fontState?: SystemFontState;
+  onRequestSystemFonts?: () => void;
 }
 
 export function CodeViewAppearanceSettings(props: CodeViewAppearanceSettingsProps) {
@@ -36,8 +39,15 @@ export function CodeViewAppearanceSettings(props: CodeViewAppearanceSettingsProp
 }
 
 function CodeViewAppearanceSettingsWithFonts(props: CodeViewAppearanceSettingsProps) {
-  const fontState = useSystemFonts();
-  return <CodeViewAppearanceSettingsContent {...props} fontState={fontState} />;
+  const [fontCatalogRequested, setFontCatalogRequested] = useState(false);
+  const fontState = useSystemFonts(fontCatalogRequested);
+  return (
+    <CodeViewAppearanceSettingsContent
+      {...props}
+      fontState={fontState}
+      onRequestSystemFonts={() => setFontCatalogRequested(true)}
+    />
+  );
 }
 
 function CodeViewAppearanceSettingsContent({
@@ -45,24 +55,31 @@ function CodeViewAppearanceSettingsContent({
   terminalProfile,
   onProfileChange,
   fontState,
+  onRequestSystemFonts,
 }: CodeViewAppearanceSettingsProps & { fontState: SystemFontState }) {
   const t = useT();
-  const fontOptions = useTerminalFontOptions(fontState.fonts);
+  const primaryFont = useMemo(() => getPrimaryFontName(profile.fontFamily), [profile.fontFamily]);
+  const fontOptions = useTerminalFontOptions(
+    [...(fontState.fonts.length > 0 ? fontState.fonts : SAFE_TERMINAL_FONT_FALLBACKS), primaryFont],
+  );
   const selectedFont = resolveSelectedFontName(profile.fontFamily, fontOptions);
   const showFontWarning = selectedFont ? !isMonospaceFont(selectedFont) : false;
-  const primaryFont = useMemo(() => getPrimaryFontName(profile.fontFamily), [profile.fontFamily]);
   const safeFontFamily = useMemo(() => {
     return isMonospaceFont(primaryFont) ? profile.fontFamily : makeTerminalFontFamily("Source Code Pro");
   }, [primaryFont, profile.fontFamily]);
-  const partitionedFonts = useMemo(() => {
-    const mono: string[] = [];
-    const prop: string[] = [];
-    for (const font of fontOptions) {
-      if (isMonospaceFont(font)) mono.push(font);
-      else prop.push(font);
-    }
-    return { mono, prop };
-  }, [fontOptions]);
+  const fontPickerOptions = useMemo<FontPickerOption[]>(() => fontOptions.map((font) => ({
+    value: font,
+    label: font,
+    fontFamily: `"${font}", monospace`,
+  })), [fontOptions]);
+  const fontGroupLabels = useMemo(() => ({
+    mono: t("terminalAppearance.fontGroupMonoRecommended"),
+    proportional: t("terminalAppearance.fontGroupProportional"),
+  }), [t]);
+  const fontGroupForOption = useCallback(
+    (option: FontPickerOption) => isMonospaceFont(option.label) ? "mono" : "proportional",
+    [],
+  );
   const [fontSizeText, setFontSizeText] = useState(String(profile.fontSize));
   const draftProfileRef = useRef(profile);
 
@@ -102,32 +119,16 @@ function CodeViewAppearanceSettingsContent({
         <div className="grid grid-cols-12 gap-3 items-end">
           <label className="col-span-12 md:col-span-7">
             <span className="block text-[12px] font-semibold mb-1">{t("codeViewAppearance.fontLabel")}</span>
-            <select
-              aria-label={t("codeViewAppearance.fontAria")}
-              className="taomni-input w-full"
-              value={selectedFont}
-              disabled={fontOptions.length === 0}
-              onChange={(event) => updateProfile({ fontFamily: makeTerminalFontFamily(event.target.value) })}
-            >
-              {partitionedFonts.mono.length > 0 && (
-                <optgroup label={t("terminalAppearance.fontGroupMonoRecommended")}>
-                  {partitionedFonts.mono.map((font) => (
-                    <option key={font} value={font}>
-                      {font}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-              {partitionedFonts.prop.length > 0 && (
-                <optgroup label={t("terminalAppearance.fontGroupProportional")}>
-                  {partitionedFonts.prop.map((font) => (
-                    <option key={font} value={font}>
-                      {font}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
+            <FontPickerSelect
+              ariaLabel={t("codeViewAppearance.fontAria")}
+              options={fontPickerOptions}
+              selectedValue={selectedFont}
+              loading={fontState.loading && fontState.fonts.length === 0}
+              groupForOption={fontGroupForOption}
+              groupLabels={fontGroupLabels}
+              onOpen={onRequestSystemFonts}
+              onSelect={(font) => updateProfile({ fontFamily: makeTerminalFontFamily(font) })}
+            />
             {showFontWarning && (
               <p className="mt-1.5 text-[11px] text-[#ff6b6b] leading-snug">
                 {t("terminalAppearance.nonMonospaceWarning")}

@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import {
+  getPrimaryFontName,
   isMonospaceFont,
   makeTerminalFontFamily,
   resolveSelectedFontName,
   SAFE_TERMINAL_FONT_FALLBACKS,
+  useSystemFonts,
   useTerminalFontOptions,
 } from "../../lib/systemFonts";
 import { ThemePreviewList, type ThemePreviewOption } from "../theme/ThemePreviewSelect";
+import { FontPickerSelect, type FontPickerOption } from "./FontPickerPanel";
 
 const MIXED_FONT_VALUE = "__mixed_font__";
 
@@ -36,7 +39,6 @@ export const DEFAULT_TERMINAL_APPEARANCE_MENU_LABELS: TerminalAppearanceMenuLabe
 export function TerminalAppearanceMenuPanel({
   themeValue,
   themeOptions,
-  fonts,
   fontFamily,
   fontSize,
   onChangeTheme,
@@ -49,7 +51,6 @@ export function TerminalAppearanceMenuPanel({
 }: {
   themeValue: string;
   themeOptions: ThemePreviewOption[];
-  fonts: string[];
   fontFamily: string | null;
   fontSize: number | null;
   onChangeTheme: (theme: string) => void;
@@ -60,25 +61,38 @@ export function TerminalAppearanceMenuPanel({
   fontSelectTestId?: string;
   fontSizeTestId?: string;
 }) {
-  const fontOptions = useTerminalFontOptions(fonts.length > 0 ? fonts : SAFE_TERMINAL_FONT_FALLBACKS);
+  const [fontCatalogRequested, setFontCatalogRequested] = useState(false);
+  const fontState = useSystemFonts(fontCatalogRequested);
+  const currentPrimaryFont = fontFamily ? getPrimaryFontName(fontFamily) : null;
+  const fontOptions = useTerminalFontOptions(
+    [
+      ...(fontState.fonts.length > 0 ? fontState.fonts : SAFE_TERMINAL_FONT_FALLBACKS),
+      ...(currentPrimaryFont ? [currentPrimaryFont] : []),
+    ],
+  );
   const [draftThemeValue, setDraftThemeValue] = useState(themeValue);
   const [draftFontFamily, setDraftFontFamily] = useState<string | null>(fontFamily);
   const [draftFontSize, setDraftFontSize] = useState<number | null>(fontSize);
   const draftFontSizeRef = useRef<number | null>(fontSize);
   const selectedFont = draftFontFamily ? resolveSelectedFontName(draftFontFamily, fontOptions) : MIXED_FONT_VALUE;
   const [fontSizeText, setFontSizeText] = useState(draftFontSize === null ? "" : String(draftFontSize));
-  const partitionedFonts = useMemo(() => {
-    const mono: string[] = [];
-    const prop: string[] = [];
-    for (const font of fontOptions) {
-      if (isMonospaceFont(font)) {
-        mono.push(font);
-      } else {
-        prop.push(font);
-      }
-    }
-    return { mono, prop };
-  }, [fontOptions]);
+  const fontPickerOptions = useMemo<FontPickerOption[]>(() => [
+    ...(!draftFontFamily ? [{ value: MIXED_FONT_VALUE, label: labels.mixedFont, group: "mixed" }] : []),
+    ...fontOptions.map((font) => ({
+      value: font,
+      label: font,
+      fontFamily: `"${font}", monospace`,
+    })),
+  ], [draftFontFamily, fontOptions, labels.mixedFont]);
+  const fontGroupLabels = useMemo(() => ({
+    mixed: "",
+    mono: labels.monospaceFonts,
+    proportional: labels.proportionalFonts,
+  }), [labels.monospaceFonts, labels.proportionalFonts]);
+  const fontGroupForOption = useCallback(
+    (option: FontPickerOption) => isMonospaceFont(option.label) ? "mono" : "proportional",
+    [],
+  );
 
   useEffect(() => {
     setDraftThemeValue(themeValue);
@@ -127,42 +141,22 @@ export function TerminalAppearanceMenuPanel({
       <div className="border-t border-[var(--taomni-divider)] p-2 space-y-2">
         <label className="block">
           <span className="block mb-1 text-[11px] font-semibold text-[var(--taomni-text-muted)]">{labels.font}</span>
-          <select
-            className="taomni-input h-8 w-full text-[12px]"
-            aria-label={labels.font}
-            data-testid={fontSelectTestId}
-            value={selectedFont}
-            disabled={fontOptions.length === 0}
-            onChange={(event) => {
-              const nextFontFamily = makeTerminalFontFamily(event.target.value);
+          <FontPickerSelect
+            ariaLabel={labels.font}
+            testId={fontSelectTestId}
+            options={fontPickerOptions}
+            selectedValue={selectedFont}
+            loading={fontCatalogRequested && fontState.loading}
+            groupForOption={fontGroupForOption}
+            groupLabels={fontGroupLabels}
+            onOpen={() => setFontCatalogRequested(true)}
+            onSelect={(font) => {
+              if (font === MIXED_FONT_VALUE) return;
+              const nextFontFamily = makeTerminalFontFamily(font);
               setDraftFontFamily(nextFontFamily);
               onChangeFontFamily(nextFontFamily);
             }}
-          >
-            {!draftFontFamily && (
-              <option value={MIXED_FONT_VALUE} disabled>
-                {labels.mixedFont}
-              </option>
-            )}
-            {partitionedFonts.mono.length > 0 && (
-              <optgroup label={labels.monospaceFonts}>
-                {partitionedFonts.mono.map((font) => (
-                  <option key={font} value={font}>
-                    {font}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            {partitionedFonts.prop.length > 0 && (
-              <optgroup label={labels.proportionalFonts}>
-                {partitionedFonts.prop.map((font) => (
-                  <option key={font} value={font}>
-                    {font}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </select>
+          />
         </label>
         <div className="flex items-center justify-between gap-2">
           <span className="text-[11px] font-semibold text-[var(--taomni-text-muted)]">{labels.textSize}</span>
