@@ -22,6 +22,7 @@ import {
   PanelRight,
   Columns2,
   Rows2,
+  TerminalSquare,
   Search,
   X,
   ZoomIn,
@@ -247,6 +248,10 @@ import {
 import { useWorkspaceTreeData } from "./workspace/useWorkspaceTreeData";
 import { useWorkspaceLspSession } from "./workspace/useWorkspaceLspSession";
 import { Breadcrumbs, type BreadcrumbPathSegment } from "./workspace/Breadcrumbs";
+import {
+  TerminalDockPanel,
+  type TerminalDockHandle,
+} from "./workspace/panels/TerminalDockPanel";
 import type { EditorRevealTarget } from "./workspace/EditorGroup";
 
 export function CodeWorkspaceTab({
@@ -556,6 +561,7 @@ export function CodeWorkspaceTab({
   const treePaneRef = useRef<HTMLElement | null>(null);
   const editorPaneRef = useRef<HTMLElement | null>(null);
   const inactiveEditorPaneRef = useRef<HTMLElement | null>(null);
+  const terminalDockRef = useRef<TerminalDockHandle | null>(null);
   const {
     serverStatuses: lspServerStatuses,
     commandPrefs: lspCommandPrefs,
@@ -1068,6 +1074,16 @@ export function CodeWorkspaceTab({
     }));
   }, []);
 
+  const openTerminalAt = useCallback((rootId: string, path: string, pathIsFile = false) => {
+    const root = findRoot(rootId);
+    if (!root) return;
+    const relativeDirectory = pathIsFile ? parentPath(path) : path;
+    const cwd = absoluteWorkspacePath(root, relativeDirectory);
+    setBottomDockTab("terminal");
+    setBottomDockOpen(true);
+    terminalDockRef.current?.openAt(cwd, relativeDirectory ? basename(relativeDirectory) : root.name);
+  }, [findRoot]);
+
   const copyTreePath = useCallback(
     async (rootId: string, path: string, absolute: boolean) => {
       const root = findRoot(rootId);
@@ -1542,6 +1558,7 @@ export function CodeWorkspaceTab({
             label: "Reveal in Explorer",
             onClick: () => void revealInExplorer(ref.rootId, ref.path),
           },
+          { label: "Open in Terminal", onClick: () => openTerminalAt(ref.rootId, ref.path, true) },
         ]);
         return;
       }
@@ -1562,6 +1579,7 @@ export function CodeWorkspaceTab({
             label: "Reveal in Explorer",
             onClick: () => void revealInExplorer(selection.rootId, selection.path),
           },
+          { label: "Open in Terminal", onClick: () => openTerminalAt(selection.rootId, selection.path) },
         ]);
         return;
       }
@@ -1582,12 +1600,13 @@ export function CodeWorkspaceTab({
             label: "Reveal in Explorer",
             onClick: () => void revealInExplorer(selection.rootId, ""),
           },
+          { label: "Open in Terminal", onClick: () => openTerminalAt(selection.rootId, "") },
           { separator: true, label: "" },
           { label: "Remove from Workspace", danger: true, onClick: run("workspace.tree.delete", { selection }) },
         ]);
       }
     },
-    [pasteTreeClipboard, revealInExplorer, treeContextMenu],
+    [openTerminalAt, pasteTreeClipboard, revealInExplorer, treeContextMenu],
   );
 
   const updateFileText = useCallback((key: string, text: string) => {
@@ -2546,6 +2565,23 @@ export function CodeWorkspaceTab({
       category: "View",
       keywords: ["right", "docs", "pin"],
       run: () => setRightPaneOpen((open) => !open),
+    },
+    {
+      id: "workspace.toggleTerminal",
+      title: "Toggle Workspace Terminal",
+      category: "View",
+      keybinding: "Alt+F12",
+      keywords: ["terminal", "shell", "bottom"],
+      run: () => {
+        const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+        if (ui.bottomDockOpen && ui.bottomDockTab === "terminal") {
+          setBottomDockOpen(false);
+        } else {
+          setBottomDockTab("terminal");
+          setBottomDockOpen(true);
+          terminalDockRef.current?.focus();
+        }
+      },
     },
     {
       id: "workspace.save",
@@ -3537,9 +3573,24 @@ export function CodeWorkspaceTab({
               />
             ),
           },
+          {
+            id: "terminal",
+            label: "Terminal",
+            icon: <TerminalSquare className="h-3.5 w-3.5" />,
+            badge: undefined,
+            content: (
+              <TerminalDockPanel
+                ref={terminalDockRef}
+                workspaceInstanceId={workspaceInstanceId}
+                roots={roots}
+                defaultCwd={activeRoot?.path ?? roots[0]?.path ?? ""}
+                active={bottomDockOpen && bottomDockTab === "terminal"}
+              />
+            ),
+          },
         ]}
         onOpenChange={setBottomDockOpen}
-        onActiveTabChange={(tab) => setBottomDockTab(tab as "problems" | "search" | "references")}
+        onActiveTabChange={(tab) => setBottomDockTab(tab as BottomDockTabId)}
       />
       <WorkspacePopupsHost
         searchEverywhereOpen={searchEverywhereOpen}

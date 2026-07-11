@@ -78,6 +78,12 @@ vi.mock("../git/diffLanguage", () => ({
   languageForPath: vi.fn(async () => null),
 }));
 
+vi.mock("../terminal/TerminalPanel", () => ({
+  TerminalPanel: ({ tabId, initialCwd }: { tabId?: string; initialCwd?: string }) => (
+    <div data-testid="mock-workspace-terminal" data-tab-id={tabId} data-initial-cwd={initialCwd} />
+  ),
+}));
+
 function file(
   path: string,
   text: string,
@@ -293,7 +299,7 @@ describe("CodeWorkspaceTab", () => {
     expect(await screen.findByText("Code · Multi Repo")).toBeInTheDocument();
     expect(screen.getByText("2 roots")).toBeInTheDocument();
     expect(screen.getAllByText("app").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("lib")).toBeInTheDocument();
+    expect(screen.getAllByText("lib").length).toBeGreaterThanOrEqual(1);
     expect(await screen.findByText("Language Servers")).toBeInTheDocument();
     expect(await screen.findByText("C#")).toBeInTheDocument();
     expect(screen.getAllByText("dotnet tool install -g csharp-ls")[0]).toBeInTheDocument();
@@ -1108,6 +1114,11 @@ describe("CodeWorkspaceTab", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Find in Directory..." }));
     expect(screen.getByRole("tab", { name: /Search/, selected: true })).toBeInTheDocument();
     expect(screen.getByLabelText("Include globs")).toHaveValue("src/**");
+
+    fireEvent.contextMenu(fileRow);
+    fireEvent.click(await screen.findByRole("button", { name: "Open in Terminal" }));
+    expect(screen.getByRole("tab", { name: /Terminal/, selected: true })).toBeInTheDocument();
+    expect(await screen.findByTestId("mock-workspace-terminal")).toHaveAttribute("data-initial-cwd", "/repo/app");
   });
 
   it("opens a shared buffer in a resizable editor split and collapses it", async () => {
