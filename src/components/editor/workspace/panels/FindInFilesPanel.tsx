@@ -12,6 +12,8 @@ import type { CodeWorkspaceRootInfo } from "../../../../types";
 interface FindInFilesPanelProps {
   roots: CodeWorkspaceRootInfo[];
   onOpenMatch: (match: WorkspaceSearchMatch) => void;
+  /** Apply replacements for the current result set via the shared WorkspaceEdit path. */
+  onReplaceMatches?: (matches: WorkspaceSearchMatch[], replacement: string) => void | Promise<void>;
   /** Bump to move focus into the query input (Ctrl+Shift+F). */
   focusNonce?: number;
   /** Bump the nonce to overwrite the include globs ("Find in Directory..."). */
@@ -76,8 +78,16 @@ function groupTitle(match: WorkspaceSearchMatch): string {
   return `${match.rootName}/${match.path}`;
 }
 
-export function FindInFilesPanel({ roots, onOpenMatch, focusNonce = 0, includePreset, queryPreset }: FindInFilesPanelProps) {
+export function FindInFilesPanel({
+  roots,
+  onOpenMatch,
+  onReplaceMatches,
+  focusNonce = 0,
+  includePreset,
+  queryPreset,
+}: FindInFilesPanelProps) {
   const [query, setQuery] = useState("");
+  const [replacement, setReplacement] = useState("");
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [wholeWord, setWholeWord] = useState(false);
   const [regexp, setRegexp] = useState(false);
@@ -87,6 +97,7 @@ export function FindInFilesPanel({ roots, onOpenMatch, focusNonce = 0, includePr
   const [groups, setGroups] = useState<MatchGroup[]>([]);
   const [summary, setSummary] = useState<SearchSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [replacing, setReplacing] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const searchIdRef = useRef<string | null>(null);
@@ -209,6 +220,26 @@ export function FindInFilesPanel({ roots, onOpenMatch, focusNonce = 0, includePr
     [groups],
   );
 
+  const allMatches = useMemo(
+    () => groups.flatMap((group) => group.matches),
+    [groups],
+  );
+
+  const replaceAll = useCallback(async () => {
+    if (!onReplaceMatches || allMatches.length === 0 || replacing) return;
+    const files = new Set(allMatches.map((match) => `${match.rootId}:${match.path}`)).size;
+    const ok = window.confirm(
+      `Replace ${allMatches.length} occurrence${allMatches.length === 1 ? "" : "s"} in ${files} file${files === 1 ? "" : "s"}?`,
+    );
+    if (!ok) return;
+    setReplacing(true);
+    try {
+      await onReplaceMatches(allMatches, replacement);
+    } finally {
+      setReplacing(false);
+    }
+  }, [allMatches, onReplaceMatches, replacement, replacing]);
+
   const toggles = [
     { label: "Match case", icon: <CaseSensitive className="h-3.5 w-3.5" />, value: caseSensitive, set: setCaseSensitive },
     { label: "Whole word", icon: <WholeWord className="h-3.5 w-3.5" />, value: wholeWord, set: setWholeWord },
@@ -263,6 +294,13 @@ export function FindInFilesPanel({ roots, onOpenMatch, focusNonce = 0, includePr
           onChange={(event) => setExcludeGlobs(event.target.value)}
           onKeyDown={(event) => event.key === "Enter" && void startSearch()}
         />
+        <input
+          value={replacement}
+          placeholder="Replace with"
+          aria-label="Replace text"
+          className="h-6 w-36 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1.5 text-[11px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
+          onChange={(event) => setReplacement(event.target.value)}
+        />
         {status === "searching" ? (
           <button
             type="button"
@@ -283,6 +321,17 @@ export function FindInFilesPanel({ roots, onOpenMatch, focusNonce = 0, includePr
           >
             <Search className="h-3.5 w-3.5" />
             <span>Search</span>
+          </button>
+        )}
+        {onReplaceMatches && (
+          <button
+            type="button"
+            aria-label="Replace all matches"
+            disabled={allMatches.length === 0 || replacing || status === "searching"}
+            className="h-6 inline-flex items-center gap-1 rounded px-1.5 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-50"
+            onClick={() => void replaceAll()}
+          >
+            <span>{replacing ? "Replacing…" : "Replace All"}</span>
           </button>
         )}
         <span className="ml-auto flex items-center gap-1.5 text-[10px] text-[var(--taomni-code-muted)]">

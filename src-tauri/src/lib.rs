@@ -437,6 +437,8 @@ pub fn run() {
             lsp::lsp_formatting,
             lsp::lsp_range_formatting,
             lsp::lsp_code_actions,
+            lsp::lsp_prepare_rename,
+            lsp::lsp_rename,
             lsp::lsp_workspace_symbols,
             lsp::lsp_signature_help,
             windowing::open_detached_window,

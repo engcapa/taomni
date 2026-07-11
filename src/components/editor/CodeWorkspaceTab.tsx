@@ -70,8 +70,10 @@ import {
   lspHover,
   lspImplementation,
   lspOpenDocument,
+  lspPrepareRename,
   lspRangeFormatting,
   lspReferences,
+  lspRename,
   lspSaveDocument,
   lspSignatureHelp,
   lspTypeDefinition,
@@ -114,6 +116,7 @@ import {
   applyWorkspaceEdit,
   summarizeWorkspaceEditOutcomes,
 } from "./workspace/workspaceEditApply";
+import { buildReplaceWorkspaceEdit } from "./workspace/buildReplaceEdits";
 import { BottomDock } from "./workspace/panels/BottomDock";
 import {
   ReferencesPanel,
@@ -865,6 +868,7 @@ export function CodeWorkspaceTab({
   const workspaceCommandRunnerRef = useRef<(commandId: string, context?: WorkspaceCommandContext) => boolean>(() => false);
   const goToTypeDefinitionRef = useRef<(file: OpenFileState, position: LspPosition) => Promise<boolean>>(async () => false);
   const goToImplementationRef = useRef<(file: OpenFileState, position: LspPosition) => Promise<boolean>>(async () => false);
+  const renameSymbolRef = useRef<() => Promise<void>>(async () => {});
   const initialOpenedKeyRef = useRef<string | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const treePaneRef = useRef<HTMLElement | null>(null);
@@ -2819,6 +2823,17 @@ export function CodeWorkspaceTab({
       run: openFindInFiles,
     },
     {
+      id: "workspace.replaceInFiles",
+      title: "Replace in Files",
+      category: "Search",
+      keybinding: "Ctrl+Shift+R",
+      keywords: ["bulk replace"],
+      run: () => {
+        openFindInFiles();
+        setStatusMessage("Enter a replace string and use Replace All in Find in Files");
+      },
+    },
+    {
       id: "workspace.fileStructure",
       title: "File Structure",
       category: "Navigation",
@@ -2888,6 +2903,16 @@ export function CodeWorkspaceTab({
         if (!file) return;
         void goToImplementationRef.current(file, editorSelectionRef.current.start);
       },
+    },
+    {
+      id: "workspace.renameSymbol",
+      title: "Rename Symbol",
+      category: "Refactor",
+      keybinding: "Shift+F6",
+      keywords: ["refactor", "rename"],
+      when: (context) => context.focus === "editor" && !!activeFile && !activeFile.loading
+        && (!activeCapabilities || !!activeCapabilities.rename),
+      run: () => void renameSymbolRef.current(),
     },
     {
       id: "workspace.toggleDocumentationPane",
@@ -3262,6 +3287,62 @@ export function CodeWorkspaceTab({
   );
   goToTypeDefinitionRef.current = goToTypeDefinition;
   goToImplementationRef.current = goToImplementation;
+
+  const renameSymbolAtCursor = useCallback(async () => {
+    const file = activeFile;
+    if (!file || file.loading) return;
+    const descriptor = lspDescriptorForFile(file);
+    if (!descriptor) return;
+    const caps = lspFilesRef.current[file.key]?.status?.capabilities;
+    if (caps && !caps.rename) {
+      setStatusMessage("Rename is not supported by this language server");
+      return;
+    }
+    const position = editorSelectionRef.current.start;
+    try {
+      const prepared = await lspPrepareRename(descriptor, position);
+      updateLspStatusForFile(file, prepared.status);
+      if (!prepared.allowed && prepared.range == null && !prepared.placeholder) {
+        setStatusMessage(prepared.message ?? "Cannot rename symbol here");
+        return;
+      }
+      const defaultName = prepared.placeholder
+        ?? (() => {
+          const lines = file.text.split("\n");
+          const line = lines[position.line] ?? "";
+          if (prepared.range) {
+            return line.slice(prepared.range.start.character, prepared.range.end.character);
+          }
+          return line.slice(position.character).match(/^[A-Za-z0-9_$]+/)?.[0] ?? "";
+        })();
+      const nextName = await promptAppDialog({
+        title: "Rename Symbol",
+        label: "New name",
+        initialValue: defaultName,
+        confirmLabel: "Rename",
+      });
+      if (!nextName || nextName === defaultName) return;
+      const renamed = await lspRename(descriptor, position, nextName);
+      updateLspStatusForFile(file, renamed.status);
+      if (!renamed.edit.documentEdits.length) {
+        setStatusMessage("Rename produced no edits");
+        return;
+      }
+      const fileCount = renamed.edit.documentEdits.length;
+      if (fileCount > 1) {
+        const confirmed = await confirmAppDialog({
+          title: "Rename across files",
+          message: `This rename touches ${fileCount} files. Apply non-atomic WorkspaceEdit?`,
+          confirmLabel: "Apply",
+        });
+        if (!confirmed) return;
+      }
+      await applyLspWorkspaceEdit(renamed.edit);
+    } catch (err) {
+      setStatusMessage(errorMessage(err));
+    }
+  }, [activeFile, applyLspWorkspaceEdit, lspDescriptorForFile, setStatusMessage, updateLspStatusForFile]);
+  renameSymbolRef.current = renameSymbolAtCursor;
 
   const findReferences = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
@@ -4149,6 +4230,10 @@ export function CodeWorkspaceTab({
                 includePreset={searchIncludePreset}
                 queryPreset={searchQueryPreset}
                 onOpenMatch={openSearchMatch}
+                onReplaceMatches={async (matches, replacement) => {
+                  const edit = buildReplaceWorkspaceEdit(matches, replacement);
+                  await applyLspWorkspaceEdit(edit);
+                }}
               />
             ),
           },

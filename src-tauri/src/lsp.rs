@@ -1465,6 +1465,183 @@ pub struct LspCodeActionsResult {
     pub actions: Vec<LspCodeAction>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspPrepareRenameResult {
+    pub status: LspDocumentStatus,
+    pub range: Option<LspRange>,
+    pub placeholder: Option<String>,
+    pub allowed: bool,
+    pub message: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspRenameResult {
+    pub status: LspDocumentStatus,
+    pub edit: LspWorkspaceEdit,
+}
+
+#[tauri::command]
+pub async fn lsp_prepare_rename(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspPrepareRenameResult, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let session = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session,
+        None => {
+            let status = state
+                .lsp
+                .document_status(
+                    &document,
+                    server_command_id.as_deref(),
+                    custom_server_command.as_ref(),
+                )
+                .await;
+            return Ok(LspPrepareRenameResult {
+                status,
+                range: None,
+                placeholder: None,
+                allowed: false,
+                message: Some("Language server is not active".into()),
+            });
+        }
+    };
+    let result = session
+        .request(
+            "textDocument/prepareRename",
+            json!({
+                "textDocument": { "uri": document.uri },
+                "position": { "line": line, "character": character },
+            }),
+        )
+        .await;
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    match result {
+        Ok(Value::Null) | Err(_) => Ok(LspPrepareRenameResult {
+            status,
+            range: None,
+            placeholder: None,
+            allowed: false,
+            message: Some("Rename is not available at this position".into()),
+        }),
+        Ok(value) => {
+            // Range | { range, placeholder } | { defaultBehavior: true }
+            if value.get("defaultBehavior").and_then(Value::as_bool) == Some(true) {
+                return Ok(LspPrepareRenameResult {
+                    status,
+                    range: None,
+                    placeholder: None,
+                    allowed: true,
+                    message: None,
+                });
+            }
+            let range = value
+                .get("range")
+                .and_then(parse_range)
+                .or_else(|| parse_range(&value));
+            let placeholder = value
+                .get("placeholder")
+                .and_then(Value::as_str)
+                .map(ToString::to_string);
+            Ok(LspPrepareRenameResult {
+                status,
+                range,
+                placeholder,
+                allowed: range.is_some() || placeholder.is_some(),
+                message: None,
+            })
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn lsp_rename(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    new_name: String,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspRenameResult, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let session = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session,
+        None => {
+            let status = state
+                .lsp
+                .document_status(
+                    &document,
+                    server_command_id.as_deref(),
+                    custom_server_command.as_ref(),
+                )
+                .await;
+            return Ok(LspRenameResult {
+                status,
+                edit: LspWorkspaceEdit::default(),
+            });
+        }
+    };
+    let result = session
+        .request(
+            "textDocument/rename",
+            json!({
+                "textDocument": { "uri": document.uri },
+                "position": { "line": line, "character": character },
+                "newName": new_name,
+            }),
+        )
+        .await
+        .unwrap_or(Value::Null);
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    Ok(LspRenameResult {
+        status,
+        edit: parse_workspace_edit(&result),
+    })
+}
+
 #[tauri::command]
 pub async fn lsp_type_definition(
     state: State<'_, AppState>,

@@ -406,6 +406,43 @@ export function lspWorkspaceSymbols(
   });
 }
 
+export interface LspPrepareRenameResult {
+  status: LspDocumentStatus;
+  range: LspRange | null;
+  placeholder: string | null;
+  allowed: boolean;
+  message: string | null;
+}
+
+export interface LspRenameResult {
+  status: LspDocumentStatus;
+  edit: LspWorkspaceEdit;
+}
+
+export function lspPrepareRename(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+): Promise<LspPrepareRenameResult> {
+  return invoke<LspPrepareRenameResult>("lsp_prepare_rename", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+  });
+}
+
+export function lspRename(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+  newName: string,
+): Promise<LspRenameResult> {
+  return invoke<LspRenameResult>("lsp_rename", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+    newName,
+  });
+}
+
 /** LSP SymbolKind values treated as "classes" in Search Everywhere. */
 export const LSP_CLASS_SYMBOL_KINDS = new Set([5, 10, 11, 23, 26]);
 
