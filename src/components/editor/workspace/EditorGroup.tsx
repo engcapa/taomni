@@ -5,6 +5,8 @@ import {
   Eye,
   File,
   Loader2,
+  MoreHorizontal,
+  Pin,
   X,
 } from "lucide-react";
 import type { LspCapabilitySummary, LspDiagnostic, LspPosition } from "../../../lib/editor/lsp";
@@ -15,6 +17,8 @@ import type {
 } from "../../../lib/editor/lsp";
 import { CodeMirrorHost, type EditorSelectionRange } from "./CodeMirrorHost";
 import type { OpenFileViewModel } from "./editorGroupTypes";
+import { useContextMenu } from "../../ContextMenu";
+import type { EditorGroupId } from "../../../stores/codeWorkspaceStore";
 
 export type MarkdownViewMode = "edit" | "preview" | "split";
 
@@ -26,11 +30,14 @@ export interface EditorRevealTarget {
 }
 
 interface EditorGroupProps {
+  groupId: EditorGroupId;
   workspaceInstanceId: string;
   visible: boolean;
   openOrder: string[];
   openFiles: Record<string, OpenFileViewModel>;
   activeKey: string | null;
+  previewKey: string | null;
+  pinnedKeys: string[];
   activeFile: OpenFileViewModel | null;
   activeMarkdownMode: MarkdownViewMode;
   activeDiagnostics: LspDiagnostic[];
@@ -41,7 +48,14 @@ interface EditorGroupProps {
   editorPaneRef: MutableRefObject<HTMLElement | null>;
   editorPaneStyle: CSSProperties;
   onActivate: (key: string) => void;
+  onActivateGroup: () => void;
   onClose: (key: string) => void;
+  onPin: (key: string, pinned: boolean) => void;
+  onPromotePreview: (key: string) => void;
+  onCloseOthers: (key: string) => void;
+  onCloseRight: (key: string) => void;
+  onCloseUnmodified: () => void;
+  onCloseAll: () => void;
   onMarkdownModeChange: (mode: MarkdownViewMode) => void;
   onChangeText: (key: string, text: string) => void;
   onSave: (key: string) => void;
@@ -74,11 +88,14 @@ interface EditorGroupProps {
  * presentation boundary for the center pane (M3 will grow this into multi-group).
  */
 export function EditorGroup({
+  groupId,
   workspaceInstanceId,
   visible,
   openOrder,
   openFiles,
   activeKey,
+  previewKey,
+  pinnedKeys,
   activeFile,
   activeMarkdownMode,
   activeDiagnostics,
@@ -89,7 +106,14 @@ export function EditorGroup({
   editorPaneRef,
   editorPaneStyle,
   onActivate,
+  onActivateGroup,
   onClose,
+  onPin,
+  onPromotePreview,
+  onCloseOthers,
+  onCloseRight,
+  onCloseUnmodified,
+  onCloseAll,
   onMarkdownModeChange,
   onChangeText,
   onSave,
@@ -107,23 +131,47 @@ export function EditorGroup({
   isMarkdownPath,
   renderMarkdownPreview,
 }: EditorGroupProps) {
+  const tabMenu = useContextMenu();
+  const pinnedSet = new Set(pinnedKeys);
+  const orderedKeys = [
+    ...openOrder.filter((key) => pinnedSet.has(key)),
+    ...openOrder.filter((key) => !pinnedSet.has(key)),
+  ];
+  const showTabMenu = (event: React.MouseEvent, key: string) => {
+    const pinned = pinnedSet.has(key);
+    tabMenu.show(event, [
+      { label: pinned ? "Unpin Tab" : "Pin Tab", onClick: () => onPin(key, !pinned) },
+      { label: "Close", shortcut: "Ctrl+F4", onClick: () => onClose(key) },
+      { label: "Close Others", onClick: () => onCloseOthers(key) },
+      { label: "Close Tabs to the Right", onClick: () => onCloseRight(key) },
+      { label: "Close Unmodified", onClick: onCloseUnmodified },
+      { separator: true, label: "" },
+      { label: "Close All", onClick: onCloseAll },
+    ]);
+  };
   return (
     <main
       ref={editorPaneRef}
       data-testid="code-workspace-editor-pane"
+      data-editor-group-id={groupId}
+      onMouseDown={onActivateGroup}
       className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-bg)]"
       style={editorPaneStyle}
     >
       {openOrder.length > 0 && (
         <div className="h-8 shrink-0 flex items-end overflow-x-auto border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]">
-          {openOrder.map((key) => {
+          {orderedKeys.map((key) => {
             const file = openFiles[key];
             if (!file) return null;
             const active = key === activeKey;
+            const preview = key === previewKey;
+            const pinned = pinnedSet.has(key);
             return (
               <div
                 key={key}
                 data-active={active || undefined}
+                data-preview={preview || undefined}
+                data-pinned={pinned || undefined}
                 className="h-[var(--taomni-code-editor-tab-height)] min-w-[130px] max-w-[240px] flex items-center border-r border-[var(--taomni-code-border)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
               >
                 <button
@@ -131,9 +179,15 @@ export function EditorGroup({
                   className="min-w-0 flex-1 h-full flex items-center gap-1.5 px-2 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
                   title={file.subtitle}
                   onClick={() => onActivate(key)}
+                  onDoubleClick={() => onPromotePreview(key)}
+                  onAuxClick={(event) => {
+                    if (event.button === 1) onClose(key);
+                  }}
+                  onContextMenu={(event) => showTabMenu(event, key)}
                 >
                   <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-                  <span className="truncate">{file.title}</span>
+                  {pinned && <Pin className="h-3 w-3 shrink-0" />}
+                  <span className={`truncate ${preview ? "italic" : ""}`}>{file.title}</span>
                   {file.dirty && <span className="text-[var(--taomni-accent)]">*</span>}
                 </button>
                 <button
@@ -147,6 +201,23 @@ export function EditorGroup({
               </div>
             );
           })}
+          {openOrder.length > 1 && (
+            <button
+              type="button"
+              aria-label="Show all editor tabs"
+              className="ml-auto h-full w-7 shrink-0 inline-flex items-center justify-center hover:bg-[var(--taomni-code-active-line-bg)]"
+              onClick={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                tabMenu.showAt(rect.right, rect.bottom, orderedKeys.map((key) => ({
+                  label: openFiles[key]?.title ?? key,
+                  checked: key === activeKey,
+                  onClick: () => onActivate(key),
+                })));
+              }}
+            >
+              <MoreHorizontal className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       )}
       <div
@@ -211,7 +282,10 @@ export function EditorGroup({
                         visible={visible}
                         diagnostics={activeDiagnostics}
                         reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
-                        onChange={(doc) => onChangeText(activeFile.key, doc)}
+                        onChange={(doc) => {
+                          if (previewKey === activeFile.key) onPromotePreview(activeFile.key);
+                          onChangeText(activeFile.key, doc);
+                        }}
                         onSave={() => onSave(activeFile.key)}
                         onHover={(position) => onHover(activeFile, position)}
                         onDefinition={(position) => onDefinition(activeFile, position)}
@@ -235,7 +309,10 @@ export function EditorGroup({
                     visible={visible}
                     diagnostics={activeDiagnostics}
                     reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
-                    onChange={(doc) => onChangeText(activeFile.key, doc)}
+                    onChange={(doc) => {
+                      if (previewKey === activeFile.key) onPromotePreview(activeFile.key);
+                      onChangeText(activeFile.key, doc);
+                    }}
                     onSave={() => onSave(activeFile.key)}
                     onHover={(position) => onHover(activeFile, position)}
                     onDefinition={(position) => onDefinition(activeFile, position)}
@@ -258,6 +335,7 @@ export function EditorGroup({
           )}
         </div>
       </div>
+      {tabMenu.render}
     </main>
   );
 }

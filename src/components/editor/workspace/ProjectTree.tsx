@@ -59,7 +59,7 @@ export interface ProjectTreeProps {
   onToggleRoot: (rootId: string) => void;
   onToggleDir: (rootId: string, path: string) => void;
   onSelect: (selection: TreeSelection) => void;
-  onOpenFile: (ref: CodeWorkspaceFileRef) => void;
+  onOpenFile: (ref: CodeWorkspaceFileRef, options?: { preview?: boolean }) => void;
   onContextMenu: (event: MouseEvent, selection: TreeSelection) => void;
 }
 
@@ -176,8 +176,9 @@ function renderFlatEntries(
                 title={`${root.name} / ${entry.path}${entry.size ? ` - ${formatBytes(entry.size)}` : ""}`}
                 onClick={() => {
                   onSelect({ kind: "file", ref });
-                  onOpenFile(ref);
+                  onOpenFile(ref, { preview: true });
                 }}
+                onDoubleClick={() => onOpenFile(ref)}
                 onContextMenu={(event) => onContextMenu(event, { kind: "file", ref })}
               >
                 <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
@@ -320,8 +321,9 @@ function renderEntries(
         title={`${root.name} / ${entry.path}${entry.size ? ` - ${formatBytes(entry.size)}` : ""}`}
         onClick={() => {
           onSelect({ kind: "file", ref });
-          onOpenFile(ref);
+          onOpenFile(ref, { preview: true });
         }}
+        onDoubleClick={() => onOpenFile(ref)}
         onContextMenu={(event) => onContextMenu(event, { kind: "file", ref })}
       >
         <span className="w-3.5 shrink-0" />
@@ -431,8 +433,9 @@ export function ProjectTree(props: ProjectTreeProps) {
                 title={file.path}
                 onClick={() => {
                   onSelect({ kind: "file", ref });
-                  onOpenFile(ref);
+                  onOpenFile(ref, { preview: true });
                 }}
+                onDoubleClick={() => onOpenFile(ref)}
               >
                 <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
                 <span className="truncate">{file.name}</span>

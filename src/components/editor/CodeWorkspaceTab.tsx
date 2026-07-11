@@ -87,6 +87,8 @@ import {
   selectCodeWorkspaceUi,
   useCodeWorkspaceStore,
   type BottomDockTabId,
+  type CodeWorkspaceEditorGroupState,
+  type EditorGroupId,
 } from "../../stores/codeWorkspaceStore";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { writeText } from "../../lib/clipboard";
@@ -239,6 +241,8 @@ export function CodeWorkspaceTab({
   const updateStoreLspFiles = useCodeWorkspaceStore((s) => s.updateLspFiles);
   const updateStoreExpandedRootIds = useCodeWorkspaceStore((s) => s.updateExpandedRootIds);
   const updateStoreExpandedDirKeys = useCodeWorkspaceStore((s) => s.updateExpandedDirKeys);
+  const updateStoreEditorGroup = useCodeWorkspaceStore((s) => s.updateEditorGroup);
+  const setStoreActiveEditorGroup = useCodeWorkspaceStore((s) => s.setActiveEditorGroup);
   const seedTreeExpandIfEmpty = useCodeWorkspaceStore((s) => s.seedTreeExpandIfEmpty);
   // Ensure before first read so the selector always hits a real map entry.
   ensureWorkspaceUi(workspaceInstanceId);
@@ -287,6 +291,8 @@ export function CodeWorkspaceTab({
     searchQueryPreset,
     openOrder,
     activeKey,
+    editorGroups,
+    activeEditorGroupId,
     markdownModes,
     treeFilter,
     treeViewMode,
@@ -395,6 +401,15 @@ export function CodeWorkspaceTab({
     const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).activeKey;
     setStoreActiveKey(workspaceInstanceId, typeof key === "function" ? key(prev) : key);
   }, [setStoreActiveKey, workspaceInstanceId]);
+  const updateEditorGroup = useCallback((
+    groupId: EditorGroupId,
+    updater: CodeWorkspaceEditorGroupState | ((prev: CodeWorkspaceEditorGroupState) => CodeWorkspaceEditorGroupState),
+  ) => {
+    updateStoreEditorGroup(workspaceInstanceId, groupId, updater);
+  }, [updateStoreEditorGroup, workspaceInstanceId]);
+  const activateEditorGroup = useCallback((groupId: EditorGroupId) => {
+    setStoreActiveEditorGroup(workspaceInstanceId, groupId);
+  }, [setStoreActiveEditorGroup, workspaceInstanceId]);
   const setMarkdownModes = useCallback((
     updater: Record<string, MarkdownViewMode> | ((prev: Record<string, MarkdownViewMode>) => Record<string, MarkdownViewMode>),
   ) => {
@@ -808,10 +823,28 @@ export function CodeWorkspaceTab({
   }, [findRoot]);
 
   const openFile = useCallback(
-    async (ref: CodeWorkspaceFileRef) => {
+    async (ref: CodeWorkspaceFileRef, options: { preview?: boolean; groupId?: EditorGroupId } = {}) => {
       const key = fileKey(ref);
-      setActiveKey(key);
-      setOpenOrder((current) => (current.includes(key) ? current : [...current, key]));
+      const currentUi = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+      const groupId = options.groupId ?? currentUi.activeEditorGroupId;
+      updateEditorGroup(groupId, (group) => {
+        const alreadyOpen = group.openOrder.includes(key);
+        let nextOrder = group.openOrder;
+        let previewKey = group.previewKey;
+        if (!alreadyOpen) {
+          if (options.preview && previewKey && previewKey !== key && !group.pinnedKeys.includes(previewKey)) {
+            nextOrder = nextOrder.filter((entry) => entry !== previewKey);
+          }
+          nextOrder = [...nextOrder, key];
+        }
+        if (options.preview) {
+          previewKey = group.pinnedKeys.includes(key) ? null : key;
+        } else if (previewKey === key) {
+          previewKey = null;
+        }
+        return { ...group, openOrder: nextOrder, activeKey: key, previewKey };
+      });
+      if (groupId !== currentUi.activeEditorGroupId) activateEditorGroup(groupId);
       if (openFilesRef.current[key] && !openFilesRef.current[key].loading) return;
       setOpenFiles((current) => ({
         ...current,
@@ -845,8 +878,13 @@ export function CodeWorkspaceTab({
           };
           return next;
         });
-        setOpenOrder((current) => current.map((item) => (item === key ? fileKey(nextRef) : item)));
-        setActiveKey(fileKey(nextRef));
+        updateEditorGroup(groupId, (group) => ({
+          ...group,
+          openOrder: group.openOrder.map((item) => (item === key ? fileKey(nextRef) : item)),
+          activeKey: group.activeKey === key ? fileKey(nextRef) : group.activeKey,
+          previewKey: group.previewKey === key ? fileKey(nextRef) : group.previewKey,
+          pinnedKeys: group.pinnedKeys.map((item) => (item === key ? fileKey(nextRef) : item)),
+        }));
         setStatusMessage(`Opened ${meta.subtitle}`);
       } catch (err) {
         const message = errorMessage(err);
@@ -862,7 +900,7 @@ export function CodeWorkspaceTab({
         setStatusMessage(message);
       }
     },
-    [findRoot, setStatusMessage],
+    [activateEditorGroup, findRoot, setStatusMessage, updateEditorGroup, workspaceInstanceId],
   );
 
   const openSearchEverywhere = useCallback((mode: SearchEverywhereMode = "files") => {
@@ -1676,9 +1714,15 @@ export function CodeWorkspaceTab({
   );
 
   const closeFile = useCallback(
-    async (key: string) => {
+    async (key: string, groupId: EditorGroupId = activeEditorGroupId) => {
+      const currentUi = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+      const group = currentUi.editorGroups[groupId];
+      if (!group.openOrder.includes(key)) return;
       const file = openFilesRef.current[key];
-      if (file?.dirty) {
+      const usedByOtherGroup = Object.values(currentUi.editorGroups).some(
+        (candidate) => candidate.id !== groupId && candidate.openOrder.includes(key),
+      );
+      if (file?.dirty && !usedByOtherGroup) {
         const confirmed = await confirmAppDialog({
           title: "Close file",
           message: `Discard unsaved changes in ${file.subtitle}?`,
@@ -1687,11 +1731,19 @@ export function CodeWorkspaceTab({
         });
         if (!confirmed) return;
       }
-      const order = openOrderRef.current;
-      const index = order.indexOf(key);
-      const nextOrder = order.filter((entry) => entry !== key);
+      const index = group.openOrder.indexOf(key);
+      const nextOrder = group.openOrder.filter((entry) => entry !== key);
+      updateEditorGroup(groupId, (current) => ({
+        ...current,
+        openOrder: nextOrder,
+        activeKey: current.activeKey === key
+          ? nextOrder[Math.min(index, nextOrder.length - 1)] ?? null
+          : current.activeKey,
+        previewKey: current.previewKey === key ? null : current.previewKey,
+        pinnedKeys: current.pinnedKeys.filter((entry) => entry !== key),
+      }));
+      if (usedByOtherGroup) return;
       if (file) closeLspDocument(file);
-      setOpenOrder(nextOrder);
       setOpenFiles((current) => {
         const next = { ...current };
         delete next[key];
@@ -1709,13 +1761,30 @@ export function CodeWorkspaceTab({
         delete next[key];
         return next;
       });
-      setActiveKey((current) => {
-        if (current !== key) return current;
-        return nextOrder[Math.min(index, nextOrder.length - 1)] ?? null;
-      });
     },
-    [closeLspDocument],
+    [activeEditorGroupId, closeLspDocument, updateEditorGroup, workspaceInstanceId],
   );
+
+  const promotePreviewTab = useCallback((groupId: EditorGroupId, key: string) => {
+    updateEditorGroup(groupId, (group) => ({
+      ...group,
+      previewKey: group.previewKey === key ? null : group.previewKey,
+    }));
+  }, [updateEditorGroup]);
+
+  const setTabPinned = useCallback((groupId: EditorGroupId, key: string, pinned: boolean) => {
+    updateEditorGroup(groupId, (group) => ({
+      ...group,
+      previewKey: pinned && group.previewKey === key ? null : group.previewKey,
+      pinnedKeys: pinned
+        ? [...group.pinnedKeys.filter((entry) => entry !== key), key]
+        : group.pinnedKeys.filter((entry) => entry !== key),
+    }));
+  }, [updateEditorGroup]);
+
+  const closeGroupFiles = useCallback(async (groupId: EditorGroupId, keys: string[]) => {
+    for (const key of keys) await closeFile(key, groupId);
+  }, [closeFile]);
 
   const activeFile = activeKey ? openFiles[activeKey] ?? null : null;
   const activeLspState = activeKey ? lspFiles[activeKey] ?? null : null;
@@ -3080,7 +3149,7 @@ export function CodeWorkspaceTab({
                 onToggleRoot={toggleRoot}
                 onToggleDir={toggleDir}
                 onSelect={setSelected}
-                onOpenFile={(ref) => { void openFile(ref); }}
+                onOpenFile={(ref, options) => { void openFile(ref, options); }}
                 onContextMenu={showTreeContextMenu}
               />
           </FileTreePane>
@@ -3088,11 +3157,14 @@ export function CodeWorkspaceTab({
         <PanelResizeHandle className="w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
         <Panel id="editor" defaultSize={rightPaneOpen ? "56%" : "76%"} minSize="35%" className="min-w-0">
           <EditorGroup
+            groupId={activeEditorGroupId}
             workspaceInstanceId={workspaceInstanceId}
             visible={visible}
             openOrder={openOrder}
             openFiles={openFiles}
             activeKey={activeKey}
+            previewKey={editorGroups[activeEditorGroupId].previewKey}
+            pinnedKeys={editorGroups[activeEditorGroupId].pinnedKeys}
             activeFile={activeFile}
             activeMarkdownMode={activeMarkdownMode}
             activeDiagnostics={activeDiagnostics}
@@ -3102,8 +3174,37 @@ export function CodeWorkspaceTab({
             revealTarget={revealTarget}
             editorPaneRef={editorPaneRef}
             editorPaneStyle={editorPaneStyle}
-            onActivate={setActiveKey}
-            onClose={(key) => void closeFile(key)}
+            onActivate={(key) => {
+              activateEditorGroup(activeEditorGroupId);
+              setActiveKey(key);
+            }}
+            onActivateGroup={() => activateEditorGroup(activeEditorGroupId)}
+            onClose={(key) => void closeFile(key, activeEditorGroupId)}
+            onPin={(key, pinned) => setTabPinned(activeEditorGroupId, key, pinned)}
+            onPromotePreview={(key) => promotePreviewTab(activeEditorGroupId, key)}
+            onCloseOthers={(key) => {
+              const group = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).editorGroups[activeEditorGroupId];
+              void closeGroupFiles(activeEditorGroupId, group.openOrder.filter(
+                (entry) => entry !== key && !group.pinnedKeys.includes(entry),
+              ));
+            }}
+            onCloseRight={(key) => {
+              const group = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).editorGroups[activeEditorGroupId];
+              const index = group.openOrder.indexOf(key);
+              void closeGroupFiles(activeEditorGroupId, group.openOrder.slice(index + 1).filter(
+                (entry) => !group.pinnedKeys.includes(entry),
+              ));
+            }}
+            onCloseUnmodified={() => {
+              const group = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).editorGroups[activeEditorGroupId];
+              void closeGroupFiles(activeEditorGroupId, group.openOrder.filter(
+                (entry) => !openFilesRef.current[entry]?.dirty,
+              ));
+            }}
+            onCloseAll={() => {
+              const group = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).editorGroups[activeEditorGroupId];
+              void closeGroupFiles(activeEditorGroupId, group.openOrder);
+            }}
             onMarkdownModeChange={setActiveMarkdownMode}
             onChangeText={updateFileText}
             onSave={(key) => void saveFile(key)}
