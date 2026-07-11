@@ -46,6 +46,9 @@ src-tauri/frameworks/
 .embeddings/
 .vectordb/
 
+# Local MCP tool schema dumps (agent/session caches, not project sources)
+/mcps/
+
 
 # =============================================================================
 # IDE / Editors
