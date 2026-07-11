@@ -2,7 +2,7 @@
 
 > 目标：在现有 Code Workspace 基础上做功能与交互完善，达到"日常代码开发够用"的 IntelliJ IDEA 级体验（非全量对标）。本文档为设计稿，不含实现代码。
 >
-> 日期：2026-07-11 · 版本：v2（新增交互原型、语言智能设计）· 状态：待评审
+> 日期：2026-07-11 · 版本：v2.2（进度标记，见 §8.1）· 状态：**实施中**（分支 `feat/code-workspace-ide`）
 
 ---
 
@@ -570,16 +570,93 @@ src/stores/
 
 ## 8. 实施计划（里程碑）
 
-| 里程碑 | 内容 | 规模 |
-|--------|------|------|
-| **M0 前置重构** | 组件拆分 + codeWorkspaceStore + 命令系统骨架 + 底部 dock 容器（References 迁入） | M |
-| **M1 编辑器智能·上（P0）** | 查找替换、LSP 补全（含 auto-import）/签名/快速文档/格式化、诊断呈现升级、Problems 面板 | L |
-| **M2 导航与搜索（P0）** | Find in Files（后端搜索模块 + 面板）、Search Everywhere（含 Classes/Symbols）、Go to File/Class/Symbol、Recent Files、导航历史、Outline + 结构弹窗、类型/实现跳转 + peek、重命名、Code Actions、树右键/键盘 | L |
-| **M3 布局与终端（P1）** | 分屏、tab 管理/预览 tab、面包屑、集成终端、Run/Tasks | L |
-| **M4 语言智能·下 + Git（P1）** | 调用层级、类型层级、用法高亮、inlay hints、智能选区(LSP)、Git gutter、inline blame、状态栏分段、持久化增强 | L |
-| **M5 差异化（P2）** | 本地历史、AI 集成入口、语义高亮、TODO/书签（可选）、远程工作区 spike | M–L |
+| 里程碑 | 内容 | 规模 | 状态 |
+|--------|------|------|------|
+| **M0 前置重构** | 组件拆分 + codeWorkspaceStore + 命令系统骨架 + 底部 dock 容器（References 迁入） | M | 🔶 部分完成 |
+| **M1 编辑器智能·上（P0）** | 查找替换、LSP 补全（含 auto-import）/签名/快速文档/格式化、诊断呈现升级、Problems 面板 | L | 🔶 大部分完成 |
+| **M2 导航与搜索（P0）** | Find in Files（后端搜索模块 + 面板）、Search Everywhere（含 Classes/Symbols）、Go to File/Class/Symbol、Recent Files、导航历史、Outline + 结构弹窗、类型/实现跳转 + peek、重命名、Code Actions、树右键/键盘 | L | 🔶 大部分完成 |
+| **M3 布局与终端（P1）** | 分屏、tab 管理/预览 tab、面包屑、集成终端、Run/Tasks | L | ⬜ 未开始 |
+| **M4 语言智能·下 + Git（P1）** | 调用层级、类型层级、用法高亮、inlay hints、智能选区(LSP)、Git gutter、inline blame、状态栏分段、持久化增强 | L | ⬜ 未开始 |
+| **M5 差异化（P2）** | 本地历史、AI 集成入口、语义高亮、TODO/书签（可选）、远程工作区 spike | M–L | ⬜ 未开始 |
 
 依赖关系：M0 是一切前提；M1/M2 内部可并行（后端 LSP 扩展与搜索模块独立）；M3 依赖 M0 的 dock 容器；M4 的层级面板依赖 M0 dock + M2 的 LSP 请求管道。每个里程碑独立可发布、可验收。
+
+### 8.1 进度明细（勾选清单）
+
+> 更新于 2026-07-11，分支 `feat/code-workspace-ide`。已完成项附提交号。
+
+**M0 前置重构 — 🔶 部分完成**
+
+- [x] CodeMirror host 抽取（`CodeMirrorHost.tsx`）— `042d03f`
+- [x] 底部 dock 容器 + References 面板迁入 — `09108e2`（`4766f43` 起改为面板常驻挂载）
+- [ ] 组件全量拆分（FileTreePane / EditorGroup / 弹窗群 → §6.1 目录结构）+ `codeWorkspaceStore` — **⚠ 技术债：`CodeWorkspaceTab.tsx` 已约 3.9k 行且持续增长，M3 分屏前必须补课**
+- [ ] 命令系统骨架（`workspaceCommands.ts`，§6.2）
+
+**M1 编辑器智能·上（P0）— 🔶 大部分完成**
+
+- [x] 编辑器内查找/替换（`@codemirror/search` 自绘面板）— `d346c37`
+- [x] IDEA 编辑命令键位（注释/复制行/删除行/移动行/扩选/跳转行）— `19e23f4`
+- [x] Problems 面板（打开文件范围 + severity 过滤 + 徽标）— `e0135a3`
+- [x] capability 摘要下发（§5.2.0，initialize 握手升级 + `LspDocumentStatus.capabilities`）— `fa8ce88`
+- [x] LSP 补全（kind 图标、snippet 转换、auto-import via resolve、触发字符、词级回退）— `fa8ce88`
+- [x] 签名帮助（触发字符自动弹出 / Ctrl+Shift+Space，活动参数加粗）— `fa8ce88`
+- [ ] 快速文档升级（Ctrl+Q 显式弹出 + pin 到右栏；hover markdown 渲染已有）
+- [ ] 格式化（`lsp_formatting` / `lsp_range_formatting`，Ctrl+Alt+L，保存时格式化开关）
+- [ ] 诊断呈现收尾（gutter 图标、overview ruler 色条、灯泡入口；波浪线已有）
+
+**M2 导航与搜索（P0）— 🔶 大部分完成**
+
+- [x] Find in Files 后端（ignore + grep-searcher 流式搜索、取消、截断）— `65ac601`
+- [x] Find in Files 面板（Ctrl+Shift+F、大小写/整词/正则、include/exclude glob）— `4766f43`
+- [x] Go to File（双 Shift / Ctrl+Shift+N / Ctrl+P，camelCase 模糊匹配）— `972ad00`
+- [x] 文件树右键菜单（新建/重命名/删除/复制路径/Find in Directory）— `6be92f5`
+- [x] Recent Files（Ctrl+E，最近优先、连按推进、上一文件预选）— `f5ae894`
+- [x] 导航历史（Ctrl+Alt+←/→ + 头部按钮，100 条上限）— `f5ae894`
+- [x] 文件结构弹窗（Ctrl+F12，documentSymbol 层级/扁平双格式）— `5939c76`
+- [ ] Go to Class / Go to Symbol（`lsp_workspace_symbols`，SE 增加 Classes/Symbols 分组，需 QuickPickOverlay 支持异步 source）
+- [ ] 类型声明/实现跳转 + 多结果 peek（`lsp_type_definition` / `lsp_implementation`）
+- [ ] 重命名（prepareRename + rename + §5.2.9 WorkspaceEdit 应用规则）
+- [ ] Code Actions / Alt+Enter（含 server 回推 applyEdit 的 oneshot 通道）
+- [ ] 树键盘导航（↑↓←→/Enter/F2）与拖拽
+- [ ] 替换（Replace in Files，`workspace_replace_in_files` 后端已预留设计）
+
+**M3 布局与终端（P1）— ⬜ 未开始**
+
+- [ ] 编辑区二分屏（共享 buffer）
+- [ ] 编辑器 tab 行为（预览 tab、固定、关闭其他、中键关闭、溢出下拉）
+- [ ] 面包屑（路径 + 光标符号链）
+- [ ] 集成终端底部面板（复用 TerminalPanel，cwd 联动，多实例）
+- [ ] Run/Tasks（`workspace_detect_tasks` + Run 面板 + 终端运行）
+
+**M4 语言智能·下 + Git（P1）— ⬜ 未开始**
+
+- [ ] 调用层级（Ctrl+Alt+H，Callers⇄Callees，懒展开/环检测）
+- [ ] 类型层级（Ctrl+H，Supertypes⇄Subtypes）
+- [ ] 用法高亮（documentHighlight，读/写区分）
+- [ ] Inlay hints（视口 range 请求，默认关）
+- [ ] 智能选区换 LSP selectionRange（syntaxTree 回退已有）
+- [ ] 右侧 Outline 常驻工具窗（结构弹窗已有，常驻形态归此）
+- [ ] Git gutter 变更标记 + 内联 diff 浮层
+- [ ] Inline blame（`git_blame_lines`）
+- [ ] 状态栏分段（光标/语言/LSP 状态/分支）
+- [ ] 工作区状态持久化增强（打开 tab/分屏/dock 状态/搜索历史）
+
+**M5 差异化（P2）— ⬜ 未开始**
+
+- [ ] 本地历史（快照存储 + 时间线 diff + 恢复）
+- [ ] AI 集成入口（选区工具条 + diff 应用 + 右栏会话）
+- [ ] 语义高亮（semanticTokens 增量）
+- [ ] TODO / 书签面板（可选）
+- [ ] 远程工作区 `WorkspaceFs` trait spike
+
+**横切事项**
+
+- [x] 交互原型交付（`claudedocs/prototype/code-workspace-prototype.html`）
+- [x] 签名帮助键位决策：Ctrl+Shift+Space（Ctrl+P 已作 Go to File 别名）— `f4d9c15`
+- [ ] **⚠ 真机验证欠账**：`65ac601` 起的功能均为测试级验证，需 `pnpm tauri dev` 人工过一遍（重点：补全/auto-import、签名帮助、Ctrl+F12、Ctrl+Shift+F、双 Shift、Ctrl+E、树右键）
+- [ ] ⚠ 后端既有测试失败 8 例（config 剪贴板 URI ×4、terminal pushd ×1、workspace git 根检测 ×3），与本特性无关，待排查
+
+**建议推进顺序**：M0 拆分补课 → 重命名 + Code Actions + 诊断收尾 → Go to Class/Symbol + 类型/实现跳转 → M3。
 
 ---
 
