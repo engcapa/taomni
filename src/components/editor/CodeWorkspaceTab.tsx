@@ -37,7 +37,6 @@ import {
   workspaceCreateDir,
   workspaceCreateFile,
   workspaceDeletePath,
-  workspaceDetectGitRoots,
   workspaceReadFile,
   workspaceReadLooseFile,
   workspaceRenamePath,
@@ -48,11 +47,9 @@ import {
 import {
   gitBlameLines,
   gitBlobPair,
-  gitSnapshot,
   type GitBlameLine,
   type GitChange,
 } from "../../lib/git";
-import { notifyGitRepoChanged, subscribeGitRepoRefresh } from "../../lib/gitRefresh";
 import {
   lspCodeActions,
   lspCompletion,
@@ -263,7 +260,6 @@ import {
   type OpenFileState,
   type TreeSelection,
   type TreeViewMode,
-  type WorkspaceGitSnapshotState,
   type WorkspaceTreeCommandPayload,
   CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE,
   CODE_WORKSPACE_MAX_FONT_SIZE,
@@ -313,6 +309,7 @@ import {
 } from "./workspace/codeWorkspaceModel";
 import { useWorkspaceTreeData } from "./workspace/useWorkspaceTreeData";
 import { useWorkspaceLspSession } from "./workspace/useWorkspaceLspSession";
+import { useWorkspaceGitSnapshots } from "./workspace/useWorkspaceGitSnapshots";
 import { Breadcrumbs, type BreadcrumbPathSegment } from "./workspace/Breadcrumbs";
 import {
   TerminalDockPanel,
@@ -633,9 +630,15 @@ export function CodeWorkspaceTab({
     treeViewMode,
     onError: setStatusMessage,
   });
-  const [gitRoots, setGitRoots] = useState<WorkspaceGitRoot[]>([]);
-  const [gitRootsLoading, setGitRootsLoading] = useState(false);
-  const [gitSnapshots, setGitSnapshots] = useState<Record<string, WorkspaceGitSnapshotState>>({});
+  const {
+    gitRoots,
+    gitRootsLoading,
+    gitSnapshots,
+    notifyWorkspacePathGitChanged,
+  } = useWorkspaceGitSnapshots({
+    roots,
+    onError: setStatusMessage,
+  });
   const [navCan, setNavCan] = useState({ back: false, forward: false });
   const [revealTarget, setRevealTarget] = useState<EditorRevealTarget | null>(null);
   const [cursorPositions, setCursorPositions] = useState<Record<EditorGroupId, LspPosition>>({
@@ -693,7 +696,6 @@ export function CodeWorkspaceTab({
   const looseFilesRef = useRef(looseFiles);
   const codeViewProfileRef = useRef(codeViewProfile);
   const treeFontSizeRef = useRef(treeFontSize);
-  const gitRootsRef = useRef(gitRoots);
   const navHistoryRef = useRef<{ stack: CodeWorkspaceFileRef[]; index: number; suppress: boolean }>({
     stack: [],
     index: -1,
@@ -767,10 +769,6 @@ export function CodeWorkspaceTab({
   useEffect(() => {
     looseFilesRef.current = looseFiles;
   }, [looseFiles]);
-
-  useEffect(() => {
-    gitRootsRef.current = gitRoots;
-  }, [gitRoots]);
 
   useEffect(() => {
     openFilesRef.current = openFiles;
@@ -947,108 +945,6 @@ export function CodeWorkspaceTab({
   }, [stepCodeViewFontSize, stepTreeFontSize, visible, zoomTargetForNode]);
 
   const findRoot = useCallback((rootId: string) => rootsRef.current.find((root) => root.id === rootId) ?? null, []);
-
-  const refreshWorkspaceGitSnapshots = useCallback(async (targets = gitRootsRef.current) => {
-    await Promise.all(targets.map(async (root) => {
-      setGitSnapshots((current) => ({
-        ...current,
-        [root.repoRoot]: {
-          changes: current[root.repoRoot]?.changes ?? [],
-          headOid: current[root.repoRoot]?.headOid ?? null,
-          currentBranch: current[root.repoRoot]?.currentBranch ?? null,
-          ahead: current[root.repoRoot]?.ahead ?? 0,
-          behind: current[root.repoRoot]?.behind ?? 0,
-          loading: true,
-          error: null,
-        },
-      }));
-      try {
-        const snapshot = await gitSnapshot(root.repoRoot);
-        setGitSnapshots((current) => ({
-          ...current,
-          [root.repoRoot]: {
-            changes: snapshot.changes,
-            headOid: snapshot.headOid,
-            currentBranch: snapshot.currentBranch,
-            ahead: snapshot.ahead,
-            behind: snapshot.behind,
-            loading: false,
-            error: null,
-          },
-        }));
-      } catch (err) {
-        setGitSnapshots((current) => ({
-          ...current,
-          [root.repoRoot]: {
-            changes: current[root.repoRoot]?.changes ?? [],
-            headOid: current[root.repoRoot]?.headOid ?? null,
-            currentBranch: current[root.repoRoot]?.currentBranch ?? null,
-            ahead: current[root.repoRoot]?.ahead ?? 0,
-            behind: current[root.repoRoot]?.behind ?? 0,
-            loading: false,
-            error: errorMessage(err),
-          },
-        }));
-      }
-    }));
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (roots.length === 0) {
-      setGitRoots([]);
-      setGitRootsLoading(false);
-      setGitSnapshots({});
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    setGitRootsLoading(true);
-    void workspaceDetectGitRoots(roots.map((root) => ({
-      id: root.id,
-      name: root.name,
-      path: root.path,
-    }))).then((detected) => {
-      if (cancelled) return;
-      setGitRoots(detected);
-      setGitSnapshots((current) => Object.fromEntries(
-        Object.entries(current).filter(([repoRoot]) => detected.some((root) => root.repoRoot === repoRoot)),
-      ));
-    }).catch((err) => {
-      if (cancelled) return;
-      const message = errorMessage(err);
-      setGitRoots([]);
-      setStatusMessage(message);
-    }).finally(() => {
-      if (!cancelled) setGitRootsLoading(false);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [roots, setStatusMessage]);
-
-  useEffect(() => {
-    if (gitRoots.length === 0) return;
-    void refreshWorkspaceGitSnapshots(gitRoots);
-    const timer = window.setInterval(() => {
-      void refreshWorkspaceGitSnapshots(gitRootsRef.current);
-    }, 30_000);
-    return () => window.clearInterval(timer);
-  }, [gitRoots, refreshWorkspaceGitSnapshots]);
-
-  useEffect(() => subscribeGitRepoRefresh((repoRoot) => {
-    const root = gitRootsRef.current.find((item) => item.repoRoot === repoRoot);
-    if (root) void refreshWorkspaceGitSnapshots([root]);
-  }), [refreshWorkspaceGitSnapshots]);
-
-  const notifyWorkspacePathGitChanged = useCallback((rootId: string, path: string) => {
-    const root = findRoot(rootId);
-    if (!root) return;
-    const repo = gitRootForWorkspacePath(root, path, gitRootsRef.current);
-    if (repo) notifyGitRepoChanged(repo.repoRoot);
-  }, [findRoot]);
 
   const openFile = useCallback(
     async (ref: CodeWorkspaceFileRef, options: { preview?: boolean; groupId?: EditorGroupId } = {}) => {
