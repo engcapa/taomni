@@ -1214,6 +1214,9 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "lsp_list_presets": {
       return STUB_LSP_PRESETS as T;
     }
+    case "git_blame_lines": {
+      return [] as T;
+    }
     case "lsp_detect_servers": {
       return stubLspServerStatuses() as T;
     }

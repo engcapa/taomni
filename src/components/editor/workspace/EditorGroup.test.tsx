@@ -47,6 +47,8 @@ function props(overrides: Partial<ComponentProps<typeof EditorGroup>> = {}): Com
     activeDiagnostics: [],
     activeHighlights: [],
     activeInlayHints: [],
+    activeGitChanges: [],
+    activeGitBlame: null,
     activeCapabilities: null,
     activeLspSyncing: false,
     lspStatusPill: null,

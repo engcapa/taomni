@@ -43,6 +43,8 @@ import { createWorkspaceSearchPanel, WORKSPACE_SEARCH_STYLE } from "./editorSear
 import { createLspCompletionSource } from "./lspCompletion";
 import { createDiagnosticChrome } from "./lspDiagnosticChrome";
 import { createLspIntelligenceChrome } from "./lspIntelligenceChrome";
+import { createGitEditorChrome, type GitLineChange } from "./gitEditorChrome";
+import type { GitBlameLine } from "../../../lib/git";
 import { lspPositionFromOffset, offsetFromLspPosition } from "./lspPositions";
 import {
   expandSelectionFromLspRanges,
@@ -69,6 +71,8 @@ interface CodeMirrorHostProps {
   diagnostics: LspDiagnostic[];
   highlights?: LspDocumentHighlight[];
   inlayHints?: LspInlayHint[];
+  gitChanges?: GitLineChange[];
+  gitBlame?: GitBlameLine | null;
   reveal: EditorRevealTarget | null;
   onChange: (doc: string) => void;
   onSave: () => void;
@@ -88,6 +92,7 @@ interface CodeMirrorHostProps {
   onViewportChange?: (range: LspRange) => void;
   onExpandSelection?: (selection: EditorSelectionRange) => Promise<LspRange[] | null>;
   onLightbulb?: (line: number) => void;
+  onGitChangeClick?: (change: GitLineChange) => void;
   completionTriggers?: string[];
   signatureTriggers?: string[];
 }
@@ -225,6 +230,8 @@ export function CodeMirrorHost({
   diagnostics,
   highlights = [],
   inlayHints = [],
+  gitChanges = [],
+  gitBlame = null,
   reveal,
   onChange,
   onSave,
@@ -238,6 +245,7 @@ export function CodeMirrorHost({
   onViewportChange,
   onExpandSelection,
   onLightbulb,
+  onGitChangeClick,
   completionTriggers,
   signatureTriggers,
 }: CodeMirrorHostProps) {
@@ -246,6 +254,7 @@ export function CodeMirrorHost({
   const languageCompartment = useRef(new Compartment());
   const diagnosticsCompartment = useRef(new Compartment());
   const intelligenceCompartment = useRef(new Compartment());
+  const gitCompartment = useRef(new Compartment());
   const signatureCompartment = useRef(new Compartment());
   const signatureShownRef = useRef(false);
   const onChangeRef = useRef(onChange);
@@ -260,6 +269,7 @@ export function CodeMirrorHost({
   const onViewportChangeRef = useRef(onViewportChange);
   const onExpandSelectionRef = useRef(onExpandSelection);
   const onLightbulbRef = useRef(onLightbulb);
+  const onGitChangeClickRef = useRef(onGitChangeClick);
   const completionTriggersRef = useRef(completionTriggers ?? []);
   const signatureTriggersRef = useRef(signatureTriggers ?? []);
   onChangeRef.current = onChange;
@@ -274,6 +284,7 @@ export function CodeMirrorHost({
   onViewportChangeRef.current = onViewportChange;
   onExpandSelectionRef.current = onExpandSelection;
   onLightbulbRef.current = onLightbulb;
+  onGitChangeClickRef.current = onGitChangeClick;
   completionTriggersRef.current = completionTriggers ?? [];
   signatureTriggersRef.current = signatureTriggers ?? [];
 
@@ -413,6 +424,11 @@ export function CodeMirrorHost({
           highlights,
           inlayHints,
         )),
+        gitCompartment.current.of(createGitEditorChrome(
+          gitChanges,
+          gitBlame,
+          (change) => onGitChangeClickRef.current?.(change),
+        )),
         signatureCompartment.current.of([]),
         ...lspInteractionExtensions(onHoverRef, onDefinitionRef, onReferencesRef),
         ...codeViewExtensions(),
@@ -509,6 +525,18 @@ export function CodeMirrorHost({
       ),
     });
   }, [highlights, inlayHints]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: gitCompartment.current.reconfigure(createGitEditorChrome(
+        gitChanges,
+        gitBlame,
+        (change) => onGitChangeClickRef.current?.(change),
+      )),
+    });
+  }, [gitBlame, gitChanges]);
 
   useEffect(() => {
     const view = viewRef.current;

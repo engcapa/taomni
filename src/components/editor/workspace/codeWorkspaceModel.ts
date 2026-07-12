@@ -93,6 +93,8 @@ export const DEFAULT_FLAT_FILES_STATE: FlatFilesState = {
 
 export interface WorkspaceGitSnapshotState {
   changes: GitChange[];
+  headOid: string | null;
+  currentBranch: string | null;
   loading: boolean;
   error: string | null;
 }
@@ -638,4 +640,3 @@ export function initialFileRef(workspace: CodeWorkspaceTabInfo, roots: CodeWorks
   }
   return looseFiles[0] ? { kind: "loose", id: looseFiles[0].id, path: looseFiles[0].path } : null;
 }
-

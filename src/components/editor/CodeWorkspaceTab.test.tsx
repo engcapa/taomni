@@ -71,6 +71,8 @@ vi.mock("../../lib/clipboard", () => clipboardMocks);
 
 const gitMocks = vi.hoisted(() => ({
   gitSnapshot: vi.fn(),
+  gitBlobPair: vi.fn(),
+  gitBlameLines: vi.fn(),
   gitChangeLabel: vi.fn((change: { conflict?: boolean; status: string }) => (
     change.conflict ? "Conflicted" : change.status[0]?.toUpperCase() + change.status.slice(1)
   )),
@@ -254,6 +256,8 @@ describe("CodeWorkspaceTab", () => {
     ipcMocks.selectFilePath.mockReset();
     ipcMocks.selectFolderPath.mockReset();
     gitMocks.gitSnapshot.mockReset();
+    gitMocks.gitBlobPair.mockReset();
+    gitMocks.gitBlameLines.mockReset();
     gitMocks.gitChangeLabel.mockClear();
     vi.mocked(mermaid.initialize).mockClear();
     vi.mocked(mermaid.render).mockClear();
@@ -296,6 +300,22 @@ describe("CodeWorkspaceTab", () => {
         commitGpgsign: null,
       },
     });
+    gitMocks.gitBlobPair.mockResolvedValue({
+      path: "src/main.ts",
+      oldPath: null,
+      oldText: "",
+      newText: null,
+      oldExists: true,
+      newExists: false,
+      binary: false,
+      image: false,
+      oldImageB64: null,
+      newImageB64: null,
+      oversize: false,
+      oldSize: 0,
+      newSize: 0,
+    });
+    gitMocks.gitBlameLines.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -619,6 +639,87 @@ describe("CodeWorkspaceTab", () => {
       ],
       activeRepoRoot: "/repo/app",
     });
+  });
+
+  it("shows Git gutter diffs and opt-in inline blame for the active line", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-git-editor",
+      workspaceInstanceId: "instance-git-editor",
+      name: "Git Editor",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "const value = 1;"));
+    workspaceMocks.workspaceDetectGitRoots.mockResolvedValue([{
+      id: "app",
+      name: "app",
+      path: "/repo/app",
+      repoRoot: "/repo/app",
+      rootIds: ["app"],
+    }]);
+    gitMocks.gitSnapshot.mockResolvedValue({
+      repoRoot: "/repo/app",
+      currentBranch: "main",
+      headOid: "0123456789abcdef",
+      detached: false,
+      upstream: null,
+      ahead: 0,
+      behind: 0,
+      changes: [],
+      remotes: [],
+      branches: [],
+      stashes: [],
+      tags: [],
+      settings: {
+        userName: null,
+        userEmail: null,
+        httpProxy: null,
+        httpsProxy: null,
+        pullRebase: null,
+        pushDefault: null,
+        coreAutocrlf: null,
+        coreFilemode: null,
+        commitGpgsign: null,
+      },
+    });
+    gitMocks.gitBlobPair.mockResolvedValue({
+      path: "src/main.ts",
+      oldPath: null,
+      oldText: "const previous = 1;",
+      newText: null,
+      oldExists: true,
+      newExists: false,
+      binary: false,
+      image: false,
+      oldImageB64: null,
+      newImageB64: null,
+      oversize: false,
+      oldSize: 19,
+      newSize: 0,
+    });
+    gitMocks.gitBlameLines.mockResolvedValue([{
+      line: 1,
+      commit: "0123456789abcdef",
+      author: "Ada",
+      authorMail: "ada@example.test",
+      authorTime: Math.floor(Date.now() / 1000) - 3_600,
+      summary: "feat: seed main",
+    }]);
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    const marker = await screen.findByLabelText("modified Git change · show diff", {}, { timeout: 3_000 });
+    fireEvent.mouseDown(marker);
+    expect(screen.getByTestId("code-workspace-git-diff-peek")).toHaveTextContent("previous");
+    expect(screen.getByTestId("code-workspace-git-diff-peek")).toHaveTextContent("value");
+
+    const blameToggle = screen.getByTestId("code-workspace-inline-blame-toggle");
+    expect(blameToggle).not.toBeDisabled();
+    fireEvent.click(blameToggle);
+    await waitFor(() => expect(gitMocks.gitBlameLines).toHaveBeenCalledWith("/repo/app", "src/main.ts", 1, 1));
+    expect(await screen.findByText(/Ada, .* · feat: seed main/)).toBeInTheDocument();
   });
 
   it("selects the child repository that owns the active file inside a plain workspace root", async () => {

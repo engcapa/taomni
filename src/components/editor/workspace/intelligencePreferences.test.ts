@@ -13,10 +13,12 @@ describe("workspace intelligence preferences", () => {
     writeWorkspaceIntelligencePreferences("ws", {
       inlayHintsEnabled: true,
       inlayHintLanguages: { typescript: false, rust: true },
+      inlineBlameEnabled: true,
     });
     const restored = readWorkspaceIntelligencePreferences("ws");
     expect(inlayHintsEnabledForLanguage(restored, "typescript")).toBe(false);
     expect(inlayHintsEnabledForLanguage(restored, "rust")).toBe(true);
     expect(inlayHintsEnabledForLanguage(restored, "go")).toBe(true);
+    expect(restored.inlineBlameEnabled).toBe(true);
   });
 });

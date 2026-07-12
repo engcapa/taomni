@@ -1,4 +1,4 @@
-import type { CSSProperties, MutableRefObject, ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type MutableRefObject, type ReactNode } from "react";
 import {
   AlertTriangle,
   Columns2,
@@ -26,6 +26,9 @@ import { CodeMirrorHost, type EditorSelectionRange } from "./CodeMirrorHost";
 import type { OpenFileViewModel } from "./editorGroupTypes";
 import { useContextMenu } from "../../ContextMenu";
 import type { EditorGroupId } from "../../../stores/codeWorkspaceStore";
+import type { GitBlameLine } from "../../../lib/git";
+import type { GitLineChange } from "./gitEditorChrome";
+import { GitDiffPeek } from "./GitDiffPeek";
 
 export type MarkdownViewMode = "edit" | "preview" | "split";
 
@@ -50,6 +53,8 @@ interface EditorGroupProps {
   activeDiagnostics: LspDiagnostic[];
   activeHighlights: LspDocumentHighlight[];
   activeInlayHints: LspInlayHint[];
+  activeGitChanges: GitLineChange[];
+  activeGitBlame: GitBlameLine | null;
   activeCapabilities: LspCapabilitySummary | null;
   activeLspSyncing: boolean;
   lspStatusPill: ReactNode;
@@ -119,6 +124,8 @@ export function EditorGroup({
   activeDiagnostics,
   activeHighlights,
   activeInlayHints,
+  activeGitChanges,
+  activeGitBlame,
   activeCapabilities,
   activeLspSyncing,
   lspStatusPill,
@@ -161,6 +168,8 @@ export function EditorGroup({
   renderMarkdownPreview,
 }: EditorGroupProps) {
   const tabMenu = useContextMenu();
+  const [gitDiffPeek, setGitDiffPeek] = useState<GitLineChange | null>(null);
+  useEffect(() => setGitDiffPeek(null), [activeKey]);
   const pinnedSet = new Set(pinnedKeys);
   const orderedKeys = [
     ...openOrder.filter((key) => pinnedSet.has(key)),
@@ -304,7 +313,8 @@ export function EditorGroup({
                   <span className="min-w-0 truncate">{activeFile.error}</span>
                 </div>
               )}
-              <div data-testid="code-workspace-editor" className="flex-1 min-h-0">
+              <div data-testid="code-workspace-editor" className="relative flex-1 min-h-0">
+                {gitDiffPeek && <GitDiffPeek change={gitDiffPeek} onClose={() => setGitDiffPeek(null)} />}
                 {activeFile.loading ? (
                   <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-code-muted)]">
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -322,6 +332,8 @@ export function EditorGroup({
                         diagnostics={activeDiagnostics}
                         highlights={activeHighlights}
                         inlayHints={activeInlayHints}
+                        gitChanges={activeGitChanges}
+                        gitBlame={activeGitBlame}
                         reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
                         onChange={(doc) => {
                           if (previewKey === activeFile.key) onPromotePreview(activeFile.key);
@@ -338,6 +350,7 @@ export function EditorGroup({
                         onViewportChange={onViewportChange}
                         onExpandSelection={(selection) => onExpandSelection(activeFile, selection)}
                         onLightbulb={onLightbulb}
+                        onGitChangeClick={setGitDiffPeek}
                         completionTriggers={activeCapabilities?.completionTriggerCharacters ?? []}
                         signatureTriggers={activeCapabilities?.signatureTriggerCharacters ?? []}
                       />
@@ -353,6 +366,8 @@ export function EditorGroup({
                     diagnostics={activeDiagnostics}
                     highlights={activeHighlights}
                     inlayHints={activeInlayHints}
+                    gitChanges={activeGitChanges}
+                    gitBlame={activeGitBlame}
                     reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
                     onChange={(doc) => {
                       if (previewKey === activeFile.key) onPromotePreview(activeFile.key);
@@ -369,6 +384,7 @@ export function EditorGroup({
                     onViewportChange={onViewportChange}
                     onExpandSelection={(selection) => onExpandSelection(activeFile, selection)}
                     onLightbulb={onLightbulb}
+                    onGitChangeClick={setGitDiffPeek}
                     completionTriggers={activeCapabilities?.completionTriggerCharacters ?? []}
                     signatureTriggers={activeCapabilities?.signatureTriggerCharacters ?? []}
                   />

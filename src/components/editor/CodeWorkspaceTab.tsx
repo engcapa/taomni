@@ -13,6 +13,7 @@ import {
   ArrowRight,
   Braces,
   GitBranch,
+  GitCommitHorizontal,
   ListTree,
   GitFork,
   Network,
@@ -44,7 +45,10 @@ import {
   type WorkspaceGitRoot,
 } from "../../lib/editor/workspace";
 import {
+  gitBlameLines,
+  gitBlobPair,
   gitSnapshot,
+  type GitBlameLine,
   type GitChange,
 } from "../../lib/git";
 import { notifyGitRepoChanged, subscribeGitRepoRefresh } from "../../lib/gitRefresh";
@@ -153,6 +157,7 @@ import { ProjectTree } from "./workspace/ProjectTree";
 import { MarkdownPreview } from "./workspace/MarkdownPreview";
 import { IconButton, LspStatusPill } from "./workspace/workspaceChrome";
 import { OutlinePane } from "./workspace/OutlinePane";
+import { buildGitLineChanges, type GitLineChange } from "./workspace/gitEditorChrome";
 import {
   dispatchWorkspaceCommandKeydown,
   runWorkspaceCommand,
@@ -252,6 +257,7 @@ import {
   formatBytes,
   formatMtime,
   gitRootForWorkspacePath,
+  gitPathForWorkspacePath,
   gitRootsForWorkspaceRoot,
   initialFileRef,
   initialLooseFiles,
@@ -574,6 +580,12 @@ export function CodeWorkspaceTab({
     primary: [],
     secondary: [],
   });
+  const [gitHeadTextByFile, setGitHeadTextByFile] = useState<Record<string, { sourceKey: string; text: string | null }>>({});
+  const [gitLineChangesByFile, setGitLineChangesByFile] = useState<Record<string, GitLineChange[]>>({});
+  const [gitBlameByGroup, setGitBlameByGroup] = useState<Record<EditorGroupId, GitBlameLine | null>>({
+    primary: null,
+    secondary: null,
+  });
   const [intelligencePreferences, setIntelligencePreferencesState] = useState<WorkspaceIntelligencePreferences>(
     () => readWorkspaceIntelligencePreferences(workspaceInstanceId),
   );
@@ -610,6 +622,8 @@ export function CodeWorkspaceTab({
     suppress: false,
   });
   const recentFilesRef = useRef<CodeWorkspaceFileRef[]>([]);
+  const gitHeadRequestsRef = useRef(new Set<string>());
+  const gitBlameCacheRef = useRef(new Map<string, GitBlameLine | null>());
   const revealNonceRef = useRef(0);
   const editorSelectionRef = useRef<EditorSelectionRange>({
     start: { line: 0, character: 0 },
@@ -851,6 +865,8 @@ export function CodeWorkspaceTab({
         ...current,
         [root.repoRoot]: {
           changes: current[root.repoRoot]?.changes ?? [],
+          headOid: current[root.repoRoot]?.headOid ?? null,
+          currentBranch: current[root.repoRoot]?.currentBranch ?? null,
           loading: true,
           error: null,
         },
@@ -861,6 +877,8 @@ export function CodeWorkspaceTab({
           ...current,
           [root.repoRoot]: {
             changes: snapshot.changes,
+            headOid: snapshot.headOid,
+            currentBranch: snapshot.currentBranch,
             loading: false,
             error: null,
           },
@@ -870,6 +888,8 @@ export function CodeWorkspaceTab({
           ...current,
           [root.repoRoot]: {
             changes: current[root.repoRoot]?.changes ?? [],
+            headOid: current[root.repoRoot]?.headOid ?? null,
+            currentBranch: current[root.repoRoot]?.currentBranch ?? null,
             loading: false,
             error: errorMessage(err),
           },
@@ -2128,6 +2148,12 @@ export function CodeWorkspaceTab({
       };
     });
   }, [activeLanguageId, setIntelligencePreferences]);
+  const toggleInlineBlame = useCallback(() => {
+    setIntelligencePreferences((current) => ({
+      ...current,
+      inlineBlameEnabled: !current.inlineBlameEnabled,
+    }));
+  }, [setIntelligencePreferences]);
 
   useEffect(() => {
     const groupId = activeEditorGroupId;
@@ -2297,6 +2323,120 @@ export function CodeWorkspaceTab({
     }
     return map;
   }, [gitRoots, gitSnapshots, roots]);
+
+  const gitTargetForFile = useCallback((file: OpenFileState | null) => {
+    if (!file || file.loading || file.ref.kind !== "root") return null;
+    const ref = file.ref;
+    const root = roots.find((candidate) => candidate.id === ref.rootId);
+    if (!root) return null;
+    const repo = gitRootForWorkspacePath(root, ref.path, gitRoots);
+    if (!repo) return null;
+    const path = gitPathForWorkspacePath(root, repo, ref.path);
+    if (!path) return null;
+    const snapshot = gitSnapshots[repo.repoRoot];
+    return {
+      repoRoot: repo.repoRoot,
+      path,
+      headOid: snapshot?.headOid ?? null,
+      sourceKey: `${repo.repoRoot}:${snapshot?.headOid ?? "no-head"}:${path}`,
+    };
+  }, [gitRoots, gitSnapshots, roots]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const activeKeys = new Set([
+      editorGroups.primary.activeKey,
+      editorGroups.secondary.activeKey,
+    ].filter((key): key is string => !!key));
+    for (const key of activeKeys) {
+      const file = openFiles[key];
+      const target = gitTargetForFile(file ?? null);
+      if (!file || !target || gitHeadTextByFile[key]?.sourceKey === target.sourceKey) continue;
+      if (!target.headOid) {
+        setGitHeadTextByFile((current) => ({
+          ...current,
+          [key]: { sourceKey: target.sourceKey, text: "" },
+        }));
+        continue;
+      }
+      if (gitHeadRequestsRef.current.has(target.sourceKey)) continue;
+      gitHeadRequestsRef.current.add(target.sourceKey);
+      void gitBlobPair(target.repoRoot, target.path, "HEAD", "")
+        .then((pair) => {
+          if (cancelled) return;
+          setGitHeadTextByFile((current) => ({
+            ...current,
+            [key]: {
+              sourceKey: target.sourceKey,
+              text: pair.binary || pair.oversize ? null : pair.oldText ?? "",
+            },
+          }));
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setGitHeadTextByFile((current) => ({
+              ...current,
+              [key]: { sourceKey: target.sourceKey, text: null },
+            }));
+          }
+        })
+        .finally(() => gitHeadRequestsRef.current.delete(target.sourceKey));
+    }
+    return () => { cancelled = true; };
+  }, [editorGroups.primary.activeKey, editorGroups.secondary.activeKey, gitHeadTextByFile, gitTargetForFile, openFiles]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const next: Record<string, GitLineChange[]> = {};
+      for (const [key, head] of Object.entries(gitHeadTextByFile)) {
+        const file = openFiles[key];
+        const target = gitTargetForFile(file ?? null);
+        if (!file || !target || head.sourceKey !== target.sourceKey || head.text === null) continue;
+        next[key] = buildGitLineChanges(head.text, file.text);
+      }
+      setGitLineChangesByFile(next);
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [gitHeadTextByFile, gitTargetForFile, openFiles]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const timers: number[] = [];
+    const loadForGroup = (groupId: EditorGroupId) => {
+      const key = editorGroups[groupId].activeKey;
+      const file = key ? openFiles[key] ?? null : null;
+      const target = gitTargetForFile(file);
+      if (!intelligencePreferences.inlineBlameEnabled || !file || file.dirty || !target?.headOid) {
+        setGitBlameByGroup((current) => current[groupId] === null ? current : { ...current, [groupId]: null });
+        return;
+      }
+      const line = (cursorPositions[groupId]?.line ?? 0) + 1;
+      const cacheKey = `${target.sourceKey}:${file.hash}:${line}`;
+      if (gitBlameCacheRef.current.has(cacheKey)) {
+        const cached = gitBlameCacheRef.current.get(cacheKey) ?? null;
+        setGitBlameByGroup((current) => current[groupId] === cached ? current : { ...current, [groupId]: cached });
+        return;
+      }
+      timers.push(window.setTimeout(() => {
+        void gitBlameLines(target.repoRoot, target.path, line, line)
+          .then((lines) => {
+            const blame = lines[0] ?? null;
+            gitBlameCacheRef.current.set(cacheKey, blame);
+            if (!cancelled) setGitBlameByGroup((current) => ({ ...current, [groupId]: blame }));
+          })
+          .catch(() => {
+            gitBlameCacheRef.current.set(cacheKey, null);
+            if (!cancelled) setGitBlameByGroup((current) => ({ ...current, [groupId]: null }));
+          });
+      }, 250));
+    };
+    loadForGroup("primary");
+    loadForGroup("secondary");
+    return () => {
+      cancelled = true;
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [cursorPositions, editorGroups, gitTargetForFile, intelligencePreferences.inlineBlameEnabled, openFiles]);
 
   useEffect(() => {
     if (!visible || !activeFile || activeFile.loading) return;
@@ -2947,6 +3087,14 @@ export function CodeWorkspaceTab({
       run: toggleInlayHintsForActiveLanguage,
     },
     {
+      id: "workspace.toggleInlineBlame",
+      title: `${intelligencePreferences.inlineBlameEnabled ? "Disable" : "Enable"} Inline Git Blame`,
+      category: "Git",
+      keywords: ["git", "blame", "author", "line"],
+      when: () => !!activeGitRoot,
+      run: toggleInlineBlame,
+    },
+    {
       id: "workspace.toggleTerminal",
       title: "Toggle Workspace Terminal",
       category: "View",
@@ -3134,6 +3282,7 @@ export function CodeWorkspaceTab({
     activeCapabilities,
     activeEditorGroupId,
     activeFile,
+    activeGitRoot,
     activeKey,
     activeInlayHintsEnabled,
     activeLanguageId,
@@ -3171,8 +3320,10 @@ export function CodeWorkspaceTab({
     selected,
     selectedRootDirectory,
     intelligencePreferences.inlayHintsEnabled,
+    intelligencePreferences.inlineBlameEnabled,
     toggleInlayHints,
     toggleInlayHintsForActiveLanguage,
+    toggleInlineBlame,
     toggleOutlinePane,
   ]);
 
@@ -3619,6 +3770,8 @@ export function CodeWorkspaceTab({
         activeDiagnostics={groupDiagnostics}
         activeHighlights={highlightsByGroup[groupId]}
         activeInlayHints={inlayHintsByGroup[groupId]}
+        activeGitChanges={groupFile ? gitLineChangesByFile[groupFile.key] ?? [] : []}
+        activeGitBlame={gitBlameByGroup[groupId]}
         activeCapabilities={groupCapabilities}
         activeLspSyncing={!!groupLspState?.syncing}
         lspStatusPill={<LspStatusPill state={groupLspState} diagnostics={groupDiagnostics} />}
@@ -3831,6 +3984,14 @@ export function CodeWorkspaceTab({
           active={activeInlayHintsEnabled}
           disabled={!activeCapabilities?.inlayHint}
           onClick={toggleInlayHintsForActiveLanguage}
+        />
+        <IconButton
+          label={`${intelligencePreferences.inlineBlameEnabled ? "Disable" : "Enable"} inline Git blame`}
+          testId="code-workspace-inline-blame-toggle"
+          icon={<GitCommitHorizontal className="h-3.5 w-3.5" />}
+          active={intelligencePreferences.inlineBlameEnabled}
+          disabled={!activeGitRoot}
+          onClick={toggleInlineBlame}
         />
         <IconButton
           label="Toggle outline pane"

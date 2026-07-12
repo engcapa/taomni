@@ -1,11 +1,13 @@
 export interface WorkspaceIntelligencePreferences {
   inlayHintsEnabled: boolean;
   inlayHintLanguages: Record<string, boolean>;
+  inlineBlameEnabled: boolean;
 }
 
 export const DEFAULT_WORKSPACE_INTELLIGENCE_PREFERENCES: WorkspaceIntelligencePreferences = {
   inlayHintsEnabled: false,
   inlayHintLanguages: {},
+  inlineBlameEnabled: false,
 };
 
 function storageKey(workspaceInstanceId: string): string {
@@ -24,6 +26,7 @@ export function readWorkspaceIntelligencePreferences(
       inlayHintLanguages: parsed.inlayHintLanguages && typeof parsed.inlayHintLanguages === "object"
         ? Object.fromEntries(Object.entries(parsed.inlayHintLanguages).filter(([, enabled]) => typeof enabled === "boolean"))
         : {},
+      inlineBlameEnabled: parsed.inlineBlameEnabled === true,
     };
   } catch {
     return { ...DEFAULT_WORKSPACE_INTELLIGENCE_PREFERENCES };

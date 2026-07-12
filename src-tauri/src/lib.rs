@@ -363,6 +363,7 @@ pub fn run() {
             git::git_snapshot,
             git::git_diff,
             git::git_blob_pair,
+            git::git_blame_lines,
             git::git_stage,
             git::git_unstage,
             git::git_discard,
