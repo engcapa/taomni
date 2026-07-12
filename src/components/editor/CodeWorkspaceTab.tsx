@@ -169,12 +169,10 @@ import {
 import { type QuickDocContent } from "./workspace/QuickDocPopup";
 import { type LocationPeekState } from "./workspace/LocationPeek";
 import {
-  type GoToFileItem,
   type GoToSymbolItem,
   type SearchEverywhereMode,
 } from "./workspace/SearchEverywhere";
 import { type RecentFileEntry } from "./workspace/RecentFilesPopup";
-import { createDoubleShiftDetector } from "./workspace/doubleShift";
 import { EditorGroup } from "./workspace/EditorGroup";
 import { WorkspacePopupsHost } from "./workspace/WorkspacePopupsHost";
 import { FileTreePane } from "./workspace/FileTreePane";
@@ -267,8 +265,6 @@ import {
   CODE_WORKSPACE_MIN_FONT_SIZE,
   CODE_WORKSPACE_MIN_TREE_FONT_SIZE,
   CUSTOM_LSP_COMMAND_ID,
-  NAV_HISTORY_LIMIT,
-  RECENT_FILES_LIMIT,
   absoluteWorkspacePath,
   basename,
   clampCodeWorkspaceFontSize,
@@ -301,7 +297,6 @@ import {
   resolveLooseMarkdownLink,
   resolveRootMarkdownLink,
   rootDirKey,
-  shouldHideEntry,
   workspacePathForGitPath,
   workspaceTitle,
   writeCodeWorkspaceTreeFontSize,
@@ -310,6 +305,7 @@ import {
 import { useWorkspaceTreeData } from "./workspace/useWorkspaceTreeData";
 import { useWorkspaceLspSession } from "./workspace/useWorkspaceLspSession";
 import { useWorkspaceGitSnapshots } from "./workspace/useWorkspaceGitSnapshots";
+import { useWorkspaceNavigation } from "./workspace/useWorkspaceNavigation";
 import { Breadcrumbs, type BreadcrumbPathSegment } from "./workspace/Breadcrumbs";
 import {
   TerminalDockPanel,
@@ -639,7 +635,6 @@ export function CodeWorkspaceTab({
     roots,
     onError: setStatusMessage,
   });
-  const [navCan, setNavCan] = useState({ back: false, forward: false });
   const [revealTarget, setRevealTarget] = useState<EditorRevealTarget | null>(null);
   const [cursorPositions, setCursorPositions] = useState<Record<EditorGroupId, LspPosition>>({
     primary: { line: 0, character: 0 },
@@ -696,12 +691,6 @@ export function CodeWorkspaceTab({
   const looseFilesRef = useRef(looseFiles);
   const codeViewProfileRef = useRef(codeViewProfile);
   const treeFontSizeRef = useRef(treeFontSize);
-  const navHistoryRef = useRef<{ stack: CodeWorkspaceFileRef[]; index: number; suppress: boolean }>({
-    stack: [],
-    index: -1,
-    suppress: false,
-  });
-  const recentFilesRef = useRef<CodeWorkspaceFileRef[]>([]);
   const gitHeadRequestsRef = useRef(new Set<string>());
   const gitBlameCacheRef = useRef(new Map<string, GitBlameLine | null>());
   const revealNonceRef = useRef(0);
@@ -1027,123 +1016,32 @@ export function CodeWorkspaceTab({
     [activateEditorGroup, findRoot, setStatusMessage, updateEditorGroup, workspaceInstanceId],
   );
 
-  const openSearchEverywhere = useCallback((mode: SearchEverywhereMode = "files") => {
-    // Warm the recursive file index for every root; loadFlatFiles caches.
-    rootsRef.current.forEach((root) => void loadFlatFiles(root.id));
-    setSearchEverywhereMode(mode);
-    setSearchEverywhereOpen(true);
-  }, [loadFlatFiles]);
-
-  const goToFileItems = useMemo<GoToFileItem[]>(() => {
-    const items: GoToFileItem[] = [];
-    for (const root of roots) {
-      const state = flatFiles[root.id];
-      if (!state) continue;
-      for (const entry of state.entries) {
-        if (entry.fileType !== "file" || shouldHideEntry(entry)) continue;
-        items.push({ rootId: root.id, rootName: root.name, path: entry.path });
-      }
-    }
-    return items;
-  }, [flatFiles, roots]);
-  const goToFileLoading = useMemo(
-    () => roots.some((root) => flatFiles[root.id]?.loading ?? false),
-    [flatFiles, roots],
-  );
-  const goToFileTruncated = useMemo(
-    () => roots.some((root) => flatFiles[root.id]?.truncated ?? false),
-    [flatFiles, roots],
-  );
-
-  const openGoToFileItem = useCallback(
-    (item: GoToFileItem, options?: { split: boolean }) => {
-      setSearchEverywhereOpen(false);
-      const ref: CodeWorkspaceFileRef = { kind: "root", rootId: item.rootId, path: item.path };
-      if (options?.split) {
-        const current = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
-        const targetGroupId: EditorGroupId = current.activeEditorGroupId === "primary"
-          ? "secondary"
-          : "primary";
-        setStoreSplitOrientation(workspaceInstanceId, "vertical");
-        void openFile(ref, { groupId: targetGroupId });
-        return;
-      }
-      void openFile(ref, { preview: true });
-    },
-    [openFile, setStoreSplitOrientation, workspaceInstanceId],
-  );
-
-  // Track file activations for Recent Files (Ctrl+E) and the back/forward
-  // navigation history.
-  useEffect(() => {
-    if (!activeKey) return;
-    const ref = openFilesRef.current[activeKey]?.ref;
-    if (!ref) return;
-    recentFilesRef.current = [
-      ref,
-      ...recentFilesRef.current.filter((item) => fileKey(item) !== activeKey),
-    ].slice(0, RECENT_FILES_LIMIT);
-    const nav = navHistoryRef.current;
-    if (nav.suppress) {
-      nav.suppress = false;
-      setNavCan({ back: nav.index > 0, forward: nav.index < nav.stack.length - 1 });
-      return;
-    }
-    if (nav.index >= 0 && nav.stack[nav.index] && fileKey(nav.stack[nav.index]) === activeKey) return;
-    nav.stack = [...nav.stack.slice(0, nav.index + 1), ref].slice(-NAV_HISTORY_LIMIT);
-    nav.index = nav.stack.length - 1;
-    setNavCan({ back: nav.index > 0, forward: false });
-  }, [activeKey]);
-
-  const navigateHistory = useCallback(
-    (delta: -1 | 1) => {
-      const nav = navHistoryRef.current;
-      const nextIndex = nav.index + delta;
-      if (nextIndex < 0 || nextIndex >= nav.stack.length) return;
-      nav.index = nextIndex;
-      nav.suppress = true;
-      setNavCan({ back: nextIndex > 0, forward: nextIndex < nav.stack.length - 1 });
-      void openFile(nav.stack[nextIndex]);
-    },
-    [openFile],
-  );
-
-  const openRecentFiles = useCallback(() => {
-    const entries: RecentFileEntry[] = recentFilesRef.current.map((ref) => {
-      const key = fileKey(ref);
-      const meta = fileMeta(ref, rootsRef.current, looseFilesRef.current);
-      return {
-        key,
-        ref,
-        title: meta.title,
-        subtitle: meta.subtitle,
-        open: !!openFilesRef.current[key],
-      };
-    });
-    setRecentEntries(entries);
-    setRecentFilesOpen(true);
-  }, []);
-
-  const pickRecentFile = useCallback(
-    (entry: RecentFileEntry) => {
-      setRecentFilesOpen(false);
-      void openFile(entry.ref);
-    },
-    [openFile],
-  );
-
-  useEffect(() => {
-    if (!visible) return;
-    const detector = createDoubleShiftDetector(() => openSearchEverywhere("all"));
-    const handleKeyDown = (event: KeyboardEvent) => detector.handleKeyDown(event);
-    const handleKeyUp = (event: KeyboardEvent) => detector.handleKeyUp(event);
-    window.addEventListener("keydown", handleKeyDown, true);
-    window.addEventListener("keyup", handleKeyUp, true);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown, true);
-      window.removeEventListener("keyup", handleKeyUp, true);
-    };
-  }, [openSearchEverywhere, visible]);
+  const {
+    navCan,
+    goToFileItems,
+    goToFileLoading,
+    goToFileTruncated,
+    openSearchEverywhere,
+    openGoToFileItem,
+    navigateHistory,
+    openRecentFiles,
+    pickRecentFile,
+  } = useWorkspaceNavigation({
+    workspaceInstanceId,
+    activeKey,
+    roots,
+    flatFiles,
+    visible,
+    rootsRef,
+    looseFilesRef,
+    openFilesRef,
+    loadFlatFiles,
+    openFile,
+    setSearchEverywhereMode,
+    setSearchEverywhereOpen,
+    setRecentEntries,
+    setRecentFilesOpen,
+  });
 
   const openFindInFiles = useCallback(() => {
     setBottomDockOpen(true);
