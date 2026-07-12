@@ -42,3 +42,24 @@ export function normalizeLocalStartCwd(cwd: string, platform: AppPlatform): stri
   // No Windows drive to anchor to (MSYS `/home`, WSL Linux paths, …).
   return null;
 }
+
+/**
+ * Return the compact directory label used as a terminal tab title prefix.
+ * OSC 7 paths can use either POSIX or Windows separators (WSL/MSYS included),
+ * so this intentionally does not depend on the frontend host platform.
+ */
+export function terminalCwdTitlePrefix(cwd: string): string | null {
+  const value = cwd.trim();
+  if (!value) return null;
+
+  const withoutTrailingSeparators = value.replace(/[\\/]+$/g, "");
+  if (!withoutTrailingSeparators) return "root";
+
+  // Native or OSC-normalized Windows drive roots: `C:\\`, `C:/`, `/C:/`.
+  const driveRoot = /^\/?([A-Za-z]):$/.exec(withoutTrailingSeparators);
+  if (driveRoot) return driveRoot[1].toUpperCase();
+
+  const segments = withoutTrailingSeparators.split(/[\\/]+/).filter(Boolean);
+  const last = segments.at(-1)?.trim();
+  return last || null;
+}

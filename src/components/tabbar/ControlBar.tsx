@@ -7,6 +7,8 @@ import {
   MessageSquare,
   Monitor,
   MoreHorizontal,
+  PanelsTopLeft,
+  Info,
   PanelLeft,
   Plus,
   Power,
@@ -59,6 +61,7 @@ interface ControlBarProps {
   onConnectSession: (session: SessionConfig) => void;
   onOpenSessionEditor: () => void;
   onDuplicateTab?: (id: string) => void;
+  onDetachActiveTab?: () => void;
   onCloseWindow?: () => void;
   /** Receives the DOM node that hosts the active tab's contextual actions. */
   slotRef: (el: HTMLDivElement | null) => void;
@@ -76,11 +79,13 @@ export function ControlBar({
   onConnectSession,
   onOpenSessionEditor,
   onDuplicateTab,
+  onDetachActiveTab,
   onCloseWindow,
   slotRef,
 }: ControlBarProps) {
   const ctx = useContextMenu();
   const t = useT();
+  const [detailsRevealHovered, setDetailsRevealHovered] = useState(false);
   const {
     hasSessions,
     importJson,
@@ -229,6 +234,7 @@ export function ControlBar({
           onConnectSession={onConnectSession}
           onOpenSessionEditor={onOpenSessionEditor}
           onDuplicateTab={onDuplicateTab}
+          detailsRevealExternal={detailsRevealHovered}
         />
       </div>
       {/* Update hint sits just left of the tab-action group (centre-right of the
@@ -237,9 +243,24 @@ export function ControlBar({
       {/* Per-tab contextual actions portal in here (SFTP / Chat / detach …). */}
       <div ref={slotRef} data-testid="tab-action-slot" className="flex items-center gap-0.5 self-stretch shrink-0 pr-1" />
       <CaptureIndicators />
+      <button
+        type="button"
+        data-testid="tab-details-hover"
+        aria-label={t("tabs.detailsShortcutHint", { shortcut: IS_MAC ? "Cmd+Shift+H" : "Ctrl+Shift+H" })}
+        title={t("tabs.detailsShortcutHint", { shortcut: IS_MAC ? "Cmd+Shift+H" : "Ctrl+Shift+H" })}
+        data-active={detailsRevealHovered || undefined}
+        className="relative h-6 w-7 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] data-[active=true]:bg-[var(--taomni-selected)]"
+        onMouseEnter={() => setDetailsRevealHovered(true)}
+        onMouseLeave={() => setDetailsRevealHovered(false)}
+        onFocus={() => setDetailsRevealHovered(true)}
+        onBlur={() => setDetailsRevealHovered(false)}
+      >
+        <PanelsTopLeft className="w-4 h-4" />
+        <Info className="absolute right-0.5 bottom-0.5 w-2.5 h-2.5 rounded-full" style={{ background: "var(--taomni-chrome-bg)" }} />
+      </button>
       {/* Open-tabs `⋯` overflow — also hosts the Screenshot actions. Sits at the
           right end of the tab-action group. */}
-      <TabMore />
+      <TabMore onDetachActiveTab={onDetachActiveTab} />
       <div
         className={IS_MAC ? "w-3 self-stretch shrink-0" : "w-6 self-stretch shrink-0"}
         data-window-drag
@@ -255,7 +276,7 @@ export function ControlBar({
 /** The `⋯` open-tabs overflow button + its dropdown, relocated from the tab
  *  strip to the right end of the tab-action group. The dropdown also lists the
  *  active tab's Screenshot actions (see OpenTabsMenu). */
-function TabMore() {
+function TabMore({ onDetachActiveTab }: { onDetachActiveTab?: () => void }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -263,11 +284,18 @@ function TabMore() {
     <div ref={wrapRef} className="relative shrink-0 pr-1">
       <BarButton
         testId="tab-more"
-        title={t("tabs.more")}
+        title={t("tabs.moreWithDetailsShortcut", {
+          shortcut: IS_MAC ? "Cmd+Shift+H" : "Ctrl+Shift+H",
+        })}
         icon={<MoreHorizontal className="w-4 h-4" />}
         onClick={() => setOpen((v) => !v)}
       />
-      <OpenTabsMenu open={open} onClose={() => setOpen(false)} anchorRef={wrapRef} />
+      <OpenTabsMenu
+        open={open}
+        onClose={() => setOpen(false)}
+        anchorRef={wrapRef}
+        onDetachActiveTab={onDetachActiveTab}
+      />
     </div>
   );
 }

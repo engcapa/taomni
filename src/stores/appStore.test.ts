@@ -259,6 +259,142 @@ describe("computeNewTerminalTitle", () => {
   });
 });
 
+describe("appStore terminal automatic titles", () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      tabs: [],
+      activeTabId: null,
+      cwdByTab: {},
+      terminalRuntimeByTab: {},
+    });
+  });
+
+  it("resolves a new terminal from cwd, sequences its family, and follows later cd changes", () => {
+    useAppStore.setState({
+      tabs: [
+        tab("existing", { title: "taomni" }),
+        tab("pending", {
+          title: "Production",
+          terminalTitleMode: "pending-auto",
+          terminalTitleOperation: "new",
+        }),
+      ],
+    });
+
+    useAppStore.getState().assignTerminalAutoTitle("pending", "/srv/taomni");
+    expect(useAppStore.getState().tabs[1]).toMatchObject({ title: "taomni-1", terminalTitleMode: "auto" });
+
+    useAppStore.getState().assignTerminalAutoTitle("pending", "/tmp/other");
+    expect(useAppStore.getState().tabs[1].title).toBe("other");
+  });
+
+  it("keeps a saved remote session name before the live cwd", () => {
+    useAppStore.setState({
+      tabs: [tab("remote", {
+        title: "Production",
+        terminalTitleMode: "pending-auto",
+        terminalTitleOperation: "new",
+        terminalTitleSessionName: "Production",
+      })],
+    });
+
+    useAppStore.getState().assignTerminalAutoTitle("remote", "/srv/taomni");
+    expect(useAppStore.getState().tabs[0].title).toBe("Production · taomni");
+
+    useAppStore.getState().assignTerminalAutoTitle("remote", "/var/log");
+    expect(useAppStore.getState().tabs[0].title).toBe("Production · log");
+  });
+
+  it("keeps duplicate force-suffix semantics when resolving a cwd family", () => {
+    useAppStore.setState({
+      tabs: [tab("copy", {
+        title: "Legacy-1",
+        terminalTitleMode: "pending-auto",
+        terminalTitleOperation: "duplicate",
+      })],
+    });
+
+    useAppStore.getState().assignTerminalAutoTitle("copy", "/work/repo");
+    expect(useAppStore.getState().tabs[0].title).toBe("repo-1");
+  });
+
+  it("never overwrites an explicit manual rename", () => {
+    useAppStore.setState({
+      tabs: [tab("term", {
+        title: "Local terminal",
+        terminalTitleMode: "pending-auto",
+        terminalTitleOperation: "new",
+      })],
+    });
+
+    useAppStore.getState().updateTabTitle("term", "Logs");
+    useAppStore.getState().assignTerminalAutoTitle("term", "/var/log");
+    expect(useAppStore.getState().tabs[0]).toMatchObject({ title: "Logs", terminalTitleMode: "manual" });
+  });
+
+  it("names a duplicate immediately when its source cwd was already known", () => {
+    useAppStore.setState({ tabs: [tab("source", { title: "Production" })] });
+    useAppStore.getState().duplicateTab("source", {
+      terminalInitialCwd: "/srv/repo",
+      terminalTitlePrefix: "repo",
+    });
+    expect(useAppStore.getState().tabs[1]).toMatchObject({
+      title: "repo-1",
+      terminalTitleMode: "auto",
+      terminalTitleOperation: "duplicate",
+    });
+  });
+
+  it("keeps the remote session name when duplicating a known cwd", () => {
+    useAppStore.setState({
+      tabs: [tab("source", {
+        title: "Production · repo",
+        terminalTitleMode: "auto",
+        terminalTitleSessionName: "Production",
+      })],
+    });
+    useAppStore.getState().duplicateTab("source", {
+      terminalInitialCwd: "/srv/repo",
+      terminalTitlePrefix: "repo",
+    });
+    expect(useAppStore.getState().tabs[1].title).toBe("Production · repo-1");
+  });
+
+  it("continues the source cwd title family when duplicating an auto-named tab", () => {
+    useAppStore.setState({ tabs: [tab("source", { title: "repo-3", terminalTitleMode: "auto" })] });
+    useAppStore.getState().duplicateTab("source", {
+      terminalInitialCwd: "/srv/repo",
+      terminalTitlePrefix: "repo",
+    });
+    expect(useAppStore.getState().tabs[1].title).toBe("repo-4");
+  });
+});
+
+describe("appStore terminal runtime", () => {
+  it("merges live activity and cleans it with cwd when the tab closes", () => {
+    useAppStore.setState({
+      tabs: [tab("term")],
+      activeTabId: "term",
+      cwdByTab: { term: "/work/repo" },
+      terminalRuntimeByTab: {},
+    });
+    useAppStore.getState().setTerminalRuntime("term", {
+      backendSessionId: "runtime-1",
+      state: "running",
+      program: "vite",
+    });
+    expect(useAppStore.getState().terminalRuntimeByTab.term).toMatchObject({
+      backendSessionId: "runtime-1",
+      state: "running",
+      program: "vite",
+    });
+
+    useAppStore.getState().removeTab("term");
+    expect(useAppStore.getState().cwdByTab.term).toBeUndefined();
+    expect(useAppStore.getState().terminalRuntimeByTab.term).toBeUndefined();
+  });
+});
+
 describe("appStore.uiAppearance", () => {
   it("allows setting and persisting uiFontFamily", () => {
     const font = "Outfit, sans-serif";

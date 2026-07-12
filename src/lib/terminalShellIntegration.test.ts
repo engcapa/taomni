@@ -4,7 +4,8 @@ import { buildSshCwdIntegration, SSH_CWD_INTEGRATION_BODY } from "./terminalShel
 describe("buildSshCwdIntegration", () => {
   it("emits a printf OSC 7 form matching the frontend parser", () => {
     // Real backslashes so the remote printf produces ESC ] 7 ; ... ESC \.
-    expect(SSH_CWD_INTEGRATION_BODY).toContain("printf '\\033]7;file://%s%s\\033\\\\'");
+    expect(SSH_CWD_INTEGRATION_BODY).toContain("\\033]133;A\\033\\\\");
+    expect(SSH_CWD_INTEGRATION_BODY).toContain("\\033]7;file://%s%s\\033\\\\'");
     expect(SSH_CWD_INTEGRATION_BODY).toContain('"${HOSTNAME:-localhost}"');
     expect(SSH_CWD_INTEGRATION_BODY).toContain('"$PWD"');
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeLocalStartCwd } from "./terminalCwd";
+import { normalizeLocalStartCwd, terminalCwdTitlePrefix } from "./terminalCwd";
 
 describe("normalizeLocalStartCwd", () => {
   it("strips the leading slash before a Windows drive and uses backslashes", () => {
@@ -41,5 +41,24 @@ describe("normalizeLocalStartCwd", () => {
   it("returns null for empty input", () => {
     expect(normalizeLocalStartCwd("", "windows")).toBeNull();
     expect(normalizeLocalStartCwd("", "linux")).toBeNull();
+  });
+});
+
+describe("terminalCwdTitlePrefix", () => {
+  it("uses the final segment for POSIX, Windows, UNC, and WSL-style paths", () => {
+    expect(terminalCwdTitlePrefix("/home/ada/taomni")).toBe("taomni");
+    expect(terminalCwdTitlePrefix("C:\\work\\taomni\\")).toBe("taomni");
+    expect(terminalCwdTitlePrefix("\\\\server\\share\\project")).toBe("project");
+    expect(terminalCwdTitlePrefix("/mnt/c/work/app/")).toBe("app");
+  });
+
+  it("gives stable labels to filesystem roots", () => {
+    expect(terminalCwdTitlePrefix("/")).toBe("root");
+    expect(terminalCwdTitlePrefix("C:\\")).toBe("C");
+    expect(terminalCwdTitlePrefix("/D:/")).toBe("D");
+  });
+
+  it("rejects empty cwd values", () => {
+    expect(terminalCwdTitlePrefix("  ")).toBeNull();
   });
 });

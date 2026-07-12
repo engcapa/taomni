@@ -11,6 +11,7 @@ import type {
 import { t as tr } from "../lib/i18n";
 import { detectXServer, type XServerStatus } from "../lib/ipc";
 import type { TabFilter } from "../lib/tabFilter";
+import { terminalCwdTitlePrefix } from "../lib/terminalCwd";
 
 export type SideTab = "sessions" | "tools" | "macros";
 export type TerminalSplitLayout = "horizontal" | "vertical" | "grid";
@@ -51,7 +52,23 @@ export interface CodeWorkspaceContext {
 type DuplicateTabOverrides = {
   terminalInitialCwd?: string;
   terminalProfile?: Tab["terminalProfile"];
+  terminalTitlePrefix?: string;
 };
+
+export type TerminalActivityState =
+  | "connecting"
+  | "idle"
+  | "running"
+  | "disconnected"
+  | "unknown";
+
+export interface TerminalRuntimeInfo {
+  backendSessionId?: string;
+  state: TerminalActivityState;
+  program?: string;
+  activitySource?: "shell-integration" | "input-heuristic" | "process-probe";
+  updatedAt: number;
+}
 
 export interface CodeWorkspaceRootContext {
   id: string;
@@ -162,6 +179,9 @@ interface AppState {
    */
   cwdByTab: Record<string, string>;
 
+  /** Live connection/activity facts kept separate from persistent tab data. */
+  terminalRuntimeByTab: Record<string, TerminalRuntimeInfo>;
+
   /**
    * Live DB-client runtime connection id per tab (Phase 6). The DB/Redis tab
    * generates this id when it connects (`createRuntimeDbSessionId`) and the
@@ -210,6 +230,8 @@ interface AppState {
   removeTab: (id: string) => void;
   removeTabs: (ids: string[]) => void;
   updateTabTitle: (id: string, title: string) => void;
+  /** Resolve or refresh an automatic terminal title from a valid cwd report. */
+  assignTerminalAutoTitle: (tabId: string, cwd: string) => void;
   updateGitTabInfo: (id: string, git: GitTabInfo, title?: string) => void;
   setActiveTab: (id: string) => void;
   moveTab: (fromId: string, targetId: string, position: "before" | "after") => void;
@@ -245,6 +267,8 @@ interface AppState {
   clearTabFilter: () => void;
   /** Record a terminal tab's latest OSC-7 cwd (see {@link cwdByTab}). */
   setTabCwd: (tabId: string, cwd: string) => void;
+  /** Merge live terminal connection/activity facts, or clear them with null. */
+  setTerminalRuntime: (tabId: string, patch: Partial<TerminalRuntimeInfo> | null) => void;
   /**
    * Record (or clear, with `null`) a DB/Redis tab's live runtime connection id
    * (see {@link dbConnByTab}). Called by the DB client on connect/disconnect.
@@ -742,6 +766,13 @@ function pruneSet(ids: Set<string>, validIds: Set<string>): Set<string> {
   return next;
 }
 
+function omitRecordKeys<T>(record: Record<string, T>, ids: Set<string>): Record<string, T> {
+  if (![...ids].some((id) => id in record)) return record;
+  const next = { ...record };
+  for (const id of ids) delete next[id];
+  return next;
+}
+
 function dbSelectedObjectsEqual(a: DbSelectedObject[] | undefined, b: DbSelectedObject[]): boolean {
   if (!a || a.length !== b.length) return false;
   return a.every((item, index) => {
@@ -821,6 +852,11 @@ function computeSequencedTitle(sourceTitle: string, openTitles: string[], forceS
   return `${base}-${maxSuffix + 1}`;
 }
 
+function terminalAutoTitleBase(tab: Tab, cwdPrefix: string): string {
+  const sessionName = tab.terminalTitleSessionName?.trim();
+  return sessionName ? `${sessionName} · ${cwdPrefix}` : cwdPrefix;
+}
+
 export const useAppStore = create<AppState>((set) => ({
   tabs: [
     {
@@ -834,6 +870,7 @@ export const useAppStore = create<AppState>((set) => ({
   sidebarCollapsed: readSidebarCollapsed(),
   activeSideTab: "sessions",
   cwdByTab: {},
+  terminalRuntimeByTab: {},
   dbConnByTab: {},
   dbSelectedObjectsByTab: {},
   codeWorkspaceByTab: {},
@@ -885,17 +922,31 @@ export const useAppStore = create<AppState>((set) => ({
       const idx = s.tabs.findIndex((t) => t.id === id);
       if (idx === -1) return s;
       const source = s.tabs[idx];
+      const terminalTitlePrefix =
+        source.type === "terminal" ? overrides?.terminalTitlePrefix?.trim() : undefined;
+      const duplicateTitleBase = terminalTitlePrefix
+        ? terminalAutoTitleBase(source, terminalTitlePrefix)
+        : undefined;
+      const duplicateTitle = duplicateTitleBase
+        ? computeDuplicateTitle(
+            duplicateTitleBase,
+            s.tabs.filter((tab) => tab.type === "terminal").map((tab) => tab.title),
+          )
+        : computeDuplicateTitle(source.title, s.tabs.map((t) => t.title));
       const copy: Tab = {
         ...source,
         id: `dup-${crypto.randomUUID()}`,
         chatTabId: undefined,
-        title: computeDuplicateTitle(source.title, s.tabs.map((t) => t.title)),
+        title: duplicateTitle,
         closable: true,
         hasNewOutput: false,
         // Only terminal copies carry an initial cwd; clear any inherited value
         // for other tab kinds (and when none was resolved).
         terminalInitialCwd:
           source.type === "terminal" ? overrides?.terminalInitialCwd : undefined,
+        terminalTitleMode:
+          source.type === "terminal" ? (terminalTitlePrefix ? "auto" : "pending-auto") : undefined,
+        terminalTitleOperation: source.type === "terminal" ? "duplicate" : undefined,
         terminalProfile:
           source.type === "terminal" ? overrides?.terminalProfile ?? source.terminalProfile : source.terminalProfile,
         codeWorkspace:
@@ -960,6 +1011,8 @@ export const useAppStore = create<AppState>((set) => ({
         terminalSplitActive: s.terminalSplitActive && activeTabIsTerminal(next, activeId),
         terminalSplitInputLockedTabIds: pruneSet(s.terminalSplitInputLockedTabIds, validIds),
         multiExecSelectedTabIds: pruneSet(s.multiExecSelectedTabIds, validIds),
+        cwdByTab: omitRecordKeys(s.cwdByTab, new Set([id])),
+        terminalRuntimeByTab: omitRecordKeys(s.terminalRuntimeByTab, new Set([id])),
         statusMessage: tr("status.closedTab"),
       };
     }),
@@ -1001,15 +1054,52 @@ export const useAppStore = create<AppState>((set) => ({
         terminalSplitActive: s.terminalSplitActive && activeTabIsTerminal(next, activeId),
         terminalSplitInputLockedTabIds: pruneSet(s.terminalSplitInputLockedTabIds, validIds),
         multiExecSelectedTabIds: pruneSet(s.multiExecSelectedTabIds, validIds),
+        cwdByTab: omitRecordKeys(s.cwdByTab, idSet),
+        terminalRuntimeByTab: omitRecordKeys(s.terminalRuntimeByTab, idSet),
         statusMessage: tr("status.closedTabs"),
       };
     }),
 
   updateTabTitle: (id, title) =>
     set((s) => ({
-      tabs: s.tabs.map((tab) => (tab.id === id ? { ...tab, title } : tab)),
+      tabs: s.tabs.map((tab) =>
+        tab.id === id
+          ? {
+              ...tab,
+              title,
+              ...(tab.type === "terminal" ? { terminalTitleMode: "manual" as const } : {}),
+            }
+          : tab,
+      ),
       statusMessage: tr("status.renamedTab", { title }),
     })),
+
+  assignTerminalAutoTitle: (tabId, cwd) =>
+    set((s) => {
+      const target = s.tabs.find((tab) => tab.id === tabId);
+      if (
+        !target ||
+        target.type !== "terminal" ||
+        (target.terminalTitleMode !== "pending-auto" && target.terminalTitleMode !== "auto")
+      ) {
+        return s;
+      }
+      const cwdPrefix = terminalCwdTitlePrefix(cwd);
+      if (!cwdPrefix) return s;
+      const prefix = terminalAutoTitleBase(target, cwdPrefix);
+      const openTitles = s.tabs
+        .filter((tab) => tab.id !== tabId && tab.type === "terminal")
+        .map((tab) => tab.title);
+      const title = target.terminalTitleOperation === "duplicate"
+        ? computeDuplicateTitle(prefix, openTitles)
+        : computeNewTerminalTitle(prefix, openTitles);
+      if (target.title === title && target.terminalTitleMode === "auto") return s;
+      return {
+        tabs: s.tabs.map((tab) =>
+          tab.id === tabId ? { ...tab, title, terminalTitleMode: "auto" as const } : tab,
+        ),
+      };
+    }),
 
   updateGitTabInfo: (id, git, title) =>
     set((s) => {
@@ -1321,6 +1411,31 @@ export const useAppStore = create<AppState>((set) => ({
   clearTabFilter: () => set({ tabFilter: null }),
   setTabCwd: (tabId, cwd) =>
     set((s) => (s.cwdByTab[tabId] === cwd ? s : { cwdByTab: { ...s.cwdByTab, [tabId]: cwd } })),
+
+  setTerminalRuntime: (tabId, patch) =>
+    set((s) => {
+      if (patch === null) {
+        if (!(tabId in s.terminalRuntimeByTab)) return s;
+        return { terminalRuntimeByTab: omitRecordKeys(s.terminalRuntimeByTab, new Set([tabId])) };
+      }
+      const current = s.terminalRuntimeByTab[tabId];
+      const merged = {
+        ...current,
+        ...patch,
+        state: patch.state ?? current?.state ?? "unknown",
+      };
+      if (
+        current &&
+        current.backendSessionId === merged.backendSessionId &&
+        current.state === merged.state &&
+        current.program === merged.program &&
+        current.activitySource === merged.activitySource
+      ) {
+        return s;
+      }
+      const next: TerminalRuntimeInfo = { ...merged, updatedAt: patch.updatedAt ?? Date.now() };
+      return { terminalRuntimeByTab: { ...s.terminalRuntimeByTab, [tabId]: next } };
+    }),
 
   setTabDbConn: (tabId, connId) =>
     set((s) => {

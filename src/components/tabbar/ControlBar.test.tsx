@@ -3,6 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ControlBar } from "./ControlBar";
 import type { AppCommand } from "../menubar/commands";
 
+const tabBarMocks = vi.hoisted(() => ({ props: [] as Array<{ detailsRevealExternal?: boolean }> }));
+const openTabsMocks = vi.hoisted(() => ({ props: [] as Array<{ onDetachActiveTab?: () => void }> }));
+
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     startDragging: vi.fn(async () => undefined),
@@ -15,11 +18,17 @@ vi.mock("../../lib/runtime", () => ({
 }));
 
 vi.mock("./TabBar", () => ({
-  TabBar: () => <div data-testid="tab-bar" />,
+  TabBar: (props: { detailsRevealExternal?: boolean }) => {
+    tabBarMocks.props.push(props);
+    return <div data-testid="tab-bar" />;
+  },
 }));
 
 vi.mock("./OpenTabsMenu", () => ({
-  OpenTabsMenu: () => null,
+  OpenTabsMenu: (props: { onDetachActiveTab?: () => void }) => {
+    openTabsMocks.props.push(props);
+    return null;
+  },
 }));
 
 vi.mock("../window/WindowControls", () => ({
@@ -64,6 +73,7 @@ function renderControlBar(
     commands?: Parameters<typeof ControlBar>[0]["workspaceCommands"];
     onCommand?: (commandId: string) => void;
   } = {},
+  onDetachActiveTab?: () => void,
 ) {
   return render(
     <ControlBar
@@ -78,6 +88,7 @@ function renderControlBar(
       onStartLocalTerminal={vi.fn()}
       onConnectSession={vi.fn()}
       onOpenSessionEditor={vi.fn()}
+      onDetachActiveTab={onDetachActiveTab}
       onCloseWindow={vi.fn()}
       slotRef={vi.fn()}
     />,
@@ -88,6 +99,8 @@ describe("ControlBar settings button", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    tabBarMocks.props.length = 0;
+    openTabsMocks.props.length = 0;
   });
 
   it("keeps only the app menu in the left button group", () => {
@@ -119,5 +132,22 @@ describe("ControlBar settings button", () => {
     fireEvent.mouseEnter(screen.getByTestId("context-menu-workspace-actions"));
     fireEvent.click(screen.getByTestId("context-menu-workspace-command-workspace.findInFiles"));
     expect(onWorkspaceCommand).toHaveBeenCalledWith("workspace.findInFiles");
+  });
+
+  it("uses the button before More to reveal tab details on hover", () => {
+    renderControlBar(vi.fn());
+    const button = screen.getByTestId("tab-details-hover");
+
+    expect(tabBarMocks.props.at(-1)?.detailsRevealExternal).toBe(false);
+    fireEvent.mouseEnter(button);
+    expect(tabBarMocks.props.at(-1)?.detailsRevealExternal).toBe(true);
+    fireEvent.mouseLeave(button);
+    expect(tabBarMocks.props.at(-1)?.detailsRevealExternal).toBe(false);
+  });
+
+  it("forwards the active detach action into the More menu", () => {
+    const onDetach = vi.fn();
+    renderControlBar(vi.fn(), {}, onDetach);
+    expect(openTabsMocks.props.at(-1)?.onDetachActiveTab).toBe(onDetach);
   });
 });

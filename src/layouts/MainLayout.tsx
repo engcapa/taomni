@@ -74,6 +74,8 @@ import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams, Deta
 import { Columns2, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
 import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo, MailConnectionSecurity, MailTabInfo, MailAuthMode, MailProvider, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, GitWorkspaceRootInfo, RecentWorkspace } from "../types";
 import { computeNewTerminalTitle, newWorkspaceInstanceId, recentWorkspaceIdFromParts, useAppStore, type TerminalSplitLayout } from "../stores/appStore";
+import { terminalCwdTitlePrefix } from "../lib/terminalCwd";
+import { buildTabDetailSummary } from "../lib/tabDetails";
 import { useSessionStore } from "../stores/sessionStore";
 import { WelcomePanel } from "../components/WelcomePanel";
 import { AboutDialog } from "../components/AboutDialog";
@@ -633,6 +635,7 @@ export function MainLayout() {
     removeTab,
     duplicateTab,
     updateTabTitle,
+    assignTerminalAutoTitle,
     updateGitTabInfo,
     setActiveTab,
     moveTabToIndex,
@@ -646,6 +649,7 @@ export function MainLayout() {
     terminalSplitActive,
     terminalSplitLayout,
     terminalSplitInputLockedTabIds,
+    terminalRuntimeByTab,
     welcomeRecentSessionLimit,
     recentWorkspaces,
     toggleMultiExec,
@@ -903,6 +907,7 @@ export function MainLayout() {
     // Mirror into the app store so the AI chat store can read the bound tab's
     // live cwd when sending a turn to Claude Code (Phase 3.3).
     useAppStore.getState().setTabCwd(tabId, cwd);
+    assignTerminalAutoTitle(tabId, cwd);
     // Hand the freshly reported cwd to anyone awaiting it (e.g. a pending tab
     // duplication) before broadcasting to other windows.
     const resolvers = cwdQueryResolversRef.current[tabId];
@@ -921,7 +926,7 @@ export function MainLayout() {
       broadcastCwdHint(tabId, cwd);
       broadcastCwdHint(`attached-${tabId}`, cwd);
     });
-  }, []);
+  }, [assignTerminalAutoTitle]);
 
   // Ask a terminal tab for its current working directory and resolve once the
   // shell reports back via OSC 7. Resolves null if the terminal isn't ready or
@@ -978,9 +983,11 @@ export function MainLayout() {
         }
       }
       const terminalProfile = duplicateTerminalProfileFor(source);
+      const terminalTitlePrefix = initialCwd ? terminalCwdTitlePrefix(initialCwd) ?? undefined : undefined;
       duplicateTab(tabId, {
         ...(initialCwd ? { terminalInitialCwd: initialCwd } : {}),
         ...(terminalProfile ? { terminalProfile } : {}),
+        ...(terminalTitlePrefix ? { terminalTitlePrefix } : {}),
       });
     },
     [duplicateTab, duplicateTerminalProfileFor, queryTerminalCwd],
@@ -1194,6 +1201,9 @@ export function MainLayout() {
       const payload: DetachedTerminalParams = {
         tabId,
         title,
+        terminalTitleMode: tab.terminalTitleMode,
+        terminalTitleOperation: tab.terminalTitleOperation,
+        terminalTitleSessionName: tab.terminalTitleSessionName,
         ssh: tab.ssh ?? null,
         commandTerminal: tab.commandTerminal ?? null,
         localShell: tab.localShell ?? null,
@@ -1232,6 +1242,23 @@ export function MainLayout() {
     },
     [openDetachedGenericWindow],
   );
+
+  const handleDetachActiveTab = useCallback(() => {
+    const state = useAppStore.getState();
+    const tab = state.tabs.find((item) => item.id === state.activeTabId);
+    if (!tab) return;
+    if (tab.type === "terminal" && !state.terminalSplitActive) {
+      openDetachedTerminal(tab.id, tab, tab.title);
+    } else if (tab.type === "rdp" && tab.rdp) {
+      openDetachedRdp(tab.id, tab.rdp, tab.title);
+    } else if (tab.type === "vnc" && tab.vnc) {
+      openDetachedVnc(tab.id, tab.vnc, tab.title);
+    } else if (tab.type === "database" && tab.db) {
+      openDetachedDatabase(tab.id, tab.db, tab.title);
+    } else if (tab.type === "sftp" && tab.sftp) {
+      openDetachedSftp(tab.sftp, tab.title);
+    }
+  }, [openDetachedDatabase, openDetachedRdp, openDetachedSftp, openDetachedTerminal, openDetachedVnc]);
 
   /**
    * Subscribe to reattach messages broadcast by detached windows. Each
@@ -1350,6 +1377,9 @@ export function MainLayout() {
             id: reattachTabId,
             type: "terminal",
             title: p.title || tr("tabs.localTerminal"),
+            terminalTitleMode: p.terminalTitleMode,
+            terminalTitleOperation: p.terminalTitleOperation,
+            terminalTitleSessionName: p.terminalTitleSessionName,
             closable: true,
             ssh: p.ssh ?? undefined,
             commandTerminal: p.commandTerminal ?? undefined,
@@ -1548,7 +1578,8 @@ export function MainLayout() {
   ) => {
     const id = `local-${Date.now()}`;
     const resolvedTerminalProfile = terminalProfile ?? loadTerminalDefaultProfile();
-    const requestedTitle = title || tr("tabs.localTerminal");
+    const initialTitlePrefix = initialCwd ? terminalCwdTitlePrefix(initialCwd) : null;
+    const requestedTitle = initialTitlePrefix || title || tr("tabs.localTerminal");
     const resolvedTitle = computeNewTerminalTitle(
       requestedTitle,
       useAppStore.getState().tabs
@@ -1563,6 +1594,8 @@ export function MainLayout() {
       localShell,
       terminalProfile: resolvedTerminalProfile,
       terminalInitialCwd: initialCwd,
+      terminalTitleMode: initialTitlePrefix ? "auto" : "pending-auto",
+      terminalTitleOperation: "new",
       closable: true,
     });
     if (sessionId) void markConnected(sessionId);
@@ -2090,6 +2123,9 @@ export function MainLayout() {
       type: "terminal",
       title: session.name || `${session.username}@${session.host}`,
       sessionId: session.id,
+      terminalTitleMode: "pending-auto",
+      terminalTitleOperation: "new",
+      terminalTitleSessionName: session.name || `${session.username ?? "root"}@${session.host}`,
       closable: true,
       ssh: {
         sessionId: session.id,
@@ -2126,6 +2162,9 @@ export function MainLayout() {
       type: "terminal",
       title,
       sessionId: session.id,
+      terminalTitleMode: "pending-auto",
+      terminalTitleOperation: "new",
+      terminalTitleSessionName: session.name || title,
       closable: true,
       commandTerminal,
       terminalProfile: getSessionTerminalProfile(session.options_json) ?? loadTerminalDefaultProfile(),
@@ -3225,6 +3264,17 @@ export function MainLayout() {
         onConnectSession={handleConnectSession}
         onOpenSessionEditor={() => handleNewSession()}
         onDuplicateTab={handleDuplicateTab}
+        onDetachActiveTab={
+          activeTab && (
+            (activeTab.type === "terminal" && !terminalSplitVisible) ||
+            (activeTab.type === "rdp" && !!activeTab.rdp) ||
+            (activeTab.type === "vnc" && !!activeTab.vnc) ||
+            (activeTab.type === "database" && !!activeTab.db) ||
+            (activeTab.type === "sftp" && !!activeTab.sftp)
+          )
+            ? handleDetachActiveTab
+            : undefined
+        }
         onCloseWindow={requestAppExit}
         slotRef={setTabActionSlot}
       />
@@ -3374,6 +3424,13 @@ export function MainLayout() {
                       const liveTerminalProfile = terminalProfileOverrides[tab.id]
                         ?? (tab.sessionId ? terminalProfilesBySessionId.get(tab.sessionId) : undefined)
                         ?? tab.terminalProfile;
+                      const tabDetails = buildTabDetailSummary(
+                        tab,
+                        sessions,
+                        terminalRuntimeByTab[tab.id],
+                        terminalCwds[tab.id],
+                        t,
+                      );
                       const terminalNode = (
                         <div className="h-full w-full relative">
                           <TerminalPanel
@@ -3447,9 +3504,6 @@ export function MainLayout() {
                                 }
                                 await openGitRepository(cwd);
                               },
-                            } : undefined}
-                            detachToggle={!terminalSplitVisible ? {
-                              onDetach: () => openDetachedTerminal(tab.id, tab, tab.title),
                             } : undefined}
                           />
                         </div>
@@ -3554,6 +3608,14 @@ export function MainLayout() {
                             >
                               {tab.title}
                             </button>
+                            <span
+                              data-testid={`terminal-split-activity-${tab.id}`}
+                              className="max-w-[150px] truncate rounded px-1.5 py-0.5 text-[10px] text-[var(--taomni-text-muted)]"
+                              style={{ background: "var(--taomni-hover)" }}
+                              title={tabDetails.activityLabel}
+                            >
+                              {tabDetails.activityLabel}
+                            </span>
                             <button
                               type="button"
                               data-testid={`terminal-split-lock-${tab.id}`}
@@ -3772,7 +3834,6 @@ export function MainLayout() {
                           username={tab.vnc.username}
                           password={tab.vnc.password}
                           visible={isActive}
-                          onDetach={() => openDetachedVnc(tab.id, tab.vnc!, tab.title)}
                         />
                       </Suspense>
                     </div>
@@ -3799,7 +3860,6 @@ export function MainLayout() {
                           options={tab.rdp.options}
                           networkSettingsJson={tab.rdp.networkSettingsJson}
                           visible={isActive}
-                          onDetach={() => openDetachedRdp(tab.id, tab.rdp!, tab.title)}
                         />
                       </Suspense>
                     </div>
@@ -3879,7 +3939,6 @@ export function MainLayout() {
                           tabId={tab.id}
                           info={tab.db}
                           visible={isActive}
-                          onDetach={() => openDetachedDatabase(tab.id, tab.db!, tab.title)}
                         />
                       </Suspense>
                     </div>

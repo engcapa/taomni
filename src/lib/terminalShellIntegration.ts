@@ -34,7 +34,7 @@ const SSH_CWD_HISTORY_RESTORE =
   " if [ -n \"${__taomni_hist_restore:-}\" ]; then set -o history; fi; unset __taomni_hist_restore";
 
 const SSH_CWD_INTEGRATION_INSTALL =
-  " __taomni_osc7(){ printf '\\033]7;file://%s%s\\033\\\\' \"${HOSTNAME:-localhost}\" \"$PWD\"; };" +
+  " __taomni_osc7(){ printf '\\033]133;A\\033\\\\\\033]7;file://%s%s\\033\\\\' \"${HOSTNAME:-localhost}\" \"$PWD\"; };" +
   " if [ -n \"$ZSH_VERSION\" ]; then typeset -ag precmd_functions 2>/dev/null; precmd_functions+=(__taomni_osc7);" +
   " elif [ -n \"$BASH_VERSION\" ]; then case \";$PROMPT_COMMAND;\" in *\";__taomni_osc7;\"*) ;;" +
   " *) PROMPT_COMMAND=\"__taomni_osc7${PROMPT_COMMAND:+;$PROMPT_COMMAND}\";; esac; fi;" +
