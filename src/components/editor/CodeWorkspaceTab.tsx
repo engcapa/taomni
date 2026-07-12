@@ -113,6 +113,7 @@ import {
   detectWorkspaceEol,
   useCodeWorkspaceStatusStore,
 } from "../../stores/codeWorkspaceStatusStore";
+import { historySnapshot } from "../../lib/localHistory";
 import {
   fileRefFromFileKey,
   layoutSnapshotHasOpenFiles,
@@ -121,6 +122,7 @@ import {
   uniqueOrderedKeys,
   writeWorkspaceLayoutSnapshot,
 } from "./workspace/workspaceLayoutPersistence";
+import { LocalHistoryDialog } from "./workspace/LocalHistoryDialog";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { writeText } from "../../lib/clipboard";
 import { useContextMenu } from "../ContextMenu";
@@ -1905,11 +1907,36 @@ export function CodeWorkspaceTab({
     setOpenFiles((current) => ({ ...current, [key]: next }));
   }, []);
 
+  const absolutePathForOpenFile = useCallback((file: OpenFileState): string | null => {
+    if (file.ref.kind === "loose") return normalizeFsPath(file.ref.path);
+    const root = findRoot(file.ref.rootId);
+    if (!root) return null;
+    return absoluteWorkspacePath(root, file.ref.path);
+  }, [findRoot]);
+
   /**
    * Persist an open buffer with an explicit text payload.
    * Used by WorkspaceEdit for open-clean files (§5.2.9): apply then save.
    * Unlike `saveFile`, this does not require the buffer to already be dirty.
    */
+  const [localHistoryTarget, setLocalHistoryTarget] = useState<{ key: string; path: string } | null>(null);
+
+  const openLocalHistoryForKey = useCallback((key: string) => {
+    const file = openFilesRef.current[key];
+    if (!file) return;
+    const absolute = absolutePathForOpenFile(file);
+    if (!absolute) {
+      setStatusMessage("Cannot resolve path for local history");
+      return;
+    }
+    setLocalHistoryTarget({ key, path: absolute });
+  }, [absolutePathForOpenFile, setStatusMessage]);
+
+  const restoreLocalHistoryText = useCallback((key: string, text: string) => {
+    updateFileText(key, text);
+    setStatusMessage("Restored local history snapshot into the editor buffer");
+  }, [setStatusMessage, updateFileText]);
+
   const saveOpenBufferText = useCallback(async (key: string, textToSave: string) => {
     const file = openFilesRef.current[key];
     if (!file || file.loading) {
@@ -1924,6 +1951,11 @@ export function CodeWorkspaceTab({
       [key]: { ...file, text: textToSave, saving: true, error: null },
     };
     try {
+      // Snapshot the previous on-disk contents before overwrite when available.
+      const historyPath = absolutePathForOpenFile(file);
+      if (historyPath && file.savedText.length <= 2 * 1024 * 1024) {
+        await historySnapshot(historyPath, file.savedText, "save").catch(() => null);
+      }
       const saved = file.ref.kind === "root"
         ? await workspaceWriteFile(findRoot(file.ref.rootId)?.path ?? "", file.ref.path, textToSave, file.hash)
         : await workspaceWriteLooseFile(file.ref.path, textToSave, file.hash);
@@ -1979,7 +2011,7 @@ export function CodeWorkspaceTab({
       }));
       throw err instanceof Error ? err : new Error(message);
     }
-  }, [findRoot, notifyWorkspacePathGitChanged, saveLspDocument]);
+  }, [absolutePathForOpenFile, findRoot, notifyWorkspacePathGitChanged, saveLspDocument]);
 
   const saveFile = useCallback(
     async (key: string | null = activeKey) => {
@@ -2807,13 +2839,6 @@ export function CodeWorkspaceTab({
     }
   }, [activeFile, lspDescriptorForFile, updateFileText]);
 
-  const absolutePathForOpenFile = useCallback((file: OpenFileState): string | null => {
-    if (file.ref.kind === "loose") return normalizeFsPath(file.ref.path);
-    const root = findRoot(file.ref.rootId);
-    if (!root) return null;
-    return absoluteWorkspacePath(root, file.ref.path);
-  }, [findRoot]);
-
   const applyLspWorkspaceEdit = useCallback(async (edit: LspWorkspaceEdit) => {
     const outcomes = await applyWorkspaceEdit(edit, {
       resolvePath: (file) => {
@@ -2853,6 +2878,32 @@ export function CodeWorkspaceTab({
         }
       },
       writeDisk: async (absolutePath, text, expectedHash) => {
+        // Snapshot current disk contents before bulk WorkspaceEdit writes.
+        try {
+          let oldText: string | null = null;
+          for (const root of rootsRef.current) {
+            const rel = relativePathWithinRoot(root.path, absolutePath);
+            if (rel === null) continue;
+            try {
+              oldText = (await workspaceReadFile(root.path, rel)).text;
+            } catch {
+              oldText = null;
+            }
+            break;
+          }
+          if (oldText == null) {
+            try {
+              oldText = (await workspaceReadLooseFile(absolutePath)).text;
+            } catch {
+              oldText = null;
+            }
+          }
+          if (oldText != null && oldText.length <= 2 * 1024 * 1024) {
+            await historySnapshot(absolutePath, oldText, "replace").catch(() => null);
+          }
+        } catch {
+          // Best-effort history; never block the edit write.
+        }
         for (const root of rootsRef.current) {
           const rel = relativePathWithinRoot(root.path, absolutePath);
           if (rel === null) continue;
@@ -4001,6 +4052,7 @@ export function CodeWorkspaceTab({
         onRevealInTree={revealEditorTabInTree}
         onRevealInSystem={revealEditorTabInExplorer}
         onOpenInTerminal={openEditorTabInTerminal}
+        onLocalHistory={openLocalHistoryForKey}
         onMarkdownModeChange={(mode) => {
           if (!groupFile) return;
           setMarkdownModes((current) => ({ ...current, [groupFile.key]: mode }));
@@ -4499,6 +4551,14 @@ export function CodeWorkspaceTab({
         }}
       />
       {treeContextMenu.render}
+      {localHistoryTarget && openFiles[localHistoryTarget.key] && (
+        <LocalHistoryDialog
+          path={localHistoryTarget.path}
+          currentText={openFiles[localHistoryTarget.key].text}
+          onClose={() => setLocalHistoryTarget(null)}
+          onRestore={(text) => restoreLocalHistoryText(localHistoryTarget.key, text)}
+        />
+      )}
     </div>
   );
 }

@@ -1217,6 +1217,18 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "git_blame_lines": {
       return [] as T;
     }
+    case "history_snapshot": {
+      return null as T;
+    }
+    case "history_list": {
+      return [] as T;
+    }
+    case "history_read": {
+      return "" as T;
+    }
+    case "history_prune": {
+      return 0 as T;
+    }
     case "lsp_detect_servers": {
       return stubLspServerStatuses() as T;
     }

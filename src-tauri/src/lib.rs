@@ -35,6 +35,7 @@ mod voice;
 mod windowing;
 mod workspace;
 mod workspace_search;
+mod local_history;
 mod wsl;
 
 use state::AppState;
@@ -121,6 +122,9 @@ pub fn run() {
                 lanchat_state,
             ));
             app.manage(workspace_search::WorkspaceSearchState::default());
+            let local_history = local_history::init_local_history(app.handle())
+                .expect("failed to init local history store");
+            app.manage(local_history);
 
             let handle_for_reaper = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -418,6 +422,10 @@ pub fn run() {
             workspace::workspace_create_dir,
             workspace::workspace_delete_path,
             workspace::workspace_rename_path,
+            local_history::history_snapshot,
+            local_history::history_list,
+            local_history::history_read,
+            local_history::history_prune,
             workspace_search::workspace_search_start,
             workspace_search::workspace_search_cancel,
             lsp::lsp_list_presets,

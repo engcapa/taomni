@@ -77,6 +77,7 @@ interface EditorGroupProps {
   onRevealInTree: (key: string) => void;
   onRevealInSystem: (key: string) => void;
   onOpenInTerminal: (key: string) => void;
+  onLocalHistory?: (key: string) => void;
   onMarkdownModeChange: (mode: MarkdownViewMode) => void;
   onChangeText: (key: string, text: string) => void;
   onSave: (key: string) => void;
@@ -148,6 +149,7 @@ export function EditorGroup({
   onRevealInTree,
   onRevealInSystem,
   onOpenInTerminal,
+  onLocalHistory,
   onMarkdownModeChange,
   onChangeText,
   onSave,
@@ -194,6 +196,10 @@ export function EditorGroup({
       { label: "Reveal in Project Tree", shortcut: "Alt+F1", onClick: () => onRevealInTree(key) },
       { label: "Reveal in Explorer", onClick: () => onRevealInSystem(key) },
       { label: "Open in Terminal", onClick: () => onOpenInTerminal(key) },
+      ...(onLocalHistory ? [
+        { separator: true as const, label: "" },
+        { label: "Local History…", onClick: () => onLocalHistory(key) },
+      ] : []),
     ]);
   };
   return (
