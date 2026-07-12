@@ -39,6 +39,7 @@ export interface SftpSessionState {
   attaching: boolean;
   homeDir: string | null;
   error: string | null;
+  connectionOpts?: AttachOptions;
   remote: PaneState;
   local: PaneState;
 }
@@ -76,6 +77,7 @@ export type FilePanelStoreHook = UseBoundStore<StoreApi<FilePanelStore>>;
 interface SftpStoreState {
   sessions: Record<string, SftpSessionState>;
   attach: (opts: AttachOptions) => Promise<void>;
+  reconnect: (sessionId: string) => Promise<void>;
   /**
    * Attach a session id to the store without opening any SFTP channel —
    * used by the embedded local file-browser tab (File session type) so it
@@ -165,6 +167,21 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+export function isConnectionError(err: unknown): boolean {
+  const msg = errorMessage(err).toLowerCase();
+  return (
+    msg.includes("connection closed") ||
+    msg.includes("socket closed") ||
+    msg.includes("channel closed") ||
+    msg.includes("broken pipe") ||
+    msg.includes("not attached") ||
+    msg.includes("ssh error") ||
+    msg.includes("io error") ||
+    msg.includes("timed out") ||
+    msg.includes("eof")
+  );
+}
+
 function isSftpRefreshDirectorySignal(err: unknown): boolean {
   return errorMessage(err)
     .toLowerCase()
@@ -246,6 +263,7 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
           ...(state.sessions[sid] ?? freshSession(sid)),
           attaching: true,
           error: null,
+          connectionOpts: opts,
         },
       },
     }));
@@ -453,13 +471,18 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
       set((state) => {
         const cur = state.sessions[sessionId];
         if (!cur) return state;
+        const nextSession = {
+          ...cur,
+          [side]: { ...cur[side], loading: false, error: message },
+        };
+        if (side === "remote" && isConnectionError(err)) {
+          nextSession.attached = false;
+          nextSession.error = message;
+        }
         return {
           sessions: {
             ...state.sessions,
-            [sessionId]: {
-              ...cur,
-              [side]: { ...cur[side], loading: false, error: message },
-            },
+            [sessionId]: nextSession,
           },
         };
       });
@@ -528,13 +551,18 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
       set((state) => {
         const cur = state.sessions[sessionId];
         if (!cur) return state;
+        const nextSession = {
+          ...cur,
+          [side]: { ...cur[side], loading: false, error: message },
+        };
+        if (side === "remote" && isConnectionError(displayErr)) {
+          nextSession.attached = false;
+          nextSession.error = message;
+        }
         return {
           sessions: {
             ...state.sessions,
-            [sessionId]: {
-              ...cur,
-              [side]: { ...cur[side], loading: false, error: message },
-            },
+            [sessionId]: nextSession,
           },
         };
       });
@@ -577,13 +605,18 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
       set((state) => {
         const cur = state.sessions[sessionId];
         if (!cur) return state;
+        const nextSession = {
+          ...cur,
+          [side]: { ...cur[side], loading: false, error: message },
+        };
+        if (side === "remote" && isConnectionError(err)) {
+          nextSession.attached = false;
+          nextSession.error = message;
+        }
         return {
           sessions: {
             ...state.sessions,
-            [sessionId]: {
-              ...cur,
-              [side]: { ...cur[side], loading: false, error: message },
-            },
+            [sessionId]: nextSession,
           },
         };
       });
@@ -626,13 +659,18 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
       set((state) => {
         const cur = state.sessions[sessionId];
         if (!cur) return state;
+        const nextSession = {
+          ...cur,
+          [side]: { ...cur[side], loading: false, error: message },
+        };
+        if (side === "remote" && isConnectionError(err)) {
+          nextSession.attached = false;
+          nextSession.error = message;
+        }
         return {
           sessions: {
             ...state.sessions,
-            [sessionId]: {
-              ...cur,
-              [side]: { ...cur[side], loading: false, error: message },
-            },
+            [sessionId]: nextSession,
           },
         };
       });
@@ -714,5 +752,14 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
         },
       };
     });
+  },
+
+  reconnect: async (sessionId) => {
+    const session = get().sessions[sessionId];
+    if (!session || !session.connectionOpts) {
+      throw new Error("No connection credentials cached for this session");
+    }
+    await get().detach(sessionId).catch(() => {});
+    await get().attach(session.connectionOpts);
   },
 }));
