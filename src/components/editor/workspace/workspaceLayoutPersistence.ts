@@ -40,6 +40,7 @@ const BOTTOM_DOCK_TABS: BottomDockTabId[] = [
   "references",
   "call-hierarchy",
   "type-hierarchy",
+  "todos",
   "terminal",
   "run",
 ];

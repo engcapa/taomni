@@ -18,6 +18,7 @@ export type BottomDockTabId =
   | "references"
   | "call-hierarchy"
   | "type-hierarchy"
+  | "todos"
   | "terminal"
   | "run";
 export type EditorGroupId = "primary" | "secondary";

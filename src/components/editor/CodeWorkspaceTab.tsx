@@ -17,6 +17,7 @@ import {
   ListTree,
   GitFork,
   Network,
+  ListTodo,
   Loader2,
   RefreshCw,
   RotateCcw,
@@ -160,6 +161,14 @@ import {
   HierarchyPanel,
   type HierarchyRootState,
 } from "./workspace/panels/HierarchyPanel";
+import { TodosBookmarksPanel } from "./workspace/panels/TodosBookmarksPanel";
+import {
+  readWorkspaceBookmarks,
+  scanTodosInOpenFiles,
+  toggleWorkspaceBookmark,
+  writeWorkspaceBookmarks,
+  type WorkspaceBookmark,
+} from "./workspace/todoBookmarks";
 import { type QuickDocContent } from "./workspace/QuickDocPopup";
 import { type LocationPeekState } from "./workspace/LocationPeek";
 import {
@@ -330,6 +339,9 @@ export function CodeWorkspaceTab({
     () => workspace.workspaceInstanceId ?? workspace.workspaceId ?? workspace.repoRoot?.trim() ?? tabId,
     [tabId, workspace.repoRoot, workspace.workspaceId, workspace.workspaceInstanceId],
   );
+  const [bookmarks, setBookmarks] = useState<WorkspaceBookmark[]>(
+    () => readWorkspaceBookmarks(workspaceInstanceId),
+  );
   const ensureWorkspaceUi = useCodeWorkspaceStore((s) => s.ensureInstance);
   const disposeWorkspaceUi = useCodeWorkspaceStore((s) => s.disposeInstance);
   const patchWorkspaceUi = useCodeWorkspaceStore((s) => s.patchInstance);
@@ -349,6 +361,7 @@ export function CodeWorkspaceTab({
 
   useEffect(() => {
     ensureWorkspaceUi(workspaceInstanceId);
+    setBookmarks(readWorkspaceBookmarks(workspaceInstanceId));
     return () => disposeWorkspaceUi(workspaceInstanceId);
   }, [disposeWorkspaceUi, ensureWorkspaceUi, workspaceInstanceId]);
 
@@ -2546,6 +2559,14 @@ export function CodeWorkspaceTab({
     return activeFile ? breadcrumbSegmentsForFile(activeFile, roots) : [];
   }, [activeFile, roots]);
 
+  const openFileTodos = useMemo(() => scanTodosInOpenFiles(
+    Object.values(openFiles).map((file) => ({
+      key: file.key,
+      pathLabel: file.subtitle || file.path,
+      text: file.text,
+    })),
+  ), [openFiles]);
+
   useEffect(() => {
     let cancelled = false;
     if (!activeFile || activeFile.loading || !activeCapabilities?.documentSymbol) {
@@ -3228,6 +3249,50 @@ export function CodeWorkspaceTab({
     if (activeKey) revealEditorLocation(activeKey, symbol.selectionRange);
   }, [activeKey, revealEditorLocation]);
 
+  const openFileByKey = useCallback(async (key: string): Promise<boolean> => {
+    const existing = openFilesRef.current[key];
+    if (existing) {
+      updateEditorGroup(activeEditorGroupId, (group) => (
+        group.openOrder.includes(key)
+          ? { ...group, activeKey: key }
+          : { ...group, openOrder: [...group.openOrder, key], activeKey: key, previewKey: group.previewKey === key ? null : group.previewKey }
+      ));
+      return true;
+    }
+    if (key.startsWith("root:")) {
+      const rest = key.slice("root:".length);
+      const sep = rest.indexOf(":");
+      if (sep > 0) {
+        const rootId = rest.slice(0, sep);
+        const path = rest.slice(sep + 1);
+        await openFile({ kind: "root", rootId, path });
+        return true;
+      }
+    }
+    if (key.startsWith("loose:")) {
+      const id = key.slice("loose:".length);
+      const loose = looseFilesRef.current.find((item) => item.id === id);
+      if (loose) {
+        await openFile({ kind: "loose", id: loose.id, path: loose.path });
+        return true;
+      }
+    }
+    return false;
+  }, [activeEditorGroupId, openFile, updateEditorGroup]);
+
+  const openTodoOrBookmark = useCallback(async (
+    item: { fileKey: string; line: number; character: number },
+  ) => {
+    if (!await openFileByKey(item.fileKey)) {
+      setStatusMessage("The bookmarked file is no longer part of this workspace");
+      return;
+    }
+    revealEditorLocation(item.fileKey, {
+      start: { line: item.line, character: item.character },
+      end: { line: item.line, character: item.character },
+    });
+  }, [openFileByKey, revealEditorLocation, setStatusMessage]);
+
   const toggleOutlinePane = useCallback(() => {
     if (rightPaneOpen && rightPaneTab === "outline") {
       setRightPaneOpen(false);
@@ -3236,6 +3301,50 @@ export function CodeWorkspaceTab({
     setRightPaneTab("outline");
     setRightPaneOpen(true);
   }, [rightPaneOpen, rightPaneTab, setRightPaneOpen, setRightPaneTab]);
+
+  const openTodosPane = useCallback(() => {
+    setBottomDockTab("todos");
+    setBottomDockOpen(true);
+  }, [setBottomDockOpen, setBottomDockTab]);
+
+  const toggleTodosPane = useCallback(() => {
+    const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+    if (ui.bottomDockOpen && ui.bottomDockTab === "todos") {
+      setBottomDockOpen(false);
+      return;
+    }
+    openTodosPane();
+  }, [openTodosPane, setBottomDockOpen, workspaceInstanceId]);
+
+  const toggleBookmarkAtCursor = useCallback(() => {
+    const file = activeKey ? openFilesRef.current[activeKey] : null;
+    if (!file) {
+      setStatusMessage("Open a file to toggle bookmarks");
+      return;
+    }
+    const position = editorSelectionRef.current.end;
+    const lineText = file.text.split("\n")[position.line] ?? "";
+    const label = lineText.trim() || `${file.title}:${position.line + 1}`;
+    const next = toggleWorkspaceBookmark(workspaceInstanceId, {
+      fileKey: file.key,
+      pathLabel: file.subtitle || file.path,
+      line: position.line,
+      character: position.character,
+      label,
+    }, bookmarks);
+    setBookmarks(next);
+    setStatusMessage(next.some((item) => item.fileKey === file.key && item.line === position.line)
+      ? `Bookmarked line ${position.line + 1}`
+      : `Removed bookmark on line ${position.line + 1}`);
+    openTodosPane();
+  }, [activeKey, openTodosPane, setStatusMessage, bookmarks, workspaceInstanceId]);
+
+  const removeBookmark = useCallback((id: string) => {
+    const next = bookmarks.filter((item) => item.id !== id);
+    writeWorkspaceBookmarks(workspaceInstanceId, next);
+    setBookmarks(next);
+  }, [bookmarks, workspaceInstanceId]);
+
 
   const workspaceCommands = useMemo<WorkspaceCommand[]>(() => [
     {
@@ -3425,6 +3534,22 @@ export function CodeWorkspaceTab({
       when: (context) => context.focus === "editor" && !!activeFile
         && !!activeCapabilities?.typeHierarchy,
       run: () => void openHierarchy("type"),
+    },
+    {
+      id: "workspace.toggleTodosPane",
+      title: "Toggle TODOs / Bookmarks",
+      category: "View",
+      keywords: ["todo", "fixme", "bookmark", "markers"],
+      run: toggleTodosPane,
+    },
+    {
+      id: "workspace.toggleBookmark",
+      title: "Toggle Bookmark",
+      category: "Edit",
+      keybinding: "F11",
+      keywords: ["bookmark", "mark", "line"],
+      when: (context) => context.focus === "editor" && !!activeFile && !activeFile.loading,
+      run: toggleBookmarkAtCursor,
     },
     {
       id: "workspace.toggleInlayHints",
@@ -3679,7 +3804,9 @@ export function CodeWorkspaceTab({
     toggleInlayHints,
     toggleInlayHintsForActiveLanguage,
     toggleInlineBlame,
+    toggleBookmarkAtCursor,
     toggleOutlinePane,
+    toggleTodosPane,
   ]);
 
   const executeWorkspaceCommand = useCallback((
@@ -4605,6 +4732,21 @@ export function CodeWorkspaceTab({
                 onStatus={(status) => {
                   if (activeFile) updateLspStatusForFile(activeFile, status);
                 }}
+              />
+            ),
+          },
+          {
+            id: "todos",
+            label: "TODOs",
+            icon: <ListTodo className="h-3.5 w-3.5" />,
+            badge: (openFileTodos.length + bookmarks.length) > 0 ? (openFileTodos.length + bookmarks.length) : undefined,
+            content: (
+              <TodosBookmarksPanel
+                todos={openFileTodos}
+                bookmarks={bookmarks}
+                onOpenTodo={(item) => void openTodoOrBookmark(item)}
+                onOpenBookmark={(item) => void openTodoOrBookmark(item)}
+                onRemoveBookmark={removeBookmark}
               />
             ),
           },

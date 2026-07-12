@@ -909,7 +909,9 @@ describe("CodeWorkspaceTab", () => {
 
     renderWorkspace(workspace);
 
-    await waitFor(() => expect(lspMocks.lspGetDiagnostics).toHaveBeenCalled());
+    await screen.findByTitle("app / src/Program.cs");
+    await waitFor(() => expect(lspMocks.lspOpenDocument).toHaveBeenCalled(), { timeout: 3_000 });
+    await waitFor(() => expect(lspMocks.lspGetDiagnostics).toHaveBeenCalled(), { timeout: 3_000 });
     await waitFor(() => {
       const context = useAppStore.getState().codeWorkspaceByTab["tab-code"];
       expect(context).toMatchObject({
@@ -1597,6 +1599,37 @@ describe("CodeWorkspaceTab", () => {
     expect(await screen.findByTestId("code-workspace-editor-split")).toBeInTheDocument();
     const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-split");
     expect(ui.editorGroups.secondary.activeKey).toBe("root:app:README.md");
+  });
+
+  it("scans open-file TODOs and toggles persistent bookmarks with F11", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-todos",
+      workspaceInstanceId: "instance-todos",
+      name: "TODOs",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file(
+      "src/main.ts",
+      "const value = 1; // TODO: replace fixture",
+    ));
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    const editor = screen.getByTestId("code-workspace-editor-pane");
+    fireEvent.keyDown(editor, { key: "F11", code: "F11" });
+
+    const panel = await screen.findByTestId("code-workspace-todos-panel");
+    expect(screen.getByRole("tab", { name: /TODOs/, selected: true })).toBeInTheDocument();
+    expect(panel).toHaveTextContent("replace fixture");
+    expect(panel).toHaveTextContent("const value = 1");
+    expect(window.localStorage.getItem("taomni.codeWorkspace.bookmarks.v1.instance-todos"))
+      .toContain("root:app:src/main.ts");
+
+    fireEvent.keyDown(editor, { key: "F11", code: "F11" });
+    await waitFor(() => expect(panel).toHaveTextContent("No bookmarks yet"));
   });
 
   it("restores open editor tabs and dock chrome from the layout snapshot", async () => {
