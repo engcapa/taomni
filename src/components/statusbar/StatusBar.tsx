@@ -1,5 +1,6 @@
 import {
   Bot,
+  GitBranch,
   Monitor,
   Wifi,
   KeyRound,
@@ -12,17 +13,47 @@ import {
   Sparkles,
   Cpu,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useAppTheme } from "../../lib/appTheme";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useAiStore } from "../../stores/aiStore";
+import { useCodeWorkspaceStatusStore } from "../../stores/codeWorkspaceStatusStore";
 import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
+
+function StatusSegment({
+  testId,
+  title,
+  onClick,
+  children,
+}: {
+  testId?: string;
+  title?: string;
+  onClick?: () => void;
+  children: ReactNode;
+}) {
+  const className = "flex items-center gap-1 text-[11px] max-w-[220px] truncate"
+    + (onClick ? " rounded px-1 hover:bg-[var(--taomni-hover)] cursor-pointer" : "");
+  if (onClick) {
+    return (
+      <button type="button" data-testid={testId} title={title} className={className} onClick={onClick}>
+        {children}
+      </button>
+    );
+  }
+  return (
+    <span data-testid={testId} title={title} className={className}>
+      {children}
+    </span>
+  );
+}
 
 export function StatusBar() {
   const { tabs, activeTabId, xServerEnabled, xServerStatus, statusMessage } = useAppStore();
   const { sessions, selectedSessionId } = useSessionStore();
+  const workspaceStatus = useCodeWorkspaceStatusStore((s) => s.status);
+  const workspaceActions = useCodeWorkspaceStatusStore((s) => s.actions);
   const { mode, resolvedTheme } = useAppTheme();
   const [online, setOnline] = useState(navigator.onLine);
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
@@ -37,6 +68,8 @@ export function StatusBar() {
   const searchEnabled = !!aiConfig?.web_search.client_enabled;
   const t = useT();
   const themeLabel = useAppThemeI18nLabel();
+  const showWorkspaceSegments = activeTab?.type === "code-workspace"
+    && workspaceStatus?.tabId === activeTabId;
 
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
@@ -155,6 +188,76 @@ export function StatusBar() {
 
       <div className="flex-1" />
       <span className="truncate max-w-[260px]">{statusMessage}</span>
+
+      {showWorkspaceSegments && workspaceStatus && (
+        <>
+          <span className="taomni-divider-v h-3" />
+          <StatusSegment
+            testId="status-bar-workspace-cursor"
+            title={`Cursor · line ${workspaceStatus.line}, column ${workspaceStatus.column}`}
+          >
+            <span className="taomni-mono">Ln {workspaceStatus.line}, Col {workspaceStatus.column}</span>
+          </StatusSegment>
+          <StatusSegment
+            testId="status-bar-workspace-encoding"
+            title="File encoding (workspace currently reads/writes UTF-8)"
+          >
+            {workspaceStatus.encoding}
+          </StatusSegment>
+          <StatusSegment
+            testId="status-bar-workspace-eol"
+            title="Detected line endings"
+          >
+            {workspaceStatus.eol}
+          </StatusSegment>
+          <StatusSegment
+            testId="status-bar-workspace-language"
+            title={workspaceStatus.languageId
+              ? `Language: ${workspaceStatus.languageId} · open language servers`
+              : "Language unknown · open language servers"}
+            onClick={workspaceActions?.openLanguagePanel}
+          >
+            {workspaceStatus.languageId ?? "Plain Text"}
+          </StatusSegment>
+          <StatusSegment
+            testId="status-bar-workspace-lsp"
+            title={workspaceStatus.lspLabel ?? (workspaceStatus.lspActive ? "LSP active" : "No language server")}
+            onClick={workspaceActions?.openLanguagePanel}
+          >
+            {dot(workspaceStatus.lspError
+              ? "bg-amber-400"
+              : workspaceStatus.lspActive
+                ? "bg-emerald-400"
+                : "bg-slate-400")}
+            <span className="truncate">{workspaceStatus.lspLabel ?? (workspaceStatus.lspActive ? "LSP" : "No LSP")}</span>
+          </StatusSegment>
+          {workspaceStatus.gitBranch && (
+            <StatusSegment
+              testId="status-bar-workspace-git"
+              title={`Git branch ${workspaceStatus.gitBranch}${workspaceStatus.gitAhead || workspaceStatus.gitBehind
+                ? ` · ahead ${workspaceStatus.gitAhead} · behind ${workspaceStatus.gitBehind}`
+                : ""}`}
+              onClick={workspaceActions?.openGitManager}
+            >
+              <GitBranch className="w-3 h-3 shrink-0" />
+              <span className="truncate">{workspaceStatus.gitBranch}</span>
+              {(workspaceStatus.gitAhead > 0 || workspaceStatus.gitBehind > 0) && (
+                <span className="taomni-mono shrink-0 text-[10px] opacity-80">
+                  {workspaceStatus.gitAhead > 0 ? `↑${workspaceStatus.gitAhead}` : ""}
+                  {workspaceStatus.gitBehind > 0 ? `↓${workspaceStatus.gitBehind}` : ""}
+                </span>
+              )}
+            </StatusSegment>
+          )}
+          <StatusSegment
+            testId="status-bar-workspace-zoom"
+            title="Editor font size"
+          >
+            {workspaceStatus.fontSize}px
+          </StatusSegment>
+        </>
+      )}
+
       <span className="taomni-divider-v h-3" />
       <span className="flex items-center gap-1">
         {resolvedTheme === "dark" ? <Moon className="w-3 h-3" /> : <Sun className="w-3 h-3" />}

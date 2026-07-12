@@ -109,6 +109,10 @@ import {
   type EditorSplitOrientation,
   type RightPaneTabId,
 } from "../../stores/codeWorkspaceStore";
+import {
+  detectWorkspaceEol,
+  useCodeWorkspaceStatusStore,
+} from "../../stores/codeWorkspaceStatusStore";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { writeText } from "../../lib/clipboard";
 import { useContextMenu } from "../ContextMenu";
@@ -303,6 +307,9 @@ export function CodeWorkspaceTab({
 }: CodeWorkspaceTabProps) {
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const setTabCodeWorkspaceContext = useAppStore((s) => s.setTabCodeWorkspaceContext);
+  const setWorkspaceStatusSegments = useCodeWorkspaceStatusStore((s) => s.setStatus);
+  const setWorkspaceStatusActions = useCodeWorkspaceStatusStore((s) => s.setActions);
+  const clearWorkspaceStatus = useCodeWorkspaceStatusStore((s) => s.clearForTab);
   const workspaceInstanceId = useMemo(
     () => workspace.workspaceInstanceId ?? workspace.workspaceId ?? workspace.repoRoot?.trim() ?? tabId,
     [tabId, workspace.repoRoot, workspace.workspaceId, workspace.workspaceInstanceId],
@@ -867,6 +874,8 @@ export function CodeWorkspaceTab({
           changes: current[root.repoRoot]?.changes ?? [],
           headOid: current[root.repoRoot]?.headOid ?? null,
           currentBranch: current[root.repoRoot]?.currentBranch ?? null,
+          ahead: current[root.repoRoot]?.ahead ?? 0,
+          behind: current[root.repoRoot]?.behind ?? 0,
           loading: true,
           error: null,
         },
@@ -879,6 +888,8 @@ export function CodeWorkspaceTab({
             changes: snapshot.changes,
             headOid: snapshot.headOid,
             currentBranch: snapshot.currentBranch,
+            ahead: snapshot.ahead,
+            behind: snapshot.behind,
             loading: false,
             error: null,
           },
@@ -890,6 +901,8 @@ export function CodeWorkspaceTab({
             changes: current[root.repoRoot]?.changes ?? [],
             headOid: current[root.repoRoot]?.headOid ?? null,
             currentBranch: current[root.repoRoot]?.currentBranch ?? null,
+            ahead: current[root.repoRoot]?.ahead ?? 0,
+            behind: current[root.repoRoot]?.behind ?? 0,
             loading: false,
             error: errorMessage(err),
           },
@@ -2308,6 +2321,55 @@ export function CodeWorkspaceTab({
     if (!onOpenGitManager || !gitManagerPayload) return;
     onOpenGitManager(gitManagerPayload);
   }, [gitManagerPayload, onOpenGitManager]);
+
+  useEffect(() => {
+    if (!visible) {
+      clearWorkspaceStatus(tabId);
+      return;
+    }
+    const cursor = cursorPositions[activeEditorGroupId] ?? { line: 0, character: 0 };
+    const status = activeLspState?.status ?? null;
+    const gitSnapshot = activeGitRoot ? gitSnapshots[activeGitRoot.repoRoot] : null;
+    setWorkspaceStatusSegments({
+      tabId,
+      line: cursor.line + 1,
+      column: cursor.character + 1,
+      encoding: "UTF-8",
+      eol: detectWorkspaceEol(activeFile?.text ?? ""),
+      languageId: status?.languageId ?? activeLanguageId,
+      lspActive: !!status?.active,
+      lspLabel: status?.displayName ?? (status?.active ? "LSP" : null),
+      lspError: !!activeLspState?.error || (!!status && !status.active && !!status.error),
+      gitBranch: gitSnapshot?.currentBranch ?? null,
+      gitAhead: gitSnapshot?.ahead ?? 0,
+      gitBehind: gitSnapshot?.behind ?? 0,
+      fontSize: codeViewProfile.fontSize,
+    });
+    setWorkspaceStatusActions(tabId, {
+      openLanguagePanel: () => setLanguagePanelOpen(true),
+      openGitManager: gitManagerPayload && onOpenGitManager ? openGitManager : undefined,
+    });
+    return () => clearWorkspaceStatus(tabId);
+  }, [
+    activeEditorGroupId,
+    activeFile?.text,
+    activeGitRoot,
+    activeLanguageId,
+    activeLspState,
+    clearWorkspaceStatus,
+    codeViewProfile.fontSize,
+    cursorPositions,
+    gitManagerPayload,
+    gitSnapshots,
+    onOpenGitManager,
+    openGitManager,
+    setLanguagePanelOpen,
+    setWorkspaceStatusActions,
+    setWorkspaceStatusSegments,
+    tabId,
+    visible,
+  ]);
+
   const gitChangeByRootPath = useMemo(() => {
     const map = new Map<string, GitChange>();
     for (const root of roots) {

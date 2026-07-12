@@ -95,6 +95,8 @@ export interface WorkspaceGitSnapshotState {
   changes: GitChange[];
   headOid: string | null;
   currentBranch: string | null;
+  ahead: number;
+  behind: number;
   loading: boolean;
   error: string | null;
 }
