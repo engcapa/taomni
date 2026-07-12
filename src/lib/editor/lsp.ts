@@ -59,6 +59,7 @@ export interface LspCapabilitySummary {
   callHierarchy: boolean;
   typeHierarchy: boolean;
   inlayHint: boolean;
+  selectionRange: boolean;
   completionTriggerCharacters: string[];
   signatureTriggerCharacters: string[];
 }
@@ -428,6 +429,37 @@ export interface LspTypeHierarchyResult {
   items: LspHierarchyItem[];
 }
 
+export interface LspDocumentHighlight {
+  range: LspRange;
+  /** 1 = text, 2 = read, 3 = write. */
+  kind: number | null;
+}
+
+export interface LspDocumentHighlightsResult {
+  status: LspDocumentStatus;
+  highlights: LspDocumentHighlight[];
+}
+
+export interface LspInlayHint {
+  position: LspPosition;
+  label: string;
+  /** 1 = type, 2 = parameter. */
+  kind: number | null;
+  tooltip: string | null;
+  paddingLeft: boolean;
+  paddingRight: boolean;
+}
+
+export interface LspInlayHintsResult {
+  status: LspDocumentStatus;
+  hints: LspInlayHint[];
+}
+
+export interface LspSelectionRangesResult {
+  status: LspDocumentStatus;
+  ranges: LspRange[];
+}
+
 export function lspWorkspaceSymbols(
   descriptor: LspDocumentDescriptor,
   query: string,
@@ -497,6 +529,41 @@ export function lspTypeHierarchySubtypes(
   return invoke<LspTypeHierarchyResult>("lsp_type_hierarchy_subtypes", {
     ...documentArgs(descriptor),
     item,
+  });
+}
+
+export function lspDocumentHighlights(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+): Promise<LspDocumentHighlightsResult> {
+  return invoke<LspDocumentHighlightsResult>("lsp_document_highlights", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+  });
+}
+
+export function lspInlayHints(
+  descriptor: LspDocumentDescriptor,
+  range: LspRange,
+): Promise<LspInlayHintsResult> {
+  return invoke<LspInlayHintsResult>("lsp_inlay_hints", {
+    ...documentArgs(descriptor),
+    startLine: range.start.line,
+    startCharacter: range.start.character,
+    endLine: range.end.line,
+    endCharacter: range.end.character,
+  });
+}
+
+export function lspSelectionRanges(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+): Promise<LspSelectionRangesResult> {
+  return invoke<LspSelectionRangesResult>("lsp_selection_ranges", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
   });
 }
 

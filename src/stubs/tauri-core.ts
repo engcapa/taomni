@@ -1262,6 +1262,24 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         entries: [],
       } as T;
     }
+    case "lsp_document_highlights": {
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        highlights: [],
+      } as T;
+    }
+    case "lsp_inlay_hints": {
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        hints: [],
+      } as T;
+    }
+    case "lsp_selection_ranges": {
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        ranges: [],
+      } as T;
+    }
     case "workspace_list_dir": {
       const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
       const path = (args?.path as string) || "";

@@ -233,6 +233,48 @@ pub struct LspTypeHierarchyResult {
     pub items: Vec<LspHierarchyItem>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspDocumentHighlight {
+    pub range: LspRange,
+    /// 1 = text, 2 = read, 3 = write.
+    pub kind: Option<u8>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspDocumentHighlightsResult {
+    pub status: LspDocumentStatus,
+    pub highlights: Vec<LspDocumentHighlight>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspInlayHint {
+    pub position: LspPosition,
+    pub label: String,
+    /// 1 = type, 2 = parameter.
+    pub kind: Option<u8>,
+    pub tooltip: Option<String>,
+    pub padding_left: bool,
+    pub padding_right: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspInlayHintsResult {
+    pub status: LspDocumentStatus,
+    pub hints: Vec<LspInlayHint>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspSelectionRangesResult {
+    pub status: LspDocumentStatus,
+    /// Innermost to outermost range for the requested position.
+    pub ranges: Vec<LspRange>,
+}
+
 /// Feature summary distilled from the server's `initialize` response so the
 /// UI can enable/disable entry points per capability instead of guessing.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -255,6 +297,7 @@ pub struct LspCapabilitySummary {
     pub call_hierarchy: bool,
     pub type_hierarchy: bool,
     pub inlay_hint: bool,
+    pub selection_range: bool,
     pub completion_trigger_characters: Vec<String>,
     pub signature_trigger_characters: Vec<String>,
 }
@@ -2067,6 +2110,139 @@ async fn lsp_hierarchy_item_request(
 }
 
 #[tauri::command]
+pub async fn lsp_document_highlights(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspDocumentHighlightsResult, String> {
+    let (status, value) = lsp_document_feature_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "textDocument/documentHighlight",
+        json!({ "position": { "line": line, "character": character } }),
+    )
+    .await?;
+    Ok(LspDocumentHighlightsResult {
+        status,
+        highlights: parse_document_highlights(&value),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_inlay_hints(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    start_line: u32,
+    start_character: u32,
+    end_line: u32,
+    end_character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspInlayHintsResult, String> {
+    let (status, value) = lsp_document_feature_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "textDocument/inlayHint",
+        json!({
+            "range": {
+                "start": { "line": start_line, "character": start_character },
+                "end": { "line": end_line, "character": end_character },
+            }
+        }),
+    )
+    .await?;
+    Ok(LspInlayHintsResult {
+        status,
+        hints: parse_inlay_hints(&value),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_selection_ranges(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspSelectionRangesResult, String> {
+    let (status, value) = lsp_document_feature_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "textDocument/selectionRange",
+        json!({ "positions": [{ "line": line, "character": character }] }),
+    )
+    .await?;
+    Ok(LspSelectionRangesResult {
+        status,
+        ranges: parse_selection_ranges(&value),
+    })
+}
+
+async fn lsp_document_feature_request(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+    method: &str,
+    mut params: Value,
+) -> Result<(LspDocumentStatus, Value), String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    params["textDocument"] = json!({ "uri": document.uri });
+    let result = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session.request(method, params).await.unwrap_or(Value::Null),
+        None => Value::Null,
+    };
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    Ok((status, result))
+}
+
+#[tauri::command]
 pub async fn lsp_code_actions(
     state: State<'_, AppState>,
     workspace_id: String,
@@ -2690,6 +2866,7 @@ fn capability_summary_from(capabilities: &Value) -> LspCapabilitySummary {
         call_hierarchy: has_provider(capabilities, "callHierarchyProvider"),
         type_hierarchy: has_provider(capabilities, "typeHierarchyProvider"),
         inlay_hint: has_provider(capabilities, "inlayHintProvider"),
+        selection_range: has_provider(capabilities, "selectionRangeProvider"),
         completion_trigger_characters: provider_strings(
             capabilities,
             "completionProvider",
@@ -3121,6 +3298,87 @@ fn parse_call_hierarchy_entries(value: &Value, item_key: &str) -> Vec<LspCallHie
         .unwrap_or_default()
 }
 
+fn parse_document_highlights(value: &Value) -> Vec<LspDocumentHighlight> {
+    value
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| {
+                    Some(LspDocumentHighlight {
+                        range: item.get("range").and_then(parse_range)?,
+                        kind: item
+                            .get("kind")
+                            .and_then(Value::as_u64)
+                            .and_then(|kind| kind.try_into().ok()),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn inlay_hint_label(value: &Value) -> Option<String> {
+    if let Some(label) = value.as_str() {
+        return Some(label.to_string());
+    }
+    let parts = value.as_array()?.iter().filter_map(|part| {
+        part.get("value")
+            .and_then(Value::as_str)
+            .map(ToString::to_string)
+    });
+    let label = parts.collect::<String>();
+    (!label.is_empty()).then_some(label)
+}
+
+fn parse_inlay_hints(value: &Value) -> Vec<LspInlayHint> {
+    value
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| {
+                    Some(LspInlayHint {
+                        position: item.get("position").and_then(parse_position)?,
+                        label: item.get("label").and_then(inlay_hint_label)?,
+                        kind: item
+                            .get("kind")
+                            .and_then(Value::as_u64)
+                            .and_then(|kind| kind.try_into().ok()),
+                        tooltip: item.get("tooltip").and_then(markup_to_string),
+                        padding_left: item
+                            .get("paddingLeft")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false),
+                        padding_right: item
+                            .get("paddingRight")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn parse_selection_ranges(value: &Value) -> Vec<LspRange> {
+    let Some(mut current) = value.as_array().and_then(|items| items.first()) else {
+        return Vec::new();
+    };
+    let mut ranges = Vec::new();
+    for _ in 0..64 {
+        let Some(range) = current.get("range").and_then(parse_range) else {
+            break;
+        };
+        ranges.push(range);
+        let Some(parent) = current.get("parent").filter(|parent| parent.is_object()) else {
+            break;
+        };
+        current = parent;
+    }
+    ranges
+}
+
 fn parse_location(value: &Value) -> Option<LspLocation> {
     let (uri, range) = if let Some(uri) = value.get("uri").and_then(Value::as_str) {
         (uri, parse_range(value.get("range")?)?)
@@ -3488,6 +3746,7 @@ mod tests {
             "signatureHelpProvider": { "triggerCharacters": ["(", ","] },
             "hoverProvider": true,
             "renameProvider": { "prepareProvider": true },
+            "selectionRangeProvider": true,
             "documentFormattingProvider": false,
             "typeHierarchyProvider": null,
         }));
@@ -3498,6 +3757,7 @@ mod tests {
         assert_eq!(summary.signature_trigger_characters, vec!["(", ","]);
         assert!(summary.hover);
         assert!(summary.rename);
+        assert!(summary.selection_range);
         assert!(!summary.formatting);
         assert!(!summary.type_hierarchy);
         assert!(!summary.workspace_symbol);
@@ -3717,5 +3977,51 @@ mod tests {
         assert_eq!(incoming[0].from_ranges[0].start.line, 3);
         assert_eq!(outgoing.len(), 1);
         assert_eq!(outgoing[0].item.name, "caller");
+    }
+
+    #[test]
+    fn parses_highlights_inlay_hints_and_selection_ranges() {
+        let highlights = parse_document_highlights(&json!([
+            {
+                "range": {
+                    "start": { "line": 1, "character": 2 },
+                    "end": { "line": 1, "character": 5 }
+                },
+                "kind": 3
+            },
+            { "invalid": true }
+        ]));
+        assert_eq!(highlights.len(), 1);
+        assert_eq!(highlights[0].kind, Some(3));
+
+        let hints = parse_inlay_hints(&json!([
+            {
+                "position": { "line": 2, "character": 8 },
+                "label": [{ "value": "value" }, { "value": ": number" }],
+                "kind": 1,
+                "tooltip": { "kind": "markdown", "value": "inferred type" },
+                "paddingLeft": true
+            }
+        ]));
+        assert_eq!(hints.len(), 1);
+        assert_eq!(hints[0].label, "value: number");
+        assert_eq!(hints[0].tooltip.as_deref(), Some("inferred type"));
+        assert!(hints[0].padding_left);
+
+        let ranges = parse_selection_ranges(&json!([{
+            "range": {
+                "start": { "line": 3, "character": 4 },
+                "end": { "line": 3, "character": 8 }
+            },
+            "parent": {
+                "range": {
+                    "start": { "line": 3, "character": 0 },
+                    "end": { "line": 3, "character": 10 }
+                }
+            }
+        }]));
+        assert_eq!(ranges.len(), 2);
+        assert_eq!(ranges[0].start.character, 4);
+        assert_eq!(ranges[1].start.character, 0);
     }
 }
