@@ -22,6 +22,8 @@ interface UseWorkspaceTreeDataOptions {
   roots: CodeWorkspaceRootInfo[];
   expandedRootIds: ReadonlySet<string>;
   treeViewMode: TreeViewMode;
+  /** When non-empty, recursive file indexes load so tree filter can match nested files. */
+  treeFilter?: string;
   onError: (message: string) => void;
 }
 
@@ -48,6 +50,7 @@ export function useWorkspaceTreeData({
   roots,
   expandedRootIds,
   treeViewMode,
+  treeFilter = "",
   onError,
 }: UseWorkspaceTreeDataOptions): WorkspaceTreeDataController {
   const [directories, setDirectories] = useState<Record<string, DirectoryState>>({});
@@ -239,9 +242,12 @@ export function useWorkspaceTreeData({
   }, [directories, loadCompactChain, treeViewMode]);
 
   useEffect(() => {
-    if (treeViewMode !== "flat") return;
+    // Flat view always indexes; tree/compact only index when the filter needs
+    // nested matches (substring search cannot walk unloaded directories).
+    const needsFlatIndex = treeViewMode === "flat" || treeFilter.trim().length > 0;
+    if (!needsFlatIndex) return;
     roots.forEach((root) => void loadFlatFiles(root.id));
-  }, [loadFlatFiles, roots, treeViewMode]);
+  }, [loadFlatFiles, roots, treeFilter, treeViewMode]);
 
   return {
     directories,

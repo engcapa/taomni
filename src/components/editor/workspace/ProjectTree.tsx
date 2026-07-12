@@ -23,12 +23,14 @@ import {
   DEFAULT_FLAT_FILES_STATE,
   fileKey,
   fileRefEquals,
-  flatExtensionGroup,
+  flatSourceGroup,
+  flatSourceRelativePath,
   FLAT_VIEW_MAX_FILES,
   formatBytes,
   gitChangeForPath,
   gitDirectoryChangeCount,
   isRootRef,
+  matchesTreeFilter,
   rootDirKey,
   shouldHideEntry,
   type CompactChainState,
@@ -90,9 +92,10 @@ function GitStatusBadge({ change }: { change: GitChange | undefined }): ReactNod
   );
 }
 
-function renderFlatEntries(
+function renderMatchingFlatFiles(
   root: CodeWorkspaceRootInfo,
   props: ProjectTreeProps,
+  options: { groupBySource: boolean },
 ): ReactNode {
   const {
     flatFiles,
@@ -106,7 +109,6 @@ function renderFlatEntries(
     onContextMenu,
   } = props;
   const state = flatFiles[root.id] ?? DEFAULT_FLAT_FILES_STATE;
-  const filter = treeFilter.trim().toLowerCase();
   if (state.loading && !state.loaded) {
     return (
       <div className="h-[var(--taomni-code-tree-row-height)] flex items-center gap-2 px-4 text-[var(--taomni-code-muted)]">
@@ -124,8 +126,7 @@ function renderFlatEntries(
   }
   const entries = state.entries.filter((entry) => {
     if (shouldHideEntry(entry)) return false;
-    if (!filter) return true;
-    return entry.name.toLowerCase().includes(filter) || entry.path.toLowerCase().includes(filter);
+    return matchesTreeFilter(entry.name, entry.path, treeFilter);
   });
   if (entries.length === 0) {
     return (
@@ -135,9 +136,15 @@ function renderFlatEntries(
     );
   }
   const groups = new Map<string, WorkspaceEntry[]>();
-  for (const entry of entries) {
-    const group = flatExtensionGroup(entry.path);
-    groups.set(group, [...(groups.get(group) ?? []), entry]);
+  if (options.groupBySource) {
+    for (const entry of entries) {
+      const group = flatSourceGroup(entry.path);
+      const list = groups.get(group) ?? [];
+      list.push(entry);
+      groups.set(group, list);
+    }
+  } else {
+    groups.set("__matches__", entries);
   }
   return (
     <>
@@ -148,14 +155,17 @@ function renderFlatEntries(
       )}
       {[...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([group, groupEntries]) => (
         <Fragment key={`${root.id}:flat:${group}`}>
-          <div
-            className="h-6 flex items-center gap-1.5 px-4 font-semibold text-[var(--taomni-code-muted)]"
-            style={{ fontSize: "var(--taomni-code-tree-small-font-size)" }}
-          >
-            <File className="w-3.5 h-3.5" />
-            <span>{group}</span>
-            <span className="ml-auto text-[10px] font-normal">{groupEntries.length}</span>
-          </div>
+          {options.groupBySource && (
+            <div
+              className="h-6 flex items-center gap-1.5 px-4 font-semibold text-[var(--taomni-code-muted)]"
+              style={{ fontSize: "var(--taomni-code-tree-small-font-size)" }}
+              data-testid="code-workspace-flat-group"
+            >
+              <Folder className="w-3.5 h-3.5 text-[#d59d32]" />
+              <span>{group}</span>
+              <span className="ml-auto text-[10px] font-normal">{groupEntries.length}</span>
+            </div>
+          )}
           {groupEntries.map((entry) => {
             const ref: CodeWorkspaceFileRef = { kind: "root", rootId: root.id, path: entry.path };
             const key = fileKey(ref);
@@ -163,6 +173,7 @@ function renderFlatEntries(
             const isSelected = selected?.kind === "file" && isRootRef(selected.ref, root.id, entry.path);
             const open = openFiles[key];
             const change = gitChangeForPath(gitChangeByRootPath, root.id, entry.path);
+            const label = options.groupBySource ? flatSourceRelativePath(entry.path) : entry.path;
             return (
               <button
                 key={`${root.id}:flat:${entry.path}`}
@@ -182,7 +193,7 @@ function renderFlatEntries(
                 onContextMenu={(event) => onContextMenu(event, { kind: "file", ref })}
               >
                 <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-                <span className="truncate">{entry.path}</span>
+                <span className="truncate">{label}</span>
                 {(change || open?.dirty) && (
                   <span className="ml-auto flex shrink-0 items-center gap-1">
                     <GitStatusBadge change={change} />
@@ -196,6 +207,13 @@ function renderFlatEntries(
       ))}
     </>
   );
+}
+
+function renderFlatEntries(
+  root: CodeWorkspaceRootInfo,
+  props: ProjectTreeProps,
+): ReactNode {
+  return renderMatchingFlatFiles(root, props, { groupBySource: true });
 }
 
 function renderEntries(
@@ -220,7 +238,13 @@ function renderEntries(
     onContextMenu,
   } = props;
   const state = directories[rootDirKey(root.id, path)] ?? DEFAULT_DIR_STATE;
-  const filter = treeFilter.trim().toLowerCase();
+  const filter = treeFilter.trim();
+  // Substring filter cannot see unexpanded/unloaded children. When a query is
+  // active, fall back to the recursive flat index so e.g. `http` finds
+  // `src/foo/http2_connect.rs` without expanding every folder first.
+  if (filter) {
+    return renderMatchingFlatFiles(root, props, { groupBySource: false });
+  }
   if (state.loading && !state.loaded) {
     return (
       <div className="h-[var(--taomni-code-tree-row-height)] flex items-center gap-2 px-2 text-[var(--taomni-code-muted)]">
@@ -236,11 +260,7 @@ function renderEntries(
       </div>
     );
   }
-  const entries = state.entries.filter((entry) => {
-    if (shouldHideEntry(entry)) return false;
-    if (!filter) return true;
-    return entry.name.toLowerCase().includes(filter) || entry.path.toLowerCase().includes(filter);
-  });
+  const entries = state.entries.filter((entry) => !shouldHideEntry(entry));
   if (entries.length === 0) {
     return (
       <div className="px-3 py-2 text-[var(--taomni-code-muted)]">
@@ -250,7 +270,7 @@ function renderEntries(
   }
   return entries.map((entry) => {
     const isDir = entry.fileType === "dir";
-    const chain = treeViewMode === "compact" && !filter
+    const chain = treeViewMode === "compact"
       ? compactChains[rootDirKey(root.id, entry.path)]
       : undefined;
     const displayPath = isDir && chain?.path ? chain.path : entry.path;
@@ -345,6 +365,7 @@ export function ProjectTree(props: ProjectTreeProps) {
     roots,
     looseFiles,
     treeViewMode,
+    treeFilter,
     expandedRoots,
     selected,
     activeKey,
@@ -401,7 +422,9 @@ export function ProjectTree(props: ProjectTreeProps) {
             {expanded && (
               treeViewMode === "flat"
                 ? renderFlatEntries(root, props)
-                : renderEntries(root, "", 1, props)
+                : treeFilter.trim()
+                  ? renderMatchingFlatFiles(root, props, { groupBySource: false })
+                  : renderEntries(root, "", 1, props)
             )}
           </Fragment>
         );

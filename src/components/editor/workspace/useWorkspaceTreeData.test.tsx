@@ -31,21 +31,29 @@ describe("useWorkspaceTreeData", () => {
   it("loads expanded roots and recursive flat indexes", async () => {
     const onError = vi.fn();
     const { result, rerender } = renderHook(
-      ({ mode }: { mode: "tree" | "flat" }) => useWorkspaceTreeData({
+      ({ mode, filter }: { mode: "tree" | "flat"; filter?: string }) => useWorkspaceTreeData({
         roots,
         expandedRootIds: expandedRoots,
         treeViewMode: mode,
+        treeFilter: filter ?? "",
         onError,
       }),
-      { initialProps: { mode: "tree" } as { mode: "tree" | "flat" } },
+      { initialProps: { mode: "tree" as "tree" | "flat", filter: "" } },
     );
 
     await waitFor(() => expect(result.current.directories["root-1:"]?.loaded).toBe(true));
     expect(workspaceMocks.workspaceListDir).toHaveBeenCalledWith("/repo", "");
+    expect(workspaceMocks.workspaceListFilesRecursive).not.toHaveBeenCalled();
 
-    rerender({ mode: "flat" });
+    rerender({ mode: "tree", filter: "http" });
     await waitFor(() => expect(result.current.flatFiles[root.id]?.loaded).toBe(true));
     expect(workspaceMocks.workspaceListFilesRecursive).toHaveBeenCalledWith("/repo", "", 25, 2_000);
+
+    // Flat mode reuses the already-warmed index (no second recursive scan).
+    workspaceMocks.workspaceListFilesRecursive.mockClear();
+    rerender({ mode: "flat", filter: "" });
+    expect(result.current.flatFiles[root.id]?.loaded).toBe(true);
+    expect(workspaceMocks.workspaceListFilesRecursive).not.toHaveBeenCalled();
   });
 
   it("discards in-flight results after reset and removes one root cache", async () => {

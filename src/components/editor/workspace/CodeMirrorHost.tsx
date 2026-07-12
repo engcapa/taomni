@@ -263,6 +263,8 @@ export function CodeMirrorHost({
   const gitCompartment = useRef(new Compartment());
   const signatureCompartment = useRef(new Compartment());
   const signatureShownRef = useRef(false);
+  /** True while applying a prop-driven doc replace so it is not treated as a user edit. */
+  const applyingExternalDocRef = useRef(false);
   const onChangeRef = useRef(onChange);
   const onSaveRef = useRef(onSave);
   const onHoverRef = useRef(onHover);
@@ -473,13 +475,19 @@ export function CodeMirrorHost({
         ]),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
-            onChangeRef.current(update.state.doc.toString());
+            if (!applyingExternalDocRef.current) {
+              onChangeRef.current(update.state.doc.toString());
+            }
             let inserted = "";
             update.changes.iterChanges((_fromA, _toA, _fromB, _toB, text) => {
               inserted = text.toString();
             });
             const lastChar = inserted.slice(-1);
-            if (lastChar && signatureTriggersRef.current.includes(lastChar)) {
+            if (
+              !applyingExternalDocRef.current
+              && lastChar
+              && signatureTriggersRef.current.includes(lastChar)
+            ) {
               requestSignatureHelp(update.view, lastChar);
             } else if (
               signatureShownRef.current &&
@@ -566,7 +574,12 @@ export function CodeMirrorHost({
     if (!view) return;
     const current = view.state.doc.toString();
     if (current === doc) return;
-    view.dispatch({ changes: { from: 0, to: current.length, insert: doc } });
+    applyingExternalDocRef.current = true;
+    try {
+      view.dispatch({ changes: { from: 0, to: current.length, insert: doc } });
+    } finally {
+      applyingExternalDocRef.current = false;
+    }
   }, [doc]);
 
   useEffect(() => {

@@ -87,4 +87,25 @@ describe("BottomDock", () => {
     expect(onActiveTabChange).toHaveBeenCalledWith("references");
     expect(onOpenChange).toHaveBeenCalledWith(true);
   });
+
+  it("exposes a top resize handle that grows the dock upward", () => {
+    const onHeightChange = vi.fn();
+    render(
+      <BottomDock
+        open
+        activeTab="references"
+        tabs={tabs}
+        height={200}
+        onHeightChange={onHeightChange}
+        onOpenChange={vi.fn()}
+        onActiveTabChange={vi.fn()}
+      />,
+    );
+
+    const handle = screen.getByTestId("code-workspace-bottom-dock-resize");
+    fireEvent.pointerDown(handle, { clientY: 400, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientY: 300, pointerId: 1 });
+    fireEvent.pointerUp(window, { clientY: 300, pointerId: 1 });
+    expect(onHeightChange).toHaveBeenCalledWith(300);
+  });
 });

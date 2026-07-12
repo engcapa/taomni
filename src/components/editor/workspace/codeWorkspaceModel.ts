@@ -8,7 +8,7 @@ import type { LspCustomServerCommand, LspDocumentStatus, LspDiagnostic } from ".
 import type { GitChange } from "../../../lib/git";
 import { DEFAULT_CODE_VIEW_PROFILE } from "../../../lib/codeViewProfile";
 import type { LspCustomCommandConfig } from "./FileTreePane";
-import type { OpenFileViewModel } from "./editorGroupTypes";
+import type { OpenFileEol, OpenFileViewModel } from "./editorGroupTypes";
 import type { FileTreeViewMode } from "./FileTreePane";
 
 export type MermaidApi = typeof import("mermaid").default;
@@ -342,8 +342,27 @@ export function formatMtime(mtime: number): string {
   }
 }
 
+/** Directory names skipped in recursive indexes / heavy walks (and hidden in tree). */
+export const HEAVY_DIR_NAMES = new Set([
+  ".git",
+  ".hg",
+  ".svn",
+  "node_modules",
+  "target",
+  "dist",
+  "build",
+  ".next",
+  ".turbo",
+  ".cache",
+  "__pycache__",
+  ".venv",
+  "venv",
+]);
+
 export function shouldHideEntry(entry: WorkspaceEntry): boolean {
-  return entry.path === ".git" || entry.path.startsWith(".git/");
+  if (!entry.path) return false;
+  const segments = entry.path.replace(/\\/g, "/").split("/");
+  return segments.some((segment) => HEAVY_DIR_NAMES.has(segment));
 }
 
 /** Compact-tree display name: `src` → `src/main` when a single-child chain is folded. */
@@ -364,6 +383,53 @@ export function flatExtensionGroup(path: string): string {
   const dot = name.lastIndexOf(".");
   if (dot <= 0 || dot === name.length - 1) return "No extension";
   return name.slice(dot).toLowerCase();
+}
+
+/**
+ * Flat-view primary group: top-level source / package directory so language
+ * roots like `src` and `src-tauri` stay visible instead of one mixed list.
+ */
+export function flatSourceGroup(path: string): string {
+  const normalized = path.replace(/\\/g, "/");
+  const slash = normalized.indexOf("/");
+  if (slash <= 0) return "(root)";
+  return normalized.slice(0, slash);
+}
+
+/** Path relative to {@link flatSourceGroup} for display under that group. */
+export function flatSourceRelativePath(path: string): string {
+  const normalized = path.replace(/\\/g, "/");
+  const slash = normalized.indexOf("/");
+  if (slash <= 0) return normalized || path;
+  return normalized.slice(slash + 1);
+}
+
+/** Case-insensitive name/path substring match for the project-tree filter. */
+export function matchesTreeFilter(name: string, path: string, filter: string): boolean {
+  const q = filter.trim().toLowerCase();
+  if (!q) return true;
+  return name.toLowerCase().includes(q) || path.replace(/\\/g, "/").toLowerCase().includes(q);
+}
+
+/**
+ * CodeMirror always stores LF line endings. Normalize disk text to LF for the
+ * buffer and remember the original style so save can restore it.
+ */
+export function normalizeEditorText(text: string): { text: string; eol: OpenFileEol } {
+  let eol: OpenFileEol = "LF";
+  if (text.includes("\r\n")) eol = "CRLF";
+  else if (text.includes("\r")) eol = "CR";
+  return {
+    text: text.replace(/\r\n/g, "\n").replace(/\r/g, "\n"),
+    eol,
+  };
+}
+
+/** Convert LF buffer text back to the file's original line endings on save. */
+export function applyEditorEol(text: string, eol: OpenFileEol): string {
+  if (eol === "CRLF") return text.replace(/\n/g, "\r\n");
+  if (eol === "CR") return text.replace(/\n/g, "\r");
+  return text;
 }
 
 /** Lookup a git change in the precomputed `rootId:workspacePath` map. */
@@ -596,6 +662,7 @@ export function makeLoadingFile(ref: CodeWorkspaceFileRef, roots: CodeWorkspaceR
     languagePath: meta.languagePath,
     text: "",
     savedText: "",
+    eol: "LF",
     hash: "",
     mtime: 0,
     size: 0,

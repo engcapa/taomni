@@ -912,6 +912,9 @@ fn should_skip_git_root_scan_dir(path: &Path) -> bool {
             | ".next"
             | ".turbo"
             | ".cache"
+            | "__pycache__"
+            | ".venv"
+            | "venv"
     )
 }
 
@@ -945,8 +948,16 @@ fn collect_workspace_files(
     if depth > max_depth || files.len() >= max_files {
         return Ok(());
     }
+    // Skip dependency / build trees on every platform; walking `node_modules`
+    // or `target` is a common Windows CPU spike when the flat index builds.
+    if depth > 0 && should_skip_git_root_scan_dir(dir) {
+        return Ok(());
+    }
     for entry in list_workspace_entries(root, dir)? {
         if entry.path == ".git" || entry.path.starts_with(".git/") {
+            continue;
+        }
+        if should_skip_workspace_entry_path(&entry.path) {
             continue;
         }
         match entry.file_type.as_str() {
@@ -967,6 +978,27 @@ fn collect_workspace_files(
         }
     }
     Ok(())
+}
+
+fn should_skip_workspace_entry_path(path: &str) -> bool {
+    path.split(['/', '\\']).any(|segment| {
+        matches!(
+            segment,
+            ".git"
+                | ".hg"
+                | ".svn"
+                | "node_modules"
+                | "target"
+                | "dist"
+                | "build"
+                | ".next"
+                | ".turbo"
+                | ".cache"
+                | "__pycache__"
+                | ".venv"
+                | "venv"
+        )
+    })
 }
 
 fn workspace_entry(root: &Path, path: &Path) -> Result<WorkspaceEntry, String> {
@@ -1216,6 +1248,22 @@ mod tests {
 
         let limited = workspace_list_files_recursive(root, None, Some(10), Some(1)).unwrap();
         assert_eq!(limited.len(), 1);
+    }
+
+    #[test]
+    fn recursive_listing_skips_dependency_and_build_dirs() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_string_lossy().to_string();
+        fs::create_dir_all(dir.path().join("src")).unwrap();
+        fs::create_dir_all(dir.path().join("node_modules/pkg")).unwrap();
+        fs::create_dir_all(dir.path().join("target/debug")).unwrap();
+        fs::write(dir.path().join("src/main.rs"), "fn main() {}").unwrap();
+        fs::write(dir.path().join("node_modules/pkg/index.js"), "module.exports=1").unwrap();
+        fs::write(dir.path().join("target/debug/app"), "bin").unwrap();
+
+        let files = workspace_list_files_recursive(root, None, Some(10), Some(100)).unwrap();
+        let paths: Vec<_> = files.iter().map(|entry| entry.path.as_str()).collect();
+        assert_eq!(paths, vec!["src/main.rs"]);
     }
 
     #[test]

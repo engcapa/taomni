@@ -503,7 +503,7 @@ describe("CodeWorkspaceTab", () => {
     expect(window.localStorage.getItem("taomni.codeWorkspace.treeFontSize.v1")).toBe("13");
   });
 
-  it("persists and renders the flat file view with extension groups", async () => {
+  it("persists and renders the flat file view with source directory groups", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
       workspaceId: "ws-flat",
@@ -525,11 +525,13 @@ describe("CodeWorkspaceTab", () => {
     fireEvent.click(screen.getByTestId("code-workspace-view-flat"));
 
     expect(window.localStorage.getItem("taomni.codeWorkspace.treeViewMode.v1")).toBe("flat");
-    expect(await screen.findByText(".md")).toBeInTheDocument();
-    expect(await screen.findByText(".tsx")).toBeInTheDocument();
+    expect(await screen.findByText("(root)")).toBeInTheDocument();
+    expect(await screen.findByText("src")).toBeInTheDocument();
     expect(screen.getAllByTestId("code-workspace-flat-file")).toHaveLength(2);
+    expect(screen.getByText("App.tsx")).toBeInTheDocument();
+    expect(screen.getByText("README.md")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("src/App.tsx"));
+    fireEvent.click(screen.getByText("App.tsx"));
     await waitFor(() => {
       expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/App.tsx");
     });

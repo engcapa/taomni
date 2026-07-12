@@ -46,6 +46,7 @@ const file: OpenFileState = {
   languagePath: "src/main.ts",
   text: "const value = 1;",
   savedText: "const value = 1;",
+  eol: "LF",
   size: 16,
   mtime: 1,
   hash: "hash",
