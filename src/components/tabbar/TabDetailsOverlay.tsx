@@ -168,9 +168,23 @@ export function TabDetailsOverlay({
                 {summary.cwd ?? t("tabs.detailsCwdUnknown")}
               </div>
             )}
-            <div className="truncate text-[var(--taomni-text-muted)]" title={summary.activityLabel}>
-              {summary.activityLabel}
-            </div>
+            {summary.program ? (
+              <div className="flex min-w-0 items-center gap-1" title={summary.activityLabel}>
+                <span className="shrink-0 text-[var(--taomni-text-muted)]">{t("tabs.detailsRunning")}</span>
+                <span className="text-[var(--taomni-text-muted)]">·</span>
+                <span
+                  data-testid={`tab-details-program-${tab.id}`}
+                  className="min-w-0 truncate font-semibold"
+                  style={{ color: "var(--taomni-accent-soft)" }}
+                >
+                  {summary.program}
+                </span>
+              </div>
+            ) : (
+              <div className="truncate text-[var(--taomni-text-muted)]" title={summary.activityLabel}>
+                {summary.activityLabel}
+              </div>
+            )}
           </div>
         );
       })}

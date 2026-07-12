@@ -772,6 +772,7 @@ const dict = {
     detailsAdHocSession: "Ad-hoc session",
     detailsNoSession: "No saved session",
     detailsTabType: "{type} tab",
+    detailsRunning: "Running",
     detailsRunningProgram: "Running · {program}",
     detailsRunningUnknown: "Running · unknown program",
     detailsIdle: "Idle · {shell}",

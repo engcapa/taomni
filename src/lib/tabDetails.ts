@@ -11,6 +11,7 @@ export interface TabDetailSummary {
   endpoint: string | null;
   activityLabel: string;
   activityState: TerminalRuntimeInfo["state"] | null;
+  program: string | null;
   cwd: string | null;
 }
 
@@ -66,6 +67,7 @@ export function buildTabDetailSummary(
       endpoint: endpoint || null,
       activityLabel: t("tabs.detailsTabType", { type: kind }),
       activityState: null,
+      program: null,
       cwd: null,
     };
   }
@@ -89,6 +91,7 @@ export function buildTabDetailSummary(
     endpoint: endpoint || null,
     activityLabel,
     activityState: state,
+    program: state === "running" ? runtime?.program ?? null : null,
     cwd: cwd ?? null,
   };
 }

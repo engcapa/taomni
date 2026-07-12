@@ -771,6 +771,7 @@ export const zhCN: DeepPartial<typeof en> = {
     detailsAdHocSession: "临时连接会话",
     detailsNoSession: "无保存会话",
     detailsTabType: "{type} 标签",
+    detailsRunning: "运行中",
     detailsRunningProgram: "运行中 · {program}",
     detailsRunningUnknown: "运行中 · 未知程序",
     detailsIdle: "空闲 · {shell}",

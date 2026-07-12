@@ -311,7 +311,13 @@ describe("TabBar overflow navigation", () => {
     });
 
     expect(await screen.findByTestId("tab-details-overlay")).toBeInTheDocument();
-    expect(screen.getByTestId("tab-details-card-tab-0")).toHaveTextContent("Running · vite");
+    const runningCard = screen.getByTestId("tab-details-card-tab-0");
+    expect(runningCard).toHaveTextContent("Running");
+    expect(screen.getByTestId("tab-details-program-tab-0")).toHaveTextContent("vite");
+    expect(screen.getByTestId("tab-details-program-tab-0")).toHaveClass("font-semibold");
+    expect(screen.getByTestId("tab-details-program-tab-0")).toHaveStyle({
+      color: "var(--taomni-accent-soft)",
+    });
     expect(screen.getByTestId("tab-details-card-tab-0")).toHaveTextContent("/work/taomni");
     expect(screen.getByTestId("tab-details-card-tab-1")).toBeInTheDocument();
     expect(screen.getByTestId("tab-details-card-tab-2")).toBeInTheDocument();

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TerminalPanel, collectTerminalBlockSelectionText } from "./TerminalPanel";
 import { DEFAULT_TERMINAL_PROFILE, SYSTEM_TERMINAL_THEME } from "../../lib/terminalProfile";
@@ -339,6 +339,51 @@ describe("TerminalPanel focus behavior", () => {
       activitySource: "shell-integration",
     });
     expect(useAppStore.getState().terminalRuntimeByTab["term-activity"]?.program).toBeUndefined();
+  });
+
+  it("installs SSH cwd reporting when a delayed startup later reaches an idle prompt", async () => {
+    let onOutput: ((data: Uint8Array) => void) | undefined;
+    ipcMocks.createSshTerminal.mockImplementation(async (...args: unknown[]) => {
+      onOutput = args[9] as (data: Uint8Array) => void;
+      return "terminal-session";
+    });
+    const onSessionReady = vi.fn();
+    render(<TerminalPanel tabId="slow-ssh" visible ssh={sshInfo} onSessionReady={onSessionReady} />);
+
+    await waitFor(() => {
+      expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
+      expect(onOutput).toBeTypeOf("function");
+    });
+
+    const term = terminalMocks.terminalCtor.mock.results[0].value;
+    const prompt = "(base) user@example.test:/srv/project$ ";
+    term.buffer.active = {
+      type: "normal",
+      length: 1,
+      baseY: 0,
+      cursorY: 0,
+      cursorX: prompt.length,
+      getLine: vi.fn(() => ({
+        isWrapped: false,
+        translateToString: () => prompt,
+      })),
+    };
+    term.write.mockImplementation((_data: Uint8Array, callback?: () => void) => callback?.());
+    ipcMocks.writeTerminal.mockClear();
+
+    await act(async () => {
+      onOutput?.(new TextEncoder().encode(prompt));
+    });
+
+    await waitFor(() => {
+      const integrationWrite = (ipcMocks.writeTerminal.mock.calls as unknown[][]).find(
+        ([sessionId, encoded]) =>
+          sessionId === "terminal-session" &&
+          typeof encoded === "string" &&
+          atob(encoded).includes("__taomni_osc7"),
+      );
+      expect(integrationWrite).toBeTruthy();
+    });
   });
 
   it("does not load the WebGL renderer inside the macOS Tauri webview", async () => {

@@ -566,6 +566,10 @@ export function TerminalPanel({
   const isComposingRef = useRef(false);
   const compositionBufferRef = useRef<Uint8Array[]>([]);
   const injectedInputEchoSuppressorRef = useRef<InputEchoSuppressor | null>(null);
+  // SSH login scripts and startup commands can take longer than the initial
+  // polling window. Keep a deferred installer so the first later idle prompt
+  // can still enable continuous OSC 7 cwd reporting.
+  const installSshCwdIntegrationRef = useRef<(() => boolean) | null>(null);
   const webglAddonRef = useRef<{
     addon: WebglAddon;
     contextLossDisposable: { dispose: () => void } | null;
@@ -2580,7 +2584,6 @@ export function TerminalPanel({
             compositionBufferRef.current.push(filtered);
           } else {
             term.write(filtered, () => {
-              if (!tabId) return;
               if (activityPromptTimer) clearTimeout(activityPromptTimer);
               activityPromptTimer = setTimeout(() => {
                 if (
@@ -2588,11 +2591,14 @@ export function TerminalPanel({
                   connectionStateRef.current === "connected" &&
                   terminalAtIdlePrompt(term)
                 ) {
-                  setTerminalRuntime(tabId, {
-                    state: "idle",
-                    program: undefined,
-                    activitySource: "input-heuristic",
-                  });
+                  if (tabId) {
+                    setTerminalRuntime(tabId, {
+                      state: "idle",
+                      program: undefined,
+                      activitySource: "input-heuristic",
+                    });
+                  }
+                  installSshCwdIntegrationRef.current?.();
                 }
               }, 120);
             });
@@ -2801,20 +2807,27 @@ export function TerminalPanel({
         // MOTD, or a half-typed line. Injecting early on a slow server is what
         // leaked the raw command: the input got buffered, the echo came back
         // after the suppressor's TTL, and the whole line printed. Poll for the
-        // prompt over several seconds, then give up quietly (no integration this
-        // session — safe, just no cwd-follow if it's later duplicated). The
-        // terminal is usable immediately; this only defers the background hook.
+        // prompt over several seconds. If login initialization or a configured
+        // startup command outlives that polling window, retain an event-driven
+        // installer and run it when any later output settles at an idle prompt.
+        // The terminal is usable immediately; this only defers the background hook.
         const integrationCommand = buildSshCwdIntegration(initialCwd);
         let integrationAttempts = 0;
+        let integrationInstalling = false;
         const MAX_INTEGRATION_ATTEMPTS = 12; // ~6s of polling for a slow login
-        const installCwdIntegration = () => {
-          if (destroyed || sessionIdRef.current !== connectedSid) return;
+        const installCwdIntegration = (): boolean => {
+          if (destroyed || sessionIdRef.current !== connectedSid) {
+            if (installSshCwdIntegrationRef.current === installCwdIntegration) {
+              installSshCwdIntegrationRef.current = null;
+            }
+            return false;
+          }
+          if (integrationInstalling) return true;
           const liveTerm = termRef.current;
-          if (!liveTerm || !terminalAtIdlePrompt(liveTerm)) {
-            if (integrationAttempts >= MAX_INTEGRATION_ATTEMPTS) return;
-            integrationAttempts += 1;
-            window.setTimeout(installCwdIntegration, 500);
-            return;
+          if (!liveTerm || !terminalAtIdlePrompt(liveTerm)) return false;
+          integrationInstalling = true;
+          if (installSshCwdIntegrationRef.current === installCwdIntegration) {
+            installSshCwdIntegrationRef.current = null;
           }
           // Generous TTL so a laggy link's echo round-trip still arrives while
           // the suppressor is dropping (we only get here at a ready prompt, so
@@ -2824,11 +2837,23 @@ export function TerminalPanel({
           injectedInputEchoSuppressorRef.current = createOsc7BlankingSuppressor(4000);
           writeTerminal(connectedSid, encodeBase64(`${integrationCommand}\r`)).catch(() => {
             if (sessionIdRef.current === connectedSid) {
+              integrationInstalling = false;
+              installSshCwdIntegrationRef.current = installCwdIntegration;
               injectedInputEchoSuppressorRef.current = null;
             }
           });
+          return true;
         };
-        window.setTimeout(installCwdIntegration, 500);
+        installSshCwdIntegrationRef.current = installCwdIntegration;
+        const pollForCwdIntegration = () => {
+          if (installCwdIntegration()) return;
+          if (destroyed || sessionIdRef.current !== connectedSid) return;
+          if (integrationAttempts < MAX_INTEGRATION_ATTEMPTS) {
+            integrationAttempts += 1;
+            window.setTimeout(pollForCwdIntegration, 500);
+          }
+        };
+        window.setTimeout(pollForCwdIntegration, 500);
       }
 
       unlistenExit = await listenTerminalExit(connectedSid, () => markDisconnected(connectedSid));
@@ -3025,6 +3050,7 @@ export function TerminalPanel({
       resizeDisposable.dispose();
       clearTimeout(resizeTimer);
       if (activityPromptTimer) clearTimeout(activityPromptTimer);
+      installSshCwdIntegrationRef.current = null;
       unlistenExit?.();
       unlistenForwardError?.();
       unlistenAuthPrompt?.();

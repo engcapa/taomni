@@ -254,6 +254,7 @@
 - `[data-testid="tab-details-hover"]` — interactive — F1.5.tab-details-hover
 - `[data-testid="tab-details-overlay"]` — display [optional] — F1.5.tab-details-overlay
 - `[data-testid^="tab-details-card-"]` — display [optional] — F1.5.tab-details-card
+- `[data-testid^="tab-details-program-"]` — display [optional] — F1.5.tab-details-program
 - `[data-testid="open-tabs-menu"]` — display [optional] — F1.5.open-tabs-menu
 - `[data-testid="open-tabs-detach-active"]` — interactive [optional] — F1.5.open-tabs-detach-active
 - `[data-testid="context-menu-item-move-to-first"]` — interactive [optional] — F1.5.tab-menu-move-first

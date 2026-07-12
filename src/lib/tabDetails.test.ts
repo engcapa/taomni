@@ -43,6 +43,7 @@ describe("buildTabDetailSummary", () => {
       connectionLabel: "tabs.detailsRemote",
       endpoint: "root@10.0.0.8:22",
       activityLabel: "tabs.detailsRunningProgram:vite",
+      program: "vite",
       cwd: "/srv/taomni",
     });
   });
@@ -54,6 +55,7 @@ describe("buildTabDetailSummary", () => {
       connectionLabel: "tabs.detailsLocal",
       endpoint: null,
       activityLabel: "tabs.detailsIdle:tabs.detailsShell",
+      program: null,
     });
   });
 });
