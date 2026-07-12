@@ -278,8 +278,10 @@ import {
   initialRoots,
   isExternalHref,
   isMarkdownPath,
+  applyEditorEol,
   makeLoadingFile,
   makeLooseFile,
+  normalizeEditorText,
   normalizeFsPath,
   parentPath,
   readCodeWorkspaceTreeFontSize,
@@ -615,6 +617,7 @@ export function CodeWorkspaceTab({
     roots,
     expandedRootIds: expandedRoots,
     treeViewMode,
+    treeFilter,
     onError: setStatusMessage,
   });
   const {
@@ -960,6 +963,9 @@ export function CodeWorkspaceTab({
           : await workspaceReadLooseFile(ref.path);
         const nextRef = ref.kind === "root" ? { ...ref, path: file.path } : { ...ref, path: file.path };
         const meta = fileMeta(nextRef, rootsRef.current, looseFilesRef.current);
+        // CodeMirror normalizes to LF; keep buffer + dirty compare on LF and
+        // remember original EOL so save restores CRLF/CR on Windows files.
+        const normalized = normalizeEditorText(file.text);
         setOpenFiles((current) => {
           const next = { ...current };
           if (fileKey(nextRef) !== key) delete next[key];
@@ -970,8 +976,9 @@ export function CodeWorkspaceTab({
             title: meta.title,
             subtitle: meta.subtitle,
             languagePath: meta.languagePath,
-            text: file.text,
-            savedText: file.text,
+            text: normalized.text,
+            savedText: normalized.text,
+            eol: normalized.eol,
             hash: file.hash,
             mtime: file.mtime,
             size: file.size,
@@ -1538,15 +1545,19 @@ export function CodeWorkspaceTab({
       // Snapshot the previous on-disk contents before overwrite when available.
       const historyPath = absolutePathForOpenFile(file);
       if (historyPath && file.savedText.length <= 2 * 1024 * 1024) {
-        await historySnapshot(historyPath, file.savedText, "save").catch(() => null);
+        const historyText = applyEditorEol(file.savedText, file.eol);
+        await historySnapshot(historyPath, historyText, "save").catch(() => null);
       }
+      const diskText = applyEditorEol(textToSave, file.eol);
       const saved = file.ref.kind === "root"
-        ? await workspaceWriteFile(findRoot(file.ref.rootId)?.path ?? "", file.ref.path, textToSave, file.hash)
-        : await workspaceWriteLooseFile(file.ref.path, textToSave, file.hash);
+        ? await workspaceWriteFile(findRoot(file.ref.rootId)?.path ?? "", file.ref.path, diskText, file.hash)
+        : await workspaceWriteLooseFile(file.ref.path, diskText, file.hash);
+      const normalized = normalizeEditorText(saved.text);
       const cleaned: OpenFileState = {
         ...file,
-        text: saved.text,
-        savedText: saved.text,
+        text: normalized.text,
+        savedText: normalized.text,
+        eol: normalized.eol,
         hash: saved.hash,
         mtime: saved.mtime,
         size: saved.size,
@@ -1562,14 +1573,15 @@ export function CodeWorkspaceTab({
           ...(current[key] ?? cleaned),
           ...cleaned,
           // If the user typed while we saved, keep their newer text dirty.
-          text: (current[key]?.text ?? saved.text) !== textToSave && current[key]
+          text: (current[key]?.text ?? normalized.text) !== textToSave && current[key]
             ? current[key].text
-            : saved.text,
-          dirty: (current[key]?.text ?? saved.text) !== textToSave
-            && (current[key]?.text ?? saved.text) !== saved.text
+            : normalized.text,
+          dirty: (current[key]?.text ?? normalized.text) !== textToSave
+            && (current[key]?.text ?? normalized.text) !== normalized.text
             ? true
             : false,
-          savedText: saved.text,
+          savedText: normalized.text,
+          eol: normalized.eol,
           hash: saved.hash,
           mtime: saved.mtime,
           size: saved.size,
@@ -1686,12 +1698,14 @@ export function CodeWorkspaceTab({
         const reloaded = file.ref.kind === "root"
           ? await workspaceReadFile(findRoot(file.ref.rootId)?.path ?? "", file.ref.path)
           : await workspaceReadLooseFile(file.ref.path);
+        const normalized = normalizeEditorText(reloaded.text);
         setOpenFiles((current) => ({
           ...current,
           [key]: {
             ...file,
-            text: reloaded.text,
-            savedText: reloaded.text,
+            text: normalized.text,
+            savedText: normalized.text,
+            eol: normalized.eol,
             hash: reloaded.hash,
             mtime: reloaded.mtime,
             size: reloaded.size,
@@ -2151,7 +2165,7 @@ export function CodeWorkspaceTab({
       line: cursor.line + 1,
       column: cursor.character + 1,
       encoding: "UTF-8",
-      eol: detectWorkspaceEol(activeFile?.text ?? ""),
+      eol: activeFile?.eol ?? detectWorkspaceEol(activeFile?.text ?? ""),
       languageId: status?.languageId ?? activeLanguageId,
       lspActive: !!status?.active,
       lspLabel: status?.displayName ?? (status?.active ? "LSP" : null),
@@ -2168,6 +2182,7 @@ export function CodeWorkspaceTab({
     return () => clearWorkspaceStatus(tabId);
   }, [
     activeEditorGroupId,
+    activeFile?.eol,
     activeFile?.text,
     activeGitRoot,
     activeLanguageId,

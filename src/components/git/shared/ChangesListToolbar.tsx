@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import type { GitChange } from "../../../lib/git";
 import { useT } from "../../../lib/i18n";
+import { FilterClearButton } from "../../editor/workspace/workspaceChrome";
 
 export type GitStageFilter = "unstaged" | "staged";
 export type GitStatusFilter = "modified" | "added" | "untracked" | "deleted" | "renamed" | "conflict";
@@ -152,11 +153,19 @@ export function ChangesListToolbar({
       <div className="relative min-w-24 flex-1">
         <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
         <input
-          className="taomni-input h-7 w-full pl-7"
+          className="taomni-input h-7 w-full pl-7 pr-7"
           value={filter}
           placeholder={t("git.workspaceChanges.filterPlaceholder")}
           aria-label={t("git.workspaceChanges.filterPlaceholder")}
           onChange={(event) => onFilterChange(event.target.value)}
+        />
+        <FilterClearButton
+          value={filter}
+          variant="app"
+          placement="absolute"
+          label="Clear change filter"
+          testId="git-change-filter-clear"
+          onClear={() => onFilterChange("")}
         />
       </div>
 

@@ -99,12 +99,14 @@ describe("FileTreePane", () => {
     const callbacks = renderPane();
 
     fireEvent.change(screen.getByRole("textbox", { name: "Filter files" }), { target: { value: "lib" } });
+    fireEvent.click(screen.getByRole("button", { name: "Clear file filter" }));
     fireEvent.click(screen.getByRole("button", { name: "Flat file view" }));
     fireEvent.click(screen.getByRole("button", { name: "Tree zoom in" }));
     fireEvent.click(screen.getByRole("button", { name: "Open file" }));
     fireEvent.click(screen.getByRole("button", { name: "New directory" }));
 
     expect(callbacks.onFilterChange).toHaveBeenCalledWith("lib");
+    expect(callbacks.onFilterChange).toHaveBeenCalledWith("");
     expect(callbacks.onViewModeChange).toHaveBeenCalledWith("flat");
     expect(callbacks.onFontSizeChange).toHaveBeenCalledWith(13);
     expect(callbacks.onOpenFile).toHaveBeenCalledOnce();

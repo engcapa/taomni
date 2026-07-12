@@ -20,6 +20,7 @@ function file(key: string): OpenFileViewModel {
     languagePath: `${key}.ts`,
     text: key,
     savedText: key,
+    eol: "LF",
     size: 1,
     mtime: 1,
     hash: key,

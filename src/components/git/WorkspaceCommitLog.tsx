@@ -12,6 +12,7 @@ import {
 } from "../../lib/git";
 import { buildGraph, graphColor, type GraphRow } from "../../lib/gitGraph";
 import type { GitWorkspaceRootInfo } from "../../types";
+import { FilterClearButton } from "../editor/workspace/workspaceChrome";
 import { DiffViewer } from "./DiffViewer";
 
 const ROW_H = 88;
@@ -211,10 +212,19 @@ export function WorkspaceCommitLog({ roots, snapshots, busy }: WorkspaceCommitLo
             <div className="relative flex-1 min-w-0">
               <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
               <input
-                className="taomni-input h-7 w-full pl-7"
+                className="taomni-input h-7 w-full pl-7 pr-7"
                 placeholder="Filter messages"
+                aria-label="Filter messages"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
+              />
+              <FilterClearButton
+                value={query}
+                variant="app"
+                placement="absolute"
+                label="Clear message filter"
+                testId="workspace-git-commit-message-filter-clear"
+                onClear={() => setQuery("")}
               />
             </div>
             <select

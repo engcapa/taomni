@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, ListTree, Search } from "lucide-react";
 import type { LspDocumentSymbol, LspPosition } from "../../../lib/editor/lsp";
 import { symbolChainAtPosition } from "./Breadcrumbs";
 import { symbolKindBadge } from "./StructurePopup";
+import { FilterClearButton } from "./workspaceChrome";
 
 export type OutlineSortMode = "position" | "type" | "name";
 
@@ -112,13 +113,19 @@ export function OutlinePane({
     <section data-testid="code-workspace-outline-pane" className="flex h-full min-h-0 flex-col">
       <div className="shrink-0 space-y-1.5 border-b border-[var(--taomni-code-border)] p-2">
         <label className="flex h-7 items-center gap-1.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-2">
-          <Search className="h-3.5 w-3.5 text-[var(--taomni-code-muted)]" />
+          <Search className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
           <input
             aria-label="Filter outline"
             value={query}
             placeholder="Filter symbols"
             className="min-w-0 flex-1 bg-transparent text-[11px] text-[var(--taomni-code-text)] outline-none"
             onChange={(event) => setQuery(event.target.value)}
+          />
+          <FilterClearButton
+            value={query}
+            label="Clear outline filter"
+            testId="code-workspace-outline-filter-clear"
+            onClear={() => setQuery("")}
           />
         </label>
         <div className="flex items-center gap-1 text-[10px] text-[var(--taomni-code-muted)]">

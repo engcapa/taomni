@@ -71,4 +71,16 @@ describe("OutlinePane", () => {
     fireEvent.click(screen.getByRole("button", { name: "Expand Widget" }));
     expect(screen.getByText("render")).toBeInTheDocument();
   });
+
+  it("clears the outline filter from the trailing icon", () => {
+    render(
+      <OutlinePane symbols={symbols} position={{ line: 0, character: 0 }} loading={false} onPick={() => {}} />,
+    );
+    const input = screen.getByRole("textbox", { name: "Filter outline" });
+    fireEvent.change(input, { target: { value: "render" } });
+    expect(screen.queryByText("alpha")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear outline filter" }));
+    expect(input).toHaveValue("");
+    expect(screen.getByText("alpha")).toBeInTheDocument();
+  });
 });

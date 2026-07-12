@@ -23,6 +23,7 @@ function openState(ref: CodeWorkspaceFileRef): OpenFileState {
     languagePath: path,
     text: "",
     savedText: "",
+    eol: "LF",
     hash: "hash",
     mtime: 1,
     size: 0,

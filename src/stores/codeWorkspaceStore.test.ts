@@ -96,6 +96,7 @@ describe("codeWorkspaceStore", () => {
         languagePath: "a.ts",
         text: "x",
         savedText: "x",
+        eol: "LF",
         hash: "h",
         mtime: 1,
         size: 1,
