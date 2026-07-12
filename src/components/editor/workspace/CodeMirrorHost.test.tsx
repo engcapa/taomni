@@ -1,8 +1,13 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ComponentProps } from "react";
 import { CodeMirrorHost } from "./CodeMirrorHost";
 
-function renderEditor(doc: string, onChange = vi.fn()) {
+function renderEditor(
+  doc: string,
+  onChange = vi.fn(),
+  overrides: Partial<ComponentProps<typeof CodeMirrorHost>> = {},
+) {
   const result = render(
     <CodeMirrorHost
       path="src/example.ts"
@@ -15,6 +20,7 @@ function renderEditor(doc: string, onChange = vi.fn()) {
       onHover={vi.fn(async () => null)}
       onDefinition={vi.fn(async () => false)}
       onReferences={vi.fn(async () => undefined)}
+      {...overrides}
     />,
   );
   const content = result.container.querySelector<HTMLElement>(".cm-content");
@@ -126,5 +132,35 @@ describe("CodeMirrorHost search", () => {
     const { content } = renderEditor("one\ntwo");
     fireEvent.keyDown(content, { key: "g", code: "KeyG", ctrlKey: true });
     expect(await screen.findByRole("textbox", { name: /Go to line/ })).toBeInTheDocument();
+  });
+
+  it("renders usage/inlay chrome, reports its viewport, and requests semantic selection", async () => {
+    const onViewportChange = vi.fn();
+    const onExpandSelection = vi.fn(async () => [{
+      start: { line: 0, character: 0 },
+      end: { line: 0, character: 11 },
+    }]);
+    const { content, container } = renderEditor("const value", vi.fn(), {
+      highlights: [{
+        range: { start: { line: 0, character: 6 }, end: { line: 0, character: 11 } },
+        kind: 2,
+      }],
+      inlayHints: [{
+        position: { line: 0, character: 11 },
+        label: ": string",
+        kind: 1,
+        tooltip: "inferred",
+        paddingLeft: true,
+        paddingRight: false,
+      }],
+      onViewportChange,
+      onExpandSelection,
+    });
+
+    expect(container.querySelector(".cm-lsp-usage-read")).not.toBeNull();
+    expect(container.querySelector(".cm-lsp-inlay-hint")).toHaveTextContent(": string");
+    expect(onViewportChange).toHaveBeenCalled();
+    fireEvent.keyDown(content, { key: "w", code: "KeyW", ctrlKey: true });
+    await waitFor(() => expect(onExpandSelection).toHaveBeenCalledWith(expect.objectContaining({ empty: true })));
   });
 });

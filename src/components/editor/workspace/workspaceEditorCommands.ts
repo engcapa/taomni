@@ -15,6 +15,9 @@ import {
 import { syntaxTree } from "@codemirror/language";
 import { gotoLine } from "@codemirror/search";
 import type { Command, KeyBinding } from "@codemirror/view";
+import type { EditorView } from "@codemirror/view";
+import type { LspRange } from "../../../lib/editor/lsp";
+import { offsetFromLspPosition } from "./lspPositions";
 
 const setSelectionHistory = StateEffect.define<EditorSelection[]>();
 
@@ -57,6 +60,24 @@ export const expandSyntaxSelection: Command = (view) => {
   });
   return true;
 };
+
+export function expandSelectionFromLspRanges(view: EditorView, ranges: LspRange[]): boolean {
+  const current = view.state.selection.main;
+  for (const range of ranges) {
+    const from = offsetFromLspPosition(view.state.doc, range.start);
+    const to = offsetFromLspPosition(view.state.doc, range.end);
+    if (from > current.from || to < current.to) continue;
+    if (from === current.from && to === current.to) continue;
+    const history = view.state.field(selectionHistoryField);
+    view.dispatch({
+      selection: EditorSelection.range(from, to),
+      effects: setSelectionHistory.of([...history, view.state.selection]),
+      scrollIntoView: true,
+    });
+    return true;
+  }
+  return false;
+}
 
 export const shrinkSyntaxSelection: Command = (view) => {
   const history = view.state.field(selectionHistoryField);

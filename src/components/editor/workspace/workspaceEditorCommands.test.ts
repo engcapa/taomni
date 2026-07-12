@@ -4,6 +4,7 @@ import { javascript } from "@codemirror/lang-javascript";
 import { describe, expect, it } from "vitest";
 import {
   expandSyntaxSelection,
+  expandSelectionFromLspRanges,
   selectionHistoryField,
   shrinkSyntaxSelection,
   workspaceEditorKeymap,
@@ -45,5 +46,23 @@ describe("workspace editor commands", () => {
       "Mod-Shift-w",
       "Mod-g",
     ]);
+  });
+
+  it("expands through semantic LSP ranges before shrinking from shared history", () => {
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: "const value = 1;",
+        selection: { anchor: 8 },
+        extensions: [selectionHistoryField],
+      }),
+    });
+    expect(expandSelectionFromLspRanges(view, [
+      { start: { line: 0, character: 6 }, end: { line: 0, character: 11 } },
+      { start: { line: 0, character: 0 }, end: { line: 0, character: 16 } },
+    ])).toBe(true);
+    expect(view.state.sliceDoc(view.state.selection.main.from, view.state.selection.main.to)).toBe("value");
+    expect(shrinkSyntaxSelection(view)).toBe(true);
+    expect(view.state.selection.main.empty).toBe(true);
+    view.destroy();
   });
 });

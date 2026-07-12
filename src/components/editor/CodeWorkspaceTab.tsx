@@ -53,16 +53,19 @@ import {
   lspCompletion,
   lspCompletionResolve,
   lspDocumentSymbols,
+  lspDocumentHighlights,
   lspFormatting,
   lspDefinition,
   lspHover,
   lspImplementation,
+  lspInlayHints,
   lspPrepareCallHierarchy,
   lspPrepareRename,
   lspPrepareTypeHierarchy,
   lspRangeFormatting,
   lspReferences,
   lspRename,
+  lspSelectionRanges,
   lspSignatureHelp,
   lspTypeDefinition,
   lspWorkspaceSymbols,
@@ -71,6 +74,8 @@ import {
   type LspCompletionResult,
   type LspDiagnostic,
   type LspDocumentSymbol,
+  type LspDocumentHighlight,
+  type LspInlayHint,
   type LspLocation,
   type LspPosition,
   type LspRange,
@@ -103,6 +108,13 @@ import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { writeText } from "../../lib/clipboard";
 import { useContextMenu } from "../ContextMenu";
 import { type EditorSelectionRange } from "./workspace/CodeMirrorHost";
+import { fallbackWordHighlights } from "./workspace/lspIntelligenceChrome";
+import {
+  inlayHintsEnabledForLanguage,
+  readWorkspaceIntelligencePreferences,
+  writeWorkspaceIntelligencePreferences,
+  type WorkspaceIntelligencePreferences,
+} from "./workspace/intelligencePreferences";
 import { applyLspTextEditsToString } from "./workspace/lspTextEdits";
 import {
   applyWorkspaceEdit,
@@ -199,6 +211,15 @@ function breadcrumbSegmentsForFile(
     path = path === "/" ? `/${part}` : path ? `${path}/${part}` : part;
     return { label: part, path, kind: index === parts.length - 1 ? "file" : "directory" };
   });
+}
+
+function initialInlayHintRange(text: string): LspRange {
+  const lines = text.split("\n");
+  const endLine = Math.min(Math.max(lines.length - 1, 0), 199);
+  return {
+    start: { line: 0, character: 0 },
+    end: { line: endLine, character: lines[endLine]?.length ?? 0 },
+  };
 }
 
 import {
@@ -535,6 +556,21 @@ export function CodeWorkspaceTab({
     primary: { line: 0, character: 0 },
     secondary: { line: 0, character: 0 },
   });
+  const [viewportRanges, setViewportRanges] = useState<Record<EditorGroupId, LspRange | null>>({
+    primary: null,
+    secondary: null,
+  });
+  const [highlightsByGroup, setHighlightsByGroup] = useState<Record<EditorGroupId, LspDocumentHighlight[]>>({
+    primary: [],
+    secondary: [],
+  });
+  const [inlayHintsByGroup, setInlayHintsByGroup] = useState<Record<EditorGroupId, LspInlayHint[]>>({
+    primary: [],
+    secondary: [],
+  });
+  const [intelligencePreferences, setIntelligencePreferencesState] = useState<WorkspaceIntelligencePreferences>(
+    () => readWorkspaceIntelligencePreferences(workspaceInstanceId),
+  );
   const [breadcrumbSymbolsByGroup, setBreadcrumbSymbolsByGroup] = useState<Record<EditorGroupId, LspDocumentSymbol[]>>({
     primary: [],
     secondary: [],
@@ -547,6 +583,16 @@ export function CodeWorkspaceTab({
   });
   const [callHierarchyRoot, setCallHierarchyRoot] = useState<HierarchyRootState | null>(null);
   const [typeHierarchyRoot, setTypeHierarchyRoot] = useState<HierarchyRootState | null>(null);
+  const setIntelligencePreferences = useCallback((
+    update: WorkspaceIntelligencePreferences
+      | ((current: WorkspaceIntelligencePreferences) => WorkspaceIntelligencePreferences),
+  ) => {
+    setIntelligencePreferencesState((current) => {
+      const next = typeof update === "function" ? update(current) : update;
+      writeWorkspaceIntelligencePreferences(workspaceInstanceId, next);
+      return next;
+    });
+  }, [workspaceInstanceId]);
   const rootsRef = useRef(roots);
   const looseFilesRef = useRef(looseFiles);
   const codeViewProfileRef = useRef(codeViewProfile);
@@ -2050,6 +2096,133 @@ export function CodeWorkspaceTab({
     setStatusMessage,
     updateLspStatusForFile,
   ]);
+  const activeLanguageId = activeLspState?.status?.languageId ?? null;
+  const activeInlayHintsEnabled = inlayHintsEnabledForLanguage(
+    intelligencePreferences,
+    activeLanguageId,
+  );
+  const toggleInlayHints = useCallback(() => {
+    setIntelligencePreferences((current) => ({
+      ...current,
+      inlayHintsEnabled: !current.inlayHintsEnabled,
+    }));
+  }, [setIntelligencePreferences]);
+  const toggleInlayHintsForActiveLanguage = useCallback(() => {
+    const languageId = activeLanguageId;
+    setIntelligencePreferences((current) => {
+      if (!languageId) return { ...current, inlayHintsEnabled: !current.inlayHintsEnabled };
+      const currentlyEnabled = inlayHintsEnabledForLanguage(current, languageId);
+      return {
+        ...current,
+        inlayHintsEnabled: true,
+        inlayHintLanguages: {
+          ...current.inlayHintLanguages,
+          [languageId]: !currentlyEnabled,
+        },
+      };
+    });
+  }, [activeLanguageId, setIntelligencePreferences]);
+
+  useEffect(() => {
+    const groupId = activeEditorGroupId;
+    const file = activeFile;
+    if (!file || file.loading) {
+      setHighlightsByGroup((current) => ({ ...current, [groupId]: [] }));
+      return;
+    }
+    let cancelled = false;
+    const position = cursorPositions[groupId] ?? { line: 0, character: 0 };
+    const timer = window.setTimeout(() => {
+      const descriptor = lspDescriptorForFile(file);
+      if (!activeCapabilities?.documentHighlight || !descriptor) {
+        if (!cancelled) {
+          setHighlightsByGroup((current) => ({
+            ...current,
+            [groupId]: fallbackWordHighlights(file.text, position),
+          }));
+        }
+        return;
+      }
+      void lspDocumentHighlights(descriptor, position)
+        .then((result) => {
+          if (cancelled) return;
+          updateLspStatusForFile(file, result.status);
+          setHighlightsByGroup((current) => ({ ...current, [groupId]: result.highlights }));
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setHighlightsByGroup((current) => ({
+              ...current,
+              [groupId]: fallbackWordHighlights(file.text, position),
+            }));
+          }
+        });
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    activeCapabilities?.documentHighlight,
+    activeEditorGroupId,
+    activeFile,
+    cursorPositions,
+    lspDescriptorForFile,
+    updateLspStatusForFile,
+  ]);
+
+  useEffect(() => {
+    const groupId = activeEditorGroupId;
+    const file = activeFile;
+    if (!file || file.loading || !activeInlayHintsEnabled || !activeCapabilities?.inlayHint) {
+      setInlayHintsByGroup((current) => ({ ...current, [groupId]: [] }));
+      return;
+    }
+    const range = viewportRanges[groupId] ?? initialInlayHintRange(file.text);
+    const descriptor = lspDescriptorForFile(file);
+    if (!descriptor) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void lspInlayHints(descriptor, range)
+        .then((result) => {
+          if (cancelled) return;
+          updateLspStatusForFile(file, result.status);
+          setInlayHintsByGroup((current) => ({ ...current, [groupId]: result.hints }));
+        })
+        .catch(() => {
+          if (!cancelled) setInlayHintsByGroup((current) => ({ ...current, [groupId]: [] }));
+        });
+    }, 200);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    activeCapabilities?.inlayHint,
+    activeEditorGroupId,
+    activeFile,
+    activeInlayHintsEnabled,
+    lspDescriptorForFile,
+    updateLspStatusForFile,
+    viewportRanges,
+  ]);
+
+  const getLspSelectionRanges = useCallback(async (
+    file: OpenFileState,
+    selection: EditorSelectionRange,
+  ): Promise<LspRange[] | null> => {
+    const capabilities = lspFilesRef.current[file.key]?.status?.capabilities;
+    if (!capabilities?.selectionRange) return null;
+    const descriptor = lspDescriptorForFile(file);
+    if (!descriptor) return null;
+    try {
+      const result = await lspSelectionRanges(descriptor, selection.end);
+      updateLspStatusForFile(file, result.status);
+      return result.ranges.length > 0 ? result.ranges : null;
+    } catch {
+      return null;
+    }
+  }, [lspDescriptorForFile, updateLspStatusForFile]);
   const breadcrumbPathSegments = useMemo<BreadcrumbPathSegment[]>(() => {
     return activeFile ? breadcrumbSegmentsForFile(activeFile, roots) : [];
   }, [activeFile, roots]);
@@ -2739,6 +2912,21 @@ export function CodeWorkspaceTab({
       run: () => void openHierarchy("type"),
     },
     {
+      id: "workspace.toggleInlayHints",
+      title: `${intelligencePreferences.inlayHintsEnabled ? "Disable" : "Enable"} Inlay Hints`,
+      category: "View",
+      keywords: ["inlay", "hints", "types", "parameters"],
+      run: toggleInlayHints,
+    },
+    {
+      id: "workspace.toggleLanguageInlayHints",
+      title: `${activeInlayHintsEnabled ? "Disable" : "Enable"} Inlay Hints for ${activeLanguageId ?? "Current Language"}`,
+      category: "View",
+      keywords: ["inlay", "language", "hints"],
+      when: () => !!activeCapabilities?.inlayHint,
+      run: toggleInlayHintsForActiveLanguage,
+    },
+    {
       id: "workspace.toggleTerminal",
       title: "Toggle Workspace Terminal",
       category: "View",
@@ -2927,6 +3115,8 @@ export function CodeWorkspaceTab({
     activeEditorGroupId,
     activeFile,
     activeKey,
+    activeInlayHintsEnabled,
+    activeLanguageId,
     addRoot,
     closeFile,
     copyTreePath,
@@ -2960,6 +3150,9 @@ export function CodeWorkspaceTab({
     seSymbolsAvailable,
     selected,
     selectedRootDirectory,
+    intelligencePreferences.inlayHintsEnabled,
+    toggleInlayHints,
+    toggleInlayHintsForActiveLanguage,
   ]);
 
   const executeWorkspaceCommand = useCallback((
@@ -3403,6 +3596,8 @@ export function CodeWorkspaceTab({
         activeFile={groupFile}
         activeMarkdownMode={groupMarkdownMode}
         activeDiagnostics={groupDiagnostics}
+        activeHighlights={highlightsByGroup[groupId]}
+        activeInlayHints={inlayHintsByGroup[groupId]}
         activeCapabilities={groupCapabilities}
         activeLspSyncing={!!groupLspState?.syncing}
         lspStatusPill={<LspStatusPill state={groupLspState} diagnostics={groupDiagnostics} />}
@@ -3483,6 +3678,10 @@ export function CodeWorkspaceTab({
           if (groupId === activeEditorGroupId) editorSelectionRef.current = selection;
           setCursorPositions((current) => ({ ...current, [groupId]: selection.end }));
         }}
+        onViewportChange={(range) => {
+          setViewportRanges((current) => ({ ...current, [groupId]: range }));
+        }}
+        onExpandSelection={getLspSelectionRanges}
         onLightbulb={(line) => void openCodeActionsForLine(line)}
         onOpenMarkdownHref={openMarkdownHref}
         formatBytes={formatBytes}
@@ -3604,6 +3803,14 @@ export function CodeWorkspaceTab({
             onClick={closeSplit}
           />
         )}
+        <IconButton
+          label={`${activeInlayHintsEnabled ? "Disable" : "Enable"} inlay hints${activeLanguageId ? ` for ${activeLanguageId}` : ""}`}
+          testId="code-workspace-inlay-hints-toggle"
+          icon={<Braces className="h-3.5 w-3.5" />}
+          active={activeInlayHintsEnabled}
+          disabled={!activeCapabilities?.inlayHint}
+          onClick={toggleInlayHintsForActiveLanguage}
+        />
         <IconButton
           label="Toggle documentation pane"
           testId="code-workspace-right-pane-toggle"

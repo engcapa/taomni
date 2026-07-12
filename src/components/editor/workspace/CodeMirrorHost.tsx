@@ -32,15 +32,24 @@ import type {
   LspCompletionItem,
   LspCompletionResult,
   LspDiagnostic,
+  LspDocumentHighlight,
+  LspInlayHint,
   LspPosition,
+  LspRange,
   LspSignatureHelpResult,
 } from "../../../lib/editor/lsp";
 import { languageForPath } from "../../git/diffLanguage";
 import { createWorkspaceSearchPanel, WORKSPACE_SEARCH_STYLE } from "./editorSearchPanel";
 import { createLspCompletionSource } from "./lspCompletion";
 import { createDiagnosticChrome } from "./lspDiagnosticChrome";
+import { createLspIntelligenceChrome } from "./lspIntelligenceChrome";
 import { lspPositionFromOffset, offsetFromLspPosition } from "./lspPositions";
-import { selectionHistoryField, workspaceEditorKeymap } from "./workspaceEditorCommands";
+import {
+  expandSelectionFromLspRanges,
+  expandSyntaxSelection,
+  selectionHistoryField,
+  workspaceEditorKeymap,
+} from "./workspaceEditorCommands";
 
 interface EditorRevealTarget {
   line: number;
@@ -58,6 +67,8 @@ interface CodeMirrorHostProps {
   doc: string;
   visible: boolean;
   diagnostics: LspDiagnostic[];
+  highlights?: LspDocumentHighlight[];
+  inlayHints?: LspInlayHint[];
   reveal: EditorRevealTarget | null;
   onChange: (doc: string) => void;
   onSave: () => void;
@@ -74,6 +85,8 @@ interface CodeMirrorHostProps {
     triggerCharacter: string | null,
   ) => Promise<LspSignatureHelpResult | null>;
   onSelectionChange?: (selection: EditorSelectionRange) => void;
+  onViewportChange?: (range: LspRange) => void;
+  onExpandSelection?: (selection: EditorSelectionRange) => Promise<LspRange[] | null>;
   onLightbulb?: (line: number) => void;
   completionTriggers?: string[];
   signatureTriggers?: string[];
@@ -210,6 +223,8 @@ export function CodeMirrorHost({
   doc,
   visible,
   diagnostics,
+  highlights = [],
+  inlayHints = [],
   reveal,
   onChange,
   onSave,
@@ -220,6 +235,8 @@ export function CodeMirrorHost({
   onCompleteResolve,
   onSignatureHelp,
   onSelectionChange,
+  onViewportChange,
+  onExpandSelection,
   onLightbulb,
   completionTriggers,
   signatureTriggers,
@@ -228,6 +245,7 @@ export function CodeMirrorHost({
   const viewRef = useRef<EditorView | null>(null);
   const languageCompartment = useRef(new Compartment());
   const diagnosticsCompartment = useRef(new Compartment());
+  const intelligenceCompartment = useRef(new Compartment());
   const signatureCompartment = useRef(new Compartment());
   const signatureShownRef = useRef(false);
   const onChangeRef = useRef(onChange);
@@ -239,6 +257,8 @@ export function CodeMirrorHost({
   const onCompleteResolveRef = useRef(onCompleteResolve);
   const onSignatureHelpRef = useRef(onSignatureHelp);
   const onSelectionChangeRef = useRef(onSelectionChange);
+  const onViewportChangeRef = useRef(onViewportChange);
+  const onExpandSelectionRef = useRef(onExpandSelection);
   const onLightbulbRef = useRef(onLightbulb);
   const completionTriggersRef = useRef(completionTriggers ?? []);
   const signatureTriggersRef = useRef(signatureTriggers ?? []);
@@ -251,6 +271,8 @@ export function CodeMirrorHost({
   onCompleteResolveRef.current = onCompleteResolve;
   onSignatureHelpRef.current = onSignatureHelp;
   onSelectionChangeRef.current = onSelectionChange;
+  onViewportChangeRef.current = onViewportChange;
+  onExpandSelectionRef.current = onExpandSelection;
   onLightbulbRef.current = onLightbulb;
   completionTriggersRef.current = completionTriggers ?? [];
   signatureTriggersRef.current = signatureTriggers ?? [];
@@ -265,6 +287,13 @@ export function CodeMirrorHost({
       start: lspPositionFromOffset(view.state.doc, from),
       end: lspPositionFromOffset(view.state.doc, to),
       empty: main.empty,
+    });
+  };
+
+  const emitViewport = (view: EditorView) => {
+    onViewportChangeRef.current?.({
+      start: lspPositionFromOffset(view.state.doc, view.viewport.from),
+      end: lspPositionFromOffset(view.state.doc, view.viewport.to),
     });
   };
 
@@ -322,6 +351,27 @@ export function CodeMirrorHost({
       });
       return true;
     };
+    const expandSemanticSelection = (view: EditorView) => {
+      const handler = onExpandSelectionRef.current;
+      if (!handler) return expandSyntaxSelection(view);
+      const main = view.state.selection.main;
+      const selection: EditorSelectionRange = {
+        start: lspPositionFromOffset(view.state.doc, main.from),
+        end: lspPositionFromOffset(view.state.doc, main.to),
+        empty: main.empty,
+      };
+      void handler(selection).then((ranges) => {
+        const current = viewRef.current;
+        if (!current || current !== view) return;
+        if (!ranges || !expandSelectionFromLspRanges(current, ranges)) {
+          expandSyntaxSelection(current);
+        }
+      }).catch(() => {
+        const current = viewRef.current;
+        if (current === view) expandSyntaxSelection(current);
+      });
+      return true;
+    };
     const state = EditorState.create({
       doc,
       extensions: [
@@ -358,6 +408,11 @@ export function CodeMirrorHost({
           diagnostics,
           (line) => onLightbulbRef.current?.(line),
         )),
+        intelligenceCompartment.current.of(createLspIntelligenceChrome(
+          EditorState.create({ doc }).doc,
+          highlights,
+          inlayHints,
+        )),
         signatureCompartment.current.of([]),
         ...lspInteractionExtensions(onHoverRef, onDefinitionRef, onReferencesRef),
         ...codeViewExtensions(),
@@ -369,6 +424,7 @@ export function CodeMirrorHost({
           { key: "Mod-r", run: openReplacePanel },
           { key: "Escape", run: () => hideSignature() },
           { key: "Mod-Shift-Space", run: (view) => requestSignatureHelp(view, null) },
+          { key: "Mod-w", run: expandSemanticSelection },
           ...workspaceEditorKeymap,
           ...searchKeymap,
           ...closeBracketsKeymap,
@@ -399,12 +455,14 @@ export function CodeMirrorHost({
           if (update.selectionSet || update.docChanged) {
             emitSelection(update.view);
           }
+          if (update.viewportChanged || update.docChanged) emitViewport(update.view);
         }),
       ],
     });
     const view = new EditorView({ state, parent: hostRef.current });
     viewRef.current = view;
     emitSelection(view);
+    emitViewport(view);
     return () => {
       view.destroy();
       viewRef.current = null;
@@ -441,6 +499,16 @@ export function CodeMirrorHost({
       )),
     });
   }, [diagnostics]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: intelligenceCompartment.current.reconfigure(
+        createLspIntelligenceChrome(view.state.doc, highlights, inlayHints),
+      ),
+    });
+  }, [highlights, inlayHints]);
 
   useEffect(() => {
     const view = viewRef.current;

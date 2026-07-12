@@ -9,7 +9,14 @@ import {
   Pin,
   X,
 } from "lucide-react";
-import type { LspCapabilitySummary, LspDiagnostic, LspPosition } from "../../../lib/editor/lsp";
+import type {
+  LspCapabilitySummary,
+  LspDiagnostic,
+  LspDocumentHighlight,
+  LspInlayHint,
+  LspPosition,
+  LspRange,
+} from "../../../lib/editor/lsp";
 import type {
   LspCompletionItem,
   LspCompletionResult,
@@ -41,6 +48,8 @@ interface EditorGroupProps {
   activeFile: OpenFileViewModel | null;
   activeMarkdownMode: MarkdownViewMode;
   activeDiagnostics: LspDiagnostic[];
+  activeHighlights: LspDocumentHighlight[];
+  activeInlayHints: LspInlayHint[];
   activeCapabilities: LspCapabilitySummary | null;
   activeLspSyncing: boolean;
   lspStatusPill: ReactNode;
@@ -81,6 +90,8 @@ interface EditorGroupProps {
     trigger: string | null,
   ) => Promise<LspSignatureHelpResult | null>;
   onSelectionChange: (selection: EditorSelectionRange) => void;
+  onViewportChange: (range: LspRange) => void;
+  onExpandSelection: (file: OpenFileViewModel, selection: EditorSelectionRange) => Promise<LspRange[] | null>;
   onLightbulb: (line: number) => void;
   onOpenMarkdownHref: (href: string) => boolean;
   formatBytes: (size: number) => string;
@@ -106,6 +117,8 @@ export function EditorGroup({
   activeFile,
   activeMarkdownMode,
   activeDiagnostics,
+  activeHighlights,
+  activeInlayHints,
   activeCapabilities,
   activeLspSyncing,
   lspStatusPill,
@@ -138,6 +151,8 @@ export function EditorGroup({
   onCompleteResolve,
   onSignatureHelp,
   onSelectionChange,
+  onViewportChange,
+  onExpandSelection,
   onLightbulb,
   onOpenMarkdownHref,
   formatBytes,
@@ -305,6 +320,8 @@ export function EditorGroup({
                         doc={activeFile.text}
                         visible={visible}
                         diagnostics={activeDiagnostics}
+                        highlights={activeHighlights}
+                        inlayHints={activeInlayHints}
                         reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
                         onChange={(doc) => {
                           if (previewKey === activeFile.key) onPromotePreview(activeFile.key);
@@ -318,6 +335,8 @@ export function EditorGroup({
                         onCompleteResolve={(raw) => onCompleteResolve(activeFile, raw)}
                         onSignatureHelp={(position, trigger) => onSignatureHelp(activeFile, position, trigger)}
                         onSelectionChange={onSelectionChange}
+                        onViewportChange={onViewportChange}
+                        onExpandSelection={(selection) => onExpandSelection(activeFile, selection)}
                         onLightbulb={onLightbulb}
                         completionTriggers={activeCapabilities?.completionTriggerCharacters ?? []}
                         signatureTriggers={activeCapabilities?.signatureTriggerCharacters ?? []}
@@ -332,6 +351,8 @@ export function EditorGroup({
                     doc={activeFile.text}
                     visible={visible}
                     diagnostics={activeDiagnostics}
+                    highlights={activeHighlights}
+                    inlayHints={activeInlayHints}
                     reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
                     onChange={(doc) => {
                       if (previewKey === activeFile.key) onPromotePreview(activeFile.key);
@@ -345,6 +366,8 @@ export function EditorGroup({
                     onCompleteResolve={(raw) => onCompleteResolve(activeFile, raw)}
                     onSignatureHelp={(position, trigger) => onSignatureHelp(activeFile, position, trigger)}
                     onSelectionChange={onSelectionChange}
+                    onViewportChange={onViewportChange}
+                    onExpandSelection={(selection) => onExpandSelection(activeFile, selection)}
                     onLightbulb={onLightbulb}
                     completionTriggers={activeCapabilities?.completionTriggerCharacters ?? []}
                     signatureTriggers={activeCapabilities?.signatureTriggerCharacters ?? []}

@@ -46,6 +46,9 @@ const lspMocks = vi.hoisted(() => ({
   lspTypeHierarchySupertypes: vi.fn(),
   lspTypeHierarchySubtypes: vi.fn(),
   lspDocumentSymbols: vi.fn(),
+  lspDocumentHighlights: vi.fn(),
+  lspInlayHints: vi.fn(),
+  lspSelectionRanges: vi.fn(),
   lspCompletion: vi.fn(),
   lspCompletionResolve: vi.fn(),
   lspSignatureHelp: vi.fn(),
@@ -216,7 +219,13 @@ describe("CodeWorkspaceTab", () => {
     lspMocks.lspTypeHierarchySupertypes.mockReset();
     lspMocks.lspTypeHierarchySubtypes.mockReset();
     lspMocks.lspDocumentSymbols.mockReset();
+    lspMocks.lspDocumentHighlights.mockReset();
+    lspMocks.lspInlayHints.mockReset();
+    lspMocks.lspSelectionRanges.mockReset();
     lspMocks.lspDocumentSymbols.mockResolvedValue({ status: documentStatus(), symbols: [] });
+    lspMocks.lspDocumentHighlights.mockResolvedValue({ status: documentStatus(), highlights: [] });
+    lspMocks.lspInlayHints.mockResolvedValue({ status: documentStatus(), hints: [] });
+    lspMocks.lspSelectionRanges.mockResolvedValue({ status: documentStatus(), ranges: [] });
     lspMocks.lspCompletion.mockReset();
     lspMocks.lspCompletion.mockResolvedValue({ status: documentStatus(), isIncomplete: false, items: [] });
     lspMocks.lspCompletionResolve.mockReset();
@@ -991,6 +1000,7 @@ describe("CodeWorkspaceTab", () => {
         callHierarchy: false,
         typeHierarchy: false,
         inlayHint: false,
+        selectionRange: false,
         completionTriggerCharacters: [],
         signatureTriggerCharacters: [],
       },
@@ -1068,6 +1078,7 @@ describe("CodeWorkspaceTab", () => {
         callHierarchy: false,
         typeHierarchy: false,
         inlayHint: false,
+        selectionRange: false,
         completionTriggerCharacters: ["."],
         signatureTriggerCharacters: ["(", ","],
       },
@@ -1132,6 +1143,7 @@ describe("CodeWorkspaceTab", () => {
       callHierarchy: true,
       typeHierarchy: true,
       inlayHint: false,
+      selectionRange: false,
       completionTriggerCharacters: [],
       signatureTriggerCharacters: [],
     };
@@ -1176,6 +1188,93 @@ describe("CodeWorkspaceTab", () => {
     await waitFor(() => expect(lspMocks.lspPrepareTypeHierarchy).toHaveBeenCalled());
     expect(screen.getByRole("tab", { name: "Type Hierarchy", selected: true })).toBeInTheDocument();
     expect(screen.getByTestId("code-workspace-type-hierarchy-panel")).toHaveTextContent("Base");
+  });
+
+  it("requests usage highlights, viewport inlay hints, and semantic selection ranges", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-intelligence",
+      workspaceInstanceId: "instance-intelligence",
+      name: "Intelligence",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    const capabilities = {
+      completion: false,
+      signatureHelp: false,
+      hover: false,
+      definition: false,
+      typeDefinition: false,
+      implementation: false,
+      references: false,
+      documentSymbol: false,
+      workspaceSymbol: false,
+      rename: false,
+      formatting: false,
+      rangeFormatting: false,
+      codeAction: false,
+      documentHighlight: true,
+      callHierarchy: false,
+      typeHierarchy: false,
+      inlayHint: true,
+      selectionRange: true,
+      completionTriggerCharacters: [],
+      signatureTriggerCharacters: [],
+    };
+    const activeStatus = documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      available: true,
+      active: true,
+      capabilities,
+    });
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "const value = value;"));
+    lspMocks.lspOpenDocument.mockResolvedValue(activeStatus);
+    lspMocks.lspChangeDocument.mockResolvedValue(activeStatus);
+    lspMocks.lspGetDiagnostics.mockResolvedValue({ status: activeStatus, diagnostics: [] });
+    lspMocks.lspDocumentHighlights.mockResolvedValue({
+      status: activeStatus,
+      highlights: [{
+        range: { start: { line: 0, character: 6 }, end: { line: 0, character: 11 } },
+        kind: 2,
+      }],
+    });
+    lspMocks.lspInlayHints.mockResolvedValue({
+      status: activeStatus,
+      hints: [{
+        position: { line: 0, character: 11 },
+        label: ": number",
+        kind: 1,
+        tooltip: null,
+        paddingLeft: true,
+        paddingRight: false,
+      }],
+    });
+    lspMocks.lspSelectionRanges.mockResolvedValue({
+      status: activeStatus,
+      ranges: [{
+        start: { line: 0, character: 0 },
+        end: { line: 0, character: 20 },
+      }],
+    });
+
+    const rendered = renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(lspMocks.lspDocumentHighlights).toHaveBeenCalled());
+
+    const inlayHintsToggle = screen.getByTestId("code-workspace-inlay-hints-toggle");
+    expect(inlayHintsToggle).not.toBeDisabled();
+    fireEvent.click(inlayHintsToggle);
+    await waitFor(() => expect(inlayHintsToggle).toHaveAttribute("aria-pressed", "true"));
+    await waitFor(() => expect(lspMocks.lspInlayHints).toHaveBeenCalled());
+    expect(window.localStorage.getItem("taomni.codeWorkspace.intelligence.v1.instance-intelligence"))
+      .toContain('"inlayHintsEnabled":true');
+
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+    expect(content).not.toBeNull();
+    fireEvent.keyDown(content!, { key: "w", code: "KeyW", ctrlKey: true });
+    await waitFor(() => expect(lspMocks.lspSelectionRanges).toHaveBeenCalled());
   });
 
   it("offers tree context menu actions: copy path and scoped search", async () => {
