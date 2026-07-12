@@ -9,6 +9,8 @@ import {
   flatSourceRelativePath,
   gitChangeForPath,
   gitDirectoryChangeCount,
+  isFlatViewSourceFile,
+  languageSourceRootFor,
   matchesTreeFilter,
   normalizeEditorText,
   shouldHideEntry,
@@ -36,12 +38,26 @@ describe("project tree model helpers", () => {
     expect(flatExtensionGroup("archive.")).toBe("No extension");
   });
 
-  it("flatSourceGroup keeps language/src top-level directories", () => {
+  it("flat view only keeps language sources under recognized src roots", () => {
+    expect(languageSourceRootFor("src/http2_connect.rs")).toBe("src");
+    expect(languageSourceRootFor("src-tauri/src/lib.rs")).toBe("src-tauri/src");
+    expect(languageSourceRootFor("packages/web/src/App.tsx")).toBe("packages/web/src");
+    expect(languageSourceRootFor("README.md")).toBeNull();
+    expect(languageSourceRootFor("docs/guide.md")).toBeNull();
+    expect(languageSourceRootFor("target/debug/app")).toBeNull();
+
+    expect(isFlatViewSourceFile("src/App.tsx")).toBe(true);
+    expect(isFlatViewSourceFile("src-tauri/src/lib.rs")).toBe(true);
+    expect(isFlatViewSourceFile("README.md")).toBe(false);
+    expect(isFlatViewSourceFile("docs/guide.md")).toBe(false);
+    expect(isFlatViewSourceFile("target/debug/foo.rs")).toBe(false);
+    expect(isFlatViewSourceFile("output/build.log")).toBe(false);
+    expect(isFlatViewSourceFile("src/README.md")).toBe(false);
+
     expect(flatSourceGroup("src/http2_connect.rs")).toBe("src");
-    expect(flatSourceGroup("src-tauri/src/lib.rs")).toBe("src-tauri");
-    expect(flatSourceGroup("README.md")).toBe("(root)");
+    expect(flatSourceGroup("src-tauri/src/lib.rs")).toBe("src-tauri/src");
     expect(flatSourceRelativePath("src/http2_connect.rs")).toBe("http2_connect.rs");
-    expect(flatSourceRelativePath("src-tauri/src/lib.rs")).toBe("src/lib.rs");
+    expect(flatSourceRelativePath("src-tauri/src/main/http.rs")).toBe("main/http.rs");
   });
 
   it("matchesTreeFilter finds nested path substrings", () => {

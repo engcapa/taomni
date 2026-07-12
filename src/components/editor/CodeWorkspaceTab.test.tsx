@@ -503,7 +503,7 @@ describe("CodeWorkspaceTab", () => {
     expect(window.localStorage.getItem("taomni.codeWorkspace.treeFontSize.v1")).toBe("13");
   });
 
-  it("persists and renders the flat file view with source directory groups", async () => {
+  it("persists and renders the flat file view with language src groups only", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
       workspaceId: "ws-flat",
@@ -516,6 +516,9 @@ describe("CodeWorkspaceTab", () => {
     workspaceMocks.workspaceListFilesRecursive.mockResolvedValue([
       entry("README.md", "README.md"),
       entry("App.tsx", "src/App.tsx"),
+      entry("lib.rs", "src-tauri/src/lib.rs"),
+      entry("guide.md", "docs/guide.md"),
+      entry("foo.rs", "target/debug/foo.rs"),
     ]);
     workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/App.tsx", "export function App() {}"));
 
@@ -525,16 +528,63 @@ describe("CodeWorkspaceTab", () => {
     fireEvent.click(screen.getByTestId("code-workspace-view-flat"));
 
     expect(window.localStorage.getItem("taomni.codeWorkspace.treeViewMode.v1")).toBe("flat");
-    expect(await screen.findByText("(root)")).toBeInTheDocument();
     expect(await screen.findByText("src")).toBeInTheDocument();
+    expect(await screen.findByText("src-tauri/src")).toBeInTheDocument();
+    expect(screen.queryByText("README.md")).not.toBeInTheDocument();
+    expect(screen.queryByText("guide.md")).not.toBeInTheDocument();
+    expect(screen.queryByText("(root)")).not.toBeInTheDocument();
     expect(screen.getAllByTestId("code-workspace-flat-file")).toHaveLength(2);
     expect(screen.getByText("App.tsx")).toBeInTheDocument();
-    expect(screen.getByText("README.md")).toBeInTheDocument();
+    expect(screen.getByText("lib.rs")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("App.tsx"));
     await waitFor(() => {
       expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/App.tsx");
     });
+  });
+
+  it("opens successive tree files as permanent tabs without closing the previous one", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-tabs",
+      workspaceInstanceId: "instance-tabs",
+      name: "Tabs",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: null,
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([
+      entry("main.ts", "src/main.ts"),
+      entry("util.ts", "src/util.ts"),
+    ]);
+    workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => (
+      file(path, path === "src/main.ts" ? "export const main = 1;" : "export const util = 2;")
+    ));
+
+    renderWorkspace(workspace);
+    expect(await screen.findByText("Code · Tabs")).toBeInTheDocument();
+
+    const rows = await screen.findAllByTestId("code-workspace-tree-file");
+    fireEvent.click(rows[0]);
+    await waitFor(() => {
+      expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/main.ts");
+    });
+    fireEvent.click(rows[1]);
+    await waitFor(() => {
+      expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/util.ts");
+    });
+
+    await waitFor(() => {
+      const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tabs");
+      expect(ui.editorGroups.primary.openOrder).toEqual([
+        "root:app:src/main.ts",
+        "root:app:src/util.ts",
+      ]);
+      expect(ui.editorGroups.primary.activeKey).toBe("root:app:src/util.ts");
+      expect(ui.editorGroups.primary.previewKey).toBeNull();
+    });
+    expect(screen.getByTitle("app / src/main.ts")).toBeInTheDocument();
+    expect(screen.getByTitle("app / src/util.ts")).toBeInTheDocument();
   });
 
   it("renders compact directory chains and expands the endpoint", async () => {

@@ -386,11 +386,129 @@ export function flatExtensionGroup(path: string): string {
 }
 
 /**
- * Flat-view primary group: top-level source / package directory so language
- * roots like `src` and `src-tauri` stay visible instead of one mixed list.
+ * Directories that must never appear as flat-view language source groups
+ * (build output, docs, caches, vendored trees, etc.).
+ */
+export const FLAT_EXCLUDED_DIR_NAMES = new Set([
+  ...HEAVY_DIR_NAMES,
+  "output",
+  "outputs",
+  "out",
+  "docs",
+  "doc",
+  "documentation",
+  "examples",
+  "example",
+  "vendor",
+  "third_party",
+  "third-party",
+  "coverage",
+  "tmp",
+  "temp",
+  "logs",
+  "log",
+  "bin",
+  "obj",
+  "assets",
+  "static",
+  "public",
+  "images",
+  "img",
+  "fonts",
+  "testdata",
+  "fixtures",
+  "snapshots",
+  "generated",
+  "gen",
+]);
+
+/** Directory basenames treated as language source roots for the flat view. */
+export const LANGUAGE_SOURCE_DIR_NAMES = new Set([
+  "src",
+  "lib",
+  "app",
+  "source",
+  "sources",
+]);
+
+function normalizeWorkspacePath(path: string): string {
+  return path.replace(/\\/g, "/");
+}
+
+/**
+ * Nearest language source root containing `path` (prefer the deepest `src` /
+ * `lib` / `app` segment). Returns null when the file is not under such a root
+ * (e.g. README, docs/, target/, root-level configs).
+ *
+ * Examples:
+ * - `src/App.tsx` → `src`
+ * - `src-tauri/src/lib.rs` → `src-tauri/src`
+ * - `packages/web/src/main.ts` → `packages/web/src`
+ */
+export function languageSourceRootFor(path: string): string | null {
+  const normalized = normalizeWorkspacePath(path);
+  const parts = normalized.split("/").filter(Boolean);
+  if (parts.length < 2) return null;
+  // Walk directory segments only (exclude the file name).
+  let rootIndex = -1;
+  for (let i = 0; i < parts.length - 1; i += 1) {
+    if (LANGUAGE_SOURCE_DIR_NAMES.has(parts[i])) rootIndex = i;
+  }
+  if (rootIndex < 0) return null;
+  return parts.slice(0, rootIndex + 1).join("/");
+}
+
+function pathHasExcludedSegment(path: string): boolean {
+  return normalizeWorkspacePath(path)
+    .split("/")
+    .some((segment) => segment.length > 0 && FLAT_EXCLUDED_DIR_NAMES.has(segment));
+}
+
+/** True when the path looks like a documentation / non-source artifact. */
+export function isDocumentationPath(path: string): boolean {
+  if (isMarkdownPath(path)) return true;
+  const name = basename(path).toLowerCase();
+  if (
+    name === "readme"
+    || name === "changelog"
+    || name === "license"
+    || name === "licence"
+    || name === "authors"
+    || name === "contributing"
+    || name.startsWith("readme.")
+  ) {
+    return true;
+  }
+  const lower = normalizeWorkspacePath(path).toLowerCase();
+  return (
+    lower.startsWith("docs/")
+    || lower.startsWith("doc/")
+    || lower.includes("/docs/")
+    || lower.includes("/doc/")
+  );
+}
+
+/**
+ * Flat-view eligibility: language source file under a recognized `src`/`lib`/
+ * `app` root, excluding build output and documentation trees.
+ */
+export function isFlatViewSourceFile(path: string): boolean {
+  const normalized = normalizeWorkspacePath(path);
+  if (!normalized || pathHasExcludedSegment(normalized)) return false;
+  if (isDocumentationPath(normalized)) return false;
+  if (!lspPresetIdForPath(normalized)) return false;
+  return languageSourceRootFor(normalized) != null;
+}
+
+/**
+ * Flat-view group key: language source root (`src`, `src-tauri/src`, …).
+ * Falls back to the top-level directory only when a source root is missing
+ * (callers should normally filter with {@link isFlatViewSourceFile} first).
  */
 export function flatSourceGroup(path: string): string {
-  const normalized = path.replace(/\\/g, "/");
+  const root = languageSourceRootFor(path);
+  if (root) return root;
+  const normalized = normalizeWorkspacePath(path);
   const slash = normalized.indexOf("/");
   if (slash <= 0) return "(root)";
   return normalized.slice(0, slash);
@@ -398,10 +516,12 @@ export function flatSourceGroup(path: string): string {
 
 /** Path relative to {@link flatSourceGroup} for display under that group. */
 export function flatSourceRelativePath(path: string): string {
-  const normalized = path.replace(/\\/g, "/");
-  const slash = normalized.indexOf("/");
-  if (slash <= 0) return normalized || path;
-  return normalized.slice(slash + 1);
+  const normalized = normalizeWorkspacePath(path);
+  const root = languageSourceRootFor(normalized) ?? flatSourceGroup(normalized);
+  if (root === "(root)") return normalized || path;
+  if (normalized === root) return basename(normalized);
+  if (normalized.startsWith(`${root}/`)) return normalized.slice(root.length + 1);
+  return normalized;
 }
 
 /** Case-insensitive name/path substring match for the project-tree filter. */

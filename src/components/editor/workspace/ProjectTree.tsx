@@ -29,6 +29,7 @@ import {
   formatBytes,
   gitChangeForPath,
   gitDirectoryChangeCount,
+  isFlatViewSourceFile,
   isRootRef,
   matchesTreeFilter,
   rootDirKey,
@@ -126,12 +127,15 @@ function renderMatchingFlatFiles(
   }
   const entries = state.entries.filter((entry) => {
     if (shouldHideEntry(entry)) return false;
+    // Flat view only lists language sources under recognized src/lib/app roots.
+    // Filter search keeps the broader recursive index so nested names still match.
+    if (options.groupBySource && !isFlatViewSourceFile(entry.path)) return false;
     return matchesTreeFilter(entry.name, entry.path, treeFilter);
   });
   if (entries.length === 0) {
     return (
       <div className="px-3 py-2 text-[var(--taomni-code-muted)]">
-        {state.loaded ? "No files" : "Not loaded"}
+        {state.loaded ? (options.groupBySource ? "No language source files" : "No files") : "Not loaded"}
       </div>
     );
   }
@@ -187,7 +191,8 @@ function renderMatchingFlatFiles(
                 title={`${root.name} / ${entry.path}${entry.size ? ` - ${formatBytes(entry.size)}` : ""}`}
                 onClick={() => {
                   onSelect({ kind: "file", ref });
-                  onOpenFile(ref, { preview: true });
+                  // Permanent editor tab — do not replace a previous preview tab.
+                  onOpenFile(ref);
                 }}
                 onDoubleClick={() => onOpenFile(ref)}
                 onContextMenu={(event) => onContextMenu(event, { kind: "file", ref })}
@@ -341,7 +346,8 @@ function renderEntries(
         title={`${root.name} / ${entry.path}${entry.size ? ` - ${formatBytes(entry.size)}` : ""}`}
         onClick={() => {
           onSelect({ kind: "file", ref });
-          onOpenFile(ref, { preview: true });
+          // Permanent editor tab — keep previously opened tabs switchable.
+          onOpenFile(ref);
         }}
         onDoubleClick={() => onOpenFile(ref)}
         onContextMenu={(event) => onContextMenu(event, { kind: "file", ref })}
@@ -456,7 +462,7 @@ export function ProjectTree(props: ProjectTreeProps) {
                 title={file.path}
                 onClick={() => {
                   onSelect({ kind: "file", ref });
-                  onOpenFile(ref, { preview: true });
+                  onOpenFile(ref);
                 }}
                 onDoubleClick={() => onOpenFile(ref)}
               >
