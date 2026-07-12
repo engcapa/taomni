@@ -16,6 +16,7 @@ import type {
   LspInlayHint,
   LspPosition,
   LspRange,
+  LspSemanticToken,
 } from "../../../lib/editor/lsp";
 import type {
   LspCompletionItem,
@@ -53,6 +54,7 @@ interface EditorGroupProps {
   activeDiagnostics: LspDiagnostic[];
   activeHighlights: LspDocumentHighlight[];
   activeInlayHints: LspInlayHint[];
+  activeSemanticTokens?: LspSemanticToken[];
   activeGitChanges: GitLineChange[];
   activeGitBlame: GitBlameLine | null;
   activeCapabilities: LspCapabilitySummary | null;
@@ -125,6 +127,7 @@ export function EditorGroup({
   activeDiagnostics,
   activeHighlights,
   activeInlayHints,
+  activeSemanticTokens = [],
   activeGitChanges,
   activeGitBlame,
   activeCapabilities,
@@ -338,6 +341,7 @@ export function EditorGroup({
                         diagnostics={activeDiagnostics}
                         highlights={activeHighlights}
                         inlayHints={activeInlayHints}
+                        semanticTokens={activeSemanticTokens}
                         gitChanges={activeGitChanges}
                         gitBlame={activeGitBlame}
                         reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
@@ -372,6 +376,7 @@ export function EditorGroup({
                     diagnostics={activeDiagnostics}
                     highlights={activeHighlights}
                     inlayHints={activeInlayHints}
+                    semanticTokens={activeSemanticTokens}
                     gitChanges={activeGitChanges}
                     gitBlame={activeGitBlame}
                     reveal={revealTarget?.key === activeFile.key ? revealTarget : null}

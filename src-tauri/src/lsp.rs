@@ -275,6 +275,21 @@ pub struct LspSelectionRangesResult {
     pub ranges: Vec<LspRange>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspSemanticToken {
+    pub range: LspRange,
+    pub token_type: String,
+    pub modifiers: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspSemanticTokensResult {
+    pub status: LspDocumentStatus,
+    pub tokens: Vec<LspSemanticToken>,
+}
+
 /// Feature summary distilled from the server's `initialize` response so the
 /// UI can enable/disable entry points per capability instead of guessing.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -298,6 +313,7 @@ pub struct LspCapabilitySummary {
     pub type_hierarchy: bool,
     pub inlay_hint: bool,
     pub selection_range: bool,
+    pub semantic_tokens: bool,
     pub completion_trigger_characters: Vec<String>,
     pub signature_trigger_characters: Vec<String>,
 }
@@ -405,6 +421,8 @@ struct LspSession {
     opened_documents: RwLock<HashSet<String>>,
     diagnostics: RwLock<HashMap<String, Vec<LspDiagnostic>>>,
     capabilities: RwLock<Option<LspCapabilitySummary>>,
+    semantic_token_types: RwLock<Vec<String>>,
+    semantic_token_modifiers: RwLock<Vec<String>>,
     next_id: AtomicU64,
     _child: Mutex<Child>,
 }
@@ -610,6 +628,8 @@ impl LspSession {
             opened_documents: RwLock::new(HashSet::new()),
             diagnostics: RwLock::new(HashMap::new()),
             capabilities: RwLock::new(None),
+            semantic_token_types: RwLock::new(Vec::new()),
+            semantic_token_modifiers: RwLock::new(Vec::new()),
             next_id: AtomicU64::new(1),
             _child: Mutex::new(child),
         });
@@ -673,6 +693,22 @@ impl LspSession {
                     "publishDiagnostics": {
                         "relatedInformation": true,
                         "versionSupport": true
+                    },
+                    "semanticTokens": {
+                        "requests": { "full": true, "range": false },
+                        "tokenTypes": [
+                            "namespace", "type", "class", "enum", "interface", "struct", "typeParameter",
+                            "parameter", "variable", "property", "enumMember", "event", "function",
+                            "method", "macro", "keyword", "modifier", "comment", "string", "number",
+                            "regexp", "operator", "decorator"
+                        ],
+                        "tokenModifiers": [
+                            "declaration", "definition", "readonly", "static", "deprecated",
+                            "abstract", "async", "modification", "documentation", "defaultLibrary"
+                        ],
+                        "formats": ["relative"],
+                        "overlappingTokenSupport": false,
+                        "multilineTokenSupport": true
                     }
                 },
                 "workspace": {
@@ -684,9 +720,11 @@ impl LspSession {
         let initialize_result = session
             .request_with_timeout("initialize", initialize_params, INITIALIZE_TIMEOUT_SECS)
             .await?;
-        *session.capabilities.write().await = initialize_result
-            .get("capabilities")
-            .map(capability_summary_from);
+        let server_caps = initialize_result.get("capabilities").cloned().unwrap_or(Value::Null);
+        *session.capabilities.write().await = Some(capability_summary_from(&server_caps));
+        let (token_types, token_modifiers) = semantic_token_legend_from(&server_caps);
+        *session.semantic_token_types.write().await = token_types;
+        *session.semantic_token_modifiers.write().await = token_modifiers;
         session.notify("initialized", json!({})).await?;
         Ok(session)
     }
@@ -2206,6 +2244,73 @@ pub async fn lsp_selection_ranges(
     })
 }
 
+#[tauri::command]
+pub async fn lsp_semantic_tokens(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspSemanticTokensResult, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    let Some(session) = state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    else {
+        return Ok(LspSemanticTokensResult {
+            status,
+            tokens: Vec::new(),
+        });
+    };
+    if !session
+        .capabilities
+        .read()
+        .await
+        .as_ref()
+        .map(|caps| caps.semantic_tokens)
+        .unwrap_or(false)
+    {
+        return Ok(LspSemanticTokensResult {
+            status,
+            tokens: Vec::new(),
+        });
+    }
+    let value = session
+        .request(
+            "textDocument/semanticTokens/full",
+            json!({ "textDocument": { "uri": document.uri } }),
+        )
+        .await
+        .unwrap_or(Value::Null);
+    let token_types = session.semantic_token_types.read().await.clone();
+    let token_modifiers = session.semantic_token_modifiers.read().await.clone();
+    let tokens = parse_semantic_tokens(&value, &token_types, &token_modifiers);
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    Ok(LspSemanticTokensResult { status, tokens })
+}
+
 async fn lsp_document_feature_request(
     state: State<'_, AppState>,
     workspace_id: String,
@@ -2867,6 +2972,7 @@ fn capability_summary_from(capabilities: &Value) -> LspCapabilitySummary {
         type_hierarchy: has_provider(capabilities, "typeHierarchyProvider"),
         inlay_hint: has_provider(capabilities, "inlayHintProvider"),
         selection_range: has_provider(capabilities, "selectionRangeProvider"),
+        semantic_tokens: has_provider(capabilities, "semanticTokensProvider"),
         completion_trigger_characters: provider_strings(
             capabilities,
             "completionProvider",
@@ -3377,6 +3483,135 @@ fn parse_selection_ranges(value: &Value) -> Vec<LspRange> {
         current = parent;
     }
     ranges
+}
+
+fn semantic_token_legend_from(capabilities: &Value) -> (Vec<String>, Vec<String>) {
+    let legend = capabilities
+        .get("semanticTokensProvider")
+        .and_then(|provider| {
+            if provider.is_object() {
+                provider.get("legend")
+            } else {
+                None
+            }
+        });
+    let token_types = legend
+        .and_then(|legend| legend.get("tokenTypes"))
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_else(|| {
+            vec![
+                "namespace", "type", "class", "enum", "interface", "struct", "typeParameter",
+                "parameter", "variable", "property", "enumMember", "event", "function",
+                "method", "macro", "keyword", "modifier", "comment", "string", "number",
+                "regexp", "operator", "decorator",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect()
+        });
+    let token_modifiers = legend
+        .and_then(|legend| legend.get("tokenModifiers"))
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_else(|| {
+            vec![
+                "declaration", "definition", "readonly", "static", "deprecated",
+                "abstract", "async", "modification", "documentation", "defaultLibrary",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect()
+        });
+    (token_types, token_modifiers)
+}
+
+fn decode_semantic_token_data(
+    data: &[u64],
+    token_types: &[String],
+    token_modifiers: &[String],
+) -> Vec<LspSemanticToken> {
+    let mut tokens = Vec::new();
+    let mut line = 0u32;
+    let mut character = 0u32;
+    for chunk in data.chunks_exact(5) {
+        let delta_line = chunk[0] as u32;
+        let delta_start = chunk[1] as u32;
+        let length = chunk[2] as u32;
+        let type_index = chunk[3] as usize;
+        let modifier_bits = chunk[4];
+        if delta_line == 0 {
+            character = character.saturating_add(delta_start);
+        } else {
+            line = line.saturating_add(delta_line);
+            character = delta_start;
+        }
+        let token_type = token_types
+            .get(type_index)
+            .cloned()
+            .unwrap_or_else(|| format!("unknown:{type_index}"));
+        let mut modifiers = Vec::new();
+        for (index, name) in token_modifiers.iter().enumerate() {
+            if (modifier_bits >> index) & 1 == 1 {
+                modifiers.push(name.clone());
+            }
+        }
+        let end_character = character.saturating_add(length);
+        tokens.push(LspSemanticToken {
+            range: LspRange {
+                start: LspPosition { line, character },
+                end: LspPosition {
+                    line,
+                    character: end_character,
+                },
+            },
+            token_type,
+            modifiers,
+        });
+    }
+    tokens
+}
+
+fn parse_semantic_tokens(
+    value: &Value,
+    token_types: &[String],
+    token_modifiers: &[String],
+) -> Vec<LspSemanticToken> {
+    // full result: { data: number[], resultId?: string }
+    if let Some(data) = value
+        .get("data")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_u64)
+                .collect::<Vec<_>>()
+        })
+    {
+        return decode_semantic_token_data(&data, token_types, token_modifiers);
+    }
+    // Some servers return the data array directly.
+    if let Some(data) = value.as_array().map(|items| {
+        items
+            .iter()
+            .filter_map(Value::as_u64)
+            .collect::<Vec<_>>()
+    }) {
+        return decode_semantic_token_data(&data, token_types, token_modifiers);
+    }
+    Vec::new()
 }
 
 fn parse_location(value: &Value) -> Option<LspLocation> {
@@ -4023,5 +4258,35 @@ mod tests {
         assert_eq!(ranges.len(), 2);
         assert_eq!(ranges[0].start.character, 4);
         assert_eq!(ranges[1].start.character, 0);
+    }
+
+    #[test]
+    fn parses_semantic_tokens_relative_data() {
+        let (types, modifiers) = semantic_token_legend_from(&json!({
+            "semanticTokensProvider": {
+                "legend": {
+                    "tokenTypes": ["variable", "function", "class"],
+                    "tokenModifiers": ["declaration", "readonly"]
+                }
+            }
+        }));
+        assert_eq!(types, vec!["variable", "function", "class"]);
+        assert_eq!(modifiers, vec!["declaration", "readonly"]);
+
+        // Token A at 0:0 len 3 type variable+declaration
+        // Token B same line start+4 len 5 type function
+        let tokens = parse_semantic_tokens(
+            &json!({ "data": [0, 0, 3, 0, 1, 0, 4, 5, 1, 0] }),
+            &types,
+            &modifiers,
+        );
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0].token_type, "variable");
+        assert_eq!(tokens[0].modifiers, vec!["declaration"]);
+        assert_eq!(tokens[0].range.start.character, 0);
+        assert_eq!(tokens[0].range.end.character, 3);
+        assert_eq!(tokens[1].token_type, "function");
+        assert_eq!(tokens[1].range.start.character, 4);
+        assert_eq!(tokens[1].range.end.character, 9);
     }
 }

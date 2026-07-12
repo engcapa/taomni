@@ -48,6 +48,7 @@ const lspMocks = vi.hoisted(() => ({
   lspDocumentSymbols: vi.fn(),
   lspDocumentHighlights: vi.fn(),
   lspInlayHints: vi.fn(),
+  lspSemanticTokens: vi.fn(),
   lspSelectionRanges: vi.fn(),
   lspCompletion: vi.fn(),
   lspCompletionResolve: vi.fn(),
@@ -233,10 +234,12 @@ describe("CodeWorkspaceTab", () => {
     lspMocks.lspDocumentSymbols.mockReset();
     lspMocks.lspDocumentHighlights.mockReset();
     lspMocks.lspInlayHints.mockReset();
+    lspMocks.lspSemanticTokens.mockReset();
     lspMocks.lspSelectionRanges.mockReset();
     lspMocks.lspDocumentSymbols.mockResolvedValue({ status: documentStatus(), symbols: [] });
     lspMocks.lspDocumentHighlights.mockResolvedValue({ status: documentStatus(), highlights: [] });
     lspMocks.lspInlayHints.mockResolvedValue({ status: documentStatus(), hints: [] });
+    lspMocks.lspSemanticTokens.mockResolvedValue({ status: documentStatus(), tokens: [] });
     lspMocks.lspSelectionRanges.mockResolvedValue({ status: documentStatus(), ranges: [] });
     lspMocks.lspCompletion.mockReset();
     lspMocks.lspCompletion.mockResolvedValue({ status: documentStatus(), isIncomplete: false, items: [] });
@@ -1069,6 +1072,7 @@ describe("CodeWorkspaceTab", () => {
       typeHierarchy: false,
       inlayHint: false,
       selectionRange: false,
+      semanticTokens: false,
       completionTriggerCharacters: [],
       signatureTriggerCharacters: [],
     };
@@ -1172,6 +1176,7 @@ describe("CodeWorkspaceTab", () => {
         typeHierarchy: false,
         inlayHint: false,
         selectionRange: false,
+      semanticTokens: false,
         completionTriggerCharacters: [],
         signatureTriggerCharacters: [],
       },
@@ -1250,6 +1255,7 @@ describe("CodeWorkspaceTab", () => {
         typeHierarchy: false,
         inlayHint: false,
         selectionRange: false,
+      semanticTokens: false,
         completionTriggerCharacters: ["."],
         signatureTriggerCharacters: ["(", ","],
       },
@@ -1315,6 +1321,7 @@ describe("CodeWorkspaceTab", () => {
       typeHierarchy: true,
       inlayHint: false,
       selectionRange: false,
+      semanticTokens: false,
       completionTriggerCharacters: [],
       signatureTriggerCharacters: [],
     };
@@ -1390,6 +1397,7 @@ describe("CodeWorkspaceTab", () => {
       typeHierarchy: false,
       inlayHint: true,
       selectionRange: true,
+      semanticTokens: false,
       completionTriggerCharacters: [],
       signatureTriggerCharacters: [],
     };

@@ -34,6 +34,7 @@ import type {
   LspDiagnostic,
   LspDocumentHighlight,
   LspInlayHint,
+  LspSemanticToken,
   LspPosition,
   LspRange,
   LspSignatureHelpResult,
@@ -74,6 +75,7 @@ interface CodeMirrorHostProps {
   diagnostics: LspDiagnostic[];
   highlights?: LspDocumentHighlight[];
   inlayHints?: LspInlayHint[];
+  semanticTokens?: LspSemanticToken[];
   gitChanges?: GitLineChange[];
   gitBlame?: GitBlameLine | null;
   reveal: EditorRevealTarget | null;
@@ -233,6 +235,7 @@ export function CodeMirrorHost({
   diagnostics,
   highlights = [],
   inlayHints = [],
+  semanticTokens = [],
   gitChanges = [],
   gitBlame = null,
   reveal,
@@ -541,10 +544,10 @@ export function CodeMirrorHost({
     if (!view) return;
     view.dispatch({
       effects: intelligenceCompartment.current.reconfigure(
-        createLspIntelligenceChrome(view.state.doc, highlights, inlayHints),
+        createLspIntelligenceChrome(view.state.doc, highlights, inlayHints, semanticTokens),
       ),
     });
-  }, [highlights, inlayHints]);
+  }, [highlights, inlayHints, semanticTokens]);
 
   useEffect(() => {
     const view = viewRef.current;

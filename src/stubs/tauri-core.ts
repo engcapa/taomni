@@ -1295,6 +1295,12 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         ranges: [],
       } as T;
     }
+    case "lsp_semantic_tokens": {
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        tokens: [],
+      } as T;
+    }
     case "workspace_list_dir": {
       const repoRoot = (args?.repoRoot as string) || VFS_ROOT;
       const path = (args?.path as string) || "";

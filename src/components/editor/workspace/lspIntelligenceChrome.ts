@@ -5,6 +5,7 @@ import type {
   LspInlayHint,
   LspPosition,
   LspRange,
+  LspSemanticToken,
 } from "../../../lib/editor/lsp";
 import { offsetFromLspPosition } from "./lspPositions";
 
@@ -40,17 +41,32 @@ function rangeOffsets(doc: Text, range: LspRange): { from: number; to: number } 
   };
 }
 
+function semanticTokenClass(token: LspSemanticToken): string {
+  const type = token.tokenType.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const mods = token.modifiers
+    .map((modifier) => modifier.replace(/[^a-zA-Z0-9_-]/g, "-"))
+    .filter(Boolean)
+    .map((modifier) => `cm-lsp-sem-mod-${modifier}`);
+  return ["cm-lsp-sem", `cm-lsp-sem-${type}`, ...mods].join(" ");
+}
+
 export function buildLspIntelligenceDecorations(
   doc: Text,
   highlights: LspDocumentHighlight[],
   hints: LspInlayHint[],
+  semanticTokens: LspSemanticToken[] = [],
 ): DecorationSet {
-  const ranges = highlights.flatMap((highlight) => {
-    const { from, to } = rangeOffsets(doc, highlight.range);
+  const ranges = semanticTokens.flatMap((token) => {
+    const { from, to } = rangeOffsets(doc, token.range);
     if (to <= from) return [];
-    const suffix = highlight.kind === 3 ? "write" : highlight.kind === 2 ? "read" : "text";
-    return [Decoration.mark({ class: `cm-lsp-usage cm-lsp-usage-${suffix}` }).range(from, to)];
+    return [Decoration.mark({ class: semanticTokenClass(token) }).range(from, to)];
   });
+  for (const highlight of highlights) {
+    const { from, to } = rangeOffsets(doc, highlight.range);
+    if (to <= from) continue;
+    const suffix = highlight.kind === 3 ? "write" : highlight.kind === 2 ? "read" : "text";
+    ranges.push(Decoration.mark({ class: `cm-lsp-usage cm-lsp-usage-${suffix}` }).range(from, to));
+  }
   for (const hint of hints) {
     const position = offsetFromLspPosition(doc, hint.position);
     ranges.push(Decoration.widget({
@@ -65,9 +81,10 @@ export function createLspIntelligenceChrome(
   doc: Text,
   highlights: LspDocumentHighlight[],
   hints: LspInlayHint[],
+  semanticTokens: LspSemanticToken[] = [],
 ): Extension[] {
   return [
-    EditorView.decorations.of(buildLspIntelligenceDecorations(doc, highlights, hints)),
+    EditorView.decorations.of(buildLspIntelligenceDecorations(doc, highlights, hints, semanticTokens)),
     EditorView.theme({
       ".cm-lsp-usage-text": { backgroundColor: "color-mix(in srgb, var(--taomni-accent) 10%, transparent)" },
       ".cm-lsp-usage-read": { backgroundColor: "color-mix(in srgb, #38bdf8 18%, transparent)" },
@@ -84,6 +101,18 @@ export function createLspIntelligenceChrome(
       },
       ".cm-lsp-inlay-parameter": { opacity: "0.82" },
       ".cm-lsp-inlay-type": { opacity: "0.68" },
+      ".cm-lsp-sem-function, .cm-lsp-sem-method, .cm-lsp-sem-macro": { color: "#7dd3fc" },
+      ".cm-lsp-sem-class, .cm-lsp-sem-struct, .cm-lsp-sem-interface, .cm-lsp-sem-type, .cm-lsp-sem-enum": { color: "#f9a8d4" },
+      ".cm-lsp-sem-variable, .cm-lsp-sem-parameter, .cm-lsp-sem-property": { color: "#fde68a" },
+      ".cm-lsp-sem-namespace": { color: "#c4b5fd" },
+      ".cm-lsp-sem-keyword, .cm-lsp-sem-modifier": { color: "#fda4af" },
+      ".cm-lsp-sem-string": { color: "#86efac" },
+      ".cm-lsp-sem-number": { color: "#fdba74" },
+      ".cm-lsp-sem-comment": { color: "var(--taomni-code-muted)", fontStyle: "italic" },
+      ".cm-lsp-sem-operator, .cm-lsp-sem-regexp": { color: "#a5b4fc" },
+      ".cm-lsp-sem-mod-deprecated": { textDecoration: "line-through", opacity: "0.75" },
+      ".cm-lsp-sem-mod-readonly": { fontStyle: "italic" },
+      ".cm-lsp-sem-mod-defaultLibrary": { opacity: "0.9" },
     }),
   ];
 }

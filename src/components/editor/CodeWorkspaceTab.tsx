@@ -70,6 +70,7 @@ import {
   lspReferences,
   lspRename,
   lspSelectionRanges,
+  lspSemanticTokens,
   lspSignatureHelp,
   lspTypeDefinition,
   lspWorkspaceSymbols,
@@ -80,6 +81,7 @@ import {
   type LspDocumentSymbol,
   type LspDocumentHighlight,
   type LspInlayHint,
+  type LspSemanticToken,
   type LspLocation,
   type LspPosition,
   type LspRange,
@@ -636,6 +638,10 @@ export function CodeWorkspaceTab({
     secondary: [],
   });
   const [inlayHintsByGroup, setInlayHintsByGroup] = useState<Record<EditorGroupId, LspInlayHint[]>>({
+    primary: [],
+    secondary: [],
+  });
+  const [semanticTokensByGroup, setSemanticTokensByGroup] = useState<Record<EditorGroupId, LspSemanticToken[]>>({
     primary: [],
     secondary: [],
   });
@@ -2486,6 +2492,40 @@ export function CodeWorkspaceTab({
     viewportRanges,
   ]);
 
+  useEffect(() => {
+    const groupId = activeEditorGroupId;
+    const file = activeFile;
+    if (!file || file.loading || !activeCapabilities?.semanticTokens) {
+      setSemanticTokensByGroup((current) => ({ ...current, [groupId]: [] }));
+      return;
+    }
+    const descriptor = lspDescriptorForFile(file);
+    if (!descriptor) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void lspSemanticTokens(descriptor)
+        .then((result) => {
+          if (cancelled) return;
+          updateLspStatusForFile(file, result.status);
+          setSemanticTokensByGroup((current) => ({ ...current, [groupId]: result.tokens }));
+        })
+        .catch(() => {
+          if (!cancelled) setSemanticTokensByGroup((current) => ({ ...current, [groupId]: [] }));
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [
+    activeCapabilities?.semanticTokens,
+    activeEditorGroupId,
+    activeFile,
+    activeFile?.text,
+    lspDescriptorForFile,
+    updateLspStatusForFile,
+  ]);
+
   const getLspSelectionRanges = useCallback(async (
     file: OpenFileState,
     selection: EditorSelectionRange,
@@ -4085,6 +4125,7 @@ export function CodeWorkspaceTab({
         activeDiagnostics={groupDiagnostics}
         activeHighlights={highlightsByGroup[groupId]}
         activeInlayHints={inlayHintsByGroup[groupId]}
+        activeSemanticTokens={semanticTokensByGroup[groupId]}
         activeGitChanges={groupFile ? gitLineChangesByFile[groupFile.key] ?? [] : []}
         activeGitBlame={gitBlameByGroup[groupId]}
         activeCapabilities={groupCapabilities}

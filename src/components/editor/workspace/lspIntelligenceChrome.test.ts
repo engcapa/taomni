@@ -48,4 +48,25 @@ describe("LSP intelligence chrome", () => {
     expect(classes).toContain("cm-lsp-usage cm-lsp-usage-write");
     expect(widgets).toBe(1);
   });
+
+  it("builds semantic token marks with type and modifier classes", () => {
+    const doc = EditorState.create({ doc: "fn main() {}" }).doc;
+    const decorations = buildLspIntelligenceDecorations(
+      doc,
+      [],
+      [],
+      [{
+        range: { start: { line: 0, character: 3 }, end: { line: 0, character: 7 } },
+        tokenType: "function",
+        modifiers: ["declaration", "defaultLibrary"],
+      }],
+    );
+    const classes: string[] = [];
+    decorations.between(0, doc.length, (_from, _to, value) => {
+      if (value.spec.class) classes.push(value.spec.class);
+    });
+    expect(classes.some((item) => item.includes("cm-lsp-sem-function"))).toBe(true);
+    expect(classes.some((item) => item.includes("cm-lsp-sem-mod-declaration"))).toBe(true);
+    expect(classes.some((item) => item.includes("cm-lsp-sem-mod-defaultLibrary"))).toBe(true);
+  });
 });

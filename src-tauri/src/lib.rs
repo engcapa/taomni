@@ -459,6 +459,7 @@ pub fn run() {
             lsp::lsp_document_highlights,
             lsp::lsp_inlay_hints,
             lsp::lsp_selection_ranges,
+            lsp::lsp_semantic_tokens,
             lsp::lsp_signature_help,
             windowing::open_detached_window,
             windowing::close_current_detached_window,

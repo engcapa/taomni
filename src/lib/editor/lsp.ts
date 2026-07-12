@@ -60,6 +60,7 @@ export interface LspCapabilitySummary {
   typeHierarchy: boolean;
   inlayHint: boolean;
   selectionRange: boolean;
+  semanticTokens: boolean;
   completionTriggerCharacters: string[];
   signatureTriggerCharacters: string[];
 }
@@ -460,6 +461,17 @@ export interface LspSelectionRangesResult {
   ranges: LspRange[];
 }
 
+export interface LspSemanticToken {
+  range: LspRange;
+  tokenType: string;
+  modifiers: string[];
+}
+
+export interface LspSemanticTokensResult {
+  status: LspDocumentStatus;
+  tokens: LspSemanticToken[];
+}
+
 export function lspWorkspaceSymbols(
   descriptor: LspDocumentDescriptor,
   query: string,
@@ -564,6 +576,14 @@ export function lspSelectionRanges(
     ...documentArgs(descriptor),
     line: position.line,
     character: position.character,
+  });
+}
+
+export function lspSemanticTokens(
+  descriptor: LspDocumentDescriptor,
+): Promise<LspSemanticTokensResult> {
+  return invoke<LspSemanticTokensResult>("lsp_semantic_tokens", {
+    ...documentArgs(descriptor),
   });
 }
 
