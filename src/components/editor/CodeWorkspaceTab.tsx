@@ -123,9 +123,12 @@ import {
   writeWorkspaceLayoutSnapshot,
 } from "./workspace/workspaceLayoutPersistence";
 import { LocalHistoryDialog } from "./workspace/LocalHistoryDialog";
+import { EditorSelectionAiToolbar, type EditorAiAction } from "./workspace/EditorSelectionAiToolbar";
+import { EditorAiRewriteDialog } from "./workspace/EditorAiRewriteDialog";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { writeText } from "../../lib/clipboard";
 import { useContextMenu } from "../ContextMenu";
+import { useChatStore } from "../../stores/chatStore";
 import { type EditorSelectionRange } from "./workspace/CodeMirrorHost";
 import { fallbackWordHighlights } from "./workspace/lspIntelligenceChrome";
 import {
@@ -320,6 +323,7 @@ export function CodeWorkspaceTab({
   const setWorkspaceStatusSegments = useCodeWorkspaceStatusStore((s) => s.setStatus);
   const setWorkspaceStatusActions = useCodeWorkspaceStatusStore((s) => s.setActions);
   const clearWorkspaceStatus = useCodeWorkspaceStatusStore((s) => s.clearForTab);
+  const attachToComposer = useChatStore((s) => s.attachToComposer);
   const workspaceInstanceId = useMemo(
     () => workspace.workspaceInstanceId ?? workspace.workspaceId ?? workspace.repoRoot?.trim() ?? tabId,
     [tabId, workspace.repoRoot, workspace.workspaceId, workspace.workspaceInstanceId],
@@ -684,7 +688,18 @@ export function CodeWorkspaceTab({
     start: { line: 0, character: 0 },
     end: { line: 0, character: 0 },
     empty: true,
+    text: "",
+    rect: null,
   });
+  const [editorAiSelection, setEditorAiSelection] = useState<EditorSelectionRange | null>(null);
+  const [aiRewriteState, setAiRewriteState] = useState<{
+    key: string;
+    path: string;
+    original: string;
+    proposal: string;
+    instruction: string;
+    range: EditorSelectionRange;
+  } | null>(null);
   const workspaceCommandRunnerRef = useRef<(commandId: string, context?: WorkspaceCommandContext) => boolean>(() => false);
   const goToTypeDefinitionRef = useRef<(file: OpenFileState, position: LspPosition) => Promise<boolean>>(async () => false);
   const goToImplementationRef = useRef<(file: OpenFileState, position: LspPosition) => Promise<boolean>>(async () => false);
@@ -1936,6 +1951,90 @@ export function CodeWorkspaceTab({
     updateFileText(key, text);
     setStatusMessage("Restored local history snapshot into the editor buffer");
   }, [setStatusMessage, updateFileText]);
+
+  const applySelectionReplacement = useCallback((key: string, range: EditorSelectionRange, nextText: string) => {
+    const file = openFilesRef.current[key];
+    if (!file) return;
+    const lines = file.text.split("\n");
+    const offsetAt = (position: { line: number; character: number }) => {
+      let offset = 0;
+      for (let line = 0; line < Math.min(position.line, lines.length); line += 1) {
+        offset += (lines[line]?.length ?? 0) + 1;
+      }
+      const lineText = lines[Math.min(position.line, Math.max(0, lines.length - 1))] ?? "";
+      return offset + Math.min(Math.max(0, position.character), lineText.length);
+    };
+    const from = offsetAt(range.start);
+    const to = offsetAt(range.end);
+    const start = Math.min(from, to);
+    const end = Math.max(from, to);
+    const replaced = `${file.text.slice(0, start)}${nextText}${file.text.slice(end)}`;
+    updateFileText(key, replaced);
+  }, [updateFileText]);
+
+  const handleEditorAiAction = useCallback(async (action: EditorAiAction, text: string) => {
+    const selection = editorSelectionRef.current;
+    const file = activeKey ? openFilesRef.current[activeKey] ?? null : null;
+    if (!file || selection.empty || !text.trim()) return;
+    const pathLabel = file.subtitle || file.path;
+    if (action === "explain") {
+      // explainSelection wraps the payload as terminal output; stage a code-specific prompt instead.
+      await attachToComposer([
+        `请解释下面这段代码的作用、关键逻辑和潜在问题：`,
+        `文件: ${pathLabel}`,
+        "",
+        "```",
+        text,
+        "```",
+      ].join("\n"));
+      setEditorAiSelection(null);
+      setStatusMessage("Staged explain request in AI chat");
+      return;
+    }
+    if (action === "fix") {
+      const prompt = [
+        `请修复下面这段代码中的问题，保持原有意图，并只返回修复后的完整代码块。`,
+        `文件: ${pathLabel}`,
+        "",
+        "```",
+        text,
+        "```",
+      ].join("\n");
+      await attachToComposer(prompt);
+      setAiRewriteState({
+        key: file.key,
+        path: pathLabel,
+        original: text,
+        proposal: text,
+        instruction: "Fix issues in the selected code",
+        range: selection,
+      });
+      setEditorAiSelection(null);
+      setStatusMessage("Staged fix request in AI chat — paste the result into the proposal or apply after editing");
+      return;
+    }
+    const instruction = "Rewrite the selected code";
+    const prompt = [
+      `请按指令改写下面的代码，只返回改写后的完整代码块。`,
+      `文件: ${pathLabel}`,
+      `指令: ${instruction}`,
+      "",
+      "```",
+      text,
+      "```",
+    ].join("\n");
+    await attachToComposer(prompt);
+    setAiRewriteState({
+      key: file.key,
+      path: pathLabel,
+      original: text,
+      proposal: text,
+      instruction,
+      range: selection,
+    });
+    setEditorAiSelection(null);
+    setStatusMessage("Staged rewrite request in AI chat");
+  }, [activeKey, attachToComposer, setStatusMessage]);
 
   const saveOpenBufferText = useCallback(async (key: string, textToSave: string) => {
     const file = openFilesRef.current[key];
@@ -4066,7 +4165,10 @@ export function CodeWorkspaceTab({
         onCompleteResolve={resolveLspCompletion}
         onSignatureHelp={getLspSignatureHelp}
         onSelectionChange={(selection) => {
-          if (groupId === activeEditorGroupId) editorSelectionRef.current = selection;
+          if (groupId === activeEditorGroupId) {
+            editorSelectionRef.current = selection;
+            setEditorAiSelection(!selection.empty && selection.text.trim().length >= 2 ? selection : null);
+          }
           setCursorPositions((current) => ({ ...current, [groupId]: selection.end }));
         }}
         onViewportChange={(range) => {
@@ -4557,6 +4659,48 @@ export function CodeWorkspaceTab({
           currentText={openFiles[localHistoryTarget.key].text}
           onClose={() => setLocalHistoryTarget(null)}
           onRestore={(text) => restoreLocalHistoryText(localHistoryTarget.key, text)}
+        />
+      )}
+      <EditorSelectionAiToolbar
+        visible={!!editorAiSelection && !aiRewriteState}
+        rect={editorAiSelection?.rect ?? null}
+        selectionText={editorAiSelection?.text ?? ""}
+        onAction={(action, text) => {
+          void handleEditorAiAction(action, text);
+        }}
+        onDismiss={() => setEditorAiSelection(null)}
+      />
+      {aiRewriteState && (
+        <EditorAiRewriteDialog
+          path={aiRewriteState.path}
+          original={aiRewriteState.original}
+          proposal={aiRewriteState.proposal}
+          instruction={aiRewriteState.instruction}
+          onInstructionChange={(value) => setAiRewriteState((current) => (
+            current ? { ...current, instruction: value } : current
+          ))}
+          onProposalChange={(value) => setAiRewriteState((current) => (
+            current ? { ...current, proposal: value } : current
+          ))}
+          onClose={() => setAiRewriteState(null)}
+          onRegenerate={() => {
+            const prompt = [
+              `请按指令改写下面的代码，只返回改写后的完整代码块。`,
+              `文件: ${aiRewriteState.path}`,
+              `指令: ${aiRewriteState.instruction || "Rewrite the selected code"}`,
+              "",
+              "```",
+              aiRewriteState.original,
+              "```",
+            ].join("\n");
+            void attachToComposer(prompt);
+            setStatusMessage("Re-staged rewrite prompt in AI chat");
+          }}
+          onApply={() => {
+            applySelectionReplacement(aiRewriteState.key, aiRewriteState.range, aiRewriteState.proposal);
+            setAiRewriteState(null);
+            setStatusMessage("Applied AI proposal to the selection");
+          }}
         />
       )}
     </div>

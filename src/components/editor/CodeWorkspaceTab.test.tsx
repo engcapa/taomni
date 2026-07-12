@@ -86,6 +86,15 @@ vi.mock("../../lib/ipc", () => ipcMocks);
 
 vi.mock("../../lib/git", () => gitMocks);
 
+const chatMocks = vi.hoisted(() => ({
+  attachToComposer: vi.fn(async () => undefined),
+  explainSelection: vi.fn(async () => undefined),
+}));
+
+vi.mock("../../stores/chatStore", () => ({
+  useChatStore: (selector: (state: typeof chatMocks) => unknown) => selector(chatMocks),
+}));
+
 vi.mock("../git/diffLanguage", () => ({
   languageForPath: vi.fn(async () => null),
 }));

@@ -62,6 +62,9 @@ export interface EditorSelectionRange {
   start: LspPosition;
   end: LspPosition;
   empty: boolean;
+  text: string;
+  /** Viewport-relative rect of the selection head; null when empty/unavailable. */
+  rect: { top: number; left: number; right: number; bottom: number } | null;
 }
 
 interface CodeMirrorHostProps {
@@ -294,10 +297,25 @@ export function CodeMirrorHost({
     const main = view.state.selection.main;
     const from = Math.min(main.from, main.to);
     const to = Math.max(main.from, main.to);
+    let rect: EditorSelectionRange["rect"] = null;
+    if (!main.empty) {
+      const startCoords = view.coordsAtPos(from);
+      const endCoords = view.coordsAtPos(to);
+      if (startCoords && endCoords) {
+        rect = {
+          top: Math.min(startCoords.top, endCoords.top),
+          left: Math.min(startCoords.left, endCoords.left),
+          right: Math.max(startCoords.right, endCoords.right),
+          bottom: Math.max(startCoords.bottom, endCoords.bottom),
+        };
+      }
+    }
     handler({
       start: lspPositionFromOffset(view.state.doc, from),
       end: lspPositionFromOffset(view.state.doc, to),
       empty: main.empty,
+      text: main.empty ? "" : view.state.doc.sliceString(from, to),
+      rect,
     });
   };
 
@@ -370,6 +388,8 @@ export function CodeMirrorHost({
         start: lspPositionFromOffset(view.state.doc, main.from),
         end: lspPositionFromOffset(view.state.doc, main.to),
         empty: main.empty,
+        text: main.empty ? "" : view.state.doc.sliceString(main.from, main.to),
+        rect: null,
       };
       void handler(selection).then((ranges) => {
         const current = viewRef.current;
