@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ControlBar } from "./ControlBar";
 import type { AppCommand } from "../menubar/commands";
@@ -58,14 +58,22 @@ vi.mock("../../stores/updateStore", () => ({
     }),
 }));
 
-function renderControlBar(onCommand: (command: AppCommand) => void) {
+function renderControlBar(
+  onCommand: (command: AppCommand) => void,
+  workspace: {
+    commands?: Parameters<typeof ControlBar>[0]["workspaceCommands"];
+    onCommand?: (commandId: string) => void;
+  } = {},
+) {
   return render(
     <ControlBar
       activeTabClosable
       nativeMenu={false}
       xServerEnabled={false}
       quickConnectVisible={false}
+      workspaceCommands={workspace.commands}
       onCommand={onCommand}
+      onWorkspaceCommand={workspace.onCommand}
       onToggleSidebar={vi.fn()}
       onStartLocalTerminal={vi.fn()}
       onConnectSession={vi.fn()}
@@ -95,5 +103,21 @@ describe("ControlBar settings button", () => {
     expect(screen.queryByTestId("sidebar-toggle")).not.toBeInTheDocument();
     expect(screen.queryByTestId("ribbon-settings")).not.toBeInTheDocument();
     expect(onCommand).not.toHaveBeenCalled();
+  });
+
+  it("exposes commands contributed by the active Code Workspace", () => {
+    const onWorkspaceCommand = vi.fn();
+    renderControlBar(vi.fn(), {
+      commands: [
+        { id: "workspace.findInFiles", title: "Find in Files", category: "Search", keybinding: "Ctrl+Shift+F", enabled: true },
+      ],
+      onCommand: onWorkspaceCommand,
+    });
+
+    fireEvent.click(screen.getByTestId("app-main-menu"));
+    fireEvent.mouseEnter(screen.getByTestId("context-menu-item-tools"));
+    fireEvent.mouseEnter(screen.getByTestId("context-menu-workspace-actions"));
+    fireEvent.click(screen.getByTestId("context-menu-workspace-command-workspace.findInFiles"));
+    expect(onWorkspaceCommand).toHaveBeenCalledWith("workspace.findInFiles");
   });
 });

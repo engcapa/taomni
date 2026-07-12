@@ -1,16 +1,16 @@
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use std::collections::{hash_map::DefaultHasher, HashMap, HashSet};
+use serde_json::{Value, json};
+use std::collections::{HashMap, HashSet, hash_map::DefaultHasher};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::State;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
-use tokio::sync::{oneshot, Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock, oneshot};
 
 const REQUEST_TIMEOUT_SECS: u64 = 8;
 const INITIALIZE_TIMEOUT_SECS: u64 = 20;
@@ -91,6 +91,9 @@ pub struct LspDocumentStatus {
     pub selected_command: Option<String>,
     pub install_hint: Option<String>,
     pub error: Option<String>,
+    /// Present only while a session is active for this document.
+    #[serde(default)]
+    pub capabilities: Option<LspCapabilitySummary>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -147,6 +150,235 @@ pub struct LspLocationsResult {
     pub locations: Vec<LspLocation>,
 }
 
+/// One entry of a flattened `textDocument/documentSymbol` tree; `depth`
+/// preserves the hierarchy for indented rendering.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspDocumentSymbol {
+    pub name: String,
+    pub detail: Option<String>,
+    pub kind: u32,
+    pub depth: u32,
+    pub range: LspRange,
+    pub selection_range: LspRange,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspDocumentSymbolsResult {
+    pub status: LspDocumentStatus,
+    pub symbols: Vec<LspDocumentSymbol>,
+}
+
+/// Workspace-wide symbol hit from `workspace/symbol`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspWorkspaceSymbol {
+    pub name: String,
+    pub kind: u32,
+    pub container_name: Option<String>,
+    pub uri: String,
+    pub path: Option<String>,
+    pub range: LspRange,
+    pub selection_range: LspRange,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspWorkspaceSymbolsResult {
+    pub status: LspDocumentStatus,
+    pub symbols: Vec<LspWorkspaceSymbol>,
+}
+
+/// Normalized CallHierarchyItem / TypeHierarchyItem. `raw` is echoed back to
+/// the server for lazy child requests so opaque server `data` is preserved.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspHierarchyItem {
+    pub name: String,
+    pub detail: Option<String>,
+    pub kind: u32,
+    pub uri: String,
+    pub path: Option<String>,
+    pub range: LspRange,
+    pub selection_range: LspRange,
+    pub raw: Value,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspHierarchyPrepareResult {
+    pub status: LspDocumentStatus,
+    pub items: Vec<LspHierarchyItem>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspCallHierarchyEntry {
+    pub item: LspHierarchyItem,
+    pub from_ranges: Vec<LspRange>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspCallHierarchyResult {
+    pub status: LspDocumentStatus,
+    pub entries: Vec<LspCallHierarchyEntry>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspTypeHierarchyResult {
+    pub status: LspDocumentStatus,
+    pub items: Vec<LspHierarchyItem>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspDocumentHighlight {
+    pub range: LspRange,
+    /// 1 = text, 2 = read, 3 = write.
+    pub kind: Option<u8>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspDocumentHighlightsResult {
+    pub status: LspDocumentStatus,
+    pub highlights: Vec<LspDocumentHighlight>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspInlayHint {
+    pub position: LspPosition,
+    pub label: String,
+    /// 1 = type, 2 = parameter.
+    pub kind: Option<u8>,
+    pub tooltip: Option<String>,
+    pub padding_left: bool,
+    pub padding_right: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspInlayHintsResult {
+    pub status: LspDocumentStatus,
+    pub hints: Vec<LspInlayHint>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspSelectionRangesResult {
+    pub status: LspDocumentStatus,
+    /// Innermost to outermost range for the requested position.
+    pub ranges: Vec<LspRange>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspSemanticToken {
+    pub range: LspRange,
+    pub token_type: String,
+    pub modifiers: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspSemanticTokensResult {
+    pub status: LspDocumentStatus,
+    pub tokens: Vec<LspSemanticToken>,
+}
+
+/// Feature summary distilled from the server's `initialize` response so the
+/// UI can enable/disable entry points per capability instead of guessing.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspCapabilitySummary {
+    pub completion: bool,
+    pub signature_help: bool,
+    pub hover: bool,
+    pub definition: bool,
+    pub type_definition: bool,
+    pub implementation: bool,
+    pub references: bool,
+    pub document_symbol: bool,
+    pub workspace_symbol: bool,
+    pub rename: bool,
+    pub formatting: bool,
+    pub range_formatting: bool,
+    pub code_action: bool,
+    pub document_highlight: bool,
+    pub call_hierarchy: bool,
+    pub type_hierarchy: bool,
+    pub inlay_hint: bool,
+    pub selection_range: bool,
+    pub semantic_tokens: bool,
+    pub completion_trigger_characters: Vec<String>,
+    pub signature_trigger_characters: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspTextEdit {
+    pub range: LspRange,
+    pub new_text: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspCompletionItem {
+    pub label: String,
+    pub kind: Option<u32>,
+    pub detail: Option<String>,
+    pub documentation: Option<String>,
+    pub insert_text: Option<String>,
+    /// 1 = plain text, 2 = snippet (`${1:placeholder}` syntax).
+    pub insert_text_format: Option<u32>,
+    pub filter_text: Option<String>,
+    pub sort_text: Option<String>,
+    pub text_edit: Option<LspTextEdit>,
+    pub additional_text_edits: Vec<LspTextEdit>,
+    /// Original server item, echoed back verbatim for `completionItem/resolve`.
+    pub raw: Value,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspCompletionResult {
+    pub status: LspDocumentStatus,
+    pub is_incomplete: bool,
+    pub items: Vec<LspCompletionItem>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspSignatureParameter {
+    pub label: String,
+    pub documentation: Option<String>,
+    /// Offsets into the signature label when the server sends `[start, end]`.
+    pub label_start: Option<u32>,
+    pub label_end: Option<u32>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspSignatureInfo {
+    pub label: String,
+    pub documentation: Option<String>,
+    pub parameters: Vec<LspSignatureParameter>,
+    pub active_parameter: Option<u32>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspSignatureHelpResult {
+    pub status: LspDocumentStatus,
+    pub signatures: Vec<LspSignatureInfo>,
+    pub active_signature: u32,
+    pub active_parameter: u32,
+}
+
 #[derive(Clone, Debug)]
 struct DetectedLanguage {
     preset_id: String,
@@ -175,6 +407,12 @@ struct PendingResponse {
     sender: oneshot::Sender<Result<Value, String>>,
 }
 
+#[derive(Clone, Debug)]
+struct SemanticTokensCache {
+    result_id: String,
+    data: Vec<u64>,
+}
+
 pub struct LspManager {
     sessions: Mutex<HashMap<String, Arc<LspSession>>>,
 }
@@ -188,6 +426,12 @@ struct LspSession {
     pending: Mutex<HashMap<u64, PendingResponse>>,
     opened_documents: RwLock<HashSet<String>>,
     diagnostics: RwLock<HashMap<String, Vec<LspDiagnostic>>>,
+    capabilities: RwLock<Option<LspCapabilitySummary>>,
+    semantic_token_types: RwLock<Vec<String>>,
+    semantic_token_modifiers: RwLock<Vec<String>>,
+    semantic_tokens_delta: RwLock<bool>,
+    semantic_tokens_cache: RwLock<HashMap<String, SemanticTokensCache>>,
+    semantic_tokens_lock: Mutex<()>,
     next_id: AtomicU64,
     _child: Mutex<Child>,
 }
@@ -229,6 +473,7 @@ impl LspManager {
                 selected_command: None,
                 install_hint: None,
                 error: Some("No language server preset for this file type".into()),
+                capabilities: None,
             };
         };
 
@@ -242,11 +487,14 @@ impl LspManager {
             .as_ref()
             .or(configured_command.as_ref())
             .map(|cmd| command_line(&cmd.command, &cmd.args));
-        let active = if let Some(cmd) = command.as_ref() {
+        let (active, capabilities) = if let Some(cmd) = command.as_ref() {
             let key = session_key(document, preset, cmd);
-            self.sessions.lock().await.contains_key(&key.map_key())
+            match self.sessions.lock().await.get(&key.map_key()) {
+                Some(session) => (true, session.capabilities.read().await.clone()),
+                None => (false, None),
+            }
         } else {
-            false
+            (false, None)
         };
         let using_custom = custom_command_to_preset(custom_command).is_some();
         LspDocumentStatus {
@@ -277,6 +525,7 @@ impl LspManager {
                     preset.display_name
                 ))
             },
+            capabilities,
         }
     }
 
@@ -329,6 +578,7 @@ impl LspManager {
                     selected_command: Some(command_line(&command.command, &command.args)),
                     install_hint: Some(command.install_hint.clone()),
                     error: Some(error),
+                    capabilities: None,
                 });
             }
         };
@@ -386,6 +636,12 @@ impl LspSession {
             pending: Mutex::new(HashMap::new()),
             opened_documents: RwLock::new(HashSet::new()),
             diagnostics: RwLock::new(HashMap::new()),
+            capabilities: RwLock::new(None),
+            semantic_token_types: RwLock::new(Vec::new()),
+            semantic_token_modifiers: RwLock::new(Vec::new()),
+            semantic_tokens_delta: RwLock::new(false),
+            semantic_tokens_cache: RwLock::new(HashMap::new()),
+            semantic_tokens_lock: Mutex::new(()),
             next_id: AtomicU64::new(1),
             _child: Mutex::new(child),
         });
@@ -420,9 +676,51 @@ impl LspSession {
                     "references": {
                         "dynamicRegistration": false
                     },
+                    "completion": {
+                        "dynamicRegistration": false,
+                        "contextSupport": true,
+                        "completionItem": {
+                            "snippetSupport": true,
+                            "insertReplaceSupport": true,
+                            "documentationFormat": ["markdown", "plaintext"],
+                            "resolveSupport": {
+                                "properties": ["documentation", "detail", "additionalTextEdits"]
+                            }
+                        },
+                        "completionItemKind": {
+                            "valueSet": (1..=25u32).collect::<Vec<_>>()
+                        }
+                    },
+                    "signatureHelp": {
+                        "contextSupport": true,
+                        "signatureInformation": {
+                            "documentationFormat": ["markdown", "plaintext"],
+                            "parameterInformation": { "labelOffsetSupport": true },
+                            "activeParameterSupport": true
+                        }
+                    },
+                    "documentSymbol": {
+                        "hierarchicalDocumentSymbolSupport": true
+                    },
                     "publishDiagnostics": {
                         "relatedInformation": true,
                         "versionSupport": true
+                    },
+                    "semanticTokens": {
+                        "requests": { "full": { "delta": true }, "range": false },
+                        "tokenTypes": [
+                            "namespace", "type", "class", "enum", "interface", "struct", "typeParameter",
+                            "parameter", "variable", "property", "enumMember", "event", "function",
+                            "method", "macro", "keyword", "modifier", "comment", "string", "number",
+                            "regexp", "operator", "decorator"
+                        ],
+                        "tokenModifiers": [
+                            "declaration", "definition", "readonly", "static", "deprecated",
+                            "abstract", "async", "modification", "documentation", "defaultLibrary"
+                        ],
+                        "formats": ["relative"],
+                        "overlappingTokenSupport": false,
+                        "multilineTokenSupport": true
                     }
                 },
                 "workspace": {
@@ -431,9 +729,15 @@ impl LspSession {
                 }
             }
         });
-        session
+        let initialize_result = session
             .request_with_timeout("initialize", initialize_params, INITIALIZE_TIMEOUT_SECS)
             .await?;
+        let server_caps = initialize_result.get("capabilities").cloned().unwrap_or(Value::Null);
+        *session.capabilities.write().await = Some(capability_summary_from(&server_caps));
+        let (token_types, token_modifiers) = semantic_token_legend_from(&server_caps);
+        *session.semantic_token_types.write().await = token_types;
+        *session.semantic_token_modifiers.write().await = token_modifiers;
+        *session.semantic_tokens_delta.write().await = semantic_token_delta_supported(&server_caps);
         session.notify("initialized", json!({})).await?;
         Ok(session)
     }
@@ -861,6 +1165,12 @@ pub async fn lsp_close_document(
             .map_err(|e| format!("LSP didClose failed: {e}"))?;
         session.opened_documents.write().await.remove(&document.uri);
         session.diagnostics.write().await.remove(&document.uri);
+        let _semantic_tokens_guard = session.semantic_tokens_lock.lock().await;
+        session
+            .semantic_tokens_cache
+            .write()
+            .await
+            .remove(&document.uri);
     }
     Ok(state
         .lsp
@@ -1093,6 +1403,1297 @@ async fn lsp_location_request(
     Ok(LspLocationsResult {
         status,
         locations: parse_locations(&result),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_document_symbols(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspDocumentSymbolsResult, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let session = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session,
+        None => {
+            let status = state
+                .lsp
+                .document_status(
+                    &document,
+                    server_command_id.as_deref(),
+                    custom_server_command.as_ref(),
+                )
+                .await;
+            return Ok(LspDocumentSymbolsResult {
+                status,
+                symbols: Vec::new(),
+            });
+        }
+    };
+    let result = session
+        .request(
+            "textDocument/documentSymbol",
+            json!({ "textDocument": { "uri": document.uri } }),
+        )
+        .await
+        .unwrap_or(Value::Null);
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    let mut symbols = Vec::new();
+    collect_document_symbols(&result, 0, &mut symbols);
+    Ok(LspDocumentSymbolsResult { status, symbols })
+}
+
+#[tauri::command]
+pub async fn lsp_completion(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    trigger_character: Option<String>,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspCompletionResult, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let session = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session,
+        None => {
+            let status = state
+                .lsp
+                .document_status(
+                    &document,
+                    server_command_id.as_deref(),
+                    custom_server_command.as_ref(),
+                )
+                .await;
+            return Ok(LspCompletionResult {
+                status,
+                is_incomplete: false,
+                items: Vec::new(),
+            });
+        }
+    };
+    let context = match trigger_character.as_deref().filter(|c| !c.is_empty()) {
+        Some(character) => json!({ "triggerKind": 2, "triggerCharacter": character }),
+        None => json!({ "triggerKind": 1 }),
+    };
+    let result = session
+        .request(
+            "textDocument/completion",
+            json!({
+                "textDocument": { "uri": document.uri },
+                "position": { "line": line, "character": character },
+                "context": context,
+            }),
+        )
+        .await
+        .unwrap_or(Value::Null);
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    let (is_incomplete, items) = parse_completion_response(&result);
+    Ok(LspCompletionResult {
+        status,
+        is_incomplete,
+        items,
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_completion_resolve(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    item: Value,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<Option<LspCompletionItem>, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let Some(session) = state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    else {
+        return Ok(None);
+    };
+    let resolved = session
+        .request("completionItem/resolve", item.clone())
+        .await
+        .unwrap_or(Value::Null);
+    // Servers without resolve support may error or return null; fall back to
+    // the original item so callers always get something applicable.
+    Ok(parse_completion_item(&resolved).or_else(|| parse_completion_item(&item)))
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspFormattingResult {
+    pub status: LspDocumentStatus,
+    pub edits: Vec<LspTextEdit>,
+}
+
+/// One file's worth of TextEdits from a WorkspaceEdit.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspFileTextEdits {
+    pub uri: String,
+    pub path: Option<String>,
+    pub edits: Vec<LspTextEdit>,
+}
+
+/// Normalized workspace edit for clients (rename / code actions / replace).
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspWorkspaceEdit {
+    pub document_edits: Vec<LspFileTextEdits>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspCodeAction {
+    pub title: String,
+    pub kind: Option<String>,
+    pub is_preferred: bool,
+    pub edit: Option<LspWorkspaceEdit>,
+    pub command: Option<String>,
+    pub command_arguments: Option<Value>,
+    /// Original server action for executeCommand / resolve.
+    pub raw: Value,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspCodeActionsResult {
+    pub status: LspDocumentStatus,
+    pub actions: Vec<LspCodeAction>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspPrepareRenameResult {
+    pub status: LspDocumentStatus,
+    pub range: Option<LspRange>,
+    pub placeholder: Option<String>,
+    pub allowed: bool,
+    pub message: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspRenameResult {
+    pub status: LspDocumentStatus,
+    pub edit: LspWorkspaceEdit,
+}
+
+#[tauri::command]
+pub async fn lsp_prepare_rename(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspPrepareRenameResult, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let session = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session,
+        None => {
+            let status = state
+                .lsp
+                .document_status(
+                    &document,
+                    server_command_id.as_deref(),
+                    custom_server_command.as_ref(),
+                )
+                .await;
+            return Ok(LspPrepareRenameResult {
+                status,
+                range: None,
+                placeholder: None,
+                allowed: false,
+                message: Some("Language server is not active".into()),
+            });
+        }
+    };
+    let result = session
+        .request(
+            "textDocument/prepareRename",
+            json!({
+                "textDocument": { "uri": document.uri },
+                "position": { "line": line, "character": character },
+            }),
+        )
+        .await;
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    match result {
+        Ok(Value::Null) | Err(_) => Ok(LspPrepareRenameResult {
+            status,
+            range: None,
+            placeholder: None,
+            allowed: false,
+            message: Some("Rename is not available at this position".into()),
+        }),
+        Ok(value) => {
+            // Range | { range, placeholder } | { defaultBehavior: true }
+            if value.get("defaultBehavior").and_then(Value::as_bool) == Some(true) {
+                return Ok(LspPrepareRenameResult {
+                    status,
+                    range: None,
+                    placeholder: None,
+                    allowed: true,
+                    message: None,
+                });
+            }
+            let range = value
+                .get("range")
+                .and_then(parse_range)
+                .or_else(|| parse_range(&value));
+            let placeholder = value
+                .get("placeholder")
+                .and_then(Value::as_str)
+                .map(ToString::to_string);
+            let allowed = range.is_some() || placeholder.is_some();
+            Ok(LspPrepareRenameResult {
+                status,
+                range,
+                placeholder,
+                allowed,
+                message: None,
+            })
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn lsp_rename(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    new_name: String,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspRenameResult, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let session = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session,
+        None => {
+            let status = state
+                .lsp
+                .document_status(
+                    &document,
+                    server_command_id.as_deref(),
+                    custom_server_command.as_ref(),
+                )
+                .await;
+            return Ok(LspRenameResult {
+                status,
+                edit: LspWorkspaceEdit::default(),
+            });
+        }
+    };
+    let result = session
+        .request(
+            "textDocument/rename",
+            json!({
+                "textDocument": { "uri": document.uri },
+                "position": { "line": line, "character": character },
+                "newName": new_name,
+            }),
+        )
+        .await
+        .unwrap_or(Value::Null);
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    Ok(LspRenameResult {
+        status,
+        edit: parse_workspace_edit(&result),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_type_definition(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspLocationsResult, String> {
+    lsp_location_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        line,
+        character,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "textDocument/typeDefinition",
+        json!({}),
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn lsp_implementation(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspLocationsResult, String> {
+    lsp_location_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        line,
+        character,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "textDocument/implementation",
+        json!({}),
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn lsp_workspace_symbols(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    query: String,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspWorkspaceSymbolsResult, String> {
+    // Any open document under the workspace is enough to resolve the active
+    // language server session for workspace/symbol.
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let session = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session,
+        None => {
+            let status = state
+                .lsp
+                .document_status(
+                    &document,
+                    server_command_id.as_deref(),
+                    custom_server_command.as_ref(),
+                )
+                .await;
+            return Ok(LspWorkspaceSymbolsResult {
+                status,
+                symbols: Vec::new(),
+            });
+        }
+    };
+    let result = session
+        .request("workspace/symbol", json!({ "query": query }))
+        .await
+        .unwrap_or(Value::Null);
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    Ok(LspWorkspaceSymbolsResult {
+        status,
+        symbols: parse_workspace_symbols(&result),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_prepare_call_hierarchy(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspHierarchyPrepareResult, String> {
+    lsp_hierarchy_prepare_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        line,
+        character,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "textDocument/prepareCallHierarchy",
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn lsp_prepare_type_hierarchy(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspHierarchyPrepareResult, String> {
+    lsp_hierarchy_prepare_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        line,
+        character,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "textDocument/prepareTypeHierarchy",
+    )
+    .await
+}
+
+async fn lsp_hierarchy_prepare_request(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+    method: &str,
+) -> Result<LspHierarchyPrepareResult, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let Some(session) = state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    else {
+        let status = state
+            .lsp
+            .document_status(
+                &document,
+                server_command_id.as_deref(),
+                custom_server_command.as_ref(),
+            )
+            .await;
+        return Ok(LspHierarchyPrepareResult {
+            status,
+            items: Vec::new(),
+        });
+    };
+    let result = session
+        .request(
+            method,
+            json!({
+                "textDocument": { "uri": document.uri },
+                "position": { "line": line, "character": character },
+            }),
+        )
+        .await
+        .unwrap_or(Value::Null);
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    Ok(LspHierarchyPrepareResult {
+        status,
+        items: parse_hierarchy_items(&result),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_call_hierarchy_incoming(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    item: Value,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspCallHierarchyResult, String> {
+    let (status, value) = lsp_hierarchy_item_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        item,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "callHierarchy/incomingCalls",
+    )
+    .await?;
+    Ok(LspCallHierarchyResult {
+        status,
+        entries: parse_call_hierarchy_entries(&value, "from"),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_call_hierarchy_outgoing(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    item: Value,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspCallHierarchyResult, String> {
+    let (status, value) = lsp_hierarchy_item_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        item,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "callHierarchy/outgoingCalls",
+    )
+    .await?;
+    Ok(LspCallHierarchyResult {
+        status,
+        entries: parse_call_hierarchy_entries(&value, "to"),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_type_hierarchy_supertypes(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    item: Value,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspTypeHierarchyResult, String> {
+    let (status, value) = lsp_hierarchy_item_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        item,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "typeHierarchy/supertypes",
+    )
+    .await?;
+    Ok(LspTypeHierarchyResult {
+        status,
+        items: parse_hierarchy_items(&value),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_type_hierarchy_subtypes(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    item: Value,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspTypeHierarchyResult, String> {
+    let (status, value) = lsp_hierarchy_item_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        item,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "typeHierarchy/subtypes",
+    )
+    .await?;
+    Ok(LspTypeHierarchyResult {
+        status,
+        items: parse_hierarchy_items(&value),
+    })
+}
+
+async fn lsp_hierarchy_item_request(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    item: Value,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+    method: &str,
+) -> Result<(LspDocumentStatus, Value), String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let result = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session
+            .request(method, json!({ "item": item }))
+            .await
+            .unwrap_or(Value::Null),
+        None => Value::Null,
+    };
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    Ok((status, result))
+}
+
+#[tauri::command]
+pub async fn lsp_document_highlights(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspDocumentHighlightsResult, String> {
+    let (status, value) = lsp_document_feature_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "textDocument/documentHighlight",
+        json!({ "position": { "line": line, "character": character } }),
+    )
+    .await?;
+    Ok(LspDocumentHighlightsResult {
+        status,
+        highlights: parse_document_highlights(&value),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_inlay_hints(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    start_line: u32,
+    start_character: u32,
+    end_line: u32,
+    end_character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspInlayHintsResult, String> {
+    let (status, value) = lsp_document_feature_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "textDocument/inlayHint",
+        json!({
+            "range": {
+                "start": { "line": start_line, "character": start_character },
+                "end": { "line": end_line, "character": end_character },
+            }
+        }),
+    )
+    .await?;
+    Ok(LspInlayHintsResult {
+        status,
+        hints: parse_inlay_hints(&value),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_selection_ranges(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspSelectionRangesResult, String> {
+    let (status, value) = lsp_document_feature_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "textDocument/selectionRange",
+        json!({ "positions": [{ "line": line, "character": character }] }),
+    )
+    .await?;
+    Ok(LspSelectionRangesResult {
+        status,
+        ranges: parse_selection_ranges(&value),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_semantic_tokens(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspSemanticTokensResult, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    let Some(session) = state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    else {
+        return Ok(LspSemanticTokensResult {
+            status,
+            tokens: Vec::new(),
+        });
+    };
+    if !session
+        .capabilities
+        .read()
+        .await
+        .as_ref()
+        .map(|caps| caps.semantic_tokens)
+        .unwrap_or(false)
+    {
+        return Ok(LspSemanticTokensResult {
+            status,
+            tokens: Vec::new(),
+        });
+    }
+    let _semantic_tokens_guard = session.semantic_tokens_lock.lock().await;
+    let cached = session
+        .semantic_tokens_cache
+        .read()
+        .await
+        .get(&document.uri)
+        .cloned();
+    let delta_supported = *session.semantic_tokens_delta.read().await;
+    let mut resolved = None;
+    if delta_supported && let Some(previous) = cached.as_ref() {
+        let delta = session
+            .request(
+                "textDocument/semanticTokens/full/delta",
+                json!({
+                    "textDocument": { "uri": document.uri },
+                    "previousResultId": previous.result_id,
+                }),
+            )
+            .await;
+        if let Ok(value) = delta {
+            resolved = semantic_token_data_from_response(&value)
+                .or_else(|| apply_semantic_token_delta(previous, &value));
+        }
+    }
+    if resolved.is_none() {
+        let value = session
+            .request(
+                "textDocument/semanticTokens/full",
+                json!({ "textDocument": { "uri": document.uri } }),
+            )
+            .await
+            .unwrap_or(Value::Null);
+        resolved = semantic_token_data_from_response(&value);
+    }
+    let (data, result_id) = resolved.unwrap_or_default();
+    if let Some(result_id) = result_id {
+        session.semantic_tokens_cache.write().await.insert(
+            document.uri.clone(),
+            SemanticTokensCache {
+                result_id,
+                data: data.clone(),
+            },
+        );
+    } else {
+        session
+            .semantic_tokens_cache
+            .write()
+            .await
+            .remove(&document.uri);
+    }
+    let token_types = session.semantic_token_types.read().await.clone();
+    let token_modifiers = session.semantic_token_modifiers.read().await.clone();
+    let tokens = decode_semantic_token_data(&data, &token_types, &token_modifiers);
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    Ok(LspSemanticTokensResult { status, tokens })
+}
+
+async fn lsp_document_feature_request(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+    method: &str,
+    mut params: Value,
+) -> Result<(LspDocumentStatus, Value), String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    params["textDocument"] = json!({ "uri": document.uri });
+    let result = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session.request(method, params).await.unwrap_or(Value::Null),
+        None => Value::Null,
+    };
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    Ok((status, result))
+}
+
+#[tauri::command]
+pub async fn lsp_code_actions(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    start_line: u32,
+    start_character: u32,
+    end_line: u32,
+    end_character: u32,
+    diagnostics: Option<Vec<Value>>,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspCodeActionsResult, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let session = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session,
+        None => {
+            let status = state
+                .lsp
+                .document_status(
+                    &document,
+                    server_command_id.as_deref(),
+                    custom_server_command.as_ref(),
+                )
+                .await;
+            return Ok(LspCodeActionsResult {
+                status,
+                actions: Vec::new(),
+            });
+        }
+    };
+    let result = session
+        .request(
+            "textDocument/codeAction",
+            json!({
+                "textDocument": { "uri": document.uri },
+                "range": {
+                    "start": { "line": start_line, "character": start_character },
+                    "end": { "line": end_line, "character": end_character },
+                },
+                "context": {
+                    "diagnostics": diagnostics.unwrap_or_default(),
+                    "only": null,
+                    "triggerKind": 1,
+                },
+            }),
+        )
+        .await
+        .unwrap_or(Value::Null);
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    Ok(LspCodeActionsResult {
+        status,
+        actions: parse_code_actions(&result),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_formatting(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+    tab_size: Option<u32>,
+    insert_spaces: Option<bool>,
+) -> Result<LspFormattingResult, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let session = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session,
+        None => {
+            let status = state
+                .lsp
+                .document_status(
+                    &document,
+                    server_command_id.as_deref(),
+                    custom_server_command.as_ref(),
+                )
+                .await;
+            return Ok(LspFormattingResult {
+                status,
+                edits: Vec::new(),
+            });
+        }
+    };
+    let result = session
+        .request(
+            "textDocument/formatting",
+            json!({
+                "textDocument": { "uri": document.uri },
+                "options": {
+                    "tabSize": tab_size.unwrap_or(2),
+                    "insertSpaces": insert_spaces.unwrap_or(true),
+                },
+            }),
+        )
+        .await
+        .unwrap_or(Value::Null);
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    Ok(LspFormattingResult {
+        status,
+        edits: parse_text_edits(&result),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_range_formatting(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    start_line: u32,
+    start_character: u32,
+    end_line: u32,
+    end_character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+    tab_size: Option<u32>,
+    insert_spaces: Option<bool>,
+) -> Result<LspFormattingResult, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let session = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session,
+        None => {
+            let status = state
+                .lsp
+                .document_status(
+                    &document,
+                    server_command_id.as_deref(),
+                    custom_server_command.as_ref(),
+                )
+                .await;
+            return Ok(LspFormattingResult {
+                status,
+                edits: Vec::new(),
+            });
+        }
+    };
+    let result = session
+        .request(
+            "textDocument/rangeFormatting",
+            json!({
+                "textDocument": { "uri": document.uri },
+                "range": {
+                    "start": { "line": start_line, "character": start_character },
+                    "end": { "line": end_line, "character": end_character },
+                },
+                "options": {
+                    "tabSize": tab_size.unwrap_or(2),
+                    "insertSpaces": insert_spaces.unwrap_or(true),
+                },
+            }),
+        )
+        .await
+        .unwrap_or(Value::Null);
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    Ok(LspFormattingResult {
+        status,
+        edits: parse_text_edits(&result),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_signature_help(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    trigger_character: Option<String>,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspSignatureHelpResult, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let session = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session,
+        None => {
+            let status = state
+                .lsp
+                .document_status(
+                    &document,
+                    server_command_id.as_deref(),
+                    custom_server_command.as_ref(),
+                )
+                .await;
+            return Ok(LspSignatureHelpResult {
+                status,
+                signatures: Vec::new(),
+                active_signature: 0,
+                active_parameter: 0,
+            });
+        }
+    };
+    let context = match trigger_character.as_deref().filter(|c| !c.is_empty()) {
+        Some(character) => json!({
+            "triggerKind": 2,
+            "triggerCharacter": character,
+            "isRetrigger": false,
+        }),
+        None => json!({ "triggerKind": 1, "isRetrigger": false }),
+    };
+    let result = session
+        .request(
+            "textDocument/signatureHelp",
+            json!({
+                "textDocument": { "uri": document.uri },
+                "position": { "line": line, "character": character },
+                "context": context,
+            }),
+        )
+        .await
+        .unwrap_or(Value::Null);
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    let (signatures, active_signature, active_parameter) = parse_signature_help(&result);
+    Ok(LspSignatureHelpResult {
+        status,
+        signatures,
+        active_signature,
+        active_parameter,
     })
 }
 
@@ -1389,6 +2990,428 @@ fn markup_to_string(value: &Value) -> Option<String> {
     None
 }
 
+/// A provider capability may be `true`, an options object, or absent/false.
+fn has_provider(capabilities: &Value, key: &str) -> bool {
+    match capabilities.get(key) {
+        Some(Value::Bool(enabled)) => *enabled,
+        Some(Value::Object(_)) => true,
+        _ => false,
+    }
+}
+
+fn provider_strings(capabilities: &Value, key: &str, field: &str) -> Vec<String> {
+    capabilities
+        .get(key)
+        .and_then(|provider| provider.get(field))
+        .and_then(Value::as_array)
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(Value::as_str)
+                .map(ToString::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn capability_summary_from(capabilities: &Value) -> LspCapabilitySummary {
+    LspCapabilitySummary {
+        completion: has_provider(capabilities, "completionProvider"),
+        signature_help: has_provider(capabilities, "signatureHelpProvider"),
+        hover: has_provider(capabilities, "hoverProvider"),
+        definition: has_provider(capabilities, "definitionProvider"),
+        type_definition: has_provider(capabilities, "typeDefinitionProvider"),
+        implementation: has_provider(capabilities, "implementationProvider"),
+        references: has_provider(capabilities, "referencesProvider"),
+        document_symbol: has_provider(capabilities, "documentSymbolProvider"),
+        workspace_symbol: has_provider(capabilities, "workspaceSymbolProvider"),
+        rename: has_provider(capabilities, "renameProvider"),
+        formatting: has_provider(capabilities, "documentFormattingProvider"),
+        range_formatting: has_provider(capabilities, "documentRangeFormattingProvider"),
+        code_action: has_provider(capabilities, "codeActionProvider"),
+        document_highlight: has_provider(capabilities, "documentHighlightProvider"),
+        call_hierarchy: has_provider(capabilities, "callHierarchyProvider"),
+        type_hierarchy: has_provider(capabilities, "typeHierarchyProvider"),
+        inlay_hint: has_provider(capabilities, "inlayHintProvider"),
+        selection_range: has_provider(capabilities, "selectionRangeProvider"),
+        semantic_tokens: has_provider(capabilities, "semanticTokensProvider"),
+        completion_trigger_characters: provider_strings(
+            capabilities,
+            "completionProvider",
+            "triggerCharacters",
+        ),
+        signature_trigger_characters: provider_strings(
+            capabilities,
+            "signatureHelpProvider",
+            "triggerCharacters",
+        ),
+    }
+}
+
+fn parse_text_edit(value: &Value) -> Option<LspTextEdit> {
+    let new_text = value.get("newText")?.as_str()?.to_string();
+    // Plain TextEdit carries `range`; InsertReplaceEdit carries
+    // `insert`/`replace` ranges — prefer the insert range.
+    let range = value
+        .get("range")
+        .or_else(|| value.get("insert"))
+        .or_else(|| value.get("replace"))
+        .and_then(parse_range)?;
+    Some(LspTextEdit { range, new_text })
+}
+
+fn parse_text_edits(value: &Value) -> Vec<LspTextEdit> {
+    value
+        .as_array()
+        .map(|items| items.iter().filter_map(parse_text_edit).collect())
+        .unwrap_or_default()
+}
+
+fn parse_workspace_edit(value: &Value) -> LspWorkspaceEdit {
+    let mut document_edits: Vec<LspFileTextEdits> = Vec::new();
+    if let Some(changes) = value.get("changes").and_then(Value::as_object) {
+        for (uri, edits) in changes {
+            document_edits.push(LspFileTextEdits {
+                uri: uri.clone(),
+                path: path_from_uri(uri),
+                edits: parse_text_edits(edits),
+            });
+        }
+    }
+    if let Some(document_changes) = value.get("documentChanges").and_then(Value::as_array) {
+        for change in document_changes {
+            // TextDocumentEdit: { textDocument: { uri }, edits: [...] }
+            // Skip CreateFile/RenameFile/DeleteFile for now.
+            let Some(uri) = change
+                .get("textDocument")
+                .and_then(|doc| doc.get("uri"))
+                .and_then(Value::as_str)
+            else {
+                continue;
+            };
+            let edits = change
+                .get("edits")
+                .map(parse_text_edits)
+                .unwrap_or_default();
+            if edits.is_empty() {
+                continue;
+            }
+            if let Some(existing) = document_edits.iter_mut().find(|item| item.uri == uri) {
+                existing.edits.extend(edits);
+            } else {
+                document_edits.push(LspFileTextEdits {
+                    uri: uri.to_string(),
+                    path: path_from_uri(uri),
+                    edits,
+                });
+            }
+        }
+    }
+    LspWorkspaceEdit { document_edits }
+}
+
+fn parse_code_action(value: &Value) -> Option<LspCodeAction> {
+    // Command-only entries appear as { title, command, arguments }.
+    // Full CodeAction has title + optional edit/command/kind.
+    let title = value
+        .get("title")
+        .and_then(Value::as_str)
+        .filter(|title| !title.is_empty())?
+        .to_string();
+    let command = value.get("command").and_then(|command| {
+        if let Some(name) = command.as_str() {
+            Some(name.to_string())
+        } else {
+            command
+                .get("command")
+                .and_then(Value::as_str)
+                .map(ToString::to_string)
+        }
+    });
+    let command_arguments = value
+        .get("command")
+        .and_then(|command| command.get("arguments"))
+        .cloned()
+        .or_else(|| value.get("arguments").cloned());
+    let edit = value.get("edit").map(parse_workspace_edit);
+    Some(LspCodeAction {
+        title,
+        kind: value
+            .get("kind")
+            .and_then(Value::as_str)
+            .map(ToString::to_string),
+        is_preferred: value
+            .get("isPreferred")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        edit,
+        command,
+        command_arguments,
+        raw: value.clone(),
+    })
+}
+
+fn parse_code_actions(value: &Value) -> Vec<LspCodeAction> {
+    value
+        .as_array()
+        .map(|items| items.iter().filter_map(parse_code_action).collect())
+        .unwrap_or_default()
+}
+
+fn parse_workspace_symbol(value: &Value) -> Option<LspWorkspaceSymbol> {
+    let name = value.get("name")?.as_str()?.to_string();
+    let kind = value
+        .get("kind")
+        .and_then(Value::as_u64)
+        .and_then(|kind| u32::try_from(kind).ok())
+        .unwrap_or(0);
+    // SymbolInformation: location.uri + location.range
+    // WorkspaceSymbol (3.17): location may be { uri } only; range optional.
+    let (uri, range) = if let Some(location) = value.get("location") {
+        let uri = location.get("uri").and_then(Value::as_str)?;
+        let range = location
+            .get("range")
+            .and_then(parse_range)
+            .or_else(|| value.get("range").and_then(parse_range))
+            .unwrap_or(LspRange {
+                start: LspPosition {
+                    line: 0,
+                    character: 0,
+                },
+                end: LspPosition {
+                    line: 0,
+                    character: 0,
+                },
+            });
+        (uri.to_string(), range)
+    } else {
+        return None;
+    };
+    let selection_range = value
+        .get("selectionRange")
+        .and_then(parse_range)
+        .unwrap_or_else(|| range.clone());
+    let path = path_from_uri(&uri);
+    Some(LspWorkspaceSymbol {
+        name,
+        kind,
+        container_name: value
+            .get("containerName")
+            .and_then(Value::as_str)
+            .filter(|name| !name.is_empty())
+            .map(ToString::to_string),
+        uri,
+        path,
+        range,
+        selection_range,
+    })
+}
+
+fn parse_workspace_symbols(value: &Value) -> Vec<LspWorkspaceSymbol> {
+    value
+        .as_array()
+        .map(|items| items.iter().filter_map(parse_workspace_symbol).collect())
+        .unwrap_or_default()
+}
+
+fn parse_completion_item(value: &Value) -> Option<LspCompletionItem> {
+    let label = value.get("label")?.as_str()?.to_string();
+    Some(LspCompletionItem {
+        label,
+        kind: value
+            .get("kind")
+            .and_then(Value::as_u64)
+            .and_then(|kind| u32::try_from(kind).ok()),
+        detail: value
+            .get("detail")
+            .and_then(Value::as_str)
+            .map(ToString::to_string),
+        documentation: value.get("documentation").and_then(markup_to_string),
+        insert_text: value
+            .get("insertText")
+            .and_then(Value::as_str)
+            .map(ToString::to_string),
+        insert_text_format: value
+            .get("insertTextFormat")
+            .and_then(Value::as_u64)
+            .and_then(|format| u32::try_from(format).ok()),
+        filter_text: value
+            .get("filterText")
+            .and_then(Value::as_str)
+            .map(ToString::to_string),
+        sort_text: value
+            .get("sortText")
+            .and_then(Value::as_str)
+            .map(ToString::to_string),
+        text_edit: value.get("textEdit").and_then(parse_text_edit),
+        additional_text_edits: value
+            .get("additionalTextEdits")
+            .and_then(Value::as_array)
+            .map(|edits| edits.iter().filter_map(parse_text_edit).collect())
+            .unwrap_or_default(),
+        raw: value.clone(),
+    })
+}
+
+/// Completion responses are either a bare `CompletionItem[]` or a
+/// `CompletionList { isIncomplete, items }`.
+fn parse_completion_response(value: &Value) -> (bool, Vec<LspCompletionItem>) {
+    if let Some(items) = value.as_array() {
+        return (
+            false,
+            items.iter().filter_map(parse_completion_item).collect(),
+        );
+    }
+    if let Some(items) = value.get("items").and_then(Value::as_array) {
+        let is_incomplete = value
+            .get("isIncomplete")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        return (
+            is_incomplete,
+            items.iter().filter_map(parse_completion_item).collect(),
+        );
+    }
+    (false, Vec::new())
+}
+
+fn parse_signature_parameter(
+    value: &Value,
+    signature_label: &str,
+) -> Option<LspSignatureParameter> {
+    let documentation = value.get("documentation").and_then(markup_to_string);
+    match value.get("label") {
+        Some(Value::String(label)) => Some(LspSignatureParameter {
+            label: label.clone(),
+            documentation,
+            label_start: None,
+            label_end: None,
+        }),
+        Some(Value::Array(offsets)) => {
+            let start = offsets.first().and_then(Value::as_u64)?;
+            let end = offsets.get(1).and_then(Value::as_u64)?;
+            let label: String = signature_label
+                .chars()
+                .skip(usize::try_from(start).ok()?)
+                .take(usize::try_from(end.saturating_sub(start)).ok()?)
+                .collect();
+            Some(LspSignatureParameter {
+                label,
+                documentation,
+                label_start: u32::try_from(start).ok(),
+                label_end: u32::try_from(end).ok(),
+            })
+        }
+        _ => None,
+    }
+}
+
+fn parse_signature_help(value: &Value) -> (Vec<LspSignatureInfo>, u32, u32) {
+    let signatures = value
+        .get("signatures")
+        .and_then(Value::as_array)
+        .map(|signatures| {
+            signatures
+                .iter()
+                .filter_map(|signature| {
+                    let label = signature.get("label")?.as_str()?.to_string();
+                    let parameters = signature
+                        .get("parameters")
+                        .and_then(Value::as_array)
+                        .map(|parameters| {
+                            parameters
+                                .iter()
+                                .filter_map(|parameter| {
+                                    parse_signature_parameter(parameter, &label)
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    Some(LspSignatureInfo {
+                        documentation: signature.get("documentation").and_then(markup_to_string),
+                        parameters,
+                        active_parameter: signature
+                            .get("activeParameter")
+                            .and_then(Value::as_u64)
+                            .and_then(|active| u32::try_from(active).ok()),
+                        label,
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let active_signature = value
+        .get("activeSignature")
+        .and_then(Value::as_u64)
+        .and_then(|active| u32::try_from(active).ok())
+        .unwrap_or(0);
+    let active_parameter = value
+        .get("activeParameter")
+        .and_then(Value::as_u64)
+        .and_then(|active| u32::try_from(active).ok())
+        .unwrap_or(0);
+    (signatures, active_signature, active_parameter)
+}
+
+/// Flattens a `textDocument/documentSymbol` response. Servers reply with
+/// either hierarchical `DocumentSymbol[]` (has `selectionRange`/`children`)
+/// or flat `SymbolInformation[]` (has `location`); both collapse into the
+/// same depth-annotated list.
+fn collect_document_symbols(value: &Value, depth: u32, out: &mut Vec<LspDocumentSymbol>) {
+    let Some(items) = value.as_array() else {
+        return;
+    };
+    for item in items {
+        let Some(name) = item.get("name").and_then(Value::as_str) else {
+            continue;
+        };
+        let kind = item
+            .get("kind")
+            .and_then(Value::as_u64)
+            .and_then(|kind| u32::try_from(kind).ok())
+            .unwrap_or(0);
+        if item.get("selectionRange").is_some() {
+            let Some(range) = item.get("range").and_then(parse_range) else {
+                continue;
+            };
+            let Some(selection_range) = item.get("selectionRange").and_then(parse_range) else {
+                continue;
+            };
+            out.push(LspDocumentSymbol {
+                name: name.to_string(),
+                detail: item
+                    .get("detail")
+                    .and_then(Value::as_str)
+                    .filter(|detail| !detail.is_empty())
+                    .map(ToString::to_string),
+                kind,
+                depth,
+                range,
+                selection_range,
+            });
+            if let Some(children) = item.get("children") {
+                collect_document_symbols(children, depth + 1, out);
+            }
+        } else if let Some(location) = item.get("location") {
+            let Some(range) = location.get("range").and_then(parse_range) else {
+                continue;
+            };
+            out.push(LspDocumentSymbol {
+                name: name.to_string(),
+                detail: item
+                    .get("containerName")
+                    .and_then(Value::as_str)
+                    .filter(|container| !container.is_empty())
+                    .map(ToString::to_string),
+                kind,
+                depth,
+                range: range.clone(),
+                selection_range: range,
+            });
+        }
+    }
+}
+
 fn parse_locations(value: &Value) -> Vec<LspLocation> {
     if value.is_null() {
         return Vec::new();
@@ -1397,6 +3420,310 @@ fn parse_locations(value: &Value) -> Vec<LspLocation> {
         return array.iter().filter_map(parse_location).collect();
     }
     parse_location(value).into_iter().collect()
+}
+
+fn parse_hierarchy_item(value: &Value) -> Option<LspHierarchyItem> {
+    let uri = value.get("uri")?.as_str()?.to_string();
+    Some(LspHierarchyItem {
+        name: value.get("name")?.as_str()?.to_string(),
+        detail: value
+            .get("detail")
+            .and_then(Value::as_str)
+            .map(ToString::to_string),
+        kind: value.get("kind")?.as_u64()?.try_into().ok()?,
+        path: path_from_uri(&uri),
+        uri,
+        range: value.get("range").and_then(parse_range)?,
+        selection_range: value.get("selectionRange").and_then(parse_range)?,
+        raw: value.clone(),
+    })
+}
+
+fn parse_hierarchy_items(value: &Value) -> Vec<LspHierarchyItem> {
+    value
+        .as_array()
+        .map(|items| items.iter().filter_map(parse_hierarchy_item).collect())
+        .unwrap_or_default()
+}
+
+fn parse_call_hierarchy_entries(value: &Value, item_key: &str) -> Vec<LspCallHierarchyEntry> {
+    value
+        .as_array()
+        .map(|entries| {
+            entries
+                .iter()
+                .filter_map(|entry| {
+                    let item = entry.get(item_key).and_then(parse_hierarchy_item)?;
+                    let from_ranges = entry
+                        .get("fromRanges")
+                        .and_then(Value::as_array)
+                        .map(|ranges| ranges.iter().filter_map(parse_range).collect())
+                        .unwrap_or_default();
+                    Some(LspCallHierarchyEntry { item, from_ranges })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn parse_document_highlights(value: &Value) -> Vec<LspDocumentHighlight> {
+    value
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| {
+                    Some(LspDocumentHighlight {
+                        range: item.get("range").and_then(parse_range)?,
+                        kind: item
+                            .get("kind")
+                            .and_then(Value::as_u64)
+                            .and_then(|kind| kind.try_into().ok()),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn inlay_hint_label(value: &Value) -> Option<String> {
+    if let Some(label) = value.as_str() {
+        return Some(label.to_string());
+    }
+    let parts = value.as_array()?.iter().filter_map(|part| {
+        part.get("value")
+            .and_then(Value::as_str)
+            .map(ToString::to_string)
+    });
+    let label = parts.collect::<String>();
+    (!label.is_empty()).then_some(label)
+}
+
+fn parse_inlay_hints(value: &Value) -> Vec<LspInlayHint> {
+    value
+        .as_array()
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| {
+                    Some(LspInlayHint {
+                        position: item.get("position").and_then(parse_position)?,
+                        label: item.get("label").and_then(inlay_hint_label)?,
+                        kind: item
+                            .get("kind")
+                            .and_then(Value::as_u64)
+                            .and_then(|kind| kind.try_into().ok()),
+                        tooltip: item.get("tooltip").and_then(markup_to_string),
+                        padding_left: item
+                            .get("paddingLeft")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false),
+                        padding_right: item
+                            .get("paddingRight")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false),
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn parse_selection_ranges(value: &Value) -> Vec<LspRange> {
+    let Some(mut current) = value.as_array().and_then(|items| items.first()) else {
+        return Vec::new();
+    };
+    let mut ranges = Vec::new();
+    for _ in 0..64 {
+        let Some(range) = current.get("range").and_then(parse_range) else {
+            break;
+        };
+        ranges.push(range);
+        let Some(parent) = current.get("parent").filter(|parent| parent.is_object()) else {
+            break;
+        };
+        current = parent;
+    }
+    ranges
+}
+
+fn semantic_token_legend_from(capabilities: &Value) -> (Vec<String>, Vec<String>) {
+    let legend = capabilities
+        .get("semanticTokensProvider")
+        .and_then(|provider| {
+            if provider.is_object() {
+                provider.get("legend")
+            } else {
+                None
+            }
+        });
+    let token_types = legend
+        .and_then(|legend| legend.get("tokenTypes"))
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_else(|| {
+            vec![
+                "namespace", "type", "class", "enum", "interface", "struct", "typeParameter",
+                "parameter", "variable", "property", "enumMember", "event", "function",
+                "method", "macro", "keyword", "modifier", "comment", "string", "number",
+                "regexp", "operator", "decorator",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect()
+        });
+    let token_modifiers = legend
+        .and_then(|legend| legend.get("tokenModifiers"))
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_else(|| {
+            vec![
+                "declaration", "definition", "readonly", "static", "deprecated",
+                "abstract", "async", "modification", "documentation", "defaultLibrary",
+            ]
+            .into_iter()
+            .map(str::to_string)
+            .collect()
+        });
+    (token_types, token_modifiers)
+}
+
+fn semantic_token_delta_supported(capabilities: &Value) -> bool {
+    capabilities
+        .get("semanticTokensProvider")
+        .and_then(|provider| provider.get("full"))
+        .and_then(|full| full.get("delta"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}
+
+fn semantic_token_data_from_response(value: &Value) -> Option<(Vec<u64>, Option<String>)> {
+    let (data, result_id) = if let Some(data) = value.get("data").and_then(Value::as_array) {
+        (
+            data.iter().map(Value::as_u64).collect::<Option<Vec<_>>>()?,
+            value
+                .get("resultId")
+                .and_then(Value::as_str)
+                .map(ToString::to_string),
+        )
+    } else if let Some(data) = value.as_array() {
+        (
+            data.iter().map(Value::as_u64).collect::<Option<Vec<_>>>()?,
+            None,
+        )
+    } else {
+        return None;
+    };
+    (data.len() % 5 == 0).then_some((data, result_id))
+}
+
+fn apply_semantic_token_delta(
+    previous: &SemanticTokensCache,
+    value: &Value,
+) -> Option<(Vec<u64>, Option<String>)> {
+    let edits = value.get("edits")?.as_array()?;
+    let mut parsed = edits
+        .iter()
+        .map(|edit| {
+            let start = usize::try_from(edit.get("start")?.as_u64()?).ok()?;
+            let delete_count = usize::try_from(edit.get("deleteCount")?.as_u64()?).ok()?;
+            let data = match edit.get("data") {
+                Some(value) => value
+                    .as_array()?
+                    .iter()
+                    .map(Value::as_u64)
+                    .collect::<Option<Vec<_>>>()?,
+                None => Vec::new(),
+            };
+            Some((start, delete_count, data))
+        })
+        .collect::<Option<Vec<_>>>()?;
+    parsed.sort_by(|left, right| right.0.cmp(&left.0));
+    let mut data = previous.data.clone();
+    for (start, delete_count, inserted) in parsed {
+        let end = start.checked_add(delete_count)?;
+        if start > data.len() || end > data.len() {
+            return None;
+        }
+        data.splice(start..end, inserted);
+    }
+    if data.len() % 5 != 0 {
+        return None;
+    }
+    let result_id = value
+        .get("resultId")
+        .and_then(Value::as_str)
+        .map(ToString::to_string)
+        .or_else(|| Some(previous.result_id.clone()));
+    Some((data, result_id))
+}
+
+fn decode_semantic_token_data(
+    data: &[u64],
+    token_types: &[String],
+    token_modifiers: &[String],
+) -> Vec<LspSemanticToken> {
+    let mut tokens = Vec::new();
+    let mut line = 0u32;
+    let mut character = 0u32;
+    for chunk in data.chunks_exact(5) {
+        let delta_line = chunk[0] as u32;
+        let delta_start = chunk[1] as u32;
+        let length = chunk[2] as u32;
+        let type_index = chunk[3] as usize;
+        let modifier_bits = chunk[4];
+        if delta_line == 0 {
+            character = character.saturating_add(delta_start);
+        } else {
+            line = line.saturating_add(delta_line);
+            character = delta_start;
+        }
+        let token_type = token_types
+            .get(type_index)
+            .cloned()
+            .unwrap_or_else(|| format!("unknown:{type_index}"));
+        let mut modifiers = Vec::new();
+        for (index, name) in token_modifiers.iter().enumerate() {
+            if (modifier_bits >> index) & 1 == 1 {
+                modifiers.push(name.clone());
+            }
+        }
+        let end_character = character.saturating_add(length);
+        tokens.push(LspSemanticToken {
+            range: LspRange {
+                start: LspPosition { line, character },
+                end: LspPosition {
+                    line,
+                    character: end_character,
+                },
+            },
+            token_type,
+            modifiers,
+        });
+    }
+    tokens
+}
+
+fn parse_semantic_tokens(
+    value: &Value,
+    token_types: &[String],
+    token_modifiers: &[String],
+) -> Vec<LspSemanticToken> {
+    semantic_token_data_from_response(value)
+        .map(|(data, _)| decode_semantic_token_data(&data, token_types, token_modifiers))
+        .unwrap_or_default()
 }
 
 fn parse_location(value: &Value) -> Option<LspLocation> {
@@ -1685,4 +4012,425 @@ pub fn lsp_presets() -> Vec<LspServerPreset> {
             )],
         },
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn flattens_hierarchical_document_symbols_with_depth() {
+        let response = json!([
+            {
+                "name": "OpenFileState",
+                "detail": "",
+                "kind": 11,
+                "range": { "start": { "line": 4, "character": 0 }, "end": { "line": 8, "character": 1 } },
+                "selectionRange": { "start": { "line": 4, "character": 10 }, "end": { "line": 4, "character": 23 } },
+                "children": [
+                    {
+                        "name": "path",
+                        "detail": "string",
+                        "kind": 7,
+                        "range": { "start": { "line": 5, "character": 2 }, "end": { "line": 5, "character": 15 } },
+                        "selectionRange": { "start": { "line": 5, "character": 2 }, "end": { "line": 5, "character": 6 } }
+                    }
+                ]
+            }
+        ]);
+
+        let mut symbols = Vec::new();
+        collect_document_symbols(&response, 0, &mut symbols);
+
+        assert_eq!(symbols.len(), 2);
+        assert_eq!(symbols[0].name, "OpenFileState");
+        assert_eq!(symbols[0].depth, 0);
+        assert_eq!(symbols[0].detail, None);
+        assert_eq!(symbols[0].selection_range.start.character, 10);
+        assert_eq!(symbols[1].name, "path");
+        assert_eq!(symbols[1].depth, 1);
+        assert_eq!(symbols[1].detail.as_deref(), Some("string"));
+    }
+
+    #[test]
+    fn accepts_flat_symbol_information_responses() {
+        let response = json!([
+            {
+                "name": "workspace_read_file",
+                "kind": 12,
+                "containerName": "workspace",
+                "location": {
+                    "uri": "file:///repo/src/workspace.rs",
+                    "range": { "start": { "line": 3, "character": 0 }, "end": { "line": 12, "character": 1 } }
+                }
+            },
+            { "name": "missing range" }
+        ]);
+
+        let mut symbols = Vec::new();
+        collect_document_symbols(&response, 0, &mut symbols);
+
+        assert_eq!(symbols.len(), 1);
+        assert_eq!(symbols[0].name, "workspace_read_file");
+        assert_eq!(symbols[0].kind, 12);
+        assert_eq!(symbols[0].detail.as_deref(), Some("workspace"));
+        assert_eq!(symbols[0].selection_range.start.line, 3);
+    }
+
+    #[test]
+    fn ignores_null_and_non_array_responses() {
+        let mut symbols = Vec::new();
+        collect_document_symbols(&Value::Null, 0, &mut symbols);
+        collect_document_symbols(&json!({ "unexpected": true }), 0, &mut symbols);
+        assert!(symbols.is_empty());
+    }
+
+    #[test]
+    fn summarizes_server_capabilities_across_provider_shapes() {
+        let summary = capability_summary_from(&json!({
+            "completionProvider": { "triggerCharacters": [".", "::"], "resolveProvider": true },
+            "signatureHelpProvider": { "triggerCharacters": ["(", ","] },
+            "hoverProvider": true,
+            "renameProvider": { "prepareProvider": true },
+            "selectionRangeProvider": true,
+            "documentFormattingProvider": false,
+            "typeHierarchyProvider": null,
+        }));
+
+        assert!(summary.completion);
+        assert_eq!(summary.completion_trigger_characters, vec![".", "::"]);
+        assert!(summary.signature_help);
+        assert_eq!(summary.signature_trigger_characters, vec!["(", ","]);
+        assert!(summary.hover);
+        assert!(summary.rename);
+        assert!(summary.selection_range);
+        assert!(!summary.formatting);
+        assert!(!summary.type_hierarchy);
+        assert!(!summary.workspace_symbol);
+    }
+
+    #[test]
+    fn parses_completion_lists_and_bare_arrays() {
+        let (incomplete, items) = parse_completion_response(&json!({
+            "isIncomplete": true,
+            "items": [
+                {
+                    "label": "openFile",
+                    "kind": 3,
+                    "detail": "(path: string) => Promise<void>",
+                    "sortText": "11",
+                    "insertTextFormat": 2,
+                    "insertText": "openFile(${1:path})",
+                    "textEdit": {
+                        "newText": "openFile",
+                        "insert": { "start": { "line": 2, "character": 4 }, "end": { "line": 2, "character": 8 } },
+                        "replace": { "start": { "line": 2, "character": 4 }, "end": { "line": 2, "character": 10 } }
+                    },
+                    "additionalTextEdits": [
+                        {
+                            "newText": "import { openFile } from \"./files\";\n",
+                            "range": { "start": { "line": 0, "character": 0 }, "end": { "line": 0, "character": 0 } }
+                        }
+                    ]
+                },
+                { "noLabel": true }
+            ]
+        }));
+
+        assert!(incomplete);
+        assert_eq!(items.len(), 1);
+        let item = &items[0];
+        assert_eq!(item.label, "openFile");
+        assert_eq!(item.insert_text_format, Some(2));
+        // InsertReplaceEdit prefers the insert range.
+        assert_eq!(item.text_edit.as_ref().unwrap().range.end.character, 8);
+        assert_eq!(item.additional_text_edits.len(), 1);
+        assert!(item.raw.get("label").is_some());
+
+        let (incomplete, items) = parse_completion_response(&json!([{ "label": "bare" }]));
+        assert!(!incomplete);
+        assert_eq!(items[0].label, "bare");
+
+        let (_, empty) = parse_completion_response(&Value::Null);
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn parses_signature_help_with_offset_parameter_labels() {
+        let (signatures, active_signature, active_parameter) = parse_signature_help(&json!({
+            "signatures": [{
+                "label": "openFile(path: string, preview: boolean): void",
+                "documentation": "Opens a file.",
+                "parameters": [
+                    { "label": "path: string" },
+                    { "label": [23, 39], "documentation": { "kind": "markdown", "value": "preview flag" } }
+                ]
+            }],
+            "activeSignature": 0,
+            "activeParameter": 1
+        }));
+
+        assert_eq!(signatures.len(), 1);
+        assert_eq!(active_signature, 0);
+        assert_eq!(active_parameter, 1);
+        let signature = &signatures[0];
+        assert_eq!(signature.parameters[0].label, "path: string");
+        assert_eq!(signature.parameters[1].label, "preview: boolean");
+        assert_eq!(signature.parameters[1].label_start, Some(23));
+        assert_eq!(
+            signature.parameters[1].documentation.as_deref(),
+            Some("preview flag")
+        );
+    }
+
+    #[test]
+    fn parses_formatting_text_edit_arrays() {
+        let edits = parse_text_edits(&json!([
+            {
+                "range": {
+                    "start": { "line": 0, "character": 0 },
+                    "end": { "line": 0, "character": 4 }
+                },
+                "newText": "  x"
+            },
+            { "newText": "missing range" },
+            {
+                "range": {
+                    "start": { "line": 1, "character": 0 },
+                    "end": { "line": 1, "character": 0 }
+                },
+                "newText": "\n"
+            }
+        ]));
+        assert_eq!(edits.len(), 2);
+        assert_eq!(edits[0].new_text, "  x");
+        assert_eq!(edits[0].range.start.line, 0);
+        assert_eq!(edits[1].new_text, "\n");
+        assert!(parse_text_edits(&Value::Null).is_empty());
+        assert!(parse_text_edits(&json!({ "not": "array" })).is_empty());
+    }
+
+    #[test]
+    fn parses_workspace_symbol_information() {
+        let symbols = parse_workspace_symbols(&json!([
+            {
+                "name": "CodeWorkspaceTab",
+                "kind": 5,
+                "containerName": "editor",
+                "location": {
+                    "uri": "file:///repo/src/CodeWorkspaceTab.tsx",
+                    "range": {
+                        "start": { "line": 10, "character": 0 },
+                        "end": { "line": 40, "character": 1 }
+                    }
+                }
+            },
+            { "name": "no location" }
+        ]));
+        assert_eq!(symbols.len(), 1);
+        assert_eq!(symbols[0].name, "CodeWorkspaceTab");
+        assert_eq!(symbols[0].kind, 5);
+        assert_eq!(symbols[0].container_name.as_deref(), Some("editor"));
+        assert_eq!(symbols[0].range.start.line, 10);
+    }
+
+    #[test]
+    fn parses_code_actions_and_workspace_edits() {
+        let actions = parse_code_actions(&json!([
+            {
+                "title": "Add import",
+                "kind": "quickfix",
+                "isPreferred": true,
+                "edit": {
+                    "changes": {
+                        "file:///repo/src/a.ts": [{
+                            "range": {
+                                "start": { "line": 0, "character": 0 },
+                                "end": { "line": 0, "character": 0 }
+                            },
+                            "newText": "import x from 'x';\n"
+                        }]
+                    }
+                }
+            },
+            {
+                "title": "Organize Imports",
+                "command": { "command": "source.organizeImports", "arguments": [] }
+            },
+            { "noTitle": true }
+        ]));
+        assert_eq!(actions.len(), 2);
+        assert_eq!(actions[0].title, "Add import");
+        assert!(actions[0].is_preferred);
+        assert_eq!(actions[0].edit.as_ref().unwrap().document_edits.len(), 1);
+        assert_eq!(
+            actions[1].command.as_deref(),
+            Some("source.organizeImports")
+        );
+    }
+
+    #[test]
+    fn parses_hierarchy_items_and_preserves_opaque_data() {
+        let items = parse_hierarchy_items(&json!([{
+            "name": "renderEditor",
+            "detail": "CodeWorkspaceTab",
+            "kind": 12,
+            "uri": "file:///repo/src/editor.ts",
+            "range": {
+                "start": { "line": 8, "character": 0 },
+                "end": { "line": 20, "character": 1 }
+            },
+            "selectionRange": {
+                "start": { "line": 8, "character": 9 },
+                "end": { "line": 8, "character": 21 }
+            },
+            "data": { "serverId": 42 }
+        }]));
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].name, "renderEditor");
+        assert_eq!(items[0].detail.as_deref(), Some("CodeWorkspaceTab"));
+        assert_eq!(items[0].selection_range.start.character, 9);
+        assert_eq!(items[0].raw["data"]["serverId"], 42);
+    }
+
+    #[test]
+    fn parses_incoming_and_outgoing_call_entries() {
+        let item = json!({
+            "name": "caller",
+            "kind": 12,
+            "uri": "file:///repo/src/caller.ts",
+            "range": {
+                "start": { "line": 1, "character": 0 },
+                "end": { "line": 4, "character": 1 }
+            },
+            "selectionRange": {
+                "start": { "line": 1, "character": 9 },
+                "end": { "line": 1, "character": 15 }
+            }
+        });
+        let range = json!({
+            "start": { "line": 3, "character": 2 },
+            "end": { "line": 3, "character": 8 }
+        });
+        let incoming = parse_call_hierarchy_entries(
+            &json!([{ "from": item.clone(), "fromRanges": [range.clone()] }]),
+            "from",
+        );
+        let outgoing =
+            parse_call_hierarchy_entries(&json!([{ "to": item, "fromRanges": [range] }]), "to");
+        assert_eq!(incoming.len(), 1);
+        assert_eq!(incoming[0].item.name, "caller");
+        assert_eq!(incoming[0].from_ranges[0].start.line, 3);
+        assert_eq!(outgoing.len(), 1);
+        assert_eq!(outgoing[0].item.name, "caller");
+    }
+
+    #[test]
+    fn parses_highlights_inlay_hints_and_selection_ranges() {
+        let highlights = parse_document_highlights(&json!([
+            {
+                "range": {
+                    "start": { "line": 1, "character": 2 },
+                    "end": { "line": 1, "character": 5 }
+                },
+                "kind": 3
+            },
+            { "invalid": true }
+        ]));
+        assert_eq!(highlights.len(), 1);
+        assert_eq!(highlights[0].kind, Some(3));
+
+        let hints = parse_inlay_hints(&json!([
+            {
+                "position": { "line": 2, "character": 8 },
+                "label": [{ "value": "value" }, { "value": ": number" }],
+                "kind": 1,
+                "tooltip": { "kind": "markdown", "value": "inferred type" },
+                "paddingLeft": true
+            }
+        ]));
+        assert_eq!(hints.len(), 1);
+        assert_eq!(hints[0].label, "value: number");
+        assert_eq!(hints[0].tooltip.as_deref(), Some("inferred type"));
+        assert!(hints[0].padding_left);
+
+        let ranges = parse_selection_ranges(&json!([{
+            "range": {
+                "start": { "line": 3, "character": 4 },
+                "end": { "line": 3, "character": 8 }
+            },
+            "parent": {
+                "range": {
+                    "start": { "line": 3, "character": 0 },
+                    "end": { "line": 3, "character": 10 }
+                }
+            }
+        }]));
+        assert_eq!(ranges.len(), 2);
+        assert_eq!(ranges[0].start.character, 4);
+        assert_eq!(ranges[1].start.character, 0);
+    }
+
+    #[test]
+    fn parses_semantic_tokens_relative_data() {
+        let (types, modifiers) = semantic_token_legend_from(&json!({
+            "semanticTokensProvider": {
+                "legend": {
+                    "tokenTypes": ["variable", "function", "class"],
+                    "tokenModifiers": ["declaration", "readonly"]
+                }
+            }
+        }));
+        assert_eq!(types, vec!["variable", "function", "class"]);
+        assert_eq!(modifiers, vec!["declaration", "readonly"]);
+
+        // Token A at 0:0 len 3 type variable+declaration
+        // Token B same line start+4 len 5 type function
+        let tokens = parse_semantic_tokens(
+            &json!({ "data": [0, 0, 3, 0, 1, 0, 4, 5, 1, 0] }),
+            &types,
+            &modifiers,
+        );
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0].token_type, "variable");
+        assert_eq!(tokens[0].modifiers, vec!["declaration"]);
+        assert_eq!(tokens[0].range.start.character, 0);
+        assert_eq!(tokens[0].range.end.character, 3);
+        assert_eq!(tokens[1].token_type, "function");
+        assert_eq!(tokens[1].range.start.character, 4);
+        assert_eq!(tokens[1].range.end.character, 9);
+    }
+
+    #[test]
+    fn applies_semantic_token_delta_edits_and_detects_capability() {
+        let capabilities = json!({
+            "semanticTokensProvider": {
+                "legend": { "tokenTypes": ["variable"], "tokenModifiers": [] },
+                "full": { "delta": true }
+            }
+        });
+        assert!(semantic_token_delta_supported(&capabilities));
+        let previous = SemanticTokensCache {
+            result_id: "one".into(),
+            data: vec![0, 0, 3, 0, 0, 0, 4, 2, 0, 0],
+        };
+        let (data, result_id) = apply_semantic_token_delta(
+            &previous,
+            &json!({
+                "resultId": "two",
+                "edits": [{ "start": 5, "deleteCount": 5, "data": [1, 1, 4, 0, 0] }]
+            }),
+        )
+        .unwrap();
+        assert_eq!(result_id.as_deref(), Some("two"));
+        assert_eq!(data, vec![0, 0, 3, 0, 0, 1, 1, 4, 0, 0]);
+        assert!(
+            apply_semantic_token_delta(
+                &previous,
+                &json!({ "edits": [{ "start": 99, "deleteCount": 1 }] }),
+            )
+            .is_none()
+        );
+    }
 }

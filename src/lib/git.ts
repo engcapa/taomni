@@ -50,6 +50,15 @@ export interface GitBlobPair {
   newSize: number;
 }
 
+export interface GitBlameLine {
+  line: number;
+  commit: string;
+  author: string;
+  authorMail: string | null;
+  authorTime: number;
+  summary: string;
+}
+
 export interface GitRemote {
   name: string;
   fetchUrl: string;
@@ -172,6 +181,15 @@ export function gitBlobPair(
     oldRef,
     newRef,
   });
+}
+
+export function gitBlameLines(
+  repoRoot: string,
+  path: string,
+  startLine: number,
+  endLine: number,
+): Promise<GitBlameLine[]> {
+  return invoke<GitBlameLine[]>("git_blame_lines", { repoRoot, path, startLine, endLine });
 }
 
 export function gitStage(repoRoot: string, paths: string[]): Promise<void> {

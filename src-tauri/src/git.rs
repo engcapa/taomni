@@ -157,6 +157,17 @@ pub struct GitBlobPair {
     pub new_size: u64,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GitBlameLine {
+    pub line: u32,
+    pub commit: String,
+    pub author: String,
+    pub author_mail: Option<String>,
+    pub author_time: i64,
+    pub summary: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitOperationState {
@@ -259,6 +270,45 @@ pub async fn git_blob_pair(
         let old_blob = read_blob(&root, &old_ref, &old_target)?;
         let new_blob = read_blob(&root, &new_ref, &path)?;
         Ok(build_blob_pair(path, old_path, old_blob, new_blob))
+    })
+    .await
+}
+
+/// Read line attribution from Git's stable porcelain format. Line numbers are
+/// one-based to match `git blame -L` and are bounded to keep editor requests
+/// cheap even when called with an accidental large range.
+#[tauri::command]
+pub async fn git_blame_lines(
+    repo_root: String,
+    path: String,
+    start_line: u32,
+    end_line: u32,
+) -> Result<Vec<GitBlameLine>, String> {
+    blocking(move || {
+        let root = PathBuf::from(repo_root);
+        ensure_repo(&root)?;
+        if path.trim().is_empty() {
+            return Err("Git blame path is required".into());
+        }
+        if start_line == 0 || end_line < start_line {
+            return Err("Git blame line range is invalid".into());
+        }
+        if end_line - start_line > 499 {
+            return Err("Git blame range cannot exceed 500 lines".into());
+        }
+        let range = format!("{start_line},{end_line}");
+        let raw = run_git_strings(
+            Some(&root),
+            vec![
+                "blame".into(),
+                "--line-porcelain".into(),
+                "-L".into(),
+                range,
+                "--".into(),
+                path,
+            ],
+        )?;
+        Ok(parse_blame_porcelain(&raw))
     })
     .await
 }
@@ -1457,6 +1507,57 @@ fn parse_name_status(output: &str) -> Vec<GitChange> {
     out
 }
 
+fn parse_blame_porcelain(output: &str) -> Vec<GitBlameLine> {
+    #[derive(Default)]
+    struct PendingLine {
+        commit: String,
+        line: Option<u32>,
+        author: String,
+        author_mail: Option<String>,
+        author_time: i64,
+        summary: String,
+    }
+
+    let mut pending = PendingLine::default();
+    let mut result = Vec::new();
+    for line in output.lines() {
+        if line.starts_with('\t') {
+            if let Some(line_number) = pending.line.take() {
+                result.push(GitBlameLine {
+                    line: line_number,
+                    commit: std::mem::take(&mut pending.commit),
+                    author: std::mem::take(&mut pending.author),
+                    author_mail: pending.author_mail.take(),
+                    author_time: pending.author_time,
+                    summary: std::mem::take(&mut pending.summary),
+                });
+            }
+            pending = PendingLine::default();
+            continue;
+        }
+
+        let mut header = line.split_whitespace();
+        let maybe_commit = header.next().unwrap_or_default();
+        let maybe_original = header.next().and_then(|value| value.parse::<u32>().ok());
+        let maybe_final = header.next().and_then(|value| value.parse::<u32>().ok());
+        if maybe_commit.len() >= 8 && maybe_original.is_some() && maybe_final.is_some() {
+            pending.commit = maybe_commit.to_string();
+            pending.line = maybe_final;
+            continue;
+        }
+        if let Some(value) = line.strip_prefix("author ") {
+            pending.author = value.to_string();
+        } else if let Some(value) = line.strip_prefix("author-mail ") {
+            pending.author_mail = non_empty_string(value.trim_matches(['<', '>']));
+        } else if let Some(value) = line.strip_prefix("author-time ") {
+            pending.author_time = value.parse().unwrap_or_default();
+        } else if let Some(value) = line.strip_prefix("summary ") {
+            pending.summary = value.to_string();
+        }
+    }
+    result
+}
+
 fn list_tags(root: &Path) -> Result<Vec<GitTag>, String> {
     let raw = run_git_in(
         Some(root),
@@ -2407,6 +2508,37 @@ mod tests {
         assert_eq!(changes[3].status, "renamed");
         assert_eq!(changes[3].old_path.as_deref(), Some("old.txt"));
         assert_eq!(changes[3].path, "new.txt");
+    }
+
+    #[test]
+    fn parses_line_porcelain_blame() {
+        let raw = concat!(
+            "0123456789abcdef0123456789abcdef01234567 3 7 1\n",
+            "author Ada Lovelace\n",
+            "author-mail <ada@example.test>\n",
+            "author-time 1783814400\n",
+            "author-tz +0800\n",
+            "summary feat: add outline\n",
+            "filename src/main.ts\n",
+            "\tconst value = 1;\n",
+            "0000000000000000000000000000000000000000 4 8 1\n",
+            "author Not Committed Yet\n",
+            "author-mail <not.committed.yet>\n",
+            "author-time 1783814500\n",
+            "summary Version of src/main.ts from src/main.ts\n",
+            "filename src/main.ts\n",
+            "\tconst draft = 2;\n",
+        );
+
+        let lines = parse_blame_porcelain(raw);
+
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0].line, 7);
+        assert_eq!(lines[0].author, "Ada Lovelace");
+        assert_eq!(lines[0].author_mail.as_deref(), Some("ada@example.test"));
+        assert_eq!(lines[0].summary, "feat: add outline");
+        assert_eq!(lines[1].line, 8);
+        assert!(lines[1].commit.chars().all(|character| character == '0'));
     }
 
     #[test]

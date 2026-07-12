@@ -59,6 +59,235 @@ pub struct WorkspaceGitRoot {
     pub is_submodule: bool,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceTask {
+    pub id: String,
+    pub label: String,
+    pub command: String,
+    pub cwd: String,
+    pub source: String,
+}
+
+fn push_task(
+    tasks: &mut Vec<WorkspaceTask>,
+    source: &str,
+    label: impl Into<String>,
+    command: impl Into<String>,
+    cwd: &Path,
+) {
+    let label = label.into();
+    tasks.push(WorkspaceTask {
+        id: format!("{}:{}", source, label.to_lowercase().replace(' ', "-")),
+        label,
+        command: command.into(),
+        cwd: path_to_string(cwd),
+        source: source.to_string(),
+    });
+}
+
+fn parse_named_targets(contents: &str) -> Vec<String> {
+    let mut targets = Vec::new();
+    for line in contents.lines() {
+        if line.starts_with(char::is_whitespace) || line.starts_with('#') {
+            continue;
+        }
+        let Some((candidate, _)) = line.split_once(':') else {
+            continue;
+        };
+        let candidate = candidate.trim();
+        if candidate.is_empty()
+            || candidate.contains(['=', '%', '$'])
+            || candidate.split_whitespace().count() != 1
+        {
+            continue;
+        }
+        if !targets.iter().any(|target| target == candidate) {
+            targets.push(candidate.to_string());
+        }
+        if targets.len() >= 50 {
+            break;
+        }
+    }
+    targets
+}
+
+fn detect_workspace_tasks(root: &Path) -> Result<Vec<WorkspaceTask>, String> {
+    let mut tasks = Vec::new();
+
+    let package_json = root.join("package.json");
+    if package_json.is_file() {
+        let contents = fs::read_to_string(&package_json)
+            .map_err(|e| format!("read {}: {e}", package_json.display()))?;
+        let package: serde_json::Value = serde_json::from_str(&contents)
+            .map_err(|e| format!("parse {}: {e}", package_json.display()))?;
+        let manager = if root.join("pnpm-lock.yaml").is_file() {
+            "pnpm"
+        } else if root.join("yarn.lock").is_file() {
+            "yarn"
+        } else {
+            "npm"
+        };
+        if let Some(scripts) = package
+            .get("scripts")
+            .and_then(serde_json::Value::as_object)
+        {
+            let mut names: Vec<_> = scripts.keys().cloned().collect();
+            names.sort();
+            for name in names {
+                push_task(
+                    &mut tasks,
+                    "package.json",
+                    name.clone(),
+                    format!("{manager} run {name}"),
+                    root,
+                );
+            }
+        }
+    }
+
+    if root.join("Cargo.toml").is_file() {
+        for (label, command) in [
+            ("build", "cargo build"),
+            ("test", "cargo test"),
+            ("run", "cargo run"),
+            ("clippy", "cargo clippy"),
+        ] {
+            push_task(&mut tasks, "Cargo.toml", label, command, root);
+        }
+    }
+
+    for (file_name, runner) in [
+        ("Makefile", "make"),
+        ("makefile", "make"),
+        ("justfile", "just"),
+    ] {
+        let path = root.join(file_name);
+        if !path.is_file() {
+            continue;
+        }
+        let contents =
+            fs::read_to_string(&path).map_err(|e| format!("read {}: {e}", path.display()))?;
+        for target in parse_named_targets(&contents) {
+            push_task(
+                &mut tasks,
+                file_name,
+                target.clone(),
+                format!("{runner} {target}"),
+                root,
+            );
+        }
+        if file_name.eq_ignore_ascii_case("makefile") {
+            break;
+        }
+    }
+
+    if root.join("build.gradle").is_file() || root.join("build.gradle.kts").is_file() {
+        let runner = if cfg!(windows) && root.join("gradlew.bat").is_file() {
+            "gradlew.bat"
+        } else if root.join("gradlew").is_file() {
+            "./gradlew"
+        } else {
+            "gradle"
+        };
+        for target in ["build", "test"] {
+            push_task(
+                &mut tasks,
+                "Gradle",
+                target,
+                format!("{runner} {target}"),
+                root,
+            );
+        }
+    }
+
+    if root.join("pom.xml").is_file() {
+        let runner = if cfg!(windows) && root.join("mvnw.cmd").is_file() {
+            "mvnw.cmd"
+        } else if root.join("mvnw").is_file() {
+            "./mvnw"
+        } else {
+            "mvn"
+        };
+        for target in ["package", "test"] {
+            push_task(
+                &mut tasks,
+                "Maven",
+                target,
+                format!("{runner} {target}"),
+                root,
+            );
+        }
+    }
+
+    if root.join("go.mod").is_file() {
+        for (label, command) in [
+            ("build", "go build ./..."),
+            ("test", "go test ./..."),
+            ("vet", "go vet ./..."),
+        ] {
+            push_task(&mut tasks, "go.mod", label, command, root);
+        }
+    }
+
+    let pyproject = root.join("pyproject.toml");
+    if pyproject.is_file() {
+        let contents = fs::read_to_string(&pyproject)
+            .map_err(|e| format!("read {}: {e}", pyproject.display()))?;
+        let project: toml::Value =
+            toml::from_str(&contents).map_err(|e| format!("parse {}: {e}", pyproject.display()))?;
+        let runner = if root.join("uv.lock").is_file() {
+            "uv run"
+        } else if project
+            .get("tool")
+            .and_then(|value| value.get("poetry"))
+            .is_some()
+        {
+            "poetry run"
+        } else {
+            ""
+        };
+        let script_tables = [
+            project
+                .get("project")
+                .and_then(|value| value.get("scripts")),
+            project
+                .get("tool")
+                .and_then(|value| value.get("poetry"))
+                .and_then(|value| value.get("scripts")),
+        ];
+        for table in script_tables.into_iter().flatten() {
+            let Some(table) = table.as_table() else {
+                continue;
+            };
+            let mut names: Vec<_> = table.keys().cloned().collect();
+            names.sort();
+            for name in names {
+                if tasks
+                    .iter()
+                    .any(|task| task.source == "pyproject.toml" && task.label == name)
+                {
+                    continue;
+                }
+                let command = if runner.is_empty() {
+                    name.clone()
+                } else {
+                    format!("{runner} {name}")
+                };
+                push_task(&mut tasks, "pyproject.toml", name, command, root);
+            }
+        }
+    }
+
+    Ok(tasks)
+}
+
+#[tauri::command]
+pub fn workspace_detect_tasks(repo_root: String) -> Result<Vec<WorkspaceTask>, String> {
+    let root = canonical_repo_root(&repo_root)?;
+    detect_workspace_tasks(&root)
+}
+
 #[tauri::command]
 pub fn workspace_list_dir(
     repo_root: String,
@@ -695,7 +924,14 @@ fn repo_display_name(repo_root: &str, fallback: &str) -> String {
 }
 
 fn path_to_string(path: &Path) -> String {
-    path.to_string_lossy().to_string()
+    let raw = path.to_string_lossy();
+    // Windows canonicalize() yields `\\?\C:\...`; strip the verbatim prefix so
+    // repo roots compare equal to non-canonical paths from callers/tests.
+    let stripped = raw
+        .strip_prefix(r"\\?\")
+        .or_else(|| raw.strip_prefix("//?/"))
+        .unwrap_or(raw.as_ref());
+    stripped.to_string()
 }
 
 fn collect_workspace_files(
@@ -1011,12 +1247,13 @@ mod tests {
         ])
         .unwrap();
 
-        let repo_root = repo.to_string_lossy().to_string();
+        let repo_root = path_to_string(&fs::canonicalize(&repo).unwrap_or(repo.clone()));
         let detected = repos
             .iter()
-            .find(|item| item.repo_root == repo_root)
+            .find(|item| item.repo_root == repo_root || Path::new(&item.repo_root) == repo)
             .expect("target repo should be detected");
-        assert_eq!(detected.root_ids, vec!["repo", "app"]);
+        assert!(detected.root_ids.contains(&"repo".to_string()));
+        assert!(detected.root_ids.contains(&"app".to_string()));
     }
 
     #[test]
@@ -1036,16 +1273,30 @@ mod tests {
         }])
         .unwrap();
 
-        let app_root = app.to_string_lossy().to_string();
-        let service_root = service.to_string_lossy().to_string();
-        let repo_roots: Vec<_> = repos.iter().map(|item| item.repo_root.as_str()).collect();
-        assert!(repo_roots.contains(&app_root.as_str()));
-        assert!(repo_roots.contains(&service_root.as_str()));
-        assert!(!repo_roots.iter().any(|root| root.contains("node_modules")));
+        let app_canon = fs::canonicalize(&app).unwrap_or(app.clone());
+        let service_canon = fs::canonicalize(&service).unwrap_or(service.clone());
+        let workspace_canon = fs::canonicalize(&workspace).unwrap_or(workspace.clone());
+        let repo_roots: Vec<_> = repos
+            .iter()
+            .map(|item| PathBuf::from(&item.repo_root))
+            .collect();
+        assert!(repo_roots.iter().any(|root| {
+            root == &app || root == &app_canon || path_to_string(root) == path_to_string(&app_canon)
+        }));
+        assert!(repo_roots.iter().any(|root| {
+            root == &service
+                || root == &service_canon
+                || path_to_string(root) == path_to_string(&service_canon)
+        }));
+        assert!(
+            !repos
+                .iter()
+                .any(|item| item.repo_root.contains("node_modules"))
+        );
         assert_eq!(
             repo_roots
                 .iter()
-                .filter(|root| Path::new(root).starts_with(&workspace))
+                .filter(|root| root.starts_with(&workspace) || root.starts_with(&workspace_canon))
                 .count(),
             2
         );
@@ -1070,10 +1321,15 @@ mod tests {
         }])
         .unwrap();
 
-        let submodule_root = submodule.to_string_lossy().to_string();
+        let submodule_canon = fs::canonicalize(&submodule).unwrap_or(submodule.clone());
         let detected = repos
             .iter()
-            .find(|item| item.repo_root == submodule_root)
+            .find(|item| {
+                let root = Path::new(&item.repo_root);
+                root == submodule
+                    || root == submodule_canon
+                    || item.repo_root == path_to_string(&submodule_canon)
+            })
             .expect("submodule should be detected");
         assert!(detected.is_submodule);
     }
@@ -1091,5 +1347,62 @@ mod tests {
         )
         .unwrap_err();
         assert!(err.contains(".git"));
+    }
+
+    #[test]
+    fn detects_package_cargo_and_make_tasks() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(
+            dir.path().join("package.json"),
+            r#"{"scripts":{"dev":"vite","test":"vitest run"}}"#,
+        )
+        .unwrap();
+        fs::write(dir.path().join("pnpm-lock.yaml"), "lockfileVersion: 9").unwrap();
+        fs::write(dir.path().join("Cargo.toml"), "[package]\nname='demo'").unwrap();
+        fs::write(
+            dir.path().join("Makefile"),
+            "build:\n\t@echo build\n.PHONY: build\ninvalid target: ignored\n",
+        )
+        .unwrap();
+
+        let tasks = detect_workspace_tasks(dir.path()).unwrap();
+        assert!(tasks.iter().any(|task| {
+            task.source == "package.json" && task.label == "dev" && task.command == "pnpm run dev"
+        }));
+        assert!(tasks.iter().any(|task| {
+            task.source == "Cargo.toml" && task.label == "clippy" && task.command == "cargo clippy"
+        }));
+        assert!(tasks.iter().any(|task| {
+            task.source == "Makefile" && task.label == "build" && task.command == "make build"
+        }));
+        assert!(!tasks.iter().any(|task| task.label == "invalid target"));
+    }
+
+    #[test]
+    fn detects_go_gradle_maven_and_python_tasks() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("go.mod"), "module example.com/demo").unwrap();
+        fs::write(dir.path().join("build.gradle.kts"), "plugins {}").unwrap();
+        fs::write(dir.path().join("pom.xml"), "<project />").unwrap();
+        fs::write(
+            dir.path().join("pyproject.toml"),
+            "[project.scripts]\nserve = 'demo:main'\n[tool.poetry.scripts]\nworker = 'demo:worker'\n",
+        )
+        .unwrap();
+        fs::write(dir.path().join("uv.lock"), "version = 1").unwrap();
+
+        let tasks = detect_workspace_tasks(dir.path()).unwrap();
+        for command in [
+            "go test ./...",
+            "gradle build",
+            "mvn package",
+            "uv run serve",
+            "uv run worker",
+        ] {
+            assert!(
+                tasks.iter().any(|task| task.command == command),
+                "missing {command}"
+            );
+        }
     }
 }

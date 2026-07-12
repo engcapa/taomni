@@ -142,4 +142,27 @@ describe("buildAppMenuSpec", () => {
       expect(acts).toContain(a);
     }
   });
+
+  it("adds active Code Workspace commands as a dynamic Tools submenu", () => {
+    const spec = buildAppMenuSpec({
+      ...baseParams,
+      workspaceCommands: [
+        { id: "workspace.findInFiles", title: "Find in Files", category: "Search", keybinding: "Ctrl+Shift+F", enabled: true },
+        { id: "workspace.navigateBack", title: "Navigate Back", category: "Navigation", keybinding: "Ctrl+Alt+Left", enabled: false },
+      ],
+    });
+    const tools = submenu(spec, "tools");
+    const workspace = tools.items.find((node) => node.type === "submenu" && node.id === "code-workspace-actions");
+    expect(workspace?.type).toBe("submenu");
+    if (!workspace || workspace.type !== "submenu") return;
+    expect(actions(workspace.items)).toEqual([
+      "workspace-command:workspace.findInFiles",
+      "workspace-command:workspace.navigateBack",
+    ]);
+    expect(workspace.items[0]).toEqual(expect.objectContaining({
+      accelerator: "CmdOrCtrl+Shift+F",
+      enabled: true,
+    }));
+    expect(workspace.items[1]).toEqual(expect.objectContaining({ enabled: false }));
+  });
 });

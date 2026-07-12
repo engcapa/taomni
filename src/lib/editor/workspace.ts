@@ -39,6 +39,14 @@ export interface WorkspaceGitRoot {
   isSubmodule?: boolean;
 }
 
+export interface WorkspaceTask {
+  id: string;
+  label: string;
+  command: string;
+  cwd: string;
+  source: string;
+}
+
 export function workspaceListDir(
   repoRoot: string,
   path = "",
@@ -76,6 +84,10 @@ export function workspaceDetectGitRoots(
   roots: WorkspaceGitRootCandidate[],
 ): Promise<WorkspaceGitRoot[]> {
   return invoke<WorkspaceGitRoot[]>("workspace_detect_git_roots", { roots });
+}
+
+export function workspaceDetectTasks(repoRoot: string): Promise<WorkspaceTask[]> {
+  return invoke<WorkspaceTask[]>("workspace_detect_tasks", { repoRoot });
 }
 
 export function workspaceReadFile(

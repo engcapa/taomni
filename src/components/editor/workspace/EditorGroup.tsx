@@ -1,0 +1,442 @@
+import { useEffect, useState, type CSSProperties, type MutableRefObject, type ReactNode } from "react";
+import {
+  AlertTriangle,
+  Columns2,
+  Eye,
+  File,
+  Loader2,
+  MoreHorizontal,
+  Pin,
+  X,
+} from "lucide-react";
+import type {
+  LspCapabilitySummary,
+  LspDiagnostic,
+  LspDocumentHighlight,
+  LspInlayHint,
+  LspPosition,
+  LspRange,
+  LspSemanticToken,
+} from "../../../lib/editor/lsp";
+import type {
+  LspCompletionItem,
+  LspCompletionResult,
+  LspSignatureHelpResult,
+} from "../../../lib/editor/lsp";
+import { CodeMirrorHost, type EditorSelectionRange } from "./CodeMirrorHost";
+import type { OpenFileViewModel } from "./editorGroupTypes";
+import { useContextMenu } from "../../ContextMenu";
+import type { EditorGroupId } from "../../../stores/codeWorkspaceStore";
+import type { GitBlameLine } from "../../../lib/git";
+import type { GitLineChange } from "./gitEditorChrome";
+import { GitDiffPeek } from "./GitDiffPeek";
+
+export type MarkdownViewMode = "edit" | "preview" | "split";
+
+export interface EditorRevealTarget {
+  key: string;
+  line: number;
+  character: number;
+  nonce: number;
+}
+
+interface EditorGroupProps {
+  groupId: EditorGroupId;
+  workspaceInstanceId: string;
+  visible: boolean;
+  openOrder: string[];
+  openFiles: Record<string, OpenFileViewModel>;
+  activeKey: string | null;
+  previewKey: string | null;
+  pinnedKeys: string[];
+  activeFile: OpenFileViewModel | null;
+  activeMarkdownMode: MarkdownViewMode;
+  activeDiagnostics: LspDiagnostic[];
+  activeHighlights: LspDocumentHighlight[];
+  activeInlayHints: LspInlayHint[];
+  activeSemanticTokens?: LspSemanticToken[];
+  activeGitChanges: GitLineChange[];
+  activeGitBlame: GitBlameLine | null;
+  activeCapabilities: LspCapabilitySummary | null;
+  activeLspSyncing: boolean;
+  lspStatusPill: ReactNode;
+  breadcrumbs: ReactNode;
+  revealTarget: EditorRevealTarget | null;
+  editorPaneRef: MutableRefObject<HTMLElement | null>;
+  editorPaneStyle: CSSProperties;
+  onActivate: (key: string) => void;
+  onActivateGroup: () => void;
+  onClose: (key: string) => void;
+  onPin: (key: string, pinned: boolean) => void;
+  onPromotePreview: (key: string) => void;
+  onCloseOthers: (key: string) => void;
+  onCloseRight: (key: string) => void;
+  onCloseUnmodified: () => void;
+  onCloseAll: () => void;
+  onSplitRight: (key: string) => void;
+  onSplitDown: (key: string) => void;
+  onCopyPath: (key: string, absolute: boolean) => void;
+  onRevealInTree: (key: string) => void;
+  onRevealInSystem: (key: string) => void;
+  onOpenInTerminal: (key: string) => void;
+  onLocalHistory?: (key: string) => void;
+  onMarkdownModeChange: (mode: MarkdownViewMode) => void;
+  onChangeText: (key: string, text: string) => void;
+  onSave: (key: string) => void;
+  onHover: (file: OpenFileViewModel, position: LspPosition) => Promise<string | null>;
+  onDefinition: (file: OpenFileViewModel, position: LspPosition) => Promise<boolean>;
+  onReferences: (file: OpenFileViewModel, position: LspPosition) => Promise<void>;
+  onComplete: (
+    file: OpenFileViewModel,
+    position: LspPosition,
+    trigger: string | null,
+  ) => Promise<LspCompletionResult | null>;
+  onCompleteResolve: (file: OpenFileViewModel, raw: unknown) => Promise<LspCompletionItem | null>;
+  onSignatureHelp: (
+    file: OpenFileViewModel,
+    position: LspPosition,
+    trigger: string | null,
+  ) => Promise<LspSignatureHelpResult | null>;
+  onSelectionChange: (selection: EditorSelectionRange) => void;
+  onViewportChange: (range: LspRange) => void;
+  onExpandSelection: (file: OpenFileViewModel, selection: EditorSelectionRange) => Promise<LspRange[] | null>;
+  onLightbulb: (line: number) => void;
+  onOpenMarkdownHref: (href: string) => boolean;
+  formatBytes: (size: number) => string;
+  formatMtime: (mtime: number) => string;
+  isMarkdownPath: (path: string) => boolean;
+  renderMarkdownPreview: (file: OpenFileViewModel, onOpenHref: (href: string) => boolean) => ReactNode;
+}
+
+/**
+ * Single editor group: tab strip + active buffer chrome + CodeMirror/markdown.
+ * File buffers and LSP sessions stay owned by the shell/store; this is the
+ * presentation boundary for the center pane (M3 will grow this into multi-group).
+ */
+export function EditorGroup({
+  groupId,
+  workspaceInstanceId,
+  visible,
+  openOrder,
+  openFiles,
+  activeKey,
+  previewKey,
+  pinnedKeys,
+  activeFile,
+  activeMarkdownMode,
+  activeDiagnostics,
+  activeHighlights,
+  activeInlayHints,
+  activeSemanticTokens = [],
+  activeGitChanges,
+  activeGitBlame,
+  activeCapabilities,
+  activeLspSyncing,
+  lspStatusPill,
+  breadcrumbs,
+  revealTarget,
+  editorPaneRef,
+  editorPaneStyle,
+  onActivate,
+  onActivateGroup,
+  onClose,
+  onPin,
+  onPromotePreview,
+  onCloseOthers,
+  onCloseRight,
+  onCloseUnmodified,
+  onCloseAll,
+  onSplitRight,
+  onSplitDown,
+  onCopyPath,
+  onRevealInTree,
+  onRevealInSystem,
+  onOpenInTerminal,
+  onLocalHistory,
+  onMarkdownModeChange,
+  onChangeText,
+  onSave,
+  onHover,
+  onDefinition,
+  onReferences,
+  onComplete,
+  onCompleteResolve,
+  onSignatureHelp,
+  onSelectionChange,
+  onViewportChange,
+  onExpandSelection,
+  onLightbulb,
+  onOpenMarkdownHref,
+  formatBytes,
+  formatMtime,
+  isMarkdownPath,
+  renderMarkdownPreview,
+}: EditorGroupProps) {
+  const tabMenu = useContextMenu();
+  const [gitDiffPeek, setGitDiffPeek] = useState<GitLineChange | null>(null);
+  useEffect(() => setGitDiffPeek(null), [activeKey]);
+  const pinnedSet = new Set(pinnedKeys);
+  const orderedKeys = [
+    ...openOrder.filter((key) => pinnedSet.has(key)),
+    ...openOrder.filter((key) => !pinnedSet.has(key)),
+  ];
+  const showTabMenu = (event: React.MouseEvent, key: string) => {
+    const pinned = pinnedSet.has(key);
+    tabMenu.show(event, [
+      { label: pinned ? "Unpin Tab" : "Pin Tab", onClick: () => onPin(key, !pinned) },
+      { label: "Open in Split Right", onClick: () => onSplitRight(key) },
+      { label: "Open in Split Down", onClick: () => onSplitDown(key) },
+      { separator: true, label: "" },
+      { label: "Close", shortcut: "Ctrl+F4", onClick: () => onClose(key) },
+      { label: "Close Others", onClick: () => onCloseOthers(key) },
+      { label: "Close Tabs to the Right", onClick: () => onCloseRight(key) },
+      { label: "Close Unmodified", onClick: onCloseUnmodified },
+      { separator: true, label: "" },
+      { label: "Close All", onClick: onCloseAll },
+      { separator: true, label: "" },
+      { label: "Copy Path", onClick: () => onCopyPath(key, true) },
+      { label: "Copy Relative Path", onClick: () => onCopyPath(key, false) },
+      { label: "Reveal in Project Tree", shortcut: "Alt+F1", onClick: () => onRevealInTree(key) },
+      { label: "Reveal in Explorer", onClick: () => onRevealInSystem(key) },
+      { label: "Open in Terminal", onClick: () => onOpenInTerminal(key) },
+      ...(onLocalHistory ? [
+        { separator: true as const, label: "" },
+        { label: "Local History…", onClick: () => onLocalHistory(key) },
+      ] : []),
+    ]);
+  };
+  return (
+    <main
+      ref={editorPaneRef}
+      data-testid="code-workspace-editor-pane"
+      data-editor-group-id={groupId}
+      onMouseDown={onActivateGroup}
+      className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-bg)]"
+      style={editorPaneStyle}
+    >
+      {openOrder.length > 0 && (
+        <div className="h-8 shrink-0 flex items-end overflow-x-auto border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]">
+          {orderedKeys.map((key) => {
+            const file = openFiles[key];
+            if (!file) return null;
+            const active = key === activeKey;
+            const preview = key === previewKey;
+            const pinned = pinnedSet.has(key);
+            return (
+              <div
+                key={key}
+                data-active={active || undefined}
+                data-preview={preview || undefined}
+                data-pinned={pinned || undefined}
+                className="h-[var(--taomni-code-editor-tab-height)] min-w-[130px] max-w-[240px] flex items-center border-r border-[var(--taomni-code-border)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
+              >
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 h-full flex items-center gap-1.5 px-2 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
+                  title={file.subtitle}
+                  onClick={() => onActivate(key)}
+                  onDoubleClick={() => onPromotePreview(key)}
+                  onAuxClick={(event) => {
+                    if (event.button === 1) onClose(key);
+                  }}
+                  onContextMenu={(event) => showTabMenu(event, key)}
+                >
+                  <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+                  {pinned && <Pin className="h-3 w-3 shrink-0" />}
+                  <span className={`truncate ${preview ? "italic" : ""}`}>{file.title}</span>
+                  {file.dirty && <span className="text-[var(--taomni-accent)]">*</span>}
+                </button>
+                <button
+                  type="button"
+                  className="h-full w-6 shrink-0 inline-flex items-center justify-center hover:bg-[var(--taomni-code-active-line-bg)]"
+                  title="Close"
+                  onClick={() => onClose(key)}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            );
+          })}
+          {openOrder.length > 1 && (
+            <button
+              type="button"
+              aria-label="Show all editor tabs"
+              className="ml-auto h-full w-7 shrink-0 inline-flex items-center justify-center hover:bg-[var(--taomni-code-active-line-bg)]"
+              onClick={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                tabMenu.showAt(rect.right, rect.bottom, orderedKeys.map((key) => ({
+                  label: openFiles[key]?.title ?? key,
+                  checked: key === activeKey,
+                  onClick: () => onActivate(key),
+                })));
+              }}
+            >
+              <MoreHorizontal className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
+      <div
+        id={`code-workspace-editor-stack-${workspaceInstanceId}`}
+        className="flex-1 min-h-0"
+      >
+        <div className="h-full min-h-0 relative">
+          {activeFile ? (
+            <div className="absolute inset-0 flex flex-col">
+              {breadcrumbs}
+              <div className="min-h-7 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)]">
+                <span className="truncate">{activeFile.subtitle}</span>
+                <span className="shrink-0">{formatBytes(activeFile.size)}</span>
+                {formatMtime(activeFile.mtime) && (
+                  <span className="shrink-0">{formatMtime(activeFile.mtime)}</span>
+                )}
+                {activeFile.loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {activeLspSyncing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {lspStatusPill}
+                {isMarkdownPath(activeFile.languagePath) && (
+                  <div className="ml-auto flex items-center gap-0.5">
+                    <ModeButton
+                      label="Edit"
+                      active={activeMarkdownMode === "edit"}
+                      icon={<File className="w-3 h-3" />}
+                      onClick={() => onMarkdownModeChange("edit")}
+                    />
+                    <ModeButton
+                      label="Preview"
+                      active={activeMarkdownMode === "preview"}
+                      icon={<Eye className="w-3 h-3" />}
+                      onClick={() => onMarkdownModeChange("preview")}
+                    />
+                    <ModeButton
+                      label="Split"
+                      active={activeMarkdownMode === "split"}
+                      icon={<Columns2 className="w-3 h-3" />}
+                      onClick={() => onMarkdownModeChange("split")}
+                    />
+                  </div>
+                )}
+              </div>
+              {activeFile.error && (
+                <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-red-500/30 bg-red-500/10 text-[12px] text-red-500">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span className="min-w-0 truncate">{activeFile.error}</span>
+                </div>
+              )}
+              <div data-testid="code-workspace-editor" className="relative flex-1 min-h-0">
+                {gitDiffPeek && <GitDiffPeek change={gitDiffPeek} onClose={() => setGitDiffPeek(null)} />}
+                {activeFile.loading ? (
+                  <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-code-muted)]">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  </div>
+                ) : isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "preview" ? (
+                  renderMarkdownPreview(activeFile, onOpenMarkdownHref)
+                ) : isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "split" ? (
+                  <div className="h-full min-h-0 grid grid-cols-2">
+                    <div className="min-w-0 min-h-0 border-r border-[var(--taomni-code-border)]">
+                      <CodeMirrorHost
+                        key={`${activeFile.key}:edit`}
+                        path={activeFile.languagePath}
+                        doc={activeFile.text}
+                        visible={visible}
+                        diagnostics={activeDiagnostics}
+                        highlights={activeHighlights}
+                        inlayHints={activeInlayHints}
+                        semanticTokens={activeSemanticTokens}
+                        gitChanges={activeGitChanges}
+                        gitBlame={activeGitBlame}
+                        reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
+                        onChange={(doc) => {
+                          if (previewKey === activeFile.key) onPromotePreview(activeFile.key);
+                          onChangeText(activeFile.key, doc);
+                        }}
+                        onSave={() => onSave(activeFile.key)}
+                        onHover={(position) => onHover(activeFile, position)}
+                        onDefinition={(position) => onDefinition(activeFile, position)}
+                        onReferences={(position) => onReferences(activeFile, position)}
+                        onComplete={(position, trigger) => onComplete(activeFile, position, trigger)}
+                        onCompleteResolve={(raw) => onCompleteResolve(activeFile, raw)}
+                        onSignatureHelp={(position, trigger) => onSignatureHelp(activeFile, position, trigger)}
+                        onSelectionChange={onSelectionChange}
+                        onViewportChange={onViewportChange}
+                        onExpandSelection={(selection) => onExpandSelection(activeFile, selection)}
+                        onLightbulb={onLightbulb}
+                        onGitChangeClick={setGitDiffPeek}
+                        completionTriggers={activeCapabilities?.completionTriggerCharacters ?? []}
+                        signatureTriggers={activeCapabilities?.signatureTriggerCharacters ?? []}
+                      />
+                    </div>
+                    {renderMarkdownPreview(activeFile, onOpenMarkdownHref)}
+                  </div>
+                ) : (
+                  <CodeMirrorHost
+                    key={activeFile.key}
+                    path={activeFile.languagePath}
+                    doc={activeFile.text}
+                    visible={visible}
+                    diagnostics={activeDiagnostics}
+                    highlights={activeHighlights}
+                    inlayHints={activeInlayHints}
+                    semanticTokens={activeSemanticTokens}
+                    gitChanges={activeGitChanges}
+                    gitBlame={activeGitBlame}
+                    reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
+                    onChange={(doc) => {
+                      if (previewKey === activeFile.key) onPromotePreview(activeFile.key);
+                      onChangeText(activeFile.key, doc);
+                    }}
+                    onSave={() => onSave(activeFile.key)}
+                    onHover={(position) => onHover(activeFile, position)}
+                    onDefinition={(position) => onDefinition(activeFile, position)}
+                    onReferences={(position) => onReferences(activeFile, position)}
+                    onComplete={(position, trigger) => onComplete(activeFile, position, trigger)}
+                    onCompleteResolve={(raw) => onCompleteResolve(activeFile, raw)}
+                    onSignatureHelp={(position, trigger) => onSignatureHelp(activeFile, position, trigger)}
+                    onSelectionChange={onSelectionChange}
+                    onViewportChange={onViewportChange}
+                    onExpandSelection={(selection) => onExpandSelection(activeFile, selection)}
+                    onLightbulb={onLightbulb}
+                    onGitChangeClick={setGitDiffPeek}
+                    completionTriggers={activeCapabilities?.completionTriggerCharacters ?? []}
+                    signatureTriggers={activeCapabilities?.signatureTriggerCharacters ?? []}
+                  />
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-code-muted)]">
+              No file open
+            </div>
+          )}
+        </div>
+      </div>
+      {tabMenu.render}
+    </main>
+  );
+}
+
+function ModeButton({
+  label,
+  active,
+  icon,
+  onClick,
+}: {
+  label: string;
+  active?: boolean;
+  icon: ReactNode;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      aria-pressed={active}
+      data-active={active || undefined}
+      className="h-6 inline-flex items-center gap-1 rounded px-1.5 text-[10px] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
+      onClick={onClick}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+}

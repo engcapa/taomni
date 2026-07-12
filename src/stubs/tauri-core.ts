@@ -1214,6 +1214,21 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "lsp_list_presets": {
       return STUB_LSP_PRESETS as T;
     }
+    case "git_blame_lines": {
+      return [] as T;
+    }
+    case "history_snapshot": {
+      return null as T;
+    }
+    case "history_list": {
+      return [] as T;
+    }
+    case "history_read": {
+      return "" as T;
+    }
+    case "history_prune": {
+      return 0 as T;
+    }
     case "lsp_detect_servers": {
       return stubLspServerStatuses() as T;
     }
@@ -1238,10 +1253,52 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       } as T;
     }
     case "lsp_definition":
+    case "lsp_type_definition":
+    case "lsp_implementation":
     case "lsp_references": {
       return {
         status: stubLspDocumentStatus(args as InvokeArgs),
         locations: [],
+      } as T;
+    }
+    case "lsp_prepare_call_hierarchy":
+    case "lsp_prepare_type_hierarchy":
+    case "lsp_type_hierarchy_supertypes":
+    case "lsp_type_hierarchy_subtypes": {
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        items: [],
+      } as T;
+    }
+    case "lsp_call_hierarchy_incoming":
+    case "lsp_call_hierarchy_outgoing": {
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        entries: [],
+      } as T;
+    }
+    case "lsp_document_highlights": {
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        highlights: [],
+      } as T;
+    }
+    case "lsp_inlay_hints": {
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        hints: [],
+      } as T;
+    }
+    case "lsp_selection_ranges": {
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        ranges: [],
+      } as T;
+    }
+    case "lsp_semantic_tokens": {
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        tokens: [],
       } as T;
     }
     case "workspace_list_dir": {
@@ -1399,6 +1456,9 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       throw new Error(
         "Local terminal is not available in browser preview. Use the Quick connect bar or 'New session' to open an SSH connection (e.g. demo@test.rebex.net).",
       );
+    }
+    case "workspace_detect_tasks": {
+      return [] as T;
     }
     case "create_ssh_terminal": {
       const cols = (args?.cols as number) ?? 80;

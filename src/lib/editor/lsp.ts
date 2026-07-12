@@ -41,6 +41,30 @@ export interface LspServerStatus {
   commands: LspServerCommandStatus[];
 }
 
+export interface LspCapabilitySummary {
+  completion: boolean;
+  signatureHelp: boolean;
+  hover: boolean;
+  definition: boolean;
+  typeDefinition: boolean;
+  implementation: boolean;
+  references: boolean;
+  documentSymbol: boolean;
+  workspaceSymbol: boolean;
+  rename: boolean;
+  formatting: boolean;
+  rangeFormatting: boolean;
+  codeAction: boolean;
+  documentHighlight: boolean;
+  callHierarchy: boolean;
+  typeHierarchy: boolean;
+  inlayHint: boolean;
+  selectionRange: boolean;
+  semanticTokens: boolean;
+  completionTriggerCharacters: string[];
+  signatureTriggerCharacters: string[];
+}
+
 export interface LspDocumentStatus {
   path: string;
   uri: string;
@@ -53,6 +77,7 @@ export interface LspDocumentStatus {
   selectedCommand: string | null;
   installHint: string | null;
   error: string | null;
+  capabilities?: LspCapabilitySummary | null;
 }
 
 export interface LspPosition {
@@ -93,6 +118,68 @@ export interface LspHoverResult {
 export interface LspLocationsResult {
   status: LspDocumentStatus;
   locations: LspLocation[];
+}
+
+export interface LspDocumentSymbol {
+  name: string;
+  detail: string | null;
+  kind: number;
+  depth: number;
+  range: LspRange;
+  selectionRange: LspRange;
+}
+
+export interface LspDocumentSymbolsResult {
+  status: LspDocumentStatus;
+  symbols: LspDocumentSymbol[];
+}
+
+export interface LspTextEdit {
+  range: LspRange;
+  newText: string;
+}
+
+export interface LspCompletionItem {
+  label: string;
+  kind: number | null;
+  detail: string | null;
+  documentation: string | null;
+  insertText: string | null;
+  /** 1 = plain text, 2 = snippet. */
+  insertTextFormat: number | null;
+  filterText: string | null;
+  sortText: string | null;
+  textEdit: LspTextEdit | null;
+  additionalTextEdits: LspTextEdit[];
+  /** Original server item, passed back verbatim to completionItem/resolve. */
+  raw: unknown;
+}
+
+export interface LspCompletionResult {
+  status: LspDocumentStatus;
+  isIncomplete: boolean;
+  items: LspCompletionItem[];
+}
+
+export interface LspSignatureParameter {
+  label: string;
+  documentation: string | null;
+  labelStart: number | null;
+  labelEnd: number | null;
+}
+
+export interface LspSignatureInfo {
+  label: string;
+  documentation: string | null;
+  parameters: LspSignatureParameter[];
+  activeParameter: number | null;
+}
+
+export interface LspSignatureHelpResult {
+  status: LspDocumentStatus;
+  signatures: LspSignatureInfo[];
+  activeSignature: number;
+  activeParameter: number;
 }
 
 export interface LspDocumentDescriptor {
@@ -177,6 +264,369 @@ export function lspGetDiagnostics(
   return invoke<LspDiagnosticsResult>("lsp_get_diagnostics", documentArgs(descriptor));
 }
 
+export function lspDocumentSymbols(
+  descriptor: LspDocumentDescriptor,
+): Promise<LspDocumentSymbolsResult> {
+  return invoke<LspDocumentSymbolsResult>("lsp_document_symbols", documentArgs(descriptor));
+}
+
+export function lspCompletion(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+  triggerCharacter?: string | null,
+): Promise<LspCompletionResult> {
+  return invoke<LspCompletionResult>("lsp_completion", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+    triggerCharacter: triggerCharacter ?? null,
+  });
+}
+
+export function lspCompletionResolve(
+  descriptor: LspDocumentDescriptor,
+  item: unknown,
+): Promise<LspCompletionItem | null> {
+  return invoke<LspCompletionItem | null>("lsp_completion_resolve", {
+    ...documentArgs(descriptor),
+    item,
+  });
+}
+
+export function lspSignatureHelp(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+  triggerCharacter?: string | null,
+): Promise<LspSignatureHelpResult> {
+  return invoke<LspSignatureHelpResult>("lsp_signature_help", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+    triggerCharacter: triggerCharacter ?? null,
+  });
+}
+
+export interface LspFormattingResult {
+  status: LspDocumentStatus;
+  edits: LspTextEdit[];
+}
+
+export interface LspFormattingOptions {
+  tabSize?: number;
+  insertSpaces?: boolean;
+}
+
+export function lspFormatting(
+  descriptor: LspDocumentDescriptor,
+  options?: LspFormattingOptions,
+): Promise<LspFormattingResult> {
+  return invoke<LspFormattingResult>("lsp_formatting", {
+    ...documentArgs(descriptor),
+    tabSize: options?.tabSize ?? null,
+    insertSpaces: options?.insertSpaces ?? null,
+  });
+}
+
+export function lspRangeFormatting(
+  descriptor: LspDocumentDescriptor,
+  range: LspRange,
+  options?: LspFormattingOptions,
+): Promise<LspFormattingResult> {
+  return invoke<LspFormattingResult>("lsp_range_formatting", {
+    ...documentArgs(descriptor),
+    startLine: range.start.line,
+    startCharacter: range.start.character,
+    endLine: range.end.line,
+    endCharacter: range.end.character,
+    tabSize: options?.tabSize ?? null,
+    insertSpaces: options?.insertSpaces ?? null,
+  });
+}
+
+export interface LspFileTextEdits {
+  uri: string;
+  path: string | null;
+  edits: LspTextEdit[];
+}
+
+export interface LspWorkspaceEdit {
+  documentEdits: LspFileTextEdits[];
+}
+
+export interface LspCodeAction {
+  title: string;
+  kind: string | null;
+  isPreferred: boolean;
+  edit: LspWorkspaceEdit | null;
+  command: string | null;
+  commandArguments: unknown;
+  raw: unknown;
+}
+
+export interface LspCodeActionsResult {
+  status: LspDocumentStatus;
+  actions: LspCodeAction[];
+}
+
+export function lspCodeActions(
+  descriptor: LspDocumentDescriptor,
+  range: LspRange,
+  diagnostics?: unknown[] | null,
+): Promise<LspCodeActionsResult> {
+  return invoke<LspCodeActionsResult>("lsp_code_actions", {
+    ...documentArgs(descriptor),
+    startLine: range.start.line,
+    startCharacter: range.start.character,
+    endLine: range.end.line,
+    endCharacter: range.end.character,
+    diagnostics: diagnostics ?? null,
+  });
+}
+
+export interface LspWorkspaceSymbol {
+  name: string;
+  kind: number;
+  containerName: string | null;
+  uri: string;
+  path: string | null;
+  range: LspRange;
+  selectionRange: LspRange;
+}
+
+export interface LspWorkspaceSymbolsResult {
+  status: LspDocumentStatus;
+  symbols: LspWorkspaceSymbol[];
+}
+
+export interface LspHierarchyItem {
+  name: string;
+  detail: string | null;
+  kind: number;
+  uri: string;
+  path: string | null;
+  range: LspRange;
+  selectionRange: LspRange;
+  /** Original server item retained for lazy hierarchy requests. */
+  raw: unknown;
+}
+
+export interface LspHierarchyPrepareResult {
+  status: LspDocumentStatus;
+  items: LspHierarchyItem[];
+}
+
+export interface LspCallHierarchyEntry {
+  item: LspHierarchyItem;
+  fromRanges: LspRange[];
+}
+
+export interface LspCallHierarchyResult {
+  status: LspDocumentStatus;
+  entries: LspCallHierarchyEntry[];
+}
+
+export interface LspTypeHierarchyResult {
+  status: LspDocumentStatus;
+  items: LspHierarchyItem[];
+}
+
+export interface LspDocumentHighlight {
+  range: LspRange;
+  /** 1 = text, 2 = read, 3 = write. */
+  kind: number | null;
+}
+
+export interface LspDocumentHighlightsResult {
+  status: LspDocumentStatus;
+  highlights: LspDocumentHighlight[];
+}
+
+export interface LspInlayHint {
+  position: LspPosition;
+  label: string;
+  /** 1 = type, 2 = parameter. */
+  kind: number | null;
+  tooltip: string | null;
+  paddingLeft: boolean;
+  paddingRight: boolean;
+}
+
+export interface LspInlayHintsResult {
+  status: LspDocumentStatus;
+  hints: LspInlayHint[];
+}
+
+export interface LspSelectionRangesResult {
+  status: LspDocumentStatus;
+  ranges: LspRange[];
+}
+
+export interface LspSemanticToken {
+  range: LspRange;
+  tokenType: string;
+  modifiers: string[];
+}
+
+export interface LspSemanticTokensResult {
+  status: LspDocumentStatus;
+  tokens: LspSemanticToken[];
+}
+
+export function lspWorkspaceSymbols(
+  descriptor: LspDocumentDescriptor,
+  query: string,
+): Promise<LspWorkspaceSymbolsResult> {
+  return invoke<LspWorkspaceSymbolsResult>("lsp_workspace_symbols", {
+    ...documentArgs(descriptor),
+    query,
+  });
+}
+
+export function lspPrepareCallHierarchy(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+): Promise<LspHierarchyPrepareResult> {
+  return invoke<LspHierarchyPrepareResult>("lsp_prepare_call_hierarchy", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+  });
+}
+
+export function lspCallHierarchyIncoming(
+  descriptor: LspDocumentDescriptor,
+  item: unknown,
+): Promise<LspCallHierarchyResult> {
+  return invoke<LspCallHierarchyResult>("lsp_call_hierarchy_incoming", {
+    ...documentArgs(descriptor),
+    item,
+  });
+}
+
+export function lspCallHierarchyOutgoing(
+  descriptor: LspDocumentDescriptor,
+  item: unknown,
+): Promise<LspCallHierarchyResult> {
+  return invoke<LspCallHierarchyResult>("lsp_call_hierarchy_outgoing", {
+    ...documentArgs(descriptor),
+    item,
+  });
+}
+
+export function lspPrepareTypeHierarchy(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+): Promise<LspHierarchyPrepareResult> {
+  return invoke<LspHierarchyPrepareResult>("lsp_prepare_type_hierarchy", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+  });
+}
+
+export function lspTypeHierarchySupertypes(
+  descriptor: LspDocumentDescriptor,
+  item: unknown,
+): Promise<LspTypeHierarchyResult> {
+  return invoke<LspTypeHierarchyResult>("lsp_type_hierarchy_supertypes", {
+    ...documentArgs(descriptor),
+    item,
+  });
+}
+
+export function lspTypeHierarchySubtypes(
+  descriptor: LspDocumentDescriptor,
+  item: unknown,
+): Promise<LspTypeHierarchyResult> {
+  return invoke<LspTypeHierarchyResult>("lsp_type_hierarchy_subtypes", {
+    ...documentArgs(descriptor),
+    item,
+  });
+}
+
+export function lspDocumentHighlights(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+): Promise<LspDocumentHighlightsResult> {
+  return invoke<LspDocumentHighlightsResult>("lsp_document_highlights", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+  });
+}
+
+export function lspInlayHints(
+  descriptor: LspDocumentDescriptor,
+  range: LspRange,
+): Promise<LspInlayHintsResult> {
+  return invoke<LspInlayHintsResult>("lsp_inlay_hints", {
+    ...documentArgs(descriptor),
+    startLine: range.start.line,
+    startCharacter: range.start.character,
+    endLine: range.end.line,
+    endCharacter: range.end.character,
+  });
+}
+
+export function lspSelectionRanges(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+): Promise<LspSelectionRangesResult> {
+  return invoke<LspSelectionRangesResult>("lsp_selection_ranges", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+  });
+}
+
+export function lspSemanticTokens(
+  descriptor: LspDocumentDescriptor,
+): Promise<LspSemanticTokensResult> {
+  return invoke<LspSemanticTokensResult>("lsp_semantic_tokens", {
+    ...documentArgs(descriptor),
+  });
+}
+
+export interface LspPrepareRenameResult {
+  status: LspDocumentStatus;
+  range: LspRange | null;
+  placeholder: string | null;
+  allowed: boolean;
+  message: string | null;
+}
+
+export interface LspRenameResult {
+  status: LspDocumentStatus;
+  edit: LspWorkspaceEdit;
+}
+
+export function lspPrepareRename(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+): Promise<LspPrepareRenameResult> {
+  return invoke<LspPrepareRenameResult>("lsp_prepare_rename", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+  });
+}
+
+export function lspRename(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+  newName: string,
+): Promise<LspRenameResult> {
+  return invoke<LspRenameResult>("lsp_rename", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+    newName,
+  });
+}
+
+/** LSP SymbolKind values treated as "classes" in Search Everywhere. */
+export const LSP_CLASS_SYMBOL_KINDS = new Set([5, 10, 11, 23, 26]);
+
 export function lspHover(
   descriptor: LspDocumentDescriptor,
   position: LspPosition,
@@ -193,6 +643,28 @@ export function lspDefinition(
   position: LspPosition,
 ): Promise<LspLocationsResult> {
   return invoke<LspLocationsResult>("lsp_definition", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+  });
+}
+
+export function lspTypeDefinition(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+): Promise<LspLocationsResult> {
+  return invoke<LspLocationsResult>("lsp_type_definition", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+  });
+}
+
+export function lspImplementation(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+): Promise<LspLocationsResult> {
+  return invoke<LspLocationsResult>("lsp_implementation", {
     ...documentArgs(descriptor),
     line: position.line,
     character: position.character,

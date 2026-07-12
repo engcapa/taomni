@@ -34,6 +34,9 @@ mod vnc;
 mod voice;
 mod windowing;
 mod workspace;
+mod workspace_fs;
+mod workspace_search;
+mod local_history;
 mod wsl;
 
 use state::AppState;
@@ -119,6 +122,10 @@ pub fn run() {
                 ai_ctx,
                 lanchat_state,
             ));
+            app.manage(workspace_search::WorkspaceSearchState::default());
+            let local_history = local_history::init_local_history(app.handle())
+                .expect("failed to init local history store");
+            app.manage(local_history);
 
             let handle_for_reaper = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -361,6 +368,7 @@ pub fn run() {
             git::git_snapshot,
             git::git_diff,
             git::git_blob_pair,
+            git::git_blame_lines,
             git::git_stage,
             git::git_unstage,
             git::git_discard,
@@ -406,6 +414,7 @@ pub fn run() {
             workspace::workspace_compact_chain,
             workspace::workspace_list_files_recursive,
             workspace::workspace_detect_git_roots,
+            workspace::workspace_detect_tasks,
             workspace::workspace_read_file,
             workspace::workspace_read_loose_file,
             workspace::workspace_write_file,
@@ -414,6 +423,12 @@ pub fn run() {
             workspace::workspace_create_dir,
             workspace::workspace_delete_path,
             workspace::workspace_rename_path,
+            local_history::history_snapshot,
+            local_history::history_list,
+            local_history::history_read,
+            local_history::history_prune,
+            workspace_search::workspace_search_start,
+            workspace_search::workspace_search_cancel,
             lsp::lsp_list_presets,
             lsp::lsp_detect_servers,
             lsp::lsp_document_status,
@@ -424,7 +439,29 @@ pub fn run() {
             lsp::lsp_get_diagnostics,
             lsp::lsp_hover,
             lsp::lsp_definition,
+            lsp::lsp_type_definition,
+            lsp::lsp_implementation,
             lsp::lsp_references,
+            lsp::lsp_document_symbols,
+            lsp::lsp_completion,
+            lsp::lsp_completion_resolve,
+            lsp::lsp_formatting,
+            lsp::lsp_range_formatting,
+            lsp::lsp_code_actions,
+            lsp::lsp_prepare_rename,
+            lsp::lsp_rename,
+            lsp::lsp_workspace_symbols,
+            lsp::lsp_prepare_call_hierarchy,
+            lsp::lsp_call_hierarchy_incoming,
+            lsp::lsp_call_hierarchy_outgoing,
+            lsp::lsp_prepare_type_hierarchy,
+            lsp::lsp_type_hierarchy_supertypes,
+            lsp::lsp_type_hierarchy_subtypes,
+            lsp::lsp_document_highlights,
+            lsp::lsp_inlay_hints,
+            lsp::lsp_selection_ranges,
+            lsp::lsp_semantic_tokens,
+            lsp::lsp_signature_help,
             windowing::open_detached_window,
             windowing::close_current_detached_window,
             appearance::list_system_fonts,

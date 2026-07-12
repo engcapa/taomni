@@ -1,0 +1,80 @@
+import { File, Loader2 } from "lucide-react";
+import type { LspLocation } from "../../../../lib/editor/lsp";
+import type { CodeWorkspaceRootInfo } from "../../../../types";
+
+export interface ReferencesResultState {
+  loading: boolean;
+  origin: string | null;
+  locations: LspLocation[];
+  error: string | null;
+}
+
+interface ReferencesPanelProps {
+  result: ReferencesResultState;
+  roots: CodeWorkspaceRootInfo[];
+  onOpenLocation: (location: LspLocation) => void;
+}
+
+function normalizeFsPath(path: string): string {
+  return path.replace(/\\/g, "/").replace(/\/+$/, "");
+}
+
+function relativePathWithinRoot(rootPath: string, filePath: string): string | null {
+  const root = normalizeFsPath(rootPath);
+  const file = normalizeFsPath(filePath);
+  if (file === root) return "";
+  return file.startsWith(`${root}/`) ? file.slice(root.length + 1) : null;
+}
+
+function displayLocationPath(location: LspLocation, roots: CodeWorkspaceRootInfo[]): string {
+  const path = location.path ?? location.uri;
+  for (const root of roots) {
+    const relative = location.path ? relativePathWithinRoot(root.path, location.path) : null;
+    if (relative !== null) return `${root.name}/${relative}`;
+  }
+  return path;
+}
+
+export function ReferencesPanel({ result, roots, onOpenLocation }: ReferencesPanelProps) {
+  return (
+    <div data-testid="code-workspace-references-panel" className="h-full min-h-0 overflow-auto py-1 text-[11px]">
+      {result.loading && (
+        <div className="flex items-center gap-2 px-3 py-2 text-[var(--taomni-code-muted)]">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <span>Finding references...</span>
+        </div>
+      )}
+      {result.origin && (
+        <div className="truncate px-3 py-1 text-[10px] text-[var(--taomni-code-muted)]" title={result.origin}>
+          {result.origin}
+        </div>
+      )}
+      {result.error && (
+        <div className="mx-2 mb-1 rounded border border-red-500/30 bg-red-500/10 p-2 text-red-500">
+          {result.error}
+        </div>
+      )}
+      {!result.loading && !result.error && result.locations.length === 0 && (
+        <div className="px-3 py-2 text-[var(--taomni-code-muted)]">No references</div>
+      )}
+      {result.locations.map((location, index) => {
+        const label = displayLocationPath(location, roots);
+        return (
+          <button
+            key={`${location.uri}:${location.range.start.line}:${location.range.start.character}:${index}`}
+            type="button"
+            className="h-7 w-full min-w-0 flex items-center gap-2 px-3 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
+            title={`${label}:${location.range.start.line + 1}:${location.range.start.character + 1}`}
+            onClick={() => onOpenLocation(location)}
+          >
+            <File className="h-3.5 w-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+            <span className="min-w-0 flex-1 truncate">{label}</span>
+            <span className="shrink-0 font-mono text-[10px] text-[var(--taomni-code-muted)]">
+              {location.range.start.line + 1}:{location.range.start.character + 1}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
