@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useSftpStore, type PaneState, type SftpSessionState } from "./sftpStore";
-import { sftpListRemote, type FileEntry } from "../lib/sftp";
+import { sftpListRemote, sftpAttach, sftpDetach, type FileEntry } from "../lib/sftp";
 
 vi.mock("../lib/sftp", () => ({
-  sftpListRemote: vi.fn(),
-  sftpListLocal: vi.fn(),
-  sftpLocalHome: vi.fn(),
-  sftpLocalDrives: vi.fn(),
-  sftpAttach: vi.fn(),
-  sftpDetach: vi.fn(),
-  sftpRealpath: vi.fn(),
+  sftpListRemote: vi.fn(async () => []),
+  sftpListLocal: vi.fn(async () => []),
+  sftpLocalHome: vi.fn(async () => "/"),
+  sftpLocalDrives: vi.fn(async () => []),
+  sftpAttach: vi.fn(async () => ({ homeDir: "/" })),
+  sftpDetach: vi.fn(async () => {}),
+  sftpRealpath: vi.fn(async (_sid: string, p: string) => p),
 }));
 
 const charsetSwitchEntry: FileEntry = {
@@ -85,5 +85,55 @@ describe("sftpStore", () => {
       ["sid", charsetSwitchEntry.path],
       ["sid", "/"],
     ]);
+  });
+
+  it("caches connectionOpts on attach and uses them on reconnect", async () => {
+    vi.mocked(sftpAttach).mockResolvedValue({ homeDir: "/home/test" });
+    vi.mocked(sftpListRemote).mockResolvedValue([]);
+
+    const opts = {
+      sessionId: "new-sid",
+      host: "example.com",
+      port: 22,
+      username: "user",
+      authMethod: "Password",
+      authData: "pass",
+    };
+
+    await useSftpStore.getState().attach(opts);
+
+    const s = useSftpStore.getState().sessions["new-sid"];
+    expect(s.connectionOpts).toEqual(opts);
+    expect(s.attached).toBe(true);
+
+    // Reset mocks to verify reconnect behavior
+    vi.mocked(sftpDetach).mockResolvedValue(undefined);
+    vi.mocked(sftpAttach).mockClear();
+
+    await useSftpStore.getState().reconnect("new-sid");
+    expect(vi.mocked(sftpDetach)).toHaveBeenCalledWith("new-sid");
+    expect(vi.mocked(sftpAttach)).toHaveBeenCalledWith(opts);
+  });
+
+  it("escalates connection errors on remote navigation to session level error", async () => {
+    vi.mocked(sftpListRemote).mockRejectedValue(new Error("socket closed"));
+
+    await useSftpStore.getState().navigate("sid", "remote", "/some/path");
+
+    const s = useSftpStore.getState().sessions.sid;
+    expect(s.attached).toBe(false);
+    expect(s.error).toBe("socket closed");
+    expect(s.remote.error).toBe("socket closed");
+  });
+
+  it("does not escalate non-connection errors on remote navigation", async () => {
+    vi.mocked(sftpListRemote).mockRejectedValue(new Error("Permission denied"));
+
+    await useSftpStore.getState().navigate("sid", "remote", "/some/path");
+
+    const s = useSftpStore.getState().sessions.sid;
+    expect(s.attached).toBe(true);
+    expect(s.error).toBeNull();
+    expect(s.remote.error).toBe("Permission denied");
   });
 });

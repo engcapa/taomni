@@ -102,6 +102,7 @@ export function FileBrowser(props: FileBrowserProps) {
   const attach = useSftpStore((s) => s.attach);
   const detach = useSftpStore((s) => s.detach);
   const navigate = useSftpStore((s) => s.navigate);
+  const reconnect = useSftpStore((s) => s.reconnect);
   const setStatus = useAppStore((s) => s.setStatusMessage);
   const controller = useSftpController(props.sessionId);
   const { confirm: confirmDialog, render: confirmDialogRender } = useConfirmDialog();
@@ -228,6 +229,26 @@ export function FileBrowser(props: FileBrowserProps) {
       }
     };
   }, [props.sessionId, detach]);
+
+  useEffect(() => {
+    const handleTerminalReconnected = (e: Event) => {
+      const customEvent = e as CustomEvent<{ tabId: string }>;
+      const targetTabId = customEvent.detail?.tabId;
+      if (!targetTabId) return;
+
+      const isAttachedSidebar = props.sessionId === `attached-${targetTabId}`;
+      if (isAttachedSidebar) {
+        void reconnect(props.sessionId).catch((err) => {
+          console.error("Auto-reconnection of SFTP failed:", err);
+        });
+      }
+    };
+
+    window.addEventListener("taomni:terminal-reconnected", handleTerminalReconnected);
+    return () => {
+      window.removeEventListener("taomni:terminal-reconnected", handleTerminalReconnected);
+    };
+  }, [props.sessionId, reconnect]);
 
   useEffect(() => {
     pendingTerminalSyncRef.current = false;
@@ -837,16 +858,8 @@ export function FileBrowser(props: FileBrowserProps) {
               type="button"
               className="ml-2 underline"
               onClick={() => {
-                void detach(props.sessionId).then(() =>
-                  attach({
-                    sessionId: props.sessionId,
-                    host: props.host,
-                    port: props.port,
-                    username: props.username,
-                    authMethod: props.authMethod,
-                    authData: props.authData,
-                    networkSettingsJson: props.networkSettingsJson ?? null,
-                  }).catch((err) => setStatus(t("fileBrowser.statusReconnectFailed", { error: String(err) })))
+                void reconnect(props.sessionId).catch((err) =>
+                  setStatus(t("fileBrowser.statusReconnectFailed", { error: String(err) }))
                 );
               }}
             >

@@ -2686,6 +2686,11 @@ export function TerminalPanel({
           term.write(`\r\n\x1b[32m[Reconnected to ${ssh.username}@${ssh.host}:${ssh.port}]\x1b[0m\r\n`);
           setStatusMessage("SSH reconnected");
           window.setTimeout(focusTerminal, 0);
+          window.dispatchEvent(
+            new CustomEvent("taomni:terminal-reconnected", {
+              detail: { tabId },
+            }),
+          );
         } else {
           term.write(formatSshInfoBanner(ssh));
         }
