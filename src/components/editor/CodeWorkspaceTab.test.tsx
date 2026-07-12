@@ -929,6 +929,66 @@ describe("CodeWorkspaceTab", () => {
     expect(screen.queryByTestId("code-workspace-structure-popup")).not.toBeInTheDocument();
   });
 
+  it("opens the persistent Outline pane and follows document symbols", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-outline",
+      workspaceInstanceId: "instance-outline",
+      name: "Outline",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    const capabilities = {
+      completion: false,
+      signatureHelp: false,
+      hover: false,
+      definition: false,
+      typeDefinition: false,
+      implementation: false,
+      references: false,
+      documentSymbol: true,
+      workspaceSymbol: false,
+      rename: false,
+      formatting: false,
+      rangeFormatting: false,
+      codeAction: false,
+      documentHighlight: false,
+      callHierarchy: false,
+      typeHierarchy: false,
+      inlayHint: false,
+      selectionRange: false,
+      completionTriggerCharacters: [],
+      signatureTriggerCharacters: [],
+    };
+    const status = documentStatus({ available: true, active: true, capabilities });
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "function render() {}"));
+    lspMocks.lspOpenDocument.mockResolvedValue(status);
+    lspMocks.lspChangeDocument.mockResolvedValue(status);
+    lspMocks.lspGetDiagnostics.mockResolvedValue({ status, diagnostics: [] });
+    lspMocks.lspDocumentSymbols.mockResolvedValue({
+      status,
+      symbols: [{
+        name: "render",
+        detail: "() => void",
+        kind: 12,
+        depth: 0,
+        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 20 } },
+        selectionRange: { start: { line: 0, character: 9 }, end: { line: 0, character: 15 } },
+      }],
+    });
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(lspMocks.lspDocumentSymbols).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId("code-workspace-right-pane-toggle"));
+
+    expect(screen.getByRole("tab", { name: "Outline", selected: true })).toBeInTheDocument();
+    const outline = await screen.findByTestId("code-workspace-outline-pane");
+    expect(outline).toHaveTextContent("render");
+    fireEvent.click(within(outline).getByText("render"));
+  });
+
   it("opens quick documentation with Ctrl+Q and pins it to the right pane", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",

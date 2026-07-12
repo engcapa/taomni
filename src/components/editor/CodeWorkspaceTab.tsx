@@ -103,6 +103,7 @@ import {
   type CodeWorkspaceEditorGroupState,
   type EditorGroupId,
   type EditorSplitOrientation,
+  type RightPaneTabId,
 } from "../../stores/codeWorkspaceStore";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { writeText } from "../../lib/clipboard";
@@ -151,6 +152,7 @@ import { FileTreePane } from "./workspace/FileTreePane";
 import { ProjectTree } from "./workspace/ProjectTree";
 import { MarkdownPreview } from "./workspace/MarkdownPreview";
 import { IconButton, LspStatusPill } from "./workspace/workspaceChrome";
+import { OutlinePane } from "./workspace/OutlinePane";
 import {
   dispatchWorkspaceCommandKeydown,
   runWorkspaceCommand,
@@ -340,6 +342,7 @@ export function CodeWorkspaceTab({
     bottomDockOpen,
     bottomDockTab,
     rightPaneOpen,
+    rightPaneTab,
     searchEverywhereOpen,
     searchEverywhereMode,
     recentFilesOpen,
@@ -394,6 +397,9 @@ export function CodeWorkspaceTab({
   const setRightPaneOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
     const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).rightPaneOpen;
     patchWorkspaceUi(workspaceInstanceId, { rightPaneOpen: typeof open === "function" ? open(prev) : open });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setRightPaneTab = useCallback((tab: RightPaneTabId) => {
+    patchWorkspaceUi(workspaceInstanceId, { rightPaneTab: tab });
   }, [patchWorkspaceUi, workspaceInstanceId]);
   const setSearchEverywhereOpen = useCallback((open: boolean) => {
     patchWorkspaceUi(workspaceInstanceId, { searchEverywhereOpen: open });
@@ -2423,9 +2429,10 @@ export function CodeWorkspaceTab({
   const pinQuickDocumentation = useCallback((content: QuickDocContent) => {
     setPinnedDoc(content);
     setPinnedDocLocked(true);
+    setRightPaneTab("documentation");
     setRightPaneOpen(true);
     setQuickDocOpen(false);
-  }, []);
+  }, [setPinnedDoc, setPinnedDocLocked, setQuickDocOpen, setRightPaneOpen, setRightPaneTab]);
 
   const openQuickDocumentation = useCallback(async () => {
     const file = activeFile;
@@ -2722,6 +2729,19 @@ export function CodeWorkspaceTab({
     [revealEditorLocation],
   );
 
+  const pickOutlineSymbol = useCallback((symbol: LspDocumentSymbol) => {
+    if (activeKey) revealEditorLocation(activeKey, symbol.selectionRange);
+  }, [activeKey, revealEditorLocation]);
+
+  const toggleOutlinePane = useCallback(() => {
+    if (rightPaneOpen && rightPaneTab === "outline") {
+      setRightPaneOpen(false);
+      return;
+    }
+    setRightPaneTab("outline");
+    setRightPaneOpen(true);
+  }, [rightPaneOpen, rightPaneTab, setRightPaneOpen, setRightPaneTab]);
+
   const workspaceCommands = useMemo<WorkspaceCommand[]>(() => [
     {
       id: "workspace.goToFile",
@@ -2886,10 +2906,10 @@ export function CodeWorkspaceTab({
     },
     {
       id: "workspace.toggleDocumentationPane",
-      title: "Toggle Documentation Pane",
+      title: "Toggle Outline Pane",
       category: "View",
-      keywords: ["right", "docs", "pin"],
-      run: () => setRightPaneOpen((open) => !open),
+      keywords: ["right", "outline", "structure", "symbols"],
+      run: toggleOutlinePane,
     },
     {
       id: "workspace.callHierarchy",
@@ -3153,6 +3173,7 @@ export function CodeWorkspaceTab({
     intelligencePreferences.inlayHintsEnabled,
     toggleInlayHints,
     toggleInlayHintsForActiveLanguage,
+    toggleOutlinePane,
   ]);
 
   const executeWorkspaceCommand = useCallback((
@@ -3812,10 +3833,10 @@ export function CodeWorkspaceTab({
           onClick={toggleInlayHintsForActiveLanguage}
         />
         <IconButton
-          label="Toggle documentation pane"
+          label="Toggle outline pane"
           testId="code-workspace-right-pane-toggle"
           icon={<PanelRight className="w-3.5 h-3.5" />}
-          active={rightPaneOpen}
+          active={rightPaneOpen && rightPaneTab === "outline"}
           onClick={() => executeWorkspaceCommand("workspace.toggleDocumentationPane")}
         />
       </header>
@@ -3920,28 +3941,60 @@ export function CodeWorkspaceTab({
                 data-testid="code-workspace-right-pane"
                 className="h-full min-h-0 flex flex-col border-l border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]"
               >
-                <div className="flex h-8 shrink-0 items-center gap-1 border-b border-[var(--taomni-code-border)] px-2">
-                  <BookOpen className="h-3.5 w-3.5 text-[var(--taomni-code-muted)]" />
-                  <span className="text-[11px] font-semibold text-[var(--taomni-code-text)]">Documentation</span>
+                <div role="tablist" aria-label="Right tool window" className="flex h-8 shrink-0 items-center border-b border-[var(--taomni-code-border)] px-1">
                   <button
                     type="button"
-                    aria-label="Close documentation pane"
+                    role="tab"
+                    aria-selected={rightPaneTab === "outline"}
+                    className="inline-flex h-7 items-center gap-1 rounded px-2 text-[10px] text-[var(--taomni-code-muted)] aria-selected:bg-[var(--taomni-code-active-line-bg)] aria-selected:text-[var(--taomni-code-text)]"
+                    onClick={() => setRightPaneTab("outline")}
+                  >
+                    <ListTree className="h-3.5 w-3.5" />
+                    Outline
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={rightPaneTab === "documentation"}
+                    className="inline-flex h-7 items-center gap-1 rounded px-2 text-[10px] text-[var(--taomni-code-muted)] aria-selected:bg-[var(--taomni-code-active-line-bg)] aria-selected:text-[var(--taomni-code-text)]"
+                    onClick={() => setRightPaneTab("documentation")}
+                  >
+                    <BookOpen className="h-3.5 w-3.5" />
+                    Documentation
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Close right pane"
                     className="ml-auto inline-flex h-6 w-6 items-center justify-center rounded text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
                     onClick={() => setRightPaneOpen(false)}
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
-                <div className="min-h-0 flex-1">
-                  <DocumentationPane
-                    content={pinnedDoc}
-                    locked={pinnedDocLocked}
-                    onUnlock={() => setPinnedDocLocked(false)}
-                    onClear={() => {
-                      setPinnedDoc(null);
-                      setPinnedDocLocked(false);
-                    }}
-                  />
+                <div role="tabpanel" className="min-h-0 flex-1">
+                  {rightPaneTab === "outline" ? (
+                    <OutlinePane
+                      symbols={breadcrumbSymbolsByGroup[activeEditorGroupId]}
+                      position={cursorPositions[activeEditorGroupId] ?? { line: 0, character: 0 }}
+                      loading={!!activeFile && (!!activeLspState?.syncing || (activeCapabilities?.documentSymbol === true && !activeLspState?.status))}
+                      unavailableReason={!activeFile
+                        ? "Open a file to view its outline"
+                        : activeCapabilities?.documentSymbol === false
+                          ? "Document symbols are not supported by this language server"
+                          : null}
+                      onPick={pickOutlineSymbol}
+                    />
+                  ) : (
+                    <DocumentationPane
+                      content={pinnedDoc}
+                      locked={pinnedDocLocked}
+                      onUnlock={() => setPinnedDocLocked(false)}
+                      onClear={() => {
+                        setPinnedDoc(null);
+                        setPinnedDocLocked(false);
+                      }}
+                    />
+                  )}
                 </div>
               </aside>
             </Panel>

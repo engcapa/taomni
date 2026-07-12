@@ -22,6 +22,7 @@ export type BottomDockTabId =
   | "run";
 export type EditorGroupId = "primary" | "secondary";
 export type EditorSplitOrientation = "horizontal" | "vertical";
+export type RightPaneTabId = "outline" | "documentation";
 
 export interface CodeWorkspaceEditorGroupState {
   id: EditorGroupId;
@@ -47,6 +48,7 @@ export interface CodeWorkspaceInstanceUi {
   bottomDockOpen: boolean;
   bottomDockTab: BottomDockTabId;
   rightPaneOpen: boolean;
+  rightPaneTab: RightPaneTabId;
   searchEverywhereOpen: boolean;
   searchEverywhereMode: SearchEverywhereMode;
   recentFilesOpen: boolean;
@@ -88,6 +90,7 @@ export function createDefaultCodeWorkspaceUi(): CodeWorkspaceInstanceUi {
     bottomDockOpen: true,
     bottomDockTab: "references",
     rightPaneOpen: false,
+    rightPaneTab: "outline",
     searchEverywhereOpen: false,
     searchEverywhereMode: "files",
     recentFilesOpen: false,
