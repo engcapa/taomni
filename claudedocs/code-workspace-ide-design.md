@@ -2,7 +2,7 @@
 
 > 目标：在现有 Code Workspace 基础上做功能与交互完善，达到"日常代码开发够用"的 IntelliJ IDEA 级体验（非全量对标）。本文档为设计稿，不含实现代码。
 >
-> 日期：2026-07-12 · 版本：v2.7（M3 布局、终端与任务交付，见 §8.1–8.2）· 状态：**实施中**（分支 `feat/code-workspace-ide`；M0–M3 功能交付，M0 壳体技术债继续消化，真机冒烟人工待办）
+> 日期：2026-07-12 · 版本：v2.9（M0–M5 主线交付与后续收口，见 §8.1–8.2）· 状态：**实施中**（M0–M5 已合入 `main`；后续分支 `feat/code-workspace-followups` 已固化自动化门禁、抽离 Git snapshot controller 并交付保存时格式化，M0 壳体技术债与真机冒烟继续推进）
 
 ---
 
@@ -572,7 +572,7 @@ src/stores/
 
 | 里程碑 | 内容 | 规模 | 状态 |
 |--------|------|------|------|
-| **M0 前置重构** | 组件拆分 + codeWorkspaceStore + 命令系统骨架 + 底部 dock 容器（References 迁入） | M | 🔶 功能前提已交付；树数据与 LSP session 已抽 hook，壳体仍约 3.8k 行，Git/导航/命令/header 继续下沉 |
+| **M0 前置重构** | 组件拆分 + codeWorkspaceStore + 命令系统骨架 + 底部 dock 容器（References 迁入） | M | 🔶 功能前提已交付；树数据、LSP session 与 Git snapshot 已抽 hook，壳体仍约 4.8k 行，导航/文件动作/命令/header 继续下沉 |
 | **M1 编辑器智能·上（P0）** | 查找替换、LSP 补全（含 auto-import）/签名/快速文档/格式化、诊断呈现升级、Problems 面板 | L | ✅ 9/9 |
 | **M2 导航与搜索（P0）** | Find in Files（后端搜索模块 + 面板）、Search Everywhere（含 Classes/Symbols）、Go to File/Class/Symbol、Recent Files、导航历史、Outline + 结构弹窗、类型/实现跳转 + peek、重命名、Code Actions、树右键/键盘 | L | ✅ 14/14（拖拽仍为 P1） |
 | **M3 布局与终端（P1）** | 分屏、tab 管理/预览 tab、面包屑、集成终端、Run/Tasks | L | ✅ 5/5 |
@@ -583,7 +583,7 @@ src/stores/
 
 ### 8.1 进度明细（勾选清单）
 
-> 更新于 2026-07-12（v2.8），分支 `feat/code-workspace-ide`。M0–M5 功能已按代码、提交与自动化门禁复核；真机冒烟按本轮约定后置，M0 壳拆分技术债继续消化。完成度按本节拆分条目计数，已完成项附提交号。
+> 更新于 2026-07-12（v2.9）。M0–M5 已由 PR #361 合入 `main`；后续收口位于 `feat/code-workspace-followups`。功能按代码、提交与自动化门禁复核；真机冒烟按约定后置，M0 壳拆分技术债继续消化。完成度按本节拆分条目计数，已完成项附提交号。
 
 **M0 前置重构 — 🔶 清单项齐，壳体继续瘦身中**
 
@@ -608,7 +608,7 @@ src/stores/
 - [x] LSP 补全（kind 图标、snippet 转换、auto-import via resolve、触发字符、词级回退）— `fa8ce88`
 - [x] 签名帮助（触发字符自动弹出 / Ctrl+Shift+Space，活动参数加粗）— `fa8ce88`
 - [x] 快速文档升级（Ctrl+Q / F1 显式弹出 + pin 到右栏 Documentation）— `c4e1435`
-- [x] 格式化（`lsp_formatting` / `lsp_range_formatting`，Ctrl+Alt+L）— `e210694`（保存时格式化开关仍可后续加）
+- [x] 格式化（`lsp_formatting` / `lsp_range_formatting`，Ctrl+Alt+L）— `e210694`；工作区级保存时格式化开关（默认关）— `4ff2ed7`
 - [x] 诊断呈现收尾（gutter 图标、overview ruler 色条、灯泡入口）— `b049952`
 
 **M2 导航与搜索（P0）— ✅ 14/14（拖拽仍为 P1）**
@@ -665,27 +665,27 @@ src/stores/
 - [x] WorkspaceEdit §5.2.9 三态规则收口（open-clean 应用后保存、open-dirty 保持 dirty、未打开写盘 + hash 预检）— `workspaceEditApply` + `5d87203`
 - [x] 合并门禁 8 例 Windows 失败已修复（clipboard URI ×4、pushd ×1、git 根 ×3）— `f6c1f36`
 - [ ] **⚠ 真机验证欠账（人工）**：M0–M5 能力仍以单测/构建为主；`pnpm tauri dev` 冒烟按本轮约定后置，结果回填本节
-- [ ] ⚠ M0 继续瘦身：树数据与 LSP session 已抽离；Git 快照、导航、命令注册、header/layout 大段继续下沉，目标装配壳 <400 行（当前加入 M3 后约 3.8k 行）
-- [ ] ⚠ 下列增强项可选收口：保存时格式化开关；server 回推 `workspace/applyEdit` oneshot；Git ignore；树/tab 拖拽停靠（P1）
+- [ ] ⚠ M0 继续瘦身：树数据、LSP session 与 Git snapshot controller 已抽离；导航、文件动作、命令注册、header/layout 大段继续下沉，目标装配壳 <400 行（当前约 4.8k 行）
+- [ ] ⚠ 下列增强项可选收口：server 回推 `workspace/applyEdit` oneshot；Git ignore；树/tab 拖拽停靠（P1）
 
 ### 8.2 下一步待办（建议顺序）
 
-> M0–M5 计划项均已交付并拆分提交。**真机冒烟仍为人工待办并明确后置。** 下一编码优先级：稳定自动化门禁 → 继续 M0 壳体瘦身 / 可选体验补丁 → 合入主干。
+> M0–M5 计划项均已交付并合入主干。后续收口已完成自动化门禁固化、Git snapshot controller 抽离和保存时格式化。**真机冒烟仍为人工待办并明确后置。**
 
-1. **固化全量前端门禁参数**
-   默认高并发会令 Code Workspace 重型用例与 Terminal 焦点用例出现资源竞争；本轮以 `--testTimeout=15000 --maxWorkers=4` 全绿，建议写入 CI 脚本或 Vitest 配置。
+1. **✅ 固化全量前端门禁参数** — `a9f7484`
+   `vitest.config.ts` 已统一设置 `testTimeout: 15_000` 与 `maxWorkers: 4`；无额外参数的 `pnpm test` 全绿。
 
 2. **（人工）真机冒烟并记缺陷**
    `pnpm tauri dev` 覆盖 M0–M5 快捷键、分屏、PTY、Git gutter/blame、本地历史、AI 入口、语义高亮和 TODO/书签；本轮后置，不作为自动化门禁。
 
-3. **继续 M0 瘦身（目标装配壳 <400）**
-   抽 Git snapshot、导航与文件动作 controller；命令注册和 header/layout 组件化。
+3. **🔶 继续 M0 瘦身（目标装配壳 <400）**
+   Git snapshot controller 已抽离并覆盖仓库探测、轮询、刷新订阅与路径失效 — `cbc40ec`。下一步抽导航与文件动作 controller，再组件化命令注册和 header/layout。
 
 4. **（可选）体验补丁**
-   保存时格式化；server 回推 `workspace/applyEdit` oneshot；Git ignore；树/tab 拖拽停靠；评估把 `WorkspaceFs` 接入一条生产只读链路。
+   工作区级保存时格式化已交付 — `4ff2ed7`。剩余：server 回推 `workspace/applyEdit` oneshot；Git ignore；树/tab 拖拽停靠；评估把 `WorkspaceFs` 接入一条生产只读链路。
 
-5. **合入主干**
-   自动化门禁通过后 merge；真机冒烟结果可在后续独立补录。
+5. **✅ 合入主干**
+   M0–M5 已由 PR #361 合入 `main`；后续收口分支待独立合并，真机冒烟结果可在后续独立补录。
 
 ---
 
