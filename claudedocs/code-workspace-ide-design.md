@@ -576,14 +576,14 @@ src/stores/
 | **M1 编辑器智能·上（P0）** | 查找替换、LSP 补全（含 auto-import）/签名/快速文档/格式化、诊断呈现升级、Problems 面板 | L | ✅ 9/9 |
 | **M2 导航与搜索（P0）** | Find in Files（后端搜索模块 + 面板）、Search Everywhere（含 Classes/Symbols）、Go to File/Class/Symbol、Recent Files、导航历史、Outline + 结构弹窗、类型/实现跳转 + peek、重命名、Code Actions、树右键/键盘 | L | ✅ 14/14（拖拽仍为 P1） |
 | **M3 布局与终端（P1）** | 分屏、tab 管理/预览 tab、面包屑、集成终端、Run/Tasks | L | ✅ 5/5 |
-| **M4 语言智能·下 + Git（P1）** | 调用层级、类型层级、用法高亮、inlay hints、智能选区(LSP)、Git gutter、inline blame、状态栏分段、持久化增强 | L | ⬜ 0/10，未开始 |
-| **M5 差异化（P2）** | 本地历史、AI 集成入口、语义高亮、TODO/书签（可选）、远程工作区 spike | M–L | ⬜ 0/5，未开始 |
+| **M4 语言智能·下 + Git（P1）** | 调用层级、类型层级、用法高亮、inlay hints、智能选区(LSP)、Git gutter、inline blame、状态栏分段、持久化增强 | L | ✅ 10/10（代码已交付；真机冒烟后置） |
+| **M5 差异化（P2）** | 本地历史、AI 集成入口、语义高亮、TODO/书签（可选）、远程工作区 spike | M–L | ✅ 5/5（代码已交付；真机冒烟后置） |
 
 依赖关系：M0 是一切前提；M1/M2 内部可并行（后端 LSP 扩展与搜索模块独立）；M3 依赖 M0 的 dock 容器；M4 的层级面板依赖 M0 dock + M2 的 LSP 请求管道。每个里程碑独立可发布、可验收。
 
 ### 8.1 进度明细（勾选清单）
 
-> 更新于 2026-07-12（v2.7），分支 `feat/code-workspace-ide`。M0–M3 功能已按代码、提交与自动化门禁复核；真机冒烟按本轮约定后置，M0 壳拆分技术债继续消化。完成度按本节拆分条目计数，已完成项附提交号。
+> 更新于 2026-07-12（v2.8），分支 `feat/code-workspace-ide`。M0–M5 功能已按代码、提交与自动化门禁复核；真机冒烟按本轮约定后置，M0 壳拆分技术债继续消化。完成度按本节拆分条目计数，已完成项附提交号。
 
 **M0 前置重构 — 🔶 清单项齐，壳体继续瘦身中**
 
@@ -636,56 +636,56 @@ src/stores/
 - [x] 集成终端底部面板（复用 `TerminalPanel`、当前根 cwd、多实例/根选择、`Alt+F12`、工作区卸载清理）— `49c53fc`
 - [x] Run/Tasks（多生态 `workspace_detect_tasks`、按根分组、自定义任务持久化、运行历史、PTY 复用与真实退出码）— `da62223`
 
-**M4 语言智能·下 + Git（P1）— ⬜ 0/10，未开始**
+**M4 语言智能·下 + Git（P1）— ✅ 10/10（代码已交付；真机冒烟后置）**
 
-- [ ] 调用层级（Ctrl+Alt+H，Callers⇄Callees，懒展开/环检测）
-- [ ] 类型层级（Ctrl+H，Supertypes⇄Subtypes）
-- [ ] 用法高亮（documentHighlight，读/写区分）
-- [ ] Inlay hints（视口 range 请求，默认关）
-- [ ] 智能选区换 LSP selectionRange（syntaxTree 回退已有）
-- [ ] 右侧 Outline 常驻工具窗（结构弹窗已有，常驻形态归此）
-- [ ] Git gutter 变更标记 + 内联 diff 浮层
-- [ ] Inline blame（`git_blame_lines`）
-- [ ] 状态栏分段（光标/语言/LSP 状态/分支）
-- [ ] 工作区状态持久化增强（打开 tab/分屏/dock 状态/搜索历史）
+- [x] 调用层级（Ctrl+Alt+H，Callers⇄Callees，懒展开/环检测）— `c26a230` + `f50939d`
+- [x] 类型层级（Ctrl+H，Supertypes⇄Subtypes）— `c26a230` + `f50939d`
+- [x] 用法高亮（documentHighlight，读/写区分）— `b7b27d9` + `047ceb9`
+- [x] Inlay hints（视口 range 请求，默认关）— `b7b27d9` + `047ceb9`
+- [x] 智能选区换 LSP selectionRange（syntaxTree 回退已有）— `b7b27d9` + `047ceb9`
+- [x] 右侧 Outline 常驻工具窗（结构弹窗已有，常驻形态归此）— `728b50d`
+- [x] Git gutter 变更标记 + 内联 diff 浮层 — `ea96ae2`
+- [x] Inline blame（`git_blame_lines`）— `ea96ae2`
+- [x] 状态栏分段（光标/语言/LSP 状态/分支）— `8b30d88`
+- [x] 工作区状态持久化增强（打开 tab/分屏/dock 状态/搜索历史）— `3abe038`
 
-**M5 差异化（P2）— ⬜ 0/5，未开始**
+**M5 差异化（P2）— ✅ 5/5（代码已交付；真机冒烟后置）**
 
-- [ ] 本地历史（快照存储 + 时间线 diff + 恢复）
-- [ ] AI 集成入口（选区工具条 + diff 应用 + 右栏会话）
-- [ ] 语义高亮（semanticTokens 增量）
-- [ ] TODO / 书签面板（可选）
-- [ ] 远程工作区 `WorkspaceFs` trait spike
+- [x] 本地历史（快照存储 + 时间线 diff + 恢复）— `2b78171`
+- [x] AI 集成入口（选区工具条 + diff 应用 + 右栏会话）— `0571bd9`（rewrite/fix preview + 全局 ChatDrawer `attachToComposer`）
+- [x] 语义高亮（semanticTokens full + 增量协商、缓存、delta 校验与 full 回退）— `ce4e101` + `420455e`
+- [x] TODO / 书签面板（打开文件标记扫描、F11 行书签、工作区持久化与关闭文件重开跳转）— `63a4240`
+- [x] 远程工作区 `WorkspaceFs` trait spike（异步 trait、本地实现、路径/符号链接越界防护）— `0d14e06`
 
 **横切事项**
 
 - [x] 交互原型交付（`claudedocs/prototype/code-workspace-prototype.html`）
 - [x] 签名帮助键位决策：Ctrl+Shift+Space（Ctrl+P 已作 Go to File 别名）— `f4d9c15`
-- [x] 代码与自动化复核（2026-07-12 v2.7）：全量 Vitest **148 文件 / 1232 项**通过；`pnpm build` 通过；M3 聚焦测试（tab/分屏/面包屑/Terminal/Run）通过；全量 `cargo test` 通过（lib **737 passed / 11 ignored**，其余 integration/doc tests 全绿）
+- [x] 代码与自动化复核（2026-07-12 v2.8）：全量 Vitest **159 文件 / 1267 项**通过（`--testTimeout=15000 --maxWorkers=4`）；`pnpm build` 通过；全量 `cargo test` 通过（lib **748 passed / 11 ignored**，其余 integration/doc tests 全绿）
 - [x] WorkspaceEdit §5.2.9 三态规则收口（open-clean 应用后保存、open-dirty 保持 dirty、未打开写盘 + hash 预检）— `workspaceEditApply` + `5d87203`
 - [x] 合并门禁 8 例 Windows 失败已修复（clipboard URI ×4、pushd ×1、git 根 ×3）— `f6c1f36`
-- [ ] **⚠ 真机验证欠账（人工）**：M0–M3 能力仍以单测/构建为主；`pnpm tauri dev` 冒烟按本轮约定后置，结果回填本节
+- [ ] **⚠ 真机验证欠账（人工）**：M0–M5 能力仍以单测/构建为主；`pnpm tauri dev` 冒烟按本轮约定后置，结果回填本节
 - [ ] ⚠ M0 继续瘦身：树数据与 LSP session 已抽离；Git 快照、导航、命令注册、header/layout 大段继续下沉，目标装配壳 <400 行（当前加入 M3 后约 3.8k 行）
 - [ ] ⚠ 下列增强项可选收口：保存时格式化开关；server 回推 `workspace/applyEdit` oneshot；Git ignore；树/tab 拖拽停靠（P1）
 
 ### 8.2 下一步待办（建议顺序）
 
-> M0–M3 功能已交付；树数据与 LSP session 已下沉，M3 的 tab/分屏/面包屑/终端/任务链路已有聚焦与全量自动化覆盖。**真机冒烟仍为人工待办并明确后置。** 下一编码优先级：M3 真机回归 → 合入主干 → M0 壳体技术债 / M4。
+> M0–M5 计划项均已交付并拆分提交。**真机冒烟仍为人工待办并明确后置。** 下一编码优先级：稳定自动化门禁 → 继续 M0 壳体瘦身 / 可选体验补丁 → 合入主干。
 
-1. **（人工）真机冒烟并记缺陷**  
-   `pnpm tauri dev` 覆盖 M0–M3 快捷键、分屏、PTY 生命周期与任务退出码；本轮后置，不作为自动化门禁。
+1. **固化全量前端门禁参数**
+   默认高并发会令 Code Workspace 重型用例与 Terminal 焦点用例出现资源竞争；本轮以 `--testTimeout=15000 --maxWorkers=4` 全绿，建议写入 CI 脚本或 Vitest 配置。
 
-2. **合入主干**
-   自动化门禁通过后 merge；真机冒烟结果可在后续独立补录。
+2. **（人工）真机冒烟并记缺陷**
+   `pnpm tauri dev` 覆盖 M0–M5 快捷键、分屏、PTY、Git gutter/blame、本地历史、AI 入口、语义高亮和 TODO/书签；本轮后置，不作为自动化门禁。
 
 3. **继续 M0 瘦身（目标装配壳 <400）**
-   抽 Git snapshot、导航与文件动作 controller；命令注册和 header/layout 组件化，保持 M3 行为测试全绿。
+   抽 Git snapshot、导航与文件动作 controller；命令注册和 header/layout 组件化。
 
 4. **（可选）体验补丁**
-   保存时格式化；applyEdit oneshot；Git ignore；树/tab 拖拽停靠。
+   保存时格式化；server 回推 `workspace/applyEdit` oneshot；Git ignore；树/tab 拖拽停靠；评估把 `WorkspaceFs` 接入一条生产只读链路。
 
-5. **M4 / M5**
-   层级/inlay/Git gutter/状态栏/持久化；本地历史 / AI / 语义高亮 / 远程。
+5. **合入主干**
+   自动化门禁通过后 merge；真机冒烟结果可在后续独立补录。
 
 ---
 
