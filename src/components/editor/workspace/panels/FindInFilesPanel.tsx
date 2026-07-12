@@ -8,6 +8,10 @@ import {
   type WorkspaceSearchMatch,
 } from "../../../../lib/editor/workspaceSearch";
 import type { CodeWorkspaceRootInfo } from "../../../../types";
+import {
+  pushWorkspaceSearchHistory,
+  readWorkspaceSearchHistory,
+} from "../workspaceLayoutPersistence";
 
 interface FindInFilesPanelProps {
   roots: CodeWorkspaceRootInfo[];
@@ -20,6 +24,8 @@ interface FindInFilesPanelProps {
   includePreset?: { value: string; nonce: number };
   /** Bump the nonce to seed the query field (Search Everywhere Text tab). */
   queryPreset?: { value: string; nonce: number };
+  /** Workspace instance id for search history persistence. */
+  workspaceInstanceId?: string;
 }
 
 interface MatchGroup {
@@ -85,6 +91,7 @@ export function FindInFilesPanel({
   focusNonce = 0,
   includePreset,
   queryPreset,
+  workspaceInstanceId,
 }: FindInFilesPanelProps) {
   const [query, setQuery] = useState("");
   const [replacement, setReplacement] = useState("");
@@ -98,6 +105,9 @@ export function FindInFilesPanel({
   const [summary, setSummary] = useState<SearchSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [replacing, setReplacing] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>(() => (
+    workspaceInstanceId ? readWorkspaceSearchHistory(workspaceInstanceId) : []
+  ));
 
   const inputRef = useRef<HTMLInputElement>(null);
   const searchIdRef = useRef<string | null>(null);
@@ -139,9 +149,16 @@ export function FindInFilesPanel({
 
   useEffect(() => teardownSearch, [teardownSearch]);
 
+  useEffect(() => {
+    setSearchHistory(workspaceInstanceId ? readWorkspaceSearchHistory(workspaceInstanceId) : []);
+  }, [workspaceInstanceId]);
+
   const startSearch = useCallback(async () => {
     const trimmed = query.trim();
     if (!trimmed || roots.length === 0) return;
+    if (workspaceInstanceId) {
+      setSearchHistory(pushWorkspaceSearchHistory(workspaceInstanceId, trimmed));
+    }
     teardownSearch();
     groupsRef.current = new Map();
     setGroups([]);
@@ -207,7 +224,7 @@ export function FindInFilesPanel({
         setError(err instanceof Error ? err.message : String(err));
       }
     }
-  }, [caseSensitive, excludeGlobs, includeGlobs, query, regexp, roots, teardownSearch, wholeWord]);
+  }, [caseSensitive, excludeGlobs, includeGlobs, query, regexp, roots, teardownSearch, wholeWord, workspaceInstanceId]);
 
   const cancelSearch = useCallback(() => {
     const active = searchIdRef.current;
@@ -254,6 +271,7 @@ export function FindInFilesPanel({
           <input
             ref={inputRef}
             value={query}
+            list={workspaceInstanceId ? "code-workspace-search-history" : undefined}
             placeholder="Search in files (Enter to run)"
             aria-label="Search query"
             className="h-6 w-full bg-transparent text-[11px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
@@ -263,6 +281,13 @@ export function FindInFilesPanel({
               else if (event.key === "Escape") cancelSearch();
             }}
           />
+          {workspaceInstanceId && searchHistory.length > 0 && (
+            <datalist id="code-workspace-search-history">
+              {searchHistory.map((item) => (
+                <option key={item} value={item} />
+              ))}
+            </datalist>
+          )}
           {toggles.map((toggle) => (
             <button
               key={toggle.label}

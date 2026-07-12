@@ -192,6 +192,7 @@ describe("CodeWorkspaceTab", () => {
       statusMessage: "Ready",
       codeWorkspaceByTab: {},
     });
+    useCodeWorkspaceStore.setState({ byInstanceId: {} });
     workspaceMocks.workspaceListDir.mockReset();
     workspaceMocks.workspaceCompactChain.mockReset();
     workspaceMocks.workspaceListFilesRecursive.mockReset();
@@ -1579,5 +1580,64 @@ describe("CodeWorkspaceTab", () => {
     expect(await screen.findByTestId("code-workspace-editor-split")).toBeInTheDocument();
     const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-split");
     expect(ui.editorGroups.secondary.activeKey).toBe("root:app:README.md");
+  });
+
+  it("restores open editor tabs and dock chrome from the layout snapshot", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-layout-restore",
+      workspaceInstanceId: "instance-layout-restore",
+      name: "Layout Restore",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => (
+      path === "src/util.ts"
+        ? file("src/util.ts", "export const util = 1;")
+        : file("src/main.ts", "export const main = 1;")
+    ));
+    window.localStorage.setItem("taomni.codeWorkspace.layout.v1.instance-layout-restore", JSON.stringify({
+      version: 1,
+      bottomDockOpen: false,
+      bottomDockTab: "search",
+      rightPaneOpen: true,
+      rightPaneTab: "outline",
+      languagePanelOpen: false,
+      splitOrientation: "vertical",
+      activeEditorGroupId: "primary",
+      expandedRootIds: ["app"],
+      expandedDirKeys: ["app:"],
+      editorGroups: {
+        primary: {
+          openOrder: ["root:app:src/main.ts"],
+          activeKey: "root:app:src/main.ts",
+          previewKey: null,
+          pinnedKeys: ["root:app:src/main.ts"],
+        },
+        secondary: {
+          openOrder: ["root:app:src/util.ts"],
+          activeKey: "root:app:src/util.ts",
+          previewKey: null,
+          pinnedKeys: [],
+        },
+      },
+    }));
+
+    renderWorkspace(workspace);
+
+    await screen.findByTitle("app / src/main.ts");
+    await screen.findByTitle("app / src/util.ts");
+    await waitFor(() => {
+      const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-layout-restore");
+      expect(ui.bottomDockOpen).toBe(false);
+      expect(ui.bottomDockTab).toBe("search");
+      expect(ui.rightPaneOpen).toBe(true);
+      expect(ui.splitOrientation).toBe("vertical");
+      expect(ui.editorGroups.primary.openOrder).toContain("root:app:src/main.ts");
+      expect(ui.editorGroups.secondary.openOrder).toContain("root:app:src/util.ts");
+    });
+    expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/main.ts");
+    expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/util.ts");
   });
 });

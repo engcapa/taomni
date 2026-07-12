@@ -113,6 +113,14 @@ import {
   detectWorkspaceEol,
   useCodeWorkspaceStatusStore,
 } from "../../stores/codeWorkspaceStatusStore";
+import {
+  fileRefFromFileKey,
+  layoutSnapshotHasOpenFiles,
+  readWorkspaceLayoutSnapshot,
+  snapshotFromWorkspaceUi,
+  uniqueOrderedKeys,
+  writeWorkspaceLayoutSnapshot,
+} from "./workspace/workspaceLayoutPersistence";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { writeText } from "../../lib/clipboard";
 import { useContextMenu } from "../ContextMenu";
@@ -336,11 +344,49 @@ export function CodeWorkspaceTab({
     return () => disposeWorkspaceUi(workspaceInstanceId);
   }, [disposeWorkspaceUi, ensureWorkspaceUi, workspaceInstanceId]);
 
-  // Seed root expand keys once per instance mount (do not re-expand if user collapsed all).
-  const treeExpandSeededRef = useRef<string | null>(null);
+  // Restore chrome/layout once per instance, then seed expand keys only when empty.
+  const layoutHydratedRef = useRef<string | null>(null);
+  const layoutRestoredOpenFilesRef = useRef(false);
   useEffect(() => {
-    if (treeExpandSeededRef.current === workspaceInstanceId) return;
-    treeExpandSeededRef.current = workspaceInstanceId;
+    if (layoutHydratedRef.current === workspaceInstanceId) return;
+    layoutHydratedRef.current = workspaceInstanceId;
+    layoutRestoredOpenFilesRef.current = false;
+    const snapshot = readWorkspaceLayoutSnapshot(workspaceInstanceId);
+    if (snapshot) {
+      patchWorkspaceUi(workspaceInstanceId, {
+        bottomDockOpen: snapshot.bottomDockOpen,
+        bottomDockTab: snapshot.bottomDockTab,
+        rightPaneOpen: snapshot.rightPaneOpen,
+        rightPaneTab: snapshot.rightPaneTab,
+        languagePanelOpen: snapshot.languagePanelOpen,
+        splitOrientation: snapshot.splitOrientation,
+        activeEditorGroupId: snapshot.activeEditorGroupId,
+        expandedRootIds: snapshot.expandedRootIds,
+        expandedDirKeys: snapshot.expandedDirKeys,
+        editorGroups: {
+          primary: {
+            id: "primary",
+            openOrder: snapshot.editorGroups.primary.openOrder,
+            activeKey: snapshot.editorGroups.primary.activeKey,
+            previewKey: snapshot.editorGroups.primary.previewKey,
+            pinnedKeys: snapshot.editorGroups.primary.pinnedKeys,
+          },
+          secondary: {
+            id: "secondary",
+            openOrder: snapshot.editorGroups.secondary.openOrder,
+            activeKey: snapshot.editorGroups.secondary.activeKey,
+            previewKey: snapshot.editorGroups.secondary.previewKey,
+            pinnedKeys: snapshot.editorGroups.secondary.pinnedKeys,
+          },
+        },
+        openOrder: uniqueOrderedKeys(snapshot.editorGroups),
+        activeKey: snapshot.editorGroups[snapshot.activeEditorGroupId]?.activeKey
+          ?? snapshot.editorGroups.primary.activeKey
+          ?? snapshot.editorGroups.secondary.activeKey,
+      });
+      layoutRestoredOpenFilesRef.current = layoutSnapshotHasOpenFiles(snapshot);
+      return;
+    }
     const seedRoots = initialRoots(workspace);
     if (seedRoots.length === 0) return;
     seedTreeExpandIfEmpty(
@@ -348,7 +394,7 @@ export function CodeWorkspaceTab({
       seedRoots.map((root) => root.id),
       seedRoots.map((root) => rootDirKey(root.id, "")),
     );
-  }, [seedTreeExpandIfEmpty, workspace, workspaceInstanceId]);
+  }, [patchWorkspaceUi, seedTreeExpandIfEmpty, workspace, workspaceInstanceId]);
 
   const {
     languagePanelOpen,
@@ -1210,13 +1256,70 @@ export function CodeWorkspaceTab({
   );
 
   useEffect(() => {
+    if (layoutRestoredOpenFilesRef.current) {
+      const snapshot = readWorkspaceLayoutSnapshot(workspaceInstanceId);
+      if (!snapshot) {
+        layoutRestoredOpenFilesRef.current = false;
+      } else {
+        const keys = uniqueOrderedKeys(snapshot.editorGroups);
+        if (keys.length === 0) {
+          layoutRestoredOpenFilesRef.current = false;
+        } else {
+          if (initialOpenedKeyRef.current === `restored:${workspaceInstanceId}`) return;
+          initialOpenedKeyRef.current = `restored:${workspaceInstanceId}`;
+          for (const groupId of ["primary", "secondary"] as const) {
+            const group = snapshot.editorGroups[groupId];
+            for (const key of group.openOrder) {
+              const ref = fileRefFromFileKey(key, looseFiles);
+              if (!ref) continue;
+              void openFile(ref, {
+                groupId,
+                preview: group.previewKey === key,
+              });
+            }
+          }
+          return;
+        }
+      }
+    }
     const ref = initialFileRef(workspace, roots, looseFiles);
     if (!ref) return;
     const key = fileKey(ref);
     if (initialOpenedKeyRef.current === key) return;
     initialOpenedKeyRef.current = key;
     void openFile(ref);
-  }, [looseFiles, openFile, roots, workspace]);
+  }, [looseFiles, openFile, roots, workspace, workspaceInstanceId]);
+
+  useEffect(() => {
+    if (!workspaceInstanceId) return;
+    const timer = window.setTimeout(() => {
+      writeWorkspaceLayoutSnapshot(workspaceInstanceId, snapshotFromWorkspaceUi({
+        bottomDockOpen,
+        bottomDockTab,
+        rightPaneOpen,
+        rightPaneTab,
+        languagePanelOpen,
+        splitOrientation,
+        activeEditorGroupId,
+        expandedRootIds,
+        expandedDirKeys,
+        editorGroups,
+      }));
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [
+    activeEditorGroupId,
+    bottomDockOpen,
+    bottomDockTab,
+    editorGroups,
+    expandedDirKeys,
+    expandedRootIds,
+    languagePanelOpen,
+    rightPaneOpen,
+    rightPaneTab,
+    splitOrientation,
+    workspaceInstanceId,
+  ]);
 
   const addRoot = useCallback(async () => {
     const path = await selectFolderPath();
@@ -4253,6 +4356,7 @@ export function CodeWorkspaceTab({
             content: (
               <FindInFilesPanel
                 roots={roots}
+                workspaceInstanceId={workspaceInstanceId}
                 focusNonce={searchFocusNonce}
                 includePreset={searchIncludePreset}
                 queryPreset={searchQueryPreset}
