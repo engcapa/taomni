@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TerminalPanel, collectTerminalBlockSelectionText } from "./TerminalPanel";
 import { DEFAULT_TERMINAL_PROFILE, SYSTEM_TERMINAL_THEME } from "../../lib/terminalProfile";
 import { NATIVE_FILE_DROP_EVENT } from "../../lib/osFileDrop";
+import { useAppStore } from "../../stores/appStore";
 
 const terminalMocks = vi.hoisted(() => {
   const focus = vi.fn();
@@ -128,6 +129,8 @@ const ipcMocks = vi.hoisted(() => {
     writeStreamClose: vi.fn(async () => undefined),
     writeStreamOpen: vi.fn(async () => "stream-handle"),
     checkFileExists: vi.fn(async () => false),
+    ccTrackTerminal: vi.fn(async () => undefined),
+    ccUntrackTerminal: vi.fn(async () => undefined),
     historyAppend: vi.fn(async () => undefined),
     historyMatchPrefix: vi.fn(async () => [] as string[]),
     historyListRecent: vi.fn(async () => [] as string[]),
@@ -274,6 +277,7 @@ describe("TerminalPanel focus behavior", () => {
     terminalMocks.state.onResizeHandler = null;
     terminalMocks.state.customKeyEventHandler = null;
     ipcMocks.terminalExitHandlers.clear();
+    useAppStore.setState({ terminalRuntimeByTab: {}, cwdByTab: {} });
     ipcMocks.createTerminalSessionId.mockImplementation(() => "terminal-session");
     ipcMocks.createLocalTerminal.mockImplementation(async (sessionId: string) => ({
       sessionId,
@@ -309,6 +313,32 @@ describe("TerminalPanel focus behavior", () => {
     await waitFor(() => {
       expect(terminalMocks.focus).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("tracks a submitted program and returns to idle on the next shell prompt", async () => {
+    render(<TerminalPanel tabId="term-activity" visible />);
+
+    await waitFor(() => {
+      expect(useAppStore.getState().terminalRuntimeByTab["term-activity"]?.backendSessionId).toBe(
+        "terminal-session",
+      );
+    });
+
+    terminalMocks.state.onDataHandler?.("sudo -u deploy vite --host");
+    terminalMocks.state.onDataHandler?.("\r");
+
+    expect(useAppStore.getState().terminalRuntimeByTab["term-activity"]).toMatchObject({
+      state: "running",
+      program: "vite",
+      activitySource: "input-heuristic",
+    });
+
+    terminalMocks.oscHandlers.get(7)?.("file://localhost/work/taomni");
+    expect(useAppStore.getState().terminalRuntimeByTab["term-activity"]).toMatchObject({
+      state: "idle",
+      activitySource: "shell-integration",
+    });
+    expect(useAppStore.getState().terminalRuntimeByTab["term-activity"]?.program).toBeUndefined();
   });
 
   it("does not load the WebGL renderer inside the macOS Tauri webview", async () => {

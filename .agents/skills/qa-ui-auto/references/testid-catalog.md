@@ -251,6 +251,11 @@
 - `[data-testid="new-tab-launch-menu"]` — interactive — F1.5.new-tab-launch-menu
 - `[data-testid="launch-menu-new-session"]` — interactive [optional] — F1.5.launch-menu-new-session
 - `[data-testid="tab-more"]` — interactive — F1.5.tabs-more
+- `[data-testid="tab-details-hover"]` — interactive — F1.5.tab-details-hover
+- `[data-testid="tab-details-overlay"]` — display [optional] — F1.5.tab-details-overlay
+- `[data-testid^="tab-details-card-"]` — display [optional] — F1.5.tab-details-card
+- `[data-testid="open-tabs-menu"]` — display [optional] — F1.5.open-tabs-menu
+- `[data-testid="open-tabs-detach-active"]` — interactive [optional] — F1.5.open-tabs-detach-active
 - `[data-testid="context-menu-item-move-to-first"]` — interactive [optional] — F1.5.tab-menu-move-first
 - `[data-testid="context-menu-item-move-left"]` — interactive [optional] — F1.5.tab-menu-move-left
 - `[data-testid="context-menu-item-move-right"]` — interactive [optional] — F1.5.tab-menu-move-right

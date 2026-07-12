@@ -8,6 +8,7 @@ import {
   Check,
   Trash2,
   Camera,
+  ExternalLink,
 } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
@@ -21,12 +22,15 @@ import {
   type TabFilter,
 } from "../../lib/tabFilter";
 import { TabIcon } from "./TabBar";
+import { buildTabDetailSummary } from "../../lib/tabDetails";
+import { getAppPlatform } from "../../lib/runtime";
 
 interface OpenTabsMenuProps {
   open: boolean;
   onClose: () => void;
   /** The trigger element the menu anchors to (used for positioning + hit-test). */
   anchorRef: RefObject<HTMLElement | null>;
+  onDetachActiveTab?: () => void;
 }
 
 interface TabGroup {
@@ -43,7 +47,7 @@ interface TabGroup {
  * panel always shows the full list (hidden ones dimmed) so any tab stays
  * reachable. See issue #121.
  */
-export function OpenTabsMenu({ open, onClose, anchorRef }: OpenTabsMenuProps) {
+export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab }: OpenTabsMenuProps) {
   const t = useT();
   const tabs = useAppStore((s) => s.tabs);
   const activeTabId = useAppStore((s) => s.activeTabId);
@@ -51,6 +55,8 @@ export function OpenTabsMenu({ open, onClose, anchorRef }: OpenTabsMenuProps) {
   const setActiveTab = useAppStore((s) => s.setActiveTab);
   const setTabFilter = useAppStore((s) => s.setTabFilter);
   const removeTabs = useAppStore((s) => s.removeTabs);
+  const runtimeByTab = useAppStore((s) => s.terminalRuntimeByTab);
+  const cwdByTab = useAppStore((s) => s.cwdByTab);
   const sessions = useSessionStore((s) => s.sessions);
   // Screenshot actions for the active tab fold into this menu (the standalone
   // capture button was removed). Empty for non-capturable tabs.
@@ -238,6 +244,8 @@ export function OpenTabsMenu({ open, onClose, anchorRef }: OpenTabsMenuProps) {
     );
     onClose();
   };
+  const stripVisibleCount = filterVisibleTabs(tabs, sessions, tabFilter).length;
+  const detailsShortcut = getAppPlatform() === "macos" ? "Cmd+Shift+H" : "Ctrl+Shift+H";
 
   const rowClass =
     "w-full px-3 py-1 text-left flex items-center gap-2 hover:bg-[var(--taomni-hover)]";
@@ -257,12 +265,33 @@ export function OpenTabsMenu({ open, onClose, anchorRef }: OpenTabsMenuProps) {
       }}
     >
       <div className="py-1">
+        {onDetachActiveTab && (
+          <button
+            type="button"
+            data-testid="open-tabs-detach-active"
+            className={rowClass}
+            onClick={() => {
+              onDetachActiveTab();
+              onClose();
+            }}
+          >
+            <span className="w-4 flex-shrink-0 flex items-center justify-center">
+              <ExternalLink className="w-3 h-3" />
+            </span>
+            <span className="flex-1 truncate">{t("rdp.detach")}</span>
+          </button>
+        )}
         <button type="button" className={rowClass} onClick={closeAllTerminals}>
           <span className="w-4 flex-shrink-0 flex items-center justify-center">
             <Trash2 className="w-3 h-3" />
           </span>
           <span className="flex-1 truncate">{t("tabs.closeAllTerminals")}</span>
         </button>
+      </div>
+
+      <div className="px-3 pb-1.5 flex items-center justify-between gap-2 text-[10px] text-[var(--taomni-text-muted)]">
+        <span>{t("tabs.detailsVisibleCount", { visible: stripVisibleCount, total: tabs.length })}</span>
+        <span>{t("tabs.detailsShortcutHint", { shortcut: detailsShortcut })}</span>
       </div>
 
       <div className="h-px mx-2" style={{ background: "var(--taomni-divider)" }} />
@@ -347,6 +376,13 @@ export function OpenTabsMenu({ open, onClose, anchorRef }: OpenTabsMenuProps) {
                       : tabFilter?.kind === "multi"
                         ? tabFilter.tabIds.includes(tab.id) || tabFilter.paths.includes(group.key)
                         : false;
+                  const details = buildTabDetailSummary(
+                    tab,
+                    sessions,
+                    runtimeByTab[tab.id],
+                    cwdByTab[tab.id],
+                    t,
+                  );
                   return (
                     <div
                       key={tab.id}
@@ -363,13 +399,18 @@ export function OpenTabsMenu({ open, onClose, anchorRef }: OpenTabsMenuProps) {
                         type="button"
                         data-testid={`open-tabs-tab-${tab.id}`}
                         onClick={() => pickTab(tab)}
-                        title={tab.title}
+                        title={`${tab.title}\n${details.sessionLabel}\n${details.activityLabel}`}
                         className="flex-1 flex items-center gap-2 min-w-0 text-left"
                       >
                         <span className="w-4 flex-shrink-0 flex items-center justify-center">
                           {isActive ? <Check className="w-3 h-3" /> : <TabIcon tab={tab} />}
                         </span>
-                        <span className="flex-1 truncate">{tab.title}</span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block truncate">{tab.title}</span>
+                          <span className="block truncate text-[10px] text-[var(--taomni-text-muted)]">
+                            {details.sessionLabel} · {details.activityLabel}
+                          </span>
+                        </span>
                       </button>
                     </div>
                   );

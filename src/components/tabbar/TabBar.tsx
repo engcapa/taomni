@@ -41,6 +41,7 @@ import {
 } from "../../lib/ipc";
 import { getAppPlatform } from "../../lib/runtime";
 import { filterVisibleTabs, getFilterChipText } from "../../lib/tabFilter";
+import { TabDetailsOverlay } from "./TabDetailsOverlay";
 
 type DropIndicator = { tabId: string; side: "before" | "after" } | null;
 type TabScrollState = { overflow: boolean; atStart: boolean; atEnd: boolean };
@@ -77,6 +78,8 @@ interface TabBarProps {
    * action (no cwd handling) when not provided.
    */
   onDuplicateTab?: (id: string) => void;
+  /** External hover/focus trigger from the title-bar details button. */
+  detailsRevealExternal?: boolean;
 }
 
 export function TabBar({
@@ -84,6 +87,7 @@ export function TabBar({
   onConnectSession,
   onOpenSessionEditor,
   onDuplicateTab,
+  detailsRevealExternal = false,
 }: TabBarProps) {
   const {
     tabs,
@@ -108,6 +112,8 @@ export function TabBar({
   const [dropIndicator, setDropIndicator] = useState<DropIndicator>(null);
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
+  const [detailsRevealHeld, setDetailsRevealHeld] = useState(false);
+  const detailsReveal = detailsRevealHeld || detailsRevealExternal;
   const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
   const [wslDistros, setWslDistros] = useState<{ name: string; isDefault: boolean }[]>([]);
   const [shellsLoaded, setShellsLoaded] = useState(false);
@@ -186,6 +192,49 @@ export function TabBar({
   useEffect(() => {
     updateTabScrollState();
   }, [tabs, updateTabScrollState]);
+
+  useEffect(() => {
+    const isMac = getAppPlatform() === "macos";
+    const matchesShortcut = (event: KeyboardEvent) =>
+      event.key.toLowerCase() === "h" &&
+      event.shiftKey &&
+      !event.altKey &&
+      (isMac
+        ? event.metaKey && !event.ctrlKey
+        : event.ctrlKey && !event.metaKey);
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.isComposing || !matchesShortcut(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      setDetailsRevealHeld(true);
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (!["h", "shift", isMac ? "meta" : "control"].includes(event.key.toLowerCase())) return;
+      setDetailsRevealHeld(false);
+      if (event.key.toLowerCase() === "h") {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+      }
+    };
+    const hide = () => setDetailsRevealHeld(false);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") hide();
+    };
+
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keyup", onKeyUp, true);
+    window.addEventListener("blur", hide);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("keyup", onKeyUp, true);
+      window.removeEventListener("blur", hide);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
 
   useEffect(() => {
     const el = tabScrollRef.current;
@@ -418,10 +467,17 @@ export function TabBar({
   return (
     <div
       data-testid="tab-bar"
+      data-details-reveal={detailsReveal || undefined}
       className="taomni-tabbar h-8 flex items-end pl-2 pr-1 pt-1.5 gap-0 overflow-hidden"
       style={{ background: "linear-gradient(to bottom, var(--taomni-tab-inactive), var(--taomni-chrome-bg))" }}
     >
       {ctx.render}
+      <TabDetailsOverlay
+        open={detailsReveal}
+        tabs={visibleTabs}
+        tabElements={tabElementRefs.current}
+        scrollRef={tabScrollRef}
+      />
       {tabFilter && (
         <button
           type="button"

@@ -138,10 +138,16 @@ controls:
 id: F1.5
 status: done
 area: main/tabs
-components: [TabBar]
+components: [TabBar, ControlBar, OpenTabsMenu, TabDetailsOverlay]
 files:
   - src/components/tabbar/TabBar.tsx
+  - src/components/tabbar/ControlBar.tsx
+  - src/components/tabbar/OpenTabsMenu.tsx
+  - src/components/tabbar/TabDetailsOverlay.tsx
   - src/lib/customDnD.ts
+  - src/lib/tabDetails.ts
+  - src/lib/terminalActivity.ts
+  - src/lib/terminalCwd.ts
   - src/stores/appStore.ts
 controls:
   - id: tab-bar
@@ -173,6 +179,25 @@ controls:
   - id: tabs-more
     selector: '[data-testid="tab-more"]'
     kind: interactive
+  - id: tab-details-hover
+    selector: '[data-testid="tab-details-hover"]'
+    kind: interactive
+  - id: tab-details-overlay
+    selector: '[data-testid="tab-details-overlay"]'
+    kind: display
+    optional: true
+  - id: tab-details-card
+    selector: '[data-testid^="tab-details-card-"]'
+    kind: display
+    optional: true
+  - id: open-tabs-menu
+    selector: '[data-testid="open-tabs-menu"]'
+    kind: display
+    optional: true
+  - id: open-tabs-detach-active
+    selector: '[data-testid="open-tabs-detach-active"]'
+    kind: interactive
+    optional: true
   - id: tab-menu-move-first
     selector: '[data-testid="context-menu-item-move-to-first"]'
     kind: interactive
@@ -200,6 +225,9 @@ controls:
 - **新建标签 split-button**（Windows Terminal 风格 `+ ▾`）：`+`（`new-local-terminal`）直接开默认本地终端；`▾`（`new-tab-launch-menu`）打开快速启动菜单，列出全部本地 shell（含检测到的 WSL 发行版，`launch-menu-shell-<id>`）、最近会话子菜单（`launch-menu-recent-<id>`）、以及 `New session…`（`launch-menu-new-session`）打开会话编辑器
 - **拖拽排序**：标签通过 `customDnD` 指针驱动层重新排列，拖拽时显示 drop indicator
 - **重命名**：双击标签标题或右键菜单 "Rename" 进入内联编辑，Enter 确认 / Esc 取消 / 失焦自动提交
+- **终端目录自动命名**：新开本地/SSH terminal 在首次取得 cwd 后以末级目录命名；复制 terminal 使用源 cwd 并延续 `-N` 家族编号；手动重命名后不再自动覆盖
+- **可见标签详情层**：按住 `Ctrl+Shift+H`（macOS 为 `Cmd+Shift+H`）或 hover/focus tab 右侧的叠放标签信息按钮，同时展示视口内标签的所属 session、运行程序、cwd 和连接状态
+- **Detach 收纳**：主窗口 terminal/RDP/VNC/DB 的 Detach 从 tab action slot 移入 `⋯` Open Tabs 菜单，原位置由标签详情按钮替代
 - 标签右键菜单：关闭、关闭其他、关闭全部、复制标签、新建本地终端、重命名、Move to first/left/right/last
 - SSH / SFTP / VNC 标签 **常驻挂载**（切换标签不销毁，传输/输出/连接不中断）
 - 关闭应用前若有终端活跃会弹出确认

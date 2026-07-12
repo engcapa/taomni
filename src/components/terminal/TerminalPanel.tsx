@@ -106,6 +106,7 @@ import {
 import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
 import { extractTerminalCommand } from "../../lib/terminalCommand";
 import { normalizeLocalStartCwd } from "../../lib/terminalCwd";
+import { inferTerminalProgram } from "../../lib/terminalActivity";
 import { buildSshCwdIntegration } from "../../lib/terminalShellIntegration";
 import { registerTerminal, consumeTerminalDetachPending } from "../../lib/terminal/terminalRegistry";
 import {
@@ -383,6 +384,7 @@ export function TerminalPanel({
   const contextMenu = useContextMenu();
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const updateTabTitle = useAppStore((s) => s.updateTabTitle);
+  const setTerminalRuntime = useAppStore((s) => s.setTerminalRuntime);
   const attachToComposer = useChatStore((s) => s.attachToComposer);
   const explainSelection = useChatStore((s) => s.explainSelection);
   const isLocal = !ssh && !commandTerminal;
@@ -394,6 +396,11 @@ export function TerminalPanel({
   const appliedTerminalProfileSignatureRef = useRef<string | null>(
     terminalProfile ? terminalProfileSignature(terminalProfile) : null,
   );
+
+  useEffect(() => {
+    if (!tabId) return;
+    setTerminalRuntime(tabId, { state: "connecting", program: undefined });
+  }, [setTerminalRuntime, tabId]);
   const currentTerminalProfileRef = useRef<TerminalProfile>(initialProfile);
 
   const [fontFamily, setFontFamily] = useState(initialProfile.fontFamily);
@@ -977,12 +984,22 @@ export function TerminalPanel({
       }
       return;
     }
+    if (tabId && /[\r\n]/.test(data)) {
+      const program = inferTerminalProgram(data.split(/[\r\n]/).find((line) => line.trim()) ?? "");
+      if (program) {
+        setTerminalRuntime(tabId, {
+          state: "running",
+          program,
+          activitySource: "input-heuristic",
+        });
+      }
+    }
     trackPending(data);
     if (multiExecActiveRef.current) {
       onInputBroadcastRef.current?.(data);
     }
     sendTerminalInput(data);
-  }, [sendTerminalInput, setStatusMessage, ssh, trackPending]);
+  }, [sendTerminalInput, setStatusMessage, setTerminalRuntime, ssh, tabId, trackPending]);
 
   const writeXtermInput = useCallback((data: string) => {
     if (readOnlyRef.current) return;
@@ -1047,12 +1064,29 @@ export function TerminalPanel({
       }
     }
 
+    if (endsWithEnter && tabId) {
+      const term = termRef.current;
+      const submittedChunk = filtered.replace(/[\r\n]+$/g, "");
+      const command =
+        term && term.buffer.active.type !== "alternate"
+          ? captureBufferCommand(term) || `${pendingRef.current}${submittedChunk}`
+          : `${pendingRef.current}${submittedChunk}`;
+      const program = inferTerminalProgram(command);
+      if (program) {
+        setTerminalRuntime(tabId, {
+          state: "running",
+          program,
+          activitySource: "input-heuristic",
+        });
+      }
+    }
+
     trackPending(filtered);
     if (multiExecActiveRef.current) {
       onInputBroadcastRef.current?.(filtered);
     }
     sendTerminalInput(filtered);
-  }, [sendTerminalInput, setStatusMessage, ssh, trackPending, refreshSuggestion, isLocalPowerShell, terminalProfile?.aiInlineQqRender]);
+  }, [sendTerminalInput, setStatusMessage, setTerminalRuntime, ssh, tabId, trackPending, refreshSuggestion, isLocalPowerShell, terminalProfile?.aiInlineQqRender]);
 
   const writeBinaryInput = useCallback((data: string) => {
     const sid = sessionIdRef.current;
@@ -2229,6 +2263,7 @@ export function TerminalPanel({
     let detachImeGuard: (() => void) | null = null;
     let cleanupImePositionLock: (() => void) | null = null;
     let resizeTimer: ReturnType<typeof setTimeout>;
+    let activityPromptTimer: ReturnType<typeof setTimeout> | undefined;
 
     const primaryFont = getPrimaryFontName(fontFamily);
     const safeFontFamily = isMonospaceFont(primaryFont) ? fontFamily : getDefaultTerminalFontFamily();
@@ -2373,6 +2408,39 @@ export function TerminalPanel({
         if (cwd) {
           latestCwdRef.current = cwd;
           cwdCallbackRef.current?.(cwd);
+          if (tabId) {
+            setTerminalRuntime(tabId, {
+              state: "idle",
+              program: undefined,
+              activitySource: "shell-integration",
+            });
+          }
+        }
+        return true;
+      });
+    } catch {
+      /* parser API absent in some xterm builds */
+    }
+
+    // OSC 133 shell integration is emitted by a number of modern prompts.
+    // `A` means prompt start (idle); `C` means command execution start. We do
+    // not receive a safe executable name here, so retain any input-derived
+    // program label and only improve the lifecycle state.
+    try {
+      term.parser.registerOscHandler(133, (data) => {
+        if (!tabId) return true;
+        const marker = data.trim().split(";")[0];
+        if (marker === "A") {
+          setTerminalRuntime(tabId, {
+            state: "idle",
+            program: undefined,
+            activitySource: "shell-integration",
+          });
+        } else if (marker === "C") {
+          setTerminalRuntime(tabId, {
+            state: "running",
+            activitySource: "shell-integration",
+          });
         }
         return true;
       });
@@ -2511,7 +2579,23 @@ export function TerminalPanel({
           if (isComposingRef.current) {
             compositionBufferRef.current.push(filtered);
           } else {
-            term.write(filtered);
+            term.write(filtered, () => {
+              if (!tabId) return;
+              if (activityPromptTimer) clearTimeout(activityPromptTimer);
+              activityPromptTimer = setTimeout(() => {
+                if (
+                  !destroyed &&
+                  connectionStateRef.current === "connected" &&
+                  terminalAtIdlePrompt(term)
+                ) {
+                  setTerminalRuntime(tabId, {
+                    state: "idle",
+                    program: undefined,
+                    activitySource: "input-heuristic",
+                  });
+                }
+              }, 120);
+            });
           }
         },
         onStateChange: (state, progress) => {
@@ -2636,6 +2720,13 @@ export function TerminalPanel({
       suggestionRef.current = null;
       bumpGhost();
       refreshSuggestion();
+      if (tabId) {
+        setTerminalRuntime(tabId, {
+          state: "disconnected",
+          program: undefined,
+          backendSessionId: undefined,
+        });
+      }
       onDetachedStateChangeRef.current?.({ snapshotText: getBufferText(term) });
 
       appendEvent("disconnect", "Terminal session ended");
@@ -2670,6 +2761,13 @@ export function TerminalPanel({
       sessionIdRef.current = connectedSid;
       lastTerminalSizeSyncRef.current = null;
       setRegisteredSessionId(connectedSid);
+      if (tabId) {
+        setTerminalRuntime(tabId, {
+          backendSessionId: connectedSid,
+          state: "unknown",
+          program: undefined,
+        });
+      }
       zmodemRef.current = zmodem;
       if (shellId) setResolvedLocalShellId(shellId);
       pendingMfaRequestIdRef.current = null;
@@ -2770,6 +2868,13 @@ export function TerminalPanel({
       setRegisteredSessionId(null);
       zmodemRef.current = null;
       const message = String(err);
+      if (tabId) {
+        setTerminalRuntime(tabId, {
+          state: "disconnected",
+          program: undefined,
+          backendSessionId: undefined,
+        });
+      }
       const label = ssh && mode === "reconnect" ? "Reconnect failed" : "Connection failed";
       appendEvent("error", `${label}: ${message}`);
       if (ssh && !adopted) {
@@ -2787,6 +2892,7 @@ export function TerminalPanel({
       clearConnectionListeners();
       cancelPendingMfa();
       connectionStateRef.current = mode === "reconnect" ? "reconnecting" : "connecting";
+      if (tabId) setTerminalRuntime(tabId, { state: "connecting", program: undefined });
       sessionIdRef.current = null;
       setRegisteredSessionId(null);
       zmodemRef.current = null;
@@ -2838,6 +2944,7 @@ export function TerminalPanel({
 
       clearConnectionListeners();
       connectionStateRef.current = "connecting";
+      if (tabId) setTerminalRuntime(tabId, { state: "connecting", program: undefined });
       sessionIdRef.current = null;
       setRegisteredSessionId(null);
       zmodemRef.current = null;
@@ -2917,6 +3024,7 @@ export function TerminalPanel({
       renderDisposable.dispose();
       resizeDisposable.dispose();
       clearTimeout(resizeTimer);
+      if (activityPromptTimer) clearTimeout(activityPromptTimer);
       unlistenExit?.();
       unlistenForwardError?.();
       unlistenAuthPrompt?.();
@@ -3214,6 +3322,16 @@ export function TerminalPanel({
       },
       writeInput: (data: string) => {
         if (readOnlyRef.current) return;
+        if (/[\r\n]/.test(data)) {
+          const program = inferTerminalProgram(data.split(/[\r\n]/).find((line) => line.trim()) ?? "");
+          if (program) {
+            setTerminalRuntime(tabId, {
+              state: "running",
+              program,
+              activitySource: "input-heuristic",
+            });
+          }
+        }
         writeTerminal(registeredSessionId, encodeBase64(data)).catch(console.error);
       },
       // Display-only echo (xterm.write): mirror Claude Code's captured-run
@@ -3234,7 +3352,7 @@ export function TerminalPanel({
       unregister();
       void ccUntrackTerminal(tabId, registeredSessionId).catch(() => {});
     };
-  }, [isLocal, localShell?.args, localShell?.id, localShell?.name, resolvedLocalShellId, tabId, registeredSessionId, tabTitle]);
+  }, [isLocal, localShell?.args, localShell?.id, localShell?.name, resolvedLocalShellId, setTerminalRuntime, tabId, registeredSessionId, tabTitle]);
 
   // Publish this terminal's capture source while it's the active tab, so the
   // screenshot actions (folded into the tab-strip `⋯` menu in the main window,

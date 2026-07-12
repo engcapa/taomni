@@ -24,7 +24,7 @@ use std::path::PathBuf;
 /// before each prompt. Mirrors the one-shot probe's `printf` form so the path
 /// flows through the same frontend parser/normalizer.
 const BASH_PROMPT_COMMAND: &str =
-    r#"printf '\033]7;file://%s%s\033\\' "${HOSTNAME:-localhost}" "$PWD""#;
+    r#"printf '\033]133;A\033\\\033]7;file://%s%s\033\\' "${HOSTNAME:-localhost}" "$PWD""#;
 
 /// PowerShell integration script. Captures the current `prompt` (which, run
 /// after the profile, is the user's customized one) and replaces it with a
@@ -33,6 +33,7 @@ const PS_INTEGRATION_SCRIPT: &str = r#"$global:__taomniOrigPrompt = $function:pr
 function global:prompt {
   try {
     $p = $PWD.ProviderPath
+    [Console]::Write([char]27 + ']133;A' + [char]27 + '\')
     if ($p) { [Console]::Write([char]27 + ']7;file://' + $env:COMPUTERNAME + '/' + ($p -replace '\\','/') + [char]27 + '\') }
   } catch {}
   if ($global:__taomniOrigPrompt) { & $global:__taomniOrigPrompt } else { 'PS ' + $PWD.Path + '> ' }
@@ -74,7 +75,10 @@ pub fn integration_for(program: &str, shell_id: &str, args: &[String]) -> Integr
     if is_posix_shell(program) {
         return Integration {
             extra_args: Vec::new(),
-            env: vec![("PROMPT_COMMAND".to_string(), BASH_PROMPT_COMMAND.to_string())],
+            env: vec![(
+                "PROMPT_COMMAND".to_string(),
+                BASH_PROMPT_COMMAND.to_string(),
+            )],
         };
     }
 
@@ -108,7 +112,11 @@ fn is_posix_shell(program: &str) -> bool {
 /// We only auto-wrap PowerShell when it launches with the stock args, so a
 /// user-supplied command/profile setup is never clobbered.
 fn uses_default_powershell_args(args: &[String]) -> bool {
-    args.is_empty() || args.iter().map(|a| a.to_ascii_lowercase()).eq(["-nologo".to_string()])
+    args.is_empty()
+        || args
+            .iter()
+            .map(|a| a.to_ascii_lowercase())
+            .eq(["-nologo".to_string()])
 }
 
 fn basename_lower(program: &str) -> String {
@@ -148,10 +156,11 @@ mod tests {
 
     #[test]
     fn git_bash_path_is_posix() {
-        let i = integration_for(r"C:\Program Files\Git\bin\bash.exe", "git-bash", &[
-            "--login".to_string(),
-            "-i".to_string(),
-        ]);
+        let i = integration_for(
+            r"C:\Program Files\Git\bin\bash.exe",
+            "git-bash",
+            &["--login".to_string(), "-i".to_string()],
+        );
         assert_eq!(i.env.first().map(|e| e.0.as_str()), Some("PROMPT_COMMAND"));
         assert!(i.extra_args.is_empty());
     }
@@ -159,7 +168,9 @@ mod tests {
     #[test]
     fn cmd_and_powershell_are_not_posix() {
         assert!(!is_posix_shell(r"C:\Windows\System32\cmd.exe"));
-        assert!(!is_posix_shell(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"));
+        assert!(!is_posix_shell(
+            r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+        ));
         assert!(is_powershell("pwsh.exe", "custom"));
         assert!(is_powershell("anything", "windows-powershell"));
     }
@@ -170,12 +181,18 @@ mod tests {
         // only assert it does not bail purely on the args check).
         assert!(uses_default_powershell_args(&[]));
         assert!(uses_default_powershell_args(&["-NoLogo".to_string()]));
-        assert!(!uses_default_powershell_args(&["-NoLogo".to_string(), "-Command".to_string()]));
+        assert!(!uses_default_powershell_args(&[
+            "-NoLogo".to_string(),
+            "-Command".to_string()
+        ]));
         assert!(!uses_default_powershell_args(&["-NoProfile".to_string()]));
     }
 
     #[test]
     fn unknown_shell_gets_nothing() {
-        assert_eq!(integration_for("/usr/bin/fish", "default", &[]), Integration::default());
+        assert_eq!(
+            integration_for("/usr/bin/fish", "default", &[]),
+            Integration::default()
+        );
     }
 }

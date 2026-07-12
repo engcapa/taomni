@@ -46,6 +46,7 @@ const quickConnectMock = vi.hoisted(() => ({
 const controlBarMock = vi.hoisted(() => ({
   props: [] as Array<{
     onDuplicateTab?: (id: string) => void;
+    onDetachActiveTab?: () => void;
   }>,
 }));
 
@@ -116,16 +117,18 @@ vi.mock("../components/tabbar/ControlBar", () => ({
     onCommand,
     onCloseWindow,
     onDuplicateTab,
+    onDetachActiveTab,
     onToggleSidebar,
     slotRef,
   }: {
     onCommand?: (command: string) => void;
     onCloseWindow?: () => void;
     onDuplicateTab?: (id: string) => void;
+    onDetachActiveTab?: () => void;
     onToggleSidebar?: () => void;
     slotRef?: (el: HTMLDivElement | null) => void;
   }) => {
-    controlBarMock.props.push({ onDuplicateTab });
+    controlBarMock.props.push({ onDuplicateTab, onDetachActiveTab });
     return (
       <div data-testid="control-bar">
         <button type="button" data-testid="window-close" onClick={() => onCloseWindow?.()}>
@@ -527,6 +530,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     expect(screen.getByTestId("terminal-panel")).toBeInTheDocument();
     expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
     expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
+    expect(controlBarMock.props.at(-1)?.onDetachActiveTab).toEqual(expect.any(Function));
   });
 
   it("opens settings from the lower-left sidebar rail button", () => {
