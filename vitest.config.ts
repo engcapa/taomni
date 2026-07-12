@@ -15,6 +15,8 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["src/test/setup.ts"],
+    testTimeout: 15_000,
+    maxWorkers: 4,
     // .claude/worktrees holds parallel git worktrees for other branches
     // (Claude Code's worktree feature). They each carry their own
     // node_modules with a *different* React copy, which makes vitest

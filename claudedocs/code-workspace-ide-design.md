@@ -2,7 +2,7 @@
 
 > 目标：在现有 Code Workspace 基础上做功能与交互完善，达到"日常代码开发够用"的 IntelliJ IDEA 级体验（非全量对标）。本文档为设计稿，不含实现代码。
 >
-> 日期：2026-07-12 · 版本：v2.7（M3 布局、终端与任务交付，见 §8.1–8.2）· 状态：**实施中**（分支 `feat/code-workspace-ide`；M0–M3 功能交付，M0 壳体技术债继续消化，真机冒烟人工待办）
+> 日期：2026-07-12 · 版本：v2.10（M0–M5 主线交付与后续收口，见 §8.1–8.2）· 状态：**实施中**（M0–M5 已合入 `main`；后续分支 `feat/code-workspace-followups` 已固化自动化门禁，抽离 Git snapshot、导航与文件动作 controller，并交付保存时格式化和 Git ignore；命令/header/layout 壳体技术债与真机冒烟继续推进）
 
 ---
 
@@ -572,7 +572,7 @@ src/stores/
 
 | 里程碑 | 内容 | 规模 | 状态 |
 |--------|------|------|------|
-| **M0 前置重构** | 组件拆分 + codeWorkspaceStore + 命令系统骨架 + 底部 dock 容器（References 迁入） | M | 🔶 功能前提已交付；树数据与 LSP session 已抽 hook，壳体仍约 3.8k 行，Git/导航/命令/header 继续下沉 |
+| **M0 前置重构** | 组件拆分 + codeWorkspaceStore + 命令系统骨架 + 底部 dock 容器（References 迁入） | M | 🔶 功能前提已交付；树数据、LSP session、Git snapshot、导航与文件动作已抽 hook，壳体约 4.4k 行，命令注册/header/layout 继续下沉 |
 | **M1 编辑器智能·上（P0）** | 查找替换、LSP 补全（含 auto-import）/签名/快速文档/格式化、诊断呈现升级、Problems 面板 | L | ✅ 9/9 |
 | **M2 导航与搜索（P0）** | Find in Files（后端搜索模块 + 面板）、Search Everywhere（含 Classes/Symbols）、Go to File/Class/Symbol、Recent Files、导航历史、Outline + 结构弹窗、类型/实现跳转 + peek、重命名、Code Actions、树右键/键盘 | L | ✅ 14/14（拖拽仍为 P1） |
 | **M3 布局与终端（P1）** | 分屏、tab 管理/预览 tab、面包屑、集成终端、Run/Tasks | L | ✅ 5/5 |
@@ -583,7 +583,7 @@ src/stores/
 
 ### 8.1 进度明细（勾选清单）
 
-> 更新于 2026-07-12（v2.8），分支 `feat/code-workspace-ide`。M0–M5 功能已按代码、提交与自动化门禁复核；真机冒烟按本轮约定后置，M0 壳拆分技术债继续消化。完成度按本节拆分条目计数，已完成项附提交号。
+> 更新于 2026-07-12（v2.10）。M0–M5 已由 PR #361 合入 `main`；后续收口位于 `feat/code-workspace-followups`。功能按代码、提交与自动化门禁复核；真机冒烟由用户执行并待回填，M0 壳拆分技术债继续消化。完成度按本节拆分条目计数，已完成项附提交号。
 
 **M0 前置重构 — 🔶 清单项齐，壳体继续瘦身中**
 
@@ -598,6 +598,9 @@ src/stores/
 - [x] 命令系统收尾：树右键/工具栏复用 command id，terminalFocus 上下文接入 — `2312ef8`
 - [x] 目录 listing 生命周期抽为 `useWorkspaceTreeData`（目录/compact/flat 缓存、异步过期保护）— `1d9617e`
 - [x] LSP 文档 open/change/save/close session 管道抽为 `useWorkspaceLspSession`（共享文档与异步过期保护）— `f574a5d`
+- [x] Git 仓库探测、快照轮询、刷新订阅与路径失效抽为 `useWorkspaceGitSnapshots` — `cbc40ec`
+- [x] Search Everywhere/Go to File、Recent Files、前进后退与双 Shift 生命周期抽为 `useWorkspaceNavigation` — `057006a`
+- [x] 根/松散文件接入、树刷新、创建/重命名/删除、剪切复制粘贴与 Explorer 操作抽为 `useWorkspaceFileActions` — `d97b2cb`
 
 **M1 编辑器智能·上（P0）— ✅ 9/9**
 
@@ -608,7 +611,7 @@ src/stores/
 - [x] LSP 补全（kind 图标、snippet 转换、auto-import via resolve、触发字符、词级回退）— `fa8ce88`
 - [x] 签名帮助（触发字符自动弹出 / Ctrl+Shift+Space，活动参数加粗）— `fa8ce88`
 - [x] 快速文档升级（Ctrl+Q / F1 显式弹出 + pin 到右栏 Documentation）— `c4e1435`
-- [x] 格式化（`lsp_formatting` / `lsp_range_formatting`，Ctrl+Alt+L）— `e210694`（保存时格式化开关仍可后续加）
+- [x] 格式化（`lsp_formatting` / `lsp_range_formatting`，Ctrl+Alt+L）— `e210694`；工作区级保存时格式化开关（默认关）— `4ff2ed7`
 - [x] 诊断呈现收尾（gutter 图标、overview ruler 色条、灯泡入口）— `b049952`
 
 **M2 导航与搜索（P0）— ✅ 14/14（拖拽仍为 P1）**
@@ -620,7 +623,7 @@ src/stores/
 - [x] Recent Files（Ctrl+E，最近优先、连按推进、上一文件预选）— `f5ae894`
 - [x] 导航历史（Ctrl+Alt+←/→ + 头部按钮，100 条上限）— `f5ae894`
 - [x] 文件结构弹窗（Ctrl+F12，documentSymbol 层级/扁平双格式）— `5939c76`
-- [x] 文件树右键菜单补齐（剪切/复制/粘贴、资源管理器打开）— `1d8fa2f`；根感知「终端中打开」— `49c53fc`（Git ignore 仍可增强）
+- [x] 文件树右键菜单补齐（剪切/复制/粘贴、资源管理器打开）— `1d8fa2f`；根感知「终端中打开」— `49c53fc`；文件/目录 Git ignore — `6b41676`
 - [x] Go to Class / Go to Symbol（`lsp_workspace_symbols` + SE Classes/Symbols）— `4040d6f`
 - [x] 类型声明/实现跳转 + 多结果 peek — `e373d0d`
 - [x] 重命名（prepareRename + rename + §5.2.9 WorkspaceEdit 应用规则）— `e7873ef`；open-clean 保存路径 — `5d87203`
@@ -662,30 +665,31 @@ src/stores/
 - [x] 交互原型交付（`claudedocs/prototype/code-workspace-prototype.html`）
 - [x] 签名帮助键位决策：Ctrl+Shift+Space（Ctrl+P 已作 Go to File 别名）— `f4d9c15`
 - [x] 代码与自动化复核（2026-07-12 v2.8）：全量 Vitest **159 文件 / 1267 项**通过（`--testTimeout=15000 --maxWorkers=4`）；`pnpm build` 通过；全量 `cargo test` 通过（lib **748 passed / 11 ignored**，其余 integration/doc tests 全绿）
+- [ ] **⚠ 当前自动化门禁（v2.10）**：全量 Vitest **164 文件 / 1304 项**通过；`pnpm build` 通过；Git ignore Rust 定向测试 **2 passed**；全量 `cargo test` 为 **739 passed / 3 failed / 11 ignored**，失败均为未被本分支修改的 Windows `rdp::cliprdr::uri_list_*` 路径前导斜杠断言，需独立修复后恢复全绿
 - [x] WorkspaceEdit §5.2.9 三态规则收口（open-clean 应用后保存、open-dirty 保持 dirty、未打开写盘 + hash 预检）— `workspaceEditApply` + `5d87203`
 - [x] 合并门禁 8 例 Windows 失败已修复（clipboard URI ×4、pushd ×1、git 根 ×3）— `f6c1f36`
-- [ ] **⚠ 真机验证欠账（人工）**：M0–M5 能力仍以单测/构建为主；`pnpm tauri dev` 冒烟按本轮约定后置，结果回填本节
-- [ ] ⚠ M0 继续瘦身：树数据与 LSP session 已抽离；Git 快照、导航、命令注册、header/layout 大段继续下沉，目标装配壳 <400 行（当前加入 M3 后约 3.8k 行）
-- [ ] ⚠ 下列增强项可选收口：保存时格式化开关；server 回推 `workspace/applyEdit` oneshot；Git ignore；树/tab 拖拽停靠（P1）
+- [ ] **⚠ 真机验证欠账（由用户执行）**：M0–M5 能力仍以单测/构建为主；`pnpm tauri dev` 冒烟结果回填本节
+- [ ] ⚠ M0 继续瘦身：树数据、LSP session、Git snapshot、导航与文件动作 controller 已抽离；命令注册、header/layout 大段继续下沉，目标装配壳 <400 行（当前约 4.4k 行）
+- [ ] ⚠ 下列增强项可选收口：server 回推 `workspace/applyEdit` oneshot；树/tab 拖拽停靠（P1）；`WorkspaceFs` 生产只读链路
 
 ### 8.2 下一步待办（建议顺序）
 
-> M0–M5 计划项均已交付并拆分提交。**真机冒烟仍为人工待办并明确后置。** 下一编码优先级：稳定自动化门禁 → 继续 M0 壳体瘦身 / 可选体验补丁 → 合入主干。
+> M0–M5 计划项均已交付并合入主干。后续收口已完成自动化门禁固化，Git snapshot、导航与文件动作 controller 抽离，以及保存时格式化和 Git ignore。**真机冒烟由用户执行；当前另有 3 项既有 Windows cliprdr Rust 门禁失败待修。**
 
-1. **固化全量前端门禁参数**
-   默认高并发会令 Code Workspace 重型用例与 Terminal 焦点用例出现资源竞争；本轮以 `--testTimeout=15000 --maxWorkers=4` 全绿，建议写入 CI 脚本或 Vitest 配置。
+1. **✅ 固化全量前端门禁参数** — `a9f7484`
+   `vitest.config.ts` 已统一设置 `testTimeout: 15_000` 与 `maxWorkers: 4`；无额外参数的 `pnpm test` 全绿。
 
-2. **（人工）真机冒烟并记缺陷**
-   `pnpm tauri dev` 覆盖 M0–M5 快捷键、分屏、PTY、Git gutter/blame、本地历史、AI 入口、语义高亮和 TODO/书签；本轮后置，不作为自动化门禁。
+2. **（用户执行）真机冒烟并记缺陷**
+   `pnpm tauri dev` 覆盖 M0–M5 快捷键、分屏、PTY、Git gutter/blame、本地历史、AI 入口、语义高亮和 TODO/书签；结果回填本节。
 
-3. **继续 M0 瘦身（目标装配壳 <400）**
-   抽 Git snapshot、导航与文件动作 controller；命令注册和 header/layout 组件化。
+3. **🔶 继续 M0 瘦身（目标装配壳 <400）**
+   Git snapshot、导航与文件动作 controller 已抽离 — `cbc40ec`、`057006a`、`d97b2cb`。下一步组件化命令注册和 header/layout；当前壳体约 4.4k 行。
 
 4. **（可选）体验补丁**
-   保存时格式化；server 回推 `workspace/applyEdit` oneshot；Git ignore；树/tab 拖拽停靠；评估把 `WorkspaceFs` 接入一条生产只读链路。
+   工作区级保存时格式化与 Git ignore 已交付 — `4ff2ed7`、`6b41676`。剩余：server 回推 `workspace/applyEdit` oneshot；树/tab 拖拽停靠；评估把 `WorkspaceFs` 接入一条生产只读链路。
 
-5. **合入主干**
-   自动化门禁通过后 merge；真机冒烟结果可在后续独立补录。
+5. **✅ 合入主干**
+   M0–M5 已由 PR #361 合入 `main`；后续收口分支待独立合并，真机冒烟结果可在后续独立补录。
 
 ---
 
@@ -693,7 +697,7 @@ src/stores/
 
 | 风险 | 说明 | 缓解 |
 |------|------|------|
-| M0 重构回归 | 3.6k 行组件拆迁易碎 | 行为不变原则 + 现有测试全绿 + 回归清单；按面板分多个 PR |
+| M0 重构回归 | 4.4k 行组件拆迁易碎 | 行为不变原则 + 聚焦测试 + 回归清单；按 controller/面板分多个提交 |
 | LSP 服务器差异 | completion/rename/hierarchy 各 server capability 差异大 | §5.2.0 capability 驱动开关；不支持则置灰 + hint；§5.2.12 矩阵仅作方向参考 |
 | WorkspaceEdit 非原子 | 跨文件重命名部分失败 | 如实呈现结果清单（§5.2.9），不承诺原子性 |
 | 补全性能/竞态 | 高频输入下请求风暴、过期回填 | 防抖 + 请求代际取消；resolve 惰性化；isIncomplete 续查 |
@@ -712,5 +716,5 @@ src/stores/
 2. 右侧 Outline / Documentation / AI 是否首期合并为单栏多 tab（原型按合并形态演示）？
 3. 本地历史保留策略默认值（50 版/7 天）是否合适？
 4. 是否首期就提供 VS Code keymap 预设？
-5. 远程工作区 spike 是否提前到 M3 之前验证 `WorkspaceFs` trait 设计？
+5. `WorkspaceFs` trait spike 已完成，下一步是否接入一条生产只读链路？
 6. Inlay hints 默认开关（方案默认关，rust-analyzer 用户可能期待默认开）？

@@ -34,13 +34,8 @@ import {
   ZoomOut,
 } from "lucide-react";
 import {
-  workspaceCreateDir,
-  workspaceCreateFile,
-  workspaceDeletePath,
-  workspaceDetectGitRoots,
   workspaceReadFile,
   workspaceReadLooseFile,
-  workspaceRenamePath,
   workspaceWriteFile,
   workspaceWriteLooseFile,
   type WorkspaceGitRoot,
@@ -48,11 +43,9 @@ import {
 import {
   gitBlameLines,
   gitBlobPair,
-  gitSnapshot,
   type GitBlameLine,
   type GitChange,
 } from "../../lib/git";
-import { notifyGitRepoChanged, subscribeGitRepoRefresh } from "../../lib/gitRefresh";
 import {
   lspCodeActions,
   lspCompletion,
@@ -90,7 +83,6 @@ import {
   type LspWorkspaceEdit,
 } from "../../lib/editor/lsp";
 import { invoke } from "@tauri-apps/api/core";
-import { selectFilePath, selectFolderPath } from "../../lib/ipc";
 import {
   DEFAULT_CODE_VIEW_PROFILE,
   applyCodeViewProfile,
@@ -172,12 +164,10 @@ import {
 import { type QuickDocContent } from "./workspace/QuickDocPopup";
 import { type LocationPeekState } from "./workspace/LocationPeek";
 import {
-  type GoToFileItem,
   type GoToSymbolItem,
   type SearchEverywhereMode,
 } from "./workspace/SearchEverywhere";
 import { type RecentFileEntry } from "./workspace/RecentFilesPopup";
-import { createDoubleShiftDetector } from "./workspace/doubleShift";
 import { EditorGroup } from "./workspace/EditorGroup";
 import { WorkspacePopupsHost } from "./workspace/WorkspacePopupsHost";
 import { FileTreePane } from "./workspace/FileTreePane";
@@ -263,7 +253,6 @@ import {
   type OpenFileState,
   type TreeSelection,
   type TreeViewMode,
-  type WorkspaceGitSnapshotState,
   type WorkspaceTreeCommandPayload,
   CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE,
   CODE_WORKSPACE_MAX_FONT_SIZE,
@@ -271,8 +260,6 @@ import {
   CODE_WORKSPACE_MIN_FONT_SIZE,
   CODE_WORKSPACE_MIN_TREE_FONT_SIZE,
   CUSTOM_LSP_COMMAND_ID,
-  NAV_HISTORY_LIMIT,
-  RECENT_FILES_LIMIT,
   absoluteWorkspacePath,
   basename,
   clampCodeWorkspaceFontSize,
@@ -281,7 +268,6 @@ import {
   errorMessage,
   fileKey,
   fileMeta,
-  fileRefUnder,
   formatBytes,
   formatMtime,
   gitRootForWorkspacePath,
@@ -292,20 +278,15 @@ import {
   initialRoots,
   isExternalHref,
   isMarkdownPath,
-  joinRelativePath,
   makeLoadingFile,
   makeLooseFile,
-  makeRoot,
   normalizeFsPath,
   parentPath,
   readCodeWorkspaceTreeFontSize,
   relativePathWithinRoot,
-  remapFileRef,
-  remapRelativePath,
   resolveLooseMarkdownLink,
   resolveRootMarkdownLink,
   rootDirKey,
-  shouldHideEntry,
   workspacePathForGitPath,
   workspaceTitle,
   writeCodeWorkspaceTreeFontSize,
@@ -313,6 +294,9 @@ import {
 } from "./workspace/codeWorkspaceModel";
 import { useWorkspaceTreeData } from "./workspace/useWorkspaceTreeData";
 import { useWorkspaceLspSession } from "./workspace/useWorkspaceLspSession";
+import { useWorkspaceGitSnapshots } from "./workspace/useWorkspaceGitSnapshots";
+import { useWorkspaceNavigation } from "./workspace/useWorkspaceNavigation";
+import { useWorkspaceFileActions } from "./workspace/useWorkspaceFileActions";
 import { Breadcrumbs, type BreadcrumbPathSegment } from "./workspace/Breadcrumbs";
 import {
   TerminalDockPanel,
@@ -633,10 +617,15 @@ export function CodeWorkspaceTab({
     treeViewMode,
     onError: setStatusMessage,
   });
-  const [gitRoots, setGitRoots] = useState<WorkspaceGitRoot[]>([]);
-  const [gitRootsLoading, setGitRootsLoading] = useState(false);
-  const [gitSnapshots, setGitSnapshots] = useState<Record<string, WorkspaceGitSnapshotState>>({});
-  const [navCan, setNavCan] = useState({ back: false, forward: false });
+  const {
+    gitRoots,
+    gitRootsLoading,
+    gitSnapshots,
+    notifyWorkspacePathGitChanged,
+  } = useWorkspaceGitSnapshots({
+    roots,
+    onError: setStatusMessage,
+  });
   const [revealTarget, setRevealTarget] = useState<EditorRevealTarget | null>(null);
   const [cursorPositions, setCursorPositions] = useState<Record<EditorGroupId, LspPosition>>({
     primary: { line: 0, character: 0 },
@@ -693,13 +682,6 @@ export function CodeWorkspaceTab({
   const looseFilesRef = useRef(looseFiles);
   const codeViewProfileRef = useRef(codeViewProfile);
   const treeFontSizeRef = useRef(treeFontSize);
-  const gitRootsRef = useRef(gitRoots);
-  const navHistoryRef = useRef<{ stack: CodeWorkspaceFileRef[]; index: number; suppress: boolean }>({
-    stack: [],
-    index: -1,
-    suppress: false,
-  });
-  const recentFilesRef = useRef<CodeWorkspaceFileRef[]>([]);
   const gitHeadRequestsRef = useRef(new Set<string>());
   const gitBlameCacheRef = useRef(new Map<string, GitBlameLine | null>());
   const revealNonceRef = useRef(0);
@@ -767,10 +749,6 @@ export function CodeWorkspaceTab({
   useEffect(() => {
     looseFilesRef.current = looseFiles;
   }, [looseFiles]);
-
-  useEffect(() => {
-    gitRootsRef.current = gitRoots;
-  }, [gitRoots]);
 
   useEffect(() => {
     openFilesRef.current = openFiles;
@@ -948,108 +926,6 @@ export function CodeWorkspaceTab({
 
   const findRoot = useCallback((rootId: string) => rootsRef.current.find((root) => root.id === rootId) ?? null, []);
 
-  const refreshWorkspaceGitSnapshots = useCallback(async (targets = gitRootsRef.current) => {
-    await Promise.all(targets.map(async (root) => {
-      setGitSnapshots((current) => ({
-        ...current,
-        [root.repoRoot]: {
-          changes: current[root.repoRoot]?.changes ?? [],
-          headOid: current[root.repoRoot]?.headOid ?? null,
-          currentBranch: current[root.repoRoot]?.currentBranch ?? null,
-          ahead: current[root.repoRoot]?.ahead ?? 0,
-          behind: current[root.repoRoot]?.behind ?? 0,
-          loading: true,
-          error: null,
-        },
-      }));
-      try {
-        const snapshot = await gitSnapshot(root.repoRoot);
-        setGitSnapshots((current) => ({
-          ...current,
-          [root.repoRoot]: {
-            changes: snapshot.changes,
-            headOid: snapshot.headOid,
-            currentBranch: snapshot.currentBranch,
-            ahead: snapshot.ahead,
-            behind: snapshot.behind,
-            loading: false,
-            error: null,
-          },
-        }));
-      } catch (err) {
-        setGitSnapshots((current) => ({
-          ...current,
-          [root.repoRoot]: {
-            changes: current[root.repoRoot]?.changes ?? [],
-            headOid: current[root.repoRoot]?.headOid ?? null,
-            currentBranch: current[root.repoRoot]?.currentBranch ?? null,
-            ahead: current[root.repoRoot]?.ahead ?? 0,
-            behind: current[root.repoRoot]?.behind ?? 0,
-            loading: false,
-            error: errorMessage(err),
-          },
-        }));
-      }
-    }));
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (roots.length === 0) {
-      setGitRoots([]);
-      setGitRootsLoading(false);
-      setGitSnapshots({});
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    setGitRootsLoading(true);
-    void workspaceDetectGitRoots(roots.map((root) => ({
-      id: root.id,
-      name: root.name,
-      path: root.path,
-    }))).then((detected) => {
-      if (cancelled) return;
-      setGitRoots(detected);
-      setGitSnapshots((current) => Object.fromEntries(
-        Object.entries(current).filter(([repoRoot]) => detected.some((root) => root.repoRoot === repoRoot)),
-      ));
-    }).catch((err) => {
-      if (cancelled) return;
-      const message = errorMessage(err);
-      setGitRoots([]);
-      setStatusMessage(message);
-    }).finally(() => {
-      if (!cancelled) setGitRootsLoading(false);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [roots, setStatusMessage]);
-
-  useEffect(() => {
-    if (gitRoots.length === 0) return;
-    void refreshWorkspaceGitSnapshots(gitRoots);
-    const timer = window.setInterval(() => {
-      void refreshWorkspaceGitSnapshots(gitRootsRef.current);
-    }, 30_000);
-    return () => window.clearInterval(timer);
-  }, [gitRoots, refreshWorkspaceGitSnapshots]);
-
-  useEffect(() => subscribeGitRepoRefresh((repoRoot) => {
-    const root = gitRootsRef.current.find((item) => item.repoRoot === repoRoot);
-    if (root) void refreshWorkspaceGitSnapshots([root]);
-  }), [refreshWorkspaceGitSnapshots]);
-
-  const notifyWorkspacePathGitChanged = useCallback((rootId: string, path: string) => {
-    const root = findRoot(rootId);
-    if (!root) return;
-    const repo = gitRootForWorkspacePath(root, path, gitRootsRef.current);
-    if (repo) notifyGitRepoChanged(repo.repoRoot);
-  }, [findRoot]);
-
   const openFile = useCallback(
     async (ref: CodeWorkspaceFileRef, options: { preview?: boolean; groupId?: EditorGroupId } = {}) => {
       const key = fileKey(ref);
@@ -1131,123 +1007,32 @@ export function CodeWorkspaceTab({
     [activateEditorGroup, findRoot, setStatusMessage, updateEditorGroup, workspaceInstanceId],
   );
 
-  const openSearchEverywhere = useCallback((mode: SearchEverywhereMode = "files") => {
-    // Warm the recursive file index for every root; loadFlatFiles caches.
-    rootsRef.current.forEach((root) => void loadFlatFiles(root.id));
-    setSearchEverywhereMode(mode);
-    setSearchEverywhereOpen(true);
-  }, [loadFlatFiles]);
-
-  const goToFileItems = useMemo<GoToFileItem[]>(() => {
-    const items: GoToFileItem[] = [];
-    for (const root of roots) {
-      const state = flatFiles[root.id];
-      if (!state) continue;
-      for (const entry of state.entries) {
-        if (entry.fileType !== "file" || shouldHideEntry(entry)) continue;
-        items.push({ rootId: root.id, rootName: root.name, path: entry.path });
-      }
-    }
-    return items;
-  }, [flatFiles, roots]);
-  const goToFileLoading = useMemo(
-    () => roots.some((root) => flatFiles[root.id]?.loading ?? false),
-    [flatFiles, roots],
-  );
-  const goToFileTruncated = useMemo(
-    () => roots.some((root) => flatFiles[root.id]?.truncated ?? false),
-    [flatFiles, roots],
-  );
-
-  const openGoToFileItem = useCallback(
-    (item: GoToFileItem, options?: { split: boolean }) => {
-      setSearchEverywhereOpen(false);
-      const ref: CodeWorkspaceFileRef = { kind: "root", rootId: item.rootId, path: item.path };
-      if (options?.split) {
-        const current = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
-        const targetGroupId: EditorGroupId = current.activeEditorGroupId === "primary"
-          ? "secondary"
-          : "primary";
-        setStoreSplitOrientation(workspaceInstanceId, "vertical");
-        void openFile(ref, { groupId: targetGroupId });
-        return;
-      }
-      void openFile(ref, { preview: true });
-    },
-    [openFile, setStoreSplitOrientation, workspaceInstanceId],
-  );
-
-  // Track file activations for Recent Files (Ctrl+E) and the back/forward
-  // navigation history.
-  useEffect(() => {
-    if (!activeKey) return;
-    const ref = openFilesRef.current[activeKey]?.ref;
-    if (!ref) return;
-    recentFilesRef.current = [
-      ref,
-      ...recentFilesRef.current.filter((item) => fileKey(item) !== activeKey),
-    ].slice(0, RECENT_FILES_LIMIT);
-    const nav = navHistoryRef.current;
-    if (nav.suppress) {
-      nav.suppress = false;
-      setNavCan({ back: nav.index > 0, forward: nav.index < nav.stack.length - 1 });
-      return;
-    }
-    if (nav.index >= 0 && nav.stack[nav.index] && fileKey(nav.stack[nav.index]) === activeKey) return;
-    nav.stack = [...nav.stack.slice(0, nav.index + 1), ref].slice(-NAV_HISTORY_LIMIT);
-    nav.index = nav.stack.length - 1;
-    setNavCan({ back: nav.index > 0, forward: false });
-  }, [activeKey]);
-
-  const navigateHistory = useCallback(
-    (delta: -1 | 1) => {
-      const nav = navHistoryRef.current;
-      const nextIndex = nav.index + delta;
-      if (nextIndex < 0 || nextIndex >= nav.stack.length) return;
-      nav.index = nextIndex;
-      nav.suppress = true;
-      setNavCan({ back: nextIndex > 0, forward: nextIndex < nav.stack.length - 1 });
-      void openFile(nav.stack[nextIndex]);
-    },
-    [openFile],
-  );
-
-  const openRecentFiles = useCallback(() => {
-    const entries: RecentFileEntry[] = recentFilesRef.current.map((ref) => {
-      const key = fileKey(ref);
-      const meta = fileMeta(ref, rootsRef.current, looseFilesRef.current);
-      return {
-        key,
-        ref,
-        title: meta.title,
-        subtitle: meta.subtitle,
-        open: !!openFilesRef.current[key],
-      };
-    });
-    setRecentEntries(entries);
-    setRecentFilesOpen(true);
-  }, []);
-
-  const pickRecentFile = useCallback(
-    (entry: RecentFileEntry) => {
-      setRecentFilesOpen(false);
-      void openFile(entry.ref);
-    },
-    [openFile],
-  );
-
-  useEffect(() => {
-    if (!visible) return;
-    const detector = createDoubleShiftDetector(() => openSearchEverywhere("all"));
-    const handleKeyDown = (event: KeyboardEvent) => detector.handleKeyDown(event);
-    const handleKeyUp = (event: KeyboardEvent) => detector.handleKeyUp(event);
-    window.addEventListener("keydown", handleKeyDown, true);
-    window.addEventListener("keyup", handleKeyUp, true);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown, true);
-      window.removeEventListener("keyup", handleKeyUp, true);
-    };
-  }, [openSearchEverywhere, visible]);
+  const {
+    navCan,
+    goToFileItems,
+    goToFileLoading,
+    goToFileTruncated,
+    openSearchEverywhere,
+    openGoToFileItem,
+    navigateHistory,
+    openRecentFiles,
+    pickRecentFile,
+  } = useWorkspaceNavigation({
+    workspaceInstanceId,
+    activeKey,
+    roots,
+    flatFiles,
+    visible,
+    rootsRef,
+    looseFilesRef,
+    openFilesRef,
+    loadFlatFiles,
+    openFile,
+    setSearchEverywhereMode,
+    setSearchEverywhereOpen,
+    setRecentEntries,
+    setRecentFilesOpen,
+  });
 
   const openFindInFiles = useCallback(() => {
     setBottomDockOpen(true);
@@ -1273,23 +1058,6 @@ export function CodeWorkspaceTab({
     setBottomDockOpen(true);
     terminalDockRef.current?.openAt(cwd, relativeDirectory ? basename(relativeDirectory) : root.name);
   }, [findRoot]);
-
-  const copyTreePath = useCallback(
-    async (rootId: string, path: string, absolute: boolean) => {
-      const root = findRoot(rootId);
-      if (!root) return;
-      const text = absolute
-        ? (path ? `${normalizeFsPath(root.path)}/${path}` : normalizeFsPath(root.path))
-        : path || normalizeFsPath(root.path);
-      try {
-        await writeText(text);
-        setStatusMessage(`Copied ${text}`);
-      } catch (err) {
-        setStatusMessage(errorMessage(err));
-      }
-    },
-    [findRoot, setStatusMessage],
-  );
 
   useEffect(() => {
     if (layoutRestoredOpenFilesRef.current) {
@@ -1357,329 +1125,56 @@ export function CodeWorkspaceTab({
     workspaceInstanceId,
   ]);
 
-  const addRoot = useCallback(async () => {
-    const path = await selectFolderPath();
-    if (!path) return;
-    const root = makeRoot(path, "folder");
-    if (rootsRef.current.some((item) => item.path === root.path)) {
-      setStatusMessage(`Folder already in workspace: ${root.path}`);
-      return;
-    }
-    setRoots((current) => [...current, root]);
-    setExpandedRoots((current) => new Set(current).add(root.id));
-    setExpandedDirs((current) => new Set(current).add(rootDirKey(root.id, "")));
-    setStatusMessage(`Added folder ${root.path}`);
-    void loadDir(root.id, "");
-  }, [loadDir, setStatusMessage]);
-
-  const addLooseFilePath = useCallback(async (path: string) => {
-    if (!path) return;
-    const file = makeLooseFile(path);
-    setLooseFiles((current) => current.some((item) => item.path === file.path) ? current : [...current, file]);
-    setSelected({ kind: "file", ref: { kind: "loose", id: file.id, path: file.path } });
-    await openFile({ kind: "loose", id: file.id, path: file.path });
-  }, [openFile]);
-
-  const openLooseFile = useCallback(async () => {
-    const path = await selectFilePath();
-    if (!path) return;
-    await addLooseFilePath(path);
-  }, [addLooseFilePath]);
-
-  const refreshTree = useCallback(() => {
-    resetTreeData();
-    rootsRef.current.forEach((root) => {
-      if (expandedRoots.has(root.id)) void loadDir(root.id, "");
-      if (treeViewMode === "flat") void loadFlatFiles(root.id, true);
-    });
-  }, [expandedRoots, loadDir, loadFlatFiles, resetTreeData, treeViewMode]);
-
-  const toggleRoot = useCallback(
-    (rootId: string) => {
-      setSelected({ kind: "root", rootId });
-      setExpandedRoots((current) => {
-        const next = new Set(current);
-        if (next.has(rootId)) next.delete(rootId);
-        else next.add(rootId);
-        return next;
-      });
-      if (!directories[rootDirKey(rootId, "")]?.loaded) void loadDir(rootId, "");
-    },
-    [directories, loadDir],
-  );
-
-  const toggleDir = useCallback(
-    (rootId: string, path: string) => {
-      const key = rootDirKey(rootId, path);
-      const wasExpanded = expandedDirs.has(key);
-      setExpandedDirs((current) => {
-        const next = new Set(current);
-        if (next.has(key)) next.delete(key);
-        else next.add(key);
-        return next;
-      });
-      const state = directories[key];
-      if (!wasExpanded && (!state?.loaded || state.error)) {
-        void loadDir(rootId, path);
-      }
-    },
-    [directories, expandedDirs, loadDir],
-  );
-
-  const selectedRootDirectory = useMemo(() => {
-    if (selected?.kind === "dir") return { rootId: selected.rootId, path: selected.path };
-    if (selected?.kind === "file" && selected.ref.kind === "root") {
-      return { rootId: selected.ref.rootId, path: parentPath(selected.ref.path) };
-    }
-    if (activeKey) {
-      const active = openFiles[activeKey];
-      if (active?.ref.kind === "root") return { rootId: active.ref.rootId, path: parentPath(active.ref.path) };
-    }
-    return roots[0] ? { rootId: roots[0].id, path: "" } : null;
-  }, [activeKey, openFiles, roots, selected]);
-
-  const createFile = useCallback(async (target?: { rootId: string; path: string }) => {
-    const directory = target ?? selectedRootDirectory;
-    if (!directory) {
-      setStatusMessage("Add a folder before creating files");
-      return;
-    }
-    const name = await promptAppDialog({
-      title: "New file",
-      label: "File name",
-      initialValue: directory.path ? `${directory.path}/` : "",
-    });
-    if (!name) return;
-    const root = findRoot(directory.rootId);
-    if (!root) return;
-    const path = name.includes("/") || name.includes("\\")
-      ? name.trim().replace(/\\/g, "/").replace(/^\/+/, "")
-      : joinRelativePath(directory.path, name);
-    try {
-      const file = await workspaceCreateFile(root.path, path);
-      await loadDir(root.id, parentPath(file.path));
-      const ref: CodeWorkspaceFileRef = { kind: "root", rootId: root.id, path: file.path };
-      setSelected({ kind: "file", ref });
-      await openFile(ref);
-      notifyWorkspacePathGitChanged(root.id, file.path);
-      setStatusMessage(`Created ${root.name} / ${file.path}`);
-    } catch (err) {
-      setStatusMessage(errorMessage(err));
-    }
-  }, [findRoot, loadDir, notifyWorkspacePathGitChanged, openFile, selectedRootDirectory, setStatusMessage]);
-
-  const createDir = useCallback(async (target?: { rootId: string; path: string }) => {
-    const directory = target ?? selectedRootDirectory;
-    if (!directory) {
-      setStatusMessage("Add a folder before creating directories");
-      return;
-    }
-    const name = await promptAppDialog({
-      title: "New directory",
-      label: "Directory name",
-      initialValue: directory.path ? `${directory.path}/` : "",
-    });
-    if (!name) return;
-    const root = findRoot(directory.rootId);
-    if (!root) return;
-    const path = name.includes("/") || name.includes("\\")
-      ? name.trim().replace(/\\/g, "/").replace(/^\/+/, "")
-      : joinRelativePath(directory.path, name);
-    try {
-      const entry = await workspaceCreateDir(root.path, path);
-      await loadDir(root.id, parentPath(entry.path));
-      setExpandedDirs((current) => new Set(current).add(rootDirKey(root.id, parentPath(entry.path))));
-      setSelected({ kind: "dir", rootId: root.id, path: entry.path });
-      notifyWorkspacePathGitChanged(root.id, entry.path);
-      setStatusMessage(`Created ${root.name} / ${entry.path}`);
-    } catch (err) {
-      setStatusMessage(errorMessage(err));
-    }
-  }, [findRoot, loadDir, notifyWorkspacePathGitChanged, selectedRootDirectory, setStatusMessage]);
-
-  const renameSelected = useCallback(async (target?: TreeSelection) => {
-    const selection = target ?? selected;
-    if (!selection) return;
-    if (selection.kind === "root") {
-      const root = findRoot(selection.rootId);
-      if (!root) return;
-      const name = await promptAppDialog({ title: "Rename root", label: "Display name", initialValue: root.name });
-      if (!name || name === root.name) return;
-      setRoots((current) => current.map((item) => item.id === root.id ? { ...item, name } : item));
-      return;
-    }
-    if (selection.kind === "file" && selection.ref.kind === "loose") {
-      const ref = selection.ref;
-      const loose = looseFilesRef.current.find((item) => item.id === ref.id);
-      if (!loose) return;
-      const name = await promptAppDialog({ title: "Rename loose file", label: "Display name", initialValue: loose.name });
-      if (!name || name === loose.name) return;
-      setLooseFiles((current) => current.map((item) => item.id === loose.id ? { ...item, name } : item));
-      return;
-    }
-    const rootTarget = selection.kind === "dir"
-      ? { rootId: selection.rootId, path: selection.path }
-      : selection.ref.kind === "root"
-        ? { rootId: selection.ref.rootId, path: selection.ref.path }
-        : null;
-    if (!rootTarget) return;
-    const rootId = rootTarget.rootId;
-    const selectedPath = rootTarget.path;
-    const root = findRoot(rootId);
-    if (!root) return;
-    const nextName = await promptAppDialog({
-      title: "Rename",
-      label: "New name",
-      initialValue: basename(selectedPath),
-    });
-    if (!nextName || nextName === basename(selectedPath)) return;
-    const nextPath = joinRelativePath(parentPath(selectedPath), nextName);
-    try {
-      const entry = await workspaceRenamePath(root.path, selectedPath, nextPath);
-      const newPath = entry.path;
-      await loadDir(root.id, parentPath(selectedPath));
-      await loadDir(root.id, parentPath(newPath));
-      setExpandedDirs((current) => {
-        const next = new Set<string>();
-        for (const item of current) {
-          const [id, path] = item.split(":", 2);
-          next.add(id === root.id ? rootDirKey(root.id, remapRelativePath(path, selectedPath, newPath)) : item);
-        }
-        return next;
-      });
-      setOpenFiles((current) => {
-        const next: Record<string, OpenFileState> = {};
-        for (const file of Object.values(current)) {
-          const ref = remapFileRef(file.ref, root.id, selectedPath, newPath);
-          const meta = fileMeta(ref, rootsRef.current, looseFilesRef.current);
-          next[fileKey(ref)] = { ...file, ref, key: fileKey(ref), path: meta.path, title: meta.title, subtitle: meta.subtitle, languagePath: meta.languagePath };
-        }
-        return next;
-      });
-      setOpenOrder((current) => current.map((key) => {
-        const file = openFilesRef.current[key];
-        if (!file) return key;
-        return fileKey(remapFileRef(file.ref, root.id, selectedPath, newPath));
-      }));
-      setActiveKey((current) => {
-        const file = current ? openFilesRef.current[current] : null;
-        return file ? fileKey(remapFileRef(file.ref, root.id, selectedPath, newPath)) : current;
-      });
-      setSelected(entry.fileType === "dir" ? { kind: "dir", rootId: root.id, path: newPath } : { kind: "file", ref: { kind: "root", rootId: root.id, path: newPath } });
-      notifyWorkspacePathGitChanged(root.id, selectedPath);
-      notifyWorkspacePathGitChanged(root.id, newPath);
-      setStatusMessage(`Renamed to ${root.name} / ${newPath}`);
-    } catch (err) {
-      setStatusMessage(errorMessage(err));
-    }
-  }, [findRoot, loadDir, notifyWorkspacePathGitChanged, selected, setStatusMessage]);
-
-  const deleteSelected = useCallback(async (target?: TreeSelection) => {
-    const selection = target ?? selected;
-    if (!selection) return;
-    if (selection.kind === "root") {
-      const root = findRoot(selection.rootId);
-      if (!root) return;
-      const confirmed = await confirmAppDialog({
-        title: "Remove folder",
-        message: `Remove ${root.name} from this workspace? Files on disk are not deleted.`,
-        confirmLabel: "Remove",
-      });
-      if (!confirmed) return;
-      const removedRootId = root.id;
-      setRoots((current) => current.filter((item) => item.id !== removedRootId));
-      removeTreeDataRoot(removedRootId);
-      setOpenFiles((current) => Object.fromEntries(Object.entries(current).filter(([, file]) => file.ref.kind !== "root" || file.ref.rootId !== removedRootId)));
-      const remaining = openOrderRef.current.filter((key) => {
-        const file = openFilesRef.current[key];
-        return !file || file.ref.kind !== "root" || file.ref.rootId !== removedRootId;
-      });
-      setOpenOrder(remaining);
-      setActiveKey((current) => current && !remaining.includes(current) ? remaining[0] ?? null : current);
-      setSelected(null);
-      return;
-    }
-    if (selection.kind === "file" && selection.ref.kind === "loose") {
-      const ref = selection.ref;
-      const confirmed = await confirmAppDialog({
-        title: "Remove loose file",
-        message: `Remove ${ref.path} from this workspace? The file on disk is not deleted.`,
-        confirmLabel: "Remove",
-      });
-      if (!confirmed) return;
-      const key = fileKey(ref);
-      setLooseFiles((current) => current.filter((item) => item.id !== ref.id));
-      setOpenFiles((current) => {
-        const next = { ...current };
-        delete next[key];
-        return next;
-      });
-      const remaining = openOrderRef.current.filter((item) => item !== key);
-      setOpenOrder(remaining);
-      setActiveKey((current) => current === key ? remaining[0] ?? null : current);
-      setSelected(null);
-      return;
-    }
-    const rootTarget = selection.kind === "dir"
-      ? { rootId: selection.rootId, path: selection.path }
-      : selection.ref.kind === "root"
-        ? { rootId: selection.ref.rootId, path: selection.ref.path }
-        : null;
-    if (!rootTarget) return;
-    const rootId = rootTarget.rootId;
-    const selectedPath = rootTarget.path;
-    const root = findRoot(rootId);
-    if (!root) return;
-    const confirmed = await confirmAppDialog({
-      title: "Delete",
-      message: `Delete ${root.name} / ${selectedPath}?`,
-      confirmLabel: "Delete",
-      danger: true,
-    });
-    if (!confirmed) return;
-    try {
-      await workspaceDeletePath(root.path, selectedPath, selection.kind === "dir");
-      await loadDir(root.id, parentPath(selectedPath));
-      setExpandedDirs((current) => {
-        const next = new Set<string>();
-        for (const item of current) {
-          const [id, path] = item.split(":", 2);
-          if (id !== root.id || (path !== selectedPath && !path.startsWith(`${selectedPath}/`))) next.add(item);
-        }
-        return next;
-      });
-      setOpenFiles((current) => Object.fromEntries(Object.entries(current).filter(([, file]) => !fileRefUnder(file.ref, root.id, selectedPath))));
-      const remainingOpen = openOrderRef.current.filter((key) => {
-        const file = openFilesRef.current[key];
-        return !file || !fileRefUnder(file.ref, root.id, selectedPath);
-      });
-      setOpenOrder(remainingOpen);
-      setActiveKey((current) => {
-        const file = current ? openFilesRef.current[current] : null;
-        return file && fileRefUnder(file.ref, root.id, selectedPath) ? remainingOpen[0] ?? null : current;
-      });
-      setSelected(null);
-      notifyWorkspacePathGitChanged(root.id, selectedPath);
-      setStatusMessage(`Deleted ${root.name} / ${selectedPath}`);
-    } catch (err) {
-      setStatusMessage(errorMessage(err));
-    }
-  }, [findRoot, loadDir, notifyWorkspacePathGitChanged, removeTreeDataRoot, selected, setStatusMessage]);
+  const {
+    selectedRootDirectory,
+    copyTreePath,
+    addRoot,
+    addLooseFilePath,
+    openLooseFile,
+    refreshTree,
+    toggleRoot,
+    toggleDir,
+    createFile,
+    createDir,
+    renameSelected,
+    deleteSelected,
+    revealInExplorer,
+    stageTreeClipboard,
+    canPasteTreeClipboard,
+    pasteTreeClipboard,
+    ignoreWorkspacePath,
+  } = useWorkspaceFileActions({
+    roots,
+    gitRoots,
+    selected,
+    activeKey,
+    openFiles,
+    directories,
+    expandedRoots,
+    expandedDirs,
+    treeViewMode,
+    rootsRef,
+    looseFilesRef,
+    openFilesRef,
+    openOrderRef,
+    setRoots,
+    setLooseFiles,
+    setSelected,
+    setExpandedRoots,
+    setExpandedDirs,
+    setOpenFiles,
+    setOpenOrder,
+    setActiveKey,
+    loadDir,
+    loadFlatFiles,
+    resetTreeData,
+    removeTreeDataRoot,
+    openFile,
+    notifyWorkspacePathGitChanged,
+    onStatus: setStatusMessage,
+  });
 
   const treeContextMenu = useContextMenu();
-  const treeClipboardRef = useRef<{ mode: "copy" | "cut"; rootId: string; path: string } | null>(null);
-
-  const revealInExplorer = useCallback(async (rootId: string, path: string) => {
-    const root = findRoot(rootId);
-    if (!root) return;
-    const absolute = path ? absoluteWorkspacePath(root, path) : normalizeFsPath(root.path);
-    try {
-      await invoke("sftp_open_path", { path: absolute });
-      setStatusMessage(`Opened ${absolute}`);
-    } catch (err) {
-      setStatusMessage(errorMessage(err));
-    }
-  }, [findRoot, setStatusMessage]);
 
   const copyEditorTabPath = useCallback(async (key: string, absolute: boolean) => {
     const file = openFilesRef.current[key];
@@ -1797,38 +1292,6 @@ export function CodeWorkspaceTab({
     }
   }, [openFile, selected, setStoreSplitOrientation, workspaceInstanceId]);
 
-  const pasteTreeClipboard = useCallback(async (target: { rootId: string; path: string }) => {
-    const clip = treeClipboardRef.current;
-    if (!clip) {
-      setStatusMessage("Nothing to paste");
-      return;
-    }
-    if (clip.rootId !== target.rootId) {
-      setStatusMessage("Cross-root paste is not supported");
-      return;
-    }
-    const root = findRoot(clip.rootId);
-    if (!root) return;
-    const name = basename(clip.path);
-    const destPath = target.path ? `${target.path}/${name}` : name;
-    try {
-      if (clip.mode === "cut") {
-        await workspaceRenamePath(root.path, clip.path, destPath);
-        treeClipboardRef.current = null;
-        setStatusMessage(`Moved to ${destPath}`);
-      } else {
-        const file = await workspaceReadFile(root.path, clip.path);
-        await workspaceCreateFile(root.path, destPath, file.text);
-        setStatusMessage(`Copied to ${destPath}`);
-      }
-      await loadDir(clip.rootId, parentPath(clip.path) || "");
-      if (target.path) await loadDir(target.rootId, target.path);
-      else await loadDir(target.rootId, "");
-    } catch (err) {
-      setStatusMessage(errorMessage(err));
-    }
-  }, [findRoot, loadDir, setStatusMessage]);
-
   const showTreeContextMenu = useCallback(
     (event: React.MouseEvent, selection: TreeSelection) => {
       setSelected(selection);
@@ -1838,21 +1301,15 @@ export function CodeWorkspaceTab({
       const clipboardItems = (rootId: string, path: string, directory: { rootId: string; path: string }) => [
         {
           label: "Cut",
-          onClick: () => {
-            treeClipboardRef.current = { mode: "cut", rootId, path };
-            setStatusMessage("Cut to clipboard");
-          },
+          onClick: () => stageTreeClipboard("cut", rootId, path),
         },
         {
           label: "Copy",
-          onClick: () => {
-            treeClipboardRef.current = { mode: "copy", rootId, path };
-            setStatusMessage("Copied to clipboard");
-          },
+          onClick: () => stageTreeClipboard("copy", rootId, path),
         },
         {
           label: "Paste",
-          disabled: !treeClipboardRef.current,
+          disabled: !canPasteTreeClipboard(),
           onClick: () => void pasteTreeClipboard(directory),
         },
       ];
@@ -1866,6 +1323,7 @@ export function CodeWorkspaceTab({
           { label: "New Directory...", onClick: run("workspace.tree.newDirectory", { directory: { rootId: ref.rootId, path: dir } }) },
           { label: "Rename...", onClick: run("workspace.tree.rename", { selection }) },
           { label: "Delete", danger: true, onClick: run("workspace.tree.delete", { selection }) },
+          { label: "Add to .gitignore", onClick: run("workspace.tree.addToGitignore", { selection }) },
           { separator: true, label: "" },
           ...clipboardItems(ref.rootId, ref.path, { rootId: ref.rootId, path: dir }),
           { separator: true, label: "" },
@@ -1885,6 +1343,7 @@ export function CodeWorkspaceTab({
           { label: "New Directory...", onClick: run("workspace.tree.newDirectory", { directory: { rootId: selection.rootId, path: selection.path } }) },
           { label: "Rename...", onClick: run("workspace.tree.rename", { selection }) },
           { label: "Delete", danger: true, onClick: run("workspace.tree.delete", { selection }) },
+          { label: "Add to .gitignore", onClick: run("workspace.tree.addToGitignore", { selection }) },
           { separator: true, label: "" },
           ...clipboardItems(selection.rootId, selection.path, { rootId: selection.rootId, path: selection.path }),
           { separator: true, label: "" },
@@ -1908,7 +1367,7 @@ export function CodeWorkspaceTab({
           { separator: true, label: "" },
           {
             label: "Paste",
-            disabled: !treeClipboardRef.current,
+            disabled: !canPasteTreeClipboard(),
             onClick: () => void pasteTreeClipboard({ rootId: selection.rootId, path: "" }),
           },
           { separator: true, label: "" },
@@ -1923,7 +1382,14 @@ export function CodeWorkspaceTab({
         ]);
       }
     },
-    [openTerminalAt, pasteTreeClipboard, revealInExplorer, treeContextMenu],
+    [
+      canPasteTreeClipboard,
+      openTerminalAt,
+      pasteTreeClipboard,
+      revealInExplorer,
+      stageTreeClipboard,
+      treeContextMenu,
+    ],
   );
 
   const updateFileText = useCallback((key: string, text: string) => {
@@ -2131,19 +1597,67 @@ export function CodeWorkspaceTab({
     }
   }, [absolutePathForOpenFile, findRoot, notifyWorkspacePathGitChanged, saveLspDocument]);
 
+  const formatFileText = useCallback(async (
+    file: OpenFileState,
+    selection: EditorSelectionRange | null = null,
+  ): Promise<string | null> => {
+    const descriptor = lspDescriptorForFile(file);
+    if (!descriptor) return null;
+    const capabilities = lspFilesRef.current[file.key]?.status?.capabilities ?? null;
+    const hasSelection = !!selection && !selection.empty
+      && (selection.start.line !== selection.end.line
+        || selection.start.character !== selection.end.character);
+    const useRange = hasSelection && (capabilities?.rangeFormatting ?? false);
+    if (capabilities && !useRange && !capabilities.formatting) return null;
+    if (capabilities && useRange && !capabilities.rangeFormatting) return null;
+
+    const result = useRange && selection
+      ? await lspRangeFormatting(descriptor, {
+        start: selection.start,
+        end: selection.end,
+      })
+      : await lspFormatting(descriptor);
+    updateLspStatusForFile(file, result.status);
+    if (!result.edits.length) return file.text;
+    return applyLspTextEditsToString(file.text, result.edits);
+  }, [lspDescriptorForFile, updateLspStatusForFile]);
+
   const saveFile = useCallback(
     async (key: string | null = activeKey) => {
       if (!key) return;
       const file = openFilesRef.current[key];
       if (!file || file.loading || file.saving || !file.dirty) return;
+      let textToSave = file.text;
+      let formatError: string | null = null;
+      if (intelligencePreferences.formatOnSave) {
+        try {
+          const formatted = await formatFileText(file);
+          const current = openFilesRef.current[key];
+          // Do not overwrite keystrokes entered while the formatter was running.
+          textToSave = current?.text === file.text
+            ? formatted ?? file.text
+            : current?.text ?? file.text;
+        } catch (error) {
+          formatError = errorMessage(error);
+          textToSave = openFilesRef.current[key]?.text ?? file.text;
+        }
+      }
       try {
-        await saveOpenBufferText(key, file.text);
-        setStatusMessage(`Saved ${file.subtitle}`);
+        await saveOpenBufferText(key, textToSave);
+        setStatusMessage(formatError
+          ? `Saved ${file.subtitle}; format on save failed: ${formatError}`
+          : `Saved ${file.subtitle}`);
       } catch (err) {
         setStatusMessage(errorMessage(err));
       }
     },
-    [activeKey, saveOpenBufferText, setStatusMessage],
+    [
+      activeKey,
+      formatFileText,
+      intelligencePreferences.formatOnSave,
+      saveOpenBufferText,
+      setStatusMessage,
+    ],
   );
 
   const reloadFile = useCallback(
@@ -2420,6 +1934,13 @@ export function CodeWorkspaceTab({
       inlineBlameEnabled: !current.inlineBlameEnabled,
     }));
   }, [setIntelligencePreferences]);
+  const setFormatOnSave = useCallback((enabled: boolean) => {
+    setIntelligencePreferences((current) => ({
+      ...current,
+      formatOnSave: enabled,
+    }));
+    setStatusMessage(`Format on save ${enabled ? "enabled" : "disabled"} for this workspace`);
+  }, [setIntelligencePreferences, setStatusMessage]);
 
   useEffect(() => {
     const groupId = activeEditorGroupId;
@@ -2969,35 +2490,14 @@ export function CodeWorkspaceTab({
   const formatActiveFile = useCallback(async () => {
     const file = activeFile;
     if (!file || file.loading) return;
-    const descriptor = lspDescriptorForFile(file);
-    if (!descriptor) return;
-    const caps = lspFilesRef.current[file.key]?.status?.capabilities ?? null;
-    const selection = editorSelectionRef.current;
-    const hasSelection = !selection.empty
-      && (selection.start.line !== selection.end.line || selection.start.character !== selection.end.character);
-    const useRange = hasSelection && (caps?.rangeFormatting ?? false);
-    // When capabilities are known and neither provider is present, stay silent.
-    if (caps && !useRange && !caps.formatting && !(hasSelection && caps.rangeFormatting)) {
-      return;
-    }
-    if (caps && !caps.formatting && !caps.rangeFormatting) return;
     try {
-      const range: LspRange = {
-        start: selection.start,
-        end: selection.end,
-      };
-      // Prefer range formatting only when advertised; otherwise format the whole document.
-      // If capabilities are not yet known, attempt full-document formatting.
-      const result = useRange
-        ? await lspRangeFormatting(descriptor, range)
-        : await lspFormatting(descriptor);
-      if (!result.edits.length) return;
-      const next = applyLspTextEditsToString(file.text, result.edits);
+      const next = await formatFileText(file, editorSelectionRef.current);
+      if (next === null) return;
       if (next !== file.text) updateFileText(file.key, next);
     } catch (error) {
       console.error("Format document failed", error);
     }
-  }, [activeFile, lspDescriptorForFile, updateFileText]);
+  }, [activeFile, formatFileText, updateFileText]);
 
   const applyLspWorkspaceEdit = useCallback(async (edit: LspWorkspaceEdit) => {
     const outcomes = await applyWorkspaceEdit(edit, {
@@ -3454,6 +2954,13 @@ export function CodeWorkspaceTab({
       run: () => void formatActiveFile(),
     },
     {
+      id: "workspace.toggleFormatOnSave",
+      title: `${intelligencePreferences.formatOnSave ? "Disable" : "Enable"} Format on Save`,
+      category: "Code",
+      keywords: ["format", "save", "workspace"],
+      run: () => setFormatOnSave(!intelligencePreferences.formatOnSave),
+    },
+    {
       id: "workspace.quickDocumentation",
       title: "Quick Documentation",
       category: "Code",
@@ -3725,6 +3232,27 @@ export function CodeWorkspaceTab({
       },
     },
     {
+      id: "workspace.tree.addToGitignore",
+      title: "Add Tree Selection to .gitignore",
+      category: "Git",
+      keywords: ["git", "ignore", "exclude"],
+      when: (context) => {
+        const selection = (context.payload as WorkspaceTreeCommandPayload | undefined)?.selection ?? selected;
+        return context.focus === "tree" && (
+          selection?.kind === "dir"
+          || (selection?.kind === "file" && selection.ref.kind === "root")
+        );
+      },
+      run: (context) => {
+        const selection = (context.payload as WorkspaceTreeCommandPayload | undefined)?.selection ?? selected;
+        if (selection?.kind === "dir") {
+          void ignoreWorkspacePath(selection.rootId, selection.path, true);
+        } else if (selection?.kind === "file" && selection.ref.kind === "root") {
+          void ignoreWorkspacePath(selection.ref.rootId, selection.ref.path, false);
+        }
+      },
+    },
+    {
       id: "workspace.tree.findInDirectory",
       title: "Find in Selected Directory",
       category: "Search",
@@ -3776,6 +3304,7 @@ export function CodeWorkspaceTab({
     formatActiveFile,
     gitRoots.length,
     gitRootsLoading,
+    ignoreWorkspacePath,
     navCan.back,
     navCan.forward,
     navigateHistory,
@@ -3801,6 +3330,8 @@ export function CodeWorkspaceTab({
     selectedRootDirectory,
     intelligencePreferences.inlayHintsEnabled,
     intelligencePreferences.inlineBlameEnabled,
+    intelligencePreferences.formatOnSave,
+    setFormatOnSave,
     toggleInlayHints,
     toggleInlayHintsForActiveLanguage,
     toggleInlineBlame,
@@ -4523,8 +4054,10 @@ export function CodeWorkspaceTab({
               commandPrefs: lspCommandPrefs,
               customCommands: lspCustomCommands,
               customCommandId: CUSTOM_LSP_COMMAND_ID,
+              formatOnSave: intelligencePreferences.formatOnSave,
               onToggle: () => setLanguagePanelOpen((value) => !value),
               onRefresh: () => void refreshLspServerStatuses(),
+              onFormatOnSaveChange: setFormatOnSave,
               onCommandChange: updateLspCommandPref,
               onCustomCommandChange: updateLspCustomCommand,
             }}
