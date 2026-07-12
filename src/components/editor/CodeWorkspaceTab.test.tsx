@@ -72,6 +72,7 @@ vi.mock("../../lib/clipboard", () => clipboardMocks);
 
 const gitMocks = vi.hoisted(() => ({
   gitSnapshot: vi.fn(),
+  gitIgnorePath: vi.fn(),
   gitBlobPair: vi.fn(),
   gitBlameLines: vi.fn(),
   gitChangeLabel: vi.fn((change: { conflict?: boolean; status: string }) => (
@@ -269,6 +270,7 @@ describe("CodeWorkspaceTab", () => {
     ipcMocks.selectFilePath.mockReset();
     ipcMocks.selectFolderPath.mockReset();
     gitMocks.gitSnapshot.mockReset();
+    gitMocks.gitIgnorePath.mockReset();
     gitMocks.gitBlobPair.mockReset();
     gitMocks.gitBlameLines.mockReset();
     gitMocks.gitChangeLabel.mockClear();
@@ -312,6 +314,11 @@ describe("CodeWorkspaceTab", () => {
         coreFilemode: null,
         commitGpgsign: null,
       },
+    });
+    gitMocks.gitIgnorePath.mockResolvedValue({
+      rule: "/README.md",
+      gitignorePath: "/repo/app/.gitignore",
+      added: true,
     });
     gitMocks.gitBlobPair.mockResolvedValue({
       path: "src/main.ts",
@@ -1568,6 +1575,13 @@ describe("CodeWorkspaceTab", () => {
       entry("src", "src", "dir"),
       entry("README.md", "README.md"),
     ]);
+    workspaceMocks.workspaceDetectGitRoots.mockResolvedValue([{
+      id: "git-app",
+      name: "app",
+      path: "/repo/app",
+      repoRoot: "/repo/app",
+      rootIds: ["app"],
+    }]);
 
     renderWorkspace(workspace);
 
@@ -1579,6 +1593,14 @@ describe("CodeWorkspaceTab", () => {
     fireEvent.contextMenu(fileRow);
     fireEvent.click(await screen.findByRole("button", { name: "Copy Path" }));
     await waitFor(() => expect(clipboardMocks.writeText).toHaveBeenCalledWith("/repo/app/README.md"));
+
+    fireEvent.contextMenu(fileRow);
+    fireEvent.click(await screen.findByRole("button", { name: "Add to .gitignore" }));
+    await waitFor(() => expect(gitMocks.gitIgnorePath).toHaveBeenCalledWith(
+      "/repo/app",
+      "README.md",
+      false,
+    ));
 
     const dirRow = await screen.findByTestId("code-workspace-tree-dir");
     fireEvent.contextMenu(dirRow);

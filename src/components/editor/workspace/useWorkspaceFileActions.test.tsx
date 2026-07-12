@@ -18,10 +18,14 @@ const ipcMocks = vi.hoisted(() => ({
   selectFilePath: vi.fn(),
   selectFolderPath: vi.fn(),
 }));
+const gitMocks = vi.hoisted(() => ({
+  gitIgnorePath: vi.fn(),
+}));
 
 vi.mock("../../../lib/appDialogs", () => dialogMocks);
 vi.mock("../../../lib/editor/workspace", () => workspaceMocks);
 vi.mock("../../../lib/ipc", () => ipcMocks);
+vi.mock("../../../lib/git", () => gitMocks);
 vi.mock("../../../lib/clipboard", () => ({ writeText: vi.fn(async () => {}) }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => undefined) }));
 
@@ -35,6 +39,13 @@ const roots: CodeWorkspaceRootInfo[] = [{
 function options(overrides: Record<string, unknown> = {}) {
   return {
     roots,
+    gitRoots: [{
+      id: "git-1",
+      name: "repo",
+      path: "/repo",
+      repoRoot: "/repo",
+      rootIds: ["root-1"],
+    }],
     selected: { kind: "dir" as const, rootId: "root-1", path: "src" },
     activeKey: null,
     openFiles: {},
@@ -76,6 +87,7 @@ describe("useWorkspaceFileActions", () => {
     workspaceMocks.workspaceRenamePath.mockReset();
     ipcMocks.selectFilePath.mockReset();
     ipcMocks.selectFolderPath.mockReset();
+    gitMocks.gitIgnorePath.mockReset();
   });
 
   it("derives the selected directory and owns file creation", async () => {
@@ -165,5 +177,21 @@ describe("useWorkspaceFileActions", () => {
       "source",
     );
     expect(props.notifyWorkspacePathGitChanged).toHaveBeenCalledWith("root-1", "dest/source.ts");
+  });
+
+  it("adds repository-relative ignore rules and refreshes Git state", async () => {
+    gitMocks.gitIgnorePath.mockResolvedValue({
+      rule: "/build/",
+      gitignorePath: "/repo/.gitignore",
+      added: true,
+    });
+    const props = options();
+    const { result } = renderHook(() => useWorkspaceFileActions(props));
+
+    await act(async () => result.current.ignoreWorkspacePath("root-1", "build", true));
+
+    expect(gitMocks.gitIgnorePath).toHaveBeenCalledWith("/repo", "build", true);
+    expect(props.notifyWorkspacePathGitChanged).toHaveBeenCalledWith("root-1", "build");
+    expect(props.onStatus).toHaveBeenCalledWith("Added /build/ to .gitignore");
   });
 });

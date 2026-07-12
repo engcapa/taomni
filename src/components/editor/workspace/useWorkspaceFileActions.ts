@@ -8,7 +8,9 @@ import {
   workspaceDeletePath,
   workspaceReadFile,
   workspaceRenamePath,
+  type WorkspaceGitRoot,
 } from "../../../lib/editor/workspace";
+import { gitIgnorePath } from "../../../lib/git";
 import { selectFilePath, selectFolderPath } from "../../../lib/ipc";
 import type {
   CodeWorkspaceFileRef,
@@ -22,6 +24,8 @@ import {
   fileKey,
   fileMeta,
   fileRefUnder,
+  gitPathForWorkspacePath,
+  gitRootForWorkspacePath,
   joinRelativePath,
   makeLooseFile,
   makeRoot,
@@ -42,6 +46,7 @@ type RootDirectory = { rootId: string; path: string };
 
 interface UseWorkspaceFileActionsOptions {
   roots: CodeWorkspaceRootInfo[];
+  gitRoots: WorkspaceGitRoot[];
   selected: TreeSelection | null;
   activeKey: string | null;
   openFiles: Record<string, OpenFileState>;
@@ -87,10 +92,12 @@ export interface WorkspaceFileActionsController {
   stageTreeClipboard: (mode: "copy" | "cut", rootId: string, path: string) => void;
   canPasteTreeClipboard: () => boolean;
   pasteTreeClipboard: (target: RootDirectory) => Promise<void>;
+  ignoreWorkspacePath: (rootId: string, path: string, directory: boolean) => Promise<void>;
 }
 
 export function useWorkspaceFileActions({
   roots,
+  gitRoots,
   selected,
   activeKey,
   openFiles,
@@ -542,6 +549,34 @@ export function useWorkspaceFileActions({
     }
   }, [findRoot, loadDir, notifyWorkspacePathGitChanged, onStatus]);
 
+  const ignoreWorkspacePath = useCallback(async (
+    rootId: string,
+    path: string,
+    directory: boolean,
+  ) => {
+    const root = findRoot(rootId);
+    if (!root) return;
+    const repo = gitRootForWorkspacePath(root, path, gitRoots);
+    if (!repo) {
+      onStatus("The selected path is not inside a detected Git repository");
+      return;
+    }
+    const gitPath = gitPathForWorkspacePath(root, repo, path);
+    if (!gitPath) {
+      onStatus("Select a file or directory inside the Git repository to ignore");
+      return;
+    }
+    try {
+      const result = await gitIgnorePath(repo.repoRoot, gitPath, directory);
+      notifyWorkspacePathGitChanged(rootId, path);
+      onStatus(result.added
+        ? `Added ${result.rule} to .gitignore`
+        : `${gitPath} is already ignored`);
+    } catch (error) {
+      onStatus(errorMessage(error));
+    }
+  }, [findRoot, gitRoots, notifyWorkspacePathGitChanged, onStatus]);
+
   return {
     selectedRootDirectory,
     copyTreePath,
@@ -559,5 +594,6 @@ export function useWorkspaceFileActions({
     stageTreeClipboard,
     canPasteTreeClipboard,
     pasteTreeClipboard,
+    ignoreWorkspacePath,
   };
 }

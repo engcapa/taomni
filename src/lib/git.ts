@@ -59,6 +59,12 @@ export interface GitBlameLine {
   summary: string;
 }
 
+export interface GitIgnoreResult {
+  rule: string;
+  gitignorePath: string;
+  added: boolean;
+}
+
 export interface GitRemote {
   name: string;
   fetchUrl: string;
@@ -206,6 +212,14 @@ export function gitDiscard(repoRoot: string, paths: string[]): Promise<void> {
 
 export function gitCleanUntracked(repoRoot: string, paths: string[]): Promise<void> {
   return invoke("git_clean_untracked", { repoRoot, paths });
+}
+
+export function gitIgnorePath(
+  repoRoot: string,
+  path: string,
+  directory = false,
+): Promise<GitIgnoreResult> {
+  return invoke<GitIgnoreResult>("git_ignore_path", { repoRoot, path, directory });
 }
 
 export function gitCommit(

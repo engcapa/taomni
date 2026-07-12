@@ -1142,8 +1142,10 @@ export function CodeWorkspaceTab({
     stageTreeClipboard,
     canPasteTreeClipboard,
     pasteTreeClipboard,
+    ignoreWorkspacePath,
   } = useWorkspaceFileActions({
     roots,
+    gitRoots,
     selected,
     activeKey,
     openFiles,
@@ -1321,6 +1323,7 @@ export function CodeWorkspaceTab({
           { label: "New Directory...", onClick: run("workspace.tree.newDirectory", { directory: { rootId: ref.rootId, path: dir } }) },
           { label: "Rename...", onClick: run("workspace.tree.rename", { selection }) },
           { label: "Delete", danger: true, onClick: run("workspace.tree.delete", { selection }) },
+          { label: "Add to .gitignore", onClick: run("workspace.tree.addToGitignore", { selection }) },
           { separator: true, label: "" },
           ...clipboardItems(ref.rootId, ref.path, { rootId: ref.rootId, path: dir }),
           { separator: true, label: "" },
@@ -1340,6 +1343,7 @@ export function CodeWorkspaceTab({
           { label: "New Directory...", onClick: run("workspace.tree.newDirectory", { directory: { rootId: selection.rootId, path: selection.path } }) },
           { label: "Rename...", onClick: run("workspace.tree.rename", { selection }) },
           { label: "Delete", danger: true, onClick: run("workspace.tree.delete", { selection }) },
+          { label: "Add to .gitignore", onClick: run("workspace.tree.addToGitignore", { selection }) },
           { separator: true, label: "" },
           ...clipboardItems(selection.rootId, selection.path, { rootId: selection.rootId, path: selection.path }),
           { separator: true, label: "" },
@@ -3228,6 +3232,27 @@ export function CodeWorkspaceTab({
       },
     },
     {
+      id: "workspace.tree.addToGitignore",
+      title: "Add Tree Selection to .gitignore",
+      category: "Git",
+      keywords: ["git", "ignore", "exclude"],
+      when: (context) => {
+        const selection = (context.payload as WorkspaceTreeCommandPayload | undefined)?.selection ?? selected;
+        return context.focus === "tree" && (
+          selection?.kind === "dir"
+          || (selection?.kind === "file" && selection.ref.kind === "root")
+        );
+      },
+      run: (context) => {
+        const selection = (context.payload as WorkspaceTreeCommandPayload | undefined)?.selection ?? selected;
+        if (selection?.kind === "dir") {
+          void ignoreWorkspacePath(selection.rootId, selection.path, true);
+        } else if (selection?.kind === "file" && selection.ref.kind === "root") {
+          void ignoreWorkspacePath(selection.ref.rootId, selection.ref.path, false);
+        }
+      },
+    },
+    {
       id: "workspace.tree.findInDirectory",
       title: "Find in Selected Directory",
       category: "Search",
@@ -3279,6 +3304,7 @@ export function CodeWorkspaceTab({
     formatActiveFile,
     gitRoots.length,
     gitRootsLoading,
+    ignoreWorkspacePath,
     navCan.back,
     navCan.forward,
     navigateHistory,

@@ -373,6 +373,7 @@ pub fn run() {
             git::git_unstage,
             git::git_discard,
             git::git_clean_untracked,
+            git::git_ignore_path,
             git::git_commit,
             git::git_fetch,
             git::git_pull,
