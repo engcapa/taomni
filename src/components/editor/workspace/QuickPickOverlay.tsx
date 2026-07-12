@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Loader2, Search } from "lucide-react";
+import { FilterClearButton } from "./workspaceChrome";
 
 interface QuickPickOverlayProps<T> {
   open: boolean;
@@ -130,7 +131,7 @@ export function QuickPickOverlay<T>({
             value={query}
             placeholder={placeholder}
             aria-label={inputLabel}
-            className="h-6 w-full bg-transparent text-[12px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
+            className="h-6 min-w-0 flex-1 bg-transparent text-[12px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
             onChange={(event) => {
               const next = event.target.value;
               setQuery(next);
@@ -138,6 +139,17 @@ export function QuickPickOverlay<T>({
               setSelectedIndex(0);
             }}
             onKeyDown={handleKeyDown}
+          />
+          <FilterClearButton
+            value={query}
+            label="Clear search"
+            testId={`${testId}-filter-clear`}
+            onClear={() => {
+              setQuery("");
+              onQueryChangeRef.current?.("");
+              setSelectedIndex(0);
+              inputRef.current?.focus();
+            }}
           />
           {loading && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--taomni-code-muted)]" />}
         </div>

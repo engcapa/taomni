@@ -54,6 +54,11 @@ describe("SearchEverywhere", () => {
     expect(screen.getByText("CodeWorkspaceTab.tsx")).toBeInTheDocument();
     expect(screen.queryByText("deploy.sh")).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(input).toHaveValue("");
+    expect(screen.getByText("deploy.sh")).toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: "cwt" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(onOpenFile).toHaveBeenCalledWith(items[0]);
   });

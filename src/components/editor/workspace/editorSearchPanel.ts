@@ -23,6 +23,30 @@ function input(label: string, name: string, placeholder: string): HTMLInputEleme
   return element;
 }
 
+function clearButton(label: string, onClear: () => void): HTMLButtonElement {
+  const element = document.createElement("button");
+  element.type = "button";
+  element.className = "cm-workspace-search-clear";
+  element.setAttribute("aria-label", label);
+  element.title = label;
+  element.hidden = true;
+  element.textContent = "×";
+  element.addEventListener("mousedown", (event) => event.preventDefault());
+  element.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onClear();
+  });
+  return element;
+}
+
+function fieldShell(field: HTMLInputElement, clear: HTMLButtonElement): HTMLDivElement {
+  const shell = document.createElement("div");
+  shell.className = "cm-workspace-search-field";
+  shell.append(field, clear);
+  return shell;
+}
+
 function matchStatus(view: EditorView, query: SearchQuery): string {
   if (!query.search) return "0 matches";
   if (!query.valid) return "Invalid pattern";
@@ -44,6 +68,8 @@ class WorkspaceSearchPanel implements Panel {
   private query: SearchQuery;
   private readonly searchField: HTMLInputElement;
   private readonly replaceField: HTMLInputElement;
+  private readonly searchClear: HTMLButtonElement;
+  private readonly replaceClear: HTMLButtonElement;
   private readonly caseButton: HTMLButtonElement;
   private readonly wordButton: HTMLButtonElement;
   private readonly regexpButton: HTMLButtonElement;
@@ -54,6 +80,16 @@ class WorkspaceSearchPanel implements Panel {
     this.searchField = input("Find", "search", "Find");
     this.searchField.setAttribute("main-field", "true");
     this.replaceField = input("Replace", "replace", "Replace");
+    this.searchClear = clearButton("Clear find", () => {
+      this.searchField.value = "";
+      this.commit();
+      this.searchField.focus();
+    });
+    this.replaceClear = clearButton("Clear replace", () => {
+      this.replaceField.value = "";
+      this.commit();
+      this.replaceField.focus();
+    });
     this.caseButton = button("Match case", "Aa", () => this.toggle("caseSensitive"));
     this.wordButton = button("Match whole word", "W", () => this.toggle("wholeWord"));
     this.regexpButton = button("Use regular expression", ".*", () => this.toggle("regexp"));
@@ -64,7 +100,7 @@ class WorkspaceSearchPanel implements Panel {
     const findRow = document.createElement("div");
     findRow.className = "cm-workspace-search-row";
     findRow.append(
-      this.searchField,
+      fieldShell(this.searchField, this.searchClear),
       this.caseButton,
       this.wordButton,
       this.regexpButton,
@@ -77,7 +113,7 @@ class WorkspaceSearchPanel implements Panel {
     const replaceRow = document.createElement("div");
     replaceRow.className = "cm-workspace-search-row cm-workspace-replace-row";
     replaceRow.append(
-      this.replaceField,
+      fieldShell(this.replaceField, this.replaceClear),
       button("Replace current match", "Replace", () => replaceNext(this.view)),
       button("Replace all matches", "Replace All", () => replaceAll(this.view)),
     );
@@ -115,6 +151,8 @@ class WorkspaceSearchPanel implements Panel {
       wholeWord: this.wordButton.getAttribute("aria-pressed") === "true",
       regexp: this.regexpButton.getAttribute("aria-pressed") === "true",
     });
+    this.searchClear.hidden = !this.searchField.value;
+    this.replaceClear.hidden = !this.replaceField.value;
     if (query.eq(this.query)) return;
     this.query = query;
     this.view.dispatch({ effects: setSearchQuery.of(query) });
@@ -136,6 +174,8 @@ class WorkspaceSearchPanel implements Panel {
     this.query = query;
     this.searchField.value = query.search;
     this.replaceField.value = query.replace;
+    this.searchClear.hidden = !query.search;
+    this.replaceClear.hidden = !query.replace;
     this.caseButton.setAttribute("aria-pressed", String(query.caseSensitive));
     this.wordButton.setAttribute("aria-pressed", String(query.wholeWord));
     this.regexpButton.setAttribute("aria-pressed", String(query.regexp));
@@ -144,6 +184,8 @@ class WorkspaceSearchPanel implements Panel {
 
   private updateStatus(): void {
     this.status.textContent = matchStatus(this.view, this.query);
+    this.searchClear.hidden = !this.searchField.value;
+    this.replaceClear.hidden = !this.replaceField.value;
   }
 
   private onKeyDown(event: KeyboardEvent): void {
@@ -187,14 +229,21 @@ export const WORKSPACE_SEARCH_STYLE = EditorView.theme({
     gap: "4px",
     minWidth: "0",
   },
-  ".cm-workspace-search-input": {
-    boxSizing: "border-box",
+  ".cm-workspace-search-field": {
+    position: "relative",
+    display: "flex",
+    alignItems: "center",
     width: "min(320px, 45%)",
     minWidth: "120px",
+  },
+  ".cm-workspace-search-input": {
+    boxSizing: "border-box",
+    width: "100%",
+    minWidth: "0",
     height: "26px",
     border: "1px solid var(--taomni-code-border)",
     borderRadius: "4px",
-    padding: "0 7px",
+    padding: "0 22px 0 7px",
     outline: "none",
     background: "var(--taomni-code-bg)",
     color: "var(--taomni-code-text)",
@@ -202,6 +251,25 @@ export const WORKSPACE_SEARCH_STYLE = EditorView.theme({
   },
   ".cm-workspace-search-input:focus": {
     borderColor: "var(--taomni-accent)",
+  },
+  ".cm-workspace-search-clear": {
+    position: "absolute",
+    right: "3px",
+    boxSizing: "border-box",
+    height: "18px",
+    width: "18px",
+    border: "none",
+    borderRadius: "4px",
+    padding: "0",
+    background: "transparent",
+    color: "var(--taomni-code-muted)",
+    font: "inherit",
+    lineHeight: "1",
+    cursor: "pointer",
+  },
+  ".cm-workspace-search-clear:hover": {
+    background: "var(--taomni-code-active-line-bg)",
+    color: "var(--taomni-code-text)",
   },
   ".cm-workspace-search-button": {
     boxSizing: "border-box",

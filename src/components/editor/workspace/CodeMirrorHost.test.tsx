@@ -45,6 +45,10 @@ describe("CodeMirrorHost search", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Previous match" }));
     expect(screen.getByText("2 / 2")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear find" }));
+    expect(search).toHaveValue("");
+    expect(screen.getByText("0 matches")).toBeInTheDocument();
   });
 
   it("applies case, whole-word, and regular-expression search options", async () => {

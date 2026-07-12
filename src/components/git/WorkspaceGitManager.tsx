@@ -27,6 +27,7 @@ import {
   Search,
   Upload,
 } from "lucide-react";
+import { FilterClearButton } from "../editor/workspace/workspaceChrome";
 import {
   GIT_REF_WORKTREE,
   gitBlobPair,
@@ -1029,10 +1030,19 @@ function WorkspaceBranchesView({
         <div className="relative w-64 max-w-full min-w-44">
           <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
           <input
-            className="taomni-input h-7 w-full pl-7"
+            className="taomni-input h-7 w-full pl-7 pr-7"
             placeholder="Search branches"
+            aria-label="Search branches"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+          />
+          <FilterClearButton
+            value={query}
+            variant="app"
+            placement="absolute"
+            label="Clear branch search"
+            testId="workspace-git-branch-search-clear"
+            onClear={() => setQuery("")}
           />
         </div>
         <span className="text-[11px] text-[var(--taomni-text-muted)]">
@@ -1095,10 +1105,19 @@ function WorkspaceTagsView({
         <div className="relative w-64 max-w-full min-w-44">
           <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
           <input
-            className="taomni-input h-7 w-full pl-7"
+            className="taomni-input h-7 w-full pl-7 pr-7"
             placeholder="Search tags"
+            aria-label="Search tags"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+          />
+          <FilterClearButton
+            value={query}
+            variant="app"
+            placement="absolute"
+            label="Clear tag search"
+            testId="workspace-git-tag-search-clear"
+            onClear={() => setQuery("")}
           />
         </div>
         <span className="text-[11px] text-[var(--taomni-text-muted)]">
@@ -1181,10 +1200,19 @@ function WorkspaceSettingsAggregateView({
         <div className="relative w-72 max-w-full min-w-44">
           <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
           <input
-            className="taomni-input h-7 w-full pl-7"
+            className="taomni-input h-7 w-full pl-7 pr-7"
             placeholder="Search settings"
+            aria-label="Search settings"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+          />
+          <FilterClearButton
+            value={query}
+            variant="app"
+            placement="absolute"
+            label="Clear settings search"
+            testId="workspace-git-settings-search-clear"
+            onClear={() => setQuery("")}
           />
         </div>
         <span className="text-[11px] text-[var(--taomni-text-muted)]">
@@ -1402,11 +1430,20 @@ function RepoSelector({
                 <div className="relative">
                   <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
                   <input
-                    className="taomni-input h-7 w-full pl-7"
+                    className="taomni-input h-7 w-full pl-7 pr-7"
                     value={filter}
                     placeholder="Search repositories"
+                    aria-label="Search repositories"
                     autoFocus
                     onChange={(event) => setFilter(event.target.value)}
+                  />
+                  <FilterClearButton
+                    value={filter}
+                    variant="app"
+                    placement="absolute"
+                    label="Clear repository search"
+                    testId="workspace-git-repo-search-clear"
+                    onClear={() => setFilter("")}
                   />
                 </div>
               </div>

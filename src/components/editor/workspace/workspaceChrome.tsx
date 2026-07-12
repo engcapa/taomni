@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { X } from "lucide-react";
 import type { LspDiagnostic } from "../../../lib/editor/lsp";
 import type { LspFileState } from "./codeWorkspaceModel";
 
@@ -64,6 +65,55 @@ export function IconButton({
       onClick={onClick}
     >
       {icon}
+    </button>
+  );
+}
+
+/**
+ * Trailing clear control for filter/search fields. Hidden when the field is
+ * empty. Use `variant="app"` for main shell / Git chrome tokens, and
+ * `placement="absolute"` for Search-icon inputs with `pl-7 pr-7`.
+ */
+export function FilterClearButton({
+  value,
+  onClear,
+  label = "Clear",
+  testId,
+  variant = "code",
+  placement = "inline",
+}: {
+  value: string;
+  onClear: () => void;
+  label?: string;
+  testId?: string;
+  variant?: "code" | "app";
+  placement?: "inline" | "absolute";
+}) {
+  if (!value) return null;
+  const tone = variant === "app"
+    ? "text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] hover:text-[var(--taomni-text)]"
+    : "text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]";
+  const place = placement === "absolute"
+    ? "absolute right-1.5 top-1/2 -translate-y-1/2"
+    : "shrink-0";
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      title={label}
+      aria-label={label}
+      className={`h-5 w-5 inline-flex items-center justify-center rounded ${place} ${tone}`}
+      onMouseDown={(event) => {
+        // Keep focus behavior predictable: clear without stealing the next click.
+        event.preventDefault();
+      }}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onClear();
+      }}
+    >
+      <X className="h-3 w-3" />
     </button>
   );
 }

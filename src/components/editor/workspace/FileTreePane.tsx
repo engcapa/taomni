@@ -19,6 +19,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import type { LspDocumentStatus, LspServerStatus } from "../../../lib/editor/lsp";
+import { FilterClearButton } from "./workspaceChrome";
 
 export type FileTreeViewMode = "tree" | "compact" | "flat";
 
@@ -132,15 +133,23 @@ export function FileTreePane({
       onKeyDown={onKeyDown}
     >
       <div className="h-9 shrink-0 flex items-center gap-2 overflow-x-auto px-2 border-b border-[var(--taomni-code-border)]">
-        <Search className="w-3.5 h-3.5 text-[var(--taomni-code-muted)]" />
-        <input
-          value={filter}
-          onChange={(event) => onFilterChange(event.target.value)}
-          placeholder="Filter"
-          aria-label="Filter files"
-          className="min-w-0 flex-1 bg-transparent outline-none text-[var(--taomni-code-text)] placeholder:text-[var(--taomni-code-muted)]"
-          style={{ fontSize: "var(--taomni-code-tree-font-size)" }}
-        />
+        <Search className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+        <div className="min-w-0 flex-1 flex items-center gap-0.5">
+          <input
+            value={filter}
+            onChange={(event) => onFilterChange(event.target.value)}
+            placeholder="Filter"
+            aria-label="Filter files"
+            className="min-w-0 flex-1 bg-transparent outline-none text-[var(--taomni-code-text)] placeholder:text-[var(--taomni-code-muted)]"
+            style={{ fontSize: "var(--taomni-code-tree-font-size)" }}
+          />
+          <FilterClearButton
+            value={filter}
+            label="Clear file filter"
+            testId="code-workspace-tree-filter-clear"
+            onClear={() => onFilterChange("")}
+          />
+        </div>
         <div className="flex shrink-0 items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1">
           <TreeIconButton
             label="Tree view"

@@ -12,6 +12,7 @@ import {
   pushWorkspaceSearchHistory,
   readWorkspaceSearchHistory,
 } from "../workspaceLayoutPersistence";
+import { FilterClearButton } from "../workspaceChrome";
 
 interface FindInFilesPanelProps {
   roots: CodeWorkspaceRootInfo[];
@@ -274,7 +275,7 @@ export function FindInFilesPanel({
             list={workspaceInstanceId ? "code-workspace-search-history" : undefined}
             placeholder="Search in files (Enter to run)"
             aria-label="Search query"
-            className="h-6 w-full bg-transparent text-[11px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
+            className="h-6 min-w-0 flex-1 bg-transparent text-[11px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") void startSearch();
@@ -288,6 +289,15 @@ export function FindInFilesPanel({
               ))}
             </datalist>
           )}
+          <FilterClearButton
+            value={query}
+            label="Clear search query"
+            testId="code-workspace-find-query-clear"
+            onClear={() => {
+              setQuery("");
+              inputRef.current?.focus();
+            }}
+          />
           {toggles.map((toggle) => (
             <button
               key={toggle.label}
@@ -303,29 +313,53 @@ export function FindInFilesPanel({
             </button>
           ))}
         </div>
-        <input
-          value={includeGlobs}
-          placeholder="include: *.ts, src/**"
-          aria-label="Include globs"
-          className="h-6 w-32 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1.5 text-[11px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
-          onChange={(event) => setIncludeGlobs(event.target.value)}
-          onKeyDown={(event) => event.key === "Enter" && void startSearch()}
-        />
-        <input
-          value={excludeGlobs}
-          placeholder="exclude: dist/**"
-          aria-label="Exclude globs"
-          className="h-6 w-32 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1.5 text-[11px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
-          onChange={(event) => setExcludeGlobs(event.target.value)}
-          onKeyDown={(event) => event.key === "Enter" && void startSearch()}
-        />
-        <input
-          value={replacement}
-          placeholder="Replace with"
-          aria-label="Replace text"
-          className="h-6 w-36 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1.5 text-[11px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
-          onChange={(event) => setReplacement(event.target.value)}
-        />
+        <label className="inline-flex h-6 w-32 items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1.5">
+          <input
+            value={includeGlobs}
+            placeholder="include: *.ts, src/**"
+            aria-label="Include globs"
+            className="min-w-0 flex-1 bg-transparent text-[11px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
+            onChange={(event) => setIncludeGlobs(event.target.value)}
+            onKeyDown={(event) => event.key === "Enter" && void startSearch()}
+          />
+          <FilterClearButton
+            value={includeGlobs}
+            label="Clear include globs"
+            testId="code-workspace-find-include-clear"
+            onClear={() => setIncludeGlobs("")}
+          />
+        </label>
+        <label className="inline-flex h-6 w-32 items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1.5">
+          <input
+            value={excludeGlobs}
+            placeholder="exclude: dist/**"
+            aria-label="Exclude globs"
+            className="min-w-0 flex-1 bg-transparent text-[11px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
+            onChange={(event) => setExcludeGlobs(event.target.value)}
+            onKeyDown={(event) => event.key === "Enter" && void startSearch()}
+          />
+          <FilterClearButton
+            value={excludeGlobs}
+            label="Clear exclude globs"
+            testId="code-workspace-find-exclude-clear"
+            onClear={() => setExcludeGlobs("")}
+          />
+        </label>
+        <label className="inline-flex h-6 w-36 items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1.5">
+          <input
+            value={replacement}
+            placeholder="Replace with"
+            aria-label="Replace text"
+            className="min-w-0 flex-1 bg-transparent text-[11px] text-[var(--taomni-code-text)] outline-none placeholder:text-[var(--taomni-code-muted)]"
+            onChange={(event) => setReplacement(event.target.value)}
+          />
+          <FilterClearButton
+            value={replacement}
+            label="Clear replace text"
+            testId="code-workspace-find-replace-clear"
+            onClear={() => setReplacement("")}
+          />
+        </label>
         {status === "searching" ? (
           <button
             type="button"
