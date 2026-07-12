@@ -1238,10 +1238,28 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       } as T;
     }
     case "lsp_definition":
+    case "lsp_type_definition":
+    case "lsp_implementation":
     case "lsp_references": {
       return {
         status: stubLspDocumentStatus(args as InvokeArgs),
         locations: [],
+      } as T;
+    }
+    case "lsp_prepare_call_hierarchy":
+    case "lsp_prepare_type_hierarchy":
+    case "lsp_type_hierarchy_supertypes":
+    case "lsp_type_hierarchy_subtypes": {
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        items: [],
+      } as T;
+    }
+    case "lsp_call_hierarchy_incoming":
+    case "lsp_call_hierarchy_outgoing": {
+      return {
+        status: stubLspDocumentStatus(args as InvokeArgs),
+        entries: [],
       } as T;
     }
     case "workspace_list_dir": {

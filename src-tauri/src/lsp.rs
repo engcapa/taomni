@@ -1,16 +1,16 @@
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use std::collections::{hash_map::DefaultHasher, HashMap, HashSet};
+use serde_json::{Value, json};
+use std::collections::{HashMap, HashSet, hash_map::DefaultHasher};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::State;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
-use tokio::sync::{oneshot, Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock, oneshot};
 
 const REQUEST_TIMEOUT_SECS: u64 = 8;
 const INITIALIZE_TIMEOUT_SECS: u64 = 20;
@@ -188,6 +188,49 @@ pub struct LspWorkspaceSymbol {
 pub struct LspWorkspaceSymbolsResult {
     pub status: LspDocumentStatus,
     pub symbols: Vec<LspWorkspaceSymbol>,
+}
+
+/// Normalized CallHierarchyItem / TypeHierarchyItem. `raw` is echoed back to
+/// the server for lazy child requests so opaque server `data` is preserved.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspHierarchyItem {
+    pub name: String,
+    pub detail: Option<String>,
+    pub kind: u32,
+    pub uri: String,
+    pub path: Option<String>,
+    pub range: LspRange,
+    pub selection_range: LspRange,
+    pub raw: Value,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspHierarchyPrepareResult {
+    pub status: LspDocumentStatus,
+    pub items: Vec<LspHierarchyItem>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspCallHierarchyEntry {
+    pub item: LspHierarchyItem,
+    pub from_ranges: Vec<LspRange>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspCallHierarchyResult {
+    pub status: LspDocumentStatus,
+    pub entries: Vec<LspCallHierarchyEntry>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspTypeHierarchyResult {
+    pub status: LspDocumentStatus,
+    pub items: Vec<LspHierarchyItem>,
 }
 
 /// Feature summary distilled from the server's `initialize` response so the
@@ -1739,10 +1782,7 @@ pub async fn lsp_workspace_symbols(
         }
     };
     let result = session
-        .request(
-            "workspace/symbol",
-            json!({ "query": query }),
-        )
+        .request("workspace/symbol", json!({ "query": query }))
         .await
         .unwrap_or(Value::Null);
     let status = state
@@ -1757,6 +1797,273 @@ pub async fn lsp_workspace_symbols(
         status,
         symbols: parse_workspace_symbols(&result),
     })
+}
+
+#[tauri::command]
+pub async fn lsp_prepare_call_hierarchy(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspHierarchyPrepareResult, String> {
+    lsp_hierarchy_prepare_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        line,
+        character,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "textDocument/prepareCallHierarchy",
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn lsp_prepare_type_hierarchy(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspHierarchyPrepareResult, String> {
+    lsp_hierarchy_prepare_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        line,
+        character,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "textDocument/prepareTypeHierarchy",
+    )
+    .await
+}
+
+async fn lsp_hierarchy_prepare_request(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    line: u32,
+    character: u32,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+    method: &str,
+) -> Result<LspHierarchyPrepareResult, String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let Some(session) = state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    else {
+        let status = state
+            .lsp
+            .document_status(
+                &document,
+                server_command_id.as_deref(),
+                custom_server_command.as_ref(),
+            )
+            .await;
+        return Ok(LspHierarchyPrepareResult {
+            status,
+            items: Vec::new(),
+        });
+    };
+    let result = session
+        .request(
+            method,
+            json!({
+                "textDocument": { "uri": document.uri },
+                "position": { "line": line, "character": character },
+            }),
+        )
+        .await
+        .unwrap_or(Value::Null);
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    Ok(LspHierarchyPrepareResult {
+        status,
+        items: parse_hierarchy_items(&result),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_call_hierarchy_incoming(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    item: Value,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspCallHierarchyResult, String> {
+    let (status, value) = lsp_hierarchy_item_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        item,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "callHierarchy/incomingCalls",
+    )
+    .await?;
+    Ok(LspCallHierarchyResult {
+        status,
+        entries: parse_call_hierarchy_entries(&value, "from"),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_call_hierarchy_outgoing(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    item: Value,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspCallHierarchyResult, String> {
+    let (status, value) = lsp_hierarchy_item_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        item,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "callHierarchy/outgoingCalls",
+    )
+    .await?;
+    Ok(LspCallHierarchyResult {
+        status,
+        entries: parse_call_hierarchy_entries(&value, "to"),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_type_hierarchy_supertypes(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    item: Value,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspTypeHierarchyResult, String> {
+    let (status, value) = lsp_hierarchy_item_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        item,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "typeHierarchy/supertypes",
+    )
+    .await?;
+    Ok(LspTypeHierarchyResult {
+        status,
+        items: parse_hierarchy_items(&value),
+    })
+}
+
+#[tauri::command]
+pub async fn lsp_type_hierarchy_subtypes(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    item: Value,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+) -> Result<LspTypeHierarchyResult, String> {
+    let (status, value) = lsp_hierarchy_item_request(
+        state,
+        workspace_id,
+        root_path,
+        file_path,
+        item,
+        language_id,
+        server_command_id,
+        custom_server_command,
+        "typeHierarchy/subtypes",
+    )
+    .await?;
+    Ok(LspTypeHierarchyResult {
+        status,
+        items: parse_hierarchy_items(&value),
+    })
+}
+
+async fn lsp_hierarchy_item_request(
+    state: State<'_, AppState>,
+    workspace_id: String,
+    root_path: Option<String>,
+    file_path: String,
+    item: Value,
+    language_id: Option<String>,
+    server_command_id: Option<String>,
+    custom_server_command: Option<LspCustomServerCommand>,
+    method: &str,
+) -> Result<(LspDocumentStatus, Value), String> {
+    let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
+    let result = match state
+        .lsp
+        .active_session(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await
+    {
+        Some(session) => session
+            .request(method, json!({ "item": item }))
+            .await
+            .unwrap_or(Value::Null),
+        None => Value::Null,
+    };
+    let status = state
+        .lsp
+        .document_status(
+            &document,
+            server_command_id.as_deref(),
+            custom_server_command.as_ref(),
+        )
+        .await;
+    Ok((status, result))
 }
 
 #[tauri::command]
@@ -2466,18 +2773,16 @@ fn parse_code_action(value: &Value) -> Option<LspCodeAction> {
         .and_then(Value::as_str)
         .filter(|title| !title.is_empty())?
         .to_string();
-    let command = value
-        .get("command")
-        .and_then(|command| {
-            if let Some(name) = command.as_str() {
-                Some(name.to_string())
-            } else {
-                command
-                    .get("command")
-                    .and_then(Value::as_str)
-                    .map(ToString::to_string)
-            }
-        });
+    let command = value.get("command").and_then(|command| {
+        if let Some(name) = command.as_str() {
+            Some(name.to_string())
+        } else {
+            command
+                .get("command")
+                .and_then(Value::as_str)
+                .map(ToString::to_string)
+        }
+    });
     let command_arguments = value
         .get("command")
         .and_then(|command| command.get("arguments"))
@@ -2607,7 +2912,10 @@ fn parse_completion_item(value: &Value) -> Option<LspCompletionItem> {
 /// `CompletionList { isIncomplete, items }`.
 fn parse_completion_response(value: &Value) -> (bool, Vec<LspCompletionItem>) {
     if let Some(items) = value.as_array() {
-        return (false, items.iter().filter_map(parse_completion_item).collect());
+        return (
+            false,
+            items.iter().filter_map(parse_completion_item).collect(),
+        );
     }
     if let Some(items) = value.get("items").and_then(Value::as_array) {
         let is_incomplete = value
@@ -2622,7 +2930,10 @@ fn parse_completion_response(value: &Value) -> (bool, Vec<LspCompletionItem>) {
     (false, Vec::new())
 }
 
-fn parse_signature_parameter(value: &Value, signature_label: &str) -> Option<LspSignatureParameter> {
+fn parse_signature_parameter(
+    value: &Value,
+    signature_label: &str,
+) -> Option<LspSignatureParameter> {
     let documentation = value.get("documentation").and_then(markup_to_string);
     match value.get("label") {
         Some(Value::String(label)) => Some(LspSignatureParameter {
@@ -2665,7 +2976,9 @@ fn parse_signature_help(value: &Value) -> (Vec<LspSignatureInfo>, u32, u32) {
                         .map(|parameters| {
                             parameters
                                 .iter()
-                                .filter_map(|parameter| parse_signature_parameter(parameter, &label))
+                                .filter_map(|parameter| {
+                                    parse_signature_parameter(parameter, &label)
+                                })
                                 .collect()
                         })
                         .unwrap_or_default();
@@ -2762,6 +3075,50 @@ fn parse_locations(value: &Value) -> Vec<LspLocation> {
         return array.iter().filter_map(parse_location).collect();
     }
     parse_location(value).into_iter().collect()
+}
+
+fn parse_hierarchy_item(value: &Value) -> Option<LspHierarchyItem> {
+    let uri = value.get("uri")?.as_str()?.to_string();
+    Some(LspHierarchyItem {
+        name: value.get("name")?.as_str()?.to_string(),
+        detail: value
+            .get("detail")
+            .and_then(Value::as_str)
+            .map(ToString::to_string),
+        kind: value.get("kind")?.as_u64()?.try_into().ok()?,
+        path: path_from_uri(&uri),
+        uri,
+        range: value.get("range").and_then(parse_range)?,
+        selection_range: value.get("selectionRange").and_then(parse_range)?,
+        raw: value.clone(),
+    })
+}
+
+fn parse_hierarchy_items(value: &Value) -> Vec<LspHierarchyItem> {
+    value
+        .as_array()
+        .map(|items| items.iter().filter_map(parse_hierarchy_item).collect())
+        .unwrap_or_default()
+}
+
+fn parse_call_hierarchy_entries(value: &Value, item_key: &str) -> Vec<LspCallHierarchyEntry> {
+    value
+        .as_array()
+        .map(|entries| {
+            entries
+                .iter()
+                .filter_map(|entry| {
+                    let item = entry.get(item_key).and_then(parse_hierarchy_item)?;
+                    let from_ranges = entry
+                        .get("fromRanges")
+                        .and_then(Value::as_array)
+                        .map(|ranges| ranges.iter().filter_map(parse_range).collect())
+                        .unwrap_or_default();
+                    Some(LspCallHierarchyEntry { item, from_ranges })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn parse_location(value: &Value) -> Option<LspLocation> {
@@ -3214,7 +3571,10 @@ mod tests {
         assert_eq!(signature.parameters[0].label, "path: string");
         assert_eq!(signature.parameters[1].label, "preview: boolean");
         assert_eq!(signature.parameters[1].label_start, Some(23));
-        assert_eq!(signature.parameters[1].documentation.as_deref(), Some("preview flag"));
+        assert_eq!(
+            signature.parameters[1].documentation.as_deref(),
+            Some("preview flag")
+        );
     }
 
     #[test]
@@ -3297,6 +3657,65 @@ mod tests {
         assert_eq!(actions[0].title, "Add import");
         assert!(actions[0].is_preferred);
         assert_eq!(actions[0].edit.as_ref().unwrap().document_edits.len(), 1);
-        assert_eq!(actions[1].command.as_deref(), Some("source.organizeImports"));
+        assert_eq!(
+            actions[1].command.as_deref(),
+            Some("source.organizeImports")
+        );
+    }
+
+    #[test]
+    fn parses_hierarchy_items_and_preserves_opaque_data() {
+        let items = parse_hierarchy_items(&json!([{
+            "name": "renderEditor",
+            "detail": "CodeWorkspaceTab",
+            "kind": 12,
+            "uri": "file:///repo/src/editor.ts",
+            "range": {
+                "start": { "line": 8, "character": 0 },
+                "end": { "line": 20, "character": 1 }
+            },
+            "selectionRange": {
+                "start": { "line": 8, "character": 9 },
+                "end": { "line": 8, "character": 21 }
+            },
+            "data": { "serverId": 42 }
+        }]));
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].name, "renderEditor");
+        assert_eq!(items[0].detail.as_deref(), Some("CodeWorkspaceTab"));
+        assert_eq!(items[0].selection_range.start.character, 9);
+        assert_eq!(items[0].raw["data"]["serverId"], 42);
+    }
+
+    #[test]
+    fn parses_incoming_and_outgoing_call_entries() {
+        let item = json!({
+            "name": "caller",
+            "kind": 12,
+            "uri": "file:///repo/src/caller.ts",
+            "range": {
+                "start": { "line": 1, "character": 0 },
+                "end": { "line": 4, "character": 1 }
+            },
+            "selectionRange": {
+                "start": { "line": 1, "character": 9 },
+                "end": { "line": 1, "character": 15 }
+            }
+        });
+        let range = json!({
+            "start": { "line": 3, "character": 2 },
+            "end": { "line": 3, "character": 8 }
+        });
+        let incoming = parse_call_hierarchy_entries(
+            &json!([{ "from": item.clone(), "fromRanges": [range.clone()] }]),
+            "from",
+        );
+        let outgoing =
+            parse_call_hierarchy_entries(&json!([{ "to": item, "fromRanges": [range] }]), "to");
+        assert_eq!(incoming.len(), 1);
+        assert_eq!(incoming[0].item.name, "caller");
+        assert_eq!(incoming[0].from_ranges[0].start.line, 3);
+        assert_eq!(outgoing.len(), 1);
+        assert_eq!(outgoing[0].item.name, "caller");
     }
 }

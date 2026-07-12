@@ -396,6 +396,38 @@ export interface LspWorkspaceSymbolsResult {
   symbols: LspWorkspaceSymbol[];
 }
 
+export interface LspHierarchyItem {
+  name: string;
+  detail: string | null;
+  kind: number;
+  uri: string;
+  path: string | null;
+  range: LspRange;
+  selectionRange: LspRange;
+  /** Original server item retained for lazy hierarchy requests. */
+  raw: unknown;
+}
+
+export interface LspHierarchyPrepareResult {
+  status: LspDocumentStatus;
+  items: LspHierarchyItem[];
+}
+
+export interface LspCallHierarchyEntry {
+  item: LspHierarchyItem;
+  fromRanges: LspRange[];
+}
+
+export interface LspCallHierarchyResult {
+  status: LspDocumentStatus;
+  entries: LspCallHierarchyEntry[];
+}
+
+export interface LspTypeHierarchyResult {
+  status: LspDocumentStatus;
+  items: LspHierarchyItem[];
+}
+
 export function lspWorkspaceSymbols(
   descriptor: LspDocumentDescriptor,
   query: string,
@@ -403,6 +435,68 @@ export function lspWorkspaceSymbols(
   return invoke<LspWorkspaceSymbolsResult>("lsp_workspace_symbols", {
     ...documentArgs(descriptor),
     query,
+  });
+}
+
+export function lspPrepareCallHierarchy(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+): Promise<LspHierarchyPrepareResult> {
+  return invoke<LspHierarchyPrepareResult>("lsp_prepare_call_hierarchy", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+  });
+}
+
+export function lspCallHierarchyIncoming(
+  descriptor: LspDocumentDescriptor,
+  item: unknown,
+): Promise<LspCallHierarchyResult> {
+  return invoke<LspCallHierarchyResult>("lsp_call_hierarchy_incoming", {
+    ...documentArgs(descriptor),
+    item,
+  });
+}
+
+export function lspCallHierarchyOutgoing(
+  descriptor: LspDocumentDescriptor,
+  item: unknown,
+): Promise<LspCallHierarchyResult> {
+  return invoke<LspCallHierarchyResult>("lsp_call_hierarchy_outgoing", {
+    ...documentArgs(descriptor),
+    item,
+  });
+}
+
+export function lspPrepareTypeHierarchy(
+  descriptor: LspDocumentDescriptor,
+  position: LspPosition,
+): Promise<LspHierarchyPrepareResult> {
+  return invoke<LspHierarchyPrepareResult>("lsp_prepare_type_hierarchy", {
+    ...documentArgs(descriptor),
+    line: position.line,
+    character: position.character,
+  });
+}
+
+export function lspTypeHierarchySupertypes(
+  descriptor: LspDocumentDescriptor,
+  item: unknown,
+): Promise<LspTypeHierarchyResult> {
+  return invoke<LspTypeHierarchyResult>("lsp_type_hierarchy_supertypes", {
+    ...documentArgs(descriptor),
+    item,
+  });
+}
+
+export function lspTypeHierarchySubtypes(
+  descriptor: LspDocumentDescriptor,
+  item: unknown,
+): Promise<LspTypeHierarchyResult> {
+  return invoke<LspTypeHierarchyResult>("lsp_type_hierarchy_subtypes", {
+    ...documentArgs(descriptor),
+    item,
   });
 }
 
