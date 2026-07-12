@@ -1294,6 +1294,102 @@ describe("CodeWorkspaceTab", () => {
     );
   });
 
+  it("persists the workspace format-on-save switch and saves formatted text", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-format-on-save",
+      workspaceInstanceId: "instance-format-on-save",
+      name: "Format on save",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    const capabilities = {
+      completion: false,
+      signatureHelp: false,
+      hover: true,
+      definition: true,
+      typeDefinition: false,
+      implementation: false,
+      references: true,
+      documentSymbol: true,
+      workspaceSymbol: false,
+      rename: false,
+      formatting: true,
+      rangeFormatting: true,
+      codeAction: false,
+      documentHighlight: false,
+      callHierarchy: false,
+      typeHierarchy: false,
+      inlayHint: false,
+      selectionRange: false,
+      semanticTokens: false,
+      completionTriggerCharacters: [],
+      signatureTriggerCharacters: [],
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "const x=1"));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      presetId: "typescript-javascript",
+      languageId: "typescript",
+      displayName: "TypeScript / JavaScript",
+      available: true,
+      active: true,
+      capabilities,
+    }));
+    lspMocks.lspFormatting
+      .mockResolvedValueOnce({
+        status: documentStatus({ active: true, available: true, capabilities }),
+        edits: [{
+          range: {
+            start: { line: 0, character: 7 },
+            end: { line: 0, character: 7 },
+          },
+          newText: " ",
+        }],
+      })
+      .mockResolvedValueOnce({
+        status: documentStatus({ active: true, available: true, capabilities }),
+        edits: [{
+          range: {
+            start: { line: 0, character: 0 },
+            end: { line: 0, character: 0 },
+          },
+          newText: "// formatted\n",
+        }],
+      });
+    workspaceMocks.workspaceWriteFile.mockResolvedValue(file(
+      "src/main.ts",
+      "// formatted\nconst x =1",
+      { hash: "hash-formatted" },
+    ));
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Format on save" }));
+    expect(JSON.parse(
+      window.localStorage.getItem("taomni.codeWorkspace.intelligence.v1.instance-format-on-save") ?? "{}",
+    )).toMatchObject({ formatOnSave: true });
+
+    // Make the buffer dirty through the existing manual formatting path.
+    fireEvent.keyDown(window, { key: "l", ctrlKey: true, altKey: true });
+    await waitFor(() => expect(screen.getByText(/unsaved/)).toBeInTheDocument());
+
+    fireEvent.keyDown(window, { key: "s", ctrlKey: true });
+    await waitFor(() => expect(workspaceMocks.workspaceWriteFile).toHaveBeenCalledWith(
+      "/repo/app",
+      "src/main.ts",
+      "// formatted\nconst x =1",
+      "hash-src/main.ts",
+    ));
+    expect(lspMocks.lspFormatting).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(screen.queryByText(/unsaved/)).not.toBeInTheDocument());
+  });
+
   it("opens call and type hierarchy from capability-gated shortcuts", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",

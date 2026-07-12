@@ -32,6 +32,7 @@ function renderPane(overrides: {
   canCreate?: boolean;
   canMutateSelection?: boolean;
   languageOpen?: boolean;
+  formatOnSave?: boolean;
 } = {}) {
   const callbacks = {
     onFilterChange: vi.fn(),
@@ -45,6 +46,7 @@ function renderPane(overrides: {
     onDelete: vi.fn(),
     onLanguageToggle: vi.fn(),
     onLanguageRefresh: vi.fn(),
+    onFormatOnSaveChange: vi.fn(),
     onCommandChange: vi.fn(),
     onCustomCommandChange: vi.fn(),
   };
@@ -76,8 +78,10 @@ function renderPane(overrides: {
         commandPrefs: {},
         customCommands: {},
         customCommandId: "__custom__",
+        formatOnSave: overrides.formatOnSave ?? false,
         onToggle: callbacks.onLanguageToggle,
         onRefresh: callbacks.onLanguageRefresh,
+        onFormatOnSaveChange: callbacks.onFormatOnSaveChange,
         onCommandChange: callbacks.onCommandChange,
         onCustomCommandChange: callbacks.onCustomCommandChange,
       }}
@@ -109,17 +113,25 @@ describe("FileTreePane", () => {
   });
 
   it("enforces tree action availability and exposes language server controls", () => {
-    const callbacks = renderPane({ canCreate: false, canMutateSelection: false, languageOpen: true });
+    const callbacks = renderPane({
+      canCreate: false,
+      canMutateSelection: false,
+      languageOpen: true,
+      formatOnSave: true,
+    });
 
     expect(screen.getByRole("button", { name: "New file" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Rename" })).toBeDisabled();
     expect(screen.getByText("1 missing")).toBeInTheDocument();
     expect(screen.getByText("TypeScript")).toBeInTheDocument();
     expect(screen.getByText("npm install -g typescript-language-server")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Format on save" })).toBeChecked();
 
+    fireEvent.click(screen.getByRole("checkbox", { name: "Format on save" }));
     fireEvent.click(screen.getByRole("button", { name: /Language Servers/ }));
     fireEvent.click(screen.getByRole("button", { name: "Refresh language servers" }));
     expect(callbacks.onLanguageToggle).toHaveBeenCalledOnce();
     expect(callbacks.onLanguageRefresh).toHaveBeenCalledOnce();
+    expect(callbacks.onFormatOnSaveChange).toHaveBeenCalledWith(false);
   });
 });

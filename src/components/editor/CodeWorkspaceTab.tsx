@@ -2027,19 +2027,67 @@ export function CodeWorkspaceTab({
     }
   }, [absolutePathForOpenFile, findRoot, notifyWorkspacePathGitChanged, saveLspDocument]);
 
+  const formatFileText = useCallback(async (
+    file: OpenFileState,
+    selection: EditorSelectionRange | null = null,
+  ): Promise<string | null> => {
+    const descriptor = lspDescriptorForFile(file);
+    if (!descriptor) return null;
+    const capabilities = lspFilesRef.current[file.key]?.status?.capabilities ?? null;
+    const hasSelection = !!selection && !selection.empty
+      && (selection.start.line !== selection.end.line
+        || selection.start.character !== selection.end.character);
+    const useRange = hasSelection && (capabilities?.rangeFormatting ?? false);
+    if (capabilities && !useRange && !capabilities.formatting) return null;
+    if (capabilities && useRange && !capabilities.rangeFormatting) return null;
+
+    const result = useRange && selection
+      ? await lspRangeFormatting(descriptor, {
+        start: selection.start,
+        end: selection.end,
+      })
+      : await lspFormatting(descriptor);
+    updateLspStatusForFile(file, result.status);
+    if (!result.edits.length) return file.text;
+    return applyLspTextEditsToString(file.text, result.edits);
+  }, [lspDescriptorForFile, updateLspStatusForFile]);
+
   const saveFile = useCallback(
     async (key: string | null = activeKey) => {
       if (!key) return;
       const file = openFilesRef.current[key];
       if (!file || file.loading || file.saving || !file.dirty) return;
+      let textToSave = file.text;
+      let formatError: string | null = null;
+      if (intelligencePreferences.formatOnSave) {
+        try {
+          const formatted = await formatFileText(file);
+          const current = openFilesRef.current[key];
+          // Do not overwrite keystrokes entered while the formatter was running.
+          textToSave = current?.text === file.text
+            ? formatted ?? file.text
+            : current?.text ?? file.text;
+        } catch (error) {
+          formatError = errorMessage(error);
+          textToSave = openFilesRef.current[key]?.text ?? file.text;
+        }
+      }
       try {
-        await saveOpenBufferText(key, file.text);
-        setStatusMessage(`Saved ${file.subtitle}`);
+        await saveOpenBufferText(key, textToSave);
+        setStatusMessage(formatError
+          ? `Saved ${file.subtitle}; format on save failed: ${formatError}`
+          : `Saved ${file.subtitle}`);
       } catch (err) {
         setStatusMessage(errorMessage(err));
       }
     },
-    [activeKey, saveOpenBufferText, setStatusMessage],
+    [
+      activeKey,
+      formatFileText,
+      intelligencePreferences.formatOnSave,
+      saveOpenBufferText,
+      setStatusMessage,
+    ],
   );
 
   const reloadFile = useCallback(
@@ -2316,6 +2364,13 @@ export function CodeWorkspaceTab({
       inlineBlameEnabled: !current.inlineBlameEnabled,
     }));
   }, [setIntelligencePreferences]);
+  const setFormatOnSave = useCallback((enabled: boolean) => {
+    setIntelligencePreferences((current) => ({
+      ...current,
+      formatOnSave: enabled,
+    }));
+    setStatusMessage(`Format on save ${enabled ? "enabled" : "disabled"} for this workspace`);
+  }, [setIntelligencePreferences, setStatusMessage]);
 
   useEffect(() => {
     const groupId = activeEditorGroupId;
@@ -2865,35 +2920,14 @@ export function CodeWorkspaceTab({
   const formatActiveFile = useCallback(async () => {
     const file = activeFile;
     if (!file || file.loading) return;
-    const descriptor = lspDescriptorForFile(file);
-    if (!descriptor) return;
-    const caps = lspFilesRef.current[file.key]?.status?.capabilities ?? null;
-    const selection = editorSelectionRef.current;
-    const hasSelection = !selection.empty
-      && (selection.start.line !== selection.end.line || selection.start.character !== selection.end.character);
-    const useRange = hasSelection && (caps?.rangeFormatting ?? false);
-    // When capabilities are known and neither provider is present, stay silent.
-    if (caps && !useRange && !caps.formatting && !(hasSelection && caps.rangeFormatting)) {
-      return;
-    }
-    if (caps && !caps.formatting && !caps.rangeFormatting) return;
     try {
-      const range: LspRange = {
-        start: selection.start,
-        end: selection.end,
-      };
-      // Prefer range formatting only when advertised; otherwise format the whole document.
-      // If capabilities are not yet known, attempt full-document formatting.
-      const result = useRange
-        ? await lspRangeFormatting(descriptor, range)
-        : await lspFormatting(descriptor);
-      if (!result.edits.length) return;
-      const next = applyLspTextEditsToString(file.text, result.edits);
+      const next = await formatFileText(file, editorSelectionRef.current);
+      if (next === null) return;
       if (next !== file.text) updateFileText(file.key, next);
     } catch (error) {
       console.error("Format document failed", error);
     }
-  }, [activeFile, lspDescriptorForFile, updateFileText]);
+  }, [activeFile, formatFileText, updateFileText]);
 
   const applyLspWorkspaceEdit = useCallback(async (edit: LspWorkspaceEdit) => {
     const outcomes = await applyWorkspaceEdit(edit, {
@@ -3350,6 +3384,13 @@ export function CodeWorkspaceTab({
       run: () => void formatActiveFile(),
     },
     {
+      id: "workspace.toggleFormatOnSave",
+      title: `${intelligencePreferences.formatOnSave ? "Disable" : "Enable"} Format on Save`,
+      category: "Code",
+      keywords: ["format", "save", "workspace"],
+      run: () => setFormatOnSave(!intelligencePreferences.formatOnSave),
+    },
+    {
       id: "workspace.quickDocumentation",
       title: "Quick Documentation",
       category: "Code",
@@ -3697,6 +3738,8 @@ export function CodeWorkspaceTab({
     selectedRootDirectory,
     intelligencePreferences.inlayHintsEnabled,
     intelligencePreferences.inlineBlameEnabled,
+    intelligencePreferences.formatOnSave,
+    setFormatOnSave,
     toggleInlayHints,
     toggleInlayHintsForActiveLanguage,
     toggleInlineBlame,
@@ -4419,8 +4462,10 @@ export function CodeWorkspaceTab({
               commandPrefs: lspCommandPrefs,
               customCommands: lspCustomCommands,
               customCommandId: CUSTOM_LSP_COMMAND_ID,
+              formatOnSave: intelligencePreferences.formatOnSave,
               onToggle: () => setLanguagePanelOpen((value) => !value),
               onRefresh: () => void refreshLspServerStatuses(),
+              onFormatOnSaveChange: setFormatOnSave,
               onCommandChange: updateLspCommandPref,
               onCustomCommandChange: updateLspCustomCommand,
             }}

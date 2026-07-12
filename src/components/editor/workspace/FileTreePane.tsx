@@ -56,8 +56,10 @@ interface FileTreePaneProps {
     commandPrefs: Record<string, string>;
     customCommands: Record<string, LspCustomCommandConfig>;
     customCommandId: string;
+    formatOnSave: boolean;
     onToggle: () => void;
     onRefresh: () => void;
+    onFormatOnSaveChange: (enabled: boolean) => void;
     onCommandChange: (presetId: string, commandId: string) => void;
     onCustomCommandChange: (presetId: string, patch: Partial<LspCustomCommandConfig>) => void;
   };
@@ -214,8 +216,10 @@ function LanguageServersPanel({
   commandPrefs,
   customCommands,
   customCommandId,
+  formatOnSave,
   onToggle,
   onRefresh,
+  onFormatOnSaveChange,
   onCommandChange,
   onCustomCommandChange,
 }: FileTreePaneProps["languageServers"]) {
@@ -225,6 +229,7 @@ function LanguageServersPanel({
       <div className="h-7 flex items-center text-[11px] font-semibold">
         <button
           type="button"
+          data-testid="code-workspace-language-servers-toggle"
           className="min-w-0 flex-1 h-full flex items-center gap-1.5 px-2 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
           onClick={onToggle}
         >
@@ -247,6 +252,17 @@ function LanguageServersPanel({
       </div>
       {open && (
         <div className="max-h-56 overflow-auto pb-1">
+          <label className="flex items-center gap-2 border-b border-[var(--taomni-code-border)] px-2 py-1.5 text-[11px]">
+            <input
+              type="checkbox"
+              data-testid="code-workspace-format-on-save"
+              aria-label="Format on save"
+              checked={formatOnSave}
+              onChange={(event) => onFormatOnSaveChange(event.target.checked)}
+            />
+            <span className="min-w-0 flex-1">Format on save</span>
+            <span className="shrink-0 text-[10px] text-[var(--taomni-code-muted)]">Workspace</span>
+          </label>
           {activeStatus && (
             <div className="px-2 py-1 border-b border-[var(--taomni-code-border)] text-[11px]">
               <div className="flex items-center gap-1.5">
