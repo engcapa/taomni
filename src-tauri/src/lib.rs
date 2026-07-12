@@ -34,6 +34,7 @@ mod vnc;
 mod voice;
 mod windowing;
 mod workspace;
+mod workspace_fs;
 mod workspace_search;
 mod local_history;
 mod wsl;
