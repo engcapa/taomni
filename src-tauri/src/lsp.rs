@@ -407,6 +407,12 @@ struct PendingResponse {
     sender: oneshot::Sender<Result<Value, String>>,
 }
 
+#[derive(Clone, Debug)]
+struct SemanticTokensCache {
+    result_id: String,
+    data: Vec<u64>,
+}
+
 pub struct LspManager {
     sessions: Mutex<HashMap<String, Arc<LspSession>>>,
 }
@@ -423,6 +429,9 @@ struct LspSession {
     capabilities: RwLock<Option<LspCapabilitySummary>>,
     semantic_token_types: RwLock<Vec<String>>,
     semantic_token_modifiers: RwLock<Vec<String>>,
+    semantic_tokens_delta: RwLock<bool>,
+    semantic_tokens_cache: RwLock<HashMap<String, SemanticTokensCache>>,
+    semantic_tokens_lock: Mutex<()>,
     next_id: AtomicU64,
     _child: Mutex<Child>,
 }
@@ -630,6 +639,9 @@ impl LspSession {
             capabilities: RwLock::new(None),
             semantic_token_types: RwLock::new(Vec::new()),
             semantic_token_modifiers: RwLock::new(Vec::new()),
+            semantic_tokens_delta: RwLock::new(false),
+            semantic_tokens_cache: RwLock::new(HashMap::new()),
+            semantic_tokens_lock: Mutex::new(()),
             next_id: AtomicU64::new(1),
             _child: Mutex::new(child),
         });
@@ -695,7 +707,7 @@ impl LspSession {
                         "versionSupport": true
                     },
                     "semanticTokens": {
-                        "requests": { "full": true, "range": false },
+                        "requests": { "full": { "delta": true }, "range": false },
                         "tokenTypes": [
                             "namespace", "type", "class", "enum", "interface", "struct", "typeParameter",
                             "parameter", "variable", "property", "enumMember", "event", "function",
@@ -725,6 +737,7 @@ impl LspSession {
         let (token_types, token_modifiers) = semantic_token_legend_from(&server_caps);
         *session.semantic_token_types.write().await = token_types;
         *session.semantic_token_modifiers.write().await = token_modifiers;
+        *session.semantic_tokens_delta.write().await = semantic_token_delta_supported(&server_caps);
         session.notify("initialized", json!({})).await?;
         Ok(session)
     }
@@ -1152,6 +1165,12 @@ pub async fn lsp_close_document(
             .map_err(|e| format!("LSP didClose failed: {e}"))?;
         session.opened_documents.write().await.remove(&document.uri);
         session.diagnostics.write().await.remove(&document.uri);
+        let _semantic_tokens_guard = session.semantic_tokens_lock.lock().await;
+        session
+            .semantic_tokens_cache
+            .write()
+            .await
+            .remove(&document.uri);
     }
     Ok(state
         .lsp
@@ -2290,16 +2309,59 @@ pub async fn lsp_semantic_tokens(
             tokens: Vec::new(),
         });
     }
-    let value = session
-        .request(
-            "textDocument/semanticTokens/full",
-            json!({ "textDocument": { "uri": document.uri } }),
-        )
+    let _semantic_tokens_guard = session.semantic_tokens_lock.lock().await;
+    let cached = session
+        .semantic_tokens_cache
+        .read()
         .await
-        .unwrap_or(Value::Null);
+        .get(&document.uri)
+        .cloned();
+    let delta_supported = *session.semantic_tokens_delta.read().await;
+    let mut resolved = None;
+    if delta_supported && let Some(previous) = cached.as_ref() {
+        let delta = session
+            .request(
+                "textDocument/semanticTokens/full/delta",
+                json!({
+                    "textDocument": { "uri": document.uri },
+                    "previousResultId": previous.result_id,
+                }),
+            )
+            .await;
+        if let Ok(value) = delta {
+            resolved = semantic_token_data_from_response(&value)
+                .or_else(|| apply_semantic_token_delta(previous, &value));
+        }
+    }
+    if resolved.is_none() {
+        let value = session
+            .request(
+                "textDocument/semanticTokens/full",
+                json!({ "textDocument": { "uri": document.uri } }),
+            )
+            .await
+            .unwrap_or(Value::Null);
+        resolved = semantic_token_data_from_response(&value);
+    }
+    let (data, result_id) = resolved.unwrap_or_default();
+    if let Some(result_id) = result_id {
+        session.semantic_tokens_cache.write().await.insert(
+            document.uri.clone(),
+            SemanticTokensCache {
+                result_id,
+                data: data.clone(),
+            },
+        );
+    } else {
+        session
+            .semantic_tokens_cache
+            .write()
+            .await
+            .remove(&document.uri);
+    }
     let token_types = session.semantic_token_types.read().await.clone();
     let token_modifiers = session.semantic_token_modifiers.read().await.clone();
-    let tokens = parse_semantic_tokens(&value, &token_types, &token_modifiers);
+    let tokens = decode_semantic_token_data(&data, &token_types, &token_modifiers);
     let status = state
         .lsp
         .document_status(
@@ -3538,6 +3600,76 @@ fn semantic_token_legend_from(capabilities: &Value) -> (Vec<String>, Vec<String>
     (token_types, token_modifiers)
 }
 
+fn semantic_token_delta_supported(capabilities: &Value) -> bool {
+    capabilities
+        .get("semanticTokensProvider")
+        .and_then(|provider| provider.get("full"))
+        .and_then(|full| full.get("delta"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+}
+
+fn semantic_token_data_from_response(value: &Value) -> Option<(Vec<u64>, Option<String>)> {
+    let (data, result_id) = if let Some(data) = value.get("data").and_then(Value::as_array) {
+        (
+            data.iter().map(Value::as_u64).collect::<Option<Vec<_>>>()?,
+            value
+                .get("resultId")
+                .and_then(Value::as_str)
+                .map(ToString::to_string),
+        )
+    } else if let Some(data) = value.as_array() {
+        (
+            data.iter().map(Value::as_u64).collect::<Option<Vec<_>>>()?,
+            None,
+        )
+    } else {
+        return None;
+    };
+    (data.len() % 5 == 0).then_some((data, result_id))
+}
+
+fn apply_semantic_token_delta(
+    previous: &SemanticTokensCache,
+    value: &Value,
+) -> Option<(Vec<u64>, Option<String>)> {
+    let edits = value.get("edits")?.as_array()?;
+    let mut parsed = edits
+        .iter()
+        .map(|edit| {
+            let start = usize::try_from(edit.get("start")?.as_u64()?).ok()?;
+            let delete_count = usize::try_from(edit.get("deleteCount")?.as_u64()?).ok()?;
+            let data = match edit.get("data") {
+                Some(value) => value
+                    .as_array()?
+                    .iter()
+                    .map(Value::as_u64)
+                    .collect::<Option<Vec<_>>>()?,
+                None => Vec::new(),
+            };
+            Some((start, delete_count, data))
+        })
+        .collect::<Option<Vec<_>>>()?;
+    parsed.sort_by(|left, right| right.0.cmp(&left.0));
+    let mut data = previous.data.clone();
+    for (start, delete_count, inserted) in parsed {
+        let end = start.checked_add(delete_count)?;
+        if start > data.len() || end > data.len() {
+            return None;
+        }
+        data.splice(start..end, inserted);
+    }
+    if data.len() % 5 != 0 {
+        return None;
+    }
+    let result_id = value
+        .get("resultId")
+        .and_then(Value::as_str)
+        .map(ToString::to_string)
+        .or_else(|| Some(previous.result_id.clone()));
+    Some((data, result_id))
+}
+
 fn decode_semantic_token_data(
     data: &[u64],
     token_types: &[String],
@@ -3589,29 +3721,9 @@ fn parse_semantic_tokens(
     token_types: &[String],
     token_modifiers: &[String],
 ) -> Vec<LspSemanticToken> {
-    // full result: { data: number[], resultId?: string }
-    if let Some(data) = value
-        .get("data")
-        .and_then(Value::as_array)
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(Value::as_u64)
-                .collect::<Vec<_>>()
-        })
-    {
-        return decode_semantic_token_data(&data, token_types, token_modifiers);
-    }
-    // Some servers return the data array directly.
-    if let Some(data) = value.as_array().map(|items| {
-        items
-            .iter()
-            .filter_map(Value::as_u64)
-            .collect::<Vec<_>>()
-    }) {
-        return decode_semantic_token_data(&data, token_types, token_modifiers);
-    }
-    Vec::new()
+    semantic_token_data_from_response(value)
+        .map(|(data, _)| decode_semantic_token_data(&data, token_types, token_modifiers))
+        .unwrap_or_default()
 }
 
 fn parse_location(value: &Value) -> Option<LspLocation> {
@@ -4288,5 +4400,37 @@ mod tests {
         assert_eq!(tokens[1].token_type, "function");
         assert_eq!(tokens[1].range.start.character, 4);
         assert_eq!(tokens[1].range.end.character, 9);
+    }
+
+    #[test]
+    fn applies_semantic_token_delta_edits_and_detects_capability() {
+        let capabilities = json!({
+            "semanticTokensProvider": {
+                "legend": { "tokenTypes": ["variable"], "tokenModifiers": [] },
+                "full": { "delta": true }
+            }
+        });
+        assert!(semantic_token_delta_supported(&capabilities));
+        let previous = SemanticTokensCache {
+            result_id: "one".into(),
+            data: vec![0, 0, 3, 0, 0, 0, 4, 2, 0, 0],
+        };
+        let (data, result_id) = apply_semantic_token_delta(
+            &previous,
+            &json!({
+                "resultId": "two",
+                "edits": [{ "start": 5, "deleteCount": 5, "data": [1, 1, 4, 0, 0] }]
+            }),
+        )
+        .unwrap();
+        assert_eq!(result_id.as_deref(), Some("two"));
+        assert_eq!(data, vec![0, 0, 3, 0, 0, 1, 1, 4, 0, 0]);
+        assert!(
+            apply_semantic_token_delta(
+                &previous,
+                &json!({ "edits": [{ "start": 99, "deleteCount": 1 }] }),
+            )
+            .is_none()
+        );
     }
 }
