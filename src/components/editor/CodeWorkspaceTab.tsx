@@ -14,6 +14,8 @@ import {
   Braces,
   GitBranch,
   ListTree,
+  GitFork,
+  Network,
   Loader2,
   RefreshCw,
   RotateCcw,
@@ -55,7 +57,9 @@ import {
   lspDefinition,
   lspHover,
   lspImplementation,
+  lspPrepareCallHierarchy,
   lspPrepareRename,
+  lspPrepareTypeHierarchy,
   lspRangeFormatting,
   lspReferences,
   lspRename,
@@ -116,6 +120,10 @@ import {
 } from "./workspace/panels/ProblemsPanel";
 import { FindInFilesPanel } from "./workspace/panels/FindInFilesPanel";
 import { DocumentationPane } from "./workspace/panels/DocumentationPane";
+import {
+  HierarchyPanel,
+  type HierarchyRootState,
+} from "./workspace/panels/HierarchyPanel";
 import { type QuickDocContent } from "./workspace/QuickDocPopup";
 import { type LocationPeekState } from "./workspace/LocationPeek";
 import {
@@ -537,6 +545,8 @@ export function CodeWorkspaceTab({
     locations: [],
     error: null,
   });
+  const [callHierarchyRoot, setCallHierarchyRoot] = useState<HierarchyRootState | null>(null);
+  const [typeHierarchyRoot, setTypeHierarchyRoot] = useState<HierarchyRootState | null>(null);
   const rootsRef = useRef(roots);
   const looseFilesRef = useRef(looseFiles);
   const codeViewProfileRef = useRef(codeViewProfile);
@@ -1993,6 +2003,53 @@ export function CodeWorkspaceTab({
   const activeFile = activeKey ? openFiles[activeKey] ?? null : null;
   const activeLspState = activeKey ? lspFiles[activeKey] ?? null : null;
   const activeCapabilities = activeLspState?.status?.capabilities ?? null;
+  const openHierarchy = useCallback(async (mode: "call" | "type") => {
+    const file = activeFile;
+    if (!file || file.loading) return;
+    const descriptor = lspDescriptorForFile(file);
+    if (!descriptor) {
+      setStatusMessage("No language service for this file");
+      return;
+    }
+    const capabilities = lspFilesRef.current[file.key]?.status?.capabilities;
+    const supported = mode === "call" ? capabilities?.callHierarchy : capabilities?.typeHierarchy;
+    if (!supported) {
+      setStatusMessage(`${mode === "call" ? "Call" : "Type"} hierarchy is not supported by this language server`);
+      return;
+    }
+    try {
+      const position = cursorPositions[activeEditorGroupId] ?? editorSelectionRef.current.start;
+      const result = mode === "call"
+        ? await lspPrepareCallHierarchy(descriptor, position)
+        : await lspPrepareTypeHierarchy(descriptor, position);
+      updateLspStatusForFile(file, result.status);
+      const item = result.items[0];
+      if (!item) {
+        setStatusMessage(`No ${mode} hierarchy is available at the cursor`);
+        return;
+      }
+      const root: HierarchyRootState = { descriptor, item };
+      if (mode === "call") {
+        setCallHierarchyRoot(root);
+        setBottomDockTab("call-hierarchy");
+      } else {
+        setTypeHierarchyRoot(root);
+        setBottomDockTab("type-hierarchy");
+      }
+      setBottomDockOpen(true);
+    } catch (cause) {
+      setStatusMessage(errorMessage(cause));
+    }
+  }, [
+    activeEditorGroupId,
+    activeFile,
+    cursorPositions,
+    lspDescriptorForFile,
+    setBottomDockOpen,
+    setBottomDockTab,
+    setStatusMessage,
+    updateLspStatusForFile,
+  ]);
   const breadcrumbPathSegments = useMemo<BreadcrumbPathSegment[]>(() => {
     return activeFile ? breadcrumbSegmentsForFile(activeFile, roots) : [];
   }, [activeFile, roots]);
@@ -2662,6 +2719,26 @@ export function CodeWorkspaceTab({
       run: () => setRightPaneOpen((open) => !open),
     },
     {
+      id: "workspace.callHierarchy",
+      title: "Call Hierarchy",
+      category: "Navigation",
+      keybinding: "Ctrl+Alt+H",
+      keywords: ["callers", "callees", "calls"],
+      when: (context) => context.focus === "editor" && !!activeFile
+        && !!activeCapabilities?.callHierarchy,
+      run: () => void openHierarchy("call"),
+    },
+    {
+      id: "workspace.typeHierarchy",
+      title: "Type Hierarchy",
+      category: "Navigation",
+      keybinding: "Ctrl+H",
+      keywords: ["supertypes", "subtypes", "inheritance"],
+      when: (context) => context.focus === "editor" && !!activeFile
+        && !!activeCapabilities?.typeHierarchy,
+      run: () => void openHierarchy("type"),
+    },
+    {
       id: "workspace.toggleTerminal",
       title: "Toggle Workspace Terminal",
       category: "View",
@@ -2868,6 +2945,7 @@ export function CodeWorkspaceTab({
     openFile,
     openFindInFiles,
     openGitManager,
+    openHierarchy,
     openLooseFile,
     openQuickDocumentation,
     openRecentFiles,
@@ -3713,6 +3791,38 @@ export function CodeWorkspaceTab({
                 result={referencesResult}
                 roots={roots}
                 onOpenLocation={(location) => void openLspLocation(location)}
+              />
+            ),
+          },
+          {
+            id: "call-hierarchy",
+            label: "Call Hierarchy",
+            icon: <GitFork className="h-3.5 w-3.5" />,
+            content: (
+              <HierarchyPanel
+                mode="call"
+                root={callHierarchyRoot}
+                active={bottomDockOpen && bottomDockTab === "call-hierarchy"}
+                onOpenLocation={(location) => void openLspLocation(location)}
+                onStatus={(status) => {
+                  if (activeFile) updateLspStatusForFile(activeFile, status);
+                }}
+              />
+            ),
+          },
+          {
+            id: "type-hierarchy",
+            label: "Type Hierarchy",
+            icon: <Network className="h-3.5 w-3.5" />,
+            content: (
+              <HierarchyPanel
+                mode="type"
+                root={typeHierarchyRoot}
+                active={bottomDockOpen && bottomDockTab === "type-hierarchy"}
+                onOpenLocation={(location) => void openLspLocation(location)}
+                onStatus={(status) => {
+                  if (activeFile) updateLspStatusForFile(activeFile, status);
+                }}
               />
             ),
           },

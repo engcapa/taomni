@@ -12,7 +12,14 @@ import type {
 } from "../components/editor/workspace/codeWorkspaceModel";
 import { readCodeWorkspaceTreeViewMode } from "../components/editor/workspace/codeWorkspaceModel";
 
-export type BottomDockTabId = "problems" | "search" | "references" | "terminal" | "run";
+export type BottomDockTabId =
+  | "problems"
+  | "search"
+  | "references"
+  | "call-hierarchy"
+  | "type-hierarchy"
+  | "terminal"
+  | "run";
 export type EditorGroupId = "primary" | "secondary";
 export type EditorSplitOrientation = "horizontal" | "vertical";
 

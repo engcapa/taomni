@@ -39,6 +39,12 @@ const lspMocks = vi.hoisted(() => ({
   lspHover: vi.fn(),
   lspDefinition: vi.fn(),
   lspReferences: vi.fn(),
+  lspPrepareCallHierarchy: vi.fn(),
+  lspCallHierarchyIncoming: vi.fn(),
+  lspCallHierarchyOutgoing: vi.fn(),
+  lspPrepareTypeHierarchy: vi.fn(),
+  lspTypeHierarchySupertypes: vi.fn(),
+  lspTypeHierarchySubtypes: vi.fn(),
   lspDocumentSymbols: vi.fn(),
   lspCompletion: vi.fn(),
   lspCompletionResolve: vi.fn(),
@@ -203,6 +209,12 @@ describe("CodeWorkspaceTab", () => {
     lspMocks.lspHover.mockReset();
     lspMocks.lspDefinition.mockReset();
     lspMocks.lspReferences.mockReset();
+    lspMocks.lspPrepareCallHierarchy.mockReset();
+    lspMocks.lspCallHierarchyIncoming.mockReset();
+    lspMocks.lspCallHierarchyOutgoing.mockReset();
+    lspMocks.lspPrepareTypeHierarchy.mockReset();
+    lspMocks.lspTypeHierarchySupertypes.mockReset();
+    lspMocks.lspTypeHierarchySubtypes.mockReset();
     lspMocks.lspDocumentSymbols.mockReset();
     lspMocks.lspDocumentSymbols.mockResolvedValue({ status: documentStatus(), symbols: [] });
     lspMocks.lspCompletion.mockReset();
@@ -224,6 +236,12 @@ describe("CodeWorkspaceTab", () => {
     lspMocks.lspCodeActions.mockResolvedValue({ status: documentStatus(), actions: [] });
     lspMocks.lspWorkspaceSymbols.mockReset();
     lspMocks.lspWorkspaceSymbols.mockResolvedValue({ status: documentStatus(), symbols: [] });
+    lspMocks.lspPrepareCallHierarchy.mockResolvedValue({ status: documentStatus(), items: [] });
+    lspMocks.lspCallHierarchyIncoming.mockResolvedValue({ status: documentStatus(), entries: [] });
+    lspMocks.lspCallHierarchyOutgoing.mockResolvedValue({ status: documentStatus(), entries: [] });
+    lspMocks.lspPrepareTypeHierarchy.mockResolvedValue({ status: documentStatus(), items: [] });
+    lspMocks.lspTypeHierarchySupertypes.mockResolvedValue({ status: documentStatus(), items: [] });
+    lspMocks.lspTypeHierarchySubtypes.mockResolvedValue({ status: documentStatus(), items: [] });
     ipcMocks.selectFilePath.mockReset();
     ipcMocks.selectFolderPath.mockReset();
     gitMocks.gitSnapshot.mockReset();
@@ -1084,6 +1102,80 @@ describe("CodeWorkspaceTab", () => {
         filePath: "src/main.ts",
       }),
     );
+  });
+
+  it("opens call and type hierarchy from capability-gated shortcuts", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-hierarchy",
+      workspaceInstanceId: "instance-hierarchy",
+      name: "Hierarchy",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    const capabilities = {
+      completion: false,
+      signatureHelp: false,
+      hover: false,
+      definition: false,
+      typeDefinition: false,
+      implementation: false,
+      references: false,
+      documentSymbol: false,
+      workspaceSymbol: false,
+      rename: false,
+      formatting: false,
+      rangeFormatting: false,
+      codeAction: false,
+      documentHighlight: false,
+      callHierarchy: true,
+      typeHierarchy: true,
+      inlayHint: false,
+      completionTriggerCharacters: [],
+      signatureTriggerCharacters: [],
+    };
+    const hierarchyItem = {
+      name: "main",
+      detail: "module",
+      kind: 12,
+      uri: "file:///repo/app/src/main.ts",
+      path: "/repo/app/src/main.ts",
+      range: { start: { line: 0, character: 0 }, end: { line: 2, character: 1 } },
+      selectionRange: { start: { line: 0, character: 9 }, end: { line: 0, character: 13 } },
+      raw: { name: "main", data: "opaque" },
+    };
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "function main() {}"));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      available: true,
+      active: true,
+      capabilities,
+    }));
+    lspMocks.lspPrepareCallHierarchy.mockResolvedValue({
+      status: documentStatus({ available: true, active: true, capabilities }),
+      items: [hierarchyItem],
+    });
+    lspMocks.lspPrepareTypeHierarchy.mockResolvedValue({
+      status: documentStatus({ available: true, active: true, capabilities }),
+      items: [{ ...hierarchyItem, name: "Base", raw: { name: "Base" } }],
+    });
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+    const editor = screen.getByTestId("code-workspace-editor-pane");
+
+    fireEvent.keyDown(editor, { key: "h", ctrlKey: true, altKey: true });
+    await waitFor(() => expect(lspMocks.lspPrepareCallHierarchy).toHaveBeenCalled());
+    expect(screen.getByRole("tab", { name: "Call Hierarchy", selected: true })).toBeInTheDocument();
+    expect(screen.getByTestId("code-workspace-call-hierarchy-panel")).toHaveTextContent("main");
+
+    fireEvent.keyDown(editor, { key: "h", ctrlKey: true });
+    await waitFor(() => expect(lspMocks.lspPrepareTypeHierarchy).toHaveBeenCalled());
+    expect(screen.getByRole("tab", { name: "Type Hierarchy", selected: true })).toBeInTheDocument();
+    expect(screen.getByTestId("code-workspace-type-hierarchy-panel")).toHaveTextContent("Base");
   });
 
   it("offers tree context menu actions: copy path and scoped search", async () => {
