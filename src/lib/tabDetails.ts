@@ -7,11 +7,11 @@ type Translate = (key: string, args?: Record<string, string | number>) => string
 
 export interface TabDetailSummary {
   sessionLabel: string;
-  sessionDetail: string;
+  connectionLabel: string;
+  endpoint: string | null;
   activityLabel: string;
   activityState: TerminalRuntimeInfo["state"] | null;
   cwd: string | null;
-  backendSessionId: string | null;
 }
 
 function endpointForTab(tab: Tab, session?: SessionConfig): string {
@@ -23,12 +23,17 @@ function endpointForTab(tab: Tab, session?: SessionConfig): string {
   return port && port > 0 ? `${authority}:${port}` : authority;
 }
 
-function typeLabel(tab: Tab, session?: SessionConfig): string {
-  if (session?.session_type) return session.session_type;
-  if (tab.ssh) return "SSH";
-  if (tab.commandTerminal) return tab.commandTerminal.kind;
-  if (tab.type === "terminal") return "LocalShell";
-  return tab.type;
+function typeLabel(tab: Tab, session: SessionConfig | undefined, t: Translate): string {
+  if (tab.type === "terminal") {
+    if (tab.ssh) return t("tabs.detailsRemote");
+    if (tab.commandTerminal) {
+      return tab.commandTerminal.kind === "Serial"
+        ? tab.commandTerminal.kind
+        : t("tabs.detailsRemote");
+    }
+    return t("tabs.detailsLocal");
+  }
+  return session?.session_type || tab.type;
 }
 
 export function buildTabDetailSummary(
@@ -52,17 +57,16 @@ export function buildTabDetailSummary(
     sessionLabel = t("tabs.detailsNoSession");
   }
 
-  const kind = typeLabel(tab, session);
-  const sessionDetail = endpoint ? `${kind} · ${endpoint}` : kind;
+  const kind = typeLabel(tab, session, t);
 
   if (tab.type !== "terminal") {
     return {
       sessionLabel,
-      sessionDetail,
+      connectionLabel: kind,
+      endpoint: endpoint || null,
       activityLabel: t("tabs.detailsTabType", { type: kind }),
       activityState: null,
       cwd: null,
-      backendSessionId: null,
     };
   }
 
@@ -81,10 +85,10 @@ export function buildTabDetailSummary(
 
   return {
     sessionLabel,
-    sessionDetail,
+    connectionLabel: kind,
+    endpoint: endpoint || null,
     activityLabel,
     activityState: state,
     cwd: cwd ?? null,
-    backendSessionId: runtime?.backendSessionId ?? null,
   };
 }

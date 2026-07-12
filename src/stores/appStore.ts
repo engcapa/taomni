@@ -230,7 +230,7 @@ interface AppState {
   removeTab: (id: string) => void;
   removeTabs: (ids: string[]) => void;
   updateTabTitle: (id: string, title: string) => void;
-  /** Resolve a pending terminal title from its first valid cwd report. */
+  /** Resolve or refresh an automatic terminal title from a valid cwd report. */
   assignTerminalAutoTitle: (tabId: string, cwd: string) => void;
   updateGitTabInfo: (id: string, git: GitTabInfo, title?: string) => void;
   setActiveTab: (id: string) => void;
@@ -852,6 +852,11 @@ function computeSequencedTitle(sourceTitle: string, openTitles: string[], forceS
   return `${base}-${maxSuffix + 1}`;
 }
 
+function terminalAutoTitleBase(tab: Tab, cwdPrefix: string): string {
+  const sessionName = tab.terminalTitleSessionName?.trim();
+  return sessionName ? `${sessionName} · ${cwdPrefix}` : cwdPrefix;
+}
+
 export const useAppStore = create<AppState>((set) => ({
   tabs: [
     {
@@ -919,9 +924,12 @@ export const useAppStore = create<AppState>((set) => ({
       const source = s.tabs[idx];
       const terminalTitlePrefix =
         source.type === "terminal" ? overrides?.terminalTitlePrefix?.trim() : undefined;
-      const duplicateTitle = terminalTitlePrefix
+      const duplicateTitleBase = terminalTitlePrefix
+        ? terminalAutoTitleBase(source, terminalTitlePrefix)
+        : undefined;
+      const duplicateTitle = duplicateTitleBase
         ? computeDuplicateTitle(
-            terminalTitlePrefix,
+            duplicateTitleBase,
             s.tabs.filter((tab) => tab.type === "terminal").map((tab) => tab.title),
           )
         : computeDuplicateTitle(source.title, s.tabs.map((t) => t.title));
@@ -1072,18 +1080,20 @@ export const useAppStore = create<AppState>((set) => ({
       if (
         !target ||
         target.type !== "terminal" ||
-        target.terminalTitleMode !== "pending-auto"
+        (target.terminalTitleMode !== "pending-auto" && target.terminalTitleMode !== "auto")
       ) {
         return s;
       }
-      const prefix = terminalCwdTitlePrefix(cwd);
-      if (!prefix) return s;
+      const cwdPrefix = terminalCwdTitlePrefix(cwd);
+      if (!cwdPrefix) return s;
+      const prefix = terminalAutoTitleBase(target, cwdPrefix);
       const openTitles = s.tabs
         .filter((tab) => tab.id !== tabId && tab.type === "terminal")
         .map((tab) => tab.title);
       const title = target.terminalTitleOperation === "duplicate"
         ? computeDuplicateTitle(prefix, openTitles)
         : computeNewTerminalTitle(prefix, openTitles);
+      if (target.title === title && target.terminalTitleMode === "auto") return s;
       return {
         tabs: s.tabs.map((tab) =>
           tab.id === tabId ? { ...tab, title, terminalTitleMode: "auto" as const } : tab,

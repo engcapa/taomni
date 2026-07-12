@@ -1,11 +1,11 @@
 id: TC-auto-F1-5-tab-details-overlay
 title: Visible tab details overlay and active detach menu
 description: |
-  Exercises the title-bar details shortcut introduced for F1.5. A local
-  terminal supplies a second visible tab; hovering the stacked-tabs info
-  button reveals one detail card per viewport-visible tab. The case then
-  verifies that Detach is discoverable from the Open Tabs menu instead of the
-  active tab action slot.
+  Exercises all three detail-overlay entry points introduced for F1.5. A local
+  terminal supplies a second visible tab; hovering one tab title reveals only
+  its rich card, Ctrl+Shift+H toggles every viewport-visible card, and hovering
+  the stacked-tabs info button reveals them as well. The case then verifies
+  that Detach is discoverable from the Open Tabs menu.
 covers: [F1.5]
 tags: [auto-generated, smoke, needs-review, tabs, terminal]
 modes: [browser]
@@ -17,6 +17,15 @@ steps:
   - click: '[data-testid="new-local-terminal"]'
   - wait_for: '[data-testid="terminal-pane"]'
   - assert_count: {selector: '[data-testid="tab-item"]', min: 2}
+  - hover: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
+  - wait_for: '[data-testid="tab-details-overlay"]'
+  - assert_count: {selector: '[data-testid^="tab-details-card-"]', equal: 1}
+  - hover: '[data-testid="terminal-pane"]'
+  - assert_not_visible: '[data-testid="tab-details-overlay"]'
+  - press: Control+Shift+H
+  - assert_count: {selector: '[data-testid^="tab-details-card-"]', min: 2}
+  - press: Control+Shift+H
+  - assert_not_visible: '[data-testid="tab-details-overlay"]'
   - hover: '[data-testid="tab-details-hover"]'
   - wait_for: '[data-testid="tab-details-overlay"]'
   - assert_count: {selector: '[data-testid^="tab-details-card-"]', min: 2}

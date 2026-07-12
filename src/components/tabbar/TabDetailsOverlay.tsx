@@ -7,7 +7,7 @@ import { buildTabDetailSummary } from "../../lib/tabDetails";
 import { useT } from "../../lib/i18n";
 
 const CARD_WIDTH = 250;
-const CARD_HEIGHT = 126;
+const CARD_HEIGHT = 116;
 const CARD_GAP = 8;
 const VIEWPORT_MARGIN = 8;
 
@@ -23,6 +23,8 @@ interface TabDetailsOverlayProps {
   tabs: readonly Tab[];
   tabElements: ReadonlyMap<string, HTMLElement>;
   scrollRef: RefObject<HTMLDivElement | null>;
+  /** When set, render only the hovered tab instead of every visible tab. */
+  tabId?: string | null;
 }
 
 function stateColor(state: ReturnType<typeof buildTabDetailSummary>["activityState"]): string {
@@ -40,7 +42,13 @@ function stateColor(state: ReturnType<typeof buildTabDetailSummary>["activitySta
   }
 }
 
-export function TabDetailsOverlay({ open, tabs, tabElements, scrollRef }: TabDetailsOverlayProps) {
+export function TabDetailsOverlay({
+  open,
+  tabs,
+  tabElements,
+  scrollRef,
+  tabId = null,
+}: TabDetailsOverlayProps) {
   const t = useT();
   const sessions = useSessionStore((s) => s.sessions);
   const runtimeByTab = useAppStore((s) => s.terminalRuntimeByTab);
@@ -57,6 +65,7 @@ export function TabDetailsOverlay({ open, tabs, tabElements, scrollRef }: TabDet
     if (!scroll) return;
     const clip = scroll.getBoundingClientRect();
     const candidates = tabs
+      .filter((tab) => !tabId || tab.id === tabId)
       .map((tab) => ({ tab, rect: tabElements.get(tab.id)?.getBoundingClientRect() }))
       .filter((item): item is { tab: Tab; rect: DOMRect } => !!item.rect)
       .filter(({ rect }) =>
@@ -88,7 +97,7 @@ export function TabDetailsOverlay({ open, tabs, tabElements, scrollRef }: TabDet
       });
     }
     setPlacements(next);
-  }, [open, scrollRef, tabElements, tabs]);
+  }, [open, scrollRef, tabElements, tabId, tabs]);
 
   useLayoutEffect(() => {
     measure();
@@ -141,17 +150,27 @@ export function TabDetailsOverlay({ open, tabs, tabElements, scrollRef }: TabDet
                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: stateColor(summary.activityState) }} />
               )}
             </div>
-            <div className="mt-1 truncate" title={summary.sessionLabel}>{summary.sessionLabel}</div>
-            <div className="truncate text-[var(--taomni-text-muted)]" title={summary.sessionDetail}>{summary.sessionDetail}</div>
-            <div className="mt-1 truncate" title={summary.activityLabel}>{summary.activityLabel}</div>
-            <div className="truncate text-[var(--taomni-text-muted)]" title={summary.cwd ?? undefined}>
-              {summary.cwd ?? t("tabs.detailsCwdUnknown")}
+            <div className="mt-1 flex min-w-0 items-center gap-1">
+              <span className="shrink-0 text-[var(--taomni-text-muted)]">{summary.connectionLabel}</span>
+              <span className="text-[var(--taomni-text-muted)]">·</span>
+              <span className="min-w-0 truncate" title={summary.sessionLabel}>{summary.sessionLabel}</span>
             </div>
-            {summary.backendSessionId && (
-              <div className="truncate text-[10px] text-[var(--taomni-text-muted)]" title={summary.backendSessionId}>
-                {t("tabs.detailsSessionId", { id: summary.backendSessionId })}
+            {summary.endpoint && (
+              <div className="truncate text-[10px] text-[var(--taomni-text-muted)]" title={summary.endpoint}>
+                {summary.endpoint}
               </div>
             )}
+            {tab.type === "terminal" && (
+              <div
+                className="mt-1 truncate text-[12px] font-semibold"
+                title={summary.cwd ?? undefined}
+              >
+                {summary.cwd ?? t("tabs.detailsCwdUnknown")}
+              </div>
+            )}
+            <div className="truncate text-[var(--taomni-text-muted)]" title={summary.activityLabel}>
+              {summary.activityLabel}
+            </div>
           </div>
         );
       })}

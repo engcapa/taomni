@@ -269,7 +269,7 @@ describe("appStore terminal automatic titles", () => {
     });
   });
 
-  it("resolves a new terminal once from the first cwd and sequences its family", () => {
+  it("resolves a new terminal from cwd, sequences its family, and follows later cd changes", () => {
     useAppStore.setState({
       tabs: [
         tab("existing", { title: "taomni" }),
@@ -285,7 +285,24 @@ describe("appStore terminal automatic titles", () => {
     expect(useAppStore.getState().tabs[1]).toMatchObject({ title: "taomni-1", terminalTitleMode: "auto" });
 
     useAppStore.getState().assignTerminalAutoTitle("pending", "/tmp/other");
-    expect(useAppStore.getState().tabs[1].title).toBe("taomni-1");
+    expect(useAppStore.getState().tabs[1].title).toBe("other");
+  });
+
+  it("keeps a saved remote session name before the live cwd", () => {
+    useAppStore.setState({
+      tabs: [tab("remote", {
+        title: "Production",
+        terminalTitleMode: "pending-auto",
+        terminalTitleOperation: "new",
+        terminalTitleSessionName: "Production",
+      })],
+    });
+
+    useAppStore.getState().assignTerminalAutoTitle("remote", "/srv/taomni");
+    expect(useAppStore.getState().tabs[0].title).toBe("Production · taomni");
+
+    useAppStore.getState().assignTerminalAutoTitle("remote", "/var/log");
+    expect(useAppStore.getState().tabs[0].title).toBe("Production · log");
   });
 
   it("keeps duplicate force-suffix semantics when resolving a cwd family", () => {
@@ -326,6 +343,21 @@ describe("appStore terminal automatic titles", () => {
       terminalTitleMode: "auto",
       terminalTitleOperation: "duplicate",
     });
+  });
+
+  it("keeps the remote session name when duplicating a known cwd", () => {
+    useAppStore.setState({
+      tabs: [tab("source", {
+        title: "Production · repo",
+        terminalTitleMode: "auto",
+        terminalTitleSessionName: "Production",
+      })],
+    });
+    useAppStore.getState().duplicateTab("source", {
+      terminalInitialCwd: "/srv/repo",
+      terminalTitlePrefix: "repo",
+    });
+    expect(useAppStore.getState().tabs[1].title).toBe("Production · repo-1");
   });
 
   it("continues the source cwd title family when duplicating an auto-named tab", () => {

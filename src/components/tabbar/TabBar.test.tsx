@@ -249,13 +249,37 @@ describe("TabBar overflow navigation", () => {
     expect(useAppStore.getState().activeTabId).toBe("t-cap");
   });
 
-  it("shows the tab's full title as a tooltip", () => {
+  it("shows the rich detail card instead of a native title tooltip when a tab title is hovered", async () => {
+    useAppStore.setState({
+      tabs: [makeTab(0), makeTab(1)],
+      activeTabId: "tab-0",
+      cwdByTab: { "tab-0": "/work/taomni" },
+    });
     renderTabBar();
+    const scrollArea = screen.getByTestId("tab-scroll-area");
+    vi.spyOn(scrollArea, "getBoundingClientRect").mockReturnValue({
+      x: 0, y: 0, left: 0, top: 0, right: 360, bottom: 32,
+      width: 360, height: 32, toJSON: () => ({}),
+    });
     const tabItems = screen.getAllByTestId("tab-item");
-    expect(tabItems[0]).toHaveAttribute("title", "Terminal 0");
+    vi.spyOn(tabItems[0], "getBoundingClientRect").mockReturnValue({
+      x: 0, y: 0, left: 0, top: 0, right: 110, bottom: 32,
+      width: 110, height: 32, toJSON: () => ({}),
+    });
+
+    expect(tabItems[0]).not.toHaveAttribute("title");
+    fireEvent.mouseEnter(within(tabItems[0]).getByTestId("tab-title"));
+
+    const card = await screen.findByTestId("tab-details-card-tab-0");
+    expect(card).toHaveTextContent("/work/taomni");
+    expect(within(card).getByText("/work/taomni")).toHaveClass("font-semibold");
+    expect(screen.queryByTestId("tab-details-card-tab-1")).not.toBeInTheDocument();
+
+    fireEvent.mouseLeave(within(tabItems[0]).getByTestId("tab-title"));
+    await waitFor(() => expect(screen.queryByTestId("tab-details-overlay")).not.toBeInTheDocument());
   });
 
-  it("reveals details for every viewport-visible tab only while Ctrl+Shift+H is held", async () => {
+  it("toggles details for every viewport-visible tab with the Linux Ctrl+Shift+H shortcut", async () => {
     useAppStore.setState({
       tabs: [makeTab(0), makeTab(1), makeTab(2)],
       activeTabId: "tab-0",
@@ -279,7 +303,12 @@ describe("TabBar overflow navigation", () => {
       });
     });
 
-    fireEvent.keyDown(window, { key: "H", ctrlKey: true, shiftKey: true });
+    fireEvent.keyDown(window, {
+      key: "Unidentified",
+      code: "KeyH",
+      ctrlKey: true,
+      shiftKey: true,
+    });
 
     expect(await screen.findByTestId("tab-details-overlay")).toBeInTheDocument();
     expect(screen.getByTestId("tab-details-card-tab-0")).toHaveTextContent("Running · vite");
@@ -287,7 +316,10 @@ describe("TabBar overflow navigation", () => {
     expect(screen.getByTestId("tab-details-card-tab-1")).toBeInTheDocument();
     expect(screen.getByTestId("tab-details-card-tab-2")).toBeInTheDocument();
 
-    fireEvent.keyUp(window, { key: "H", ctrlKey: true, shiftKey: true });
+    fireEvent.keyUp(window, { key: "H", code: "KeyH", ctrlKey: true, shiftKey: true });
+    expect(screen.getByTestId("tab-details-overlay")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "H", code: "KeyH", ctrlKey: true, shiftKey: true });
     await waitFor(() => expect(screen.queryByTestId("tab-details-overlay")).not.toBeInTheDocument());
   });
 });

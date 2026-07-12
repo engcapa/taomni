@@ -112,8 +112,9 @@ export function TabBar({
   const [dropIndicator, setDropIndicator] = useState<DropIndicator>(null);
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
-  const [detailsRevealHeld, setDetailsRevealHeld] = useState(false);
-  const detailsReveal = detailsRevealHeld || detailsRevealExternal;
+  const [detailsRevealShortcut, setDetailsRevealShortcut] = useState(false);
+  const [hoveredDetailsTabId, setHoveredDetailsTabId] = useState<string | null>(null);
+  const detailsReveal = detailsRevealShortcut || detailsRevealExternal;
   const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
   const [wslDistros, setWslDistros] = useState<{ name: string; isDefault: boolean }[]>([]);
   const [shellsLoaded, setShellsLoaded] = useState(false);
@@ -196,7 +197,7 @@ export function TabBar({
   useEffect(() => {
     const isMac = getAppPlatform() === "macos";
     const matchesShortcut = (event: KeyboardEvent) =>
-      event.key.toLowerCase() === "h" &&
+      (event.code === "KeyH" || event.key.toLowerCase() === "h") &&
       event.shiftKey &&
       !event.altKey &&
       (isMac
@@ -204,33 +205,26 @@ export function TabBar({
         : event.ctrlKey && !event.metaKey);
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setDetailsRevealShortcut(false);
+        return;
+      }
       if (event.isComposing || !matchesShortcut(event)) return;
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      setDetailsRevealHeld(true);
+      if (!event.repeat) setDetailsRevealShortcut((visible) => !visible);
     };
-    const onKeyUp = (event: KeyboardEvent) => {
-      if (!["h", "shift", isMac ? "meta" : "control"].includes(event.key.toLowerCase())) return;
-      setDetailsRevealHeld(false);
-      if (event.key.toLowerCase() === "h") {
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-      }
-    };
-    const hide = () => setDetailsRevealHeld(false);
+    const hide = () => setDetailsRevealShortcut(false);
     const onVisibilityChange = () => {
       if (document.visibilityState === "hidden") hide();
     };
 
     window.addEventListener("keydown", onKeyDown, true);
-    window.addEventListener("keyup", onKeyUp, true);
     window.addEventListener("blur", hide);
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       window.removeEventListener("keydown", onKeyDown, true);
-      window.removeEventListener("keyup", onKeyUp, true);
       window.removeEventListener("blur", hide);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
@@ -467,16 +461,17 @@ export function TabBar({
   return (
     <div
       data-testid="tab-bar"
-      data-details-reveal={detailsReveal || undefined}
+      data-details-reveal={(detailsReveal || hoveredDetailsTabId !== null) || undefined}
       className="taomni-tabbar h-8 flex items-end pl-2 pr-1 pt-1.5 gap-0 overflow-hidden"
       style={{ background: "linear-gradient(to bottom, var(--taomni-tab-inactive), var(--taomni-chrome-bg))" }}
     >
       {ctx.render}
       <TabDetailsOverlay
-        open={detailsReveal}
+        open={detailsReveal || hoveredDetailsTabId !== null}
         tabs={visibleTabs}
         tabElements={tabElementRefs.current}
         scrollRef={tabScrollRef}
+        tabId={detailsReveal ? null : hoveredDetailsTabId}
       />
       {tabFilter && (
         <button
@@ -578,6 +573,10 @@ export function TabBar({
               onCommitRename={commitRename}
               onCancelRename={cancelRename}
               onStartRename={startRename}
+              onShowDetails={setHoveredDetailsTabId}
+              onHideDetails={(tabId) =>
+                setHoveredDetailsTabId((current) => (current === tabId ? null : current))
+              }
               onToggleMultiExecTab={toggleMultiExecTab}
               onRemove={removeTab}
             />
@@ -739,6 +738,8 @@ interface TabItemProps {
   onCommitRename: () => void;
   onCancelRename: () => void;
   onStartRename: (tab: Tab) => void;
+  onShowDetails: (id: string) => void;
+  onHideDetails: (id: string) => void;
   onToggleMultiExecTab: (id: string) => void;
   onRemove: (id: string) => void;
 }
@@ -767,6 +768,8 @@ function TabItem(props: TabItemProps) {
     onCommitRename,
     onCancelRename,
     onStartRename,
+    onShowDetails,
+    onHideDetails,
     onToggleMultiExecTab,
     onRemove,
   } = props;
@@ -805,7 +808,6 @@ function TabItem(props: TabItemProps) {
       data-drop-side={dropSide}
       className="taomni-tab relative"
       data-active={active}
-      title={editing ? undefined : tab.title}
       onClick={() => onActivate(tab)}
       onMouseDown={(e) => {
         if (editing) return;
@@ -851,6 +853,8 @@ function TabItem(props: TabItemProps) {
       <span
         data-testid="tab-title"
         className="truncate max-w-[180px]"
+        onMouseEnter={() => onShowDetails(tab.id)}
+        onMouseLeave={() => onHideDetails(tab.id)}
         onDoubleClick={(e) => {
           e.stopPropagation();
           onStartRename(tab);

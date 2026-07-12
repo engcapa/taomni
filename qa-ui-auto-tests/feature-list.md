@@ -225,8 +225,8 @@ controls:
 - **新建标签 split-button**（Windows Terminal 风格 `+ ▾`）：`+`（`new-local-terminal`）直接开默认本地终端；`▾`（`new-tab-launch-menu`）打开快速启动菜单，列出全部本地 shell（含检测到的 WSL 发行版，`launch-menu-shell-<id>`）、最近会话子菜单（`launch-menu-recent-<id>`）、以及 `New session…`（`launch-menu-new-session`）打开会话编辑器
 - **拖拽排序**：标签通过 `customDnD` 指针驱动层重新排列，拖拽时显示 drop indicator
 - **重命名**：双击标签标题或右键菜单 "Rename" 进入内联编辑，Enter 确认 / Esc 取消 / 失焦自动提交
-- **终端目录自动命名**：新开本地/SSH terminal 在首次取得 cwd 后以末级目录命名；复制 terminal 使用源 cwd 并延续 `-N` 家族编号；手动重命名后不再自动覆盖
-- **可见标签详情层**：按住 `Ctrl+Shift+H`（macOS 为 `Cmd+Shift+H`）或 hover/focus tab 右侧的叠放标签信息按钮，同时展示视口内标签的所属 session、运行程序、cwd 和连接状态
+- **终端目录自动命名**：未手动命名的本地/SSH terminal 标题随 cwd 末级目录持续更新；远程标题始终以 session 名开头；复制 terminal 使用源 cwd 并延续 `-N` 家族编号
+- **可见标签详情层**：按 `Ctrl+Shift+H`（macOS 为 `Cmd+Shift+H`）切换所有可见标签详情；hover 单个标签标题只展示该标签，hover/focus 右侧叠放标签信息按钮则展示全部；详情突出 cwd，并简洁显示本地/远程、session、endpoint 和运行状态
 - **Detach 收纳**：主窗口 terminal/RDP/VNC/DB 的 Detach 从 tab action slot 移入 `⋯` Open Tabs 菜单，原位置由标签详情按钮替代
 - 标签右键菜单：关闭、关闭其他、关闭全部、复制标签、新建本地终端、重命名、Move to first/left/right/last
 - SSH / SFTP / VNC 标签 **常驻挂载**（切换标签不销毁，传输/输出/连接不中断）

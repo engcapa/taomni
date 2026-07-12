@@ -1283,6 +1283,7 @@ describe("MainLayout attached SFTP sidebar", () => {
         fontSize: 18,
         theme: "kanagawa-wave",
       });
+      expect(tab?.terminalTitleSessionName).toBe("Default SSH");
     });
   });
 
@@ -1326,6 +1327,7 @@ describe("MainLayout attached SFTP sidebar", () => {
     expect(terminal).toHaveAttribute("data-command-host", host);
     expect(terminal).toHaveAttribute("data-command-port", String(port));
     expect(terminal).toHaveAttribute("data-command-username", username);
+    expect(useAppStore.getState().tabs.find((tab) => tab.sessionId === id)?.terminalTitleSessionName).toBe(name);
     await waitFor(() => expect(markSessionConnected).toHaveBeenCalledWith(id));
     expect(useAppStore.getState().tabs.some((tab) => tab.type === "placeholder")).toBe(false);
   });

@@ -404,13 +404,15 @@ export interface Tab {
   hasNewOutput?: boolean;
   /**
    * Ownership of a terminal tab title. Fresh terminals keep their launch label
-   * only as a placeholder until the first valid cwd arrives. Once a cwd-based
-   * title is assigned it stays stable across later `cd`s; an explicit rename
-   * permanently opts the tab out of automatic naming.
+   * only as a placeholder until the first valid cwd arrives. Automatic titles
+   * continue following later `cd`s; an explicit rename permanently opts the
+   * tab out of automatic naming.
    */
   terminalTitleMode?: "pending-auto" | "auto" | "manual";
   /** The sequencing rule to use when a pending automatic title is resolved. */
   terminalTitleOperation?: "new" | "duplicate";
+  /** Saved remote-session name kept at the front of cwd-derived titles. */
+  terminalTitleSessionName?: string;
   /**
    * One-shot starting directory for a freshly opened local/SSH terminal tab.
    * Set when a terminal tab is duplicated so the copy lands in the same

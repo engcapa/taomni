@@ -40,10 +40,10 @@ describe("buildTabDetailSummary", () => {
       t,
     )).toMatchObject({
       sessionLabel: "Production",
-      sessionDetail: "SSH · root@10.0.0.8:22",
+      connectionLabel: "tabs.detailsRemote",
+      endpoint: "root@10.0.0.8:22",
       activityLabel: "tabs.detailsRunningProgram:vite",
       cwd: "/srv/taomni",
-      backendSessionId: "runtime-1",
     });
   });
 
@@ -51,6 +51,8 @@ describe("buildTabDetailSummary", () => {
     const tab: Tab = { id: "local", type: "terminal", title: "home", closable: true };
     expect(buildTabDetailSummary(tab, [], { state: "idle", updatedAt: 1 }, "/home/ada", t)).toMatchObject({
       sessionLabel: "tabs.detailsTemporaryLocal",
+      connectionLabel: "tabs.detailsLocal",
+      endpoint: null,
       activityLabel: "tabs.detailsIdle:tabs.detailsShell",
     });
   });

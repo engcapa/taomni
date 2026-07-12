@@ -36,7 +36,7 @@ import {
 } from "../../lib/detachedSession";
 import { closeCurrentDetachedWindow } from "../../lib/detachWindowing";
 import type { RdpOptions } from "../../types/rdp";
-import type { DbConnectInfo, TabKind } from "../../types";
+import type { DbConnectInfo, Tab, TabKind } from "../../types";
 import type { TerminalProfile } from "../../lib/terminalProfile";
 import type { CommandTerminalConnectInfo, SshConnectInfo } from "../terminal/TerminalPanel";
 import type { LocalShellSelection } from "../../types";
@@ -86,6 +86,9 @@ export interface DetachedVncParams {
 export interface DetachedTerminalParams {
   tabId?: string;
   title?: string;
+  terminalTitleMode?: Tab["terminalTitleMode"];
+  terminalTitleOperation?: Tab["terminalTitleOperation"];
+  terminalTitleSessionName?: string;
   ssh?: SshConnectInfo | null;
   commandTerminal?: CommandTerminalConnectInfo | null;
   localShell?: LocalShellSelection | null;
