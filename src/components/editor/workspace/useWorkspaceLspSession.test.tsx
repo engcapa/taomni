@@ -139,4 +139,54 @@ describe("useWorkspaceLspSession", () => {
     await act(async () => pending);
     expect(lspFiles[file.key]?.syncedText).toBeNull();
   });
+
+  it("coalesces edits during open and follows with only the latest buffer", async () => {
+    let resolveOpen!: (value: LspDocumentStatus) => void;
+    lspMocks.lspOpenDocument.mockImplementation(() => new Promise<LspDocumentStatus>((resolve) => {
+      resolveOpen = resolve;
+    }));
+    const edited = { ...file, text: "const value = 2;", dirty: true };
+    const latest = { ...file, text: "const value = 3;", dirty: true };
+    const openFilesRef: { current: Record<string, OpenFileState> } = {
+      current: { [file.key]: file },
+    };
+    let lspFiles: Record<string, LspFileState> = {};
+    const updateLspFiles = vi.fn((updater: Record<string, LspFileState> | ((current: Record<string, LspFileState>) => Record<string, LspFileState>)) => {
+      lspFiles = typeof updater === "function" ? updater(lspFiles) : updater;
+    });
+    const { result } = renderHook(() => useWorkspaceLspSession({
+      workspaceInstanceId: "workspace-1",
+      roots,
+      openFilesRef,
+      updateLspFiles,
+      onError: vi.fn(),
+    }));
+
+    let initialSync!: Promise<void>;
+    act(() => {
+      initialSync = result.current.syncDocument(file, "open");
+    });
+    await waitFor(() => expect(lspMocks.lspOpenDocument).toHaveBeenCalledOnce());
+    await act(async () => {
+      openFilesRef.current[file.key] = edited;
+      await result.current.syncDocument(edited, "open");
+      openFilesRef.current[file.key] = latest;
+      await result.current.syncDocument(latest, "open");
+    });
+    expect(lspMocks.lspOpenDocument).toHaveBeenCalledOnce();
+    expect(lspMocks.lspChangeDocument).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveOpen(status);
+      await initialSync;
+    });
+    expect(lspMocks.lspChangeDocument).toHaveBeenCalledOnce();
+    expect(lspMocks.lspChangeDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ filePath: "src/main.ts" }),
+      latest.text,
+      2,
+    );
+    expect(lspFiles[file.key]?.syncedText).toBe(latest.text);
+    expect(lspFiles[file.key]?.syncing).toBe(false);
+  });
 });
