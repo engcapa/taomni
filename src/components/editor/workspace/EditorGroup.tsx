@@ -215,53 +215,69 @@ export function EditorGroup({
       style={editorPaneStyle}
     >
       {openOrder.length > 0 && (
-        <div className="h-8 shrink-0 flex items-end overflow-x-auto border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]">
-          {orderedKeys.map((key) => {
-            const file = openFiles[key];
-            if (!file) return null;
-            const active = key === activeKey;
-            const preview = key === previewKey;
-            const pinned = pinnedSet.has(key);
-            return (
-              <div
-                key={key}
-                data-active={active || undefined}
-                data-preview={preview || undefined}
-                data-pinned={pinned || undefined}
-                className="h-[var(--taomni-code-editor-tab-height)] min-w-[130px] max-w-[240px] flex items-center border-r border-[var(--taomni-code-border)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
-              >
-                <button
-                  type="button"
-                  className="min-w-0 flex-1 h-full flex items-center gap-1.5 px-2 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
-                  title={file.subtitle}
-                  onClick={() => onActivate(key)}
-                  onDoubleClick={() => onPromotePreview(key)}
-                  onAuxClick={(event) => {
-                    if (event.button === 1) onClose(key);
-                  }}
-                  onContextMenu={(event) => showTabMenu(event, key)}
+        <div
+          data-testid="code-workspace-editor-tab-strip"
+          className="shrink-0 flex items-stretch border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]"
+          style={{ height: "var(--taomni-code-editor-tab-height)" }}
+        >
+          {/*
+            Scroll track is height-matched to tab content via the CSS token (not rem h-8,
+            which collapses to 24px under the 12px app root font). Classic native scrollbars
+            are suppressed via taomni-tab-scroll so they cannot steal vertical space.
+          */}
+          <div
+            data-testid="code-workspace-editor-tab-scroll"
+            className="taomni-tab-scroll min-w-0 flex-1 flex items-stretch overflow-x-auto overflow-y-hidden"
+          >
+            {orderedKeys.map((key) => {
+              const file = openFiles[key];
+              if (!file) return null;
+              const active = key === activeKey;
+              const preview = key === previewKey;
+              const pinned = pinnedSet.has(key);
+              return (
+                <div
+                  key={key}
+                  data-editor-tab-key={key}
+                  data-active={active || undefined}
+                  data-preview={preview || undefined}
+                  data-pinned={pinned || undefined}
+                  className="h-full min-w-[96px] max-w-[240px] flex items-center border-r border-[var(--taomni-code-border)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
                 >
-                  <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-                  {pinned && <Pin className="h-3 w-3 shrink-0" />}
-                  <span className={`truncate ${preview ? "italic" : ""}`}>{file.title}</span>
-                  {file.dirty && <span className="text-[var(--taomni-accent)]">*</span>}
-                </button>
-                <button
-                  type="button"
-                  className="h-full w-6 shrink-0 inline-flex items-center justify-center hover:bg-[var(--taomni-code-active-line-bg)]"
-                  title="Close"
-                  onClick={() => onClose(key)}
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            );
-          })}
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 h-full flex items-center gap-1.5 px-2 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
+                    title={file.subtitle}
+                    onClick={() => onActivate(key)}
+                    onDoubleClick={() => onPromotePreview(key)}
+                    onAuxClick={(event) => {
+                      if (event.button === 1) onClose(key);
+                    }}
+                    onContextMenu={(event) => showTabMenu(event, key)}
+                  >
+                    <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+                    {pinned && <Pin className="h-3 w-3 shrink-0" />}
+                    <span className={`truncate ${preview ? "italic" : ""}`}>{file.title}</span>
+                    {file.dirty && <span className="text-[var(--taomni-accent)]">*</span>}
+                  </button>
+                  <button
+                    type="button"
+                    className="h-full w-6 shrink-0 inline-flex items-center justify-center hover:bg-[var(--taomni-code-active-line-bg)]"
+                    title="Close"
+                    onClick={() => onClose(key)}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
           {openOrder.length > 1 && (
             <button
               type="button"
+              data-testid="code-workspace-editor-tabs-menu"
               aria-label="Show all editor tabs"
-              className="ml-auto h-full w-7 shrink-0 inline-flex items-center justify-center hover:bg-[var(--taomni-code-active-line-bg)]"
+              className="h-full w-7 shrink-0 inline-flex items-center justify-center border-l border-[var(--taomni-code-border)] hover:bg-[var(--taomni-code-active-line-bg)]"
               onClick={(event) => {
                 const rect = event.currentTarget.getBoundingClientRect();
                 tabMenu.showAt(rect.right, rect.bottom, orderedKeys.map((key) => ({

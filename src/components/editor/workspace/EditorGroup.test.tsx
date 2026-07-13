@@ -154,4 +154,33 @@ describe("EditorGroup tabs", () => {
     expect(onRevealInSystem).toHaveBeenCalledWith("b");
     expect(onOpenInTerminal).toHaveBeenCalledWith("b");
   });
+
+  it("matches strip height to the editor tab height token and hides layout-eating scroll chrome", () => {
+    const many = Array.from({ length: 12 }, (_, i) => `f${i}`);
+    const openFiles = Object.fromEntries(many.map((key) => [key, file(key)]));
+    render(<EditorGroup {...props({
+      openOrder: many,
+      openFiles,
+      activeKey: many[many.length - 1],
+      previewKey: null,
+      pinnedKeys: [],
+      activeFile: openFiles[many[many.length - 1]],
+    })} />);
+
+    const strip = screen.getByTestId("code-workspace-editor-tab-strip");
+    const scroll = screen.getByTestId("code-workspace-editor-tab-scroll");
+    const menu = screen.getByTestId("code-workspace-editor-tabs-menu");
+
+    expect(strip.style.height).toBe("var(--taomni-code-editor-tab-height)");
+    expect(strip.className).not.toMatch(/\bh-8\b/);
+    expect(scroll.className).toContain("taomni-tab-scroll");
+    expect(scroll.className).toContain("overflow-x-auto");
+    expect(scroll.className).toContain("overflow-y-hidden");
+    // All-tabs control must stay pinned outside the scrolling track.
+    expect(scroll.contains(menu)).toBe(false);
+    expect(strip.contains(menu)).toBe(true);
+    expect(scroll.querySelectorAll("[data-editor-tab-key]")).toHaveLength(12);
+    const firstTab = scroll.querySelector("[data-editor-tab-key]") as HTMLElement;
+    expect(firstTab.className).toMatch(/min-w-\[96px\]/);
+  });
 });
