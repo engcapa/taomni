@@ -1,24 +1,20 @@
-import type { CSSProperties, KeyboardEvent, ReactNode, RefObject } from "react";
+import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode, RefObject } from "react";
 import {
   ChevronDown,
   ChevronRight,
   Columns2,
-  File,
-  FilePlus,
-  FolderOpen,
-  FolderPlus,
   Info,
   List,
   ListTree,
-  Pencil,
+  MoreHorizontal,
   RefreshCw,
   Search,
   Server,
-  Trash2,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
 import type { LspDocumentStatus, LspServerStatus } from "../../../lib/editor/lsp";
+import { useContextMenu } from "../../ContextMenu";
 import { FilterClearButton } from "./workspaceChrome";
 
 export type FileTreeViewMode = "tree" | "compact" | "flat";
@@ -69,7 +65,7 @@ interface FileTreePaneProps {
 interface TreeIconButtonProps {
   label: string;
   icon: ReactNode;
-  onClick: () => void;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   testId?: string;
   active?: boolean;
   disabled?: boolean;
@@ -123,6 +119,19 @@ export function FileTreePane({
   languageServers,
   onKeyDown,
 }: FileTreePaneProps) {
+  const toolbarMenu = useContextMenu();
+  const openToolbarOverflow = (event: MouseEvent<HTMLElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    toolbarMenu.showAt(rect.right, rect.bottom, [
+      { label: "Open file", onClick: onOpenFile },
+      { label: "Add folder", onClick: onAddFolder },
+      { label: "New file", disabled: !canCreate, onClick: onCreateFile },
+      { label: "New directory", disabled: !canCreate, onClick: onCreateDirectory },
+      { separator: true, label: "" },
+      { label: "Rename", disabled: !canMutateSelection, onClick: onRename },
+      { label: "Delete or remove", disabled: !canMutateSelection, onClick: onDelete },
+    ]);
+  };
   return (
     <aside
       ref={paneRef}
@@ -132,7 +141,15 @@ export function FileTreePane({
       style={style}
       onKeyDown={onKeyDown}
     >
-      <div className="h-9 shrink-0 flex items-center gap-2 overflow-x-auto px-2 border-b border-[var(--taomni-code-border)]">
+      {/*
+        Fixed 32px row (not rem h-9 → ~27px under 12px root). Primary filter/view/zoom
+        stay inline; lower-frequency file actions live in a pinned overflow menu so a
+        narrow project pane never needs a classic thick horizontal scrollbar.
+      */}
+      <div
+        data-testid="code-workspace-tree-toolbar"
+        className="h-[32px] shrink-0 flex items-center gap-1.5 px-2 border-b border-[var(--taomni-code-border)]"
+      >
         <Search className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
         <div className="min-w-0 flex-1 flex items-center gap-0.5">
           <input
@@ -150,7 +167,7 @@ export function FileTreePane({
             onClear={() => onFilterChange("")}
           />
         </div>
-        <div className="flex shrink-0 items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1">
+        <div className="flex shrink-0 items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-0.5">
           <TreeIconButton
             label="Tree view"
             testId="code-workspace-view-tree"
@@ -173,7 +190,7 @@ export function FileTreePane({
             onClick={() => onViewModeChange("flat")}
           />
         </div>
-        <div className="flex shrink-0 items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1">
+        <div className="flex shrink-0 items-center gap-0.5 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-0.5">
           <TreeIconButton
             label="Tree zoom out"
             testId="code-workspace-tree-zoom-out"
@@ -186,7 +203,7 @@ export function FileTreePane({
             data-testid="code-workspace-tree-zoom-reset"
             title="Reset tree zoom"
             aria-label="Reset tree zoom"
-            className="h-6 min-w-10 rounded px-1.5 text-[11px] tabular-nums text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+            className="h-6 min-w-8 rounded px-1 text-[11px] tabular-nums text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
             onClick={() => onFontSizeChange(defaultFontSize)}
           >
             {fontSize}px
@@ -199,12 +216,12 @@ export function FileTreePane({
             onClick={() => onFontSizeChange(fontSize + 1)}
           />
         </div>
-        <TreeIconButton label="Open file" icon={<File className="w-3.5 h-3.5" />} onClick={onOpenFile} />
-        <TreeIconButton label="Add folder" icon={<FolderOpen className="w-3.5 h-3.5" />} onClick={onAddFolder} />
-        <TreeIconButton label="New file" icon={<FilePlus className="w-3.5 h-3.5" />} disabled={!canCreate} onClick={onCreateFile} />
-        <TreeIconButton label="New directory" icon={<FolderPlus className="w-3.5 h-3.5" />} disabled={!canCreate} onClick={onCreateDirectory} />
-        <TreeIconButton label="Rename" icon={<Pencil className="w-3.5 h-3.5" />} disabled={!canMutateSelection} onClick={onRename} />
-        <TreeIconButton label="Delete or remove" icon={<Trash2 className="w-3.5 h-3.5" />} disabled={!canMutateSelection} onClick={onDelete} />
+        <TreeIconButton
+          label="More tree actions"
+          testId="code-workspace-tree-toolbar-more"
+          icon={<MoreHorizontal className="w-3.5 h-3.5" />}
+          onClick={openToolbarOverflow}
+        />
       </div>
       <div
         data-testid="code-workspace-tree"
@@ -214,6 +231,7 @@ export function FileTreePane({
         {children}
       </div>
       <LanguageServersPanel {...languageServers} />
+      {toolbarMenu.render}
     </aside>
   );
 }
