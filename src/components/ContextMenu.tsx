@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useLayoutEffect, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { forwardRef, useCallback, useLayoutEffect, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ChevronRight } from "lucide-react";
 
@@ -271,11 +271,16 @@ export function useContextMenu() {
 
   const close = useCallback(() => setMenu(null), []);
 
-  const render = menu ? (
-    <ContextMenu items={menu.items} x={menu.x} y={menu.y} onClose={close} />
-  ) : null;
-
-  return { show, showAt, refreshItems, close, render, isOpen: menu !== null };
+  return useMemo(() => ({
+    show,
+    showAt,
+    refreshItems,
+    close,
+    render: menu ? (
+      <ContextMenu items={menu.items} x={menu.x} y={menu.y} onClose={close} />
+    ) : null,
+    isOpen: menu !== null,
+  }), [close, menu, refreshItems, show, showAt]);
 }
 
 function slugForTestId(value: string): string {

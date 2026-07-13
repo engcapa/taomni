@@ -5,29 +5,48 @@ import "./index.css";
 
 interface RootErrorBoundaryState {
   error: unknown;
+  componentStack: string;
 }
 
 class RootErrorBoundary extends React.Component<{ children: React.ReactNode }, RootErrorBoundaryState> {
-  state: RootErrorBoundaryState = { error: null };
+  state: RootErrorBoundaryState = { error: null, componentStack: "" };
 
   static getDerivedStateFromError(error: unknown): RootErrorBoundaryState {
-    return { error };
+    return { error, componentStack: "" };
   }
 
-  componentDidCatch(error: unknown) {
-    console.error("[startup] React render failed", error);
+  componentDidCatch(error: unknown, info: React.ErrorInfo) {
+    const componentStack = info.componentStack ?? "";
+    console.error("[ui] React render failed", error, componentStack);
+    this.setState({ componentStack });
   }
 
   render() {
     if (this.state.error) {
-      return <StartupCrash error={this.state.error} />;
+      return (
+        <AppCrash
+          error={this.state.error}
+          componentStack={this.state.componentStack}
+          phase="ui"
+        />
+      );
     }
     return this.props.children;
   }
 }
 
-function StartupCrash({ error }: { error: unknown }) {
+function AppCrash({
+  error,
+  componentStack = "",
+  phase,
+}: {
+  error: unknown;
+  componentStack?: string;
+  phase: "startup" | "ui";
+}) {
   const message = error instanceof Error ? error.message : String(error);
+  const report = componentStack ? `${message}\n\n--- React component stack ---\n${componentStack}` : message;
+  const startup = phase === "startup";
 
   return (
     <div
@@ -41,9 +60,13 @@ function StartupCrash({ error }: { error: unknown }) {
       }}
     >
       <div style={{ maxWidth: 760 }}>
-        <h1 style={{ margin: "0 0 12px", fontSize: 20, fontWeight: 700 }}>Taomni failed to start</h1>
+        <h1 style={{ margin: "0 0 12px", fontSize: 20, fontWeight: 700 }}>
+          {startup ? "Taomni failed to start" : "Taomni UI encountered an error"}
+        </h1>
         <p style={{ margin: "0 0 16px", color: "#59636e", fontSize: 13, lineHeight: 1.5 }}>
-          The app hit a startup error in this WebView. Please include the details below when reporting it.
+          {startup
+            ? "The app failed while loading in this WebView. Please include the details below when reporting it."
+            : "The app hit a React UI error in this WebView. Please include the details below when reporting it."}
         </p>
         <pre
           style={{
@@ -58,7 +81,7 @@ function StartupCrash({ error }: { error: unknown }) {
             lineHeight: 1.45,
           }}
         >
-          {message}
+          {report}
         </pre>
       </div>
     </div>
@@ -67,7 +90,7 @@ function StartupCrash({ error }: { error: unknown }) {
 
 function renderStartupCrash(error: unknown): void {
   console.error("[startup] App module failed to load", error);
-  ReactDOM.createRoot(document.getElementById("root")!).render(<StartupCrash error={error} />);
+  ReactDOM.createRoot(document.getElementById("root")!).render(<AppCrash error={error} phase="startup" />);
 }
 
 async function bootstrap(): Promise<void> {

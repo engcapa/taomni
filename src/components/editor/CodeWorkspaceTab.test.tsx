@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import mermaid from "mermaid";
-import type { ComponentProps } from "react";
+import { useCallback, useRef, useState, type ComponentProps } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { selectCodeWorkspaceUi, useCodeWorkspaceStore } from "../../stores/codeWorkspaceStore";
 import { DEFAULT_CODE_VIEW_PROFILE, saveCodeViewProfile } from "../../lib/codeViewProfile";
@@ -340,6 +340,97 @@ describe("CodeWorkspaceTab", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  it("keeps command registration stable across unrelated parent rerenders", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "",
+      workspaceId: "ws-registration",
+      workspaceInstanceId: "instance-registration",
+      name: "Registration Workspace",
+      roots: [],
+      looseFiles: [],
+    };
+    const onCommandsChange = vi.fn();
+    const rendered = renderWorkspace(workspace, { onCommandsChange });
+
+    await waitFor(() => {
+      expect(onCommandsChange).toHaveBeenCalledWith(
+        "tab-code",
+        expect.objectContaining({ items: expect.any(Array), execute: expect.any(Function) }),
+      );
+    });
+
+    onCommandsChange.mockClear();
+    rendered.rerender(
+      <CodeWorkspaceTab
+        tabId="tab-code"
+        workspace={workspace}
+        visible
+        onCommandsChange={onCommandsChange}
+      />,
+    );
+    expect(onCommandsChange).not.toHaveBeenCalled();
+
+    rendered.unmount();
+    expect(onCommandsChange).toHaveBeenCalledTimes(1);
+    expect(onCommandsChange).toHaveBeenCalledWith("tab-code", null);
+  });
+
+  it("settles when the parent stores command registrations in state", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "",
+      workspaceId: "ws-registration-feedback",
+      workspaceInstanceId: "instance-registration-feedback",
+      name: "Registration Feedback Workspace",
+      roots: [],
+      looseFiles: [],
+    };
+    let parentRenderCount = 0;
+
+    function RegistrationHost() {
+      const renderCount = useRef(0);
+      renderCount.current += 1;
+      parentRenderCount = Math.max(parentRenderCount, renderCount.current);
+      if (renderCount.current > 20) {
+        throw new Error("Command registration feedback did not settle");
+      }
+
+      const [, setRegistrations] = useState<Record<string, unknown>>({});
+      const handleCommandsChange = useCallback<
+        NonNullable<ComponentProps<typeof CodeWorkspaceTab>["onCommandsChange"]>
+      >((tabId, registration) => {
+        setRegistrations((current) => {
+          if (registration) {
+            return current[tabId] === registration
+              ? current
+              : { ...current, [tabId]: registration };
+          }
+          if (!(tabId in current)) return current;
+          const next = { ...current };
+          delete next[tabId];
+          return next;
+        });
+      }, []);
+
+      return (
+        <CodeWorkspaceTab
+          tabId="tab-code-feedback"
+          workspace={workspace}
+          visible
+          onCommandsChange={handleCommandsChange}
+        />
+      );
+    }
+
+    render(<RegistrationHost />);
+
+    expect(await screen.findByText("Code · Registration Feedback Workspace")).toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(parentRenderCount).toBeGreaterThan(1);
+    expect(parentRenderCount).toBeLessThan(20);
   });
 
   it("opens a multi-root workspace and shows missing C# language server commands", async () => {
