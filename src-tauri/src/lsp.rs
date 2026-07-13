@@ -5,9 +5,9 @@ use std::collections::{HashMap, HashSet, hash_map::DefaultHasher};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::time::Duration;
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex as StdMutex, OnceLock};
+use std::time::{Duration, Instant};
 use tauri::State;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
@@ -17,6 +17,7 @@ const REQUEST_TIMEOUT_SECS: u64 = 8;
 const INITIALIZE_TIMEOUT_SECS: u64 = 20;
 const SHUTDOWN_TIMEOUT_SECS: u64 = 3;
 const EXIT_TIMEOUT_SECS: u64 = 2;
+const COMMAND_AVAILABILITY_TTL: Duration = Duration::from_secs(30);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -111,6 +112,14 @@ pub struct LspPosition {
 pub struct LspRange {
     pub start: LspPosition,
     pub end: LspPosition,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LspDocumentContentChange {
+    pub range: LspRange,
+    pub range_length: u64,
+    pub text: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -298,6 +307,8 @@ pub struct LspSemanticTokensResult {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LspCapabilitySummary {
+    /// 0 = none, 1 = full, 2 = incremental.
+    pub text_document_sync_kind: u8,
     pub completion: bool,
     pub signature_help: bool,
     pub hover: bool,
@@ -408,7 +419,17 @@ impl LspSessionKey {
 #[derive(Debug)]
 struct PendingResponse {
     sender: oneshot::Sender<Result<Value, String>>,
+    document_uri: Option<String>,
 }
+
+#[derive(Clone, Copy)]
+struct CachedCommandAvailability {
+    available: bool,
+    checked_at: Instant,
+}
+
+static COMMAND_AVAILABILITY_CACHE: OnceLock<StdMutex<HashMap<String, CachedCommandAvailability>>> =
+    OnceLock::new();
 
 #[derive(Clone, Debug)]
 struct SemanticTokensCache {
@@ -451,6 +472,7 @@ struct LspSession {
     opened_documents: RwLock<HashSet<String>>,
     diagnostics: RwLock<HashMap<String, Vec<LspDiagnostic>>>,
     capabilities: RwLock<Option<LspCapabilitySummary>>,
+    text_document_sync_kind: AtomicU8,
     semantic_token_types: RwLock<Vec<String>>,
     semantic_token_modifiers: RwLock<Vec<String>>,
     semantic_tokens_delta: RwLock<bool>,
@@ -820,6 +842,7 @@ impl LspSession {
             opened_documents: RwLock::new(HashSet::new()),
             diagnostics: RwLock::new(HashMap::new()),
             capabilities: RwLock::new(None),
+            text_document_sync_kind: AtomicU8::new(1),
             semantic_token_types: RwLock::new(Vec::new()),
             semantic_token_modifiers: RwLock::new(Vec::new()),
             semantic_tokens_delta: RwLock::new(false),
@@ -932,6 +955,9 @@ impl LspSession {
         };
         let server_caps = initialize_result.get("capabilities").cloned().unwrap_or(Value::Null);
         *session.capabilities.write().await = Some(capability_summary_from(&server_caps));
+        session
+            .text_document_sync_kind
+            .store(text_document_sync_kind(&server_caps), Ordering::SeqCst);
         let (token_types, token_modifiers) = semantic_token_legend_from(&server_caps);
         *session.semantic_token_types.write().await = token_types;
         *session.semantic_token_modifiers.write().await = token_modifiers;
@@ -969,10 +995,14 @@ impl LspSession {
     ) -> Result<Value, String> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let (sender, receiver) = oneshot::channel();
-        self.pending
-            .lock()
-            .await
-            .insert(id, PendingResponse { sender });
+        let document_uri = request_document_uri(&params).map(ToString::to_string);
+        self.pending.lock().await.insert(
+            id,
+            PendingResponse {
+                sender,
+                document_uri,
+            },
+        );
         let payload = json!({
             "jsonrpc": "2.0",
             "id": id,
@@ -987,9 +1017,22 @@ impl LspSession {
             Ok(Ok(result)) => result,
             Ok(Err(_)) => Err(format!("language server closed request {method}")),
             Err(_) => {
-                self.pending.lock().await.remove(&id);
+                if self.pending.lock().await.remove(&id).is_some() {
+                    let _ = self.notify("$/cancelRequest", json!({ "id": id })).await;
+                }
                 Err(format!("language server request timed out: {method}"))
             }
+        }
+    }
+
+    async fn cancel_document_requests(&self, uri: &str, reason: &str) {
+        let cancelled = {
+            let mut pending = self.pending.lock().await;
+            take_pending_for_document(&mut *pending, uri)
+        };
+        for (id, response) in cancelled {
+            let _ = response.sender.send(Err(reason.to_string()));
+            let _ = self.notify("$/cancelRequest", json!({ "id": id })).await;
         }
     }
 
@@ -1199,6 +1242,7 @@ pub fn lsp_list_presets() -> Vec<LspServerPreset> {
 
 #[tauri::command]
 pub fn lsp_detect_servers() -> Vec<LspServerStatus> {
+    clear_command_availability_cache();
     lsp_presets()
         .iter()
         .map(|preset| server_status(preset, None, false, None))
@@ -1287,7 +1331,8 @@ pub async fn lsp_change_document(
     workspace_id: String,
     root_path: Option<String>,
     file_path: String,
-    text: String,
+    text: Option<String>,
+    change: Option<LspDocumentContentChange>,
     version: i64,
     language_id: Option<String>,
     server_command_id: Option<String>,
@@ -1303,6 +1348,9 @@ pub async fn lsp_change_document(
         )
         .await
     else {
+        let Some(text) = text else {
+            return Err("LSP change requires full document text while starting a session".into());
+        };
         return lsp_open_document(
             state,
             document.workspace_id.clone(),
@@ -1316,12 +1364,21 @@ pub async fn lsp_change_document(
         )
         .await;
     };
+    session
+        .cancel_document_requests(
+            &document.uri,
+            "language server request cancelled: document changed",
+        )
+        .await;
     if !session
         .opened_documents
         .read()
         .await
         .contains(&document.uri)
     {
+        let Some(text) = text else {
+            return Err("LSP change requires full document text while reopening a document".into());
+        };
         let language_id = document.language_id.as_deref().unwrap_or("plaintext");
         session
             .notify(
@@ -1351,6 +1408,11 @@ pub async fn lsp_change_document(
             )
             .await);
     }
+    let content_change = content_change_for_sync(
+        text,
+        change,
+        session.text_document_sync_kind.load(Ordering::SeqCst),
+    )?;
     session
         .notify(
             "textDocument/didChange",
@@ -1359,7 +1421,7 @@ pub async fn lsp_change_document(
                     "uri": document.uri,
                     "version": document.version
                 },
-                "contentChanges": [{ "text": text }]
+                "contentChanges": [content_change]
             }),
         )
         .await
@@ -1437,6 +1499,12 @@ pub async fn lsp_close_document(
         )
         .await
     {
+        session
+            .cancel_document_requests(
+                &document.uri,
+                "language server request cancelled: document closed",
+            )
+            .await;
         session
             .notify(
                 "textDocument/didClose",
@@ -3198,11 +3266,43 @@ fn command_available(command: &str) -> bool {
     if command.is_empty() {
         return false;
     }
+    let now = Instant::now();
+    let mut cache = command_availability_cache()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some(cached) = cache.get(command)
+        && now.duration_since(cached.checked_at) < COMMAND_AVAILABILITY_TTL
+    {
+        return cached.available;
+    }
+    let available = command_available_uncached(command);
+    cache.insert(
+        command.to_string(),
+        CachedCommandAvailability {
+            available,
+            checked_at: now,
+        },
+    );
+    available
+}
+
+fn command_available_uncached(command: &str) -> bool {
     let path = Path::new(command);
     if path.is_absolute() || command.contains('/') || command.contains('\\') {
         return path.is_file();
     }
     which::which(command).is_ok()
+}
+
+fn command_availability_cache() -> &'static StdMutex<HashMap<String, CachedCommandAvailability>> {
+    COMMAND_AVAILABILITY_CACHE.get_or_init(|| StdMutex::new(HashMap::new()))
+}
+
+fn clear_command_availability_cache() {
+    command_availability_cache()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .clear();
 }
 
 fn command_line(command: &str, args: &[String]) -> String {
@@ -3217,6 +3317,26 @@ fn message_id(value: &Value) -> Option<u64> {
     value
         .as_u64()
         .or_else(|| value.as_str().and_then(|id| id.parse::<u64>().ok()))
+}
+
+fn request_document_uri(params: &Value) -> Option<&str> {
+    params
+        .pointer("/textDocument/uri")
+        .or_else(|| params.pointer("/item/uri"))
+        .and_then(Value::as_str)
+}
+
+fn take_pending_for_document(
+    pending: &mut HashMap<u64, PendingResponse>,
+    uri: &str,
+) -> Vec<(u64, PendingResponse)> {
+    let ids = pending
+        .iter()
+        .filter_map(|(id, response)| (response.document_uri.as_deref() == Some(uri)).then_some(*id))
+        .collect::<Vec<_>>();
+    ids.into_iter()
+        .filter_map(|id| pending.remove(&id).map(|response| (id, response)))
+        .collect()
 }
 
 fn parse_position(value: &Value) -> Option<LspPosition> {
@@ -3309,6 +3429,7 @@ fn provider_strings(capabilities: &Value, key: &str, field: &str) -> Vec<String>
 
 fn capability_summary_from(capabilities: &Value) -> LspCapabilitySummary {
     LspCapabilitySummary {
+        text_document_sync_kind: text_document_sync_kind(capabilities),
         completion: has_provider(capabilities, "completionProvider"),
         signature_help: has_provider(capabilities, "signatureHelpProvider"),
         hover: has_provider(capabilities, "hoverProvider"),
@@ -3339,6 +3460,35 @@ fn capability_summary_from(capabilities: &Value) -> LspCapabilitySummary {
             "triggerCharacters",
         ),
     }
+}
+
+fn text_document_sync_kind(capabilities: &Value) -> u8 {
+    let sync = capabilities.get("textDocumentSync");
+    let kind = match sync {
+        Some(Value::Number(value)) => value.as_u64(),
+        Some(Value::Object(options)) => options.get("change").and_then(Value::as_u64),
+        _ => None,
+    };
+    match kind {
+        Some(2) => 2,
+        Some(0) => 0,
+        _ => 1,
+    }
+}
+
+fn content_change_for_sync(
+    full_text: Option<String>,
+    incremental: Option<LspDocumentContentChange>,
+    sync_kind: u8,
+) -> Result<Value, String> {
+    if sync_kind == 2
+        && let Some(change) = incremental
+    {
+        return Ok(json!(change));
+    }
+    full_text
+        .map(|text| json!({ "text": text }))
+        .ok_or_else(|| "LSP server requires full document synchronization".into())
 }
 
 fn parse_text_edit(value: &Value) -> Option<LspTextEdit> {
@@ -4473,6 +4623,114 @@ mod tests {
         assert!(!summary.formatting);
         assert!(!summary.type_hierarchy);
         assert!(!summary.workspace_symbol);
+    }
+
+    #[test]
+    fn reads_text_document_sync_kind_and_falls_back_to_full_changes() {
+        assert_eq!(
+            text_document_sync_kind(&json!({ "textDocumentSync": 2 })),
+            2
+        );
+        assert_eq!(
+            text_document_sync_kind(&json!({ "textDocumentSync": { "change": 2 } })),
+            2
+        );
+        assert_eq!(
+            text_document_sync_kind(&json!({ "textDocumentSync": 0 })),
+            0
+        );
+        assert_eq!(text_document_sync_kind(&json!({})), 1);
+
+        let incremental = LspDocumentContentChange {
+            range: LspRange {
+                start: LspPosition {
+                    line: 1,
+                    character: 4,
+                },
+                end: LspPosition {
+                    line: 1,
+                    character: 7,
+                },
+            },
+            range_length: 3,
+            text: "replacement".into(),
+        };
+        assert_eq!(
+            content_change_for_sync(Some("full text".into()), Some(incremental.clone()), 2)
+                .unwrap(),
+            json!({
+                "range": {
+                    "start": { "line": 1, "character": 4 },
+                    "end": { "line": 1, "character": 7 }
+                },
+                "rangeLength": 3,
+                "text": "replacement"
+            })
+        );
+        assert_eq!(
+            content_change_for_sync(Some("full text".into()), Some(incremental), 1).unwrap(),
+            json!({ "text": "full text" })
+        );
+        assert!(content_change_for_sync(None, None, 1).is_err());
+    }
+
+    #[test]
+    fn associates_and_removes_pending_requests_by_document_uri() {
+        let uri = "file:///repo/src/main.rs";
+        assert_eq!(
+            request_document_uri(&json!({ "textDocument": { "uri": uri } })),
+            Some(uri)
+        );
+        assert_eq!(
+            request_document_uri(&json!({ "item": { "uri": uri } })),
+            Some(uri)
+        );
+
+        let (document_sender, _document_receiver) = oneshot::channel();
+        let (workspace_sender, _workspace_receiver) = oneshot::channel();
+        let mut pending = HashMap::from([
+            (
+                1,
+                PendingResponse {
+                    sender: document_sender,
+                    document_uri: Some(uri.into()),
+                },
+            ),
+            (
+                2,
+                PendingResponse {
+                    sender: workspace_sender,
+                    document_uri: None,
+                },
+            ),
+        ]);
+
+        let cancelled = take_pending_for_document(&mut pending, uri);
+        assert_eq!(cancelled.len(), 1);
+        assert_eq!(cancelled[0].0, 1);
+        assert!(pending.contains_key(&2));
+    }
+
+    #[test]
+    fn caches_command_availability_until_explicit_refresh() {
+        let directory = tempfile::tempdir().unwrap();
+        let command_path = directory.path().join("temporary-language-server");
+        std::fs::write(&command_path, b"test").unwrap();
+        let command = command_path.to_string_lossy().into_owned();
+        command_availability_cache()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .remove(&command);
+
+        assert!(command_available(&command));
+        std::fs::remove_file(&command_path).unwrap();
+        assert!(command_available(&command));
+
+        command_availability_cache()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .remove(&command);
+        assert!(!command_available(&command));
     }
 
     #[test]

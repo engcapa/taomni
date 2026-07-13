@@ -38,6 +38,34 @@ const status: LspDocumentStatus = {
   error: null,
 };
 
+const incrementalStatus: LspDocumentStatus = {
+  ...status,
+  capabilities: {
+    textDocumentSyncKind: 2,
+    completion: false,
+    signatureHelp: false,
+    hover: false,
+    definition: false,
+    typeDefinition: false,
+    implementation: false,
+    references: false,
+    documentSymbol: false,
+    workspaceSymbol: false,
+    rename: false,
+    formatting: false,
+    rangeFormatting: false,
+    codeAction: false,
+    documentHighlight: false,
+    callHierarchy: false,
+    typeHierarchy: false,
+    inlayHint: false,
+    selectionRange: false,
+    semanticTokens: false,
+    completionTriggerCharacters: [],
+    signatureTriggerCharacters: [],
+  },
+};
+
 const file: OpenFileState = {
   key: "root:root-1:src/main.ts",
   ref: { kind: "root", rootId: "root-1", path: "src/main.ts" },
@@ -140,6 +168,9 @@ describe("useWorkspaceLspSession", () => {
     resolveOpen(status);
     await act(async () => pending);
     expect(lspFiles[file.key]?.syncedText).toBeNull();
+    expect(lspMocks.lspCloseDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ filePath: "src/main.ts" }),
+    );
   });
 
   it("stops every backend LSP session when the workspace unmounts", () => {
@@ -193,16 +224,55 @@ describe("useWorkspaceLspSession", () => {
     expect(lspMocks.lspChangeDocument).not.toHaveBeenCalled();
 
     await act(async () => {
-      resolveOpen(status);
+      resolveOpen(incrementalStatus);
       await initialSync;
     });
     expect(lspMocks.lspChangeDocument).toHaveBeenCalledOnce();
     expect(lspMocks.lspChangeDocument).toHaveBeenCalledWith(
       expect.objectContaining({ filePath: "src/main.ts" }),
-      latest.text,
+      null,
       2,
+      {
+        range: {
+          start: { line: 0, character: 14 },
+          end: { line: 0, character: 15 },
+        },
+        rangeLength: 1,
+        text: "3",
+      },
     );
     expect(lspFiles[file.key]?.syncedText).toBe(latest.text);
     expect(lspFiles[file.key]?.syncing).toBe(false);
+  });
+
+  it("retries with full text if an incremental-only change cannot be delivered", async () => {
+    lspMocks.lspOpenDocument.mockResolvedValue(incrementalStatus);
+    lspMocks.lspChangeDocument
+      .mockRejectedValueOnce(new Error("full document text required"))
+      .mockResolvedValueOnce(incrementalStatus);
+    const edited = { ...file, text: "const value = 2;", dirty: true };
+    const openFilesRef: { current: Record<string, OpenFileState> } = {
+      current: { [file.key]: file },
+    };
+    let lspFiles: Record<string, LspFileState> = {};
+    const updateLspFiles = vi.fn((updater: Record<string, LspFileState> | ((current: Record<string, LspFileState>) => Record<string, LspFileState>)) => {
+      lspFiles = typeof updater === "function" ? updater(lspFiles) : updater;
+    });
+    const { result } = renderHook(() => useWorkspaceLspSession({
+      workspaceInstanceId: "workspace-1",
+      roots,
+      openFilesRef,
+      updateLspFiles,
+      onError: vi.fn(),
+    }));
+
+    await act(async () => result.current.syncDocument(file, "open"));
+    openFilesRef.current[file.key] = edited;
+    await act(async () => result.current.syncDocument(edited, "change"));
+
+    expect(lspMocks.lspChangeDocument).toHaveBeenCalledTimes(2);
+    expect(lspMocks.lspChangeDocument.mock.calls[0]?.[1]).toBeNull();
+    expect(lspMocks.lspChangeDocument.mock.calls[1]?.[1]).toBe(edited.text);
+    expect(lspFiles[file.key]?.syncedText).toBe(edited.text);
   });
 });

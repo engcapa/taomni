@@ -13,6 +13,7 @@ import {
 } from "../../../lib/editor/lsp";
 import type { CodeWorkspaceRootInfo } from "../../../types";
 import type { LspCustomCommandConfig } from "./FileTreePane";
+import { buildIncrementalContentChange } from "./lspTextEdits";
 import {
   CUSTOM_LSP_COMMAND_ID,
   customServerCommandFromConfig,
@@ -80,6 +81,8 @@ export function useWorkspaceLspSession({
   );
   const rootsRef = useRef(roots);
   const versionRef = useRef<Record<string, number>>({});
+  const syncedTextRef = useRef<Record<string, string>>({});
+  const incrementalSyncRef = useRef<Record<string, boolean>>({});
   const diagnosticsTimersRef = useRef<Record<string, number>>({});
   const syncQueuesRef = useRef<Record<string, DocumentSyncQueue>>({});
   const mountedRef = useRef(true);
@@ -94,6 +97,8 @@ export function useWorkspaceLspSession({
       mountedRef.current = false;
       Object.values(syncQueuesRef.current).forEach((queue) => { queue.closed = true; });
       syncQueuesRef.current = {};
+      syncedTextRef.current = {};
+      incrementalSyncRef.current = {};
       Object.values(diagnosticsTimersRef.current).forEach((timer) => window.clearTimeout(timer));
       diagnosticsTimersRef.current = {};
     };
@@ -117,6 +122,8 @@ export function useWorkspaceLspSession({
   }, [refreshServerStatuses]);
 
   const invalidateSyncedText = useCallback(() => {
+    syncedTextRef.current = {};
+    incrementalSyncRef.current = {};
     updateLspFiles((current) => Object.fromEntries(
       Object.entries(current).map(([key, state]) => [key, { ...state, syncedText: null }]),
     ));
@@ -253,11 +260,45 @@ export function useWorkspaceLspSession({
         }));
         let active = false;
         try {
-          const status = currentSync.mode === "open"
-            ? await lspOpenDocument(descriptor, currentSync.file.text, version)
-            : await lspChangeDocument(descriptor, currentSync.file.text, version);
+          const previousText = syncedTextRef.current[currentSync.file.key];
+          const change = previousText === undefined
+            ? null
+            : buildIncrementalContentChange(previousText, currentSync.file.text);
+          let status: LspDocumentStatus;
+          if (currentSync.mode === "open") {
+            status = await lspOpenDocument(descriptor, currentSync.file.text, version);
+          } else {
+            const omitFullText = incrementalSyncRef.current[currentSync.file.key] && change !== null;
+            try {
+              status = await lspChangeDocument(
+                descriptor,
+                omitFullText ? null : currentSync.file.text,
+                version,
+                change,
+              );
+            } catch (error) {
+              if (!omitFullText) throw error;
+              status = await lspChangeDocument(
+                descriptor,
+                currentSync.file.text,
+                version,
+                change,
+              );
+            }
+          }
           active = status.active;
-          if (!mountedRef.current || queue.closed || !openFilesRef.current[currentSync.file.key]) break;
+          const fileIsOpen = !!openFilesRef.current[currentSync.file.key];
+          if (!mountedRef.current || queue.closed || !fileIsOpen) {
+            if (mountedRef.current && (queue.closed || !fileIsOpen)) {
+              void lspCloseDocument(descriptor);
+            }
+            break;
+          }
+          if (active) {
+            syncedTextRef.current[currentSync.file.key] = currentSync.file.text;
+            incrementalSyncRef.current[currentSync.file.key] =
+              status.capabilities?.textDocumentSyncKind === 2;
+          }
           updateLspFiles((current) => ({
             ...current,
             [currentSync.file.key]: {
@@ -323,6 +364,8 @@ export function useWorkspaceLspSession({
 
   const forgetDocument = useCallback((key: string) => {
     delete versionRef.current[key];
+    delete syncedTextRef.current[key];
+    delete incrementalSyncRef.current[key];
     const timer = diagnosticsTimersRef.current[key];
     if (timer) window.clearTimeout(timer);
     delete diagnosticsTimersRef.current[key];
