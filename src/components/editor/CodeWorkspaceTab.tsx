@@ -1181,7 +1181,11 @@ export function CodeWorkspaceTab({
     onStatus: setStatusMessage,
   });
 
-  const treeContextMenu = useContextMenu();
+  const {
+    show: openTreeContextMenu,
+    showAt: openTreeContextMenuAt,
+    render: treeContextMenu,
+  } = useContextMenu();
 
   const copyEditorTabPath = useCallback(async (key: string, absolute: boolean) => {
     const file = openFilesRef.current[key];
@@ -1323,7 +1327,7 @@ export function CodeWorkspaceTab({
       if (selection.kind === "file" && selection.ref.kind === "root") {
         const ref = selection.ref;
         const dir = parentPath(ref.path);
-        treeContextMenu.show(event, [
+        openTreeContextMenu(event, [
           { label: "Open", onClick: run("workspace.tree.open", { selection }) },
           { separator: true, label: "" },
           { label: "New File...", onClick: run("workspace.tree.newFile", { directory: { rootId: ref.rootId, path: dir } }) },
@@ -1345,7 +1349,7 @@ export function CodeWorkspaceTab({
         return;
       }
       if (selection.kind === "dir") {
-        treeContextMenu.show(event, [
+        openTreeContextMenu(event, [
           { label: "New File...", onClick: run("workspace.tree.newFile", { directory: { rootId: selection.rootId, path: selection.path } }) },
           { label: "New Directory...", onClick: run("workspace.tree.newDirectory", { directory: { rootId: selection.rootId, path: selection.path } }) },
           { label: "Rename...", onClick: run("workspace.tree.rename", { selection }) },
@@ -1367,7 +1371,7 @@ export function CodeWorkspaceTab({
         return;
       }
       if (selection.kind === "root") {
-        treeContextMenu.show(event, [
+        openTreeContextMenu(event, [
           { label: "New File...", onClick: run("workspace.tree.newFile", { directory: { rootId: selection.rootId, path: "" } }) },
           { label: "New Directory...", onClick: run("workspace.tree.newDirectory", { directory: { rootId: selection.rootId, path: "" } }) },
           { label: "Rename Root...", onClick: run("workspace.tree.rename", { selection }) },
@@ -1392,10 +1396,10 @@ export function CodeWorkspaceTab({
     [
       canPasteTreeClipboard,
       openTerminalAt,
+      openTreeContextMenu,
       pasteTreeClipboard,
       revealInExplorer,
       stageTreeClipboard,
-      treeContextMenu,
     ],
   );
 
@@ -2651,19 +2655,11 @@ export function CodeWorkspaceTab({
       if (a.isPreferred !== b.isPreferred) return a.isPreferred ? -1 : 1;
       return a.title.localeCompare(b.title);
     });
-    // Use a synthetic context menu near the caret / lightbulb.
-    const synthetic = {
-      preventDefault() {},
-      stopPropagation() {},
-      clientX,
-      clientY,
-      button: 2,
-    } as unknown as React.MouseEvent;
-    treeContextMenu.show(synthetic, sorted.map((action) => ({
+    openTreeContextMenuAt(clientX, clientY, sorted.map((action) => ({
       label: action.title,
       onClick: () => void runCodeAction(action),
     })));
-  }, [requestCodeActions, runCodeAction, treeContextMenu]);
+  }, [openTreeContextMenuAt, requestCodeActions, runCodeAction, setStatusMessage]);
 
   const openCodeActionsAtCursor = useCallback(async () => {
     const file = activeFile;
@@ -3406,8 +3402,12 @@ export function CodeWorkspaceTab({
   useEffect(() => {
     if (!onCommandsChange) return;
     onCommandsChange(tabId, commandRegistration);
-    return () => onCommandsChange(tabId, null);
   }, [commandRegistration, onCommandsChange, tabId]);
+
+  useEffect(() => {
+    if (!onCommandsChange) return;
+    return () => onCommandsChange(tabId, null);
+  }, [onCommandsChange, tabId]);
 
   const getLspCompletions = useCallback(
     async (
@@ -4383,7 +4383,7 @@ export function CodeWorkspaceTab({
           void openLspLocation(location);
         }}
       />
-      {treeContextMenu.render}
+      {treeContextMenu}
       {localHistoryTarget && openFiles[localHistoryTarget.key] && (
         <LocalHistoryDialog
           path={localHistoryTarget.path}

@@ -1,10 +1,47 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ContextMenu, type MenuItem } from "./ContextMenu";
+import { ContextMenu, useContextMenu, type MenuItem } from "./ContextMenu";
 
 afterEach(cleanup);
 
 describe("ContextMenu", () => {
+  it("keeps the hook controller stable across unrelated rerenders", () => {
+    const controllers: Array<ReturnType<typeof useContextMenu>> = [];
+
+    function Harness({ nonce }: { nonce: number }) {
+      const contextMenu = useContextMenu();
+      controllers.push(contextMenu);
+      return (
+        <div data-nonce={nonce}>
+          <button
+            type="button"
+            onClick={() => contextMenu.showAt(10, 10, [{ label: "Inspect" }])}
+          >
+            Open menu
+          </button>
+          {contextMenu.render}
+        </div>
+      );
+    }
+
+    const rendered = render(<Harness nonce={0} />);
+    const initial = controllers[controllers.length - 1];
+
+    rendered.rerender(<Harness nonce={1} />);
+    expect(controllers[controllers.length - 1]).toBe(initial);
+
+    fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
+    const opened = controllers[controllers.length - 1];
+    expect(opened).not.toBe(initial);
+    expect(opened.show).toBe(initial.show);
+    expect(opened.showAt).toBe(initial.showAt);
+    expect(opened.close).toBe(initial.close);
+    expect(screen.getByTestId("context-menu-item-inspect")).toBeInTheDocument();
+
+    rendered.rerender(<Harness nonce={2} />);
+    expect(controllers[controllers.length - 1]).toBe(opened);
+  });
+
   it("renders a flat menu and closes after a leaf click", () => {
     const onClose = vi.fn();
     const onClick = vi.fn();
