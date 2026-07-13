@@ -6,12 +6,14 @@ import {
   lspGetDiagnostics,
   lspOpenDocument,
   lspSaveDocument,
+  lspStopWorkspace,
   type LspDocumentDescriptor,
   type LspDocumentStatus,
   type LspServerStatus,
 } from "../../../lib/editor/lsp";
 import type { CodeWorkspaceRootInfo } from "../../../types";
 import type { LspCustomCommandConfig } from "./FileTreePane";
+import { buildIncrementalContentChange } from "./lspTextEdits";
 import {
   CUSTOM_LSP_COMMAND_ID,
   customServerCommandFromConfig,
@@ -37,6 +39,16 @@ interface UseWorkspaceLspSessionOptions {
   openFilesRef: MutableRefObject<Record<string, OpenFileState>>;
   updateLspFiles: LspFilesUpdater;
   onError: (message: string) => void;
+}
+
+interface PendingDocumentSync {
+  file: OpenFileState;
+  mode: "open" | "change";
+}
+
+interface DocumentSyncQueue {
+  closed: boolean;
+  pending: PendingDocumentSync | null;
 }
 
 export interface WorkspaceLspSessionController {
@@ -69,7 +81,10 @@ export function useWorkspaceLspSession({
   );
   const rootsRef = useRef(roots);
   const versionRef = useRef<Record<string, number>>({});
+  const syncedTextRef = useRef<Record<string, string>>({});
+  const incrementalSyncRef = useRef<Record<string, boolean>>({});
   const diagnosticsTimersRef = useRef<Record<string, number>>({});
+  const syncQueuesRef = useRef<Record<string, DocumentSyncQueue>>({});
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -80,10 +95,18 @@ export function useWorkspaceLspSession({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      Object.values(syncQueuesRef.current).forEach((queue) => { queue.closed = true; });
+      syncQueuesRef.current = {};
+      syncedTextRef.current = {};
+      incrementalSyncRef.current = {};
       Object.values(diagnosticsTimersRef.current).forEach((timer) => window.clearTimeout(timer));
       diagnosticsTimersRef.current = {};
     };
   }, []);
+
+  useEffect(() => () => {
+    void lspStopWorkspace(workspaceInstanceId);
+  }, [workspaceInstanceId]);
 
   const refreshServerStatuses = useCallback(async () => {
     try {
@@ -99,6 +122,8 @@ export function useWorkspaceLspSession({
   }, [refreshServerStatuses]);
 
   const invalidateSyncedText = useCallback(() => {
+    syncedTextRef.current = {};
+    incrementalSyncRef.current = {};
     updateLspFiles((current) => Object.fromEntries(
       Object.entries(current).map(([key, state]) => [key, { ...state, syncedText: null }]),
     ));
@@ -208,45 +233,101 @@ export function useWorkspaceLspSession({
 
   const syncDocument = useCallback(async (file: OpenFileState, mode: "open" | "change") => {
     if (file.loading) return;
-    const descriptor = descriptorForFile(file);
-    if (!descriptor) return;
-    const version = (versionRef.current[file.key] ?? 0) + 1;
-    versionRef.current[file.key] = version;
-    updateLspFiles((current) => ({
-      ...current,
-      [file.key]: {
-        ...(current[file.key] ?? emptyLspFileState()),
-        syncing: true,
-        error: null,
-      },
-    }));
+    const running = syncQueuesRef.current[file.key];
+    if (running) {
+      running.pending = { file, mode };
+      return;
+    }
+
+    const queue: DocumentSyncQueue = { closed: false, pending: null };
+    syncQueuesRef.current[file.key] = queue;
+    let next: PendingDocumentSync | null = { file, mode };
     try {
-      const status = mode === "open"
-        ? await lspOpenDocument(descriptor, file.text, version)
-        : await lspChangeDocument(descriptor, file.text, version);
-      if (!mountedRef.current || !openFilesRef.current[file.key]) return;
-      updateLspFiles((current) => ({
-        ...current,
-        [file.key]: {
-          ...(current[file.key] ?? emptyLspFileState()),
-          status,
-          diagnostics: current[file.key]?.diagnostics ?? [],
-          syncing: false,
-          syncedText: file.text,
-          error: null,
-        },
-      }));
-      scheduleDiagnostics(file.key);
-    } catch (error) {
-      if (!mountedRef.current || !openFilesRef.current[file.key]) return;
-      updateLspFiles((current) => ({
-        ...current,
-        [file.key]: {
-          ...(current[file.key] ?? emptyLspFileState()),
-          syncing: false,
-          error: errorMessage(error),
-        },
-      }));
+      while (next && mountedRef.current && !queue.closed) {
+        const currentSync: PendingDocumentSync = next;
+        next = null;
+        const descriptor = descriptorForFile(currentSync.file);
+        if (!descriptor) break;
+        const version = (versionRef.current[currentSync.file.key] ?? 0) + 1;
+        versionRef.current[currentSync.file.key] = version;
+        updateLspFiles((current) => ({
+          ...current,
+          [currentSync.file.key]: {
+            ...(current[currentSync.file.key] ?? emptyLspFileState()),
+            syncing: true,
+            error: null,
+          },
+        }));
+        let active = false;
+        try {
+          const previousText = syncedTextRef.current[currentSync.file.key];
+          const change = previousText === undefined
+            ? null
+            : buildIncrementalContentChange(previousText, currentSync.file.text);
+          let status: LspDocumentStatus;
+          if (currentSync.mode === "open") {
+            status = await lspOpenDocument(descriptor, currentSync.file.text, version);
+          } else {
+            const omitFullText = incrementalSyncRef.current[currentSync.file.key] && change !== null;
+            try {
+              status = await lspChangeDocument(
+                descriptor,
+                omitFullText ? null : currentSync.file.text,
+                version,
+                change,
+              );
+            } catch (error) {
+              if (!omitFullText) throw error;
+              status = await lspChangeDocument(
+                descriptor,
+                currentSync.file.text,
+                version,
+                change,
+              );
+            }
+          }
+          active = status.active;
+          const fileIsOpen = !!openFilesRef.current[currentSync.file.key];
+          if (!mountedRef.current || queue.closed || !fileIsOpen) {
+            if (mountedRef.current && (queue.closed || !fileIsOpen)) {
+              void lspCloseDocument(descriptor);
+            }
+            break;
+          }
+          if (active) {
+            syncedTextRef.current[currentSync.file.key] = currentSync.file.text;
+            incrementalSyncRef.current[currentSync.file.key] =
+              status.capabilities?.textDocumentSyncKind === 2;
+          }
+          updateLspFiles((current) => ({
+            ...current,
+            [currentSync.file.key]: {
+              ...(current[currentSync.file.key] ?? emptyLspFileState()),
+              status,
+              diagnostics: current[currentSync.file.key]?.diagnostics ?? [],
+              syncing: queue.pending !== null,
+              syncedText: currentSync.file.text,
+              error: null,
+            },
+          }));
+          scheduleDiagnostics(currentSync.file.key);
+        } catch (error) {
+          if (!mountedRef.current || queue.closed || !openFilesRef.current[currentSync.file.key]) break;
+          updateLspFiles((current) => ({
+            ...current,
+            [currentSync.file.key]: {
+              ...(current[currentSync.file.key] ?? emptyLspFileState()),
+              syncing: queue.pending !== null,
+              error: errorMessage(error),
+            },
+          }));
+        }
+        next = queue.pending;
+        queue.pending = null;
+        if (next && active) next.mode = "change";
+      }
+    } finally {
+      if (syncQueuesRef.current[file.key] === queue) delete syncQueuesRef.current[file.key];
     }
   }, [descriptorForFile, openFilesRef, scheduleDiagnostics, updateLspFiles]);
 
@@ -283,12 +364,20 @@ export function useWorkspaceLspSession({
 
   const forgetDocument = useCallback((key: string) => {
     delete versionRef.current[key];
+    delete syncedTextRef.current[key];
+    delete incrementalSyncRef.current[key];
     const timer = diagnosticsTimersRef.current[key];
     if (timer) window.clearTimeout(timer);
     delete diagnosticsTimersRef.current[key];
   }, []);
 
   const closeDocument = useCallback((file: OpenFileState) => {
+    const queue = syncQueuesRef.current[file.key];
+    if (queue) {
+      queue.closed = true;
+      queue.pending = null;
+      delete syncQueuesRef.current[file.key];
+    }
     const descriptor = descriptorForFile(file);
     if (descriptor) void lspCloseDocument(descriptor);
     forgetDocument(file.key);

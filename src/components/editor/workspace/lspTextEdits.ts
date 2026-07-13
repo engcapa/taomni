@@ -1,4 +1,9 @@
-import type { LspPosition, LspRange, LspTextEdit } from "../../../lib/editor/lsp";
+import type {
+  LspDocumentContentChange,
+  LspPosition,
+  LspRange,
+  LspTextEdit,
+} from "../../../lib/editor/lsp";
 
 /** Convert a 0-based LSP position into a string offset for `\n`-normalized text. */
 export function offsetFromLspPositionInString(text: string, position: LspPosition): number {
@@ -39,4 +44,65 @@ export function applyLspTextEditsToString(text: string, edits: readonly LspTextE
 
 export function rangeIsEmpty(range: LspRange): boolean {
   return range.start.line === range.end.line && range.start.character === range.end.character;
+}
+
+function positionFromStringOffset(text: string, offset: number): LspPosition {
+  let line = 0;
+  let lineStart = 0;
+  for (let index = 0; index < offset; index += 1) {
+    if (text.charCodeAt(index) === 10) {
+      line += 1;
+      lineStart = index + 1;
+    }
+  }
+  return { line, character: offset - lineStart };
+}
+
+function offsetSplitsSurrogatePair(text: string, offset: number): boolean {
+  if (offset <= 0 || offset >= text.length) return false;
+  const previous = text.charCodeAt(offset - 1);
+  const current = text.charCodeAt(offset);
+  return previous >= 0xd800 && previous <= 0xdbff
+    && current >= 0xdc00 && current <= 0xdfff;
+}
+
+/** Build one minimal UTF-16 LSP edit that transforms `previousText` into `nextText`. */
+export function buildIncrementalContentChange(
+  previousText: string,
+  nextText: string,
+): LspDocumentContentChange | null {
+  if (previousText === nextText) return null;
+
+  const commonLength = Math.min(previousText.length, nextText.length);
+  let start = 0;
+  while (start < commonLength && previousText.charCodeAt(start) === nextText.charCodeAt(start)) {
+    start += 1;
+  }
+  if (offsetSplitsSurrogatePair(previousText, start)
+    || offsetSplitsSurrogatePair(nextText, start)) {
+    start -= 1;
+  }
+
+  let previousEnd = previousText.length;
+  let nextEnd = nextText.length;
+  while (previousEnd > start
+    && nextEnd > start
+    && previousText.charCodeAt(previousEnd - 1) === nextText.charCodeAt(nextEnd - 1)) {
+    previousEnd -= 1;
+    nextEnd -= 1;
+  }
+  if (offsetSplitsSurrogatePair(previousText, previousEnd)
+    || offsetSplitsSurrogatePair(nextText, nextEnd)) {
+    previousEnd += 1;
+    nextEnd += 1;
+  }
+
+  return {
+    range: {
+      start: positionFromStringOffset(previousText, start),
+      end: positionFromStringOffset(previousText, previousEnd),
+    },
+    rangeLength: previousEnd - start,
+    text: nextText.slice(start, nextEnd),
+  };
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyLspTextEditsToString,
+  buildIncrementalContentChange,
   offsetFromLspPositionInString,
   rangeIsEmpty,
 } from "./lspTextEdits";
@@ -65,5 +66,34 @@ describe("lspTextEdits", () => {
       start: { line: 2, character: 4 },
       end: { line: 2, character: 5 },
     })).toBe(false);
+  });
+
+  it("builds a minimal multiline incremental content change", () => {
+    expect(buildIncrementalContentChange(
+      "fn main() {\n    old();\n}\n",
+      "fn main() {\n    replacement();\n}\n",
+    )).toEqual({
+      range: {
+        start: { line: 1, character: 4 },
+        end: { line: 1, character: 7 },
+      },
+      rangeLength: 3,
+      text: "replacement",
+    });
+  });
+
+  it("uses UTF-16 positions without splitting surrogate pairs", () => {
+    expect(buildIncrementalContentChange("let icon = \"😀\";", "let icon = \"😁\";")).toEqual({
+      range: {
+        start: { line: 0, character: 12 },
+        end: { line: 0, character: 14 },
+      },
+      rangeLength: 2,
+      text: "😁",
+    });
+  });
+
+  it("returns null when the text is unchanged", () => {
+    expect(buildIncrementalContentChange("same", "same")).toBeNull();
   });
 });

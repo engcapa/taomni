@@ -35,6 +35,7 @@ const lspMocks = vi.hoisted(() => ({
   lspChangeDocument: vi.fn(),
   lspSaveDocument: vi.fn(),
   lspCloseDocument: vi.fn(),
+  lspStopWorkspace: vi.fn(),
   lspGetDiagnostics: vi.fn(),
   lspHover: vi.fn(),
   lspDefinition: vi.fn(),
@@ -222,6 +223,7 @@ describe("CodeWorkspaceTab", () => {
     lspMocks.lspChangeDocument.mockReset();
     lspMocks.lspSaveDocument.mockReset();
     lspMocks.lspCloseDocument.mockReset();
+    lspMocks.lspStopWorkspace.mockReset().mockResolvedValue(0);
     lspMocks.lspGetDiagnostics.mockReset();
     lspMocks.lspHover.mockReset();
     lspMocks.lspDefinition.mockReset();

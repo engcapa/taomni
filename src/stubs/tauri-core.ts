@@ -1239,6 +1239,9 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "lsp_close_document": {
       return stubLspDocumentStatus(args as InvokeArgs) as T;
     }
+    case "lsp_stop_workspace": {
+      return 0 as T;
+    }
     case "lsp_get_diagnostics": {
       return {
         status: stubLspDocumentStatus(args as InvokeArgs),

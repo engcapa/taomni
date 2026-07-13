@@ -42,6 +42,8 @@ export interface LspServerStatus {
 }
 
 export interface LspCapabilitySummary {
+  /** LSP TextDocumentSyncKind: 0 = none, 1 = full, 2 = incremental. */
+  textDocumentSyncKind?: number;
   completion: boolean;
   signatureHelp: boolean;
   hover: boolean;
@@ -88,6 +90,12 @@ export interface LspPosition {
 export interface LspRange {
   start: LspPosition;
   end: LspPosition;
+}
+
+export interface LspDocumentContentChange {
+  range: LspRange;
+  rangeLength: number;
+  text: string;
 }
 
 export interface LspDiagnostic {
@@ -230,12 +238,14 @@ export function lspOpenDocument(
 
 export function lspChangeDocument(
   descriptor: LspDocumentDescriptor,
-  text: string,
+  text: string | null,
   version: number,
+  change: LspDocumentContentChange | null = null,
 ): Promise<LspDocumentStatus> {
   return invoke<LspDocumentStatus>("lsp_change_document", {
     ...documentArgs(descriptor),
     text,
+    change,
     version,
   });
 }
@@ -256,6 +266,10 @@ export function lspCloseDocument(
   descriptor: LspDocumentDescriptor,
 ): Promise<LspDocumentStatus> {
   return invoke<LspDocumentStatus>("lsp_close_document", documentArgs(descriptor));
+}
+
+export function lspStopWorkspace(workspaceId: string): Promise<number> {
+  return invoke<number>("lsp_stop_workspace", { workspaceId });
 }
 
 export function lspGetDiagnostics(
