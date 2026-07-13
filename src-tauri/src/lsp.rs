@@ -608,13 +608,16 @@ impl LspSession {
         root_path: PathBuf,
         root_uri: String,
     ) -> Result<Arc<Self>, String> {
-        let mut child = Command::new(&command.command)
+        let mut process = Command::new(&command.command);
+        process
             .args(&command.args)
             .current_dir(&root_path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .kill_on_drop(true)
+            .kill_on_drop(true);
+        no_console_window(&mut process);
+        let mut child = process
             .spawn()
             .map_err(|e| format!("spawn {}: {e}", command.command))?;
         let stdin = child
@@ -847,6 +850,21 @@ impl LspSession {
                 .await
                 .insert(uri.to_string(), diagnostics);
         }
+    }
+}
+
+/// Packaged Windows builds use the GUI subsystem and have no parent console.
+/// Every language-server command, including custom commands, is background
+/// infrastructure and must not allocate a transient console window.
+fn no_console_window(command: &mut Command) {
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = command;
     }
 }
 
