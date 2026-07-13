@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   computeEditorTabScrollState,
+  contentRangeFromRects,
   editorTabScrollStep,
   ensureChildVisibleScrollLeft,
+  ensureContentRangeVisibleScrollLeft,
   maxScrollLeft,
 } from "./editorTabScroll";
 
@@ -36,21 +38,67 @@ describe("editorTabScroll", () => {
     expect(editorTabScrollStep(400)).toBe(320);
   });
 
-  it("computes scrollLeft to bring an off-screen child into view", () => {
-    // Child left of viewport
-    expect(ensureChildVisibleScrollLeft(
-      { scrollLeft: 200, clientWidth: 200 },
-      { offsetLeft: 0, offsetWidth: 100 },
-    )).toBe(0);
-    // Child right of viewport
-    expect(ensureChildVisibleScrollLeft(
-      { scrollLeft: 0, clientWidth: 200 },
-      { offsetLeft: 250, offsetWidth: 100 },
-    )).toBe(158); // 350 - 200 + 8
-    // Already visible — unchanged
-    expect(ensureChildVisibleScrollLeft(
-      { scrollLeft: 50, clientWidth: 200 },
-      { offsetLeft: 80, offsetWidth: 40 },
-    )).toBe(50);
+  it("maps viewport rects into scroll-content coordinates (sidebar-safe)", () => {
+    // Container starts at x=300 (left tree pane); child tab is 450px into content.
+    const range = contentRangeFromRects(
+      {
+        scrollLeft: 0,
+        getBoundingClientRect: () => ({ left: 300 }),
+      },
+      {
+        getBoundingClientRect: () => ({ left: 750, right: 900 }),
+      },
+    );
+    expect(range).toEqual({ left: 450, right: 600 });
+
+    // With existing scrollLeft, rects already shifted; content coords stay stable.
+    const scrolled = contentRangeFromRects(
+      {
+        scrollLeft: 200,
+        getBoundingClientRect: () => ({ left: 300 }),
+      },
+      {
+        getBoundingClientRect: () => ({ left: 550, right: 700 }),
+      },
+    );
+    expect(scrolled).toEqual({ left: 450, right: 600 });
+  });
+
+  it("computes scrollLeft to bring an off-screen content range into view", () => {
+    expect(ensureContentRangeVisibleScrollLeft(200, 200, 0, 100)).toBe(0);
+    expect(ensureContentRangeVisibleScrollLeft(0, 200, 250, 350)).toBe(158);
+    expect(ensureContentRangeVisibleScrollLeft(50, 200, 80, 120)).toBe(50);
+  });
+
+  it("ensureChildVisibleScrollLeft uses rect geometry, not offsetLeft", () => {
+    // Poison offsetLeft as if offsetParent were body (sidebar + content offset).
+    const container = {
+      scrollLeft: 0,
+      clientWidth: 200,
+      offsetLeft: 0,
+      getBoundingClientRect: () => ({ left: 300, right: 500, width: 200, top: 0, bottom: 28, height: 28, x: 300, y: 0, toJSON: () => ({}) }),
+    };
+    const child = {
+      // Body-relative offsetLeft that would wrongly scroll if trusted:
+      offsetLeft: 300 + 750,
+      offsetWidth: 150,
+      getBoundingClientRect: () => ({
+        left: 300 + 750,
+        right: 300 + 750 + 150,
+        width: 150,
+        top: 0,
+        bottom: 28,
+        height: 28,
+        x: 1050,
+        y: 0,
+        toJSON: () => ({}),
+      }),
+    };
+    // Content left is 750; need scrollLeft = 750+150-200+8 = 708
+    expect(ensureChildVisibleScrollLeft(container, child)).toBe(708);
+    // If someone used offsetLeft=1050 as content left they would get 1008.
+    expect(ensureChildVisibleScrollLeft(container, child)).not.toBe(
+      child.offsetLeft + child.offsetWidth - container.clientWidth + 8,
+    );
   });
 });

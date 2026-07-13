@@ -224,7 +224,7 @@ describe("EditorGroup tabs", () => {
     expect(screen.getByTestId("code-workspace-editor-tab-scroll-left")).not.toBeDisabled();
   });
 
-  it("scrolls the active tab into the visible track when it would be off-screen", () => {
+  it("scrolls the active tab into the visible track using rect geometry (sidebar-safe)", () => {
     const many = Array.from({ length: 6 }, (_, i) => `f${i}`);
     const openFiles = Object.fromEntries(many.map((key) => [key, file(key)]));
     const { rerender } = render(<EditorGroup {...props({
@@ -238,6 +238,8 @@ describe("EditorGroup tabs", () => {
 
     const scroll = screen.getByTestId("code-workspace-editor-tab-scroll");
     let scrollLeft = 0;
+    // Simulate a ~300px left project pane: the scroll track is not at x=0.
+    const paneLeft = 300;
     Object.defineProperty(scroll, "clientWidth", { configurable: true, value: 200 });
     Object.defineProperty(scroll, "scrollWidth", { configurable: true, value: 1000 });
     Object.defineProperty(scroll, "scrollLeft", {
@@ -247,11 +249,36 @@ describe("EditorGroup tabs", () => {
         scrollLeft = value;
       },
     });
+    scroll.getBoundingClientRect = () => ({
+      left: paneLeft,
+      right: paneLeft + 200,
+      width: 200,
+      top: 0,
+      bottom: 28,
+      height: 28,
+      x: paneLeft,
+      y: 0,
+      toJSON: () => ({}),
+    });
 
     const tabs = Array.from(scroll.querySelectorAll<HTMLElement>("[data-editor-tab-key]"));
     tabs.forEach((tab, index) => {
-      Object.defineProperty(tab, "offsetLeft", { configurable: true, value: index * 150 });
+      const contentLeft = index * 150;
+      // Poison body-relative offsetLeft (Chromium when offsetParent is BODY).
+      // An implementation that trusts offsetLeft would scroll incorrectly.
+      Object.defineProperty(tab, "offsetLeft", { configurable: true, value: paneLeft + contentLeft });
       Object.defineProperty(tab, "offsetWidth", { configurable: true, value: 150 });
+      tab.getBoundingClientRect = () => ({
+        left: paneLeft + contentLeft - scrollLeft,
+        right: paneLeft + contentLeft - scrollLeft + 150,
+        width: 150,
+        top: 0,
+        bottom: 28,
+        height: 28,
+        x: paneLeft + contentLeft - scrollLeft,
+        y: 0,
+        toJSON: () => ({}),
+      });
     });
 
     rerender(<EditorGroup {...props({
@@ -263,8 +290,9 @@ describe("EditorGroup tabs", () => {
       activeFile: openFiles.f5,
     })} />);
 
-    // f5 starts at 750 with width 150; viewport 200 → scroll so the tab enters range.
-    expect(scrollLeft).toBeGreaterThan(0);
+    // f5 content left=750, width=150, viewport=200 → scrollLeft 708.
+    // offsetLeft-based math would wrongly use 300+750 and not land here.
     expect(scrollLeft).toBe(750 + 150 - 200 + 8);
+    expect(scrollLeft).not.toBe((paneLeft + 750) + 150 - 200 + 8);
   });
 });

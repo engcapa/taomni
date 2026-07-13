@@ -31,25 +31,70 @@ export function editorTabScrollStep(clientWidth: number, stepMin = EDITOR_TAB_SC
 }
 
 /**
- * Returns the scrollLeft needed to bring `child` fully into the container's
- * visible range (with padding). Returns the current scrollLeft when already visible.
+ * Map a child's viewport box into the container's scroll-content coordinate
+ * system. Uses getBoundingClientRect (not offsetLeft) so a left sidebar that
+ * makes offsetParent === body does not poison scroll math — same approach as
+ * the main TabBar ensure-visible path.
  */
-export function ensureChildVisibleScrollLeft(
-  container: { scrollLeft: number; clientWidth: number },
-  child: { offsetLeft: number; offsetWidth: number },
+export function contentRangeFromRects(
+  container: { getBoundingClientRect: () => Pick<DOMRect, "left">; scrollLeft: number },
+  child: { getBoundingClientRect: () => Pick<DOMRect, "left" | "right"> },
+): { left: number; right: number } {
+  const containerRect = container.getBoundingClientRect();
+  const childRect = child.getBoundingClientRect();
+  return {
+    left: childRect.left - containerRect.left + container.scrollLeft,
+    right: childRect.right - containerRect.left + container.scrollLeft,
+  };
+}
+
+/**
+ * Returns the scrollLeft needed to bring `contentLeft..contentRight` fully into
+ * the container's visible range (with padding). Unchanged when already visible.
+ */
+export function ensureContentRangeVisibleScrollLeft(
+  scrollLeft: number,
+  clientWidth: number,
+  contentLeft: number,
+  contentRight: number,
   padding = EDITOR_TAB_SCROLL_PADDING,
 ): number {
-  const visibleLeft = container.scrollLeft;
-  const visibleRight = visibleLeft + container.clientWidth;
-  const childLeft = child.offsetLeft;
-  const childRight = childLeft + child.offsetWidth;
-  if (childLeft < visibleLeft + padding) {
-    return Math.max(0, childLeft - padding);
+  const visibleLeft = scrollLeft;
+  const visibleRight = visibleLeft + clientWidth;
+  if (contentLeft < visibleLeft + padding) {
+    return Math.max(0, contentLeft - padding);
   }
-  if (childRight > visibleRight - padding) {
-    return Math.max(0, childRight - container.clientWidth + padding);
+  if (contentRight > visibleRight - padding) {
+    return Math.max(0, contentRight - clientWidth + padding);
   }
-  return container.scrollLeft;
+  return scrollLeft;
+}
+
+/**
+ * Returns the scrollLeft needed to bring `child` fully into the container's
+ * visible range. Geometry is derived from getBoundingClientRect so it stays
+ * correct when the strip is offset by a left project pane (offsetLeft alone is
+ * unreliable in Chromium when offsetParent is body).
+ */
+export function ensureChildVisibleScrollLeft(
+  container: {
+    scrollLeft: number;
+    clientWidth: number;
+    getBoundingClientRect: () => Pick<DOMRect, "left">;
+  },
+  child: {
+    getBoundingClientRect: () => Pick<DOMRect, "left" | "right">;
+  },
+  padding = EDITOR_TAB_SCROLL_PADDING,
+): number {
+  const { left, right } = contentRangeFromRects(container, child);
+  return ensureContentRangeVisibleScrollLeft(
+    container.scrollLeft,
+    container.clientWidth,
+    left,
+    right,
+    padding,
+  );
 }
 
 export function setScrollLeft(el: HTMLElement, left: number): void {
