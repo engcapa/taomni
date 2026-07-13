@@ -1,6 +1,16 @@
-import { useEffect, useState, type CSSProperties, type MutableRefObject, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MutableRefObject,
+  type ReactNode,
+} from "react";
 import {
   AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
   Columns2,
   Eye,
   File,
@@ -30,6 +40,13 @@ import type { EditorGroupId } from "../../../stores/codeWorkspaceStore";
 import type { GitBlameLine } from "../../../lib/git";
 import type { GitLineChange } from "./gitEditorChrome";
 import { GitDiffPeek } from "./GitDiffPeek";
+import {
+  computeEditorTabScrollState,
+  editorTabScrollStep,
+  ensureChildVisibleScrollLeft,
+  setScrollLeft,
+  type EditorTabScrollState,
+} from "./editorTabScroll";
 
 export type MarkdownViewMode = "edit" | "preview" | "split";
 
@@ -174,12 +191,77 @@ export function EditorGroup({
 }: EditorGroupProps) {
   const tabMenu = useContextMenu();
   const [gitDiffPeek, setGitDiffPeek] = useState<GitLineChange | null>(null);
+  const tabScrollRef = useRef<HTMLDivElement>(null);
+  const [tabScrollState, setTabScrollState] = useState<EditorTabScrollState>({
+    overflow: false,
+    atStart: true,
+    atEnd: true,
+  });
   useEffect(() => setGitDiffPeek(null), [activeKey]);
   const pinnedSet = new Set(pinnedKeys);
   const orderedKeys = [
     ...openOrder.filter((key) => pinnedSet.has(key)),
     ...openOrder.filter((key) => !pinnedSet.has(key)),
   ];
+
+  const updateTabScrollState = useCallback(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    const next = computeEditorTabScrollState(el);
+    setTabScrollState((prev) =>
+      prev.overflow === next.overflow &&
+      prev.atStart === next.atStart &&
+      prev.atEnd === next.atEnd
+        ? prev
+        : next,
+    );
+  }, []);
+
+  const scrollTabsBy = useCallback(
+    (direction: "left" | "right") => {
+      const el = tabScrollRef.current;
+      if (!el) return;
+      const delta = editorTabScrollStep(el.clientWidth);
+      setScrollLeft(el, el.scrollLeft + (direction === "right" ? delta : -delta));
+      updateTabScrollState();
+    },
+    [updateTabScrollState],
+  );
+
+  useEffect(() => {
+    updateTabScrollState();
+  }, [openOrder, orderedKeys.length, updateTabScrollState]);
+
+  useEffect(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    const ro =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => updateTabScrollState());
+    ro?.observe(el);
+    window.addEventListener("resize", updateTabScrollState);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", updateTabScrollState);
+    };
+  }, [openOrder.length, updateTabScrollState]);
+
+  useEffect(() => {
+    const container = tabScrollRef.current;
+    if (!container || !activeKey) return;
+    const child = Array.from(container.children).find(
+      (node): node is HTMLElement =>
+        node instanceof HTMLElement && node.dataset.editorTabKey === activeKey,
+    );
+    if (!child) return;
+    const nextLeft = ensureChildVisibleScrollLeft(container, child);
+    if (nextLeft !== container.scrollLeft) {
+      setScrollLeft(container, nextLeft);
+    }
+    updateTabScrollState();
+  }, [activeKey, openOrder, updateTabScrollState]);
+
   const showTabMenu = (event: React.MouseEvent, key: string) => {
     const pinned = pinnedSet.has(key);
     tabMenu.show(event, [
@@ -224,10 +306,26 @@ export function EditorGroup({
             Scroll track is height-matched to tab content via the CSS token (not rem h-8,
             which collapses to 24px under the 12px app root font). Classic native scrollbars
             are suppressed via taomni-tab-scroll so they cannot steal vertical space.
+            Chevron buttons and the all-tabs menu stay outside the scroll track.
           */}
+          {tabScrollState.overflow && (
+            <button
+              type="button"
+              data-testid="code-workspace-editor-tab-scroll-left"
+              aria-label="Scroll editor tabs left"
+              title="Scroll tabs left"
+              disabled={tabScrollState.atStart}
+              className="h-full w-7 shrink-0 inline-flex items-center justify-center border-r border-[var(--taomni-code-border)] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
+              onClick={() => scrollTabsBy("left")}
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+          )}
           <div
+            ref={tabScrollRef}
             data-testid="code-workspace-editor-tab-scroll"
             className="taomni-tab-scroll min-w-0 flex-1 flex items-stretch overflow-x-auto overflow-y-hidden"
+            onScroll={updateTabScrollState}
           >
             {orderedKeys.map((key) => {
               const file = openFiles[key];
@@ -272,6 +370,19 @@ export function EditorGroup({
               );
             })}
           </div>
+          {tabScrollState.overflow && (
+            <button
+              type="button"
+              data-testid="code-workspace-editor-tab-scroll-right"
+              aria-label="Scroll editor tabs right"
+              title="Scroll tabs right"
+              disabled={tabScrollState.atEnd}
+              className="h-full w-7 shrink-0 inline-flex items-center justify-center border-l border-[var(--taomni-code-border)] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
+              onClick={() => scrollTabsBy("right")}
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          )}
           {openOrder.length > 1 && (
             <button
               type="button"

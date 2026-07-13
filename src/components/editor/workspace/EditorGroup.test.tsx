@@ -183,4 +183,88 @@ describe("EditorGroup tabs", () => {
     const firstTab = scroll.querySelector("[data-editor-tab-key]") as HTMLElement;
     expect(firstTab.className).toMatch(/min-w-\[96px\]/);
   });
+
+  it("shows pinned scroll chevrons when the tab track overflows and scrolls on click", () => {
+    const many = Array.from({ length: 8 }, (_, i) => `f${i}`);
+    const openFiles = Object.fromEntries(many.map((key) => [key, file(key)]));
+    render(<EditorGroup {...props({
+      openOrder: many,
+      openFiles,
+      activeKey: "f0",
+      previewKey: null,
+      pinnedKeys: [],
+      activeFile: openFiles.f0,
+    })} />);
+
+    const scroll = screen.getByTestId("code-workspace-editor-tab-scroll");
+    let scrollLeft = 0;
+    Object.defineProperty(scroll, "clientWidth", { configurable: true, value: 200 });
+    Object.defineProperty(scroll, "scrollWidth", { configurable: true, value: 1200 });
+    Object.defineProperty(scroll, "scrollLeft", {
+      configurable: true,
+      get: () => scrollLeft,
+      set: (value: number) => {
+        scrollLeft = value;
+      },
+    });
+    fireEvent.scroll(scroll);
+
+    const left = screen.getByTestId("code-workspace-editor-tab-scroll-left");
+    const right = screen.getByTestId("code-workspace-editor-tab-scroll-right");
+    const menu = screen.getByTestId("code-workspace-editor-tabs-menu");
+    expect(scroll.contains(left)).toBe(false);
+    expect(scroll.contains(right)).toBe(false);
+    expect(scroll.contains(menu)).toBe(false);
+    expect(left).toBeDisabled();
+    expect(right).not.toBeDisabled();
+
+    fireEvent.click(right);
+    expect(scrollLeft).toBeGreaterThan(0);
+    fireEvent.scroll(scroll);
+    expect(screen.getByTestId("code-workspace-editor-tab-scroll-left")).not.toBeDisabled();
+  });
+
+  it("scrolls the active tab into the visible track when it would be off-screen", () => {
+    const many = Array.from({ length: 6 }, (_, i) => `f${i}`);
+    const openFiles = Object.fromEntries(many.map((key) => [key, file(key)]));
+    const { rerender } = render(<EditorGroup {...props({
+      openOrder: many,
+      openFiles,
+      activeKey: "f0",
+      previewKey: null,
+      pinnedKeys: [],
+      activeFile: openFiles.f0,
+    })} />);
+
+    const scroll = screen.getByTestId("code-workspace-editor-tab-scroll");
+    let scrollLeft = 0;
+    Object.defineProperty(scroll, "clientWidth", { configurable: true, value: 200 });
+    Object.defineProperty(scroll, "scrollWidth", { configurable: true, value: 1000 });
+    Object.defineProperty(scroll, "scrollLeft", {
+      configurable: true,
+      get: () => scrollLeft,
+      set: (value: number) => {
+        scrollLeft = value;
+      },
+    });
+
+    const tabs = Array.from(scroll.querySelectorAll<HTMLElement>("[data-editor-tab-key]"));
+    tabs.forEach((tab, index) => {
+      Object.defineProperty(tab, "offsetLeft", { configurable: true, value: index * 150 });
+      Object.defineProperty(tab, "offsetWidth", { configurable: true, value: 150 });
+    });
+
+    rerender(<EditorGroup {...props({
+      openOrder: many,
+      openFiles,
+      activeKey: "f5",
+      previewKey: null,
+      pinnedKeys: [],
+      activeFile: openFiles.f5,
+    })} />);
+
+    // f5 starts at 750 with width 150; viewport 200 → scroll so the tab enters range.
+    expect(scrollLeft).toBeGreaterThan(0);
+    expect(scrollLeft).toBe(750 + 150 - 200 + 8);
+  });
 });
