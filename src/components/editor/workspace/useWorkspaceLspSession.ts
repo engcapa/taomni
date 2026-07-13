@@ -6,6 +6,7 @@ import {
   lspGetDiagnostics,
   lspOpenDocument,
   lspSaveDocument,
+  lspStopWorkspace,
   type LspDocumentDescriptor,
   type LspDocumentStatus,
   type LspServerStatus,
@@ -97,6 +98,10 @@ export function useWorkspaceLspSession({
       diagnosticsTimersRef.current = {};
     };
   }, []);
+
+  useEffect(() => () => {
+    void lspStopWorkspace(workspaceInstanceId);
+  }, [workspaceInstanceId]);
 
   const refreshServerStatuses = useCallback(async () => {
     try {

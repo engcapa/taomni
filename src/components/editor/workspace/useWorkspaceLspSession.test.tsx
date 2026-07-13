@@ -11,6 +11,7 @@ const lspMocks = vi.hoisted(() => ({
   lspChangeDocument: vi.fn(),
   lspSaveDocument: vi.fn(),
   lspCloseDocument: vi.fn(),
+  lspStopWorkspace: vi.fn(),
   lspGetDiagnostics: vi.fn(),
 }));
 
@@ -64,6 +65,7 @@ describe("useWorkspaceLspSession", () => {
     lspMocks.lspChangeDocument.mockReset().mockResolvedValue(status);
     lspMocks.lspSaveDocument.mockReset().mockResolvedValue(status);
     lspMocks.lspCloseDocument.mockReset().mockResolvedValue(status);
+    lspMocks.lspStopWorkspace.mockReset().mockResolvedValue(0);
     lspMocks.lspGetDiagnostics.mockReset().mockResolvedValue({ status, diagnostics: [] });
   });
 
@@ -138,6 +140,20 @@ describe("useWorkspaceLspSession", () => {
     resolveOpen(status);
     await act(async () => pending);
     expect(lspFiles[file.key]?.syncedText).toBeNull();
+  });
+
+  it("stops every backend LSP session when the workspace unmounts", () => {
+    const { unmount } = renderHook(() => useWorkspaceLspSession({
+      workspaceInstanceId: "workspace-stop",
+      roots,
+      openFilesRef: { current: {} },
+      updateLspFiles: vi.fn(),
+      onError: vi.fn(),
+    }));
+
+    unmount();
+    expect(lspMocks.lspStopWorkspace).toHaveBeenCalledOnce();
+    expect(lspMocks.lspStopWorkspace).toHaveBeenCalledWith("workspace-stop");
   });
 
   it("coalesces edits during open and follows with only the latest buffer", async () => {

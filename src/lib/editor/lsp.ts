@@ -258,6 +258,10 @@ export function lspCloseDocument(
   return invoke<LspDocumentStatus>("lsp_close_document", documentArgs(descriptor));
 }
 
+export function lspStopWorkspace(workspaceId: string): Promise<number> {
+  return invoke<number>("lsp_stop_workspace", { workspaceId });
+}
+
 export function lspGetDiagnostics(
   descriptor: LspDocumentDescriptor,
 ): Promise<LspDiagnosticsResult> {

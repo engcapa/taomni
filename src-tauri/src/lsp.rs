@@ -6,7 +6,8 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::Duration;
 use tauri::State;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
@@ -14,6 +15,8 @@ use tokio::sync::{Mutex, Notify, RwLock, oneshot};
 
 const REQUEST_TIMEOUT_SECS: u64 = 8;
 const INITIALIZE_TIMEOUT_SECS: u64 = 20;
+const SHUTDOWN_TIMEOUT_SECS: u64 = 3;
+const EXIT_TIMEOUT_SECS: u64 = 2;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -413,8 +416,10 @@ struct SemanticTokensCache {
     data: Vec<u64>,
 }
 
+type LspSessionRegistry = Arc<Mutex<HashMap<String, LspSessionEntry>>>;
+
 pub struct LspManager {
-    sessions: Mutex<HashMap<String, LspSessionEntry>>,
+    sessions: LspSessionRegistry,
 }
 
 enum LspSessionEntry {
@@ -428,10 +433,12 @@ enum LspSessionClaim {
     Ready(Arc<LspSession>),
 }
 
-#[derive(Default)]
 struct LspSessionStart {
+    workspace_id: String,
     result: Mutex<Option<Result<Arc<LspSession>, String>>>,
     completed: Notify,
+    cancellation: Mutex<Option<String>>,
+    cancelled: Notify,
 }
 
 struct LspSession {
@@ -450,7 +457,8 @@ struct LspSession {
     semantic_tokens_cache: RwLock<HashMap<String, SemanticTokensCache>>,
     semantic_tokens_lock: Mutex<()>,
     next_id: AtomicU64,
-    _child: Mutex<Child>,
+    shutting_down: AtomicBool,
+    child: Mutex<Child>,
 }
 
 struct ResolvedDocument {
@@ -467,7 +475,7 @@ struct ResolvedDocument {
 impl LspManager {
     pub fn new() -> Self {
         Self {
-            sessions: Mutex::new(HashMap::new()),
+            sessions: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -506,11 +514,13 @@ impl LspManager {
             .map(|cmd| command_line(&cmd.command, &cmd.args));
         let (active, capabilities) = if let Some(cmd) = command.as_ref() {
             let key = session_key(document, preset, cmd);
-            match self.sessions.lock().await.get(&key.map_key()) {
-                Some(LspSessionEntry::Ready(session)) => {
-                    (true, session.capabilities.read().await.clone())
-                }
-                Some(LspSessionEntry::Starting(_)) | None => (false, None),
+            let session = match self.sessions.lock().await.get(&key.map_key()) {
+                Some(LspSessionEntry::Ready(session)) => Some(session.clone()),
+                Some(LspSessionEntry::Starting(_)) | None => None,
+            };
+            match session {
+                Some(session) => (true, session.capabilities.read().await.clone()),
+                None => (false, None),
             }
         } else {
             (false, None)
@@ -567,7 +577,7 @@ impl LspManager {
         };
         let key = session_key(document, preset, &command);
         let map_key = key.map_key();
-        let start = match self.claim_session(&map_key).await {
+        let start = match self.claim_session(&map_key, &document.workspace_id).await {
             LspSessionClaim::Ready(session) => return Ok(session),
             LspSessionClaim::Wait(start) => {
                 return start.wait().await.map_err(|error| {
@@ -583,20 +593,22 @@ impl LspManager {
             command.clone(),
             document.root_path.clone(),
             document.root_uri.clone(),
+            self.sessions.clone(),
+            map_key.clone(),
+            start.clone(),
         )
         .await;
-        self.finish_session_start(&map_key, &start, result.clone())
-            .await;
+        let result = self.finish_session_start(&map_key, &start, result).await;
         result.map_err(|error| session_start_error_status(document, preset, &command, error))
     }
 
-    async fn claim_session(&self, map_key: &str) -> LspSessionClaim {
+    async fn claim_session(&self, map_key: &str, workspace_id: &str) -> LspSessionClaim {
         let mut sessions = self.sessions.lock().await;
         match sessions.get(map_key) {
             Some(LspSessionEntry::Ready(session)) => LspSessionClaim::Ready(session.clone()),
             Some(LspSessionEntry::Starting(start)) => LspSessionClaim::Wait(start.clone()),
             None => {
-                let start = Arc::new(LspSessionStart::default());
+                let start = Arc::new(LspSessionStart::new(workspace_id.to_string()));
                 sessions.insert(
                     map_key.to_string(),
                     LspSessionEntry::Starting(start.clone()),
@@ -611,7 +623,7 @@ impl LspManager {
         map_key: &str,
         start: &Arc<LspSessionStart>,
         result: Result<Arc<LspSession>, String>,
-    ) {
+    ) -> Result<Arc<LspSession>, String> {
         let mut sessions = self.sessions.lock().await;
         let owns_slot = matches!(
             sessions.get(map_key),
@@ -628,7 +640,43 @@ impl LspManager {
             }
         }
         drop(sessions);
+        if !owns_slot && let Ok(session) = result.as_ref() {
+            session.shutdown().await;
+        }
         start.complete(result).await;
+        start.wait().await
+    }
+
+    async fn stop_workspace(&self, workspace_id: &str) -> usize {
+        let (starts, ready) = {
+            let mut sessions = self.sessions.lock().await;
+            let matching: Vec<String> = sessions
+                .iter()
+                .filter_map(|(map_key, entry)| {
+                    (entry.workspace_id() == workspace_id).then(|| map_key.clone())
+                })
+                .collect();
+            let mut starts = Vec::new();
+            let mut ready = Vec::new();
+            for map_key in matching {
+                match sessions.remove(&map_key) {
+                    Some(LspSessionEntry::Starting(start)) => starts.push(start),
+                    Some(LspSessionEntry::Ready(session)) => ready.push(session),
+                    None => {}
+                }
+            }
+            (starts, ready)
+        };
+        let stopped = starts.len() + ready.len();
+        for start in starts {
+            start
+                .cancel(format!("LSP workspace stopped: {workspace_id}"))
+                .await;
+        }
+        for session in ready {
+            session.shutdown().await;
+        }
+        stopped
     }
 
     async fn active_session(
@@ -647,7 +695,26 @@ impl LspManager {
     }
 }
 
+impl LspSessionEntry {
+    fn workspace_id(&self) -> &str {
+        match self {
+            Self::Starting(start) => &start.workspace_id,
+            Self::Ready(session) => &session.key.workspace_id,
+        }
+    }
+}
+
 impl LspSessionStart {
+    fn new(workspace_id: String) -> Self {
+        Self {
+            workspace_id,
+            result: Mutex::new(None),
+            completed: Notify::new(),
+            cancellation: Mutex::new(None),
+            cancelled: Notify::new(),
+        }
+    }
+
     async fn wait(&self) -> Result<Arc<LspSession>, String> {
         loop {
             let completed = self.completed.notified();
@@ -659,8 +726,32 @@ impl LspSessionStart {
     }
 
     async fn complete(&self, result: Result<Arc<LspSession>, String>) {
-        *self.result.lock().await = Some(result);
-        self.completed.notify_waiters();
+        let mut current = self.result.lock().await;
+        if current.is_none() {
+            *current = Some(result);
+            drop(current);
+            self.completed.notify_waiters();
+        }
+    }
+
+    async fn cancel(&self, error: String) {
+        let mut cancellation = self.cancellation.lock().await;
+        if cancellation.is_none() {
+            *cancellation = Some(error.clone());
+            drop(cancellation);
+            self.cancelled.notify_waiters();
+        }
+        self.complete(Err(error)).await;
+    }
+
+    async fn wait_cancelled(&self) -> String {
+        loop {
+            let cancelled = self.cancelled.notified();
+            if let Some(error) = self.cancellation.lock().await.clone() {
+                return error;
+            }
+            cancelled.await;
+        }
     }
 }
 
@@ -693,6 +784,9 @@ impl LspSession {
         command: LspServerCommandPreset,
         root_path: PathBuf,
         root_uri: String,
+        sessions: LspSessionRegistry,
+        map_key: String,
+        start: Arc<LspSessionStart>,
     ) -> Result<Arc<Self>, String> {
         let mut process = Command::new(&command.command);
         process
@@ -732,10 +826,11 @@ impl LspSession {
             semantic_tokens_cache: RwLock::new(HashMap::new()),
             semantic_tokens_lock: Mutex::new(()),
             next_id: AtomicU64::new(1),
-            _child: Mutex::new(child),
+            shutting_down: AtomicBool::new(false),
+            child: Mutex::new(child),
         });
 
-        tokio::spawn(read_stdout(session.clone(), stdout));
+        tokio::spawn(read_stdout(session.clone(), stdout, sessions, map_key));
         if let Some(stderr) = stderr {
             tokio::spawn(read_stderr(session.command.command.clone(), stderr));
         }
@@ -818,16 +913,37 @@ impl LspSession {
                 }
             }
         });
-        let initialize_result = session
-            .request_with_timeout("initialize", initialize_params, INITIALIZE_TIMEOUT_SECS)
-            .await?;
+        let initialize_result = match tokio::select! {
+            result = session.request_with_timeout(
+                "initialize",
+                initialize_params,
+                INITIALIZE_TIMEOUT_SECS,
+            ) => result,
+            error = start.wait_cancelled() => {
+                session.abort(&error).await;
+                return Err(error);
+            }
+        } {
+            Ok(result) => result,
+            Err(error) => {
+                session.abort(&error).await;
+                return Err(error);
+            }
+        };
         let server_caps = initialize_result.get("capabilities").cloned().unwrap_or(Value::Null);
         *session.capabilities.write().await = Some(capability_summary_from(&server_caps));
         let (token_types, token_modifiers) = semantic_token_legend_from(&server_caps);
         *session.semantic_token_types.write().await = token_types;
         *session.semantic_token_modifiers.write().await = token_modifiers;
         *session.semantic_tokens_delta.write().await = semantic_token_delta_supported(&server_caps);
-        session.notify("initialized", json!({})).await?;
+        if let Some(error) = start.cancellation.lock().await.clone() {
+            session.abort(&error).await;
+            return Err(error);
+        }
+        if let Err(error) = session.notify("initialized", json!({})).await {
+            session.abort(&error).await;
+            return Err(error);
+        }
         Ok(session)
     }
 
@@ -867,7 +983,7 @@ impl LspSession {
             self.pending.lock().await.remove(&id);
             return Err(error);
         }
-        match tokio::time::timeout(std::time::Duration::from_secs(timeout_secs), receiver).await {
+        match tokio::time::timeout(Duration::from_secs(timeout_secs), receiver).await {
             Ok(Ok(result)) => result,
             Ok(Err(_)) => Err(format!("language server closed request {method}")),
             Err(_) => {
@@ -937,6 +1053,44 @@ impl LspSession {
                 .insert(uri.to_string(), diagnostics);
         }
     }
+
+    async fn shutdown(&self) {
+        if self.shutting_down.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        let _ = self
+            .request_with_timeout("shutdown", Value::Null, SHUTDOWN_TIMEOUT_SECS)
+            .await;
+        let _ = self.notify("exit", Value::Null).await;
+        let _ = self.stdin.lock().await.shutdown().await;
+
+        let mut child = self.child.lock().await;
+        if tokio::time::timeout(Duration::from_secs(EXIT_TIMEOUT_SECS), child.wait())
+            .await
+            .is_err()
+        {
+            let _ = child.kill().await;
+            let _ = child.wait().await;
+        }
+        self.fail_pending("language server stopped").await;
+    }
+
+    async fn abort(&self, error: &str) {
+        self.shutting_down.store(true, Ordering::SeqCst);
+        let _ = self.stdin.lock().await.shutdown().await;
+        let mut child = self.child.lock().await;
+        let _ = child.kill().await;
+        let _ = child.wait().await;
+        drop(child);
+        self.fail_pending(error).await;
+    }
+
+    async fn fail_pending(&self, error: &str) {
+        let pending = std::mem::take(&mut *self.pending.lock().await);
+        for response in pending.into_values() {
+            let _ = response.sender.send(Err(error.to_string()));
+        }
+    }
 }
 
 /// Packaged Windows builds use the GUI subsystem and have no parent console.
@@ -954,14 +1108,19 @@ fn no_console_window(command: &mut Command) {
     }
 }
 
-async fn read_stdout(session: Arc<LspSession>, stdout: ChildStdout) {
+async fn read_stdout(
+    session: Arc<LspSession>,
+    stdout: ChildStdout,
+    sessions: LspSessionRegistry,
+    map_key: String,
+) {
     let mut reader = BufReader::new(stdout);
-    loop {
+    let reason = 'messages: loop {
         let mut content_length = None;
         loop {
             let mut line = Vec::new();
             match reader.read_until(b'\n', &mut line).await {
-                Ok(0) => return,
+                Ok(0) => break 'messages "language server stdout closed".to_string(),
                 Ok(_) => {
                     if line == b"\r\n" || line == b"\n" {
                         break;
@@ -974,30 +1133,48 @@ async fn read_stdout(session: Arc<LspSession>, stdout: ChildStdout) {
                     }
                 }
                 Err(e) => {
-                    log::warn!(
-                        "lsp: stdout read failed for {}: {e}",
-                        session.command.command
-                    );
-                    return;
+                    break 'messages format!("language server stdout read failed: {e}");
                 }
             }
         }
         let Some(len) = content_length else {
-            log::warn!(
-                "lsp: missing Content-Length from {}",
-                session.command.command
-            );
-            return;
+            break "language server response missing Content-Length".to_string();
         };
         let mut body = vec![0u8; len];
         if let Err(e) = reader.read_exact(&mut body).await {
-            log::warn!("lsp: body read failed for {}: {e}", session.command.command);
-            return;
+            break format!("language server response body read failed: {e}");
         }
         match serde_json::from_slice::<Value>(&body) {
             Ok(message) => session.handle_message(message).await,
             Err(e) => log::warn!("lsp: invalid JSON from {}: {e}", session.command.command),
         }
+    };
+    let expected_shutdown = session.shutting_down.load(Ordering::SeqCst);
+    if expected_shutdown {
+        session.fail_pending(&reason).await;
+    } else {
+        session.abort(&reason).await;
+    }
+    remove_exited_session(&sessions, &map_key, &session).await;
+    if expected_shutdown {
+        log::debug!("lsp:{}: {reason}", session.command.command);
+    } else {
+        log::warn!("lsp:{}: {reason}", session.command.command);
+    }
+}
+
+async fn remove_exited_session(
+    sessions: &LspSessionRegistry,
+    map_key: &str,
+    session: &Arc<LspSession>,
+) {
+    let mut sessions = sessions.lock().await;
+    let is_current = matches!(
+        sessions.get(map_key),
+        Some(LspSessionEntry::Ready(current)) if Arc::ptr_eq(current, session)
+    );
+    if is_current {
+        sessions.remove(map_key);
     }
 }
 
@@ -1284,6 +1461,18 @@ pub async fn lsp_close_document(
             custom_server_command.as_ref(),
         )
         .await)
+}
+
+#[tauri::command]
+pub async fn lsp_stop_workspace(
+    state: State<'_, AppState>,
+    workspace_id: String,
+) -> Result<usize, String> {
+    let workspace_id = workspace_id.trim();
+    if workspace_id.is_empty() {
+        return Err("workspaceId is required".into());
+    }
+    Ok(state.lsp.stop_workspace(workspace_id).await)
 }
 
 #[tauri::command]
@@ -4127,14 +4316,14 @@ mod tests {
     async fn coalesces_concurrent_session_start_claims() {
         let manager = LspManager::new();
         let start = match manager
-            .claim_session("workspace\nrust\n/root\nrust-analyzer")
+            .claim_session("workspace\nrust\n/root\nrust-analyzer", "workspace")
             .await
         {
             LspSessionClaim::Start(start) => start,
             _ => panic!("first claimant must own the session start"),
         };
         let waiter = match manager
-            .claim_session("workspace\nrust\n/root\nrust-analyzer")
+            .claim_session("workspace\nrust\n/root\nrust-analyzer", "workspace")
             .await
         {
             LspSessionClaim::Wait(waiter) => waiter,
@@ -4148,16 +4337,16 @@ mod tests {
     async fn broadcasts_start_failure_and_allows_retry() {
         let manager = LspManager::new();
         let key = "workspace\nrust\n/root\nrust-analyzer";
-        let start = match manager.claim_session(key).await {
+        let start = match manager.claim_session(key, "workspace").await {
             LspSessionClaim::Start(start) => start,
             _ => panic!("first claimant must own the session start"),
         };
-        let waiter = match manager.claim_session(key).await {
+        let waiter = match manager.claim_session(key, "workspace").await {
             LspSessionClaim::Wait(waiter) => waiter,
             _ => panic!("concurrent claimant must wait for the in-flight start"),
         };
 
-        manager
+        let _ = manager
             .finish_session_start(key, &start, Err("initialize failed".into()))
             .await;
         match waiter.wait().await {
@@ -4165,7 +4354,32 @@ mod tests {
             Ok(_) => panic!("waiter must receive the shared initialization failure"),
         }
         assert!(matches!(
-            manager.claim_session(key).await,
+            manager.claim_session(key, "workspace").await,
+            LspSessionClaim::Start(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn stopping_workspace_cancels_start_waiters_and_clears_slot() {
+        let manager = LspManager::new();
+        let key = "workspace\nrust\n/root\nrust-analyzer";
+        let start = match manager.claim_session(key, "workspace").await {
+            LspSessionClaim::Start(start) => start,
+            _ => panic!("first claimant must own the session start"),
+        };
+        let waiter = match manager.claim_session(key, "workspace").await {
+            LspSessionClaim::Wait(waiter) => waiter,
+            _ => panic!("concurrent claimant must wait for the in-flight start"),
+        };
+        assert!(Arc::ptr_eq(&start, &waiter));
+
+        assert_eq!(manager.stop_workspace("workspace").await, 1);
+        match waiter.wait().await {
+            Err(error) => assert!(error.contains("workspace stopped")),
+            Ok(_) => panic!("workspace shutdown must cancel an in-flight start"),
+        }
+        assert!(matches!(
+            manager.claim_session(key, "workspace").await,
             LspSessionClaim::Start(_)
         ));
     }

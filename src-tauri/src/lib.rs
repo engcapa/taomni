@@ -437,6 +437,7 @@ pub fn run() {
             lsp::lsp_change_document,
             lsp::lsp_save_document,
             lsp::lsp_close_document,
+            lsp::lsp_stop_workspace,
             lsp::lsp_get_diagnostics,
             lsp::lsp_hover,
             lsp::lsp_definition,
