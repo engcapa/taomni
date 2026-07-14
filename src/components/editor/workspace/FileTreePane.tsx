@@ -9,24 +9,18 @@ import {
   type RefObject,
 } from "react";
 import {
-  ChevronDown,
-  ChevronRight,
   Columns2,
   File,
   FilePlus,
   FolderOpen,
   FolderPlus,
-  Info,
   List,
   ListTree,
   MoreHorizontal,
-  RefreshCw,
   Search,
-  Server,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import type { LspDocumentStatus, LspServerStatus } from "../../../lib/editor/lsp";
 import { useContextMenu, type MenuItem } from "../../ContextMenu";
 import { FilterClearButton } from "./workspaceChrome";
 import {
@@ -39,6 +33,7 @@ import {
 
 export type { FileTreeViewMode };
 
+/** Custom LSP command shape (prefs shared with Settings Language Servers). */
 export interface LspCustomCommandConfig {
   command: string;
   args: string;
@@ -66,20 +61,6 @@ interface FileTreePaneProps {
   onDelete: () => void;
   onKeyDown?: (event: KeyboardEvent<HTMLElement>) => void;
   children: ReactNode;
-  languageServers: {
-    open: boolean;
-    statuses: LspServerStatus[];
-    activeStatus: LspDocumentStatus | null;
-    commandPrefs: Record<string, string>;
-    customCommands: Record<string, LspCustomCommandConfig>;
-    customCommandId: string;
-    formatOnSave: boolean;
-    onToggle: () => void;
-    onRefresh: () => void;
-    onFormatOnSaveChange: (enabled: boolean) => void;
-    onCommandChange: (presetId: string, commandId: string) => void;
-    onCustomCommandChange: (presetId: string, patch: Partial<LspCustomCommandConfig>) => void;
-  };
 }
 
 interface TreeIconButtonProps {
@@ -147,7 +128,6 @@ export function FileTreePane({
   onRename,
   onDelete,
   children,
-  languageServers,
   onKeyDown,
 }: FileTreePaneProps) {
   const toolbarMenu = useContextMenu();
@@ -375,7 +355,6 @@ export function FileTreePane({
       >
         {children}
       </div>
-      <LanguageServersPanel {...languageServers} />
       {toolbarMenu.render}
     </aside>
   );
@@ -383,131 +362,4 @@ export function FileTreePane({
 
 /** Default before first measure — treat as wide so SSR/tests show full primary actions. */
 const TREE_DEFAULT_WIDTH_ASSUMPTION = 360;
-
-function LanguageServersPanel({
-  open,
-  statuses,
-  activeStatus,
-  commandPrefs,
-  customCommands,
-  customCommandId,
-  formatOnSave,
-  onToggle,
-  onRefresh,
-  onFormatOnSaveChange,
-  onCommandChange,
-  onCustomCommandChange,
-}: FileTreePaneProps["languageServers"]) {
-  const missingCount = statuses.filter((status) => !status.available).length;
-  return (
-    <section className="shrink-0 border-t border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]">
-      <div className="h-7 flex items-center text-[11px] font-semibold">
-        <button
-          type="button"
-          data-testid="code-workspace-language-servers-toggle"
-          className="min-w-0 flex-1 h-full flex items-center gap-1.5 px-2 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
-          onClick={onToggle}
-        >
-          {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-          <Server className="w-3.5 h-3.5 text-[var(--taomni-code-muted)]" />
-          <span className="min-w-0 flex-1 truncate">Language Servers</span>
-          {missingCount > 0 && (
-            <span className="shrink-0 text-[10px] text-amber-500">{missingCount} missing</span>
-          )}
-        </button>
-        <button
-          type="button"
-          title="Refresh language servers"
-          aria-label="Refresh language servers"
-          className="mr-1 h-5 w-5 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)]"
-          onClick={onRefresh}
-        >
-          <RefreshCw className="w-3 h-3" />
-        </button>
-      </div>
-      {open && (
-        <div className="max-h-56 overflow-auto pb-1">
-          <label className="flex items-center gap-2 border-b border-[var(--taomni-code-border)] px-2 py-1.5 text-[11px]">
-            <input
-              type="checkbox"
-              data-testid="code-workspace-format-on-save"
-              aria-label="Format on save"
-              checked={formatOnSave}
-              onChange={(event) => onFormatOnSaveChange(event.target.checked)}
-            />
-            <span className="min-w-0 flex-1">Format on save</span>
-            <span className="shrink-0 text-[10px] text-[var(--taomni-code-muted)]">Workspace</span>
-          </label>
-          {activeStatus && (
-            <div className="px-2 py-1 border-b border-[var(--taomni-code-border)] text-[11px]">
-              <div className="flex items-center gap-1.5">
-                <Info className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-                <span className="min-w-0 flex-1 truncate">
-                  Active: {activeStatus.displayName ?? "None"}
-                </span>
-              </div>
-              {!activeStatus.active && activeStatus.installHint && (
-                <div className="mt-1 truncate font-mono text-[10px] text-amber-500" title={activeStatus.installHint}>
-                  {activeStatus.installHint}
-                </div>
-              )}
-            </div>
-          )}
-          {statuses.map((status) => {
-            const custom = customCommands[status.presetId] ?? { command: "", args: "" };
-            const selected = commandPrefs[status.presetId] ?? status.selectedCommandId ?? status.commands[0]?.id ?? "";
-            return (
-              <div key={status.presetId} className="px-2 py-1.5 text-[11px]">
-                <div className="flex items-center gap-1.5">
-                  <span
-                    data-available={status.available || undefined}
-                    className="h-2 w-2 shrink-0 rounded-full bg-amber-500 data-[available=true]:bg-[var(--taomni-accent)]"
-                  />
-                  <span className="min-w-0 flex-1 truncate">{status.displayName}</span>
-                  {status.active && <span className="shrink-0 text-[10px] text-[var(--taomni-accent)]">active</span>}
-                </div>
-                <select
-                  value={selected}
-                  className="mt-1 h-6 w-full rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 text-[11px] text-[var(--taomni-code-text)] outline-none"
-                  onChange={(event) => onCommandChange(status.presetId, event.target.value)}
-                  aria-label={`${status.displayName} language server command`}
-                >
-                  {status.commands.map((command) => (
-                    <option key={command.id} value={command.id}>
-                      {command.label}{command.fallback ? " fallback" : ""}
-                    </option>
-                  ))}
-                  <option value={customCommandId}>Custom command</option>
-                </select>
-                {selected === customCommandId && (
-                  <div className="mt-1 grid grid-cols-1 gap-1">
-                    <input
-                      value={custom.command}
-                      className="h-6 min-w-0 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 font-mono text-[11px] text-[var(--taomni-code-text)] outline-none"
-                      placeholder="Command or absolute path"
-                      aria-label={`${status.displayName} custom command`}
-                      onChange={(event) => onCustomCommandChange(status.presetId, { command: event.target.value })}
-                    />
-                    <input
-                      value={custom.args}
-                      className="h-6 min-w-0 rounded border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)] px-1 font-mono text-[11px] text-[var(--taomni-code-text)] outline-none"
-                      placeholder="Args"
-                      aria-label={`${status.displayName} custom args`}
-                      onChange={(event) => onCustomCommandChange(status.presetId, { args: event.target.value })}
-                    />
-                  </div>
-                )}
-                {!status.available && (
-                  <div className="mt-1 truncate font-mono text-[10px] text-amber-500" title={status.installHint}>
-                    {status.installHint}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-}
 

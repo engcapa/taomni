@@ -116,4 +116,29 @@ describe("createLspCompletionSource", () => {
 
     expect(result?.options.some((option) => option.label === "workspace")).toBe(true);
   });
+
+  it("uses filterText for matching and sortText for ordering metadata", async () => {
+    const fetch = vi.fn(async (): Promise<LspCompletionResult> => ({
+      status: status(true),
+      isIncomplete: false,
+      items: [{
+        label: "toString(): string",
+        kind: 2,
+        detail: null,
+        documentation: null,
+        insertText: "toString",
+        insertTextFormat: 1,
+        filterText: "toString",
+        sortText: "0001",
+        textEdit: null,
+        additionalTextEdits: [],
+        raw: {},
+      }],
+    }));
+    const source = createLspCompletionSource({ fetch, triggerCharacters: () => [] });
+    const result = await source(contextAt("to", 2));
+    expect(result?.options[0]?.label).toBe("toString");
+    expect(result?.options[0]?.displayLabel).toBe("toString(): string");
+    expect(result?.options[0]?.sortText).toBe("0001");
+  });
 });

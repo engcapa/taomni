@@ -1001,6 +1001,76 @@ select.taomni-input:not(.appearance-none):not([multiple]) {
 }
 .taomni-chat-md img { max-width: 100%; height: auto; border-radius: 3px; }
 
+/*
+ * LSP hover / documentation tooltips live in CodeMirror tooltips (often portaled)
+ * and reuse .taomni-chat-md. Chat-md styles target app chrome vars (--taomni-bg,
+ * --taomni-divider, …) which can clash with the active code theme (e.g. light
+ * pre backgrounds inside a dark code tooltip). Force code-theme tokens here.
+ */
+.cm-lsp-hover,
+.cm-tooltip .cm-lsp-hover,
+.cm-tooltip.cm-tooltip-hover {
+  background: var(--taomni-code-tooltip-bg) !important;
+  color: var(--taomni-code-text) !important;
+  border-color: var(--taomni-code-border) !important;
+}
+.cm-lsp-hover.taomni-chat-md,
+.cm-tooltip .taomni-chat-md {
+  color: var(--taomni-code-text);
+}
+.cm-lsp-hover.taomni-chat-md a,
+.cm-tooltip .taomni-chat-md a {
+  color: var(--taomni-code-syntax-link);
+  text-decoration-color: color-mix(in srgb, var(--taomni-code-syntax-link) 50%, transparent);
+}
+.cm-lsp-hover.taomni-chat-md h4,
+.cm-lsp-hover.taomni-chat-md h5,
+.cm-lsp-hover.taomni-chat-md h6,
+.cm-tooltip .taomni-chat-md h4,
+.cm-tooltip .taomni-chat-md h5,
+.cm-tooltip .taomni-chat-md h6,
+.cm-lsp-hover.taomni-chat-md blockquote,
+.cm-tooltip .taomni-chat-md blockquote {
+  color: var(--taomni-code-muted);
+}
+.cm-lsp-hover.taomni-chat-md code,
+.cm-tooltip .taomni-chat-md code {
+  background: color-mix(in srgb, var(--taomni-code-border) 70%, transparent);
+  color: var(--taomni-code-text);
+}
+.cm-lsp-hover.taomni-chat-md pre,
+.cm-tooltip .taomni-chat-md pre {
+  background: var(--taomni-code-bg);
+  border: 1px solid var(--taomni-code-border);
+  color: var(--taomni-code-text);
+}
+.cm-lsp-hover.taomni-chat-md pre code,
+.cm-tooltip .taomni-chat-md pre code {
+  background: transparent;
+  color: inherit;
+}
+.cm-lsp-hover.taomni-chat-md th,
+.cm-tooltip .taomni-chat-md th {
+  background: color-mix(in srgb, var(--taomni-code-border) 55%, transparent);
+}
+.cm-lsp-hover.taomni-chat-md th,
+.cm-lsp-hover.taomni-chat-md td,
+.cm-tooltip .taomni-chat-md th,
+.cm-tooltip .taomni-chat-md td {
+  border-color: var(--taomni-code-border);
+}
+.cm-lsp-hover.taomni-chat-md hr,
+.cm-tooltip .taomni-chat-md hr {
+  border-top-color: var(--taomni-code-border);
+}
+/* Completion list detail/info panes share the same tokens. */
+.cm-tooltip-autocomplete,
+.cm-tooltip.cm-completionInfo {
+  background: var(--taomni-code-tooltip-bg) !important;
+  color: var(--taomni-code-text) !important;
+  border-color: var(--taomni-code-border) !important;
+}
+
 .taomni-proto-btn {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 8px 8px 6px;

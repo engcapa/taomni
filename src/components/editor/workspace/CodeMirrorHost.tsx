@@ -1,5 +1,5 @@
 import { useEffect, useRef, type MutableRefObject } from "react";
-import { Compartment, EditorState, type Extension } from "@codemirror/state";
+import { Compartment, EditorState, Prec, type Extension } from "@codemirror/state";
 import {
   EditorView,
   crosshairCursor,
@@ -20,6 +20,7 @@ import {
   indentWithTab,
 } from "@codemirror/commands";
 import {
+  acceptCompletion,
   autocompletion,
   closeBrackets,
   closeBracketsKeymap,
@@ -102,8 +103,24 @@ interface CodeMirrorHostProps {
   onExpandSelection?: (selection: EditorSelectionRange) => Promise<LspRange[] | null>;
   onLightbulb?: (line: number) => void;
   onGitChangeClick?: (change: GitLineChange) => void;
+  /** Editor-area right-click (symbol / buffer menu). */
+  onContextMenu?: (info: EditorContextMenuRequest) => void;
   completionTriggers?: string[];
   signatureTriggers?: string[];
+}
+
+/** Payload for the editor context menu (coordinates + clipboard helpers). */
+export interface EditorContextMenuRequest {
+  position: LspPosition;
+  selectionStart: LspPosition;
+  selectionEnd: LspPosition;
+  clientX: number;
+  clientY: number;
+  hasSelection: boolean;
+  selectedText: string;
+  cut: () => void;
+  copy: () => void;
+  paste: () => void;
 }
 
 const WORKSPACE_EDITOR_STYLE = EditorView.theme({
@@ -135,12 +152,16 @@ const LSP_EDITOR_STYLE = EditorView.theme({
     overflow: "auto",
     padding: "8px 10px",
     border: "1px solid var(--taomni-code-border)",
+    // Prefer a surface slightly lifted from the editor bg so body text and
+    // nested markdown code blocks remain legible across light/dark code themes.
     background: "var(--taomni-code-tooltip-bg)",
     color: "var(--taomni-code-text)",
     boxShadow: "0 12px 28px rgba(0, 0, 0, 0.28)",
     fontSize: "12px",
     lineHeight: "1.5",
   },
+  // Nested markdown (via .taomni-chat-md) is themed in index.css so it tracks
+  // --taomni-code-* even when the tooltip is portaled outside the editor host.
 });
 
 const EMPTY_HIGHLIGHTS: LspDocumentHighlight[] = [];
@@ -266,6 +287,7 @@ export function CodeMirrorHost({
   onExpandSelection,
   onLightbulb,
   onGitChangeClick,
+  onContextMenu,
   completionTriggers,
   signatureTriggers,
 }: CodeMirrorHostProps) {
@@ -301,6 +323,7 @@ export function CodeMirrorHost({
   const onExpandSelectionRef = useRef(onExpandSelection);
   const onLightbulbRef = useRef(onLightbulb);
   const onGitChangeClickRef = useRef(onGitChangeClick);
+  const onContextMenuRef = useRef(onContextMenu);
   const completionTriggersRef = useRef(completionTriggers ?? []);
   const signatureTriggersRef = useRef(signatureTriggers ?? []);
   onChangeRef.current = onChange;
@@ -316,6 +339,7 @@ export function CodeMirrorHost({
   onExpandSelectionRef.current = onExpandSelection;
   onLightbulbRef.current = onLightbulb;
   onGitChangeClickRef.current = onGitChangeClick;
+  onContextMenuRef.current = onContextMenu;
   completionTriggersRef.current = completionTriggers ?? [];
   signatureTriggersRef.current = signatureTriggers ?? [];
 
@@ -470,10 +494,9 @@ export function CodeMirrorHost({
         closeBrackets(),
         indentOnInput(),
         autocompletion({
-          // The default 100ms queries a language server while the user is
-          // still typing. Keep automatic completion, but wait for a short
-          // idle window so the document sync can get ahead of it.
-          activateOnTypingDelay: 350,
+          // Slightly above CM's 100ms default so didChange can get ahead of
+          // completion, without feeling as laggy as a full 350ms idle wait.
+          activateOnTypingDelay: 200,
           override: [
             createLspCompletionSource({
               fetch: (position, trigger) =>
@@ -512,6 +535,13 @@ export function CodeMirrorHost({
         WORKSPACE_EDITOR_STYLE,
         LSP_EDITOR_STYLE,
         WORKSPACE_SEARCH_STYLE,
+        // IDEA-style Tab-to-accept: high priority so it wins over indent when
+        // a completion is open; returns false otherwise so indentWithTab runs.
+        // Snippet tabstops (also Prec.highest via autocompletion) still win
+        // when a snippet field is active and no completion is open.
+        Prec.high(keymap.of([
+          { key: "Tab", run: acceptCompletion },
+        ])),
         keymap.of([
           { key: "Mod-s", run: saveHandler },
           { key: "Mod-r", run: openReplacePanel },
@@ -525,6 +555,59 @@ export function CodeMirrorHost({
           ...historyKeymap,
           indentWithTab,
         ]),
+        EditorView.domEventHandlers({
+          contextmenu(event, view) {
+            const handler = onContextMenuRef.current;
+            if (!handler) return false;
+            const coords = { x: event.clientX, y: event.clientY };
+            // posAtCoords can be null in headless/jsdom; fall back to caret.
+            const pos = view.posAtCoords(coords) ?? view.state.selection.main.head;
+            event.preventDefault();
+            const main = view.state.selection.main;
+            // Click outside the selection: place the caret there (IDEA-like).
+            if (pos < main.from || pos > main.to) {
+              view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+            }
+            const selection = view.state.selection.main;
+            const selectedText = view.state.sliceDoc(selection.from, selection.to);
+            const replaceSelection = (text: string) => {
+              view.dispatch(view.state.replaceSelection(text));
+              view.focus();
+            };
+            const selectionStart = lspPositionFromOffset(
+              view.state.doc,
+              Math.min(selection.from, selection.to),
+            );
+            const selectionEnd = lspPositionFromOffset(
+              view.state.doc,
+              Math.max(selection.from, selection.to),
+            );
+            handler({
+              position: lspPositionFromOffset(view.state.doc, selection.head),
+              selectionStart,
+              selectionEnd,
+              clientX: event.clientX,
+              clientY: event.clientY,
+              hasSelection: !selection.empty,
+              selectedText,
+              cut: () => {
+                if (selection.empty) return;
+                void navigator.clipboard.writeText(selectedText).catch(() => {});
+                replaceSelection("");
+              },
+              copy: () => {
+                if (selection.empty) return;
+                void navigator.clipboard.writeText(selectedText).catch(() => {});
+              },
+              paste: () => {
+                void navigator.clipboard.readText()
+                  .then((text) => replaceSelection(text))
+                  .catch(() => {});
+              },
+            });
+            return true;
+          },
+        }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             if (!applyingExternalDocRef.current) {

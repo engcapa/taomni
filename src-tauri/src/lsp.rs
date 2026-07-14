@@ -4269,6 +4269,76 @@ fn cmd(
     }
 }
 
+/// OS-aware install hints for language servers that lack a single cross-platform package.
+fn install_hint_for(command_id: &str) -> String {
+    let os = std::env::consts::OS;
+    match command_id {
+        "jdtls" => match os {
+            "macos" => {
+                "Requires JDK 17+. macOS: brew install jdtls. \
+Or download Eclipse JDT LS (https://download.eclipse.org/jdtls/) and put `jdtls` on PATH (config_mac)."
+                    .into()
+            }
+            "windows" => {
+                "Requires JDK 17+. Windows: download Eclipse JDT LS zip \
+(https://download.eclipse.org/jdtls/), extract, wrap java -jar launcher with config_win into jdtls.cmd on PATH."
+                    .into()
+            }
+            _ => {
+                "Requires JDK 17+. Linux: download Eclipse JDT LS tarball \
+(https://download.eclipse.org/jdtls/), extract to ~/.local/share/jdtls, wrap launcher with config_linux as `jdtls` on PATH. \
+Arch: pacman -S jdtls (if available)."
+                    .into()
+            }
+        },
+        "clangd" => match os {
+            "macos" => "brew install llvm  # then ensure clangd is on PATH".into(),
+            "windows" => {
+                "Install LLVM (https://llvm.org/) or use winget/choco `llvm`; ensure `clangd` is on PATH"
+                    .into()
+            }
+            _ => {
+                "sudo apt install clangd  # Debian/Ubuntu; or install LLVM clangd package for your distro"
+                    .into()
+            }
+        },
+        "kotlin-language-server" => match os {
+            "macos" => {
+                "brew install kotlin-language-server  # or download from \
+https://github.com/fwcd/kotlin-language-server/releases"
+                    .into()
+            }
+            _ => {
+                "Download kotlin-language-server from \
+https://github.com/fwcd/kotlin-language-server/releases and put it on PATH"
+                    .into()
+            }
+        },
+        "metals" => match os {
+            "macos" => "brew install metals  # or: coursier install metals".into(),
+            _ => {
+                "Install Metals: coursier install metals  # or see https://scalameta.org/metals/docs/"
+                    .into()
+            }
+        },
+        "omnisharp" => match os {
+            "macos" => "brew install omnisharp  # or download OmniSharp from GitHub releases".into(),
+            "windows" => {
+                "Install OmniSharp-roslyn release and ensure `omnisharp` is on PATH".into()
+            }
+            _ => "Install OmniSharp-roslyn and ensure `omnisharp` is on PATH".into(),
+        },
+        "sourcekit-lsp" => match os {
+            "macos" => "Install Xcode or Swift toolchain (sourcekit-lsp ships with it)".into(),
+            _ => {
+                "Install Swift toolchain from https://www.swift.org/ and ensure `sourcekit-lsp` is on PATH"
+                    .into()
+            }
+        },
+        _ => format!("Install `{command_id}` and ensure it is on PATH"),
+    }
+}
+
 pub fn lsp_presets() -> Vec<LspServerPreset> {
     vec![
         LspServerPreset {
@@ -4356,7 +4426,7 @@ pub fn lsp_presets() -> Vec<LspServerPreset> {
                 "jdtls",
                 "jdtls",
                 &[],
-                "Install Eclipse JDT LS and ensure `jdtls` is on PATH",
+                &install_hint_for("jdtls"),
                 false,
             )],
         },
@@ -4380,7 +4450,7 @@ pub fn lsp_presets() -> Vec<LspServerPreset> {
                 "clangd",
                 "clangd",
                 &[],
-                "Install LLVM clangd and ensure `clangd` is on PATH",
+                &install_hint_for("clangd"),
                 false,
             )],
         },
@@ -4395,7 +4465,7 @@ pub fn lsp_presets() -> Vec<LspServerPreset> {
                 "kotlin-language-server",
                 "kotlin-language-server",
                 &[],
-                "Install kotlin-language-server and ensure it is on PATH",
+                &install_hint_for("kotlin-language-server"),
                 false,
             )],
         },
@@ -4410,7 +4480,7 @@ pub fn lsp_presets() -> Vec<LspServerPreset> {
                 "Metals",
                 "metals",
                 &[],
-                "Install Metals and ensure `metals` is on PATH",
+                &install_hint_for("metals"),
                 false,
             )],
         },
@@ -4434,7 +4504,7 @@ pub fn lsp_presets() -> Vec<LspServerPreset> {
                     "OmniSharp",
                     "omnisharp",
                     &["--languageserver"],
-                    "Install OmniSharp and ensure `omnisharp` is on PATH",
+                    &install_hint_for("omnisharp"),
                     true,
                 ),
             ],
@@ -4450,7 +4520,7 @@ pub fn lsp_presets() -> Vec<LspServerPreset> {
                 "SourceKit-LSP",
                 "sourcekit-lsp",
                 &[],
-                "Install Swift toolchain and ensure `sourcekit-lsp` is on PATH",
+                &install_hint_for("sourcekit-lsp"),
                 false,
             )],
         },
@@ -4461,6 +4531,26 @@ pub fn lsp_presets() -> Vec<LspServerPreset> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn java_install_hint_is_platform_specific() {
+        let hint = install_hint_for("jdtls");
+        assert!(
+            hint.contains("JDK 17") || hint.contains("jdtls"),
+            "expected JDK / jdtls guidance, got: {hint}"
+        );
+        let java = find_preset("java").expect("java preset");
+        assert_eq!(java.commands[0].install_hint, hint);
+    }
+
+    #[test]
+    fn clangd_install_hint_mentions_package_or_path() {
+        let hint = install_hint_for("clangd");
+        assert!(
+            hint.contains("clangd") || hint.contains("llvm") || hint.contains("LLVM"),
+            "unexpected clangd hint: {hint}"
+        );
+    }
 
     #[tokio::test]
     async fn coalesces_concurrent_session_start_claims() {

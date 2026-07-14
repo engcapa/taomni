@@ -41,7 +41,12 @@ import { CodeViewAppearanceSettings } from "./CodeViewAppearanceSettings";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 import { SqlCompletionSettings } from "./SqlCompletionSettings";
 import { SqlExecutionSettings } from "./SqlExecutionSettings";
+import { LanguageServersSettings } from "./LanguageServersSettings";
 import { FontPickerSelect, type FontPickerOption } from "../terminal/FontPickerPanel";
+import {
+  OPEN_SETTINGS_SECTION_EVENT,
+  type OpenSettingsSectionDetail,
+} from "../../lib/settingsNavigation";
 
 const UI_FONTS = [
   { value: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', label: "Inter (Default UI - Highly Recommended)" },
@@ -147,6 +152,18 @@ export function SettingsPanel() {
     if (matchIds.length > 0) scrollToId(matchIds[0]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchKey]);
+
+  // Status bar / deep links: open Settings and scroll to a section.
+  useEffect(() => {
+    const onOpenSection = (event: Event) => {
+      const detail = (event as CustomEvent<OpenSettingsSectionDetail>).detail;
+      if (!detail?.id) return;
+      // Allow the settings tab to paint before scrolling.
+      window.requestAnimationFrame(() => scrollToId(detail.id));
+    };
+    window.addEventListener(OPEN_SETTINGS_SECTION_EVENT, onOpenSection as EventListener);
+    return () => window.removeEventListener(OPEN_SETTINGS_SECTION_EVENT, onOpenSection as EventListener);
+  }, [scrollToId]);
 
   const goToMatch = useCallback(
     (delta: number) => {
@@ -463,6 +480,10 @@ export function SettingsPanel() {
               fontState={systemFonts}
               onRequestSystemFonts={requestSystemFonts}
             />
+          </SettingsAnchor>
+
+          <SettingsAnchor id="language-servers">
+            <LanguageServersSettings />
           </SettingsAnchor>
 
           <SettingsAnchor id="sql-completion">

@@ -138,6 +138,21 @@ describe("CodeMirrorHost search", () => {
     expect(await screen.findByRole("textbox", { name: /Go to line/ })).toBeInTheDocument();
   });
 
+  it("forwards editor contextmenu with caret position and clipboard helpers", async () => {
+    const onContextMenu = vi.fn();
+    const { content } = renderEditor("hello world", vi.fn(), { onContextMenu });
+    content.focus();
+    fireEvent.contextMenu(content, { clientX: 24, clientY: 36, button: 2 });
+    await waitFor(() => expect(onContextMenu).toHaveBeenCalled());
+    const request = onContextMenu.mock.calls[0][0];
+    expect(request.clientX).toBe(24);
+    expect(request.clientY).toBe(36);
+    expect(request.position).toEqual(expect.objectContaining({ line: expect.any(Number) }));
+    expect(typeof request.cut).toBe("function");
+    expect(typeof request.copy).toBe("function");
+    expect(typeof request.paste).toBe("function");
+  });
+
   it("renders usage/inlay chrome, reports its viewport, and requests semantic selection", async () => {
     const onViewportChange = vi.fn();
     const onExpandSelection = vi.fn(async () => [{

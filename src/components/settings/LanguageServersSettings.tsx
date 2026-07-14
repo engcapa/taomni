@@ -1,0 +1,346 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, Copy, RefreshCw, Server } from "lucide-react";
+import { lspDetectServers, type LspServerStatus } from "../../lib/editor/lsp";
+import { writeText } from "../../lib/clipboard";
+import { useT } from "../../lib/i18n";
+import {
+  detectHostOs,
+  osLabel,
+  resolveInstallGuide,
+  type LspInstallOs,
+  type ResolvedInstallGuide,
+} from "../../lib/lspInstallGuides";
+import {
+  CUSTOM_LSP_COMMAND_ID,
+  readLspCommandPrefs,
+  readLspCustomCommands,
+  writeLspCommandPrefs,
+  writeLspCustomCommands,
+  type LspCustomCommandConfig,
+} from "../editor/workspace/codeWorkspaceModel";
+
+/**
+ * Global language-server configuration (install hints, binary selection,
+ * custom commands). Lives in Settings so every Code Workspace does not
+ * repeat the same panel in the project tree.
+ */
+export function LanguageServersSettings() {
+  const t = useT();
+  const [statuses, setStatuses] = useState<LspServerStatus[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [commandPrefs, setCommandPrefs] = useState<Record<string, string>>(() => readLspCommandPrefs());
+  const [customCommands, setCustomCommands] = useState<Record<string, LspCustomCommandConfig>>(
+    () => readLspCustomCommands(),
+  );
+  /** Expanded install panels keyed by presetId. */
+  const [expandedInstall, setExpandedInstall] = useState<Record<string, boolean>>({});
+  const hostOs = useMemo(() => detectHostOs(), []);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const next = await lspDetectServers();
+      setStatuses(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const updateCommand = (presetId: string, commandId: string) => {
+    setCommandPrefs((current) => {
+      const next = { ...current, [presetId]: commandId };
+      writeLspCommandPrefs(next);
+      return next;
+    });
+  };
+
+  const updateCustom = (presetId: string, patch: Partial<LspCustomCommandConfig>) => {
+    setCustomCommands((current) => {
+      const existing = current[presetId] ?? { command: "", args: "" };
+      const nextConfig = { ...existing, ...patch };
+      const next = { ...current };
+      if (nextConfig.command.trim() || nextConfig.args.trim()) next[presetId] = nextConfig;
+      else delete next[presetId];
+      writeLspCustomCommands(next);
+      return next;
+    });
+  };
+
+  const toggleInstall = (presetId: string) => {
+    setExpandedInstall((current) => ({
+      ...current,
+      [presetId]: !current[presetId],
+    }));
+  };
+
+  const missingCount = statuses.filter((status) => !status.available).length;
+
+  return (
+    <section
+      data-testid="language-servers-settings"
+      className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3"
+    >
+      <div className="mb-3 flex items-start gap-3">
+        <Server className="mt-0.5 h-4 w-4 shrink-0 text-[var(--taomni-accent)]" />
+        <div className="min-w-0 flex-1">
+          <div className="text-[14px] font-semibold">{t("settings.languageServersTitle")}</div>
+          <div className="text-[12px] text-[var(--taomni-text-muted)]">
+            {t("settings.languageServersSubtitle")}
+          </div>
+        </div>
+        <button
+          type="button"
+          data-testid="language-servers-refresh"
+          className="taomni-btn h-7 px-2.5 inline-flex items-center gap-1 text-[11px]"
+          onClick={() => void refresh()}
+          disabled={loading}
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+          {t("settings.languageServersRefresh")}
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-2 rounded border border-red-500/30 bg-red-500/10 px-2 py-1.5 text-[12px] text-red-500">
+          {error}
+        </div>
+      )}
+
+      <div className="mb-2 flex items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
+        <span>
+          {loading
+            ? t("settings.languageServersDetecting")
+            : t("settings.languageServersSummary", {
+              available: statuses.filter((s) => s.available).length,
+              total: statuses.length,
+            })}
+        </span>
+        {missingCount > 0 && (
+          <span className="text-amber-500">
+            {t("settings.languageServersMissing", { count: missingCount })}
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {statuses.map((status) => {
+          const custom = customCommands[status.presetId] ?? { command: "", args: "" };
+          const selected = commandPrefs[status.presetId]
+            ?? status.selectedCommandId
+            ?? status.commands[0]?.id
+            ?? "";
+          const selectedCommand = status.commands.find((command) => command.id === selected)
+            ?? status.commands[0]
+            ?? null;
+          // Prefer guide for the selected binary; fall back to first command / server hint.
+          const installGuide = resolveInstallGuide(
+            selectedCommand?.id ?? status.commands[0]?.id ?? status.presetId,
+            selectedCommand?.installHint ?? status.installHint,
+          );
+          const installOpen = !!expandedInstall[status.presetId];
+
+          return (
+            <div
+              key={status.presetId}
+              data-testid={`language-server-row-${status.presetId}`}
+              className="rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-2.5 py-2"
+            >
+              <div className="flex items-center gap-2 text-[12px]">
+                <span
+                  data-available={status.available || undefined}
+                  className="h-2 w-2 shrink-0 rounded-full bg-amber-500 data-[available=true]:bg-[var(--taomni-accent)]"
+                  title={status.available ? "Available" : "Not found on PATH"}
+                />
+                <span className="min-w-0 flex-1 font-medium text-[var(--taomni-text)]">
+                  {status.displayName}
+                </span>
+                <span className="shrink-0 font-mono text-[10px] text-[var(--taomni-text-muted)]">
+                  {status.documentLanguageIds.slice(0, 3).join(", ")}
+                  {status.documentLanguageIds.length > 3 ? "…" : ""}
+                </span>
+              </div>
+
+              <label className="mt-1.5 block text-[11px] text-[var(--taomni-text-muted)]">
+                {t("settings.languageServersCommand")}
+                <select
+                  value={selected}
+                  className="mt-0.5 h-7 w-full rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 text-[12px] text-[var(--taomni-text)] outline-none"
+                  onChange={(event) => updateCommand(status.presetId, event.target.value)}
+                  aria-label={`${status.displayName} language server command`}
+                >
+                  {status.commands.map((command) => (
+                    <option key={command.id} value={command.id}>
+                      {command.label}{command.fallback ? " fallback" : ""}
+                      {command.available ? "" : " — missing"}
+                    </option>
+                  ))}
+                  <option value={CUSTOM_LSP_COMMAND_ID}>
+                    {t("settings.languageServersCustomCommand")}
+                  </option>
+                </select>
+              </label>
+
+              {selected === CUSTOM_LSP_COMMAND_ID && (
+                <div className="mt-1.5 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  <input
+                    value={custom.command}
+                    className="h-7 min-w-0 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 font-mono text-[11px] text-[var(--taomni-text)] outline-none"
+                    placeholder={t("settings.languageServersCommandPlaceholder")}
+                    aria-label={`${status.displayName} custom command`}
+                    onChange={(event) => updateCustom(status.presetId, { command: event.target.value })}
+                  />
+                  <input
+                    value={custom.args}
+                    className="h-7 min-w-0 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 font-mono text-[11px] text-[var(--taomni-text)] outline-none"
+                    placeholder={t("settings.languageServersArgsPlaceholder")}
+                    aria-label={`${status.displayName} custom args`}
+                    onChange={(event) => updateCustom(status.presetId, { args: event.target.value })}
+                  />
+                </div>
+              )}
+
+              {installGuide && (
+                <InstallGuideDisclosure
+                  open={installOpen}
+                  onToggle={() => toggleInstall(status.presetId)}
+                  guide={installGuide}
+                  hostOs={hostOs}
+                  label={status.displayName}
+                  available={status.available}
+                />
+              )}
+              {status.error && (
+                <div className="mt-1 text-[11px] text-red-500">{status.error}</div>
+              )}
+            </div>
+          );
+        })}
+        {!loading && statuses.length === 0 && (
+          <div className="py-4 text-center text-[12px] text-[var(--taomni-text-muted)]">
+            {t("settings.languageServersEmpty")}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function InstallGuideDisclosure({
+  open,
+  onToggle,
+  guide,
+  hostOs,
+  label,
+  available,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  guide: ResolvedInstallGuide;
+  hostOs: LspInstallOs | null;
+  label: string;
+  available: boolean;
+}) {
+  const t = useT();
+  return (
+    <div className="mt-1.5" data-testid="language-servers-install-disclosure">
+      <button
+        type="button"
+        data-testid="language-servers-install-toggle"
+        className="inline-flex h-6 items-center gap-1 rounded px-1 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] hover:text-[var(--taomni-text)]"
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        {open
+          ? <ChevronDown className="h-3.5 w-3.5" />
+          : <ChevronRight className="h-3.5 w-3.5" />}
+        {open
+          ? t("settings.languageServersHideInstall")
+          : available
+            ? t("settings.languageServersShowInstallInstalled")
+            : t("settings.languageServersShowInstall")}
+      </button>
+      {open && (
+        <div
+          className="mt-1 flex flex-col gap-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-2"
+          data-testid="language-servers-install-panel"
+        >
+          {guide.lines.map((line) => {
+            const isCurrent = line.os != null && line.os === hostOs;
+            const rowKey = line.os ?? "shared";
+            return (
+              <div
+                key={rowKey}
+                data-testid={`language-servers-install-line-${rowKey}`}
+                data-current-os={isCurrent || undefined}
+                className={`rounded px-1.5 py-1 ${
+                  isCurrent ? "bg-[var(--taomni-selected)]/40 ring-1 ring-[var(--taomni-accent-soft)]" : ""
+                }`}
+              >
+                <div className="mb-0.5 flex items-center gap-1.5 text-[10px] font-medium text-[var(--taomni-text-muted)]">
+                  {line.os
+                    ? (
+                      <>
+                        <span>{osLabel(line.os)}</span>
+                        {isCurrent && (
+                          <span className="rounded bg-[var(--taomni-accent)]/15 px-1 text-[var(--taomni-accent)]">
+                            {t("settings.languageServersThisOs")}
+                          </span>
+                        )}
+                      </>
+                    )
+                    : (
+                      <span>{t("settings.languageServersAllOs")}</span>
+                    )}
+                  <button
+                    type="button"
+                    className="ml-auto inline-flex h-5 items-center gap-1 rounded px-1.5 text-[10px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] hover:text-[var(--taomni-text)]"
+                    title={t("settings.languageServersCopyInstall")}
+                    aria-label={`${t("settings.languageServersCopyInstall")} (${label}${line.os ? ` · ${osLabel(line.os)}` : ""})`}
+                    data-testid={`language-servers-copy-install-${rowKey}`}
+                    onClick={() => { void writeText(line.command); }}
+                  >
+                    <Copy className="h-3 w-3" />
+                    {t("settings.languageServersCopy")}
+                  </button>
+                </div>
+                {line.note && (
+                  <div
+                    className="mb-1 rounded border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[10px] leading-snug text-[var(--taomni-text)]"
+                    data-testid={`language-servers-install-note-${rowKey}`}
+                  >
+                    <span className="font-semibold text-amber-600">
+                      {t("settings.languageServersInstallNote")}:{" "}
+                    </span>
+                    {line.note}
+                  </div>
+                )}
+                <div className="mb-0.5 text-[10px] text-[var(--taomni-text-muted)]">
+                  {t("settings.languageServersCopyHint")}
+                </div>
+                <pre
+                  className="m-0 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-2 py-1.5 font-mono text-[11px] leading-snug text-[var(--taomni-text)]"
+                  data-testid={
+                    // Keep a stable selector for the first/primary copyable command block.
+                    line === guide.lines[0]
+                      ? "language-servers-install-hint"
+                      : `language-servers-install-cmd-${rowKey}`
+                  }
+                >
+                  {line.command}
+                </pre>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

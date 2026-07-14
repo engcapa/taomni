@@ -206,16 +206,25 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
     }
     if (result.items.length === 0) return null;
 
-    const options = result.items.map((item): Completion => ({
-      label: item.label,
-      type: completionKindToType(item.kind),
-      detail: item.detail ?? undefined,
-      info: item.documentation || hooks.resolve
-        ? () => completionInfo(item, hooks.resolve)
-        : undefined,
-      apply: (view, completion, from, to) =>
-        applyLspCompletion(view, completion, item, from, to, hooks.resolve),
-    }));
+    const options = result.items.map((item): Completion => {
+      const filterText = item.filterText?.trim() ? item.filterText : null;
+      // Match against filterText when the server provides it (e.g. method
+      // signatures), but keep the human label visible in the list.
+      const label = filterText ?? item.label;
+      const displayLabel = filterText && filterText !== item.label ? item.label : undefined;
+      return {
+        label,
+        displayLabel,
+        sortText: item.sortText ?? undefined,
+        type: completionKindToType(item.kind),
+        detail: item.detail ?? undefined,
+        info: item.documentation || hooks.resolve
+          ? () => completionInfo(item, hooks.resolve)
+          : undefined,
+        apply: (view, completion, from, to) =>
+          applyLspCompletion(view, completion, item, from, to, hooks.resolve),
+      };
+    });
     return {
       from: word ? word.from : context.pos,
       options,
