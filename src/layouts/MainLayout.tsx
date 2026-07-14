@@ -3241,14 +3241,20 @@ export function MainLayout() {
   // so the custom resize handles are Windows/Linux only.
   const isMac = getAppPlatform() === "macos";
   const chatDockViewport = useViewportSize();
-  const chatDockMode =
-    chatDrawerOpen && !aiFullyDisabled
-      ? resolveChatDock(chatDrawerPosition, chatDrawerPinned, chatDockViewport.width, chatDockViewport.height)
-      : "floating";
+  // After the drawer has been opened once, keep ChatDrawer mounted (hidden)
+  // across tab switches so the transcript does not remount and re-animate.
+  const [chatDrawerKeepAlive, setChatDrawerKeepAlive] = useState(false);
+  useEffect(() => {
+    if (chatDrawerOpen) setChatDrawerKeepAlive(true);
+  }, [chatDrawerOpen]);
+  const chatDrawerSurfaceActive = !aiFullyDisabled && (chatDrawerOpen || chatDrawerKeepAlive);
+  const chatDockMode = chatDrawerSurfaceActive
+    ? resolveChatDock(chatDrawerPosition, chatDrawerPinned, chatDockViewport.width, chatDockViewport.height)
+    : "floating";
   const chatDrawerInline = chatDockMode === "side-inline";
   const chatDrawerTopPinned = chatDockMode === "stacked-inline" && chatDrawerPosition === "top";
   const chatDrawerBottomPinned = chatDockMode === "stacked-inline" && chatDrawerPosition === "bottom";
-  const chatDrawerFloating = chatDrawerOpen && !aiFullyDisabled && chatDockMode === "floating";
+  const chatDrawerFloating = chatDrawerSurfaceActive && chatDockMode === "floating";
 
   return (
     <TabActionSlotProvider slot={tabActionSlot}>
@@ -3372,8 +3378,13 @@ export function MainLayout() {
                 />
               )}
               <div className="flex-1 min-h-0 overflow-hidden relative">
-                {/* Welcome panel */}
-                {(activeTab?.type === "welcome" || !activeTab) && (
+                {/* Welcome stays mounted so filters, scroll, and shell
+                    selections survive switching to another tab. */}
+                <div
+                  data-testid="welcome-tab-panel"
+                  className="absolute inset-0"
+                  style={{ display: (activeTab?.type === "welcome" || !activeTab) ? "block" : "none" }}
+                >
                   <WelcomePanel
                     onStartLocalTerminal={(localShell, cwd) => openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell, cwd)}
                     onNewSession={handleNewSession}
@@ -3394,7 +3405,7 @@ export function MainLayout() {
                     onOpenNewWorkspace={() => void openNewCodeWorkspaceFromWelcome()}
                     onOpenSettings={openSettingsTab}
                   />
-                )}
+                </div>
 
                 {/* All terminal tabs stay mounted. Single-tab mode hides
                     inactive panes; split mode only changes the pane wrappers. */}

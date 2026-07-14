@@ -121,6 +121,11 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const resizingRef = useRef(false);
   const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
+  // Track open/thread/length so tab-return (same thread, just re-shown) keeps
+  // the current scroll offset instead of re-animating top→bottom.
+  const prevDrawerOpenRef = useRef(false);
+  const prevScrollThreadIdRef = useRef<string | null>(null);
+  const prevScrollMessageCountRef = useRef(0);
 
   // Subscribe to the active tab so the drawer re-renders (and the
   // scope/picker logic re-evaluates) whenever the user switches tabs. We
@@ -148,7 +153,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
 
   const activeMessages = activeThreadId ? (messages[activeThreadId] ?? []) : [];
   const sending = activeThreadId ? sendingByThreadId[activeThreadId] === true : false;
-  const activeThread = threads.find((t) => t.id === activeThreadId);
+  const activeThread = (threads ?? []).find((t) => t.id === activeThreadId);
   const linkedTab = useAppStore((s) =>
     activeThread?.linked_session_id
       ? s.tabs.find((tab) =>
@@ -172,9 +177,12 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
   const linkedTabType = linkedTab?.type ?? null;
   const isQueryThread = linkedTabType === "database";
   const visibleThreads = useMemo(
-    () => drawerTabId
-      ? threads.filter((thread) => thread.linked_session_id === drawerTabId)
-      : threads.filter((thread) => thread.linked_session_id),
+    () => {
+      const list = threads ?? [];
+      return drawerTabId
+        ? list.filter((thread) => thread.linked_session_id === drawerTabId)
+        : list.filter((thread) => thread.linked_session_id);
+    },
     [drawerTabId, threads],
   );
   const taoAlerts = useMemo(
@@ -326,10 +334,39 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     }
   }, [activeThreadId]);
 
-  // Scroll to bottom on new messages.
+  // Scroll policy:
+  // - same thread re-shown after hide (tab switch away/back): keep scroll
+  // - thread change / first open: jump to bottom instantly
+  // - new messages while open: smooth-scroll only when the list already had content
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [activeMessages.length]);
+    if (!drawerOpen) {
+      prevDrawerOpenRef.current = false;
+      return;
+    }
+    const end = messagesEndRef.current;
+    if (!end) return;
+
+    const opened = !prevDrawerOpenRef.current;
+    const threadChanged = prevScrollThreadIdRef.current !== activeThreadId;
+    const previousCount = prevScrollMessageCountRef.current;
+    const grew = activeMessages.length > previousCount;
+
+    prevDrawerOpenRef.current = true;
+    prevScrollThreadIdRef.current = activeThreadId;
+    prevScrollMessageCountRef.current = activeMessages.length;
+
+    // Re-opening the same transcript (tab return) — preserve scroll position.
+    if (opened && !threadChanged) return;
+
+    if (threadChanged || opened) {
+      end.scrollIntoView({ behavior: "auto" });
+      return;
+    }
+
+    if (grew) {
+      end.scrollIntoView({ behavior: previousCount === 0 ? "auto" : "smooth" });
+    }
+  }, [drawerOpen, activeThreadId, activeMessages.length]);
 
   const pickProviderForMode = (mode: ChatThreadMode, preferredProviderId?: string | null): string | null => {
     const ids = chatDrawerProviderIds(aiConfig, capabilityForMode(mode));
@@ -578,8 +615,6 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     window.addEventListener("pointercancel", onUp);
   };
 
-  if (!drawerOpen) return null;
-
   const positionLabel = t(`chat.drawerPosition_${drawerPosition}`);
   const PositionIcon = positionIcon(drawerPosition);
   const containerClass = [
@@ -590,7 +625,10 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     drawerPosition === "left" ? "order-first" : "",
     floating ? "rounded-md" : "",
   ].filter(Boolean).join(" ");
-  const containerStyle: CSSProperties = sideBySide
+  // Stay mounted while hidden so tab switches do not remount the transcript.
+  const containerStyle: CSSProperties = !drawerOpen
+    ? { display: "none" }
+    : sideBySide
     ? { width: drawerWidth }
     : stackedInline
     ? { height: drawerHeight, width: "100%" }
@@ -609,10 +647,10 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
         transform: "translateX(-50%)",
         [drawerPosition]: 0,
       };
-  if (topBottomFloating) {
+  if (drawerOpen && topBottomFloating) {
     containerStyle.opacity = drawerFloatingOpacity;
   }
-  const themedContainerStyle: CSSProperties = hubTab === "notes"
+  const themedContainerStyle: CSSProperties = drawerOpen && hubTab === "notes"
     ? { ...containerStyle, ...notesThemeStyle(notesTheme) }
     : containerStyle;
   const resizeHandleClass = isHorizontalDock
@@ -661,6 +699,8 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
       data-testid="ai-chat-drawer"
       data-position={drawerPosition}
       data-pinned={drawerPinned || undefined}
+      data-open={drawerOpen || undefined}
+      aria-hidden={!drawerOpen}
     >
       {/* Resize handle */}
       <div
