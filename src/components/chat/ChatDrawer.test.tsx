@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatDrawer, ChatDrawerRibbon } from "./ChatDrawer";
 import { useAppStore } from "../../stores/appStore";
@@ -342,6 +342,59 @@ describe("ChatDrawer layout resizing", () => {
       drawerOpen: false,
       tabDrawerOpenByTabId: { "term-1": false },
     });
+  });
+
+  it("keeps the drawer mounted while closed and does not re-animate scroll on reopen", async () => {
+    const scrollIntoView = Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>;
+    useChatStore.setState({
+      drawerPosition: "right",
+      drawerPinned: true,
+      messages: {
+        "thread-1": [
+          {
+            id: "m1",
+            thread_id: "thread-1",
+            role: "user",
+            content: "hello",
+            created_at: 1,
+            redacted: false,
+          },
+          {
+            id: "m2",
+            thread_id: "thread-1",
+            role: "assistant",
+            content: "world",
+            created_at: 2,
+            redacted: false,
+          },
+        ],
+      },
+    });
+
+    render(<ChatDrawer />);
+    const drawer = screen.getByTestId("ai-chat-drawer");
+    expect(drawer).not.toHaveStyle({ display: "none" });
+
+    // Initial open + thread align uses instant scroll, never smooth.
+    await waitFor(() => {
+      expect(scrollIntoView).toHaveBeenCalled();
+    });
+    expect(scrollIntoView.mock.calls.every((call) => call[0]?.behavior !== "smooth")).toBe(true);
+    scrollIntoView.mockClear();
+
+    act(() => {
+      useChatStore.setState({ drawerOpen: false });
+    });
+    expect(drawer).toBeInTheDocument();
+    expect(drawer).toHaveStyle({ display: "none" });
+    expect(scrollIntoView).not.toHaveBeenCalled();
+
+    act(() => {
+      useChatStore.setState({ drawerOpen: true });
+    });
+    expect(drawer).not.toHaveStyle({ display: "none" });
+    // Same thread re-shown: preserve scroll, do not jump/animate again.
+    expect(scrollIntoView).not.toHaveBeenCalled();
   });
 
   it("keeps a floating drawer open when the AI safety gate is clicked", () => {

@@ -575,6 +575,40 @@ describe("MainLayout attached SFTP sidebar", () => {
     });
   });
 
+  it("keeps the welcome tab mounted when switching away", async () => {
+    useAppStore.setState({
+      tabs: [
+        { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+        { id: "ssh-tab", type: "terminal", title: "SSH", closable: true },
+      ],
+      activeTabId: "welcome",
+    });
+
+    render(<MainLayout />);
+
+    const wrapper = screen.getByTestId("welcome-tab-panel") as HTMLElement;
+    const panel = screen.getByTestId("welcome-panel");
+    expect(wrapper.style.display).toBe("block");
+
+    act(() => {
+      useAppStore.getState().setActiveTab("ssh-tab");
+    });
+
+    await waitFor(() => {
+      expect(wrapper.style.display).toBe("none");
+    });
+    expect(panel).toBeInTheDocument();
+
+    act(() => {
+      useAppStore.getState().setActiveTab("welcome");
+    });
+
+    await waitFor(() => {
+      expect(wrapper.style.display).toBe("block");
+    });
+    expect(panel).toBeInTheDocument();
+  });
+
   it("passes a Git rail action to the sidebar for the active local terminal", () => {
     useAppStore.setState({
       tabs: [{ id: "local-tab", type: "terminal", title: "Local terminal", closable: true }],
