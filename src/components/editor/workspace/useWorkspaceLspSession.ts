@@ -51,6 +51,30 @@ interface DocumentSyncQueue {
   pending: PendingDocumentSync | null;
 }
 
+/**
+ * LSP feature responses all carry a document status.  Most responses for an
+ * already-open document repeat that exact status, and publishing a new store
+ * map for each one makes the whole workspace chrome render again.  Keep the
+ * comparison local and cheap (the capability summary is small) so feature
+ * requests that do not change observable state are true no-ops.
+ */
+function sameDocumentStatus(left: LspDocumentStatus, right: LspDocumentStatus): boolean {
+  return left === right || (
+    left.path === right.path
+    && left.uri === right.uri
+    && left.presetId === right.presetId
+    && left.languageId === right.languageId
+    && left.displayName === right.displayName
+    && left.available === right.available
+    && left.active === right.active
+    && left.selectedCommandId === right.selectedCommandId
+    && left.selectedCommand === right.selectedCommand
+    && left.installHint === right.installHint
+    && left.error === right.error
+    && JSON.stringify(left.capabilities ?? null) === JSON.stringify(right.capabilities ?? null)
+  );
+}
+
 export interface WorkspaceLspSessionController {
   serverStatuses: LspServerStatus[];
   commandPrefs: Record<string, string>;
@@ -181,15 +205,22 @@ export function useWorkspaceLspSession({
 
   const updateStatus = useCallback((file: OpenFileState, status: LspDocumentStatus) => {
     if (!mountedRef.current) return;
-    updateLspFiles((current) => ({
-      ...current,
-      [file.key]: {
-        ...(current[file.key] ?? emptyLspFileState()),
-        status,
-        syncing: false,
-        error: null,
-      },
-    }));
+    updateLspFiles((current) => {
+      const existing = current[file.key] ?? emptyLspFileState();
+      if (existing.status && sameDocumentStatus(existing.status, status)
+        && !existing.syncing && existing.error === null) {
+        return current;
+      }
+      return {
+        ...current,
+        [file.key]: {
+          ...existing,
+          status,
+          syncing: false,
+          error: null,
+        },
+      };
+    });
   }, [updateLspFiles]);
 
   const refreshDiagnostics = useCallback(async (file: OpenFileState) => {

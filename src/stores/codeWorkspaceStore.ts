@@ -307,12 +307,14 @@ export const useCodeWorkspaceStore = create<CodeWorkspaceStoreState>((set, get) 
     get().ensureInstance(instanceId);
     set((state) => {
       const current = state.byInstanceId[instanceId] ?? createDefaultCodeWorkspaceUi();
+      const openFiles = resolveUpdater(current.openFiles, updater);
+      if (openFiles === current.openFiles) return state;
       return {
         byInstanceId: {
           ...state.byInstanceId,
           [instanceId]: {
             ...current,
-            openFiles: resolveUpdater(current.openFiles, updater),
+            openFiles,
           },
         },
       };
@@ -323,12 +325,14 @@ export const useCodeWorkspaceStore = create<CodeWorkspaceStoreState>((set, get) 
     get().ensureInstance(instanceId);
     set((state) => {
       const current = state.byInstanceId[instanceId] ?? createDefaultCodeWorkspaceUi();
+      const lspFiles = resolveUpdater(current.lspFiles, updater);
+      if (lspFiles === current.lspFiles) return state;
       return {
         byInstanceId: {
           ...state.byInstanceId,
           [instanceId]: {
             ...current,
-            lspFiles: resolveUpdater(current.lspFiles, updater),
+            lspFiles,
           },
         },
       };

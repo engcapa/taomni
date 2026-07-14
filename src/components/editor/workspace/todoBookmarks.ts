@@ -20,6 +20,12 @@ export interface WorkspaceBookmark {
   createdAt: number;
 }
 
+export interface WorkspaceTodoFile {
+  key: string;
+  pathLabel: string;
+  text: string;
+}
+
 const BOOKMARKS_PREFIX = "taomni.codeWorkspace.bookmarks.v1.";
 const TODO_PATTERN = /\b(TODO|FIXME|XXX|HACK)\b(?:[:\s-]+(.*))?$/i;
 
@@ -50,13 +56,74 @@ export function scanTodosInText(
 }
 
 export function scanTodosInOpenFiles(
-  files: Array<{ key: string; pathLabel: string; text: string }>,
+  files: WorkspaceTodoFile[],
 ): WorkspaceTodoItem[] {
   return files
     .flatMap((file) => scanTodosInText(file.key, file.pathLabel, file.text))
     .sort((left, right) => left.pathLabel.localeCompare(right.pathLabel)
       || left.line - right.line
       || left.character - right.character);
+}
+
+/**
+ * Incremental cache for open-file TODOs.  Open editor state preserves the
+ * object/text of untouched files, so one edit only needs to rescan its own
+ * buffer rather than all open tabs.
+ */
+export interface OpenFileTodoScanner {
+  scan: (files: WorkspaceTodoFile[]) => WorkspaceTodoItem[];
+}
+
+export function createOpenFileTodoScanner(): OpenFileTodoScanner {
+  let cachedByFile = new Map<string, {
+    pathLabel: string;
+    text: string;
+    items: WorkspaceTodoItem[];
+  }>();
+
+  return {
+    scan(files) {
+      const nextCache = new Map<string, {
+        pathLabel: string;
+        text: string;
+        items: WorkspaceTodoItem[];
+      }>();
+      const items: WorkspaceTodoItem[] = [];
+      for (const file of files) {
+        const cached = cachedByFile.get(file.key);
+        const fileItems = cached && cached.pathLabel === file.pathLabel && cached.text === file.text
+          ? cached.items
+          : scanTodosInText(file.key, file.pathLabel, file.text);
+        nextCache.set(file.key, {
+          pathLabel: file.pathLabel,
+          text: file.text,
+          items: fileItems,
+        });
+        items.push(...fileItems);
+      }
+      cachedByFile = nextCache;
+      return items.sort((left, right) => left.pathLabel.localeCompare(right.pathLabel)
+        || left.line - right.line
+        || left.character - right.character);
+    },
+  };
+}
+
+export function sameWorkspaceTodoItems(
+  left: WorkspaceTodoItem[],
+  right: WorkspaceTodoItem[],
+): boolean {
+  if (left === right) return true;
+  if (left.length !== right.length) return false;
+  return left.every((item, index) => {
+    const other = right[index];
+    return item.key === other?.key
+      && item.pathLabel === other.pathLabel
+      && item.kind === other.kind
+      && item.line === other.line
+      && item.character === other.character
+      && item.text === other.text;
+  });
 }
 
 function bookmarksKey(workspaceInstanceId: string): string {

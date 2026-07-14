@@ -43,7 +43,11 @@ import { languageForPath } from "../../git/diffLanguage";
 import { createWorkspaceSearchPanel, WORKSPACE_SEARCH_STYLE } from "./editorSearchPanel";
 import { createLspCompletionSource } from "./lspCompletion";
 import { createDiagnosticChrome } from "./lspDiagnosticChrome";
-import { createLspIntelligenceChrome } from "./lspIntelligenceChrome";
+import {
+  createLspOverlayChrome,
+  createLspSemanticTokenChrome,
+  LSP_INTELLIGENCE_THEME,
+} from "./lspIntelligenceChrome";
 import { createGitEditorChrome, type GitLineChange } from "./gitEditorChrome";
 import type { GitBlameLine } from "../../../lib/git";
 import { lspPositionFromOffset, offsetFromLspPosition } from "./lspPositions";
@@ -139,6 +143,16 @@ const LSP_EDITOR_STYLE = EditorView.theme({
   },
 });
 
+const EMPTY_HIGHLIGHTS: LspDocumentHighlight[] = [];
+const EMPTY_INLAY_HINTS: LspInlayHint[] = [];
+const EMPTY_SEMANTIC_TOKENS: LspSemanticToken[] = [];
+const EMPTY_GIT_CHANGES: GitLineChange[] = [];
+
+/** New empty-array props are common while LSP requests are debounced. */
+function sameArrayOrBothEmpty<T>(previous: readonly T[], next: readonly T[]): boolean {
+  return previous === next || (previous.length === 0 && next.length === 0);
+}
+
 function signatureTooltipDom(result: LspSignatureHelpResult): HTMLElement {
   const dom = document.createElement("div");
   dom.className = "cm-lsp-hover taomni-chat-md";
@@ -233,10 +247,10 @@ export function CodeMirrorHost({
   doc,
   visible,
   diagnostics,
-  highlights = [],
-  inlayHints = [],
-  semanticTokens = [],
-  gitChanges = [],
+  highlights = EMPTY_HIGHLIGHTS,
+  inlayHints = EMPTY_INLAY_HINTS,
+  semanticTokens = EMPTY_SEMANTIC_TOKENS,
+  gitChanges = EMPTY_GIT_CHANGES,
   gitBlame = null,
   reveal,
   onChange,
@@ -259,12 +273,21 @@ export function CodeMirrorHost({
   const viewRef = useRef<EditorView | null>(null);
   const languageCompartment = useRef(new Compartment());
   const diagnosticsCompartment = useRef(new Compartment());
-  const intelligenceCompartment = useRef(new Compartment());
+  const overlayCompartment = useRef(new Compartment());
+  const semanticTokensCompartment = useRef(new Compartment());
   const gitCompartment = useRef(new Compartment());
   const signatureCompartment = useRef(new Compartment());
   const signatureShownRef = useRef(false);
   /** True while applying a prop-driven doc replace so it is not treated as a user edit. */
   const applyingExternalDocRef = useRef(false);
+  /** Mirrors the last full text sent through onChange or applied from props. */
+  const lastDocumentTextRef = useRef(doc);
+  const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
+  const selectionEmitTimerRef = useRef<number | null>(null);
+  const renderedDiagnosticsRef = useRef(diagnostics);
+  const renderedOverlayRef = useRef({ highlights, inlayHints });
+  const renderedSemanticTokensRef = useRef(semanticTokens);
+  const renderedGitRef = useRef({ changes: gitChanges, blame: gitBlame });
   const onChangeRef = useRef(onChange);
   const onSaveRef = useRef(onSave);
   const onHoverRef = useRef(onHover);
@@ -302,6 +325,9 @@ export function CodeMirrorHost({
     const main = view.state.selection.main;
     const from = Math.min(main.from, main.to);
     const to = Math.max(main.from, main.to);
+    const previous = lastSelectionRef.current;
+    if (previous?.from === from && previous.to === to) return;
+    lastSelectionRef.current = { from, to };
     let rect: EditorSelectionRange["rect"] = null;
     if (!main.empty) {
       const startCoords = view.coordsAtPos(from);
@@ -333,6 +359,23 @@ export function CodeMirrorHost({
 
   useEffect(() => {
     if (!hostRef.current) return;
+    const initialDoc = EditorState.create({ doc }).doc;
+    const clearPendingSelectionEmit = () => {
+      if (selectionEmitTimerRef.current === null) return;
+      window.clearTimeout(selectionEmitTimerRef.current);
+      selectionEmitTimerRef.current = null;
+    };
+    const scheduleSelectionEmit = (view: EditorView, delay = 0) => {
+      clearPendingSelectionEmit();
+      if (delay === 0) {
+        emitSelection(view);
+        return;
+      }
+      selectionEmitTimerRef.current = window.setTimeout(() => {
+        selectionEmitTimerRef.current = null;
+        if (viewRef.current === view) emitSelection(view);
+      }, delay);
+    };
     const saveHandler = () => {
       onSaveRef.current();
       return true;
@@ -409,7 +452,7 @@ export function CodeMirrorHost({
       return true;
     };
     const state = EditorState.create({
-      doc,
+      doc: initialDoc,
       extensions: [
         lineNumbers(),
         foldGutter(),
@@ -427,6 +470,10 @@ export function CodeMirrorHost({
         closeBrackets(),
         indentOnInput(),
         autocompletion({
+          // The default 100ms queries a language server while the user is
+          // still typing. Keep automatic completion, but wait for a short
+          // idle window so the document sync can get ahead of it.
+          activateOnTypingDelay: 350,
           override: [
             createLspCompletionSource({
               fetch: (position, trigger) =>
@@ -444,11 +491,16 @@ export function CodeMirrorHost({
           diagnostics,
           (line) => onLightbulbRef.current?.(line),
         )),
-        intelligenceCompartment.current.of(createLspIntelligenceChrome(
-          EditorState.create({ doc }).doc,
+        overlayCompartment.current.of(createLspOverlayChrome(
+          initialDoc,
           highlights,
           inlayHints,
         )),
+        semanticTokensCompartment.current.of(createLspSemanticTokenChrome(
+          initialDoc,
+          semanticTokens,
+        )),
+        LSP_INTELLIGENCE_THEME,
         gitCompartment.current.of(createGitEditorChrome(
           gitChanges,
           gitBlame,
@@ -476,7 +528,12 @@ export function CodeMirrorHost({
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             if (!applyingExternalDocRef.current) {
-              onChangeRef.current(update.state.doc.toString());
+              // onChange currently carries a full string, so one conversion is
+              // unavoidable. Remember it to avoid a second full conversion in
+              // the controlled-doc effect after React reflects the change.
+              const nextDoc = update.state.doc.toString();
+              lastDocumentTextRef.current = nextDoc;
+              onChangeRef.current(nextDoc);
             }
             let inserted = "";
             update.changes.iterChanges((_fromA, _toA, _fromB, _toB, text) => {
@@ -500,9 +557,12 @@ export function CodeMirrorHost({
             hideSignature();
           }
           if (update.selectionSet || update.docChanged) {
-            emitSelection(update.view);
+            // Cursor state fans out into workspace UI and LSP effects. During
+            // a text burst, publish the final cursor after a short idle rather
+            // than causing a React render for every keypress.
+            scheduleSelectionEmit(update.view, update.docChanged ? 125 : 0);
           }
-          if (update.viewportChanged || update.docChanged) emitViewport(update.view);
+          if (update.viewportChanged) emitViewport(update.view);
         }),
       ],
     });
@@ -511,6 +571,7 @@ export function CodeMirrorHost({
     emitSelection(view);
     emitViewport(view);
     return () => {
+      clearPendingSelectionEmit();
       view.destroy();
       viewRef.current = null;
     };
@@ -539,6 +600,8 @@ export function CodeMirrorHost({
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
+    if (sameArrayOrBothEmpty(renderedDiagnosticsRef.current, diagnostics)) return;
+    renderedDiagnosticsRef.current = diagnostics;
     view.dispatch({
       effects: diagnosticsCompartment.current.reconfigure(createDiagnosticChrome(
         diagnostics,
@@ -550,16 +613,39 @@ export function CodeMirrorHost({
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
+    const previous = renderedOverlayRef.current;
+    if (
+      sameArrayOrBothEmpty(previous.highlights, highlights)
+      && sameArrayOrBothEmpty(previous.inlayHints, inlayHints)
+    ) {
+      return;
+    }
+    renderedOverlayRef.current = { highlights, inlayHints };
     view.dispatch({
-      effects: intelligenceCompartment.current.reconfigure(
-        createLspIntelligenceChrome(view.state.doc, highlights, inlayHints, semanticTokens),
+      effects: overlayCompartment.current.reconfigure(
+        createLspOverlayChrome(view.state.doc, highlights, inlayHints),
       ),
     });
-  }, [highlights, inlayHints, semanticTokens]);
+  }, [highlights, inlayHints]);
 
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
+    if (sameArrayOrBothEmpty(renderedSemanticTokensRef.current, semanticTokens)) return;
+    renderedSemanticTokensRef.current = semanticTokens;
+    view.dispatch({
+      effects: semanticTokensCompartment.current.reconfigure(
+        createLspSemanticTokenChrome(view.state.doc, semanticTokens),
+      ),
+    });
+  }, [semanticTokens]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    const previous = renderedGitRef.current;
+    if (sameArrayOrBothEmpty(previous.changes, gitChanges) && previous.blame === gitBlame) return;
+    renderedGitRef.current = { changes: gitChanges, blame: gitBlame };
     view.dispatch({
       effects: gitCompartment.current.reconfigure(createGitEditorChrome(
         gitChanges,
@@ -572,11 +658,11 @@ export function CodeMirrorHost({
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
-    const current = view.state.doc.toString();
-    if (current === doc) return;
+    if (lastDocumentTextRef.current === doc) return;
     applyingExternalDocRef.current = true;
     try {
-      view.dispatch({ changes: { from: 0, to: current.length, insert: doc } });
+      lastDocumentTextRef.current = doc;
+      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: doc } });
     } finally {
       applyingExternalDocRef.current = false;
     }

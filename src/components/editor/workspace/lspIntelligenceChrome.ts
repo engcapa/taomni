@@ -77,6 +77,91 @@ export function buildLspIntelligenceDecorations(
   return Decoration.set(ranges, true);
 }
 
+/**
+ * Semantic tokens are typically the largest LSP payload. Keep their
+ * decorations separate from cursor-dependent highlights and viewport hints so
+ * a highlight refresh does not rebuild the whole document's token chrome.
+ */
+export function buildLspSemanticTokenDecorations(
+  doc: Text,
+  semanticTokens: LspSemanticToken[] = [],
+): DecorationSet {
+  const ranges = semanticTokens.flatMap((token) => {
+    const { from, to } = rangeOffsets(doc, token.range);
+    if (to <= from) return [];
+    return [Decoration.mark({ class: semanticTokenClass(token) }).range(from, to)];
+  });
+  return Decoration.set(ranges, true);
+}
+
+/** Cursor- and viewport-scoped intelligence chrome. */
+export function buildLspOverlayDecorations(
+  doc: Text,
+  highlights: LspDocumentHighlight[],
+  hints: LspInlayHint[],
+): DecorationSet {
+  const ranges = [];
+  for (const highlight of highlights) {
+    const { from, to } = rangeOffsets(doc, highlight.range);
+    if (to <= from) continue;
+    const suffix = highlight.kind === 3 ? "write" : highlight.kind === 2 ? "read" : "text";
+    ranges.push(Decoration.mark({ class: `cm-lsp-usage cm-lsp-usage-${suffix}` }).range(from, to));
+  }
+  for (const hint of hints) {
+    const position = offsetFromLspPosition(doc, hint.position);
+    ranges.push(Decoration.widget({
+      widget: new InlayHintWidget(hint),
+      side: 1,
+    }).range(position));
+  }
+  return Decoration.set(ranges, true);
+}
+
+export function createLspSemanticTokenChrome(
+  doc: Text,
+  semanticTokens: LspSemanticToken[] = [],
+): Extension[] {
+  return [EditorView.decorations.of(buildLspSemanticTokenDecorations(doc, semanticTokens))];
+}
+
+export function createLspOverlayChrome(
+  doc: Text,
+  highlights: LspDocumentHighlight[],
+  hints: LspInlayHint[],
+): Extension[] {
+  return [EditorView.decorations.of(buildLspOverlayDecorations(doc, highlights, hints))];
+}
+
+export const LSP_INTELLIGENCE_THEME = EditorView.theme({
+  ".cm-lsp-usage-text": { backgroundColor: "color-mix(in srgb, var(--taomni-accent) 10%, transparent)" },
+  ".cm-lsp-usage-read": { backgroundColor: "color-mix(in srgb, #38bdf8 18%, transparent)" },
+  ".cm-lsp-usage-write": { backgroundColor: "color-mix(in srgb, #f59e0b 22%, transparent)" },
+  ".cm-lsp-inlay-hint": {
+    margin: "0 2px",
+    borderRadius: "3px",
+    padding: "0 3px",
+    color: "var(--taomni-code-muted)",
+    backgroundColor: "var(--taomni-code-active-line-bg)",
+    fontSize: "0.85em",
+    fontStyle: "italic",
+    userSelect: "none",
+  },
+  ".cm-lsp-inlay-parameter": { opacity: "0.82" },
+  ".cm-lsp-inlay-type": { opacity: "0.68" },
+  ".cm-lsp-sem-function, .cm-lsp-sem-method, .cm-lsp-sem-macro": { color: "#7dd3fc" },
+  ".cm-lsp-sem-class, .cm-lsp-sem-struct, .cm-lsp-sem-interface, .cm-lsp-sem-type, .cm-lsp-sem-enum": { color: "#f9a8d4" },
+  ".cm-lsp-sem-variable, .cm-lsp-sem-parameter, .cm-lsp-sem-property": { color: "#fde68a" },
+  ".cm-lsp-sem-namespace": { color: "#c4b5fd" },
+  ".cm-lsp-sem-keyword, .cm-lsp-sem-modifier": { color: "#fda4af" },
+  ".cm-lsp-sem-string": { color: "#86efac" },
+  ".cm-lsp-sem-number": { color: "#fdba74" },
+  ".cm-lsp-sem-comment": { color: "var(--taomni-code-muted)", fontStyle: "italic" },
+  ".cm-lsp-sem-operator, .cm-lsp-sem-regexp": { color: "#a5b4fc" },
+  ".cm-lsp-sem-mod-deprecated": { textDecoration: "line-through", opacity: "0.75" },
+  ".cm-lsp-sem-mod-readonly": { fontStyle: "italic" },
+  ".cm-lsp-sem-mod-defaultLibrary": { opacity: "0.9" },
+});
+
 export function createLspIntelligenceChrome(
   doc: Text,
   highlights: LspDocumentHighlight[],
@@ -84,36 +169,9 @@ export function createLspIntelligenceChrome(
   semanticTokens: LspSemanticToken[] = [],
 ): Extension[] {
   return [
-    EditorView.decorations.of(buildLspIntelligenceDecorations(doc, highlights, hints, semanticTokens)),
-    EditorView.theme({
-      ".cm-lsp-usage-text": { backgroundColor: "color-mix(in srgb, var(--taomni-accent) 10%, transparent)" },
-      ".cm-lsp-usage-read": { backgroundColor: "color-mix(in srgb, #38bdf8 18%, transparent)" },
-      ".cm-lsp-usage-write": { backgroundColor: "color-mix(in srgb, #f59e0b 22%, transparent)" },
-      ".cm-lsp-inlay-hint": {
-        margin: "0 2px",
-        borderRadius: "3px",
-        padding: "0 3px",
-        color: "var(--taomni-code-muted)",
-        backgroundColor: "var(--taomni-code-active-line-bg)",
-        fontSize: "0.85em",
-        fontStyle: "italic",
-        userSelect: "none",
-      },
-      ".cm-lsp-inlay-parameter": { opacity: "0.82" },
-      ".cm-lsp-inlay-type": { opacity: "0.68" },
-      ".cm-lsp-sem-function, .cm-lsp-sem-method, .cm-lsp-sem-macro": { color: "#7dd3fc" },
-      ".cm-lsp-sem-class, .cm-lsp-sem-struct, .cm-lsp-sem-interface, .cm-lsp-sem-type, .cm-lsp-sem-enum": { color: "#f9a8d4" },
-      ".cm-lsp-sem-variable, .cm-lsp-sem-parameter, .cm-lsp-sem-property": { color: "#fde68a" },
-      ".cm-lsp-sem-namespace": { color: "#c4b5fd" },
-      ".cm-lsp-sem-keyword, .cm-lsp-sem-modifier": { color: "#fda4af" },
-      ".cm-lsp-sem-string": { color: "#86efac" },
-      ".cm-lsp-sem-number": { color: "#fdba74" },
-      ".cm-lsp-sem-comment": { color: "var(--taomni-code-muted)", fontStyle: "italic" },
-      ".cm-lsp-sem-operator, .cm-lsp-sem-regexp": { color: "#a5b4fc" },
-      ".cm-lsp-sem-mod-deprecated": { textDecoration: "line-through", opacity: "0.75" },
-      ".cm-lsp-sem-mod-readonly": { fontStyle: "italic" },
-      ".cm-lsp-sem-mod-defaultLibrary": { opacity: "0.9" },
-    }),
+    ...createLspSemanticTokenChrome(doc, semanticTokens),
+    ...createLspOverlayChrome(doc, highlights, hints),
+    LSP_INTELLIGENCE_THEME,
   ];
 }
 

@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -105,7 +106,6 @@ import {
   type RightPaneTabId,
 } from "../../stores/codeWorkspaceStore";
 import {
-  detectWorkspaceEol,
   useCodeWorkspaceStatusStore,
 } from "../../stores/codeWorkspaceStatusStore";
 import { historySnapshot } from "../../lib/localHistory";
@@ -156,11 +156,11 @@ import {
 import { TodosBookmarksPanel } from "./workspace/panels/TodosBookmarksPanel";
 import {
   readWorkspaceBookmarks,
-  scanTodosInOpenFiles,
   toggleWorkspaceBookmark,
   writeWorkspaceBookmarks,
   type WorkspaceBookmark,
 } from "./workspace/todoBookmarks";
+import { useDeferredOpenFileTodos } from "./workspace/useDeferredOpenFileTodos";
 import { type QuickDocContent } from "./workspace/QuickDocPopup";
 import { type LocationPeekState } from "./workspace/LocationPeek";
 import {
@@ -175,7 +175,7 @@ import { ProjectTree } from "./workspace/ProjectTree";
 import { MarkdownPreview } from "./workspace/MarkdownPreview";
 import { IconButton, LspStatusPill } from "./workspace/workspaceChrome";
 import { OutlinePane } from "./workspace/OutlinePane";
-import { buildGitLineChanges, type GitLineChange } from "./workspace/gitEditorChrome";
+import { useDeferredGitLineChanges } from "./workspace/useDeferredGitLineChanges";
 import {
   dispatchWorkspaceCommandKeydown,
   runWorkspaceCommand,
@@ -246,6 +246,19 @@ function initialInlayHintRange(text: string): LspRange {
     end: { line: endLine, character: lines[endLine]?.length ?? 0 },
   };
 }
+
+// Keep document synchronization ahead of the comparatively expensive derived
+// LSP features.  In particular, rust-analyzer semantic tokens can be large
+// enough that applying them while somebody is still typing is noticeable.
+const LSP_CHANGE_SYNC_DELAY_MS = 150;
+const LSP_HIGHLIGHT_IDLE_DELAY_MS = 500;
+const LSP_INLAY_HINT_IDLE_DELAY_MS = 650;
+const LSP_SEMANTIC_TOKENS_IDLE_DELAY_MS = 900;
+const LSP_DOCUMENT_SYMBOLS_IDLE_DELAY_MS = 650;
+// CodeMirror owns the live text while the user is typing. Publishing every
+// keypress into the workspace-wide Zustand object redraws the file tree,
+// panels, and command chrome, so commit an editing burst as one update.
+const EDITOR_TEXT_COMMIT_IDLE_DELAY_MS = 125;
 
 import {
   type LspFileState,
@@ -348,8 +361,7 @@ export function CodeWorkspaceTab({
   useEffect(() => {
     ensureWorkspaceUi(workspaceInstanceId);
     setBookmarks(readWorkspaceBookmarks(workspaceInstanceId));
-    return () => disposeWorkspaceUi(workspaceInstanceId);
-  }, [disposeWorkspaceUi, ensureWorkspaceUi, workspaceInstanceId]);
+  }, [ensureWorkspaceUi, workspaceInstanceId]);
 
   // Restore chrome/layout once per instance, then seed expand keys only when empty.
   const layoutHydratedRef = useRef<string | null>(null);
@@ -447,6 +459,8 @@ export function CodeWorkspaceTab({
   const openFilesRef = useRef(openFiles);
   const openOrderRef = useRef(openOrder);
   const lspFilesRef = useRef(lspFiles);
+  const pendingEditorTextByFileRef = useRef(new Map<string, OpenFileState>());
+  const pendingEditorTextTimerRef = useRef<number | null>(null);
 
   const setLanguagePanelOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
     const next = typeof open === "function" ? open(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).languagePanelOpen) : open;
@@ -583,14 +597,47 @@ export function CodeWorkspaceTab({
     updateStoreExpandedDirKeys(workspaceInstanceId, [...next]);
   }, [updateStoreExpandedDirKeys, workspaceInstanceId]);
 
-  const setOpenFiles = useCallback((
-    updater: Record<string, OpenFileState> | ((prev: Record<string, OpenFileState>) => Record<string, OpenFileState>),
-  ) => {
-    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).openFiles;
-    const next = typeof updater === "function" ? updater(prev) : updater;
+  const flushPendingEditorText = useCallback(() => {
+    if (pendingEditorTextTimerRef.current !== null) {
+      window.clearTimeout(pendingEditorTextTimerRef.current);
+      pendingEditorTextTimerRef.current = null;
+    }
+    const pending = pendingEditorTextByFileRef.current;
+    if (pending.size === 0) return;
+    const current = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).openFiles;
+    let next = current;
+    for (const [key, file] of pending) {
+      // A close/reload may have removed the buffer while its input callback
+      // was queued. Do not resurrect it.
+      if (!(key in current) || current[key] === file) continue;
+      if (next === current) next = { ...current };
+      next[key] = file;
+    }
+    pending.clear();
+    if (next === current) return;
     openFilesRef.current = next;
     updateStoreOpenFiles(workspaceInstanceId, next);
   }, [updateStoreOpenFiles, workspaceInstanceId]);
+  const setOpenFiles = useCallback((
+    updater: Record<string, OpenFileState> | ((prev: Record<string, OpenFileState>) => Record<string, OpenFileState>),
+  ) => {
+    // External operations (save, reload, rename, close, WorkspaceEdit) need
+    // a coherent current buffer, so they flush any in-progress typing first.
+    flushPendingEditorText();
+    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).openFiles;
+    const next = typeof updater === "function" ? updater(prev) : updater;
+    if (next === prev) return;
+    openFilesRef.current = next;
+    updateStoreOpenFiles(workspaceInstanceId, next);
+  }, [flushPendingEditorText, updateStoreOpenFiles, workspaceInstanceId]);
+
+  useEffect(() => () => {
+    // Capture this workspace's flush callback in the effect closure. A tab can
+    // be rebound to a different workspace without unmounting, and a ref read
+    // during cleanup would then point at the new instance.
+    flushPendingEditorText();
+    disposeWorkspaceUi(workspaceInstanceId);
+  }, [disposeWorkspaceUi, flushPendingEditorText, workspaceInstanceId]);
 
   const setLspFiles = useCallback((
     updater: Record<string, LspFileState> | ((prev: Record<string, LspFileState>) => Record<string, LspFileState>),
@@ -651,7 +698,6 @@ export function CodeWorkspaceTab({
     secondary: [],
   });
   const [gitHeadTextByFile, setGitHeadTextByFile] = useState<Record<string, { sourceKey: string; text: string | null }>>({});
-  const [gitLineChangesByFile, setGitLineChangesByFile] = useState<Record<string, GitLineChange[]>>({});
   const [gitBlameByGroup, setGitBlameByGroup] = useState<Record<EditorGroupId, GitBlameLine | null>>({
     primary: null,
     secondary: null,
@@ -687,6 +733,9 @@ export function CodeWorkspaceTab({
   const treeFontSizeRef = useRef(treeFontSize);
   const gitHeadRequestsRef = useRef(new Set<string>());
   const gitBlameCacheRef = useRef(new Map<string, GitBlameLine | null>());
+  // Incremented for each active-buffer revision.  Async LSP responses capture
+  // this value so an older response can never repaint a newer buffer.
+  const lspDocumentEpochRef = useRef<Record<string, number>>({});
   const revealNonceRef = useRef(0);
   const editorSelectionRef = useRef<EditorSelectionRange>({
     start: { line: 0, character: 0 },
@@ -931,6 +980,9 @@ export function CodeWorkspaceTab({
 
   const openFile = useCallback(
     async (ref: CodeWorkspaceFileRef, options: { preview?: boolean; groupId?: EditorGroupId } = {}) => {
+      // Switching tabs before the input idle timer fires must never show an
+      // older buffer snapshot in the newly activated editor.
+      flushPendingEditorText();
       const key = fileKey(ref);
       const currentUi = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
       const groupId = options.groupId ?? currentUi.activeEditorGroupId;
@@ -1011,7 +1063,14 @@ export function CodeWorkspaceTab({
         setStatusMessage(message);
       }
     },
-    [activateEditorGroup, findRoot, setStatusMessage, updateEditorGroup, workspaceInstanceId],
+    [
+      activateEditorGroup,
+      findRoot,
+      flushPendingEditorText,
+      setStatusMessage,
+      updateEditorGroup,
+      workspaceInstanceId,
+    ],
   );
 
   const {
@@ -1412,11 +1471,32 @@ export function CodeWorkspaceTab({
       dirty: text !== file.savedText,
       error: null,
     };
-    // Sync ref immediately so WorkspaceEdit apply → save sees the new text
-    // without waiting for React to flush setState.
-    openFilesRef.current = { ...openFilesRef.current, [key]: next };
+    // Non-editor callers need the updated model immediately (formatting,
+    // WorkspaceEdit, reload), so they intentionally bypass the input batch.
     setOpenFiles((current) => ({ ...current, [key]: next }));
-  }, []);
+  }, [setOpenFiles]);
+
+  const queueEditorTextUpdate = useCallback((key: string, text: string) => {
+    const file = openFilesRef.current[key];
+    if (!file || file.text === text) return;
+    const next: OpenFileState = {
+      ...file,
+      text,
+      dirty: text !== file.savedText,
+      error: null,
+    };
+    // Keep every command/save/LSP call correct immediately, but delay the
+    // store publication that causes the surrounding workspace to re-render.
+    openFilesRef.current = { ...openFilesRef.current, [key]: next };
+    pendingEditorTextByFileRef.current.set(key, next);
+    if (pendingEditorTextTimerRef.current !== null) {
+      window.clearTimeout(pendingEditorTextTimerRef.current);
+    }
+    pendingEditorTextTimerRef.current = window.setTimeout(
+      flushPendingEditorText,
+      EDITOR_TEXT_COMMIT_IDLE_DELAY_MS,
+    );
+  }, [flushPendingEditorText]);
 
   const absolutePathForOpenFile = useCallback((file: OpenFileState): string | null => {
     if (file.ref.kind === "loose") return normalizeFsPath(file.ref.path);
@@ -1871,8 +1951,47 @@ export function CodeWorkspaceTab({
   }, [activateEditorGroup, editorGroups, setStoreSplitOrientation, splitOrientation, updateEditorGroup, workspaceInstanceId]);
 
   const activeFile = activeKey ? openFiles[activeKey] ?? null : null;
+  // Metadata panels and AI workspace context do not need a new snapshot for
+  // every character.  Let React publish that non-interactive work after the
+  // input update has painted.
+  const deferredOpenFiles = useDeferredValue(openFiles);
   const activeLspState = activeKey ? lspFiles[activeKey] ?? null : null;
   const activeCapabilities = activeLspState?.status?.capabilities ?? null;
+  const activeLspDocumentIsSynced = Boolean(
+    activeFile
+    && !activeFile.loading
+    && activeLspState?.status
+    && !activeLspState.syncing
+    && activeLspState.syncedText === activeFile.text,
+  );
+
+  // The backend is responsible for serializing didOpen/didChange calls, but
+  // the view also needs a revision token so a slow feature response cannot
+  // paint a document revision that has already been replaced locally.
+  useEffect(() => {
+    if (!activeFile) return;
+    lspDocumentEpochRef.current[activeFile.key] =
+      (lspDocumentEpochRef.current[activeFile.key] ?? 0) + 1;
+  }, [activeFile?.key, activeFile?.text]);
+
+  const isCurrentLspDocumentRequest = useCallback((file: OpenFileState, epoch: number) => {
+    const latestFile = openFilesRef.current[file.key];
+    const lspState = lspFilesRef.current[file.key];
+    return latestFile?.text === file.text
+      && lspDocumentEpochRef.current[file.key] === epoch
+      && lspState?.syncedText === file.text
+      && !lspState.syncing;
+  }, []);
+
+  const currentSyncedLspDocument = useCallback((file: OpenFileState) => {
+    const latestFile = openFilesRef.current[file.key];
+    const lspState = lspFilesRef.current[file.key];
+    if (!latestFile || lspState?.syncing || lspState?.syncedText !== latestFile.text) return null;
+    return {
+      file: latestFile,
+      epoch: lspDocumentEpochRef.current[file.key] ?? 0,
+    };
+  }, []);
   const openHierarchy = useCallback(async (mode: "call" | "type") => {
     const file = activeFile;
     if (!file || file.loading) return;
@@ -1960,41 +2079,70 @@ export function CodeWorkspaceTab({
     setStatusMessage(`Format on save ${enabled ? "enabled" : "disabled"} for this workspace`);
   }, [setIntelligencePreferences, setStatusMessage]);
 
+  // Send the latest document update before scheduling any derived LSP work.
+  // A short debounce coalesces normal typing without leaving the server one
+  // full feature-refresh cycle behind the editor.
+  useEffect(() => {
+    if (!visible || !activeFile || activeFile.loading) return;
+    const lspState = lspFilesRef.current[activeFile.key];
+    if (lspState?.syncedText === activeFile.text && lspState.status) return;
+    const mode: "open" | "change" = lspState?.status ? "change" : "open";
+    const timer = window.setTimeout(() => {
+      const latest = openFilesRef.current[activeFile.key];
+      if (latest) void syncLspDocument(latest, mode);
+    }, mode === "open" ? 0 : LSP_CHANGE_SYNC_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [activeFile, syncLspDocument, visible]);
+
   useEffect(() => {
     const groupId = activeEditorGroupId;
     const file = activeFile;
     if (!file || file.loading) {
-      setHighlightsByGroup((current) => ({ ...current, [groupId]: [] }));
+      setHighlightsByGroup((current) => (
+        current[groupId].length === 0 ? current : { ...current, [groupId]: [] }
+      ));
       return;
     }
     let cancelled = false;
     const position = cursorPositions[groupId] ?? { line: 0, character: 0 };
-    const timer = window.setTimeout(() => {
-      const descriptor = lspDescriptorForFile(file);
-      if (!activeCapabilities?.documentHighlight || !descriptor) {
-        if (!cancelled) {
+    const descriptor = lspDescriptorForFile(file);
+    if (!activeCapabilities?.documentHighlight || !descriptor) {
+      const timer = window.setTimeout(() => {
+        if (!cancelled && openFilesRef.current[file.key]?.text === file.text) {
           setHighlightsByGroup((current) => ({
             ...current,
             [groupId]: fallbackWordHighlights(file.text, position),
           }));
         }
-        return;
-      }
+      }, LSP_HIGHLIGHT_IDLE_DELAY_MS);
+      return () => {
+        cancelled = true;
+        window.clearTimeout(timer);
+      };
+    }
+    if (!activeLspDocumentIsSynced) {
+      setHighlightsByGroup((current) => (
+        current[groupId].length === 0 ? current : { ...current, [groupId]: [] }
+      ));
+      return () => { cancelled = true; };
+    }
+    const epoch = lspDocumentEpochRef.current[file.key] ?? 0;
+    const timer = window.setTimeout(() => {
+      if (!isCurrentLspDocumentRequest(file, epoch)) return;
       void lspDocumentHighlights(descriptor, position)
         .then((result) => {
-          if (cancelled) return;
+          if (cancelled || !isCurrentLspDocumentRequest(file, epoch)) return;
           updateLspStatusForFile(file, result.status);
           setHighlightsByGroup((current) => ({ ...current, [groupId]: result.highlights }));
         })
         .catch(() => {
-          if (!cancelled) {
-            setHighlightsByGroup((current) => ({
-              ...current,
-              [groupId]: fallbackWordHighlights(file.text, position),
-            }));
-          }
+          if (cancelled || !isCurrentLspDocumentRequest(file, epoch)) return;
+          setHighlightsByGroup((current) => ({
+            ...current,
+            [groupId]: fallbackWordHighlights(file.text, position),
+          }));
         });
-    }, 300);
+    }, LSP_HIGHLIGHT_IDLE_DELAY_MS);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
@@ -2003,7 +2151,9 @@ export function CodeWorkspaceTab({
     activeCapabilities?.documentHighlight,
     activeEditorGroupId,
     activeFile,
+    activeLspDocumentIsSynced,
     cursorPositions,
+    isCurrentLspDocumentRequest,
     lspDescriptorForFile,
     updateLspStatusForFile,
   ]);
@@ -2012,24 +2162,37 @@ export function CodeWorkspaceTab({
     const groupId = activeEditorGroupId;
     const file = activeFile;
     if (!file || file.loading || !activeInlayHintsEnabled || !activeCapabilities?.inlayHint) {
-      setInlayHintsByGroup((current) => ({ ...current, [groupId]: [] }));
+      setInlayHintsByGroup((current) => (
+        current[groupId].length === 0 ? current : { ...current, [groupId]: [] }
+      ));
+      return;
+    }
+    if (!activeLspDocumentIsSynced) {
+      setInlayHintsByGroup((current) => (
+        current[groupId].length === 0 ? current : { ...current, [groupId]: [] }
+      ));
       return;
     }
     const range = viewportRanges[groupId] ?? initialInlayHintRange(file.text);
     const descriptor = lspDescriptorForFile(file);
     if (!descriptor) return;
     let cancelled = false;
+    const epoch = lspDocumentEpochRef.current[file.key] ?? 0;
     const timer = window.setTimeout(() => {
+      if (!isCurrentLspDocumentRequest(file, epoch)) return;
       void lspInlayHints(descriptor, range)
         .then((result) => {
-          if (cancelled) return;
+          if (cancelled || !isCurrentLspDocumentRequest(file, epoch)) return;
           updateLspStatusForFile(file, result.status);
           setInlayHintsByGroup((current) => ({ ...current, [groupId]: result.hints }));
         })
         .catch(() => {
-          if (!cancelled) setInlayHintsByGroup((current) => ({ ...current, [groupId]: [] }));
+          if (cancelled || !isCurrentLspDocumentRequest(file, epoch)) return;
+          setInlayHintsByGroup((current) => (
+            current[groupId].length === 0 ? current : { ...current, [groupId]: [] }
+          ));
         });
-    }, 200);
+    }, LSP_INLAY_HINT_IDLE_DELAY_MS);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
@@ -2039,6 +2202,8 @@ export function CodeWorkspaceTab({
     activeEditorGroupId,
     activeFile,
     activeInlayHintsEnabled,
+    activeLspDocumentIsSynced,
+    isCurrentLspDocumentRequest,
     lspDescriptorForFile,
     updateLspStatusForFile,
     viewportRanges,
@@ -2048,23 +2213,36 @@ export function CodeWorkspaceTab({
     const groupId = activeEditorGroupId;
     const file = activeFile;
     if (!file || file.loading || !activeCapabilities?.semanticTokens) {
-      setSemanticTokensByGroup((current) => ({ ...current, [groupId]: [] }));
+      setSemanticTokensByGroup((current) => (
+        current[groupId].length === 0 ? current : { ...current, [groupId]: [] }
+      ));
+      return;
+    }
+    if (!activeLspDocumentIsSynced) {
+      setSemanticTokensByGroup((current) => (
+        current[groupId].length === 0 ? current : { ...current, [groupId]: [] }
+      ));
       return;
     }
     const descriptor = lspDescriptorForFile(file);
     if (!descriptor) return;
     let cancelled = false;
+    const epoch = lspDocumentEpochRef.current[file.key] ?? 0;
     const timer = window.setTimeout(() => {
+      if (!isCurrentLspDocumentRequest(file, epoch)) return;
       void lspSemanticTokens(descriptor)
         .then((result) => {
-          if (cancelled) return;
+          if (cancelled || !isCurrentLspDocumentRequest(file, epoch)) return;
           updateLspStatusForFile(file, result.status);
           setSemanticTokensByGroup((current) => ({ ...current, [groupId]: result.tokens }));
         })
         .catch(() => {
-          if (!cancelled) setSemanticTokensByGroup((current) => ({ ...current, [groupId]: [] }));
+          if (cancelled || !isCurrentLspDocumentRequest(file, epoch)) return;
+          setSemanticTokensByGroup((current) => (
+            current[groupId].length === 0 ? current : { ...current, [groupId]: [] }
+          ));
         });
-    }, 250);
+    }, LSP_SEMANTIC_TOKENS_IDLE_DELAY_MS);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
@@ -2073,7 +2251,8 @@ export function CodeWorkspaceTab({
     activeCapabilities?.semanticTokens,
     activeEditorGroupId,
     activeFile,
-    activeFile?.text,
+    activeLspDocumentIsSynced,
+    isCurrentLspDocumentRequest,
     lspDescriptorForFile,
     updateLspStatusForFile,
   ]);
@@ -2098,25 +2277,33 @@ export function CodeWorkspaceTab({
     return activeFile ? breadcrumbSegmentsForFile(activeFile, roots) : [];
   }, [activeFile, roots]);
 
-  const openFileTodos = useMemo(() => scanTodosInOpenFiles(
-    Object.values(openFiles).map((file) => ({
-      key: file.key,
-      pathLabel: file.subtitle || file.path,
-      text: file.text,
-    })),
-  ), [openFiles]);
+  const openFileTodos = useDeferredOpenFileTodos(openFiles);
 
   useEffect(() => {
     let cancelled = false;
     if (!activeFile || activeFile.loading || !activeCapabilities?.documentSymbol) {
-      setBreadcrumbSymbolsByGroup((current) => ({ ...current, [activeEditorGroupId]: [] }));
+      setBreadcrumbSymbolsByGroup((current) => (
+        current[activeEditorGroupId].length === 0
+          ? current
+          : { ...current, [activeEditorGroupId]: [] }
+      ));
+      return () => { cancelled = true; };
+    }
+    if (!activeLspDocumentIsSynced) {
+      setBreadcrumbSymbolsByGroup((current) => (
+        current[activeEditorGroupId].length === 0
+          ? current
+          : { ...current, [activeEditorGroupId]: [] }
+      ));
       return () => { cancelled = true; };
     }
     const descriptor = lspDescriptorForFile(activeFile);
     if (!descriptor) return () => { cancelled = true; };
+    const epoch = lspDocumentEpochRef.current[activeFile.key] ?? 0;
     const timer = window.setTimeout(() => {
+      if (!isCurrentLspDocumentRequest(activeFile, epoch)) return;
       void lspDocumentSymbols(descriptor).then((result) => {
-        if (!cancelled) {
+        if (!cancelled && isCurrentLspDocumentRequest(activeFile, epoch)) {
           updateLspStatusForFile(activeFile, result.status);
           setBreadcrumbSymbolsByGroup((current) => ({
             ...current,
@@ -2124,16 +2311,28 @@ export function CodeWorkspaceTab({
           }));
         }
       }).catch(() => {
-        if (!cancelled) {
-          setBreadcrumbSymbolsByGroup((current) => ({ ...current, [activeEditorGroupId]: [] }));
+        if (!cancelled && isCurrentLspDocumentRequest(activeFile, epoch)) {
+          setBreadcrumbSymbolsByGroup((current) => (
+            current[activeEditorGroupId].length === 0
+              ? current
+              : { ...current, [activeEditorGroupId]: [] }
+          ));
         }
       });
-    }, 200);
+    }, LSP_DOCUMENT_SYMBOLS_IDLE_DELAY_MS);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [activeCapabilities?.documentSymbol, activeEditorGroupId, activeFile, lspDescriptorForFile, updateLspStatusForFile]);
+  }, [
+    activeCapabilities?.documentSymbol,
+    activeEditorGroupId,
+    activeFile,
+    activeLspDocumentIsSynced,
+    isCurrentLspDocumentRequest,
+    lspDescriptorForFile,
+    updateLspStatusForFile,
+  ]);
   const activeRootId = activeFile?.ref.kind === "root" ? activeFile.ref.rootId : null;
   const activeRoot = activeRootId ? roots.find((root) => root.id === activeRootId) ?? null : null;
   const activeGitRoot = activeRoot && activeFile?.ref.kind === "root"
@@ -2169,7 +2368,7 @@ export function CodeWorkspaceTab({
       line: cursor.line + 1,
       column: cursor.character + 1,
       encoding: "UTF-8",
-      eol: activeFile?.eol ?? detectWorkspaceEol(activeFile?.text ?? ""),
+      eol: activeFile?.eol ?? "LF",
       languageId: status?.languageId ?? activeLanguageId,
       lspActive: !!status?.active,
       lspLabel: status?.displayName ?? (status?.active ? "LSP" : null),
@@ -2179,23 +2378,29 @@ export function CodeWorkspaceTab({
       gitBehind: gitSnapshot?.behind ?? 0,
       fontSize: codeViewProfile.fontSize,
     });
-    setWorkspaceStatusActions(tabId, {
-      openLanguagePanel: () => setLanguagePanelOpen(true),
-      openGitManager: gitManagerPayload && onOpenGitManager ? openGitManager : undefined,
-    });
-    return () => clearWorkspaceStatus(tabId);
   }, [
     activeEditorGroupId,
     activeFile?.eol,
-    activeFile?.text,
     activeGitRoot,
     activeLanguageId,
     activeLspState,
     clearWorkspaceStatus,
     codeViewProfile.fontSize,
     cursorPositions,
-    gitManagerPayload,
     gitSnapshots,
+    setWorkspaceStatusSegments,
+    tabId,
+    visible,
+  ]);
+
+  useEffect(() => {
+    if (!visible) return;
+    setWorkspaceStatusActions(tabId, {
+      openLanguagePanel: () => setLanguagePanelOpen(true),
+      openGitManager: gitManagerPayload && onOpenGitManager ? openGitManager : undefined,
+    });
+  }, [
+    gitManagerPayload,
     onOpenGitManager,
     openGitManager,
     setLanguagePanelOpen,
@@ -2204,6 +2409,10 @@ export function CodeWorkspaceTab({
     tabId,
     visible,
   ]);
+
+  useEffect(() => {
+    return () => clearWorkspaceStatus(tabId);
+  }, [clearWorkspaceStatus, tabId]);
 
   const gitChangeByRootPath = useMemo(() => {
     const map = new Map<string, GitChange>();
@@ -2239,6 +2448,46 @@ export function CodeWorkspaceTab({
     };
   }, [gitRoots, gitSnapshots, roots]);
 
+  const activeGitFileStateSignature = useMemo(() => {
+    const stateForKey = (key: string | null) => {
+      if (!key) return "empty";
+      const file = openFiles[key];
+      if (!file) return "missing";
+      return file.loading ? "loading" : "ready";
+    };
+    return [
+      editorGroups.primary.activeKey,
+      stateForKey(editorGroups.primary.activeKey),
+      editorGroups.secondary.activeKey,
+      stateForKey(editorGroups.secondary.activeKey),
+    ].join(":");
+  }, [editorGroups.primary.activeKey, editorGroups.secondary.activeKey, openFiles]);
+
+  const gitDiffSources = useMemo(() => {
+    const seen = new Set<string>();
+    return [editorGroups.primary.activeKey, editorGroups.secondary.activeKey].flatMap((key) => {
+      if (!key || seen.has(key)) return [];
+      seen.add(key);
+      const file = openFiles[key];
+      const target = gitTargetForFile(file ?? null);
+      const head = gitHeadTextByFile[key];
+      if (!file || !target || !head || head.sourceKey !== target.sourceKey) return [];
+      return [{
+        key,
+        sourceKey: target.sourceKey,
+        headText: head.text,
+        bufferText: file.text,
+      }];
+    });
+  }, [
+    editorGroups.primary.activeKey,
+    editorGroups.secondary.activeKey,
+    gitHeadTextByFile,
+    gitTargetForFile,
+    openFiles,
+  ]);
+  const gitLineChangesByFile = useDeferredGitLineChanges(gitDiffSources);
+
   useEffect(() => {
     let cancelled = false;
     const activeKeys = new Set([
@@ -2246,7 +2495,7 @@ export function CodeWorkspaceTab({
       editorGroups.secondary.activeKey,
     ].filter((key): key is string => !!key));
     for (const key of activeKeys) {
-      const file = openFiles[key];
+      const file = openFilesRef.current[key];
       const target = gitTargetForFile(file ?? null);
       if (!file || !target || gitHeadTextByFile[key]?.sourceKey === target.sourceKey) continue;
       if (!target.headOid) {
@@ -2280,28 +2529,47 @@ export function CodeWorkspaceTab({
         .finally(() => gitHeadRequestsRef.current.delete(target.sourceKey));
     }
     return () => { cancelled = true; };
-  }, [editorGroups.primary.activeKey, editorGroups.secondary.activeKey, gitHeadTextByFile, gitTargetForFile, openFiles]);
+  }, [activeGitFileStateSignature, gitHeadTextByFile, gitTargetForFile]);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const next: Record<string, GitLineChange[]> = {};
-      for (const [key, head] of Object.entries(gitHeadTextByFile)) {
-        const file = openFiles[key];
-        const target = gitTargetForFile(file ?? null);
-        if (!file || !target || head.sourceKey !== target.sourceKey || head.text === null) continue;
-        next[key] = buildGitLineChanges(head.text, file.text);
+  const gitBlameRequestSignature = useMemo(() => {
+    const signatureForGroup = (groupId: EditorGroupId) => {
+      const key = editorGroups[groupId].activeKey;
+      // Input batching keeps the store snapshot stable during a typing burst,
+      // but the ref is updated immediately.  Use it here so inline blame is
+      // disabled from the first dirty keystroke rather than one batch later.
+      const file = key ? openFilesRef.current[key] ?? null : null;
+      const target = gitTargetForFile(file);
+      if (!intelligencePreferences.inlineBlameEnabled || !file || file.dirty || !target?.headOid) {
+        return `${groupId}:${key ?? "empty"}:disabled`;
       }
-      setGitLineChangesByFile(next);
-    }, 500);
-    return () => window.clearTimeout(timer);
-  }, [gitHeadTextByFile, gitTargetForFile, openFiles]);
+      const line = (cursorPositions[groupId]?.line ?? 0) + 1;
+      return `${groupId}:${key}:${target.sourceKey}:${file.hash}:${line}`;
+    };
+    return `${signatureForGroup("primary")}|${signatureForGroup("secondary")}`;
+  }, [
+    cursorPositions,
+    editorGroups.primary.activeKey,
+    editorGroups.secondary.activeKey,
+    gitTargetForFile,
+    intelligencePreferences.inlineBlameEnabled,
+    openFiles,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
     const timers: number[] = [];
+    const cacheBlame = (cacheKey: string, blame: GitBlameLine | null) => {
+      const cache = gitBlameCacheRef.current;
+      cache.delete(cacheKey);
+      cache.set(cacheKey, blame);
+      if (cache.size > 256) {
+        const oldest = cache.keys().next().value;
+        if (oldest) cache.delete(oldest);
+      }
+    };
     const loadForGroup = (groupId: EditorGroupId) => {
       const key = editorGroups[groupId].activeKey;
-      const file = key ? openFiles[key] ?? null : null;
+      const file = key ? openFilesRef.current[key] ?? null : null;
       const target = gitTargetForFile(file);
       if (!intelligencePreferences.inlineBlameEnabled || !file || file.dirty || !target?.headOid) {
         setGitBlameByGroup((current) => current[groupId] === null ? current : { ...current, [groupId]: null });
@@ -2311,6 +2579,7 @@ export function CodeWorkspaceTab({
       const cacheKey = `${target.sourceKey}:${file.hash}:${line}`;
       if (gitBlameCacheRef.current.has(cacheKey)) {
         const cached = gitBlameCacheRef.current.get(cacheKey) ?? null;
+        cacheBlame(cacheKey, cached);
         setGitBlameByGroup((current) => current[groupId] === cached ? current : { ...current, [groupId]: cached });
         return;
       }
@@ -2318,14 +2587,14 @@ export function CodeWorkspaceTab({
         void gitBlameLines(target.repoRoot, target.path, line, line)
           .then((lines) => {
             const blame = lines[0] ?? null;
-            gitBlameCacheRef.current.set(cacheKey, blame);
+            cacheBlame(cacheKey, blame);
             if (!cancelled) setGitBlameByGroup((current) => ({ ...current, [groupId]: blame }));
           })
           .catch(() => {
-            gitBlameCacheRef.current.set(cacheKey, null);
+            cacheBlame(cacheKey, null);
             if (!cancelled) setGitBlameByGroup((current) => ({ ...current, [groupId]: null }));
           });
-      }, 250));
+      }, 500));
     };
     loadForGroup("primary");
     loadForGroup("secondary");
@@ -2333,19 +2602,11 @@ export function CodeWorkspaceTab({
       cancelled = true;
       timers.forEach((timer) => window.clearTimeout(timer));
     };
-  }, [cursorPositions, editorGroups, gitTargetForFile, intelligencePreferences.inlineBlameEnabled, openFiles]);
-
-  useEffect(() => {
-    if (!visible || !activeFile || activeFile.loading) return;
-    const lspState = lspFilesRef.current[activeFile.key];
-    if (lspState?.syncedText === activeFile.text && lspState.status) return;
-    const mode: "open" | "change" = lspState?.status ? "change" : "open";
-    const timer = window.setTimeout(() => {
-      const latest = openFilesRef.current[activeFile.key];
-      if (latest) void syncLspDocument(latest, mode);
-    }, mode === "open" ? 0 : 350);
-    return () => window.clearTimeout(timer);
-  }, [activeFile, syncLspDocument, visible]);
+  }, [
+    gitBlameRequestSignature,
+    gitTargetForFile,
+    intelligencePreferences.inlineBlameEnabled,
+  ]);
 
   const openMarkdownHref = useCallback(
     (href: string) => {
@@ -3415,17 +3676,29 @@ export function CodeWorkspaceTab({
       position: LspPosition,
       triggerCharacter: string | null,
     ): Promise<LspCompletionResult | null> => {
-      const descriptor = lspDescriptorForFile(file);
+      // CodeMirror can ask for completion while an edit is still crossing the
+      // IPC boundary.  Returning null here lets its local sources handle the
+      // keystroke and prevents a stale server completion from doing work (or
+      // reopening a completion list) for a superseded document version.
+      const snapshot = currentSyncedLspDocument(file);
+      if (!snapshot) return null;
+      const descriptor = lspDescriptorForFile(snapshot.file);
       if (!descriptor) return null;
       try {
         const result = await lspCompletion(descriptor, position, triggerCharacter);
-        updateLspStatusForFile(file, result.status);
+        if (!isCurrentLspDocumentRequest(snapshot.file, snapshot.epoch)) return null;
+        updateLspStatusForFile(snapshot.file, result.status);
         return result;
       } catch {
         return null;
       }
     },
-    [lspDescriptorForFile, updateLspStatusForFile],
+    [
+      currentSyncedLspDocument,
+      isCurrentLspDocumentRequest,
+      lspDescriptorForFile,
+      updateLspStatusForFile,
+    ],
   );
 
   const resolveLspCompletion = useCallback(
@@ -3650,23 +3923,24 @@ export function CodeWorkspaceTab({
     [lspDescriptorForFile, setStatusMessage, updateLspStatusForFile],
   );
 
+  const deferredActiveFile = activeKey ? deferredOpenFiles[activeKey] ?? activeFile : null;
   const dirtyCount = useMemo(
-    () => Object.values(openFiles).filter((file) => file.dirty).length,
-    [openFiles],
+    () => Object.values(deferredOpenFiles).filter((file) => file.dirty).length,
+    [deferredOpenFiles],
   );
   const dirtyFiles = useMemo(
-    () => openOrder.map((key) => openFiles[key]).filter((file): file is OpenFileState => !!file?.dirty),
-    [openFiles, openOrder],
+    () => openOrder.map((key) => deferredOpenFiles[key]).filter((file): file is OpenFileState => !!file?.dirty),
+    [deferredOpenFiles, openOrder],
   );
   const problemFiles = useMemo<ProblemFileGroup[]>(
     () => openOrder.flatMap((key) => {
-      const file = openFiles[key];
+      const file = deferredOpenFiles[key];
       const diagnostics = lspFiles[key]?.diagnostics ?? [];
       return file && diagnostics.length > 0
         ? [{ key, title: file.title, subtitle: file.subtitle, diagnostics }]
         : [];
     }),
-    [lspFiles, openFiles, openOrder],
+    [deferredOpenFiles, lspFiles, openOrder],
   );
   const problemCounts = useMemo(
     () => problemFiles.reduce(
@@ -3697,7 +3971,7 @@ export function CodeWorkspaceTab({
 
   useEffect(() => {
     const firstRoot = roots[0] ?? null;
-    const openStates = openOrder.map((key) => openFiles[key]).filter((file): file is OpenFileState => !!file);
+    const openStates = openOrder.map((key) => deferredOpenFiles[key]).filter((file): file is OpenFileState => !!file);
     const toContextFile = (file: OpenFileState) => {
       const ref = file.ref;
       if (ref.kind === "root") {
@@ -3754,17 +4028,29 @@ export function CodeWorkspaceTab({
       : null;
     setTabCodeWorkspaceContext(tabId, {
       repoRoot: firstRoot?.path ?? workspace.repoRoot ?? "",
-      activePath: activeFile?.ref.kind === "root" && activeFile.ref.rootId === firstRoot?.id ? activeFile.ref.path : null,
+      activePath: deferredActiveFile?.ref.kind === "root" && deferredActiveFile.ref.rootId === firstRoot?.id ? deferredActiveFile.ref.path : null,
       openPaths: firstRoot ? openStates.filter((file) => file.ref.kind === "root" && file.ref.rootId === firstRoot.id).map((file) => file.ref.path) : [],
       dirtyPaths: firstRoot ? dirtyFiles.filter((file) => file.ref.kind === "root" && file.ref.rootId === firstRoot.id).map((file) => file.ref.path) : [],
       roots,
       looseFiles,
-      activeFile: activeFile ? toContextFile(activeFile) : null,
+      activeFile: deferredActiveFile ? toContextFile(deferredActiveFile) : null,
       openFiles: openStates.map(toContextFile),
       dirtyFiles: dirtyFiles.map(toContextFile),
       lsp: lspContext,
     });
-  }, [activeFile, activeLspState, dirtyFiles, looseFiles, lspFiles, openFiles, openOrder, roots, setTabCodeWorkspaceContext, tabId, workspace.repoRoot]);
+  }, [
+    activeLspState,
+    deferredActiveFile,
+    deferredOpenFiles,
+    dirtyFiles,
+    looseFiles,
+    lspFiles,
+    openOrder,
+    roots,
+    setTabCodeWorkspaceContext,
+    tabId,
+    workspace.repoRoot,
+  ]);
 
   useEffect(() => {
     return () => setTabCodeWorkspaceContext(tabId, null);
@@ -3829,6 +4115,7 @@ export function CodeWorkspaceTab({
         editorPaneRef={groupId === activeEditorGroupId ? editorPaneRef : inactiveEditorPaneRef}
         editorPaneStyle={editorPaneStyle}
         onActivate={(key) => {
+          flushPendingEditorText();
           updateEditorGroup(groupId, (current) => ({ ...current, activeKey: key }));
           activateEditorGroup(groupId);
         }}
@@ -3870,7 +4157,7 @@ export function CodeWorkspaceTab({
           if (!groupFile) return;
           setMarkdownModes((current) => ({ ...current, [groupFile.key]: mode }));
         }}
-        onChangeText={updateFileText}
+        onChangeText={queueEditorTextUpdate}
         onSave={(key) => void saveFile(key)}
         onHover={getLspHover}
         onDefinition={goToDefinition}
