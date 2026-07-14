@@ -69,7 +69,13 @@ const clipboardMocks = vi.hoisted(() => ({
   writeText: vi.fn(async () => {}),
 }));
 
+const settingsNavigationMocks = vi.hoisted(() => ({
+  openSettingsSection: vi.fn(),
+}));
+
 vi.mock("../../lib/clipboard", () => clipboardMocks);
+
+vi.mock("../../lib/settingsNavigation", () => settingsNavigationMocks);
 
 const gitMocks = vi.hoisted(() => ({
   gitSnapshot: vi.fn(),
@@ -479,6 +485,32 @@ describe("CodeWorkspaceTab", () => {
         "class Program {}",
         1,
       );
+    });
+  });
+
+  it("offers a settings link when opening a file without an active language server", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-lsp-settings",
+      name: "LSP Settings",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/Program.cs" },
+    };
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/Program.cs", "class Program {}"));
+    lspMocks.lspDetectServers.mockResolvedValue([csharpStatus()]);
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus());
+
+    renderWorkspace(workspace);
+
+    await screen.findByTitle("app / src/Program.cs");
+    await waitFor(() => expect(lspMocks.lspOpenDocument).toHaveBeenCalled(), { timeout: 3_000 });
+
+    const link = await screen.findByTestId("code-workspace-lsp-open-settings");
+    expect(link).toBeInTheDocument();
+    fireEvent.click(link);
+    expect(settingsNavigationMocks.openSettingsSection).toHaveBeenCalledWith("language-servers", {
+      presetId: "csharp",
     });
   });
 

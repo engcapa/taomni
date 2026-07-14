@@ -1825,6 +1825,7 @@ export const zhCN: DeepPartial<typeof en> = {
     languageServersAllOs: "全平台",
     languageServersThisOs: "当前系统",
     languageServersEmpty: "未返回语言服务器预设。",
+    languageServersOpenSettings: "打开设置",
     sqlCompletionTitle: "数据库 / SQL 编辑器",
     sqlCompletionSubtitle: "配置 SQL 建议与补全按键行为",
     sqlCompletionResetTitle: "重置 SQL 补全设置",

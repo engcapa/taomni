@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { clearPendingSettingsSection, openSettingsSection } from "../../lib/settingsNavigation";
 import { LanguageServersSettings } from "./LanguageServersSettings";
 
 const writeTextMock = vi.fn(async (_text: string) => {});
@@ -24,9 +25,11 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   window.localStorage.clear();
+  clearPendingSettingsSection();
 });
 
 beforeEach(() => {
+  Element.prototype.scrollIntoView = vi.fn();
   detectMock.mockResolvedValue([
     {
       presetId: "java",
@@ -126,6 +129,18 @@ describe("LanguageServersSettings", () => {
     fireEvent.click(screen.getByTestId("language-servers-copy-install-shared"));
     expect(writeTextMock).toHaveBeenCalled();
     expect(String(writeTextMock.mock.calls[0][0])).toContain("rustup component add rust-analyzer");
+  });
+
+  it("scrolls to and highlights the requested language server preset", async () => {
+    openSettingsSection("language-servers", { presetId: "java" });
+    render(<LanguageServersSettings />);
+
+    const javaRow = await screen.findByTestId("language-server-row-java");
+    await waitFor(() => {
+      expect(javaRow).toHaveAttribute("data-focused", "true");
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    });
+    expect(await screen.findByTestId("language-servers-install-panel")).toBeInTheDocument();
   });
 
   it("persists command preference selection", async () => {

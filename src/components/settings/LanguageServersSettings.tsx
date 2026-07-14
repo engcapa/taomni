@@ -11,6 +11,10 @@ import {
   type ResolvedInstallGuide,
 } from "../../lib/lspInstallGuides";
 import {
+  clearPendingSettingsSection,
+  consumePendingSettingsSection,
+} from "../../lib/settingsNavigation";
+import {
   CUSTOM_LSP_COMMAND_ID,
   readLspCommandPrefs,
   readLspCustomCommands,
@@ -35,6 +39,11 @@ export function LanguageServersSettings() {
   );
   /** Expanded install panels keyed by presetId. */
   const [expandedInstall, setExpandedInstall] = useState<Record<string, boolean>>({});
+  /** Brief highlight when deep-linked from a Code Workspace file. */
+  const [focusPresetId, setFocusPresetId] = useState<string | null>(() => {
+    const pending = consumePendingSettingsSection();
+    return pending?.id === "language-servers" ? pending.presetId ?? null : null;
+  });
   const hostOs = useMemo(() => detectHostOs(), []);
 
   const refresh = useCallback(async () => {
@@ -53,6 +62,38 @@ export function LanguageServersSettings() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    const pending = consumePendingSettingsSection();
+    if (pending?.id === "language-servers" && pending.presetId) {
+      setFocusPresetId(pending.presetId);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!focusPresetId || loading) return;
+    const status = statuses.find((item) => item.presetId === focusPresetId);
+    if (!status) return;
+
+    if (!status.available) {
+      setExpandedInstall((current) => ({ ...current, [focusPresetId]: true }));
+    }
+
+    const row = document.getElementById(`language-server-${focusPresetId}`);
+    if (!row) return;
+
+    let highlightTimer: number | undefined;
+    const scrollFrame = window.requestAnimationFrame(() => {
+      row.scrollIntoView({ block: "center", behavior: "smooth" });
+      clearPendingSettingsSection();
+      highlightTimer = window.setTimeout(() => setFocusPresetId(null), 4000);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(scrollFrame);
+      if (highlightTimer) window.clearTimeout(highlightTimer);
+    };
+  }, [focusPresetId, loading, statuses]);
 
   const updateCommand = (presetId: string, commandId: string) => {
     setCommandPrefs((current) => {
@@ -150,8 +191,14 @@ export function LanguageServersSettings() {
           return (
             <div
               key={status.presetId}
+              id={`language-server-${status.presetId}`}
               data-testid={`language-server-row-${status.presetId}`}
-              className="rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-2.5 py-2"
+              data-focused={focusPresetId === status.presetId || undefined}
+              className={`rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] px-2.5 py-2 scroll-mt-20 ${
+                focusPresetId === status.presetId
+                  ? "ring-2 ring-[var(--taomni-accent)] ring-offset-2 ring-offset-[var(--taomni-panel-bg)]"
+                  : ""
+              }`}
             >
               <div className="flex items-center gap-2 text-[12px]">
                 <span

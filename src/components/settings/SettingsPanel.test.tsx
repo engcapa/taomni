@@ -5,6 +5,7 @@ import { setAppThemeMode } from "../../lib/appTheme";
 import { useAppStore } from "../../stores/appStore";
 import { SettingsPanel } from "./SettingsPanel";
 import { resetSystemFontCacheForTests } from "../../lib/systemFonts";
+import { openSettingsSection } from "../../lib/settingsNavigation";
 
 const ipcMocks = vi.hoisted(() => ({
   listSystemFonts: vi.fn(),
@@ -229,6 +230,15 @@ describe("SettingsPanel", () => {
     expect(screen.getByTestId("sql-execution-settings")).toBeInTheDocument();
   });
 
+
+  it("scrolls to the language servers section when deep-linked", async () => {
+    openSettingsSection("language-servers");
+    render(<SettingsPanel />);
+
+    await waitFor(() => {
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    });
+  });
 
   it("shows an empty state when no setting matches", async () => {
     const user = userEvent.setup();
