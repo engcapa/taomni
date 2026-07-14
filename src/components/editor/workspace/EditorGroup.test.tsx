@@ -154,4 +154,145 @@ describe("EditorGroup tabs", () => {
     expect(onRevealInSystem).toHaveBeenCalledWith("b");
     expect(onOpenInTerminal).toHaveBeenCalledWith("b");
   });
+
+  it("matches strip height to the editor tab height token and hides layout-eating scroll chrome", () => {
+    const many = Array.from({ length: 12 }, (_, i) => `f${i}`);
+    const openFiles = Object.fromEntries(many.map((key) => [key, file(key)]));
+    render(<EditorGroup {...props({
+      openOrder: many,
+      openFiles,
+      activeKey: many[many.length - 1],
+      previewKey: null,
+      pinnedKeys: [],
+      activeFile: openFiles[many[many.length - 1]],
+    })} />);
+
+    const strip = screen.getByTestId("code-workspace-editor-tab-strip");
+    const scroll = screen.getByTestId("code-workspace-editor-tab-scroll");
+    const menu = screen.getByTestId("code-workspace-editor-tabs-menu");
+
+    expect(strip.style.height).toBe("var(--taomni-code-editor-tab-height)");
+    expect(strip.className).not.toMatch(/\bh-8\b/);
+    expect(scroll.className).toContain("taomni-tab-scroll");
+    expect(scroll.className).toContain("overflow-x-auto");
+    expect(scroll.className).toContain("overflow-y-hidden");
+    // All-tabs control must stay pinned outside the scrolling track.
+    expect(scroll.contains(menu)).toBe(false);
+    expect(strip.contains(menu)).toBe(true);
+    expect(scroll.querySelectorAll("[data-editor-tab-key]")).toHaveLength(12);
+    const firstTab = scroll.querySelector("[data-editor-tab-key]") as HTMLElement;
+    expect(firstTab.className).toMatch(/min-w-\[96px\]/);
+  });
+
+  it("shows pinned scroll chevrons when the tab track overflows and scrolls on click", () => {
+    const many = Array.from({ length: 8 }, (_, i) => `f${i}`);
+    const openFiles = Object.fromEntries(many.map((key) => [key, file(key)]));
+    render(<EditorGroup {...props({
+      openOrder: many,
+      openFiles,
+      activeKey: "f0",
+      previewKey: null,
+      pinnedKeys: [],
+      activeFile: openFiles.f0,
+    })} />);
+
+    const scroll = screen.getByTestId("code-workspace-editor-tab-scroll");
+    let scrollLeft = 0;
+    Object.defineProperty(scroll, "clientWidth", { configurable: true, value: 200 });
+    Object.defineProperty(scroll, "scrollWidth", { configurable: true, value: 1200 });
+    Object.defineProperty(scroll, "scrollLeft", {
+      configurable: true,
+      get: () => scrollLeft,
+      set: (value: number) => {
+        scrollLeft = value;
+      },
+    });
+    fireEvent.scroll(scroll);
+
+    const left = screen.getByTestId("code-workspace-editor-tab-scroll-left");
+    const right = screen.getByTestId("code-workspace-editor-tab-scroll-right");
+    const menu = screen.getByTestId("code-workspace-editor-tabs-menu");
+    expect(scroll.contains(left)).toBe(false);
+    expect(scroll.contains(right)).toBe(false);
+    expect(scroll.contains(menu)).toBe(false);
+    expect(left).toBeDisabled();
+    expect(right).not.toBeDisabled();
+
+    fireEvent.click(right);
+    expect(scrollLeft).toBeGreaterThan(0);
+    fireEvent.scroll(scroll);
+    expect(screen.getByTestId("code-workspace-editor-tab-scroll-left")).not.toBeDisabled();
+  });
+
+  it("scrolls the active tab into the visible track using rect geometry (sidebar-safe)", () => {
+    const many = Array.from({ length: 6 }, (_, i) => `f${i}`);
+    const openFiles = Object.fromEntries(many.map((key) => [key, file(key)]));
+    const { rerender } = render(<EditorGroup {...props({
+      openOrder: many,
+      openFiles,
+      activeKey: "f0",
+      previewKey: null,
+      pinnedKeys: [],
+      activeFile: openFiles.f0,
+    })} />);
+
+    const scroll = screen.getByTestId("code-workspace-editor-tab-scroll");
+    let scrollLeft = 0;
+    // Simulate a ~300px left project pane: the scroll track is not at x=0.
+    const paneLeft = 300;
+    Object.defineProperty(scroll, "clientWidth", { configurable: true, value: 200 });
+    Object.defineProperty(scroll, "scrollWidth", { configurable: true, value: 1000 });
+    Object.defineProperty(scroll, "scrollLeft", {
+      configurable: true,
+      get: () => scrollLeft,
+      set: (value: number) => {
+        scrollLeft = value;
+      },
+    });
+    scroll.getBoundingClientRect = () => ({
+      left: paneLeft,
+      right: paneLeft + 200,
+      width: 200,
+      top: 0,
+      bottom: 28,
+      height: 28,
+      x: paneLeft,
+      y: 0,
+      toJSON: () => ({}),
+    });
+
+    const tabs = Array.from(scroll.querySelectorAll<HTMLElement>("[data-editor-tab-key]"));
+    tabs.forEach((tab, index) => {
+      const contentLeft = index * 150;
+      // Poison body-relative offsetLeft (Chromium when offsetParent is BODY).
+      // An implementation that trusts offsetLeft would scroll incorrectly.
+      Object.defineProperty(tab, "offsetLeft", { configurable: true, value: paneLeft + contentLeft });
+      Object.defineProperty(tab, "offsetWidth", { configurable: true, value: 150 });
+      tab.getBoundingClientRect = () => ({
+        left: paneLeft + contentLeft - scrollLeft,
+        right: paneLeft + contentLeft - scrollLeft + 150,
+        width: 150,
+        top: 0,
+        bottom: 28,
+        height: 28,
+        x: paneLeft + contentLeft - scrollLeft,
+        y: 0,
+        toJSON: () => ({}),
+      });
+    });
+
+    rerender(<EditorGroup {...props({
+      openOrder: many,
+      openFiles,
+      activeKey: "f5",
+      previewKey: null,
+      pinnedKeys: [],
+      activeFile: openFiles.f5,
+    })} />);
+
+    // f5 content left=750, width=150, viewport=200 → scrollLeft 708.
+    // offsetLeft-based math would wrongly use 300+750 and not land here.
+    expect(scrollLeft).toBe(750 + 150 - 200 + 8);
+    expect(scrollLeft).not.toBe((paneLeft + 750) + 150 - 200 + 8);
+  });
 });
