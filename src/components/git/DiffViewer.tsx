@@ -9,7 +9,12 @@ import {
 } from "@codemirror/merge";
 import { ChevronDown, ChevronUp, Columns2, Loader2, RefreshCw, Rows2 } from "lucide-react";
 import type { GitBlobPair } from "../../lib/git";
-import { buildDiffOverride, type WhitespaceMode } from "../../lib/diffWhitespace";
+import {
+  buildDiffOverride,
+  eolOnlyDiffLabel,
+  isEolOnlyDiff,
+  type WhitespaceMode,
+} from "../../lib/diffWhitespace";
 import { codeViewExtensions } from "../../lib/codeViewTheme";
 import { languageForPath } from "./diffLanguage";
 
@@ -19,6 +24,12 @@ interface DiffViewerProps {
   pair: GitBlobPair | null;
   loading?: boolean;
   emptyLabel?: string;
+  /** When set, shown for EOL-only pairs so the user can rewrite the worktree. */
+  onNormalizeLineEndings?: () => void;
+  normalizeLineEndingsBusy?: boolean;
+  /** P2: allow editing the worktree (new) side of the diff. */
+  worktreeEditable?: boolean;
+  onSaveWorktree?: (text: string) => Promise<void> | void;
 }
 
 const VIEW_KEY = "taomni.git.diff.view";
@@ -543,7 +554,15 @@ function formatBytes(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function DiffViewer({ pair, loading, emptyLabel }: DiffViewerProps) {
+export function DiffViewer({
+  pair,
+  loading,
+  emptyLabel,
+  onNormalizeLineEndings,
+  normalizeLineEndingsBusy = false,
+  worktreeEditable = false,
+  onSaveWorktree,
+}: DiffViewerProps) {
   const [view, setView] = useState<ViewMode>(() => readPref<ViewMode>(VIEW_KEY, "split"));
   const [whitespace, setWhitespace] = useState<WhitespaceMode>(() => readPref<WhitespaceMode>(WS_KEY, "none"));
   const [syncScrolling, setSyncScrolling] = useState(
@@ -728,8 +747,32 @@ export function DiffViewer({ pair, loading, emptyLabel }: DiffViewerProps) {
     );
   }
 
+  const eolOnly = isEolOnlyDiff(pair.oldText, pair.newText);
+  const eolLabel = eolOnly && pair.oldText != null && pair.newText != null
+    ? eolOnlyDiffLabel(pair.oldText, pair.newText)
+    : null;
+
   return (
     <div className="h-full min-h-0 flex flex-col bg-[var(--taomni-panel-bg)]">
+      {eolOnly && eolLabel ? (
+        <div
+          data-testid="git-diff-eol-only-banner"
+          className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-amber-500/40 bg-amber-500/10 text-[11px] text-amber-700 dark:text-amber-300"
+        >
+          <span className="min-w-0 flex-1">{eolLabel}</span>
+          {onNormalizeLineEndings ? (
+            <button
+              type="button"
+              className="taomni-btn h-6 px-2 shrink-0"
+              data-testid="git-diff-normalize-eol"
+              disabled={normalizeLineEndingsBusy}
+              onClick={onNormalizeLineEndings}
+            >
+              {normalizeLineEndingsBusy ? "Normalizing…" : "Normalize line endings"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="h-10 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-divider)] text-[12px] bg-[var(--taomni-chrome-bg)]">
         <div className="inline-flex rounded-md p-0.5 bg-[var(--taomni-hover)] border border-[var(--taomni-divider)]">
           <button

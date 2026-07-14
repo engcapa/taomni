@@ -29,9 +29,15 @@ const dialogMocks = vi.hoisted(() => ({
   confirmAppDialog: vi.fn(),
 }));
 
+const workspaceMocks = vi.hoisted(() => ({
+  workspaceWriteFile: vi.fn(),
+}));
+
 vi.mock("../../lib/git", () => gitMocks);
 
 vi.mock("../../lib/appDialogs", () => dialogMocks);
+
+vi.mock("../../lib/editor/workspace", () => workspaceMocks);
 
 vi.mock("./GitPanel", () => ({
   GitPanel: ({ repoRoot, changesView, workspaceHeader }: any) => (
@@ -183,6 +189,14 @@ describe("WorkspaceGitManager", () => {
     dialogMocks.choiceAppDialog.mockResolvedValue("primary");
     dialogMocks.confirmAppDialog.mockReset();
     dialogMocks.confirmAppDialog.mockResolvedValue(true);
+    workspaceMocks.workspaceWriteFile.mockReset();
+    workspaceMocks.workspaceWriteFile.mockResolvedValue({
+      path: "src/App.tsx",
+      text: "old",
+      size: 3,
+      mtime: 0,
+      hash: "h",
+    });
   });
 
   afterEach(() => {
@@ -247,6 +261,49 @@ describe("WorkspaceGitManager", () => {
     });
     expect(gitMocks.gitCommit).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Commit: 1 completed"));
+  });
+
+  it("normalizes EOL-only worktree text from the diff banner (issue #324 B2)", async () => {
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
+      snapshot(repoRoot, [change("src/App.tsx")])
+    ));
+    gitMocks.gitBlobPair.mockResolvedValue({
+      path: "src/App.tsx",
+      oldPath: null,
+      oldText: "line\n",
+      newText: "line\r\n",
+      oldExists: true,
+      newExists: true,
+      binary: false,
+      image: false,
+      oldImageB64: null,
+      newImageB64: null,
+      oversize: false,
+      oldSize: 5,
+      newSize: 6,
+    });
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("git-diff-eol-only-banner")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("git-diff-normalize-eol"));
+
+    await waitFor(() => {
+      expect(workspaceMocks.workspaceWriteFile).toHaveBeenCalledWith(
+        "/repo/app",
+        "src/App.tsx",
+        "line\n",
+      );
+    });
   });
 
   it("stops snapshotting a repo after a missing-path error (issue #324 B1)", async () => {

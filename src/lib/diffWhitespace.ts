@@ -2,6 +2,8 @@ import { Change, diff } from "@codemirror/merge";
 
 export type WhitespaceMode = "none" | "trailing" | "all";
 
+export type LineEndingStyle = "LF" | "CRLF" | "CR" | "mixed" | "none";
+
 interface Normalized {
   norm: string;
   // map[k] = index in the original string of the k-th kept character
@@ -47,6 +49,88 @@ function mapPos(norm: Normalized, originalLength: number, pos: number): number {
   if (pos <= 0) return 0;
   if (pos >= norm.map.length) return originalLength;
   return norm.map[pos];
+}
+
+/** Strip CR so LF and CRLF (and bare CR) compare as content-equal. */
+export function stripLineEndings(text: string): string {
+  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+export function detectLineEndingStyle(text: string): LineEndingStyle {
+  let crlf = 0;
+  let lf = 0;
+  let cr = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch === "\r") {
+      if (text[i + 1] === "\n") {
+        crlf += 1;
+        i += 1;
+      } else {
+        cr += 1;
+      }
+    } else if (ch === "\n") {
+      lf += 1;
+    }
+  }
+  const kinds = (crlf > 0 ? 1 : 0) + (lf > 0 ? 1 : 0) + (cr > 0 ? 1 : 0);
+  if (kinds === 0) return "none";
+  if (kinds > 1) return "mixed";
+  if (crlf > 0) return "CRLF";
+  if (cr > 0) return "CR";
+  return "LF";
+}
+
+/**
+ * True when old/new differ only by line-ending bytes (and maybe identical empty).
+ * Content after normalizing \r\n / \r → \n is equal, but the raw strings are not.
+ */
+export function isEolOnlyDiff(oldText: string | null | undefined, newText: string | null | undefined): boolean {
+  if (oldText == null || newText == null) return false;
+  if (oldText === newText) return false;
+  return stripLineEndings(oldText) === stripLineEndings(newText);
+}
+
+export function eolOnlyDiffLabel(oldText: string, newText: string): string {
+  const from = detectLineEndingStyle(oldText);
+  const to = detectLineEndingStyle(newText);
+  if (from === to) {
+    return "Line endings differ only (same style reported; mixed/offset CR/LF bytes).";
+  }
+  return `Line endings only: ${from} → ${to}. Content is identical after normalizing newlines.`;
+}
+
+/**
+ * Rewrite `text` so its line endings match `target` (typically HEAD / old side).
+ * Used to clear phantom CRLF changes from the worktree.
+ */
+export function applyLineEndingStyle(text: string, target: LineEndingStyle): string {
+  const lf = stripLineEndings(text);
+  if (target === "CRLF") return lf.replace(/\n/g, "\r\n");
+  if (target === "CR") return lf.replace(/\n/g, "\r");
+  // LF, none, mixed → prefer LF for a clean worktree
+  return lf;
+}
+
+/**
+ * Normalize worktree text to match the old side's line-ending style when the
+ * pair is EOL-only. Returns null when not applicable.
+ */
+export function normalizeWorktreeToMatchHead(
+  oldText: string | null | undefined,
+  newText: string | null | undefined,
+): string | null {
+  if (!isEolOnlyDiff(oldText, newText) || oldText == null || newText == null) return null;
+  const style = detectLineEndingStyle(oldText);
+  const normalized = applyLineEndingStyle(newText, style === "mixed" || style === "none" ? "LF" : style);
+  // Prefer exact match to old when content-equal after strip
+  if (stripLineEndings(normalized) === stripLineEndings(oldText)) {
+    // Rebuild from old content with old's exact bytes when possible
+    if (stripLineEndings(oldText) === stripLineEndings(newText)) {
+      return oldText;
+    }
+  }
+  return normalized;
 }
 
 /**

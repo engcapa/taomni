@@ -65,6 +65,11 @@ export interface WorkspaceChangesViewProps {
   onToggleChecked: (repoRoot: string, paths: string[], value: boolean) => void;
   onSelect: (repoRoot: string, path: string, mods: { ctrl: boolean; shift: boolean }) => void;
   onContextMenu: (repoRoot: string, path: string, event: ReactMouseEvent) => void;
+  onNormalizeLineEndings?: () => void;
+  normalizeLineEndingsBusy?: boolean;
+  onOpenInEditor?: () => void;
+  onSaveWorktree?: (text: string) => Promise<void> | void;
+  worktreeEditable?: boolean;
 }
 
 export function WorkspaceChangesView({
@@ -96,6 +101,11 @@ export function WorkspaceChangesView({
   onToggleChecked,
   onSelect,
   onContextMenu,
+  onNormalizeLineEndings,
+  normalizeLineEndingsBusy,
+  onOpenInEditor,
+  onSaveWorktree,
+  worktreeEditable,
 }: WorkspaceChangesViewProps) {
   const t = useT();
   const [filter, setFilter] = useState("");
@@ -271,6 +281,11 @@ export function WorkspaceChangesView({
           onStage={stageSelected}
           onUnstage={unstageSelected}
           onDiscard={discardSelected}
+          onNormalizeLineEndings={onNormalizeLineEndings}
+          normalizeLineEndingsBusy={normalizeLineEndingsBusy}
+          onOpenInEditor={onOpenInEditor}
+          onSaveWorktree={onSaveWorktree}
+          worktreeEditable={worktreeEditable}
         />
       </Panel>
     </PanelGroup>

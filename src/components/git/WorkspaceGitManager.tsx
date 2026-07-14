@@ -49,6 +49,8 @@ import {
 } from "../../lib/git";
 import { notifyGitRepoChanged, subscribeGitRepoRefresh } from "../../lib/gitRefresh";
 import { alertAppDialog, choiceAppDialog, confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
+import { normalizeWorktreeToMatchHead } from "../../lib/diffWhitespace";
+import { workspaceWriteFile } from "../../lib/editor/workspace";
 import { useAppStore } from "../../stores/appStore";
 import type { GitWorkspaceRootInfo } from "../../types";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
@@ -582,6 +584,36 @@ export function WorkspaceGitManager({
     discardChangesByKeys(focusedOperationKeys);
   }, [discardChangesByKeys, focusedOperationKeys]);
 
+  const normalizeFocusedLineEndings = useCallback(() => {
+    if (!focusedChange || !pair) return;
+    const nextText = normalizeWorktreeToMatchHead(pair.oldText, pair.newText);
+    if (nextText == null) {
+      setStatusMessage("No line-ending-only difference to normalize");
+      return;
+    }
+    void (async () => {
+      setBusyLabel("Normalize EOL");
+      try {
+        await workspaceWriteFile(focusedChange.repoRoot, focusedChange.change.path, nextText);
+        notifyGitRepoChanged(focusedChange.repoRoot);
+        const nextPair = await gitBlobPair(
+          focusedChange.repoRoot,
+          focusedChange.change.path,
+          "HEAD",
+          GIT_REF_WORKTREE,
+          focusedChange.change.oldPath,
+        );
+        setPair(nextPair);
+        await refreshRepo(focusedChange.repoRoot);
+        setStatusMessage(`Normalized line endings: ${focusedChange.change.path}`);
+      } catch (err) {
+        setStatusMessage(errorMessage(err));
+      } finally {
+        setBusyLabel(null);
+      }
+    })();
+  }, [focusedChange, pair, refreshRepo, setStatusMessage]);
+
   const commitWorkspaceChanges = useCallback((push: boolean) => {
     const message = commitMessage.trim();
     if (!message || checkedChangeKeys.size === 0) return;
@@ -984,6 +1016,8 @@ export function WorkspaceGitManager({
                 onToggleChecked={toggleChangeChecked}
                 onSelect={selectWorkspaceChange}
                 onContextMenu={openWorkspaceChangeMenu}
+                onNormalizeLineEndings={normalizeFocusedLineEndings}
+                normalizeLineEndingsBusy={busyLabel === "Normalize EOL"}
               />
             )}
           />
