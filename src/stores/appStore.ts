@@ -922,8 +922,13 @@ export const useAppStore = create<AppState>((set) => ({
       const idx = s.tabs.findIndex((t) => t.id === id);
       if (idx === -1) return s;
       const source = s.tabs[idx];
+      const isTerminal = source.type === "terminal";
+      // Explicit renames permanently opt out of cwd-derived titles. A duplicate
+      // of a manual tab must keep that choice and sequence the renamed title
+      // (`name` -> `name-1`), not replace it with the cwd basename.
+      const sourceIsManual = isTerminal && source.terminalTitleMode === "manual";
       const terminalTitlePrefix =
-        source.type === "terminal" ? overrides?.terminalTitlePrefix?.trim() : undefined;
+        isTerminal && !sourceIsManual ? overrides?.terminalTitlePrefix?.trim() : undefined;
       const duplicateTitleBase = terminalTitlePrefix
         ? terminalAutoTitleBase(source, terminalTitlePrefix)
         : undefined;
@@ -941,14 +946,16 @@ export const useAppStore = create<AppState>((set) => ({
         closable: true,
         hasNewOutput: false,
         // Only terminal copies carry an initial cwd; clear any inherited value
-        // for other tab kinds (and when none was resolved).
+        // for other tab kinds (and when none was resolved). Cwd is still used
+        // to open the shell in the same directory even when the title is manual.
         terminalInitialCwd:
-          source.type === "terminal" ? overrides?.terminalInitialCwd : undefined,
-        terminalTitleMode:
-          source.type === "terminal" ? (terminalTitlePrefix ? "auto" : "pending-auto") : undefined,
-        terminalTitleOperation: source.type === "terminal" ? "duplicate" : undefined,
+          isTerminal ? overrides?.terminalInitialCwd : undefined,
+        terminalTitleMode: isTerminal
+          ? (sourceIsManual ? "manual" : terminalTitlePrefix ? "auto" : "pending-auto")
+          : undefined,
+        terminalTitleOperation: isTerminal && !sourceIsManual ? "duplicate" : undefined,
         terminalProfile:
-          source.type === "terminal" ? overrides?.terminalProfile ?? source.terminalProfile : source.terminalProfile,
+          isTerminal ? overrides?.terminalProfile ?? source.terminalProfile : source.terminalProfile,
         codeWorkspace:
           source.type === "code-workspace" && source.codeWorkspace
             ? {

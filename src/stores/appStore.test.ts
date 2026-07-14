@@ -368,6 +368,56 @@ describe("appStore terminal automatic titles", () => {
     });
     expect(useAppStore.getState().tabs[1].title).toBe("repo-4");
   });
+
+  it("duplicates a manually renamed tab as manual-name + suffix, not cwd basename", () => {
+    useAppStore.setState({
+      tabs: [tab("source", {
+        title: "name",
+        terminalTitleMode: "manual",
+        terminalTitleSessionName: "Production",
+      })],
+    });
+    useAppStore.getState().duplicateTab("source", {
+      terminalInitialCwd: "/srv/repo",
+      terminalTitlePrefix: "repo",
+    });
+    expect(useAppStore.getState().tabs[1]).toMatchObject({
+      title: "name-1",
+      terminalTitleMode: "manual",
+      terminalInitialCwd: "/srv/repo",
+      terminalTitleOperation: undefined,
+    });
+  });
+
+  it("keeps a manual duplicate out of later automatic cwd renames", () => {
+    useAppStore.setState({
+      tabs: [tab("source", { title: "name", terminalTitleMode: "manual" })],
+    });
+    useAppStore.getState().duplicateTab("source", {
+      terminalInitialCwd: "/srv/repo",
+      terminalTitlePrefix: "repo",
+    });
+    const copyId = useAppStore.getState().tabs[1].id;
+    useAppStore.getState().assignTerminalAutoTitle(copyId, "/var/log");
+    expect(useAppStore.getState().tabs[1]).toMatchObject({
+      title: "name-1",
+      terminalTitleMode: "manual",
+    });
+  });
+
+  it("sequences further duplicates from a manual title family", () => {
+    useAppStore.setState({
+      tabs: [
+        tab("source", { title: "name", terminalTitleMode: "manual" }),
+        tab("copy1", { title: "name-1", terminalTitleMode: "manual" }),
+      ],
+    });
+    useAppStore.getState().duplicateTab("source", {
+      terminalInitialCwd: "/srv/repo",
+      terminalTitlePrefix: "repo",
+    });
+    expect(useAppStore.getState().tabs[1].title).toBe("name-2");
+  });
 });
 
 describe("appStore terminal runtime", () => {
