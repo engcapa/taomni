@@ -213,15 +213,15 @@ export function StatusBar() {
           <StatusSegment
             testId="status-bar-workspace-language"
             title={workspaceStatus.languageId
-              ? `Language: ${workspaceStatus.languageId} · open language servers`
-              : "Language unknown · open language servers"}
+              ? `Language: ${workspaceStatus.languageId} · open Language Servers settings`
+              : "Language unknown · open Language Servers settings"}
             onClick={workspaceActions?.openLanguagePanel}
           >
             {workspaceStatus.languageId ?? "Plain Text"}
           </StatusSegment>
           <StatusSegment
             testId="status-bar-workspace-lsp"
-            title={workspaceStatus.lspLabel ?? (workspaceStatus.lspActive ? "LSP active" : "No language server")}
+            title={`${workspaceStatus.lspLabel ?? (workspaceStatus.lspActive ? "LSP active" : "No language server")} · open Language Servers settings`}
             onClick={workspaceActions?.openLanguagePanel}
           >
             {dot(workspaceStatus.lspError

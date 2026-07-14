@@ -152,12 +152,16 @@ const LSP_EDITOR_STYLE = EditorView.theme({
     overflow: "auto",
     padding: "8px 10px",
     border: "1px solid var(--taomni-code-border)",
+    // Prefer a surface slightly lifted from the editor bg so body text and
+    // nested markdown code blocks remain legible across light/dark code themes.
     background: "var(--taomni-code-tooltip-bg)",
     color: "var(--taomni-code-text)",
     boxShadow: "0 12px 28px rgba(0, 0, 0, 0.28)",
     fontSize: "12px",
     lineHeight: "1.5",
   },
+  // Nested markdown (via .taomni-chat-md) is themed in index.css so it tracks
+  // --taomni-code-* even when the tooltip is portaled outside the editor host.
 });
 
 const EMPTY_HIGHLIGHTS: LspDocumentHighlight[] = [];

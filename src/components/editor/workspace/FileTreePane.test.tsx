@@ -1,44 +1,13 @@
 import { createRef } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { LspServerStatus } from "../../../lib/editor/lsp";
 import { FileTreePane, type FileTreeViewMode } from "./FileTreePane";
 import { TREE_TOOLBAR_MEDIUM_MIN_PX, TREE_TOOLBAR_WIDE_MIN_PX } from "./treeToolbarChrome";
-
-const writeTextMock = vi.fn(async (_text: string) => {});
-vi.mock("../../../lib/clipboard", () => ({
-  writeText: (text: string) => writeTextMock(text),
-}));
-
-const unavailableServer: LspServerStatus = {
-  presetId: "typescript",
-  displayName: "TypeScript",
-  documentLanguageIds: ["typescript"],
-  available: false,
-  active: false,
-  selectedCommandId: "typescript-language-server",
-  selectedCommand: null,
-  installHint: "npm install -g typescript-language-server",
-  error: null,
-  commands: [
-    {
-      id: "typescript-language-server",
-      label: "typescript-language-server",
-      command: "typescript-language-server",
-      args: ["--stdio"],
-      installHint: "npm install -g typescript-language-server",
-      fallback: false,
-      available: false,
-    },
-  ],
-};
 
 function renderPane(overrides: {
   viewMode?: FileTreeViewMode;
   canCreate?: boolean;
   canMutateSelection?: boolean;
-  languageOpen?: boolean;
-  formatOnSave?: boolean;
   paneWidth?: number;
 } = {}) {
   const callbacks = {
@@ -51,11 +20,6 @@ function renderPane(overrides: {
     onCreateDirectory: vi.fn(),
     onRename: vi.fn(),
     onDelete: vi.fn(),
-    onLanguageToggle: vi.fn(),
-    onLanguageRefresh: vi.fn(),
-    onFormatOnSaveChange: vi.fn(),
-    onCommandChange: vi.fn(),
-    onCustomCommandChange: vi.fn(),
   };
   const paneRef = createRef<HTMLElement>();
   render(
@@ -79,20 +43,6 @@ function renderPane(overrides: {
       onCreateDirectory={callbacks.onCreateDirectory}
       onRename={callbacks.onRename}
       onDelete={callbacks.onDelete}
-      languageServers={{
-        open: overrides.languageOpen ?? false,
-        statuses: [unavailableServer],
-        activeStatus: null,
-        commandPrefs: {},
-        customCommands: {},
-        customCommandId: "__custom__",
-        formatOnSave: overrides.formatOnSave ?? false,
-        onToggle: callbacks.onLanguageToggle,
-        onRefresh: callbacks.onLanguageRefresh,
-        onFormatOnSaveChange: callbacks.onFormatOnSaveChange,
-        onCommandChange: callbacks.onCommandChange,
-        onCustomCommandChange: callbacks.onCustomCommandChange,
-      }}
     >
       <button type="button">workspace root</button>
     </FileTreePane>,
@@ -214,11 +164,9 @@ describe("FileTreePane", () => {
   });
 
   it("reaches rename/delete through the overflow menu and enforces disabled create", () => {
-    const callbacks = renderPane({
+    renderPane({
       canCreate: false,
       canMutateSelection: false,
-      languageOpen: true,
-      formatOnSave: true,
       paneWidth: TREE_TOOLBAR_WIDE_MIN_PX + 20,
     });
 
@@ -226,25 +174,7 @@ describe("FileTreePane", () => {
     fireEvent.click(screen.getByTestId("code-workspace-tree-toolbar-more"));
     expect(screen.getByRole("button", { name: "Rename" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Delete or remove" })).toBeDisabled();
-    expect(screen.getByText("1 missing")).toBeInTheDocument();
-    expect(screen.getByText("TypeScript")).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Format on save" })).toBeChecked();
-
-    fireEvent.click(screen.getByRole("checkbox", { name: "Format on save" }));
-    fireEvent.click(screen.getByRole("button", { name: /Language Servers/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Refresh language servers" }));
-    expect(callbacks.onLanguageToggle).toHaveBeenCalledOnce();
-    expect(callbacks.onLanguageRefresh).toHaveBeenCalledOnce();
-    expect(callbacks.onFormatOnSaveChange).toHaveBeenCalledWith(false);
-  });
-
-  it("copies language-server install instructions to the clipboard", async () => {
-    writeTextMock.mockClear();
-    renderPane({ languageOpen: true, paneWidth: TREE_TOOLBAR_WIDE_MIN_PX + 20 });
-    expect(screen.getByTestId("code-workspace-lsp-install-hint")).toHaveTextContent(
-      "npm install -g typescript-language-server",
-    );
-    fireEvent.click(screen.getByRole("button", { name: /Copy install instructions for TypeScript/ }));
-    expect(writeTextMock).toHaveBeenCalledWith("npm install -g typescript-language-server");
+    // Language Servers live in Settings now — not in every workspace tree.
+    expect(screen.queryByText("Language Servers")).toBeNull();
   });
 });

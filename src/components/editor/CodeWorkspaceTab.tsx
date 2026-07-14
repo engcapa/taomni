@@ -129,6 +129,7 @@ import {
   type EditorSelectionRange,
 } from "./workspace/CodeMirrorHost";
 import { buildEditorContextMenuItems } from "./workspace/editorContextMenu";
+import { openSettingsSection } from "../../lib/settingsNavigation";
 import { fallbackWordHighlights } from "./workspace/lspIntelligenceChrome";
 import {
   inlayHintsEnabledForLanguage,
@@ -276,7 +277,6 @@ import {
   CODE_WORKSPACE_MAX_TREE_FONT_SIZE,
   CODE_WORKSPACE_MIN_FONT_SIZE,
   CODE_WORKSPACE_MIN_TREE_FONT_SIZE,
-  CUSTOM_LSP_COMMAND_ID,
   absoluteWorkspacePath,
   basename,
   clampCodeWorkspaceFontSize,
@@ -769,12 +769,6 @@ export function CodeWorkspaceTab({
   const terminalDockRef = useRef<TerminalDockHandle | null>(null);
   const runPanelRef = useRef<RunPanelHandle | null>(null);
   const {
-    serverStatuses: lspServerStatuses,
-    commandPrefs: lspCommandPrefs,
-    customCommands: lspCustomCommands,
-    refreshServerStatuses: refreshLspServerStatuses,
-    updateCommandPref: updateLspCommandPref,
-    updateCustomCommand: updateLspCustomCommand,
     descriptorForFile: lspDescriptorForFile,
     syncDocument: syncLspDocument,
     saveDocument: saveLspDocument,
@@ -2404,14 +2398,14 @@ export function CodeWorkspaceTab({
   useEffect(() => {
     if (!visible) return;
     setWorkspaceStatusActions(tabId, {
-      openLanguagePanel: () => setLanguagePanelOpen(true),
+      // Language server install / binary selection lives in Settings (global).
+      openLanguagePanel: () => openSettingsSection("language-servers"),
       openGitManager: gitManagerPayload && onOpenGitManager ? openGitManager : undefined,
     });
   }, [
     gitManagerPayload,
     onOpenGitManager,
     openGitManager,
-    setLanguagePanelOpen,
     setWorkspaceStatusActions,
     setWorkspaceStatusSegments,
     tabId,
@@ -4435,20 +4429,6 @@ export function CodeWorkspaceTab({
             onCreateDirectory={() => executeWorkspaceCommand("workspace.tree.newDirectory", { focus: "tree" })}
             onRename={() => executeWorkspaceCommand("workspace.tree.rename", { focus: "tree" })}
             onDelete={() => executeWorkspaceCommand("workspace.tree.delete", { focus: "tree" })}
-            languageServers={{
-              open: languagePanelOpen,
-              statuses: lspServerStatuses,
-              activeStatus: activeLspState?.status ?? null,
-              commandPrefs: lspCommandPrefs,
-              customCommands: lspCustomCommands,
-              customCommandId: CUSTOM_LSP_COMMAND_ID,
-              formatOnSave: intelligencePreferences.formatOnSave,
-              onToggle: () => setLanguagePanelOpen((value) => !value),
-              onRefresh: () => void refreshLspServerStatuses(),
-              onFormatOnSaveChange: setFormatOnSave,
-              onCommandChange: updateLspCommandPref,
-              onCustomCommandChange: updateLspCustomCommand,
-            }}
           >
               <ProjectTree
                 roots={roots}

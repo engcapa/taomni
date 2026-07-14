@@ -103,7 +103,9 @@ export function codeThemeVariablesFromPalette(p: CodeThemePalette): CodeThemeVar
     "--taomni-code-bracket-match-bg": mix(green, 24, "transparent"),
     "--taomni-code-bracket-match-border": mix(green, 44, "transparent"),
     "--taomni-code-bracket-error-bg": mix(red, 18, "transparent"),
-    "--taomni-code-tooltip-bg": dark ? mix(fg, 8, bg) : bg,
+    // Lift tooltips above the editor surface so hover docs stay readable
+    // (especially when markdown code blocks use --taomni-code-bg inside).
+    "--taomni-code-tooltip-bg": dark ? mix(fg, 12, bg) : mix(fg, 3, bg),
     "--taomni-code-scrollbar-track": mix(fg, dark ? 5 : 4, bg),
     "--taomni-code-scrollbar-thumb": mix(fg, dark ? 30 : 26, bg),
     "--taomni-code-syntax-keyword": p.keyword,

@@ -48,6 +48,15 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     ],
   },
   {
+    id: "language-servers",
+    titleKeys: ["settings.languageServersTitle", "settings.languageServersSubtitle"],
+    terms: [
+      "language server", "lsp", "jdtls", "rust-analyzer", "gopls", "clangd", "pyright",
+      "install", "language intelligence", "code intelligence",
+      "语言服务器", "语言智能", "安装", "补全", "代码智能",
+    ],
+  },
+  {
     id: "sql-completion",
     titleKeys: ["settings.sqlCompletionTitle", "settings.sqlCompletionTriggerShortcut"],
     terms: [

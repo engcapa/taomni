@@ -2573,6 +2573,14 @@ export function MainLayout() {
     });
   }, [addTab, setActiveTab]);
 
+  useEffect(() => {
+    const onOpenSettingsSection = () => {
+      openSettingsTab();
+    };
+    window.addEventListener("taomni:open-settings-section", onOpenSettingsSection);
+    return () => window.removeEventListener("taomni:open-settings-section", onOpenSettingsSection);
+  }, [openSettingsTab]);
+
   const executeControlTool = useCallback(async (dispatch: ControlToolDispatch) => {
     let ok = false;
     let output = "";

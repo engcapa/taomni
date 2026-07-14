@@ -22,6 +22,7 @@ import {
   lspPresetIdForPath,
   readLspCommandPrefs,
   readLspCustomCommands,
+  subscribeLspServerPrefs,
   writeLspCommandPrefs,
   writeLspCustomCommands,
   type LspFileState,
@@ -144,6 +145,20 @@ export function useWorkspaceLspSession({
   useEffect(() => {
     void refreshServerStatuses();
   }, [refreshServerStatuses]);
+
+  // Settings panel is the primary editor for LSP server prefs; keep live
+  // workspace sessions in sync without remounting the tab.
+  useEffect(() => subscribeLspServerPrefs(() => {
+    if (!mountedRef.current) return;
+    setCommandPrefs(readLspCommandPrefs());
+    setCustomCommands(readLspCustomCommands());
+    syncedTextRef.current = {};
+    incrementalSyncRef.current = {};
+    updateLspFiles((current) => Object.fromEntries(
+      Object.entries(current).map(([key, state]) => [key, { ...state, syncedText: null }]),
+    ));
+    void refreshServerStatuses();
+  }), [refreshServerStatuses, updateLspFiles]);
 
   const invalidateSyncedText = useCallback(() => {
     syncedTextRef.current = {};

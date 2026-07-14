@@ -599,6 +599,39 @@ export function lspPresetIdForPath(path: string): string | null {
   return null;
 }
 
+const LSP_PREFS_CHANGED_EVENT = "taomni:lsp-server-prefs-changed";
+
+function emitLspPrefsChanged(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new CustomEvent(LSP_PREFS_CHANGED_EVENT));
+  } catch {
+    // CustomEvent may be unavailable in exotic environments.
+  }
+}
+
+/** Subscribe to LSP command / custom-command preference changes (Settings ↔ Workspace). */
+export function subscribeLspServerPrefs(listener: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const onCustom = () => listener();
+  const onStorage = (event: StorageEvent) => {
+    if (
+      event.key !== null
+      && event.key !== LSP_COMMAND_PREFS_KEY
+      && event.key !== LSP_CUSTOM_COMMANDS_KEY
+    ) {
+      return;
+    }
+    listener();
+  };
+  window.addEventListener(LSP_PREFS_CHANGED_EVENT, onCustom);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener(LSP_PREFS_CHANGED_EVENT, onCustom);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
 export function readLspCommandPrefs(): Record<string, string> {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(LSP_COMMAND_PREFS_KEY) ?? "{}");
@@ -614,6 +647,7 @@ export function writeLspCommandPrefs(prefs: Record<string, string>): void {
   } catch {
     // Ignore storage failures.
   }
+  emitLspPrefsChanged();
 }
 
 export function readLspCustomCommands(): Record<string, LspCustomCommandConfig> {
@@ -643,6 +677,7 @@ export function writeLspCustomCommands(commands: Record<string, LspCustomCommand
   } catch {
     // Ignore storage failures.
   }
+  emitLspPrefsChanged();
 }
 
 export function splitCommandArgs(value: string): string[] {

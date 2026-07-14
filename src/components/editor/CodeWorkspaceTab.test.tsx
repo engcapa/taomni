@@ -435,7 +435,7 @@ describe("CodeWorkspaceTab", () => {
     expect(parentRenderCount).toBeLessThan(20);
   });
 
-  it("opens a multi-root workspace and shows missing C# language server commands", async () => {
+  it("opens a multi-root workspace without embedding Language Servers in the tree", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
       workspaceId: "ws-multi",
@@ -463,32 +463,9 @@ describe("CodeWorkspaceTab", () => {
     expect(screen.getByText("2 roots")).toBeInTheDocument();
     expect(screen.getAllByText("app").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("lib").length).toBeGreaterThanOrEqual(1);
-    expect(await screen.findByText("Language Servers")).toBeInTheDocument();
-    expect(await screen.findByText("C#")).toBeInTheDocument();
-    expect(screen.getAllByText("dotnet tool install -g csharp-ls")[0]).toBeInTheDocument();
-
-    const commandSelect = screen.getByLabelText("C# language server command");
-    expect(commandSelect).toHaveValue("csharp-ls");
-    expect(within(commandSelect).getByRole("option", { name: "OmniSharp fallback" })).toBeInTheDocument();
-
-    fireEvent.change(commandSelect, { target: { value: "omnisharp" } });
-    expect(window.localStorage.getItem("taomni.codeWorkspace.lspCommandPrefs.v1")).toBe(
-      JSON.stringify({ csharp: "omnisharp" }),
-    );
-
-    fireEvent.change(commandSelect, { target: { value: "__custom__" } });
-    fireEvent.change(screen.getByLabelText("C# custom command"), {
-      target: { value: "/opt/lsp/csharp-ls" },
-    });
-    fireEvent.change(screen.getByLabelText("C# custom args"), {
-      target: { value: "--stdio --logLevel Debug" },
-    });
-    expect(window.localStorage.getItem("taomni.codeWorkspace.lspCommandPrefs.v1")).toBe(
-      JSON.stringify({ csharp: "__custom__" }),
-    );
-    expect(window.localStorage.getItem("taomni.codeWorkspace.lspCustomCommands.v1")).toBe(
-      JSON.stringify({ csharp: { command: "/opt/lsp/csharp-ls", args: "--stdio --logLevel Debug" } }),
-    );
+    // Language Servers UI moved to Settings — tree should stay free of it.
+    expect(screen.queryByText("Language Servers")).toBeNull();
+    expect(screen.queryByText("dotnet tool install -g csharp-ls")).toBeNull();
 
     await waitFor(() => {
       expect(lspMocks.lspOpenDocument).toHaveBeenCalledWith(
@@ -1518,14 +1495,16 @@ describe("CodeWorkspaceTab", () => {
       { hash: "hash-formatted" },
     ));
 
+    // Format-on-save is a workspace intelligence preference (command / Settings path).
+    // Pref-seed before mount so save applies formatting without the old tree checkbox.
+    window.localStorage.setItem(
+      "taomni.codeWorkspace.intelligence.v1.instance-format-on-save",
+      JSON.stringify({ formatOnSave: true }),
+    );
+
     renderWorkspace(workspace);
     await screen.findByTitle("app / src/main.ts");
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
-
-    fireEvent.click(await screen.findByRole("checkbox", { name: "Format on save" }));
-    expect(JSON.parse(
-      window.localStorage.getItem("taomni.codeWorkspace.intelligence.v1.instance-format-on-save") ?? "{}",
-    )).toMatchObject({ formatOnSave: true });
 
     // Make the buffer dirty through the existing manual formatting path.
     fireEvent.keyDown(window, { key: "l", ctrlKey: true, altKey: true });
