@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  createOpenFileTodoScanner,
   readWorkspaceBookmarks,
   scanTodosInText,
+  sameWorkspaceTodoItems,
   toggleWorkspaceBookmark,
 } from "./todoBookmarks";
 
@@ -46,5 +48,26 @@ describe("todoBookmarks", () => {
       label: "entry",
     }, first);
     expect(second).toHaveLength(0);
+  });
+
+  it("caches unchanged open buffers while still updating the edited buffer", () => {
+    const scanner = createOpenFileTodoScanner();
+    const first = scanner.scan([
+      { key: "a", pathLabel: "a.ts", text: "// TODO: first" },
+      { key: "b", pathLabel: "b.ts", text: "// FIXME: second" },
+    ]);
+    const second = scanner.scan([
+      { key: "a", pathLabel: "a.ts", text: "// TODO: changed" },
+      { key: "b", pathLabel: "b.ts", text: "// FIXME: second" },
+    ]);
+
+    expect(second).toHaveLength(2);
+    expect(second.find((item) => item.fileKey === "a")?.text).toBe("changed");
+    expect(second.find((item) => item.fileKey === "b")).toBe(first.find((item) => item.fileKey === "b"));
+    expect(sameWorkspaceTodoItems(first, second)).toBe(false);
+    expect(sameWorkspaceTodoItems(second, scanner.scan([
+      { key: "a", pathLabel: "a.ts", text: "// TODO: changed" },
+      { key: "b", pathLabel: "b.ts", text: "// FIXME: second" },
+    ]))).toBe(true);
   });
 });

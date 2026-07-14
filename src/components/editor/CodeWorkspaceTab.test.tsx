@@ -1706,6 +1706,154 @@ describe("CodeWorkspaceTab", () => {
     await waitFor(() => expect(lspMocks.lspSelectionRanges).toHaveBeenCalled());
   });
 
+  it("syncs edits before idle intelligence work and ignores an older semantic-token response", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-lsp-scheduler",
+      workspaceInstanceId: "instance-lsp-scheduler",
+      name: "LSP scheduler",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    const capabilities = {
+      completion: false,
+      signatureHelp: false,
+      hover: false,
+      definition: false,
+      typeDefinition: false,
+      implementation: false,
+      references: false,
+      documentSymbol: true,
+      workspaceSymbol: false,
+      rename: false,
+      formatting: false,
+      rangeFormatting: false,
+      codeAction: false,
+      documentHighlight: true,
+      callHierarchy: false,
+      typeHierarchy: false,
+      inlayHint: false,
+      selectionRange: false,
+      semanticTokens: true,
+      completionTriggerCharacters: [],
+      signatureTriggerCharacters: [],
+    };
+    const status = documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      available: true,
+      active: true,
+      capabilities,
+    });
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "const alpha = 1;"));
+    lspMocks.lspOpenDocument.mockResolvedValue(status);
+    lspMocks.lspChangeDocument.mockResolvedValue(status);
+    lspMocks.lspGetDiagnostics.mockResolvedValue({ status, diagnostics: [] });
+    lspMocks.lspDocumentHighlights.mockResolvedValue({ status, highlights: [] });
+    lspMocks.lspDocumentSymbols.mockResolvedValue({ status, symbols: [] });
+
+    const rendered = renderWorkspace(workspace);
+    const fileKey = "root:app:src/main.ts";
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-lsp-scheduler")
+        .lspFiles[fileKey]?.syncedText,
+    ).toBe("const alpha = 1;"));
+
+    lspMocks.lspChangeDocument.mockClear();
+    lspMocks.lspDocumentHighlights.mockClear();
+    lspMocks.lspDocumentSymbols.mockClear();
+    lspMocks.lspSemanticTokens.mockClear();
+    let resolveOldSemantic: ((value: { status: LspDocumentStatus; tokens: unknown[] }) => void) | null = null;
+    lspMocks.lspSemanticTokens.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveOldSemantic = resolve;
+    }));
+
+    act(() => {
+      useCodeWorkspaceStore.getState().updateOpenFiles("instance-lsp-scheduler", (current) => ({
+        ...current,
+        [fileKey]: {
+          ...current[fileKey]!,
+          text: "const beta = 2;",
+          dirty: true,
+        },
+      }));
+    });
+
+    await waitFor(() => expect(lspMocks.lspChangeDocument).toHaveBeenCalledOnce());
+    await waitFor(() => expect(lspMocks.lspDocumentHighlights).toHaveBeenCalledOnce());
+    await waitFor(() => expect(lspMocks.lspDocumentSymbols).toHaveBeenCalledOnce());
+    await waitFor(() => expect(lspMocks.lspSemanticTokens).toHaveBeenCalledOnce());
+    const changeOrder = lspMocks.lspChangeDocument.mock.invocationCallOrder[0]!;
+    expect(changeOrder).toBeLessThan(lspMocks.lspDocumentHighlights.mock.invocationCallOrder[0]!);
+    expect(changeOrder).toBeLessThan(lspMocks.lspDocumentSymbols.mock.invocationCallOrder[0]!);
+    expect(changeOrder).toBeLessThan(lspMocks.lspSemanticTokens.mock.invocationCallOrder[0]!);
+
+    act(() => {
+      useCodeWorkspaceStore.getState().updateOpenFiles("instance-lsp-scheduler", (current) => ({
+        ...current,
+        [fileKey]: {
+          ...current[fileKey]!,
+          text: "const gamma = 3;",
+          dirty: true,
+        },
+      }));
+    });
+    await waitFor(() => expect(lspMocks.lspChangeDocument).toHaveBeenCalledTimes(2));
+
+    expect(resolveOldSemantic).not.toBeNull();
+    await act(async () => {
+      resolveOldSemantic!({
+        status,
+        tokens: [{
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
+          tokenType: "function",
+          modifiers: [],
+        }],
+      });
+      await Promise.resolve();
+    });
+    expect(rendered.container.querySelector(".cm-lsp-sem-function")).toBeNull();
+  });
+
+  it("coalesces editor text publications until the input burst is idle", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-editor-text-batch",
+      workspaceInstanceId: "instance-editor-text-batch",
+      name: "Editor text batch",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "one\ntwo"));
+
+    const rendered = renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+    expect(content).not.toBeNull();
+    const fileKey = "root:app:src/main.ts";
+    const getBufferText = () => selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-editor-text-batch",
+    ).openFiles[fileKey]?.text;
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.keyDown(content!, { key: "d", code: "KeyD", ctrlKey: true });
+      expect(getBufferText()).toBe("one\ntwo");
+
+      act(() => vi.advanceTimersByTime(124));
+      expect(getBufferText()).toBe("one\ntwo");
+
+      act(() => vi.advanceTimersByTime(1));
+      expect(getBufferText()).toBe("one\none\ntwo");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("offers tree context menu actions: copy path and scoped search", async () => {
     clipboardMocks.writeText.mockClear();
     const workspace: CodeWorkspaceTabInfo = {

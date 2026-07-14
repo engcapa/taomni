@@ -157,12 +157,18 @@ describe("CodeMirrorHost search", () => {
         paddingLeft: true,
         paddingRight: false,
       }],
+      semanticTokens: [{
+        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
+        tokenType: "keyword",
+        modifiers: [],
+      }],
       onViewportChange,
       onExpandSelection,
     });
 
     expect(container.querySelector(".cm-lsp-usage-read")).not.toBeNull();
     expect(container.querySelector(".cm-lsp-inlay-hint")).toHaveTextContent(": string");
+    expect(container.querySelector(".cm-lsp-sem-keyword")).not.toBeNull();
     expect(onViewportChange).toHaveBeenCalled();
     fireEvent.keyDown(content, { key: "w", code: "KeyW", ctrlKey: true });
     await waitFor(() => expect(onExpandSelection).toHaveBeenCalledWith(expect.objectContaining({ empty: true })));

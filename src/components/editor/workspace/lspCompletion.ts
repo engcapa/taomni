@@ -187,6 +187,9 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
     const isTrigger = !word && !!charBefore && hooks.triggerCharacters().includes(charBefore);
     if (!context.explicit && !word && !isTrigger) return null;
 
+    // LSP responses are tied to a document version. Do not spend renderer time
+    // mapping a response that became stale while the user kept typing.
+    context.addEventListener("abort", () => {}, { onDocChange: true });
     let result: LspCompletionResult | null = null;
     try {
       result = await hooks.fetch(
@@ -196,6 +199,7 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
     } catch {
       result = null;
     }
+    if (context.aborted) return null;
     // No language service: fall back to buffer-word completion.
     if (!result || (!result.status.active && result.items.length === 0)) {
       return completeAnyWord(context);
