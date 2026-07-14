@@ -36,7 +36,7 @@ beforeEach(() => {
       active: false,
       selectedCommandId: "jdtls",
       selectedCommand: null,
-      installHint: "brew install jdtls  # JDK 17+",
+      installHint: "Requires JDK 17+. Linux: …",
       error: null,
       commands: [
         {
@@ -44,7 +44,7 @@ beforeEach(() => {
           label: "jdtls",
           command: "jdtls",
           args: [],
-          installHint: "brew install jdtls  # JDK 17+",
+          installHint: "Requires JDK 17+. Linux: …",
           fallback: false,
           available: false,
         },
@@ -76,19 +76,56 @@ beforeEach(() => {
 });
 
 describe("LanguageServersSettings", () => {
-  it("lists detected servers and shows install hints for missing ones", async () => {
+  it("lists servers and keeps install commands collapsed by default", async () => {
     render(<LanguageServersSettings />);
     expect(await screen.findByTestId("language-server-row-java")).toBeInTheDocument();
     expect(screen.getByTestId("language-server-row-rust")).toBeInTheDocument();
-    expect(screen.getByTestId("language-servers-install-hint")).toHaveTextContent("brew install jdtls");
-    expect(screen.queryByText("rustup component add rust-analyzer")).not.toBeInTheDocument();
+    // Collapsed: no install command body visible.
+    expect(screen.queryByTestId("language-servers-install-panel")).not.toBeInTheDocument();
+    expect(screen.queryByText("brew install jdtls")).not.toBeInTheDocument();
+    // Both missing and installed servers expose a show-install control.
+    expect(screen.getAllByTestId("language-servers-install-toggle")).toHaveLength(2);
   });
 
-  it("copies install instructions to the clipboard", async () => {
+  it("expands multi-OS install commands for jdtls with real URLs and copies the script", async () => {
     render(<LanguageServersSettings />);
-    await screen.findByTestId("language-servers-install-hint");
-    fireEvent.click(screen.getByTestId("language-servers-copy-install-hint"));
-    expect(writeTextMock).toHaveBeenCalledWith("brew install jdtls  # JDK 17+");
+    const javaRow = await screen.findByTestId("language-server-row-java");
+    const toggle = javaRow.querySelector(
+      "[data-testid='language-servers-install-toggle']",
+    ) as HTMLButtonElement;
+    fireEvent.click(toggle);
+
+    expect(await screen.findByTestId("language-servers-install-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("language-servers-install-line-linux")).toBeInTheDocument();
+    expect(screen.getByTestId("language-servers-install-line-macos")).toBeInTheDocument();
+    expect(screen.getByTestId("language-servers-install-line-windows")).toBeInTheDocument();
+    expect(screen.getByTestId("language-servers-install-note-linux")).toHaveTextContent(/JDK 17/i);
+    expect(screen.getAllByText(/jdt-language-server-latest\.tar\.gz/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/brew install jdtls/)).toBeInTheDocument();
+    expect(screen.getByTestId("language-servers-install-hint")).toHaveTextContent("config_linux");
+
+    fireEvent.click(screen.getByTestId("language-servers-copy-install-macos"));
+    expect(writeTextMock).toHaveBeenCalled();
+    const copied = String(writeTextMock.mock.calls[0][0]);
+    expect(copied).toContain("brew install jdtls");
+  });
+
+  it("shows install commands for already-installed servers as a single shared line", async () => {
+    render(<LanguageServersSettings />);
+    const rustRow = await screen.findByTestId("language-server-row-rust");
+    fireEvent.click(rustRow.querySelector(
+      "[data-testid='language-servers-install-toggle']",
+    ) as HTMLButtonElement);
+
+    expect(await screen.findByTestId("language-servers-install-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("language-servers-install-line-shared")).toBeInTheDocument();
+    expect(screen.getByText(/rustup component add rust-analyzer/)).toBeInTheDocument();
+    // Shared catalog entry → no OS labels.
+    expect(screen.queryByTestId("language-servers-install-line-linux")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("language-servers-copy-install-shared"));
+    expect(writeTextMock).toHaveBeenCalled();
+    expect(String(writeTextMock.mock.calls[0][0])).toContain("rustup component add rust-analyzer");
   });
 
   it("persists command preference selection", async () => {
