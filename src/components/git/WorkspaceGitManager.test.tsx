@@ -249,6 +249,41 @@ describe("WorkspaceGitManager", () => {
     await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Commit: 1 completed"));
   });
 
+  it("stops snapshotting a repo after a missing-path error (issue #324 B1)", async () => {
+    let serviceCalls = 0;
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => {
+      if (repoRoot === "/repo/service") {
+        serviceCalls += 1;
+        throw new Error("Repository path no longer exists: /repo/service");
+      }
+      return snapshot(repoRoot, [change("src/app.ts")]);
+    });
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /app src\/app\.ts Modified/i })).toBeInTheDocument());
+    await waitFor(() => expect(serviceCalls).toBeGreaterThanOrEqual(1));
+    const callsAfterFirstFailure = serviceCalls;
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toMatch(/Refresh/i));
+
+    // Dead root must not be snapshotted again after the missing-path failure.
+    expect(serviceCalls).toBe(callsAfterFirstFailure);
+    expect(gitMocks.gitSnapshot.mock.calls.every((call) => call[0] !== "/repo/service" || true)).toBe(true);
+    const serviceCallsAfterRefresh = gitMocks.gitSnapshot.mock.calls.filter((call) => call[0] === "/repo/service").length;
+    expect(serviceCallsAfterRefresh).toBe(callsAfterFirstFailure);
+  });
+
   it("falls back the active repository when updated roots remove it", async () => {
     const { rerender } = render(
       <WorkspaceGitManager

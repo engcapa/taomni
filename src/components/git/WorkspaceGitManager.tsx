@@ -60,6 +60,11 @@ import {
   workspaceChangeKey,
   workspacePathsByRepoFromKeys,
 } from "./workspaceGitKeys";
+import {
+  filterSnapshotRoots,
+  isMissingRepoPathError,
+  retainDeadRepoRoots,
+} from "../../lib/workspaceGitManagerSync";
 
 interface WorkspaceGitManagerProps {
   workspaceName?: string | null;
@@ -116,6 +121,8 @@ export function WorkspaceGitManager({
       return false;
     }
   });
+  /** Repo paths that failed with missing-cwd style errors; skip further snapshots. */
+  const [deadRepoRoots, setDeadRepoRoots] = useState<Set<string>>(() => new Set());
   const anchorChangeKeyRef = useRef<string | null>(null);
 
   const selectedRoot = useMemo(
@@ -202,6 +209,10 @@ export function WorkspaceGitManager({
   const totalChangedFiles = allChanges.length;
   const title = workspaceName?.trim() || "Code Workspace";
   const singleRepoMode = normalizedRoots.length === 1;
+  const liveRoots = useMemo(
+    () => filterSnapshotRoots(normalizedRoots, deadRepoRoots),
+    [deadRepoRoots, normalizedRoots],
+  );
 
   useEffect(() => {
     try {
@@ -210,6 +221,20 @@ export function WorkspaceGitManager({
       /* ignore */
     }
   }, [treeMode]);
+
+  useEffect(() => {
+    setDeadRepoRoots((current) => {
+      const next = retainDeadRepoRoots(current, normalizedRoots);
+      if (next.size === current.size && [...next].every((root) => current.has(root))) return current;
+      return next;
+    });
+    setSnapshots((current) => {
+      const live = new Set(normalizedRoots.map((root) => root.repoRoot));
+      const entries = Object.entries(current).filter(([repoRoot]) => live.has(repoRoot));
+      if (entries.length === Object.keys(current).length) return current;
+      return Object.fromEntries(entries);
+    });
+  }, [normalizedRoots]);
 
   useEffect(() => {
     setUncheckedChangeKeys((current) => retainWorkspaceChangeKeys(current, validChangeKeys));
@@ -242,6 +267,18 @@ export function WorkspaceGitManager({
   }, [normalizedRoots, repoScope, rootsKey]);
 
   const refreshRepo = useCallback(async (repoRoot: string) => {
+    if (deadRepoRoots.has(repoRoot)) {
+      const message = `Repository path no longer exists: ${repoRoot}`;
+      setSnapshots((current) => ({
+        ...current,
+        [repoRoot]: {
+          snapshot: null,
+          loading: false,
+          error: message,
+        },
+      }));
+      throw new Error(message);
+    }
     setSnapshots((current) => ({
       ...current,
       [repoRoot]: {
@@ -263,33 +300,43 @@ export function WorkspaceGitManager({
       return snapshot;
     } catch (err) {
       const message = errorMessage(err);
+      if (isMissingRepoPathError(message)) {
+        setDeadRepoRoots((current) => {
+          if (current.has(repoRoot)) return current;
+          const next = new Set(current);
+          next.add(repoRoot);
+          return next;
+        });
+      }
       setSnapshots((current) => ({
         ...current,
         [repoRoot]: {
-          snapshot: current[repoRoot]?.snapshot ?? null,
+          snapshot: isMissingRepoPathError(message) ? null : (current[repoRoot]?.snapshot ?? null),
           loading: false,
           error: message,
         },
       }));
       throw err;
     }
-  }, []);
+  }, [deadRepoRoots]);
 
-  const refreshRepos = useCallback(async (targets = normalizedRoots) => {
-    await Promise.allSettled(targets.map((root) => refreshRepo(root.repoRoot)));
-  }, [normalizedRoots, refreshRepo]);
+  const refreshRepos = useCallback(async (targets = liveRoots) => {
+    const snapshotTargets = filterSnapshotRoots(targets, deadRepoRoots);
+    await Promise.allSettled(snapshotTargets.map((root) => refreshRepo(root.repoRoot)));
+  }, [deadRepoRoots, liveRoots, refreshRepo]);
 
   useEffect(() => subscribeGitRepoRefresh((repoRoot) => {
+    if (deadRepoRoots.has(repoRoot)) return;
     if (normalizedRoots.some((root) => root.repoRoot === repoRoot)) {
       void refreshRepo(repoRoot);
       setPanelVersion((current) => current + 1);
     }
-  }), [normalizedRoots, refreshRepo]);
+  }), [deadRepoRoots, normalizedRoots, refreshRepo]);
 
   useEffect(() => {
-    if (!visible || normalizedRoots.length === 0 || singleRepoMode) return;
-    void refreshRepos(normalizedRoots);
-  }, [normalizedRoots, refreshRepos, singleRepoMode, visible]);
+    if (!visible || liveRoots.length === 0 || singleRepoMode) return;
+    void refreshRepos(liveRoots);
+  }, [liveRoots, refreshRepos, singleRepoMode, visible]);
 
   useEffect(() => {
     let cancelled = false;

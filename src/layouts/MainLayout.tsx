@@ -35,6 +35,7 @@ import { GitPanel } from "../components/git/GitPanel";
 import { WorkspaceGitManager } from "../components/git/WorkspaceGitManager";
 import { CodeWorkspaceTab, type CodeWorkspaceGitManagerPayload } from "../components/editor/CodeWorkspaceTab";
 import type { WorkspaceCommandRegistration } from "../components/editor/workspace/workspaceCommands";
+import { decideWorkspaceGitSync } from "../lib/workspaceGitManagerSync";
 import { MultiExecBar } from "../components/terminal/MultiExecBar";
 import { SessionEditor } from "../components/session/SessionEditor";
 import { AuthPrompt } from "../components/session/AuthPrompt";
@@ -1932,30 +1933,54 @@ export function MainLayout() {
     const sourceWorkspaceInstanceId = payload.workspaceInstanceId;
     if (!sourceWorkspaceInstanceId) return;
     const workspaceRoots = normalizeGitWorkspaceRoots(payload.roots);
-    if (workspaceRoots.length === 0) return;
     const existing = tabsRef.current.find((tab) => (
       tab.type === "git"
       && tab.git?.sourceWorkspaceInstanceId === sourceWorkspaceInstanceId
     ));
-    if (!existing?.git) return;
-    const existingActiveRepoRoot = existing.git.activeRepoRoot ?? existing.git.repoRoot;
-    const activeRepoRoot = existingActiveRepoRoot && workspaceRoots.some((root) => root.repoRoot === existingActiveRepoRoot)
-      ? existingActiveRepoRoot
-      : payload.activeRepoRoot && workspaceRoots.some((root) => root.repoRoot === payload.activeRepoRoot)
-        ? payload.activeRepoRoot
-        : workspaceRoots[0].repoRoot;
+    const decision = decideWorkspaceGitSync({
+      hasLinkedTab: !!existing?.git,
+      workspaceRoots,
+      existingActiveRepoRoot: existing?.git?.activeRepoRoot ?? existing?.git?.repoRoot,
+      payloadActiveRepoRoot: payload.activeRepoRoot,
+    });
+    if (decision.kind === "noop" || !existing?.git) return;
+    // Empty / removed roots: close the linked Git tab so we never keep
+    // snapshotting deleted paths after the workspace drops them (issue #324 B1).
+    if (decision.kind === "close") {
+      removeTab(existing.id);
+      return;
+    }
     const name = payload.workspaceName.trim() || "Code Workspace";
     updateGitTabInfo(existing.id, {
       ...existing.git,
-      repoRoot: activeRepoRoot,
+      repoRoot: decision.activeRepoRoot,
       workspaceName: name,
-      workspaceRoots,
-      activeRepoRoot,
+      workspaceRoots: decision.workspaceRoots,
+      activeRepoRoot: decision.activeRepoRoot,
       sourceWorkspaceInstanceId,
       sourceWorkspaceId: payload.workspaceId ?? existing.git.sourceWorkspaceId,
       sourceWorkspaceName: name,
     }, `Git · ${name}`);
-  }, [updateGitTabInfo]);
+  }, [removeTab, updateGitTabInfo]);
+
+  // Close workspace Git manager tabs whose source Code Workspace tab is gone so
+  // they cannot keep snapshotting stale repo paths after the workspace is closed.
+  useEffect(() => {
+    const openWorkspaceInstanceIds = new Set(
+      tabs
+        .filter((tab) => tab.type === "code-workspace" && tab.codeWorkspace)
+        .map((tab) => {
+          const ws = tab.codeWorkspace!;
+          return ws.workspaceInstanceId ?? ws.workspaceId ?? ws.repoRoot?.trim() ?? tab.id;
+        }),
+    );
+    for (const tab of tabs) {
+      if (tab.type !== "git" || !tab.git?.sourceWorkspaceInstanceId) continue;
+      if (!tab.git.workspaceRoots?.length) continue;
+      if (openWorkspaceInstanceIds.has(tab.git.sourceWorkspaceInstanceId)) continue;
+      removeTab(tab.id);
+    }
+  }, [removeTab, tabs]);
 
   const openCodeWorkspaceInfo = useCallback((workspace: CodeWorkspaceTabInfo) => {
     const roots = workspace.roots ?? [];

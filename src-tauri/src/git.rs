@@ -1779,6 +1779,24 @@ where
 fn run_git_strings(cwd: Option<&Path>, args: Vec<String>) -> Result<String, String> {
     let mut command = new_git_command();
     if let Some(cwd) = cwd {
+        // Validate before current_dir: on Windows an invalid cwd yields
+        // ERROR_DIRECTORY (os error 267) with a vague spawn failure. Prefer a
+        // stable message so the frontend can drop the dead root (issue #324).
+        match fs::metadata(cwd) {
+            Ok(meta) if meta.is_dir() => {}
+            Ok(_) => {
+                return Err(format!(
+                    "Repository path is not a directory: {}",
+                    cwd.display()
+                ));
+            }
+            Err(_) => {
+                return Err(format!(
+                    "Repository path no longer exists: {}",
+                    cwd.display()
+                ));
+            }
+        }
         command.current_dir(cwd);
     }
     apply_stable_locale(&mut command);
@@ -2249,6 +2267,19 @@ fn require_non_empty(label: &str, value: &str) -> Result<(), String> {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    #[test]
+    fn run_git_strings_rejects_missing_cwd_with_stable_message() {
+        let missing = std::env::temp_dir().join(format!(
+            "taomni-missing-git-cwd-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let err = run_git_strings(Some(&missing), vec!["status".into()]).unwrap_err();
+        assert!(
+            err.contains("Repository path no longer exists"),
+            "unexpected error: {err}"
+        );
+    }
 
     #[cfg(windows)]
     #[test]
