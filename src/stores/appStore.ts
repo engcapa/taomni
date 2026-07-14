@@ -830,6 +830,17 @@ export function computeNewTerminalTitle(requestedTitle: string, openTerminalTitl
   return computeSequencedTitle(requestedTitle, openTerminalTitles, false);
 }
 
+/**
+ * Keep a duplicate tab's allocated `-N` suffix while updating the cwd prefix.
+ * Used after the first auto-title resolution so later OSC 7 reports and `cd`
+ * do not re-run the family-wide duplicate counter.
+ */
+export function updateDuplicateAutoTitle(currentTitle: string, newPrefix: string): string {
+  const suffixMatch = /^(.*?)-(\d+)$/.exec(currentTitle);
+  if (!suffixMatch) return newPrefix;
+  return `${newPrefix}-${suffixMatch[2]}`;
+}
+
 function computeSequencedTitle(sourceTitle: string, openTitles: string[], forceSuffix: boolean): string {
   const suffixMatch = /^(.*?)-(\d+)$/.exec(sourceTitle);
   const base = suffixMatch ? suffixMatch[1] : sourceTitle;
@@ -1098,7 +1109,9 @@ export const useAppStore = create<AppState>((set) => ({
         .filter((tab) => tab.id !== tabId && tab.type === "terminal")
         .map((tab) => tab.title);
       const title = target.terminalTitleOperation === "duplicate"
-        ? computeDuplicateTitle(prefix, openTitles)
+        ? target.terminalTitleMode === "pending-auto"
+          ? computeDuplicateTitle(prefix, openTitles)
+          : updateDuplicateAutoTitle(target.title, prefix)
         : computeNewTerminalTitle(prefix, openTitles);
       if (target.title === title && target.terminalTitleMode === "auto") return s;
       return {
