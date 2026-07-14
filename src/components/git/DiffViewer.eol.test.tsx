@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { EditorView } from "@codemirror/view";
 import type { GitBlobPair } from "../../lib/git";
 import { DiffViewer } from "./DiffViewer";
 
@@ -43,5 +44,44 @@ describe("DiffViewer EOL-only banner (issue #324 B2)", () => {
   it("does not show the banner when content actually differs", () => {
     render(<DiffViewer pair={pair("hello\n", "hallo\n")} />);
     expect(screen.queryByTestId("git-diff-eol-only-banner")).not.toBeInTheDocument();
+  });
+
+  it("exposes save control when worktree editing is enabled (issue #324 S1B)", () => {
+    const onSave = vi.fn();
+    render(
+      <DiffViewer
+        pair={pair("hello\n", "hello world\n")}
+        worktreeEditable
+        onSaveWorktree={onSave}
+      />,
+    );
+    const save = screen.getByTestId("git-diff-save-worktree");
+    expect(save).toBeDisabled();
+    expect(save).toHaveTextContent("Saved");
+  });
+
+  it("saves dirty worktree text through onSaveWorktree (issue #324 S1B)", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const { container } = render(
+      <DiffViewer
+        pair={pair("hello\n", "hello\n")}
+        worktreeEditable
+        onSaveWorktree={onSave}
+      />,
+    );
+
+    await waitFor(() => expect(container.querySelector(".cm-editor")).toBeTruthy());
+    const editors = Array.from(container.querySelectorAll(".cm-editor"));
+    // Split view: side B is the last editor (worktree).
+    const worktreeDom = editors[editors.length - 1] as HTMLElement;
+    const view = EditorView.findFromDOM(worktreeDom);
+    expect(view).toBeTruthy();
+    view!.dispatch({
+      changes: { from: 0, to: view!.state.doc.length, insert: "edited\n" },
+    });
+
+    await waitFor(() => expect(screen.getByTestId("git-diff-save-worktree")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("git-diff-save-worktree"));
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith("edited\n"));
   });
 });

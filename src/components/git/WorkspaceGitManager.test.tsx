@@ -269,6 +269,55 @@ describe("WorkspaceGitManager", () => {
     await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Commit: 1 completed"));
   });
 
+  it("opens the focused change in the code workspace editor (issue #324 S1A)", async () => {
+    const onOpenWorkspace = vi.fn();
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
+      snapshot(repoRoot, [change("src/App.tsx")])
+    ));
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        onOpenWorkspace={onOpenWorkspace}
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /app src\/App\.tsx Modified/i })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /app src\/App\.tsx Modified/i }));
+    await waitFor(() => expect(gitMocks.gitBlobPair).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByTestId("git-diff-open-in-editor")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("git-diff-open-in-editor"));
+    expect(onOpenWorkspace).toHaveBeenCalledWith("/repo/app", "src/App.tsx");
+  });
+
+  it("wires worktree save control for focused changes (issue #324 S1B)", async () => {
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
+      snapshot(repoRoot, [change("src/App.tsx")])
+    ));
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        onOpenWorkspace={vi.fn()}
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /app src\/App\.tsx Modified/i })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /app src\/App\.tsx Modified/i }));
+    await waitFor(() => expect(screen.getByTestId("git-diff-save-worktree")).toBeInTheDocument());
+    expect(screen.getByTestId("git-diff-open-in-editor")).toBeInTheDocument();
+  });
+
   it("creates and checks out a typed target branch before commit (issue #324 S4)", async () => {
     gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
       snapshot(repoRoot, [change("src/App.tsx")], {

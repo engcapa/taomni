@@ -78,7 +78,7 @@ interface WorkspaceGitManagerProps {
   roots: GitWorkspaceRootInfo[];
   activeRepoRoot?: string | null;
   visible?: boolean;
-  onOpenWorkspace?: (repoRoot: string) => void;
+  onOpenWorkspace?: (repoRoot: string, path?: string | null) => void;
 }
 
 interface RepoSnapshotState {
@@ -590,6 +590,19 @@ export function WorkspaceGitManager({
     discardChangesByKeys(focusedOperationKeys);
   }, [discardChangesByKeys, focusedOperationKeys]);
 
+  const reloadFocusedPair = useCallback(async () => {
+    if (!focusedChange) return null;
+    const nextPair = await gitBlobPair(
+      focusedChange.repoRoot,
+      focusedChange.change.path,
+      "HEAD",
+      GIT_REF_WORKTREE,
+      focusedChange.change.oldPath,
+    );
+    setPair(nextPair);
+    return nextPair;
+  }, [focusedChange]);
+
   const normalizeFocusedLineEndings = useCallback(() => {
     if (!focusedChange || !pair) return;
     const nextText = normalizeWorktreeToMatchHead(pair.oldText, pair.newText);
@@ -602,14 +615,7 @@ export function WorkspaceGitManager({
       try {
         await workspaceWriteFile(focusedChange.repoRoot, focusedChange.change.path, nextText);
         notifyGitRepoChanged(focusedChange.repoRoot);
-        const nextPair = await gitBlobPair(
-          focusedChange.repoRoot,
-          focusedChange.change.path,
-          "HEAD",
-          GIT_REF_WORKTREE,
-          focusedChange.change.oldPath,
-        );
-        setPair(nextPair);
+        await reloadFocusedPair();
         await refreshRepo(focusedChange.repoRoot);
         setStatusMessage(`Normalized line endings: ${focusedChange.change.path}`);
       } catch (err) {
@@ -618,7 +624,25 @@ export function WorkspaceGitManager({
         setBusyLabel(null);
       }
     })();
-  }, [focusedChange, pair, refreshRepo, setStatusMessage]);
+  }, [focusedChange, pair, refreshRepo, reloadFocusedPair, setStatusMessage]);
+
+  const openFocusedInEditor = useCallback(() => {
+    if (!focusedChange || !onOpenWorkspace) return;
+    if (focusedChange.change.status === "deleted") {
+      setStatusMessage("Deleted files cannot be opened in the editor");
+      return;
+    }
+    onOpenWorkspace(focusedChange.repoRoot, focusedChange.change.path);
+  }, [focusedChange, onOpenWorkspace, setStatusMessage]);
+
+  const saveFocusedWorktree = useCallback(async (text: string) => {
+    if (!focusedChange) return;
+    await workspaceWriteFile(focusedChange.repoRoot, focusedChange.change.path, text);
+    notifyGitRepoChanged(focusedChange.repoRoot);
+    await reloadFocusedPair();
+    await refreshRepo(focusedChange.repoRoot);
+    setStatusMessage(`Saved ${focusedChange.change.path}`);
+  }, [focusedChange, refreshRepo, reloadFocusedPair, setStatusMessage]);
 
   const commitBranchOptions = useMemo(
     () => collectLocalBranchNames(scopedRoots.map((root) => snapshots[root.repoRoot]?.snapshot ?? null)),
@@ -1047,6 +1071,9 @@ export function WorkspaceGitManager({
                 onContextMenu={openWorkspaceChangeMenu}
                 onNormalizeLineEndings={normalizeFocusedLineEndings}
                 normalizeLineEndingsBusy={busyLabel === "Normalize EOL"}
+                onOpenInEditor={onOpenWorkspace ? openFocusedInEditor : undefined}
+                onSaveWorktree={saveFocusedWorktree}
+                worktreeEditable={!!focusedChange && focusedChange.change.status !== "deleted"}
               />
             )}
           />
