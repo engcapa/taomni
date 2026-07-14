@@ -2395,19 +2395,28 @@ export function CodeWorkspaceTab({
     visible,
   ]);
 
+  const activeLspPresetIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    activeLspPresetIdRef.current = activeLspState?.status?.presetId ?? null;
+  }, [activeLspState?.status?.presetId]);
+
+  const openLanguageServersSettings = useCallback((presetId?: string | null) => {
+    openSettingsSection("language-servers", { presetId: presetId ?? null });
+  }, []);
+
   useEffect(() => {
     if (!visible) return;
     setWorkspaceStatusActions(tabId, {
       // Language server install / binary selection lives in Settings (global).
-      openLanguagePanel: () => openSettingsSection("language-servers"),
+      openLanguagePanel: () => openLanguageServersSettings(activeLspPresetIdRef.current),
       openGitManager: gitManagerPayload && onOpenGitManager ? openGitManager : undefined,
     });
   }, [
     gitManagerPayload,
     onOpenGitManager,
     openGitManager,
+    openLanguageServersSettings,
     setWorkspaceStatusActions,
-    setWorkspaceStatusSegments,
     tabId,
     visible,
   ]);
@@ -4168,7 +4177,13 @@ export function CodeWorkspaceTab({
         activeGitBlame={gitBlameByGroup[groupId]}
         activeCapabilities={groupCapabilities}
         activeLspSyncing={!!groupLspState?.syncing}
-        lspStatusPill={<LspStatusPill state={groupLspState} diagnostics={groupDiagnostics} />}
+        lspStatusPill={(
+          <LspStatusPill
+            state={groupLspState}
+            diagnostics={groupDiagnostics}
+            onOpenSettings={() => openLanguageServersSettings(groupLspState?.status?.presetId)}
+          />
+        )}
         breadcrumbs={groupFile ? (
           <Breadcrumbs
             pathSegments={groupBreadcrumbSegments}

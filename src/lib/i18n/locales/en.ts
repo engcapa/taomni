@@ -1829,6 +1829,7 @@ const dict = {
     languageServersAllOs: "All platforms",
     languageServersThisOs: "This OS",
     languageServersEmpty: "No language server presets returned.",
+    languageServersOpenSettings: "Settings",
     sqlCompletionTitle: "Database / SQL Editor",
     sqlCompletionSubtitle: "Configure SQL suggestions and completion keyboard behavior",
     sqlCompletionResetTitle: "Reset SQL completion settings",

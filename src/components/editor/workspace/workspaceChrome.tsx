@@ -1,15 +1,27 @@
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
+import { useT } from "../../../lib/i18n";
 import type { LspDiagnostic } from "../../../lib/editor/lsp";
 import type { LspFileState } from "./codeWorkspaceModel";
+
+/** True when the document sync finished but no language server is running. */
+export function lspNeedsSetup(state: LspFileState | null): boolean {
+  if (!state?.status || state.syncing) return false;
+  if (state.error) return true;
+  const status = state.status;
+  return !status.active && !!(status.error || status.installHint);
+}
 
 export function LspStatusPill({
   state,
   diagnostics,
+  onOpenSettings,
 }: {
   state: LspFileState | null;
   diagnostics: LspDiagnostic[];
+  onOpenSettings?: () => void;
 }) {
+  const t = useT();
   if (!state?.status) {
     return (
       <span className="shrink-0 text-[10px] text-[var(--taomni-code-muted)]">
@@ -24,15 +36,33 @@ export function LspStatusPill({
     ? `${status.displayName ?? "LSP"}${errors || warnings ? ` · ${errors}E ${warnings}W` : ""}`
     : status.installHint
       ? `Install: ${status.installHint}`
-      : status.error ?? "No LSP";
+      : status.error ?? state.error ?? "No LSP";
+  const showSettingsLink = lspNeedsSetup(state) && !!onOpenSettings;
+  const settingsLabel = t("settings.languageServersOpenSettings");
+  const title = showSettingsLink ? `${label} · ${settingsLabel}` : label;
   return (
     <span
-      title={label}
+      title={title}
       data-active={status.active || undefined}
       data-error={!!state.error || (!status.active && !!status.error) || undefined}
-      className="max-w-[38%] shrink-0 truncate rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-[10px] bg-[var(--taomni-code-active-line-bg)] text-[var(--taomni-code-muted)] data-[active=true]:text-[var(--taomni-accent)] data-[error=true]:text-amber-500"
+      className="max-w-[50%] shrink-0 inline-flex min-w-0 items-center gap-1 rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-[10px] bg-[var(--taomni-code-active-line-bg)] text-[var(--taomni-code-muted)] data-[active=true]:text-[var(--taomni-accent)] data-[error=true]:text-amber-500"
     >
-      {label}
+      <span className="min-w-0 truncate">{label}</span>
+      {showSettingsLink && (
+        <button
+          type="button"
+          data-testid="code-workspace-lsp-open-settings"
+          title={settingsLabel}
+          className="shrink-0 underline decoration-dotted underline-offset-2 hover:text-[var(--taomni-accent)]"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onOpenSettings?.();
+          }}
+        >
+          {settingsLabel}
+        </button>
+      )}
     </span>
   );
 }

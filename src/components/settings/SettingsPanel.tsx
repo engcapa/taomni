@@ -44,6 +44,8 @@ import { SqlExecutionSettings } from "./SqlExecutionSettings";
 import { LanguageServersSettings } from "./LanguageServersSettings";
 import { FontPickerSelect, type FontPickerOption } from "../terminal/FontPickerPanel";
 import {
+  consumePendingSettingsSection,
+  clearPendingSettingsSection,
   OPEN_SETTINGS_SECTION_EVENT,
   type OpenSettingsSectionDetail,
 } from "../../lib/settingsNavigation";
@@ -146,6 +148,26 @@ export function SettingsPanel() {
     anchorRefs.current.get(id)?.scrollIntoView?.({ block: "center", behavior: "smooth" });
   }, []);
 
+  const focusSection = useCallback((detail: OpenSettingsSectionDetail) => {
+    let attempts = 0;
+    let frame = 0;
+    const run = () => {
+      const anchor = anchorRefs.current.get(detail.id);
+      if (anchor) {
+        anchor.scrollIntoView({
+          block: detail.presetId ? "start" : "center",
+          behavior: attempts === 0 ? "auto" : "smooth",
+        });
+        if (!detail.presetId) clearPendingSettingsSection();
+        return;
+      }
+      attempts += 1;
+      if (attempts < 48) frame = window.requestAnimationFrame(run);
+    };
+    frame = window.requestAnimationFrame(run);
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
   // New query → jump to the first match.
   useEffect(() => {
     setActiveIndex(0);
@@ -158,12 +180,18 @@ export function SettingsPanel() {
     const onOpenSection = (event: Event) => {
       const detail = (event as CustomEvent<OpenSettingsSectionDetail>).detail;
       if (!detail?.id) return;
-      // Allow the settings tab to paint before scrolling.
-      window.requestAnimationFrame(() => scrollToId(detail.id));
+      focusSection(detail);
     };
     window.addEventListener(OPEN_SETTINGS_SECTION_EVENT, onOpenSection as EventListener);
     return () => window.removeEventListener(OPEN_SETTINGS_SECTION_EVENT, onOpenSection as EventListener);
-  }, [scrollToId]);
+  }, [focusSection]);
+
+  // Settings tab may mount after the navigation event (first open).
+  useEffect(() => {
+    const pending = consumePendingSettingsSection();
+    if (!pending?.id) return;
+    return focusSection(pending);
+  }, [focusSection]);
 
   const goToMatch = useCallback(
     (delta: number) => {

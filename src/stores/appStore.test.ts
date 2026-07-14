@@ -3,6 +3,7 @@ import {
   VAULT_UNLOCK_MODE_KEY,
   computeNewTerminalTitle,
   recentWorkspaceIdFromParts,
+  updateDuplicateAutoTitle,
   useAppStore,
   type CodeWorkspaceContext,
 } from "./appStore";
@@ -243,6 +244,17 @@ describe("appStore.duplicateTab", () => {
   });
 });
 
+describe("updateDuplicateAutoTitle", () => {
+  it("replaces the cwd prefix but keeps the allocated suffix", () => {
+    expect(updateDuplicateAutoTitle("repo-1", "other")).toBe("other-1");
+    expect(updateDuplicateAutoTitle("Production · repo-3", "Production · log")).toBe("Production · log-3");
+  });
+
+  it("returns the new prefix when no suffix is present", () => {
+    expect(updateDuplicateAutoTitle("repo", "other")).toBe("other");
+  });
+});
+
 describe("computeNewTerminalTitle", () => {
   it("keeps the requested title when no terminal title family exists", () => {
     expect(computeNewTerminalTitle("Local terminal", ["root@example.test"])).toBe("Local terminal");
@@ -316,6 +328,54 @@ describe("appStore terminal automatic titles", () => {
 
     useAppStore.getState().assignTerminalAutoTitle("copy", "/work/repo");
     expect(useAppStore.getState().tabs[0].title).toBe("repo-1");
+  });
+
+  it("keeps a resolved duplicate suffix stable across later cwd refreshes", () => {
+    useAppStore.setState({
+      tabs: [
+        tab("source", { title: "repo", terminalTitleMode: "auto" }),
+        tab("copy1", {
+          title: "repo-1",
+          terminalTitleMode: "auto",
+          terminalTitleOperation: "duplicate",
+        }),
+        tab("copy2", {
+          title: "repo-2",
+          terminalTitleMode: "auto",
+          terminalTitleOperation: "duplicate",
+        }),
+      ],
+    });
+
+    useAppStore.getState().assignTerminalAutoTitle("copy1", "/srv/repo");
+    expect(useAppStore.getState().tabs[1].title).toBe("repo-1");
+  });
+
+  it("follows cd in a resolved duplicate while preserving its suffix", () => {
+    useAppStore.setState({
+      tabs: [tab("copy", {
+        title: "repo-1",
+        terminalTitleMode: "auto",
+        terminalTitleOperation: "duplicate",
+      })],
+    });
+
+    useAppStore.getState().assignTerminalAutoTitle("copy", "/tmp/other");
+    expect(useAppStore.getState().tabs[0].title).toBe("other-1");
+  });
+
+  it("keeps the remote session name when a resolved duplicate changes cwd", () => {
+    useAppStore.setState({
+      tabs: [tab("copy", {
+        title: "Production · repo-1",
+        terminalTitleMode: "auto",
+        terminalTitleOperation: "duplicate",
+        terminalTitleSessionName: "Production",
+      })],
+    });
+
+    useAppStore.getState().assignTerminalAutoTitle("copy", "/var/log");
+    expect(useAppStore.getState().tabs[0].title).toBe("Production · log-1");
   });
 
   it("never overwrites an explicit manual rename", () => {
