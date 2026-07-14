@@ -263,6 +263,39 @@ describe("WorkspaceGitManager", () => {
     await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Commit: 1 completed"));
   });
 
+  it("renders flat changes grouped under project headers with compact single-line rows (issue #324 S2/S3)", async () => {
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
+      repoRoot === "/repo/app"
+        ? snapshot(repoRoot, [change("src/App.tsx"), change("src/lib/util.ts")])
+        : snapshot(repoRoot, [change("cmd/main.go")])
+    ));
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("workspace-flat-changes-list")).toBeInTheDocument());
+    const headers = screen.getAllByTestId("workspace-flat-repo-header");
+    expect(headers).toHaveLength(2);
+    expect(headers[0]).toHaveTextContent(/app/i);
+    expect(headers[1]).toHaveTextContent(/service/i);
+
+    const rows = screen.getAllByTestId("workspace-change-row");
+    expect(rows.length).toBe(3);
+    expect(rows.every((row) => row.getAttribute("data-compact") === "true")).toBe(true);
+    // Single-line: filename + small path, not a second block for "app / src /"
+    expect(screen.getByText("App.tsx")).toBeInTheDocument();
+    expect(screen.getAllByTestId("workspace-change-path").some((node) => node.textContent === "src")).toBe(true);
+    expect(screen.queryByText("app /")).not.toBeInTheDocument();
+  });
+
   it("normalizes EOL-only worktree text from the diff banner (issue #324 B2)", async () => {
     gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
       snapshot(repoRoot, [change("src/App.tsx")])
@@ -461,7 +494,8 @@ describe("WorkspaceGitManager", () => {
     fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Show untracked files" }));
 
     expect(screen.getByRole("button", { name: /app scratch\.txt Untracked/i })).toBeInTheDocument();
-    expect(screen.getByText("app /")).toBeInTheDocument();
+    // Flat list groups by project header (issue #324 S2); path is no longer a second line.
+    expect(screen.getAllByTestId("workspace-flat-repo-header").some((node) => node.textContent?.includes("app"))).toBe(true);
     expect(screen.queryByRole("button", { name: /app src\/app\.ts Modified/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /service src\/service\.ts Modified/i })).not.toBeInTheDocument();
 

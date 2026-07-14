@@ -23,14 +23,13 @@ import {
 } from "./shared/ChangesListToolbar";
 import { DiffPane } from "./shared/DiffPane";
 import { parseWorkspaceChangeKey, workspaceChangeKey } from "./workspaceGitKeys";
+import {
+  buildWorkspaceFlatGroups,
+  changeFileName,
+  changePathDirectory,
+} from "../../lib/workspaceGitFlatList";
 
 type TriState = "all" | "none" | "some";
-
-interface WorkspaceChangeRow {
-  root: GitWorkspaceRootInfo;
-  change: GitChange;
-  key: string;
-}
 
 export interface WorkspaceChangesViewProps {
   roots: GitWorkspaceRootInfo[];
@@ -123,16 +122,6 @@ export function WorkspaceChangesView({
           && workspaceChangeMatchesSearch(root, change, normalizedFilter);
       }),
     };
-  });
-  const flatRows = groups.flatMap((group) => (
-    group.visibleChanges.map((change) => ({
-      root: group.root,
-      change,
-      key: workspaceChangeKey(group.root.repoRoot, change.path),
-    }))
-  )).sort((a, b) => {
-    const repoCompare = a.root.name.localeCompare(b.root.name);
-    return repoCompare || a.change.path.localeCompare(b.change.path);
   });
   const totalChanges = groups.reduce((total, group) => total + (group.snapshot?.changes.length ?? 0), 0);
   const visibleChangeCount = groups.reduce((total, group) => total + group.visibleChanges.length, 0);
@@ -247,10 +236,11 @@ export function WorkspaceChangesView({
           ) : (
             <WorkspaceFlatChangesList
               groups={groups}
-              rows={flatRows}
               checkedKeys={checkedKeys}
               selectedKeys={selectedKeys}
               focusedKey={focusedKey}
+              collapsedRepos={collapsedRepos}
+              onToggleCollapsed={toggleRepoCollapsed}
               onToggleChecked={onToggleChecked}
               onSelect={onSelect}
               onContextMenu={onContextMenu}
@@ -294,10 +284,11 @@ export function WorkspaceChangesView({
 
 function WorkspaceFlatChangesList({
   groups,
-  rows,
   checkedKeys,
   selectedKeys,
   focusedKey,
+  collapsedRepos,
+  onToggleCollapsed,
   onToggleChecked,
   onSelect,
   onContextMenu,
@@ -308,30 +299,95 @@ function WorkspaceFlatChangesList({
     snapshot: GitSnapshot | null;
     visibleChanges: GitSnapshot["changes"];
   }>;
-  rows: WorkspaceChangeRow[];
   checkedKeys: Set<string>;
   selectedKeys: Set<string>;
   focusedKey: string | null;
+  collapsedRepos: Set<string>;
+  onToggleCollapsed: (repoRoot: string) => void;
   onToggleChecked: (repoRoot: string, paths: string[], value: boolean) => void;
   onSelect: (repoRoot: string, path: string, mods: { ctrl: boolean; shift: boolean }) => void;
   onContextMenu: (repoRoot: string, path: string, event: ReactMouseEvent) => void;
 }) {
+  const t = useT();
+  const changesByRepo = new Map(
+    groups.map((group) => [group.root.repoRoot, group.visibleChanges] as const),
+  );
+  const flatGroups = buildWorkspaceFlatGroups(
+    groups.map((group) => group.root),
+    changesByRepo,
+  );
   const statusRows = groups.filter((group) => group.state?.loading || group.state?.error);
 
   return (
-    <div className="min-h-full">
-      {rows.map((row) => (
-        <WorkspaceFlatChangeRow
-          key={row.key}
-          row={row}
-          checked={checkedKeys.has(row.key)}
-          selected={selectedKeys.has(row.key)}
-          active={focusedKey === row.key}
-          onToggleChecked={(value) => onToggleChecked(row.root.repoRoot, [row.change.path], value)}
-          onSelect={(mods) => onSelect(row.root.repoRoot, row.change.path, mods)}
-          onContextMenu={(event) => onContextMenu(row.root.repoRoot, row.change.path, event)}
-        />
-      ))}
+    <div className="min-h-full" data-testid="workspace-flat-changes-list">
+      {flatGroups.map((group) => {
+        const collapsed = collapsedRepos.has(group.root.repoRoot);
+        const branch = groupSnapshotBranch(groups, group.root.repoRoot);
+        const checkedCount = group.changes.filter((change) => (
+          checkedKeys.has(workspaceChangeKey(group.root.repoRoot, change.path))
+        )).length;
+        return (
+          <section
+            key={group.root.repoRoot}
+            data-testid="workspace-flat-repo-group"
+            data-repo-root={group.root.repoRoot}
+            className="border-b border-[var(--taomni-divider)]"
+          >
+            <div
+              data-testid="workspace-flat-repo-header"
+              className="h-7 flex items-center gap-1.5 pl-2 pr-2 bg-[var(--taomni-quick-bg)] border-b border-[var(--taomni-divider)]"
+            >
+              <button
+                type="button"
+                className="shrink-0 flex items-center justify-center text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"
+                aria-label={collapsed
+                  ? t("git.workspaceChanges.expandRepository", { repo: group.root.name })
+                  : t("git.workspaceChanges.collapseRepository", { repo: group.root.name })}
+                onClick={() => onToggleCollapsed(group.root.repoRoot)}
+              >
+                {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+              <TriCheckbox
+                state={checkState(checkedCount, group.changes.length)}
+                disabled={group.changes.length === 0}
+                ariaLabel={t("git.workspaceChanges.selectRepoChanges", { repo: group.root.name })}
+                onChange={(value) => onToggleChecked(
+                  group.root.repoRoot,
+                  group.changes.map((change) => change.path),
+                  value,
+                )}
+              />
+              <GitBranch className="w-3 h-3 shrink-0 text-[var(--taomni-accent)]" />
+              <span className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-wide text-[var(--taomni-text)]">
+                {group.root.name}
+              </span>
+              {branch ? (
+                <span className="min-w-0 truncate text-[10px] text-[var(--taomni-text-muted)]">{branch}</span>
+              ) : null}
+              <div className="flex-1" />
+              <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]">
+                {checkedCount}/{group.changes.length}
+              </span>
+            </div>
+            {collapsed ? null : group.changes.map((change) => {
+              const key = workspaceChangeKey(group.root.repoRoot, change.path);
+              return (
+                <WorkspaceFlatChangeRow
+                  key={key}
+                  root={group.root}
+                  change={change}
+                  checked={checkedKeys.has(key)}
+                  selected={selectedKeys.has(key)}
+                  active={focusedKey === key}
+                  onToggleChecked={(value) => onToggleChecked(group.root.repoRoot, [change.path], value)}
+                  onSelect={(mods) => onSelect(group.root.repoRoot, change.path, mods)}
+                  onContextMenu={(event) => onContextMenu(group.root.repoRoot, change.path, event)}
+                />
+              );
+            })}
+          </section>
+        );
+      })}
       {statusRows.map((group) => (
         <RepoFlatStatusRow
           key={group.root.repoRoot}
@@ -344,8 +400,19 @@ function WorkspaceFlatChangesList({
   );
 }
 
+function groupSnapshotBranch(
+  groups: Array<{ root: GitWorkspaceRootInfo; snapshot: GitSnapshot | null }>,
+  repoRoot: string,
+): string | null {
+  const snapshot = groups.find((group) => group.root.repoRoot === repoRoot)?.snapshot ?? null;
+  if (!snapshot) return null;
+  if (snapshot.detached) return `detached ${snapshot.headOid ?? ""}`.trim();
+  return snapshot.currentBranch;
+}
+
 function WorkspaceFlatChangeRow({
-  row,
+  root,
+  change,
   checked,
   selected,
   active,
@@ -353,7 +420,8 @@ function WorkspaceFlatChangeRow({
   onSelect,
   onContextMenu,
 }: {
-  row: WorkspaceChangeRow;
+  root: GitWorkspaceRootInfo;
+  change: GitChange;
   checked: boolean;
   selected: boolean;
   active: boolean;
@@ -361,23 +429,21 @@ function WorkspaceFlatChangeRow({
   onSelect: (mods: { ctrl: boolean; shift: boolean }) => void;
   onContextMenu: (event: ReactMouseEvent) => void;
 }) {
-  const { root, change } = row;
   const t = useT();
-  const repoColor = repoColorFor(root.repoRoot);
-  const pathDir = workspaceDirectoryLabel(root.name, change.path);
-  const oldPathLabel = change.oldPath ? workspacePathLabel(root.name, change.oldPath) : "";
+  const pathDir = changePathDirectory(change.path);
+  const name = changeFileName(change.path);
   const status = workspaceStatusMeta(change, t);
   return (
     <div
       role="button"
       tabIndex={0}
       data-testid="workspace-change-row"
+      data-compact="true"
       aria-label={`${root.name} ${change.path} ${status.statusLabel}`}
       title={`${root.repoRoot}\n${change.path}`}
-      className={`group relative w-full min-h-[48px] pr-2 py-1.5 flex items-center gap-2 text-left cursor-pointer border-b border-[var(--taomni-divider)] ${
+      className={`group relative w-full min-h-[28px] h-7 pl-6 pr-2 py-0.5 flex items-center gap-1.5 text-left cursor-pointer border-b border-[var(--taomni-divider)]/60 ${
         active ? "bg-[var(--taomni-hover)]" : selected ? "bg-[var(--taomni-accent)]/10" : "hover:bg-[var(--taomni-hover)]"
       }`}
-      style={{ borderLeft: `3px solid ${repoColor.border}` }}
       onClick={(event) => onSelect({ ctrl: event.ctrlKey || event.metaKey, shift: event.shiftKey })}
       onContextMenu={onContextMenu}
       onKeyDown={(event) => {
@@ -389,38 +455,31 @@ function WorkspaceFlatChangeRow({
     >
       <input
         type="checkbox"
-        className="ml-1 shrink-0 accent-[var(--taomni-accent)]"
+        className="shrink-0 accent-[var(--taomni-accent)]"
         checked={checked}
         aria-label={t("git.workspaceChanges.selectFile", { repo: root.name, path: change.path })}
         onClick={(event) => event.stopPropagation()}
         onChange={(event) => onToggleChecked(event.target.checked)}
       />
       <span
-        className="shrink-0 w-12 rounded px-1.5 py-0.5 text-center text-[10px] font-semibold uppercase"
-        style={{
-          background: repoColor.bg,
-          border: `1px solid ${repoColor.border}`,
-          color: repoColor.text,
-        }}
-        title={root.repoRoot}
-      >
-        {repoAbbr(root.name || root.repoRoot)}
-      </span>
-      <span
-        className={`shrink-0 w-6 rounded px-1 py-0.5 text-center text-[10px] font-semibold ${status.kindClass}`}
+        className={`shrink-0 w-5 rounded px-0.5 py-0 text-center text-[10px] font-semibold ${status.kindClass}`}
         title={status.statusLabel}
         aria-label={status.statusLabel}
       >
         {status.kindLabel}
       </span>
-      <div className="min-w-0 flex-1">
-        <div className="min-w-0">
-          <span className="block min-w-0 truncate text-[12px] font-semibold">{fileName(change.path)}</span>
-        </div>
-        <div className="truncate text-[11px] text-[var(--taomni-text-muted)]">
-          {pathDir}
-          {change.oldPath ? ` · ${t("git.workspaceChanges.fromPath", { path: oldPathLabel })}` : ""}
-        </div>
+      <div className="min-w-0 flex-1 flex items-baseline gap-1.5 overflow-hidden">
+        <span className="shrink-0 max-w-[55%] truncate text-[12px] font-medium">{name}</span>
+        {pathDir ? (
+          <span className="min-w-0 truncate text-[10px] text-[var(--taomni-text-muted)]" data-testid="workspace-change-path">
+            {pathDir}
+          </span>
+        ) : null}
+        {change.oldPath ? (
+          <span className="min-w-0 truncate text-[10px] text-[var(--taomni-text-muted)]">
+            · {t("git.workspaceChanges.fromPath", { path: change.oldPath })}
+          </span>
+        ) : null}
       </div>
     </div>
   );
@@ -603,21 +662,6 @@ function checkState(checkedCount: number, totalCount: number): TriState {
   if (totalCount === 0 || checkedCount === 0) return "none";
   if (checkedCount === totalCount) return "all";
   return "some";
-}
-
-function fileName(path: string): string {
-  const parts = path.split("/").filter(Boolean);
-  return parts[parts.length - 1] ?? path;
-}
-
-function workspaceDirectoryLabel(repoName: string, path: string): string {
-  const parts = path.split("/").filter(Boolean);
-  parts.pop();
-  return [repoName || "repo", ...parts].join(" / ") + " /";
-}
-
-function workspacePathLabel(repoName: string, path: string): string {
-  return [repoName || "repo", ...path.split("/").filter(Boolean)].join(" / ");
 }
 
 function repoAbbr(name: string): string {
