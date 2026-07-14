@@ -5,6 +5,11 @@ import type { LspServerStatus } from "../../../lib/editor/lsp";
 import { FileTreePane, type FileTreeViewMode } from "./FileTreePane";
 import { TREE_TOOLBAR_MEDIUM_MIN_PX, TREE_TOOLBAR_WIDE_MIN_PX } from "./treeToolbarChrome";
 
+const writeTextMock = vi.fn(async (_text: string) => {});
+vi.mock("../../../lib/clipboard", () => ({
+  writeText: (text: string) => writeTextMock(text),
+}));
+
 const unavailableServer: LspServerStatus = {
   presetId: "typescript",
   displayName: "TypeScript",
@@ -231,5 +236,15 @@ describe("FileTreePane", () => {
     expect(callbacks.onLanguageToggle).toHaveBeenCalledOnce();
     expect(callbacks.onLanguageRefresh).toHaveBeenCalledOnce();
     expect(callbacks.onFormatOnSaveChange).toHaveBeenCalledWith(false);
+  });
+
+  it("copies language-server install instructions to the clipboard", async () => {
+    writeTextMock.mockClear();
+    renderPane({ languageOpen: true, paneWidth: TREE_TOOLBAR_WIDE_MIN_PX + 20 });
+    expect(screen.getByTestId("code-workspace-lsp-install-hint")).toHaveTextContent(
+      "npm install -g typescript-language-server",
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Copy install instructions for TypeScript/ }));
+    expect(writeTextMock).toHaveBeenCalledWith("npm install -g typescript-language-server");
   });
 });

@@ -33,7 +33,11 @@ import type {
   LspCompletionResult,
   LspSignatureHelpResult,
 } from "../../../lib/editor/lsp";
-import { CodeMirrorHost, type EditorSelectionRange } from "./CodeMirrorHost";
+import {
+  CodeMirrorHost,
+  type EditorContextMenuRequest,
+  type EditorSelectionRange,
+} from "./CodeMirrorHost";
 import type { OpenFileViewModel } from "./editorGroupTypes";
 import { useContextMenu } from "../../ContextMenu";
 import type { EditorGroupId } from "../../../stores/codeWorkspaceStore";
@@ -118,6 +122,7 @@ interface EditorGroupProps {
   onViewportChange: (range: LspRange) => void;
   onExpandSelection: (file: OpenFileViewModel, selection: EditorSelectionRange) => Promise<LspRange[] | null>;
   onLightbulb: (line: number) => void;
+  onEditorContextMenu: (file: OpenFileViewModel, request: EditorContextMenuRequest) => void;
   onOpenMarkdownHref: (href: string) => boolean;
   formatBytes: (size: number) => string;
   formatMtime: (mtime: number) => string;
@@ -183,6 +188,7 @@ export function EditorGroup({
   onViewportChange,
   onExpandSelection,
   onLightbulb,
+  onEditorContextMenu,
   onOpenMarkdownHref,
   formatBytes,
   formatMtime,
@@ -488,6 +494,7 @@ export function EditorGroup({
                         onExpandSelection={(selection) => onExpandSelection(activeFile, selection)}
                         onLightbulb={onLightbulb}
                         onGitChangeClick={setGitDiffPeek}
+                        onContextMenu={(request) => onEditorContextMenu(activeFile, request)}
                         completionTriggers={activeCapabilities?.completionTriggerCharacters ?? []}
                         signatureTriggers={activeCapabilities?.signatureTriggerCharacters ?? []}
                       />
@@ -523,6 +530,7 @@ export function EditorGroup({
                     onExpandSelection={(selection) => onExpandSelection(activeFile, selection)}
                     onLightbulb={onLightbulb}
                     onGitChangeClick={setGitDiffPeek}
+                    onContextMenu={(request) => onEditorContextMenu(activeFile, request)}
                     completionTriggers={activeCapabilities?.completionTriggerCharacters ?? []}
                     signatureTriggers={activeCapabilities?.signatureTriggerCharacters ?? []}
                   />

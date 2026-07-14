@@ -124,7 +124,11 @@ import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { writeText } from "../../lib/clipboard";
 import { useContextMenu } from "../ContextMenu";
 import { useChatStore } from "../../stores/chatStore";
-import { type EditorSelectionRange } from "./workspace/CodeMirrorHost";
+import {
+  type EditorContextMenuRequest,
+  type EditorSelectionRange,
+} from "./workspace/CodeMirrorHost";
+import { buildEditorContextMenuItems } from "./workspace/editorContextMenu";
 import { fallbackWordHighlights } from "./workspace/lspIntelligenceChrome";
 import {
   inlayHintsEnabledForLanguage,
@@ -1244,6 +1248,10 @@ export function CodeWorkspaceTab({
     show: openTreeContextMenu,
     showAt: openTreeContextMenuAt,
     render: treeContextMenu,
+  } = useContextMenu();
+  const {
+    showAt: openEditorContextMenuAt,
+    render: editorContextMenu,
   } = useContextMenu();
 
   const copyEditorTabPath = useCallback(async (key: string, absolute: boolean) => {
@@ -3677,10 +3685,22 @@ export function CodeWorkspaceTab({
       triggerCharacter: string | null,
     ): Promise<LspCompletionResult | null> => {
       // CodeMirror can ask for completion while an edit is still crossing the
-      // IPC boundary.  Returning null here lets its local sources handle the
-      // keystroke and prevents a stale server completion from doing work (or
-      // reopening a completion list) for a superseded document version.
-      const snapshot = currentSyncedLspDocument(file);
+      // IPC boundary.  Wait briefly for didChange to settle instead of
+      // immediately falling back to word completion (feels "slow"/empty).
+      let snapshot = currentSyncedLspDocument(file);
+      if (!snapshot) {
+        const deadline = performance.now() + 450;
+        while (!snapshot && performance.now() < deadline) {
+          await new Promise<void>((resolve) => {
+            window.setTimeout(resolve, 24);
+          });
+          // Drop out if the buffer moved on while we waited.
+          if (!openFilesRef.current[file.key] || openFilesRef.current[file.key]?.text !== file.text) {
+            return null;
+          }
+          snapshot = currentSyncedLspDocument(file);
+        }
+      }
       if (!snapshot) return null;
       const descriptor = lspDescriptorForFile(snapshot.file);
       if (!descriptor) return null;
@@ -3922,6 +3942,71 @@ export function CodeWorkspaceTab({
     },
     [lspDescriptorForFile, setStatusMessage, updateLspStatusForFile],
   );
+
+  const showEditorContextMenu = useCallback((
+    file: OpenFileState,
+    request: EditorContextMenuRequest,
+  ) => {
+    // Keep selection/cursor in sync for commands that read editorSelectionRef.
+    editorSelectionRef.current = {
+      start: request.selectionStart,
+      end: request.selectionEnd,
+      empty: !request.hasSelection,
+      text: request.selectedText,
+      rect: null,
+    };
+    const status = lspFilesRef.current[file.key]?.status;
+    const capabilities = status?.capabilities ?? null;
+    const lspAvailable = !!(status?.active || status?.available);
+    const range: LspRange = {
+      start: request.selectionStart,
+      end: request.selectionEnd,
+    };
+
+    openEditorContextMenuAt(
+      request.clientX,
+      request.clientY,
+      buildEditorContextMenuItems({
+        capabilities,
+        hasSelection: request.hasSelection,
+        clientX: request.clientX,
+        clientY: request.clientY,
+        lspAvailable,
+        actions: {
+          goToDefinition: () => { void goToDefinition(file, request.position); },
+          goToTypeDefinition: () => { void goToTypeDefinition(file, request.position); },
+          goToImplementation: () => { void goToImplementation(file, request.position); },
+          findReferences: () => { void findReferences(file, request.position); },
+          callHierarchy: () => { void openHierarchy("call"); },
+          typeHierarchy: () => { void openHierarchy("type"); },
+          rename: () => { void renameSymbolAtCursor(); },
+          quickDocumentation: () => { void openQuickDocumentation(); },
+          codeActions: (x, y) => {
+            const diagnostics = (lspFilesRef.current[file.key]?.diagnostics ?? []).filter((item) => (
+              item.range.start.line === request.position.line
+              || item.range.end.line === request.position.line
+            ));
+            void showCodeActionsMenu(x, y, file, range, diagnostics);
+          },
+          format: () => { void formatActiveFile(); },
+          cut: request.cut,
+          copy: request.copy,
+          paste: request.paste,
+        },
+      }),
+    );
+  }, [
+    findReferences,
+    formatActiveFile,
+    goToDefinition,
+    goToImplementation,
+    goToTypeDefinition,
+    openEditorContextMenuAt,
+    openHierarchy,
+    openQuickDocumentation,
+    renameSymbolAtCursor,
+    showCodeActionsMenu,
+  ]);
 
   const deferredActiveFile = activeKey ? deferredOpenFiles[activeKey] ?? activeFile : null;
   const dirtyCount = useMemo(
@@ -4177,6 +4262,7 @@ export function CodeWorkspaceTab({
         }}
         onExpandSelection={getLspSelectionRanges}
         onLightbulb={(line) => void openCodeActionsForLine(line)}
+        onEditorContextMenu={showEditorContextMenu}
         onOpenMarkdownHref={openMarkdownHref}
         formatBytes={formatBytes}
         formatMtime={formatMtime}
@@ -4671,6 +4757,7 @@ export function CodeWorkspaceTab({
         }}
       />
       {treeContextMenu}
+      {editorContextMenu}
       {localHistoryTarget && openFiles[localHistoryTarget.key] && (
         <LocalHistoryDialog
           path={localHistoryTarget.path}

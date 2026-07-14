@@ -1,0 +1,157 @@
+import type { MenuItem } from "../../ContextMenu";
+import type { LspCapabilitySummary } from "../../../lib/editor/lsp";
+
+export interface EditorContextMenuCapabilities {
+  definition?: boolean;
+  typeDefinition?: boolean;
+  implementation?: boolean;
+  references?: boolean;
+  callHierarchy?: boolean;
+  typeHierarchy?: boolean;
+  rename?: boolean;
+  hover?: boolean;
+  codeAction?: boolean;
+  formatting?: boolean;
+  rangeFormatting?: boolean;
+}
+
+export interface EditorContextMenuActions {
+  goToDefinition: () => void;
+  goToTypeDefinition: () => void;
+  goToImplementation: () => void;
+  findReferences: () => void;
+  callHierarchy: () => void;
+  typeHierarchy: () => void;
+  rename: () => void;
+  quickDocumentation: () => void;
+  codeActions: (clientX: number, clientY: number) => void;
+  format: () => void;
+  cut: () => void;
+  copy: () => void;
+  paste: () => void;
+}
+
+export interface BuildEditorContextMenuInput {
+  capabilities: EditorContextMenuCapabilities | LspCapabilitySummary | null | undefined;
+  hasSelection: boolean;
+  clientX: number;
+  clientY: number;
+  actions: EditorContextMenuActions;
+  /** When true, LSP navigation items stay enabled even if capabilities are unknown. */
+  lspAvailable?: boolean;
+}
+
+function capEnabled(
+  capabilities: EditorContextMenuCapabilities | LspCapabilitySummary | null | undefined,
+  key: keyof EditorContextMenuCapabilities,
+  lspAvailable: boolean,
+): boolean {
+  if (!lspAvailable) return false;
+  if (!capabilities) return true;
+  return !!capabilities[key];
+}
+
+/**
+ * Build the editor symbol / buffer context menu (IDEA-style).
+ * Pure helper so unit tests do not need CodeMirror or React.
+ */
+export function buildEditorContextMenuItems(input: BuildEditorContextMenuInput): MenuItem[] {
+  const { capabilities, hasSelection, clientX, clientY, actions } = input;
+  const lspAvailable = input.lspAvailable ?? true;
+
+  return [
+    {
+      label: "Go to Definition",
+      shortcut: "F12",
+      testId: "editor-context-goto-definition",
+      disabled: !capEnabled(capabilities, "definition", lspAvailable),
+      onClick: actions.goToDefinition,
+    },
+    {
+      label: "Go to Type Definition",
+      shortcut: "Ctrl+Shift+B",
+      testId: "editor-context-goto-type-definition",
+      disabled: !capEnabled(capabilities, "typeDefinition", lspAvailable),
+      onClick: actions.goToTypeDefinition,
+    },
+    {
+      label: "Go to Implementation",
+      shortcut: "Ctrl+Alt+B",
+      testId: "editor-context-goto-implementation",
+      disabled: !capEnabled(capabilities, "implementation", lspAvailable),
+      onClick: actions.goToImplementation,
+    },
+    {
+      label: "Find Usages",
+      shortcut: "Shift+F12",
+      testId: "editor-context-find-usages",
+      disabled: !capEnabled(capabilities, "references", lspAvailable),
+      onClick: actions.findReferences,
+    },
+    {
+      label: "Call Hierarchy",
+      shortcut: "Ctrl+Alt+H",
+      testId: "editor-context-call-hierarchy",
+      disabled: !capEnabled(capabilities, "callHierarchy", lspAvailable),
+      onClick: actions.callHierarchy,
+    },
+    {
+      label: "Type Hierarchy",
+      shortcut: "Ctrl+H",
+      testId: "editor-context-type-hierarchy",
+      disabled: !capEnabled(capabilities, "typeHierarchy", lspAvailable),
+      onClick: actions.typeHierarchy,
+    },
+    { separator: true, label: "" },
+    {
+      label: "Rename Symbol…",
+      shortcut: "Shift+F6",
+      testId: "editor-context-rename",
+      disabled: !capEnabled(capabilities, "rename", lspAvailable),
+      onClick: actions.rename,
+    },
+    {
+      label: "Quick Documentation",
+      shortcut: "Ctrl+Q",
+      testId: "editor-context-quick-doc",
+      disabled: !capEnabled(capabilities, "hover", lspAvailable),
+      onClick: actions.quickDocumentation,
+    },
+    {
+      label: "Show Code Actions…",
+      shortcut: "Alt+Enter",
+      testId: "editor-context-code-actions",
+      disabled: !capEnabled(capabilities, "codeAction", lspAvailable),
+      onClick: () => actions.codeActions(clientX, clientY),
+    },
+    {
+      label: hasSelection ? "Format Selection" : "Format Document",
+      shortcut: "Ctrl+Alt+L",
+      testId: "editor-context-format",
+      disabled: !capEnabled(capabilities, "formatting", lspAvailable)
+        && !capEnabled(capabilities, "rangeFormatting", lspAvailable),
+      onClick: actions.format,
+    },
+    { separator: true, label: "" },
+    {
+      label: "Cut",
+      shortcut: "Ctrl+X",
+      testId: "editor-context-cut",
+      disabled: !hasSelection,
+      onClick: actions.cut,
+    },
+    {
+      label: "Copy",
+      shortcut: "Ctrl+C",
+      testId: "editor-context-copy",
+      disabled: !hasSelection,
+      onClick: actions.copy,
+    },
+    {
+      label: "Paste",
+      shortcut: "Ctrl+V",
+      testId: "editor-context-paste",
+      onClick: actions.paste,
+    },
+  ];
+}

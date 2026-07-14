@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronRight,
   Columns2,
+  Copy,
   File,
   FilePlus,
   FolderOpen,
@@ -27,6 +28,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import type { LspDocumentStatus, LspServerStatus } from "../../../lib/editor/lsp";
+import { writeText } from "../../../lib/clipboard";
 import { useContextMenu, type MenuItem } from "../../ContextMenu";
 import { FilterClearButton } from "./workspaceChrome";
 import {
@@ -447,9 +449,7 @@ function LanguageServersPanel({
                 </span>
               </div>
               {!activeStatus.active && activeStatus.installHint && (
-                <div className="mt-1 truncate font-mono text-[10px] text-amber-500" title={activeStatus.installHint}>
-                  {activeStatus.installHint}
-                </div>
+                <InstallHintRow hint={activeStatus.installHint} label="active server" />
               )}
             </div>
           )}
@@ -497,10 +497,8 @@ function LanguageServersPanel({
                     />
                   </div>
                 )}
-                {!status.available && (
-                  <div className="mt-1 truncate font-mono text-[10px] text-amber-500" title={status.installHint}>
-                    {status.installHint}
-                  </div>
+                {!status.available && status.installHint && (
+                  <InstallHintRow hint={status.installHint} label={status.displayName} />
                 )}
               </div>
             );
@@ -508,6 +506,30 @@ function LanguageServersPanel({
         </div>
       )}
     </section>
+  );
+}
+
+function InstallHintRow({ hint, label }: { hint: string; label: string }) {
+  return (
+    <div className="mt-1 flex items-start gap-1 text-[10px] text-amber-500">
+      <div
+        className="min-w-0 flex-1 whitespace-normal break-words font-mono leading-snug"
+        title={hint}
+        data-testid="code-workspace-lsp-install-hint"
+      >
+        {hint}
+      </div>
+      <button
+        type="button"
+        className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)]"
+        title="Copy install instructions"
+        aria-label={`Copy install instructions for ${label}`}
+        data-testid="code-workspace-lsp-copy-install-hint"
+        onClick={() => { void writeText(hint); }}
+      >
+        <Copy className="h-3 w-3" />
+      </button>
+    </div>
   );
 }
 
