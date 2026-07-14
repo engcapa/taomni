@@ -9,6 +9,8 @@ const gitMocks = vi.hoisted(() => ({
   gitBlobPair: vi.fn(),
   gitCleanUntracked: vi.fn(),
   gitCommit: vi.fn(),
+  gitCheckoutBranch: vi.fn(),
+  gitCreateBranch: vi.fn(),
   gitChangeLabel: vi.fn((change: { conflict?: boolean; status: string }) => (
     change.conflict ? "Conflicted" : change.status[0]?.toUpperCase() + change.status.slice(1)
   )),
@@ -148,6 +150,10 @@ describe("WorkspaceGitManager", () => {
     });
     gitMocks.gitCommit.mockReset();
     gitMocks.gitCommit.mockResolvedValue(undefined);
+    gitMocks.gitCheckoutBranch.mockReset();
+    gitMocks.gitCheckoutBranch.mockResolvedValue(undefined);
+    gitMocks.gitCreateBranch.mockReset();
+    gitMocks.gitCreateBranch.mockResolvedValue(undefined);
     gitMocks.gitFetch.mockReset();
     gitMocks.gitFetch.mockResolvedValue(undefined);
     gitMocks.gitPull.mockReset();
@@ -261,6 +267,121 @@ describe("WorkspaceGitManager", () => {
     });
     expect(gitMocks.gitCommit).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Commit: 1 completed"));
+  });
+
+  it("creates and checks out a typed target branch before commit (issue #324 S4)", async () => {
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
+      snapshot(repoRoot, [change("src/App.tsx")], {
+        currentBranch: "main",
+        branches: [{
+          name: "main",
+          fullName: "refs/heads/main",
+          current: true,
+          remote: false,
+          upstream: null,
+          oid: "abc",
+          subject: "s",
+        }],
+      })
+    ));
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("commit-target-branch")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Commit target branch"), {
+      target: { value: "feature/issue-324" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Commit message"), {
+      target: { value: "commit on new branch" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Commit" }));
+
+    await waitFor(() => {
+      expect(gitMocks.gitCreateBranch).toHaveBeenCalledWith(
+        "/repo/app",
+        "feature/issue-324",
+        null,
+        true,
+      );
+    });
+    expect(gitMocks.gitCommit).toHaveBeenCalledWith(
+      "/repo/app",
+      "commit on new branch",
+      false,
+      ["src/App.tsx"],
+    );
+    expect(dialogMocks.confirmAppDialog).toHaveBeenCalled();
+    const confirmArg = dialogMocks.confirmAppDialog.mock.calls[0]?.[0] as { message?: string };
+    expect(confirmArg?.message ?? "").toContain("feature/issue-324");
+    expect(confirmArg?.message ?? "").toMatch(/create/i);
+  });
+
+  it("checks out an existing branch before commit when selected (issue #324 S4)", async () => {
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
+      snapshot(repoRoot, [change("src/App.tsx")], {
+        currentBranch: "main",
+        branches: [
+          {
+            name: "main",
+            fullName: "refs/heads/main",
+            current: true,
+            remote: false,
+            upstream: null,
+            oid: "abc",
+            subject: "s",
+          },
+          {
+            name: "develop",
+            fullName: "refs/heads/develop",
+            current: false,
+            remote: false,
+            upstream: null,
+            oid: "def",
+            subject: "s",
+          },
+        ],
+      })
+    ));
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText("Commit target branch")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Commit target branch"), {
+      target: { value: "develop" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Commit message"), {
+      target: { value: "commit on develop" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Commit" }));
+
+    await waitFor(() => {
+      expect(gitMocks.gitCheckoutBranch).toHaveBeenCalledWith("/repo/app", "develop");
+    });
+    expect(gitMocks.gitCreateBranch).not.toHaveBeenCalled();
+    expect(gitMocks.gitCommit).toHaveBeenCalledWith(
+      "/repo/app",
+      "commit on develop",
+      false,
+      ["src/App.tsx"],
+    );
   });
 
   it("renders flat changes grouped under project headers with compact single-line rows (issue #324 S2/S3)", async () => {

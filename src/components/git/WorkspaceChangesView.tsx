@@ -52,6 +52,10 @@ export interface WorkspaceChangesViewProps {
   setCommitMessage: (message: string) => void;
   canCommitAndPush: boolean;
   scopeSummary: string;
+  targetBranch?: string;
+  setTargetBranch?: (branch: string) => void;
+  branchOptions?: string[];
+  branchPlaceholder?: string;
   stageVisible: (pathsByRepo: Record<string, string[]>) => void;
   unstageVisible: (pathsByRepo: Record<string, string[]>) => void;
   stagePaths: (repoRoot: string, paths: string[]) => void;
@@ -88,6 +92,10 @@ export function WorkspaceChangesView({
   setCommitMessage,
   canCommitAndPush,
   scopeSummary,
+  targetBranch,
+  setTargetBranch,
+  branchOptions,
+  branchPlaceholder,
   stageVisible,
   unstageVisible,
   stagePaths,
@@ -256,6 +264,10 @@ export function WorkspaceChangesView({
           onCommit={commit}
           onCommitAndPush={commitAndPush}
           summary={`${checkedCount} files in ${checkedRepoCount} repos`}
+          targetBranch={targetBranch}
+          onTargetBranchChange={setTargetBranch}
+          branchOptions={branchOptions}
+          branchPlaceholder={branchPlaceholder}
         />
       </Panel>
 

@@ -67,6 +67,11 @@ import {
   isMissingRepoPathError,
   retainDeadRepoRoots,
 } from "../../lib/workspaceGitManagerSync";
+import {
+  collectLocalBranchNames,
+  formatCommitBranchPlanLine,
+  resolveCommitBranchPlan,
+} from "../../lib/workspaceGitCommitTarget";
 
 interface WorkspaceGitManagerProps {
   workspaceName?: string | null;
@@ -108,6 +113,7 @@ export function WorkspaceGitManager({
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
   const [panelVersion, setPanelVersion] = useState(0);
   const [commitMessage, setCommitMessage] = useState("");
+  const [targetBranch, setTargetBranch] = useState("");
   const [uncheckedChangeKeys, setUncheckedChangeKeys] = useState<Set<string>>(() => new Set());
   const [selectedChangeKeys, setSelectedChangeKeys] = useState<Set<string>>(() => new Set());
   const [focusedChangeKey, setFocusedChangeKey] = useState<string | null>(null);
@@ -614,6 +620,11 @@ export function WorkspaceGitManager({
     })();
   }, [focusedChange, pair, refreshRepo, setStatusMessage]);
 
+  const commitBranchOptions = useMemo(
+    () => collectLocalBranchNames(scopedRoots.map((root) => snapshots[root.repoRoot]?.snapshot ?? null)),
+    [scopedRoots, snapshots],
+  );
+
   const commitWorkspaceChanges = useCallback((push: boolean) => {
     const message = commitMessage.trim();
     if (!message || checkedChangeKeys.size === 0) return;
@@ -625,6 +636,7 @@ export function WorkspaceGitManager({
         targets,
         checkedChangePathsByRepo,
         snapshots,
+        targetBranch,
       });
       if (!decision) return;
       await runChangeAction(decision === "commit-and-push" ? "Commit and Push" : "Commit", targets, async (_root, snapshot) => {
@@ -633,11 +645,22 @@ export function WorkspaceGitManager({
           .filter((change) => selectedPaths.has(change.path))
           .map((change) => change.path);
         if (paths.length === 0) return "skipped";
+        const plan = resolveCommitBranchPlan(snapshot, targetBranch);
+        if (plan.action === "checkout") {
+          await gitCheckoutBranch(snapshot.repoRoot, plan.targetBranch);
+        } else if (plan.action === "create") {
+          await gitCreateBranch(snapshot.repoRoot, plan.targetBranch, null, true);
+        }
         await gitCommit(snapshot.repoRoot, message, false, paths);
         if (decision === "commit-and-push") {
-          const remote = selectedRemote(snapshot);
-          if (remote && snapshot.currentBranch) {
-            await gitPush(snapshot.repoRoot, remote.name, snapshot.currentBranch, !snapshot.upstream);
+          const refreshed = await refreshRepo(snapshot.repoRoot).catch(() => snapshot);
+          const remote = selectedRemote(refreshed);
+          const branchName = plan.action === "stay"
+            ? (refreshed.currentBranch ?? snapshot.currentBranch)
+            : plan.targetBranch;
+          if (remote && branchName) {
+            const hasUpstream = !!refreshed.upstream && plan.action === "stay";
+            await gitPush(snapshot.repoRoot, remote.name, branchName, !hasUpstream);
           }
         }
         return "completed";
@@ -649,8 +672,10 @@ export function WorkspaceGitManager({
     checkedChangePathsByRepo,
     commitMessage,
     normalizedRoots,
+    refreshRepo,
     runChangeAction,
     snapshots,
+    targetBranch,
   ]);
 
   const remoteNameForSnapshot = useCallback((snapshot: GitSnapshot | null): string => {
@@ -1004,6 +1029,10 @@ export function WorkspaceGitManager({
                 setCommitMessage={setCommitMessage}
                 canCommitAndPush={canPushCheckedChanges}
                 scopeSummary={scopeSummary}
+                targetBranch={targetBranch}
+                setTargetBranch={setTargetBranch}
+                branchOptions={commitBranchOptions}
+                branchPlaceholder="Current branch (or type a new name)"
                 stageVisible={stageVisibleChanges}
                 unstageVisible={unstageVisibleChanges}
                 stagePaths={stagePathsInRepo}
@@ -1905,12 +1934,14 @@ async function confirmCommitOperation({
   targets,
   checkedChangePathsByRepo,
   snapshots,
+  targetBranch,
 }: {
   message: string;
   push: boolean;
   targets: GitWorkspaceRootInfo[];
   checkedChangePathsByRepo: Record<string, string[]>;
   snapshots: Record<string, RepoSnapshotState>;
+  targetBranch: string;
 }): Promise<CommitDecision | null> {
   const confirmMessage = commitOperationConfirmMessage({
     message,
@@ -1918,6 +1949,7 @@ async function confirmCommitOperation({
     targets,
     checkedChangePathsByRepo,
     snapshots,
+    targetBranch,
   });
   if (!push) {
     const confirmed = await confirmAppDialog({
@@ -1944,21 +1976,33 @@ function commitOperationConfirmMessage({
   targets,
   checkedChangePathsByRepo,
   snapshots,
+  targetBranch,
 }: {
   message: string;
   push: boolean;
   targets: GitWorkspaceRootInfo[];
   checkedChangePathsByRepo: Record<string, string[]>;
   snapshots: Record<string, RepoSnapshotState>;
+  targetBranch: string;
 }): string {
+  const branchPlans = targets.map((root) => {
+    const snapshot = snapshots[root.repoRoot]?.snapshot ?? null;
+    const plan = resolveCommitBranchPlan(snapshot, targetBranch);
+    return formatCommitBranchPlanLine(root.name, plan);
+  });
   const lines = targets.map((root) => {
     const paths = checkedChangePathsByRepo[root.repoRoot] ?? [];
     const snapshot = snapshots[root.repoRoot]?.snapshot ?? null;
-    const branch = snapshot ? branchSummary(snapshot) : "will refresh";
+    const plan = resolveCommitBranchPlan(snapshot, targetBranch);
+    const branch = plan.action === "stay"
+      ? (snapshot ? branchSummary(snapshot) : "will refresh")
+      : plan.targetBranch;
     const remote = snapshot ? selectedRemote(snapshot) : null;
     const pushSummary = push
-      ? remote && snapshot?.currentBranch
-        ? ` -> ${remote.name}/${snapshot.currentBranch}${snapshot.upstream ? "" : " (set upstream)"}`
+      ? remote
+        ? ` -> ${remote.name}/${plan.action === "stay" ? (snapshot?.currentBranch ?? branch) : plan.targetBranch}${
+          plan.action === "stay" && snapshot?.upstream ? "" : " (set upstream)"
+        }`
         : " -> push skipped (missing remote or branch)"
       : "";
     return `- ${root.name}: ${paths.length} file(s) on ${branch}${pushSummary}${paths.length ? `\n  ${summarizePaths(paths)}` : ""}`;
@@ -1966,12 +2010,15 @@ function commitOperationConfirmMessage({
   return [
     `Message: ${message}`,
     "",
+    "Branches:",
+    ...branchPlans,
+    "",
     "Repositories:",
     ...lines,
     "",
     push
-      ? "Confirming will commit the checked files, then push each repository that has a current branch and remote."
-      : "Confirming will commit only the checked files listed above.",
+      ? "Confirming will switch/create the target branch when needed, commit the checked files, then push each repository that has a remote."
+      : "Confirming will switch/create the target branch when needed, then commit only the checked files listed above.",
   ].join("\n");
 }
 
