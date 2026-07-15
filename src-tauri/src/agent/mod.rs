@@ -4,6 +4,7 @@ pub mod cc_bridge;
 pub mod codex_bridge;
 pub mod cmd_classify;
 pub mod commands;
+pub mod local;
 pub mod safety;
 pub mod search;
 pub mod sql_classify;
