@@ -171,6 +171,22 @@ describe("SettingsPanel", () => {
     expect(window.localStorage.getItem("taomni.vaultUnlockMode")).toBe("startup");
   });
 
+  it("renders collapsible groups with titles visible when collapsed", async () => {
+    const user = userEvent.setup();
+    render(<SettingsPanel />);
+
+    for (const id of ["general", "code", "database", "terminal", "security", "network", "ai"]) {
+      expect(screen.getByTestId(`settings-group-${id}`)).toHaveAttribute("data-expanded", "true");
+    }
+
+    await user.click(screen.getByTestId("settings-group-toggle-terminal"));
+    expect(screen.getByTestId("settings-group-terminal")).toHaveAttribute("data-expanded", "false");
+    expect(screen.getByTestId("settings-group-body-terminal")).not.toBeVisible();
+    // Header title remains available while body is collapsed.
+    expect(screen.getByTestId("settings-group-toggle-terminal")).toHaveTextContent("Terminal");
+    expect(screen.getByTestId("settings-group-toggle-terminal")).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("highlights settings matching the search query", async () => {
     const user = userEvent.setup();
     const { container } = render(<SettingsPanel />);
@@ -187,6 +203,13 @@ describe("SettingsPanel", () => {
 
     // Application Proxy and ACP proxy policy are separate searchable units.
     expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 2");
+    // Matches span Network + AI groups.
+    expect(screen.getByTestId("settings-search-group-count")).toHaveTextContent("2 groups");
+    expect(screen.getByTestId("settings-group-network")).toHaveAttribute("data-expanded", "true");
+    expect(screen.getByTestId("settings-group-ai")).toHaveAttribute("data-expanded", "true");
+    expect(screen.getByTestId("settings-group-network")).toHaveAttribute("data-group-match", "true");
+    expect(screen.getByTestId("settings-group-ai")).toHaveAttribute("data-group-match", "true");
+    expect(screen.getByTestId("settings-group-general")).toHaveAttribute("data-group-match", "false");
 
     // Clearing the search drops the active state entirely.
     await user.click(screen.getByRole("button", { name: "Clear search" }));
@@ -194,6 +217,29 @@ describe("SettingsPanel", () => {
     expect(
       container.querySelector('[data-search-id="app-proxy"]'),
     ).not.toHaveAttribute("data-search-match");
+  });
+
+  it("opens collapsed groups that contain search matches and supports prev/next", async () => {
+    const user = userEvent.setup();
+    render(<SettingsPanel />);
+
+    // Collapse both groups that "proxy" hits before searching.
+    await user.click(screen.getByTestId("settings-group-toggle-network"));
+    await user.click(screen.getByTestId("settings-group-toggle-ai"));
+    expect(screen.getByTestId("settings-group-network")).toHaveAttribute("data-expanded", "false");
+    expect(screen.getByTestId("settings-group-ai")).toHaveAttribute("data-expanded", "false");
+
+    await user.type(screen.getByTestId("settings-search-input"), "proxy");
+
+    expect(screen.getByTestId("settings-group-network")).toHaveAttribute("data-expanded", "true");
+    expect(screen.getByTestId("settings-group-ai")).toHaveAttribute("data-expanded", "true");
+    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 2");
+
+    await user.click(screen.getByRole("button", { name: "Next match" }));
+    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("2 / 2");
+
+    await user.click(screen.getByRole("button", { name: "Previous match" }));
+    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 2");
   });
 
   it("highlights Codex settings from a codex search query", async () => {
