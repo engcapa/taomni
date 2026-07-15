@@ -72,6 +72,7 @@ fn make_config(api_key: String) -> AiConfig {
         web_search: Default::default(),
         cc_bridge: Default::default(),
         codex_bridge: Default::default(),
+        acp_bridge: Default::default(),
         full_local_mode: false,
         fully_disabled: false,
         chat_output_format: "md".into(),

@@ -5,9 +5,17 @@
 //! Existing Claude Code and Codex bridges intentionally remain on their
 //! current protocols.
 
+pub mod config;
+mod presets;
 mod process;
 mod protocol;
 
+pub use config::{
+    ACP_PROVIDER_PREFIX, AcpBridgeConfig, AcpProfileConfig, AcpProxySource,
+    apply_proxy_environment, effective_proxy_source, process_config, profile_id_from_provider_id,
+    provider_id_for_profile, resolve_effective_proxy_url,
+};
+pub use presets::{GROK_COMMAND, GROK_PROFILE_ID, GROK_PROFILE_NAME, grok_profile};
 pub use process::{
     AcpProcess, AcpProcessConfig, AcpRuntimeError, AcpRuntimeEvent, DEFAULT_REQUEST_TIMEOUT,
 };

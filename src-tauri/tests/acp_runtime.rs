@@ -2,7 +2,8 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 use taomni_lib::agent::acp_bridge::{
-    AcpProcess, AcpProcessConfig, AcpRuntimeError, AcpRuntimeEvent, AcpStopReason,
+    AcpProcess, AcpProcessConfig, AcpProfileConfig, AcpRuntimeError, AcpRuntimeEvent,
+    AcpStopReason, process_config,
 };
 use taomni_lib::agent::local::LocalAgentEvent;
 
@@ -177,6 +178,66 @@ async fn request_timeout_removes_the_pending_request() {
         }
     );
     process.stop().await;
+}
+
+#[tokio::test]
+async fn process_proxy_policy_reaches_the_child_environment() {
+    let direct = recorded_proxy_environment(None).await;
+    for key in [
+        "httpProxy",
+        "httpsProxy",
+        "allProxy",
+        "httpProxyLower",
+        "httpsProxyLower",
+        "allProxyLower",
+    ] {
+        assert!(direct.get(key).is_none_or(serde_json::Value::is_null));
+    }
+    assert_eq!(
+        direct.get("noProxy").and_then(serde_json::Value::as_str),
+        Some("localhost,127.0.0.1,::1")
+    );
+    assert_eq!(
+        direct
+            .get("noProxyLower")
+            .and_then(serde_json::Value::as_str),
+        Some("localhost,127.0.0.1,::1")
+    );
+
+    let manual_url = "socks5://127.0.0.1:1080";
+    let manual = recorded_proxy_environment(Some(manual_url)).await;
+    for key in [
+        "httpProxy",
+        "httpsProxy",
+        "allProxy",
+        "httpProxyLower",
+        "httpsProxyLower",
+        "allProxyLower",
+    ] {
+        assert_eq!(
+            manual.get(key).and_then(serde_json::Value::as_str),
+            Some(manual_url)
+        );
+    }
+}
+
+async fn recorded_proxy_environment(proxy_url: Option<&str>) -> serde_json::Value {
+    let record = tempfile::NamedTempFile::new().unwrap();
+    let profile = AcpProfileConfig {
+        id: "fixture".into(),
+        command: env!("CARGO_BIN_EXE_acp-fake-agent").into(),
+        args: vec!["happy".into()],
+        ..Default::default()
+    };
+    let config = process_config(&profile, None, proxy_url, Duration::from_secs(2))
+        .unwrap()
+        .with_env("ACP_FAKE_RECORD", record.path().to_string_lossy());
+    let process = AcpProcess::spawn(config).await.unwrap();
+    process.initialize().await.unwrap();
+    process.stop().await;
+
+    let line = std::fs::read_to_string(record.path()).unwrap();
+    serde_json::from_str(line.lines().next().unwrap()).unwrap()
 }
 
 async fn wait_for_stderr(process: &AcpProcess) -> String {
