@@ -8,6 +8,10 @@ import { useSftpStore, type PaneState } from "../../stores/sftpStore";
 import { NATIVE_FILE_DROP_EVENT } from "../../lib/osFileDrop";
 import type { FileEntry } from "../../lib/sftp";
 import { setLocale } from "../../lib/i18n";
+import {
+  saveSftpPreferences,
+  SFTP_PREFERENCES_STORAGE_KEY,
+} from "../../lib/sftpPreferences";
 
 const controllerMocks = vi.hoisted(() => ({
   upload: vi.fn(async () => undefined),
@@ -35,6 +39,7 @@ const sftpMocks = vi.hoisted(() => ({
     fileType: "file",
     isHidden: false,
   })),
+  sftpOpenPath: vi.fn(async () => undefined),
 }));
 
 vi.mock("../../lib/sftpController", () => ({
@@ -52,6 +57,7 @@ vi.mock("../../lib/sftp", async () => {
     sftpDetach: vi.fn(async () => undefined),
     sftpRealpath: vi.fn(async (_sid: string, p: string) => p),
     sftpStat: sftpMocks.sftpStat,
+    sftpOpenPath: sftpMocks.sftpOpenPath,
   };
 });
 
@@ -129,6 +135,7 @@ afterEach(() => {
   cleanup();
   useSftpStore.setState({ sessions: {} });
   setLocale("en");
+  localStorage.removeItem(SFTP_PREFERENCES_STORAGE_KEY);
   vi.clearAllMocks();
 });
 
@@ -583,6 +590,36 @@ describe("FileBrowser → FilePanel toolbar wiring", () => {
     expect(uploadArgs[0]).toMatchObject({
       path: "/work/notes.txt",
     });
+  });
+
+  it("double-clicks a local file to open it by default", async () => {
+    seedSession();
+    renderBrowser();
+
+    const localPanel = screen.getByText("LOCAL").closest("div.h-full") as HTMLElement;
+    fireEvent.doubleClick(within(localPanel).getByText("notes.txt"));
+
+    await waitFor(() => {
+      expect(sftpMocks.sftpOpenPath).toHaveBeenCalledWith("/work/notes.txt");
+    });
+    expect(controllerMocks.upload).not.toHaveBeenCalled();
+  });
+
+  it("double-clicks a local file to upload when the preference is upload", async () => {
+    saveSftpPreferences({ localDoubleClickAction: "upload" });
+    seedSession();
+    renderBrowser();
+
+    const localPanel = screen.getByText("LOCAL").closest("div.h-full") as HTMLElement;
+    fireEvent.doubleClick(within(localPanel).getByText("notes.txt"));
+
+    await waitFor(() => {
+      expect(controllerMocks.upload).toHaveBeenCalledWith(
+        expect.objectContaining({ path: "/work/notes.txt", name: "notes.txt" }),
+        "/work",
+      );
+    });
+    expect(sftpMocks.sftpOpenPath).not.toHaveBeenCalled();
   });
 
   it("uploads OS-dropped files to the current remote directory", async () => {

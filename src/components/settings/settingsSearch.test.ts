@@ -29,6 +29,13 @@ describe("settingsSearch groups", () => {
     expect(matchingGroupIds(ids)).toEqual(["network", "ai"]);
   });
 
+  it("matches the sftp double-click settings entry under the terminal group", () => {
+    // terms match via term.includes(query); identity `t` skips titleKeys.
+    const ids = matchingIds("double click", t);
+    expect(ids).toEqual(["sftp"]);
+    expect(groupIdForEntry("sftp")).toBe("terminal");
+  });
+
   it("preserves group order even when entry list is reordered", () => {
     expect(matchingGroupIds(["ai-acp", "app-proxy", "language"])).toEqual([
       "ai",

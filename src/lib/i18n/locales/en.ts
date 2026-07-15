@@ -1866,6 +1866,17 @@ const dict = {
     sqlExecutionShortcutInvalid: "Use a modifier plus a key, or a function key such as F8.",
     sqlExecutionShortcutReserved: "That shortcut is already used by an SQL editor or completion command.",
     sqlExecutionConflict: "Shortcut conflicts with {shortcut}.",
+    sftpTitle: "SFTP File Browser",
+    sftpSubtitle: "Global behavior for dedicated SFTP sessions and the sidebar SFTP pane",
+    sftpResetTitle: "Reset SFTP settings",
+    sftpLocalDoubleClickLabel: "Double-click local file",
+    sftpLocalDoubleClickHint:
+      "Applies to the local pane in dual-pane SFTP (standalone SFTP tab and terminal-attached SFTP sidebar).",
+    sftpLocalDoubleClickOpen: "Open with system default app",
+    sftpLocalDoubleClickOpenHint: "Current default. Opens the file the same way as the toolbar Open button.",
+    sftpLocalDoubleClickUpload: "Upload to remote",
+    sftpLocalDoubleClickUploadHint:
+      "Uploads the file into the current remote directory (uses path mappings when available).",
     localTerminalDefaultsTitle: "Terminal Defaults",
     localTerminalDefaultsSubtitle: "Default appearance, behavior, history, and command assistance for new terminal sessions",
     resetLocalTerminalDefaults: "Reset terminal defaults",

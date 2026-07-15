@@ -1862,6 +1862,17 @@ export const zhCN: DeepPartial<typeof en> = {
     sqlExecutionShortcutInvalid: "请使用修饰键加普通按键，或使用 F8 等功能键。",
     sqlExecutionShortcutReserved: "该快捷键已被 SQL 编辑器或补全命令占用。",
     sqlExecutionConflict: "快捷键与「{shortcut}」冲突。",
+    sftpTitle: "SFTP 文件浏览器",
+    sftpSubtitle: "适用于独立 SFTP 会话与侧边 SFTP 面板的全局行为",
+    sftpResetTitle: "重置 SFTP 设置",
+    sftpLocalDoubleClickLabel: "双击本地文件时",
+    sftpLocalDoubleClickHint:
+      "作用于双栏 SFTP 的本地面板（独立 SFTP 标签页与终端侧边 SFTP 面板）。",
+    sftpLocalDoubleClickOpen: "用系统默认应用打开",
+    sftpLocalDoubleClickOpenHint: "默认行为。与工具栏「打开」按钮相同。",
+    sftpLocalDoubleClickUpload: "上传到远端",
+    sftpLocalDoubleClickUploadHint:
+      "上传到当前远端目录（若有路径映射则优先使用映射）。",
     localTerminalDefaultsTitle: "终端默认设置",
     localTerminalDefaultsSubtitle: "设置新建终端会话默认使用的外观、行为、历史与命令辅助",
     resetLocalTerminalDefaults: "重置终端默认设置",
