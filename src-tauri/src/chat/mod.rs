@@ -1,3 +1,4 @@
+mod acp;
 pub mod inline_qq;
 pub mod redact;
 pub mod run;
@@ -479,6 +480,7 @@ pub async fn chat_set_thread_provider(
         crate::agent::codex_bridge::commands::recycle_thread_process(state.inner(), &thread_id)
             .await;
     }
+    acp::recycle_if_profile_changed(state.inner(), &thread_id, &provider_id).await;
     Ok(())
 }
 
@@ -1911,6 +1913,7 @@ pub async fn chat_stop_stream(thread_id: String, state: State<'_, AppState>) -> 
     let run = { state.chat_runs.lock().await.remove(&thread_id) };
     let cc_process = { state.cc_processes.lock().await.remove(&thread_id) };
     let codex_process = { state.codex_processes.lock().await.remove(&thread_id) };
+    let acp_process = { state.acp_processes.lock().await.remove(&thread_id) };
 
     if let Some(run) = run {
         run.stop().await;
@@ -1921,6 +1924,9 @@ pub async fn chat_stop_stream(thread_id: String, state: State<'_, AppState>) -> 
         }
     }
     if let Some(process) = codex_process {
+        process.stop().await;
+    }
+    if let Some(process) = acp_process {
         process.stop().await;
     }
     Ok(())
@@ -1998,6 +2004,22 @@ pub async fn chat_stream(
             code_workspace: req.code_workspace.clone(),
         },
     )?;
+
+    if crate::agent::acp_bridge::profile_id_from_provider_id(&thread.provider_id).is_some() {
+        return acp::stream(
+            &req,
+            &app,
+            state.inner(),
+            &event_name,
+            &thread,
+            &history,
+            &attachments,
+            &clean_content,
+            redacted_count,
+            &agent_ctx,
+        )
+        .await;
+    }
 
     if thread.provider_id == "claude-code" {
         // Allocate the assistant message id and begin streaming.

@@ -25,7 +25,13 @@ impl AcpThreadProcess {
         auth_method_id: Option<&str>,
         mcp_token: String,
     ) -> Result<Self, AcpRuntimeError> {
-        let process = AcpProcess::spawn(config).await?;
+        let process = match AcpProcess::spawn(config).await {
+            Ok(process) => process,
+            Err(error) => {
+                crate::agent::mcp_bridge::revoke_token(&mcp_token);
+                return Err(error);
+            }
+        };
         let agent_info = match process.initialize().await {
             Ok(info) => info,
             Err(error) => {

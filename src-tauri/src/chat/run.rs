@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
+use crate::agent::acp_bridge::AcpThreadProcess;
 use crate::agent::cc_bridge::process::CcProcess;
 
 #[async_trait]
@@ -16,6 +17,13 @@ pub trait ChatBridgeRun: Send + Sync {
 impl ChatBridgeRun for CcProcess {
     async fn stop(&self) {
         CcProcess::stop(self).await;
+    }
+}
+
+#[async_trait]
+impl ChatBridgeRun for AcpThreadProcess {
+    async fn stop(&self) {
+        AcpThreadProcess::stop(self).await;
     }
 }
 
