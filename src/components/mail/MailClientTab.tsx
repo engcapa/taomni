@@ -121,6 +121,10 @@ import {
   writeStreamOpen,
 } from "../../lib/ipc";
 import {
+  readClipboardImageFiles,
+  readNativeClipboardImagePath,
+} from "../../lib/clipboard";
+import {
   droppedFilePaths,
   droppedFiles,
   isOsFileDrag,
@@ -2240,14 +2244,40 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
   const handlePasteImages = useCallback(async (files: File[]): Promise<string[]> => {
     const snippets: string[] = [];
-    setAttachProgress({ done: 0, total: files.length, label: "Inserting images…" });
-    try {
-      for (let i = 0; i < files.length; i += 1) {
-        const html = await insertInlineImageFromFile(files[i]);
-        if (html) snippets.push(html);
-        setAttachProgress({ done: i + 1, total: files.length, label: "Inserting images…" });
+    // Prefer files from the paste event when present (multi-image). When the
+    // webview omits image/* (common on Linux WebKitGTK for screenshots), fall
+    // back to native arboard, then the async Clipboard API.
+    let imageFiles = files.filter((file) => (file.type || "").startsWith("image/"));
+    if (imageFiles.length === 0) {
+      const nativePath = await readNativeClipboardImagePath();
+      if (nativePath) {
+        setAttachProgress({ done: 0, total: 1, label: "Inserting images…" });
+        try {
+          const html = await insertInlineImageFromPath(nativePath);
+          if (html) {
+            setAttachProgress({ done: 1, total: 1, label: "Images inserted" });
+            setStatus("Image pasted");
+            window.setTimeout(() => setAttachProgress(null), 1200);
+            return [html];
+          }
+        } catch (e) {
+          setAttachProgress(null);
+          setError(mailClientErrorMessage(e));
+          return [];
+        }
       }
-      setAttachProgress({ done: files.length, total: files.length, label: "Images inserted" });
+      imageFiles = await readClipboardImageFiles();
+    }
+    if (imageFiles.length === 0) return [];
+
+    setAttachProgress({ done: 0, total: imageFiles.length, label: "Inserting images…" });
+    try {
+      for (let i = 0; i < imageFiles.length; i += 1) {
+        const html = await insertInlineImageFromFile(imageFiles[i]);
+        if (html) snippets.push(html);
+        setAttachProgress({ done: i + 1, total: imageFiles.length, label: "Inserting images…" });
+      }
+      setAttachProgress({ done: imageFiles.length, total: imageFiles.length, label: "Images inserted" });
       if (snippets.length > 0) {
         setStatus(snippets.length === 1 ? "Image pasted" : `${snippets.length} images pasted`);
       }
@@ -2258,7 +2288,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       setError(mailClientErrorMessage(e));
       return snippets;
     }
-  }, [insertInlineImageFromFile]);
+  }, [insertInlineImageFromFile, insertInlineImageFromPath]);
 
   const handleDropComposeFiles = useCallback(async (files: File[]) => {
     if (files.length === 0) return;

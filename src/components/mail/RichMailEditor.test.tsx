@@ -143,4 +143,79 @@ describe("RichMailEditor", () => {
       );
     });
   });
+
+  it("asks parent for native clipboard images when paste event has no image items", async () => {
+    const execCommand = vi.fn();
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      value: execCommand,
+    });
+    const onPasteImages = vi.fn(async (files: File[]) => {
+      expect(files).toEqual([]);
+      return [
+        "<img src=\"data:image/png;base64,bb\" data-taomni-cid=\"native@inline.local\" alt=\"native\">",
+      ];
+    });
+
+    render(
+      <RichMailEditor
+        html="<p>Hello</p>"
+        onChange={vi.fn()}
+        onPasteImages={onPasteImages}
+      />,
+    );
+
+    const editor = screen.getByTestId("mail-compose-editor");
+    // Linux WebKitGTK paste of a screenshot: no image/* items, no text.
+    fireEvent.paste(editor, {
+      clipboardData: {
+        items: [],
+        files: [],
+        getData: () => "",
+      },
+    });
+
+    await waitFor(() => {
+      expect(onPasteImages).toHaveBeenCalledWith([]);
+      expect(execCommand).toHaveBeenCalledWith(
+        "insertHTML",
+        false,
+        "<img src=\"data:image/png;base64,bb\" data-taomni-cid=\"native@inline.local\" alt=\"native\">",
+      );
+    });
+  });
+
+  it("does not call native image paste when plain text is present", async () => {
+    const execCommand = vi.fn();
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      value: execCommand,
+    });
+    const onPasteImages = vi.fn(async () => []);
+
+    render(
+      <RichMailEditor
+        html="<p>Hello</p>"
+        onChange={vi.fn()}
+        onPasteImages={onPasteImages}
+      />,
+    );
+
+    fireEvent.paste(screen.getByTestId("mail-compose-editor"), {
+      clipboardData: {
+        items: [],
+        files: [],
+        getData: (type: string) => (type === "text/plain" ? "hello from clipboard" : ""),
+      },
+    });
+
+    await waitFor(() => {
+      expect(execCommand).toHaveBeenCalledWith(
+        "insertHTML",
+        false,
+        "hello from clipboard",
+      );
+    });
+    expect(onPasteImages).not.toHaveBeenCalled();
+  });
 });

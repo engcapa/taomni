@@ -140,8 +140,16 @@ export function RichMailEditor({
   const handlePaste = (event: ClipboardEvent<HTMLDivElement>) => {
     if (disabled) return;
 
+    const pastedHtml = event.clipboardData?.getData("text/html") ?? "";
+    const pastedText = event.clipboardData?.getData("text/plain") ?? "";
     const imageFiles = clipboardImageFiles(event.clipboardData);
-    if (imageFiles.length > 0 && onPasteImages) {
+    // Linux WebKitGTK often omits image/* from the paste event even when the
+    // OS clipboard holds a screenshot. When there is no text/html payload,
+    // let the parent try native clipboard image read.
+    const maybeNativeImageOnly =
+      !!onPasteImages && imageFiles.length === 0 && !pastedHtml.trim() && !pastedText.trim();
+
+    if (onPasteImages && (imageFiles.length > 0 || maybeNativeImageOnly)) {
       event.preventDefault();
       void (async () => {
         try {
@@ -157,8 +165,6 @@ export function RichMailEditor({
     }
 
     event.preventDefault();
-    const pastedHtml = event.clipboardData.getData("text/html");
-    const pastedText = event.clipboardData.getData("text/plain");
     if (pastedHtml) {
       insertHtml(sanitizeMailComposeHtml(pastedHtml), true);
       return;
