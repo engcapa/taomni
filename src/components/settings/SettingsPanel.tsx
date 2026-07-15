@@ -1,5 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Bot, ChevronDown, ChevronUp, History, RotateCcw, Search, Terminal, Type, Undo, X } from "lucide-react";
+import {
+  Bot,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  History,
+  RotateCcw,
+  Search,
+  Terminal,
+  Type,
+  Undo,
+  X,
+} from "lucide-react";
 import { useAppTheme } from "../../lib/appTheme";
 import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
@@ -37,7 +49,13 @@ import { ChatHistoryPanel } from "./ChatHistoryPanel";
 import { ChatOutputFormatPanel } from "./ChatOutputFormatPanel";
 import { ModelsAdvancedPanel } from "./ModelsAdvancedPanel";
 import { useAiStore } from "../../stores/aiStore";
-import { matchingIds } from "./settingsSearch";
+import {
+  SETTINGS_GROUPS,
+  defaultExpandedGroups,
+  groupIdForEntry,
+  matchingGroupIds,
+  matchingIds,
+} from "./settingsSearch";
 import { CodeViewAppearanceSettings } from "./CodeViewAppearanceSettings";
 import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettings";
 import { SqlCompletionSettings } from "./SqlCompletionSettings";
@@ -113,6 +131,77 @@ function SettingsAnchor({
   );
 }
 
+function SettingsGroup({
+  id,
+  title,
+  expanded,
+  onToggle,
+  matchCount,
+  searching,
+  children,
+}: {
+  id: string;
+  title: string;
+  expanded: boolean;
+  onToggle: () => void;
+  matchCount: number;
+  searching: boolean;
+  children: React.ReactNode;
+}) {
+  const hasMatch = matchCount > 0;
+  return (
+    <section
+      data-testid={`settings-group-${id}`}
+      data-group-id={id}
+      data-expanded={expanded ? "true" : "false"}
+      data-group-match={searching ? String(hasMatch) : undefined}
+      className="mb-4"
+      style={{
+        opacity: searching && !hasMatch ? 0.55 : 1,
+        transition: "opacity 120ms ease",
+      }}
+    >
+      <button
+        type="button"
+        data-testid={`settings-group-toggle-${id}`}
+        aria-expanded={expanded}
+        aria-controls={`settings-group-body-${id}`}
+        className="flex w-full items-center gap-2 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] px-3 py-2 text-left hover:bg-[var(--taomni-control-hover)]"
+        style={
+          searching && hasMatch
+            ? { outline: "1px solid var(--taomni-accent)", outlineOffset: 1 }
+            : undefined
+        }
+        onClick={onToggle}
+      >
+        {expanded ? (
+          <ChevronDown className="h-4 w-4 shrink-0 text-[var(--taomni-text-muted)]" />
+        ) : (
+          <ChevronRight className="h-4 w-4 shrink-0 text-[var(--taomni-text-muted)]" />
+        )}
+        <span className="flex-1 text-[13px] font-semibold tracking-wide">{title}</span>
+        {searching && hasMatch && (
+          <span
+            data-testid={`settings-group-match-count-${id}`}
+            className="tabular-nums text-[11px] font-medium text-[var(--taomni-accent)]"
+          >
+            {matchCount}
+          </span>
+        )}
+      </button>
+      {/* Keep body mounted so SettingsAnchor refs stay registered for scroll. */}
+      <div
+        id={`settings-group-body-${id}`}
+        data-testid={`settings-group-body-${id}`}
+        hidden={!expanded}
+        className="mt-2"
+      >
+        {children}
+      </div>
+    </section>
+  );
+}
+
 export function SettingsPanel() {
   const [codeViewProfile, setCodeViewProfile] = useState<CodeViewProfile>(() => loadCodeViewProfile());
   const [terminalDefaultProfile, setTerminalDefaultProfile] = useState<TerminalProfile>(
@@ -138,23 +227,49 @@ export function SettingsPanel() {
   const [activeIndex, setActiveIndex] = useState(0);
   const anchorRefs = useRef<Map<string, HTMLElement>>(new Map());
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(defaultExpandedGroups);
 
   const register = useCallback((id: string, el: HTMLElement | null) => {
     if (el) anchorRefs.current.set(id, el);
     else anchorRefs.current.delete(id);
   }, []);
 
-  const scrollToId = useCallback((id: string | undefined) => {
-    if (!id) return;
-    anchorRefs.current.get(id)?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+  const ensureGroupExpanded = useCallback((entryId: string | undefined) => {
+    if (!entryId) return;
+    const groupId = groupIdForEntry(entryId);
+    if (!groupId) return;
+    setExpandedGroups((prev) => {
+      if (prev[groupId]) return prev;
+      return { ...prev, [groupId]: true };
+    });
   }, []);
 
+  const scrollToId = useCallback((id: string | undefined) => {
+    if (!id) return;
+    ensureGroupExpanded(id);
+    // Expand may reflow; wait a frame so hidden=false is applied before scroll.
+    window.requestAnimationFrame(() => {
+      anchorRefs.current.get(id)?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    });
+  }, [ensureGroupExpanded]);
+
   const focusSection = useCallback((detail: OpenSettingsSectionDetail) => {
+    ensureGroupExpanded(detail.id);
     let attempts = 0;
     let frame = 0;
     const run = () => {
       const anchor = anchorRefs.current.get(detail.id);
       if (anchor) {
+        // Group body may still be `hidden` on the first frame after expand.
+        const groupId = groupIdForEntry(detail.id);
+        const body = groupId
+          ? document.querySelector(`[data-testid="settings-group-body-${groupId}"]`)
+          : null;
+        if (body instanceof HTMLElement && body.hidden) {
+          attempts += 1;
+          if (attempts < 48) frame = window.requestAnimationFrame(run);
+          return;
+        }
         anchor.scrollIntoView({
           block: detail.presetId ? "start" : "center",
           behavior: attempts === 0 ? "auto" : "smooth",
@@ -167,12 +282,23 @@ export function SettingsPanel() {
     };
     frame = window.requestAnimationFrame(run);
     return () => window.cancelAnimationFrame(frame);
-  }, []);
+  }, [ensureGroupExpanded]);
 
-  // New query → jump to the first match.
+  // New query → expand matching groups, jump to the first match.
   useEffect(() => {
     setActiveIndex(0);
-    if (matchIds.length > 0) scrollToId(matchIds[0]);
+    if (matchIds.length === 0) return;
+    const groups = matchingGroupIds(matchIds);
+    setExpandedGroups((prev) => {
+      const next = { ...prev };
+      for (const g of SETTINGS_GROUPS) {
+        // While searching, open groups with hits so matches are reachable;
+        // leave other groups as the user left them (usually collapsed after browse).
+        if (groups.includes(g.id)) next[g.id] = true;
+      }
+      return next;
+    });
+    scrollToId(matchIds[0]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchKey]);
 
@@ -210,6 +336,21 @@ export function SettingsPanel() {
   const activeId = matchIds[clampedIndex] ?? null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const matchedSet = useMemo(() => new Set(matchIds), [matchKey]);
+  const matchedGroupIds = useMemo(() => matchingGroupIds(matchIds), [matchKey]);
+
+  const toggleGroup = useCallback((groupId: string) => {
+    setExpandedGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
+  }, []);
+
+  const matchCountByGroup = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const g of SETTINGS_GROUPS) counts[g.id] = 0;
+    for (const id of matchIds) {
+      const g = groupIdForEntry(id);
+      if (g) counts[g] = (counts[g] ?? 0) + 1;
+    }
+    return counts;
+  }, [matchKey]);
 
   const ctxValue = useMemo<SettingsSearchContextValue>(
     () => ({ searching, matchedSet, activeId, register }),
@@ -278,6 +419,8 @@ export function SettingsPanel() {
     saveTerminalDefaultProfile(DEFAULT_TERMINAL_DEFAULT_PROFILE);
   }, []);
 
+  const groupTitle = useCallback((titleKey: string) => t(titleKey), [t]);
+
   return (
     <SettingsSearchContext.Provider value={ctxValue}>
       <div
@@ -337,6 +480,15 @@ export function SettingsPanel() {
                   <span data-testid="settings-search-count" className="tabular-nums">
                     {t("settings.searchResultCount", { current: clampedIndex + 1, total: matchIds.length })}
                   </span>
+                  {matchedGroupIds.length > 1 && (
+                    <span
+                      data-testid="settings-search-group-count"
+                      className="tabular-nums text-[var(--taomni-text-muted)]"
+                      title={t("settings.searchGroupHint")}
+                    >
+                      · {t("settings.searchGroupCount", { count: matchedGroupIds.length })}
+                    </span>
+                  )}
                   <button
                     type="button"
                     aria-label={t("settings.searchPrev")}
@@ -366,288 +518,360 @@ export function SettingsPanel() {
             )}
           </div>
 
-          <SettingsAnchor id="language">
-            <LanguageSection />
-          </SettingsAnchor>
-          <SettingsAnchor id="app-theme">
-            <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
-              <div className="mb-2 flex items-center gap-3">
-                <div>
-                  <div className="text-[14px] font-semibold">{t("settings.appThemeTitle")}</div>
-                  <div className="text-[12px] text-[var(--taomni-text-muted)]">
-                    {t("settings.appThemeCurrent", { mode: themeLabel(mode), resolved: resolvedTheme })}
+          {/* —— General —— */}
+          <SettingsGroup
+            id="general"
+            title={groupTitle("settings.groupGeneral")}
+            expanded={!!expandedGroups.general}
+            onToggle={() => toggleGroup("general")}
+            matchCount={matchCountByGroup.general ?? 0}
+            searching={searching}
+          >
+            <SettingsAnchor id="language">
+              <LanguageSection />
+            </SettingsAnchor>
+            <SettingsAnchor id="app-theme">
+              <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
+                <div className="mb-2 flex items-center gap-3">
+                  <div>
+                    <div className="text-[14px] font-semibold">{t("settings.appThemeTitle")}</div>
+                    <div className="text-[12px] text-[var(--taomni-text-muted)]">
+                      {t("settings.appThemeCurrent", { mode: themeLabel(mode), resolved: resolvedTheme })}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <AppThemeSwitcher />
-            </section>
-          </SettingsAnchor>
+                <AppThemeSwitcher />
+              </section>
+            </SettingsAnchor>
 
-          <SettingsAnchor id="welcome-history">
-            <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
-              <div className="mb-3 flex items-center gap-3">
-                <History className="w-4 h-4 text-[var(--taomni-accent)]" />
-                <div>
-                  <div className="text-[14px] font-semibold">{t("settings.welcomeHistoryTitle")}</div>
-                  <div className="text-[12px] text-[var(--taomni-text-muted)]">
-                    {t("settings.welcomeHistorySubtitle")}
+            <SettingsAnchor id="welcome-history">
+              <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
+                <div className="mb-3 flex items-center gap-3">
+                  <History className="w-4 h-4 text-[var(--taomni-accent)]" />
+                  <div>
+                    <div className="text-[14px] font-semibold">{t("settings.welcomeHistoryTitle")}</div>
+                    <div className="text-[12px] text-[var(--taomni-text-muted)]">
+                      {t("settings.welcomeHistorySubtitle")}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 pt-2 border-t border-[var(--taomni-divider)]">
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="welcome-recent-session-limit" className="text-[12px] font-medium text-[var(--taomni-text-muted)]">
-                    {t("settings.welcomeHistoryLimitLabel")}
-                  </label>
-                  <input
-                    id="welcome-recent-session-limit"
-                    data-testid="settings-welcome-recent-session-limit"
-                    className="taomni-input h-8 w-full"
-                    type="number"
-                    min={1}
-                    max={100}
-                    step={1}
-                    aria-label={t("settings.welcomeHistoryLimitAria")}
-                    value={welcomeRecentSessionLimit}
-                    onChange={(e) => setWelcomeRecentSessionLimit(parseInt(e.target.value, 10))}
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 pt-2 border-t border-[var(--taomni-divider)]">
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="welcome-recent-session-limit" className="text-[12px] font-medium text-[var(--taomni-text-muted)]">
+                      {t("settings.welcomeHistoryLimitLabel")}
+                    </label>
+                    <input
+                      id="welcome-recent-session-limit"
+                      data-testid="settings-welcome-recent-session-limit"
+                      className="taomni-input h-8 w-full"
+                      type="number"
+                      min={1}
+                      max={100}
+                      step={1}
+                      aria-label={t("settings.welcomeHistoryLimitAria")}
+                      value={welcomeRecentSessionLimit}
+                      onChange={(e) => setWelcomeRecentSessionLimit(parseInt(e.target.value, 10))}
+                    />
+                  </div>
+                  <div className="text-[12px] text-[var(--taomni-text-muted)] flex items-center">
+                    {t("settings.welcomeHistoryLimitHint")}
+                  </div>
                 </div>
-                <div className="text-[12px] text-[var(--taomni-text-muted)] flex items-center">
-                  {t("settings.welcomeHistoryLimitHint")}
-                </div>
-              </div>
-            </section>
-          </SettingsAnchor>
+              </section>
+            </SettingsAnchor>
 
-          <SettingsAnchor id="global-ui">
-            <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
-              <div className="mb-3 flex items-center gap-3">
-                <div>
-                  <div className="text-[14px] font-semibold flex items-center gap-2">
-                    <Type className="w-4 h-4 text-[var(--taomni-accent)]" />
-                    {t("settings.globalUiTitle")}
+            <SettingsAnchor id="global-ui">
+              <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
+                <div className="mb-3 flex items-center gap-3">
+                  <div>
+                    <div className="text-[14px] font-semibold flex items-center gap-2">
+                      <Type className="w-4 h-4 text-[var(--taomni-accent)]" />
+                      {t("settings.globalUiTitle")}
+                    </div>
+                    <div className="text-[12px] text-[var(--taomni-text-muted)]">
+                      {t("settings.globalUiSubtitle")}
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    className="taomni-btn ml-auto h-7 px-2.5 inline-flex items-center gap-1 text-[11px]"
+                    onClick={() => {
+                      setUiFontFamily('"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
+                      setUiFontSize(12);
+                    }}
+                    title={t("settings.resetUiFontTitle")}
+                  >
+                    <Undo className="w-3.5 h-3.5" />
+                    {t("settings.resetUiFont")}
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 pt-2 border-t border-[var(--taomni-divider)]">
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="ui-font-family-select" className="text-[12px] font-medium text-[var(--taomni-text-muted)]">
+                      {t("settings.fontFamilyLabel")}
+                    </label>
+                    <FontPickerSelect
+                      ariaLabel={t("settings.fontFamilyLabel")}
+                      id="ui-font-family-select"
+                      testId="ui-font-family-select"
+                      options={uiFontOptions}
+                      selectedValue={currentSelectValue}
+                      groupLabels={uiFontGroupLabels}
+                      loading={fontCatalogRequested && systemFonts.loading}
+                      onOpen={requestSystemFonts}
+                      onSelect={setUiFontFamily}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex justify-between items-center text-[12px] font-medium text-[var(--taomni-text-muted)]">
+                      <label htmlFor="ui-font-size-slider">{t("settings.fontSizeLabel")}</label>
+                      <span className="font-mono bg-[var(--taomni-selected)] text-[var(--taomni-accent)] px-1.5 py-0.5 rounded text-[11px] font-semibold">
+                        {uiFontSize}px
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1">
+                      <span className="text-[10px] text-[var(--taomni-text-muted)]">A</span>
+                      <input
+                        id="ui-font-size-slider"
+                        type="range"
+                        min="10"
+                        max="18"
+                        step="1"
+                        value={uiFontSize}
+                        onChange={(e) => setUiFontSize(parseInt(e.target.value, 10))}
+                        className="flex-1 h-1.5 rounded-lg appearance-none cursor-pointer accent-[var(--taomni-accent)] bg-[var(--taomni-divider)]"
+                      />
+                      <span className="text-[14px] font-semibold text-[var(--taomni-text-muted)]">A</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </SettingsAnchor>
+          </SettingsGroup>
+
+          {/* —— Code —— */}
+          <SettingsGroup
+            id="code"
+            title={groupTitle("settings.groupCode")}
+            expanded={!!expandedGroups.code}
+            onToggle={() => toggleGroup("code")}
+            matchCount={matchCountByGroup.code ?? 0}
+            searching={searching}
+          >
+            <SettingsAnchor id="code-view-appearance">
+              <div className="mb-4 flex items-center gap-3">
+                <div>
+                  <div className="text-[18px] font-semibold">{t("settings.codeViewAppearanceTitle")}</div>
+                  <div className="text-[12px] text-[var(--taomni-text-muted)]">{t("settings.codeViewAppearanceSubtitle")}</div>
+                </div>
+                <button
+                  data-testid="settings-reset-code-view-profile"
+                  className="taomni-btn ml-auto h-8 inline-flex items-center gap-1.5"
+                  type="button"
+                  onClick={() => setCodeViewProfile(DEFAULT_CODE_VIEW_PROFILE)}
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  {t("settings.reset")}
+                </button>
+              </div>
+              <CodeViewAppearanceSettings
+                profile={codeViewProfile}
+                terminalProfile={DEFAULT_TERMINAL_PROFILE}
+                onProfileChange={setCodeViewProfile}
+                fontState={systemFonts}
+                onRequestSystemFonts={requestSystemFonts}
+              />
+            </SettingsAnchor>
+
+            <SettingsAnchor id="language-servers" className="mt-4">
+              <LanguageServersSettings />
+            </SettingsAnchor>
+          </SettingsGroup>
+
+          {/* —— Database —— */}
+          <SettingsGroup
+            id="database"
+            title={groupTitle("settings.groupDatabase")}
+            expanded={!!expandedGroups.database}
+            onToggle={() => toggleGroup("database")}
+            matchCount={matchCountByGroup.database ?? 0}
+            searching={searching}
+          >
+            <SettingsAnchor id="sql-completion">
+              <SqlCompletionSettings />
+            </SettingsAnchor>
+
+            <SettingsAnchor id="sql-execution" className="mt-4">
+              <SqlExecutionSettings />
+            </SettingsAnchor>
+          </SettingsGroup>
+
+          {/* —— Terminal —— */}
+          <SettingsGroup
+            id="terminal"
+            title={groupTitle("settings.groupTerminal")}
+            expanded={!!expandedGroups.terminal}
+            onToggle={() => toggleGroup("terminal")}
+            matchCount={matchCountByGroup.terminal ?? 0}
+            searching={searching}
+          >
+            <SettingsAnchor id="terminal-defaults">
+              <div className="mb-4 flex items-center gap-3">
+                <Terminal className="w-4 h-4 text-[var(--taomni-accent)]" />
+                <div>
+                  <div className="text-[18px] font-semibold">{t("settings.terminalDefaultsTitle")}</div>
                   <div className="text-[12px] text-[var(--taomni-text-muted)]">
-                    {t("settings.globalUiSubtitle")}
+                    {t("settings.terminalDefaultsSubtitle")}
                   </div>
                 </div>
                 <button
+                  data-testid="settings-reset-terminal-default-profile"
+                  className="taomni-btn ml-auto h-8 inline-flex items-center gap-1.5"
                   type="button"
-                  className="taomni-btn ml-auto h-7 px-2.5 inline-flex items-center gap-1 text-[11px]"
-                  onClick={() => {
-                    setUiFontFamily('"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
-                    setUiFontSize(12);
-                  }}
-                  title={t("settings.resetUiFontTitle")}
+                  onClick={resetTerminalDefaultProfile}
+                  title={t("settings.resetTerminalDefaults")}
                 >
-                  <Undo className="w-3.5 h-3.5" />
-                  {t("settings.resetUiFont")}
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  {t("settings.reset")}
                 </button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 pt-2 border-t border-[var(--taomni-divider)]">
-                <div className="flex flex-col gap-1.5">
-                  <label htmlFor="ui-font-family-select" className="text-[12px] font-medium text-[var(--taomni-text-muted)]">
-                    {t("settings.fontFamilyLabel")}
-                  </label>
-                  <FontPickerSelect
-                    ariaLabel={t("settings.fontFamilyLabel")}
-                    id="ui-font-family-select"
-                    testId="ui-font-family-select"
-                    options={uiFontOptions}
-                    selectedValue={currentSelectValue}
-                    groupLabels={uiFontGroupLabels}
-                    loading={fontCatalogRequested && systemFonts.loading}
-                    onOpen={requestSystemFonts}
-                    onSelect={setUiFontFamily}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex justify-between items-center text-[12px] font-medium text-[var(--taomni-text-muted)]">
-                    <label htmlFor="ui-font-size-slider">{t("settings.fontSizeLabel")}</label>
-                    <span className="font-mono bg-[var(--taomni-selected)] text-[var(--taomni-accent)] px-1.5 py-0.5 rounded text-[11px] font-semibold">
-                      {uiFontSize}px
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="text-[10px] text-[var(--taomni-text-muted)]">A</span>
-                    <input
-                      id="ui-font-size-slider"
-                      type="range"
-                      min="10"
-                      max="18"
-                      step="1"
-                      value={uiFontSize}
-                      onChange={(e) => setUiFontSize(parseInt(e.target.value, 10))}
-                      className="flex-1 h-1.5 rounded-lg appearance-none cursor-pointer accent-[var(--taomni-accent)] bg-[var(--taomni-divider)]"
-                    />
-                    <span className="text-[14px] font-semibold text-[var(--taomni-text-muted)]">A</span>
-                  </div>
-                </div>
-              </div>
-            </section>
-          </SettingsAnchor>
-          <SettingsAnchor id="code-view-appearance">
-            <div className="mb-4 flex items-center gap-3">
-              <div>
-                <div className="text-[18px] font-semibold">{t("settings.codeViewAppearanceTitle")}</div>
-                <div className="text-[12px] text-[var(--taomni-text-muted)]">{t("settings.codeViewAppearanceSubtitle")}</div>
-              </div>
-              <button
-                data-testid="settings-reset-code-view-profile"
-                className="taomni-btn ml-auto h-8 inline-flex items-center gap-1.5"
-                type="button"
-                onClick={() => setCodeViewProfile(DEFAULT_CODE_VIEW_PROFILE)}
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                {t("settings.reset")}
-              </button>
-            </div>
-            <CodeViewAppearanceSettings
-              profile={codeViewProfile}
-              terminalProfile={DEFAULT_TERMINAL_PROFILE}
-              onProfileChange={setCodeViewProfile}
-              fontState={systemFonts}
-              onRequestSystemFonts={requestSystemFonts}
-            />
-          </SettingsAnchor>
+              <TerminalAppearanceSettings
+                profile={terminalDefaultProfile}
+                onProfileChange={handleTerminalDefaultProfileChange}
+                showCustomColors
+                allowSystemTheme
+                fontState={systemFonts}
+                onRequestSystemFonts={requestSystemFonts}
+              />
+            </SettingsAnchor>
+          </SettingsGroup>
 
-          <SettingsAnchor id="language-servers">
-            <LanguageServersSettings />
-          </SettingsAnchor>
+          {/* —— Security —— */}
+          <SettingsGroup
+            id="security"
+            title={groupTitle("settings.groupSecurity")}
+            expanded={!!expandedGroups.security}
+            onToggle={() => toggleGroup("security")}
+            matchCount={matchCountByGroup.security ?? 0}
+            searching={searching}
+          >
+            <SettingsAnchor id="vault">
+              <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)]">
+                <VaultSettings />
+              </section>
+            </SettingsAnchor>
+          </SettingsGroup>
 
-          <SettingsAnchor id="sql-completion">
-            <SqlCompletionSettings />
-          </SettingsAnchor>
-
-          <SettingsAnchor id="sql-execution">
-            <SqlExecutionSettings />
-          </SettingsAnchor>
-
-          <SettingsAnchor id="terminal-defaults">
-            <div className="mt-6 mb-4 flex items-center gap-3">
-              <Terminal className="w-4 h-4 text-[var(--taomni-accent)]" />
-              <div>
-                <div className="text-[18px] font-semibold">{t("settings.terminalDefaultsTitle")}</div>
-                <div className="text-[12px] text-[var(--taomni-text-muted)]">
-                  {t("settings.terminalDefaultsSubtitle")}
-                </div>
-              </div>
-              <button
-                data-testid="settings-reset-terminal-default-profile"
-                className="taomni-btn ml-auto h-8 inline-flex items-center gap-1.5"
-                type="button"
-                onClick={resetTerminalDefaultProfile}
-                title={t("settings.resetTerminalDefaults")}
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                {t("settings.reset")}
-              </button>
-            </div>
-            <TerminalAppearanceSettings
-              profile={terminalDefaultProfile}
-              onProfileChange={handleTerminalDefaultProfileChange}
-              showCustomColors
-              allowSystemTheme
-              fontState={systemFonts}
-              onRequestSystemFonts={requestSystemFonts}
-            />
-          </SettingsAnchor>
-
-          <SettingsAnchor id="vault">
-            <section className="mt-6 mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)]">
-              <VaultSettings />
-            </section>
-          </SettingsAnchor>
-
-          <SettingsAnchor id="app-proxy">
-            <section className="mt-6 mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
-              <AppProxyPanel />
-            </section>
-          </SettingsAnchor>
-
-          <SettingsAnchor id="lanchat">
-            <section className="mt-6 mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
-              <LanChatSettings />
-            </section>
-          </SettingsAnchor>
-          <section className="mt-6 mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
-            <SettingsAnchor id="ai-master">
-              <div className="mb-3 flex items-center gap-2">
-                <Bot className="w-4 h-4 text-[var(--taomni-accent)]" />
-                <div>
-                  <div className="text-[14px] font-semibold">{t("settings.aiSection")}</div>
-                  <div className="text-[11px] text-[var(--taomni-text-muted)]">
-                    {t("settings.aiSubtitle")}
-                  </div>
-                </div>
-              </div>
-              <div className="mb-3">
-                <AiMasterSwitch />
-              </div>
+          {/* —— Network —— */}
+          <SettingsGroup
+            id="network"
+            title={groupTitle("settings.groupNetwork")}
+            expanded={!!expandedGroups.network}
+            onToggle={() => toggleGroup("network")}
+            matchCount={matchCountByGroup.network ?? 0}
+            searching={searching}
+          >
+            <SettingsAnchor id="app-proxy">
+              <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
+                <AppProxyPanel />
+              </section>
             </SettingsAnchor>
 
-            <SettingsAnchor id="ai-privacy">
-              <div className="mb-3">
-                <PrivacyToggle />
-              </div>
+            <SettingsAnchor id="lanchat">
+              <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
+                <LanChatSettings />
+              </section>
             </SettingsAnchor>
+          </SettingsGroup>
 
-            <SettingsAnchor id="ai-shell">
-              <div className="mb-3 pt-3 border-t border-[var(--taomni-divider)]">
-                <AiShellPanel enabled={voiceShellEnabled} onToggle={toggleVoiceShell} />
-              </div>
-            </SettingsAnchor>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-[var(--taomni-divider)]">
-              <SettingsAnchor id="ai-asr">
-                <AsrPanel />
+          {/* —— AI —— */}
+          <SettingsGroup
+            id="ai"
+            title={groupTitle("settings.groupAi")}
+            expanded={!!expandedGroups.ai}
+            onToggle={() => toggleGroup("ai")}
+            matchCount={matchCountByGroup.ai ?? 0}
+            searching={searching}
+          >
+            <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
+              <SettingsAnchor id="ai-master">
+                <div className="mb-3 flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-[var(--taomni-accent)]" />
+                  <div>
+                    <div className="text-[14px] font-semibold">{t("settings.aiSection")}</div>
+                    <div className="text-[11px] text-[var(--taomni-text-muted)]">
+                      {t("settings.aiSubtitle")}
+                    </div>
+                  </div>
+                </div>
+                <div className="mb-3">
+                  <AiMasterSwitch />
+                </div>
               </SettingsAnchor>
-              <SettingsAnchor id="ai-llm">
-                <LlmProvidersPanel />
+
+              <SettingsAnchor id="ai-privacy">
+                <div className="mb-3">
+                  <PrivacyToggle />
+                </div>
               </SettingsAnchor>
-            </div>
-            <SettingsAnchor id="ai-websearch">
-              <div className="pt-3 border-t border-[var(--taomni-divider)]">
-                <WebSearchPanel />
-              </div>
-            </SettingsAnchor>
 
-            <SettingsAnchor id="ai-claude">
-              <div className="pt-3 border-t border-[var(--taomni-divider)]">
-                <ClaudeCodePanel />
-              </div>
-            </SettingsAnchor>
+              <SettingsAnchor id="ai-shell">
+                <div className="mb-3 pt-3 border-t border-[var(--taomni-divider)]">
+                  <AiShellPanel enabled={voiceShellEnabled} onToggle={toggleVoiceShell} />
+                </div>
+              </SettingsAnchor>
 
-            <SettingsAnchor id="ai-codex">
-              <div className="pt-3 border-t border-[var(--taomni-divider)]">
-                <CodexCodePanel />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-[var(--taomni-divider)]">
+                <SettingsAnchor id="ai-asr">
+                  <AsrPanel />
+                </SettingsAnchor>
+                <SettingsAnchor id="ai-llm">
+                  <LlmProvidersPanel />
+                </SettingsAnchor>
               </div>
-            </SettingsAnchor>
+              <SettingsAnchor id="ai-websearch">
+                <div className="pt-3 border-t border-[var(--taomni-divider)]">
+                  <WebSearchPanel />
+                </div>
+              </SettingsAnchor>
 
-            <SettingsAnchor id="ai-acp">
-              <div className="pt-3 border-t border-[var(--taomni-divider)]">
-                <AcpAgentsPanel />
-              </div>
-            </SettingsAnchor>
+              <SettingsAnchor id="ai-claude">
+                <div className="pt-3 border-t border-[var(--taomni-divider)]">
+                  <ClaudeCodePanel />
+                </div>
+              </SettingsAnchor>
 
-            <SettingsAnchor id="ai-chatformat">
-              <div className="pt-3 border-t border-[var(--taomni-divider)]">
-                <ChatOutputFormatPanel />
-              </div>
-            </SettingsAnchor>
+              <SettingsAnchor id="ai-codex">
+                <div className="pt-3 border-t border-[var(--taomni-divider)]">
+                  <CodexCodePanel />
+                </div>
+              </SettingsAnchor>
 
-            <SettingsAnchor id="ai-chathistory">
-              <div className="pt-3 border-t border-[var(--taomni-divider)]">
-                <ChatHistoryPanel />
-              </div>
-            </SettingsAnchor>
+              <SettingsAnchor id="ai-acp">
+                <div className="pt-3 border-t border-[var(--taomni-divider)]">
+                  <AcpAgentsPanel />
+                </div>
+              </SettingsAnchor>
 
-            <SettingsAnchor id="ai-models">
-              <div className="pt-3 border-t border-[var(--taomni-divider)]">
-                <ModelsAdvancedPanel />
-              </div>
-            </SettingsAnchor>
-          </section>
+              <SettingsAnchor id="ai-chatformat">
+                <div className="pt-3 border-t border-[var(--taomni-divider)]">
+                  <ChatOutputFormatPanel />
+                </div>
+              </SettingsAnchor>
+
+              <SettingsAnchor id="ai-chathistory">
+                <div className="pt-3 border-t border-[var(--taomni-divider)]">
+                  <ChatHistoryPanel />
+                </div>
+              </SettingsAnchor>
+
+              <SettingsAnchor id="ai-models">
+                <div className="pt-3 border-t border-[var(--taomni-divider)]">
+                  <ModelsAdvancedPanel />
+                </div>
+              </SettingsAnchor>
+            </section>
+          </SettingsGroup>
         </div>
       </div>
     </SettingsSearchContext.Provider>

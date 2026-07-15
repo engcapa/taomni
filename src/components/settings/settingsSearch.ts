@@ -8,10 +8,19 @@ import type { TranslateFn } from "../../lib/i18n";
 //
 // To make a newly-added settings panel searchable, add one entry here in the
 // same order it renders and wrap its markup in <SettingsAnchor id="...">.
+// Also place the entry id in the matching SETTINGS_GROUPS[].entryIds list.
 export interface SettingsSearchEntry {
   id: string;
   titleKeys: string[];
   terms: string[];
+}
+
+// Collapsible group in the Settings panel. Order MUST match the render order
+// in SettingsPanel. `titleKey` is the group header shown when collapsed.
+export interface SettingsGroupDef {
+  id: string;
+  titleKey: string;
+  entryIds: string[];
 }
 
 // Order MUST match the render order in SettingsPanel so prev/next navigation
@@ -164,6 +173,79 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
   },
 ];
 
+// Collapsible groups. Entry ids must cover every SETTINGS_SEARCH_ENTRIES id
+// exactly once, in the same top-to-bottom order as the panel renders.
+export const SETTINGS_GROUPS: SettingsGroupDef[] = [
+  {
+    id: "general",
+    titleKey: "settings.groupGeneral",
+    entryIds: ["language", "app-theme", "welcome-history", "global-ui"],
+  },
+  {
+    id: "code",
+    titleKey: "settings.groupCode",
+    entryIds: ["code-view-appearance", "language-servers"],
+  },
+  {
+    id: "database",
+    titleKey: "settings.groupDatabase",
+    entryIds: ["sql-completion", "sql-execution"],
+  },
+  {
+    id: "terminal",
+    titleKey: "settings.groupTerminal",
+    entryIds: ["terminal-defaults"],
+  },
+  {
+    id: "security",
+    titleKey: "settings.groupSecurity",
+    entryIds: ["vault"],
+  },
+  {
+    id: "network",
+    titleKey: "settings.groupNetwork",
+    entryIds: ["app-proxy", "lanchat"],
+  },
+  {
+    id: "ai",
+    titleKey: "settings.groupAi",
+    entryIds: [
+      "ai-master",
+      "ai-privacy",
+      "ai-shell",
+      "ai-asr",
+      "ai-llm",
+      "ai-websearch",
+      "ai-claude",
+      "ai-codex",
+      "ai-acp",
+      "ai-chatformat",
+      "ai-chathistory",
+      "ai-models",
+    ],
+  },
+];
+
+/** Map search-entry id → group id (built once from SETTINGS_GROUPS). */
+export const ENTRY_TO_GROUP: ReadonlyMap<string, string> = (() => {
+  const map = new Map<string, string>();
+  for (const group of SETTINGS_GROUPS) {
+    for (const entryId of group.entryIds) {
+      map.set(entryId, group.id);
+    }
+  }
+  return map;
+})();
+
+export function groupIdForEntry(entryId: string): string | undefined {
+  return ENTRY_TO_GROUP.get(entryId);
+}
+
+/** Default expand map: every group collapsed so the panel opens as a compact TOC. */
+export function defaultExpandedGroups(): Record<string, boolean> {
+  return Object.fromEntries(SETTINGS_GROUPS.map((g) => [g.id, false]));
+}
+
 // True when `query` matches the entry's resolved titles or any literal term.
 // Empty/whitespace queries never match (caller treats that as "no search").
 export function matchesEntry(entry: SettingsSearchEntry, query: string, t: TranslateFn): boolean {
@@ -182,4 +264,17 @@ export function matchesEntry(entry: SettingsSearchEntry, query: string, t: Trans
 export function matchingIds(query: string, t: TranslateFn): string[] {
   if (!query.trim()) return [];
   return SETTINGS_SEARCH_ENTRIES.filter((entry) => matchesEntry(entry, query, t)).map((e) => e.id);
+}
+
+/** Ordered unique group ids that contain at least one of the given entry ids. */
+export function matchingGroupIds(entryIds: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const entryId of entryIds) {
+    const groupId = ENTRY_TO_GROUP.get(entryId);
+    if (!groupId || seen.has(groupId)) continue;
+    seen.add(groupId);
+    out.push(groupId);
+  }
+  return out;
 }

@@ -50,6 +50,7 @@ describe("SettingsPanel", () => {
     const user = userEvent.setup();
     render(<SettingsPanel />);
 
+    await user.click(screen.getByTestId("settings-group-toggle-general"));
     expect(ipcMocks.listSystemFonts).not.toHaveBeenCalled();
     await user.click(screen.getByLabelText("UI Font Family"));
     await waitFor(() => expect(ipcMocks.listSystemFonts).toHaveBeenCalledTimes(1));
@@ -59,9 +60,11 @@ describe("SettingsPanel", () => {
     cleanup();
   });
 
-  it("exposes terminal defaults instead of legacy terminal appearance settings", () => {
+  it("exposes terminal defaults instead of legacy terminal appearance settings", async () => {
+    const user = userEvent.setup();
     render(<SettingsPanel />);
 
+    await user.click(screen.getByTestId("settings-group-toggle-terminal"));
     expect(screen.queryByText("Terminal Appearance")).not.toBeInTheDocument();
     expect(screen.getByText("Terminal Defaults")).toBeInTheDocument();
     expect(screen.getByTestId("terminal-appearance-settings")).toBeInTheDocument();
@@ -72,6 +75,7 @@ describe("SettingsPanel", () => {
     const user = userEvent.setup();
     render(<SettingsPanel />);
 
+    await user.click(screen.getByTestId("settings-group-toggle-general"));
     await user.click(screen.getByTestId("app-theme-select"));
     await user.click(screen.getByTestId("app-theme-dark"));
     expect(window.localStorage.getItem(APP_THEME_STORAGE_KEY)).toBe("dark");
@@ -85,6 +89,7 @@ describe("SettingsPanel", () => {
     const user = userEvent.setup();
     render(<SettingsPanel />);
 
+    await user.click(screen.getByTestId("settings-group-toggle-general"));
     // Select alternative UI font
     const fontSelect = screen.getByLabelText("UI Font Family");
     await user.click(fontSelect);
@@ -108,6 +113,7 @@ describe("SettingsPanel", () => {
     const user = userEvent.setup();
     render(<SettingsPanel />);
 
+    await user.click(screen.getByTestId("settings-group-toggle-code"));
     const codeFontSelect = screen.getByLabelText("Code font");
     await user.click(codeFontSelect);
     await user.click(await screen.findByRole("option", { name: "JetBrains Mono" }));
@@ -131,6 +137,7 @@ describe("SettingsPanel", () => {
     const user = userEvent.setup();
     render(<SettingsPanel />);
 
+    await user.click(screen.getByTestId("settings-group-toggle-terminal"));
     const terminalFontSelect = screen.getByLabelText("Terminal font");
     await user.click(terminalFontSelect);
     await user.click(await screen.findByRole("option", { name: "JetBrains Mono" }));
@@ -145,9 +152,11 @@ describe("SettingsPanel", () => {
     });
   });
 
-  it("persists the welcome recent session history limit", () => {
+  it("persists the welcome recent session history limit", async () => {
+    const user = userEvent.setup();
     render(<SettingsPanel />);
 
+    await user.click(screen.getByTestId("settings-group-toggle-general"));
     const input = screen.getByLabelText("Recent session history limit");
     fireEvent.change(input, { target: { value: "35" } });
 
@@ -159,6 +168,7 @@ describe("SettingsPanel", () => {
     const user = userEvent.setup();
     render(<SettingsPanel />);
 
+    await user.click(screen.getByTestId("settings-group-toggle-security"));
     expect(screen.getByTestId("vault-unlock-mode-startup")).toHaveAttribute("aria-pressed", "true");
 
     await user.click(screen.getByTestId("vault-unlock-mode-on-demand"));
@@ -169,6 +179,23 @@ describe("SettingsPanel", () => {
     await user.click(screen.getByTestId("vault-unlock-mode-startup"));
     expect(useAppStore.getState().vaultUnlockMode).toBe("startup");
     expect(window.localStorage.getItem("taomni.vaultUnlockMode")).toBe("startup");
+  });
+
+  it("opens with all groups collapsed and titles visible", async () => {
+    const user = userEvent.setup();
+    render(<SettingsPanel />);
+
+    for (const id of ["general", "code", "database", "terminal", "security", "network", "ai"]) {
+      expect(screen.getByTestId(`settings-group-${id}`)).toHaveAttribute("data-expanded", "false");
+      expect(screen.getByTestId(`settings-group-body-${id}`)).not.toBeVisible();
+    }
+
+    // Expanding a group reveals its body; title stays on the header either way.
+    expect(screen.getByTestId("settings-group-toggle-terminal")).toHaveTextContent("Terminal");
+    await user.click(screen.getByTestId("settings-group-toggle-terminal"));
+    expect(screen.getByTestId("settings-group-terminal")).toHaveAttribute("data-expanded", "true");
+    expect(screen.getByTestId("settings-group-body-terminal")).toBeVisible();
+    expect(screen.getByTestId("settings-group-toggle-terminal")).toHaveAttribute("aria-expanded", "true");
   });
 
   it("highlights settings matching the search query", async () => {
@@ -187,6 +214,13 @@ describe("SettingsPanel", () => {
 
     // Application Proxy and ACP proxy policy are separate searchable units.
     expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 2");
+    // Matches span Network + AI groups.
+    expect(screen.getByTestId("settings-search-group-count")).toHaveTextContent("2 groups");
+    expect(screen.getByTestId("settings-group-network")).toHaveAttribute("data-expanded", "true");
+    expect(screen.getByTestId("settings-group-ai")).toHaveAttribute("data-expanded", "true");
+    expect(screen.getByTestId("settings-group-network")).toHaveAttribute("data-group-match", "true");
+    expect(screen.getByTestId("settings-group-ai")).toHaveAttribute("data-group-match", "true");
+    expect(screen.getByTestId("settings-group-general")).toHaveAttribute("data-group-match", "false");
 
     // Clearing the search drops the active state entirely.
     await user.click(screen.getByRole("button", { name: "Clear search" }));
@@ -194,6 +228,27 @@ describe("SettingsPanel", () => {
     expect(
       container.querySelector('[data-search-id="app-proxy"]'),
     ).not.toHaveAttribute("data-search-match");
+  });
+
+  it("opens collapsed groups that contain search matches and supports prev/next", async () => {
+    const user = userEvent.setup();
+    render(<SettingsPanel />);
+
+    // Default is collapsed; search should still open the hit groups.
+    expect(screen.getByTestId("settings-group-network")).toHaveAttribute("data-expanded", "false");
+    expect(screen.getByTestId("settings-group-ai")).toHaveAttribute("data-expanded", "false");
+
+    await user.type(screen.getByTestId("settings-search-input"), "proxy");
+
+    expect(screen.getByTestId("settings-group-network")).toHaveAttribute("data-expanded", "true");
+    expect(screen.getByTestId("settings-group-ai")).toHaveAttribute("data-expanded", "true");
+    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 2");
+
+    await user.click(screen.getByRole("button", { name: "Next match" }));
+    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("2 / 2");
+
+    await user.click(screen.getByRole("button", { name: "Previous match" }));
+    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 2");
   });
 
   it("highlights Codex settings from a codex search query", async () => {
