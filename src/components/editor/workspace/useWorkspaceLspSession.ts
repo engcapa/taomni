@@ -12,7 +12,6 @@ import {
   type LspServerStatus,
 } from "../../../lib/editor/lsp";
 import type { CodeWorkspaceRootInfo } from "../../../types";
-import type { LspCustomCommandConfig } from "./FileTreePane";
 import { buildIncrementalContentChange } from "./lspTextEdits";
 import {
   CUSTOM_LSP_COMMAND_ID,
@@ -25,6 +24,7 @@ import {
   subscribeLspServerPrefs,
   writeLspCommandPrefs,
   writeLspCustomCommands,
+  type LspCustomCommandConfig,
   type LspFileState,
   type OpenFileState,
 } from "./codeWorkspaceModel";

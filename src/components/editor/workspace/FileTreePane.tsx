@@ -33,12 +33,6 @@ import {
 
 export type { FileTreeViewMode };
 
-/** Custom LSP command shape (prefs shared with Settings Language Servers). */
-export interface LspCustomCommandConfig {
-  command: string;
-  args: string;
-}
-
 interface FileTreePaneProps {
   paneRef: RefObject<HTMLElement | null>;
   style: CSSProperties;

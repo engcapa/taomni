@@ -466,10 +466,6 @@ export function CodeWorkspaceTab({
   const pendingEditorTextByFileRef = useRef(new Map<string, OpenFileState>());
   const pendingEditorTextTimerRef = useRef<number | null>(null);
 
-  const setLanguagePanelOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
-    const next = typeof open === "function" ? open(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).languagePanelOpen) : open;
-    patchWorkspaceUi(workspaceInstanceId, { languagePanelOpen: next });
-  }, [patchWorkspaceUi, workspaceInstanceId]);
   const setBottomDockOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
     const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).bottomDockOpen;
     patchWorkspaceUi(workspaceInstanceId, { bottomDockOpen: typeof open === "function" ? open(prev) : open });
