@@ -9,9 +9,9 @@ const MAIL_ALLOWED_TAGS = [
 ];
 
 const MAIL_ALLOWED_ATTR = [
-  "align", "alt", "class", "color", "colspan", "face", "height", "href",
-  "lang", "name", "rel", "rowspan", "size", "src", "style", "target",
-  "title", "width",
+  "align", "alt", "class", "color", "colspan", "data-taomni-cid", "face",
+  "height", "href", "lang", "name", "rel", "rowspan", "size", "src", "style",
+  "target", "title", "width",
 ];
 
 const MAIL_PURIFY_CONFIG: DomPurifyConfig = {
@@ -20,8 +20,9 @@ const MAIL_PURIFY_CONFIG: DomPurifyConfig = {
   FORBID_TAGS: ["script", "iframe", "object", "embed", "link", "meta"],
   FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus"],
   ALLOW_DATA_ATTR: false,
-  ADD_ATTR: ["target"],
-  ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|cid):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+  ADD_ATTR: ["target", "data-taomni-cid"],
+  // Thunderbird-style: allow embedded cid:/data: images; remote http(s) stay for optional load.
+  ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|cid|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
 };
 
 const SAFE_STYLE_PROPS = new Set([
@@ -39,6 +40,8 @@ const SAFE_STYLE_PROPS = new Set([
   "text-decoration",
   "text-decoration-line",
 ]);
+
+const REMOTE_IMAGE_PLACEHOLDER = "[remote image blocked]";
 
 let hooksInstalled = false;
 
@@ -111,17 +114,47 @@ function isSafeCssColor(value: string): boolean {
   return /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(\s*,\s*(0|1|0?\.\d+))?\s*\)$/.test(lower);
 }
 
-export function sanitizeMailDisplayHtml(html: string, allowImages: boolean): string {
+/** Remote content that should stay blocked until the user opts in (Thunderbird privacy model). */
+export function isRemoteMailImageSrc(src: string | null | undefined): boolean {
+  const value = (src ?? "").trim();
+  if (!value) return false;
+  if (/^(cid:|data:|blob:|file:)/i.test(value)) return false;
+  return /^(https?:|\/\/)/i.test(value);
+}
+
+export function mailHtmlHasRemoteImages(html: string | null | undefined): boolean {
+  const value = html?.trim();
+  if (!value) return false;
+  if (typeof DOMParser === "undefined") {
+    return /<img\b[^>]*\bsrc\s*=\s*["']?\s*(?:https?:|\/\/)/i.test(value);
+  }
+  const doc = new DOMParser().parseFromString(value, "text/html");
+  return Array.from(doc.querySelectorAll("img")).some((img) => isRemoteMailImageSrc(img.getAttribute("src")));
+}
+
+/**
+ * Sanitize HTML for the message reader.
+ * When allowRemoteImages is false, only remote http(s) images are blocked —
+ * embedded cid:/data: images remain visible (Thunderbird-aligned).
+ */
+export function sanitizeMailDisplayHtml(html: string, allowRemoteImages: boolean): string {
   installMailPurifyHooks();
   const sanitized = DOMPurify.sanitize(html, MAIL_PURIFY_CONFIG) as unknown as string;
-  if (allowImages) return sanitized;
+  if (allowRemoteImages) return sanitized;
   if (typeof DOMParser === "undefined") {
-    return sanitized.replace(/<img\b[^>]*>/gi, "[image blocked]");
+    return sanitized.replace(/<img\b[^>]*>/gi, (tag) => {
+      const srcMatch = /\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(tag);
+      const src = srcMatch?.[1] ?? srcMatch?.[2] ?? srcMatch?.[3] ?? "";
+      return isRemoteMailImageSrc(src) ? REMOTE_IMAGE_PLACEHOLDER : tag;
+    });
   }
   const doc = new DOMParser().parseFromString(sanitized, "text/html");
   doc.querySelectorAll("img").forEach((img) => {
+    if (!isRemoteMailImageSrc(img.getAttribute("src"))) return;
     const placeholder = doc.createElement("span");
-    placeholder.textContent = "[image blocked]";
+    placeholder.setAttribute("data-taomni-remote-image", "blocked");
+    placeholder.className = "taomni-mail-remote-image-blocked";
+    placeholder.textContent = REMOTE_IMAGE_PLACEHOLDER;
     img.replaceWith(placeholder);
   });
   return doc.body.innerHTML;
@@ -131,6 +164,38 @@ export function sanitizeMailComposeHtml(html: string): string {
   installMailPurifyHooks();
   const sanitized = DOMPurify.sanitize(html, MAIL_PURIFY_CONFIG) as unknown as string;
   return sanitized.trim() || "<p><br></p>";
+}
+
+/** Build a compose-time inline image that previews via data URL and sends as cid: */
+export function buildInlineImageHtml(opts: {
+  contentId: string;
+  dataUrl: string;
+  alt?: string;
+}): string {
+  const contentId = opts.contentId.trim();
+  const dataUrl = opts.dataUrl.trim();
+  const alt = opts.alt?.trim() || "image";
+  return `<img src="${escapeHtml(dataUrl)}" data-taomni-cid="${escapeHtml(contentId)}" alt="${escapeHtml(alt)}">`;
+}
+
+/** Rewrite compose previews (data URL + data-taomni-cid) to cid: for MIME send. */
+export function prepareMailHtmlForSend(html: string): string {
+  const sanitized = sanitizeMailComposeHtml(html);
+  if (typeof DOMParser === "undefined") {
+    return sanitized.replace(
+      /<img\b([^>]*?)\bsrc=(["'])data:[^"']*\2([^>]*?)\bdata-taomni-cid=(["'])([^"']+)\4([^>]*)>/gi,
+      (_full, before: string, _q1: string, mid: string, _q2: string, cid: string, after: string) =>
+        `<img${before}src="cid:${cid}"${mid}${after}>`.replace(/\sdata-taomni-cid=(["'])[^"']+\1/i, ""),
+    );
+  }
+  const doc = new DOMParser().parseFromString(sanitized, "text/html");
+  doc.querySelectorAll("img[data-taomni-cid]").forEach((img) => {
+    const cid = img.getAttribute("data-taomni-cid")?.trim();
+    if (!cid) return;
+    img.setAttribute("src", `cid:${cid}`);
+    img.removeAttribute("data-taomni-cid");
+  });
+  return doc.body.innerHTML.trim() || "<p><br></p>";
 }
 
 export function plainTextToMailHtml(text: string): string {

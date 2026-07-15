@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode, type UIEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type UIEvent } from "react";
 import {
   Group as PanelGroup,
   Panel,
@@ -98,16 +98,36 @@ import {
 } from "../../lib/mailRecipients";
 import {
   buildForwardHtml,
+  buildInlineImageHtml,
   buildReplyHtml,
   hasRichMailFormatting,
+  mailHtmlHasRemoteImages,
   mailHtmlToPlainText,
   plainTextToMailHtml,
+  prepareMailHtmlForSend,
   quotePlainText,
   sanitizeMailComposeHtml,
   sanitizeMailDisplayHtml,
   signatureToMailHtml,
 } from "../../lib/mailHtml";
-import { openLocalPath, selectUploadFile, temporaryFilePath } from "../../lib/ipc";
+import {
+  openLocalPath,
+  readFileBytes,
+  selectUploadFile,
+  temporaryFilePath,
+  writeStreamAbort,
+  writeStreamAppend,
+  writeStreamClose,
+  writeStreamOpen,
+} from "../../lib/ipc";
+import {
+  droppedFilePaths,
+  droppedFiles,
+  isOsFileDrag,
+  NATIVE_FILE_DROP_EVENT,
+  preventDefaultForOsFileDrag,
+  type NativeFileDropDetail,
+} from "../../lib/osFileDrop";
 import { useChatStore } from "../../stores/chatStore";
 import { useTaoAlertStore } from "../../stores/taoAlertStore";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
@@ -759,8 +779,77 @@ function appendUniqueAddress(target: string[], seen: Set<string>, address: MailA
   target.push(label);
 }
 
-function sanitizeMailHtml(html: string, allowImages: boolean): string {
-  return sanitizeMailDisplayHtml(html, allowImages);
+function sanitizeMailHtml(html: string, allowRemoteImages: boolean): string {
+  return sanitizeMailDisplayHtml(html, allowRemoteImages);
+}
+
+async function writeBytesToPath(path: string, bytes: Uint8Array): Promise<void> {
+  let handleId: string | null = null;
+  try {
+    handleId = await writeStreamOpen(path);
+    const chunkSize = 256 * 1024;
+    for (let offset = 0; offset < bytes.byteLength; offset += chunkSize) {
+      const end = Math.min(offset + chunkSize, bytes.byteLength);
+      await writeStreamAppend(handleId, bytes.subarray(offset, end));
+    }
+    await writeStreamClose(handleId);
+  } catch (err) {
+    if (handleId) await writeStreamAbort(handleId).catch(() => undefined);
+    throw err;
+  }
+}
+
+function uint8ToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+function extensionForMime(mime: string): string {
+  const lower = mime.toLowerCase();
+  if (lower.includes("jpeg") || lower.includes("jpg")) return "jpg";
+  if (lower.includes("png")) return "png";
+  if (lower.includes("gif")) return "gif";
+  if (lower.includes("webp")) return "webp";
+  if (lower.includes("bmp")) return "bmp";
+  if (lower.includes("svg")) return "svg";
+  return "bin";
+}
+
+function RemoteImagesBanner({
+  visible,
+  allowRemoteImages,
+  onToggle,
+}: {
+  visible: boolean;
+  allowRemoteImages: boolean;
+  onToggle: () => void;
+}) {
+  if (!visible) return null;
+  return (
+    <div
+      className="mx-4 mt-3 mb-0 flex flex-wrap items-center gap-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)] px-3 py-2 text-[12px]"
+      data-testid="mail-remote-images-banner"
+    >
+      <ImageOff className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
+      <span className="flex-1 text-[var(--taomni-text-muted)]">
+        {allowRemoteImages
+          ? "Remote images are shown for this message."
+          : "To protect your privacy, remote images in this message have been blocked."}
+      </span>
+      <button
+        type="button"
+        className="taomni-btn h-6 px-2 text-[11px]"
+        data-testid="mail-remote-images-toggle"
+        onClick={onToggle}
+      >
+        {allowRemoteImages ? "Block remote content" : "Show remote content"}
+      </button>
+    </div>
+  );
 }
 
 function htmlToText(html: string): string {
@@ -832,6 +921,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const [sending, setSending] = useState(false);
   const [downloadingAttachmentIndex, setDownloadingAttachmentIndex] = useState<number | null>(null);
   const [allowRemoteImages, setAllowRemoteImages] = useState(false);
+  const [composeDragActive, setComposeDragActive] = useState(false);
+  const [attachProgress, setAttachProgress] = useState<{ done: number; total: number; label: string } | null>(null);
+  const composeRootRef = useRef<HTMLDivElement>(null);
   const visibleRef = useRef(visible);
   const pendingCacheRefreshRef = useRef(false);
   const initialSyncDoneRef = useRef(false);
@@ -956,6 +1048,10 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     if (!selectedBody?.html) return null;
     return sanitizeMailHtml(selectedBody.html, allowRemoteImages);
   }, [allowRemoteImages, selectedBody?.html]);
+  const selectedHasRemoteImages = useMemo(
+    () => mailHtmlHasRemoteImages(selectedBody?.html),
+    [selectedBody?.html],
+  );
 
   const visibleAttachments = useMemo(
     () => (selectedBody?.attachments.length ? selectedBody.attachments : selectedMessage?.attachments ?? []),
@@ -1982,7 +2078,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   };
 
   const handleSendDraft = async () => {
-    const htmlBody = sanitizeMailComposeHtml(draft.htmlBody);
+    // Convert compose-time data-URL previews (data-taomni-cid) to cid: for MIME.
+    const htmlBody = prepareMailHtmlForSend(draft.htmlBody);
     const textBody = draft.textBody.trim() || mailHtmlToPlainText(htmlBody);
     const sendHtml = draft.richFormatUsed || hasRichMailFormatting(htmlBody);
     const request = {
@@ -2028,13 +2125,14 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }
   };
 
-  const handleAddDraftAttachments = async () => {
+  const addDraftAttachmentPaths = useCallback(async (paths: string[]) => {
+    const unique = paths.map((path) => path.trim()).filter(Boolean);
+    if (unique.length === 0) return;
+    setAttachProgress({ done: 0, total: unique.length, label: "Attaching files…" });
     try {
-      const paths = await selectUploadFile();
-      if (!paths.length) return;
       setDraft((current) => {
         const existing = new Set(current.attachments.map((attachment) => attachment.path));
-        const nextAttachments = paths
+        const nextAttachments = unique
           .filter((path) => !existing.has(path))
           .map((path) => {
             const name = basename(path);
@@ -2048,43 +2146,140 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           });
         return { ...current, attachments: [...current.attachments, ...nextAttachments] };
       });
+      setAttachProgress({ done: unique.length, total: unique.length, label: "Attachments ready" });
+      setStatus(
+        unique.length === 1
+          ? `Attached ${basename(unique[0])}`
+          : `Attached ${unique.length} files`,
+      );
+      window.setTimeout(() => setAttachProgress(null), 1200);
+    } catch (e) {
+      setAttachProgress(null);
+      setError(mailClientErrorMessage(e));
+    }
+  }, []);
+
+  const handleAddDraftAttachments = async () => {
+    try {
+      const paths = await selectUploadFile();
+      if (!paths.length) return;
+      await addDraftAttachmentPaths(paths);
     } catch (e) {
       setError(mailClientErrorMessage(e));
     }
   };
+
+  const insertInlineImageFromPath = useCallback(async (path: string): Promise<string | null> => {
+    const name = basename(path);
+    const contentType = guessContentType(name);
+    if (!contentType.toLowerCase().startsWith("image/")) {
+      setError("Inline image must be a local image file.");
+      return null;
+    }
+    const bytes = await readFileBytes(path);
+    const dataUrl = `data:${contentType};base64,${uint8ToBase64(bytes)}`;
+    const contentId = makeInlineImageContentId(name);
+    const attachment: MailDraftAttachment = {
+      path,
+      name,
+      contentType,
+      inline: true,
+      contentId,
+      size: bytes.byteLength,
+      modifiedAt: null,
+    };
+    setDraft((current) => ({
+      ...current,
+      richFormatUsed: true,
+      attachments: [...current.attachments, attachment],
+    }));
+    return buildInlineImageHtml({ contentId, dataUrl, alt: name });
+  }, []);
+
+  const insertInlineImageFromFile = useCallback(async (file: File): Promise<string | null> => {
+    const mime = file.type || "image/png";
+    if (!mime.toLowerCase().startsWith("image/")) {
+      setError("Inline image must be an image file.");
+      return null;
+    }
+    const ext = extensionForMime(mime);
+    const name = (file.name?.trim() || `pasted-image.${ext}`).replace(/[\\/]/g, "_");
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const path = await temporaryFilePath(name);
+    await writeBytesToPath(path, bytes);
+    const dataUrl = `data:${mime};base64,${uint8ToBase64(bytes)}`;
+    const contentId = makeInlineImageContentId(name);
+    const attachment: MailDraftAttachment = {
+      path,
+      name,
+      contentType: mime,
+      inline: true,
+      contentId,
+      size: bytes.byteLength,
+      modifiedAt: null,
+    };
+    setDraft((current) => ({
+      ...current,
+      richFormatUsed: true,
+      attachments: [...current.attachments, attachment],
+    }));
+    return buildInlineImageHtml({ contentId, dataUrl, alt: name });
+  }, []);
 
   const handleInsertInlineImage = async (): Promise<string | null> => {
     try {
       const paths = await selectUploadFile();
       const path = paths[0];
       if (!path) return null;
-      const name = basename(path);
-      const contentType = guessContentType(name);
-      if (!contentType.toLowerCase().startsWith("image/")) {
-        setError("Inline image must be a local image file.");
-        return null;
-      }
-      const contentId = makeInlineImageContentId(name);
-      const attachment: MailDraftAttachment = {
-        path,
-        name,
-        contentType,
-        inline: true,
-        contentId,
-        size: null,
-        modifiedAt: null,
-      };
-      setDraft((current) => ({
-        ...current,
-        richFormatUsed: true,
-        attachments: [...current.attachments, attachment],
-      }));
-      return `<img src="cid:${escapeHtml(contentId)}" alt="${escapeHtml(name)}">`;
+      return await insertInlineImageFromPath(path);
     } catch (e) {
       setError(mailClientErrorMessage(e));
       return null;
     }
   };
+
+  const handlePasteImages = useCallback(async (files: File[]): Promise<string[]> => {
+    const snippets: string[] = [];
+    setAttachProgress({ done: 0, total: files.length, label: "Inserting images…" });
+    try {
+      for (let i = 0; i < files.length; i += 1) {
+        const html = await insertInlineImageFromFile(files[i]);
+        if (html) snippets.push(html);
+        setAttachProgress({ done: i + 1, total: files.length, label: "Inserting images…" });
+      }
+      setAttachProgress({ done: files.length, total: files.length, label: "Images inserted" });
+      if (snippets.length > 0) {
+        setStatus(snippets.length === 1 ? "Image pasted" : `${snippets.length} images pasted`);
+      }
+      window.setTimeout(() => setAttachProgress(null), 1200);
+      return snippets;
+    } catch (e) {
+      setAttachProgress(null);
+      setError(mailClientErrorMessage(e));
+      return snippets;
+    }
+  }, [insertInlineImageFromFile]);
+
+  const handleDropComposeFiles = useCallback(async (files: File[]) => {
+    if (files.length === 0) return;
+    setAttachProgress({ done: 0, total: files.length, label: "Attaching files…" });
+    try {
+      const paths: string[] = [];
+      for (let i = 0; i < files.length; i += 1) {
+        const file = files[i];
+        const name = (file.name?.trim() || `attachment-${i + 1}`).replace(/[\\/]/g, "_");
+        const path = await temporaryFilePath(name);
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        await writeBytesToPath(path, bytes);
+        paths.push(path);
+        setAttachProgress({ done: i + 1, total: files.length, label: "Attaching files…" });
+      }
+      await addDraftAttachmentPaths(paths);
+    } catch (e) {
+      setAttachProgress(null);
+      setError(mailClientErrorMessage(e));
+    }
+  }, [addDraftAttachmentPaths]);
 
   const removeDraftAttachment = (index: number) => {
     setDraft((current) => {
@@ -2094,10 +2289,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         return { ...current, attachments };
       }
       const cid = escapeRegExp(removed.contentId);
-      const htmlBody = current.htmlBody.replace(
-        new RegExp(`<img\\b[^>]*\\bsrc=["']cid:${cid}["'][^>]*>`, "gi"),
-        "",
-      );
+      const htmlBody = current.htmlBody
+        .replace(new RegExp(`<img\\b[^>]*\\bdata-taomni-cid=["']${cid}["'][^>]*>`, "gi"), "")
+        .replace(new RegExp(`<img\\b[^>]*\\bsrc=["']cid:${cid}["'][^>]*>`, "gi"), "");
       return {
         ...current,
         attachments,
@@ -2106,6 +2300,25 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       };
     });
   };
+
+  useEffect(() => {
+    if (!composeOpen) {
+      setComposeDragActive(false);
+      return;
+    }
+    const handleNativeFileDrop = (event: Event) => {
+      if (sending) return;
+      const detail = (event as CustomEvent<NativeFileDropDetail>).detail;
+      if (!detail?.paths?.length) return;
+      const root = composeRootRef.current;
+      const target = document.elementFromPoint(detail.clientX, detail.clientY);
+      if (!root || !target || !root.contains(target)) return;
+      setComposeDragActive(false);
+      void addDraftAttachmentPaths(detail.paths);
+    };
+    window.addEventListener(NATIVE_FILE_DROP_EVENT, handleNativeFileDrop);
+    return () => window.removeEventListener(NATIVE_FILE_DROP_EVENT, handleNativeFileDrop);
+  }, [addDraftAttachmentPaths, composeOpen, sending]);
 
   const discardCurrentDraft = async () => {
     const draftId = draft.id;
@@ -2808,6 +3021,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const currentBody = message
       ? bodyCache.get(messageKey(message)) ?? (bodyMatchesMessage(body, message) ? body : null)
       : null;
+    const currentHasRemoteImages = mailHtmlHasRemoteImages(currentBody?.html);
     const currentHtml = currentBody?.html ? sanitizeMailHtml(currentBody.html, allowRemoteImages) : null;
     const currentAttachments = currentBody?.attachments.length ? currentBody.attachments : message?.attachments ?? [];
     const loadingThisBody = !!message && bodyLoadingKey === messageKey(message);
@@ -2889,13 +3103,14 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
               <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
                 <span>{currentBody?.source === "cache" ? "cached body" : currentBody?.source === "remote" ? "remote body" : "header cached"}</span>
                 {message.rawSize ? <span>{formatBytes(message.rawSize)}</span> : null}
-                {currentBody?.html && (
+                {currentHasRemoteImages && (
                   <button
                     type="button"
                     className="taomni-btn h-5 px-2 text-[10px]"
+                    data-testid="mail-remote-images-header-toggle"
                     onClick={() => setAllowRemoteImages((value) => !value)}
                   >
-                    {allowRemoteImages ? "Block images" : "Load images"}
+                    {allowRemoteImages ? "Block remote images" : "Load remote images"}
                   </button>
                 )}
               </div>
@@ -2941,6 +3156,12 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                 </div>
               ) : null}
             </div>
+
+            <RemoteImagesBanner
+              visible={currentHasRemoteImages}
+              allowRemoteImages={allowRemoteImages}
+              onToggle={() => setAllowRemoteImages((value) => !value)}
+            />
 
             <div className="p-5 text-[13px] leading-6">
               {loadingThisBody && !currentBody ? (
@@ -3455,13 +3676,14 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                       <span>{selectedBody?.source === "cache" ? "cached body" : selectedBody?.source === "remote" ? "remote body" : "header cached"}</span>
                       {selectedMessage.rawSize ? <span>{formatBytes(selectedMessage.rawSize)}</span> : null}
                       {info.ai.enabled && <span>AI confirm {info.ai.skipBodyConfirm ? "skipped" : "required"}</span>}
-                      {selectedBody?.html && (
+                      {selectedHasRemoteImages && (
                         <button
                           type="button"
                           className="taomni-btn h-5 px-2 text-[10px]"
+                          data-testid="mail-remote-images-header-toggle"
                           onClick={() => setAllowRemoteImages((value) => !value)}
                         >
-                          {allowRemoteImages ? "Block images" : "Load images"}
+                          {allowRemoteImages ? "Block remote images" : "Load remote images"}
                         </button>
                       )}
                     </div>
@@ -3507,6 +3729,12 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                       </div>
                     ) : null}
                   </div>
+
+                  <RemoteImagesBanner
+                    visible={selectedHasRemoteImages}
+                    allowRemoteImages={allowRemoteImages}
+                    onToggle={() => setAllowRemoteImages((value) => !value)}
+                  />
 
                   <div className="p-4 text-[13px] leading-6">
                     {selectedMessage && bodyLoadingKey === messageKey(selectedMessage) && !selectedBody ? (
@@ -3655,7 +3883,42 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       )}
 
       {composeOpen && (
-        <div className="absolute inset-0 z-[150] bg-black/30 flex items-center justify-center p-4" data-testid="mail-compose-dialog">
+        <div
+          ref={composeRootRef}
+          className="absolute inset-0 z-[150] bg-black/30 flex items-center justify-center p-4"
+          data-testid="mail-compose-dialog"
+          onDragEnter={(event: ReactDragEvent<HTMLDivElement>) => {
+            if (sending || !isOsFileDrag(event.dataTransfer)) return;
+            preventDefaultForOsFileDrag(event);
+            event.preventDefault();
+            setComposeDragActive(true);
+          }}
+          onDragOver={(event: ReactDragEvent<HTMLDivElement>) => {
+            if (sending || !isOsFileDrag(event.dataTransfer)) return;
+            preventDefaultForOsFileDrag(event);
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+            setComposeDragActive(true);
+          }}
+          onDragLeave={(event: ReactDragEvent<HTMLDivElement>) => {
+            if (!composeRootRef.current?.contains(event.relatedTarget as Node | null)) {
+              setComposeDragActive(false);
+            }
+          }}
+          onDrop={(event: ReactDragEvent<HTMLDivElement>) => {
+            if (sending) return;
+            if (!isOsFileDrag(event.dataTransfer)) return;
+            event.preventDefault();
+            setComposeDragActive(false);
+            const paths = droppedFilePaths(event.dataTransfer);
+            if (paths.length > 0) {
+              void addDraftAttachmentPaths(paths);
+              return;
+            }
+            const files = droppedFiles(event.dataTransfer);
+            if (files.length > 0) void handleDropComposeFiles(files);
+          }}
+        >
           <MailDraggableDialog
             title={draft.id ? "Edit draft" : draft.replyContext?.kind ? "Reply" : "New message"}
             icon={<MailIcon className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
@@ -3673,9 +3936,36 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
               <button type="button" className="taomni-btn h-6 px-2" disabled={sending}>Options</button>
               <button type="button" className="taomni-btn h-6 px-2" disabled={sending}>Tools</button>
               <span className="ml-auto text-[11px] text-[var(--taomni-text-muted)]">
-                {savingDraft ? "Saving draft..." : draft.id ? "Draft saved locally" : "Auto draft"}
+                {attachProgress
+                  ? `${attachProgress.label} ${attachProgress.done}/${attachProgress.total}`
+                  : savingDraft
+                    ? "Saving draft..."
+                    : draft.id
+                      ? "Draft saved locally"
+                      : "Auto draft"}
               </span>
             </div>
+            {attachProgress && (
+              <div
+                className="px-3 py-1.5 border-b border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)] text-[11px] text-[var(--taomni-text-muted)] flex items-center gap-2"
+                data-testid="mail-compose-attach-progress"
+              >
+                {attachProgress.done < attachProgress.total
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                <span>
+                  {attachProgress.label}
+                  {" "}
+                  ({attachProgress.done}/{attachProgress.total})
+                </span>
+                <div className="ml-auto h-1.5 w-32 rounded bg-[var(--taomni-divider)] overflow-hidden">
+                  <div
+                    className="h-full bg-[var(--taomni-accent)] transition-all"
+                    style={{ width: `${attachProgress.total ? Math.round((attachProgress.done / attachProgress.total) * 100) : 0}%` }}
+                  />
+                </div>
+              </div>
+            )}
             <div className="p-3 grid grid-cols-[56px_1fr] gap-2 text-[12px]">
               <RecipientField
                 id={`mail-to-${tabId}`}
@@ -3725,37 +4015,55 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
             <RichMailEditor
               html={draft.htmlBody}
               disabled={sending}
+              dragActive={composeDragActive}
               onAttach={() => void handleAddDraftAttachments()}
               onInlineImage={() => handleInsertInlineImage()}
+              onPasteImages={handlePasteImages}
+              onDropFiles={(files) => void handleDropComposeFiles(files)}
               onRichFormatUsed={() => setDraft((current) => ({ ...current, richFormatUsed: true }))}
               onChange={(htmlBody, textBody) => setDraft((current) => ({ ...current, htmlBody, textBody }))}
             />
-            {draft.attachments.length > 0 && (
-              <div className="mx-3 mb-3 flex flex-wrap gap-1.5" data-testid="mail-compose-attachments">
-                {draft.attachments.map((attachment, index) => (
-                  <span
-                    key={`${attachment.path}-${index}`}
-                    className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-2 py-1 text-[11px] text-[var(--taomni-text-muted)] bg-[var(--taomni-sidebar-bg)]"
-                    data-testid="mail-compose-attachment-chip"
-                    title={attachment.path}
-                  >
-                    {attachment.inline ? <ImageIcon className="w-3 h-3" /> : <Paperclip className="w-3 h-3" />}
-                    <span className="max-w-[280px] truncate">
-                      {attachment.inline ? "Inline " : ""}{attachment.name || basename(attachment.path)}
-                    </span>
-                    <button
-                      type="button"
-                      className="ml-1 text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"
-                      aria-label={`Remove ${attachment.name || "attachment"}`}
-                      onClick={() => removeDraftAttachment(index)}
-                      disabled={sending}
+            <div
+              className={`mx-3 mb-3 min-h-[40px] rounded border border-dashed px-2 py-2 ${
+                composeDragActive
+                  ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/10"
+                  : "border-[var(--taomni-divider)]"
+              }`}
+              data-testid="mail-compose-attachments"
+              data-drag-active={composeDragActive ? "true" : "false"}
+            >
+              {draft.attachments.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {draft.attachments.map((attachment, index) => (
+                    <span
+                      key={`${attachment.path}-${index}`}
+                      className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-2 py-1 text-[11px] text-[var(--taomni-text-muted)] bg-[var(--taomni-sidebar-bg)]"
+                      data-testid="mail-compose-attachment-chip"
+                      title={attachment.path}
                     >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
+                      {attachment.inline ? <ImageIcon className="w-3 h-3" /> : <Paperclip className="w-3 h-3" />}
+                      <span className="max-w-[280px] truncate">
+                        {attachment.inline ? "Inline " : ""}{attachment.name || basename(attachment.path)}
+                      </span>
+                      <button
+                        type="button"
+                        className="ml-1 text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"
+                        aria-label={`Remove ${attachment.name || "attachment"}`}
+                        onClick={() => removeDraftAttachment(index)}
+                        disabled={sending}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-[11px] text-[var(--taomni-text-muted)] flex items-center gap-1.5">
+                  <Paperclip className="w-3.5 h-3.5" />
+                  Drop files here to attach, or use Attach / paste images into the editor
+                </div>
+              )}
+            </div>
             <div className="h-10 px-3 flex items-center justify-end gap-2 border-t border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)]">
               <button type="button" className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5 mr-auto" onClick={() => void handleAddDraftAttachments()} disabled={sending}>
                 <Paperclip className="w-3.5 h-3.5" />

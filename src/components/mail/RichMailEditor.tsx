@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, type ClipboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type DragEvent as ReactDragEvent,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
 import {
   AlignCenter,
   AlignLeft,
@@ -20,6 +28,7 @@ import {
   Underline,
 } from "lucide-react";
 import { mailHtmlToPlainText, sanitizeMailComposeHtml } from "../../lib/mailHtml";
+import { isOsFileDrag, preventDefaultForOsFileDrag } from "../../lib/osFileDrop";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 
 interface RichMailEditorProps {
@@ -29,6 +38,11 @@ interface RichMailEditorProps {
   onRichFormatUsed?: () => void;
   onAttach?: () => void;
   onInlineImage?: () => string | null | Promise<string | null>;
+  /** Paste / drop image blobs → parent returns insertable HTML snippets (data URL + cid metadata). */
+  onPasteImages?: (files: File[]) => Promise<string[]>;
+  /** Non-image file drops should become regular attachments. */
+  onDropFiles?: (files: File[]) => void | Promise<void>;
+  dragActive?: boolean;
 }
 
 const PARAGRAPH_OPTIONS = [
@@ -80,9 +94,13 @@ export function RichMailEditor({
   onRichFormatUsed,
   onAttach,
   onInlineImage,
+  onPasteImages,
+  onDropFiles,
+  dragActive = false,
 }: RichMailEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [color, setColor] = useState("#1f2937");
+  const [localDrag, setLocalDrag] = useState(false);
   const editorMenu = useContextMenu();
 
   useEffect(() => {
@@ -120,6 +138,24 @@ export function RichMailEditor({
   };
 
   const handlePaste = (event: ClipboardEvent<HTMLDivElement>) => {
+    if (disabled) return;
+
+    const imageFiles = clipboardImageFiles(event.clipboardData);
+    if (imageFiles.length > 0 && onPasteImages) {
+      event.preventDefault();
+      void (async () => {
+        try {
+          const snippets = await onPasteImages(imageFiles);
+          for (const snippet of snippets) {
+            if (snippet) insertHtml(snippet, true);
+          }
+        } catch {
+          // Parent surfaces errors via compose status/error.
+        }
+      })();
+      return;
+    }
+
     event.preventDefault();
     const pastedHtml = event.clipboardData.getData("text/html");
     const pastedText = event.clipboardData.getData("text/plain");
@@ -128,6 +164,51 @@ export function RichMailEditor({
       return;
     }
     if (pastedText) insertHtml(escapeHtml(pastedText).replace(/\r?\n/g, "<br>"), false);
+  };
+
+  const handleDragOver = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    if (!isOsFileDrag(event.dataTransfer) && !hasFilePayload(event.dataTransfer)) return;
+    preventDefaultForOsFileDrag(event);
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setLocalDrag(true);
+  };
+
+  const handleDragLeave = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (!editorRef.current?.contains(event.relatedTarget as Node | null)) {
+      setLocalDrag(false);
+    }
+  };
+
+  const handleDrop = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (disabled) return;
+    setLocalDrag(false);
+    if (!isOsFileDrag(event.dataTransfer) && !hasFilePayload(event.dataTransfer)) return;
+    event.preventDefault();
+    const files = Array.from(event.dataTransfer.files ?? []);
+    if (files.length === 0) return;
+
+    const images = files.filter((file) => file.type.startsWith("image/"));
+    const others = files.filter((file) => !file.type.startsWith("image/"));
+
+    void (async () => {
+      if (images.length > 0 && onPasteImages) {
+        try {
+          const snippets = await onPasteImages(images);
+          for (const snippet of snippets) {
+            if (snippet) insertHtml(snippet, true);
+          }
+        } catch {
+          // Parent surfaces errors.
+        }
+      }
+      if (others.length > 0 && onDropFiles) {
+        await onDropFiles(others);
+      } else if (images.length === 0 && others.length === 0 && onDropFiles) {
+        await onDropFiles(files);
+      }
+    })();
   };
 
   const handleLink = () => {
@@ -206,8 +287,18 @@ export function RichMailEditor({
     },
   ];
 
+  const showDrag = dragActive || localDrag;
+
   return (
-    <div className="mx-3 mb-3 min-h-0 flex-1 flex flex-col border border-[var(--taomni-input-border)] rounded-md overflow-hidden bg-[var(--taomni-input-bg)]">
+    <div
+      className={`mx-3 mb-3 min-h-0 flex-1 flex flex-col border rounded-md overflow-hidden bg-[var(--taomni-input-bg)] ${
+        showDrag
+          ? "border-[var(--taomni-accent)] ring-1 ring-[var(--taomni-accent)]"
+          : "border-[var(--taomni-input-border)]"
+      }`}
+      data-testid="mail-compose-editor-shell"
+      data-drag-active={showDrag ? "true" : "false"}
+    >
       <div
         className="min-h-9 px-2 py-1 flex flex-wrap items-center gap-1 border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)]"
         data-testid="mail-compose-format-toolbar"
@@ -290,17 +381,30 @@ export function RichMailEditor({
         )}
       </div>
       {editorMenu.render}
-      <div
-        ref={editorRef}
-        className="flex-1 min-h-[240px] overflow-auto px-3 py-2 text-[13px] leading-6 outline-none bg-[var(--taomni-input-bg)] empty:before:content-['']"
-        contentEditable={!disabled}
-        suppressContentEditableWarning
-        role="textbox"
-        aria-label="Message body"
-        data-testid="mail-compose-editor"
-        onInput={emitChange}
-        onPaste={handlePaste}
-      />
+      <div className="relative flex-1 min-h-[240px] flex flex-col">
+        <div
+          ref={editorRef}
+          className="flex-1 min-h-[240px] overflow-auto px-3 py-2 text-[13px] leading-6 outline-none bg-[var(--taomni-input-bg)] empty:before:content-['']"
+          contentEditable={!disabled}
+          suppressContentEditableWarning
+          role="textbox"
+          aria-label="Message body"
+          data-testid="mail-compose-editor"
+          onInput={emitChange}
+          onPaste={handlePaste}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        />
+        {showDrag && (
+          <div
+            className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[var(--taomni-accent)]/10 text-[12px] font-medium text-[var(--taomni-accent)]"
+            data-testid="mail-compose-drop-hint"
+          >
+            Drop files to attach · drop images to insert inline
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -368,6 +472,24 @@ function buildTableHtml(cols: number, rows: number): string {
   )).join("");
   const body = Array.from({ length: rows }, () => `<tr>${cells}</tr>`).join("");
   return `<table style="border-collapse: collapse;"><tbody>${body}</tbody></table><p><br></p>`;
+}
+
+function clipboardImageFiles(data: DataTransfer | null): File[] {
+  if (!data) return [];
+  const fromItems: File[] = [];
+  for (const item of Array.from(data.items ?? [])) {
+    if (!item.type.startsWith("image/")) continue;
+    const file = item.getAsFile();
+    if (file) fromItems.push(file);
+  }
+  if (fromItems.length > 0) return fromItems;
+  return Array.from(data.files ?? []).filter((file) => file.type.startsWith("image/"));
+}
+
+function hasFilePayload(data: DataTransfer | null): boolean {
+  if (!data) return false;
+  if ((data.files?.length ?? 0) > 0) return true;
+  return Array.from(data.types ?? []).some((type) => type === "Files" || type === "text/uri-list");
 }
 
 function escapeHtml(value: string): string {
