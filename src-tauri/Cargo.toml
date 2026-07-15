@@ -6,6 +6,9 @@ authors = ["engcapa"]
 license = "MIT"
 edition = "2024"
 rust-version = "1.94"
+# Required once [[bin]] acp-fake-agent exists: otherwise `cargo run` /
+# `cargo tauri dev` cannot pick between taomni and acp-fake-agent.
+default-run = "taomni"
 
 [lib]
 name = "taomni_lib"
