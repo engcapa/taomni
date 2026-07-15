@@ -5,8 +5,12 @@
 //! Existing Claude Code and Codex bridges intentionally remain on their
 //! current protocols.
 
+mod process;
 mod protocol;
 
+pub use process::{
+    AcpProcess, AcpProcessConfig, AcpRuntimeError, AcpRuntimeEvent, DEFAULT_REQUEST_TIMEOUT,
+};
 pub use protocol::{
     AcpAgentInfo, AcpAuthMethod, AcpIncomingMessage, AcpNotification, AcpPromptResult,
     AcpProtocolError, AcpRequest, AcpRequestId, AcpRpcError, AcpSessionUpdate, AcpStopReason,

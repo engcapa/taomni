@@ -648,7 +648,7 @@ pub fn parse_session_update(params: &Value) -> Option<AcpSessionUpdate> {
     })
 }
 
-fn truncate_display_text(value: &str, max_chars: usize) -> String {
+pub(super) fn truncate_display_text(value: &str, max_chars: usize) -> String {
     let mut chars = value.chars();
     let truncated: String = chars.by_ref().take(max_chars).collect();
     if chars.next().is_some() {

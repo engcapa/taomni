@@ -11,6 +11,12 @@ rust-version = "1.94"
 name = "taomni_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[[bin]]
+name = "acp-fake-agent"
+path = "tests/support/acp_fake_agent.rs"
+test = false
+bench = false
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 prost-build = "0.14"
