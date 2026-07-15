@@ -7,7 +7,6 @@ import type { WorkspaceEntry, WorkspaceGitRoot } from "../../../lib/editor/works
 import type { LspCustomServerCommand, LspDocumentStatus, LspDiagnostic } from "../../../lib/editor/lsp";
 import type { GitChange } from "../../../lib/git";
 import { DEFAULT_CODE_VIEW_PROFILE } from "../../../lib/codeViewProfile";
-import type { LspCustomCommandConfig } from "./FileTreePane";
 import type { OpenFileEol, OpenFileViewModel } from "./editorGroupTypes";
 import type { FileTreeViewMode } from "./FileTreePane";
 
@@ -16,6 +15,13 @@ export type MermaidApi = typeof import("mermaid").default;
 export type OpenFileState = OpenFileViewModel;
 export type TreeViewMode = FileTreeViewMode;
 export type MarkdownViewMode = "edit" | "preview" | "split";
+
+/** Custom LSP command shape shared by workspace sessions and Settings. */
+export interface LspCustomCommandConfig {
+  command: string;
+  args: string;
+}
+
 export interface DirectoryState {
   entries: WorkspaceEntry[];
   loaded: boolean;
