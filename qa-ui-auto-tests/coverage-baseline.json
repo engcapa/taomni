@@ -1,9 +1,9 @@
 {
   "version": 1,
   "totals": {
-    "features_with_controls": 52,
-    "required": 220,
-    "covered_required": 220,
+    "features_with_controls": 53,
+    "required": 228,
+    "covered_required": 228,
     "shallow": 21,
     "orphans": 112
   },
@@ -211,6 +211,11 @@
     "F-AI-2.6": {
       "required": 9,
       "covered_required": 9,
+      "shallow": 0
+    },
+    "F-AI-2.7": {
+      "required": 8,
+      "covered_required": 8,
       "shallow": 0
     },
     "F-Split-1": {

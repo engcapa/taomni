@@ -179,12 +179,14 @@ describe("SettingsPanel", () => {
     await user.type(search, "proxy");
 
     const proxy = container.querySelector('[data-search-id="app-proxy"]');
+    const acp = container.querySelector('[data-search-id="ai-acp"]');
     const language = container.querySelector('[data-search-id="language"]');
     expect(proxy).toHaveAttribute("data-search-match", "true");
+    expect(acp).toHaveAttribute("data-search-match", "true");
     expect(language).toHaveAttribute("data-search-match", "false");
 
-    // Match counter reflects the single hit.
-    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 1");
+    // Application Proxy and ACP proxy policy are separate searchable units.
+    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 2");
 
     // Clearing the search drops the active state entirely.
     await user.click(screen.getByRole("button", { name: "Clear search" }));

@@ -8,6 +8,24 @@
 > controls (only render under conditions) are marked with `[optional]`.
 > Aliases are listed underneath the primary selector indented with `↳`.
 
+## ai/agents (F-AI-2.7)
+
+- `[data-testid="acp-settings"]` — display — F-AI-2.7.acp-settings
+- `[data-testid="acp-bridge-enabled"]` — interactive — F-AI-2.7.acp-bridge-enabled
+- `[data-testid="acp-global-proxy-direct"]` — interactive — F-AI-2.7.acp-global-proxy-direct
+- `[data-testid="acp-global-proxy-app"]` — interactive — F-AI-2.7.acp-global-proxy-app
+- `[data-testid="acp-request-timeout"]` — interactive — F-AI-2.7.acp-request-timeout
+- `[data-testid="acp-add-profile"]` — interactive [optional] — F-AI-2.7.acp-add-profile
+- `[data-testid="acp-save"]` — interactive — F-AI-2.7.acp-save
+- `[data-testid="acp-restore-grok"]` — interactive [optional] — F-AI-2.7.acp-restore-grok
+- `[data-testid="acp-profile-grok"]` — display — F-AI-2.7.acp-profile-grok
+- `[data-testid="acp-profile-grok-enabled"]` — interactive — F-AI-2.7.acp-profile-grok-enabled
+- `[data-testid="acp-profile-grok-preferred"]` — interactive [optional] — F-AI-2.7.acp-profile-grok-preferred
+- `[data-testid="acp-profile-grok-command"]` — interactive [optional] — F-AI-2.7.acp-profile-grok-command
+- `[data-testid="acp-profile-grok-args"]` — interactive [optional] — F-AI-2.7.acp-profile-grok-args
+- `[data-testid="acp-profile-grok-probe"]` — interactive [optional] — F-AI-2.7.acp-profile-grok-probe
+- `[data-testid="acp-profile-grok-probe-result"]` — display [optional] — F-AI-2.7.acp-profile-grok-probe-result
+
 ## ai/chat (F-AI-2.4)
 
 - `[data-testid="ai-chat-drawer"]` — display [optional] — F-AI-2.4.ai-chat-drawer

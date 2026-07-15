@@ -1,0 +1,28 @@
+id: TC-auto-F-AI-2-7-acp-grok-settings
+title: Configure the generic ACP bridge and Grok preset
+description: |
+  Opens AI Settings, verifies the built-in Grok ACP profile, exercises both
+  direct and application proxy policy, enables the bridge/profile, changes
+  the bounded request timeout, and saves. The case does not run the real Grok
+  process or require xAI credentials.
+covers: [F-AI-2.7]
+tags: [auto-generated, smoke, needs-review, settings, acp]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="ribbon-settings"]'
+  - click: '[data-testid="ribbon-settings"]'
+  - wait_for: '[data-testid="acp-settings"]'
+  - assert_visible: '[data-testid="acp-settings"]'
+  - assert_visible: '[data-testid="acp-profile-grok"]'
+  - click: '[data-testid="acp-bridge-enabled"]'
+  - click: '[data-testid="acp-profile-grok-enabled"]'
+  - click: '[data-testid="acp-global-proxy-app"]'
+  - click: '[data-testid="acp-global-proxy-direct"]'
+  - fill:
+      selector: '[data-testid="acp-request-timeout"]'
+      value: '90'
+  - click: '[data-testid="acp-save"]'
+  - screenshot: ai-acp-grok-settings.png
