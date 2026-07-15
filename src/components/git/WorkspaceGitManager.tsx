@@ -12,7 +12,9 @@ import {
   Braces,
   Check,
   ChevronDown,
+  ChevronRight,
   Circle,
+  Copy,
   Download,
   Ellipsis,
   FolderGit2,
@@ -25,6 +27,7 @@ import {
   RefreshCcw,
   RefreshCw,
   Search,
+  Tag,
   Upload,
 } from "lucide-react";
 import { FilterClearButton } from "../editor/workspace/workspaceChrome";
@@ -32,25 +35,46 @@ import {
   GIT_REF_WORKTREE,
   gitBlobPair,
   gitCheckoutBranch,
+  gitCheckoutTag,
   gitCleanUntracked,
   gitCommit,
   gitCreateBranch,
+  gitDeleteBranch,
+  gitDeleteTag,
   gitDiscard,
   gitFetch,
+  gitMergeBranch,
   gitPull,
   gitPush,
+  gitPushTag,
   gitRepoName,
   gitSnapshot,
   gitStage,
   gitUnstage,
   selectedRemote,
   type GitBlobPair,
+  type GitBranch as GitBranchInfo,
   type GitSnapshot,
+  type GitTag,
 } from "../../lib/git";
 import { notifyGitRepoChanged, subscribeGitRepoRefresh } from "../../lib/gitRefresh";
 import { alertAppDialog, choiceAppDialog, confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
+import { writeText } from "../../lib/clipboard";
 import { normalizeWorktreeToMatchHead } from "../../lib/diffWhitespace";
 import { workspaceWriteFile } from "../../lib/editor/workspace";
+import {
+  formatRefDate,
+  getRecentBranchNames,
+  getRecentTagNames,
+  loadBranchCollapse,
+  loadTagCollapse,
+  rememberRecentBranch,
+  rememberRecentTag,
+  saveBranchCollapse,
+  saveTagCollapse,
+  type BranchSectionId,
+  type TagSectionId,
+} from "../../lib/gitRefList";
 import { useAppStore } from "../../stores/appStore";
 import type { GitWorkspaceRootInfo } from "../../types";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
@@ -1141,6 +1165,39 @@ export function WorkspaceGitManager({
   );
 }
 
+type WorkspaceBranchRow = { root: GitWorkspaceRootInfo; branch: GitBranchInfo };
+type WorkspaceTagRow = { root: GitWorkspaceRootInfo; tag: GitTag };
+
+function workspaceBranchRowKey(row: WorkspaceBranchRow): string {
+  return `${row.root.repoRoot}\0${row.branch.fullName}`;
+}
+
+function workspaceTagRowKey(row: WorkspaceTagRow): string {
+  return `${row.root.repoRoot}\0${row.tag.name}`;
+}
+
+function sortWorkspaceBranchRows(rows: WorkspaceBranchRow[]): WorkspaceBranchRow[] {
+  return [...rows].sort((a, b) => {
+    const dateDelta = (b.branch.date ? Date.parse(b.branch.date) || 0 : 0)
+      - (a.branch.date ? Date.parse(a.branch.date) || 0 : 0);
+    if (dateDelta !== 0) return dateDelta;
+    const nameCmp = a.branch.name.localeCompare(b.branch.name, undefined, { sensitivity: "base" });
+    if (nameCmp !== 0) return nameCmp;
+    return a.root.name.localeCompare(b.root.name);
+  });
+}
+
+function sortWorkspaceTagRows(rows: WorkspaceTagRow[]): WorkspaceTagRow[] {
+  return [...rows].sort((a, b) => {
+    const dateDelta = (b.tag.date ? Date.parse(b.tag.date) || 0 : 0)
+      - (a.tag.date ? Date.parse(a.tag.date) || 0 : 0);
+    if (dateDelta !== 0) return dateDelta;
+    const nameCmp = a.tag.name.localeCompare(b.tag.name, undefined, { sensitivity: "base" });
+    if (nameCmp !== 0) return nameCmp;
+    return a.root.name.localeCompare(b.root.name);
+  });
+}
+
 function WorkspaceBranchesView({
   roots,
   snapshots,
@@ -1148,21 +1205,205 @@ function WorkspaceBranchesView({
   roots: GitWorkspaceRootInfo[];
   snapshots: Record<string, RepoSnapshotState>;
 }) {
+  const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const [query, setQuery] = useState("");
+  const [collapsed, setCollapsed] = useState(loadBranchCollapse);
+  const [busy, setBusy] = useState(false);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [ctx, setCtx] = useState<{ x: number; y: number; row: WorkspaceBranchRow } | null>(null);
+  const [recentTick, setRecentTick] = useState(0);
   const normalizedQuery = query.trim().toLowerCase();
-  const rows = useMemo(() => (
+  const rows = useMemo(() => sortWorkspaceBranchRows(
     roots.flatMap((root) => (
       (snapshots[root.repoRoot]?.snapshot?.branches ?? [])
         .filter((branch) => workspaceBranchMatchesQuery(root, branch, normalizedQuery))
         .map((branch) => ({ root, branch }))
-    ))
+    )),
   ), [normalizedQuery, roots, snapshots]);
+  const local = useMemo(() => rows.filter((row) => !row.branch.remote), [rows]);
+  const remote = useMemo(() => rows.filter((row) => row.branch.remote), [rows]);
+  const recent = useMemo(() => {
+    void recentTick;
+    const remembered: WorkspaceBranchRow[] = [];
+    const seen = new Set<string>();
+    for (const root of roots) {
+      for (const name of getRecentBranchNames(root.repoRoot)) {
+        const hit = rows.find((row) => row.root.repoRoot === root.repoRoot && row.branch.name === name);
+        if (!hit) continue;
+        const key = workspaceBranchRowKey(hit);
+        if (seen.has(key)) continue;
+        remembered.push(hit);
+        seen.add(key);
+      }
+    }
+    // Fill from date-sorted rows for remaining slots.
+    const filled = [...remembered];
+    for (const row of rows) {
+      if (filled.length >= 12) break;
+      const key = workspaceBranchRowKey(row);
+      if (seen.has(key)) continue;
+      filled.push(row);
+      seen.add(key);
+    }
+    return filled;
+  }, [recentTick, roots, rows]);
   const total = roots.reduce((count, root) => (
     count + (snapshots[root.repoRoot]?.snapshot?.branches.length ?? 0)
   ), 0);
 
+  const toggleSection = (id: BranchSectionId) => {
+    setCollapsed((current) => {
+      const next = { ...current, [id]: !current[id] };
+      saveBranchCollapse(next);
+      return next;
+    });
+  };
+
+  const runOnRow = async (label: string, row: WorkspaceBranchRow, action: () => Promise<void>) => {
+    setBusy(true);
+    try {
+      await action();
+      rememberRecentBranch(row.root.repoRoot, row.branch.remote
+        ? row.branch.name.split("/").slice(1).join("/") || row.branch.name
+        : row.branch.name);
+      setRecentTick((n) => n + 1);
+      notifyGitRepoChanged(row.root.repoRoot);
+      setStatusMessage(`${label}: ${row.root.name} / ${row.branch.name}`);
+    } catch (err) {
+      setStatusMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const branchMenuItems = (row: WorkspaceBranchRow): MenuItem[] => {
+    const { root, branch } = row;
+    const localSel = !branch.remote;
+    return [
+      {
+        label: "Checkout",
+        disabled: busy || branch.current,
+        onClick: () => void runOnRow("Checkout", row, async () => {
+          if (branch.remote) {
+            const suggested = branch.name.split("/").slice(1).join("/") || branch.name;
+            const localName = await promptAppDialog({
+              title: "Checkout remote branch",
+              label: `Local branch name (${root.name})`,
+              initialValue: suggested,
+            });
+            if (!localName) return;
+            await gitCreateBranch(root.repoRoot, localName, branch.name, true);
+            rememberRecentBranch(root.repoRoot, localName);
+          } else {
+            await gitCheckoutBranch(root.repoRoot, branch.name);
+            rememberRecentBranch(root.repoRoot, branch.name);
+          }
+        }),
+      },
+      {
+        label: "Merge into current",
+        disabled: busy || branch.current || branch.remote,
+        onClick: () => void (async () => {
+          const ok = await confirmAppDialog({
+            title: "Merge branch",
+            message: `Merge ${branch.name} into current branch in ${root.name}?`,
+          });
+          if (!ok) return;
+          await runOnRow("Merge", row, () => gitMergeBranch(root.repoRoot, branch.name));
+        })(),
+      },
+      {
+        label: "Push",
+        disabled: busy || !localSel,
+        onClick: () => void runOnRow("Push", row, async () => {
+          const remoteName = selectedRemote(snapshots[root.repoRoot]?.snapshot ?? null)?.name ?? "origin";
+          await gitPush(root.repoRoot, remoteName, branch.name, !branch.upstream);
+        }),
+      },
+      {
+        label: "Copy name",
+        icon: <Copy className="w-3.5 h-3.5" />,
+        onClick: () => void writeText(branch.name),
+      },
+      { label: "", separator: true },
+      {
+        label: "Delete…",
+        danger: true,
+        disabled: busy || branch.current || branch.remote,
+        onClick: () => void (async () => {
+          const ok = await confirmAppDialog({
+            title: "Delete branch",
+            message: `Delete local branch ${branch.name} in ${root.name}?`,
+            danger: true,
+            confirmLabel: "Delete",
+          });
+          if (!ok) return;
+          await runOnRow("Delete", row, () => gitDeleteBranch(root.repoRoot, branch.name, false));
+        })(),
+      },
+    ];
+  };
+
+  const renderRow = (row: WorkspaceBranchRow) => {
+    const key = workspaceBranchRowKey(row);
+    const dateLabel = formatRefDate(row.branch.date);
+    return (
+      <button
+        key={key}
+        type="button"
+        data-testid="workspace-git-branch-row"
+        className={`w-full px-3 py-1.5 flex items-center gap-2 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${selectedKey === key ? "bg-[var(--taomni-hover)]" : ""}`}
+        title={`${row.root.repoRoot} · ${row.branch.fullName}`}
+        onClick={() => setSelectedKey(key)}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setSelectedKey(key);
+          setCtx({ x: event.clientX, y: event.clientY, row });
+        }}
+      >
+        <GitFork className={`w-4 h-4 shrink-0 ${row.branch.current ? "text-[var(--taomni-accent)]" : "text-[var(--taomni-text-muted)]"}`} />
+        <span className="shrink-0 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1 text-[10px] text-[var(--taomni-text-muted)]">
+          {row.root.name}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[12px] truncate font-medium">{row.branch.name}</span>
+            {dateLabel ? <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]">{dateLabel}</span> : null}
+          </div>
+          <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+            {row.branch.upstream ? `tracks ${row.branch.upstream}` : row.branch.remote ? "remote" : "local"}
+            {row.branch.subject ? ` · ${row.branch.subject}` : ""}
+          </div>
+        </div>
+        {row.branch.current && <span className="text-[11px] text-[var(--taomni-accent)] shrink-0">current</span>}
+      </button>
+    );
+  };
+
+  const renderSection = (id: BranchSectionId, label: string, list: WorkspaceBranchRow[]) => {
+    if (list.length === 0) return null;
+    const isCollapsed = collapsed[id];
+    return (
+      <section data-testid={`workspace-git-branch-section-${id}`} className="border-b border-[var(--taomni-divider)]">
+        <button
+          type="button"
+          className="w-full h-7 px-2 flex items-center gap-1.5 text-left bg-[var(--taomni-quick-bg)] hover:bg-[var(--taomni-hover)]"
+          aria-expanded={!isCollapsed}
+          onClick={() => toggleSection(id)}
+        >
+          {isCollapsed
+            ? <ChevronRight className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
+            : <ChevronDown className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />}
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">{label}</span>
+          <span className="text-[10px] text-[var(--taomni-text-muted)]">({list.length})</span>
+        </button>
+        {isCollapsed ? null : list.map(renderRow)}
+      </section>
+    );
+  };
+
   return (
-    <div className="h-full min-h-0 flex flex-col">
+    <div className="h-full min-h-0 flex flex-col" data-testid="workspace-git-branches-view">
       <div className="h-9 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)]">
         <div className="relative w-64 max-w-full min-w-44">
           <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
@@ -1191,27 +1432,22 @@ function WorkspaceBranchesView({
           <EmptyState title="No branches" />
         ) : rows.length === 0 ? (
           <EmptyState title="No branches match" />
-        ) : rows.map(({ root, branch }) => (
-          <div
-            key={`${root.repoRoot}:${branch.fullName}`}
-            className="w-full px-3 py-2 flex items-center gap-2 border-b border-[var(--taomni-divider)]"
-            title={`${root.repoRoot} · ${branch.fullName}`}
-          >
-            <GitFork className={`w-4 h-4 shrink-0 ${branch.current ? "text-[var(--taomni-accent)]" : "text-[var(--taomni-text-muted)]"}`} />
-            <span className="shrink-0 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1 text-[10px] text-[var(--taomni-text-muted)]">
-              {root.name}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[12px] truncate">{branch.name}</div>
-              <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
-                {branch.upstream ? `tracks ${branch.upstream}` : branch.remote ? "remote" : "local"}
-                {branch.subject ? ` · ${branch.subject}` : ""}
-              </div>
-            </div>
-            {branch.current && <span className="text-[11px] text-[var(--taomni-accent)]">current</span>}
-          </div>
-        ))}
+        ) : (
+          <>
+            {renderSection("recent", "Recent", recent)}
+            {renderSection("local", "Local", local)}
+            {renderSection("remote", "Remote", remote)}
+          </>
+        )}
       </div>
+      {ctx ? (
+        <ContextMenu
+          x={ctx.x}
+          y={ctx.y}
+          onClose={() => setCtx(null)}
+          items={branchMenuItems(ctx.row)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1223,21 +1459,177 @@ function WorkspaceTagsView({
   roots: GitWorkspaceRootInfo[];
   snapshots: Record<string, RepoSnapshotState>;
 }) {
+  const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const [query, setQuery] = useState("");
+  const [collapsed, setCollapsed] = useState(loadTagCollapse);
+  const [busy, setBusy] = useState(false);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [ctx, setCtx] = useState<{ x: number; y: number; row: WorkspaceTagRow } | null>(null);
+  const [recentTick, setRecentTick] = useState(0);
   const normalizedQuery = query.trim().toLowerCase();
-  const rows = useMemo(() => (
+  const rows = useMemo(() => sortWorkspaceTagRows(
     roots.flatMap((root) => (
       (snapshots[root.repoRoot]?.snapshot?.tags ?? [])
         .filter((tag) => workspaceTagMatchesQuery(root, tag, normalizedQuery))
         .map((tag) => ({ root, tag }))
-    ))
+    )),
   ), [normalizedQuery, roots, snapshots]);
+  const recent = useMemo(() => {
+    void recentTick;
+    const remembered: WorkspaceTagRow[] = [];
+    const seen = new Set<string>();
+    for (const root of roots) {
+      for (const name of getRecentTagNames(root.repoRoot)) {
+        const hit = rows.find((row) => row.root.repoRoot === root.repoRoot && row.tag.name === name);
+        if (!hit) continue;
+        const key = workspaceTagRowKey(hit);
+        if (seen.has(key)) continue;
+        remembered.push(hit);
+        seen.add(key);
+      }
+    }
+    const filled = [...remembered];
+    for (const row of rows) {
+      if (filled.length >= 12) break;
+      const key = workspaceTagRowKey(row);
+      if (seen.has(key)) continue;
+      filled.push(row);
+      seen.add(key);
+    }
+    return filled;
+  }, [recentTick, roots, rows]);
   const total = roots.reduce((count, root) => (
     count + (snapshots[root.repoRoot]?.snapshot?.tags.length ?? 0)
   ), 0);
 
+  const toggleSection = (id: TagSectionId) => {
+    setCollapsed((state) => {
+      const next = { ...state, [id]: !state[id] };
+      saveTagCollapse(next);
+      return next;
+    });
+  };
+
+  const runOnRow = async (label: string, row: WorkspaceTagRow, action: () => Promise<void>) => {
+    setBusy(true);
+    try {
+      await action();
+      rememberRecentTag(row.root.repoRoot, row.tag.name);
+      setRecentTick((n) => n + 1);
+      notifyGitRepoChanged(row.root.repoRoot);
+      setStatusMessage(`${label}: ${row.root.name} / ${row.tag.name}`);
+    } catch (err) {
+      setStatusMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const tagMenuItems = (row: WorkspaceTagRow): MenuItem[] => {
+    const { root, tag } = row;
+    const remoteName = selectedRemote(snapshots[root.repoRoot]?.snapshot ?? null)?.name ?? "origin";
+    return [
+      {
+        label: "Checkout",
+        disabled: busy,
+        onClick: () => void (async () => {
+          const ok = await confirmAppDialog({
+            title: "Checkout tag",
+            message: `Checkout ${tag.name} in ${root.name}? This detaches HEAD.`,
+          });
+          if (!ok) return;
+          await runOnRow("Checkout tag", row, () => gitCheckoutTag(root.repoRoot, tag.name));
+        })(),
+      },
+      {
+        label: "Push",
+        disabled: busy,
+        onClick: () => void runOnRow("Push tag", row, () => gitPushTag(root.repoRoot, remoteName, tag.name, false)),
+      },
+      {
+        label: "Copy name",
+        icon: <Copy className="w-3.5 h-3.5" />,
+        onClick: () => void writeText(tag.name),
+      },
+      { label: "", separator: true },
+      {
+        label: "Delete…",
+        danger: true,
+        disabled: busy,
+        onClick: () => void (async () => {
+          const ok = await confirmAppDialog({
+            title: "Delete tag",
+            message: `Delete tag ${tag.name} in ${root.name}?`,
+            danger: true,
+            confirmLabel: "Delete",
+          });
+          if (!ok) return;
+          await runOnRow("Delete tag", row, () => gitDeleteTag(root.repoRoot, tag.name));
+        })(),
+      },
+    ];
+  };
+
+  const renderRow = (row: WorkspaceTagRow) => {
+    const key = workspaceTagRowKey(row);
+    const dateLabel = formatRefDate(row.tag.date);
+    return (
+      <button
+        key={key}
+        type="button"
+        data-testid="workspace-git-tag-row"
+        className={`w-full px-3 py-1.5 flex items-center gap-2 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${selectedKey === key ? "bg-[var(--taomni-hover)]" : ""}`}
+        title={`${row.root.repoRoot} · ${row.tag.name}`}
+        onClick={() => setSelectedKey(key)}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setSelectedKey(key);
+          setCtx({ x: event.clientX, y: event.clientY, row });
+        }}
+      >
+        <Tag className="w-4 h-4 shrink-0 text-[var(--taomni-text-muted)]" />
+        <span className="shrink-0 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1 text-[10px] text-[var(--taomni-text-muted)]">
+          {row.root.name}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[12px] truncate font-medium">{row.tag.name}</span>
+            {dateLabel ? <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]">{dateLabel}</span> : null}
+          </div>
+          <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+            <span className="taomni-mono text-[var(--taomni-accent)]">{row.tag.oid}</span>
+            {row.tag.annotated ? " · annotated" : " · lightweight"}
+            {row.tag.subject ? ` · ${row.tag.subject}` : ""}
+          </div>
+        </div>
+      </button>
+    );
+  };
+
+  const renderSection = (id: TagSectionId, label: string, list: WorkspaceTagRow[]) => {
+    if (list.length === 0) return null;
+    const isCollapsed = collapsed[id];
+    return (
+      <section data-testid={`workspace-git-tag-section-${id}`} className="border-b border-[var(--taomni-divider)]">
+        <button
+          type="button"
+          className="w-full h-7 px-2 flex items-center gap-1.5 text-left bg-[var(--taomni-quick-bg)] hover:bg-[var(--taomni-hover)]"
+          aria-expanded={!isCollapsed}
+          onClick={() => toggleSection(id)}
+        >
+          {isCollapsed
+            ? <ChevronRight className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
+            : <ChevronDown className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />}
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">{label}</span>
+          <span className="text-[10px] text-[var(--taomni-text-muted)]">({list.length})</span>
+        </button>
+        {isCollapsed ? null : list.map(renderRow)}
+      </section>
+    );
+  };
+
   return (
-    <div className="h-full min-h-0 flex flex-col">
+    <div className="h-full min-h-0 flex flex-col" data-testid="workspace-git-tags-view">
       <div className="h-9 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)]">
         <div className="relative w-64 max-w-full min-w-44">
           <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
@@ -1266,26 +1658,21 @@ function WorkspaceTagsView({
           <EmptyState title="No tags" />
         ) : rows.length === 0 ? (
           <EmptyState title="No tags match" />
-        ) : rows.map(({ root, tag }) => (
-          <div
-            key={`${root.repoRoot}:${tag.name}`}
-            className="w-full px-3 py-2 flex items-center gap-2 border-b border-[var(--taomni-divider)]"
-            title={`${root.repoRoot} · ${tag.name}`}
-          >
-            <GitCommitHorizontal className="w-4 h-4 shrink-0 text-[var(--taomni-text-muted)]" />
-            <span className="shrink-0 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1 text-[10px] text-[var(--taomni-text-muted)]">
-              {root.name}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[12px] truncate">{tag.name}</div>
-              <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
-                <span className="taomni-mono text-[var(--taomni-accent)]">{tag.oid}</span>
-                {tag.annotated ? " · annotated" : " · lightweight"}{tag.subject ? ` · ${tag.subject}` : ""}
-              </div>
-            </div>
-          </div>
-        ))}
+        ) : (
+          <>
+            {renderSection("recent", "Recent", recent)}
+            {renderSection("all", "All tags", rows)}
+          </>
+        )}
       </div>
+      {ctx ? (
+        <ContextMenu
+          x={ctx.x}
+          y={ctx.y}
+          onClose={() => setCtx(null)}
+          items={tagMenuItems(ctx.row)}
+        />
+      ) : null}
     </div>
   );
 }

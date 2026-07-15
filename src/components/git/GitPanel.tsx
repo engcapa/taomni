@@ -10,6 +10,9 @@ import {
 import {
   AlertTriangle,
   Braces,
+  ChevronDown,
+  ChevronRight,
+  Copy,
   GitBranch,
   GitCommitHorizontal,
   GitFork,
@@ -22,6 +25,7 @@ import {
   Save,
   Search,
   Settings,
+  Tag,
   Trash2,
   Upload,
   Download,
@@ -82,6 +86,22 @@ import {
 } from "../../lib/git";
 import { notifyGitRepoChanged, subscribeGitRepoRefresh } from "../../lib/gitRefresh";
 import { alertAppDialog, confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
+import { writeText } from "../../lib/clipboard";
+import {
+  formatRefDate,
+  getRecentBranchNames,
+  getRecentTagNames,
+  loadBranchCollapse,
+  loadTagCollapse,
+  pickRecentItems,
+  rememberRecentBranch,
+  rememberRecentTag,
+  saveBranchCollapse,
+  saveTagCollapse,
+  sortByDateThenName,
+  type BranchSectionId,
+  type TagSectionId,
+} from "../../lib/gitRefList";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
 import { ChangesTree } from "./ChangesTree";
 import { CommitLog } from "./CommitLog";
@@ -787,30 +807,38 @@ export function GitPanel({
             busy={busy}
             onCreate={async () => {
               const name = await promptAppDialog({ title: "Create branch", label: "Branch name" });
-              if (name) await runAction("Create branch", () => gitCreateBranch(repoRoot, name, selectedBranch?.name ?? null, true));
+              if (name) {
+                await runAction("Create branch", async () => {
+                  await gitCreateBranch(repoRoot, name, selectedBranch?.name ?? null, true);
+                  rememberRecentBranch(repoRoot, name);
+                });
+              }
             }}
-            onCheckout={() => selectedBranch && void checkoutBranch(repoRoot, selectedBranch, runAction)}
-            onMerge={() => selectedBranch && void confirmAndRun("Merge branch", `Merge ${selectedBranch.name} into current branch?`, false, () => runAction("Merge", () => gitMergeBranch(repoRoot, selectedBranch.name)))}
-            onDelete={() => selectedBranch && void confirmAndRun("Delete branch", `Delete local branch ${selectedBranch.name}?`, true, () => runAction("Delete branch", () => gitDeleteBranch(repoRoot, selectedBranch.name, false)))}
-            onRename={async () => {
-              if (!selectedBranch) return;
-              const next = await promptAppDialog({ title: "Rename branch", label: "New name", initialValue: selectedBranch.name });
-              if (next && next !== selectedBranch.name) await runAction("Rename branch", () => gitRenameBranch(repoRoot, selectedBranch.name, next));
+            onCheckout={(branch) => void checkoutBranch(repoRoot, branch, runAction)}
+            onMerge={(branch) => void confirmAndRun("Merge branch", `Merge ${branch.name} into current branch?`, false, () => runAction("Merge", () => gitMergeBranch(repoRoot, branch.name)))}
+            onDelete={(branch) => void confirmAndRun("Delete branch", `Delete local branch ${branch.name}?`, true, () => runAction("Delete branch", () => gitDeleteBranch(repoRoot, branch.name, false)))}
+            onRename={async (branch) => {
+              const next = await promptAppDialog({ title: "Rename branch", label: "New name", initialValue: branch.name });
+              if (next && next !== branch.name) {
+                await runAction("Rename branch", async () => {
+                  await gitRenameBranch(repoRoot, branch.name, next);
+                  rememberRecentBranch(repoRoot, next);
+                });
+              }
             }}
-            onPush={() => selectedBranch && void runAction("Push branch", () => gitPush(repoRoot, remoteName || null, selectedBranch.name, !selectedBranch.upstream))}
-            onSetUpstream={async () => {
-              if (!selectedBranch) return;
+            onPush={(branch) => void runAction("Push branch", () => gitPush(repoRoot, remoteName || null, branch.name, !branch.upstream))}
+            onSetUpstream={async (branch) => {
               const up = await promptAppDialog({
                 title: "Set upstream",
                 label: "Upstream (remote/branch, empty to clear)",
-                initialValue: selectedBranch.upstream ?? `${remoteName || "origin"}/${selectedBranch.name}`,
+                initialValue: branch.upstream ?? `${remoteName || "origin"}/${branch.name}`,
                 allowEmpty: true,
               });
-              if (up !== null) await runAction("Set upstream", () => gitSetUpstream(repoRoot, selectedBranch.name, up || null));
+              if (up !== null) await runAction("Set upstream", () => gitSetUpstream(repoRoot, branch.name, up || null));
             }}
-            onCompare={() => {
-              if (!selectedBranch || !snapshot?.currentBranch) return;
-              setCompare({ refA: selectedBranch.name, refB: snapshot.currentBranch, title: `${selectedBranch.name} → ${snapshot.currentBranch}` });
+            onCompare={(branch) => {
+              if (!snapshot?.currentBranch) return;
+              setCompare({ refA: branch.name, refB: snapshot.currentBranch, title: `${branch.name} → ${snapshot.currentBranch}` });
             }}
           />}
           </div>
@@ -1168,51 +1196,195 @@ function BranchesView({
   setSelected: (branch: GitBranchInfo) => void;
   busy: boolean;
   onCreate: () => void;
-  onCheckout: () => void;
-  onMerge: () => void;
-  onDelete: () => void;
-  onRename: () => void;
-  onPush: () => void;
-  onSetUpstream: () => void;
-  onCompare: () => void;
+  onCheckout: (branch: GitBranchInfo) => void;
+  onMerge: (branch: GitBranchInfo) => void;
+  onDelete: (branch: GitBranchInfo) => void;
+  onRename: (branch: GitBranchInfo) => void;
+  onPush: (branch: GitBranchInfo) => void;
+  onSetUpstream: (branch: GitBranchInfo) => void;
+  onCompare: (branch: GitBranchInfo) => void;
 }) {
+  const repoRoot = snapshot?.repoRoot ?? "";
   const branches = snapshot?.branches ?? [];
   const [query, setQuery] = useState("");
+  const [collapsed, setCollapsed] = useState(loadBranchCollapse);
+  const [ctx, setCtx] = useState<{ x: number; y: number; branch: GitBranchInfo } | null>(null);
+  const [recentTick, setRecentTick] = useState(0);
   const normalizedQuery = query.trim().toLowerCase();
   const filteredBranches = useMemo(() => (
-    branches.filter((branch) => branchMatchesQuery(branch, normalizedQuery))
+    sortByDateThenName(branches.filter((branch) => branchMatchesQuery(branch, normalizedQuery)))
   ), [branches, normalizedQuery]);
-  const local = filteredBranches.filter((b) => !b.remote);
-  const remote = filteredBranches.filter((b) => b.remote);
-  const renderGroup = (label: string, list: GitBranchInfo[]) =>
-    list.length === 0 ? null : (
-      <div>
-        <div className="px-3 py-1 text-[11px] uppercase tracking-wide text-[var(--taomni-text-muted)] bg-[var(--taomni-quick-bg)] border-b border-[var(--taomni-divider)]">
-          {label} ({list.length})
-        </div>
-        {list.map((branch) => (
-          <button
-            key={branch.fullName}
-            type="button"
-            className={`w-full px-3 py-2 flex items-center gap-2 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${selected?.fullName === branch.fullName ? "bg-[var(--taomni-hover)]" : ""}`}
-            onClick={() => setSelected(branch)}
-          >
-            <GitFork className={`w-4 h-4 ${branch.current ? "text-[var(--taomni-accent)]" : "text-[var(--taomni-text-muted)]"}`} />
-            <div className="min-w-0 flex-1">
-              <div className="text-[12px] truncate">{branch.name}</div>
-              <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
-                {branch.upstream ? `tracks ${branch.upstream}` : branch.remote ? "remote" : "local"}
-                {branch.subject ? ` · ${branch.subject}` : ""}
-              </div>
-            </div>
-            {branch.current && <span className="text-[11px] text-[var(--taomni-accent)]">current</span>}
-          </button>
-        ))}
-      </div>
+  const local = useMemo(() => sortByDateThenName(filteredBranches.filter((b) => !b.remote)), [filteredBranches]);
+  const remote = useMemo(() => sortByDateThenName(filteredBranches.filter((b) => b.remote)), [filteredBranches]);
+  const recent = useMemo(() => {
+    void recentTick;
+    return pickRecentItems(
+      sortByDateThenName(filteredBranches),
+      getRecentBranchNames(repoRoot),
     );
+  }, [filteredBranches, recentTick, repoRoot]);
+
+  useEffect(() => {
+    if (snapshot?.currentBranch) {
+      rememberRecentBranch(repoRoot, snapshot.currentBranch);
+      setRecentTick((n) => n + 1);
+    }
+  }, [repoRoot, snapshot?.currentBranch]);
+
+  const toggleSection = (id: BranchSectionId) => {
+    setCollapsed((current) => {
+      const next = { ...current, [id]: !current[id] };
+      saveBranchCollapse(next);
+      return next;
+    });
+  };
+
+  const openBranchMenu = (branch: GitBranchInfo, event: ReactMouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setSelected(branch);
+    setCtx({ x: event.clientX, y: event.clientY, branch });
+  };
+
+  const branchMenuItems = (branch: GitBranchInfo): MenuItem[] => {
+    const localSel = !branch.remote;
+    return [
+      {
+        label: "Checkout",
+        disabled: busy || branch.current,
+        onClick: () => {
+          setSelected(branch);
+          onCheckout(branch);
+        },
+      },
+      {
+        label: "Merge into current",
+        disabled: busy || branch.current || branch.remote,
+        onClick: () => {
+          setSelected(branch);
+          onMerge(branch);
+        },
+      },
+      {
+        label: "Compare with current",
+        disabled: busy || !snapshot?.currentBranch,
+        onClick: () => {
+          setSelected(branch);
+          onCompare(branch);
+        },
+      },
+      { label: "", separator: true },
+      {
+        label: "Rename…",
+        disabled: busy || !localSel,
+        onClick: () => {
+          setSelected(branch);
+          onRename(branch);
+        },
+      },
+      {
+        label: "Push",
+        disabled: busy || !localSel,
+        onClick: () => {
+          setSelected(branch);
+          onPush(branch);
+        },
+      },
+      {
+        label: "Set upstream…",
+        disabled: busy || !localSel,
+        onClick: () => {
+          setSelected(branch);
+          onSetUpstream(branch);
+        },
+      },
+      {
+        label: "Copy name",
+        icon: <Copy className="w-3.5 h-3.5" />,
+        onClick: () => void writeText(branch.name),
+      },
+      { label: "", separator: true },
+      {
+        label: "Delete…",
+        danger: true,
+        disabled: busy || branch.current || branch.remote,
+        onClick: () => {
+          setSelected(branch);
+          onDelete(branch);
+        },
+      },
+    ];
+  };
+
+  const renderBranchRow = (branch: GitBranchInfo) => {
+    const dateLabel = formatRefDate(branch.date);
+    return (
+      <button
+        key={branch.fullName}
+        type="button"
+        data-testid="git-branch-row"
+        data-branch={branch.name}
+        className={`w-full px-3 py-1.5 flex items-center gap-2 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${selected?.fullName === branch.fullName ? "bg-[var(--taomni-hover)]" : ""}`}
+        onClick={() => setSelected(branch)}
+        onDoubleClick={() => {
+          if (!busy && !branch.current) {
+            setSelected(branch);
+            onCheckout(branch);
+          }
+        }}
+        onContextMenu={(event) => openBranchMenu(branch, event)}
+      >
+        <GitFork className={`w-4 h-4 shrink-0 ${branch.current ? "text-[var(--taomni-accent)]" : "text-[var(--taomni-text-muted)]"}`} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[12px] truncate font-medium">{branch.name}</span>
+            {dateLabel ? (
+              <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]" title={branch.date ?? undefined}>
+                {dateLabel}
+              </span>
+            ) : null}
+          </div>
+          <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+            {branch.upstream ? `tracks ${branch.upstream}` : branch.remote ? "remote" : "local"}
+            {branch.subject ? ` · ${branch.subject}` : ""}
+          </div>
+        </div>
+        {branch.current && <span className="text-[11px] text-[var(--taomni-accent)] shrink-0">current</span>}
+      </button>
+    );
+  };
+
+  const renderSection = (
+    id: BranchSectionId,
+    label: string,
+    list: GitBranchInfo[],
+  ) => {
+    if (list.length === 0) return null;
+    const isCollapsed = collapsed[id];
+    return (
+      <section data-testid={`git-branch-section-${id}`} className="border-b border-[var(--taomni-divider)]">
+        <button
+          type="button"
+          className="w-full h-7 px-2 flex items-center gap-1.5 text-left bg-[var(--taomni-quick-bg)] hover:bg-[var(--taomni-hover)]"
+          aria-expanded={!isCollapsed}
+          onClick={() => toggleSection(id)}
+        >
+          {isCollapsed
+            ? <ChevronRight className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
+            : <ChevronDown className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />}
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">
+            {label}
+          </span>
+          <span className="text-[10px] text-[var(--taomni-text-muted)]">({list.length})</span>
+        </button>
+        {isCollapsed ? null : list.map(renderBranchRow)}
+      </section>
+    );
+  };
+
   const localSel = !!selected && !selected.remote;
   return (
-    <div className="h-full min-h-0 flex flex-col">
+    <div className="h-full min-h-0 flex flex-col" data-testid="git-branches-view">
       <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)] overflow-x-auto">
         <div className="relative w-56 min-w-40 shrink-0">
           <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
@@ -1233,22 +1405,31 @@ function BranchesView({
           />
         </div>
         <IconButton label="New" icon={<Plus className="w-3.5 h-3.5" />} disabled={busy} onClick={onCreate} />
-        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected || selected.current} onClick={onCheckout}>Checkout</button>
-        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected || selected.current || selected.remote} onClick={onMerge}>Merge</button>
-        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected} onClick={onCompare}>Compare</button>
-        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !localSel} onClick={onRename}>Rename</button>
-        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !localSel} onClick={onPush}>Push</button>
-        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !localSel} onClick={onSetUpstream}>Upstream</button>
-        <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy || !selected || selected.current || selected.remote} onClick={onDelete}>Delete</button>
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected || selected.current} onClick={() => selected && onCheckout(selected)}>Checkout</button>
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected || selected.current || selected.remote} onClick={() => selected && onMerge(selected)}>Merge</button>
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !selected} onClick={() => selected && onCompare(selected)}>Compare</button>
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !localSel || !selected} onClick={() => selected && onRename(selected)}>Rename</button>
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !localSel || !selected} onClick={() => selected && onPush(selected)}>Push</button>
+        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !localSel || !selected} onClick={() => selected && onSetUpstream(selected)}>Upstream</button>
+        <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy || !selected || selected.current || selected.remote} onClick={() => selected && onDelete(selected)}>Delete</button>
       </div>
       <div className="flex-1 min-h-0 overflow-auto">
         {branches.length === 0 ? <EmptyState title="No branches" /> : filteredBranches.length === 0 ? <EmptyState title="No branches match" /> : (
           <>
-            {renderGroup("Local", local)}
-            {renderGroup("Remote", remote)}
+            {renderSection("recent", "Recent", recent)}
+            {renderSection("local", "Local", local)}
+            {renderSection("remote", "Remote", remote)}
           </>
         )}
       </div>
+      {ctx ? (
+        <ContextMenu
+          x={ctx.x}
+          y={ctx.y}
+          onClose={() => setCtx(null)}
+          items={branchMenuItems(ctx.branch)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1270,16 +1451,131 @@ function TagsView({
   onDelete: (tag: GitTag) => void;
   onPush: (tag: GitTag) => void;
 }) {
+  const repoRoot = snapshot?.repoRoot ?? "";
   const tags = snapshot?.tags ?? [];
   const [selected, setSelected] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [collapsed, setCollapsed] = useState(loadTagCollapse);
+  const [ctx, setCtx] = useState<{ x: number; y: number; tag: GitTag } | null>(null);
+  const [recentTick, setRecentTick] = useState(0);
   const normalizedQuery = query.trim().toLowerCase();
   const filteredTags = useMemo(() => (
-    tags.filter((tag) => tagMatchesQuery(tag, normalizedQuery))
+    sortByDateThenName(tags.filter((tag) => tagMatchesQuery(tag, normalizedQuery)))
   ), [tags, normalizedQuery]);
+  const recent = useMemo(() => {
+    void recentTick;
+    return pickRecentItems(filteredTags, getRecentTagNames(repoRoot));
+  }, [filteredTags, recentTick, repoRoot]);
   const current = tags.find((t) => t.name === selected) ?? null;
+
+  const toggleSection = (id: TagSectionId) => {
+    setCollapsed((state) => {
+      const next = { ...state, [id]: !state[id] };
+      saveTagCollapse(next);
+      return next;
+    });
+  };
+
+  const openTagMenu = (tag: GitTag, event: ReactMouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setSelected(tag.name);
+    setCtx({ x: event.clientX, y: event.clientY, tag });
+  };
+
+  const tagMenuItems = (tag: GitTag): MenuItem[] => [
+    {
+      label: "Checkout",
+      disabled: busy,
+      onClick: () => {
+        rememberRecentTag(repoRoot, tag.name);
+        setRecentTick((n) => n + 1);
+        onCheckout(tag);
+      },
+    },
+    {
+      label: "Push",
+      disabled: busy || !hasRemote,
+      onClick: () => onPush(tag),
+    },
+    {
+      label: "Copy name",
+      icon: <Copy className="w-3.5 h-3.5" />,
+      onClick: () => void writeText(tag.name),
+    },
+    { label: "", separator: true },
+    {
+      label: "Delete…",
+      danger: true,
+      disabled: busy,
+      onClick: () => onDelete(tag),
+    },
+  ];
+
+  const renderTagRow = (tag: GitTag) => {
+    const dateLabel = formatRefDate(tag.date);
+    return (
+      <button
+        key={tag.name}
+        type="button"
+        data-testid="git-tag-row"
+        data-tag={tag.name}
+        className={`w-full px-3 py-1.5 flex items-center gap-2 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${selected === tag.name ? "bg-[var(--taomni-hover)]" : ""}`}
+        onClick={() => setSelected(tag.name)}
+        onDoubleClick={() => {
+          if (!busy) {
+            rememberRecentTag(repoRoot, tag.name);
+            setRecentTick((n) => n + 1);
+            onCheckout(tag);
+          }
+        }}
+        onContextMenu={(event) => openTagMenu(tag, event)}
+      >
+        <Tag className="w-4 h-4 shrink-0 text-[var(--taomni-text-muted)]" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[12px] truncate font-medium">{tag.name}</span>
+            {dateLabel ? (
+              <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]" title={tag.date ?? undefined}>
+                {dateLabel}
+              </span>
+            ) : null}
+          </div>
+          <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+            <span className="taomni-mono text-[var(--taomni-accent)]">{tag.oid}</span>
+            {tag.annotated ? " · annotated" : " · lightweight"}{tag.subject ? ` · ${tag.subject}` : ""}
+          </div>
+        </div>
+      </button>
+    );
+  };
+
+  const renderSection = (id: TagSectionId, label: string, list: GitTag[]) => {
+    if (list.length === 0) return null;
+    const isCollapsed = collapsed[id];
+    return (
+      <section data-testid={`git-tag-section-${id}`} className="border-b border-[var(--taomni-divider)]">
+        <button
+          type="button"
+          className="w-full h-7 px-2 flex items-center gap-1.5 text-left bg-[var(--taomni-quick-bg)] hover:bg-[var(--taomni-hover)]"
+          aria-expanded={!isCollapsed}
+          onClick={() => toggleSection(id)}
+        >
+          {isCollapsed
+            ? <ChevronRight className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
+            : <ChevronDown className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />}
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">
+            {label}
+          </span>
+          <span className="text-[10px] text-[var(--taomni-text-muted)]">({list.length})</span>
+        </button>
+        {isCollapsed ? null : list.map(renderTagRow)}
+      </section>
+    );
+  };
+
   return (
-    <div className="h-full min-h-0 flex flex-col">
+    <div className="h-full min-h-0 flex flex-col" data-testid="git-tags-view">
       <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)]">
         <div className="relative w-56 min-w-40 shrink-0">
           <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
@@ -1300,29 +1596,38 @@ function TagsView({
           />
         </div>
         <IconButton label="New tag" icon={<Plus className="w-3.5 h-3.5" />} disabled={busy} onClick={onCreate} />
-        <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !current} onClick={() => current && onCheckout(current)}>Checkout</button>
+        <button
+          className="taomni-btn h-7 px-2"
+          type="button"
+          disabled={busy || !current}
+          onClick={() => {
+            if (!current) return;
+            rememberRecentTag(repoRoot, current.name);
+            setRecentTick((n) => n + 1);
+            onCheckout(current);
+          }}
+        >
+          Checkout
+        </button>
         <button className="taomni-btn h-7 px-2" type="button" disabled={busy || !current || !hasRemote} onClick={() => current && onPush(current)}>Push</button>
         <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy || !current} onClick={() => current && onDelete(current)}>Delete</button>
       </div>
       <div className="flex-1 min-h-0 overflow-auto">
-        {tags.length === 0 ? <EmptyState title="No tags" /> : filteredTags.length === 0 ? <EmptyState title="No tags match" /> : filteredTags.map((tag) => (
-          <button
-            key={tag.name}
-            type="button"
-            className={`w-full px-3 py-2 flex items-center gap-2 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${selected === tag.name ? "bg-[var(--taomni-hover)]" : ""}`}
-            onClick={() => setSelected(tag.name)}
-          >
-            <GitCommitHorizontal className="w-4 h-4 text-[var(--taomni-text-muted)]" />
-            <div className="min-w-0 flex-1">
-              <div className="text-[12px] truncate">{tag.name}</div>
-              <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
-                <span className="taomni-mono text-[var(--taomni-accent)]">{tag.oid}</span>
-                {tag.annotated ? " · annotated" : " · lightweight"}{tag.subject ? ` · ${tag.subject}` : ""}
-              </div>
-            </div>
-          </button>
-        ))}
+        {tags.length === 0 ? <EmptyState title="No tags" /> : filteredTags.length === 0 ? <EmptyState title="No tags match" /> : (
+          <>
+            {renderSection("recent", "Recent", recent)}
+            {renderSection("all", "All tags", filteredTags)}
+          </>
+        )}
       </div>
+      {ctx ? (
+        <ContextMenu
+          x={ctx.x}
+          y={ctx.y}
+          onClose={() => setCtx(null)}
+          items={tagMenuItems(ctx.tag)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1764,8 +2069,14 @@ async function checkoutBranch(
       initialValue: suggested,
     });
     if (!localName) return;
-    await runAction("Checkout remote branch", () => gitCreateBranch(repoRoot, localName, branch.name, true));
+    await runAction("Checkout remote branch", async () => {
+      await gitCreateBranch(repoRoot, localName, branch.name, true);
+      rememberRecentBranch(repoRoot, localName);
+    });
     return;
   }
-  await runAction("Checkout branch", () => gitCheckoutBranch(repoRoot, branch.name));
+  await runAction("Checkout branch", async () => {
+    await gitCheckoutBranch(repoRoot, branch.name);
+    rememberRecentBranch(repoRoot, branch.name);
+  });
 }
