@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use taomni_lib::agent::acp_bridge::{
     AcpProcess, AcpProcessConfig, AcpProfileConfig, AcpRuntimeError, AcpRuntimeEvent,
-    AcpStopReason, process_config,
+    AcpStopReason, AcpThreadProcess, process_config,
 };
 use taomni_lib::agent::local::LocalAgentEvent;
 
@@ -219,6 +219,50 @@ async fn process_proxy_policy_reaches_the_child_environment() {
             Some(manual_url)
         );
     }
+}
+
+#[tokio::test]
+async fn thread_wrapper_keeps_profile_session_and_process_lifecycle_together() {
+    let thread = AcpThreadProcess::spawn(
+        "fixture-profile",
+        fake_config("happy"),
+        Some("cached_token"),
+        "unregistered-test-token".into(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(thread.profile_id(), "fixture-profile");
+    assert!(thread.agent_info().supports_session_load);
+
+    let session_id = thread
+        .ensure_session(None, "/workspace", Vec::new())
+        .await
+        .unwrap();
+    assert_eq!(session_id, "fake-session");
+    let result = thread.prompt("hello").await.unwrap();
+    assert_eq!(result.stop_reason, AcpStopReason::EndTurn);
+
+    thread.stop().await;
+    assert!(thread.is_stopped());
+}
+
+#[tokio::test]
+async fn thread_wrapper_rejects_unadvertised_auth_method() {
+    let error = match AcpThreadProcess::spawn(
+        "fixture-profile",
+        fake_config("happy"),
+        Some("not-advertised"),
+        "unregistered-test-token".into(),
+    )
+    .await
+    {
+        Ok(_) => panic!("unadvertised ACP auth method was accepted"),
+        Err(error) => error,
+    };
+    assert_eq!(
+        error,
+        AcpRuntimeError::Protocol("configured ACP authentication method was not advertised".into())
+    );
 }
 
 async fn recorded_proxy_environment(proxy_url: Option<&str>) -> serde_json::Value {

@@ -9,6 +9,7 @@ pub mod config;
 mod presets;
 mod process;
 mod protocol;
+mod thread;
 
 pub use config::{
     ACP_PROVIDER_PREFIX, AcpBridgeConfig, AcpProfileConfig, AcpProxySource,
@@ -28,3 +29,4 @@ pub use protocol::{
     new_session_request, parse_incoming_line, parse_initialize_result, parse_prompt_result,
     parse_session_update, prompt_request, session_id_from_response,
 };
+pub use thread::AcpThreadProcess;

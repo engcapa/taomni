@@ -418,6 +418,7 @@ pub async fn chat_new_thread(
         source: "drawer".into(),
         mode,
         cc_session_id: None,
+        acp_session_id: None,
         // New threads inherit the global default; the user can override per-thread later.
         output_format: None,
         cc_model: None,

@@ -16,6 +16,10 @@ pub struct ChatThread {
     /// Claude Code session ID for --resume (v2.6).
     #[serde(default)]
     pub cc_session_id: Option<String>,
+    /// ACP session ID for session/load continuity. This is intentionally not
+    /// shared with the legacy Claude Code/Codex bridge column.
+    #[serde(default)]
+    pub acp_session_id: Option<String>,
     /// Per-thread Claude Code model override.
     /// `None` means "inherit AiConfig.cc_bridge.default_model". Baked into the
     /// child's `--model` at spawn, so changing it recycles the CC process.
@@ -106,6 +110,10 @@ pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
         "ALTER TABLE ai_chat_threads ADD COLUMN cc_session_id TEXT",
         [],
     );
+    let _ = conn.execute(
+        "ALTER TABLE ai_chat_threads ADD COLUMN acp_session_id TEXT",
+        [],
+    );
     // Idempotent column add for the per-thread chat output-format override.
     let _ = conn.execute(
         "ALTER TABLE ai_chat_threads ADD COLUMN output_format TEXT",
@@ -127,13 +135,14 @@ pub fn init_chat_tables(conn: &Connection) -> SqlResult<()> {
 
 pub fn create_thread(conn: &Connection, thread: &ChatThread) -> SqlResult<()> {
     conn.execute(
-        "INSERT INTO ai_chat_threads (id, title, provider_id, created_at, updated_at, linked_session_id, source, output_format, cc_model, mode)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        "INSERT INTO ai_chat_threads (id, title, provider_id, created_at, updated_at, linked_session_id, source, output_format, cc_model, mode, acp_session_id)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
             thread.id, thread.title, thread.provider_id,
             thread.created_at, thread.updated_at,
             thread.linked_session_id, thread.source,
             thread.output_format, thread.cc_model, thread.mode,
+            thread.acp_session_id,
         ],
     )?;
     Ok(())
@@ -141,7 +150,7 @@ pub fn create_thread(conn: &Connection, thread: &ChatThread) -> SqlResult<()> {
 
 pub fn get_thread(conn: &Connection, id: &str) -> SqlResult<Option<ChatThread>> {
     let mut stmt = conn.prepare(
-        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model, mode
+        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model, mode, acp_session_id
          FROM ai_chat_threads WHERE id = ?1",
     )?;
     let mut rows = stmt.query(params![id])?;
@@ -157,6 +166,7 @@ pub fn get_thread(conn: &Connection, id: &str) -> SqlResult<Option<ChatThread>> 
         linked_session_id: row.get(5)?,
         source: row.get(6)?,
         cc_session_id: row.get(7).ok(),
+        acp_session_id: row.get(11).ok(),
         output_format: row.get(8).ok(),
         cc_model: row.get(9).ok(),
         mode: row
@@ -167,7 +177,7 @@ pub fn get_thread(conn: &Connection, id: &str) -> SqlResult<Option<ChatThread>> 
 
 pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread>> {
     let mut stmt = conn.prepare(
-        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model, mode
+        "SELECT id, title, provider_id, created_at, updated_at, linked_session_id, source, cc_session_id, output_format, cc_model, mode, acp_session_id
          FROM ai_chat_threads ORDER BY updated_at DESC LIMIT ?1",
     )?;
     let rows = stmt.query_map(params![limit as i64], |row| {
@@ -180,6 +190,7 @@ pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread
             linked_session_id: row.get(5)?,
             source: row.get(6)?,
             cc_session_id: row.get(7).ok(),
+            acp_session_id: row.get(11).ok(),
             output_format: row.get(8).ok(),
             cc_model: row.get(9).ok(),
             mode: row
@@ -193,6 +204,14 @@ pub fn list_threads(conn: &Connection, limit: usize) -> SqlResult<Vec<ChatThread
 pub fn set_cc_session_id(conn: &Connection, thread_id: &str, session_id: &str) -> SqlResult<()> {
     conn.execute(
         "UPDATE ai_chat_threads SET cc_session_id = ?1 WHERE id = ?2",
+        params![session_id, thread_id],
+    )?;
+    Ok(())
+}
+
+pub fn set_acp_session_id(conn: &Connection, thread_id: &str, session_id: &str) -> SqlResult<()> {
+    conn.execute(
+        "UPDATE ai_chat_threads SET acp_session_id = ?1 WHERE id = ?2",
         params![session_id, thread_id],
     )?;
     Ok(())
@@ -309,7 +328,10 @@ pub fn update_thread_title(conn: &Connection, id: &str, title: &str) -> SqlResul
 
 pub fn update_thread_provider(conn: &Connection, id: &str, provider_id: &str) -> SqlResult<()> {
     conn.execute(
-        "UPDATE ai_chat_threads SET provider_id = ?1 WHERE id = ?2",
+        "UPDATE ai_chat_threads
+         SET acp_session_id = CASE WHEN provider_id = ?1 THEN acp_session_id ELSE NULL END,
+             provider_id = ?1
+         WHERE id = ?2",
         params![provider_id, id],
     )?;
     Ok(())
@@ -377,6 +399,7 @@ mod tests {
             source: "drawer".into(),
             mode: "chat".into(),
             cc_session_id: None,
+            acp_session_id: None,
             cc_model: None,
             output_format: None,
         };
@@ -411,5 +434,50 @@ mod tests {
         );
         let loaded_thread = get_thread(&conn, "thread-1").unwrap().unwrap();
         assert_eq!(loaded_thread.mode, "chat");
+    }
+
+    #[test]
+    fn acp_session_is_separate_and_clears_when_provider_changes() {
+        let conn = Connection::open_in_memory().unwrap();
+        init_chat_tables(&conn).unwrap();
+        let thread = ChatThread {
+            id: "acp-thread".into(),
+            title: "ACP chat".into(),
+            provider_id: "acp:grok".into(),
+            created_at: 1,
+            updated_at: 1,
+            linked_session_id: None,
+            source: "drawer".into(),
+            mode: "chat".into(),
+            cc_session_id: None,
+            acp_session_id: None,
+            cc_model: None,
+            output_format: None,
+        };
+        create_thread(&conn, &thread).unwrap();
+        set_acp_session_id(&conn, &thread.id, "grok-session").unwrap();
+
+        let loaded = get_thread(&conn, &thread.id).unwrap().unwrap();
+        assert_eq!(loaded.acp_session_id.as_deref(), Some("grok-session"));
+        assert!(loaded.cc_session_id.is_none());
+
+        update_thread_provider(&conn, &thread.id, "acp:grok").unwrap();
+        assert_eq!(
+            get_thread(&conn, &thread.id)
+                .unwrap()
+                .unwrap()
+                .acp_session_id
+                .as_deref(),
+            Some("grok-session")
+        );
+
+        update_thread_provider(&conn, &thread.id, "codex").unwrap();
+        assert!(
+            get_thread(&conn, &thread.id)
+                .unwrap()
+                .unwrap()
+                .acp_session_id
+                .is_none()
+        );
     }
 }
