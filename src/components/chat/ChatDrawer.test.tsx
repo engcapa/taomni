@@ -231,6 +231,27 @@ describe("ChatDrawer provider and echo controls", () => {
     expect(config.llm.providers).not.toHaveProperty("xai");
   });
 
+  it("migrates bridge-only ACP enablement into a visible preferred profile", async () => {
+    const config = makeConfig();
+    config.acp_bridge.enabled = true;
+    config.acp_bridge.profiles[0].enabled = false;
+    invokeMock.mockImplementation((command: string) => {
+      if (command === "get_ai_config") return Promise.resolve(config);
+      if (command === "chat_list_threads") return Promise.resolve([]);
+      if (command === "chat_purge_old") return Promise.resolve(0);
+      return Promise.resolve(null);
+    });
+
+    await act(async () => {
+      await useAiStore.getState().loadConfig();
+    });
+    render(<ChatDrawer />);
+
+    const provider = screen.getByLabelText("Thread LLM provider") as HTMLSelectElement;
+    expect(Array.from(provider.options).map((option) => option.value)).toContain("acp:grok");
+    expect(useAiStore.getState().config?.acp_bridge.profiles[0].enabled).toBe(true);
+  });
+
   it("remembers provider changes from the thread picker", () => {
     render(<ChatDrawer />);
 

@@ -94,6 +94,39 @@ export function AcpAgentsPanel() {
     });
   };
 
+  const toggleBridge = () => {
+    const enabled = !draft.enabled;
+    if (!enabled || draft.profiles.some((profile) => profile.enabled)) {
+      patchBridge({ enabled });
+      return;
+    }
+    const fallbackProfile = draft.profiles.find((profile) =>
+      profile.id === draft.active_profile_id && profile.command.trim()
+    ) ?? draft.profiles.find((profile) => profile.command.trim());
+    patchBridge({
+      enabled,
+      ...(fallbackProfile
+        ? {
+            active_profile_id: fallbackProfile.id,
+            profiles: draft.profiles.map((profile) =>
+              profile.id === fallbackProfile.id ? { ...profile, enabled: true } : profile
+            ),
+          }
+        : {}),
+    });
+  };
+
+  const toggleProfile = (profileId: string, enabled: boolean) => {
+    const profiles = draft.profiles.map((profile) =>
+      profile.id === profileId ? { ...profile, enabled } : profile
+    );
+    patchBridge({
+      profiles,
+      enabled: enabled ? true : profiles.some((profile) => profile.enabled) ? draft.enabled : false,
+      active_profile_id: enabled && !draft.active_profile_id ? profileId : draft.active_profile_id,
+    });
+  };
+
   const persist = async (): Promise<void> => {
     await saveConfig({ ...config, acp_bridge: draft });
     setDirty(false);
@@ -184,7 +217,7 @@ export function AcpAgentsPanel() {
             ? "border-[var(--taomni-accent)]/40 bg-[var(--taomni-accent)]/5"
             : "border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
         }`}
-        onClick={() => patchBridge({ enabled: !draft.enabled })}
+        onClick={toggleBridge}
         disabled={unavailable}
         aria-pressed={draft.enabled}
         data-testid="acp-bridge-enabled"
@@ -293,7 +326,7 @@ export function AcpAgentsPanel() {
                   <input
                     type="checkbox"
                     checked={profile.enabled}
-                    onChange={(event) => patchProfile(profile.id, { enabled: event.target.checked })}
+                    onChange={(event) => toggleProfile(profile.id, event.target.checked)}
                     data-testid={`acp-profile-${profile.id}-enabled`}
                   />
                   <span className="text-[12px] font-semibold truncate">{profile.name}</span>

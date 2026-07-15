@@ -122,6 +122,28 @@ impl AcpBridgeConfig {
         self.active_profile_id = normalize_optional(&self.active_profile_id)
             .map(|id| normalize_profile_id(&id, 1))
             .filter(|id| self.profiles.iter().any(|profile| &profile.id == id));
+
+        // The settings UI historically allowed the bridge master switch to
+        // be enabled while every configured profile remained disabled. That
+        // state makes the provider picker look as if ACP has disappeared even
+        // though the user just enabled it. Treat the preferred configured
+        // profile as enabled when migrating that contradictory state.
+        if self.enabled && !self.profiles.iter().any(|profile| profile.enabled) {
+            let preferred_index = self.active_profile_id.as_deref().and_then(|active_id| {
+                self.profiles.iter().position(|profile| {
+                    profile.id == active_id && !profile.command.trim().is_empty()
+                })
+            });
+            let fallback_index = preferred_index.or_else(|| {
+                self.profiles
+                    .iter()
+                    .position(|profile| !profile.command.trim().is_empty())
+            });
+            if let Some(index) = fallback_index {
+                self.profiles[index].enabled = true;
+                self.active_profile_id = Some(self.profiles[index].id.clone());
+            }
+        }
     }
 
     pub fn active_profile(&self) -> Option<&AcpProfileConfig> {
@@ -367,6 +389,35 @@ mod tests {
             provider_id_for_profile(&config.profiles[1].id),
             "acp:my-agent-2"
         );
+    }
+
+    #[test]
+    fn enabled_bridge_migrates_preferred_configured_profile_to_enabled() {
+        let mut config = AcpBridgeConfig {
+            enabled: true,
+            ..Default::default()
+        };
+
+        assert!(!config.profiles[0].enabled);
+        config.normalize();
+
+        assert_eq!(config.active_profile_id.as_deref(), Some("grok"));
+        assert!(config.profiles[0].enabled);
+        assert_eq!(
+            config.active_profile().map(|profile| profile.id.as_str()),
+            Some("grok")
+        );
+    }
+
+    #[test]
+    fn disabled_bridge_keeps_default_profiles_disabled() {
+        let mut config = AcpBridgeConfig::default();
+
+        config.normalize();
+
+        assert!(!config.enabled);
+        assert!(!config.profiles[0].enabled);
+        assert!(config.active_profile().is_none());
     }
 
     #[test]

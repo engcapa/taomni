@@ -459,7 +459,7 @@ function normalizeAcpProfileProxyMode(mode: string | undefined | null, proxyUrl?
 
 function normalizeAcpBridge(bridge: AcpBridgeConfig | undefined): AcpBridgeConfig {
   const source = bridge ?? DEFAULT_CONFIG.acp_bridge;
-  const profiles = (source.profiles ?? []).map((profile, index) => ({
+  let profiles = (source.profiles ?? []).map((profile, index) => ({
     ...profile,
     id: profile.id?.trim() || `profile-${index + 1}`,
     name: profile.name?.trim() || profile.id?.trim() || `ACP Agent ${index + 1}`,
@@ -470,13 +470,25 @@ function normalizeAcpBridge(bridge: AcpBridgeConfig | undefined): AcpBridgeConfi
     proxy_session_id: profile.proxy_session_id?.trim() || null,
     proxy_url: profile.proxy_url?.trim() || null,
   }));
-  const activeProfileId = source.active_profile_id?.trim();
+  const requestedActiveProfileId = source.active_profile_id?.trim();
+  let activeProfileId = requestedActiveProfileId && profiles.some((profile) => profile.id === requestedActiveProfileId)
+    ? requestedActiveProfileId
+    : profiles[0]?.id ?? null;
+  if (source.enabled === true && !profiles.some((profile) => profile.enabled)) {
+    const fallbackProfile = profiles.find((profile) =>
+      profile.id === activeProfileId && profile.command.length > 0
+    ) ?? profiles.find((profile) => profile.command.length > 0);
+    if (fallbackProfile) {
+      activeProfileId = fallbackProfile.id;
+      profiles = profiles.map((profile) =>
+        profile.id === fallbackProfile.id ? { ...profile, enabled: true } : profile
+      );
+    }
+  }
   return {
     ...DEFAULT_CONFIG.acp_bridge,
     ...source,
-    active_profile_id: activeProfileId && profiles.some((profile) => profile.id === activeProfileId)
-      ? activeProfileId
-      : profiles[0]?.id ?? null,
+    active_profile_id: activeProfileId,
     proxy_mode: normalizeAcpGlobalProxyMode(source.proxy_mode, source.proxy_url),
     proxy_session_id: source.proxy_session_id?.trim() || null,
     proxy_url: source.proxy_url?.trim() || null,

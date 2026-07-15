@@ -117,7 +117,7 @@ describe("AcpAgentsPanel", () => {
     render(<AcpAgentsPanel />);
 
     await user.click(screen.getByTestId("acp-bridge-enabled"));
-    await user.click(screen.getByTestId("acp-profile-grok-enabled"));
+    expect(screen.getByTestId("acp-profile-grok-enabled")).toBeChecked();
     await user.click(screen.getByTestId("acp-global-proxy-app"));
     await user.click(screen.getByTestId("acp-save"));
 
@@ -142,6 +142,22 @@ describe("AcpAgentsPanel", () => {
     const savedConfig = useAiStore.getState().config;
     expect(savedConfig?.llm.providers).not.toHaveProperty("grok");
     expect(savedConfig?.llm.providers).not.toHaveProperty("xai");
+  });
+
+  it("keeps the bridge and profile enable switches consistent", async () => {
+    const user = userEvent.setup();
+    render(<AcpAgentsPanel />);
+
+    const bridge = screen.getByTestId("acp-bridge-enabled");
+    const profile = screen.getByTestId("acp-profile-grok-enabled");
+
+    await user.click(profile);
+    expect(profile).toBeChecked();
+    expect(bridge).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(profile);
+    expect(profile).not.toBeChecked();
+    expect(bridge).toHaveAttribute("aria-pressed", "false");
   });
 
   it("shows negotiated ACP capabilities from the bounded profile probe", async () => {
