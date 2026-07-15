@@ -9,6 +9,8 @@ const gitMocks = vi.hoisted(() => ({
   gitBlobPair: vi.fn(),
   gitCleanUntracked: vi.fn(),
   gitCommit: vi.fn(),
+  gitCheckoutBranch: vi.fn(),
+  gitCreateBranch: vi.fn(),
   gitChangeLabel: vi.fn((change: { conflict?: boolean; status: string }) => (
     change.conflict ? "Conflicted" : change.status[0]?.toUpperCase() + change.status.slice(1)
   )),
@@ -29,9 +31,15 @@ const dialogMocks = vi.hoisted(() => ({
   confirmAppDialog: vi.fn(),
 }));
 
+const workspaceMocks = vi.hoisted(() => ({
+  workspaceWriteFile: vi.fn(),
+}));
+
 vi.mock("../../lib/git", () => gitMocks);
 
 vi.mock("../../lib/appDialogs", () => dialogMocks);
+
+vi.mock("../../lib/editor/workspace", () => workspaceMocks);
 
 vi.mock("./GitPanel", () => ({
   GitPanel: ({ repoRoot, changesView, workspaceHeader }: any) => (
@@ -142,6 +150,10 @@ describe("WorkspaceGitManager", () => {
     });
     gitMocks.gitCommit.mockReset();
     gitMocks.gitCommit.mockResolvedValue(undefined);
+    gitMocks.gitCheckoutBranch.mockReset();
+    gitMocks.gitCheckoutBranch.mockResolvedValue(undefined);
+    gitMocks.gitCreateBranch.mockReset();
+    gitMocks.gitCreateBranch.mockResolvedValue(undefined);
     gitMocks.gitFetch.mockReset();
     gitMocks.gitFetch.mockResolvedValue(undefined);
     gitMocks.gitPull.mockReset();
@@ -183,6 +195,14 @@ describe("WorkspaceGitManager", () => {
     dialogMocks.choiceAppDialog.mockResolvedValue("primary");
     dialogMocks.confirmAppDialog.mockReset();
     dialogMocks.confirmAppDialog.mockResolvedValue(true);
+    workspaceMocks.workspaceWriteFile.mockReset();
+    workspaceMocks.workspaceWriteFile.mockResolvedValue({
+      path: "src/App.tsx",
+      text: "old",
+      size: 3,
+      mtime: 0,
+      hash: "h",
+    });
   });
 
   afterEach(() => {
@@ -247,6 +267,281 @@ describe("WorkspaceGitManager", () => {
     });
     expect(gitMocks.gitCommit).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Commit: 1 completed"));
+  });
+
+  it("opens the focused change in the code workspace editor (issue #324 S1A)", async () => {
+    const onOpenWorkspace = vi.fn();
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
+      snapshot(repoRoot, [change("src/App.tsx")])
+    ));
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        onOpenWorkspace={onOpenWorkspace}
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /app src\/App\.tsx Modified/i })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /app src\/App\.tsx Modified/i }));
+    await waitFor(() => expect(gitMocks.gitBlobPair).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByTestId("git-diff-open-in-editor")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("git-diff-open-in-editor"));
+    expect(onOpenWorkspace).toHaveBeenCalledWith("/repo/app", "src/App.tsx");
+  });
+
+  it("wires worktree save control for focused changes (issue #324 S1B)", async () => {
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
+      snapshot(repoRoot, [change("src/App.tsx")])
+    ));
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        onOpenWorkspace={vi.fn()}
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /app src\/App\.tsx Modified/i })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /app src\/App\.tsx Modified/i }));
+    await waitFor(() => expect(screen.getByTestId("git-diff-save-worktree")).toBeInTheDocument());
+    expect(screen.getByTestId("git-diff-open-in-editor")).toBeInTheDocument();
+  });
+
+  it("creates and checks out a typed target branch before commit (issue #324 S4)", async () => {
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
+      snapshot(repoRoot, [change("src/App.tsx")], {
+        currentBranch: "main",
+        branches: [{
+          name: "main",
+          fullName: "refs/heads/main",
+          current: true,
+          remote: false,
+          upstream: null,
+          oid: "abc",
+          subject: "s",
+        }],
+      })
+    ));
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("commit-target-branch")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Commit target branch"), {
+      target: { value: "feature/issue-324" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Commit message"), {
+      target: { value: "commit on new branch" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Commit" }));
+
+    await waitFor(() => {
+      expect(gitMocks.gitCreateBranch).toHaveBeenCalledWith(
+        "/repo/app",
+        "feature/issue-324",
+        null,
+        true,
+      );
+    });
+    expect(gitMocks.gitCommit).toHaveBeenCalledWith(
+      "/repo/app",
+      "commit on new branch",
+      false,
+      ["src/App.tsx"],
+    );
+    expect(dialogMocks.confirmAppDialog).toHaveBeenCalled();
+    const confirmArg = dialogMocks.confirmAppDialog.mock.calls[0]?.[0] as { message?: string };
+    expect(confirmArg?.message ?? "").toContain("feature/issue-324");
+    expect(confirmArg?.message ?? "").toMatch(/create/i);
+  });
+
+  it("checks out an existing branch before commit when selected (issue #324 S4)", async () => {
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
+      snapshot(repoRoot, [change("src/App.tsx")], {
+        currentBranch: "main",
+        branches: [
+          {
+            name: "main",
+            fullName: "refs/heads/main",
+            current: true,
+            remote: false,
+            upstream: null,
+            oid: "abc",
+            subject: "s",
+          },
+          {
+            name: "develop",
+            fullName: "refs/heads/develop",
+            current: false,
+            remote: false,
+            upstream: null,
+            oid: "def",
+            subject: "s",
+          },
+        ],
+      })
+    ));
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText("Commit target branch")).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Commit target branch"), {
+      target: { value: "develop" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Commit message"), {
+      target: { value: "commit on develop" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Commit" }));
+
+    await waitFor(() => {
+      expect(gitMocks.gitCheckoutBranch).toHaveBeenCalledWith("/repo/app", "develop");
+    });
+    expect(gitMocks.gitCreateBranch).not.toHaveBeenCalled();
+    expect(gitMocks.gitCommit).toHaveBeenCalledWith(
+      "/repo/app",
+      "commit on develop",
+      false,
+      ["src/App.tsx"],
+    );
+  });
+
+  it("renders flat changes grouped under project headers with compact single-line rows (issue #324 S2/S3)", async () => {
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
+      repoRoot === "/repo/app"
+        ? snapshot(repoRoot, [change("src/App.tsx"), change("src/lib/util.ts")])
+        : snapshot(repoRoot, [change("cmd/main.go")])
+    ));
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("workspace-flat-changes-list")).toBeInTheDocument());
+    const headers = screen.getAllByTestId("workspace-flat-repo-header");
+    expect(headers).toHaveLength(2);
+    expect(headers[0]).toHaveTextContent(/app/i);
+    expect(headers[1]).toHaveTextContent(/service/i);
+
+    const rows = screen.getAllByTestId("workspace-change-row");
+    expect(rows.length).toBe(3);
+    expect(rows.every((row) => row.getAttribute("data-compact") === "true")).toBe(true);
+    // Single-line: filename + small path, not a second block for "app / src /"
+    expect(screen.getByText("App.tsx")).toBeInTheDocument();
+    expect(screen.getAllByTestId("workspace-change-path").some((node) => node.textContent === "src")).toBe(true);
+    expect(screen.queryByText("app /")).not.toBeInTheDocument();
+  });
+
+  it("normalizes EOL-only worktree text from the diff banner (issue #324 B2)", async () => {
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => (
+      snapshot(repoRoot, [change("src/App.tsx")])
+    ));
+    gitMocks.gitBlobPair.mockResolvedValue({
+      path: "src/App.tsx",
+      oldPath: null,
+      oldText: "line\n",
+      newText: "line\r\n",
+      oldExists: true,
+      newExists: true,
+      binary: false,
+      image: false,
+      oldImageB64: null,
+      newImageB64: null,
+      oversize: false,
+      oldSize: 5,
+      newSize: 6,
+    });
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("git-diff-eol-only-banner")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("git-diff-normalize-eol"));
+
+    await waitFor(() => {
+      expect(workspaceMocks.workspaceWriteFile).toHaveBeenCalledWith(
+        "/repo/app",
+        "src/App.tsx",
+        "line\n",
+      );
+    });
+  });
+
+  it("stops snapshotting a repo after a missing-path error (issue #324 B1)", async () => {
+    let serviceCalls = 0;
+    gitMocks.gitSnapshot.mockImplementation(async (repoRoot: string) => {
+      if (repoRoot === "/repo/service") {
+        serviceCalls += 1;
+        throw new Error("Repository path no longer exists: /repo/service");
+      }
+      return snapshot(repoRoot, [change("src/app.ts")]);
+    });
+
+    render(
+      <WorkspaceGitManager
+        workspaceName="Workspace"
+        activeRepoRoot="/repo/app"
+        roots={[
+          { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+          { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+        ]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /app src\/app\.ts Modified/i })).toBeInTheDocument());
+    await waitFor(() => expect(serviceCalls).toBeGreaterThanOrEqual(1));
+    const callsAfterFirstFailure = serviceCalls;
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toMatch(/Refresh/i));
+
+    // Dead root must not be snapshotted again after the missing-path failure.
+    expect(serviceCalls).toBe(callsAfterFirstFailure);
+    expect(gitMocks.gitSnapshot.mock.calls.every((call) => call[0] !== "/repo/service" || true)).toBe(true);
+    const serviceCallsAfterRefresh = gitMocks.gitSnapshot.mock.calls.filter((call) => call[0] === "/repo/service").length;
+    expect(serviceCallsAfterRefresh).toBe(callsAfterFirstFailure);
   });
 
   it("falls back the active repository when updated roots remove it", async () => {
@@ -369,7 +664,8 @@ describe("WorkspaceGitManager", () => {
     fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Show untracked files" }));
 
     expect(screen.getByRole("button", { name: /app scratch\.txt Untracked/i })).toBeInTheDocument();
-    expect(screen.getByText("app /")).toBeInTheDocument();
+    // Flat list groups by project header (issue #324 S2); path is no longer a second line.
+    expect(screen.getAllByTestId("workspace-flat-repo-header").some((node) => node.textContent?.includes("app"))).toBe(true);
     expect(screen.queryByRole("button", { name: /app src\/app\.ts Modified/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /service src\/service\.ts Modified/i })).not.toBeInTheDocument();
 

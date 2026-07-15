@@ -9,7 +9,12 @@ import {
 } from "@codemirror/merge";
 import { ChevronDown, ChevronUp, Columns2, Loader2, RefreshCw, Rows2 } from "lucide-react";
 import type { GitBlobPair } from "../../lib/git";
-import { buildDiffOverride, type WhitespaceMode } from "../../lib/diffWhitespace";
+import {
+  buildDiffOverride,
+  eolOnlyDiffLabel,
+  isEolOnlyDiff,
+  type WhitespaceMode,
+} from "../../lib/diffWhitespace";
 import { codeViewExtensions } from "../../lib/codeViewTheme";
 import { languageForPath } from "./diffLanguage";
 
@@ -19,6 +24,12 @@ interface DiffViewerProps {
   pair: GitBlobPair | null;
   loading?: boolean;
   emptyLabel?: string;
+  /** When set, shown for EOL-only pairs so the user can rewrite the worktree. */
+  onNormalizeLineEndings?: () => void;
+  normalizeLineEndingsBusy?: boolean;
+  /** P2: allow editing the worktree (new) side of the diff. */
+  worktreeEditable?: boolean;
+  onSaveWorktree?: (text: string) => Promise<void> | void;
 }
 
 const VIEW_KEY = "taomni.git.diff.view";
@@ -50,13 +61,18 @@ const diffTheme = EditorView.theme({
   ".cm-cursor": { display: "none" },
 });
 
-function baseExtensions(language: Extension | null): Extension[] {
+const diffThemeEditable = EditorView.theme({
+  "&": { backgroundColor: "var(--taomni-code-bg)", color: "var(--taomni-code-text)", height: "100%" },
+  ".cm-content": { caretColor: "var(--taomni-code-text)" },
+});
+
+function baseExtensions(language: Extension | null, editable = false): Extension[] {
   const ext: Extension[] = [
     lineNumbers(),
-    EditorView.editable.of(false),
-    EditorState.readOnly.of(true),
+    EditorView.editable.of(editable),
+    EditorState.readOnly.of(!editable),
     ...codeViewExtensions(),
-    diffTheme,
+    editable ? diffThemeEditable : diffTheme,
   ];
   if (language) ext.push(language);
   return ext;
@@ -543,7 +559,15 @@ function formatBytes(n: number): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function DiffViewer({ pair, loading, emptyLabel }: DiffViewerProps) {
+export function DiffViewer({
+  pair,
+  loading,
+  emptyLabel,
+  onNormalizeLineEndings,
+  normalizeLineEndingsBusy = false,
+  worktreeEditable = false,
+  onSaveWorktree,
+}: DiffViewerProps) {
   const [view, setView] = useState<ViewMode>(() => readPref<ViewMode>(VIEW_KEY, "split"));
   const [whitespace, setWhitespace] = useState<WhitespaceMode>(() => readPref<WhitespaceMode>(WS_KEY, "none"));
   const [syncScrolling, setSyncScrolling] = useState(
@@ -552,6 +576,8 @@ export function DiffViewer({ pair, loading, emptyLabel }: DiffViewerProps) {
   const [highlightWords, setHighlightWords] = useState(true);
   const [diffCount, setDiffCount] = useState(0);
   const [forceRenderLargeDiffKey, setForceRenderLargeDiffKey] = useState("");
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const hostRef = useRef<HTMLDivElement | null>(null);
   const mergeRef = useRef<MergeView | null>(null);
@@ -559,6 +585,15 @@ export function DiffViewer({ pair, loading, emptyLabel }: DiffViewerProps) {
   const scrollCleanupRef = useRef<(() => void) | null>(null);
   const syncScrollingRef = useRef(syncScrolling);
   const activeChunkIndexRef = useRef(-1);
+  const baselineNewTextRef = useRef("");
+  const canEditWorktree = worktreeEditable
+    && !!onSaveWorktree
+    && !!pair
+    && !pair.binary
+    && !pair.image
+    && !pair.oversize
+    && pair.newExists
+    && pair.newText != null;
   const pairKey = pair
     ? `${pair.path}\0${pair.oldPath ?? ""}\0${pair.oldSize}\0${pair.newSize}\0${pair.oldText?.length ?? -1}\0${pair.newText?.length ?? -1}`
     : "";
@@ -582,6 +617,31 @@ export function DiffViewer({ pair, loading, emptyLabel }: DiffViewerProps) {
   useEffect(() => {
     syncScrollingRef.current = syncScrolling;
   }, [syncScrolling]);
+
+  useEffect(() => {
+    setDirty(false);
+    baselineNewTextRef.current = pair?.newText ?? "";
+  }, [pairKey]);
+
+  const readWorktreeText = useCallback((): string | null => {
+    if (mergeRef.current) return mergeRef.current.b.state.doc.toString();
+    if (unifiedRef.current) return unifiedRef.current.state.doc.toString();
+    return null;
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    if (!onSaveWorktree || !canEditWorktree) return;
+    const text = readWorktreeText();
+    if (text == null) return;
+    setSaving(true);
+    try {
+      await onSaveWorktree(text);
+      baselineNewTextRef.current = text;
+      setDirty(false);
+    } finally {
+      setSaving(false);
+    }
+  }, [canEditWorktree, onSaveWorktree, readWorktreeText]);
 
   // BUILD_EFFECT
   useEffect(() => {
@@ -607,16 +667,29 @@ export function DiffViewer({ pair, loading, emptyLabel }: DiffViewerProps) {
     host.innerHTML = "";
     const oldText = pair.oldText ?? "";
     const newText = pair.newText ?? "";
+    baselineNewTextRef.current = newText;
     const override = buildDiffOverride(whitespace);
     const diffConfig = override ? { override } : undefined;
+    const editable = canEditWorktree;
+    const updateListener = editable
+      ? EditorView.updateListener.of((update) => {
+        if (!update.docChanged) return;
+        const text = update.state.doc.toString();
+        setDirty(text !== baselineNewTextRef.current);
+      })
+      : null;
 
     void languageForPath(pair.path)
       .then((language) => {
         if (cancelled || hostRef.current !== host) return;
         if (view === "split") {
+          const bExtensions = [
+            ...baseExtensions(language, editable),
+            ...(updateListener ? [updateListener] : []),
+          ];
           const mv = new MergeView({
-            a: { doc: oldText, extensions: baseExtensions(language) },
-            b: { doc: newText, extensions: baseExtensions(language) },
+            a: { doc: oldText, extensions: baseExtensions(language, false) },
+            b: { doc: newText, extensions: bExtensions },
             parent: host,
             orientation: "a-b",
             highlightChanges: highlightWords,
@@ -631,7 +704,8 @@ export function DiffViewer({ pair, loading, emptyLabel }: DiffViewerProps) {
             doc: newText,
             parent: host,
             extensions: [
-              ...baseExtensions(language),
+              ...baseExtensions(language, editable),
+              ...(updateListener ? [updateListener] : []),
               unifiedMergeView({
                 original: oldText,
                 mergeControls: false,
@@ -655,7 +729,7 @@ export function DiffViewer({ pair, loading, emptyLabel }: DiffViewerProps) {
       cancelled = true;
       teardown();
     };
-  }, [pair, renderable, view, whitespace, highlightWords]);
+  }, [canEditWorktree, pair, renderable, view, whitespace, highlightWords]);
 
   const goToChunk = useCallback((direction: 1 | -1) => {
     const mv = mergeRef.current;
@@ -728,8 +802,32 @@ export function DiffViewer({ pair, loading, emptyLabel }: DiffViewerProps) {
     );
   }
 
+  const eolOnly = isEolOnlyDiff(pair.oldText, pair.newText);
+  const eolLabel = eolOnly && pair.oldText != null && pair.newText != null
+    ? eolOnlyDiffLabel(pair.oldText, pair.newText)
+    : null;
+
   return (
     <div className="h-full min-h-0 flex flex-col bg-[var(--taomni-panel-bg)]">
+      {eolOnly && eolLabel ? (
+        <div
+          data-testid="git-diff-eol-only-banner"
+          className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-amber-500/40 bg-amber-500/10 text-[11px] text-amber-700 dark:text-amber-300"
+        >
+          <span className="min-w-0 flex-1">{eolLabel}</span>
+          {onNormalizeLineEndings ? (
+            <button
+              type="button"
+              className="taomni-btn h-6 px-2 shrink-0"
+              data-testid="git-diff-normalize-eol"
+              disabled={normalizeLineEndingsBusy}
+              onClick={onNormalizeLineEndings}
+            >
+              {normalizeLineEndingsBusy ? "Normalizing…" : "Normalize line endings"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="h-10 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-divider)] text-[12px] bg-[var(--taomni-chrome-bg)]">
         <div className="inline-flex rounded-md p-0.5 bg-[var(--taomni-hover)] border border-[var(--taomni-divider)]">
           <button
@@ -791,6 +889,19 @@ export function DiffViewer({ pair, loading, emptyLabel }: DiffViewerProps) {
         </label>
 
         <div className="flex-1" />
+
+        {canEditWorktree ? (
+          <button
+            type="button"
+            className="taomni-btn h-7 px-2"
+            data-testid="git-diff-save-worktree"
+            disabled={!dirty || saving}
+            onClick={() => void handleSave()}
+            title="Save worktree file"
+          >
+            {saving ? "Saving…" : dirty ? "Save" : "Saved"}
+          </button>
+        ) : null}
 
         <span className="text-[11px] font-medium text-[var(--taomni-text-muted)] bg-[var(--taomni-hover)] px-2.5 py-0.5 rounded-full border border-[var(--taomni-divider)]">
           {diffCount === 0 ? "No differences" : `${diffCount} difference${diffCount === 1 ? "" : "s"}`}

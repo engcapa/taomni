@@ -93,6 +93,8 @@ export interface GitBranch {
   upstream: string | null;
   oid: string | null;
   subject: string | null;
+  /** Tip committer date (iso-strict), used for sort / recent UI. */
+  date?: string | null;
 }
 
 export interface GitLogEntry {
@@ -131,6 +133,8 @@ export interface GitTag {
   oid: string;
   subject: string | null;
   annotated: boolean;
+  /** Creator/tagger date (iso-strict), used for sort / recent UI. */
+  date?: string | null;
 }
 
 export type GitOperationKind = "merge" | "cherryPick" | "revert" | "rebase" | "none";

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { normalizeWhitespace, buildDiffOverride } from "./diffWhitespace";
+import {
+  normalizeWhitespace,
+  buildDiffOverride,
+  detectLineEndingStyle,
+  isEolOnlyDiff,
+  eolOnlyDiffLabel,
+  normalizeWorktreeToMatchHead,
+  stripLineEndings,
+} from "./diffWhitespace";
 
 describe("normalizeWhitespace", () => {
   it("is identity for mode none", () => {
@@ -44,5 +52,34 @@ describe("buildDiffOverride", () => {
     expect(changes[0].toA).toBe(3);
     expect(changes[0].fromB).toBe(2);
     expect(changes[0].toB).toBe(3);
+  });
+});
+
+describe("EOL-only diagnosis (issue #324 B2)", () => {
+  it("detects LF vs CRLF styles", () => {
+    expect(detectLineEndingStyle("a\nb\n")).toBe("LF");
+    expect(detectLineEndingStyle("a\r\nb\r\n")).toBe("CRLF");
+    expect(detectLineEndingStyle("a\rb\r")).toBe("CR");
+    expect(detectLineEndingStyle("a\nb\r\n")).toBe("mixed");
+  });
+
+  it("flags pairs that differ only by line endings", () => {
+    expect(isEolOnlyDiff("a\nb\n", "a\r\nb\r\n")).toBe(true);
+    expect(isEolOnlyDiff("a\nb\n", "a\nb\n")).toBe(false);
+    expect(isEolOnlyDiff("a\nb\n", "a\nc\n")).toBe(false);
+    expect(isEolOnlyDiff(null, "a\n")).toBe(false);
+  });
+
+  it("labels EOL-only pairs with from→to styles", () => {
+    expect(eolOnlyDiffLabel("a\nb", "a\r\nb")).toContain("LF");
+    expect(eolOnlyDiffLabel("a\nb", "a\r\nb")).toContain("CRLF");
+  });
+
+  it("normalizes worktree text to HEAD bytes for EOL-only pairs", () => {
+    const head = "line1\nline2\n";
+    const worktree = "line1\r\nline2\r\n";
+    expect(stripLineEndings(worktree)).toBe(stripLineEndings(head));
+    expect(normalizeWorktreeToMatchHead(head, worktree)).toBe(head);
+    expect(normalizeWorktreeToMatchHead(head, "line1\nchanged\n")).toBeNull();
   });
 });

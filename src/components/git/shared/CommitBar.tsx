@@ -1,4 +1,4 @@
-import { GitCommitHorizontal, Upload } from "lucide-react";
+import { GitBranch, GitCommitHorizontal, Upload } from "lucide-react";
 import type { ReactNode } from "react";
 
 export interface CommitBarProps {
@@ -14,6 +14,11 @@ export interface CommitBarProps {
     checked: boolean;
     onChange: (value: boolean) => void;
   };
+  /** Target branch for commit (issue #324 S4). Empty means current branch. */
+  targetBranch?: string;
+  onTargetBranchChange?: (branch: string) => void;
+  branchOptions?: string[];
+  branchPlaceholder?: string;
 }
 
 export function CommitBar({
@@ -26,9 +31,33 @@ export function CommitBar({
   commitLabel = "Commit",
   summary,
   amend,
+  targetBranch,
+  onTargetBranchChange,
+  branchOptions = [],
+  branchPlaceholder = "Current branch",
 }: CommitBarProps) {
+  const listId = "taomni-git-commit-branch-options";
   return (
     <div className="shrink-0 border-t border-[var(--taomni-divider)] p-2 space-y-2">
+      {onTargetBranchChange ? (
+        <label className="flex items-center gap-2 text-[12px]" data-testid="commit-target-branch">
+          <GitBranch className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-accent)]" />
+          <span className="shrink-0 text-[var(--taomni-text-muted)]">Branch</span>
+          <input
+            className="taomni-input h-7 flex-1 min-w-0 text-[12px]"
+            list={listId}
+            value={targetBranch ?? ""}
+            placeholder={branchPlaceholder}
+            aria-label="Commit target branch"
+            onChange={(event) => onTargetBranchChange(event.target.value)}
+          />
+          <datalist id={listId}>
+            {branchOptions.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+        </label>
+      ) : null}
       <textarea
         className="taomni-input w-full min-h-20 resize-none"
         value={message}

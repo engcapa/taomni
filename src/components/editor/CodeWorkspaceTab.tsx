@@ -2341,19 +2341,18 @@ export function CodeWorkspaceTab({
     ? gitRootForWorkspacePath(activeRoot, activeFile.ref.path, gitRoots)
     : null;
   const title = workspaceTitle(workspace, roots, looseFiles);
-  const gitManagerPayload = useMemo<CodeWorkspaceGitManagerPayload | null>(() => {
-    if (gitRoots.length === 0) return null;
-    return {
-      workspaceName: title,
-      workspaceInstanceId,
-      workspaceId: workspace.workspaceId,
-      roots: gitRoots,
-      activeRepoRoot: activeGitRoot?.repoRoot ?? gitRoots[0]?.repoRoot ?? null,
-    };
-  }, [activeGitRoot, gitRoots, title, workspace.workspaceId, workspaceInstanceId]);
+  const gitManagerPayload = useMemo<CodeWorkspaceGitManagerPayload>(() => ({
+    workspaceName: title,
+    workspaceInstanceId,
+    workspaceId: workspace.workspaceId,
+    roots: gitRoots,
+    // Empty roots still emit a payload so the linked Git manager can close
+    // instead of snapshotting stale paths (issue #324 B1).
+    activeRepoRoot: activeGitRoot?.repoRoot ?? gitRoots[0]?.repoRoot ?? null,
+  }), [activeGitRoot, gitRoots, title, workspace.workspaceId, workspaceInstanceId]);
 
   const openGitManager = useCallback(() => {
-    if (!onOpenGitManager || !gitManagerPayload) return;
+    if (!onOpenGitManager || gitManagerPayload.roots.length === 0) return;
     onOpenGitManager(gitManagerPayload);
   }, [gitManagerPayload, onOpenGitManager]);
 
@@ -2409,7 +2408,7 @@ export function CodeWorkspaceTab({
     setWorkspaceStatusActions(tabId, {
       // Language server install / binary selection lives in Settings (global).
       openLanguagePanel: () => openLanguageServersSettings(activeLspPresetIdRef.current),
-      openGitManager: gitManagerPayload && onOpenGitManager ? openGitManager : undefined,
+      openGitManager: gitManagerPayload.roots.length > 0 && onOpenGitManager ? openGitManager : undefined,
     });
   }, [
     gitManagerPayload,
@@ -4053,7 +4052,7 @@ export function CodeWorkspaceTab({
     [openFile, revealEditorLocation],
   );
   useEffect(() => {
-    if (!onSyncGitManager || !gitManagerPayload) return;
+    if (!onSyncGitManager) return;
     onSyncGitManager(gitManagerPayload);
   }, [gitManagerPayload, onSyncGitManager]);
 

@@ -84,6 +84,8 @@ pub struct GitBranch {
     pub upstream: Option<String>,
     pub oid: Option<String>,
     pub subject: Option<String>,
+    /// Tip committer date (iso-strict) for sort/recent UI.
+    pub date: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -130,6 +132,8 @@ pub struct GitTag {
     pub oid: String,
     pub subject: Option<String>,
     pub annotated: bool,
+    /// Creator/tagger date (iso-strict) for sort/recent UI.
+    pub date: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1510,7 +1514,7 @@ fn list_branches(root: &Path) -> Result<Vec<GitBranch>, String> {
             "for-each-ref",
             "refs/heads",
             "refs/remotes",
-            "--format=%(refname)%1f%(refname:short)%1f%(upstream:short)%1f%(HEAD)%1f%(objectname:short)%1f%(subject)",
+            "--format=%(refname)%1f%(refname:short)%1f%(upstream:short)%1f%(HEAD)%1f%(objectname:short)%1f%(subject)%1f%(committerdate:iso-strict)",
         ],
     )?;
     let mut branches = Vec::new();
@@ -1531,6 +1535,7 @@ fn list_branches(root: &Path) -> Result<Vec<GitBranch>, String> {
             upstream: non_empty_string(parts[2]),
             oid: non_empty_string(parts[4]),
             subject: non_empty_string(parts[5]),
+            date: parts.get(6).and_then(|s| non_empty_string(s)),
         });
     }
     Ok(branches)
@@ -1723,7 +1728,7 @@ fn list_tags(root: &Path) -> Result<Vec<GitTag>, String> {
             "for-each-ref",
             "refs/tags",
             "--sort=-creatordate",
-            "--format=%(refname:short)%1f%(objectname:short)%1f%(objecttype)%1f%(contents:subject)",
+            "--format=%(refname:short)%1f%(objectname:short)%1f%(objecttype)%1f%(contents:subject)%1f%(creatordate:iso-strict)",
         ],
     )?;
     let mut tags = Vec::new();
@@ -1737,6 +1742,7 @@ fn list_tags(root: &Path) -> Result<Vec<GitTag>, String> {
             oid: parts[1].to_string(),
             annotated: parts[2] == "tag",
             subject: non_empty_string(parts[3]),
+            date: parts.get(4).and_then(|s| non_empty_string(s)),
         });
     }
     Ok(tags)
@@ -1779,6 +1785,24 @@ where
 fn run_git_strings(cwd: Option<&Path>, args: Vec<String>) -> Result<String, String> {
     let mut command = new_git_command();
     if let Some(cwd) = cwd {
+        // Validate before current_dir: on Windows an invalid cwd yields
+        // ERROR_DIRECTORY (os error 267) with a vague spawn failure. Prefer a
+        // stable message so the frontend can drop the dead root (issue #324).
+        match fs::metadata(cwd) {
+            Ok(meta) if meta.is_dir() => {}
+            Ok(_) => {
+                return Err(format!(
+                    "Repository path is not a directory: {}",
+                    cwd.display()
+                ));
+            }
+            Err(_) => {
+                return Err(format!(
+                    "Repository path no longer exists: {}",
+                    cwd.display()
+                ));
+            }
+        }
         command.current_dir(cwd);
     }
     apply_stable_locale(&mut command);
@@ -2249,6 +2273,19 @@ fn require_non_empty(label: &str, value: &str) -> Result<(), String> {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    #[test]
+    fn run_git_strings_rejects_missing_cwd_with_stable_message() {
+        let missing = std::env::temp_dir().join(format!(
+            "taomni-missing-git-cwd-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let err = run_git_strings(Some(&missing), vec!["status".into()]).unwrap_err();
+        assert!(
+            err.contains("Repository path no longer exists"),
+            "unexpected error: {err}"
+        );
+    }
 
     #[cfg(windows)]
     #[test]

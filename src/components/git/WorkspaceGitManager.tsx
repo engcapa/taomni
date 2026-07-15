@@ -12,7 +12,9 @@ import {
   Braces,
   Check,
   ChevronDown,
+  ChevronRight,
   Circle,
+  Copy,
   Download,
   Ellipsis,
   FolderGit2,
@@ -25,6 +27,7 @@ import {
   RefreshCcw,
   RefreshCw,
   Search,
+  Tag,
   Upload,
 } from "lucide-react";
 import { FilterClearButton } from "../editor/workspace/workspaceChrome";
@@ -32,23 +35,46 @@ import {
   GIT_REF_WORKTREE,
   gitBlobPair,
   gitCheckoutBranch,
+  gitCheckoutTag,
   gitCleanUntracked,
   gitCommit,
   gitCreateBranch,
+  gitDeleteBranch,
+  gitDeleteTag,
   gitDiscard,
   gitFetch,
+  gitMergeBranch,
   gitPull,
   gitPush,
+  gitPushTag,
   gitRepoName,
   gitSnapshot,
   gitStage,
   gitUnstage,
   selectedRemote,
   type GitBlobPair,
+  type GitBranch as GitBranchInfo,
   type GitSnapshot,
+  type GitTag,
 } from "../../lib/git";
 import { notifyGitRepoChanged, subscribeGitRepoRefresh } from "../../lib/gitRefresh";
 import { alertAppDialog, choiceAppDialog, confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
+import { writeText } from "../../lib/clipboard";
+import { normalizeWorktreeToMatchHead } from "../../lib/diffWhitespace";
+import { workspaceWriteFile } from "../../lib/editor/workspace";
+import {
+  formatRefDate,
+  getRecentBranchNames,
+  getRecentTagNames,
+  loadBranchCollapse,
+  loadTagCollapse,
+  rememberRecentBranch,
+  rememberRecentTag,
+  saveBranchCollapse,
+  saveTagCollapse,
+  type BranchSectionId,
+  type TagSectionId,
+} from "../../lib/gitRefList";
 import { useAppStore } from "../../stores/appStore";
 import type { GitWorkspaceRootInfo } from "../../types";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
@@ -60,13 +86,23 @@ import {
   workspaceChangeKey,
   workspacePathsByRepoFromKeys,
 } from "./workspaceGitKeys";
+import {
+  filterSnapshotRoots,
+  isMissingRepoPathError,
+  retainDeadRepoRoots,
+} from "../../lib/workspaceGitManagerSync";
+import {
+  collectLocalBranchNames,
+  formatCommitBranchPlanLine,
+  resolveCommitBranchPlan,
+} from "../../lib/workspaceGitCommitTarget";
 
 interface WorkspaceGitManagerProps {
   workspaceName?: string | null;
   roots: GitWorkspaceRootInfo[];
   activeRepoRoot?: string | null;
   visible?: boolean;
-  onOpenWorkspace?: (repoRoot: string) => void;
+  onOpenWorkspace?: (repoRoot: string, path?: string | null) => void;
 }
 
 interface RepoSnapshotState {
@@ -101,6 +137,7 @@ export function WorkspaceGitManager({
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
   const [panelVersion, setPanelVersion] = useState(0);
   const [commitMessage, setCommitMessage] = useState("");
+  const [targetBranch, setTargetBranch] = useState("");
   const [uncheckedChangeKeys, setUncheckedChangeKeys] = useState<Set<string>>(() => new Set());
   const [selectedChangeKeys, setSelectedChangeKeys] = useState<Set<string>>(() => new Set());
   const [focusedChangeKey, setFocusedChangeKey] = useState<string | null>(null);
@@ -116,6 +153,8 @@ export function WorkspaceGitManager({
       return false;
     }
   });
+  /** Repo paths that failed with missing-cwd style errors; skip further snapshots. */
+  const [deadRepoRoots, setDeadRepoRoots] = useState<Set<string>>(() => new Set());
   const anchorChangeKeyRef = useRef<string | null>(null);
 
   const selectedRoot = useMemo(
@@ -202,6 +241,10 @@ export function WorkspaceGitManager({
   const totalChangedFiles = allChanges.length;
   const title = workspaceName?.trim() || "Code Workspace";
   const singleRepoMode = normalizedRoots.length === 1;
+  const liveRoots = useMemo(
+    () => filterSnapshotRoots(normalizedRoots, deadRepoRoots),
+    [deadRepoRoots, normalizedRoots],
+  );
 
   useEffect(() => {
     try {
@@ -210,6 +253,20 @@ export function WorkspaceGitManager({
       /* ignore */
     }
   }, [treeMode]);
+
+  useEffect(() => {
+    setDeadRepoRoots((current) => {
+      const next = retainDeadRepoRoots(current, normalizedRoots);
+      if (next.size === current.size && [...next].every((root) => current.has(root))) return current;
+      return next;
+    });
+    setSnapshots((current) => {
+      const live = new Set(normalizedRoots.map((root) => root.repoRoot));
+      const entries = Object.entries(current).filter(([repoRoot]) => live.has(repoRoot));
+      if (entries.length === Object.keys(current).length) return current;
+      return Object.fromEntries(entries);
+    });
+  }, [normalizedRoots]);
 
   useEffect(() => {
     setUncheckedChangeKeys((current) => retainWorkspaceChangeKeys(current, validChangeKeys));
@@ -242,6 +299,18 @@ export function WorkspaceGitManager({
   }, [normalizedRoots, repoScope, rootsKey]);
 
   const refreshRepo = useCallback(async (repoRoot: string) => {
+    if (deadRepoRoots.has(repoRoot)) {
+      const message = `Repository path no longer exists: ${repoRoot}`;
+      setSnapshots((current) => ({
+        ...current,
+        [repoRoot]: {
+          snapshot: null,
+          loading: false,
+          error: message,
+        },
+      }));
+      throw new Error(message);
+    }
     setSnapshots((current) => ({
       ...current,
       [repoRoot]: {
@@ -263,33 +332,43 @@ export function WorkspaceGitManager({
       return snapshot;
     } catch (err) {
       const message = errorMessage(err);
+      if (isMissingRepoPathError(message)) {
+        setDeadRepoRoots((current) => {
+          if (current.has(repoRoot)) return current;
+          const next = new Set(current);
+          next.add(repoRoot);
+          return next;
+        });
+      }
       setSnapshots((current) => ({
         ...current,
         [repoRoot]: {
-          snapshot: current[repoRoot]?.snapshot ?? null,
+          snapshot: isMissingRepoPathError(message) ? null : (current[repoRoot]?.snapshot ?? null),
           loading: false,
           error: message,
         },
       }));
       throw err;
     }
-  }, []);
+  }, [deadRepoRoots]);
 
-  const refreshRepos = useCallback(async (targets = normalizedRoots) => {
-    await Promise.allSettled(targets.map((root) => refreshRepo(root.repoRoot)));
-  }, [normalizedRoots, refreshRepo]);
+  const refreshRepos = useCallback(async (targets = liveRoots) => {
+    const snapshotTargets = filterSnapshotRoots(targets, deadRepoRoots);
+    await Promise.allSettled(snapshotTargets.map((root) => refreshRepo(root.repoRoot)));
+  }, [deadRepoRoots, liveRoots, refreshRepo]);
 
   useEffect(() => subscribeGitRepoRefresh((repoRoot) => {
+    if (deadRepoRoots.has(repoRoot)) return;
     if (normalizedRoots.some((root) => root.repoRoot === repoRoot)) {
       void refreshRepo(repoRoot);
       setPanelVersion((current) => current + 1);
     }
-  }), [normalizedRoots, refreshRepo]);
+  }), [deadRepoRoots, normalizedRoots, refreshRepo]);
 
   useEffect(() => {
-    if (!visible || normalizedRoots.length === 0 || singleRepoMode) return;
-    void refreshRepos(normalizedRoots);
-  }, [normalizedRoots, refreshRepos, singleRepoMode, visible]);
+    if (!visible || liveRoots.length === 0 || singleRepoMode) return;
+    void refreshRepos(liveRoots);
+  }, [liveRoots, refreshRepos, singleRepoMode, visible]);
 
   useEffect(() => {
     let cancelled = false;
@@ -535,6 +614,65 @@ export function WorkspaceGitManager({
     discardChangesByKeys(focusedOperationKeys);
   }, [discardChangesByKeys, focusedOperationKeys]);
 
+  const reloadFocusedPair = useCallback(async () => {
+    if (!focusedChange) return null;
+    const nextPair = await gitBlobPair(
+      focusedChange.repoRoot,
+      focusedChange.change.path,
+      "HEAD",
+      GIT_REF_WORKTREE,
+      focusedChange.change.oldPath,
+    );
+    setPair(nextPair);
+    return nextPair;
+  }, [focusedChange]);
+
+  const normalizeFocusedLineEndings = useCallback(() => {
+    if (!focusedChange || !pair) return;
+    const nextText = normalizeWorktreeToMatchHead(pair.oldText, pair.newText);
+    if (nextText == null) {
+      setStatusMessage("No line-ending-only difference to normalize");
+      return;
+    }
+    void (async () => {
+      setBusyLabel("Normalize EOL");
+      try {
+        await workspaceWriteFile(focusedChange.repoRoot, focusedChange.change.path, nextText);
+        notifyGitRepoChanged(focusedChange.repoRoot);
+        await reloadFocusedPair();
+        await refreshRepo(focusedChange.repoRoot);
+        setStatusMessage(`Normalized line endings: ${focusedChange.change.path}`);
+      } catch (err) {
+        setStatusMessage(errorMessage(err));
+      } finally {
+        setBusyLabel(null);
+      }
+    })();
+  }, [focusedChange, pair, refreshRepo, reloadFocusedPair, setStatusMessage]);
+
+  const openFocusedInEditor = useCallback(() => {
+    if (!focusedChange || !onOpenWorkspace) return;
+    if (focusedChange.change.status === "deleted") {
+      setStatusMessage("Deleted files cannot be opened in the editor");
+      return;
+    }
+    onOpenWorkspace(focusedChange.repoRoot, focusedChange.change.path);
+  }, [focusedChange, onOpenWorkspace, setStatusMessage]);
+
+  const saveFocusedWorktree = useCallback(async (text: string) => {
+    if (!focusedChange) return;
+    await workspaceWriteFile(focusedChange.repoRoot, focusedChange.change.path, text);
+    notifyGitRepoChanged(focusedChange.repoRoot);
+    await reloadFocusedPair();
+    await refreshRepo(focusedChange.repoRoot);
+    setStatusMessage(`Saved ${focusedChange.change.path}`);
+  }, [focusedChange, refreshRepo, reloadFocusedPair, setStatusMessage]);
+
+  const commitBranchOptions = useMemo(
+    () => collectLocalBranchNames(scopedRoots.map((root) => snapshots[root.repoRoot]?.snapshot ?? null)),
+    [scopedRoots, snapshots],
+  );
+
   const commitWorkspaceChanges = useCallback((push: boolean) => {
     const message = commitMessage.trim();
     if (!message || checkedChangeKeys.size === 0) return;
@@ -546,6 +684,7 @@ export function WorkspaceGitManager({
         targets,
         checkedChangePathsByRepo,
         snapshots,
+        targetBranch,
       });
       if (!decision) return;
       await runChangeAction(decision === "commit-and-push" ? "Commit and Push" : "Commit", targets, async (_root, snapshot) => {
@@ -554,11 +693,22 @@ export function WorkspaceGitManager({
           .filter((change) => selectedPaths.has(change.path))
           .map((change) => change.path);
         if (paths.length === 0) return "skipped";
+        const plan = resolveCommitBranchPlan(snapshot, targetBranch);
+        if (plan.action === "checkout") {
+          await gitCheckoutBranch(snapshot.repoRoot, plan.targetBranch);
+        } else if (plan.action === "create") {
+          await gitCreateBranch(snapshot.repoRoot, plan.targetBranch, null, true);
+        }
         await gitCommit(snapshot.repoRoot, message, false, paths);
         if (decision === "commit-and-push") {
-          const remote = selectedRemote(snapshot);
-          if (remote && snapshot.currentBranch) {
-            await gitPush(snapshot.repoRoot, remote.name, snapshot.currentBranch, !snapshot.upstream);
+          const refreshed = await refreshRepo(snapshot.repoRoot).catch(() => snapshot);
+          const remote = selectedRemote(refreshed);
+          const branchName = plan.action === "stay"
+            ? (refreshed.currentBranch ?? snapshot.currentBranch)
+            : plan.targetBranch;
+          if (remote && branchName) {
+            const hasUpstream = !!refreshed.upstream && plan.action === "stay";
+            await gitPush(snapshot.repoRoot, remote.name, branchName, !hasUpstream);
           }
         }
         return "completed";
@@ -570,8 +720,10 @@ export function WorkspaceGitManager({
     checkedChangePathsByRepo,
     commitMessage,
     normalizedRoots,
+    refreshRepo,
     runChangeAction,
     snapshots,
+    targetBranch,
   ]);
 
   const remoteNameForSnapshot = useCallback((snapshot: GitSnapshot | null): string => {
@@ -925,6 +1077,10 @@ export function WorkspaceGitManager({
                 setCommitMessage={setCommitMessage}
                 canCommitAndPush={canPushCheckedChanges}
                 scopeSummary={scopeSummary}
+                targetBranch={targetBranch}
+                setTargetBranch={setTargetBranch}
+                branchOptions={commitBranchOptions}
+                branchPlaceholder="Current branch (or type a new name)"
                 stageVisible={stageVisibleChanges}
                 unstageVisible={unstageVisibleChanges}
                 stagePaths={stagePathsInRepo}
@@ -937,6 +1093,11 @@ export function WorkspaceGitManager({
                 onToggleChecked={toggleChangeChecked}
                 onSelect={selectWorkspaceChange}
                 onContextMenu={openWorkspaceChangeMenu}
+                onNormalizeLineEndings={normalizeFocusedLineEndings}
+                normalizeLineEndingsBusy={busyLabel === "Normalize EOL"}
+                onOpenInEditor={onOpenWorkspace ? openFocusedInEditor : undefined}
+                onSaveWorktree={saveFocusedWorktree}
+                worktreeEditable={!!focusedChange && focusedChange.change.status !== "deleted"}
               />
             )}
           />
@@ -1004,6 +1165,39 @@ export function WorkspaceGitManager({
   );
 }
 
+type WorkspaceBranchRow = { root: GitWorkspaceRootInfo; branch: GitBranchInfo };
+type WorkspaceTagRow = { root: GitWorkspaceRootInfo; tag: GitTag };
+
+function workspaceBranchRowKey(row: WorkspaceBranchRow): string {
+  return `${row.root.repoRoot}\0${row.branch.fullName}`;
+}
+
+function workspaceTagRowKey(row: WorkspaceTagRow): string {
+  return `${row.root.repoRoot}\0${row.tag.name}`;
+}
+
+function sortWorkspaceBranchRows(rows: WorkspaceBranchRow[]): WorkspaceBranchRow[] {
+  return [...rows].sort((a, b) => {
+    const dateDelta = (b.branch.date ? Date.parse(b.branch.date) || 0 : 0)
+      - (a.branch.date ? Date.parse(a.branch.date) || 0 : 0);
+    if (dateDelta !== 0) return dateDelta;
+    const nameCmp = a.branch.name.localeCompare(b.branch.name, undefined, { sensitivity: "base" });
+    if (nameCmp !== 0) return nameCmp;
+    return a.root.name.localeCompare(b.root.name);
+  });
+}
+
+function sortWorkspaceTagRows(rows: WorkspaceTagRow[]): WorkspaceTagRow[] {
+  return [...rows].sort((a, b) => {
+    const dateDelta = (b.tag.date ? Date.parse(b.tag.date) || 0 : 0)
+      - (a.tag.date ? Date.parse(a.tag.date) || 0 : 0);
+    if (dateDelta !== 0) return dateDelta;
+    const nameCmp = a.tag.name.localeCompare(b.tag.name, undefined, { sensitivity: "base" });
+    if (nameCmp !== 0) return nameCmp;
+    return a.root.name.localeCompare(b.root.name);
+  });
+}
+
 function WorkspaceBranchesView({
   roots,
   snapshots,
@@ -1011,21 +1205,205 @@ function WorkspaceBranchesView({
   roots: GitWorkspaceRootInfo[];
   snapshots: Record<string, RepoSnapshotState>;
 }) {
+  const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const [query, setQuery] = useState("");
+  const [collapsed, setCollapsed] = useState(loadBranchCollapse);
+  const [busy, setBusy] = useState(false);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [ctx, setCtx] = useState<{ x: number; y: number; row: WorkspaceBranchRow } | null>(null);
+  const [recentTick, setRecentTick] = useState(0);
   const normalizedQuery = query.trim().toLowerCase();
-  const rows = useMemo(() => (
+  const rows = useMemo(() => sortWorkspaceBranchRows(
     roots.flatMap((root) => (
       (snapshots[root.repoRoot]?.snapshot?.branches ?? [])
         .filter((branch) => workspaceBranchMatchesQuery(root, branch, normalizedQuery))
         .map((branch) => ({ root, branch }))
-    ))
+    )),
   ), [normalizedQuery, roots, snapshots]);
+  const local = useMemo(() => rows.filter((row) => !row.branch.remote), [rows]);
+  const remote = useMemo(() => rows.filter((row) => row.branch.remote), [rows]);
+  const recent = useMemo(() => {
+    void recentTick;
+    const remembered: WorkspaceBranchRow[] = [];
+    const seen = new Set<string>();
+    for (const root of roots) {
+      for (const name of getRecentBranchNames(root.repoRoot)) {
+        const hit = rows.find((row) => row.root.repoRoot === root.repoRoot && row.branch.name === name);
+        if (!hit) continue;
+        const key = workspaceBranchRowKey(hit);
+        if (seen.has(key)) continue;
+        remembered.push(hit);
+        seen.add(key);
+      }
+    }
+    // Fill from date-sorted rows for remaining slots.
+    const filled = [...remembered];
+    for (const row of rows) {
+      if (filled.length >= 12) break;
+      const key = workspaceBranchRowKey(row);
+      if (seen.has(key)) continue;
+      filled.push(row);
+      seen.add(key);
+    }
+    return filled;
+  }, [recentTick, roots, rows]);
   const total = roots.reduce((count, root) => (
     count + (snapshots[root.repoRoot]?.snapshot?.branches.length ?? 0)
   ), 0);
 
+  const toggleSection = (id: BranchSectionId) => {
+    setCollapsed((current) => {
+      const next = { ...current, [id]: !current[id] };
+      saveBranchCollapse(next);
+      return next;
+    });
+  };
+
+  const runOnRow = async (label: string, row: WorkspaceBranchRow, action: () => Promise<void>) => {
+    setBusy(true);
+    try {
+      await action();
+      rememberRecentBranch(row.root.repoRoot, row.branch.remote
+        ? row.branch.name.split("/").slice(1).join("/") || row.branch.name
+        : row.branch.name);
+      setRecentTick((n) => n + 1);
+      notifyGitRepoChanged(row.root.repoRoot);
+      setStatusMessage(`${label}: ${row.root.name} / ${row.branch.name}`);
+    } catch (err) {
+      setStatusMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const branchMenuItems = (row: WorkspaceBranchRow): MenuItem[] => {
+    const { root, branch } = row;
+    const localSel = !branch.remote;
+    return [
+      {
+        label: "Checkout",
+        disabled: busy || branch.current,
+        onClick: () => void runOnRow("Checkout", row, async () => {
+          if (branch.remote) {
+            const suggested = branch.name.split("/").slice(1).join("/") || branch.name;
+            const localName = await promptAppDialog({
+              title: "Checkout remote branch",
+              label: `Local branch name (${root.name})`,
+              initialValue: suggested,
+            });
+            if (!localName) return;
+            await gitCreateBranch(root.repoRoot, localName, branch.name, true);
+            rememberRecentBranch(root.repoRoot, localName);
+          } else {
+            await gitCheckoutBranch(root.repoRoot, branch.name);
+            rememberRecentBranch(root.repoRoot, branch.name);
+          }
+        }),
+      },
+      {
+        label: "Merge into current",
+        disabled: busy || branch.current || branch.remote,
+        onClick: () => void (async () => {
+          const ok = await confirmAppDialog({
+            title: "Merge branch",
+            message: `Merge ${branch.name} into current branch in ${root.name}?`,
+          });
+          if (!ok) return;
+          await runOnRow("Merge", row, () => gitMergeBranch(root.repoRoot, branch.name));
+        })(),
+      },
+      {
+        label: "Push",
+        disabled: busy || !localSel,
+        onClick: () => void runOnRow("Push", row, async () => {
+          const remoteName = selectedRemote(snapshots[root.repoRoot]?.snapshot ?? null)?.name ?? "origin";
+          await gitPush(root.repoRoot, remoteName, branch.name, !branch.upstream);
+        }),
+      },
+      {
+        label: "Copy name",
+        icon: <Copy className="w-3.5 h-3.5" />,
+        onClick: () => void writeText(branch.name),
+      },
+      { label: "", separator: true },
+      {
+        label: "Delete…",
+        danger: true,
+        disabled: busy || branch.current || branch.remote,
+        onClick: () => void (async () => {
+          const ok = await confirmAppDialog({
+            title: "Delete branch",
+            message: `Delete local branch ${branch.name} in ${root.name}?`,
+            danger: true,
+            confirmLabel: "Delete",
+          });
+          if (!ok) return;
+          await runOnRow("Delete", row, () => gitDeleteBranch(root.repoRoot, branch.name, false));
+        })(),
+      },
+    ];
+  };
+
+  const renderRow = (row: WorkspaceBranchRow) => {
+    const key = workspaceBranchRowKey(row);
+    const dateLabel = formatRefDate(row.branch.date);
+    return (
+      <button
+        key={key}
+        type="button"
+        data-testid="workspace-git-branch-row"
+        className={`w-full px-3 py-1.5 flex items-center gap-2 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${selectedKey === key ? "bg-[var(--taomni-hover)]" : ""}`}
+        title={`${row.root.repoRoot} · ${row.branch.fullName}`}
+        onClick={() => setSelectedKey(key)}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setSelectedKey(key);
+          setCtx({ x: event.clientX, y: event.clientY, row });
+        }}
+      >
+        <GitFork className={`w-4 h-4 shrink-0 ${row.branch.current ? "text-[var(--taomni-accent)]" : "text-[var(--taomni-text-muted)]"}`} />
+        <span className="shrink-0 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1 text-[10px] text-[var(--taomni-text-muted)]">
+          {row.root.name}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[12px] truncate font-medium">{row.branch.name}</span>
+            {dateLabel ? <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]">{dateLabel}</span> : null}
+          </div>
+          <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+            {row.branch.upstream ? `tracks ${row.branch.upstream}` : row.branch.remote ? "remote" : "local"}
+            {row.branch.subject ? ` · ${row.branch.subject}` : ""}
+          </div>
+        </div>
+        {row.branch.current && <span className="text-[11px] text-[var(--taomni-accent)] shrink-0">current</span>}
+      </button>
+    );
+  };
+
+  const renderSection = (id: BranchSectionId, label: string, list: WorkspaceBranchRow[]) => {
+    if (list.length === 0) return null;
+    const isCollapsed = collapsed[id];
+    return (
+      <section data-testid={`workspace-git-branch-section-${id}`} className="border-b border-[var(--taomni-divider)]">
+        <button
+          type="button"
+          className="w-full h-7 px-2 flex items-center gap-1.5 text-left bg-[var(--taomni-quick-bg)] hover:bg-[var(--taomni-hover)]"
+          aria-expanded={!isCollapsed}
+          onClick={() => toggleSection(id)}
+        >
+          {isCollapsed
+            ? <ChevronRight className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
+            : <ChevronDown className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />}
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">{label}</span>
+          <span className="text-[10px] text-[var(--taomni-text-muted)]">({list.length})</span>
+        </button>
+        {isCollapsed ? null : list.map(renderRow)}
+      </section>
+    );
+  };
+
   return (
-    <div className="h-full min-h-0 flex flex-col">
+    <div className="h-full min-h-0 flex flex-col" data-testid="workspace-git-branches-view">
       <div className="h-9 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)]">
         <div className="relative w-64 max-w-full min-w-44">
           <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
@@ -1054,27 +1432,22 @@ function WorkspaceBranchesView({
           <EmptyState title="No branches" />
         ) : rows.length === 0 ? (
           <EmptyState title="No branches match" />
-        ) : rows.map(({ root, branch }) => (
-          <div
-            key={`${root.repoRoot}:${branch.fullName}`}
-            className="w-full px-3 py-2 flex items-center gap-2 border-b border-[var(--taomni-divider)]"
-            title={`${root.repoRoot} · ${branch.fullName}`}
-          >
-            <GitFork className={`w-4 h-4 shrink-0 ${branch.current ? "text-[var(--taomni-accent)]" : "text-[var(--taomni-text-muted)]"}`} />
-            <span className="shrink-0 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1 text-[10px] text-[var(--taomni-text-muted)]">
-              {root.name}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[12px] truncate">{branch.name}</div>
-              <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
-                {branch.upstream ? `tracks ${branch.upstream}` : branch.remote ? "remote" : "local"}
-                {branch.subject ? ` · ${branch.subject}` : ""}
-              </div>
-            </div>
-            {branch.current && <span className="text-[11px] text-[var(--taomni-accent)]">current</span>}
-          </div>
-        ))}
+        ) : (
+          <>
+            {renderSection("recent", "Recent", recent)}
+            {renderSection("local", "Local", local)}
+            {renderSection("remote", "Remote", remote)}
+          </>
+        )}
       </div>
+      {ctx ? (
+        <ContextMenu
+          x={ctx.x}
+          y={ctx.y}
+          onClose={() => setCtx(null)}
+          items={branchMenuItems(ctx.row)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1086,21 +1459,177 @@ function WorkspaceTagsView({
   roots: GitWorkspaceRootInfo[];
   snapshots: Record<string, RepoSnapshotState>;
 }) {
+  const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const [query, setQuery] = useState("");
+  const [collapsed, setCollapsed] = useState(loadTagCollapse);
+  const [busy, setBusy] = useState(false);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [ctx, setCtx] = useState<{ x: number; y: number; row: WorkspaceTagRow } | null>(null);
+  const [recentTick, setRecentTick] = useState(0);
   const normalizedQuery = query.trim().toLowerCase();
-  const rows = useMemo(() => (
+  const rows = useMemo(() => sortWorkspaceTagRows(
     roots.flatMap((root) => (
       (snapshots[root.repoRoot]?.snapshot?.tags ?? [])
         .filter((tag) => workspaceTagMatchesQuery(root, tag, normalizedQuery))
         .map((tag) => ({ root, tag }))
-    ))
+    )),
   ), [normalizedQuery, roots, snapshots]);
+  const recent = useMemo(() => {
+    void recentTick;
+    const remembered: WorkspaceTagRow[] = [];
+    const seen = new Set<string>();
+    for (const root of roots) {
+      for (const name of getRecentTagNames(root.repoRoot)) {
+        const hit = rows.find((row) => row.root.repoRoot === root.repoRoot && row.tag.name === name);
+        if (!hit) continue;
+        const key = workspaceTagRowKey(hit);
+        if (seen.has(key)) continue;
+        remembered.push(hit);
+        seen.add(key);
+      }
+    }
+    const filled = [...remembered];
+    for (const row of rows) {
+      if (filled.length >= 12) break;
+      const key = workspaceTagRowKey(row);
+      if (seen.has(key)) continue;
+      filled.push(row);
+      seen.add(key);
+    }
+    return filled;
+  }, [recentTick, roots, rows]);
   const total = roots.reduce((count, root) => (
     count + (snapshots[root.repoRoot]?.snapshot?.tags.length ?? 0)
   ), 0);
 
+  const toggleSection = (id: TagSectionId) => {
+    setCollapsed((state) => {
+      const next = { ...state, [id]: !state[id] };
+      saveTagCollapse(next);
+      return next;
+    });
+  };
+
+  const runOnRow = async (label: string, row: WorkspaceTagRow, action: () => Promise<void>) => {
+    setBusy(true);
+    try {
+      await action();
+      rememberRecentTag(row.root.repoRoot, row.tag.name);
+      setRecentTick((n) => n + 1);
+      notifyGitRepoChanged(row.root.repoRoot);
+      setStatusMessage(`${label}: ${row.root.name} / ${row.tag.name}`);
+    } catch (err) {
+      setStatusMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const tagMenuItems = (row: WorkspaceTagRow): MenuItem[] => {
+    const { root, tag } = row;
+    const remoteName = selectedRemote(snapshots[root.repoRoot]?.snapshot ?? null)?.name ?? "origin";
+    return [
+      {
+        label: "Checkout",
+        disabled: busy,
+        onClick: () => void (async () => {
+          const ok = await confirmAppDialog({
+            title: "Checkout tag",
+            message: `Checkout ${tag.name} in ${root.name}? This detaches HEAD.`,
+          });
+          if (!ok) return;
+          await runOnRow("Checkout tag", row, () => gitCheckoutTag(root.repoRoot, tag.name));
+        })(),
+      },
+      {
+        label: "Push",
+        disabled: busy,
+        onClick: () => void runOnRow("Push tag", row, () => gitPushTag(root.repoRoot, remoteName, tag.name, false)),
+      },
+      {
+        label: "Copy name",
+        icon: <Copy className="w-3.5 h-3.5" />,
+        onClick: () => void writeText(tag.name),
+      },
+      { label: "", separator: true },
+      {
+        label: "Delete…",
+        danger: true,
+        disabled: busy,
+        onClick: () => void (async () => {
+          const ok = await confirmAppDialog({
+            title: "Delete tag",
+            message: `Delete tag ${tag.name} in ${root.name}?`,
+            danger: true,
+            confirmLabel: "Delete",
+          });
+          if (!ok) return;
+          await runOnRow("Delete tag", row, () => gitDeleteTag(root.repoRoot, tag.name));
+        })(),
+      },
+    ];
+  };
+
+  const renderRow = (row: WorkspaceTagRow) => {
+    const key = workspaceTagRowKey(row);
+    const dateLabel = formatRefDate(row.tag.date);
+    return (
+      <button
+        key={key}
+        type="button"
+        data-testid="workspace-git-tag-row"
+        className={`w-full px-3 py-1.5 flex items-center gap-2 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${selectedKey === key ? "bg-[var(--taomni-hover)]" : ""}`}
+        title={`${row.root.repoRoot} · ${row.tag.name}`}
+        onClick={() => setSelectedKey(key)}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setSelectedKey(key);
+          setCtx({ x: event.clientX, y: event.clientY, row });
+        }}
+      >
+        <Tag className="w-4 h-4 shrink-0 text-[var(--taomni-text-muted)]" />
+        <span className="shrink-0 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1 text-[10px] text-[var(--taomni-text-muted)]">
+          {row.root.name}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[12px] truncate font-medium">{row.tag.name}</span>
+            {dateLabel ? <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]">{dateLabel}</span> : null}
+          </div>
+          <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
+            <span className="taomni-mono text-[var(--taomni-accent)]">{row.tag.oid}</span>
+            {row.tag.annotated ? " · annotated" : " · lightweight"}
+            {row.tag.subject ? ` · ${row.tag.subject}` : ""}
+          </div>
+        </div>
+      </button>
+    );
+  };
+
+  const renderSection = (id: TagSectionId, label: string, list: WorkspaceTagRow[]) => {
+    if (list.length === 0) return null;
+    const isCollapsed = collapsed[id];
+    return (
+      <section data-testid={`workspace-git-tag-section-${id}`} className="border-b border-[var(--taomni-divider)]">
+        <button
+          type="button"
+          className="w-full h-7 px-2 flex items-center gap-1.5 text-left bg-[var(--taomni-quick-bg)] hover:bg-[var(--taomni-hover)]"
+          aria-expanded={!isCollapsed}
+          onClick={() => toggleSection(id)}
+        >
+          {isCollapsed
+            ? <ChevronRight className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
+            : <ChevronDown className="w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />}
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--taomni-text-muted)]">{label}</span>
+          <span className="text-[10px] text-[var(--taomni-text-muted)]">({list.length})</span>
+        </button>
+        {isCollapsed ? null : list.map(renderRow)}
+      </section>
+    );
+  };
+
   return (
-    <div className="h-full min-h-0 flex flex-col">
+    <div className="h-full min-h-0 flex flex-col" data-testid="workspace-git-tags-view">
       <div className="h-9 shrink-0 flex items-center gap-2 px-2 border-b border-[var(--taomni-divider)]">
         <div className="relative w-64 max-w-full min-w-44">
           <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
@@ -1129,26 +1658,21 @@ function WorkspaceTagsView({
           <EmptyState title="No tags" />
         ) : rows.length === 0 ? (
           <EmptyState title="No tags match" />
-        ) : rows.map(({ root, tag }) => (
-          <div
-            key={`${root.repoRoot}:${tag.name}`}
-            className="w-full px-3 py-2 flex items-center gap-2 border-b border-[var(--taomni-divider)]"
-            title={`${root.repoRoot} · ${tag.name}`}
-          >
-            <GitCommitHorizontal className="w-4 h-4 shrink-0 text-[var(--taomni-text-muted)]" />
-            <span className="shrink-0 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1 text-[10px] text-[var(--taomni-text-muted)]">
-              {root.name}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="text-[12px] truncate">{tag.name}</div>
-              <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
-                <span className="taomni-mono text-[var(--taomni-accent)]">{tag.oid}</span>
-                {tag.annotated ? " · annotated" : " · lightweight"}{tag.subject ? ` · ${tag.subject}` : ""}
-              </div>
-            </div>
-          </div>
-        ))}
+        ) : (
+          <>
+            {renderSection("recent", "Recent", recent)}
+            {renderSection("all", "All tags", rows)}
+          </>
+        )}
       </div>
+      {ctx ? (
+        <ContextMenu
+          x={ctx.x}
+          y={ctx.y}
+          onClose={() => setCtx(null)}
+          items={tagMenuItems(ctx.row)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1824,12 +2348,14 @@ async function confirmCommitOperation({
   targets,
   checkedChangePathsByRepo,
   snapshots,
+  targetBranch,
 }: {
   message: string;
   push: boolean;
   targets: GitWorkspaceRootInfo[];
   checkedChangePathsByRepo: Record<string, string[]>;
   snapshots: Record<string, RepoSnapshotState>;
+  targetBranch: string;
 }): Promise<CommitDecision | null> {
   const confirmMessage = commitOperationConfirmMessage({
     message,
@@ -1837,6 +2363,7 @@ async function confirmCommitOperation({
     targets,
     checkedChangePathsByRepo,
     snapshots,
+    targetBranch,
   });
   if (!push) {
     const confirmed = await confirmAppDialog({
@@ -1863,21 +2390,33 @@ function commitOperationConfirmMessage({
   targets,
   checkedChangePathsByRepo,
   snapshots,
+  targetBranch,
 }: {
   message: string;
   push: boolean;
   targets: GitWorkspaceRootInfo[];
   checkedChangePathsByRepo: Record<string, string[]>;
   snapshots: Record<string, RepoSnapshotState>;
+  targetBranch: string;
 }): string {
+  const branchPlans = targets.map((root) => {
+    const snapshot = snapshots[root.repoRoot]?.snapshot ?? null;
+    const plan = resolveCommitBranchPlan(snapshot, targetBranch);
+    return formatCommitBranchPlanLine(root.name, plan);
+  });
   const lines = targets.map((root) => {
     const paths = checkedChangePathsByRepo[root.repoRoot] ?? [];
     const snapshot = snapshots[root.repoRoot]?.snapshot ?? null;
-    const branch = snapshot ? branchSummary(snapshot) : "will refresh";
+    const plan = resolveCommitBranchPlan(snapshot, targetBranch);
+    const branch = plan.action === "stay"
+      ? (snapshot ? branchSummary(snapshot) : "will refresh")
+      : plan.targetBranch;
     const remote = snapshot ? selectedRemote(snapshot) : null;
     const pushSummary = push
-      ? remote && snapshot?.currentBranch
-        ? ` -> ${remote.name}/${snapshot.currentBranch}${snapshot.upstream ? "" : " (set upstream)"}`
+      ? remote
+        ? ` -> ${remote.name}/${plan.action === "stay" ? (snapshot?.currentBranch ?? branch) : plan.targetBranch}${
+          plan.action === "stay" && snapshot?.upstream ? "" : " (set upstream)"
+        }`
         : " -> push skipped (missing remote or branch)"
       : "";
     return `- ${root.name}: ${paths.length} file(s) on ${branch}${pushSummary}${paths.length ? `\n  ${summarizePaths(paths)}` : ""}`;
@@ -1885,12 +2424,15 @@ function commitOperationConfirmMessage({
   return [
     `Message: ${message}`,
     "",
+    "Branches:",
+    ...branchPlans,
+    "",
     "Repositories:",
     ...lines,
     "",
     push
-      ? "Confirming will commit the checked files, then push each repository that has a current branch and remote."
-      : "Confirming will commit only the checked files listed above.",
+      ? "Confirming will switch/create the target branch when needed, commit the checked files, then push each repository that has a remote."
+      : "Confirming will switch/create the target branch when needed, then commit only the checked files listed above.",
   ].join("\n");
 }
 

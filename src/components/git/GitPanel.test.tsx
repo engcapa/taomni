@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../../stores/appStore";
 import { GitPanel } from "./GitPanel";
@@ -298,9 +298,112 @@ describe("GitPanel", () => {
 
     await waitFor(() => expect(gitMocks.gitSnapshot).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole("button", { name: "branches" }));
-    fireEvent.click(await screen.findByText("feature"));
+    // Feature appears in both Recent and Local sections; pick one row.
+    const featureRows = await screen.findAllByTestId("git-branch-row");
+    const feature = featureRows.find((row) => row.getAttribute("data-branch") === "feature");
+    expect(feature).toBeTruthy();
+    fireEvent.click(feature!);
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(gitMocks.gitSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows collapsible recent/local/remote sections and opens branch context menu", async () => {
+    const snapshotWithBranches: GitSnapshot = {
+      repoRoot: "D:\\repo",
+      currentBranch: "main",
+      headOid: "abc123",
+      detached: false,
+      upstream: null,
+      ahead: 0,
+      behind: 0,
+      changes: [],
+      remotes: [],
+      branches: [
+        {
+          name: "main",
+          fullName: "refs/heads/main",
+          current: true,
+          remote: false,
+          upstream: null,
+          oid: "abc123",
+          subject: "Initial commit",
+          date: "2024-01-01T00:00:00Z",
+        },
+        {
+          name: "feature",
+          fullName: "refs/heads/feature",
+          current: false,
+          remote: false,
+          upstream: null,
+          oid: "def456",
+          subject: "Feature work",
+          date: "2025-06-01T00:00:00Z",
+        },
+        {
+          name: "origin/main",
+          fullName: "refs/remotes/origin/main",
+          current: false,
+          remote: true,
+          upstream: null,
+          oid: "abc123",
+          subject: "Initial commit",
+          date: "2024-01-01T00:00:00Z",
+        },
+      ],
+      stashes: [],
+      tags: [
+        {
+          name: "v1.0.0",
+          oid: "abc123",
+          subject: "release",
+          annotated: true,
+          date: "2025-01-01T00:00:00Z",
+        },
+      ],
+      settings: {
+        userName: null,
+        userEmail: null,
+        httpProxy: null,
+        httpsProxy: null,
+        pullRebase: null,
+        pushDefault: null,
+        coreAutocrlf: null,
+        coreFilemode: null,
+        commitGpgsign: null,
+      },
+    };
+    gitMocks.gitSnapshot.mockResolvedValue(snapshotWithBranches);
+
+    render(<GitPanel repoRoot="D:\\repo" />);
+    await waitFor(() => expect(gitMocks.gitSnapshot).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole("button", { name: "branches" }));
+    expect(await screen.findByTestId("git-branch-section-recent")).toBeInTheDocument();
+    expect(screen.getByTestId("git-branch-section-local")).toBeInTheDocument();
+    expect(screen.getByTestId("git-branch-section-remote")).toBeInTheDocument();
+
+    // Collapse Local via the section header (first button in the section).
+    const localSection = screen.getByTestId("git-branch-section-local");
+    fireEvent.click(within(localSection).getAllByRole("button")[0]!);
+    expect(within(localSection).queryByTestId("git-branch-row")).not.toBeInTheDocument();
+
+    // Context menu on a feature row (still visible under Recent).
+    const featureRow = screen.getAllByTestId("git-branch-row").find((row) => row.getAttribute("data-branch") === "feature");
+    expect(featureRow).toBeTruthy();
+    fireEvent.contextMenu(featureRow!);
+    const branchMenu = await screen.findByTestId("context-menu");
+    expect(within(branchMenu).getByText("Checkout")).toBeInTheDocument();
+    expect(within(branchMenu).getByText("Merge into current")).toBeInTheDocument();
+    expect(within(branchMenu).getByText("Copy name")).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByTestId("context-menu")).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "tags" }));
+    expect(await screen.findByTestId("git-tag-section-recent")).toBeInTheDocument();
+    expect(screen.getByTestId("git-tag-section-all")).toBeInTheDocument();
+    fireEvent.contextMenu(screen.getAllByTestId("git-tag-row")[0]!);
+    const tagMenu = await screen.findByTestId("context-menu");
+    expect(within(tagMenu).getByText("Delete…")).toBeInTheDocument();
   });
 });
