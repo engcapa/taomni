@@ -5,6 +5,7 @@
 //! Existing Claude Code and Codex bridges intentionally remain on their
 //! current protocols.
 
+pub mod commands;
 pub mod config;
 mod presets;
 mod process;

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use taomni_lib::agent::acp_bridge::{
     AcpProcess, AcpProcessConfig, AcpProfileConfig, AcpRuntimeError, AcpRuntimeEvent,
-    AcpStopReason, AcpThreadProcess, process_config,
+    AcpStopReason, AcpThreadProcess, commands::probe_profile, process_config,
 };
 use taomni_lib::agent::local::LocalAgentEvent;
 
@@ -22,6 +22,24 @@ async fn initialized_process(scenario: &str) -> Arc<AcpProcess> {
     assert_eq!(info.name.as_deref(), Some("acp-fake-agent"));
     process.authenticate("cached_token").await.unwrap();
     process
+}
+
+#[tokio::test]
+async fn profile_probe_reports_negotiated_capabilities_without_starting_a_session() {
+    let profile = AcpProfileConfig {
+        id: "fixture-profile".into(),
+        name: "Fixture".into(),
+        enabled: false,
+        command: env!("CARGO_BIN_EXE_acp-fake-agent").into(),
+        args: vec!["happy".into()],
+        ..Default::default()
+    };
+    let result = probe_profile(&profile, None, std::path::Path::new("/tmp")).await;
+    assert!(result.ok, "{}", result.message);
+    let agent = result.agent.unwrap();
+    assert_eq!(agent.name.as_deref(), Some("acp-fake-agent"));
+    assert!(agent.supports_session_load);
+    assert!(agent.supports_mcp_http);
 }
 
 #[tokio::test]
