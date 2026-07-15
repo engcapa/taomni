@@ -87,6 +87,20 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     ],
   },
   {
+    id: "sftp",
+    titleKeys: [
+      "settings.sftpTitle",
+      "settings.sftpLocalDoubleClickLabel",
+      "settings.sftpLocalDoubleClickOpen",
+      "settings.sftpLocalDoubleClickUpload",
+    ],
+    terms: [
+      "sftp", "file browser", "double click", "upload", "open local file", "local pane",
+      "sftp pane", "sidebar sftp", "transfer",
+      "双击", "上传", "打开本地文件", "本地面板", "侧边 sftp", "文件传输", "文件浏览器",
+    ],
+  },
+  {
     id: "terminal-defaults",
     titleKeys: ["settings.terminalDefaultsTitle", "terminalAppearance.behaviorHeading"],
     terms: [
@@ -194,7 +208,7 @@ export const SETTINGS_GROUPS: SettingsGroupDef[] = [
   {
     id: "terminal",
     titleKey: "settings.groupTerminal",
-    entryIds: ["terminal-defaults"],
+    entryIds: ["sftp", "terminal-defaults"],
   },
   {
     id: "security",

@@ -34,6 +34,7 @@ import { useAppStore } from "../../stores/appStore";
 import { useT, type TranslateFn } from "../../lib/i18n";
 import { useConfirmDialog, useTextInputDialog } from "../sidebar/ConfirmDialog";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
+import { loadSftpPreferences } from "../../lib/sftpPreferences";
 
 type Orientation = "horizontal" | "vertical";
 
@@ -335,6 +336,14 @@ export function FileBrowser(props: FileBrowserProps) {
         setDownloadPrompt(entry);
         return;
       }
+      // Local file: open or upload based on global SFTP preference (default: open).
+      const { localDoubleClickAction } = loadSftpPreferences();
+      if (localDoubleClickAction === "upload") {
+        const remoteDir = session?.remote.path ?? "/";
+        const mappedRemote = resolveRemoteByMapping(entry.path, mappings);
+        void controller.upload(entry, mappedRemote ?? remoteDir);
+        return;
+      }
       try {
         const { sftpOpenPath } = await import("../../lib/sftp");
         await sftpOpenPath(entry.path);
@@ -342,7 +351,16 @@ export function FileBrowser(props: FileBrowserProps) {
         setStatus(t("fileBrowser.statusFailedToOpen", { name: entry.name, error: String(err) }));
       }
     },
-    [navigate, props.sessionId, props.onTerminalSync, setStatus, t],
+    [
+      controller,
+      mappings,
+      navigate,
+      props.sessionId,
+      props.onTerminalSync,
+      session?.remote.path,
+      setStatus,
+      t,
+    ],
   );
 
   const handleDownloadConfirmed = useCallback(

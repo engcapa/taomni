@@ -61,6 +61,7 @@ import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettin
 import { SqlCompletionSettings } from "./SqlCompletionSettings";
 import { SqlExecutionSettings } from "./SqlExecutionSettings";
 import { LanguageServersSettings } from "./LanguageServersSettings";
+import { SftpSettings } from "./SftpSettings";
 import { FontPickerSelect, type FontPickerOption } from "../terminal/FontPickerPanel";
 import {
   consumePendingSettingsSection,
@@ -715,7 +716,10 @@ export function SettingsPanel() {
             matchCount={matchCountByGroup.terminal ?? 0}
             searching={searching}
           >
-            <SettingsAnchor id="terminal-defaults">
+            <SettingsAnchor id="sftp">
+              <SftpSettings />
+            </SettingsAnchor>
+            <SettingsAnchor id="terminal-defaults" className="mt-4">
               <div className="mb-4 flex items-center gap-3">
                 <Terminal className="w-4 h-4 text-[var(--taomni-accent)]" />
                 <div>
