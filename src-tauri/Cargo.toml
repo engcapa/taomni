@@ -6,10 +6,19 @@ authors = ["engcapa"]
 license = "MIT"
 edition = "2024"
 rust-version = "1.94"
+# Required once [[bin]] acp-fake-agent exists: otherwise `cargo run` /
+# `cargo tauri dev` cannot pick between taomni and acp-fake-agent.
+default-run = "taomni"
 
 [lib]
 name = "taomni_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "acp-fake-agent"
+path = "tests/support/acp_fake_agent.rs"
+test = false
+bench = false
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

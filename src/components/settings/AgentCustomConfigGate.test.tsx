@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_CLAUDE_CODE_MODEL,
   DEFAULT_CODEX_MODEL,
+  DEFAULT_GROK_ACP_PROFILE,
   useAiStore,
   type AiConfig,
 } from "../../stores/aiStore";
@@ -81,6 +82,13 @@ function makeConfig(): AiConfig {
       confirm_readonly: false,
       terminal_echo_enabled: true,
       custom_config_profiles: [],
+    },
+    acp_bridge: {
+      enabled: false,
+      active_profile_id: "grok",
+      proxy_mode: "direct",
+      request_timeout_seconds: 120,
+      profiles: [{ ...DEFAULT_GROK_ACP_PROFILE, args: [...DEFAULT_GROK_ACP_PROFILE.args] }],
     },
     full_local_mode: false,
     fully_disabled: false,

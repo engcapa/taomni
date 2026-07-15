@@ -178,6 +178,27 @@ pub fn run() {
                             });
                         }
                     }
+                    drop(codex_registry);
+
+                    let mut acp_registry = state.acp_processes.lock().await;
+                    let mut acp_to_remove = Vec::new();
+                    for (thread_id, proc) in acp_registry.iter() {
+                        if should_reap_ai_process(
+                            active_chat_threads.contains(thread_id),
+                            proc.is_turn_active(),
+                            now.saturating_duration_since(proc.last_active_at())
+                                .as_secs(),
+                        ) {
+                            acp_to_remove.push(thread_id.clone());
+                        }
+                    }
+                    for tid in acp_to_remove {
+                        if let Some(proc) = acp_registry.remove(&tid) {
+                            tokio::spawn(async move {
+                                proc.stop().await;
+                            });
+                        }
+                    }
                 }
             });
 
@@ -635,6 +656,7 @@ pub fn run() {
             agent::search::key_storage::keyring_put,
             agent::search::key_storage::keyring_get,
             agent::search::key_storage::keyring_delete,
+            agent::acp_bridge::commands::acp_probe_profile,
             agent::cc_bridge::commands::cc_detect,
             agent::cc_bridge::commands::cc_get_custom_settings,
             agent::cc_bridge::commands::cc_get_profile_settings,

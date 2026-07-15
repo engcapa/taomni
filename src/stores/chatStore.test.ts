@@ -5,6 +5,7 @@ import { useChatStore, type ChatThread } from "./chatStore";
 import {
   DEFAULT_CLAUDE_CODE_MODEL,
   DEFAULT_CODEX_MODEL,
+  DEFAULT_GROK_ACP_PROFILE,
   rememberChatDrawerProviderPreference,
   useAiStore,
   type AiConfig,
@@ -81,6 +82,13 @@ function makeConfig(overrides: Partial<AiConfig> = {}): AiConfig {
       proxy_url: undefined,
       confirm_readonly: false,
       terminal_echo_enabled: true,
+    },
+    acp_bridge: {
+      enabled: false,
+      active_profile_id: "grok",
+      proxy_mode: "direct",
+      request_timeout_seconds: 120,
+      profiles: [{ ...DEFAULT_GROK_ACP_PROFILE, args: [...DEFAULT_GROK_ACP_PROFILE.args] }],
     },
     full_local_mode: false,
     fully_disabled: false,

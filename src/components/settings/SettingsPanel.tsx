@@ -32,6 +32,7 @@ import { AiShellPanel } from "./AiShellPanel";
 import { WebSearchPanel } from "./WebSearchPanel";
 import { ClaudeCodePanel } from "./ClaudeCodePanel";
 import { CodexCodePanel } from "./CodexCodePanel";
+import { AcpAgentsPanel } from "./AcpAgentsPanel";
 import { ChatHistoryPanel } from "./ChatHistoryPanel";
 import { ChatOutputFormatPanel } from "./ChatOutputFormatPanel";
 import { ModelsAdvancedPanel } from "./ModelsAdvancedPanel";
@@ -620,6 +621,12 @@ export function SettingsPanel() {
             <SettingsAnchor id="ai-codex">
               <div className="pt-3 border-t border-[var(--taomni-divider)]">
                 <CodexCodePanel />
+              </div>
+            </SettingsAnchor>
+
+            <SettingsAnchor id="ai-acp">
+              <div className="pt-3 border-t border-[var(--taomni-divider)]">
+                <AcpAgentsPanel />
               </div>
             </SettingsAnchor>
 

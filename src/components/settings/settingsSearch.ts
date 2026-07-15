@@ -143,6 +143,11 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     terms: ["codex", "codex app-server", "openai codex", "bridge", "config", "科德", "配置", "桥接"],
   },
   {
+    id: "ai-acp",
+    titleKeys: ["aiSettings.acpTitle"],
+    terms: ["acp", "agent client protocol", "grok", "local agent", "proxy", "智能体", "本地 agent", "代理", "通用桥接"],
+  },
+  {
     id: "ai-chatformat",
     titleKeys: ["settings.chatOutputFormat"],
     terms: ["output format", "markdown", "html", "rendering", "输出格式", "渲染"],

@@ -1979,6 +1979,15 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "chat_stop_stream": {
       return undefined as T;
     }
+    case "acp_probe_profile": {
+      const profileId = (args as InvokeArgs | undefined)?.profileId as string | undefined;
+      return {
+        profileId: profileId ?? "unknown",
+        ok: false,
+        message: "ACP handshake probing is only available in the desktop build.",
+        agent: null,
+      } as T;
+    }
     case "chat_stat_attachment_paths": {
       const paths = ((args as InvokeArgs | undefined)?.paths as string[] | undefined) ?? [];
       return paths.map((path, index) => {

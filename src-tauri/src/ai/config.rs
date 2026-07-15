@@ -13,6 +13,8 @@ pub struct AiConfig {
     pub cc_bridge: crate::agent::cc_bridge::config::CcBridgeConfig,
     #[serde(default)]
     pub codex_bridge: crate::agent::codex_bridge::config::CodexBridgeConfig,
+    #[serde(default)]
+    pub acp_bridge: crate::agent::acp_bridge::AcpBridgeConfig,
     /// Master switch: when true, all non-local network calls are refused
     /// (LLM cloud providers, web_search, web_fetch, Claude Code).
     #[serde(default)]
@@ -40,6 +42,7 @@ impl Default for AiConfig {
             web_search: WebSearchConfig::default(),
             cc_bridge: crate::agent::cc_bridge::config::CcBridgeConfig::default(),
             codex_bridge: crate::agent::codex_bridge::config::CodexBridgeConfig::default(),
+            acp_bridge: crate::agent::acp_bridge::AcpBridgeConfig::default(),
             full_local_mode: false,
             fully_disabled: false,
             chat_output_format: default_chat_output_format(),
@@ -60,6 +63,7 @@ impl AiConfig {
     pub fn normalize(&mut self) {
         self.cc_bridge.normalize();
         self.codex_bridge.normalize();
+        self.acp_bridge.normalize();
         self.llm.normalize();
     }
 
@@ -485,5 +489,35 @@ impl Default for WebSearchConfig {
             byok_key: String::new(),
             searxng_url: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_ai_config_without_acp_section_gets_disabled_grok_preset() {
+        let current = AiConfig::default();
+        let mut value = serde_json::to_value(&current).unwrap();
+        value.as_object_mut().unwrap().remove("acp_bridge");
+
+        let mut loaded: AiConfig = serde_json::from_value(value).unwrap();
+        loaded.normalize();
+
+        assert!(!loaded.acp_bridge.enabled);
+        assert_eq!(loaded.acp_bridge.profiles.len(), 1);
+        assert_eq!(loaded.acp_bridge.profiles[0].id, "grok");
+        assert!(!loaded.acp_bridge.profiles[0].enabled);
+        assert!(!loaded.llm.providers.contains_key("grok"));
+        assert!(!loaded.llm.providers.contains_key("xai"));
+        assert_eq!(
+            serde_json::to_value(&loaded.cc_bridge).unwrap(),
+            serde_json::to_value(&current.cc_bridge).unwrap()
+        );
+        assert_eq!(
+            serde_json::to_value(&loaded.codex_bridge).unwrap(),
+            serde_json::to_value(&current.codex_bridge).unwrap()
+        );
     }
 }

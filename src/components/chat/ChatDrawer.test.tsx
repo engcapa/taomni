@@ -6,7 +6,13 @@ import { useChatStore, type ChatThread } from "../../stores/chatStore";
 import { useTaoHubStore } from "../../stores/taoHubStore";
 import { useNotesStore } from "../../stores/notesStore";
 import { DEFAULT_TAO_ALERT_HISTORY_LIMIT, useTaoAlertStore } from "../../stores/taoAlertStore";
-import { DEFAULT_CLAUDE_CODE_MODEL, DEFAULT_CODEX_MODEL, useAiStore, type AiConfig } from "../../stores/aiStore";
+import {
+  DEFAULT_CLAUDE_CODE_MODEL,
+  DEFAULT_CODEX_MODEL,
+  DEFAULT_GROK_ACP_PROFILE,
+  useAiStore,
+  type AiConfig,
+} from "../../stores/aiStore";
 
 const invokeMock = vi.hoisted(() => vi.fn());
 
@@ -88,6 +94,13 @@ function makeConfig(): AiConfig {
       proxy_url: undefined,
       confirm_readonly: false,
       terminal_echo_enabled: true,
+    },
+    acp_bridge: {
+      enabled: false,
+      active_profile_id: "grok",
+      proxy_mode: "direct",
+      request_timeout_seconds: 120,
+      profiles: [{ ...DEFAULT_GROK_ACP_PROFILE, args: [...DEFAULT_GROK_ACP_PROFILE.args] }],
     },
     full_local_mode: false,
     fully_disabled: false,
@@ -201,6 +214,42 @@ describe("ChatDrawer provider and echo controls", () => {
       "claude-code",
     ]);
     expect(Array.from(provider.options).map((option) => option.textContent)).toContain("Group: Balanced");
+  });
+
+  it("lists enabled ACP profiles by display name without adding an xAI provider", () => {
+    const config = makeConfig();
+    config.acp_bridge.enabled = true;
+    config.acp_bridge.profiles[0].enabled = true;
+    useAiStore.setState({ config });
+
+    render(<ChatDrawer />);
+
+    const provider = screen.getByLabelText("Thread LLM provider") as HTMLSelectElement;
+    expect(Array.from(provider.options).map((option) => option.value)).toContain("acp:grok");
+    expect(Array.from(provider.options).map((option) => option.textContent)).toContain("Grok CLI (ACP)");
+    expect(config.llm.providers).not.toHaveProperty("grok");
+    expect(config.llm.providers).not.toHaveProperty("xai");
+  });
+
+  it("migrates bridge-only ACP enablement into a visible preferred profile", async () => {
+    const config = makeConfig();
+    config.acp_bridge.enabled = true;
+    config.acp_bridge.profiles[0].enabled = false;
+    invokeMock.mockImplementation((command: string) => {
+      if (command === "get_ai_config") return Promise.resolve(config);
+      if (command === "chat_list_threads") return Promise.resolve([]);
+      if (command === "chat_purge_old") return Promise.resolve(0);
+      return Promise.resolve(null);
+    });
+
+    await act(async () => {
+      await useAiStore.getState().loadConfig();
+    });
+    render(<ChatDrawer />);
+
+    const provider = screen.getByLabelText("Thread LLM provider") as HTMLSelectElement;
+    expect(Array.from(provider.options).map((option) => option.value)).toContain("acp:grok");
+    expect(useAiStore.getState().config?.acp_bridge.profiles[0].enabled).toBe(true);
   });
 
   it("remembers provider changes from the thread picker", () => {

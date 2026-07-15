@@ -33,6 +33,7 @@ import {
 } from "../../stores/chatStore";
 import {
   chatDrawerProviderIds,
+  acpProfileIdFromProvider,
   DEFAULT_CLAUDE_CODE_MODEL,
   DEFAULT_CODEX_MODEL,
   providerGroupIdFromRoute,
@@ -1514,6 +1515,11 @@ function modeIcon(mode: ChatThreadMode) {
 function providerLabel(id: string, t: TranslateFn, config?: AiConfig | null): string {
   if (id === "claude-code") return t("chat.claudeCodeLocal");
   if (id === "codex") return "Codex local";
+  const acpProfileId = acpProfileIdFromProvider(id);
+  if (acpProfileId) {
+    const profile = config?.acp_bridge.profiles.find((candidate) => candidate.id === acpProfileId);
+    return `${profile?.name || acpProfileId} (ACP)`;
+  }
   const groupId = providerGroupIdFromRoute(id);
   if (groupId) {
     const label = config?.llm.provider_groups?.[groupId]?.label || groupId;

@@ -2774,7 +2774,80 @@ controls:
 - 对话历史保留天数滑动 + 一键清理（位于 `ChatHistoryPanel`）
 - Thread 默认输出格式（`ChatOutputFormatPanel`）
 
-### 14.7 LLM Provider 列表 ✅
+### 14.7 通用 ACP Agent 与 Grok 预设 ✅
+
+<!-- feature
+id: F-AI-2.7
+status: done
+area: ai/agents
+components: [AcpAgentsPanel, AcpProxyFields, ChatDrawer]
+files:
+  - src/components/settings/AcpAgentsPanel.tsx
+  - src/components/settings/AcpProxyFields.tsx
+  - src/components/chat/ChatDrawer.tsx
+  - src/stores/aiStore.ts
+  - src/stubs/tauri-core.ts
+controls:
+  - id: acp-settings
+    selector: '[data-testid="acp-settings"]'
+    kind: display
+  - id: acp-bridge-enabled
+    selector: '[data-testid="acp-bridge-enabled"]'
+    kind: interactive
+  - id: acp-global-proxy-direct
+    selector: '[data-testid="acp-global-proxy-direct"]'
+    kind: interactive
+  - id: acp-global-proxy-app
+    selector: '[data-testid="acp-global-proxy-app"]'
+    kind: interactive
+  - id: acp-request-timeout
+    selector: '[data-testid="acp-request-timeout"]'
+    kind: interactive
+  - id: acp-add-profile
+    selector: '[data-testid="acp-add-profile"]'
+    kind: interactive
+    optional: true
+  - id: acp-save
+    selector: '[data-testid="acp-save"]'
+    kind: interactive
+  - id: acp-restore-grok
+    selector: '[data-testid="acp-restore-grok"]'
+    kind: interactive
+    optional: true
+  - id: acp-profile-grok
+    selector: '[data-testid="acp-profile-grok"]'
+    kind: display
+  - id: acp-profile-grok-enabled
+    selector: '[data-testid="acp-profile-grok-enabled"]'
+    kind: interactive
+  - id: acp-profile-grok-preferred
+    selector: '[data-testid="acp-profile-grok-preferred"]'
+    kind: interactive
+    optional: true
+  - id: acp-profile-grok-command
+    selector: '[data-testid="acp-profile-grok-command"]'
+    kind: interactive
+    optional: true
+  - id: acp-profile-grok-args
+    selector: '[data-testid="acp-profile-grok-args"]'
+    kind: interactive
+    optional: true
+  - id: acp-profile-grok-probe
+    selector: '[data-testid="acp-profile-grok-probe"]'
+    kind: interactive
+    optional: true
+  - id: acp-profile-grok-probe-result
+    selector: '[data-testid="acp-profile-grok-probe-result"]'
+    kind: display
+    optional: true
+-->
+
+- 通过通用 ACP v1 stdio profile 接入本机 Agent；Chat Provider ID 使用 `acp:<profile-id>`
+- 内置、默认关闭的 Grok profile 使用 `grok agent stdio`，鉴权归本机 CLI 所有，不创建 xAI API Provider
+- ACP 全局与 profile 级代理支持直连、应用代理、已保存 Proxy 会话和手动 URL；profile 可继承或覆盖全局策略
+- 设置页可编辑命令/参数、启停 profile、选择优先 profile，并执行有界的 ACP initialize 握手探测
+
+### 14.8 LLM Provider 列表 ✅
 
 <!-- feature
 id: F-AI-11

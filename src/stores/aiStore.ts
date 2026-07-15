@@ -8,6 +8,7 @@ import {
 
 export const DEFAULT_CLAUDE_CODE_MODEL = "claude-sonnet-4-5";
 export const DEFAULT_CODEX_MODEL = "gpt-5.4";
+export const ACP_PROVIDER_PREFIX = "acp:";
 
 export interface AsrProviderConfig {
   engine: string;
@@ -68,6 +69,7 @@ export interface AiConfig {
   web_search: WebSearchConfig;
   cc_bridge: CcBridgeConfig;
   codex_bridge: CodexBridgeConfig;
+  acp_bridge: AcpBridgeConfig;
   full_local_mode?: boolean;
   fully_disabled?: boolean;
   /** Default output format for chat replies: "md" | "html" | "plain". */
@@ -131,6 +133,40 @@ export interface CodexBridgeConfig {
   active_profile_id?: string;
 }
 
+export interface AcpProfileConfig {
+  id: string;
+  name: string;
+  enabled: boolean;
+  command: string;
+  args: string[];
+  auth_method_id?: string | null;
+  proxy_mode: "inherit" | "direct" | "app" | "session" | "manual" | string;
+  proxy_session_id?: string | null;
+  proxy_url?: string | null;
+}
+
+export interface AcpBridgeConfig {
+  enabled: boolean;
+  active_profile_id?: string | null;
+  proxy_mode: "direct" | "app" | "session" | "manual" | string;
+  proxy_session_id?: string | null;
+  proxy_url?: string | null;
+  request_timeout_seconds: number;
+  profiles: AcpProfileConfig[];
+}
+
+export const DEFAULT_GROK_ACP_PROFILE: AcpProfileConfig = {
+  id: "grok",
+  name: "Grok CLI",
+  enabled: false,
+  command: "grok",
+  args: ["agent", "stdio"],
+  auth_method_id: null,
+  proxy_mode: "inherit",
+  proxy_session_id: null,
+  proxy_url: null,
+};
+
 export interface WebSearchConfig {
   client_provider: string;
   client_enabled: boolean;
@@ -156,6 +192,24 @@ export function isClaudeCodeAvailableForChat(config: AiConfig | null | undefined
 export function isCodexAvailableForChat(config: AiConfig | null | undefined): boolean {
   return (
     config?.codex_bridge.enabled === true &&
+    config.full_local_mode !== true &&
+    config.fully_disabled !== true
+  );
+}
+
+export function acpProviderId(profileId: string): string {
+  return profileId.startsWith(ACP_PROVIDER_PREFIX) ? profileId : `${ACP_PROVIDER_PREFIX}${profileId}`;
+}
+
+export function acpProfileIdFromProvider(providerId: string): string | null {
+  if (!providerId.startsWith(ACP_PROVIDER_PREFIX)) return null;
+  const profileId = providerId.slice(ACP_PROVIDER_PREFIX.length);
+  return profileId || null;
+}
+
+export function isAcpAvailableForChat(config: AiConfig | null | undefined): boolean {
+  return (
+    config?.acp_bridge.enabled === true &&
     config.full_local_mode !== true &&
     config.fully_disabled !== true
   );
@@ -242,6 +296,13 @@ export function chatDrawerProviderIds(
   const localAgentIds: string[] = [];
   if (capability === "chat" && isClaudeCodeAvailableForChat(config)) localAgentIds.push("claude-code");
   if (capability === "chat" && isCodexAvailableForChat(config)) localAgentIds.push("codex");
+  if (capability === "chat" && isAcpAvailableForChat(config)) {
+    const activeProfileId = config?.acp_bridge.active_profile_id;
+    const profiles = [...(config?.acp_bridge.profiles ?? [])]
+      .filter((profile) => profile.enabled && profile.command.trim())
+      .sort((left, right) => Number(right.id === activeProfileId) - Number(left.id === activeProfileId));
+    localAgentIds.push(...profiles.map((profile) => acpProviderId(profile.id)));
+  }
   const orderedIds = [...orderedLlmIds, ...groups, ...localAgentIds];
   const preferred = readChatDrawerProviderPreference(capability);
   return Array.from(new Set(
@@ -334,6 +395,15 @@ const DEFAULT_CONFIG: AiConfig = {
     confirm_readonly: false,
     terminal_echo_enabled: true,
   },
+  acp_bridge: {
+    enabled: false,
+    active_profile_id: "grok",
+    proxy_mode: "direct",
+    proxy_session_id: null,
+    proxy_url: null,
+    request_timeout_seconds: 120,
+    profiles: [{ ...DEFAULT_GROK_ACP_PROFILE, args: [...DEFAULT_GROK_ACP_PROFILE.args] }],
+  },
   full_local_mode: false,
   fully_disabled: false,
   chat_output_format: "md",
@@ -371,6 +441,60 @@ function normalizeCcProfileProxyMode(mode: string | undefined | null, proxyUrl?:
   const trimmed = (mode ?? "").trim();
   if (trimmed === "inherit" || trimmed === "session" || trimmed === "manual") return trimmed;
   return proxyUrl?.trim() ? "manual" : "none";
+}
+
+function normalizeAcpGlobalProxyMode(mode: string | undefined | null, proxyUrl?: string | null): string {
+  const trimmed = (mode ?? "").trim();
+  if (trimmed === "app" || trimmed === "session" || trimmed === "manual") return trimmed;
+  return proxyUrl?.trim() ? "manual" : "direct";
+}
+
+function normalizeAcpProfileProxyMode(mode: string | undefined | null, proxyUrl?: string | null): string {
+  const trimmed = (mode ?? "").trim();
+  if (trimmed === "direct" || trimmed === "app" || trimmed === "session" || trimmed === "manual") {
+    return trimmed;
+  }
+  return proxyUrl?.trim() ? "manual" : "inherit";
+}
+
+function normalizeAcpBridge(bridge: AcpBridgeConfig | undefined): AcpBridgeConfig {
+  const source = bridge ?? DEFAULT_CONFIG.acp_bridge;
+  let profiles = (source.profiles ?? []).map((profile, index) => ({
+    ...profile,
+    id: profile.id?.trim() || `profile-${index + 1}`,
+    name: profile.name?.trim() || profile.id?.trim() || `ACP Agent ${index + 1}`,
+    command: profile.command?.trim() || "",
+    args: (profile.args ?? []).map((arg) => arg.trim()).filter(Boolean),
+    auth_method_id: profile.auth_method_id?.trim() || null,
+    proxy_mode: normalizeAcpProfileProxyMode(profile.proxy_mode, profile.proxy_url),
+    proxy_session_id: profile.proxy_session_id?.trim() || null,
+    proxy_url: profile.proxy_url?.trim() || null,
+  }));
+  const requestedActiveProfileId = source.active_profile_id?.trim();
+  let activeProfileId = requestedActiveProfileId && profiles.some((profile) => profile.id === requestedActiveProfileId)
+    ? requestedActiveProfileId
+    : profiles[0]?.id ?? null;
+  if (source.enabled === true && !profiles.some((profile) => profile.enabled)) {
+    const fallbackProfile = profiles.find((profile) =>
+      profile.id === activeProfileId && profile.command.length > 0
+    ) ?? profiles.find((profile) => profile.command.length > 0);
+    if (fallbackProfile) {
+      activeProfileId = fallbackProfile.id;
+      profiles = profiles.map((profile) =>
+        profile.id === fallbackProfile.id ? { ...profile, enabled: true } : profile
+      );
+    }
+  }
+  return {
+    ...DEFAULT_CONFIG.acp_bridge,
+    ...source,
+    active_profile_id: activeProfileId,
+    proxy_mode: normalizeAcpGlobalProxyMode(source.proxy_mode, source.proxy_url),
+    proxy_session_id: source.proxy_session_id?.trim() || null,
+    proxy_url: source.proxy_url?.trim() || null,
+    request_timeout_seconds: Math.min(600, Math.max(1, Math.round(source.request_timeout_seconds || 120))),
+    profiles,
+  };
 }
 
 function normalizeLlmProvider(provider: LlmProviderConfig): LlmProviderConfig {
@@ -473,6 +597,7 @@ function normalizeAiConfig(config: AiConfig): AiConfig {
         proxy_url: profile.proxy_url?.trim() || undefined,
       })),
     },
+    acp_bridge: normalizeAcpBridge(config.acp_bridge),
   };
 }
 
