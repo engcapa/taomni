@@ -33,7 +33,7 @@ export function DiffPane({
   worktreeEditable,
 }: DiffPaneProps) {
   return (
-    <>
+    <div className="h-full min-h-0 min-w-0 w-full flex flex-col">
       <div className="h-9 shrink-0 flex items-center gap-1 px-2 border-b border-[var(--taomni-divider)]">
         <span className="font-semibold truncate text-[12px]">{title}</span>
         <div className="flex-1" />
@@ -52,15 +52,17 @@ export function DiffPane({
         <button className="taomni-btn h-7 px-2" type="button" disabled={busy || selectedCount === 0} onClick={onUnstage}>Unstage</button>
         <button className="taomni-btn h-7 px-2 text-red-500" type="button" disabled={busy || selectedCount === 0} onClick={onDiscard}>Discard</button>
       </div>
-      <DiffViewer
-        pair={pair}
-        loading={pairLoading}
-        emptyLabel="Select a file to preview its diff"
-        onNormalizeLineEndings={onNormalizeLineEndings}
-        normalizeLineEndingsBusy={normalizeLineEndingsBusy}
-        worktreeEditable={worktreeEditable}
-        onSaveWorktree={onSaveWorktree}
-      />
-    </>
+      <div className="flex-1 min-h-0 min-w-0">
+        <DiffViewer
+          pair={pair}
+          loading={pairLoading}
+          emptyLabel="Select a file to preview its diff"
+          onNormalizeLineEndings={onNormalizeLineEndings}
+          normalizeLineEndingsBusy={normalizeLineEndingsBusy}
+          worktreeEditable={worktreeEditable}
+          onSaveWorktree={onSaveWorktree}
+        />
+      </div>
+    </div>
   );
 }
