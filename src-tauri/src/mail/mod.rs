@@ -33,6 +33,10 @@ use crate::terminal::network::NetworkSettings;
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
 const DEFAULT_MESSAGE_LIMIT: usize = 200;
 const DEFAULT_BODY_MAX_BYTES: usize = 256 * 1024;
+/// Cap for HTML bodies after embedding inline CID images as data URLs for display.
+const MAX_EMBEDDED_BODY_BYTES: usize = 5 * 1024 * 1024;
+/// Skip individual CID parts larger than this when rewriting for display.
+const MAX_INLINE_CID_IMAGE_BYTES: usize = 2 * 1024 * 1024;
 const OAUTH_REFRESH_SKEW_SECS: i64 = 300;
 const OAUTH_REAUTHORIZE_REQUIRED: &str = "OAuth2 authorization expired or was revoked. Reauthorize this mail account in session settings.";
 const IMAP_LOGIN_RETRY_DELAYS_MS: [u64; 2] = [500, 1500];
@@ -3438,9 +3442,17 @@ fn parse_body_message(
             let text = message
                 .body_text(0)
                 .map(|s| truncate_utf8_bytes(s.as_ref(), max_bytes));
-            let html = message
-                .body_html(0)
-                .map(|s| truncate_utf8_bytes(s.as_ref(), max_bytes));
+            let html = message.body_html(0).map(|s| {
+                // Thunderbird-style: rewrite embedded cid: images to data: URLs so
+                // the reader can show them without a network fetch. Remote http(s)
+                // images stay as-is and are gated by the frontend privacy toggle.
+                let rewritten = rewrite_cid_images_in_html(&message, s.as_ref());
+                let limit = rewritten
+                    .len()
+                    .max(max_bytes)
+                    .min(MAX_EMBEDDED_BODY_BYTES);
+                truncate_utf8_bytes(&rewritten, limit)
+            });
             MailMessageCached {
                 header: MailMessageHeader {
                     account_id: account_id.to_string(),
@@ -4899,6 +4911,126 @@ fn clean_message_id(value: &str) -> String {
         .to_string()
 }
 
+/// Rewrite `src="cid:..."` / `src='cid:...'` references to data URLs using matching
+/// MIME parts (Content-ID). Enables embedded images in the HTML reader without
+/// requiring a separate attachment download round-trip.
+fn rewrite_cid_images_in_html(message: &mail_parser::Message<'_>, html: &str) -> String {
+    if !html.to_ascii_lowercase().contains("cid:") {
+        return html.to_string();
+    }
+
+    let mut by_cid: HashMap<String, (String, Vec<u8>)> = HashMap::new();
+    for part in &message.parts {
+        let Some(raw_cid) = part.content_id() else {
+            continue;
+        };
+        let cid = clean_message_id(raw_cid);
+        if cid.is_empty() {
+            continue;
+        }
+        let content_type = part
+            .content_type()
+            .map(|ct| match ct.c_subtype.as_ref() {
+                Some(subtype) => format!("{}/{}", ct.c_type, subtype),
+                None => ct.c_type.to_string(),
+            })
+            .unwrap_or_else(|| "application/octet-stream".into());
+        // Only embed image/* parts — other cid targets (e.g. calendar) stay as cid:.
+        if !content_type.to_ascii_lowercase().starts_with("image/") {
+            continue;
+        }
+        let bytes = match &part.body {
+            PartType::Binary(b) | PartType::InlineBinary(b) => b.as_ref().to_vec(),
+            PartType::Text(s) | PartType::Html(s) => s.as_ref().as_bytes().to_vec(),
+            PartType::Message(nested) => nested.raw_message.to_vec(),
+            PartType::Multipart(_) => continue,
+        };
+        if bytes.is_empty() || bytes.len() > MAX_INLINE_CID_IMAGE_BYTES {
+            continue;
+        }
+        by_cid.insert(cid.to_ascii_lowercase(), (content_type, bytes));
+    }
+    if by_cid.is_empty() {
+        return html.to_string();
+    }
+
+    let mut out = String::with_capacity(html.len());
+    let bytes = html.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        let rest = &html[index..];
+        let lower = rest.to_ascii_lowercase();
+        let Some(rel_src) = lower.find("src=") else {
+            out.push_str(rest);
+            break;
+        };
+        out.push_str(&rest[..rel_src + 4]);
+        index += rel_src + 4;
+        if index >= bytes.len() {
+            break;
+        }
+        let quote = html.as_bytes()[index];
+        let (quote_char, value_start) = if quote == b'"' || quote == b'\'' {
+            (Some(quote as char), index + 1)
+        } else {
+            (None, index)
+        };
+        let value_end = match quote_char {
+            Some(q) => html[value_start..]
+                .find(q)
+                .map(|n| value_start + n)
+                .unwrap_or(html.len()),
+            None => {
+                let end_rel = html[value_start..]
+                    .find(|c: char| c.is_whitespace() || c == '>')
+                    .unwrap_or(html[value_start..].len());
+                value_start + end_rel
+            }
+        };
+        let raw_src = &html[value_start..value_end];
+        let cid_key = raw_src
+            .trim()
+            .strip_prefix("cid:")
+            .or_else(|| raw_src.trim().strip_prefix("CID:"))
+            .map(|v| clean_message_id(v).to_ascii_lowercase());
+        if let Some(cid) = cid_key.as_ref() {
+            if let Some((content_type, data)) = by_cid.get(cid) {
+                let encoded = BASE64_STANDARD.encode(data);
+                if let Some(q) = quote_char {
+                    out.push(q);
+                    out.push_str("data:");
+                    out.push_str(content_type);
+                    out.push_str(";base64,");
+                    out.push_str(&encoded);
+                    out.push(q);
+                } else {
+                    out.push_str("data:");
+                    out.push_str(content_type);
+                    out.push_str(";base64,");
+                    out.push_str(&encoded);
+                }
+                index = if quote_char.is_some() {
+                    value_end + 1
+                } else {
+                    value_end
+                };
+                continue;
+            }
+        }
+        // Unmatched cid or non-cid src: copy through unchanged.
+        if let Some(q) = quote_char {
+            out.push(q);
+            out.push_str(raw_src);
+            out.push(q);
+            index = value_end + 1;
+        } else {
+            out.push_str(raw_src);
+            index = value_end;
+        }
+    }
+    out
+}
+
 fn truncate_utf8_bytes(value: &str, max_bytes: usize) -> String {
     if value.len() <= max_bytes {
         return value.to_string();
@@ -4969,6 +5101,29 @@ mod tests {
 
     fn sample_attachment_message() -> Vec<u8> {
         b"From: Example Sender <sender@example.com>\r\nTo: Receiver <receiver@example.com>\r\nSubject: Attachment sample\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nBody text.\r\n--b\r\nContent-Type: text/plain; name=\"report.txt\"\r\nContent-Disposition: attachment; filename=\"report.txt\"\r\n\r\nAttachment content.\r\n--b--\r\n"
+            .to_vec()
+    }
+
+    fn sample_inline_image_message() -> Vec<u8> {
+        // 1x1 PNG (68 bytes raw) base64-encoded for a multipart/related sample.
+        b"From: Example Sender <sender@example.com>\r\n\
+To: Receiver <receiver@example.com>\r\n\
+Subject: Inline image sample\r\n\
+MIME-Version: 1.0\r\n\
+Content-Type: multipart/related; boundary=\"rel\"\r\n\
+\r\n\
+--rel\r\n\
+Content-Type: text/html; charset=utf-8\r\n\
+\r\n\
+<p>Logo: <img src=\"cid:logo@inline.local\" alt=\"logo\"></p>\r\n\
+--rel\r\n\
+Content-Type: image/png; name=\"logo.png\"\r\n\
+Content-Transfer-Encoding: base64\r\n\
+Content-ID: <logo@inline.local>\r\n\
+Content-Disposition: inline; filename=\"logo.png\"\r\n\
+\r\n\
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==\r\n\
+--rel--\r\n"
             .to_vec()
     }
 
@@ -5551,6 +5706,22 @@ mod tests {
         assert_eq!(attachment.name.as_deref(), Some("report.txt"));
         assert_eq!(attachment.content_type.as_deref(), Some("text/plain"));
         assert_eq!(attachment.bytes, b"Attachment content.");
+    }
+
+    #[test]
+    fn parse_body_rewrites_cid_images_to_data_urls() {
+        let raw = sample_inline_image_message();
+        let parsed = parse_body_message("acct", "INBOX", 9, Some(raw.len() as u32), &raw, 4096);
+        let html = parsed.body_html.as_deref().expect("html body");
+        assert!(
+            html.contains("data:image/png;base64,"),
+            "expected embedded data URL, got: {html}"
+        );
+        assert!(
+            !html.to_ascii_lowercase().contains("cid:logo@inline.local"),
+            "cid reference should be rewritten for display"
+        );
+        assert!(html.contains("alt=\"logo\""));
     }
 
     #[test]

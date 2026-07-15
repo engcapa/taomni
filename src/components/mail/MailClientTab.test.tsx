@@ -45,6 +45,11 @@ vi.mock("../../lib/ipc", () => ({
   openLocalPath: vi.fn(),
   selectUploadFile: vi.fn(async () => []),
   temporaryFilePath: vi.fn(async (name: string) => `/tmp/${name}`),
+  readFileBytes: vi.fn(async () => new Uint8Array([1, 2, 3])),
+  writeStreamOpen: vi.fn(async () => "handle-1"),
+  writeStreamAppend: vi.fn(async () => undefined),
+  writeStreamClose: vi.fn(async () => undefined),
+  writeStreamAbort: vi.fn(async () => undefined),
 }));
 
 vi.mock("../../stores/chatStore", () => {

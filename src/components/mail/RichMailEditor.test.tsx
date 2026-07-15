@@ -88,7 +88,7 @@ describe("RichMailEditor", () => {
       <RichMailEditor
         html="<p>Hello</p>"
         onChange={vi.fn()}
-        onInlineImage={vi.fn(async () => "<img src=\"cid:logo-1@inline.local\" alt=\"logo\">")}
+        onInlineImage={vi.fn(async () => "<img src=\"data:image/png;base64,aa\" data-taomni-cid=\"logo-1@inline.local\" alt=\"logo\">")}
       />,
     );
 
@@ -99,7 +99,47 @@ describe("RichMailEditor", () => {
       expect(execCommand).toHaveBeenCalledWith(
         "insertHTML",
         false,
-        "<img src=\"cid:logo-1@inline.local\" alt=\"logo\">",
+        "<img src=\"data:image/png;base64,aa\" data-taomni-cid=\"logo-1@inline.local\" alt=\"logo\">",
+      );
+    });
+  });
+
+  it("pastes clipboard images via the parent handler", async () => {
+    const execCommand = vi.fn();
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      value: execCommand,
+    });
+    const onPasteImages = vi.fn(async () => [
+      "<img src=\"data:image/png;base64,aa\" data-taomni-cid=\"paste@inline.local\" alt=\"pasted\">",
+    ]);
+    const file = new File([new Uint8Array([1, 2, 3])], "clip.png", { type: "image/png" });
+
+    render(
+      <RichMailEditor
+        html="<p>Hello</p>"
+        onChange={vi.fn()}
+        onPasteImages={onPasteImages}
+      />,
+    );
+
+    const editor = screen.getByTestId("mail-compose-editor");
+    const clipboardData = {
+      items: [{
+        type: "image/png",
+        getAsFile: () => file,
+      }],
+      files: [file],
+      getData: () => "",
+    };
+    fireEvent.paste(editor, { clipboardData });
+
+    await waitFor(() => {
+      expect(onPasteImages).toHaveBeenCalledTimes(1);
+      expect(execCommand).toHaveBeenCalledWith(
+        "insertHTML",
+        false,
+        "<img src=\"data:image/png;base64,aa\" data-taomni-cid=\"paste@inline.local\" alt=\"pasted\">",
       );
     });
   });
