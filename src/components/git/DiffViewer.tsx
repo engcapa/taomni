@@ -115,8 +115,10 @@ if (typeof document !== "undefined" && !document.getElementById(STYLE_ID)) {
 .taomni-diff-host .cm-mergeViewEditors,
 .taomni-diff-host .cm-editor {
   height: 100% !important;
+  width: 100% !important;
   min-height: 0;
   min-width: 0;
+  box-sizing: border-box;
 }
 
 .taomni-diff-host .cm-mergeView {
@@ -128,19 +130,32 @@ if (typeof document !== "undefined" && !document.getElementById(STYLE_ID)) {
 }
 
 .taomni-diff-host .cm-mergeViewEditors {
+  display: flex;
+  flex-direction: row;
   align-items: stretch;
   flex: 1 1 auto;
+  width: 100%;
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
 }
 
 .taomni-diff-host .cm-mergeViewEditor {
   display: flex;
+  flex-direction: column;
   flex: 1 1 0;
+  width: 0; /* force equal flex share so panes fill available width */
   min-width: 0;
   min-height: 0;
   overflow: hidden;
   background: var(--taomni-diff-editor-bg);
+}
+
+.taomni-diff-host .cm-mergeViewEditor > .cm-editor {
+  flex: 1 1 auto;
+  width: 100% !important;
+  min-width: 0;
+  min-height: 0;
 }
 
 .taomni-diff-host .cm-mergeViewEditor + .cm-mergeViewEditor {
@@ -151,6 +166,7 @@ if (typeof document !== "undefined" && !document.getElementById(STYLE_ID)) {
 .taomni-diff-host > .cm-editor .cm-scroller {
   flex: 1 1 auto;
   height: 100% !important;
+  width: 100% !important;
   min-height: 0;
   min-width: 0;
   overflow-x: auto !important;
@@ -387,12 +403,15 @@ function applyEditorViewportLayout(view: EditorView) {
   setImportantStyle(editor, "display", "flex");
   setImportantStyle(editor, "flex-direction", "column");
   setImportantStyle(editor, "height", "100%");
+  setImportantStyle(editor, "width", "100%");
   setImportantStyle(editor, "min-height", "0");
   setImportantStyle(editor, "min-width", "0");
   setImportantStyle(editor, "overflow", "hidden");
+  editor.style.setProperty("flex", "1 1 auto");
 
   scroller.style.setProperty("flex", "1 1 auto");
   setImportantStyle(scroller, "height", "100%");
+  setImportantStyle(scroller, "width", "100%");
   setImportantStyle(scroller, "min-height", "0");
   setImportantStyle(scroller, "min-width", "0");
   setImportantStyle(scroller, "overflow-x", "auto");
@@ -418,20 +437,30 @@ function applySplitDiffLayout(
   setImportantStyle(mv.dom, "display", "flex");
   setImportantStyle(mv.dom, "flex-direction", "column");
   setImportantStyle(mv.dom, "height", "100%");
+  setImportantStyle(mv.dom, "width", "100%");
   setImportantStyle(mv.dom, "min-height", "0");
   setImportantStyle(mv.dom, "min-width", "0");
   setImportantStyle(mv.dom, "overflow", "hidden");
 
   setImportantStyle(editorDom, "display", "flex");
+  setImportantStyle(editorDom, "flex-direction", "row");
+  setImportantStyle(editorDom, "align-items", "stretch");
   editorDom.style.setProperty("flex", "1 1 auto");
   setImportantStyle(editorDom, "height", "100%");
+  setImportantStyle(editorDom, "width", "100%");
   setImportantStyle(editorDom, "min-height", "0");
   setImportantStyle(editorDom, "min-width", "0");
   setImportantStyle(editorDom, "overflow", "hidden");
 
   for (const wrap of [leftWrap, rightWrap]) {
+    // Column so the nested .cm-editor stretches to the full pane width;
+    // row (the previous default) sized editors to content and left the
+    // scrollbar floating mid-panel instead of on each pane's right edge.
     setImportantStyle(wrap, "display", "flex");
+    setImportantStyle(wrap, "flex-direction", "column");
+    setImportantStyle(wrap, "align-items", "stretch");
     wrap.style.setProperty("flex", "1 1 0");
+    setImportantStyle(wrap, "width", "0");
     setImportantStyle(wrap, "min-height", "0");
     setImportantStyle(wrap, "min-width", "0");
     setImportantStyle(wrap, "overflow", "hidden");
@@ -808,7 +837,7 @@ export function DiffViewer({
     : null;
 
   return (
-    <div className="h-full min-h-0 flex flex-col bg-[var(--taomni-panel-bg)]">
+    <div className="h-full min-h-0 min-w-0 w-full flex flex-col bg-[var(--taomni-panel-bg)]">
       {eolOnly && eolLabel ? (
         <div
           data-testid="git-diff-eol-only-banner"
@@ -928,7 +957,7 @@ export function DiffViewer({
           </button>
         </div>
       </div>
-      <div ref={hostRef} data-testid="git-diff-viewer" className="taomni-diff-host flex-1 min-h-0 overflow-hidden" />
+      <div ref={hostRef} data-testid="git-diff-viewer" className="taomni-diff-host flex-1 min-h-0 min-w-0 w-full overflow-hidden" />
     </div>
   );
 }
