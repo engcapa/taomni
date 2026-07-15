@@ -241,9 +241,9 @@ export function groupIdForEntry(entryId: string): string | undefined {
   return ENTRY_TO_GROUP.get(entryId);
 }
 
-/** Default expand map: every group open (familiar first-open layout). */
+/** Default expand map: every group collapsed so the panel opens as a compact TOC. */
 export function defaultExpandedGroups(): Record<string, boolean> {
-  return Object.fromEntries(SETTINGS_GROUPS.map((g) => [g.id, true]));
+  return Object.fromEntries(SETTINGS_GROUPS.map((g) => [g.id, false]));
 }
 
 // True when `query` matches the entry's resolved titles or any literal term.
