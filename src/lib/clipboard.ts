@@ -139,6 +139,53 @@ export async function writeImagePng(blob: Blob): Promise<void> {
   await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
 }
 
+/**
+ * Read a system clipboard image into a temp PNG via native arboard.
+ *
+ * WebKitGTK (Linux Tauri) often omits image/* from paste events even when the
+ * OS clipboard holds a screenshot or "copy image" bitmap. Chat already uses
+ * `chat_read_clipboard_image_attachment`; mail compose reuses the same path.
+ */
+export async function readNativeClipboardImagePath(): Promise<string | null> {
+  if (!isTauriRuntime()) return null;
+  try {
+    const attachment = await invoke<{ path?: string | null } | null>(
+      "chat_read_clipboard_image_attachment",
+    );
+    const path = typeof attachment?.path === "string" ? attachment.path.trim() : "";
+    return path || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Best-effort image files from the async Clipboard API (browser / some webviews).
+ * Returns [] when unavailable or permission is denied.
+ */
+export async function readClipboardImageFiles(): Promise<File[]> {
+  if (typeof navigator === "undefined" || !navigator.clipboard?.read) return [];
+  try {
+    const items = await navigator.clipboard.read();
+    const files: File[] = [];
+    for (const item of items) {
+      for (const type of item.types) {
+        if (!type.startsWith("image/")) continue;
+        try {
+          const blob = await item.getType(type);
+          const ext = type.split("/")[1]?.split(";")[0] || "png";
+          files.push(new File([blob], `pasted-image.${ext}`, { type }));
+        } catch {
+          // Skip unreadable type.
+        }
+      }
+    }
+    return files;
+  } catch {
+    return [];
+  }
+}
+
 /** Read multi-format clipboard. Returns text plus html/rtf when available. */
 export async function readMultiFormat(): Promise<PasteResult> {
   const text = await readText();

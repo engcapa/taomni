@@ -1,6 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
+  readClipboardImageFiles,
   readMultiFormat,
+  readNativeClipboardImagePath,
   writeMultiFormat,
   writeText,
   writeImagePng,
@@ -102,5 +104,21 @@ describe("clipboard.writeImagePng", () => {
     });
     await expect(writeImagePng(new Blob([]))).rejects.toThrow();
     if (original) (globalThis as { ClipboardItem?: unknown }).ClipboardItem = original;
+  });
+});
+
+describe("clipboard.readNativeClipboardImagePath", () => {
+  it("returns null outside Tauri", async () => {
+    await expect(readNativeClipboardImagePath()).resolves.toBeNull();
+  });
+});
+
+describe("clipboard.readClipboardImageFiles", () => {
+  it("returns empty when clipboard.read is unavailable", async () => {
+    Object.defineProperty(globalThis, "navigator", {
+      value: { clipboard: {} },
+      configurable: true,
+    });
+    await expect(readClipboardImageFiles()).resolves.toEqual([]);
   });
 });
