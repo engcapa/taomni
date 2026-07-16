@@ -56,8 +56,9 @@ describe("applyQuietPollMessages", () => {
     expect(result.messages).toEqual(current);
   });
 
-  it("merges quiet poll headers and uses post-merge count for hasMore", () => {
-    // User already paged to 100 messages; quiet poll only returns the latest 50.
+  it("merges quiet poll headers and ignores offset-0 server hasMore when already fully loaded", () => {
+    // User already paged to 100 messages; quiet poll only returns the latest 50
+    // with hasMore=true (offset=0 always reports more when total > batch).
     const alreadyLoaded = Array.from({ length: 100 }, (_, i) => header("INBOX", i + 1));
     const quietPage = Array.from({ length: 50 }, (_, i) => header("INBOX", 51 + i));
     const folders = [folder("INBOX", 100)];
@@ -67,11 +68,11 @@ describe("applyQuietPollMessages", () => {
       alreadyLoaded,
       quietPage,
       folders,
-      false,
+      true, // server offset=0 hasMore — must not re-enable load-more
     );
     expect(result.applyMessages).toBe(true);
     expect(result.messages.length).toBe(100);
-    // total=100 and loaded=100 → no more pages (would wrongly flip true if using quietPage.length=50)
+    // total=100 and loaded=100 → no more pages even though server said hasMore
     expect(result.hasMore).toBe(false);
   });
 
@@ -85,10 +86,28 @@ describe("applyQuietPollMessages", () => {
       alreadyLoaded,
       quietPage,
       folders,
-      false,
+      true,
     );
     expect(result.applyMessages).toBe(true);
     expect(result.messages.length).toBeGreaterThan(40);
+    expect(result.hasMore).toBe(true);
+  });
+
+  it("uses server hasMore only when merge size does not exceed the quiet page", () => {
+    // Fresh list: no prior pages, quiet returns full batch with hasMore, no total.
+    const quietPage = Array.from({ length: 50 }, (_, i) => header("INBOX", i + 1));
+    const folders = [folder("INBOX", 0)]; // total unknown / 0 → folderHasMore false
+    folders[0] = { ...folders[0], total: null };
+    const result = applyQuietPollMessages(
+      "INBOX",
+      "INBOX",
+      [],
+      quietPage,
+      folders,
+      true,
+    );
+    expect(result.applyMessages).toBe(true);
+    expect(result.messages.length).toBe(50);
     expect(result.hasMore).toBe(true);
   });
 });

@@ -639,8 +639,12 @@ export function applyQuietPollMessages(
   }
   const previousForFolder = currentMessages.filter((message) => message.folder === polledFolder);
   const messages = mergeMessagePages(previousForFolder, polledMessages.slice());
-  const hasMore = hasMoreFromServer
-    || folderHasMoreMessages(folders, polledFolder, messages.length);
+  // Quiet poll always uses offset=0, so server hasMore is true whenever the
+  // mailbox is larger than the batch — even if the UI already paged to the end.
+  // Prefer post-merge loaded count (+ folder total). Only trust server hasMore
+  // when the merge did not already exceed the quiet page (fresh/short lists).
+  const hasMore = folderHasMoreMessages(folders, polledFolder, messages.length)
+    || (hasMoreFromServer && messages.length <= polledMessages.length);
   return { applyMessages: true, messages, hasMore };
 }
 
