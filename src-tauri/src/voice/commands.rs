@@ -1,8 +1,10 @@
 // Tauri commands for the voice/PTT pipeline.
 
 use super::VoiceTranscriptResult;
+#[cfg(feature = "voice-capture")]
 use crate::llm::{ChatMessage, ChatRequest, TaskKind};
 use crate::state::AppState;
+#[cfg(feature = "voice-capture")]
 use std::time::Instant;
 use tauri::State;
 
@@ -45,34 +47,37 @@ pub async fn voice_stop_and_transcribe(
     route_intent: bool,
     state: State<'_, AppState>,
 ) -> Result<VoiceTranscriptResult, String> {
+    #[cfg(not(feature = "voice-capture"))]
+    {
+        let _ = (route_intent, state);
+        return Err("voice-capture feature not built".into());
+    }
+
+    #[cfg(feature = "voice-capture")]
     let started = Instant::now();
+    #[cfg(feature = "voice-capture")]
+    let pcm = super::capture::stop()?;
 
-    let pcm: Vec<f32> = {
-        #[cfg(feature = "voice-capture")]
-        {
-            super::capture::stop()?
-        }
-        #[cfg(not(feature = "voice-capture"))]
-        {
-            return Err("voice-capture feature not built".into());
-        }
-    };
-
+    #[cfg(feature = "voice-capture")]
     if pcm.is_empty() {
         return Err("No audio captured".into());
     }
 
     // Transcribe via the configured ASR engine.
+    #[cfg(feature = "voice-capture")]
     let ai_ctx = state.ai_ctx.read().await;
+    #[cfg(feature = "voice-capture")]
     if ai_ctx.config.fully_disabled {
         return Err("AI is fully disabled.".into());
     }
+    #[cfg(feature = "voice-capture")]
     let transcript = ai_ctx
         .asr
         .transcribe(&pcm)
         .await
         .map_err(|e| e.to_string())?;
 
+    #[cfg(feature = "voice-capture")]
     if !route_intent {
         return Ok(VoiceTranscriptResult {
             transcript,
@@ -84,6 +89,7 @@ pub async fn voice_stop_and_transcribe(
     // Voice intent: ask the LLM to classify the transcript as one of a few
     // tools, returning JSON. Keep this minimal — the rich intent dispatcher
     // belongs in the next iteration.
+    #[cfg(feature = "voice-capture")]
     let req = ChatRequest {
         messages: vec![
             ChatMessage::system(
@@ -99,6 +105,7 @@ pub async fn voice_stop_and_transcribe(
         stream: false,
     };
 
+    #[cfg(feature = "voice-capture")]
     let intent_json = match ai_ctx.llm.complete(req, TaskKind::VoiceIntent).await {
         Ok(resp) => Some(resp.content),
         Err(e) => {
@@ -107,6 +114,7 @@ pub async fn voice_stop_and_transcribe(
         }
     };
 
+    #[cfg(feature = "voice-capture")]
     Ok(VoiceTranscriptResult {
         transcript,
         duration_ms: started.elapsed().as_millis() as u64,

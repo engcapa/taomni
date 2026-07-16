@@ -1478,7 +1478,7 @@ fn build_jdtls_java_command(
     cmd.arg("-jar");
     cmd.arg(launcher);
     cmd.arg("-data");
-    cmd.arg(data_dir);
+    cmd.arg(&data_dir);
     cmd.args(extra_args);
     log::info!(
         "lsp: launching jdtls via {} (Java {java_major}), home={}, data={}",

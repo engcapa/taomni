@@ -133,7 +133,7 @@ fn grep(path: &Path, pattern: &str, context: usize) -> Result<ReduceResult, Stri
     let mut emit_after = 0usize; // remaining trailing-context lines to emit
     let mut last_emitted: Option<usize> = None;
 
-    let mut push = |out: &mut String, no: usize, line: &str, last: &mut Option<usize>| {
+    let push = |out: &mut String, no: usize, line: &str, last: &mut Option<usize>| {
         if let Some(prev) = *last {
             if no > prev + 1 {
                 out.push_str("--\n");
