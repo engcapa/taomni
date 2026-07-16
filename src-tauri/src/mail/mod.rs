@@ -4,10 +4,17 @@
 //! proxy forwarder) for a short idle TTL. SMTP remains short-lived. Network
 //! routing uses only the mail session's `networkSettings` — never the app
 //! global proxy.
+//!
+//! Session proxy forwarding uses an explicit `tokio::runtime::Handle` with
+//! `Handle::block_on` from `spawn_blocking` workers (no long-lived
+//! `handle.enter()`). OAuth token HTTP uses `reqwest::blocking` and is isolated
+//! onto a plain OS thread when a Tokio runtime is already current, to avoid
+//! nested-runtime drop panics in debug builds.
 
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -832,12 +839,20 @@ impl ActiveImapSession {
     }
 
     fn logout(&mut self) {
-        let result = match self {
+        // The imap 2.4 crate uses `assert_eq!` on command tags. A desynced
+        // stream (common after proxy half-close or OAuth fingerprint churn)
+        // panics instead of returning Err — never let that tear down the
+        // Tokio worker.
+        let result = catch_unwind(AssertUnwindSafe(|| match self {
             Self::Tls { session, .. } => session.logout(),
             Self::Plain { session, .. } => session.logout(),
-        };
-        if let Err(e) = result {
-            tracing::debug!("mail imap logout failed: {e}");
+        }));
+        match result {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => tracing::debug!("mail imap logout failed: {e}"),
+            Err(_) => {
+                tracing::debug!("mail imap logout panicked (protocol desync); dropping connection")
+            }
         }
     }
 }
@@ -857,15 +872,21 @@ impl Drop for ActiveImapSession {
 
 impl ActiveImapSession {
     fn noop(&mut self) -> Result<(), String> {
-        match self {
-            Self::Tls { session, .. } => session
-                .noop()
-                .map_err(|e| format!("IMAP NOOP failed: {e}")),
-            Self::Plain { session, .. } => session
-                .noop()
-                .map_err(|e| format!("IMAP NOOP failed: {e}")),
+        match catch_unwind(AssertUnwindSafe(|| match self {
+            Self::Tls { session, .. } => session.noop(),
+            Self::Plain { session, .. } => session.noop(),
+        })) {
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(e)) => Err(format!("IMAP NOOP failed: {e}")),
+            Err(_) => Err("IMAP NOOP failed: protocol desync".into()),
         }
     }
+}
+
+/// Discard a live session without risking an imap-crate tag assert panic.
+fn retire_imap_session(mut session: ActiveImapSession) {
+    session.logout();
+    // Drop aborts the optional proxy forwarder task.
 }
 
 /// Per-account live IMAP session pool. Reuses TCP/TLS/auth and the optional
@@ -873,6 +894,10 @@ impl ActiveImapSession {
 /// app global proxy.
 pub struct MailImapPool {
     entries: std::sync::Mutex<HashMap<String, LiveImapEntry>>,
+    /// Serialize all IMAP work for a given account (pool checkout + op + put).
+    /// Prevents dual live connections for the same account racing through a
+    /// session proxy and desyncing Outlook's tag stream.
+    account_gates: std::sync::Mutex<HashMap<String, Arc<std::sync::Mutex<()>>>>,
 }
 
 struct LiveImapEntry {
@@ -904,15 +929,28 @@ impl MailImapPool {
     pub fn new() -> Self {
         Self {
             entries: std::sync::Mutex::new(HashMap::new()),
+            account_gates: std::sync::Mutex::new(HashMap::new()),
         }
+    }
+
+    fn account_gate(&self, account_id: &str) -> Arc<std::sync::Mutex<()>> {
+        let mut gates = self
+            .account_gates
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        gates
+            .entry(account_id.to_string())
+            .or_insert_with(|| Arc::new(std::sync::Mutex::new(())))
+            .clone()
     }
 
     fn take(&self, account_id: &str, fingerprint: &str) -> Option<ActiveImapSession> {
         let mut entries = self.entries.lock().ok()?;
         let entry = entries.remove(account_id)?;
         if entry.fingerprint != fingerprint || entry.last_used.elapsed() > IMAP_LIVE_IDLE_TTL {
-            let mut session = entry.session;
-            session.logout();
+            // OAuth refresh changes the credential fingerprint. Never call bare
+            // imap logout without panic protection — desynced pools panic here.
+            retire_imap_session(entry.session);
             return None;
         }
         Some(entry.session)
@@ -920,8 +958,8 @@ impl MailImapPool {
 
     fn put(&self, account_id: String, fingerprint: String, session: ActiveImapSession) {
         if let Ok(mut entries) = self.entries.lock() {
-            if let Some(mut old) = entries.remove(&account_id) {
-                old.session.logout();
+            if let Some(old) = entries.remove(&account_id) {
+                retire_imap_session(old.session);
             }
             entries.insert(
                 account_id,
@@ -932,15 +970,14 @@ impl MailImapPool {
                 },
             );
         } else {
-            let mut session = session;
-            session.logout();
+            retire_imap_session(session);
         }
     }
 
     fn invalidate(&self, account_id: &str) {
         if let Ok(mut entries) = self.entries.lock() {
-            if let Some(mut entry) = entries.remove(account_id) {
-                entry.session.logout();
+            if let Some(entry) = entries.remove(account_id) {
+                retire_imap_session(entry.session);
             }
         }
     }
@@ -1007,11 +1044,28 @@ fn is_imap_transport_error(message: &str) -> bool {
         || message.contains("tls")
         || message.contains("i/o")
         || message.contains("io error")
+        || message.contains("protocol desync")
+        || message.contains("desync")
+}
+
+/// Run an IMAP operation that may panic inside the imap crate (tag asserts)
+/// and convert panics into transport errors so the pool can reconnect.
+fn imap_catch_result<R>(op: impl FnOnce() -> Result<R, String>) -> Result<R, String> {
+    match catch_unwind(AssertUnwindSafe(op)) {
+        Ok(result) => result,
+        Err(_) => Err("IMAP protocol desync".into()),
+    }
 }
 
 /// Checkout or connect an IMAP session, run `f`, then return the session to
-/// the pool on success (unless `force_fresh`). Caller must already be on a
-/// thread with a Tokio runtime entered when session proxy forwarding is used.
+/// the pool on success (unless `force_fresh`).
+///
+/// `runtime` is used only when starting a session-level proxy loopback
+/// forwarder (`Handle::block_on`). Callers should pass `Handle::current()`
+/// from the async side into `spawn_blocking` — do **not** call
+/// `handle.enter()` for the whole blocking scope. Entering the runtime for the
+/// entire IMAP op makes `reqwest::blocking` (OAuth refresh) panic in debug
+/// builds when nested runtimes are dropped.
 ///
 /// Emits lightweight timing diagnostics: whether the live session was reused,
 /// checkout/connect ms, op ms, and whether a session-level proxy is in use.
@@ -1019,6 +1073,7 @@ fn is_imap_transport_error(message: &str) -> bool {
 fn with_imap_session<R>(
     pool: &MailImapPool,
     account: &ResolvedMailAccount,
+    runtime: &tokio::runtime::Handle,
     opts: ImapSessionOpts,
     mut f: impl FnMut(&mut ActiveImapSession) -> Result<R, String>,
 ) -> Result<R, String> {
@@ -1026,6 +1081,12 @@ fn with_imap_session<R>(
     let fingerprint = mail_imap_fingerprint(account);
     let session_proxy = account.network_settings.is_some();
     let total_start = Instant::now();
+
+    // One live IMAP op (and its proxy forwarder) per account at a time.
+    let gate = pool.account_gate(&account_id);
+    let _gate = gate
+        .lock()
+        .map_err(|_| "mail imap account lock poisoned".to_string())?;
 
     let mut attempt =
         |force_connect: bool| -> Result<(R, ActiveImapSession, bool, u128, u128), String> {
@@ -1035,7 +1096,7 @@ fn with_imap_session<R>(
                 if opts.force_fresh {
                     pool.invalidate(&account_id);
                 }
-                connect_imap(account)?
+                imap_catch_result(|| connect_imap(account, runtime))?
             } else if let Some(mut session) = pool.take(&account_id, &fingerprint) {
                 match session.noop() {
                     Ok(()) => {
@@ -1047,24 +1108,30 @@ fn with_imap_session<R>(
                             account_id = %account_id,
                             "mail imap live session probe failed; reconnecting: {e}"
                         );
-                        session.logout();
-                        connect_imap(account)?
+                        retire_imap_session(session);
+                        imap_catch_result(|| connect_imap(account, runtime))?
                     }
                 }
             } else {
-                connect_imap(account)?
+                imap_catch_result(|| connect_imap(account, runtime))?
             };
             let checkout_ms = checkout_start.elapsed().as_millis();
 
             let op_start = Instant::now();
-            match f(&mut session) {
-                Ok(value) => {
+            // `f` may panic on imap tag asserts; convert to Err and drop session.
+            let op_result = catch_unwind(AssertUnwindSafe(|| f(&mut session)));
+            match op_result {
+                Ok(Ok(value)) => {
                     let op_ms = op_start.elapsed().as_millis();
                     Ok((value, session, reused, checkout_ms, op_ms))
                 }
-                Err(e) => {
-                    session.logout();
+                Ok(Err(e)) => {
+                    retire_imap_session(session);
                     Err(e)
+                }
+                Err(_) => {
+                    drop(session);
+                    Err("IMAP protocol desync".into())
                 }
             }
         };
@@ -1076,8 +1143,7 @@ fn with_imap_session<R>(
                   op_ms: u128|
      -> R {
         if opts.force_fresh {
-            let mut session = session;
-            session.logout();
+            retire_imap_session(session);
         } else {
             pool.put(account_id.clone(), fingerprint.clone(), session);
         }
@@ -1267,17 +1333,17 @@ pub async fn mail_test_connection(
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        let _enter = handle.enter();
         let folders = with_imap_session(
             &pool,
             &account,
+            &handle,
             ImapSessionOpts {
                 force_fresh: true,
                 retry_on_error: false,
             },
             |imap| imap.list_folders(&account.config.session_id),
         )?;
-        test_smtp(&account)?;
+        test_smtp(&account, &handle)?;
         Ok(MailTestConnectionResult {
             imap_ok: true,
             smtp_ok: true,
@@ -1486,8 +1552,7 @@ pub async fn mail_sync_headers(
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let mut result = tokio::task::spawn_blocking(move || {
-        let _enter = handle.enter();
-        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+        with_imap_session(&pool, &account, &handle, ImapSessionOpts::default(), |imap| {
             let base_folders = if do_list {
                 imap.list_folders(&account.config.session_id)?
             } else {
@@ -1568,8 +1633,7 @@ pub async fn mail_sync_all_folders(
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let result = tokio::task::spawn_blocking(move || {
-        let _enter = handle.enter();
-        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+        with_imap_session(&pool, &account, &handle, ImapSessionOpts::default(), |imap| {
             let mut folders = imap.list_folders(&account.config.session_id)?;
             let mut messages = Vec::new();
             let mut new_messages = 0usize;
@@ -1679,8 +1743,7 @@ pub async fn mail_get_message_body(
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let message = tokio::task::spawn_blocking(move || {
-        let _enter = handle.enter();
-        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+        with_imap_session(&pool, &account, &handle, ImapSessionOpts::default(), |imap| {
             imap.fetch_body(&account, &folder, uid)
         })
     })
@@ -1711,8 +1774,7 @@ pub async fn mail_download_attachment(
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        let _enter = handle.enter();
-        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+        with_imap_session(&pool, &account, &handle, ImapSessionOpts::default(), |imap| {
             imap.download_attachment(&account, &folder, uid, attachment_index, &target_path)
         })
     })
@@ -1730,7 +1792,8 @@ pub async fn mail_send_message(
     validate_send_request(&request)?;
     let account_id = account.config.session_id.clone();
     let sent_request = request.clone();
-    let result = tokio::task::spawn_blocking(move || send_smtp(&account, &request))
+    let handle = tokio::runtime::Handle::current();
+    let result = tokio::task::spawn_blocking(move || send_smtp(&account, &request, &handle))
         .await
         .map_err(|e| format!("mail send task failed: {e}"))??;
     if result.accepted {
@@ -1839,8 +1902,7 @@ pub async fn mail_mark_read(
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        let _enter = handle.enter();
-        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+        with_imap_session(&pool, &account, &handle, ImapSessionOpts::default(), |imap| {
             imap.mark_read(&folder_for_task, &uids_for_task)
         })
     })
@@ -1901,8 +1963,7 @@ pub async fn mail_set_flags(
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        let _enter = handle.enter();
-        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+        with_imap_session(&pool, &account, &handle, ImapSessionOpts::default(), |imap| {
             imap.set_flags(
                 &folder_for_task,
                 &uids_for_task,
@@ -1956,8 +2017,7 @@ pub async fn mail_move_messages(
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        let _enter = handle.enter();
-        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+        with_imap_session(&pool, &account, &handle, ImapSessionOpts::default(), |imap| {
             imap.move_messages(&folder_for_task, &uids_for_task, &target_for_task)
         })
     })
@@ -2003,8 +2063,7 @@ pub async fn mail_copy_messages(
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        let _enter = handle.enter();
-        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+        with_imap_session(&pool, &account, &handle, ImapSessionOpts::default(), |imap| {
             imap.copy_messages(&folder_for_task, &uids_for_task, &target_for_task)
         })
     })
@@ -2047,8 +2106,7 @@ pub async fn mail_delete_messages(
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let deleted = tokio::task::spawn_blocking(move || {
-        let _enter = handle.enter();
-        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+        with_imap_session(&pool, &account, &handle, ImapSessionOpts::default(), |imap| {
             imap.delete_messages(&folder_for_task, &uids_for_task, all)
         })
     })
@@ -2084,8 +2142,7 @@ pub async fn mail_fetch_raw(
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let raw = tokio::task::spawn_blocking(move || {
-        let _enter = handle.enter();
-        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+        with_imap_session(&pool, &account, &handle, ImapSessionOpts::default(), |imap| {
             imap.fetch_raw(&folder, uid)
         })
     })
@@ -2113,8 +2170,7 @@ pub async fn mail_save_raw(
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        let _enter = handle.enter();
-        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+        with_imap_session(&pool, &account, &handle, ImapSessionOpts::default(), |imap| {
             let raw = imap.fetch_raw(&folder, uid)?;
             let path = std::path::PathBuf::from(&target_path);
             if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
@@ -2150,8 +2206,7 @@ pub async fn mail_create_folder(
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let folders = tokio::task::spawn_blocking(move || {
-        let _enter = handle.enter();
-        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+        with_imap_session(&pool, &account, &handle, ImapSessionOpts::default(), |imap| {
             imap.create_folder(&name_for_task)?;
             imap.list_folders(&account.config.session_id)
         })
@@ -2187,8 +2242,7 @@ pub async fn mail_rename_folder(
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let folders = tokio::task::spawn_blocking(move || {
-        let _enter = handle.enter();
-        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+        with_imap_session(&pool, &account, &handle, ImapSessionOpts::default(), |imap| {
             imap.rename_folder(&from_for_task, &to_for_task)?;
             imap.list_folders(&account.config.session_id)
         })
@@ -2222,8 +2276,7 @@ pub async fn mail_delete_folder(
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let folders = tokio::task::spawn_blocking(move || {
-        let _enter = handle.enter();
-        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+        with_imap_session(&pool, &account, &handle, ImapSessionOpts::default(), |imap| {
             imap.delete_folder(&name_for_task)?;
             imap.list_folders(&account.config.session_id)
         })
@@ -2385,17 +2438,29 @@ fn resolve_oauth_access_token(
         .client_id
         .as_deref()
         .and_then(non_empty_str)
-        .ok_or_else(|| "OAuth2 client ID is required to refresh this mail account".to_string())?;
+        .ok_or_else(|| "OAuth2 client ID is required to refresh this mail account".to_string())?
+        .to_string();
     let client_secret = resolve_secret(state, config.oauth.client_secret.as_deref())?;
     let refresh_scope = oauth_refresh_scope(config.provider, &bundle, &config.oauth);
-    let refreshed = refresh_oauth_token_blocking(
-        config.provider,
-        client_id,
-        client_secret.as_deref(),
-        &refresh_token,
-        refresh_scope.as_deref(),
-        network,
-    )
+    // resolve_config runs on the async command worker. reqwest::blocking builds a
+    // nested Runtime and panics in debug if the calling thread has already entered
+    // Tokio ("Cannot drop a runtime..."). Always refresh on a plain OS thread.
+    let provider = config.provider;
+    let network = network.cloned();
+    let refreshed = run_outside_tokio_context({
+        let refresh_token = refresh_token.clone();
+        let refresh_scope = refresh_scope.clone();
+        move || {
+            refresh_oauth_token_blocking(
+                provider,
+                &client_id,
+                client_secret.as_deref(),
+                &refresh_token,
+                refresh_scope.as_deref(),
+                network.as_ref(),
+            )
+        }
+    })?
     .map_err(|e| oauth_refresh_error_message(&e))?;
     bundle.access_token = refreshed.access_token;
     if let Some(refresh_token) = refreshed.refresh_token.and_then(non_empty) {
@@ -2550,6 +2615,27 @@ fn oauth_token_expired(expires_at: Option<i64>) -> bool {
         Some(ts) => ts <= now_ts() + OAUTH_REFRESH_SKEW_SECS,
         None => false,
     }
+}
+
+/// Run `f` on a thread that has **not** entered a Tokio runtime.
+///
+/// `reqwest::blocking` creates a temporary Runtime in debug builds to detect
+/// nested use; dropping that Runtime while the current thread is already inside
+/// Tokio panics with "Cannot drop a runtime in a context where blocking is not
+/// allowed". OAuth refresh is often invoked from async Tauri commands, so isolate
+/// the blocking HTTP client onto a plain OS thread when needed.
+fn run_outside_tokio_context<R: Send + 'static>(
+    f: impl FnOnce() -> R + Send + 'static,
+) -> Result<R, String> {
+    if tokio::runtime::Handle::try_current().is_err() {
+        return Ok(f());
+    }
+    std::thread::Builder::new()
+        .name("mail-oauth-http".into())
+        .spawn(f)
+        .map_err(|e| format!("failed to spawn mail HTTP worker: {e}"))?
+        .join()
+        .map_err(|_| "mail HTTP worker thread panicked".to_string())
 }
 
 fn refresh_oauth_token_blocking(
@@ -3017,10 +3103,14 @@ fn pkce_challenge(verifier: &str) -> String {
     URL_SAFE_NO_PAD.encode(digest)
 }
 
-fn connect_imap(account: &ResolvedMailAccount) -> Result<ActiveImapSession, String> {
+fn connect_imap(
+    account: &ResolvedMailAccount,
+    runtime: &tokio::runtime::Handle,
+) -> Result<ActiveImapSession, String> {
     let host = account.config.imap.host.trim();
     let port = account.config.imap.port;
-    let (connect_host, connect_port, forward_task) = mail_effective_endpoint(account, host, port)?;
+    let (connect_host, connect_port, forward_task) =
+        mail_effective_endpoint(account, host, port, runtime)?;
     match account.config.imap.security {
         MailConnectionSecurity::Tls => {
             let stream = tcp_connect(&connect_host, connect_port)?;
@@ -3074,13 +3164,15 @@ fn mail_effective_endpoint(
     account: &ResolvedMailAccount,
     host: &str,
     port: u16,
+    runtime: &tokio::runtime::Handle,
 ) -> Result<(String, u16, Option<JoinHandle<()>>), String> {
     let Some(network) = account.network_settings.clone() else {
         return Ok((host.to_string(), port, None));
     };
-    let handle = tokio::runtime::Handle::try_current()
-        .map_err(|_| "Mail proxy forwarding requires an active Tokio runtime".to_string())?;
-    let forward = handle.block_on(crate::database::forward::start(
+    // Use the caller's Handle without entering the runtime on this thread for
+    // the whole IMAP/SMTP lifetime. `block_on` only needs the Handle; keeping
+    // `enter()` active breaks `reqwest::blocking` (nested Runtime drop panic).
+    let forward = runtime.block_on(crate::database::forward::start(
         host.to_string(),
         port,
         network,
@@ -3242,24 +3334,15 @@ fn imap_list_folders<T: Read + Write>(
 
 fn imap_unread_count<T: Read + Write>(
     session: &mut imap::Session<T>,
-    folder: &str,
+    _folder: &str,
 ) -> Option<u32> {
-    // Prefer STATUS (UNSEEN) which returns a count without enumerating UIDs.
-    // The imap 2.4 crate delivers STATUS attributes via the unsolicited
-    // channel rather than the returned Mailbox struct.
-    if let Err(e) = session.status(folder, "(UNSEEN)") {
-        tracing::debug!("IMAP STATUS UNSEEN failed for {folder}: {e}; falling back to SEARCH");
-    } else {
-        while let Ok(resp) = session.unsolicited_responses.try_recv() {
-            if let imap::types::UnsolicitedResponse::Status { attributes, .. } = resp {
-                for attr in attributes {
-                    if let imap::types::StatusAttribute::Unseen(n) = attr {
-                        return Some(n);
-                    }
-                }
-            }
-        }
-    }
+    // Use UID SEARCH UNSEEN for the unread *count* of the currently
+    // selected/examined mailbox (caller always EXAMINEs first).
+    //
+    // STATUS (UNSEEN) via the imap 2.4 crate routes attributes through the
+    // unsolicited mpsc channel rather than the returned Mailbox. On some
+    // Outlook + proxy paths that left the stream desynced (tag assert panics
+    // on the next command). SEARCH is slightly chattier but protocol-stable.
     session
         .uid_search("UNSEEN")
         .ok()
@@ -4016,9 +4099,10 @@ fn empty_cached_message(account_id: &str, folder: &str, uid: u32) -> MailMessage
 fn send_smtp(
     account: &ResolvedMailAccount,
     request: &MailSendRequest,
+    runtime: &tokio::runtime::Handle,
 ) -> Result<MailSendResult, String> {
     let message = build_send_message(account, request)?;
-    let transport = build_smtp_transport(account)?;
+    let transport = build_smtp_transport(account, runtime)?;
     let response = transport
         .mailer
         .send(&message)
@@ -4029,8 +4113,11 @@ fn send_smtp(
     })
 }
 
-fn test_smtp(account: &ResolvedMailAccount) -> Result<(), String> {
-    let transport = build_smtp_transport(account)?;
+fn test_smtp(
+    account: &ResolvedMailAccount,
+    runtime: &tokio::runtime::Handle,
+) -> Result<(), String> {
+    let transport = build_smtp_transport(account, runtime)?;
     let connected = transport
         .mailer
         .test_connection()
@@ -4042,10 +4129,13 @@ fn test_smtp(account: &ResolvedMailAccount) -> Result<(), String> {
     }
 }
 
-fn build_smtp_transport(account: &ResolvedMailAccount) -> Result<MailSmtpTransport, String> {
+fn build_smtp_transport(
+    account: &ResolvedMailAccount,
+    runtime: &tokio::runtime::Handle,
+) -> Result<MailSmtpTransport, String> {
     let host = account.config.smtp.host.trim();
     let (connect_host, connect_port, forward_task) =
-        mail_effective_endpoint(account, host, account.config.smtp.port)?;
+        mail_effective_endpoint(account, host, account.config.smtp.port, runtime)?;
     let mut builder = SmtpTransport::builder_dangerous(connect_host)
         .port(connect_port)
         .timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))
@@ -5646,6 +5736,23 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
         assert!(network_fingerprint(Some(&none_kind)).starts_with("none|"));
     }
 
+    /// Regression: OAuth refresh used to call `reqwest::blocking` on the async
+    /// command worker. In debug builds that panics when dropping a nested
+    /// Runtime. Isolation must succeed while a Tokio runtime is current.
+    #[tokio::test]
+    async fn run_outside_tokio_context_avoids_nested_runtime_panic() {
+        let value = run_outside_tokio_context(|| {
+            // Mimic reqwest::blocking's debug enter probe: build+drop a shell
+            // runtime on the worker thread. Must not see an outer enter().
+            let _shell = tokio::runtime::Builder::new_current_thread()
+                .build()
+                .expect("shell runtime");
+            42
+        })
+        .expect("isolated worker");
+        assert_eq!(value, 42);
+    }
+
     #[test]
     fn mail_imap_fingerprint_changes_when_session_proxy_changes() {
         let mut account = sample_resolved_account();
@@ -5675,7 +5782,17 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
     fn is_imap_transport_error_detects_reconnectable_failures() {
         assert!(is_imap_transport_error("connection reset by peer"));
         assert!(is_imap_transport_error("IMAP NOOP failed: timed out"));
+        assert!(is_imap_transport_error("IMAP protocol desync"));
         assert!(!is_imap_transport_error("IMAP login failed: authenticationfailed"));
+    }
+
+    #[test]
+    fn imap_catch_result_converts_panic_to_transport_error() {
+        let err = imap_catch_result(|| -> Result<(), String> {
+            panic!("assertion left == right failed");
+        })
+        .expect_err("panic becomes Err");
+        assert!(is_imap_transport_error(&err));
     }
 
     #[test]
@@ -5928,7 +6045,7 @@ iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAA
             token_ref,
             &bundle,
         );
-        match connect_imap(&account) {
+        match connect_imap(&account, &tokio::runtime::Handle::current()) {
             Ok(mut session) => {
                 println!("imapCrateAuth=ok");
                 let folders = session
