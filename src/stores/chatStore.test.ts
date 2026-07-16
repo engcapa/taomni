@@ -314,6 +314,7 @@ describe("chatStore media generation", () => {
         thread_id: "image-thread",
         prompt: "a blue terminal window",
         kind: "image",
+        attachments: [],
       },
     });
     expect(useChatStore.getState().messages["image-thread"]).toHaveLength(2);
@@ -322,6 +323,43 @@ describe("chatStore media generation", () => {
       path: "/tmp/image.png",
     });
     expect(useChatStore.getState().sending).toBe(false);
+  });
+
+  it("forwards Grok reference images to video generation", async () => {
+    const thread = makeThread({
+      id: "grok-video-thread",
+      provider_id: "acp:grok",
+      mode: "video",
+    });
+    const reference = {
+      id: "reference-1",
+      kind: "image" as const,
+      path: "/tmp/reference.png",
+      name: "reference.png",
+      size: 456,
+      mime: "image/png",
+    };
+    useChatStore.setState({
+      threads: [thread],
+      activeThreadId: thread.id,
+      messages: { [thread.id]: [] },
+    });
+
+    await useChatStore.getState().sendMessage(
+      thread.id,
+      "Animate this terminal glow",
+      undefined,
+      [reference],
+    );
+
+    expect(invokeMock).toHaveBeenCalledWith("chat_generate_media", {
+      req: {
+        thread_id: "grok-video-thread",
+        prompt: "Animate this terminal glow",
+        kind: "video",
+        attachments: [reference],
+      },
+    });
   });
 });
 

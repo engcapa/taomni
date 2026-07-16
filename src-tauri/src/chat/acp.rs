@@ -1,6 +1,7 @@
 use super::*;
 use crate::agent::acp_bridge::{
-    AcpRuntimeEvent, AcpStopReason, AcpThreadProcess, profile_id_from_provider_id,
+    AcpPermissionPrompt, AcpResourceLink, AcpRuntimeEvent, AcpStopReason, AcpThreadProcess,
+    GROK_PROFILE_ID, profile_id_from_provider_id,
 };
 use crate::agent::local::LocalAgentEvent;
 use std::collections::HashMap;
@@ -22,6 +23,22 @@ pub(super) async fn recycle_if_profile_changed(
     };
     if let Some(process) = process {
         process.stop().await;
+    }
+}
+
+/// Stop an in-flight short-lived Grok media ACP process when its thread is
+/// deleted or rebound to another provider. Unlike normal ACP chat processes,
+/// media processes are not reusable and must never survive their owner.
+pub(super) async fn recycle_media_process(state: &AppState, app: &AppHandle, thread_id: &str) {
+    let process = { state.acp_media_processes.lock().await.remove(thread_id) };
+    if let Some(process) = process {
+        let permission_owner_id = process.permission_owner_id().to_string();
+        process.stop().await;
+        // `stop` normally emits a Closed event, but remove a visible card here
+        // as well so a deleted/rebound thread cannot retain an actionable gate.
+        // Scope this to the retired media process: a reusable ACP chat process
+        // for the same thread may still have its own independent card.
+        dismiss_acp_permission(app, thread_id, Some(&permission_owner_id), None);
     }
 }
 
@@ -142,15 +159,37 @@ pub(super) async fn stream(
         agent_ctx,
         &ai_config,
     );
+    // Grok currently negotiates `promptCapabilities.image = false`, so never
+    // send it an inline ACP image block. Its CLI can nevertheless read local
+    // image `resource_link`s, which preserve the attachment as a local file
+    // instead of embedding image bytes in the ACP stream.
+    let resource_links = grok_image_resource_links(profile_id, attachments);
+    let permission_owner_id = process.permission_owner_id().to_string();
     let mut updates = process.subscribe();
-    let mut prompt_future = Box::pin(process.prompt(&prompt));
+    let mut prompt_future = Box::pin(async {
+        if resource_links.is_empty() {
+            process.prompt(&prompt).await
+        } else {
+            process
+                .prompt_with_resource_links(&prompt, &resource_links)
+                .await
+        }
+    });
     let mut accumulator = AcpEventAccumulator::default();
     let prompt_result = loop {
         tokio::select! {
             result = &mut prompt_future => break result,
             update = updates.recv() => {
                 match update {
-                    Ok(update) => accumulator.handle(app, event_name, &assistant_id, update),
+                    Ok(update) => accumulator.handle(
+                        app,
+                        event_name,
+                        &assistant_id,
+                        &req.thread_id,
+                        &permission_owner_id,
+                        &profile.name,
+                        update,
+                    ),
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => {
                         break prompt_future.await;
@@ -160,7 +199,15 @@ pub(super) async fn stream(
         }
     };
     while let Ok(update) = updates.try_recv() {
-        accumulator.handle(app, event_name, &assistant_id, update);
+        accumulator.handle(
+            app,
+            event_name,
+            &assistant_id,
+            &req.thread_id,
+            &permission_owner_id,
+            &profile.name,
+            update,
+        );
     }
     state.chat_runs.lock().await.remove(&req.thread_id);
 
@@ -398,10 +445,469 @@ fn build_prompt(
     prompt
 }
 
+fn grok_image_resource_links(
+    profile_id: &str,
+    attachments: &[store::ChatAttachment],
+) -> Vec<AcpResourceLink> {
+    if profile_id != GROK_PROFILE_ID {
+        return Vec::new();
+    }
+    attachments
+        .iter()
+        .filter(|attachment| attachment.kind == "image")
+        .filter_map(|attachment| {
+            let path = std::fs::canonicalize(&attachment.path).ok()?;
+            if !path.is_file() {
+                return None;
+            }
+            let uri = url::Url::from_file_path(path).ok()?.to_string();
+            let mime_type = attachment
+                .mime
+                .as_deref()
+                .map(str::trim)
+                .filter(|mime| !mime.is_empty())
+                .map(str::to_string);
+            Some(AcpResourceLink::new(
+                uri,
+                attachment.name.clone(),
+                mime_type,
+            ))
+        })
+        .collect()
+}
+
+/// Run Grok's native media tools through its ACP server. This is intentionally
+/// separate from API-key based LLM providers: the installed `grok` CLI owns
+/// authentication and emits a local artifact path when its image/video tool
+/// completes.
+pub(super) async fn generate_grok_media(
+    app: &AppHandle,
+    state: &AppState,
+    thread_id: &str,
+    bridge: &crate::agent::acp_bridge::AcpBridgeConfig,
+    profile: &crate::agent::acp_bridge::AcpProfileConfig,
+    kind: MediaGenerationKind,
+    prompt: &str,
+    attachments: &[store::ChatAttachment],
+) -> Result<GeneratedMediaFile, String> {
+    if profile.id != GROK_PROFILE_ID {
+        return Err("Only the built-in Grok ACP profile can generate local media.".into());
+    }
+
+    let cwd = std::env::current_dir().map_err(|error| error.to_string())?;
+    let proxy_url = crate::agent::acp_bridge::resolve_effective_proxy_url(state, bridge, profile)?;
+    let process_config = crate::agent::acp_bridge::process_config(
+        profile,
+        Some(&cwd),
+        proxy_url.as_deref(),
+        bridge.request_timeout(),
+    )?;
+    let process = Arc::new(
+        crate::agent::acp_bridge::AcpProcess::spawn(process_config)
+            .await
+            .map_err(|error| error.to_string())?,
+    );
+    let permission_owner_id = process.permission_owner_id().to_string();
+    let already_running = {
+        let mut registry = state.acp_media_processes.lock().await;
+        if registry.contains_key(thread_id) {
+            true
+        } else {
+            registry.insert(thread_id.to_string(), process.clone());
+            false
+        }
+    };
+    if already_running {
+        process.stop().await;
+        return Err("Grok media generation is already active for this chat thread.".into());
+    }
+
+    let result = async {
+        let agent_info = process
+            .initialize()
+            .await
+            .map_err(|error| error.to_string())?;
+        if let Some(method_id) = profile
+            .auth_method_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|method_id| !method_id.is_empty())
+        {
+            if !agent_info
+                .auth_methods
+                .iter()
+                .any(|method| method.id == method_id)
+            {
+                return Err("Configured Grok ACP authentication method was not advertised.".into());
+            }
+            process
+                .authenticate(method_id)
+                .await
+                .map_err(|error| error.to_string())?;
+        }
+
+        let session_id = process
+            .new_session(&cwd.to_string_lossy(), Vec::new())
+            .await
+            .map_err(|error| error.to_string())?;
+        let resource_links = grok_image_resource_links(&profile.id, attachments);
+        let media_prompt = grok_media_prompt(kind, prompt, !resource_links.is_empty());
+        let candidates = collect_grok_media_candidates(
+            app,
+            thread_id,
+            &permission_owner_id,
+            &profile.name,
+            process.as_ref(),
+            &session_id,
+            &media_prompt,
+            &resource_links,
+        )
+        .await?;
+        copy_grok_generated_media(app, kind, &candidates, &profile.name).await
+    }
+    .await;
+
+    let was_registered = {
+        let mut registry = state.acp_media_processes.lock().await;
+        if registry
+            .get(thread_id)
+            .is_some_and(|registered| Arc::ptr_eq(registered, &process))
+        {
+            registry.remove(thread_id).is_some()
+        } else {
+            false
+        }
+    };
+    process.stop().await;
+    if was_registered {
+        dismiss_acp_permission(app, thread_id, Some(&permission_owner_id), None);
+    }
+    result
+}
+
+fn grok_media_prompt(kind: MediaGenerationKind, prompt: &str, has_reference_image: bool) -> String {
+    let instruction = match kind {
+        MediaGenerationKind::Image if has_reference_image => {
+            "Generate exactly one image now. Use Grok's native image_edit tool immediately, with the attached local image as the reference. Do not modify or read workspace files, and do not use any other tool. Apply this user prompt verbatim:"
+        }
+        MediaGenerationKind::Image => {
+            "Generate exactly one new image now. Use Grok's native image_gen tool immediately. Do not modify or read workspace files, and do not use any other tool. Apply this user prompt verbatim:"
+        }
+        MediaGenerationKind::Video if has_reference_image => {
+            "Generate exactly one video now. Use Grok's native image_to_video tool immediately with the attached local image as its first frame. Use a 6-second clip unless the user explicitly requests 10 seconds. Do not modify or read workspace files, and do not use any other tool. Apply this user prompt verbatim:"
+        }
+        MediaGenerationKind::Video => {
+            "Generate exactly one video now. First use Grok's native image_gen tool once to create an appropriate first frame, then use image_to_video. Use a 6-second clip unless the user explicitly requests 10 seconds. Do not modify or read workspace files, and do not use any other tool. Apply this user prompt verbatim:"
+        }
+    };
+    format!("{instruction}\n\n{prompt}")
+}
+
+async fn collect_grok_media_candidates(
+    app: &AppHandle,
+    thread_id: &str,
+    permission_owner_id: &str,
+    source_label: &str,
+    process: &crate::agent::acp_bridge::AcpProcess,
+    session_id: &str,
+    prompt: &str,
+    resource_links: &[AcpResourceLink],
+) -> Result<Vec<String>, String> {
+    let mut updates = process.subscribe();
+    let mut prompt_future = Box::pin(async {
+        if resource_links.is_empty() {
+            process.prompt(session_id, prompt).await
+        } else {
+            process
+                .prompt_with_resource_links(session_id, prompt, resource_links)
+                .await
+        }
+    });
+    let mut candidates = Vec::new();
+    let prompt_result = loop {
+        tokio::select! {
+            result = &mut prompt_future => break result,
+            update = updates.recv() => {
+                match update {
+                    Ok(update) => collect_grok_media_event(
+                        app,
+                        thread_id,
+                        permission_owner_id,
+                        source_label,
+                        update,
+                        &mut candidates,
+                    ),
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break prompt_future.await,
+                }
+            }
+        }
+    };
+    while let Ok(update) = updates.try_recv() {
+        collect_grok_media_event(
+            app,
+            thread_id,
+            permission_owner_id,
+            source_label,
+            update,
+            &mut candidates,
+        );
+    }
+
+    let result = prompt_result.map_err(|error| error.to_string())?;
+    if result.stop_reason == AcpStopReason::Cancelled {
+        return Err("Grok media generation was cancelled.".into());
+    }
+    Ok(candidates)
+}
+
+fn collect_grok_media_event(
+    app: &AppHandle,
+    thread_id: &str,
+    permission_owner_id: &str,
+    source_label: &str,
+    event: AcpRuntimeEvent,
+    candidates: &mut Vec<String>,
+) {
+    match event {
+        AcpRuntimeEvent::SessionUpdate(update) => {
+            let Some(media) = update.generated_media else {
+                return;
+            };
+            if !candidates.iter().any(|candidate| candidate == &media.path) {
+                candidates.push(media.path);
+            }
+        }
+        AcpRuntimeEvent::PermissionRequest(permission) => {
+            emit_acp_permission(
+                app,
+                thread_id,
+                permission_owner_id,
+                source_label,
+                permission,
+            );
+        }
+        AcpRuntimeEvent::PermissionResolved { call_id } => {
+            dismiss_acp_permission(app, thread_id, Some(permission_owner_id), Some(&call_id));
+        }
+        AcpRuntimeEvent::Closed => {
+            dismiss_acp_permission(app, thread_id, Some(permission_owner_id), None)
+        }
+        AcpRuntimeEvent::ProtocolWarning { message } => {
+            tracing::warn!("ACP protocol warning during Grok media generation: {message}");
+        }
+    }
+}
+
+const GROK_GENERATED_MEDIA_MAX_BYTES: u64 = 512 * 1024 * 1024;
+
+async fn copy_grok_generated_media(
+    app: &AppHandle,
+    kind: MediaGenerationKind,
+    candidates: &[String],
+    model: &str,
+) -> Result<GeneratedMediaFile, String> {
+    // Video creation can first emit its generated still frame, so examine the
+    // newest artifacts first and select by actual file type rather than a
+    // Grok-private rawOutput type label.
+    for candidate in candidates.iter().rev() {
+        if let Some(file) = copy_grok_generated_media_candidate(app, kind, candidate, model).await?
+        {
+            return Ok(file);
+        }
+    }
+    Err(format!(
+        "Grok CLI completed without providing a readable generated {}.",
+        kind.as_str()
+    ))
+}
+
+async fn copy_grok_generated_media_candidate(
+    app: &AppHandle,
+    kind: MediaGenerationKind,
+    candidate: &str,
+    model: &str,
+) -> Result<Option<GeneratedMediaFile>, String> {
+    let candidate_path = Path::new(candidate);
+    // Grok's native tools return an absolute artifact path. Rejecting relative
+    // values prevents an unexpected ACP payload from making Taomni copy a
+    // workspace file merely because its name happens to match a media type.
+    if !candidate_path.is_absolute() {
+        return Ok(None);
+    }
+    let Ok(source) = std::fs::canonicalize(candidate_path) else {
+        return Ok(None);
+    };
+    let Ok(metadata) = tokio::fs::metadata(&source).await else {
+        return Ok(None);
+    };
+    if !metadata.is_file() || metadata.len() == 0 || metadata.len() > GROK_GENERATED_MEDIA_MAX_BYTES
+    {
+        return Ok(None);
+    }
+    let Some(mime) = grok_generated_media_mime(&source, kind).await else {
+        return Ok(None);
+    };
+    let target =
+        generation_output_path(app, kind.as_str(), extension_for_mime(&mime, kind.as_str()))?;
+    tokio::fs::copy(&source, &target)
+        .await
+        .map_err(|_| "Could not copy Grok-generated media into Taomni storage.".to_string())?;
+    let name = target
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or_else(|| {
+            if kind == MediaGenerationKind::Image {
+                "generated-image.png"
+            } else {
+                "generated-video.mp4"
+            }
+        })
+        .to_string();
+    Ok(Some(GeneratedMediaFile {
+        path: target,
+        name,
+        size: metadata.len(),
+        mime,
+        remote_url: None,
+        video_id: None,
+        model: model.to_string(),
+    }))
+}
+
+async fn grok_generated_media_mime(path: &Path, kind: MediaGenerationKind) -> Option<String> {
+    use tokio::io::AsyncReadExt;
+
+    let mut file = tokio::fs::File::open(path).await.ok()?;
+    let mut header = [0_u8; 16];
+    let bytes_read = file.read(&mut header).await.ok()?;
+    let header = &header[..bytes_read];
+    match kind {
+        MediaGenerationKind::Image => infer_image_mime(header),
+        MediaGenerationKind::Video if header.get(4..8) == Some(b"ftyp") => Some("video/mp4".into()),
+        MediaGenerationKind::Video if header.starts_with(&[0x1A, 0x45, 0xDF, 0xA3]) => {
+            Some("video/webm".into())
+        }
+        MediaGenerationKind::Video => match path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .map(|extension| extension.to_ascii_lowercase())
+            .as_deref()
+        {
+            Some("mp4") => Some("video/mp4".into()),
+            Some("webm") => Some("video/webm".into()),
+            _ => None,
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn grok_media_prompts_select_the_native_tools_for_each_flow() {
+        let image = grok_media_prompt(MediaGenerationKind::Image, "a red kite", false);
+        assert!(image.contains("image_gen"));
+        assert!(image.ends_with("a red kite"));
+
+        let edited_image = grok_media_prompt(MediaGenerationKind::Image, "make it blue", true);
+        assert!(edited_image.contains("image_edit"));
+
+        let video = grok_media_prompt(MediaGenerationKind::Video, "waves moving", false);
+        assert!(video.contains("image_gen"));
+        assert!(video.contains("image_to_video"));
+        assert!(video.contains("6-second"));
+
+        let referenced_video = grok_media_prompt(MediaGenerationKind::Video, "slow zoom", true);
+        assert!(referenced_video.contains("image_to_video"));
+        assert!(!referenced_video.contains("First use Grok's native image_gen"));
+    }
+
+    #[test]
+    fn grok_image_attachments_become_local_file_resource_links() {
+        let dir = tempfile::tempdir().unwrap();
+        let image = dir.path().join("reference image.png");
+        std::fs::write(&image, [137, 80, 78, 71]).unwrap();
+        let attachment = store::ChatAttachment {
+            id: "image-1".into(),
+            kind: "image".into(),
+            path: image.to_string_lossy().into_owned(),
+            name: "reference image.png".into(),
+            size: 4,
+            mime: Some("image/png".into()),
+            preview_url: None,
+        };
+
+        let links = grok_image_resource_links(GROK_PROFILE_ID, &[attachment]);
+
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].name, "reference image.png");
+        assert_eq!(links[0].mime_type.as_deref(), Some("image/png"));
+        let uri = url::Url::parse(&links[0].uri).unwrap();
+        assert_eq!(uri.scheme(), "file");
+        assert_eq!(
+            uri.to_file_path().unwrap(),
+            std::fs::canonicalize(image).unwrap()
+        );
+        assert!(grok_image_resource_links("another-agent", &[]).is_empty());
+    }
+}
+
 #[derive(Default)]
 struct AcpEventAccumulator {
     content: String,
     tool_names: HashMap<String, String>,
+}
+
+/// Forward only the data required to render and resolve a standard ACP
+/// permission gate. In particular, raw tool input, ACP session ids,
+/// tool-call ids, and agent-authored option labels stay in the backend.
+fn emit_acp_permission(
+    app: &AppHandle,
+    thread_id: &str,
+    permission_owner_id: &str,
+    source_label: &str,
+    permission: AcpPermissionPrompt,
+) {
+    let options = permission
+        .options
+        .into_iter()
+        .map(|option| {
+            json!({
+                "optionId": option.option_id,
+                "kind": option.kind,
+            })
+        })
+        .collect::<Vec<_>>();
+    let _ = app.emit(
+        "agent-acp-permission",
+        json!({
+            "callId": permission.call_id,
+            "threadId": thread_id,
+            "permissionOwnerId": permission_owner_id,
+            "sourceLabel": source_label,
+            "title": permission.title,
+            "kind": permission.kind,
+            "options": options,
+        }),
+    );
+}
+
+fn dismiss_acp_permission(
+    app: &AppHandle,
+    thread_id: &str,
+    permission_owner_id: Option<&str>,
+    call_id: Option<&str>,
+) {
+    let _ = app.emit(
+        "agent-acp-permission-dismissed",
+        json!({
+            "threadId": thread_id,
+            "permissionOwnerId": permission_owner_id,
+            "callId": call_id,
+        }),
+    );
 }
 
 impl AcpEventAccumulator {
@@ -410,6 +916,9 @@ impl AcpEventAccumulator {
         app: &AppHandle,
         event_name: &str,
         assistant_id: &str,
+        thread_id: &str,
+        permission_owner_id: &str,
+        source_label: &str,
         event: AcpRuntimeEvent,
     ) {
         match event {
@@ -418,10 +927,25 @@ impl AcpEventAccumulator {
                     self.handle_local_event(app, event_name, assistant_id, event);
                 }
             }
+            AcpRuntimeEvent::PermissionRequest(permission) => {
+                emit_acp_permission(
+                    app,
+                    thread_id,
+                    permission_owner_id,
+                    source_label,
+                    permission,
+                );
+            }
+            AcpRuntimeEvent::PermissionResolved { call_id } => {
+                dismiss_acp_permission(app, thread_id, Some(permission_owner_id), Some(&call_id));
+            }
             AcpRuntimeEvent::ProtocolWarning { message } => {
                 tracing::warn!("ACP protocol warning: {message}");
             }
-            AcpRuntimeEvent::Closed | AcpRuntimeEvent::SessionUpdate(_) => {}
+            AcpRuntimeEvent::Closed => {
+                dismiss_acp_permission(app, thread_id, Some(permission_owner_id), None)
+            }
+            AcpRuntimeEvent::SessionUpdate(_) => {}
         }
     }
 

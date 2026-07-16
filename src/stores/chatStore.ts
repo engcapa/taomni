@@ -552,6 +552,7 @@ export const useChatStore = create<ChatStore>((set, get) => ({
             thread_id: threadId,
             prompt: content,
             kind: threadMode,
+            attachments: attachments ?? [],
           },
         });
         set((s) => ({

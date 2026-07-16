@@ -139,10 +139,20 @@ export interface AcpProfileConfig {
   enabled: boolean;
   command: string;
   args: string[];
+  /**
+   * Optional media features for the built-in Grok ACP profile. Other ACP
+   * profiles remain chat-only until they have a dedicated media adapter.
+   */
+  capabilities?: AcpProfileCapabilities;
   auth_method_id?: string | null;
   proxy_mode: "inherit" | "direct" | "app" | "session" | "manual" | string;
   proxy_session_id?: string | null;
   proxy_url?: string | null;
+}
+
+export interface AcpProfileCapabilities {
+  image_generation?: boolean;
+  video_generation?: boolean;
 }
 
 export interface AcpBridgeConfig {
@@ -160,7 +170,11 @@ export const DEFAULT_GROK_ACP_PROFILE: AcpProfileConfig = {
   name: "Grok CLI",
   enabled: false,
   command: "grok",
-  args: ["agent", "stdio"],
+  args: ["--permission-mode", "default", "agent", "--no-leader", "stdio"],
+  capabilities: {
+    image_generation: true,
+    video_generation: true,
+  },
   auth_method_id: null,
   proxy_mode: "inherit",
   proxy_session_id: null,
@@ -274,6 +288,15 @@ export function llmProviderSupports(provider: LlmProviderConfig | null | undefin
   return provider.capabilities?.[capability] === true;
 }
 
+function acpProfileSupports(profile: AcpProfileConfig, capability: LlmProviderCapability): boolean {
+  if (capability === "chat") return true;
+  if (profile.id.trim() !== DEFAULT_GROK_ACP_PROFILE.id) return false;
+  if (profile.capabilities?.[capability] === true) return true;
+  // Grok profiles saved before media capabilities were added retain the
+  // built-in preset's support. An explicit false remains an opt-out.
+  return profile.id.trim() === DEFAULT_GROK_ACP_PROFILE.id && profile.capabilities?.[capability] === undefined;
+}
+
 export function chatDrawerProviderIds(
   config: AiConfig | null | undefined,
   capability: LlmProviderCapability = "chat",
@@ -296,10 +319,10 @@ export function chatDrawerProviderIds(
   const localAgentIds: string[] = [];
   if (capability === "chat" && isClaudeCodeAvailableForChat(config)) localAgentIds.push("claude-code");
   if (capability === "chat" && isCodexAvailableForChat(config)) localAgentIds.push("codex");
-  if (capability === "chat" && isAcpAvailableForChat(config)) {
+  if (isAcpAvailableForChat(config)) {
     const activeProfileId = config?.acp_bridge.active_profile_id;
     const profiles = [...(config?.acp_bridge.profiles ?? [])]
-      .filter((profile) => profile.enabled && profile.command.trim())
+      .filter((profile) => profile.enabled && profile.command.trim() && acpProfileSupports(profile, capability))
       .sort((left, right) => Number(right.id === activeProfileId) - Number(left.id === activeProfileId));
     localAgentIds.push(...profiles.map((profile) => acpProviderId(profile.id)));
   }
@@ -457,19 +480,56 @@ function normalizeAcpProfileProxyMode(mode: string | undefined | null, proxyUrl?
   return proxyUrl?.trim() ? "manual" : "inherit";
 }
 
+function normalizeAcpProfileCapabilities(
+  profile: AcpProfileConfig,
+  profileId: string,
+): AcpProfileCapabilities | undefined {
+  const source = profile.capabilities;
+  const builtInGrok = profileId === DEFAULT_GROK_ACP_PROFILE.id;
+  if (!source && !builtInGrok) return undefined;
+  return {
+    ...(source?.image_generation !== undefined || builtInGrok
+      ? { image_generation: source?.image_generation ?? builtInGrok }
+      : {}),
+    ...(source?.video_generation !== undefined || builtInGrok
+      ? { video_generation: source?.video_generation ?? builtInGrok }
+      : {}),
+  };
+}
+
+function normalizeGrokAcpArgs(profileId: string, args: string[]): string[] {
+  // Migrate only the exact old built-in default. Custom Grok arguments remain
+  // visible and editable here; the Rust launch layer still enforces the
+  // permission policy at process start.
+  if (
+    profileId === DEFAULT_GROK_ACP_PROFILE.id &&
+    args.length === 2 &&
+    args[0] === "agent" &&
+    args[1] === "stdio"
+  ) {
+    return [...DEFAULT_GROK_ACP_PROFILE.args];
+  }
+  return args;
+}
+
 function normalizeAcpBridge(bridge: AcpBridgeConfig | undefined): AcpBridgeConfig {
   const source = bridge ?? DEFAULT_CONFIG.acp_bridge;
-  let profiles = (source.profiles ?? []).map((profile, index) => ({
-    ...profile,
-    id: profile.id?.trim() || `profile-${index + 1}`,
-    name: profile.name?.trim() || profile.id?.trim() || `ACP Agent ${index + 1}`,
-    command: profile.command?.trim() || "",
-    args: (profile.args ?? []).map((arg) => arg.trim()).filter(Boolean),
-    auth_method_id: profile.auth_method_id?.trim() || null,
-    proxy_mode: normalizeAcpProfileProxyMode(profile.proxy_mode, profile.proxy_url),
-    proxy_session_id: profile.proxy_session_id?.trim() || null,
-    proxy_url: profile.proxy_url?.trim() || null,
-  }));
+  let profiles = (source.profiles ?? []).map((profile, index) => {
+    const id = profile.id?.trim() || `profile-${index + 1}`;
+    const args = (profile.args ?? []).map((arg) => arg.trim()).filter(Boolean);
+    return {
+      ...profile,
+      id,
+      name: profile.name?.trim() || profile.id?.trim() || `ACP Agent ${index + 1}`,
+      command: profile.command?.trim() || "",
+      args: normalizeGrokAcpArgs(id, args),
+      capabilities: normalizeAcpProfileCapabilities(profile, id),
+      auth_method_id: profile.auth_method_id?.trim() || null,
+      proxy_mode: normalizeAcpProfileProxyMode(profile.proxy_mode, profile.proxy_url),
+      proxy_session_id: profile.proxy_session_id?.trim() || null,
+      proxy_url: profile.proxy_url?.trim() || null,
+    };
+  });
   const requestedActiveProfileId = source.active_profile_id?.trim();
   let activeProfileId = requestedActiveProfileId && profiles.some((profile) => profile.id === requestedActiveProfileId)
     ? requestedActiveProfileId

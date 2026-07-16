@@ -18,6 +18,21 @@ const PROXY_ENV_KEYS: [&str; 6] = [
 const NO_PROXY_ENV_KEYS: [&str; 2] = ["NO_PROXY", "no_proxy"];
 const LOOPBACK_NO_PROXY: &str = "localhost,127.0.0.1,::1";
 
+/// Optional local-media abilities exposed by an ACP profile. ACP itself does
+/// not negotiate generation abilities, so these are explicit profile metadata
+/// rather than inferred from an agent's protocol handshake.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(default)]
+pub struct AcpProfileCapabilities {
+    /// `None` means the capability was not present in an older saved profile.
+    /// That lets the built-in Grok preset retain its compatibility default
+    /// without making an explicit `false` indistinguishable from an omission.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_generation: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub video_generation: Option<bool>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct AcpProfileConfig {
@@ -26,6 +41,7 @@ pub struct AcpProfileConfig {
     pub enabled: bool,
     pub command: String,
     pub args: Vec<String>,
+    pub capabilities: AcpProfileCapabilities,
     /// Optional ACP authentication method advertised by the local CLI. No
     /// credential value is transported or persisted by this profile.
     pub auth_method_id: Option<String>,
@@ -43,6 +59,7 @@ impl Default for AcpProfileConfig {
             enabled: false,
             command: String::new(),
             args: Vec::new(),
+            capabilities: AcpProfileCapabilities::default(),
             auth_method_id: None,
             proxy_mode: default_profile_proxy_mode(),
             proxy_session_id: None,
@@ -168,6 +185,18 @@ impl AcpBridgeConfig {
     }
 }
 
+impl AcpProfileConfig {
+    pub fn supports_image_generation(&self) -> bool {
+        self.id == super::presets::GROK_PROFILE_ID
+            && self.capabilities.image_generation.unwrap_or(true)
+    }
+
+    pub fn supports_video_generation(&self) -> bool {
+        self.id == super::presets::GROK_PROFILE_ID
+            && self.capabilities.video_generation.unwrap_or(true)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AcpProxySource {
     Direct,
@@ -251,8 +280,12 @@ pub fn process_config(
     if command.is_empty() {
         return Err(format!("ACP profile `{}` has no command", profile.id));
     }
-    let mut config =
-        AcpProcessConfig::new(command, profile.args.clone()).with_request_timeout(request_timeout);
+    let args = if profile.id == super::presets::GROK_PROFILE_ID {
+        super::presets::secure_grok_acp_args(&profile.args)
+    } else {
+        profile.args.clone()
+    };
+    let mut config = AcpProcessConfig::new(command, args).with_request_timeout(request_timeout);
     if let Some(cwd) = cwd {
         config = config.with_current_dir(cwd);
     }
@@ -418,6 +451,36 @@ mod tests {
         assert!(!config.enabled);
         assert!(!config.profiles[0].enabled);
         assert!(config.active_profile().is_none());
+    }
+
+    #[test]
+    fn grok_media_capabilities_keep_legacy_support_but_honor_opt_out() {
+        let mut legacy = AcpProfileConfig {
+            id: "grok".into(),
+            command: "grok".into(),
+            args: vec!["agent".into(), "stdio".into()],
+            ..Default::default()
+        };
+        assert!(legacy.supports_image_generation());
+        assert!(legacy.supports_video_generation());
+
+        legacy.capabilities = AcpProfileCapabilities {
+            image_generation: Some(false),
+            video_generation: Some(false),
+        };
+        assert!(!legacy.supports_image_generation());
+        assert!(!legacy.supports_video_generation());
+
+        let generic = AcpProfileConfig {
+            id: "another-agent".into(),
+            capabilities: AcpProfileCapabilities {
+                image_generation: Some(true),
+                video_generation: Some(true),
+            },
+            ..Default::default()
+        };
+        assert!(!generic.supports_image_generation());
+        assert!(!generic.supports_video_generation());
     }
 
     #[test]

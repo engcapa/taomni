@@ -1,0 +1,44 @@
+id: TC-auto-F-AI-2-4-grok-media-provider
+title: Use the Grok ACP profile as an image and video provider
+description: |
+  Enables the built-in locally authenticated Grok ACP profile, then verifies
+  that image and video chat modes can select it and expose the local reference
+  image attachment control. This case deliberately does not submit generation,
+  so it never consumes a Grok quota or requires a configured xAI API key.
+covers: [F-AI-2.4]
+tags: [auto-generated, smoke, needs-review, ai, acp, grok, media]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="ribbon-settings"]'
+  - click: '[data-testid="ribbon-settings"]'
+  - wait_for: '[data-testid="acp-settings"]'
+  - click: '[data-testid="acp-bridge-enabled"]'
+  - click: '[data-testid="acp-save"]'
+  - click: '[data-testid="tab-item"][data-tab-id="welcome"]'
+  - wait_for: '[data-testid="welcome-open-chat-tao"]'
+  - click: '[data-testid="welcome-open-chat-tao"]'
+  - wait_for: '[data-testid="ai-chat-drawer"]'
+  - click: '[data-testid="chat-mode-image"]'
+  - wait_for: 'select[aria-label="Thread LLM provider"]'
+  - select_option:
+      selector: 'select[aria-label="Thread LLM provider"]'
+      value: acp:grok
+  - assert_attribute:
+      selector: 'select[aria-label="Thread LLM provider"]'
+      name: value
+      equals: acp:grok
+  - assert_visible: '[data-testid="ai-chat-attach-button"]'
+  - click: '[data-testid="chat-mode-video"]'
+  - wait_for: 'select[aria-label="Thread LLM provider"]'
+  - select_option:
+      selector: 'select[aria-label="Thread LLM provider"]'
+      value: acp:grok
+  - assert_attribute:
+      selector: 'select[aria-label="Thread LLM provider"]'
+      name: value
+      equals: acp:grok
+  - assert_visible: '[data-testid="ai-chat-attach-button"]'
+  - screenshot: ai-grok-media-provider.png

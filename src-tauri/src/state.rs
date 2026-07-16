@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use tokio::sync::RwLock;
 
-use crate::agent::acp_bridge::AcpThreadProcess;
+use crate::agent::acp_bridge::{AcpProcess, AcpThreadProcess};
 use crate::agent::cc_bridge::process::CcProcess;
 use crate::agent::codex_bridge::process::CodexAppServer;
 use crate::ai::AppAiCtx;
@@ -110,6 +110,11 @@ pub struct AppState {
     pub codex_processes: tokio::sync::Mutex<HashMap<String, Arc<CodexAppServer>>>,
     /// Per-thread ACP process registry, isolated from the legacy bridges.
     pub acp_processes: tokio::sync::Mutex<HashMap<String, Arc<AcpThreadProcess>>>,
+    /// Short-lived ACP subprocesses used for native image/video generation.
+    /// They participate in the same permission-gate and stop lifecycle as a
+    /// normal ACP chat turn, but do not own MCP credentials or persisted ACP
+    /// sessions.
+    pub acp_media_processes: tokio::sync::Mutex<HashMap<String, Arc<AcpProcess>>>,
     /// Provider-agnostic stop handles for in-flight chat turns, keyed by thread_id.
     pub chat_runs: Arc<ChatRunRegistry>,
     /// Pending CC side-effect tool calls awaiting frontend execution, keyed by
@@ -201,6 +206,7 @@ impl AppState {
             cc_processes: tokio::sync::Mutex::new(HashMap::new()),
             codex_processes: tokio::sync::Mutex::new(HashMap::new()),
             acp_processes: tokio::sync::Mutex::new(HashMap::new()),
+            acp_media_processes: tokio::sync::Mutex::new(HashMap::new()),
             chat_runs: Arc::new(ChatRunRegistry::new(HashMap::new())),
             cc_pending_tool_calls: Arc::new(Mutex::new(HashMap::new())),
             cc_pending_permissions: Arc::new(Mutex::new(HashMap::new())),

@@ -13,6 +13,7 @@ pub const METHOD_SESSION_LOAD: &str = "session/load";
 pub const METHOD_SESSION_PROMPT: &str = "session/prompt";
 pub const METHOD_SESSION_CANCEL: &str = "session/cancel";
 pub const METHOD_SESSION_UPDATE: &str = "session/update";
+pub const METHOD_SESSION_REQUEST_PERMISSION: &str = "session/request_permission";
 
 /// JSON-RPC IDs accepted by ACP. Taomni emits monotonically increasing numeric
 /// IDs, but string IDs are parsed too so unexpected peer requests can receive a
@@ -84,9 +85,10 @@ impl AcpNotification {
 
 /// The supported subset of JSON-RPC envelopes received from an ACP agent.
 ///
-/// Agent-to-client requests are retained so the stdio runtime can reject
-/// filesystem, terminal, and permission calls explicitly instead of silently
-/// dropping them. Taomni does not advertise those capabilities in v1.
+/// Agent-to-client requests are retained so the stdio runtime can surface the
+/// standard permission request through a human gate while explicitly rejecting
+/// filesystem, terminal, and other unsupported calls. Taomni does not
+/// advertise those capabilities in v1.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AcpIncomingMessage {
     Response {
@@ -123,6 +125,7 @@ pub enum AcpProtocolError {
     InvalidEnvelope(&'static str),
     InvalidRequestId,
     InvalidInitializeResponse(&'static str),
+    InvalidPermissionRequest(&'static str),
     MissingSessionId,
     MissingPromptStopReason,
 }
@@ -136,6 +139,9 @@ impl fmt::Display for AcpProtocolError {
             Self::InvalidRequestId => f.write_str("ACP message contains an invalid request id"),
             Self::InvalidInitializeResponse(detail) => {
                 write!(f, "invalid ACP initialize response: {detail}")
+            }
+            Self::InvalidPermissionRequest(detail) => {
+                write!(f, "invalid ACP permission request: {detail}")
             }
             Self::MissingSessionId => {
                 f.write_str("ACP session response did not include a session id")
@@ -223,6 +229,173 @@ pub fn parse_incoming_line(line: &str) -> Result<AcpIncomingMessage, AcpProtocol
     })
 }
 
+/// A permission option whose opaque id is returned to the ACP agent only
+/// after the user explicitly selects it. The request parser keeps just the
+/// display-safe fields needed by the confirmation UI; `rawInput` and other
+/// tool metadata are deliberately discarded.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AcpPermissionOption {
+    pub option_id: String,
+    pub name: String,
+    pub kind: AcpPermissionOptionKind,
+}
+
+/// ACP v1 permission choices supported by Taomni's human confirmation gate.
+/// Unknown choices are rejected rather than presented with ambiguous safety
+/// semantics.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AcpPermissionOptionKind {
+    AllowOnce,
+    AllowAlways,
+    RejectOnce,
+    RejectAlways,
+}
+
+/// The safe subset of an agent-originated `session/request_permission` call.
+/// Session and tool-call ids stay inside the runtime; the UI receives only the
+/// title, kind, and explicitly offered choices.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AcpPermissionRequest {
+    pub session_id: String,
+    pub tool_call_id: String,
+    pub title: String,
+    pub kind: String,
+    pub options: Vec<AcpPermissionOption>,
+}
+
+/// Parse a standard ACP `session/request_permission` request without
+/// retaining raw tool arguments. The agent's option ids are opaque, so they
+/// are kept exactly as sent and validated again before resolving the request.
+pub fn parse_permission_request(params: &Value) -> Result<AcpPermissionRequest, AcpProtocolError> {
+    let params = params
+        .as_object()
+        .ok_or(AcpProtocolError::InvalidPermissionRequest(
+            "params are not an object",
+        ))?;
+    let session_id = permission_identifier(params.get("sessionId"), "sessionId")?;
+    let tool_call = params.get("toolCall").and_then(Value::as_object).ok_or(
+        AcpProtocolError::InvalidPermissionRequest("toolCall is missing"),
+    )?;
+    let tool_call_id = permission_identifier(tool_call.get("toolCallId"), "toolCallId")?;
+    let title = tool_call
+        .get("title")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|title| !title.is_empty())
+        .map(|title| truncate_display_text(title, 240))
+        .unwrap_or_else(|| "Tool action".into());
+    let kind = tool_call
+        .get("kind")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|kind| !kind.is_empty())
+        .map(|kind| truncate_display_text(kind, 80))
+        .unwrap_or_else(|| "tool".into());
+    let options = params
+        .get("options")
+        .and_then(Value::as_array)
+        .filter(|options| !options.is_empty())
+        .ok_or(AcpProtocolError::InvalidPermissionRequest(
+            "options are missing",
+        ))?
+        .iter()
+        .map(parse_permission_option)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    if options.len() > 8 {
+        return Err(AcpProtocolError::InvalidPermissionRequest(
+            "too many options",
+        ));
+    }
+    let mut seen = std::collections::HashSet::new();
+    if options
+        .iter()
+        .any(|option| !seen.insert(option.option_id.as_str()))
+    {
+        return Err(AcpProtocolError::InvalidPermissionRequest(
+            "option ids are not unique",
+        ));
+    }
+
+    Ok(AcpPermissionRequest {
+        session_id,
+        tool_call_id,
+        title,
+        kind,
+        options,
+    })
+}
+
+/// Build the ACP success response for a human-selected permission option.
+pub fn permission_selected_response(id: AcpRequestId, option_id: &str) -> Value {
+    json!({
+        "jsonrpc": JSON_RPC_VERSION,
+        "id": id,
+        "result": {
+            "outcome": {
+                "outcome": "selected",
+                "optionId": option_id,
+            },
+        },
+    })
+}
+
+/// Build the ACP success response for a cancelled or expired confirmation.
+pub fn permission_cancelled_response(id: AcpRequestId) -> Value {
+    json!({
+        "jsonrpc": JSON_RPC_VERSION,
+        "id": id,
+        "result": { "outcome": { "outcome": "cancelled" } },
+    })
+}
+
+fn parse_permission_option(value: &Value) -> Result<AcpPermissionOption, AcpProtocolError> {
+    let option = value
+        .as_object()
+        .ok_or(AcpProtocolError::InvalidPermissionRequest(
+            "option is not an object",
+        ))?;
+    let option_id = permission_identifier(option.get("optionId"), "optionId")?;
+    let name = option
+        .get("name")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(|name| truncate_display_text(name, 160))
+        .ok_or(AcpProtocolError::InvalidPermissionRequest(
+            "option name is missing",
+        ))?;
+    let kind = match option.get("kind").and_then(Value::as_str) {
+        Some("allow_once") => AcpPermissionOptionKind::AllowOnce,
+        Some("allow_always") => AcpPermissionOptionKind::AllowAlways,
+        Some("reject_once") => AcpPermissionOptionKind::RejectOnce,
+        Some("reject_always") => AcpPermissionOptionKind::RejectAlways,
+        _ => {
+            return Err(AcpProtocolError::InvalidPermissionRequest(
+                "option kind is unsupported",
+            ));
+        }
+    };
+    Ok(AcpPermissionOption {
+        option_id,
+        name,
+        kind,
+    })
+}
+
+fn permission_identifier(
+    value: Option<&Value>,
+    field: &'static str,
+) -> Result<String, AcpProtocolError> {
+    let value = value
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty() && value.chars().count() <= 256)
+        .ok_or(AcpProtocolError::InvalidPermissionRequest(field))?;
+    Ok(value.to_string())
+}
+
 /// Build the restricted initialize request used for every ACP profile.
 ///
 /// Taomni deliberately advertises neither general filesystem access nor a
@@ -303,9 +476,46 @@ pub fn load_session_request(
     )
 }
 
-/// Build a text-only prompt turn. Text is the ACP v1 baseline content block and
-/// therefore works for every compliant profile without advertising unsupported
-/// file, image, or terminal capabilities.
+/// A local resource exposed to an ACP agent with a standard `resource_link`
+/// prompt block. Unlike an inline `image` block, resource links do not require
+/// the optional image prompt capability. They let a local agent opt into
+/// opening an attachment from its own filesystem when that agent supports it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AcpResourceLink {
+    pub uri: String,
+    pub name: String,
+    pub mime_type: Option<String>,
+}
+
+impl AcpResourceLink {
+    pub fn new(uri: impl Into<String>, name: impl Into<String>, mime_type: Option<String>) -> Self {
+        Self {
+            uri: uri.into(),
+            name: name.into(),
+            mime_type,
+        }
+    }
+
+    fn as_prompt_block(&self) -> Value {
+        let mut block = serde_json::Map::new();
+        block.insert("type".into(), Value::String("resource_link".into()));
+        block.insert("uri".into(), Value::String(self.uri.clone()));
+        block.insert("name".into(), Value::String(self.name.clone()));
+        if let Some(mime_type) = self
+            .mime_type
+            .as_deref()
+            .map(str::trim)
+            .filter(|mime_type| !mime_type.is_empty())
+        {
+            block.insert("mimeType".into(), Value::String(mime_type.into()));
+        }
+        Value::Object(block)
+    }
+}
+
+/// Build a baseline text prompt turn. Text works for every compliant profile
+/// without advertising unsupported image, audio, filesystem, or terminal
+/// capabilities.
 pub fn prompt_request(
     id: impl Into<AcpRequestId>,
     session_id: impl Into<String>,
@@ -317,6 +527,27 @@ pub fn prompt_request(
         json!({
             "sessionId": session_id.into(),
             "prompt": [{ "type": "text", "text": text.into() }],
+        }),
+    )
+}
+
+/// Build a prompt turn with local ACP resource links. This intentionally does
+/// not use an inline `image` content block: callers must honor an agent's
+/// negotiated `promptCapabilities.image` before using that optional feature.
+pub fn prompt_with_resource_links_request(
+    id: impl Into<AcpRequestId>,
+    session_id: impl Into<String>,
+    text: impl Into<String>,
+    resource_links: &[AcpResourceLink],
+) -> AcpRequest {
+    let mut prompt = vec![json!({ "type": "text", "text": text.into() })];
+    prompt.extend(resource_links.iter().map(AcpResourceLink::as_prompt_block));
+    AcpRequest::new(
+        id,
+        METHOD_SESSION_PROMPT,
+        json!({
+            "sessionId": session_id.into(),
+            "prompt": prompt,
         }),
     )
 }
@@ -341,6 +572,7 @@ pub struct AcpAgentInfo {
     pub title: Option<String>,
     pub version: Option<String>,
     pub supports_session_load: bool,
+    pub supports_prompt_images: bool,
     pub supports_mcp_http: bool,
     pub supports_mcp_sse: bool,
     pub auth_methods: Vec<AcpAuthMethod>,
@@ -369,6 +601,9 @@ pub fn parse_initialize_result(result: &Value) -> Result<AcpAgentInfo, AcpProtoc
 
     let agent_info = object.get("agentInfo").and_then(Value::as_object);
     let capabilities = object.get("agentCapabilities").and_then(Value::as_object);
+    let prompt_capabilities = capabilities
+        .and_then(|caps| caps.get("promptCapabilities"))
+        .and_then(Value::as_object);
     let mcp_capabilities = capabilities
         .and_then(|caps| caps.get("mcpCapabilities"))
         .and_then(Value::as_object);
@@ -410,6 +645,10 @@ pub fn parse_initialize_result(result: &Value) -> Result<AcpAgentInfo, AcpProtoc
             .map(|version| truncate_display_text(version, 120)),
         supports_session_load: capabilities
             .and_then(|caps| caps.get("loadSession"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        supports_prompt_images: prompt_capabilities
+            .and_then(|caps| caps.get("image"))
             .and_then(Value::as_bool)
             .unwrap_or(false),
         supports_mcp_http: mcp_capabilities
@@ -531,6 +770,18 @@ pub struct AcpSessionUpdate {
     pub is_replay: bool,
     pub event: Option<LocalAgentEvent>,
     pub usage: Option<AcpUsageUpdate>,
+    /// A local file emitted by a completed agent tool. Only the path is
+    /// retained; raw tool input/output and provider metadata stay private.
+    /// Consumers must validate and copy this file before exposing it.
+    pub generated_media: Option<AcpGeneratedMedia>,
+}
+
+/// A candidate local media artifact emitted by an ACP agent tool update.
+/// This is deliberately minimal: the raw tool output is never retained or
+/// surfaced to chat, and the artifact kind is determined from the copied file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AcpGeneratedMedia {
+    pub path: String,
 }
 
 /// Context-window usage carries different semantics from input/output token
@@ -563,6 +814,11 @@ pub fn parse_session_update(params: &Value) -> Option<AcpSessionUpdate> {
         .and_then(|meta| meta.get("isReplay"))
         .and_then(Value::as_bool)
         .unwrap_or(false);
+    let generated_media = if is_replay {
+        None
+    } else {
+        parse_generated_media(update, update_type)
+    };
 
     let event = if is_replay {
         None
@@ -645,6 +901,31 @@ pub fn parse_session_update(params: &Value) -> Option<AcpSessionUpdate> {
         is_replay,
         event,
         usage,
+        generated_media,
+    })
+}
+
+/// Extract a completed tool's local output path without preserving arbitrary
+/// tool output. Grok's image and video tools place their saved artifact at
+/// `rawOutput.path`; treating the path only as a candidate keeps this generic
+/// and lets the chat media adapter validate MIME type, size, and regular-file
+/// status before copying it into Taomni storage.
+fn parse_generated_media(update: &Value, update_type: &str) -> Option<AcpGeneratedMedia> {
+    if update_type != "tool_call_update"
+        || update.get("status").and_then(Value::as_str) != Some("completed")
+    {
+        return None;
+    }
+    let path = update
+        .get("rawOutput")
+        .or_else(|| update.get("raw_output"))
+        .and_then(Value::as_object)
+        .and_then(|output| output.get("path"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|path| !path.is_empty() && path.len() <= 32 * 1024)?;
+    Some(AcpGeneratedMedia {
+        path: path.to_string(),
     })
 }
 
@@ -705,6 +986,36 @@ mod tests {
             }),
         );
         assert_eq!(
+            serde_json::to_value(prompt_with_resource_links_request(
+                4,
+                "session-1",
+                "Describe the attachment.",
+                &[AcpResourceLink::new(
+                    "file:///workspace/reference%20image.png",
+                    "reference image.png",
+                    Some("image/png".into()),
+                )],
+            ))
+            .unwrap(),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 4,
+                "method": "session/prompt",
+                "params": {
+                    "sessionId": "session-1",
+                    "prompt": [
+                        { "type": "text", "text": "Describe the attachment." },
+                        {
+                            "type": "resource_link",
+                            "uri": "file:///workspace/reference%20image.png",
+                            "name": "reference image.png",
+                            "mimeType": "image/png",
+                        },
+                    ],
+                },
+            }),
+        );
+        assert_eq!(
             serde_json::to_value(cancel_notification("session-1")).unwrap(),
             json!({
                 "jsonrpc": "2.0",
@@ -758,6 +1069,71 @@ mod tests {
     }
 
     #[test]
+    fn parses_safe_permission_requests_and_builds_standard_outcomes() {
+        let request = parse_permission_request(&json!({
+            "sessionId": "session-1",
+            "toolCall": {
+                "toolCallId": "tool-1",
+                "title": "Edit README.md",
+                "kind": "edit",
+                "rawInput": { "api_key": "must-not-retain" },
+            },
+            "options": [
+                {
+                    "optionId": "allow-once",
+                    "name": "Allow once",
+                    "kind": "allow_once",
+                },
+                {
+                    "optionId": "reject-once",
+                    "name": "Deny",
+                    "kind": "reject_once",
+                },
+            ],
+        }))
+        .unwrap();
+        assert_eq!(request.session_id, "session-1");
+        assert_eq!(request.tool_call_id, "tool-1");
+        assert_eq!(request.title, "Edit README.md");
+        assert_eq!(request.options[0].kind, AcpPermissionOptionKind::AllowOnce);
+        assert!(!format!("{request:?}").contains("must-not-retain"));
+        assert_eq!(
+            permission_selected_response(AcpRequestId::String("permission-1".into()), "allow-once"),
+            json!({
+                "jsonrpc": "2.0",
+                "id": "permission-1",
+                "result": { "outcome": { "outcome": "selected", "optionId": "allow-once" } },
+            }),
+        );
+        assert_eq!(
+            permission_cancelled_response(AcpRequestId::Number(2)),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 2,
+                "result": { "outcome": { "outcome": "cancelled" } },
+            }),
+        );
+    }
+
+    #[test]
+    fn rejects_ambiguous_permission_options() {
+        let error = parse_permission_request(&json!({
+            "sessionId": "session-1",
+            "toolCall": { "toolCallId": "tool-1" },
+            "options": [{
+                "optionId": "maybe",
+                "name": "Maybe",
+                "kind": "ask_later",
+            }],
+        }))
+        .unwrap_err();
+        assert_eq!(
+            error,
+            AcpProtocolError::InvalidPermissionRequest("option kind is unsupported")
+        );
+    }
+
+    #[test]
     fn rejects_malformed_or_ambiguous_json_rpc_messages() {
         assert_eq!(
             parse_incoming_line("not-json"),
@@ -782,6 +1158,7 @@ mod tests {
             "agentInfo": { "name": "grok", "title": "Grok", "version": "0.2.101" },
             "agentCapabilities": {
                 "loadSession": true,
+                "promptCapabilities": { "image": false },
                 "mcpCapabilities": { "http": true, "sse": false },
             },
             "authMethods": [
@@ -798,6 +1175,7 @@ mod tests {
                 title: Some("Grok".into()),
                 version: Some("0.2.101".into()),
                 supports_session_load: true,
+                supports_prompt_images: false,
                 supports_mcp_http: true,
                 supports_mcp_sse: false,
                 auth_methods: vec![
@@ -861,6 +1239,7 @@ mod tests {
                     content: "Hello".into(),
                 }),
                 usage: None,
+                generated_media: None,
             }),
         );
         assert_eq!(
@@ -882,6 +1261,7 @@ mod tests {
                     input: Value::Null,
                 }),
                 usage: None,
+                generated_media: None,
             }),
         );
         assert_eq!(
@@ -902,6 +1282,7 @@ mod tests {
                     output: "completed".into(),
                 }),
                 usage: None,
+                generated_media: None,
             }),
         );
         assert_eq!(
@@ -917,6 +1298,7 @@ mod tests {
                 is_replay: false,
                 event: None,
                 usage: None,
+                generated_media: None,
             }),
         );
         assert_eq!(
@@ -933,6 +1315,7 @@ mod tests {
                 is_replay: true,
                 event: None,
                 usage: None,
+                generated_media: None,
             }),
         );
     }
@@ -959,7 +1342,43 @@ mod tests {
                     cost_amount: Some(0.12),
                     cost_currency: Some("USD".into()),
                 }),
+                generated_media: None,
             }),
         );
+    }
+
+    #[test]
+    fn extracts_only_completed_tool_output_paths_as_media_candidates() {
+        let update = parse_session_update(&json!({
+            "sessionId": "s1",
+            "update": {
+                "sessionUpdate": "tool_call_update",
+                "toolCallId": "image-1",
+                "status": "completed",
+                "rawOutput": {
+                    "type": "ImageGen",
+                    "path": "/tmp/grok/images/1.jpg",
+                    "private": "not retained",
+                },
+            },
+        }))
+        .expect("valid update");
+        assert_eq!(
+            update.generated_media,
+            Some(AcpGeneratedMedia {
+                path: "/tmp/grok/images/1.jpg".into(),
+            }),
+        );
+
+        let failed = parse_session_update(&json!({
+            "sessionId": "s1",
+            "update": {
+                "sessionUpdate": "tool_call_update",
+                "status": "failed",
+                "rawOutput": { "path": "/tmp/grok/images/failed.jpg" },
+            },
+        }))
+        .expect("valid update");
+        assert_eq!(failed.generated_media, None);
     }
 }

@@ -1,5 +1,6 @@
 use super::{
-    AcpAgentInfo, AcpProcess, AcpProcessConfig, AcpPromptResult, AcpRuntimeError, AcpRuntimeEvent,
+    AcpAgentInfo, AcpProcess, AcpProcessConfig, AcpPromptResult, AcpResourceLink, AcpRuntimeError,
+    AcpRuntimeEvent,
 };
 use serde_json::Value;
 use std::sync::{Mutex as StdMutex, MutexGuard as StdMutexGuard};
@@ -81,6 +82,11 @@ impl AcpThreadProcess {
         self.process.subscribe()
     }
 
+    /// Opaque identity for routing this process's native permission cards.
+    pub fn permission_owner_id(&self) -> &str {
+        self.process.permission_owner_id()
+    }
+
     pub async fn ensure_session(
         &self,
         resume_session_id: Option<&str>,
@@ -119,6 +125,20 @@ impl AcpThreadProcess {
         self.process.prompt(&session_id, text).await
     }
 
+    pub async fn prompt_with_resource_links(
+        &self,
+        text: &str,
+        resource_links: &[AcpResourceLink],
+    ) -> Result<AcpPromptResult, AcpRuntimeError> {
+        let session_id =
+            self.session_id.lock().await.clone().ok_or_else(|| {
+                AcpRuntimeError::Protocol("ACP session is not initialized".into())
+            })?;
+        self.process
+            .prompt_with_resource_links(&session_id, text, resource_links)
+            .await
+    }
+
     pub async fn cancel(&self) -> Result<(), AcpRuntimeError> {
         if let Some(session_id) = self.session_id.lock().await.clone() {
             self.process.cancel(&session_id).await?;
@@ -126,7 +146,27 @@ impl AcpThreadProcess {
         Ok(())
     }
 
+    /// Return the human-selected option for a pending ACP native-tool
+    /// permission prompt. The wrapped process validates that both ids still
+    /// belong together before writing the response to the local agent.
+    pub async fn resolve_permission(
+        &self,
+        call_id: &str,
+        option_id: &str,
+    ) -> Result<(), AcpRuntimeError> {
+        self.process.resolve_permission(call_id, option_id).await
+    }
+
+    /// Cancel a single ACP native-tool permission without selecting one of the
+    /// agent-provided options.
+    pub async fn cancel_permission(&self, call_id: &str) -> Result<(), AcpRuntimeError> {
+        self.process.cancel_permission(call_id).await
+    }
+
     pub async fn stop(&self) {
+        // Give the local CLI an explicit `cancelled` permission outcome and a
+        // session cancellation before closing its stdio transport.
+        let _ = self.cancel().await;
         revoke_owned_token(&self.mcp_token);
         self.process.stop().await;
     }

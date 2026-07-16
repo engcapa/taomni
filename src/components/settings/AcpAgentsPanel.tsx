@@ -388,7 +388,9 @@ export function AcpAgentsPanel() {
                     onChange={(event) => patchProfile(profile.id, {
                       args: event.target.value.split("\n").map((arg) => arg.trim()).filter(Boolean),
                     })}
-                    placeholder={"agent\nstdio"}
+                    placeholder={profile.id === DEFAULT_GROK_ACP_PROFILE.id
+                      ? "--permission-mode\ndefault\nagent\n--no-leader\nstdio"
+                      : "agent\nstdio"}
                     data-testid={`acp-profile-${profile.id}-args`}
                   />
                 </label>
