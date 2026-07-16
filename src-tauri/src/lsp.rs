@@ -83,6 +83,9 @@ pub struct LspServerStatus {
     pub selected_command: Option<String>,
     pub install_hint: String,
     pub error: Option<String>,
+    /// Human-readable runtime probe for Settings (e.g. Java major + path for jdtls).
+    #[serde(default)]
+    pub runtime_status: Option<String>,
     pub commands: Vec<LspServerCommandStatus>,
 }
 
@@ -562,7 +565,16 @@ impl LspManager {
             (false, false, None)
         };
         let using_custom = custom_command_to_preset(custom_command).is_some();
-        let available = command.is_some();
+        let binary_available = command.is_some();
+        let jdtls_runtime_error = if !active
+            && command.as_ref().is_some_and(command_is_jdtls)
+        {
+            resolve_java_for_jdtls().err()
+        } else {
+            None
+        };
+        // jdtls needs a suitable JDK as well as the wrapper on PATH.
+        let available = binary_available && jdtls_runtime_error.is_none();
         let last_error = if active || starting {
             None
         } else if let Some(key) = map_key.as_ref() {
@@ -583,7 +595,9 @@ impl LspManager {
             // Only advertise install guidance when the binary is missing. Always
             // returning install_hint made the editor pill show "Install: …" even
             // when jdtls was on PATH but the session was still starting/failed.
-            install_hint: if available {
+            // When jdtls is present but Java is too old, prefer the runtime error
+            // over a generic "install jdtls" hint.
+            install_hint: if binary_available {
                 None
             } else if using_custom {
                 Some("Check the custom language server command".into())
@@ -594,9 +608,10 @@ impl LspManager {
                 None
             } else if let Some(error) = last_error {
                 Some(error)
-            } else if available {
-                // Available binary, not active, no recorded failure: either idle
-                // or still starting (callers that care can inspect session state).
+            } else if let Some(error) = jdtls_runtime_error {
+                Some(error)
+            } else if binary_available {
+                // Binary ok, not active, no recorded failure: idle / starting.
                 None
             } else if using_custom {
                 Some(format!(
@@ -669,6 +684,20 @@ impl LspManager {
                 start
             }
         };
+
+        // Fail fast with a Settings-visible message before spawning when the
+        // JDK is too old for current Eclipse JDT LS (all platforms).
+        if command_is_jdtls(&command)
+            && let Err(error) = resolve_java_for_jdtls()
+        {
+            let _ = self
+                .finish_session_start(&map_key, &start, Err(error.clone()))
+                .await;
+            self.remember_error(&map_key, error.clone()).await;
+            return Err(session_start_error_status(
+                document, preset, &command, error,
+            ));
+        }
 
         let result = LspSession::spawn(
             key.clone(),
@@ -1519,11 +1548,11 @@ fn find_equinox_launcher(jdtls_home: &Path) -> Option<PathBuf> {
 }
 
 /// Pick a Java executable for jdtls, preferring the highest major >= 21.
-#[cfg(windows)]
 fn resolve_java_for_jdtls() -> Result<(PathBuf, u32), String> {
     let mut candidates: Vec<PathBuf> = Vec::new();
     if let Ok(home) = std::env::var("JAVA_HOME") {
-        let candidate = PathBuf::from(home).join("bin").join("java.exe");
+        let bin = if cfg!(windows) { "java.exe" } else { "java" };
+        let candidate = PathBuf::from(home).join("bin").join(bin);
         if candidate.is_file() {
             candidates.push(candidate);
         }
@@ -1534,21 +1563,58 @@ fn resolve_java_for_jdtls() -> Result<(PathBuf, u32), String> {
         }
     }
     // GUI-launched apps sometimes inherit a PATH that lacks the JDK even when
-    // an interactive shell sees it. Probe common Oracle/Temurin layouts.
-    for base in [
-        std::env::var_os("ProgramFiles"),
-        std::env::var_os("ProgramFiles(x86)"),
-    ]
-    .into_iter()
-    .flatten()
+    // an interactive shell sees it. Probe common install layouts.
+    #[cfg(windows)]
     {
-        for vendor in ["Java", "Eclipse Adoptium", "Microsoft", "Amazon Corretto", "Semeru"] {
-            let root = PathBuf::from(&base).join(vendor);
-            if let Ok(entries) = std::fs::read_dir(&root) {
+        for base in [
+            std::env::var_os("ProgramFiles"),
+            std::env::var_os("ProgramFiles(x86)"),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            for vendor in ["Java", "Eclipse Adoptium", "Microsoft", "Amazon Corretto", "Semeru"] {
+                let root = PathBuf::from(&base).join(vendor);
+                if let Ok(entries) = std::fs::read_dir(&root) {
+                    for entry in entries.flatten() {
+                        let candidate = entry.path().join("bin").join("java.exe");
+                        if candidate.is_file() && !candidates.iter().any(|c| c == &candidate) {
+                            candidates.push(candidate);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        for dir in [
+            "/usr/lib/jvm",
+            "/Library/Java/JavaVirtualMachines",
+            "/opt/homebrew/opt/openjdk/bin",
+            "/usr/local/opt/openjdk/bin",
+        ] {
+            let root = Path::new(dir);
+            if root.is_file() {
+                // e.g. homebrew openjdk/bin is already a bin path
+                let candidate = if root.ends_with("bin") {
+                    root.join("java")
+                } else {
+                    root.join("java")
+                };
+                if candidate.is_file() && !candidates.iter().any(|c| c == &candidate) {
+                    candidates.push(candidate);
+                }
+                continue;
+            }
+            if let Ok(entries) = std::fs::read_dir(root) {
                 for entry in entries.flatten() {
-                    let candidate = entry.path().join("bin").join("java.exe");
-                    if candidate.is_file() && !candidates.iter().any(|c| c == &candidate) {
-                        candidates.push(candidate);
+                    let path = entry.path();
+                    for rel in ["bin/java", "Contents/Home/bin/java"] {
+                        let candidate = path.join(rel);
+                        if candidate.is_file() && !candidates.iter().any(|c| c == &candidate) {
+                            candidates.push(candidate);
+                        }
                     }
                 }
             }
@@ -1602,6 +1668,58 @@ fn resolve_java_for_jdtls() -> Result<(PathBuf, u32), String> {
     } else {
         last_err
     })
+}
+
+/// Probe the JVM used by jdtls for Settings / pre-start checks.
+/// Returns `(runtime_status label, error if unusable)`.
+fn jdtls_runtime_probe() -> (Option<String>, Option<String>) {
+    match resolve_java_for_jdtls() {
+        Ok((path, major)) => {
+            let short = path.display().to_string();
+            (
+                Some(format!(
+                    "Java {major} · {short} (JDK {JDTLS_MIN_JAVA_MAJOR}+ required)"
+                )),
+                None,
+            )
+        }
+        Err(error) => {
+            // Prefer a compact status line for the Settings row.
+            let status = if let Some(major) = error
+                .split("found Java ")
+                .nth(1)
+                .and_then(|rest| rest.split_whitespace().next())
+                .and_then(|s| s.parse::<u32>().ok())
+            {
+                Some(format!(
+                    "Java {major} — need JDK {JDTLS_MIN_JAVA_MAJOR}+ for current JDT LS"
+                ))
+            } else if error.contains("java not found") {
+                Some(format!(
+                    "Java not found — need JDK {JDTLS_MIN_JAVA_MAJOR}+ for jdtls"
+                ))
+            } else {
+                Some(format!("Java runtime issue (need JDK {JDTLS_MIN_JAVA_MAJOR}+)"))
+            };
+            (status, Some(error))
+        }
+    }
+}
+
+fn command_is_jdtls(command: &LspServerCommandPreset) -> bool {
+    command.id.eq_ignore_ascii_case("jdtls")
+        || command.command.to_ascii_lowercase().contains("jdtls")
+}
+
+fn preset_uses_jdtls(
+    preset: &LspServerPreset,
+    command: Option<&LspServerCommandPreset>,
+) -> bool {
+    if preset.id == "java" {
+        return true;
+    }
+    command.is_some_and(command_is_jdtls)
+        || preset.commands.iter().any(command_is_jdtls)
 }
 
 /// Parse `java -version` output (`openjdk version "17.0.4"` / `"21.0.2"` / `"1.8.0_xxx"`).
@@ -3714,11 +3832,35 @@ fn server_status(
     error: Option<String>,
 ) -> LspServerStatus {
     let command = select_available_command(preset, preferred_command_id, None);
+    let binary_available = command.is_some();
+    let (runtime_status, runtime_error) = if preset_uses_jdtls(preset, command.as_ref()) {
+        jdtls_runtime_probe()
+    } else {
+        (None, None)
+    };
+    // jdtls is only "available" when both the wrapper/binary and a suitable
+    // JDK are present — otherwise Settings green-dots a broken install.
+    let available = if command.as_ref().is_some_and(command_is_jdtls) {
+        binary_available && runtime_error.is_none()
+    } else {
+        binary_available
+    };
+    let error = error.or_else(|| {
+        if command.as_ref().is_some_and(command_is_jdtls) {
+            runtime_error
+        } else if !binary_available && preset.id == "java" {
+            // Binary missing: keep install_hint primary; still surface a short
+            // runtime note via runtime_status only.
+            None
+        } else {
+            None
+        }
+    });
     LspServerStatus {
         preset_id: preset.id.clone(),
         display_name: preset.display_name.clone(),
         document_language_ids: preset.document_language_ids.clone(),
-        available: command.is_some(),
+        available,
         active,
         selected_command_id: command.as_ref().map(|cmd| cmd.id.clone()),
         selected_command: command
@@ -3726,6 +3868,7 @@ fn server_status(
             .map(|cmd| command_line(&cmd.command, &cmd.args)),
         install_hint: primary_install_hint(preset).unwrap_or_default(),
         error,
+        runtime_status,
         commands: preset
             .commands
             .iter()
@@ -5151,6 +5294,23 @@ Java(TM) SE Runtime Environment (build 17.0.4+11-LTS-179)
             Some(8)
         );
         assert_eq!(JDTLS_MIN_JAVA_MAJOR, 21);
+    }
+
+    #[test]
+    fn jdtls_runtime_probe_labels_insufficient_java_message() {
+        // Shape of the error string used to derive Settings runtimeStatus.
+        let err = format!(
+            "jdtls requires Java {JDTLS_MIN_JAVA_MAJOR}+ (current Eclipse JDT LS); found Java 17 at C:\\\\jdk-17\\\\bin\\\\java.exe"
+        );
+        let major = err
+            .split("found Java ")
+            .nth(1)
+            .and_then(|rest| rest.split_whitespace().next())
+            .and_then(|s| s.parse::<u32>().ok());
+        assert_eq!(major, Some(17));
+        let java = find_preset("java").expect("java preset");
+        assert!(preset_uses_jdtls(&java, java.commands.first()));
+        assert!(command_is_jdtls(&java.commands[0]));
     }
 
     #[test]

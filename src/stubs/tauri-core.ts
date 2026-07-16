@@ -501,7 +501,14 @@ const STUB_LSP_PRESETS = [
     documentLanguageIds: ["java"],
     fileExtensions: ["java"],
     fileNames: [],
-    commands: [{ id: "jdtls", label: "jdtls", command: "jdtls", args: [], installHint: "Install Eclipse JDT LS and ensure `jdtls` is on PATH", fallback: false }],
+    commands: [{
+      id: "jdtls",
+      label: "jdtls",
+      command: "jdtls",
+      args: [],
+      installHint: "Requires JDK 21+ (current JDT LS). Install Eclipse JDT LS and ensure `jdtls` + java 21 are on PATH",
+      fallback: false,
+    }],
   },
   {
     id: "cpp",
@@ -582,6 +589,9 @@ function stubLspServerStatuses() {
     selectedCommand: null,
     installHint: preset.commands[0]?.installHint ?? "",
     error: "Language servers are not available in browser preview",
+    runtimeStatus: preset.id === "java"
+      ? "Java not probed in browser preview — need JDK 21+ for jdtls"
+      : null,
     commands: preset.commands.map((command) => ({ ...command, available: false })),
   }));
 }

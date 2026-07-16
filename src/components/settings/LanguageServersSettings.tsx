@@ -75,7 +75,8 @@ export function LanguageServersSettings() {
     const status = statuses.find((item) => item.presetId === focusPresetId);
     if (!status) return;
 
-    if (!status.available) {
+    // Expand install when binary missing or runtime is unusable (e.g. Java < 21).
+    if (!status.available || status.error) {
       setExpandedInstall((current) => ({ ...current, [focusPresetId]: true }));
     }
 
@@ -203,8 +204,15 @@ export function LanguageServersSettings() {
               <div className="flex items-center gap-2 text-[12px]">
                 <span
                   data-available={status.available || undefined}
-                  className="h-2 w-2 shrink-0 rounded-full bg-amber-500 data-[available=true]:bg-[var(--taomni-accent)]"
-                  title={status.available ? "Available" : "Not found on PATH"}
+                  data-runtime-error={!!status.error || undefined}
+                  className="h-2 w-2 shrink-0 rounded-full bg-amber-500 data-[available=true]:bg-[var(--taomni-accent)] data-[runtime-error=true]:bg-amber-500"
+                  title={
+                    status.available
+                      ? t("settings.languageServersRuntimeOk")
+                      : status.error
+                        ? t("settings.languageServersRuntimeIssue")
+                        : "Not found on PATH"
+                  }
                 />
                 <span className="min-w-0 flex-1 font-medium text-[var(--taomni-text)]">
                   {status.displayName}
@@ -254,6 +262,45 @@ export function LanguageServersSettings() {
                 </div>
               )}
 
+              {(status.runtimeStatus || status.presetId === "java") && (
+                <div
+                  data-testid={`language-server-runtime-${status.presetId}`}
+                  data-ok={status.available && !status.error ? "true" : "false"}
+                  className={`mt-1.5 rounded border px-2 py-1.5 text-[11px] leading-snug ${
+                    status.available && !status.error
+                      ? "border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] text-[var(--taomni-text-muted)]"
+                      : "border-amber-500/35 bg-amber-500/10 text-[var(--taomni-text)]"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="font-semibold text-[10px] uppercase tracking-wide text-[var(--taomni-text-muted)]">
+                      {t("settings.languageServersRuntime")}
+                    </span>
+                    <span
+                      className={`rounded px-1 text-[10px] font-medium ${
+                        status.available && !status.error
+                          ? "bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)]"
+                          : "bg-amber-500/20 text-amber-700 dark:text-amber-400"
+                      }`}
+                    >
+                      {status.available && !status.error
+                        ? t("settings.languageServersRuntimeOk")
+                        : t("settings.languageServersRuntimeIssue")}
+                    </span>
+                  </div>
+                  {status.runtimeStatus && (
+                    <div className="mt-0.5 font-mono text-[10px] break-all">
+                      {status.runtimeStatus}
+                    </div>
+                  )}
+                  {status.presetId === "java" && (
+                    <div className="mt-1 text-[10px] leading-snug text-[var(--taomni-text-muted)]">
+                      {t("settings.languageServersJavaRequirement")}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {installGuide && (
                 <InstallGuideDisclosure
                   open={installOpen}
@@ -265,7 +312,12 @@ export function LanguageServersSettings() {
                 />
               )}
               {status.error && (
-                <div className="mt-1 text-[11px] text-red-500">{status.error}</div>
+                <div
+                  data-testid={`language-server-error-${status.presetId}`}
+                  className="mt-1 text-[11px] text-red-500"
+                >
+                  {status.error}
+                </div>
               )}
             </div>
           );
