@@ -87,6 +87,11 @@ export interface MailSyncOptions {
   limit?: number;
   offset?: number;
   includeBodies?: boolean;
+  /**
+   * When true (default), remote IMAP LIST refreshes the folder tree.
+   * Quiet background polls pass false to skip LIST when local cache has folders.
+   */
+  refreshFolders?: boolean;
 }
 
 export interface MailMarkReadResult {
@@ -278,6 +283,7 @@ export function mailSyncHeaders(
       limit: options.limit ?? null,
       offset: options.offset ?? null,
       includeBodies: options.includeBodies ?? null,
+      refreshFolders: options.refreshFolders ?? null,
     }),
   );
 }

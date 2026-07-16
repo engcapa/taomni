@@ -225,6 +225,8 @@ interface SyncFolderOptions {
   includeBodies?: boolean;
   append?: boolean;
   indicator?: SyncIndicator;
+  /** Default true for open/manual sync; quiet polls pass false to skip LIST. */
+  refreshFolders?: boolean;
 }
 
 const DEFAULT_FOLDER: MailFolder = {
@@ -615,6 +617,37 @@ function folderHasMoreMessages(folders: readonly MailFolder[], folderName: strin
   return typeof total === "number" && total > loadedCount;
 }
 
+/**
+ * Decide whether a quiet-poll header result should rewrite the visible message
+ * list, and compute hasMore from the post-merge loaded count (not just the
+ * poll page size). Exported for unit tests of the shipped quiet-poll path.
+ */
+export function applyQuietPollMessages(
+  selectedFolderNow: string,
+  polledFolder: string,
+  currentMessages: readonly MailMessageHeader[],
+  polledMessages: readonly MailMessageHeader[],
+  folders: readonly MailFolder[],
+  hasMoreFromServer: boolean,
+): { applyMessages: boolean; messages: MailMessageHeader[]; hasMore: boolean } {
+  if (selectedFolderNow !== polledFolder) {
+    return {
+      applyMessages: false,
+      messages: currentMessages.slice() as MailMessageHeader[],
+      hasMore: false,
+    };
+  }
+  const previousForFolder = currentMessages.filter((message) => message.folder === polledFolder);
+  const messages = mergeMessagePages(previousForFolder, polledMessages.slice());
+  // Quiet poll always uses offset=0, so server hasMore is true whenever the
+  // mailbox is larger than the batch — even if the UI already paged to the end.
+  // Prefer post-merge loaded count (+ folder total). Only trust server hasMore
+  // when the merge did not already exceed the quiet page (fresh/short lists).
+  const hasMore = folderHasMoreMessages(folders, polledFolder, messages.length)
+    || (hasMoreFromServer && messages.length <= polledMessages.length);
+  return { applyMessages: true, messages, hasMore };
+}
+
 function draftWithSignature(draft: Partial<ComposeDraft>, signature: string | null | undefined): ComposeDraft {
   const base = { ...emptyComposeDraft(), ...draft };
   if (!signature?.trim()) return base;
@@ -964,6 +997,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const autoSaveTimerRef = useRef<number | null>(null);
   const lastSavedDraftJsonRef = useRef("");
   const foldersRef = useRef<MailFolder[]>([]);
+  /** Tracks the live selected folder across awaits (folder switches ignore syncInFlight). */
+  const selectedFolderRef = useRef(selectedFolder);
+  const messagesRef = useRef<MailMessageHeader[]>([]);
   const foldersPanelRef = useRef<PanelImperativeHandle>(null);
   const [mailboxCollapsed, setMailboxCollapsed] = useState(false);
   const [mailboxPaneSize, setMailboxPaneSize] = useState(MAILBOX_EXPANDED_SIZE);
@@ -1065,6 +1101,23 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   useEffect(() => {
     foldersRef.current = folders;
   }, [folders]);
+
+  useEffect(() => {
+    selectedFolderRef.current = selectedFolder;
+  }, [selectedFolder]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  /** Keep selectedFolderRef in sync immediately (folder switches can race quiet poll awaits). */
+  const updateSelectedFolder = useCallback((next: string | ((prev: string) => string)) => {
+    setSelectedFolder((prev) => {
+      const value = typeof next === "function" ? next(prev) : next;
+      selectedFolderRef.current = value;
+      return value;
+    });
+  }, []);
 
   useEffect(() => {
     visibleRef.current = visible;
@@ -1287,7 +1340,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       }
       foldersRef.current = cached;
       setFolders(cached);
-      setSelectedFolder((current) =>
+      updateSelectedFolder((current) =>
         cached.length > 0 && !cached.some((folder) => folder.name === current)
           ? cached[0].name
           : current,
@@ -1297,7 +1350,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     } finally {
       setLoadingFolders(false);
     }
-  }, [info.sessionId]);
+  }, [info.sessionId, updateSelectedFolder]);
 
   const loadCachedMessages = useCallback(async (folder: string, offset = 0, append = false, quiet = false) => {
     if (!visibleRef.current) {
@@ -1479,6 +1532,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const offset = Math.max(0, options.offset ?? 0);
     const limit = Math.max(1, options.limit ?? (offset > 0 ? pageSize : batchSize));
     const includeBodies = options.includeBodies ?? false;
+    const refreshFolders = options.refreshFolders ?? true;
 
     if (syncInFlightRef.current) {
       if (indicator !== "none" && visibleRef.current) {
@@ -1497,14 +1551,19 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     if (indicator !== "none") setError(null);
 
     try {
-      const result = await mailSyncHeaders(info, folder, { limit, offset, includeBodies });
+      const result = await mailSyncHeaders(info, folder, {
+        limit,
+        offset,
+        includeBodies,
+        refreshFolders,
+      });
       if (!visibleRef.current) {
         pendingCacheRefreshRef.current = true;
         return result;
       }
       foldersRef.current = result.folders;
       setFolders(result.folders);
-      setSelectedFolder(result.folder);
+      updateSelectedFolder(result.folder);
       setMessages((current) => mergeMessagePages(
         current.filter((message) => message.folder === result.folder),
         result.messages,
@@ -1532,7 +1591,71 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         if (visibleRef.current) setSyncing(false);
       }
     }
-  }, [batchSize, info, pageSize, selectedFolder]);
+  }, [batchSize, info, pageSize, selectedFolder, updateSelectedFolder]);
+
+  /** Quiet background poll: selected folder (+ INBOX when different), no LIST. */
+  const quietPollSelectedAndInbox = useCallback(async () => {
+    if (syncInFlightRef.current) return;
+    syncInFlightRef.current = true;
+    // Snapshot at start; folder switches can happen during awaits (loadCachedMessages
+    // does not take syncInFlightRef).
+    const activeFolder = selectedFolderRef.current;
+    const alsoInbox = activeFolder.trim().toUpperCase() !== "INBOX";
+    try {
+      const selectedResult = await mailSyncHeaders(info, activeFolder, {
+        limit: batchSize,
+        includeBodies: false,
+        refreshFolders: false,
+      });
+      let folders = selectedResult.folders;
+      if (alsoInbox) {
+        try {
+          const inboxResult = await mailSyncHeaders(info, "INBOX", {
+            limit: batchSize,
+            includeBodies: false,
+            refreshFolders: false,
+          });
+          // Merge INBOX metadata into the folder tree without switching the UI
+          // selection away from the active folder.
+          const byName = new Map(folders.map((f) => [f.name, f]));
+          for (const f of inboxResult.folders) {
+            byName.set(f.name, f);
+          }
+          folders = Array.from(byName.values());
+        } catch (e) {
+          // Selected-folder refresh already succeeded; inbox is best-effort.
+          console.debug("quiet INBOX poll failed", e);
+        }
+      }
+      if (!visibleRef.current) {
+        pendingCacheRefreshRef.current = true;
+        return;
+      }
+      // Always refresh folder badges/metadata from the poll.
+      foldersRef.current = folders;
+      setFolders(folders);
+
+      // Only rewrite the message list if the user is still on the folder we polled.
+      const applied = applyQuietPollMessages(
+        selectedFolderRef.current,
+        selectedResult.folder,
+        messagesRef.current,
+        selectedResult.messages,
+        folders,
+        selectedResult.hasMore,
+      );
+      if (!applied.applyMessages) {
+        return;
+      }
+      messagesRef.current = applied.messages;
+      setMessages(applied.messages);
+      setHasMoreMessages(applied.hasMore);
+    } catch (e) {
+      console.debug("quiet mail poll failed", e);
+    } finally {
+      syncInFlightRef.current = false;
+    }
+  }, [batchSize, info]);
 
   const syncAllFolders = useCallback(async (
     quiet = false,
@@ -1578,7 +1701,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         ? activeBeforeSync
         : result.folders[0]?.name ?? activeBeforeSync;
       if (nextFolder !== activeBeforeSync) {
-        setSelectedFolder(nextFolder);
+        updateSelectedFolder(nextFolder);
       }
       await loadCachedMessages(nextFolder, 0, false, quiet || indicator === "none");
       if (indicator !== "none") {
@@ -1597,7 +1720,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         if (visibleRef.current) setSyncing(false);
       }
     }
-  }, [batchSize, info, loadCachedMessages, pushMailNew, selectedFolder, tabId, warmRecentBodies]);
+  }, [batchSize, info, loadCachedMessages, pushMailNew, selectedFolder, tabId, updateSelectedFolder, warmRecentBodies]);
 
   const loadBody = useCallback(async (message: MailMessageHeader) => {
     const key = messageKey(message);
@@ -1721,7 +1844,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
   const selectMessage = useCallback((message: MailMessageHeader, viewKey = "mailbox") => {
     const key = messageKey(message);
-    setSelectedFolder(message.folder);
+    updateSelectedFolder(message.folder);
     setSelectedMessageKey(key);
     setMailViewKey(viewKey);
     const cached = bodyCacheRef.current.get(key);
@@ -1730,7 +1853,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         ? cached
         : bodyMatchesMessage(current, message) ? current : null
     ));
-  }, []);
+  }, [updateSelectedFolder]);
 
   const openMessageTab = useCallback((message: MailMessageHeader) => {
     const key = messageKey(message);
@@ -1800,9 +1923,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     setHasMoreMessages(false);
     setLoadingMoreMessages(false);
     setDownloadingAttachmentIndex(null);
-    setSelectedFolder("INBOX");
+    updateSelectedFolder("INBOX");
     void loadCachedFolders();
-  }, [info.sessionId, loadCachedFolders]);
+  }, [info.sessionId, loadCachedFolders, updateSelectedFolder]);
 
   useEffect(() => {
     void loadInitialMessages(selectedFolder);
@@ -1828,18 +1951,29 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     });
   }, [batchSize, info.sync.onOpen, selectedFolder, syncFolder, visible]);
 
+  // Quiet background poll: most ticks refresh selected folder (+ INBOX when
+  // different) without remote LIST. Every 6th tick does a full-folder scan for
+  // badges / new-mail notifications across the account.
+  const pollTickRef = useRef(0);
   useEffect(() => {
+    pollTickRef.current = 0;
     if (info.sync.intervalMinutes <= 0) return;
     const intervalMs = Math.max(1, info.sync.intervalMinutes) * 60 * 1000;
     const id = window.setInterval(() => {
-      void syncAllFolders(true, {
-        limit: batchSize,
-        includeBodies: false,
-        indicator: "none",
-      });
+      pollTickRef.current += 1;
+      const fullScan = pollTickRef.current % 6 === 0;
+      if (fullScan) {
+        void syncAllFolders(true, {
+          limit: batchSize,
+          includeBodies: false,
+          indicator: "none",
+        });
+      } else {
+        void quietPollSelectedAndInbox();
+      }
     }, intervalMs);
     return () => window.clearInterval(id);
-  }, [batchSize, info.sync.intervalMinutes, syncAllFolders]);
+  }, [batchSize, info.sync.intervalMinutes, quietPollSelectedAndInbox, syncAllFolders]);
 
   useEffect(() => {
     if (messages.length === 0) {
@@ -1907,7 +2041,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   }, [messages]);
 
   const handleFolderSelect = (folder: MailFolder) => {
-    setSelectedFolder(folder.name);
+    updateSelectedFolder(folder.name);
     setSelectedMessageKey(null);
     setCheckedMessageKeys(new Set());
     setBody(null);
@@ -2898,7 +3032,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const parentPath = idx >= 0 ? folder.name.slice(0, idx + delimiter.length) : "";
     const target = `${parentPath}${trimmed}`;
     await mailRenameFolder(info, folder.name, target);
-    if (selectedFolder === folder.name) setSelectedFolder(target);
+    if (selectedFolder === folder.name) updateSelectedFolder(target);
     await loadCachedFolders();
     setStatus(`Renamed folder to ${trimmed}`);
   });

@@ -15,6 +15,7 @@ use crate::filebrowser::transfer::TransferHandle;
 use crate::hbase::HBaseSession;
 use crate::lanchat::LanChatState;
 use crate::lsp::LspManager;
+use crate::mail::MailImapPool;
 use crate::objectstorage::ObjectStorageSession;
 use crate::rdp::ws::RdpSession;
 use crate::servers::ServerRegistry;
@@ -103,6 +104,10 @@ pub struct AppState {
     /// from each other, so mailbox refresh writes cannot block session CRUD.
     mail_db_dir: PathBuf,
     mail_dbs: Arc<Mutex<HashMap<String, MailDbHandle>>>,
+    /// Live IMAP sessions keyed by mail account/session id. Reuses TCP/TLS/auth
+    /// and any session-level proxy forwarder across mail commands. Never routes
+    /// through the app global proxy.
+    pub mail_imap_pool: Arc<MailImapPool>,
     pub vault: Arc<Vault>,
     /// Per-thread Claude Code process registry (v2.6).
     pub cc_processes: tokio::sync::Mutex<HashMap<String, Arc<CcProcess>>>,
@@ -202,6 +207,7 @@ impl AppState {
             notes_db: Mutex::new(notes_db),
             mail_db_dir,
             mail_dbs: Arc::new(Mutex::new(HashMap::new())),
+            mail_imap_pool: Arc::new(MailImapPool::new()),
             vault,
             cc_processes: tokio::sync::Mutex::new(HashMap::new()),
             codex_processes: tokio::sync::Mutex::new(HashMap::new()),
