@@ -230,6 +230,26 @@ describe("FindInFilesPanel", () => {
     // Replace uses the full result set, not just currently visible rows.
     expect(onReplaceMatches).toHaveBeenCalledWith(matches, "");
   });
+
+  it("applies editor-style syntax classes on result lines once the language loads", async () => {
+    render(<FindInFilesPanel roots={roots} onOpenMatch={vi.fn()} />);
+    const emit = await runSearch();
+
+    act(() => {
+      emit({
+        ...doneEvent(),
+        kind: "batch",
+        matches: [searchMatch({ lineText: "const needle = 1;", matchStart: 6, matchEnd: 12, column: 7 })],
+      });
+      emit(doneEvent({ totalMatches: 1 }));
+    });
+
+    await waitFor(() => {
+      const line = document.querySelector(".taomni-find-line");
+      expect(line?.querySelector(".tok-keyword")).toBeTruthy();
+    });
+    expect(screen.getByTestId("code-workspace-find-match-hit")).toHaveTextContent("needle");
+  });
 });
 
 describe("matchSegments", () => {

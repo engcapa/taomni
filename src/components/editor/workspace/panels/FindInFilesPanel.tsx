@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { Language } from "@codemirror/language";
 import { Ban, CaseSensitive, ChevronDown, ChevronRight, File, Loader2, Regex, Search, WholeWord } from "lucide-react";
 import {
   newWorkspaceSearchId,
@@ -7,6 +8,10 @@ import {
   workspaceSearchStart,
   type WorkspaceSearchMatch,
 } from "../../../../lib/editor/workspaceSearch";
+import {
+  highlightSearchLine,
+  languageForSearchPath,
+} from "../../../../lib/editor/searchLineHighlight";
 import type { CodeWorkspaceRootInfo } from "../../../../types";
 import {
   pushWorkspaceSearchHistory,
@@ -172,6 +177,8 @@ export function FindInFilesPanel({
   /** Per-file expand state: collapsed (default), numeric limit, or "all". */
   const [fileExpand, setFileExpand] = useState<Record<string, number | "all">>({});
   const [collapsedFiles, setCollapsedFiles] = useState<Record<string, boolean>>({});
+  /** path → language (null = plain text / unknown). */
+  const [languagesByPath, setLanguagesByPath] = useState<Record<string, Language | null>>({});
   const [searchHistory, setSearchHistory] = useState<string[]>(() => (
     workspaceInstanceId ? readWorkspaceSearchHistory(workspaceInstanceId) : []
   ));
@@ -180,6 +187,7 @@ export function FindInFilesPanel({
   const searchIdRef = useRef<string | null>(null);
   const unlistenRef = useRef<(() => void) | null>(null);
   const groupsRef = useRef<Map<string, MatchGroup>>(new Map());
+  const languagesRef = useRef<Record<string, Language | null>>({});
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -233,6 +241,8 @@ export function FindInFilesPanel({
     setError(null);
     setFileExpand({});
     setCollapsedFiles({});
+    languagesRef.current = {};
+    setLanguagesByPath({});
     setStatus("searching");
 
     const searchId = newWorkspaceSearchId();
@@ -338,6 +348,82 @@ export function FindInFilesPanel({
   const showAllForFile = useCallback((key: string) => {
     setFileExpand((prev) => ({ ...prev, [key]: "all" }));
   }, []);
+
+  // Lazily resolve CodeMirror languages for result paths so lines can share
+  // the same grammar as the editor (and use --taomni-code-syntax-* colors).
+  useEffect(() => {
+    const paths = new Set<string>();
+    for (const group of groups) {
+      if (group.matches[0]) paths.add(group.matches[0].path);
+    }
+    let cancelled = false;
+    for (const path of paths) {
+      if (Object.prototype.hasOwnProperty.call(languagesRef.current, path)) continue;
+      void languageForSearchPath(path).then((language) => {
+        if (cancelled) return;
+        languagesRef.current = { ...languagesRef.current, [path]: language };
+        setLanguagesByPath((prev) => (
+          Object.prototype.hasOwnProperty.call(prev, path) ? prev : { ...prev, [path]: language }
+        ));
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [groups]);
+
+  const renderMatchLine = useCallback((match: WorkspaceSearchMatch, segments: MatchSegments): ReactNode => {
+    const hasLanguage = Object.prototype.hasOwnProperty.call(languagesByPath, match.path);
+    const language = hasLanguage ? languagesByPath[match.path] ?? null : null;
+    const spans = hasLanguage && language
+      ? highlightSearchLine(segments.text, segments.hitStart, segments.hitEnd, language)
+      : null;
+
+    // Plain fallback (language not resolved yet, or unknown extension): before/hit/after
+    // already carry … elision markers from matchSegments.
+    if (!spans) {
+      return (
+        <>
+          {segments.before}
+          <mark
+            className="rounded-sm border border-[var(--taomni-code-find-match-border)] bg-[var(--taomni-code-find-match-bg)] px-0.5 font-semibold text-[var(--taomni-code-find-match-fg)]"
+            data-testid="code-workspace-find-match-hit"
+          >
+            {segments.hit}
+          </mark>
+          {segments.after}
+        </>
+      );
+    }
+
+    return (
+      <>
+        {segments.elidedStart ? "…" : null}
+        {spans.map((span, index) => {
+          if (span.hit) {
+            return (
+              <mark
+                key={`h-${index}`}
+                className="rounded-sm border border-[var(--taomni-code-find-match-border)] bg-[var(--taomni-code-find-match-bg)] px-0.5 font-semibold text-[var(--taomni-code-find-match-fg)]"
+                data-testid="code-workspace-find-match-hit"
+              >
+                {span.text}
+              </mark>
+            );
+          }
+          if (span.className) {
+            return (
+              <span key={`t-${index}`} className={span.className}>
+                {span.text}
+              </span>
+            );
+          }
+          return <span key={`p-${index}`}>{span.text}</span>;
+        })}
+        {segments.elidedEnd ? "…" : null}
+      </>
+    );
+  }, [languagesByPath]);
 
   const replaceAll = useCallback(async () => {
     if (!onReplaceMatches || allMatches.length === 0 || replacing) return;
@@ -557,15 +643,8 @@ export function FindInFilesPanel({
                     <span className="shrink-0 font-mono text-[10px] text-[var(--taomni-code-muted)]">
                       {match.lineNumber}:{match.column}
                     </span>
-                    <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--taomni-code-text)]">
-                      {segments.before}
-                      <mark
-                        className="rounded-sm border border-[var(--taomni-code-find-match-border)] bg-[var(--taomni-code-find-match-bg)] px-0.5 font-semibold text-[var(--taomni-code-find-match-fg)]"
-                        data-testid="code-workspace-find-match-hit"
-                      >
-                        {segments.hit}
-                      </mark>
-                      {segments.after}
+                    <span className="taomni-find-line min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--taomni-code-text)]">
+                      {renderMatchLine(match, segments)}
                     </span>
                   </button>
                 );
