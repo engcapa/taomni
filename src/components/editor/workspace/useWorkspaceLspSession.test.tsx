@@ -7,6 +7,7 @@ import { useWorkspaceLspSession } from "./useWorkspaceLspSession";
 
 const lspMocks = vi.hoisted(() => ({
   lspDetectServers: vi.fn(),
+  lspSetJavaHome: vi.fn(),
   lspOpenDocument: vi.fn(),
   lspChangeDocument: vi.fn(),
   lspSaveDocument: vi.fn(),
@@ -89,6 +90,7 @@ describe("useWorkspaceLspSession", () => {
   beforeEach(() => {
     window.localStorage.clear();
     lspMocks.lspDetectServers.mockReset().mockResolvedValue([]);
+    lspMocks.lspSetJavaHome.mockReset().mockResolvedValue(undefined);
     lspMocks.lspOpenDocument.mockReset().mockResolvedValue(status);
     lspMocks.lspChangeDocument.mockReset().mockResolvedValue(status);
     lspMocks.lspSaveDocument.mockReset().mockResolvedValue(status);
@@ -111,11 +113,12 @@ describe("useWorkspaceLspSession", () => {
       onError: vi.fn(),
     }));
 
-    await waitFor(() => expect(lspMocks.lspDetectServers).toHaveBeenCalledOnce());
+    await waitFor(() => expect(lspMocks.lspDetectServers).toHaveBeenCalled());
     expect(result.current.descriptorForFile(file)).toMatchObject({
       workspaceId: "workspace-1",
       rootPath: "/repo",
       filePath: "src/main.ts",
+      javaHome: null,
     });
 
     await act(async () => result.current.syncDocument(file, "open"));

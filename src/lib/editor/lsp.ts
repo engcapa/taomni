@@ -199,6 +199,8 @@ export interface LspDocumentDescriptor {
   languageId?: string | null;
   serverCommandId?: string | null;
   customServerCommand?: LspCustomServerCommand | null;
+  /** Optional JDK home or java binary for jdtls (Java 21+). */
+  javaHome?: string | null;
 }
 
 function documentArgs(descriptor: LspDocumentDescriptor) {
@@ -209,6 +211,7 @@ function documentArgs(descriptor: LspDocumentDescriptor) {
     languageId: descriptor.languageId ?? null,
     serverCommandId: descriptor.serverCommandId ?? null,
     customServerCommand: descriptor.customServerCommand ?? null,
+    javaHome: descriptor.javaHome?.trim() || null,
   };
 }
 
@@ -216,8 +219,17 @@ export function lspListPresets(): Promise<LspServerPreset[]> {
   return invoke<LspServerPreset[]>("lsp_list_presets");
 }
 
-export function lspDetectServers(): Promise<LspServerStatus[]> {
-  return invoke<LspServerStatus[]>("lsp_detect_servers");
+/** Detect installed language servers. Pass `javaHome` to probe jdtls with a configured JDK. */
+export function lspDetectServers(options?: { javaHome?: string | null }): Promise<LspServerStatus[]> {
+  const javaHome = options?.javaHome?.trim() || null;
+  return invoke<LspServerStatus[]>("lsp_detect_servers", { javaHome });
+}
+
+/** Apply the configured JDK for jdtls globally in the backend process. */
+export function lspSetJavaHome(javaHome?: string | null): Promise<void> {
+  return invoke("lsp_set_java_home", {
+    javaHome: javaHome?.trim() || null,
+  });
 }
 
 export function lspDocumentStatus(

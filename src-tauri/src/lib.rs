@@ -452,6 +452,7 @@ pub fn run() {
             workspace_search::workspace_search_start,
             workspace_search::workspace_search_cancel,
             lsp::lsp_list_presets,
+            lsp::lsp_set_java_home,
             lsp::lsp_detect_servers,
             lsp::lsp_document_status,
             lsp::lsp_open_document,
