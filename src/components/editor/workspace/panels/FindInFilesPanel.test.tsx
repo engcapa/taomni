@@ -1,11 +1,15 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   WorkspaceSearchEvent,
   WorkspaceSearchMatch,
 } from "../../../../lib/editor/workspaceSearch";
 import type { CodeWorkspaceRootInfo } from "../../../../types";
-import { FindInFilesPanel, matchSegments } from "./FindInFilesPanel";
+import {
+  DEFAULT_MATCHES_PER_FILE,
+  FindInFilesPanel,
+  matchSegments,
+} from "./FindInFilesPanel";
 
 const searchMocks = vi.hoisted(() => ({
   newWorkspaceSearchId: vi.fn(() => "search-1"),
@@ -65,6 +69,11 @@ describe("FindInFilesPanel", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  beforeEach(() => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
   });
 
   it("subscribes before starting and streams grouped results", async () => {
@@ -158,6 +167,68 @@ describe("FindInFilesPanel", () => {
     render(<FindInFilesPanel roots={[]} onOpenMatch={vi.fn()} />);
     expect(screen.getByText("Add a folder to the workspace to search its files")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run search" })).toBeDisabled();
+  });
+
+  it("limits visible matches per file and expands on demand", async () => {
+    render(<FindInFilesPanel roots={roots} onOpenMatch={vi.fn()} />);
+    const emit = await runSearch();
+    const many = Array.from({ length: DEFAULT_MATCHES_PER_FILE + 5 }, (_, index) =>
+      searchMatch({
+        lineNumber: index + 1,
+        column: 1,
+        matchStart: 0,
+        matchEnd: 6,
+        lineText: `needle at ${index + 1}`,
+      }),
+    );
+
+    act(() => {
+      emit({ ...doneEvent(), kind: "batch", matches: many });
+      emit(doneEvent({ totalMatches: many.length }));
+    });
+
+    expect(screen.getAllByTestId("code-workspace-find-match-hit")).toHaveLength(DEFAULT_MATCHES_PER_FILE);
+    expect(screen.getByTestId("code-workspace-find-file-count")).toHaveTextContent(
+      `${DEFAULT_MATCHES_PER_FILE}/${many.length}`,
+    );
+    expect(screen.getByTestId("code-workspace-find-show-more")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("code-workspace-find-show-all"));
+    expect(screen.getAllByTestId("code-workspace-find-match-hit")).toHaveLength(many.length);
+    expect(screen.queryByTestId("code-workspace-find-show-more")).not.toBeInTheDocument();
+    expect(screen.getByTestId("code-workspace-find-file-count")).toHaveTextContent(`${many.length}`);
+  });
+
+  it("collapses a file group without dropping the full replace set", async () => {
+    const onReplaceMatches = vi.fn();
+    render(
+      <FindInFilesPanel
+        roots={roots}
+        onOpenMatch={vi.fn()}
+        onReplaceMatches={onReplaceMatches}
+      />,
+    );
+    const emit = await runSearch();
+    const matches = [
+      searchMatch({ lineNumber: 1, lineText: "needle one", matchStart: 0, matchEnd: 6, column: 1 }),
+      searchMatch({ lineNumber: 2, lineText: "needle two", matchStart: 0, matchEnd: 6, column: 1 }),
+      searchMatch({ path: "src/b.ts", lineNumber: 3, lineText: "needle three", matchStart: 0, matchEnd: 6, column: 1 }),
+    ];
+
+    act(() => {
+      emit({ ...doneEvent(), kind: "batch", matches });
+      emit(doneEvent({ totalMatches: matches.length }));
+    });
+
+    expect(screen.getAllByTestId("code-workspace-find-match-hit")).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button", { name: "Collapse app/src/a.ts" }));
+    // Two matches in a.ts are hidden; b.ts remains.
+    expect(screen.getAllByTestId("code-workspace-find-match-hit")).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Replace all matches" }));
+    expect(window.confirm).toHaveBeenCalled();
+    // Replace uses the full result set, not just currently visible rows.
+    expect(onReplaceMatches).toHaveBeenCalledWith(matches, "");
   });
 });
 

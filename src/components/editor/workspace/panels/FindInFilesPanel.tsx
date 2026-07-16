@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Ban, CaseSensitive, File, Loader2, Regex, Search, WholeWord } from "lucide-react";
+import { Ban, CaseSensitive, ChevronDown, ChevronRight, File, Loader2, Regex, Search, WholeWord } from "lucide-react";
 import {
   newWorkspaceSearchId,
   subscribeWorkspaceSearch,
@@ -49,6 +49,10 @@ type SearchStatus = "idle" | "searching" | "done" | "error";
  * default total well below the backend's 10k ceiling.
  */
 const MAX_TOTAL_MATCHES = 2_000;
+/** Default visible matches per file; extra rows need explicit expand. */
+export const DEFAULT_MATCHES_PER_FILE = 10;
+/** How many more rows "Show more" reveals each click. */
+export const MATCHES_PER_FILE_STEP = 20;
 /** Prefer keeping text from the line start when the match is near it. */
 const CONTEXT_BEFORE_MATCH = 48;
 /** Cap how much of the line continues past the keyword. */
@@ -165,6 +169,9 @@ export function FindInFilesPanel({
   const [summary, setSummary] = useState<SearchSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [replacing, setReplacing] = useState(false);
+  /** Per-file expand state: collapsed (default), numeric limit, or "all". */
+  const [fileExpand, setFileExpand] = useState<Record<string, number | "all">>({});
+  const [collapsedFiles, setCollapsedFiles] = useState<Record<string, boolean>>({});
   const [searchHistory, setSearchHistory] = useState<string[]>(() => (
     workspaceInstanceId ? readWorkspaceSearchHistory(workspaceInstanceId) : []
   ));
@@ -224,6 +231,8 @@ export function FindInFilesPanel({
     setGroups([]);
     setSummary(null);
     setError(null);
+    setFileExpand({});
+    setCollapsedFiles({});
     setStatus("searching");
 
     const searchId = newWorkspaceSearchId();
@@ -301,6 +310,34 @@ export function FindInFilesPanel({
     () => groups.flatMap((group) => group.matches),
     [groups],
   );
+
+  const visibleLimitFor = useCallback((key: string, total: number): number => {
+    const expand = fileExpand[key];
+    if (expand === "all") return total;
+    if (typeof expand === "number") return Math.min(total, expand);
+    return Math.min(total, DEFAULT_MATCHES_PER_FILE);
+  }, [fileExpand]);
+
+  const toggleFileCollapsed = useCallback((key: string) => {
+    setCollapsedFiles((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  const showMoreForFile = useCallback((key: string, total: number) => {
+    setFileExpand((prev) => {
+      const current = prev[key];
+      const base = current === "all"
+        ? total
+        : typeof current === "number"
+          ? current
+          : DEFAULT_MATCHES_PER_FILE;
+      const next = base + MATCHES_PER_FILE_STEP;
+      return { ...prev, [key]: next >= total ? "all" : next };
+    });
+  }, []);
+
+  const showAllForFile = useCallback((key: string) => {
+    setFileExpand((prev) => ({ ...prev, [key]: "all" }));
+  }, []);
 
   const replaceAll = useCallback(async () => {
     if (!onReplaceMatches || allMatches.length === 0 || replacing) return;
@@ -480,42 +517,84 @@ export function FindInFilesPanel({
                   : "Search file contents across all workspace roots"}
           </div>
         )}
-        {groups.map((group) => (
-          <section key={group.key}>
-            <div className="h-6 flex items-center gap-2 px-3 font-medium text-[var(--taomni-code-muted)]" title={group.title}>
-              <File className="h-3.5 w-3.5 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">{group.title}</span>
-              <span className="shrink-0 text-[10px] tabular-nums">{group.matches.length}</span>
-            </div>
-            {group.matches.map((match, index) => {
-              const segments = matchSegments(match);
-              return (
-                <button
-                  key={`${match.lineNumber}:${match.column}:${index}`}
-                  type="button"
-                  className="h-6 w-full min-w-0 flex items-center gap-2 px-4 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
-                  title={`${group.title}:${match.lineNumber}:${match.column}`}
-                  onClick={() => onOpenMatch(match, { preview: true })}
-                  onDoubleClick={() => onOpenMatch(match, { preview: false })}
-                >
-                  <span className="shrink-0 font-mono text-[10px] text-[var(--taomni-code-muted)]">
-                    {match.lineNumber}:{match.column}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--taomni-code-text)]">
-                    {segments.before}
-                    <mark
-                      className="rounded-sm border border-[var(--taomni-code-find-match-border)] bg-[var(--taomni-code-find-match-bg)] px-0.5 font-semibold text-[var(--taomni-code-find-match-fg)]"
-                      data-testid="code-workspace-find-match-hit"
-                    >
-                      {segments.hit}
-                    </mark>
-                    {segments.after}
-                  </span>
-                </button>
-              );
-            })}
-          </section>
-        ))}
+        {groups.map((group) => {
+          const total = group.matches.length;
+          const collapsed = Boolean(collapsedFiles[group.key]);
+          const visibleLimit = visibleLimitFor(group.key, total);
+          const visibleMatches = collapsed ? [] : group.matches.slice(0, visibleLimit);
+          const hiddenCount = collapsed ? total : Math.max(0, total - visibleLimit);
+          const Chevron = collapsed ? ChevronRight : ChevronDown;
+          return (
+            <section key={group.key} data-testid="code-workspace-find-file-group" data-file={group.title}>
+              <button
+                type="button"
+                className="h-6 w-full flex items-center gap-2 px-3 font-medium text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+                title={group.title}
+                aria-expanded={!collapsed}
+                aria-label={collapsed ? `Expand ${group.title}` : `Collapse ${group.title}`}
+                onClick={() => toggleFileCollapsed(group.key)}
+              >
+                <Chevron className="h-3.5 w-3.5 shrink-0" />
+                <File className="h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0 flex-1 truncate text-left">{group.title}</span>
+                <span className="shrink-0 text-[10px] tabular-nums" data-testid="code-workspace-find-file-count">
+                  {collapsed || hiddenCount === 0
+                    ? `${total}`
+                    : `${visibleLimit}/${total}`}
+                </span>
+              </button>
+              {visibleMatches.map((match, index) => {
+                const segments = matchSegments(match);
+                return (
+                  <button
+                    key={`${match.lineNumber}:${match.column}:${index}`}
+                    type="button"
+                    className="h-6 w-full min-w-0 flex items-center gap-2 px-4 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
+                    title={`${group.title}:${match.lineNumber}:${match.column}`}
+                    onClick={() => onOpenMatch(match, { preview: true })}
+                    onDoubleClick={() => onOpenMatch(match, { preview: false })}
+                  >
+                    <span className="shrink-0 font-mono text-[10px] text-[var(--taomni-code-muted)]">
+                      {match.lineNumber}:{match.column}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--taomni-code-text)]">
+                      {segments.before}
+                      <mark
+                        className="rounded-sm border border-[var(--taomni-code-find-match-border)] bg-[var(--taomni-code-find-match-bg)] px-0.5 font-semibold text-[var(--taomni-code-find-match-fg)]"
+                        data-testid="code-workspace-find-match-hit"
+                      >
+                        {segments.hit}
+                      </mark>
+                      {segments.after}
+                    </span>
+                  </button>
+                );
+              })}
+              {!collapsed && hiddenCount > 0 && (
+                <div className="flex items-center gap-2 px-4 py-0.5 text-[10px] text-[var(--taomni-code-muted)]">
+                  <button
+                    type="button"
+                    className="rounded px-1 py-0.5 hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
+                    aria-label={`Show more matches in ${group.title}`}
+                    data-testid="code-workspace-find-show-more"
+                    onClick={() => showMoreForFile(group.key, total)}
+                  >
+                    Show more ({Math.min(MATCHES_PER_FILE_STEP, hiddenCount)} of {hiddenCount})
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded px-1 py-0.5 hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
+                    aria-label={`Show all matches in ${group.title}`}
+                    data-testid="code-workspace-find-show-all"
+                    onClick={() => showAllForFile(group.key)}
+                  >
+                    Show all
+                  </button>
+                </div>
+              )}
+            </section>
+          );
+        })}
       </div>
     </div>
   );
