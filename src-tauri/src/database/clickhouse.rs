@@ -2,6 +2,7 @@
 //! existing `reqwest` client. Queries are issued with `FORMAT JSONCompact` so
 //! we get column names, types, and row data in one response.
 
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use futures::StreamExt;
@@ -12,6 +13,7 @@ use super::{
     emit_query_result_stream, send_query_stream_event, ColumnDescription, ColumnInfo, DbConfig,
     DbHandle, DbObject, QueryResult, QueryStreamChannel, QueryStreamEvent, SchemaInfo, TableInfo,
 };
+use super::sql;
 
 const DEFAULT_TIMEOUT_SECS: u64 = 15;
 const STREAM_BATCH_ROWS: usize = 100;
@@ -23,7 +25,25 @@ pub struct ClickHouseClient {
     base_url: String,
     user: Option<String>,
     password: Option<String>,
-    database: String,
+    /// Default database sent as the HTTP `database` query param. Updated when
+    /// the user runs `USE db` so subsequent queries follow the UI selection.
+    database: Arc<Mutex<String>>,
+}
+
+impl ClickHouseClient {
+    pub fn database(&self) -> String {
+        self.database
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+    }
+
+    pub fn set_database(&self, database: String) {
+        match self.database.lock() {
+            Ok(mut guard) => *guard = database,
+            Err(poisoned) => *poisoned.into_inner() = database,
+        }
+    }
 }
 
 pub async fn connect(config: &DbConfig, password: Option<&str>) -> Result<DbHandle, String> {
@@ -56,11 +76,13 @@ pub async fn connect(config: &DbConfig, password: Option<&str>) -> Result<DbHand
         base_url,
         user: config.username.clone().filter(|u| !u.is_empty()),
         password: password.map(|p| p.to_string()),
-        database: config
-            .database
-            .clone()
-            .filter(|d| !d.is_empty())
-            .unwrap_or_else(|| "default".to_string()),
+        database: Arc::new(Mutex::new(
+            config
+                .database
+                .clone()
+                .filter(|d| !d.is_empty())
+                .unwrap_or_else(|| "default".to_string()),
+        )),
     };
     // Verify reachability eagerly so db_connect reports failures up front.
     ping(&ch).await?;
@@ -68,10 +90,11 @@ pub async fn connect(config: &DbConfig, password: Option<&str>) -> Result<DbHand
 }
 
 fn sql_request(client: &ClickHouseClient, sql: &str) -> reqwest::RequestBuilder {
+    let database = client.database();
     let mut req = client
         .client
         .post(&client.base_url)
-        .query(&[("database", client.database.as_str())])
+        .query(&[("database", database.as_str())])
         .body(sql.to_string());
     if let Some(user) = &client.user {
         req = req.header("X-ClickHouse-User", user);
@@ -223,6 +246,18 @@ pub async fn execute(
             columns,
             rows,
             rows_affected: parsed.rows,
+            duration_ms: start.elapsed().as_millis() as u64,
+            warnings: Vec::new(),
+        })
+    } else if let Some(database) = sql::parse_default_schema_switch(sql) {
+        // ClickHouse HTTP binds the default DB via the `database` query param
+        // on every request, so a server-side USE would not stick. Switch the
+        // client-side default instead.
+        client.set_database(database);
+        Ok(QueryResult {
+            columns: Vec::new(),
+            rows: Vec::new(),
+            rows_affected: 0,
             duration_ms: start.elapsed().as_millis() as u64,
             warnings: Vec::new(),
         })
@@ -418,7 +453,8 @@ pub async fn list_tables(
     client: &ClickHouseClient,
     schema: Option<&str>,
 ) -> Result<Vec<TableInfo>, String> {
-    let db = schema.unwrap_or(&client.database);
+    let default_db = client.database();
+    let db = schema.unwrap_or(default_db.as_str());
     let sql = format!(
         "SELECT name, engine, total_rows FROM system.tables WHERE database = '{}' ORDER BY name",
         db.replace('\'', "''")
@@ -458,7 +494,8 @@ pub async fn search_tables(
     prefix: &str,
     limit: usize,
 ) -> Result<Vec<TableInfo>, String> {
-    let database = schema.unwrap_or(&client.database).replace('\'', "''");
+    let default_db = client.database();
+    let database = schema.unwrap_or(default_db.as_str()).replace('\'', "''");
     let prefix = prefix.replace('\\', "\\\\").replace('\'', "''");
     let sql = format!(
         "SELECT name, engine FROM system.tables \
@@ -499,7 +536,8 @@ pub async fn list_objects(
     if kind != "dictionary" {
         return Ok(Vec::new());
     }
-    let db = schema.unwrap_or(&client.database);
+    let default_db = client.database();
+    let db = schema.unwrap_or(default_db.as_str());
     let sql = format!(
         "SELECT name FROM system.dictionaries WHERE database = '{}' ORDER BY name",
         db.replace('\'', "''")
@@ -525,7 +563,8 @@ pub async fn object_ddl(
     kind: &str,
     name: &str,
 ) -> Result<String, String> {
-    let db = schema.unwrap_or(&client.database);
+    let default_db = client.database();
+    let db = schema.unwrap_or(default_db.as_str());
     let verb = if kind == "dictionary" { "DICTIONARY" } else { "TABLE" };
     let sql = format!(
         "SHOW CREATE {verb} `{}`.`{}`",
@@ -546,7 +585,8 @@ pub async fn table_stats(
     schema: Option<&str>,
     table: &str,
 ) -> Result<QueryResult, String> {
-    let db = schema.unwrap_or(&client.database);
+    let default_db = client.database();
+    let db = schema.unwrap_or(default_db.as_str());
     let sql = format!(
         "SELECT sum(rows), sum(bytes_on_disk), count() FROM system.parts \
          WHERE database = '{}' AND table = '{}' AND active",
@@ -569,7 +609,8 @@ pub async fn describe_table(
     schema: Option<&str>,
     table: &str,
 ) -> Result<Vec<ColumnDescription>, String> {
-    let db = schema.unwrap_or(&client.database);
+    let default_db = client.database();
+    let db = schema.unwrap_or(default_db.as_str());
     let sql = format!(
         "SELECT name, type, default_expression, is_in_primary_key \
          FROM system.columns WHERE database = '{}' AND table = '{}' ORDER BY position",

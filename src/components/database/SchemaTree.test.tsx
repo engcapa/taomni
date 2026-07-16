@@ -62,6 +62,38 @@ describe("SchemaTree folder model", () => {
     expect(screen.getByText("Events")).toBeInTheDocument();
   });
 
+  it("sets the clicked database as the session default and expands it", async () => {
+    const onSetDefaultSchema = vi.fn();
+    render(
+      <SchemaTree
+        sessionId="s1"
+        engine="MySQL"
+        activeSchema="other"
+        onSetDefaultSchema={onSetDefaultSchema}
+      />,
+    );
+    fireEvent.click(await screen.findByTestId("schema-tree-db-name-ecommerce"));
+    expect(onSetDefaultSchema).toHaveBeenCalledWith("ecommerce");
+    expect(await screen.findByText("Tables")).toBeInTheDocument();
+  });
+
+  it("highlights the active database without treating expand-only as USE", async () => {
+    const onSetDefaultSchema = vi.fn();
+    render(
+      <SchemaTree
+        sessionId="s1"
+        engine="MySQL"
+        activeSchema="ecommerce"
+        onSetDefaultSchema={onSetDefaultSchema}
+      />,
+    );
+    await screen.findByText("ecommerce");
+    expect(screen.getByTestId("schema-tree-db-ecommerce")).toHaveAttribute("data-active", "true");
+    fireEvent.click(screen.getByLabelText("Expand ecommerce"));
+    expect(onSetDefaultSchema).not.toHaveBeenCalled();
+    expect(await screen.findByText("Tables")).toBeInTheDocument();
+  });
+
   it("loads tables eagerly and splits them by kind under Tables/Views", async () => {
     render(<SchemaTree sessionId="s1" engine="MySQL" />);
     fireEvent.click(await screen.findByText("ecommerce"));

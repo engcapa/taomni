@@ -12,6 +12,7 @@ use futures::TryStreamExt;
 use sqlx_core::column::Column;
 use sqlx_core::pool::Pool;
 use sqlx_core::query::query;
+use sqlx_core::raw_sql::raw_sql;
 use sqlx_core::row::Row;
 use sqlx_core::sql_str::AssertSqlSafe;
 use sqlx_core::type_info::TypeInfo;
@@ -51,7 +52,70 @@ fn timeout(config: &DbConfig) -> Duration {
 // Connect
 // ---------------------------------------------------------------------------
 
-pub async fn connect_mysql(config: &DbConfig, password: Option<&str>) -> Result<DbHandle, String> {
+/// Session default schema/database remembered across pool reconnects.
+///
+/// `USE` / `SET search_path` only affect the live connection. sqlx may recreate
+/// the single pooled connection after idle timeout or network blips; the
+/// `after_connect` hook re-applies this value so the UI "active schema" sticks.
+pub type ActiveSchemaSlot = Arc<AsyncMutex<Option<String>>>;
+
+fn initial_active_schema(config: &DbConfig) -> Option<String> {
+    config
+        .database
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+pub fn new_active_schema_slot(config: &DbConfig) -> ActiveSchemaSlot {
+    // Only engines where the connection "database" field is the default schema
+    // should seed the restore slot. Postgres/PanWei/Oracle/SQLServer use a
+    // separate schema namespace from the connect database name.
+    let initial = match config.engine.as_str() {
+        "MySQL" | "StarRocks" | "ClickHouse" | "Presto" => initial_active_schema(config),
+        _ => None,
+    };
+    Arc::new(AsyncMutex::new(initial))
+}
+
+async fn restore_mysql_schema(
+    conn: &mut sqlx_mysql::MySqlConnection,
+    active_schema: &ActiveSchemaSlot,
+) -> Result<(), SqlxError> {
+    let schema = active_schema.lock().await.clone();
+    let Some(schema) = schema.filter(|value| !value.is_empty()) else {
+        return Ok(());
+    };
+    // USE is not supported by MySQL's prepared-statement protocol (error 1295).
+    let sql = format!("USE {}", quote_mysql_ident(&schema));
+    raw_sql(AssertSqlSafe(sql)).execute(&mut *conn).await?;
+    Ok(())
+}
+
+async fn restore_postgres_schema(
+    conn: &mut sqlx_postgres::PgConnection,
+    active_schema: &ActiveSchemaSlot,
+) -> Result<(), SqlxError> {
+    let schema = active_schema.lock().await.clone();
+    let Some(schema) = schema.filter(|value| !value.is_empty()) else {
+        return Ok(());
+    };
+    // Postgres search_path is session state; re-apply after reconnect.
+    let sql = format!("SET search_path TO {}", quote_pg_ident(&schema));
+    raw_sql(AssertSqlSafe(sql)).execute(&mut *conn).await?;
+    Ok(())
+}
+
+fn quote_pg_ident(ident: &str) -> String {
+    format!("\"{}\"", ident.replace('"', "\"\""))
+}
+
+pub async fn connect_mysql(
+    config: &DbConfig,
+    password: Option<&str>,
+    active_schema: ActiveSchemaSlot,
+) -> Result<DbHandle, String> {
     let mut opts = MySqlConnectOptions::new()
         .host(&config.host)
         .port(config.port);
@@ -74,6 +138,10 @@ pub async fn connect_mysql(config: &DbConfig, password: Option<&str>) -> Result<
         .max_connections(1)
         .acquire_timeout(timeout(config))
         .test_before_acquire(true)
+        .after_connect(move |conn, _meta| {
+            let active_schema = active_schema.clone();
+            Box::pin(async move { restore_mysql_schema(conn, &active_schema).await })
+        })
         .connect_with(opts)
         .await
         .map_err(|e| format!("MySQL connect failed: {e}"))?;
@@ -83,6 +151,7 @@ pub async fn connect_mysql(config: &DbConfig, password: Option<&str>) -> Result<
 pub async fn connect_starrocks(
     config: &DbConfig,
     password: Option<&str>,
+    active_schema: ActiveSchemaSlot,
 ) -> Result<DbHandle, String> {
     let mut opts = MySqlConnectOptions::new()
         .host(&config.host)
@@ -110,6 +179,10 @@ pub async fn connect_starrocks(
         .max_connections(1)
         .acquire_timeout(timeout(config))
         .test_before_acquire(true)
+        .after_connect(move |conn, _meta| {
+            let active_schema = active_schema.clone();
+            Box::pin(async move { restore_mysql_schema(conn, &active_schema).await })
+        })
         .connect_with(opts)
         .await
         .map_err(|e| format!("StarRocks connect failed: {e}"))?;
@@ -119,6 +192,7 @@ pub async fn connect_starrocks(
 pub async fn connect_postgres(
     config: &DbConfig,
     password: Option<&str>,
+    active_schema: ActiveSchemaSlot,
 ) -> Result<DbHandle, String> {
     let mut opts = PgConnectOptions::new().host(&config.host).port(config.port);
     if let Some(user) = config.username.as_deref().filter(|u| !u.is_empty()) {
@@ -140,6 +214,10 @@ pub async fn connect_postgres(
         .max_connections(1)
         .acquire_timeout(timeout(config))
         .test_before_acquire(true)
+        .after_connect(move |conn, _meta| {
+            let active_schema = active_schema.clone();
+            Box::pin(async move { restore_postgres_schema(conn, &active_schema).await })
+        })
         .connect_with(opts)
         .await
         .map_err(|e| format!("PostgreSQL connect failed: {e}"))?;
@@ -413,14 +491,17 @@ fn sqlserver_value_to_string(row: &TdsRow, i: usize) -> Option<String> {
 }
 
 /// Heuristic: does the statement return rows? (SELECT/SHOW/DESCRIBE/WITH/...)
-fn is_query(sql: &str) -> bool {
-    let head: String = executable_sql_head(sql)
+fn sql_head_keyword(sql: &str) -> String {
+    executable_sql_head(sql)
         .chars()
         .take_while(|c| c.is_alphabetic())
         .collect::<String>()
-        .to_uppercase();
+        .to_uppercase()
+}
+
+fn is_query(sql: &str) -> bool {
     matches!(
-        head.as_str(),
+        sql_head_keyword(sql).as_str(),
         "SELECT"
             | "SHOW"
             | "DESCRIBE"
@@ -431,6 +512,89 @@ fn is_query(sql: &str) -> bool {
             | "VALUES"
             | "PRAGMA"
     )
+}
+
+/// MySQL (and StarRocks) reject some statements under the prepared-statement
+/// protocol with error 1295. Run those via the text protocol (`raw_sql`).
+fn needs_mysql_text_protocol(sql: &str) -> bool {
+    matches!(
+        sql_head_keyword(sql).as_str(),
+        "USE" | "PREPARE" | "EXECUTE" | "DEALLOCATE" | "HELP"
+    )
+}
+
+/// Parse the target of session default-schema switch statements:
+/// `USE db`, `SET search_path TO schema`, `ALTER SESSION SET CURRENT_SCHEMA = schema`.
+pub fn parse_default_schema_switch(sql: &str) -> Option<String> {
+    let head = executable_sql_head(sql);
+    let keyword = sql_head_keyword(sql);
+    match keyword.as_str() {
+        "USE" => {
+            let rest = head.get(keyword.len()..)?.trim();
+            let first = rest.split_whitespace().next().unwrap_or(rest);
+            // Presto: USE catalog.schema → keep the last component as schema.
+            let target = first.rsplit('.').next().unwrap_or(first);
+            unquote_sql_ident(target)
+        }
+        "SET" => {
+            // SET search_path TO ident  |  SET search_path = ident
+            let rest = head.get(keyword.len()..)?.trim();
+            let upper = rest.to_ascii_uppercase();
+            if !upper.starts_with("SEARCH_PATH") {
+                return None;
+            }
+            let after = rest.get("search_path".len()..)?.trim_start();
+            let after_upper = after.to_ascii_uppercase();
+            let after = if after_upper.starts_with("TO") {
+                after.get(2..).unwrap_or("").trim_start()
+            } else if after.starts_with('=') {
+                after.get(1..).unwrap_or("").trim_start()
+            } else {
+                after
+            };
+            // search_path can be a comma list; take the first entry.
+            let first = after.split(',').next().unwrap_or(after).trim();
+            unquote_sql_ident(first)
+        }
+        "ALTER" => {
+            // ALTER SESSION SET CURRENT_SCHEMA = ident
+            let upper = head.to_ascii_uppercase();
+            let marker = "CURRENT_SCHEMA";
+            let idx = upper.find(marker)?;
+            let after = head.get(idx + marker.len()..)?.trim_start();
+            let after = after.strip_prefix('=').map(str::trim).unwrap_or(after);
+            let first = after.split_whitespace().next().unwrap_or(after);
+            unquote_sql_ident(first)
+        }
+        _ => None,
+    }
+}
+
+fn unquote_sql_ident(raw: &str) -> Option<String> {
+    let trimmed = raw.trim().trim_end_matches(';').trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let unquoted = if (trimmed.starts_with('`') && trimmed.ends_with('`'))
+        || (trimmed.starts_with('"') && trimmed.ends_with('"'))
+        || (trimmed.starts_with('[') && trimmed.ends_with(']'))
+        || (trimmed.starts_with('\'') && trimmed.ends_with('\''))
+    {
+        let inner = &trimmed[1..trimmed.len() - 1];
+        inner
+            .replace("``", "`")
+            .replace("\"\"", "\"")
+            .replace("]]", "]")
+            .replace("''", "'")
+    } else {
+        trimmed.to_string()
+    };
+    let unquoted = unquoted.trim();
+    if unquoted.is_empty() {
+        None
+    } else {
+        Some(unquoted.to_string())
+    }
 }
 
 fn executable_sql_head(sql: &str) -> &str {
@@ -604,6 +768,21 @@ pub async fn execute_mysql(
             columns,
             rows_affected: 0,
             rows: out_rows,
+            duration_ms: start.elapsed().as_millis() as u64,
+            warnings: Vec::new(),
+        })
+    } else if needs_mysql_text_protocol(sql) {
+        // MySQL rejects USE (and a few admin commands) on COM_STMT_PREPARE with
+        // 1295 HY000. Text protocol via raw_sql is required.
+        let exec = raw_sql(AssertSqlSafe(sql)).execute(pool);
+        let res = tokio::select! {
+            _ = token.cancelled() => return Err("Query cancelled".into()),
+            r = exec => r.map_err(|e| format!("Statement failed: {e}"))?,
+        };
+        Ok(QueryResult {
+            columns: Vec::new(),
+            rows: Vec::new(),
+            rows_affected: res.rows_affected(),
             duration_ms: start.elapsed().as_millis() as u64,
             warnings: Vec::new(),
         })
@@ -784,6 +963,20 @@ pub async fn execute_mysql_stream(
                 rows_affected: 0,
                 duration_ms: start.elapsed().as_millis() as u64,
                 warnings: limit_warning(limit_reached, max_rows),
+            },
+        )
+    } else if needs_mysql_text_protocol(sql) {
+        let exec = raw_sql(AssertSqlSafe(sql)).execute(pool);
+        let res = tokio::select! {
+            _ = token.cancelled() => return Err("Query cancelled".into()),
+            r = exec => r.map_err(|e| format!("Statement failed: {e}"))?,
+        };
+        send_query_stream_event(
+            on_event,
+            QueryStreamEvent::Done {
+                rows_affected: res.rows_affected(),
+                duration_ms: start.elapsed().as_millis() as u64,
+                warnings: Vec::new(),
             },
         )
     } else {
@@ -2372,5 +2565,34 @@ mod tests {
         ));
         assert!(!is_query("-- mutate\nINSERT INTO t VALUES (1)"));
         assert!(!is_query("/* unterminated"));
+    }
+
+    #[test]
+    fn mysql_use_requires_text_protocol() {
+        assert!(needs_mysql_text_protocol("USE `app`"));
+        assert!(needs_mysql_text_protocol("-- switch\nUSE app;"));
+        assert!(!needs_mysql_text_protocol("INSERT INTO t VALUES (1)"));
+        assert!(!needs_mysql_text_protocol("SELECT 1"));
+    }
+
+    #[test]
+    fn parse_default_schema_switch_supports_common_dialects() {
+        assert_eq!(
+            parse_default_schema_switch("USE `ali-model-tools`"),
+            Some("ali-model-tools".into())
+        );
+        assert_eq!(
+            parse_default_schema_switch("use ecommerce;"),
+            Some("ecommerce".into())
+        );
+        assert_eq!(
+            parse_default_schema_switch(r#"SET search_path TO "sales""#),
+            Some("sales".into())
+        );
+        assert_eq!(
+            parse_default_schema_switch(r#"ALTER SESSION SET CURRENT_SCHEMA = "HR""#),
+            Some("HR".into())
+        );
+        assert_eq!(parse_default_schema_switch("SELECT 1"), None);
     }
 }
