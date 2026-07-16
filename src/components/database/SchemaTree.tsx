@@ -87,6 +87,8 @@ interface SchemaTreeProps {
   onNewQuery?: () => void;
   /** Make a schema the session default. */
   onSetDefaultSchema?: (schema: string) => void;
+  /** Currently active schema/database (highlight + toolbar sync). */
+  activeSchema?: string | null;
   /** Surface a transient status message. */
   onStatus?: (message: string) => void;
   /** Bubble up schema names for the editor toolbar selector. */
@@ -156,6 +158,7 @@ export function SchemaTree({
   onInsertSql,
   onNewQuery,
   onSetDefaultSchema,
+  activeSchema = null,
   onStatus,
   onSchemasLoaded,
   onSchemaLoaded,
@@ -246,6 +249,16 @@ export function SchemaTree({
     setExpandedDb((prev) => ({ ...prev, [db]: next }));
     // Eagerly load tables so the Tables/Views folder counts appear at once.
     if (next) void ensureTables(db);
+  };
+
+  /** Clicking the database/schema name makes it the session default (USE). */
+  const selectDatabase = (db: string) => {
+    onSetDefaultSchema?.(db);
+    // Expand so the user can browse objects in the newly active database.
+    if (!expandedDb[db]) {
+      setExpandedDb((prev) => ({ ...prev, [db]: true }));
+      void ensureTables(db);
+    }
   };
 
   const toggleCategory = (db: string, kind: ObjectKind) => {
@@ -1029,23 +1042,50 @@ export function SchemaTree({
   );
 
   const renderSchemaRows = () => (
-    visibleSchemas.map((db) => (
+    visibleSchemas.map((db) => {
+      const isActive = activeSchema === db;
+      const isExpanded = expandedDb[dbKey(db)] || filterActive;
+      return (
       <div key={db}>
-        <button
-          type="button"
+        <div
           className="taomni-tree-row w-full text-left"
-          onClick={() => toggleDb(db)}
-          onContextMenu={(e) => openMenu(e, databaseMenu(db))}
+          style={{ background: isActive ? "var(--taomni-selected)" : undefined }}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            openMenu(e, databaseMenu(db));
+          }}
+          data-testid={`schema-tree-db-${db}`}
+          data-active={isActive ? "true" : "false"}
         >
-          {expandedDb[dbKey(db)] || filterActive ? (
-            <ChevronDown className="w-3 h-3" />
-          ) : (
-            <ChevronRight className="w-3 h-3" />
-          )}
-          <Database className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
-          <span className="flex-1 truncate">{db}</span>
-        </button>
-        {(expandedDb[dbKey(db)] || filterActive) &&
+          <button
+            type="button"
+            className="h-full inline-flex items-center justify-center shrink-0 rounded hover:bg-[var(--taomni-hover)]"
+            aria-label={isExpanded ? `Collapse ${db}` : `Expand ${db}`}
+            title={isExpanded ? `Collapse ${db}` : `Expand ${db}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleDb(db);
+            }}
+          >
+            {isExpanded ? (
+              <ChevronDown className="w-3 h-3" />
+            ) : (
+              <ChevronRight className="w-3 h-3" />
+            )}
+          </button>
+          <button
+            type="button"
+            className="flex-1 min-w-0 inline-flex items-center gap-1 text-left"
+            onClick={() => selectDatabase(db)}
+            title={t("dbObjects.setDefault")}
+            aria-pressed={isActive}
+            data-testid={`schema-tree-db-name-${db}`}
+          >
+            <Database className="w-3.5 h-3.5 text-[var(--taomni-accent)] shrink-0" />
+            <span className="flex-1 truncate">{db}</span>
+          </button>
+        </div>
+        {isExpanded &&
           categories.filter((kind) => categoryVisible(db, kind)).map((kind) => {
             const meta = CATEGORY_META[kind];
             const CatIcon = meta.Icon;
@@ -1076,7 +1116,8 @@ export function SchemaTree({
             );
           })}
       </div>
-    ))
+      );
+    })
   );
 
   return (

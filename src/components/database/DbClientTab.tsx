@@ -1400,34 +1400,17 @@ export default function DbClientTab({
       }
       const panelId = activePanelId;
       const sql = schemaSwitchSql(info.engine, schema, info.catalog);
-      const panel = panels.find((p) => p.id === panelId);
-      const sheet = newResultSheet(sql, (panel?.sheets.length ?? 0) + 1, rowLimit);
-      sheet.title = "Schema";
       try {
         if (!connectionSessionId) throw new Error("Database connection is still starting.");
-        const result = await dbExecute(connectionSessionId, sql);
+        await dbExecute(connectionSessionId, sql);
+        // Update UI active schema (toolbar dropdown + tree highlight) without
+        // dumping a success result sheet on every click.
         setActiveSchema(schema);
-        setPanels((prev) =>
-          prev.map((p) =>
-            p.id === panelId
-              ? {
-                  ...p,
-                  sheets: [
-                    ...p.sheets,
-                    {
-                      ...sheet,
-                      result,
-                      warnings: result.warnings,
-                      running: false,
-                      resultTab: (result.warnings.length > 0 ? "messages" : "results") as ResultSubTab,
-                    },
-                  ].slice(-maxResultSheets),
-                  activeSheetId: sheet.id,
-                }
-              : p,
-          ),
-        );
+        setStatusMessage(`Active schema: ${schema}`);
       } catch (err) {
+        const panel = panels.find((p) => p.id === panelId);
+        const sheet = newResultSheet(sql, (panel?.sheets.length ?? 0) + 1, rowLimit);
+        sheet.title = "Schema";
         setPanels((prev) =>
           prev.map((p) =>
             p.id === panelId
@@ -1449,6 +1432,7 @@ export default function DbClientTab({
               : p,
           ),
         );
+        setStatusMessage(`Schema switch failed: ${String(err)}`);
       }
     },
     [activePanelId, activeSchema, connectionSessionId, info.catalog, info.engine, maxResultSheets, panels, rowLimit],
@@ -2341,6 +2325,7 @@ export default function DbClientTab({
                     engine={info.engine}
                     catalog={info.catalog}
                     databaseName={info.database}
+                    activeSchema={activeSchema}
                     onSelectionChange={handleSchemaSelectionChange}
                     onInsertTable={insertIntoActive}
                     onQuickSelect={quickSelect}

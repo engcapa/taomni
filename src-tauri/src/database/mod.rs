@@ -291,6 +291,9 @@ pub enum DbHandle {
 pub struct DbSession {
     pub handle: DbHandle,
     pub cancel: AsyncMutex<CancellationToken>,
+    /// Last successful default schema/database from `USE` / `SET search_path`
+    /// etc. Shared with pool `after_connect` hooks so reconnects restore it.
+    pub active_schema: sql::ActiveSchemaSlot,
     shutdown: CancellationToken,
     keepalive: Option<JoinHandle<()>>,
     /// Loopback forwarder task when the connection is routed through a proxy /
@@ -299,12 +302,17 @@ pub struct DbSession {
 }
 
 impl DbSession {
-    fn with_forward(handle: DbHandle, forward: Option<JoinHandle<()>>) -> Self {
+    fn with_forward(
+        handle: DbHandle,
+        forward: Option<JoinHandle<()>>,
+        active_schema: sql::ActiveSchemaSlot,
+    ) -> Self {
         let shutdown = CancellationToken::new();
         let keepalive = start_keepalive(&handle, shutdown.clone());
         Self {
             handle,
             cancel: AsyncMutex::new(CancellationToken::new()),
+            active_schema,
             shutdown,
             keepalive,
             forward,
@@ -318,6 +326,18 @@ impl DbSession {
         let token = CancellationToken::new();
         *guard = token.clone();
         token
+    }
+
+    /// Record a successful session default-schema switch so reconnects and
+    /// engines with client-side default DB (ClickHouse) stay in sync.
+    async fn note_schema_switch(&self, sql: &str) {
+        let Some(schema) = sql::parse_default_schema_switch(sql) else {
+            return;
+        };
+        *self.active_schema.lock().await = Some(schema.clone());
+        if let DbHandle::ClickHouse(client) = &self.handle {
+            client.set_database(schema);
+        }
     }
 }
 
@@ -531,13 +551,20 @@ pub async fn db_connect(
         None => (config, None),
     };
 
+    let active_schema = sql::new_active_schema_slot(&config);
     let handle = match config.engine.as_str() {
-        "MySQL" => sql::connect_mysql(&config, password.as_deref()).await?,
-        "PostgreSQL" => sql::connect_postgres(&config, password.as_deref()).await?,
+        "MySQL" => {
+            sql::connect_mysql(&config, password.as_deref(), active_schema.clone()).await?
+        }
+        "PostgreSQL" => {
+            sql::connect_postgres(&config, password.as_deref(), active_schema.clone()).await?
+        }
         "PanWeiDB" => panwei::connect(&config, password.as_deref()).await?,
         "Oracle" => oracle::connect(&config, password.as_deref()).await?,
         "SQLServer" => sql::connect_sqlserver(&config, password.as_deref()).await?,
-        "StarRocks" => sql::connect_starrocks(&config, password.as_deref()).await?,
+        "StarRocks" => {
+            sql::connect_starrocks(&config, password.as_deref(), active_schema.clone()).await?
+        }
         "ClickHouse" => clickhouse::connect(&config, password.as_deref()).await?,
         "Presto" => presto::connect(&config, password.as_deref()).await?,
         "Redis" => redis_ops::connect(&config, password.as_deref()).await?,
@@ -548,7 +575,7 @@ pub async fn db_connect(
             return Err(format!("Unsupported database engine: {other}"));
         }
     };
-    let session = Arc::new(DbSession::with_forward(handle, forward_task));
+    let session = Arc::new(DbSession::with_forward(handle, forward_task, active_schema));
     let previous = {
         let mut map = state.db_connections.write().await;
         // If a stale session exists under this id, close it after releasing the map lock.
@@ -972,7 +999,7 @@ pub async fn db_execute(
 ) -> Result<QueryResult, String> {
     let session = get_session(&state, &session_id).await?;
     let token = session.fresh_cancel_token().await;
-    match &session.handle {
+    let result = match &session.handle {
         DbHandle::MySql(pool) => sql::execute_mysql(pool, &sql, &token).await,
         DbHandle::StarRocks(pool) => sql::execute_mysql(pool, &sql, &token).await,
         DbHandle::Postgres(pool) => sql::execute_postgres(pool, &sql, &token).await,
@@ -982,7 +1009,11 @@ pub async fn db_execute(
         DbHandle::ClickHouse(client) => clickhouse::execute(client, &sql, &token).await,
         DbHandle::Presto(client) => presto::execute(client, &sql, &token).await,
         DbHandle::Redis(_) => Err("Use redis_exec for Redis commands".into()),
+    };
+    if result.is_ok() {
+        session.note_schema_switch(&sql).await;
     }
+    result
 }
 
 #[tauri::command]
@@ -995,7 +1026,7 @@ pub async fn db_execute_stream(
 ) -> Result<(), String> {
     let session = get_session(&state, &session_id).await?;
     let token = session.fresh_cancel_token().await;
-    match &session.handle {
+    let result = match &session.handle {
         DbHandle::MySql(pool) => {
             sql::execute_mysql_stream(pool, &sql, max_rows, &token, &on_event).await
         }
@@ -1021,7 +1052,11 @@ pub async fn db_execute_stream(
             presto::execute_stream(client, &sql, max_rows, &token, &on_event).await
         }
         DbHandle::Redis(_) => Err("Use redis_exec for Redis commands".into()),
+    };
+    if result.is_ok() {
+        session.note_schema_switch(&sql).await;
     }
+    result
 }
 
 #[tauri::command]
@@ -1211,7 +1246,8 @@ mod live_tests {
             network_settings: None,
         };
 
-        let handle = sql::connect_postgres(&config, config.password.as_deref())
+        let active_schema = sql::new_active_schema_slot(&config);
+        let handle = sql::connect_postgres(&config, config.password.as_deref(), active_schema)
             .await
             .expect("Hologres PostgreSQL connect should succeed");
         let pool = match handle {
