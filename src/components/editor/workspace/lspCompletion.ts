@@ -38,20 +38,56 @@ export function completionKindToType(kind: number | null): string | undefined {
     case 8: return "interface";
     case 9: return "namespace"; // module
     case 10: return "property";
+    case 11: return "constant"; // unit
+    case 12: return "constant"; // value
     case 13: return "enum";
     case 14: return "keyword";
+    case 15: return "text"; // snippet — CM has no dedicated snippet icon
+    case 16: return "constant"; // color
+    case 17: return "file";
+    case 18: return "text"; // reference
+    case 19: return "folder";
     case 20: return "constant"; // enum member
     case 21: return "constant";
     case 22: return "class"; // struct
+    case 23: return "property"; // event
     case 24: return "keyword"; // operator
     case 25: return "type"; // type parameter
-    case 11: // unit
-    case 12: // value
-    case 16: // color
-      return "constant";
     default:
       return kind == null ? undefined : "text";
   }
+}
+
+/**
+ * Map LSP sortText (lexicographic, lower = better) into CodeMirror `boost`
+ * (higher = better) so server ranking wins over naive label order.
+ */
+export function boostFromSortText(sortText: string | null | undefined): number | undefined {
+  if (!sortText) return undefined;
+  // Prefer pure numeric prefixes ("0001", "10") then fall back to string rank.
+  const digits = sortText.match(/^\d+/)?.[0];
+  if (digits) {
+    const n = Number.parseInt(digits, 10);
+    if (Number.isFinite(n)) return Math.max(-99, 1000 - Math.min(n, 1099));
+  }
+  // Lexicographic-ish: earlier code points rank higher.
+  let score = 0;
+  for (let i = 0; i < Math.min(sortText.length, 4); i += 1) {
+    score = score * 96 + (sortText.charCodeAt(i) - 32);
+  }
+  return Math.max(-99, 500 - (score % 600));
+}
+
+/** Triggers that feel natural even when the server omits completionTriggerCharacters. */
+export const DEFAULT_COMPLETION_TRIGGERS = [".", ":"];
+
+export function mergeCompletionTriggers(server: readonly string[] | null | undefined): string[] {
+  const set = new Set<string>();
+  for (const ch of server ?? []) {
+    if (ch) set.add(ch);
+  }
+  for (const ch of DEFAULT_COMPLETION_TRIGGERS) set.add(ch);
+  return [...set];
 }
 
 /**
@@ -119,13 +155,21 @@ function applyLspCompletion(
   to: number,
   resolve?: LspCompletionHooks["resolve"],
 ): void {
+  // Prefer the server's textEdit range when present (e.g. replacing a member
+  // access span wider/narrower than the typed prefix word).
+  let replaceFrom = from;
+  let replaceTo = to;
+  if (item.textEdit) {
+    replaceFrom = offsetFromLspPosition(view.state.doc, item.textEdit.range.start);
+    replaceTo = offsetFromLspPosition(view.state.doc, item.textEdit.range.end);
+  }
   const insert = item.textEdit?.newText ?? item.insertText ?? item.label;
   if (item.insertTextFormat === 2) {
-    snippet(lspSnippetToCmSnippet(insert))(view, completion, from, to);
+    snippet(lspSnippetToCmSnippet(insert))(view, completion, replaceFrom, replaceTo);
   } else {
     view.dispatch({
-      changes: { from, to, insert },
-      selection: { anchor: from + insert.length },
+      changes: { from: replaceFrom, to: replaceTo, insert },
+      selection: { anchor: replaceFrom + insert.length },
     });
   }
   if (item.additionalTextEdits.length) {
@@ -180,12 +224,16 @@ async function completionInfo(
 
 export function createLspCompletionSource(hooks: LspCompletionHooks): CompletionSource {
   return async (context: CompletionContext): Promise<CompletionResult | null> => {
-    const word = context.matchBefore(/[\w$]+/);
+    // Include `$` and `@` so Java/Kotlin/JS identifiers and decorators continue
+    // the same completion session instead of closing after one character.
+    const word = context.matchBefore(/[\w$@]+/);
     const charBefore = context.pos > 0
       ? context.state.sliceDoc(context.pos - 1, context.pos)
       : "";
-    const isTrigger = !word && !!charBefore && hooks.triggerCharacters().includes(charBefore);
-    if (!context.explicit && !word && !isTrigger) return null;
+    const triggers = hooks.triggerCharacters();
+    // Trigger-only: just typed `.` / `:` with no identifier yet.
+    const triggerOnly = !word && !!charBefore && triggers.includes(charBefore);
+    if (!context.explicit && !word && !triggerOnly) return null;
 
     // LSP responses are tied to a document version. Do not spend renderer time
     // mapping a response that became stale while the user kept typing.
@@ -194,7 +242,7 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
     try {
       result = await hooks.fetch(
         lspPositionFromOffset(context.state.doc, context.pos),
-        isTrigger ? charBefore : null,
+        triggerOnly ? charBefore : null,
       );
     } catch {
       result = null;
@@ -212,10 +260,12 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
       // signatures), but keep the human label visible in the list.
       const label = filterText ?? item.label;
       const displayLabel = filterText && filterText !== item.label ? item.label : undefined;
+      const boost = boostFromSortText(item.sortText);
       return {
         label,
         displayLabel,
         sortText: item.sortText ?? undefined,
+        boost,
         type: completionKindToType(item.kind),
         detail: item.detail ?? undefined,
         info: item.documentation || hooks.resolve
@@ -225,10 +275,28 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
           applyLspCompletion(view, completion, item, from, to, hooks.resolve),
       };
     });
+
+    // Prefer textEdit start when every item shares the same replace range so
+    // CM's client-side filtering aligns with the server's replace span.
+    let from = word ? word.from : context.pos;
+    const firstEdit = result.items[0]?.textEdit;
+    if (firstEdit && result.items.every((item) => (
+      item.textEdit
+      && item.textEdit.range.start.line === firstEdit.range.start.line
+      && item.textEdit.range.start.character === firstEdit.range.start.character
+      && item.textEdit.range.end.line === firstEdit.range.end.line
+      && item.textEdit.range.end.character === firstEdit.range.end.character
+    ))) {
+      from = offsetFromLspPosition(context.state.doc, firstEdit.range.start);
+    }
+
     return {
-      from: word ? word.from : context.pos,
+      from,
       options,
-      validFor: result.isIncomplete ? undefined : /^[\w$]*$/,
+      // Incomplete lists should re-query on further typing (no sticky validFor).
+      // Complete lists stay open while the user continues the identifier.
+      filter: !result.isIncomplete,
+      validFor: result.isIncomplete ? undefined : /^[\w$@]*$/,
     };
   };
 }

@@ -4,12 +4,20 @@ import { useT } from "../../../lib/i18n";
 import type { LspDiagnostic } from "../../../lib/editor/lsp";
 import type { LspFileState } from "./codeWorkspaceModel";
 
-/** True when the document sync finished but no language server is running. */
+/**
+ * True when the user should open Language Server settings.
+ * Missing binary / config only — not "available but still starting", and not
+ * a pure install-hint while the server is already on PATH.
+ */
 export function lspNeedsSetup(state: LspFileState | null): boolean {
   if (!state?.status || state.syncing) return false;
   if (state.error) return true;
   const status = state.status;
-  return !status.active && !!(status.error || status.installHint);
+  if (status.active) return false;
+  // Prefer install/settings only when the binary is missing, or a real error
+  // (e.g. custom command path wrong) needs attention.
+  if (!status.available) return true;
+  return !!status.error;
 }
 
 export function LspStatusPill({
@@ -32,11 +40,16 @@ export function LspStatusPill({
   const status = state.status;
   const errors = diagnostics.filter((item) => item.severity === 1).length;
   const warnings = diagnostics.filter((item) => item.severity === 2).length;
+  const runtimeError = status.error ?? state.error;
   const label = status.active
     ? `${status.displayName ?? "LSP"}${errors || warnings ? ` · ${errors}E ${warnings}W` : ""}`
-    : status.installHint
-      ? `Install: ${status.installHint}`
-      : status.error ?? state.error ?? "No LSP";
+    : runtimeError
+      ? runtimeError
+      : !status.available && status.installHint
+        ? `Install: ${status.installHint}`
+        : !status.available
+          ? "No LSP"
+          : `${status.displayName ?? "LSP"} starting…`;
   const showSettingsLink = lspNeedsSetup(state) && !!onOpenSettings;
   const settingsLabel = t("settings.languageServersOpenSettings");
   const title = showSettingsLink ? `${label} · ${settingsLabel}` : label;

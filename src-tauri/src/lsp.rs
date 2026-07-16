@@ -15,6 +15,8 @@ use tokio::sync::{Mutex, Notify, RwLock, oneshot};
 
 const REQUEST_TIMEOUT_SECS: u64 = 8;
 const INITIALIZE_TIMEOUT_SECS: u64 = 20;
+/// Eclipse JDT LS cold-start (especially on Windows) routinely exceeds 20s.
+const JDTLS_INITIALIZE_TIMEOUT_SECS: u64 = 120;
 const SHUTDOWN_TIMEOUT_SECS: u64 = 3;
 const EXIT_TIMEOUT_SECS: u64 = 2;
 const COMMAND_AVAILABILITY_TTL: Duration = Duration::from_secs(30);
@@ -548,22 +550,28 @@ impl LspManager {
             (false, None)
         };
         let using_custom = custom_command_to_preset(custom_command).is_some();
+        let available = command.is_some();
         LspDocumentStatus {
             path: document.path.to_string_lossy().into_owned(),
             uri: document.uri.clone(),
             preset_id: Some(preset.id.clone()),
             language_id: document.language_id.clone(),
             display_name: Some(preset.display_name.clone()),
-            available: command.is_some(),
+            available,
             active,
             selected_command_id,
             selected_command,
-            install_hint: if using_custom {
+            // Only advertise install guidance when the binary is missing. Always
+            // returning install_hint made the editor pill show "Install: …" even
+            // when jdtls was on PATH but the session was still starting/failed.
+            install_hint: if available {
+                None
+            } else if using_custom {
                 Some("Check the custom language server command".into())
             } else {
                 primary_install_hint(preset)
             },
-            error: if command.is_some() {
+            error: if available {
                 None
             } else if using_custom {
                 Some(format!(
@@ -793,7 +801,8 @@ fn session_start_error_status(
         active: false,
         selected_command_id: Some(command.id.clone()),
         selected_command: Some(command_line(&command.command, &command.args)),
-        install_hint: Some(command.install_hint.clone()),
+        // Binary was found; this is a runtime/start failure, not "please install".
+        install_hint: None,
         error: Some(error),
         capabilities: None,
     }
@@ -810,9 +819,8 @@ impl LspSession {
         map_key: String,
         start: Arc<LspSessionStart>,
     ) -> Result<Arc<Self>, String> {
-        let mut process = Command::new(&command.command);
+        let mut process = build_lsp_server_command(&command.command, &command.args);
         process
-            .args(&command.args)
             .current_dir(&root_path)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -936,11 +944,12 @@ impl LspSession {
                 }
             }
         });
+        let initialize_timeout = initialize_timeout_secs(&session.command);
         let initialize_result = match tokio::select! {
             result = session.request_with_timeout(
                 "initialize",
                 initialize_params,
-                INITIALIZE_TIMEOUT_SECS,
+                initialize_timeout,
             ) => result,
             error = start.wait_cancelled() => {
                 session.abort(&error).await;
@@ -1149,6 +1158,60 @@ fn no_console_window(command: &mut Command) {
     {
         let _ = command;
     }
+}
+
+fn initialize_timeout_secs(command: &LspServerCommandPreset) -> u64 {
+    let id = command.id.to_ascii_lowercase();
+    let prog = command.command.to_ascii_lowercase();
+    if id == "jdtls" || prog.contains("jdtls") {
+        JDTLS_INITIALIZE_TIMEOUT_SECS
+    } else {
+        INITIALIZE_TIMEOUT_SECS
+    }
+}
+
+/// Build a process command for an LSP server binary.
+///
+/// On Windows, `CreateProcess` cannot execute `.cmd`/`.bat` wrappers directly
+/// (common for `jdtls.cmd` and npm global shims). Route those through `cmd.exe /C`
+/// after resolving the absolute path via `which`.
+fn build_lsp_server_command(program: &str, args: &[String]) -> Command {
+    let program = program.trim();
+    #[cfg(windows)]
+    {
+        let resolved = resolve_server_program(program);
+        let is_batch = resolved
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| {
+                ext.eq_ignore_ascii_case("cmd") || ext.eq_ignore_ascii_case("bat")
+            });
+        if is_batch {
+            let mut cmd = Command::new("cmd.exe");
+            // /D skips AutoRun registry commands that can hang GUI-spawned shells.
+            cmd.arg("/D").arg("/C").arg(resolved.as_os_str());
+            cmd.args(args);
+            return cmd;
+        }
+        let mut cmd = Command::new(&resolved);
+        cmd.args(args);
+        return cmd;
+    }
+    #[cfg(not(windows))]
+    {
+        let mut cmd = Command::new(program);
+        cmd.args(args);
+        cmd
+    }
+}
+
+#[cfg(windows)]
+fn resolve_server_program(program: &str) -> PathBuf {
+    let path = Path::new(program);
+    if path.is_absolute() || program.contains('/') || program.contains('\\') {
+        return path.to_path_buf();
+    }
+    which::which(program).unwrap_or_else(|_| PathBuf::from(program))
 }
 
 async fn read_stdout(
@@ -4541,6 +4604,26 @@ mod tests {
         );
         let java = find_preset("java").expect("java preset");
         assert_eq!(java.commands[0].install_hint, hint);
+    }
+
+    #[test]
+    fn jdtls_initialize_timeout_is_longer_than_default() {
+        let java = find_preset("java").expect("java preset");
+        let jdtls = &java.commands[0];
+        assert!(
+            initialize_timeout_secs(jdtls) >= JDTLS_INITIALIZE_TIMEOUT_SECS,
+            "jdtls needs a long initialize window"
+        );
+        let rust = find_preset("rust").expect("rust preset");
+        assert_eq!(initialize_timeout_secs(&rust.commands[0]), INITIALIZE_TIMEOUT_SECS);
+    }
+
+    #[test]
+    fn build_lsp_server_command_keeps_program_on_unix_like() {
+        // On every platform the non-batch path must still invoke the program name.
+        // Windows batch routing is covered by platform integration; here we only
+        // assert the builder returns a Command without panicking for a plain binary.
+        let _cmd = build_lsp_server_command("rust-analyzer", &["--version".into()]);
     }
 
     #[test]
