@@ -440,9 +440,14 @@ struct SemanticTokensCache {
 }
 
 type LspSessionRegistry = Arc<Mutex<HashMap<String, LspSessionEntry>>>;
+type LspLastErrorRegistry = Arc<Mutex<HashMap<String, String>>>;
 
 pub struct LspManager {
     sessions: LspSessionRegistry,
+    /// Last unexpected exit / start failure per session key. Surfaced by
+    /// `document_status` so the UI does not stick on a silent "starting…"
+    /// after the process dies with `available=true, active=false`.
+    last_errors: LspLastErrorRegistry,
 }
 
 enum LspSessionEntry {
@@ -483,6 +488,7 @@ struct LspSession {
     next_id: AtomicU64,
     shutting_down: AtomicBool,
     child: Mutex<Child>,
+    stderr_tail: Mutex<String>,
 }
 
 struct ResolvedDocument {
@@ -500,6 +506,7 @@ impl LspManager {
     pub fn new() -> Self {
         Self {
             sessions: Arc::new(Mutex::new(HashMap::new())),
+            last_errors: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -536,21 +543,30 @@ impl LspManager {
             .as_ref()
             .or(configured_command.as_ref())
             .map(|cmd| command_line(&cmd.command, &cmd.args));
-        let (active, capabilities) = if let Some(cmd) = command.as_ref() {
+        let map_key = command
+            .as_ref()
+            .map(|cmd| session_key(document, preset, cmd).map_key());
+        let (active, starting, capabilities) = if let Some(cmd) = command.as_ref() {
             let key = session_key(document, preset, cmd);
-            let session = match self.sessions.lock().await.get(&key.map_key()) {
-                Some(LspSessionEntry::Ready(session)) => Some(session.clone()),
-                Some(LspSessionEntry::Starting(_)) | None => None,
-            };
-            match session {
-                Some(session) => (true, session.capabilities.read().await.clone()),
-                None => (false, None),
+            match self.sessions.lock().await.get(&key.map_key()) {
+                Some(LspSessionEntry::Ready(session)) => {
+                    (true, false, session.capabilities.read().await.clone())
+                }
+                Some(LspSessionEntry::Starting(_)) => (false, true, None),
+                None => (false, false, None),
             }
         } else {
-            (false, None)
+            (false, false, None)
         };
         let using_custom = custom_command_to_preset(custom_command).is_some();
         let available = command.is_some();
+        let last_error = if active || starting {
+            None
+        } else if let Some(key) = map_key.as_ref() {
+            self.last_errors.lock().await.get(key).cloned()
+        } else {
+            None
+        };
         LspDocumentStatus {
             path: document.path.to_string_lossy().into_owned(),
             uri: document.uri.clone(),
@@ -571,7 +587,13 @@ impl LspManager {
             } else {
                 primary_install_hint(preset)
             },
-            error: if available {
+            error: if active {
+                None
+            } else if let Some(error) = last_error {
+                Some(error)
+            } else if available {
+                // Available binary, not active, no recorded failure: either idle
+                // or still starting (callers that care can inspect session state).
                 None
             } else if using_custom {
                 Some(format!(
@@ -586,6 +608,17 @@ impl LspManager {
             },
             capabilities,
         }
+    }
+
+    async fn remember_error(&self, map_key: &str, error: impl Into<String>) {
+        self.last_errors
+            .lock()
+            .await
+            .insert(map_key.to_string(), error.into());
+    }
+
+    async fn clear_error(&self, map_key: &str) {
+        self.last_errors.lock().await.remove(map_key);
     }
 
     async fn ensure_session(
@@ -608,13 +641,30 @@ impl LspManager {
         let key = session_key(document, preset, &command);
         let map_key = key.map_key();
         let start = match self.claim_session(&map_key, &document.workspace_id).await {
-            LspSessionClaim::Ready(session) => return Ok(session),
-            LspSessionClaim::Wait(start) => {
-                return start.wait().await.map_err(|error| {
-                    session_start_error_status(document, preset, &command, error)
-                });
+            LspSessionClaim::Ready(session) => {
+                self.clear_error(&map_key).await;
+                return Ok(session);
             }
-            LspSessionClaim::Start(start) => start,
+            LspSessionClaim::Wait(start) => {
+                return match start.wait().await {
+                    Ok(session) => {
+                        self.clear_error(&map_key).await;
+                        Ok(session)
+                    }
+                    Err(error) => {
+                        self.remember_error(&map_key, error.clone()).await;
+                        Err(session_start_error_status(
+                            document, preset, &command, error,
+                        ))
+                    }
+                };
+            }
+            LspSessionClaim::Start(start) => {
+                // Clear a previous exit error so the UI can show "starting…"
+                // while this attempt is in flight.
+                self.clear_error(&map_key).await;
+                start
+            }
         };
 
         let result = LspSession::spawn(
@@ -624,11 +674,16 @@ impl LspManager {
             document.root_path.clone(),
             document.root_uri.clone(),
             self.sessions.clone(),
+            self.last_errors.clone(),
             map_key.clone(),
             start.clone(),
         )
         .await;
         let result = self.finish_session_start(&map_key, &start, result).await;
+        match &result {
+            Ok(_) => self.clear_error(&map_key).await,
+            Err(error) => self.remember_error(&map_key, error.clone()).await,
+        }
         result.map_err(|error| session_start_error_status(document, preset, &command, error))
     }
 
@@ -816,10 +871,12 @@ impl LspSession {
         root_path: PathBuf,
         root_uri: String,
         sessions: LspSessionRegistry,
+        last_errors: LspLastErrorRegistry,
         map_key: String,
         start: Arc<LspSessionStart>,
     ) -> Result<Arc<Self>, String> {
-        let mut process = build_lsp_server_command(&command.command, &command.args);
+        let mut process = build_lsp_server_command(&command.command, &command.args, &root_path)
+            .map_err(|e| format!("prepare {}: {e}", command.command))?;
         process
             .current_dir(&root_path)
             .stdin(Stdio::piped())
@@ -859,11 +916,18 @@ impl LspSession {
             next_id: AtomicU64::new(1),
             shutting_down: AtomicBool::new(false),
             child: Mutex::new(child),
+            stderr_tail: Mutex::new(String::new()),
         });
 
-        tokio::spawn(read_stdout(session.clone(), stdout, sessions, map_key));
+        tokio::spawn(read_stdout(
+            session.clone(),
+            stdout,
+            sessions,
+            last_errors,
+            map_key,
+        ));
         if let Some(stderr) = stderr {
-            tokio::spawn(read_stderr(session.command.command.clone(), stderr));
+            tokio::spawn(read_stderr(session.clone(), stderr));
         }
 
         let initialize_params = json!({
@@ -958,6 +1022,11 @@ impl LspSession {
         } {
             Ok(result) => result,
             Err(error) => {
+                let error = if let Some(stderr) = session.stderr_snippet().await {
+                    format!("{error} ({stderr})")
+                } else {
+                    error
+                };
                 session.abort(&error).await;
                 return Err(error);
             }
@@ -1066,6 +1135,7 @@ impl LspSession {
 
     async fn handle_message(&self, message: Value) {
         if let Some(id) = message.get("id").and_then(message_id) {
+            // Response to one of our requests.
             if message.get("method").is_none() {
                 let pending = self.pending.lock().await.remove(&id);
                 if let Some(pending) = pending {
@@ -1082,6 +1152,22 @@ impl LspSession {
                 }
                 return;
             }
+
+            // Server → client request. Always answer so servers that wait on
+            // registerCapability / configuration do not stall after initialize.
+            let method = message
+                .get("method")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            let result = server_request_result(method, message.get("params"));
+            let _ = self
+                .write_message(&json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "result": result,
+                }))
+                .await;
+            return;
         }
 
         let Some(method) = message.get("method").and_then(Value::as_str) else {
@@ -1103,6 +1189,18 @@ impl LspSession {
                 .write()
                 .await
                 .insert(uri.to_string(), diagnostics);
+        }
+    }
+
+    async fn stderr_snippet(&self) -> Option<String> {
+        let tail = self.stderr_tail.lock().await;
+        let trimmed = tail.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            // Keep the error toast readable; full log is still in debug logs.
+            let snippet: String = trimmed.chars().rev().take(400).collect::<String>().chars().rev().collect();
+            Some(snippet)
         }
     }
 
@@ -1172,14 +1270,29 @@ fn initialize_timeout_secs(command: &LspServerCommandPreset) -> u64 {
 
 /// Build a process command for an LSP server binary.
 ///
-/// On Windows, `CreateProcess` cannot execute `.cmd`/`.bat` wrappers directly
-/// (common for `jdtls.cmd` and npm global shims). Route those through `cmd.exe /C`
-/// after resolving the absolute path via `which`.
-fn build_lsp_server_command(program: &str, args: &[String]) -> Command {
+/// On Windows:
+/// - Prefer launching Eclipse JDT LS via `java -jar` so stdio is not mediated by
+///   `cmd.exe` / `jdtls.cmd` (which often leaves the session stuck mid-start).
+/// - Other `.cmd`/`.bat` shims (npm globals) go through `cmd.exe /D /S /C` with a
+///   single properly-quoted command line after resolving the absolute path.
+fn build_lsp_server_command(
+    program: &str,
+    args: &[String],
+    workspace_root: &Path,
+) -> Result<Command, String> {
     let program = program.trim();
     #[cfg(windows)]
     {
         let resolved = resolve_server_program(program);
+        if is_jdtls_program(program, &resolved) {
+            if let Some(cmd) = build_jdtls_java_command(&resolved, args, workspace_root) {
+                return Ok(cmd);
+            }
+            log::warn!(
+                "lsp: could not expand jdtls to java -jar; falling back to wrapper at {}",
+                resolved.display()
+            );
+        }
         let is_batch = resolved
             .extension()
             .and_then(|ext| ext.to_str())
@@ -1188,21 +1301,68 @@ fn build_lsp_server_command(program: &str, args: &[String]) -> Command {
             });
         if is_batch {
             let mut cmd = Command::new("cmd.exe");
-            // /D skips AutoRun registry commands that can hang GUI-spawned shells.
-            cmd.arg("/D").arg("/C").arg(resolved.as_os_str());
-            cmd.args(args);
-            return cmd;
+            // /D skips AutoRun; /S keeps the quoted command line intact so paths
+            // with spaces (and trailing args) reach the batch file correctly.
+            cmd.arg("/D")
+                .arg("/S")
+                .arg("/C")
+                .arg(windows_cmd_line(&resolved, args));
+            return Ok(cmd);
         }
         let mut cmd = Command::new(&resolved);
         cmd.args(args);
-        return cmd;
+        return Ok(cmd);
     }
     #[cfg(not(windows))]
     {
+        let _ = workspace_root;
         let mut cmd = Command::new(program);
         cmd.args(args);
-        cmd
+        Ok(cmd)
     }
+}
+
+fn is_jdtls_program(program: &str, resolved: &Path) -> bool {
+    let name = program.to_ascii_lowercase();
+    if name.contains("jdtls") {
+        return true;
+    }
+    resolved
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .is_some_and(|stem| stem.eq_ignore_ascii_case("jdtls"))
+}
+
+/// Quote a Windows cmdline for `cmd.exe /S /C` so the batch path and args are
+/// preserved: `"C:\path\tool.cmd" --stdio`.
+#[cfg(windows)]
+fn windows_cmd_line(program: &Path, args: &[String]) -> String {
+    let mut line = format!("\"{}\"", program.display());
+    for arg in args {
+        line.push(' ');
+        line.push_str(&windows_quote_arg(arg));
+    }
+    line
+}
+
+#[cfg(windows)]
+fn windows_quote_arg(arg: &str) -> String {
+    if arg.is_empty() {
+        return "\"\"".into();
+    }
+    if !arg.chars().any(|c| c.is_whitespace() || c == '"') {
+        return arg.to_string();
+    }
+    let mut out = String::from("\"");
+    for ch in arg.chars() {
+        if ch == '"' {
+            out.push_str("\"\"");
+        } else {
+            out.push(ch);
+        }
+    }
+    out.push('"');
+    out
 }
 
 #[cfg(windows)]
@@ -1214,10 +1374,177 @@ fn resolve_server_program(program: &str) -> PathBuf {
     which::which(program).unwrap_or_else(|_| PathBuf::from(program))
 }
 
+/// Expand `jdtls` / `jdtls.cmd` into a direct `java -jar …` command so the LSP
+/// stdio pipes attach to the JVM, not an intermediate `cmd.exe` process.
+#[cfg(windows)]
+fn build_jdtls_java_command(
+    jdtls_path: &Path,
+    extra_args: &[String],
+    workspace_root: &Path,
+) -> Option<Command> {
+    let jdtls_home = resolve_jdtls_home(jdtls_path)?;
+    let launcher = find_equinox_launcher(&jdtls_home)?;
+    let config_dir = jdtls_home.join("config_win");
+    if !config_dir.is_dir() {
+        log::warn!(
+            "lsp: jdtls config_win missing under {}",
+            jdtls_home.display()
+        );
+        return None;
+    }
+    let java = resolve_java_binary()?;
+    let data_dir = jdtls_data_dir(workspace_root);
+    if let Err(e) = std::fs::create_dir_all(&data_dir) {
+        log::warn!(
+            "lsp: cannot create jdtls data dir {}: {e}",
+            data_dir.display()
+        );
+        return None;
+    }
+    let mut cmd = Command::new(java);
+    cmd.args([
+        "-Declipse.application=org.eclipse.jdt.ls.core.id1",
+        "-Dosgi.bundles.defaultStartLevel=4",
+        "-Declipse.product=org.eclipse.jdt.ls.core.product",
+        "-Dlog.level=ERROR",
+        "-Xmx1G",
+        "-jar",
+    ]);
+    cmd.arg(launcher);
+    cmd.arg("-configuration").arg(config_dir);
+    cmd.arg("-data").arg(data_dir);
+    cmd.args(extra_args);
+    Some(cmd)
+}
+
+#[cfg(windows)]
+fn resolve_jdtls_home(jdtls_path: &Path) -> Option<PathBuf> {
+    if let Ok(home) = std::env::var("JDTLS_HOME") {
+        let home = PathBuf::from(home);
+        if home.join("plugins").is_dir() {
+            return Some(home);
+        }
+    }
+    // Install guide layout: %LOCALAPPDATA%\jdtls-bin\jdtls.cmd + %LOCALAPPDATA%\jdtls
+    if let Some(bin_dir) = jdtls_path.parent() {
+        if let Some(local) = bin_dir.parent() {
+            let candidate = local.join("jdtls");
+            if candidate.join("plugins").is_dir() {
+                return Some(candidate);
+            }
+        }
+        // jdtls.cmd living next to an extracted distribution
+        if bin_dir.join("plugins").is_dir() {
+            return Some(bin_dir.to_path_buf());
+        }
+        if let Some(parent) = bin_dir.parent() {
+            if parent.join("plugins").is_dir() {
+                return Some(parent.to_path_buf());
+            }
+        }
+    }
+    if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+        let candidate = PathBuf::from(local).join("jdtls");
+        if candidate.join("plugins").is_dir() {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+#[cfg(windows)]
+fn find_equinox_launcher(jdtls_home: &Path) -> Option<PathBuf> {
+    let plugins = jdtls_home.join("plugins");
+    let mut matches: Vec<PathBuf> = std::fs::read_dir(&plugins)
+        .ok()?
+        .filter_map(|entry| entry.ok().map(|e| e.path()))
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| {
+                    name.starts_with("org.eclipse.equinox.launcher_") && name.ends_with(".jar")
+                })
+        })
+        .collect();
+    matches.sort();
+    matches.pop()
+}
+
+#[cfg(windows)]
+fn resolve_java_binary() -> Option<PathBuf> {
+    if let Ok(home) = std::env::var("JAVA_HOME") {
+        let candidate = PathBuf::from(home).join("bin").join("java.exe");
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    if let Ok(path) = which::which("java") {
+        return Some(path);
+    }
+    // GUI-launched apps sometimes inherit a PATH that lacks the JDK even when
+    // an interactive shell sees it. Probe the common Oracle/Temurin layouts.
+    for base in [
+        std::env::var_os("ProgramFiles"),
+        std::env::var_os("ProgramFiles(x86)"),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        for vendor in ["Java", "Eclipse Adoptium", "Microsoft", "Amazon Corretto"] {
+            let root = PathBuf::from(&base).join(vendor);
+            if let Ok(entries) = std::fs::read_dir(&root) {
+                let mut versions: Vec<PathBuf> = entries
+                    .filter_map(|entry| entry.ok().map(|e| e.path()))
+                    .filter(|path| path.is_dir())
+                    .collect();
+                versions.sort();
+                for dir in versions.into_iter().rev() {
+                    let candidate = dir.join("bin").join("java.exe");
+                    if candidate.is_file() {
+                        return Some(candidate);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+#[cfg(windows)]
+fn jdtls_data_dir(workspace_root: &Path) -> PathBuf {
+    let mut hasher = DefaultHasher::new();
+    workspace_root.to_string_lossy().hash(&mut hasher);
+    let digest = format!("{:x}", hasher.finish());
+    if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+        return PathBuf::from(local).join("jdtls-ws").join(&digest);
+    }
+    std::env::temp_dir().join("jdtls-ws").join(digest)
+}
+
+fn server_request_result(method: &str, params: Option<&Value>) -> Value {
+    match method {
+        "workspace/configuration" => {
+            let count = params
+                .and_then(|value| value.get("items"))
+                .and_then(Value::as_array)
+                .map(Vec::len)
+                .unwrap_or(0);
+            Value::Array(vec![Value::Null; count])
+        }
+        "window/showMessageRequest" => Value::Null,
+        "window/workDoneProgress/create"
+        | "client/registerCapability"
+        | "client/unregisterCapability"
+        | "workspace/workspaceFolders" => Value::Null,
+        _ => Value::Null,
+    }
+}
+
 async fn read_stdout(
     session: Arc<LspSession>,
     stdout: ChildStdout,
     sessions: LspSessionRegistry,
+    last_errors: LspLastErrorRegistry,
     map_key: String,
 ) {
     let mut reader = BufReader::new(stdout);
@@ -1256,10 +1583,19 @@ async fn read_stdout(
         }
     };
     let expected_shutdown = session.shutting_down.load(Ordering::SeqCst);
+    let reason = if let Some(stderr) = session.stderr_snippet().await {
+        format!("{reason} ({stderr})")
+    } else {
+        reason
+    };
     if expected_shutdown {
         session.fail_pending(&reason).await;
     } else {
         session.abort(&reason).await;
+        last_errors
+            .lock()
+            .await
+            .insert(map_key.clone(), reason.clone());
     }
     remove_exited_session(&sessions, &map_key, &session).await;
     if expected_shutdown {
@@ -1284,11 +1620,25 @@ async fn remove_exited_session(
     }
 }
 
-async fn read_stderr(command: String, stderr: ChildStderr) {
+async fn read_stderr(session: Arc<LspSession>, stderr: ChildStderr) {
+    let command = session.command.command.clone();
     let mut lines = BufReader::new(stderr).lines();
     loop {
         match lines.next_line().await {
-            Ok(Some(line)) => log::debug!("lsp:{command}: {line}"),
+            Ok(Some(line)) => {
+                log::debug!("lsp:{command}: {line}");
+                let mut tail = session.stderr_tail.lock().await;
+                if !tail.is_empty() {
+                    tail.push('\n');
+                }
+                tail.push_str(&line);
+                // Cap memory if a server spams stderr.
+                const MAX: usize = 8_192;
+                let len = tail.len();
+                if len > MAX {
+                    *tail = tail[len - MAX..].to_string();
+                }
+            }
             Ok(None) => return,
             Err(e) => {
                 log::debug!("lsp:{command}: stderr read failed: {e}");
@@ -4623,7 +4973,55 @@ mod tests {
         // On every platform the non-batch path must still invoke the program name.
         // Windows batch routing is covered by platform integration; here we only
         // assert the builder returns a Command without panicking for a plain binary.
-        let _cmd = build_lsp_server_command("rust-analyzer", &["--version".into()]);
+        let root = PathBuf::from("/tmp/workspace");
+        let _cmd = build_lsp_server_command("rust-analyzer", &["--version".into()], &root)
+            .expect("command builder");
+    }
+
+    #[test]
+    fn server_request_result_answers_configuration_with_matching_length() {
+        let params = json!({
+            "items": [
+                { "section": "java" },
+                { "section": "editor" }
+            ]
+        });
+        let result = server_request_result("workspace/configuration", Some(&params));
+        assert_eq!(result, json!([null, null]));
+        assert_eq!(
+            server_request_result("client/registerCapability", None),
+            Value::Null
+        );
+    }
+
+    #[test]
+    fn is_jdtls_program_detects_wrapper_names() {
+        assert!(is_jdtls_program("jdtls", Path::new("jdtls")));
+        assert!(is_jdtls_program(
+            r"C:\Users\me\AppData\Local\jdtls-bin\jdtls.cmd",
+            Path::new(r"C:\Users\me\AppData\Local\jdtls-bin\jdtls.cmd")
+        ));
+        assert!(!is_jdtls_program(
+            "rust-analyzer",
+            Path::new("rust-analyzer")
+        ));
+    }
+
+    #[test]
+    fn windows_cmd_line_quotes_paths_with_spaces() {
+        #[cfg(windows)]
+        {
+            let line = windows_cmd_line(
+                Path::new(r"C:\Program Files\tools\server.cmd"),
+                &["--stdio".into()],
+            );
+            assert_eq!(line, r#""C:\Program Files\tools\server.cmd" --stdio"#);
+        }
+        #[cfg(not(windows))]
+        {
+            // windows_cmd_line is Windows-only; keep the test compiling.
+            assert!(true);
+        }
     }
 
     #[test]

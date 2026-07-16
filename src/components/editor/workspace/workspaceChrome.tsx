@@ -41,15 +41,20 @@ export function LspStatusPill({
   const errors = diagnostics.filter((item) => item.severity === 1).length;
   const warnings = diagnostics.filter((item) => item.severity === 2).length;
   const runtimeError = status.error ?? state.error;
+  const name = status.displayName ?? "LSP";
+  // "starting…" only while a sync/open is in flight. A silent available+!active
+  // after the process exits used to look stuck forever on "Java starting…".
   const label = status.active
-    ? `${status.displayName ?? "LSP"}${errors || warnings ? ` · ${errors}E ${warnings}W` : ""}`
+    ? `${name}${errors || warnings ? ` · ${errors}E ${warnings}W` : ""}`
     : runtimeError
       ? runtimeError
       : !status.available && status.installHint
         ? `Install: ${status.installHint}`
         : !status.available
           ? "No LSP"
-          : `${status.displayName ?? "LSP"} starting…`;
+          : state.syncing
+            ? `${name} starting…`
+            : `${name} inactive`;
   const showSettingsLink = lspNeedsSetup(state) && !!onOpenSettings;
   const settingsLabel = t("settings.languageServersOpenSettings");
   const title = showSettingsLink ? `${label} · ${settingsLabel}` : label;
