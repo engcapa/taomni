@@ -1,7 +1,7 @@
 use super::*;
 use crate::agent::acp_bridge::{
-    AcpResourceLink, AcpRuntimeEvent, AcpStopReason, AcpThreadProcess, GROK_PROFILE_ID,
-    profile_id_from_provider_id,
+    AcpPermissionPrompt, AcpResourceLink, AcpRuntimeEvent, AcpStopReason, AcpThreadProcess,
+    GROK_PROFILE_ID, profile_id_from_provider_id,
 };
 use crate::agent::local::LocalAgentEvent;
 use std::collections::HashMap;
@@ -23,6 +23,22 @@ pub(super) async fn recycle_if_profile_changed(
     };
     if let Some(process) = process {
         process.stop().await;
+    }
+}
+
+/// Stop an in-flight short-lived Grok media ACP process when its thread is
+/// deleted or rebound to another provider. Unlike normal ACP chat processes,
+/// media processes are not reusable and must never survive their owner.
+pub(super) async fn recycle_media_process(state: &AppState, app: &AppHandle, thread_id: &str) {
+    let process = { state.acp_media_processes.lock().await.remove(thread_id) };
+    if let Some(process) = process {
+        let permission_owner_id = process.permission_owner_id().to_string();
+        process.stop().await;
+        // `stop` normally emits a Closed event, but remove a visible card here
+        // as well so a deleted/rebound thread cannot retain an actionable gate.
+        // Scope this to the retired media process: a reusable ACP chat process
+        // for the same thread may still have its own independent card.
+        dismiss_acp_permission(app, thread_id, Some(&permission_owner_id), None);
     }
 }
 
@@ -148,6 +164,7 @@ pub(super) async fn stream(
     // image `resource_link`s, which preserve the attachment as a local file
     // instead of embedding image bytes in the ACP stream.
     let resource_links = grok_image_resource_links(profile_id, attachments);
+    let permission_owner_id = process.permission_owner_id().to_string();
     let mut updates = process.subscribe();
     let mut prompt_future = Box::pin(async {
         if resource_links.is_empty() {
@@ -164,7 +181,15 @@ pub(super) async fn stream(
             result = &mut prompt_future => break result,
             update = updates.recv() => {
                 match update {
-                    Ok(update) => accumulator.handle(app, event_name, &assistant_id, update),
+                    Ok(update) => accumulator.handle(
+                        app,
+                        event_name,
+                        &assistant_id,
+                        &req.thread_id,
+                        &permission_owner_id,
+                        &profile.name,
+                        update,
+                    ),
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => {
                         break prompt_future.await;
@@ -174,7 +199,15 @@ pub(super) async fn stream(
         }
     };
     while let Ok(update) = updates.try_recv() {
-        accumulator.handle(app, event_name, &assistant_id, update);
+        accumulator.handle(
+            app,
+            event_name,
+            &assistant_id,
+            &req.thread_id,
+            &permission_owner_id,
+            &profile.name,
+            update,
+        );
     }
     state.chat_runs.lock().await.remove(&req.thread_id);
 
@@ -450,6 +483,7 @@ fn grok_image_resource_links(
 pub(super) async fn generate_grok_media(
     app: &AppHandle,
     state: &AppState,
+    thread_id: &str,
     bridge: &crate::agent::acp_bridge::AcpBridgeConfig,
     profile: &crate::agent::acp_bridge::AcpProfileConfig,
     kind: MediaGenerationKind,
@@ -468,9 +502,25 @@ pub(super) async fn generate_grok_media(
         proxy_url.as_deref(),
         bridge.request_timeout(),
     )?;
-    let process = crate::agent::acp_bridge::AcpProcess::spawn(process_config)
-        .await
-        .map_err(|error| error.to_string())?;
+    let process = Arc::new(
+        crate::agent::acp_bridge::AcpProcess::spawn(process_config)
+            .await
+            .map_err(|error| error.to_string())?,
+    );
+    let permission_owner_id = process.permission_owner_id().to_string();
+    let already_running = {
+        let mut registry = state.acp_media_processes.lock().await;
+        if registry.contains_key(thread_id) {
+            true
+        } else {
+            registry.insert(thread_id.to_string(), process.clone());
+            false
+        }
+    };
+    if already_running {
+        process.stop().await;
+        return Err("Grok media generation is already active for this chat thread.".into());
+    }
 
     let result = async {
         let agent_info = process
@@ -502,14 +552,36 @@ pub(super) async fn generate_grok_media(
             .map_err(|error| error.to_string())?;
         let resource_links = grok_image_resource_links(&profile.id, attachments);
         let media_prompt = grok_media_prompt(kind, prompt, !resource_links.is_empty());
-        let candidates =
-            collect_grok_media_candidates(&process, &session_id, &media_prompt, &resource_links)
-                .await?;
+        let candidates = collect_grok_media_candidates(
+            app,
+            thread_id,
+            &permission_owner_id,
+            &profile.name,
+            process.as_ref(),
+            &session_id,
+            &media_prompt,
+            &resource_links,
+        )
+        .await?;
         copy_grok_generated_media(app, kind, &candidates, &profile.name).await
     }
     .await;
 
+    let was_registered = {
+        let mut registry = state.acp_media_processes.lock().await;
+        if registry
+            .get(thread_id)
+            .is_some_and(|registered| Arc::ptr_eq(registered, &process))
+        {
+            registry.remove(thread_id).is_some()
+        } else {
+            false
+        }
+    };
     process.stop().await;
+    if was_registered {
+        dismiss_acp_permission(app, thread_id, Some(&permission_owner_id), None);
+    }
     result
 }
 
@@ -532,6 +604,10 @@ fn grok_media_prompt(kind: MediaGenerationKind, prompt: &str, has_reference_imag
 }
 
 async fn collect_grok_media_candidates(
+    app: &AppHandle,
+    thread_id: &str,
+    permission_owner_id: &str,
+    source_label: &str,
     process: &crate::agent::acp_bridge::AcpProcess,
     session_id: &str,
     prompt: &str,
@@ -553,7 +629,14 @@ async fn collect_grok_media_candidates(
             result = &mut prompt_future => break result,
             update = updates.recv() => {
                 match update {
-                    Ok(update) => collect_grok_media_candidate(update, &mut candidates),
+                    Ok(update) => collect_grok_media_event(
+                        app,
+                        thread_id,
+                        permission_owner_id,
+                        source_label,
+                        update,
+                        &mut candidates,
+                    ),
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => break prompt_future.await,
                 }
@@ -561,7 +644,14 @@ async fn collect_grok_media_candidates(
         }
     };
     while let Ok(update) = updates.try_recv() {
-        collect_grok_media_candidate(update, &mut candidates);
+        collect_grok_media_event(
+            app,
+            thread_id,
+            permission_owner_id,
+            source_label,
+            update,
+            &mut candidates,
+        );
     }
 
     let result = prompt_result.map_err(|error| error.to_string())?;
@@ -571,15 +661,41 @@ async fn collect_grok_media_candidates(
     Ok(candidates)
 }
 
-fn collect_grok_media_candidate(event: AcpRuntimeEvent, candidates: &mut Vec<String>) {
-    let AcpRuntimeEvent::SessionUpdate(update) = event else {
-        return;
-    };
-    let Some(media) = update.generated_media else {
-        return;
-    };
-    if !candidates.iter().any(|candidate| candidate == &media.path) {
-        candidates.push(media.path);
+fn collect_grok_media_event(
+    app: &AppHandle,
+    thread_id: &str,
+    permission_owner_id: &str,
+    source_label: &str,
+    event: AcpRuntimeEvent,
+    candidates: &mut Vec<String>,
+) {
+    match event {
+        AcpRuntimeEvent::SessionUpdate(update) => {
+            let Some(media) = update.generated_media else {
+                return;
+            };
+            if !candidates.iter().any(|candidate| candidate == &media.path) {
+                candidates.push(media.path);
+            }
+        }
+        AcpRuntimeEvent::PermissionRequest(permission) => {
+            emit_acp_permission(
+                app,
+                thread_id,
+                permission_owner_id,
+                source_label,
+                permission,
+            );
+        }
+        AcpRuntimeEvent::PermissionResolved { call_id } => {
+            dismiss_acp_permission(app, thread_id, Some(permission_owner_id), Some(&call_id));
+        }
+        AcpRuntimeEvent::Closed => {
+            dismiss_acp_permission(app, thread_id, Some(permission_owner_id), None)
+        }
+        AcpRuntimeEvent::ProtocolWarning { message } => {
+            tracing::warn!("ACP protocol warning during Grok media generation: {message}");
+        }
     }
 }
 
@@ -744,12 +860,65 @@ struct AcpEventAccumulator {
     tool_names: HashMap<String, String>,
 }
 
+/// Forward only the data required to render and resolve a standard ACP
+/// permission gate. In particular, raw tool input, ACP session ids,
+/// tool-call ids, and agent-authored option labels stay in the backend.
+fn emit_acp_permission(
+    app: &AppHandle,
+    thread_id: &str,
+    permission_owner_id: &str,
+    source_label: &str,
+    permission: AcpPermissionPrompt,
+) {
+    let options = permission
+        .options
+        .into_iter()
+        .map(|option| {
+            json!({
+                "optionId": option.option_id,
+                "kind": option.kind,
+            })
+        })
+        .collect::<Vec<_>>();
+    let _ = app.emit(
+        "agent-acp-permission",
+        json!({
+            "callId": permission.call_id,
+            "threadId": thread_id,
+            "permissionOwnerId": permission_owner_id,
+            "sourceLabel": source_label,
+            "title": permission.title,
+            "kind": permission.kind,
+            "options": options,
+        }),
+    );
+}
+
+fn dismiss_acp_permission(
+    app: &AppHandle,
+    thread_id: &str,
+    permission_owner_id: Option<&str>,
+    call_id: Option<&str>,
+) {
+    let _ = app.emit(
+        "agent-acp-permission-dismissed",
+        json!({
+            "threadId": thread_id,
+            "permissionOwnerId": permission_owner_id,
+            "callId": call_id,
+        }),
+    );
+}
+
 impl AcpEventAccumulator {
     fn handle(
         &mut self,
         app: &AppHandle,
         event_name: &str,
         assistant_id: &str,
+        thread_id: &str,
+        permission_owner_id: &str,
+        source_label: &str,
         event: AcpRuntimeEvent,
     ) {
         match event {
@@ -758,10 +927,25 @@ impl AcpEventAccumulator {
                     self.handle_local_event(app, event_name, assistant_id, event);
                 }
             }
+            AcpRuntimeEvent::PermissionRequest(permission) => {
+                emit_acp_permission(
+                    app,
+                    thread_id,
+                    permission_owner_id,
+                    source_label,
+                    permission,
+                );
+            }
+            AcpRuntimeEvent::PermissionResolved { call_id } => {
+                dismiss_acp_permission(app, thread_id, Some(permission_owner_id), Some(&call_id));
+            }
             AcpRuntimeEvent::ProtocolWarning { message } => {
                 tracing::warn!("ACP protocol warning: {message}");
             }
-            AcpRuntimeEvent::Closed | AcpRuntimeEvent::SessionUpdate(_) => {}
+            AcpRuntimeEvent::Closed => {
+                dismiss_acp_permission(app, thread_id, Some(permission_owner_id), None)
+            }
+            AcpRuntimeEvent::SessionUpdate(_) => {}
         }
     }
 

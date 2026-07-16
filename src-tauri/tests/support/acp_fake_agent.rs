@@ -87,6 +87,38 @@ fn main() {
                     }),
                 );
             }
+            Some("session/prompt") if scenario == "permission-request" => {
+                pending_prompt_id = id;
+                send(
+                    &mut stdout,
+                    json!({
+                        "jsonrpc": "2.0",
+                        "id": "permission-1",
+                        "method": "session/request_permission",
+                        "params": {
+                            "sessionId": "fake-session",
+                            "toolCall": {
+                                "toolCallId": "tool-permission-1",
+                                "title": "Write README.md",
+                                "kind": "edit",
+                                "rawInput": { "secret": "must-not-reach-ui" },
+                            },
+                            "options": [
+                                {
+                                    "optionId": "allow-once",
+                                    "name": "Allow once",
+                                    "kind": "allow_once",
+                                },
+                                {
+                                    "optionId": "reject-once",
+                                    "name": "Deny",
+                                    "kind": "reject_once",
+                                },
+                            ],
+                        },
+                    }),
+                );
+            }
             Some("session/prompt") => {
                 if scenario == "malformed-then-valid" {
                     writeln!(stdout, "not-json").expect("write malformed fixture");
@@ -129,6 +161,27 @@ fn main() {
             None if message.get("id") == Some(&Value::String("peer-fs-1".into())) => {
                 if let Some(id) = pending_prompt_id.take() {
                     respond(&mut stdout, Some(id), json!({ "stopReason": "end_turn" }));
+                }
+            }
+            None if message.get("id") == Some(&Value::String("permission-1".into())) => {
+                let selected = message
+                    .get("result")
+                    .and_then(|result| result.get("outcome"))
+                    .and_then(|outcome| outcome.get("outcome"))
+                    .and_then(Value::as_str);
+                let option_id = message
+                    .get("result")
+                    .and_then(|result| result.get("outcome"))
+                    .and_then(|outcome| outcome.get("optionId"))
+                    .and_then(Value::as_str);
+                let stop_reason = if selected == Some("selected") && option_id == Some("allow-once")
+                {
+                    "end_turn"
+                } else {
+                    "cancelled"
+                };
+                if let Some(id) = pending_prompt_id.take() {
+                    respond(&mut stdout, Some(id), json!({ "stopReason": stop_reason }));
                 }
             }
             _ => respond_error(&mut stdout, id, -32601, "fixture method not found"),

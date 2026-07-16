@@ -13,6 +13,7 @@ pub const METHOD_SESSION_LOAD: &str = "session/load";
 pub const METHOD_SESSION_PROMPT: &str = "session/prompt";
 pub const METHOD_SESSION_CANCEL: &str = "session/cancel";
 pub const METHOD_SESSION_UPDATE: &str = "session/update";
+pub const METHOD_SESSION_REQUEST_PERMISSION: &str = "session/request_permission";
 
 /// JSON-RPC IDs accepted by ACP. Taomni emits monotonically increasing numeric
 /// IDs, but string IDs are parsed too so unexpected peer requests can receive a
@@ -84,9 +85,10 @@ impl AcpNotification {
 
 /// The supported subset of JSON-RPC envelopes received from an ACP agent.
 ///
-/// Agent-to-client requests are retained so the stdio runtime can reject
-/// filesystem, terminal, and permission calls explicitly instead of silently
-/// dropping them. Taomni does not advertise those capabilities in v1.
+/// Agent-to-client requests are retained so the stdio runtime can surface the
+/// standard permission request through a human gate while explicitly rejecting
+/// filesystem, terminal, and other unsupported calls. Taomni does not
+/// advertise those capabilities in v1.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AcpIncomingMessage {
     Response {
@@ -123,6 +125,7 @@ pub enum AcpProtocolError {
     InvalidEnvelope(&'static str),
     InvalidRequestId,
     InvalidInitializeResponse(&'static str),
+    InvalidPermissionRequest(&'static str),
     MissingSessionId,
     MissingPromptStopReason,
 }
@@ -136,6 +139,9 @@ impl fmt::Display for AcpProtocolError {
             Self::InvalidRequestId => f.write_str("ACP message contains an invalid request id"),
             Self::InvalidInitializeResponse(detail) => {
                 write!(f, "invalid ACP initialize response: {detail}")
+            }
+            Self::InvalidPermissionRequest(detail) => {
+                write!(f, "invalid ACP permission request: {detail}")
             }
             Self::MissingSessionId => {
                 f.write_str("ACP session response did not include a session id")
@@ -221,6 +227,173 @@ pub fn parse_incoming_line(line: &str) -> Result<AcpIncomingMessage, AcpProtocol
             message: truncate_display_text(message, 500),
         },
     })
+}
+
+/// A permission option whose opaque id is returned to the ACP agent only
+/// after the user explicitly selects it. The request parser keeps just the
+/// display-safe fields needed by the confirmation UI; `rawInput` and other
+/// tool metadata are deliberately discarded.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AcpPermissionOption {
+    pub option_id: String,
+    pub name: String,
+    pub kind: AcpPermissionOptionKind,
+}
+
+/// ACP v1 permission choices supported by Taomni's human confirmation gate.
+/// Unknown choices are rejected rather than presented with ambiguous safety
+/// semantics.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AcpPermissionOptionKind {
+    AllowOnce,
+    AllowAlways,
+    RejectOnce,
+    RejectAlways,
+}
+
+/// The safe subset of an agent-originated `session/request_permission` call.
+/// Session and tool-call ids stay inside the runtime; the UI receives only the
+/// title, kind, and explicitly offered choices.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AcpPermissionRequest {
+    pub session_id: String,
+    pub tool_call_id: String,
+    pub title: String,
+    pub kind: String,
+    pub options: Vec<AcpPermissionOption>,
+}
+
+/// Parse a standard ACP `session/request_permission` request without
+/// retaining raw tool arguments. The agent's option ids are opaque, so they
+/// are kept exactly as sent and validated again before resolving the request.
+pub fn parse_permission_request(params: &Value) -> Result<AcpPermissionRequest, AcpProtocolError> {
+    let params = params
+        .as_object()
+        .ok_or(AcpProtocolError::InvalidPermissionRequest(
+            "params are not an object",
+        ))?;
+    let session_id = permission_identifier(params.get("sessionId"), "sessionId")?;
+    let tool_call = params.get("toolCall").and_then(Value::as_object).ok_or(
+        AcpProtocolError::InvalidPermissionRequest("toolCall is missing"),
+    )?;
+    let tool_call_id = permission_identifier(tool_call.get("toolCallId"), "toolCallId")?;
+    let title = tool_call
+        .get("title")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|title| !title.is_empty())
+        .map(|title| truncate_display_text(title, 240))
+        .unwrap_or_else(|| "Tool action".into());
+    let kind = tool_call
+        .get("kind")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|kind| !kind.is_empty())
+        .map(|kind| truncate_display_text(kind, 80))
+        .unwrap_or_else(|| "tool".into());
+    let options = params
+        .get("options")
+        .and_then(Value::as_array)
+        .filter(|options| !options.is_empty())
+        .ok_or(AcpProtocolError::InvalidPermissionRequest(
+            "options are missing",
+        ))?
+        .iter()
+        .map(parse_permission_option)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    if options.len() > 8 {
+        return Err(AcpProtocolError::InvalidPermissionRequest(
+            "too many options",
+        ));
+    }
+    let mut seen = std::collections::HashSet::new();
+    if options
+        .iter()
+        .any(|option| !seen.insert(option.option_id.as_str()))
+    {
+        return Err(AcpProtocolError::InvalidPermissionRequest(
+            "option ids are not unique",
+        ));
+    }
+
+    Ok(AcpPermissionRequest {
+        session_id,
+        tool_call_id,
+        title,
+        kind,
+        options,
+    })
+}
+
+/// Build the ACP success response for a human-selected permission option.
+pub fn permission_selected_response(id: AcpRequestId, option_id: &str) -> Value {
+    json!({
+        "jsonrpc": JSON_RPC_VERSION,
+        "id": id,
+        "result": {
+            "outcome": {
+                "outcome": "selected",
+                "optionId": option_id,
+            },
+        },
+    })
+}
+
+/// Build the ACP success response for a cancelled or expired confirmation.
+pub fn permission_cancelled_response(id: AcpRequestId) -> Value {
+    json!({
+        "jsonrpc": JSON_RPC_VERSION,
+        "id": id,
+        "result": { "outcome": { "outcome": "cancelled" } },
+    })
+}
+
+fn parse_permission_option(value: &Value) -> Result<AcpPermissionOption, AcpProtocolError> {
+    let option = value
+        .as_object()
+        .ok_or(AcpProtocolError::InvalidPermissionRequest(
+            "option is not an object",
+        ))?;
+    let option_id = permission_identifier(option.get("optionId"), "optionId")?;
+    let name = option
+        .get("name")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(|name| truncate_display_text(name, 160))
+        .ok_or(AcpProtocolError::InvalidPermissionRequest(
+            "option name is missing",
+        ))?;
+    let kind = match option.get("kind").and_then(Value::as_str) {
+        Some("allow_once") => AcpPermissionOptionKind::AllowOnce,
+        Some("allow_always") => AcpPermissionOptionKind::AllowAlways,
+        Some("reject_once") => AcpPermissionOptionKind::RejectOnce,
+        Some("reject_always") => AcpPermissionOptionKind::RejectAlways,
+        _ => {
+            return Err(AcpProtocolError::InvalidPermissionRequest(
+                "option kind is unsupported",
+            ));
+        }
+    };
+    Ok(AcpPermissionOption {
+        option_id,
+        name,
+        kind,
+    })
+}
+
+fn permission_identifier(
+    value: Option<&Value>,
+    field: &'static str,
+) -> Result<String, AcpProtocolError> {
+    let value = value
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty() && value.chars().count() <= 256)
+        .ok_or(AcpProtocolError::InvalidPermissionRequest(field))?;
+    Ok(value.to_string())
 }
 
 /// Build the restricted initialize request used for every ACP profile.
@@ -892,6 +1065,71 @@ mod tests {
                 method: "fs/read_text_file".into(),
                 params: json!({}),
             },
+        );
+    }
+
+    #[test]
+    fn parses_safe_permission_requests_and_builds_standard_outcomes() {
+        let request = parse_permission_request(&json!({
+            "sessionId": "session-1",
+            "toolCall": {
+                "toolCallId": "tool-1",
+                "title": "Edit README.md",
+                "kind": "edit",
+                "rawInput": { "api_key": "must-not-retain" },
+            },
+            "options": [
+                {
+                    "optionId": "allow-once",
+                    "name": "Allow once",
+                    "kind": "allow_once",
+                },
+                {
+                    "optionId": "reject-once",
+                    "name": "Deny",
+                    "kind": "reject_once",
+                },
+            ],
+        }))
+        .unwrap();
+        assert_eq!(request.session_id, "session-1");
+        assert_eq!(request.tool_call_id, "tool-1");
+        assert_eq!(request.title, "Edit README.md");
+        assert_eq!(request.options[0].kind, AcpPermissionOptionKind::AllowOnce);
+        assert!(!format!("{request:?}").contains("must-not-retain"));
+        assert_eq!(
+            permission_selected_response(AcpRequestId::String("permission-1".into()), "allow-once"),
+            json!({
+                "jsonrpc": "2.0",
+                "id": "permission-1",
+                "result": { "outcome": { "outcome": "selected", "optionId": "allow-once" } },
+            }),
+        );
+        assert_eq!(
+            permission_cancelled_response(AcpRequestId::Number(2)),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 2,
+                "result": { "outcome": { "outcome": "cancelled" } },
+            }),
+        );
+    }
+
+    #[test]
+    fn rejects_ambiguous_permission_options() {
+        let error = parse_permission_request(&json!({
+            "sessionId": "session-1",
+            "toolCall": { "toolCallId": "tool-1" },
+            "options": [{
+                "optionId": "maybe",
+                "name": "Maybe",
+                "kind": "ask_later",
+            }],
+        }))
+        .unwrap_err();
+        assert_eq!(
+            error,
+            AcpProtocolError::InvalidPermissionRequest("option kind is unsupported")
         );
     }
 

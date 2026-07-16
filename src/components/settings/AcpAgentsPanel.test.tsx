@@ -131,7 +131,7 @@ describe("AcpAgentsPanel", () => {
             profiles: [expect.objectContaining({
               id: "grok",
               command: "grok",
-              args: ["agent", "stdio"],
+              args: ["--permission-mode", "default", "agent", "--no-leader", "stdio"],
               enabled: true,
             })],
           }),

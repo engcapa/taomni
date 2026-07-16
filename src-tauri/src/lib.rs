@@ -657,6 +657,8 @@ pub fn run() {
             agent::search::key_storage::keyring_get,
             agent::search::key_storage::keyring_delete,
             agent::acp_bridge::commands::acp_probe_profile,
+            agent::acp_bridge::commands::acp_resolve_permission,
+            agent::acp_bridge::commands::acp_cancel_permission,
             agent::cc_bridge::commands::cc_detect,
             agent::cc_bridge::commands::cc_get_custom_settings,
             agent::cc_bridge::commands::cc_get_profile_settings,

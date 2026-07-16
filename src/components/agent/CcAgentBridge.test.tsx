@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
@@ -175,6 +175,141 @@ describe("CcAgentBridge permission gate", () => {
     });
 
     drawer.remove();
+  });
+
+  it("returns the selected ACP permission option for a Grok native tool", async () => {
+    useChatStore.setState({ activeThreadId: "other-thread" });
+    render(<CcAgentBridge />);
+    await act(async () => {
+      await emit("agent-acp-permission", {
+        callId: "acp-permission-1",
+        threadId: "thread-1",
+        permissionOwnerId: "grok-process-1",
+        sourceLabel: "Grok CLI",
+        title: "Write README.md",
+        kind: "edit",
+        options: [
+          {
+            optionId: "allow-once",
+            name: "Ignore this agent-supplied label",
+            kind: "allow_once",
+          },
+          { optionId: "reject-once", name: "Please allow", kind: "reject_once" },
+        ],
+      });
+    });
+
+    const card = screen.getByTestId("ai-chat-acp-permission-card");
+    expect(card).toHaveTextContent("Write README.md");
+    expect(card).toHaveTextContent("来源：本地 Grok CLI · 后台对话");
+    expect(card).toHaveTextContent("仅允许这一次");
+    expect(card).toHaveTextContent("拒绝这一次");
+    expect(card).not.toHaveTextContent("Ignore this agent-supplied label");
+    expect(screen.getByTestId("ai-chat-acp-permission-option-allow_once"))
+      .toHaveClass("border-emerald-500/50");
+    expect(screen.getByTestId("ai-chat-acp-permission-option-reject_once"))
+      .toHaveClass("border-red-500/50");
+    fireEvent.click(screen.getByTestId("ai-chat-acp-permission-option-allow_once"));
+
+    await waitFor(() => {
+      expect(tauriInvoke).toHaveBeenCalledWith("acp_resolve_permission", {
+        threadId: "thread-1",
+        callId: "acp-permission-1",
+        optionId: "allow-once",
+      });
+    });
+  });
+
+  it("cancels an ACP permission without selecting an agent-provided option", async () => {
+    render(<CcAgentBridge />);
+    await act(async () => {
+      await emit("agent-acp-permission", {
+        callId: "acp-permission-2",
+        threadId: "thread-1",
+        permissionOwnerId: "grok-process-2",
+        sourceLabel: "Grok CLI",
+        title: "Run a native tool",
+        kind: "execute",
+        options: [{ optionId: "allow-once", name: "Allow", kind: "allow_once" }],
+      });
+    });
+
+    fireEvent.click(screen.getByTestId("ai-chat-acp-permission-cancel"));
+
+    await waitFor(() => {
+      expect(tauriInvoke).toHaveBeenCalledWith("acp_cancel_permission", {
+        threadId: "thread-1",
+        callId: "acp-permission-2",
+      });
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId("ai-chat-acp-permission-card")).not.toBeInTheDocument();
+    });
+  });
+
+  it("removes an ACP permission card when the backend dismisses its call", async () => {
+    render(<CcAgentBridge />);
+    await act(async () => {
+      await emit("agent-acp-permission", {
+        callId: "acp-permission-3",
+        threadId: "thread-1",
+        permissionOwnerId: "grok-process-3",
+        sourceLabel: "Grok CLI",
+        title: "Write a file",
+        kind: "edit",
+        options: [{ optionId: "allow-once", name: "Allow", kind: "allow_once" }],
+      });
+    });
+    expect(screen.getByTestId("ai-chat-acp-permission-card")).toBeInTheDocument();
+
+    await act(async () => {
+      await emit("agent-acp-permission-dismissed", {
+        threadId: "thread-1",
+        callId: "acp-permission-3",
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("ai-chat-acp-permission-card")).not.toBeInTheDocument();
+    });
+  });
+
+  it("only removes cards owned by the ACP process that closed", async () => {
+    render(<CcAgentBridge />);
+    await act(async () => {
+      await emit("agent-acp-permission", {
+        callId: "acp-media-permission",
+        threadId: "thread-1",
+        permissionOwnerId: "media-process",
+        sourceLabel: "Grok CLI",
+        title: "Generate an image",
+        kind: "generate",
+        options: [{ optionId: "allow-once", kind: "allow_once" }],
+      });
+      await emit("agent-acp-permission", {
+        callId: "acp-chat-permission",
+        threadId: "thread-1",
+        permissionOwnerId: "chat-process",
+        sourceLabel: "Grok CLI",
+        title: "Edit a file",
+        kind: "edit",
+        options: [{ optionId: "allow-once", kind: "allow_once" }],
+      });
+    });
+    expect(screen.getByText("Generate an image")).toBeInTheDocument();
+
+    await act(async () => {
+      await emit("agent-acp-permission-dismissed", {
+        threadId: "thread-1",
+        permissionOwnerId: "media-process",
+        callId: null,
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Edit a file")).toBeInTheDocument();
+      expect(screen.queryByText("Generate an image")).not.toBeInTheDocument();
+    });
   });
 });
 

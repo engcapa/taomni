@@ -1,4 +1,4 @@
-use super::{AcpAgentInfo, AcpProcess, AcpProfileConfig, process_config};
+use super::{AcpAgentInfo, AcpProcess, AcpProfileConfig, AcpRuntimeError, process_config};
 use crate::state::AppState;
 use serde::Serialize;
 use std::path::Path;
@@ -41,6 +41,78 @@ pub async fn acp_probe_profile(
     let proxy_url = super::resolve_effective_proxy_url(state.inner(), &bridge, &profile)?;
     let cwd = std::env::current_dir().map_err(|error| error.to_string())?;
     Ok(probe_profile(&profile, proxy_url.as_deref(), &cwd).await)
+}
+
+/// Resolve one ACP agent-native permission request after the user makes an
+/// explicit choice in the AI Chat safety gate. The generated call id is scoped
+/// to the thread's live ACP process, and the process validates the option id
+/// before replying to the local CLI.
+#[tauri::command]
+pub async fn acp_resolve_permission(
+    thread_id: String,
+    call_id: String,
+    option_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let thread_process = {
+        let registry = state.acp_processes.lock().await;
+        registry.get(&thread_id).cloned()
+    };
+    if let Some(process) = thread_process {
+        match process.resolve_permission(&call_id, &option_id).await {
+            Ok(()) => return Ok(()),
+            // A thread can briefly retain its reusable chat process while an
+            // image/video request uses a separate short-lived ACP process.
+            // Only fall through on a missing call id; a matching prompt with
+            // an invalid option must remain an error.
+            Err(AcpRuntimeError::PermissionNotPending) => {}
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+    let media_process = {
+        let registry = state.acp_media_processes.lock().await;
+        registry.get(&thread_id).cloned()
+    };
+    if let Some(process) = media_process {
+        return process
+            .resolve_permission(&call_id, &option_id)
+            .await
+            .map_err(|error| error.to_string());
+    }
+    Err("ACP thread is no longer active".to_string())
+}
+
+/// Cancel a single ACP native-tool permission. This sends ACP's explicit
+/// `cancelled` outcome instead of pretending a provider-defined reject option
+/// was selected.
+#[tauri::command]
+pub async fn acp_cancel_permission(
+    thread_id: String,
+    call_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let thread_process = {
+        let registry = state.acp_processes.lock().await;
+        registry.get(&thread_id).cloned()
+    };
+    if let Some(process) = thread_process {
+        match process.cancel_permission(&call_id).await {
+            Ok(()) => return Ok(()),
+            Err(AcpRuntimeError::PermissionNotPending) => {}
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+    let media_process = {
+        let registry = state.acp_media_processes.lock().await;
+        registry.get(&thread_id).cloned()
+    };
+    if let Some(process) = media_process {
+        return process
+            .cancel_permission(&call_id)
+            .await
+            .map_err(|error| error.to_string());
+    }
+    Err("ACP thread is no longer active".to_string())
 }
 
 pub async fn probe_profile(

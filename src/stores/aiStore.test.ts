@@ -137,10 +137,11 @@ describe("ACP media provider capabilities", () => {
     expect(chatDrawerProviderIds(makeConfig([grok]), "video_generation")).toEqual([]);
   });
 
-  it("normalizes a saved legacy Grok profile with its media capabilities", async () => {
+  it("normalizes a saved legacy Grok profile with media capabilities and safe args", async () => {
     const legacyGrok = enabledGrok();
     delete legacyGrok.capabilities;
     legacyGrok.id = " grok ";
+    legacyGrok.args = ["agent", "stdio"];
     invokeMock.mockResolvedValue(makeConfig([legacyGrok]));
 
     await useAiStore.getState().loadConfig();
@@ -149,5 +150,12 @@ describe("ACP media provider capabilities", () => {
       image_generation: true,
       video_generation: true,
     });
+    expect(useAiStore.getState().config?.acp_bridge.profiles[0].args).toEqual([
+      "--permission-mode",
+      "default",
+      "agent",
+      "--no-leader",
+      "stdio",
+    ]);
   });
 });

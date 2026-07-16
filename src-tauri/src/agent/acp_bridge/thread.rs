@@ -82,6 +82,11 @@ impl AcpThreadProcess {
         self.process.subscribe()
     }
 
+    /// Opaque identity for routing this process's native permission cards.
+    pub fn permission_owner_id(&self) -> &str {
+        self.process.permission_owner_id()
+    }
+
     pub async fn ensure_session(
         &self,
         resume_session_id: Option<&str>,
@@ -141,7 +146,27 @@ impl AcpThreadProcess {
         Ok(())
     }
 
+    /// Return the human-selected option for a pending ACP native-tool
+    /// permission prompt. The wrapped process validates that both ids still
+    /// belong together before writing the response to the local agent.
+    pub async fn resolve_permission(
+        &self,
+        call_id: &str,
+        option_id: &str,
+    ) -> Result<(), AcpRuntimeError> {
+        self.process.resolve_permission(call_id, option_id).await
+    }
+
+    /// Cancel a single ACP native-tool permission without selecting one of the
+    /// agent-provided options.
+    pub async fn cancel_permission(&self, call_id: &str) -> Result<(), AcpRuntimeError> {
+        self.process.cancel_permission(call_id).await
+    }
+
     pub async fn stop(&self) {
+        // Give the local CLI an explicit `cancelled` permission outcome and a
+        // session cancellation before closing its stdio transport.
+        let _ = self.cancel().await;
         revoke_owned_token(&self.mcp_token);
         self.process.stop().await;
     }

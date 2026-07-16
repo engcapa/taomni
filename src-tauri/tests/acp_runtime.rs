@@ -140,6 +140,8 @@ async fn malformed_lines_do_not_poison_following_messages() {
             AcpRuntimeEvent::SessionUpdate(update) => {
                 saw_text |= matches!(update.event, Some(LocalAgentEvent::AssistantDelta { .. }));
             }
+            AcpRuntimeEvent::PermissionRequest(_) => {}
+            AcpRuntimeEvent::PermissionResolved { .. } => {}
             AcpRuntimeEvent::Closed => {}
         }
     }
@@ -166,6 +168,83 @@ async fn rejects_unadvertised_peer_capabilities() {
     let session_id = process.new_session("/workspace", vec![]).await.unwrap();
     let result = process.prompt(&session_id, "read a file").await.unwrap();
     assert_eq!(result.stop_reason, AcpStopReason::EndTurn);
+    process.stop().await;
+}
+
+#[tokio::test]
+async fn relays_native_permission_requests_and_returns_the_selected_option() {
+    let process = initialized_process("permission-request").await;
+    let session_id = process.new_session("/workspace", vec![]).await.unwrap();
+    let mut updates = process.subscribe();
+    let prompt_process = process.clone();
+    let prompt_session = session_id.clone();
+    let prompt =
+        tokio::spawn(async move { prompt_process.prompt(&prompt_session, "edit it").await });
+
+    let permission = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if let AcpRuntimeEvent::PermissionRequest(permission) = updates.recv().await.unwrap() {
+                break permission;
+            }
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(permission.title, "Write README.md");
+    assert_eq!(permission.kind, "edit");
+    assert_eq!(permission.options.len(), 2);
+    assert_eq!(permission.options[0].option_id, "allow-once");
+    let serialized = serde_json::to_string(&permission).unwrap();
+    assert!(!serialized.contains("must-not-reach-ui"));
+    assert!(!serialized.contains("tool-permission-1"));
+
+    process
+        .resolve_permission(&permission.call_id, "allow-once")
+        .await
+        .unwrap();
+    let result = prompt.await.unwrap().unwrap();
+    assert_eq!(result.stop_reason, AcpStopReason::EndTurn);
+    process.stop().await;
+}
+
+#[tokio::test]
+async fn cancelling_a_native_permission_flushes_its_outcome_before_session_cancel() {
+    let process = initialized_process("permission-request").await;
+    let session_id = process.new_session("/workspace", vec![]).await.unwrap();
+    let mut updates = process.subscribe();
+    let prompt_process = process.clone();
+    let prompt_session = session_id.clone();
+    let prompt =
+        tokio::spawn(async move { prompt_process.prompt(&prompt_session, "edit it").await });
+
+    let permission = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if let AcpRuntimeEvent::PermissionRequest(permission) = updates.recv().await.unwrap() {
+                break permission;
+            }
+        }
+    })
+    .await
+    .unwrap();
+
+    // `cancel` first replies to the pending `session/request_permission`.
+    // The fake agent only completes the prompt after seeing that RPC outcome,
+    // so this proves the response was flushed before `session/cancel` runs.
+    process.cancel(&session_id).await.unwrap();
+    let result = prompt.await.unwrap().unwrap();
+    assert_eq!(result.stop_reason, AcpStopReason::Cancelled);
+
+    let resolved = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if let AcpRuntimeEvent::PermissionResolved { call_id } = updates.recv().await.unwrap()
+                && call_id == permission.call_id
+            {
+                break;
+            }
+        }
+    })
+    .await;
+    assert!(resolved.is_ok());
     process.stop().await;
 }
 

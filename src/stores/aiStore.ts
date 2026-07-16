@@ -170,7 +170,7 @@ export const DEFAULT_GROK_ACP_PROFILE: AcpProfileConfig = {
   name: "Grok CLI",
   enabled: false,
   command: "grok",
-  args: ["agent", "stdio"],
+  args: ["--permission-mode", "default", "agent", "--no-leader", "stdio"],
   capabilities: {
     image_generation: true,
     video_generation: true,
@@ -497,16 +497,32 @@ function normalizeAcpProfileCapabilities(
   };
 }
 
+function normalizeGrokAcpArgs(profileId: string, args: string[]): string[] {
+  // Migrate only the exact old built-in default. Custom Grok arguments remain
+  // visible and editable here; the Rust launch layer still enforces the
+  // permission policy at process start.
+  if (
+    profileId === DEFAULT_GROK_ACP_PROFILE.id &&
+    args.length === 2 &&
+    args[0] === "agent" &&
+    args[1] === "stdio"
+  ) {
+    return [...DEFAULT_GROK_ACP_PROFILE.args];
+  }
+  return args;
+}
+
 function normalizeAcpBridge(bridge: AcpBridgeConfig | undefined): AcpBridgeConfig {
   const source = bridge ?? DEFAULT_CONFIG.acp_bridge;
   let profiles = (source.profiles ?? []).map((profile, index) => {
     const id = profile.id?.trim() || `profile-${index + 1}`;
+    const args = (profile.args ?? []).map((arg) => arg.trim()).filter(Boolean);
     return {
       ...profile,
       id,
       name: profile.name?.trim() || profile.id?.trim() || `ACP Agent ${index + 1}`,
       command: profile.command?.trim() || "",
-      args: (profile.args ?? []).map((arg) => arg.trim()).filter(Boolean),
+      args: normalizeGrokAcpArgs(id, args),
       capabilities: normalizeAcpProfileCapabilities(profile, id),
       auth_method_id: profile.auth_method_id?.trim() || null,
       proxy_mode: normalizeAcpProfileProxyMode(profile.proxy_mode, profile.proxy_url),

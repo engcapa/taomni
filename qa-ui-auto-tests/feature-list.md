@@ -2664,7 +2664,15 @@ controls:
   - id: ai-chat-safety-gate
     selector: '[data-testid="ai-chat-safety-gate"]'
     kind: display
-    optional: true       # only while a Claude Code / Codex permission prompt is pending
+    optional: true       # only while a local-agent permission prompt is pending
+  - id: ai-chat-acp-permission-card
+    selector: '[data-testid="ai-chat-acp-permission-card"]'
+    kind: display
+    optional: true       # only while an ACP agent requests a native-tool permission
+  - id: ai-chat-acp-permission-cancel
+    selector: '[data-testid="ai-chat-acp-permission-cancel"]'
+    kind: interactive
+    optional: true       # only while an ACP native-tool permission is pending
   - id: ai-chat-provider-select
     selector: 'select[aria-label="Thread LLM provider"]'
     kind: interactive

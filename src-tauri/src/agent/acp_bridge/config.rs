@@ -280,8 +280,12 @@ pub fn process_config(
     if command.is_empty() {
         return Err(format!("ACP profile `{}` has no command", profile.id));
     }
-    let mut config =
-        AcpProcessConfig::new(command, profile.args.clone()).with_request_timeout(request_timeout);
+    let args = if profile.id == super::presets::GROK_PROFILE_ID {
+        super::presets::secure_grok_acp_args(&profile.args)
+    } else {
+        profile.args.clone()
+    };
+    let mut config = AcpProcessConfig::new(command, args).with_request_timeout(request_timeout);
     if let Some(cwd) = cwd {
         config = config.with_current_dir(cwd);
     }

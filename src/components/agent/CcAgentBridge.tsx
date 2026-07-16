@@ -36,11 +36,14 @@ import { useSessionStore } from "../../stores/sessionStore";
 import { useSftpStore } from "../../stores/sftpStore";
 import { newTransferId, useTransferStore } from "../../stores/transferStore";
 /**
- * Bridges the in-app Claude Code MCP server's human-in-the-loop events to the UI.
+ * Bridges local agent human-in-the-loop events to the UI.
  *
  * - `agent-cc-permission`: CC asked to run a write/side-effect tool. We surface
  *   an ActionCard; the user's choice is sent back via `cc_resolve_permission`,
  *   unblocking the server's `permission_prompt` handler.
+ * - `agent-acp-permission`: an ACP agent (such as Grok CLI) requested native
+ *   tool permission. We show locally trusted labels for standard ACP choices
+ *   and return the selected opaque option id via `acp_resolve_permission`.
  * - `agent-cc-tool`: an approved Taomni side-effect tool needs the frontend to
  *   perform the effect (e.g. write a command into the linked SSH terminal). The
  *   outcome is returned via `cc_resolve_tool_call`.
@@ -56,6 +59,31 @@ interface PermissionPrompt {
   args: Record<string, unknown>;
   trust: string;
 }
+
+interface AcpPermissionOption {
+  optionId: string;
+  kind: "allow_once" | "allow_always" | "reject_once" | "reject_always";
+}
+
+interface AcpPermissionPrompt {
+  callId: string;
+  threadId: string;
+  permissionOwnerId: string;
+  sourceLabel: string;
+  title: string;
+  kind: string;
+  options: AcpPermissionOption[];
+}
+
+interface AcpPermissionDismissed {
+  threadId: string;
+  permissionOwnerId?: string | null;
+  callId?: string | null;
+}
+
+type QueuedPermission =
+  | ({ source: "cc" } & PermissionPrompt)
+  | ({ source: "acp" } & AcpPermissionPrompt);
 
 interface ToolDispatch {
   callId: string;
@@ -190,6 +218,89 @@ function useSafetyGatePlacement(active: boolean): SafetyGatePlacement {
   }, [active, updatePlacement]);
 
   return active ? placement : viewportSafetyGatePlacement();
+}
+
+const ACP_PERMISSION_OPTION_PRESENTATION: Record<
+  AcpPermissionOption["kind"],
+  { label: string; className: string }
+> = {
+  allow_once: {
+    label: "仅允许这一次",
+    className: "border border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/10",
+  },
+  allow_always: {
+    label: "始终允许",
+    className: "border border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/10",
+  },
+  reject_once: {
+    label: "拒绝这一次",
+    className: "border border-red-500/50 text-red-300 hover:bg-red-500/10",
+  },
+  reject_always: {
+    label: "始终拒绝",
+    className: "border border-red-500/50 text-red-300 hover:bg-red-500/10",
+  },
+};
+
+function AcpPermissionCard({
+  prompt,
+  executing,
+  isActiveThread,
+  onSelect,
+  onCancel,
+}: {
+  prompt: Extract<QueuedPermission, { source: "acp" }>;
+  executing: boolean;
+  isActiveThread: boolean;
+  onSelect: (optionId: string) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      className="max-w-md w-full rounded-lg border border-yellow-500/50 bg-[var(--taomni-panel-bg)] p-3 shadow-md"
+      data-testid="ai-chat-acp-permission-card"
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <span className="text-[12px] font-semibold">本地 Agent 请求执行操作</span>
+        <span className="rounded border border-yellow-500/40 px-1.5 py-0.5 text-[10px] text-yellow-400">
+          需要确认
+        </span>
+      </div>
+      <div className="mb-1 text-[10px] text-[var(--taomni-text-muted)]">
+        来源：本地 {prompt.sourceLabel}{isActiveThread ? "" : " · 后台对话"}
+      </div>
+      <div className="mb-1 text-[11px] text-[var(--taomni-text-muted)]">{prompt.title}</div>
+      <div className="mb-2 text-[10px] text-[var(--taomni-text-muted)]">
+        操作类型：{prompt.kind}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {prompt.options.map((option) => {
+          const presentation = ACP_PERMISSION_OPTION_PRESENTATION[option.kind];
+          return (
+            <button
+              key={option.optionId}
+              type="button"
+              className={`taomni-btn h-7 px-3 text-[12px] disabled:cursor-wait disabled:opacity-60 ${presentation.className}`}
+              disabled={executing}
+              data-testid={`ai-chat-acp-permission-option-${option.kind}`}
+              onClick={() => onSelect(option.optionId)}
+            >
+              {presentation.label}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          className="taomni-btn h-7 px-3 text-[12px] text-[var(--taomni-text-muted)] disabled:cursor-wait disabled:opacity-60"
+          disabled={executing}
+          data-testid="ai-chat-acp-permission-cancel"
+          onClick={onCancel}
+        >
+          取消操作
+        </button>
+      </div>
+    </div>
+  );
 }
 
 /** Short human description of what a tool call will do, for the ActionCard. */
@@ -773,32 +884,74 @@ async function executeSftpDownloadTool(
 }
 
 export function CcAgentBridge() {
-  const [queue, setQueue] = useState<PermissionPrompt[]>([]);
+  const [queue, setQueue] = useState<QueuedPermission[]>([]);
   const [deciding, setDeciding] = useState(false);
   const [captures, setCaptures] = useState<CaptureProgress[]>([]);
+  const activeThreadId = useChatStore((state) => state.activeThreadId);
 
   // --- permission prompts (HITL) ---------------------------------------
   useEffect(() => {
-    let unlisten: UnlistenFn | null = null;
+    let unlistenCc: UnlistenFn | null = null;
+    let unlistenAcp: UnlistenFn | null = null;
+    let unlistenAcpDismissed: UnlistenFn | null = null;
     let disposed = false;
     void listen<PermissionPrompt>("agent-cc-permission", (event) => {
       // Dedupe by callId: a stray double-emit must not stack two cards.
+      const prompt: QueuedPermission = { source: "cc", ...event.payload };
       setQueue((q) =>
-        q.some((p) => p.callId === event.payload.callId) ? q : [...q, event.payload],
+        q.some((p) => p.source === prompt.source && p.callId === prompt.callId)
+          ? q
+          : [...q, prompt],
       );
     }).then((fn) => {
       // `listen` resolves async. If the effect was already torn down (React
       // StrictMode double-mount in dev), unregister immediately instead of
       // leaking this listener — a leak would fire every handler twice.
       if (disposed) void fn();
-      else unlisten = fn;
+      else unlistenCc = fn;
     }).catch(() => {
       // `listen` can reject outside Tauri (e.g. jsdom tests); ignore — the
       // bridge is simply inert there.
     });
+    void listen<AcpPermissionPrompt>("agent-acp-permission", (event) => {
+      const prompt: QueuedPermission = { source: "acp", ...event.payload };
+      setQueue((q) =>
+        q.some(
+          (p) =>
+            p.source === prompt.source &&
+            p.threadId === prompt.threadId &&
+            p.callId === prompt.callId,
+        )
+          ? q
+          : [...q, prompt],
+      );
+    }).then((fn) => {
+      if (disposed) void fn();
+      else unlistenAcp = fn;
+    }).catch(() => {
+      // ACP gates are only emitted by the desktop backend; ignore a missing
+      // event bridge in browser-only tests just like the CC listener above.
+    });
+    void listen<AcpPermissionDismissed>("agent-acp-permission-dismissed", (event) => {
+      const { threadId, permissionOwnerId, callId } = event.payload;
+      setQueue((q) =>
+        q.filter((p) => {
+          if (p.source !== "acp" || p.threadId !== threadId) return true;
+          if (callId != null && p.callId !== callId) return true;
+          return permissionOwnerId != null && p.permissionOwnerId !== permissionOwnerId;
+        }),
+      );
+    }).then((fn) => {
+      if (disposed) void fn();
+      else unlistenAcpDismissed = fn;
+    }).catch(() => {
+      // The backend can dismiss a gate after an ACP timeout, stop, or close.
+    });
     return () => {
       disposed = true;
-      unlisten?.();
+      unlistenCc?.();
+      unlistenAcp?.();
+      unlistenAcpDismissed?.();
     };
   }, []);
 
@@ -818,7 +971,7 @@ export function CcAgentBridge() {
   }, []);
 
   const decide = useCallback(
-    async (prompt: PermissionPrompt, decision: ActionCardDecision) => {
+    async (prompt: Extract<QueuedPermission, { source: "cc" }>, decision: ActionCardDecision) => {
       setDeciding(true);
       try {
         // ActionCardDecision values ("allow" | "allow-session" | "deny") map
@@ -830,7 +983,50 @@ export function CcAgentBridge() {
       } catch (e) {
         console.error("cc_resolve_permission failed:", e);
       } finally {
-        setQueue((q) => q.filter((p) => p.callId !== prompt.callId));
+        setQueue((q) =>
+          q.filter((p) => p.source !== prompt.source || p.callId !== prompt.callId),
+        );
+        setDeciding(false);
+      }
+    },
+    [],
+  );
+
+  const decideAcp = useCallback(
+    async (prompt: Extract<QueuedPermission, { source: "acp" }>, optionId: string) => {
+      setDeciding(true);
+      try {
+        await invoke("acp_resolve_permission", {
+          threadId: prompt.threadId,
+          callId: prompt.callId,
+          optionId,
+        });
+      } catch (e) {
+        console.error("acp_resolve_permission failed:", e);
+      } finally {
+        setQueue((q) =>
+          q.filter((p) => p.source !== prompt.source || p.callId !== prompt.callId),
+        );
+        setDeciding(false);
+      }
+    },
+    [],
+  );
+
+  const cancelAcp = useCallback(
+    async (prompt: Extract<QueuedPermission, { source: "acp" }>) => {
+      setDeciding(true);
+      try {
+        await invoke("acp_cancel_permission", {
+          threadId: prompt.threadId,
+          callId: prompt.callId,
+        });
+      } catch (e) {
+        console.error("acp_cancel_permission failed:", e);
+      } finally {
+        setQueue((q) =>
+          q.filter((p) => p.source !== prompt.source || p.callId !== prompt.callId),
+        );
         setDeciding(false);
       }
     },
@@ -989,14 +1185,24 @@ export function CcAgentBridge() {
           data-testid="ai-chat-safety-gate"
           data-anchor={safetyGatePlacement.anchored ? "chat-drawer" : "viewport"}
         >
-          <ActionCard
-            tool={head.tool}
-            description={describe(head.tool, head.args)}
-            preview={preview(head.args)}
-            requiresConfirmation={true}
-            executing={deciding}
-            onDecide={(d) => void decide(head, d)}
-          />
+          {head.source === "cc" ? (
+            <ActionCard
+              tool={head.tool}
+              description={describe(head.tool, head.args)}
+              preview={preview(head.args)}
+              requiresConfirmation={true}
+              executing={deciding}
+              onDecide={(d) => void decide(head, d)}
+            />
+          ) : (
+            <AcpPermissionCard
+              prompt={head}
+              executing={deciding}
+              isActiveThread={head.threadId === activeThreadId}
+              onSelect={(optionId) => void decideAcp(head, optionId)}
+              onCancel={() => void cancelAcp(head)}
+            />
+          )}
         </div>
       )}
     </>

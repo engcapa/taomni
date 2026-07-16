@@ -449,10 +449,15 @@ pub async fn chat_list_messages(
 #[tauri::command]
 pub async fn chat_delete_thread(
     thread_id: String,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
-    store::delete_thread(&db, &thread_id).map_err(|e| e.to_string())
+    {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        store::delete_thread(&db, &thread_id).map_err(|e| e.to_string())?;
+    }
+    stop_thread_runtime(&thread_id, &app, state.inner()).await;
+    Ok(())
 }
 
 /// Change the provider (LLM) bound to an existing thread. Subsequent
@@ -461,6 +466,7 @@ pub async fn chat_delete_thread(
 pub async fn chat_set_thread_provider(
     thread_id: String,
     provider_id: String,
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     {
@@ -477,6 +483,7 @@ pub async fn chat_set_thread_provider(
             .await;
     }
     acp::recycle_if_profile_changed(state.inner(), &thread_id, &provider_id).await;
+    acp::recycle_media_process(state.inner(), &app, &thread_id).await;
     Ok(())
 }
 
@@ -1278,6 +1285,7 @@ pub async fn chat_generate_media(
         acp::generate_grok_media(
             &app,
             state.inner(),
+            &req.thread_id,
             bridge,
             &profile,
             kind,
@@ -1940,15 +1948,28 @@ fn assistant_tool_message(content: &str, tool_calls: &[ChatToolCall]) -> LlmMess
 }
 
 #[tauri::command]
-pub async fn chat_stop_stream(thread_id: String, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn chat_stop_stream(
+    thread_id: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    stop_thread_runtime(&thread_id, &app, state.inner()).await;
+    Ok(())
+}
+
+/// Stop every process and pending native permission tied to one thread. This
+/// is used both for an explicit Stop action and when deleting a thread so an
+/// already-visible confirmation card cannot approve work for a removed chat.
+async fn stop_thread_runtime(thread_id: &str, app: &AppHandle, state: &AppState) {
     // Stop the in-flight turn regardless of provider/runtime. Claude Code also
     // and Codex keep persistent per-thread process registries for reuse; remove
     // those entries on explicit stop so the next turn starts from clean bridge
     // processes.
-    let run = { state.chat_runs.lock().await.remove(&thread_id) };
-    let cc_process = { state.cc_processes.lock().await.remove(&thread_id) };
-    let codex_process = { state.codex_processes.lock().await.remove(&thread_id) };
-    let acp_process = { state.acp_processes.lock().await.remove(&thread_id) };
+    let run = { state.chat_runs.lock().await.remove(thread_id) };
+    let cc_process = { state.cc_processes.lock().await.remove(thread_id) };
+    let codex_process = { state.codex_processes.lock().await.remove(thread_id) };
+    let acp_process = { state.acp_processes.lock().await.remove(thread_id) };
+    let acp_media_process = { state.acp_media_processes.lock().await.remove(thread_id) };
 
     if let Some(run) = run {
         run.stop().await;
@@ -1964,7 +1985,15 @@ pub async fn chat_stop_stream(thread_id: String, state: State<'_, AppState>) -> 
     if let Some(process) = acp_process {
         process.stop().await;
     }
-    Ok(())
+    if let Some(process) = acp_media_process {
+        process.stop().await;
+    }
+    // Clear a visible native-tool gate immediately even when its subprocess
+    // has just been stopped and cannot deliver its own runtime event.
+    let _ = app.emit(
+        "agent-acp-permission-dismissed",
+        json!({ "threadId": thread_id, "permissionOwnerId": null, "callId": null }),
+    );
 }
 
 /// Streaming variant of `chat_send`. Emits events on
