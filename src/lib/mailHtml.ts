@@ -121,6 +121,56 @@ const REMOTE_IMAGE_PLACEHOLDER = "[remote image blocked]";
 
 let hooksInstalled = false;
 
+/**
+ * Outlook/Word emit conditional comments and namespaced junk that breaks
+ * non-Outlook renderers. Keep non-MSO branches, drop pure MSO/VML scaffolding.
+ */
+export function preprocessMailHtml(html: string): string {
+  let out = html ?? "";
+  // XML declaration / BOM-ish noise
+  out = out.replace(/^\uFEFF/, "");
+  out = out.replace(/<\?xml[\s\S]*?\?>/gi, "");
+  // <!--[if !mso]><!--> content <!--<![endif]-->  (and variants without the inner HTML comments)
+  out = out.replace(
+    /<!--\s*\[if\s*!mso[^\]]*\]\s*>(?:\s*<!--\s*>)?([\s\S]*?)(?:<!--\s*)?<!\s*\[endif\]\s*-->/gi,
+    "$1",
+  );
+  // <!--[if !IE]> content <![endif]-->
+  out = out.replace(
+    /<!--\s*\[if\s*!IE[^\]]*\]\s*>(?:\s*<!--\s*>)?([\s\S]*?)(?:<!--\s*)?<!\s*\[endif\]\s*-->/gi,
+    "$1",
+  );
+  // <!--[if mso ...]> ... <![endif]-->  (MSO-only tables, VML buttons, etc.)
+  out = out.replace(/<!--\s*\[if\s*mso[\s\S]*?<!\s*\[endif\]\s*-->/gi, "");
+  // Remaining IE conditionals — drop entirely (content is usually duplicated)
+  out = out.replace(/<!--\s*\[if[\s\S]*?<!\s*\[endif\]\s*-->/gi, "");
+  // Office namespace tags (empty wrappers)
+  out = out.replace(/<\/?(?:o|w|v|x):[^>]*>/gi, "");
+  // Common empty Office paragraphs left behind
+  out = out.replace(/<p[^>]*>\s*(?:&nbsp;|\u00a0|\s)*<\/p>/gi, (match) => {
+    // Keep real empty paragraphs that may be intentional spacing — only strip o:p residue already gone
+    return match;
+  });
+  // Drop <xml>...</xml> Word blobs
+  out = out.replace(/<xml\b[^>]*>[\s\S]*?<\/xml>/gi, "");
+  // Drop <style type="text/css"><!-- ... --></style> comment wrappers later handled by style extract
+  return out;
+}
+
+function remoteImagePlaceholderLabel(alt: string | null | undefined, src: string | null | undefined): string {
+  const cleanAlt = (alt ?? "").trim().replace(/\s+/g, " ");
+  if (cleanAlt && cleanAlt.length <= 80) return `[remote image blocked: ${cleanAlt}]`;
+  try {
+    if (src && /^https?:/i.test(src)) {
+      const host = new URL(src).hostname;
+      if (host) return `[remote image blocked · ${host}]`;
+    }
+  } catch {
+    // ignore invalid URL
+  }
+  return REMOTE_IMAGE_PLACEHOLDER;
+}
+
 function installMailPurifyHooks(): void {
   if (hooksInstalled) return;
   hooksInstalled = true;
@@ -543,15 +593,18 @@ export interface MailDisplayDocument {
  */
 export function prepareMailDisplayDocument(html: string, allowRemoteImages: boolean): MailDisplayDocument {
   installMailPurifyHooks();
-  const { html: withoutStyles, styles: rawStyles } = extractMailStyleBlocks(html);
+  const preprocessed = preprocessMailHtml(html);
+  const { html: withoutStyles, styles: rawStyles } = extractMailStyleBlocks(preprocessed);
   const bodyStyle = extractMailDocumentChrome(withoutStyles);
   let bodyHtml = DOMPurify.sanitize(withoutStyles, MAIL_PURIFY_CONFIG) as unknown as string;
   if (!allowRemoteImages) {
     if (typeof DOMParser === "undefined") {
       bodyHtml = bodyHtml.replace(/<img\b[^>]*>/gi, (tag) => {
         const srcMatch = /\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(tag);
+        const altMatch = /\balt\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(tag);
         const src = srcMatch?.[1] ?? srcMatch?.[2] ?? srcMatch?.[3] ?? "";
-        return isRemoteMailImageSrc(src) ? REMOTE_IMAGE_PLACEHOLDER : tag;
+        const alt = altMatch?.[1] ?? altMatch?.[2] ?? altMatch?.[3] ?? "";
+        return isRemoteMailImageSrc(src) ? remoteImagePlaceholderLabel(alt, src) : tag;
       });
     } else {
       const doc = new DOMParser().parseFromString(bodyHtml, "text/html");
@@ -560,7 +613,15 @@ export function prepareMailDisplayDocument(html: string, allowRemoteImages: bool
         const placeholder = doc.createElement("span");
         placeholder.setAttribute("data-taomni-remote-image", "blocked");
         placeholder.className = "taomni-mail-remote-image-blocked";
-        placeholder.textContent = REMOTE_IMAGE_PLACEHOLDER;
+        const src = img.getAttribute("src");
+        const alt = img.getAttribute("alt");
+        placeholder.textContent = remoteImagePlaceholderLabel(alt, src);
+        if (src) placeholder.setAttribute("title", src);
+        // Preserve layout footprint when width/height known so tables don't collapse as hard.
+        const width = img.getAttribute("width") || img.style.width;
+        const height = img.getAttribute("height") || img.style.height;
+        if (width) placeholder.style.minWidth = /px|%|em|rem|pt$/i.test(width) ? width : `${width}px`;
+        if (height) placeholder.style.minHeight = /px|%|em|rem|pt$/i.test(height) ? height : `${height}px`;
         img.replaceWith(placeholder);
       });
       bodyHtml = doc.body.innerHTML;

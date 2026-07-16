@@ -1514,3 +1514,15 @@ html[data-app-theme="dark"] .hover\:bg-white\/70:hover {
 .taomni-mail-reader-text .mail-quote-3 { margin-left: 0.9em; }
 .taomni-mail-reader-text .mail-quote-4 { margin-left: 1.35em; }
 .taomni-mail-reader-text .mail-quote-5 { margin-left: 1.8em; }
+
+.taomni-mail-find-hit {
+  background: #fde68a;
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.taomni-mail-reader-paper.is-dark .taomni-mail-find-hit {
+  background: #854d0e;
+  color: #fef3c7;
+}

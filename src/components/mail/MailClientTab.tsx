@@ -821,11 +821,15 @@ function extensionForMime(mime: string): string {
 function RemoteImagesBanner({
   visible,
   allowRemoteImages,
-  onToggle,
+  onAllowThisMessage,
+  onAllowAllInTab,
+  onBlock,
 }: {
   visible: boolean;
   allowRemoteImages: boolean;
-  onToggle: () => void;
+  onAllowThisMessage: () => void;
+  onAllowAllInTab: () => void;
+  onBlock: () => void;
 }) {
   if (!visible) return null;
   return (
@@ -839,14 +843,36 @@ function RemoteImagesBanner({
           ? "Remote images are shown for this message."
           : "To protect your privacy, remote images in this message have been blocked."}
       </span>
-      <button
-        type="button"
-        className="taomni-btn h-6 px-2 text-[11px]"
-        data-testid="mail-remote-images-toggle"
-        onClick={onToggle}
-      >
-        {allowRemoteImages ? "Block remote content" : "Show remote content"}
-      </button>
+      {allowRemoteImages ? (
+        <button
+          type="button"
+          className="taomni-btn h-6 px-2 text-[11px]"
+          data-testid="mail-remote-images-toggle"
+          onClick={onBlock}
+        >
+          Block remote content
+        </button>
+      ) : (
+        <>
+          <button
+            type="button"
+            className="taomni-btn h-6 px-2 text-[11px]"
+            data-testid="mail-remote-images-toggle"
+            onClick={onAllowThisMessage}
+          >
+            Show for this message
+          </button>
+          <button
+            type="button"
+            className="taomni-btn h-6 px-2 text-[11px]"
+            data-testid="mail-remote-images-allow-all"
+            onClick={onAllowAllInTab}
+            title="Allow remote images for all messages in this tab until closed"
+          >
+            Allow all in tab
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -919,7 +945,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   });
   const [sending, setSending] = useState(false);
   const [downloadingAttachmentIndex, setDownloadingAttachmentIndex] = useState<number | null>(null);
-  const [allowRemoteImages, setAllowRemoteImages] = useState(false);
+  /** Thunderbird-style: allow remote content for specific messages, or the whole tab session. */
+  const [allowRemoteAllInTab, setAllowRemoteAllInTab] = useState(false);
+  const [remoteAllowedMessageKeys, setRemoteAllowedMessageKeys] = useState<Set<string>>(() => new Set());
   const [composeDragActive, setComposeDragActive] = useState(false);
   const [attachProgress, setAttachProgress] = useState<{ done: number; total: number; label: string } | null>(null);
   const composeRootRef = useRef<HTMLDivElement>(null);
@@ -971,6 +999,36 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const scheme = String((mailAppearance as Record<string, string | number | undefined>)["--taomni-color-scheme"] ?? "");
     return scheme === "dark";
   }, [mailAppearance]);
+
+  const messageAllowsRemote = useCallback((key: string | null | undefined) => {
+    if (allowRemoteAllInTab) return true;
+    if (!key) return false;
+    return remoteAllowedMessageKeys.has(key);
+  }, [allowRemoteAllInTab, remoteAllowedMessageKeys]);
+
+  const allowRemoteForMessage = useCallback((key: string) => {
+    setRemoteAllowedMessageKeys((prev) => {
+      if (prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+  }, []);
+
+  const blockRemoteForMessage = useCallback((key: string) => {
+    setAllowRemoteAllInTab(false);
+    setRemoteAllowedMessageKeys((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  }, []);
+
+  const toggleRemoteForMessage = useCallback((key: string) => {
+    if (messageAllowsRemote(key)) blockRemoteForMessage(key);
+    else allowRemoteForMessage(key);
+  }, [allowRemoteForMessage, blockRemoteForMessage, messageAllowsRemote]);
   const selectedMessage = useMemo(
     () =>
       messages.find((message) => messageKey(message) === selectedMessageKey)
@@ -1051,6 +1109,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     () => mailHtmlHasRemoteImages(selectedBody?.html),
     [selectedBody?.html],
   );
+  const selectedMessageRemoteKey = selectedMessage ? messageKey(selectedMessage) : null;
+  const selectedAllowsRemote = messageAllowsRemote(selectedMessageRemoteKey);
 
   const visibleAttachments = useMemo(
     () => (selectedBody?.attachments.length ? selectedBody.attachments : selectedMessage?.attachments ?? []),
@@ -1810,7 +1870,8 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     let cancelled = false;
     if (remoteImagesMessageKeyRef.current !== key) {
       remoteImagesMessageKeyRef.current = key;
-      setAllowRemoteImages(false);
+      setAllowRemoteAllInTab(false);
+      setRemoteAllowedMessageKeys(new Set());
     }
     if (!selectedBody) {
       void loadBody(selectedMessage);
@@ -3040,11 +3101,12 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       const src = image.getAttribute("src") || image.src;
       if (src) items.push({ label: "Copy image address", icon: <Copy className="w-3.5 h-3.5" />, onClick: () => copyText("image address", src) });
     }
-    if (currentBody?.html) {
+    if (currentBody?.html && message) {
+      const key = messageKey(message);
       items.push({
-        label: allowRemoteImages ? "Block remote images" : "Load remote images",
+        label: messageAllowsRemote(key) ? "Block remote images" : "Load remote images",
         icon: <ImageOff className="w-3.5 h-3.5" />,
-        onClick: () => setAllowRemoteImages((value) => !value),
+        onClick: () => toggleRemoteForMessage(key),
       });
     }
     if (items.length > 0) items.push({ label: "", separator: true });
@@ -3060,7 +3122,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const currentBody = message
       ? bodyCache.get(messageKey(message)) ?? (bodyMatchesMessage(body, message) ? body : null)
       : null;
+    const currentKey = message ? messageKey(message) : null;
     const currentHasRemoteImages = mailHtmlHasRemoteImages(currentBody?.html);
+    const currentAllowsRemote = messageAllowsRemote(currentKey);
     const currentAttachments = currentBody?.attachments.length ? currentBody.attachments : message?.attachments ?? [];
     const loadingThisBody = !!message && bodyLoadingKey === messageKey(message);
 
@@ -3141,14 +3205,14 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
               <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
                 <span>{currentBody?.source === "cache" ? "cached body" : currentBody?.source === "remote" ? "remote body" : "header cached"}</span>
                 {message.rawSize ? <span>{formatBytes(message.rawSize)}</span> : null}
-                {currentHasRemoteImages && (
+                {currentHasRemoteImages && currentKey && (
                   <button
                     type="button"
                     className="taomni-btn h-5 px-2 text-[10px]"
                     data-testid="mail-remote-images-header-toggle"
-                    onClick={() => setAllowRemoteImages((value) => !value)}
+                    onClick={() => toggleRemoteForMessage(currentKey)}
                   >
-                    {allowRemoteImages ? "Block remote images" : "Load remote images"}
+                    {currentAllowsRemote ? "Block remote images" : "Load remote images"}
                   </button>
                 )}
               </div>
@@ -3197,8 +3261,10 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
             <RemoteImagesBanner
               visible={currentHasRemoteImages}
-              allowRemoteImages={allowRemoteImages}
-              onToggle={() => setAllowRemoteImages((value) => !value)}
+              allowRemoteImages={currentAllowsRemote}
+              onAllowThisMessage={() => currentKey && allowRemoteForMessage(currentKey)}
+              onAllowAllInTab={() => setAllowRemoteAllInTab(true)}
+              onBlock={() => currentKey && blockRemoteForMessage(currentKey)}
             />
 
             <div className="p-3 sm:p-4">
@@ -3206,7 +3272,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                 html={currentBody?.html}
                 text={currentBody?.text}
                 snippet={message.snippet}
-                allowRemoteImages={allowRemoteImages}
+                allowRemoteImages={currentAllowsRemote}
                 preferDark={preferDarkReader}
                 fontSize={mailFontSize}
                 title={message.subject || "Message body"}
@@ -3706,14 +3772,14 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                       <span>{selectedBody?.source === "cache" ? "cached body" : selectedBody?.source === "remote" ? "remote body" : "header cached"}</span>
                       {selectedMessage.rawSize ? <span>{formatBytes(selectedMessage.rawSize)}</span> : null}
                       {info.ai.enabled && <span>AI confirm {info.ai.skipBodyConfirm ? "skipped" : "required"}</span>}
-                      {selectedHasRemoteImages && (
+                      {selectedHasRemoteImages && selectedMessageRemoteKey && (
                         <button
                           type="button"
                           className="taomni-btn h-5 px-2 text-[10px]"
                           data-testid="mail-remote-images-header-toggle"
-                          onClick={() => setAllowRemoteImages((value) => !value)}
+                          onClick={() => toggleRemoteForMessage(selectedMessageRemoteKey)}
                         >
-                          {allowRemoteImages ? "Block remote images" : "Load remote images"}
+                          {selectedAllowsRemote ? "Block remote images" : "Load remote images"}
                         </button>
                       )}
                     </div>
@@ -3762,8 +3828,10 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
                   <RemoteImagesBanner
                     visible={selectedHasRemoteImages}
-                    allowRemoteImages={allowRemoteImages}
-                    onToggle={() => setAllowRemoteImages((value) => !value)}
+                    allowRemoteImages={selectedAllowsRemote}
+                    onAllowThisMessage={() => selectedMessageRemoteKey && allowRemoteForMessage(selectedMessageRemoteKey)}
+                    onAllowAllInTab={() => setAllowRemoteAllInTab(true)}
+                    onBlock={() => selectedMessageRemoteKey && blockRemoteForMessage(selectedMessageRemoteKey)}
                   />
 
                   <div className="p-3 sm:p-4">
@@ -3771,7 +3839,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                       html={selectedBody?.html}
                       text={selectedBody?.text}
                       snippet={selectedMessage.snippet}
-                      allowRemoteImages={allowRemoteImages}
+                      allowRemoteImages={selectedAllowsRemote}
                       preferDark={preferDarkReader}
                       fontSize={mailFontSize}
                       title={selectedMessage.subject || "Message body"}

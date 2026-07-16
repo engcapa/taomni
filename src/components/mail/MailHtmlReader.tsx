@@ -1,5 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { buildMailReaderSrcDoc } from "../../lib/mailHtml";
+
+export interface MailHtmlReaderHandle {
+  findNext: (query: string) => boolean;
+  findPrevious: (query: string) => boolean;
+  clearFind: () => void;
+}
 
 interface MailHtmlReaderProps {
   html: string;
@@ -18,15 +24,18 @@ interface MailHtmlReaderProps {
  * Thunderbird-style HTML mail surface: sandboxed iframe with its own document,
  * base paper chrome, sanitized <style> blocks, and auto height.
  */
-export function MailHtmlReader({
-  html,
-  allowRemoteImages,
-  title = "Message body",
-  className,
-  preferDark = false,
-  fontSize = 14,
-  fontFamily,
-}: MailHtmlReaderProps) {
+export const MailHtmlReader = forwardRef<MailHtmlReaderHandle, MailHtmlReaderProps>(function MailHtmlReader(
+  {
+    html,
+    allowRemoteImages,
+    title = "Message body",
+    className,
+    preferDark = false,
+    fontSize = 14,
+    fontFamily,
+  },
+  ref,
+) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [frameHeight, setFrameHeight] = useState(160);
   const srcDoc = useMemo(
@@ -38,6 +47,47 @@ export function MailHtmlReader({
     }),
     [allowRemoteImages, fontFamily, fontSize, html, preferDark],
   );
+
+  useImperativeHandle(ref, () => ({
+    findNext(query: string) {
+      return findInFrame(query, false);
+    },
+    findPrevious(query: string) {
+      return findInFrame(query, true);
+    },
+    clearFind() {
+      const win = iframeRef.current?.contentWindow as (Window & {
+        getSelection?: () => Selection | null;
+      }) | null | undefined;
+      try {
+        win?.getSelection?.()?.removeAllRanges();
+      } catch {
+        // ignore
+      }
+    },
+  }), []);
+
+  function findInFrame(query: string, backward: boolean): boolean {
+    const trimmed = query.trim();
+    if (!trimmed) return false;
+    const win = iframeRef.current?.contentWindow as (Window & {
+      find?: (
+        aString: string,
+        aCaseSensitive?: boolean,
+        aBackwards?: boolean,
+        aWrapAround?: boolean,
+        aWholeWord?: boolean,
+        aSearchInFrames?: boolean,
+        aShowDialog?: boolean,
+      ) => boolean;
+    }) | null | undefined;
+    if (!win?.find) return false;
+    try {
+      return !!win.find(trimmed, false, backward, true, false, false, false);
+    } catch {
+      return false;
+    }
+  }
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -125,4 +175,4 @@ export function MailHtmlReader({
       />
     </div>
   );
-}
+});

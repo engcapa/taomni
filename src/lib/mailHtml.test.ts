@@ -10,6 +10,7 @@ import {
   plainTextToMailHtml,
   prepareMailDisplayDocument,
   prepareMailHtmlForSend,
+  preprocessMailHtml,
   sanitizeMailComposeHtml,
   sanitizeMailDisplayHtml,
   sanitizeMailStylesheet,
@@ -47,8 +48,8 @@ describe("mailHtml", () => {
     const blocked = sanitizeMailDisplayHtml(mixed, false);
     const allowed = sanitizeMailDisplayHtml(mixed, true);
 
-    expect(blocked).toContain("[remote image blocked]");
-    expect(blocked).not.toContain("https://example.com/a.png");
+    expect(blocked).toContain("remote image blocked");
+    expect(blocked).not.toMatch(/<img[^>]+src=["']https:\/\/example\.com\/a\.png/i);
     expect(blocked).toContain("cid:logo@inline.local");
     expect(blocked).toContain("data:image/png;base64,aaaa");
     expect(allowed).toContain("https://example.com/a.png");
@@ -199,15 +200,48 @@ describe("mailHtml", () => {
     expect(src).toContain("float: left");
     expect(src).toContain("background-color: #eeeeee");
     expect(src).toContain("Styled card content");
-    expect(src).toContain("[remote image blocked]");
+    expect(src).toContain("remote image blocked");
     expect(src).not.toContain("<script");
-    expect(src).not.toContain("cdn.example");
+    expect(src).not.toMatch(/<img[^>]+src=["']https:\/\/cdn\.example/i);
 
     const prepared = prepareMailDisplayDocument(`
       <style>.x{color:#111}</style><p class="x">Hi</p>
     `, true);
     expect(prepared.styles).toContain(".x{color: #111}");
     expect(prepared.bodyHtml).toContain("Hi");
+  });
+
+  it("preprocesses Outlook/MSO conditional comments and office tags", () => {
+    const raw = `
+      <?xml version="1.0"?>
+      <!--[if mso]><table><tr><td>MSO only</td></tr></table><![endif]-->
+      <!--[if !mso]><!--><div class="web">Visible web content</div><!--<![endif]-->
+      <p><o:p>&nbsp;</o:p>Hello</p>
+      <xml><o:OfficeDocumentSettings></o:OfficeDocumentSettings></xml>
+    `;
+    const cleaned = preprocessMailHtml(raw);
+    expect(cleaned).toContain("Visible web content");
+    expect(cleaned).toContain("Hello");
+    expect(cleaned).not.toContain("MSO only");
+    expect(cleaned).not.toContain("<o:p>");
+    expect(cleaned).not.toContain("<xml>");
+    expect(cleaned).not.toContain("<?xml");
+
+    const display = sanitizeMailDisplayHtml(raw, true);
+    expect(display).toContain("Visible web content");
+    expect(display).not.toContain("MSO only");
+  });
+
+  it("labels blocked remote images with alt text or host", () => {
+    const blocked = sanitizeMailDisplayHtml(
+      '<p><img src="https://cdn.example/track.png" alt="Tracker pixel" width="1" height="1"></p>',
+      false,
+    );
+    expect(blocked).toContain("remote image blocked");
+    expect(blocked).toContain("Tracker pixel");
+    expect(blocked).not.toMatch(/<img[^>]+src=["']https:\/\/cdn\.example/i);
+    // Full URL may remain only as title tooltip for the placeholder.
+    expect(blocked).toContain('data-taomni-remote-image="blocked"');
   });
 
   it("uses dark paper defaults only when preferDark and message has no own background", () => {

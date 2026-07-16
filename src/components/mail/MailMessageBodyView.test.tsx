@@ -50,4 +50,22 @@ describe("MailMessageBodyView", () => {
     expect(screen.getByText("one")).toBeInTheDocument();
     expect(screen.getByText("two")).toBeInTheDocument();
   });
+
+  it("supports body zoom and plain-text find highlighting", () => {
+    render(
+      <MailMessageBodyView
+        text="Alpha beta gamma beta"
+        allowRemoteImages={false}
+        fontSize={14}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("mail-body-zoom-in"));
+    expect(screen.getByTestId("mail-body-zoom-reset")).toHaveTextContent("110%");
+
+    fireEvent.click(screen.getByTestId("mail-body-find-toggle"));
+    const input = screen.getByTestId("mail-body-find-input");
+    fireEvent.change(input, { target: { value: "beta" } });
+    expect(document.querySelectorAll(".taomni-mail-find-hit").length).toBeGreaterThanOrEqual(2);
+  });
 });
