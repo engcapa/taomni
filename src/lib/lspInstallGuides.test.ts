@@ -25,7 +25,7 @@ describe("resolveInstallGuide", () => {
       "https://download.eclipse.org/jdtls/snapshots/jdt-language-server-latest.tar.gz",
     );
     expect(linux?.command).toContain("config_linux");
-    expect(linux?.note).toMatch(/JDK 17/i);
+    expect(linux?.note).toMatch(/JDK 21/i);
     expect(linux?.note).toMatch(/only lists folders|目录/i);
     expect(macos?.command).toContain("brew install jdtls");
     expect(windows?.command).toContain("config_win");

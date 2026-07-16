@@ -39,7 +39,7 @@ beforeEach(() => {
       active: false,
       selectedCommandId: "jdtls",
       selectedCommand: null,
-      installHint: "Requires JDK 17+. Linux: …",
+      installHint: "Requires JDK 21+. Linux: …",
       error: null,
       commands: [
         {
@@ -47,7 +47,7 @@ beforeEach(() => {
           label: "jdtls",
           command: "jdtls",
           args: [],
-          installHint: "Requires JDK 17+. Linux: …",
+          installHint: "Requires JDK 21+. Linux: …",
           fallback: false,
           available: false,
         },
@@ -102,7 +102,7 @@ describe("LanguageServersSettings", () => {
     expect(screen.getByTestId("language-servers-install-line-linux")).toBeInTheDocument();
     expect(screen.getByTestId("language-servers-install-line-macos")).toBeInTheDocument();
     expect(screen.getByTestId("language-servers-install-line-windows")).toBeInTheDocument();
-    expect(screen.getByTestId("language-servers-install-note-linux")).toHaveTextContent(/JDK 17/i);
+    expect(screen.getByTestId("language-servers-install-note-linux")).toHaveTextContent(/JDK 21/i);
     expect(screen.getAllByText(/jdt-language-server-latest\.tar\.gz/).length).toBeGreaterThan(0);
     expect(screen.getByText(/brew install jdtls/)).toBeInTheDocument();
     expect(screen.getByTestId("language-servers-install-hint")).toHaveTextContent("config_linux");

@@ -44,14 +44,14 @@ export interface ResolvedInstallGuide {
 
 /** Eclipse JDT LS — real archive URLs (root /jdtls/ is only a folder index). */
 const JDTLS_NOTE_COMMON =
-  "Requires JDK 17+ (`java -version`). "
+  "Requires JDK 21+ (`java -version`). Current Eclipse JDT LS exits immediately on JDK 17. "
   + "Do not stop at https://download.eclipse.org/jdtls/ — that page only lists folders "
   + "(milestones/, snapshots/). Download a .tar.gz from snapshots or a version under milestones. "
   + "After install, `jdtls` must be on PATH; open a Maven/Gradle project for full intelligence.";
 
 const JDTLS_LINUX = {
-  note: JDTLS_NOTE_COMMON + " Linux uses `config_linux`.",
-  command: `# JDK 17+ required
+  note: JDTLS_NOTE_COMMON + " Linux uses shared `config_linux`.",
+  command: `# JDK 21+ required (current JDT LS)
 java -version
 
 mkdir -p "$HOME/.local/share/jdtls" "$HOME/.local/bin" "$HOME/.cache/jdtls"
@@ -74,14 +74,21 @@ JDTLS_HOME="\${JDTLS_HOME:-\$HOME/.local/share/jdtls}"
 LAUNCHER=\$(echo "\$JDTLS_HOME"/plugins/org.eclipse.equinox.launcher_*.jar)
 DATA="\${XDG_CACHE_HOME:-\$HOME/.cache}/jdtls/ws/\$(printf '%s' "\$PWD" | sha256sum | cut -c1-16)"
 mkdir -p "\$DATA"
+# Match upstream jdtls.py: shared config + JPMS opens (not plain -configuration).
 exec java \\
   -Declipse.application=org.eclipse.jdt.ls.core.id1 \\
   -Dosgi.bundles.defaultStartLevel=4 \\
   -Declipse.product=org.eclipse.jdt.ls.core.product \\
+  -Dosgi.checkConfiguration=true \\
+  -Dosgi.sharedConfiguration.area="\$JDTLS_HOME/config_linux" \\
+  -Dosgi.sharedConfiguration.area.readOnly=true \\
+  -Dosgi.configuration.cascaded=true \\
   -Dlog.level=ERROR \\
-  -Xmx1G \\
+  -Xms1G -Xmx1G \\
+  --add-modules=ALL-SYSTEM \\
+  --add-opens java.base/java.util=ALL-UNNAMED \\
+  --add-opens java.base/java.lang=ALL-UNNAMED \\
   -jar "\$LAUNCHER" \\
-  -configuration "\$JDTLS_HOME/config_linux" \\
   -data "\$DATA" \\
   "$@"
 EOF
@@ -99,7 +106,7 @@ command -v jdtls && echo "OK: jdtls is on PATH"
 
 const JDTLS_MACOS = {
   note: JDTLS_NOTE_COMMON + " Prefer Homebrew when available (config_mac is handled by the formula).",
-  command: `# JDK 17+ required
+  command: `# JDK 21+ required (current JDT LS)
 java -version
 
 # Recommended
@@ -111,14 +118,15 @@ command -v jdtls
 # curl -fL -o /tmp/jdtls.tar.gz \\
 #   "https://download.eclipse.org/jdtls/snapshots/jdt-language-server-latest.tar.gz"
 # tar -xzf /tmp/jdtls.tar.gz -C "$HOME/.local/share/jdtls"
-# # wrapper same as Linux but use -configuration "$JDTLS_HOME/config_mac"
+# # wrapper same as Linux but use shared config_mac (see Linux script)
 `.trim(),
 } satisfies LspInstallCommand;
 
 const JDTLS_WINDOWS = {
   note: JDTLS_NOTE_COMMON
-    + " Windows uses `config_win`. Prefer PowerShell. Ensure `java` and the jdtls.cmd directory are on PATH.",
-  command: `# PowerShell — JDK 17+ required
+    + " Windows: install JDK 21+ (Temurin/Oracle). Taomni launches jdtls via java -jar (shared config_win)."
+    + " Ensure `java` and the jdtls.cmd directory are on PATH so Settings can detect the install.",
+  command: `# PowerShell — JDK 21+ required (JDK 17 will fail: process exits immediately)
 java -version
 
 $JdtlsHome = Join-Path $env:LOCALAPPDATA "jdtls"
@@ -143,11 +151,14 @@ set JDTLS_HOME=%LOCALAPPDATA%\\jdtls
 for %%F in ("%JDTLS_HOME%\\plugins\\org.eclipse.equinox.launcher_*.jar") do set LAUNCHER=%%F
 set DATA=%LOCALAPPDATA%\\jdtls-ws\\%CD:\\=_%
 if not exist "%DATA%" mkdir "%DATA%"
-java -Declipse.application=org.eclipse.jdt.ls.core.id1 -Dosgi.bundles.defaultStartLevel=4 -Declipse.product=org.eclipse.jdt.ls.core.product -Dlog.level=ERROR -Xmx1G -jar "%LAUNCHER%" -configuration "%JDTLS_HOME%\\config_win" -data "%DATA%" %*
+rem Match upstream jdtls.py (shared config + JPMS opens). Do not use plain -configuration.
+java -Declipse.application=org.eclipse.jdt.ls.core.id1 -Dosgi.bundles.defaultStartLevel=4 -Declipse.product=org.eclipse.jdt.ls.core.product -Dosgi.checkConfiguration=true -Dosgi.sharedConfiguration.area="%JDTLS_HOME%\\config_win" -Dosgi.sharedConfiguration.area.readOnly=true -Dosgi.configuration.cascaded=true -Dlog.level=ERROR -Xms1G -Xmx1G --add-modules=ALL-SYSTEM --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED -jar "%LAUNCHER%" -data "%DATA%" %*
 '@ | Set-Content -Encoding ASCII (Join-Path $Bin "jdtls.cmd")
 
 # Add %LOCALAPPDATA%\\jdtls-bin to User PATH, then open a new terminal
+# Also set JAVA_HOME to a JDK 21+ install if java -version is still 17.
 Write-Host "Created $Bin\\jdtls.cmd — add this folder to User PATH, then run: where jdtls"
+Write-Host "Taomni also needs JDK 21+: winget install EclipseAdoptium.Temurin.21.JDK"
 `.trim(),
 } satisfies LspInstallCommand;
 
