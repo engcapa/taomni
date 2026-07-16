@@ -296,14 +296,22 @@ export function useWorkspaceLspSession({
         if (!descriptor) break;
         const version = (versionRef.current[currentSync.file.key] ?? 0) + 1;
         versionRef.current[currentSync.file.key] = version;
-        updateLspFiles((current) => ({
-          ...current,
-          [currentSync.file.key]: {
-            ...(current[currentSync.file.key] ?? emptyLspFileState()),
-            syncing: true,
-            error: null,
-          },
-        }));
+        updateLspFiles((current) => {
+          const existing = current[currentSync.file.key] ?? emptyLspFileState();
+          return {
+            ...current,
+            [currentSync.file.key]: {
+              ...existing,
+              syncing: true,
+              error: null,
+              // Drop a prior exit/start error so the pill can show "starting…"
+              // for this attempt instead of the stale failure text.
+              status: existing.status
+                ? { ...existing.status, error: null }
+                : existing.status,
+            },
+          };
+        });
         let active = false;
         try {
           const previousText = syncedTextRef.current[currentSync.file.key];

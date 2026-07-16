@@ -117,10 +117,11 @@ describe("LspStatusPill", () => {
     expect(screen.queryByText(/Install:/)).not.toBeInTheDocument();
   });
 
-  it("shows starting when available but not yet active", () => {
+  it("shows starting only while a document sync is in flight", () => {
     render(
       <LspStatusPill
         state={lspState({
+          syncing: true,
           status: {
             available: true,
             active: false,
@@ -136,6 +137,48 @@ describe("LspStatusPill", () => {
 
     expect(screen.getByText("Java starting…")).toBeInTheDocument();
     expect(screen.queryByTestId("code-workspace-lsp-open-settings")).not.toBeInTheDocument();
+  });
+
+  it("shows inactive when available but the session is not running", () => {
+    render(
+      <LspStatusPill
+        state={lspState({
+          status: {
+            available: true,
+            active: false,
+            displayName: "Rust",
+            installHint: null,
+            error: null,
+          },
+        })}
+        diagnostics={[]}
+        onOpenSettings={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Rust inactive")).toBeInTheDocument();
+  });
+
+  it("prefers the recorded session exit error over inactive", () => {
+    render(
+      <LspStatusPill
+        state={lspState({
+          status: {
+            available: true,
+            active: false,
+            displayName: "Java",
+            installHint: null,
+            error: "language server stdout closed (Error: JAVA_HOME not set)",
+          },
+        })}
+        diagnostics={[]}
+        onOpenSettings={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText("language server stdout closed (Error: JAVA_HOME not set)"),
+    ).toBeInTheDocument();
   });
 
   it("hides the settings link when the language server is active", () => {
