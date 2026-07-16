@@ -519,6 +519,119 @@ describe("MailClientTab", () => {
     expect(screen.getAllByText(/Header arrived before the body cache is warm/).length).toBeGreaterThan(0);
   });
 
+  it("does not overwrite the message list when the folder changes mid quiet poll", async () => {
+    vi.useFakeTimers();
+    const intervalInfo: MailTabInfo = {
+      ...info,
+      sync: { ...info.sync, onOpen: false, intervalMinutes: 1 },
+    };
+    const sentFolder: MailFolder = {
+      ...folder,
+      name: "Sent",
+      displayName: "Sent",
+      total: 1,
+      unread: 0,
+    };
+    const sentMessage: MailMessageHeader = {
+      ...message,
+      folder: "Sent",
+      uid: 201,
+      subject: "Sent item",
+      snippet: "Quiet poll should not force this after leaving Sent",
+    };
+    const inboxOnlyMessage: MailMessageHeader = {
+      ...message,
+      uid: 301,
+      subject: "Inbox after switch",
+      snippet: "Stays visible after mid-poll switch",
+    };
+    mailMocks.mailListCachedFolders.mockResolvedValue([folder, sentFolder]);
+    mailMocks.mailListCachedMessages.mockImplementation(async (_id: string, folderName: string) => {
+      if (folderName === "Sent") return [sentMessage];
+      return [inboxOnlyMessage];
+    });
+
+    let resolveSent!: (value: {
+      accountId: string;
+      folder: string;
+      folders: MailFolder[];
+      messages: MailMessageHeader[];
+      fetchedMessages: number;
+      cachedBodies: number;
+      syncedAt: number;
+      offset: number;
+      limit: number;
+      hasMore: boolean;
+    }) => void;
+    mailMocks.mailSyncHeaders.mockImplementation((_config: MailTabInfo, folderName?: string | null) => {
+      if (folderName === "Sent") {
+        return new Promise((resolve) => {
+          resolveSent = resolve;
+        });
+      }
+      return Promise.resolve({
+        accountId: info.sessionId,
+        folder: "INBOX",
+        folders: [folder, sentFolder],
+        messages: [inboxOnlyMessage],
+        fetchedMessages: 1,
+        cachedBodies: 0,
+        syncedAt: 2,
+        offset: 0,
+        limit: 50,
+        hasMore: false,
+      });
+    });
+
+    render(<MailClientTab tabId="mail-tab" info={intervalInfo} visible />);
+    await act(async () => {
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    });
+    fireEvent.click(screen.getByText("Sent"));
+    await act(async () => {
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    });
+    expect(screen.getAllByText(/Quiet poll should not force this after leaving Sent/).length).toBeGreaterThan(0);
+
+    // Start quiet poll for Sent (in-flight).
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+      for (let i = 0; i < 4; i += 1) await Promise.resolve();
+    });
+    expect(mailMocks.mailSyncHeaders).toHaveBeenCalledWith(
+      intervalInfo,
+      "Sent",
+      { limit: 50, includeBodies: false, refreshFolders: false },
+    );
+
+    // Switch to INBOX while the Sent poll is still awaiting.
+    fireEvent.click(screen.getByText("Inbox"));
+    await act(async () => {
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    });
+    expect(screen.getAllByText(/Stays visible after mid-poll switch/).length).toBeGreaterThan(0);
+
+    // Complete the stale Sent poll; messages must stay on INBOX.
+    await act(async () => {
+      resolveSent({
+        accountId: info.sessionId,
+        folder: "Sent",
+        folders: [folder, sentFolder],
+        messages: [{ ...sentMessage, subject: "Stale Sent overwrite", snippet: "Must not appear" }],
+        fetchedMessages: 1,
+        cachedBodies: 0,
+        syncedAt: 3,
+        offset: 0,
+        limit: 50,
+        hasMore: false,
+      });
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    });
+
+    expect(screen.getAllByText(/Stays visible after mid-poll switch/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Must not appear/)).toBeNull();
+  });
+
   it("quiet-polls selected folder plus INBOX when selected is not INBOX", async () => {
     vi.useFakeTimers();
     const intervalInfo: MailTabInfo = {

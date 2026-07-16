@@ -617,6 +617,33 @@ function folderHasMoreMessages(folders: readonly MailFolder[], folderName: strin
   return typeof total === "number" && total > loadedCount;
 }
 
+/**
+ * Decide whether a quiet-poll header result should rewrite the visible message
+ * list, and compute hasMore from the post-merge loaded count (not just the
+ * poll page size). Exported for unit tests of the shipped quiet-poll path.
+ */
+export function applyQuietPollMessages(
+  selectedFolderNow: string,
+  polledFolder: string,
+  currentMessages: readonly MailMessageHeader[],
+  polledMessages: readonly MailMessageHeader[],
+  folders: readonly MailFolder[],
+  hasMoreFromServer: boolean,
+): { applyMessages: boolean; messages: MailMessageHeader[]; hasMore: boolean } {
+  if (selectedFolderNow !== polledFolder) {
+    return {
+      applyMessages: false,
+      messages: currentMessages.slice() as MailMessageHeader[],
+      hasMore: false,
+    };
+  }
+  const previousForFolder = currentMessages.filter((message) => message.folder === polledFolder);
+  const messages = mergeMessagePages(previousForFolder, polledMessages.slice());
+  const hasMore = hasMoreFromServer
+    || folderHasMoreMessages(folders, polledFolder, messages.length);
+  return { applyMessages: true, messages, hasMore };
+}
+
 function draftWithSignature(draft: Partial<ComposeDraft>, signature: string | null | undefined): ComposeDraft {
   const base = { ...emptyComposeDraft(), ...draft };
   if (!signature?.trim()) return base;
@@ -966,6 +993,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const autoSaveTimerRef = useRef<number | null>(null);
   const lastSavedDraftJsonRef = useRef("");
   const foldersRef = useRef<MailFolder[]>([]);
+  /** Tracks the live selected folder across awaits (folder switches ignore syncInFlight). */
+  const selectedFolderRef = useRef(selectedFolder);
+  const messagesRef = useRef<MailMessageHeader[]>([]);
   const foldersPanelRef = useRef<PanelImperativeHandle>(null);
   const [mailboxCollapsed, setMailboxCollapsed] = useState(false);
   const [mailboxPaneSize, setMailboxPaneSize] = useState(MAILBOX_EXPANDED_SIZE);
@@ -1067,6 +1097,23 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   useEffect(() => {
     foldersRef.current = folders;
   }, [folders]);
+
+  useEffect(() => {
+    selectedFolderRef.current = selectedFolder;
+  }, [selectedFolder]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  /** Keep selectedFolderRef in sync immediately (folder switches can race quiet poll awaits). */
+  const updateSelectedFolder = useCallback((next: string | ((prev: string) => string)) => {
+    setSelectedFolder((prev) => {
+      const value = typeof next === "function" ? next(prev) : next;
+      selectedFolderRef.current = value;
+      return value;
+    });
+  }, []);
 
   useEffect(() => {
     visibleRef.current = visible;
@@ -1289,7 +1336,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       }
       foldersRef.current = cached;
       setFolders(cached);
-      setSelectedFolder((current) =>
+      updateSelectedFolder((current) =>
         cached.length > 0 && !cached.some((folder) => folder.name === current)
           ? cached[0].name
           : current,
@@ -1299,7 +1346,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     } finally {
       setLoadingFolders(false);
     }
-  }, [info.sessionId]);
+  }, [info.sessionId, updateSelectedFolder]);
 
   const loadCachedMessages = useCallback(async (folder: string, offset = 0, append = false, quiet = false) => {
     if (!visibleRef.current) {
@@ -1512,7 +1559,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       }
       foldersRef.current = result.folders;
       setFolders(result.folders);
-      setSelectedFolder(result.folder);
+      updateSelectedFolder(result.folder);
       setMessages((current) => mergeMessagePages(
         current.filter((message) => message.folder === result.folder),
         result.messages,
@@ -1540,13 +1587,15 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         if (visibleRef.current) setSyncing(false);
       }
     }
-  }, [batchSize, info, pageSize, selectedFolder]);
+  }, [batchSize, info, pageSize, selectedFolder, updateSelectedFolder]);
 
   /** Quiet background poll: selected folder (+ INBOX when different), no LIST. */
   const quietPollSelectedAndInbox = useCallback(async () => {
     if (syncInFlightRef.current) return;
     syncInFlightRef.current = true;
-    const activeFolder = selectedFolder;
+    // Snapshot at start; folder switches can happen during awaits (loadCachedMessages
+    // does not take syncInFlightRef).
+    const activeFolder = selectedFolderRef.current;
     const alsoInbox = activeFolder.trim().toUpperCase() !== "INBOX";
     try {
       const selectedResult = await mailSyncHeaders(info, activeFolder, {
@@ -1578,26 +1627,31 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         pendingCacheRefreshRef.current = true;
         return;
       }
+      // Always refresh folder badges/metadata from the poll.
       foldersRef.current = folders;
       setFolders(folders);
-      setMessages((current) => mergeMessagePages(
-        current.filter((message) => message.folder === selectedResult.folder),
+
+      // Only rewrite the message list if the user is still on the folder we polled.
+      const applied = applyQuietPollMessages(
+        selectedFolderRef.current,
+        selectedResult.folder,
+        messagesRef.current,
         selectedResult.messages,
-      ));
-      setHasMoreMessages(
-        selectedResult.hasMore
-        || folderHasMoreMessages(
-          folders,
-          selectedResult.folder,
-          selectedResult.messages.length,
-        ),
+        folders,
+        selectedResult.hasMore,
       );
+      if (!applied.applyMessages) {
+        return;
+      }
+      messagesRef.current = applied.messages;
+      setMessages(applied.messages);
+      setHasMoreMessages(applied.hasMore);
     } catch (e) {
       console.debug("quiet mail poll failed", e);
     } finally {
       syncInFlightRef.current = false;
     }
-  }, [batchSize, info, selectedFolder]);
+  }, [batchSize, info]);
 
   const syncAllFolders = useCallback(async (
     quiet = false,
@@ -1643,7 +1697,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         ? activeBeforeSync
         : result.folders[0]?.name ?? activeBeforeSync;
       if (nextFolder !== activeBeforeSync) {
-        setSelectedFolder(nextFolder);
+        updateSelectedFolder(nextFolder);
       }
       await loadCachedMessages(nextFolder, 0, false, quiet || indicator === "none");
       if (indicator !== "none") {
@@ -1662,7 +1716,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         if (visibleRef.current) setSyncing(false);
       }
     }
-  }, [batchSize, info, loadCachedMessages, pushMailNew, selectedFolder, tabId, warmRecentBodies]);
+  }, [batchSize, info, loadCachedMessages, pushMailNew, selectedFolder, tabId, updateSelectedFolder, warmRecentBodies]);
 
   const loadBody = useCallback(async (message: MailMessageHeader) => {
     const key = messageKey(message);
@@ -1786,7 +1840,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
 
   const selectMessage = useCallback((message: MailMessageHeader, viewKey = "mailbox") => {
     const key = messageKey(message);
-    setSelectedFolder(message.folder);
+    updateSelectedFolder(message.folder);
     setSelectedMessageKey(key);
     setMailViewKey(viewKey);
     const cached = bodyCacheRef.current.get(key);
@@ -1795,7 +1849,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
         ? cached
         : bodyMatchesMessage(current, message) ? current : null
     ));
-  }, []);
+  }, [updateSelectedFolder]);
 
   const openMessageTab = useCallback((message: MailMessageHeader) => {
     const key = messageKey(message);
@@ -1865,9 +1919,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     setHasMoreMessages(false);
     setLoadingMoreMessages(false);
     setDownloadingAttachmentIndex(null);
-    setSelectedFolder("INBOX");
+    updateSelectedFolder("INBOX");
     void loadCachedFolders();
-  }, [info.sessionId, loadCachedFolders]);
+  }, [info.sessionId, loadCachedFolders, updateSelectedFolder]);
 
   useEffect(() => {
     void loadInitialMessages(selectedFolder);
@@ -1983,7 +2037,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   }, [messages]);
 
   const handleFolderSelect = (folder: MailFolder) => {
-    setSelectedFolder(folder.name);
+    updateSelectedFolder(folder.name);
     setSelectedMessageKey(null);
     setCheckedMessageKeys(new Set());
     setBody(null);
@@ -2974,7 +3028,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const parentPath = idx >= 0 ? folder.name.slice(0, idx + delimiter.length) : "";
     const target = `${parentPath}${trimmed}`;
     await mailRenameFolder(info, folder.name, target);
-    if (selectedFolder === folder.name) setSelectedFolder(target);
+    if (selectedFolder === folder.name) updateSelectedFolder(target);
     await loadCachedFolders();
     setStatus(`Renamed folder to ${trimmed}`);
   });
