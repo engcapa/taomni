@@ -1828,18 +1828,33 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     });
   }, [batchSize, info.sync.onOpen, selectedFolder, syncFolder, visible]);
 
+  // Quiet background poll: most ticks only refresh the selected folder (cheap
+  // with a live IMAP session). Every 6th tick does a full-folder scan for
+  // unread badges / new-mail notifications across the account.
+  const pollTickRef = useRef(0);
   useEffect(() => {
+    pollTickRef.current = 0;
     if (info.sync.intervalMinutes <= 0) return;
     const intervalMs = Math.max(1, info.sync.intervalMinutes) * 60 * 1000;
     const id = window.setInterval(() => {
-      void syncAllFolders(true, {
-        limit: batchSize,
-        includeBodies: false,
-        indicator: "none",
-      });
+      pollTickRef.current += 1;
+      const fullScan = pollTickRef.current % 6 === 0;
+      if (fullScan) {
+        void syncAllFolders(true, {
+          limit: batchSize,
+          includeBodies: false,
+          indicator: "none",
+        });
+      } else {
+        void syncFolder(selectedFolder, true, {
+          limit: batchSize,
+          includeBodies: false,
+          indicator: "none",
+        });
+      }
     }, intervalMs);
     return () => window.clearInterval(id);
-  }, [batchSize, info.sync.intervalMinutes, syncAllFolders]);
+  }, [batchSize, info.sync.intervalMinutes, selectedFolder, syncAllFolders, syncFolder]);
 
   useEffect(() => {
     if (messages.length === 0) {

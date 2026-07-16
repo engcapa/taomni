@@ -1,13 +1,15 @@
 //! Generic IMAP/SMTP mail backend.
 //!
-//! The first version intentionally uses short-lived connections. Each command
-//! resolves credentials, performs one bounded IMAP/SMTP operation on a blocking
-//! worker thread, then writes the result to the local SQLite header/body cache.
+//! IMAP operations reuse a per-account live session (and its session-level
+//! proxy forwarder) for a short idle TTL. SMTP remains short-lived. Network
+//! routing uses only the mail session's `networkSettings` — never the app
+//! global proxy.
 
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::path::Path;
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use base64::{
@@ -40,6 +42,8 @@ const MAX_INLINE_CID_IMAGE_BYTES: usize = 2 * 1024 * 1024;
 const OAUTH_REFRESH_SKEW_SECS: i64 = 300;
 const OAUTH_REAUTHORIZE_REQUIRED: &str = "OAuth2 authorization expired or was revoked. Reauthorize this mail account in session settings.";
 const IMAP_LOGIN_RETRY_DELAYS_MS: [u64; 2] = [500, 1500];
+/// How long an idle live IMAP session (and its proxy forwarder) is kept.
+const IMAP_LIVE_IDLE_TTL: Duration = Duration::from_secs(180);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MailConnectionSecurity {
@@ -851,6 +855,232 @@ impl Drop for ActiveImapSession {
     }
 }
 
+impl ActiveImapSession {
+    fn noop(&mut self) -> Result<(), String> {
+        match self {
+            Self::Tls { session, .. } => session
+                .noop()
+                .map_err(|e| format!("IMAP NOOP failed: {e}")),
+            Self::Plain { session, .. } => session
+                .noop()
+                .map_err(|e| format!("IMAP NOOP failed: {e}")),
+        }
+    }
+}
+
+/// Per-account live IMAP session pool. Reuses TCP/TLS/auth and the optional
+/// session-level proxy forwarder across mail commands. Does not consult the
+/// app global proxy.
+pub struct MailImapPool {
+    entries: std::sync::Mutex<HashMap<String, LiveImapEntry>>,
+}
+
+struct LiveImapEntry {
+    fingerprint: String,
+    session: ActiveImapSession,
+    last_used: Instant,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ImapSessionOpts {
+    /// When true, never reuse a pooled session and do not return the session
+    /// to the pool (used by connection tests).
+    force_fresh: bool,
+    /// When the first attempt fails with a transport-like error, drop the
+    /// live session and retry once with a fresh connect.
+    retry_on_error: bool,
+}
+
+impl Default for ImapSessionOpts {
+    fn default() -> Self {
+        Self {
+            force_fresh: false,
+            retry_on_error: true,
+        }
+    }
+}
+
+impl MailImapPool {
+    pub fn new() -> Self {
+        Self {
+            entries: std::sync::Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn take(&self, account_id: &str, fingerprint: &str) -> Option<ActiveImapSession> {
+        let mut entries = self.entries.lock().ok()?;
+        let entry = entries.remove(account_id)?;
+        if entry.fingerprint != fingerprint || entry.last_used.elapsed() > IMAP_LIVE_IDLE_TTL {
+            let mut session = entry.session;
+            session.logout();
+            return None;
+        }
+        Some(entry.session)
+    }
+
+    fn put(&self, account_id: String, fingerprint: String, session: ActiveImapSession) {
+        if let Ok(mut entries) = self.entries.lock() {
+            if let Some(mut old) = entries.remove(&account_id) {
+                old.session.logout();
+            }
+            entries.insert(
+                account_id,
+                LiveImapEntry {
+                    fingerprint,
+                    session,
+                    last_used: Instant::now(),
+                },
+            );
+        } else {
+            let mut session = session;
+            session.logout();
+        }
+    }
+
+    fn invalidate(&self, account_id: &str) {
+        if let Ok(mut entries) = self.entries.lock() {
+            if let Some(mut entry) = entries.remove(account_id) {
+                entry.session.logout();
+            }
+        }
+    }
+}
+
+impl Default for MailImapPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn mail_imap_fingerprint(account: &ResolvedMailAccount) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(account.config.session_id.as_bytes());
+    hasher.update(b"|");
+    hasher.update(account.config.imap.host.trim().as_bytes());
+    hasher.update(b"|");
+    hasher.update(account.config.imap.port.to_string().as_bytes());
+    hasher.update(b"|");
+    hasher.update(format!("{:?}", account.config.imap.security).as_bytes());
+    hasher.update(b"|");
+    hasher.update(account.imap_username.as_bytes());
+    hasher.update(b"|");
+    hasher.update(format!("{:?}", account.auth_mode).as_bytes());
+    hasher.update(b"|");
+    hasher.update(account.imap_password.as_bytes());
+    hasher.update(b"|");
+    hasher.update(network_fingerprint(account.network_settings.as_ref()).as_bytes());
+    hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+fn network_fingerprint(network: Option<&NetworkSettings>) -> String {
+    let Some(net) = network else {
+        return "direct".into();
+    };
+    format!(
+        "{}|{}|{}|{}|{}|{}|{}|{}|{}",
+        net.proxy_kind,
+        net.proxy_host,
+        net.proxy_port,
+        net.proxy_user,
+        net.proxy_session_id,
+        net.jump_session_id,
+        net.jump_host,
+        net.jump_port,
+        net.jump_user,
+    )
+}
+
+fn is_imap_transport_error(message: &str) -> bool {
+    let message = message.to_ascii_lowercase();
+    message.contains("connection")
+        || message.contains("broken pipe")
+        || message.contains("reset")
+        || message.contains("timed out")
+        || message.contains("timeout")
+        || message.contains("eof")
+        || message.contains("not connected")
+        || message.contains("noop failed")
+        || message.contains("tls")
+        || message.contains("i/o")
+        || message.contains("io error")
+}
+
+/// Checkout or connect an IMAP session, run `f`, then return the session to
+/// the pool on success (unless `force_fresh`). Caller must already be on a
+/// thread with a Tokio runtime entered when session proxy forwarding is used.
+fn with_imap_session<R>(
+    pool: &MailImapPool,
+    account: &ResolvedMailAccount,
+    opts: ImapSessionOpts,
+    mut f: impl FnMut(&mut ActiveImapSession) -> Result<R, String>,
+) -> Result<R, String> {
+    let account_id = account.config.session_id.clone();
+    let fingerprint = mail_imap_fingerprint(account);
+
+    let mut attempt = |force_connect: bool| -> Result<(R, ActiveImapSession), String> {
+        let mut session = if force_connect || opts.force_fresh {
+            if opts.force_fresh {
+                pool.invalidate(&account_id);
+            }
+            connect_imap(account)?
+        } else if let Some(mut session) = pool.take(&account_id, &fingerprint) {
+            match session.noop() {
+                Ok(()) => session,
+                Err(e) => {
+                    tracing::debug!(
+                        account_id = %account_id,
+                        "mail imap live session probe failed; reconnecting: {e}"
+                    );
+                    session.logout();
+                    connect_imap(account)?
+                }
+            }
+        } else {
+            connect_imap(account)?
+        };
+
+        match f(&mut session) {
+            Ok(value) => Ok((value, session)),
+            Err(e) => {
+                session.logout();
+                Err(e)
+            }
+        }
+    };
+
+    match attempt(false) {
+        Ok((value, session)) => {
+            if opts.force_fresh {
+                let mut session = session;
+                session.logout();
+            } else {
+                pool.put(account_id, fingerprint, session);
+            }
+            Ok(value)
+        }
+        Err(e) if opts.retry_on_error && is_imap_transport_error(&e) => {
+            tracing::debug!(
+                account_id = %account_id,
+                "mail imap op failed on live/new session; retrying once: {e}"
+            );
+            pool.invalidate(&account_id);
+            let (value, session) = attempt(true)?;
+            if opts.force_fresh {
+                let mut session = session;
+                session.logout();
+            } else {
+                pool.put(account_id, fingerprint, session);
+            }
+            Ok(value)
+        }
+        Err(e) => Err(e),
+    }
+}
+
 struct MailSmtpTransport {
     mailer: SmtpTransport,
     forward_task: Option<JoinHandle<()>>,
@@ -977,10 +1207,19 @@ pub async fn mail_test_connection(
     state: State<'_, AppState>,
 ) -> Result<MailTestConnectionResult, String> {
     let account = resolve_config(&state, config)?;
+    let pool = Arc::clone(&state.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        let mut imap = connect_imap(&account)?;
-        let folders = imap.list_folders(&account.config.session_id)?;
-        imap.logout();
+        let _enter = handle.enter();
+        let folders = with_imap_session(
+            &pool,
+            &account,
+            ImapSessionOpts {
+                force_fresh: true,
+                retry_on_error: false,
+            },
+            |imap| imap.list_folders(&account.config.session_id),
+        )?;
         test_smtp(&account)?;
         Ok(MailTestConnectionResult {
             imap_ok: true,
@@ -1173,15 +1412,18 @@ pub async fn mail_sync_headers(
         .min(2000);
     let include_bodies = include_bodies.unwrap_or(false);
 
+    let pool = Arc::clone(&state.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
     let mut result = tokio::task::spawn_blocking(move || {
-        let mut imap = connect_imap(&account)?;
-        let mut folders = imap.list_folders(&account.config.session_id)?;
-        let (selected_folder, cached, has_more) =
-            imap.sync_folder(&account, &folder, offset, limit, include_bodies)?;
-        merge_selected_folder(&mut folders, selected_folder.clone());
-        imap.logout();
-        let cached_bodies = cached.iter().filter(|m| m.body_cached_at.is_some()).count();
-        Ok::<_, String>((folders, selected_folder, cached, cached_bodies, has_more))
+        let _enter = handle.enter();
+        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+            let mut folders = imap.list_folders(&account.config.session_id)?;
+            let (selected_folder, cached, has_more) =
+                imap.sync_folder(&account, &folder, offset, limit, include_bodies)?;
+            merge_selected_folder(&mut folders, selected_folder.clone());
+            let cached_bodies = cached.iter().filter(|m| m.body_cached_at.is_some()).count();
+            Ok((folders, selected_folder, cached, cached_bodies, has_more))
+        })
     })
     .await
     .map_err(|e| format!("mail sync task failed: {e}"))??;
@@ -1239,38 +1481,48 @@ pub async fn mail_sync_all_folders(
         HashMap::new()
     };
 
+    let pool = Arc::clone(&state.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
     let result = tokio::task::spawn_blocking(move || {
-        let mut imap = connect_imap(&account)?;
-        let mut folders = imap.list_folders(&account.config.session_id)?;
-        let mut messages = Vec::new();
-        let mut new_messages = 0usize;
-        for listed in folders.clone() {
-            let folder_name = listed.name;
-            let state = sync_states.get(&folder_name).copied().unwrap_or_default();
-            match imap.sync_folder_incremental(&account, &folder_name, state, limit, include_bodies)
-            {
-                Ok((synced_folder, mut synced_messages)) => {
-                    let same_uid_validity = state.max_uid > 0
-                        && (state.uid_validity.is_none()
-                            || synced_folder.uid_validity.is_none()
-                            || state.uid_validity == synced_folder.uid_validity);
-                    if same_uid_validity {
-                        new_messages += synced_messages.len();
+        let _enter = handle.enter();
+        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+            let mut folders = imap.list_folders(&account.config.session_id)?;
+            let mut messages = Vec::new();
+            let mut new_messages = 0usize;
+            for listed in folders.clone() {
+                let folder_name = listed.name;
+                let state = sync_states.get(&folder_name).copied().unwrap_or_default();
+                match imap.sync_folder_incremental(
+                    &account,
+                    &folder_name,
+                    state,
+                    limit,
+                    include_bodies,
+                ) {
+                    Ok((synced_folder, mut synced_messages)) => {
+                        let same_uid_validity = state.max_uid > 0
+                            && (state.uid_validity.is_none()
+                                || synced_folder.uid_validity.is_none()
+                                || state.uid_validity == synced_folder.uid_validity);
+                        if same_uid_validity {
+                            new_messages += synced_messages.len();
+                        }
+                        merge_selected_folder(&mut folders, synced_folder);
+                        messages.append(&mut synced_messages);
                     }
-                    merge_selected_folder(&mut folders, synced_folder);
-                    messages.append(&mut synced_messages);
-                }
-                Err(e) => {
-                    tracing::debug!("mail incremental sync skipped folder {folder_name}: {e}");
+                    Err(e) => {
+                        tracing::debug!(
+                            "mail incremental sync skipped folder {folder_name}: {e}"
+                        );
+                    }
                 }
             }
-        }
-        imap.logout();
-        let cached_bodies = messages
-            .iter()
-            .filter(|m| m.body_cached_at.is_some())
-            .count();
-        Ok::<_, String>((folders, messages, cached_bodies, new_messages))
+            let cached_bodies = messages
+                .iter()
+                .filter(|m| m.body_cached_at.is_some())
+                .count();
+            Ok((folders, messages, cached_bodies, new_messages))
+        })
     })
     .await
     .map_err(|e| format!("mail sync all task failed: {e}"))??;
@@ -1340,11 +1592,13 @@ pub async fn mail_get_message_body(
 
     let account = resolve_config(&state, config)?;
     let cache_enabled = account.config.cache.enabled;
+    let pool = Arc::clone(&state.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
     let message = tokio::task::spawn_blocking(move || {
-        let mut imap = connect_imap(&account)?;
-        let message = imap.fetch_body(&account, &folder, uid)?;
-        imap.logout();
-        Ok::<_, String>(message)
+        let _enter = handle.enter();
+        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+            imap.fetch_body(&account, &folder, uid)
+        })
     })
     .await
     .map_err(|e| format!("mail body task failed: {e}"))??;
@@ -1370,12 +1624,13 @@ pub async fn mail_download_attachment(
         return Err("attachment download path is required".into());
     }
     let account = resolve_config(&state, config)?;
+    let pool = Arc::clone(&state.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        let mut imap = connect_imap(&account)?;
-        let result =
-            imap.download_attachment(&account, &folder, uid, attachment_index, &target_path);
-        imap.logout();
-        result
+        let _enter = handle.enter();
+        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+            imap.download_attachment(&account, &folder, uid, attachment_index, &target_path)
+        })
     })
     .await
     .map_err(|e| format!("mail attachment download task failed: {e}"))?
@@ -1497,11 +1752,13 @@ pub async fn mail_mark_read(
     let marked = target_uids.len();
     let folder_for_task = folder.clone();
     let uids_for_task = target_uids.clone();
+    let pool = Arc::clone(&state.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        let mut imap = connect_imap(&account)?;
-        let result = imap.mark_read(&folder_for_task, &uids_for_task);
-        imap.logout();
-        result
+        let _enter = handle.enter();
+        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+            imap.mark_read(&folder_for_task, &uids_for_task)
+        })
     })
     .await
     .map_err(|e| format!("mail mark read task failed: {e}"))??;
@@ -1517,6 +1774,7 @@ pub async fn mail_clear_cache(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    state.mail_imap_pool.invalidate(&account_id);
     with_mail_db(&state, &account_id, |db| {
         db.execute(
             "DELETE FROM mail_messages WHERE account_id = ?1",
@@ -1556,16 +1814,18 @@ pub async fn mail_set_flags(
     let uids_for_task = target_uids.clone();
     let add_for_task = add.clone();
     let remove_for_task = remove.clone();
+    let pool = Arc::clone(&state.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        let mut imap = connect_imap(&account)?;
-        let result = imap.set_flags(
-            &folder_for_task,
-            &uids_for_task,
-            &add_for_task,
-            &remove_for_task,
-        );
-        imap.logout();
-        result
+        let _enter = handle.enter();
+        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+            imap.set_flags(
+                &folder_for_task,
+                &uids_for_task,
+                &add_for_task,
+                &remove_for_task,
+            )
+        })
     })
     .await
     .map_err(|e| format!("mail set flags task failed: {e}"))??;
@@ -1609,11 +1869,13 @@ pub async fn mail_move_messages(
     let folder_for_task = folder.clone();
     let target_for_task = target_folder.clone();
     let uids_for_task = target_uids.clone();
+    let pool = Arc::clone(&state.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        let mut imap = connect_imap(&account)?;
-        let result = imap.move_messages(&folder_for_task, &uids_for_task, &target_for_task);
-        imap.logout();
-        result
+        let _enter = handle.enter();
+        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+            imap.move_messages(&folder_for_task, &uids_for_task, &target_for_task)
+        })
     })
     .await
     .map_err(|e| format!("mail move task failed: {e}"))??;
@@ -1654,11 +1916,13 @@ pub async fn mail_copy_messages(
     let folder_for_task = folder.clone();
     let target_for_task = target_folder.clone();
     let uids_for_task = target_uids.clone();
+    let pool = Arc::clone(&state.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        let mut imap = connect_imap(&account)?;
-        let result = imap.copy_messages(&folder_for_task, &uids_for_task, &target_for_task);
-        imap.logout();
-        result
+        let _enter = handle.enter();
+        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+            imap.copy_messages(&folder_for_task, &uids_for_task, &target_for_task)
+        })
     })
     .await
     .map_err(|e| format!("mail copy task failed: {e}"))??;
@@ -1696,11 +1960,13 @@ pub async fn mail_delete_messages(
     let account = resolve_config(&state, config)?;
     let folder_for_task = folder.clone();
     let uids_for_task = target_uids.clone();
+    let pool = Arc::clone(&state.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
     let deleted = tokio::task::spawn_blocking(move || {
-        let mut imap = connect_imap(&account)?;
-        let result = imap.delete_messages(&folder_for_task, &uids_for_task, all);
-        imap.logout();
-        result
+        let _enter = handle.enter();
+        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+            imap.delete_messages(&folder_for_task, &uids_for_task, all)
+        })
     })
     .await
     .map_err(|e| format!("mail delete task failed: {e}"))??;
@@ -1731,11 +1997,13 @@ pub async fn mail_fetch_raw(
         return Err("mail folder is required".into());
     }
     let account = resolve_config(&state, config)?;
+    let pool = Arc::clone(&state.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
     let raw = tokio::task::spawn_blocking(move || {
-        let mut imap = connect_imap(&account)?;
-        let result = imap.fetch_raw(&folder, uid);
-        imap.logout();
-        result
+        let _enter = handle.enter();
+        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+            imap.fetch_raw(&folder, uid)
+        })
     })
     .await
     .map_err(|e| format!("mail fetch raw task failed: {e}"))??;
@@ -1758,21 +2026,24 @@ pub async fn mail_save_raw(
         return Err("target path is required".into());
     }
     let account = resolve_config(&state, config)?;
+    let pool = Arc::clone(&state.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        let mut imap = connect_imap(&account)?;
-        let raw = imap.fetch_raw(&folder, uid);
-        imap.logout();
-        let raw = raw?;
-        let path = std::path::PathBuf::from(&target_path);
-        if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
-            std::fs::create_dir_all(parent).map_err(|e| format!("failed to create folder: {e}"))?;
-        }
-        std::fs::write(&path, &raw).map_err(|e| format!("failed to write .eml file: {e}"))?;
-        Ok(MailDownloadAttachmentResult {
-            path: path.to_string_lossy().to_string(),
-            name: path.file_name().map(|n| n.to_string_lossy().to_string()),
-            content_type: Some("message/rfc822".to_string()),
-            size: raw.len(),
+        let _enter = handle.enter();
+        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+            let raw = imap.fetch_raw(&folder, uid)?;
+            let path = std::path::PathBuf::from(&target_path);
+            if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| format!("failed to create folder: {e}"))?;
+            }
+            std::fs::write(&path, &raw).map_err(|e| format!("failed to write .eml file: {e}"))?;
+            Ok(MailDownloadAttachmentResult {
+                path: path.to_string_lossy().to_string(),
+                name: path.file_name().map(|n| n.to_string_lossy().to_string()),
+                content_type: Some("message/rfc822".to_string()),
+                size: raw.len(),
+            })
         })
     })
     .await
@@ -1792,12 +2063,14 @@ pub async fn mail_create_folder(
     let account_id = config.session_id.clone();
     let account = resolve_config(&state, config)?;
     let name_for_task = name.clone();
+    let pool = Arc::clone(&state.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
     let folders = tokio::task::spawn_blocking(move || {
-        let mut imap = connect_imap(&account)?;
-        imap.create_folder(&name_for_task)?;
-        let folders = imap.list_folders(&account.config.session_id)?;
-        imap.logout();
-        Ok::<_, String>(folders)
+        let _enter = handle.enter();
+        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+            imap.create_folder(&name_for_task)?;
+            imap.list_folders(&account.config.session_id)
+        })
     })
     .await
     .map_err(|e| format!("mail create folder task failed: {e}"))??;
@@ -1827,12 +2100,14 @@ pub async fn mail_rename_folder(
     let account = resolve_config(&state, config)?;
     let from_for_task = from.clone();
     let to_for_task = to.clone();
+    let pool = Arc::clone(&state.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
     let folders = tokio::task::spawn_blocking(move || {
-        let mut imap = connect_imap(&account)?;
-        imap.rename_folder(&from_for_task, &to_for_task)?;
-        let folders = imap.list_folders(&account.config.session_id)?;
-        imap.logout();
-        Ok::<_, String>(folders)
+        let _enter = handle.enter();
+        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+            imap.rename_folder(&from_for_task, &to_for_task)?;
+            imap.list_folders(&account.config.session_id)
+        })
     })
     .await
     .map_err(|e| format!("mail rename folder task failed: {e}"))??;
@@ -1860,12 +2135,14 @@ pub async fn mail_delete_folder(
     let account_id = config.session_id.clone();
     let account = resolve_config(&state, config)?;
     let name_for_task = name.clone();
+    let pool = Arc::clone(&state.mail_imap_pool);
+    let handle = tokio::runtime::Handle::current();
     let folders = tokio::task::spawn_blocking(move || {
-        let mut imap = connect_imap(&account)?;
-        imap.delete_folder(&name_for_task)?;
-        let folders = imap.list_folders(&account.config.session_id)?;
-        imap.logout();
-        Ok::<_, String>(folders)
+        let _enter = handle.enter();
+        with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
+            imap.delete_folder(&name_for_task)?;
+            imap.list_folders(&account.config.session_id)
+        })
     })
     .await
     .map_err(|e| format!("mail delete folder task failed: {e}"))??;
@@ -1962,6 +2239,11 @@ fn resolve_secret(
     }
 }
 
+/// Resolve mail session network settings for IMAP/SMTP/OAuth.
+///
+/// Important: this uses **only** the mail session's own `networkSettings`.
+/// It never falls back to the app global proxy (`proxy::AppProxyConfig`).
+/// Missing settings or `proxy_kind` empty/`none` means a direct connection.
 fn prepare_mail_network(
     state: &State<'_, AppState>,
     network: Option<NetworkSettings>,
@@ -2874,6 +3156,116 @@ fn imap_list_folders<T: Read + Write>(
         .collect())
 }
 
+fn imap_unread_count<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    folder: &str,
+) -> Option<u32> {
+    // Prefer STATUS (UNSEEN) which returns a count without enumerating UIDs.
+    // The imap 2.4 crate delivers STATUS attributes via the unsolicited
+    // channel rather than the returned Mailbox struct.
+    if let Err(e) = session.status(folder, "(UNSEEN)") {
+        tracing::debug!("IMAP STATUS UNSEEN failed for {folder}: {e}; falling back to SEARCH");
+    } else {
+        while let Ok(resp) = session.unsolicited_responses.try_recv() {
+            if let imap::types::UnsolicitedResponse::Status { attributes, .. } = resp {
+                for attr in attributes {
+                    if let imap::types::StatusAttribute::Unseen(n) = attr {
+                        return Some(n);
+                    }
+                }
+            }
+        }
+    }
+    session
+        .uid_search("UNSEEN")
+        .ok()
+        .map(|ids| ids.len() as u32)
+}
+
+/// Select the newest `limit` UIDs at `offset` without a full-folder `SEARCH ALL`
+/// when possible. Uses a high UID window near `uid_next`, expanding as needed,
+/// and only falls back to `SEARCH ALL` for sparse UID spaces or deep offsets.
+fn imap_page_uids_newest_first<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    uid_next: Option<u32>,
+    exists: u32,
+    offset: usize,
+    limit: usize,
+) -> Result<(Vec<u32>, bool), String> {
+    if exists == 0 || limit == 0 {
+        return Ok((Vec::new(), false));
+    }
+    let need = offset.saturating_add(limit);
+
+    if let Some(uid_next) = uid_next.filter(|u| *u > 1) {
+        // Request a generous high-UID window first (gaps mean we may need more).
+        let mut window = need.saturating_mul(4).max(need + 64).min(10_000);
+        for _ in 0..4 {
+            let start = uid_next.saturating_sub(window as u32).max(1);
+            let mut uids = session
+                .uid_search(format!("UID {start}:*"))
+                .map_err(|e| format!("IMAP UID SEARCH range failed: {e}"))?
+                .into_iter()
+                .collect::<Vec<_>>();
+            uids.sort_unstable();
+            if uids.len() >= need || start == 1 {
+                let total_in_window = uids.len();
+                let page: Vec<u32> = uids
+                    .iter()
+                    .rev()
+                    .skip(offset)
+                    .take(limit)
+                    .copied()
+                    .collect();
+                // When start==1 the window covers the whole mailbox UID space
+                // from 1..uid_next. Otherwise older UIDs may still exist.
+                let has_more = if page.is_empty() {
+                    false
+                } else if start == 1 {
+                    offset.saturating_add(page.len()) < total_in_window
+                } else {
+                    offset.saturating_add(page.len()) < total_in_window
+                        || (exists as usize) > offset.saturating_add(page.len())
+                };
+                let mut page = page;
+                page.sort_unstable();
+                return Ok((page, has_more));
+            }
+            // Expand window and retry.
+            window = window.saturating_mul(2).min(50_000);
+        }
+    }
+
+    // Fallback: full SEARCH ALL (slow on large folders).
+    let mut uids = session
+        .uid_search("ALL")
+        .map_err(|e| format!("IMAP UID SEARCH failed: {e}"))?
+        .into_iter()
+        .collect::<Vec<_>>();
+    uids.sort_unstable();
+    let total_uids = uids.len();
+    let mut fetch_uids = uids
+        .iter()
+        .rev()
+        .skip(offset)
+        .take(limit)
+        .copied()
+        .collect::<Vec<_>>();
+    let has_more = offset.saturating_add(fetch_uids.len()) < total_uids;
+    fetch_uids.sort_unstable();
+    Ok((fetch_uids, has_more))
+}
+
+fn imap_recent_uids_for_limit<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    uid_next: Option<u32>,
+    exists: u32,
+    limit: usize,
+) -> Result<Vec<u32>, String> {
+    let (uids, _) = imap_page_uids_newest_first(session, uid_next, exists, 0, limit)?;
+    Ok(uids)
+}
+
 fn imap_sync_folder<T: Read + Write>(
     session: &mut imap::Session<T>,
     account: &ResolvedMailAccount,
@@ -2885,10 +3277,7 @@ fn imap_sync_folder<T: Read + Write>(
     let mailbox = session
         .examine(folder)
         .map_err(|e| format!("IMAP EXAMINE {folder} failed: {e}"))?;
-    let unread = session
-        .uid_search("UNSEEN")
-        .ok()
-        .map(|ids| ids.len() as u32);
+    let unread = imap_unread_count(session, folder);
     let account_id = &account.config.session_id;
     let mut folder_info = MailFolder {
         account_id: account_id.clone(),
@@ -2903,24 +3292,10 @@ fn imap_sync_folder<T: Read + Write>(
         updated_at: now_ts(),
     };
 
-    let mut uids = session
-        .uid_search("ALL")
-        .map_err(|e| format!("IMAP UID SEARCH failed: {e}"))?
-        .into_iter()
-        .collect::<Vec<_>>();
-    uids.sort_unstable();
-    let total_uids = uids.len();
     let offset = offset as usize;
     let limit = limit.max(1).min(2000) as usize;
-    let mut fetch_uids = uids
-        .iter()
-        .rev()
-        .skip(offset)
-        .take(limit)
-        .copied()
-        .collect::<Vec<_>>();
-    let has_more = offset.saturating_add(fetch_uids.len()) < total_uids;
-    fetch_uids.sort_unstable();
+    let (fetch_uids, has_more) =
+        imap_page_uids_newest_first(session, mailbox.uid_next, mailbox.exists, offset, limit)?;
     if fetch_uids.is_empty() {
         folder_info.updated_at = now_ts();
         return Ok((folder_info, Vec::new(), false));
@@ -2948,10 +3323,7 @@ fn imap_sync_folder_incremental<T: Read + Write>(
     let mailbox = session
         .examine(folder)
         .map_err(|e| format!("IMAP EXAMINE {folder} failed: {e}"))?;
-    let unread = session
-        .uid_search("UNSEEN")
-        .ok()
-        .map(|ids| ids.len() as u32);
+    let unread = imap_unread_count(session, folder);
     let account_id = &account.config.session_id;
     let folder_info = MailFolder {
         account_id: account_id.clone(),
@@ -2982,14 +3354,7 @@ fn imap_sync_folder_incremental<T: Read + Write>(
         uids.sort_unstable();
         uids.into_iter().take(limit).collect::<Vec<_>>()
     } else {
-        let mut uids = session
-            .uid_search("ALL")
-            .map_err(|e| format!("IMAP UID SEARCH failed: {e}"))?
-            .into_iter()
-            .collect::<Vec<_>>();
-        uids.sort_unstable();
-        let start = uids.len().saturating_sub(limit);
-        uids[start..].to_vec()
+        imap_recent_uids_for_limit(session, mailbox.uid_next, mailbox.exists, limit)?
     };
     fetch_uids.sort_unstable();
     if fetch_uids.is_empty() {
@@ -5125,6 +5490,51 @@ Content-Disposition: inline; filename=\"logo.png\"\r\n\
 iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==\r\n\
 --rel--\r\n"
             .to_vec()
+    }
+
+    #[test]
+    fn network_fingerprint_is_direct_without_session_proxy() {
+        assert_eq!(network_fingerprint(None), "direct");
+        let none_kind = NetworkSettings {
+            proxy_kind: "none".into(),
+            ..NetworkSettings::default()
+        };
+        // Fingerprint still records kind=none (prepare_mail_network maps this to
+        // direct routing); the important policy is prepare_mail_network never
+        // loads AppProxyConfig.
+        assert!(network_fingerprint(Some(&none_kind)).starts_with("none|"));
+    }
+
+    #[test]
+    fn mail_imap_fingerprint_changes_when_session_proxy_changes() {
+        let mut account = sample_resolved_account();
+        let direct = mail_imap_fingerprint(&account);
+        account.network_settings = Some(NetworkSettings {
+            proxy_kind: "socks5".into(),
+            proxy_host: "127.0.0.1".into(),
+            proxy_port: 1080,
+            ..NetworkSettings::default()
+        });
+        let proxied = mail_imap_fingerprint(&account);
+        assert_ne!(direct, proxied);
+        // Unrelated display fields are not part of the connection fingerprint.
+        account.config.display_name = Some("Other".into());
+        assert_eq!(proxied, mail_imap_fingerprint(&account));
+    }
+
+    #[test]
+    fn mail_imap_fingerprint_changes_when_credentials_change() {
+        let mut account = sample_resolved_account();
+        let before = mail_imap_fingerprint(&account);
+        account.imap_password = "rotated-token".into();
+        assert_ne!(before, mail_imap_fingerprint(&account));
+    }
+
+    #[test]
+    fn is_imap_transport_error_detects_reconnectable_failures() {
+        assert!(is_imap_transport_error("connection reset by peer"));
+        assert!(is_imap_transport_error("IMAP NOOP failed: timed out"));
+        assert!(!is_imap_transport_error("IMAP login failed: authenticationfailed"));
     }
 
     #[test]

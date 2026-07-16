@@ -490,10 +490,13 @@ describe("MailClientTab", () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
 
-    expect(mailMocks.mailSyncAllFolders).toHaveBeenCalledWith(
+    // First quiet ticks refresh the selected folder only (not all folders).
+    expect(mailMocks.mailSyncHeaders).toHaveBeenCalledWith(
       intervalInfo,
-      { limit: 50, includeBodies: false },
+      "INBOX",
+      { limit: 50, offset: 0, includeBodies: false },
     );
+    expect(mailMocks.mailSyncAllFolders).not.toHaveBeenCalled();
     expect(mailMocks.mailListCachedFolders).not.toHaveBeenCalled();
     expect(mailMocks.mailListCachedMessages).not.toHaveBeenCalled();
 
@@ -515,12 +518,24 @@ describe("MailClientTab", () => {
     expect(screen.getAllByText(/Header arrived before the body cache is warm/).length).toBeGreaterThan(0);
   });
 
-  it("pushes a Tao mail notification when periodic sync reports new messages", async () => {
+  it("pushes a Tao mail notification when periodic full-folder sync reports new messages", async () => {
     vi.useFakeTimers();
     const intervalInfo: MailTabInfo = {
       ...info,
       sync: { ...info.sync, onOpen: false, intervalMinutes: 1 },
     };
+    mailMocks.mailSyncHeaders.mockResolvedValue({
+      accountId: info.sessionId,
+      folder: "INBOX",
+      folders: [folder],
+      messages: [],
+      fetchedMessages: 0,
+      cachedBodies: 0,
+      syncedAt: 1,
+      offset: 0,
+      limit: 50,
+      hasMore: false,
+    });
     mailMocks.mailSyncAllFolders.mockResolvedValue({
       accountId: info.sessionId,
       folders: [folder],
@@ -532,10 +547,12 @@ describe("MailClientTab", () => {
 
     render(<MailClientTab tabId="mail-tab" info={intervalInfo} visible={false} />);
 
+    // Full-folder scan runs every 6th quiet tick.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(60_000);
+      await vi.advanceTimersByTimeAsync(6 * 60_000);
     });
 
+    expect(mailMocks.mailSyncAllFolders).toHaveBeenCalled();
     expect(useTaoAlertStore.getState().mailNew).toMatchObject([
       {
         id: "mail:mail-tab",
@@ -557,13 +574,18 @@ describe("MailClientTab", () => {
     };
     const syncResult = {
       accountId: info.sessionId,
+      folder: "INBOX",
       folders: [folder],
+      messages: [],
       fetchedMessages: 1,
       cachedBodies: 0,
       syncedAt: 2,
+      offset: 0,
+      limit: 50,
+      hasMore: false,
     };
     let resolveSync!: (value: typeof syncResult) => void;
-    mailMocks.mailSyncAllFolders.mockReturnValue(new Promise((resolve) => {
+    mailMocks.mailSyncHeaders.mockReturnValue(new Promise((resolve) => {
       resolveSync = resolve;
     }));
 
@@ -572,22 +594,22 @@ describe("MailClientTab", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
-    expect(mailMocks.mailSyncAllFolders).toHaveBeenCalledTimes(1);
+    expect(mailMocks.mailSyncHeaders).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
-    expect(mailMocks.mailSyncAllFolders).toHaveBeenCalledTimes(1);
+    expect(mailMocks.mailSyncHeaders).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       resolveSync(syncResult);
       await Promise.resolve();
     });
-    mailMocks.mailSyncAllFolders.mockResolvedValue(syncResult);
+    mailMocks.mailSyncHeaders.mockResolvedValue(syncResult);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
-    expect(mailMocks.mailSyncAllFolders).toHaveBeenCalledTimes(2);
+    expect(mailMocks.mailSyncHeaders).toHaveBeenCalledTimes(2);
   });
 });
