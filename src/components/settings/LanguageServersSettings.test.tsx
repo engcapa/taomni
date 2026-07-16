@@ -5,13 +5,20 @@ import { LanguageServersSettings } from "./LanguageServersSettings";
 
 const writeTextMock = vi.fn(async (_text: string) => {});
 const detectMock = vi.fn();
+const setJavaHomeMock = vi.fn(async (_home?: string | null) => {});
+const selectFolderPathMock = vi.fn(async (_current?: string) => null as string | null);
 
 vi.mock("../../lib/clipboard", () => ({
   writeText: (text: string) => writeTextMock(text),
 }));
 
 vi.mock("../../lib/editor/lsp", () => ({
-  lspDetectServers: () => detectMock(),
+  lspDetectServers: (options?: { javaHome?: string | null }) => detectMock(options),
+  lspSetJavaHome: (javaHome?: string | null) => setJavaHomeMock(javaHome),
+}));
+
+vi.mock("../../lib/ipc", () => ({
+  selectFolderPath: (current?: string) => selectFolderPathMock(current),
 }));
 
 vi.mock("../../lib/i18n", () => ({
@@ -175,6 +182,39 @@ describe("LanguageServersSettings", () => {
       expect(window.localStorage.getItem("taomni.codeWorkspace.lspCustomCommands.v1")).toContain(
         "/opt/jdtls/bin/jdtls",
       );
+    });
+  });
+
+  it("persists Java 21 runtime path and re-detects with that home", async () => {
+    render(<LanguageServersSettings />);
+    const input = await screen.findByTestId("language-servers-java-home");
+    fireEvent.change(input, { target: { value: "C:\\Program Files\\Java\\jdk-21" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(window.localStorage.getItem("taomni.codeWorkspace.lspJavaHome.v1")).toBe(
+        "C:\\Program Files\\Java\\jdk-21",
+      );
+    });
+    await waitFor(() => {
+      expect(setJavaHomeMock).toHaveBeenCalledWith("C:\\Program Files\\Java\\jdk-21");
+      expect(detectMock).toHaveBeenCalledWith({
+        javaHome: "C:\\Program Files\\Java\\jdk-21",
+      });
+    });
+
+    selectFolderPathMock.mockResolvedValueOnce("D:\\jdks\\jdk-21.0.2");
+    fireEvent.click(screen.getByTestId("language-servers-java-home-browse"));
+    await waitFor(() => {
+      expect(window.localStorage.getItem("taomni.codeWorkspace.lspJavaHome.v1")).toBe(
+        "D:\\jdks\\jdk-21.0.2",
+      );
+    });
+
+    fireEvent.click(screen.getByTestId("language-servers-java-home-clear"));
+    await waitFor(() => {
+      expect(window.localStorage.getItem("taomni.codeWorkspace.lspJavaHome.v1")).toBeNull();
+      expect(setJavaHomeMock).toHaveBeenCalledWith(null);
     });
   });
 });

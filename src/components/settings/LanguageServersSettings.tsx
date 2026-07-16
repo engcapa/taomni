@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Copy, RefreshCw, Server } from "lucide-react";
-import { lspDetectServers, type LspServerStatus } from "../../lib/editor/lsp";
+import { ChevronDown, ChevronRight, Copy, FolderOpen, RefreshCw, Server } from "lucide-react";
+import { lspDetectServers, lspSetJavaHome, type LspServerStatus } from "../../lib/editor/lsp";
 import { writeText } from "../../lib/clipboard";
+import { selectFolderPath } from "../../lib/ipc";
 import { useT } from "../../lib/i18n";
 import {
   detectHostOs,
@@ -18,8 +19,10 @@ import {
   CUSTOM_LSP_COMMAND_ID,
   readLspCommandPrefs,
   readLspCustomCommands,
+  readLspJavaHome,
   writeLspCommandPrefs,
   writeLspCustomCommands,
+  writeLspJavaHome,
   type LspCustomCommandConfig,
 } from "../editor/workspace/codeWorkspaceModel";
 
@@ -37,6 +40,7 @@ export function LanguageServersSettings() {
   const [customCommands, setCustomCommands] = useState<Record<string, LspCustomCommandConfig>>(
     () => readLspCustomCommands(),
   );
+  const [javaHome, setJavaHome] = useState(() => readLspJavaHome());
   /** Expanded install panels keyed by presetId. */
   const [expandedInstall, setExpandedInstall] = useState<Record<string, boolean>>({});
   /** Brief highlight when deep-linked from a Code Workspace file. */
@@ -46,11 +50,14 @@ export function LanguageServersSettings() {
   });
   const hostOs = useMemo(() => detectHostOs(), []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (overrideJavaHome?: string) => {
     setLoading(true);
     setError(null);
+    const home = (overrideJavaHome ?? readLspJavaHome()).trim();
     try {
-      const next = await lspDetectServers();
+      // Keep the backend override in sync before probing so jdtls launch + status agree.
+      await lspSetJavaHome(home || null);
+      const next = await lspDetectServers({ javaHome: home || null });
       setStatuses(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -115,6 +122,22 @@ export function LanguageServersSettings() {
       return next;
     });
   };
+
+  const commitJavaHome = useCallback((next: string) => {
+    const trimmed = next.trim();
+    setJavaHome(trimmed);
+    writeLspJavaHome(trimmed);
+    void refresh(trimmed);
+  }, [refresh]);
+
+  const browseJavaHome = useCallback(async () => {
+    try {
+      const selected = await selectFolderPath(javaHome || undefined);
+      if (selected) commitJavaHome(selected);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [commitJavaHome, javaHome]);
 
   const toggleInstall = (presetId: string) => {
     setExpandedInstall((current) => ({
@@ -294,9 +317,57 @@ export function LanguageServersSettings() {
                     </div>
                   )}
                   {status.presetId === "java" && (
-                    <div className="mt-1 text-[10px] leading-snug text-[var(--taomni-text-muted)]">
-                      {t("settings.languageServersJavaRequirement")}
-                    </div>
+                    <>
+                      <div className="mt-1 text-[10px] leading-snug text-[var(--taomni-text-muted)]">
+                        {t("settings.languageServersJavaRequirement")}
+                      </div>
+                      <label className="mt-1.5 block text-[11px] text-[var(--taomni-text-muted)]">
+                        {t("settings.languageServersJavaHome")}
+                        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                          <input
+                            data-testid="language-servers-java-home"
+                            value={javaHome}
+                            className="h-7 min-w-0 flex-1 rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 font-mono text-[11px] text-[var(--taomni-text)] outline-none"
+                            placeholder={t("settings.languageServersJavaHomePlaceholder")}
+                            aria-label={t("settings.languageServersJavaHome")}
+                            onChange={(event) => setJavaHome(event.target.value)}
+                            onBlur={(event) => {
+                              if (event.target.value.trim() !== readLspJavaHome().trim()) {
+                                commitJavaHome(event.target.value);
+                              }
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.currentTarget.blur();
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            data-testid="language-servers-java-home-browse"
+                            className="taomni-btn h-7 px-2 inline-flex items-center gap-1 text-[11px]"
+                            onClick={() => void browseJavaHome()}
+                            title={t("settings.languageServersJavaHomeBrowse")}
+                          >
+                            <FolderOpen className="h-3.5 w-3.5" />
+                            {t("settings.languageServersJavaHomeBrowse")}
+                          </button>
+                          {javaHome.trim() !== "" && (
+                            <button
+                              type="button"
+                              data-testid="language-servers-java-home-clear"
+                              className="taomni-btn h-7 px-2 text-[11px]"
+                              onClick={() => commitJavaHome("")}
+                            >
+                              {t("settings.languageServersJavaHomeClear")}
+                            </button>
+                          )}
+                        </div>
+                        <div className="mt-1 text-[10px] leading-snug text-[var(--taomni-text-muted)]">
+                          {t("settings.languageServersJavaHomeHint")}
+                        </div>
+                      </label>
+                    </>
                   )}
                 </div>
               )}

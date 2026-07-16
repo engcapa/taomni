@@ -1239,6 +1239,9 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "history_prune": {
       return 0 as T;
     }
+    case "lsp_set_java_home": {
+      return undefined as T;
+    }
     case "lsp_detect_servers": {
       return stubLspServerStatuses() as T;
     }

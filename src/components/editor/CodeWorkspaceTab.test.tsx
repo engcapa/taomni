@@ -31,6 +31,7 @@ const workspaceMocks = vi.hoisted(() => ({
 
 const lspMocks = vi.hoisted(() => ({
   lspDetectServers: vi.fn(),
+  lspSetJavaHome: vi.fn(),
   lspOpenDocument: vi.fn(),
   lspChangeDocument: vi.fn(),
   lspSaveDocument: vi.fn(),
@@ -225,6 +226,7 @@ describe("CodeWorkspaceTab", () => {
     workspaceMocks.workspaceDeletePath.mockReset();
     workspaceMocks.workspaceRenamePath.mockReset();
     lspMocks.lspDetectServers.mockReset();
+    lspMocks.lspSetJavaHome.mockReset().mockResolvedValue(undefined);
     lspMocks.lspOpenDocument.mockReset();
     lspMocks.lspChangeDocument.mockReset();
     lspMocks.lspSaveDocument.mockReset();
@@ -481,6 +483,7 @@ describe("CodeWorkspaceTab", () => {
           filePath: "src/Program.cs",
           serverCommandId: null,
           customServerCommand: null,
+          javaHome: null,
         },
         "class Program {}",
         1,
