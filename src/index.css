@@ -1277,3 +1277,240 @@ html[data-app-theme="dark"] .hover\:bg-white\/70:hover {
 .ai-z-card    { z-index: 400; }
 .ai-z-privacy { z-index: 500; }
 .ai-z-toast   { z-index: 900; }
+
+/* ── Mail message reader (Thunderbird-like paper surface) ───────────────────
+ * HTML mail expects a light document canvas. Keep app chrome themed, but isolate
+ * the message body so dark UI themes do not wash out marketing / client HTML.
+ */
+.taomni-mail-reader-paper {
+  background: #ffffff;
+  color: #1a1a1a;
+  color-scheme: light;
+  border: 1px solid color-mix(in srgb, var(--taomni-divider) 85%, #94a3b8);
+  border-radius: 6px;
+  box-shadow:
+    0 1px 2px color-mix(in srgb, #000 6%, transparent),
+    0 8px 24px color-mix(in srgb, #000 5%, transparent);
+  overflow: auto;
+  min-height: 120px;
+}
+
+.taomni-mail-reader-html {
+  box-sizing: border-box;
+  max-width: none;
+  padding: 16px 20px 24px;
+  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1a1a1a;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+
+.taomni-mail-reader-html,
+.taomni-mail-reader-html * {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.taomni-mail-reader-html img {
+  max-width: 100%;
+  height: auto;
+}
+
+.taomni-mail-reader-html a {
+  color: #0b57d0;
+  text-decoration: underline;
+}
+
+.taomni-mail-reader-html a:visited {
+  color: #681da8;
+}
+
+.taomni-mail-reader-html p {
+  margin: 0 0 0.75em;
+}
+
+.taomni-mail-reader-html p:last-child {
+  margin-bottom: 0;
+}
+
+.taomni-mail-reader-html h1,
+.taomni-mail-reader-html h2,
+.taomni-mail-reader-html h3,
+.taomni-mail-reader-html h4,
+.taomni-mail-reader-html h5,
+.taomni-mail-reader-html h6 {
+  margin: 0.9em 0 0.45em;
+  line-height: 1.25;
+  font-weight: 600;
+  color: inherit;
+}
+
+.taomni-mail-reader-html h1 { font-size: 1.5em; }
+.taomni-mail-reader-html h2 { font-size: 1.3em; }
+.taomni-mail-reader-html h3 { font-size: 1.15em; }
+
+.taomni-mail-reader-html ul,
+.taomni-mail-reader-html ol {
+  margin: 0.5em 0 0.75em;
+  padding-left: 1.5em;
+}
+
+.taomni-mail-reader-html li {
+  margin: 0.2em 0;
+}
+
+.taomni-mail-reader-html blockquote {
+  margin: 0.6em 0;
+  padding: 0 0 0 0.85em;
+  border-left: 2px solid #729fcf;
+  color: #333;
+}
+
+.taomni-mail-reader-html pre,
+.taomni-mail-reader-html code {
+  font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
+  font-size: 0.92em;
+}
+
+.taomni-mail-reader-html pre {
+  margin: 0.6em 0;
+  padding: 0.65em 0.8em;
+  overflow: auto;
+  background: #f4f4f5;
+  border: 1px solid #e4e4e7;
+  border-radius: 4px;
+  white-space: pre-wrap;
+}
+
+.taomni-mail-reader-html hr {
+  margin: 1em 0;
+  border: none;
+  border-top: 1px solid #d4d4d8;
+}
+
+.taomni-mail-reader-html table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  max-width: 100%;
+}
+
+/* Do not force cell borders — many HTML mails use tables purely for layout. */
+.taomni-mail-reader-html td,
+.taomni-mail-reader-html th {
+  vertical-align: top;
+}
+
+.taomni-mail-reader-html .taomni-mail-body-root {
+  min-height: 100%;
+}
+
+.taomni-mail-reader-html .taomni-mail-remote-image-blocked {
+  display: inline-block;
+  margin: 2px 0;
+  padding: 2px 6px;
+  border: 1px dashed #a1a1aa;
+  border-radius: 3px;
+  background: #fafafa;
+  color: #71717a;
+  font-size: 12px;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+
+.taomni-mail-reader-text {
+  margin: 0;
+  padding: 16px 20px 24px;
+  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #1a1a1a;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* Sandboxed HTML mail iframe fills the paper surface. */
+.taomni-mail-reader-frame {
+  display: block;
+  width: 100%;
+  min-height: 120px;
+  border: 0;
+  background: #ffffff;
+  color-scheme: light;
+}
+
+/* Plain-text mail body (quote colors like Thunderbird). */
+.taomni-mail-reader-paper.is-dark {
+  background: #1c1b22;
+  color: #e8e6e3;
+  color-scheme: dark;
+  border-color: color-mix(in srgb, #52525b 70%, transparent);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, #000 30%, transparent),
+    0 8px 24px color-mix(in srgb, #000 25%, transparent);
+}
+
+.taomni-mail-reader-text {
+  margin: 0;
+  padding: 16px 20px 24px;
+  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  font-size: inherit;
+  line-height: 1.55;
+  color: inherit;
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+
+.taomni-mail-reader-text .mail-line {
+  white-space: pre-wrap;
+  min-height: 1.35em;
+}
+
+.taomni-mail-reader-text .mail-line-blank {
+  min-height: 1.1em;
+}
+
+.taomni-mail-reader-text .mail-quote {
+  border-left: 2px solid #729fcf;
+  padding-left: 0.55em;
+  margin-left: 0.1em;
+}
+
+.taomni-mail-reader-text .mail-quote-mark {
+  opacity: 0.55;
+  user-select: none;
+}
+
+.taomni-mail-reader-text .mail-quote-1 { color: #1d4ed8; border-left-color: #3b82f6; }
+.taomni-mail-reader-text .mail-quote-2 { color: #047857; border-left-color: #10b981; }
+.taomni-mail-reader-text .mail-quote-3 { color: #6d28d9; border-left-color: #8b5cf6; }
+.taomni-mail-reader-text .mail-quote-4 { color: #b45309; border-left-color: #f59e0b; }
+.taomni-mail-reader-text .mail-quote-5 { color: #be123c; border-left-color: #f43f5e; }
+
+.taomni-mail-reader-paper.is-dark .mail-quote-1 { color: #93c5fd; border-left-color: #60a5fa; }
+.taomni-mail-reader-paper.is-dark .mail-quote-2 { color: #6ee7b7; border-left-color: #34d399; }
+.taomni-mail-reader-paper.is-dark .mail-quote-3 { color: #c4b5fd; border-left-color: #a78bfa; }
+.taomni-mail-reader-paper.is-dark .mail-quote-4 { color: #fcd34d; border-left-color: #fbbf24; }
+.taomni-mail-reader-paper.is-dark .mail-quote-5 { color: #fda4af; border-left-color: #fb7185; }
+
+.taomni-mail-plain-link {
+  color: #0b57d0;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.taomni-mail-reader-paper.is-dark .taomni-mail-plain-link {
+  color: #8ab4f8;
+}
+
+.taomni-mail-reader-paper.is-dark .taomni-mail-reader-frame {
+  background: #1c1b22;
+}
+
+.taomni-mail-reader-text .mail-quote-2 { margin-left: 0.45em; }
+.taomni-mail-reader-text .mail-quote-3 { margin-left: 0.9em; }
+.taomni-mail-reader-text .mail-quote-4 { margin-left: 1.35em; }
+.taomni-mail-reader-text .mail-quote-5 { margin-left: 1.8em; }

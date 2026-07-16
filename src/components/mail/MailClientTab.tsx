@@ -85,6 +85,7 @@ import {
 } from "../../lib/mail";
 import { RecipientField } from "./RecipientField";
 import { RichMailEditor } from "./RichMailEditor";
+import { MailMessageBodyView } from "./MailMessageBodyView";
 import {
   extractDefaultMailDomain,
   formatRecipientForSend,
@@ -99,6 +100,7 @@ import {
 import {
   buildForwardHtml,
   buildInlineImageHtml,
+  buildMailReaderSrcDoc,
   buildReplyHtml,
   hasRichMailFormatting,
   mailHtmlHasRemoteImages,
@@ -107,9 +109,9 @@ import {
   prepareMailHtmlForSend,
   quotePlainText,
   sanitizeMailComposeHtml,
-  sanitizeMailDisplayHtml,
   signatureToMailHtml,
 } from "../../lib/mailHtml";
+import { formatMailPlainTextHtml } from "../../lib/mailPlainText";
 import {
   openLocalPath,
   readFileBytes,
@@ -273,9 +275,6 @@ const MAIL_BASE_FONT_SIZE = DEFAULT_MAIL_TERMINAL_PROFILE.fontSize;
 const MAIL_MIN_FONT_SIZE = 8;
 const MAIL_MAX_FONT_SIZE = 32;
 const ALL_ATTACHMENTS_INDEX = -1;
-const MAIL_READER_HTML_CLASS =
-  "max-w-none text-[13px] leading-6 [&_img]:max-w-full [&_img]:h-auto [&_a]:text-[var(--taomni-accent)]";
-
 function messageKey(message: MailMessageHeader): string {
   return `${message.folder}:${message.uid}`;
 }
@@ -783,10 +782,6 @@ function appendUniqueAddress(target: string[], seen: Set<string>, address: MailA
   target.push(label);
 }
 
-function sanitizeMailHtml(html: string, allowRemoteImages: boolean): string {
-  return sanitizeMailDisplayHtml(html, allowRemoteImages);
-}
-
 async function writeBytesToPath(path: string, bytes: Uint8Array): Promise<void> {
   let handleId: string | null = null;
   try {
@@ -972,6 +967,10 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     () => mailAppearanceStyle(info.terminalProfile, mailFontSize, appPrefersDark),
     [info.terminalProfile, mailFontSize, appPrefersDark],
   );
+  const preferDarkReader = useMemo(() => {
+    const scheme = String((mailAppearance as Record<string, string | number | undefined>)["--taomni-color-scheme"] ?? "");
+    return scheme === "dark";
+  }, [mailAppearance]);
   const selectedMessage = useMemo(
     () =>
       messages.find((message) => messageKey(message) === selectedMessageKey)
@@ -1048,10 +1047,6 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     return bodyMatchesMessage(body, selectedMessage) ? body : null;
   }, [body, bodyCache, selectedMessage]);
 
-  const readerHtml = useMemo(() => {
-    if (!selectedBody?.html) return null;
-    return sanitizeMailHtml(selectedBody.html, allowRemoteImages);
-  }, [allowRemoteImages, selectedBody?.html]);
   const selectedHasRemoteImages = useMemo(
     () => mailHtmlHasRemoteImages(selectedBody?.html),
     [selectedBody?.html],
@@ -2736,15 +2731,29 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const handlePrintMessage = (message = selectedMessage) => {
     if (!message) return;
     const currentBody = bodyMatchesMessage(body, message) ? body : null;
-    const bodyHtml = currentBody?.html
-      ? sanitizeMailHtml(currentBody.html, true)
-      : `<pre style="white-space:pre-wrap;word-break:break-word;font-family:inherit">${escapeHtml(currentBody?.text ?? message.snippet ?? "")}</pre>`;
     const headerHtml = `
-      <h2 style="margin:0 0 8px">${escapeHtml(message.subject || "(no subject)")}</h2>
-      <div style="font-size:12px;color:#555;margin-bottom:4px">From: ${escapeHtml(addressLabel(message.from) || "(unknown)")}</div>
-      <div style="font-size:12px;color:#555;margin-bottom:4px">To: ${escapeHtml(message.to.map(addressLabel).filter(Boolean).join(", ") || "(none)")}</div>
-      <div style="font-size:12px;color:#555;margin-bottom:12px">Date: ${escapeHtml(formatFullDate(message.dateTs) || "(unknown)")}</div>
-      <hr style="border:none;border-top:1px solid #ccc;margin-bottom:12px" />`;
+      <div class="taomni-print-header" style="font-family:system-ui,sans-serif;padding:0 0 12px;margin:0 0 12px;border-bottom:1px solid #ccc;color:#111">
+        <h2 style="margin:0 0 8px">${escapeHtml(message.subject || "(no subject)")}</h2>
+        <div style="font-size:12px;color:#555;margin-bottom:4px">From: ${escapeHtml(addressLabel(message.from) || "(unknown)")}</div>
+        <div style="font-size:12px;color:#555;margin-bottom:4px">To: ${escapeHtml(message.to.map(addressLabel).filter(Boolean).join(", ") || "(none)")}</div>
+        <div style="font-size:12px;color:#555">Date: ${escapeHtml(formatFullDate(message.dateTs) || "(unknown)")}</div>
+      </div>`;
+    const printHtml = currentBody?.html
+      ? buildMailReaderSrcDoc(currentBody.html, {
+        allowRemoteImages: true,
+        fontSize: mailFontSize,
+        preferDark: false,
+      }).replace(
+        /<body([^>]*)>/i,
+        (_full, attrs: string) => `<body${attrs}>${headerHtml}`,
+      )
+      : `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(message.subject || "Message")}</title>
+<style>
+.mail-quote{border-left:2px solid #729fcf;padding-left:.55em;margin:.1em 0}
+.mail-quote-1{color:#1d4ed8}.mail-quote-2{color:#047857}.mail-quote-3{color:#6d28d9}
+.mail-line{white-space:pre-wrap;min-height:1.35em}
+</style>
+</head><body style="font-family:system-ui,sans-serif;padding:24px;color:#111">${headerHtml}${formatMailPlainTextHtml(currentBody?.text ?? message.snippet ?? "")}</body></html>`;
     const iframe = document.createElement("iframe");
     iframe.setAttribute("aria-hidden", "true");
     iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
@@ -2756,7 +2765,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       return;
     }
     doc.open();
-    doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(message.subject || "Message")}</title></head><body style="font-family:system-ui,sans-serif;padding:24px;color:#111">${headerHtml}${bodyHtml}</body></html>`);
+    doc.write(printHtml);
     doc.close();
     const cleanup = () => {
       window.setTimeout(() => {
@@ -3052,7 +3061,6 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       ? bodyCache.get(messageKey(message)) ?? (bodyMatchesMessage(body, message) ? body : null)
       : null;
     const currentHasRemoteImages = mailHtmlHasRemoteImages(currentBody?.html);
-    const currentHtml = currentBody?.html ? sanitizeMailHtml(currentBody.html, allowRemoteImages) : null;
     const currentAttachments = currentBody?.attachments.length ? currentBody.attachments : message?.attachments ?? [];
     const loadingThisBody = !!message && bodyLoadingKey === messageKey(message);
 
@@ -3193,25 +3201,17 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
               onToggle={() => setAllowRemoteImages((value) => !value)}
             />
 
-            <div className="p-5 text-[13px] leading-6">
-              {loadingThisBody && !currentBody ? (
-                <div className="h-32 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Loading message body
-                </div>
-              ) : currentHtml ? (
-                <div
-                  className={MAIL_READER_HTML_CLASS}
-                  data-testid="mail-reader-html"
-                  dangerouslySetInnerHTML={{ __html: currentHtml }}
-                />
-              ) : currentBody?.text ? (
-                <pre className="whitespace-pre-wrap break-words font-sans text-[13px] leading-6">{currentBody.text}</pre>
-              ) : (
-                <div className="text-[12px] text-[var(--taomni-text-muted)]">
-                  {message.snippet || "No cached body content."}
-                </div>
-              )}
+            <div className="p-3 sm:p-4">
+              <MailMessageBodyView
+                html={currentBody?.html}
+                text={currentBody?.text}
+                snippet={message.snippet}
+                allowRemoteImages={allowRemoteImages}
+                preferDark={preferDarkReader}
+                fontSize={mailFontSize}
+                title={message.subject || "Message body"}
+                loading={loadingThisBody && !currentBody}
+              />
             </div>
           </div>
         )}
@@ -3766,25 +3766,17 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
                     onToggle={() => setAllowRemoteImages((value) => !value)}
                   />
 
-                  <div className="p-4 text-[13px] leading-6">
-                    {selectedMessage && bodyLoadingKey === messageKey(selectedMessage) && !selectedBody ? (
-                      <div className="h-32 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Loading message body
-                      </div>
-                    ) : readerHtml ? (
-                      <div
-                        className={MAIL_READER_HTML_CLASS}
-                        data-testid="mail-reader-html"
-                        dangerouslySetInnerHTML={{ __html: readerHtml }}
-                      />
-                    ) : selectedBody?.text ? (
-                      <pre className="whitespace-pre-wrap break-words font-sans text-[13px] leading-6">{selectedBody.text}</pre>
-                    ) : (
-                      <div className="text-[12px] text-[var(--taomni-text-muted)]">
-                        {selectedMessage.snippet || "No cached body content."}
-                      </div>
-                    )}
+                  <div className="p-3 sm:p-4">
+                    <MailMessageBodyView
+                      html={selectedBody?.html}
+                      text={selectedBody?.text}
+                      snippet={selectedMessage.snippet}
+                      allowRemoteImages={allowRemoteImages}
+                      preferDark={preferDarkReader}
+                      fontSize={mailFontSize}
+                      title={selectedMessage.subject || "Message body"}
+                      loading={!!selectedMessage && bodyLoadingKey === messageKey(selectedMessage) && !selectedBody}
+                    />
                   </div>
                 </div>
               )}

@@ -327,11 +327,13 @@ describe("MailClientTab", () => {
 
     renderMailbox();
 
-    const html = await screen.findByTestId("mail-reader-html");
-    expect(html).toHaveTextContent("Approval content");
-    expect(html.className).not.toContain("_td]:border");
-    expect(html.className).not.toContain("_td]:px");
-    expect(html.className).not.toContain("_td]:py");
+    const frame = await screen.findByTestId("mail-reader-html");
+    expect(frame.tagName).toBe("IFRAME");
+    expect(frame.getAttribute("srcdoc") ?? "").toContain("Approval content");
+    expect(frame.getAttribute("sandbox") ?? "").toContain("allow-same-origin");
+    expect(frame.className).not.toContain("_td]:border");
+    expect(frame.className).not.toContain("_td]:px");
+    expect(frame.className).not.toContain("_td]:py");
   });
 
   it("syncs headers first and shows body warming as separate progress", async () => {
