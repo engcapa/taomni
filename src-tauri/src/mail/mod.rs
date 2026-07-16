@@ -1012,6 +1012,10 @@ fn is_imap_transport_error(message: &str) -> bool {
 /// Checkout or connect an IMAP session, run `f`, then return the session to
 /// the pool on success (unless `force_fresh`). Caller must already be on a
 /// thread with a Tokio runtime entered when session proxy forwarding is used.
+///
+/// Emits lightweight timing diagnostics: whether the live session was reused,
+/// checkout/connect ms, op ms, and whether a session-level proxy is in use.
+/// Never consults the app global proxy.
 fn with_imap_session<R>(
     pool: &MailImapPool,
     account: &ResolvedMailAccount,
@@ -1020,47 +1024,79 @@ fn with_imap_session<R>(
 ) -> Result<R, String> {
     let account_id = account.config.session_id.clone();
     let fingerprint = mail_imap_fingerprint(account);
+    let session_proxy = account.network_settings.is_some();
+    let total_start = Instant::now();
 
-    let mut attempt = |force_connect: bool| -> Result<(R, ActiveImapSession), String> {
-        let mut session = if force_connect || opts.force_fresh {
-            if opts.force_fresh {
-                pool.invalidate(&account_id);
-            }
-            connect_imap(account)?
-        } else if let Some(mut session) = pool.take(&account_id, &fingerprint) {
-            match session.noop() {
-                Ok(()) => session,
+    let mut attempt =
+        |force_connect: bool| -> Result<(R, ActiveImapSession, bool, u128, u128), String> {
+            let checkout_start = Instant::now();
+            let mut reused = false;
+            let mut session = if force_connect || opts.force_fresh {
+                if opts.force_fresh {
+                    pool.invalidate(&account_id);
+                }
+                connect_imap(account)?
+            } else if let Some(mut session) = pool.take(&account_id, &fingerprint) {
+                match session.noop() {
+                    Ok(()) => {
+                        reused = true;
+                        session
+                    }
+                    Err(e) => {
+                        tracing::debug!(
+                            account_id = %account_id,
+                            "mail imap live session probe failed; reconnecting: {e}"
+                        );
+                        session.logout();
+                        connect_imap(account)?
+                    }
+                }
+            } else {
+                connect_imap(account)?
+            };
+            let checkout_ms = checkout_start.elapsed().as_millis();
+
+            let op_start = Instant::now();
+            match f(&mut session) {
+                Ok(value) => {
+                    let op_ms = op_start.elapsed().as_millis();
+                    Ok((value, session, reused, checkout_ms, op_ms))
+                }
                 Err(e) => {
-                    tracing::debug!(
-                        account_id = %account_id,
-                        "mail imap live session probe failed; reconnecting: {e}"
-                    );
                     session.logout();
-                    connect_imap(account)?
+                    Err(e)
                 }
             }
-        } else {
-            connect_imap(account)?
         };
 
-        match f(&mut session) {
-            Ok(value) => Ok((value, session)),
-            Err(e) => {
-                session.logout();
-                Err(e)
-            }
+    let finish = |value: R,
+                  session: ActiveImapSession,
+                  reused: bool,
+                  checkout_ms: u128,
+                  op_ms: u128|
+     -> R {
+        if opts.force_fresh {
+            let mut session = session;
+            session.logout();
+        } else {
+            pool.put(account_id.clone(), fingerprint.clone(), session);
         }
+        tracing::info!(
+            account_id = %account_id,
+            session_proxy,
+            reused,
+            checkout_ms,
+            op_ms,
+            total_ms = total_start.elapsed().as_millis(),
+            force_fresh = opts.force_fresh,
+            "mail imap op"
+        );
+        value
     };
 
     match attempt(false) {
-        Ok((value, session)) => {
-            if opts.force_fresh {
-                let mut session = session;
-                session.logout();
-            } else {
-                pool.put(account_id, fingerprint, session);
-            }
-            Ok(value)
+        Ok((value, session, reused, checkout_ms, op_ms)) => {
+            Ok(finish(value, session, reused, checkout_ms, op_ms))
         }
         Err(e) if opts.retry_on_error && is_imap_transport_error(&e) => {
             tracing::debug!(
@@ -1068,17 +1104,38 @@ fn with_imap_session<R>(
                 "mail imap op failed on live/new session; retrying once: {e}"
             );
             pool.invalidate(&account_id);
-            let (value, session) = attempt(true)?;
-            if opts.force_fresh {
-                let mut session = session;
-                session.logout();
-            } else {
-                pool.put(account_id, fingerprint, session);
-            }
-            Ok(value)
+            let (value, session, reused, checkout_ms, op_ms) = attempt(true)?;
+            Ok(finish(value, session, reused, checkout_ms, op_ms))
         }
-        Err(e) => Err(e),
+        Err(e) => {
+            tracing::info!(
+                account_id = %account_id,
+                session_proxy,
+                total_ms = total_start.elapsed().as_millis(),
+                error = %e,
+                "mail imap op failed"
+            );
+            Err(e)
+        }
     }
+}
+
+/// Whether header sync should issue a remote IMAP LIST.
+/// Refresh requests always list; otherwise list only when the local folder
+/// cache is empty so the UI still gets a usable folder set.
+fn should_list_remote_folders(refresh_folders: bool, cached_folder_count: usize) -> bool {
+    refresh_folders || cached_folder_count == 0
+}
+
+/// Build the folder list returned by header sync: remote LIST (or cache) plus
+/// the just-synced selected folder metadata.
+fn folders_for_header_sync(
+    base_folders: Vec<MailFolder>,
+    selected: MailFolder,
+) -> Vec<MailFolder> {
+    let mut folders = base_folders;
+    merge_selected_folder(&mut folders, selected);
+    folders
 }
 
 struct MailSmtpTransport {
@@ -1389,6 +1446,11 @@ pub async fn mail_oauth_device_complete(
     )
 }
 
+/// Sync headers for one folder.
+///
+/// `refresh_folders`: when true (default), run IMAP LIST so the folder tree is
+/// refreshed. Quiet/background polls pass false to skip LIST when the SQLite
+/// cache already has folders; selected-folder headers still sync.
 #[tauri::command]
 pub async fn mail_sync_headers(
     config: MailAccountConfig,
@@ -1396,6 +1458,7 @@ pub async fn mail_sync_headers(
     limit: Option<u32>,
     offset: Option<u32>,
     include_bodies: Option<bool>,
+    refresh_folders: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<MailSyncResult, String> {
     let account = resolve_config(&state, config)?;
@@ -1411,18 +1474,31 @@ pub async fn mail_sync_headers(
         .max(1)
         .min(2000);
     let include_bodies = include_bodies.unwrap_or(false);
+    let refresh_folders = refresh_folders.unwrap_or(true);
+
+    let cached_folders = if cache_enabled {
+        with_mail_db(&state, &account_id, |db| list_cached_folders(db, &account_id))?
+    } else {
+        Vec::new()
+    };
+    let do_list = should_list_remote_folders(refresh_folders, cached_folders.len());
 
     let pool = Arc::clone(&state.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let mut result = tokio::task::spawn_blocking(move || {
         let _enter = handle.enter();
         with_imap_session(&pool, &account, ImapSessionOpts::default(), |imap| {
-            let mut folders = imap.list_folders(&account.config.session_id)?;
+            let base_folders = if do_list {
+                imap.list_folders(&account.config.session_id)?
+            } else {
+                // Clone: with_imap_session may invoke this FnMut twice on retry.
+                cached_folders.clone()
+            };
             let (selected_folder, cached, has_more) =
                 imap.sync_folder(&account, &folder, offset, limit, include_bodies)?;
-            merge_selected_folder(&mut folders, selected_folder.clone());
+            let folders = folders_for_header_sync(base_folders, selected_folder.clone());
             let cached_bodies = cached.iter().filter(|m| m.body_cached_at.is_some()).count();
-            Ok((folders, selected_folder, cached, cached_bodies, has_more))
+            Ok((folders, selected_folder, cached, cached_bodies, has_more, do_list))
         })
     })
     .await
@@ -1440,6 +1516,14 @@ pub async fn mail_sync_headers(
             )
         })?;
     }
+
+    tracing::debug!(
+        account_id = %account_id,
+        folder = %result.1.name,
+        listed_remote = result.5,
+        refresh_folders,
+        "mail sync headers folders source"
+    );
 
     let synced_at = now_ts();
     let messages = result.2.drain(..).map(|m| m.header).collect::<Vec<_>>();
@@ -5490,6 +5574,63 @@ Content-Disposition: inline; filename=\"logo.png\"\r\n\
 iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==\r\n\
 --rel--\r\n"
             .to_vec()
+    }
+
+    #[test]
+    fn should_list_remote_folders_only_when_refresh_or_cache_empty() {
+        assert!(should_list_remote_folders(true, 0));
+        assert!(should_list_remote_folders(true, 12));
+        assert!(should_list_remote_folders(false, 0));
+        assert!(!should_list_remote_folders(false, 3));
+    }
+
+    #[test]
+    fn folders_for_header_sync_merges_selected_into_cached_base() {
+        let base = vec![
+            MailFolder {
+                account_id: "acct".into(),
+                name: "INBOX".into(),
+                display_name: "INBOX".into(),
+                delimiter: Some("/".into()),
+                flags: vec![],
+                uid_validity: Some(1),
+                uid_next: Some(10),
+                total: Some(9),
+                unread: Some(2),
+                updated_at: 1,
+            },
+            MailFolder {
+                account_id: "acct".into(),
+                name: "Sent".into(),
+                display_name: "Sent".into(),
+                delimiter: Some("/".into()),
+                flags: vec![],
+                uid_validity: Some(1),
+                uid_next: Some(3),
+                total: Some(2),
+                unread: Some(0),
+                updated_at: 1,
+            },
+        ];
+        let selected = MailFolder {
+            account_id: "acct".into(),
+            name: "INBOX".into(),
+            display_name: "INBOX".into(),
+            delimiter: Some("/".into()),
+            flags: vec!["\\HasNoChildren".into()],
+            uid_validity: Some(1),
+            uid_next: Some(15),
+            total: Some(14),
+            unread: Some(4),
+            updated_at: 99,
+        };
+        let merged = folders_for_header_sync(base, selected);
+        assert_eq!(merged.len(), 2);
+        let inbox = merged.iter().find(|f| f.name == "INBOX").unwrap();
+        assert_eq!(inbox.total, Some(14));
+        assert_eq!(inbox.unread, Some(4));
+        assert_eq!(inbox.updated_at, 99);
+        assert!(merged.iter().any(|f| f.name == "Sent"));
     }
 
     #[test]

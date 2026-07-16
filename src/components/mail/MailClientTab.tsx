@@ -225,6 +225,8 @@ interface SyncFolderOptions {
   includeBodies?: boolean;
   append?: boolean;
   indicator?: SyncIndicator;
+  /** Default true for open/manual sync; quiet polls pass false to skip LIST. */
+  refreshFolders?: boolean;
 }
 
 const DEFAULT_FOLDER: MailFolder = {
@@ -1479,6 +1481,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const offset = Math.max(0, options.offset ?? 0);
     const limit = Math.max(1, options.limit ?? (offset > 0 ? pageSize : batchSize));
     const includeBodies = options.includeBodies ?? false;
+    const refreshFolders = options.refreshFolders ?? true;
 
     if (syncInFlightRef.current) {
       if (indicator !== "none" && visibleRef.current) {
@@ -1497,7 +1500,12 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     if (indicator !== "none") setError(null);
 
     try {
-      const result = await mailSyncHeaders(info, folder, { limit, offset, includeBodies });
+      const result = await mailSyncHeaders(info, folder, {
+        limit,
+        offset,
+        includeBodies,
+        refreshFolders,
+      });
       if (!visibleRef.current) {
         pendingCacheRefreshRef.current = true;
         return result;
@@ -1533,6 +1541,63 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       }
     }
   }, [batchSize, info, pageSize, selectedFolder]);
+
+  /** Quiet background poll: selected folder (+ INBOX when different), no LIST. */
+  const quietPollSelectedAndInbox = useCallback(async () => {
+    if (syncInFlightRef.current) return;
+    syncInFlightRef.current = true;
+    const activeFolder = selectedFolder;
+    const alsoInbox = activeFolder.trim().toUpperCase() !== "INBOX";
+    try {
+      const selectedResult = await mailSyncHeaders(info, activeFolder, {
+        limit: batchSize,
+        includeBodies: false,
+        refreshFolders: false,
+      });
+      let folders = selectedResult.folders;
+      if (alsoInbox) {
+        try {
+          const inboxResult = await mailSyncHeaders(info, "INBOX", {
+            limit: batchSize,
+            includeBodies: false,
+            refreshFolders: false,
+          });
+          // Merge INBOX metadata into the folder tree without switching the UI
+          // selection away from the active folder.
+          const byName = new Map(folders.map((f) => [f.name, f]));
+          for (const f of inboxResult.folders) {
+            byName.set(f.name, f);
+          }
+          folders = Array.from(byName.values());
+        } catch (e) {
+          // Selected-folder refresh already succeeded; inbox is best-effort.
+          console.debug("quiet INBOX poll failed", e);
+        }
+      }
+      if (!visibleRef.current) {
+        pendingCacheRefreshRef.current = true;
+        return;
+      }
+      foldersRef.current = folders;
+      setFolders(folders);
+      setMessages((current) => mergeMessagePages(
+        current.filter((message) => message.folder === selectedResult.folder),
+        selectedResult.messages,
+      ));
+      setHasMoreMessages(
+        selectedResult.hasMore
+        || folderHasMoreMessages(
+          folders,
+          selectedResult.folder,
+          selectedResult.messages.length,
+        ),
+      );
+    } catch (e) {
+      console.debug("quiet mail poll failed", e);
+    } finally {
+      syncInFlightRef.current = false;
+    }
+  }, [batchSize, info, selectedFolder]);
 
   const syncAllFolders = useCallback(async (
     quiet = false,
@@ -1828,9 +1893,9 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     });
   }, [batchSize, info.sync.onOpen, selectedFolder, syncFolder, visible]);
 
-  // Quiet background poll: most ticks only refresh the selected folder (cheap
-  // with a live IMAP session). Every 6th tick does a full-folder scan for
-  // unread badges / new-mail notifications across the account.
+  // Quiet background poll: most ticks refresh selected folder (+ INBOX when
+  // different) without remote LIST. Every 6th tick does a full-folder scan for
+  // badges / new-mail notifications across the account.
   const pollTickRef = useRef(0);
   useEffect(() => {
     pollTickRef.current = 0;
@@ -1846,15 +1911,11 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           indicator: "none",
         });
       } else {
-        void syncFolder(selectedFolder, true, {
-          limit: batchSize,
-          includeBodies: false,
-          indicator: "none",
-        });
+        void quietPollSelectedAndInbox();
       }
     }, intervalMs);
     return () => window.clearInterval(id);
-  }, [batchSize, info.sync.intervalMinutes, selectedFolder, syncAllFolders, syncFolder]);
+  }, [batchSize, info.sync.intervalMinutes, quietPollSelectedAndInbox, syncAllFolders]);
 
   useEffect(() => {
     if (messages.length === 0) {
