@@ -118,6 +118,7 @@ mod tests {
             title: Some("Example Agent".into()),
             version: Some("2.0.1".into()),
             supports_session_load: true,
+            supports_prompt_images: false,
             supports_mcp_http: true,
             supports_mcp_sse: false,
             auth_methods: Vec::new(),

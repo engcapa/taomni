@@ -1,9 +1,9 @@
 use super::protocol::{
     self, ACP_PROTOCOL_VERSION, AcpAgentInfo, AcpIncomingMessage, AcpNotification, AcpPromptResult,
-    AcpRequest, AcpRequestId, METHOD_SESSION_UPDATE, authenticate_request, cancel_notification,
-    initialize_request, load_session_request, new_session_request, parse_incoming_line,
-    parse_initialize_result, parse_prompt_result, parse_session_update, prompt_request,
-    session_id_from_response,
+    AcpRequest, AcpRequestId, AcpResourceLink, METHOD_SESSION_UPDATE, authenticate_request,
+    cancel_notification, initialize_request, load_session_request, new_session_request,
+    parse_incoming_line, parse_initialize_result, parse_prompt_result, parse_session_update,
+    prompt_request, prompt_with_resource_links_request, session_id_from_response,
 };
 use regex::Regex;
 use serde::Serialize;
@@ -311,6 +311,26 @@ impl AcpProcess {
     ) -> Result<AcpPromptResult, AcpRuntimeError> {
         let _turn = self.begin_turn()?;
         let request = prompt_request(self.allocate_id(), session_id, text);
+        let result = self.send_request(request).await?;
+        parse_prompt_result(&result).map_err(|error| AcpRuntimeError::Protocol(error.to_string()))
+    }
+
+    /// Submit a prompt with standard ACP resource links. Resource links are
+    /// intentionally distinct from inline image blocks so callers can support
+    /// local-file attachments without claiming an unadvertised image capability.
+    pub async fn prompt_with_resource_links(
+        &self,
+        session_id: &str,
+        text: &str,
+        resource_links: &[AcpResourceLink],
+    ) -> Result<AcpPromptResult, AcpRuntimeError> {
+        let _turn = self.begin_turn()?;
+        let request = prompt_with_resource_links_request(
+            self.allocate_id(),
+            session_id,
+            text,
+            resource_links,
+        );
         let result = self.send_request(request).await?;
         parse_prompt_result(&result).map_err(|error| AcpRuntimeError::Protocol(error.to_string()))
     }

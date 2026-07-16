@@ -36,6 +36,7 @@ import {
   acpProfileIdFromProvider,
   DEFAULT_CLAUDE_CODE_MODEL,
   DEFAULT_CODEX_MODEL,
+  DEFAULT_GROK_ACP_PROFILE,
   providerGroupIdFromRoute,
   rememberChatDrawerProviderPreference,
   useAiStore,
@@ -687,6 +688,12 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
     : (drawerTabId ?? activeChatTabId)
       ? `tab:${drawerTabId ?? activeChatTabId}`
       : null;
+  // Grok media mode accepts a reference image as a local ACP resource link.
+  // Other API media providers currently expose text-only generation endpoints,
+  // so keep their composer attachment surface disabled rather than silently
+  // discarding a picked file.
+  const attachmentsEnabled = currentMode === "chat"
+    || acpProfileIdFromProvider(selectedProviderId) === DEFAULT_GROK_ACP_PROFILE.id;
   const sendingLabel = currentMode === "image"
     ? t("chat.imageGenerating")
     : currentMode === "video"
@@ -1214,7 +1221,7 @@ export function ChatDrawer({ terminalContext }: ChatDrawerProps) {
           onSend={handleSend}
           sending={sending}
           disabled={false}
-          attachmentsEnabled={currentMode === "chat"}
+          attachmentsEnabled={attachmentsEnabled}
           placeholder={composerPlaceholder}
           // Use the active terminal registry when available — that's what
           // makes `@terminal:last-N` work even when the drawer is rendered

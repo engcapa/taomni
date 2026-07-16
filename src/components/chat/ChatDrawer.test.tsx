@@ -276,7 +276,7 @@ describe("ChatDrawer provider and echo controls", () => {
     expect(echo).toHaveTextContent("Terminal echo: on");
   });
 
-  it("filters provider options by the active media mode capability", () => {
+  it("offers Grok CLI and its reference-image attachment control in media modes", () => {
     const config = makeConfig();
     config.llm.providers.agnes = {
       base_url: "https://apihub.agnes-ai.com/v1",
@@ -287,6 +287,8 @@ describe("ChatDrawer provider and echo controls", () => {
       image_model: "agnes-image-2.1-flash",
       video_model: "agnes-video-v2.0",
     };
+    config.acp_bridge.enabled = true;
+    config.acp_bridge.profiles[0].enabled = true;
     invokeMock.mockImplementation((command: string) => {
       if (command === "chat_list_threads") return Promise.resolve([]);
       if (command === "chat_purge_old") return Promise.resolve(0);
@@ -296,7 +298,7 @@ describe("ChatDrawer provider and echo controls", () => {
     });
     const imageThread: ChatThread = {
       ...useChatStore.getState().threads[0],
-      provider_id: "agnes",
+      provider_id: "acp:grok",
       mode: "image",
     };
     useAiStore.setState({ config });
@@ -309,8 +311,9 @@ describe("ChatDrawer provider and echo controls", () => {
     render(<ChatDrawer />);
 
     const provider = screen.getByLabelText("Thread LLM provider") as HTMLSelectElement;
-    expect(Array.from(provider.options).map((option) => option.value)).toEqual(["agnes"]);
+    expect(Array.from(provider.options).map((option) => option.value)).toEqual(["agnes", "acp:grok"]);
     expect(screen.getByTestId("chat-mode-image")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("ai-chat-attach-button")).toBeVisible();
   });
 });
 

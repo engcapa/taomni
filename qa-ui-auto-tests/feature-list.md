@@ -2669,6 +2669,14 @@ controls:
     selector: 'select[aria-label="Thread LLM provider"]'
     kind: interactive
     optional: true       # rendered only when an active thread + at least one provider configured
+  - id: ai-chat-mode-image
+    selector: '[data-testid="chat-mode-image"]'
+    kind: interactive
+    optional: true       # disabled when no image-capable provider is configured
+  - id: ai-chat-mode-video
+    selector: '[data-testid="chat-mode-video"]'
+    kind: interactive
+    optional: true       # disabled when no video-capable provider is configured
   - id: ai-chat-output-format
     selector: 'select[aria-label="Thread output format"]'
     kind: interactive
@@ -2689,6 +2697,7 @@ controls:
 - **Thread badge 区**：显示 thread 绑定的 tab (`Link2` 图标 + tab 标题)；Provider 选择器在配置了多 provider 时显示；output format 选择器在 thread 仍空时可改、有消息后锁定
 - **Composer**：`Ctrl+Enter` 发送、附件按钮（paperclip）/ 拖拽文件到输入区 / 粘贴剪贴板图片添加本地附件，最多 10 个文件且总计最多 100 MiB；`@terminal:last-N` / `@file:./X` / `@session:Q` 解析为 `attachment-chip`，其中 `@file` 在发送前转为结构化文件附件
 - **附件分发**：Claude Code / Codex 分支收到本地文件路径清单并按需读取；普通 LLM 分支不会收到本机路径，文本附件转为内容片段，图片附件转为多模态图片 block，其他二进制仅发送文件名/类型/大小摘要
+- **Grok CLI 媒体模式**：启用内置 Grok ACP profile 后，它也会出现在图片和视频模式的 Provider 选择器；参考图片以本机 `file://` ACP `resource_link` 传给 CLI，生成文件会复制进 Taomni 管理的本地媒体目录
 - **Composer resize**：输入框高度可通过 `ai-chat-composer-resize` 拖拽调整并持久化
 - **Format cycling**：右上角按钮按 `md → html → plain` 循环显示格式
 - **AI safety gate**：Claude Code / Codex 权限 prompt 的 `ActionCard` 优先附着到可见 `ai-chat-drawer` 右下角；点击 gate 不会触发悬浮抽屉自动隐藏
@@ -2844,6 +2853,7 @@ controls:
 
 - 通过通用 ACP v1 stdio profile 接入本机 Agent；Chat Provider ID 使用 `acp:<profile-id>`
 - 内置、默认关闭的 Grok profile 使用 `grok agent stdio`，鉴权归本机 CLI 所有，不创建 xAI API Provider
+- 内置 Grok profile 声明图片和视频生成能力；聊天可上传本地图片，图片模式调用 Grok 原生 `image_gen` / `image_edit`，视频模式调用 `image_to_video`
 - ACP 全局与 profile 级代理支持直连、应用代理、已保存 Proxy 会话和手动 URL；profile 可继承或覆盖全局策略
 - 设置页可编辑命令/参数、启停 profile、选择优先 profile，并执行有界的 ACP initialize 握手探测
 

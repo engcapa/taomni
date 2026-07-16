@@ -46,6 +46,8 @@
 - `[data-testid="ai-chat-drawer-opacity-slider"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-opacity-slider
 - `[data-testid="ai-chat-safety-gate"]` — display [optional] — F-AI-2.4.ai-chat-safety-gate
 - `select[aria-label="Thread LLM provider"]` — interactive [optional] — F-AI-2.4.ai-chat-provider-select
+- `[data-testid="chat-mode-image"]` — interactive [optional] — F-AI-2.4.ai-chat-mode-image
+- `[data-testid="chat-mode-video"]` — interactive [optional] — F-AI-2.4.ai-chat-mode-video
 - `select[aria-label="Thread output format"]` — interactive [optional] — F-AI-2.4.ai-chat-output-format
 - `button[aria-label="Convert visible transcript to another format"]` — interactive [optional] — F-AI-2.4.ai-chat-format-cycle
 - `[data-testid="attachment-chip"]` — display [optional] — F-AI-2.4.attachment-chip

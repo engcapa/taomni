@@ -1,5 +1,6 @@
 use super::{
-    AcpAgentInfo, AcpProcess, AcpProcessConfig, AcpPromptResult, AcpRuntimeError, AcpRuntimeEvent,
+    AcpAgentInfo, AcpProcess, AcpProcessConfig, AcpPromptResult, AcpResourceLink, AcpRuntimeError,
+    AcpRuntimeEvent,
 };
 use serde_json::Value;
 use std::sync::{Mutex as StdMutex, MutexGuard as StdMutexGuard};
@@ -117,6 +118,20 @@ impl AcpThreadProcess {
                 AcpRuntimeError::Protocol("ACP session is not initialized".into())
             })?;
         self.process.prompt(&session_id, text).await
+    }
+
+    pub async fn prompt_with_resource_links(
+        &self,
+        text: &str,
+        resource_links: &[AcpResourceLink],
+    ) -> Result<AcpPromptResult, AcpRuntimeError> {
+        let session_id =
+            self.session_id.lock().await.clone().ok_or_else(|| {
+                AcpRuntimeError::Protocol("ACP session is not initialized".into())
+            })?;
+        self.process
+            .prompt_with_resource_links(&session_id, text, resource_links)
+            .await
     }
 
     pub async fn cancel(&self) -> Result<(), AcpRuntimeError> {

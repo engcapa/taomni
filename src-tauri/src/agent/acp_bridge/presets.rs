@@ -1,4 +1,4 @@
-use super::config::AcpProfileConfig;
+use super::config::{AcpProfileCapabilities, AcpProfileConfig};
 
 pub const GROK_PROFILE_ID: &str = "grok";
 pub const GROK_PROFILE_NAME: &str = "Grok CLI";
@@ -16,6 +16,10 @@ pub fn grok_profile() -> AcpProfileConfig {
         enabled: false,
         command: GROK_COMMAND.into(),
         args: vec!["agent".into(), "stdio".into()],
+        capabilities: AcpProfileCapabilities {
+            image_generation: Some(true),
+            video_generation: Some(true),
+        },
         auth_method_id: None,
         proxy_mode: "inherit".into(),
         proxy_session_id: None,
@@ -34,6 +38,8 @@ mod tests {
         assert!(!profile.enabled);
         assert_eq!(profile.command, "grok");
         assert_eq!(profile.args, ["agent", "stdio"]);
+        assert!(profile.supports_image_generation());
+        assert!(profile.supports_video_generation());
         assert!(profile.auth_method_id.is_none());
     }
 }

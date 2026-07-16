@@ -73,8 +73,7 @@ pub fn chat_read_clipboard_image_attachment(
             .lock()
             .map_err(|e| format!("clipboard lock: {}", e))?;
         if guard.is_none() {
-            *guard =
-                Some(arboard::Clipboard::new().map_err(|e| format!("clipboard init: {}", e))?);
+            *guard = Some(arboard::Clipboard::new().map_err(|e| format!("clipboard init: {}", e))?);
         }
         let clipboard = guard
             .as_mut()
@@ -202,10 +201,7 @@ fn clipboard_image_attachment_from_rgba(
 ) -> Result<store::ChatAttachment, String> {
     let buf =
         image::RgbaImage::from_raw(width, height, rgba.to_vec()).ok_or("invalid image buffer")?;
-    let path = std::env::temp_dir().join(format!(
-        "taomni-chat-clipboard-{}.png",
-        Uuid::new_v4()
-    ));
+    let path = std::env::temp_dir().join(format!("taomni-chat-clipboard-{}.png", Uuid::new_v4()));
     buf.save(&path)
         .map_err(|e| format!("save clipboard image: {e}"))?;
     let mut attachment = stat_attachment_path(&path.to_string_lossy(), None)?;
@@ -638,6 +634,11 @@ pub struct ChatGenerateMediaRequest {
     pub num_frames: Option<u32>,
     #[serde(default)]
     pub frame_rate: Option<u32>,
+    /// Reference attachments for providers that support image-guided media
+    /// generation. The Grok CLI adapter receives image attachments as local
+    /// ACP resource links.
+    #[serde(default)]
+    pub attachments: Vec<store::ChatAttachment>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1228,6 +1229,7 @@ pub async fn chat_generate_media(
         }
     }
     let kind = MediaGenerationKind::parse(&req.kind)?;
+    let attachments = validate_chat_attachments(&req.attachments)?;
     let (thread, history) = {
         let db = state.db.lock().map_err(|e| e.to_string())?;
         let thread = store::get_thread(&db, &req.thread_id)
@@ -1248,7 +1250,42 @@ pub async fn chat_generate_media(
     let (clean_prompt, redacted_count) = redact::redact(&req.prompt);
     let ai_config = AiConfig::load(&default_ai_config_path());
 
-    let generated = if let Some(group_id) = provider_group_id_from_route(&thread.provider_id) {
+    let generated = if let Some(profile_id) =
+        crate::agent::acp_bridge::profile_id_from_provider_id(&thread.provider_id)
+    {
+        let bridge = &ai_config.acp_bridge;
+        let profile = bridge
+            .profile(profile_id)
+            .cloned()
+            .ok_or_else(|| format!("ACP profile '{profile_id}' is not configured."))?;
+        if !bridge.enabled
+            || !profile.enabled
+            || ai_config.fully_disabled
+            || ai_config.full_local_mode
+        {
+            return Err("Grok CLI is unavailable in full-local / fully-disabled mode or its ACP profile is disabled.".into());
+        }
+        let supports_media = match kind {
+            MediaGenerationKind::Image => profile.supports_image_generation(),
+            MediaGenerationKind::Video => profile.supports_video_generation(),
+        };
+        if !supports_media {
+            return Err(format!(
+                "ACP profile '{profile_id}' does not support {} generation.",
+                kind.as_str()
+            ));
+        }
+        acp::generate_grok_media(
+            &app,
+            state.inner(),
+            bridge,
+            &profile,
+            kind,
+            &clean_prompt,
+            &attachments,
+        )
+        .await?
+    } else if let Some(group_id) = provider_group_id_from_route(&thread.provider_id) {
         let route_id = thread.provider_id.clone();
         let attempt_count = {
             let ai_ctx = state.ai_ctx.read().await;
@@ -1366,7 +1403,7 @@ pub async fn chat_generate_media(
         content: clean_prompt,
         created_at: ts,
         redacted: redacted_count > 0,
-        attachments: Vec::new(),
+        attachments,
     };
     let assistant_msg = store::ChatMessage {
         id: Uuid::new_v4().to_string(),
@@ -1843,9 +1880,7 @@ fn format_code_workspace_file(file: &crate::agent::context::AgentCodeWorkspaceFi
     }
 }
 
-fn format_code_workspace_files(
-    files: &[crate::agent::context::AgentCodeWorkspaceFile],
-) -> String {
+fn format_code_workspace_files(files: &[crate::agent::context::AgentCodeWorkspaceFile]) -> String {
     const MAX_DISPLAY_PATHS: usize = 12;
     let shown = files
         .iter()

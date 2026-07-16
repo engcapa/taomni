@@ -303,9 +303,46 @@ pub fn load_session_request(
     )
 }
 
-/// Build a text-only prompt turn. Text is the ACP v1 baseline content block and
-/// therefore works for every compliant profile without advertising unsupported
-/// file, image, or terminal capabilities.
+/// A local resource exposed to an ACP agent with a standard `resource_link`
+/// prompt block. Unlike an inline `image` block, resource links do not require
+/// the optional image prompt capability. They let a local agent opt into
+/// opening an attachment from its own filesystem when that agent supports it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AcpResourceLink {
+    pub uri: String,
+    pub name: String,
+    pub mime_type: Option<String>,
+}
+
+impl AcpResourceLink {
+    pub fn new(uri: impl Into<String>, name: impl Into<String>, mime_type: Option<String>) -> Self {
+        Self {
+            uri: uri.into(),
+            name: name.into(),
+            mime_type,
+        }
+    }
+
+    fn as_prompt_block(&self) -> Value {
+        let mut block = serde_json::Map::new();
+        block.insert("type".into(), Value::String("resource_link".into()));
+        block.insert("uri".into(), Value::String(self.uri.clone()));
+        block.insert("name".into(), Value::String(self.name.clone()));
+        if let Some(mime_type) = self
+            .mime_type
+            .as_deref()
+            .map(str::trim)
+            .filter(|mime_type| !mime_type.is_empty())
+        {
+            block.insert("mimeType".into(), Value::String(mime_type.into()));
+        }
+        Value::Object(block)
+    }
+}
+
+/// Build a baseline text prompt turn. Text works for every compliant profile
+/// without advertising unsupported image, audio, filesystem, or terminal
+/// capabilities.
 pub fn prompt_request(
     id: impl Into<AcpRequestId>,
     session_id: impl Into<String>,
@@ -317,6 +354,27 @@ pub fn prompt_request(
         json!({
             "sessionId": session_id.into(),
             "prompt": [{ "type": "text", "text": text.into() }],
+        }),
+    )
+}
+
+/// Build a prompt turn with local ACP resource links. This intentionally does
+/// not use an inline `image` content block: callers must honor an agent's
+/// negotiated `promptCapabilities.image` before using that optional feature.
+pub fn prompt_with_resource_links_request(
+    id: impl Into<AcpRequestId>,
+    session_id: impl Into<String>,
+    text: impl Into<String>,
+    resource_links: &[AcpResourceLink],
+) -> AcpRequest {
+    let mut prompt = vec![json!({ "type": "text", "text": text.into() })];
+    prompt.extend(resource_links.iter().map(AcpResourceLink::as_prompt_block));
+    AcpRequest::new(
+        id,
+        METHOD_SESSION_PROMPT,
+        json!({
+            "sessionId": session_id.into(),
+            "prompt": prompt,
         }),
     )
 }
@@ -341,6 +399,7 @@ pub struct AcpAgentInfo {
     pub title: Option<String>,
     pub version: Option<String>,
     pub supports_session_load: bool,
+    pub supports_prompt_images: bool,
     pub supports_mcp_http: bool,
     pub supports_mcp_sse: bool,
     pub auth_methods: Vec<AcpAuthMethod>,
@@ -369,6 +428,9 @@ pub fn parse_initialize_result(result: &Value) -> Result<AcpAgentInfo, AcpProtoc
 
     let agent_info = object.get("agentInfo").and_then(Value::as_object);
     let capabilities = object.get("agentCapabilities").and_then(Value::as_object);
+    let prompt_capabilities = capabilities
+        .and_then(|caps| caps.get("promptCapabilities"))
+        .and_then(Value::as_object);
     let mcp_capabilities = capabilities
         .and_then(|caps| caps.get("mcpCapabilities"))
         .and_then(Value::as_object);
@@ -410,6 +472,10 @@ pub fn parse_initialize_result(result: &Value) -> Result<AcpAgentInfo, AcpProtoc
             .map(|version| truncate_display_text(version, 120)),
         supports_session_load: capabilities
             .and_then(|caps| caps.get("loadSession"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        supports_prompt_images: prompt_capabilities
+            .and_then(|caps| caps.get("image"))
             .and_then(Value::as_bool)
             .unwrap_or(false),
         supports_mcp_http: mcp_capabilities
@@ -531,6 +597,18 @@ pub struct AcpSessionUpdate {
     pub is_replay: bool,
     pub event: Option<LocalAgentEvent>,
     pub usage: Option<AcpUsageUpdate>,
+    /// A local file emitted by a completed agent tool. Only the path is
+    /// retained; raw tool input/output and provider metadata stay private.
+    /// Consumers must validate and copy this file before exposing it.
+    pub generated_media: Option<AcpGeneratedMedia>,
+}
+
+/// A candidate local media artifact emitted by an ACP agent tool update.
+/// This is deliberately minimal: the raw tool output is never retained or
+/// surfaced to chat, and the artifact kind is determined from the copied file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AcpGeneratedMedia {
+    pub path: String,
 }
 
 /// Context-window usage carries different semantics from input/output token
@@ -563,6 +641,11 @@ pub fn parse_session_update(params: &Value) -> Option<AcpSessionUpdate> {
         .and_then(|meta| meta.get("isReplay"))
         .and_then(Value::as_bool)
         .unwrap_or(false);
+    let generated_media = if is_replay {
+        None
+    } else {
+        parse_generated_media(update, update_type)
+    };
 
     let event = if is_replay {
         None
@@ -645,6 +728,31 @@ pub fn parse_session_update(params: &Value) -> Option<AcpSessionUpdate> {
         is_replay,
         event,
         usage,
+        generated_media,
+    })
+}
+
+/// Extract a completed tool's local output path without preserving arbitrary
+/// tool output. Grok's image and video tools place their saved artifact at
+/// `rawOutput.path`; treating the path only as a candidate keeps this generic
+/// and lets the chat media adapter validate MIME type, size, and regular-file
+/// status before copying it into Taomni storage.
+fn parse_generated_media(update: &Value, update_type: &str) -> Option<AcpGeneratedMedia> {
+    if update_type != "tool_call_update"
+        || update.get("status").and_then(Value::as_str) != Some("completed")
+    {
+        return None;
+    }
+    let path = update
+        .get("rawOutput")
+        .or_else(|| update.get("raw_output"))
+        .and_then(Value::as_object)
+        .and_then(|output| output.get("path"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|path| !path.is_empty() && path.len() <= 32 * 1024)?;
+    Some(AcpGeneratedMedia {
+        path: path.to_string(),
     })
 }
 
@@ -701,6 +809,36 @@ mod tests {
                 "params": {
                     "sessionId": "session-1",
                     "prompt": [{ "type": "text", "text": "hello" }],
+                },
+            }),
+        );
+        assert_eq!(
+            serde_json::to_value(prompt_with_resource_links_request(
+                4,
+                "session-1",
+                "Describe the attachment.",
+                &[AcpResourceLink::new(
+                    "file:///workspace/reference%20image.png",
+                    "reference image.png",
+                    Some("image/png".into()),
+                )],
+            ))
+            .unwrap(),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 4,
+                "method": "session/prompt",
+                "params": {
+                    "sessionId": "session-1",
+                    "prompt": [
+                        { "type": "text", "text": "Describe the attachment." },
+                        {
+                            "type": "resource_link",
+                            "uri": "file:///workspace/reference%20image.png",
+                            "name": "reference image.png",
+                            "mimeType": "image/png",
+                        },
+                    ],
                 },
             }),
         );
@@ -782,6 +920,7 @@ mod tests {
             "agentInfo": { "name": "grok", "title": "Grok", "version": "0.2.101" },
             "agentCapabilities": {
                 "loadSession": true,
+                "promptCapabilities": { "image": false },
                 "mcpCapabilities": { "http": true, "sse": false },
             },
             "authMethods": [
@@ -798,6 +937,7 @@ mod tests {
                 title: Some("Grok".into()),
                 version: Some("0.2.101".into()),
                 supports_session_load: true,
+                supports_prompt_images: false,
                 supports_mcp_http: true,
                 supports_mcp_sse: false,
                 auth_methods: vec![
@@ -861,6 +1001,7 @@ mod tests {
                     content: "Hello".into(),
                 }),
                 usage: None,
+                generated_media: None,
             }),
         );
         assert_eq!(
@@ -882,6 +1023,7 @@ mod tests {
                     input: Value::Null,
                 }),
                 usage: None,
+                generated_media: None,
             }),
         );
         assert_eq!(
@@ -902,6 +1044,7 @@ mod tests {
                     output: "completed".into(),
                 }),
                 usage: None,
+                generated_media: None,
             }),
         );
         assert_eq!(
@@ -917,6 +1060,7 @@ mod tests {
                 is_replay: false,
                 event: None,
                 usage: None,
+                generated_media: None,
             }),
         );
         assert_eq!(
@@ -933,6 +1077,7 @@ mod tests {
                 is_replay: true,
                 event: None,
                 usage: None,
+                generated_media: None,
             }),
         );
     }
@@ -959,7 +1104,43 @@ mod tests {
                     cost_amount: Some(0.12),
                     cost_currency: Some("USD".into()),
                 }),
+                generated_media: None,
             }),
         );
+    }
+
+    #[test]
+    fn extracts_only_completed_tool_output_paths_as_media_candidates() {
+        let update = parse_session_update(&json!({
+            "sessionId": "s1",
+            "update": {
+                "sessionUpdate": "tool_call_update",
+                "toolCallId": "image-1",
+                "status": "completed",
+                "rawOutput": {
+                    "type": "ImageGen",
+                    "path": "/tmp/grok/images/1.jpg",
+                    "private": "not retained",
+                },
+            },
+        }))
+        .expect("valid update");
+        assert_eq!(
+            update.generated_media,
+            Some(AcpGeneratedMedia {
+                path: "/tmp/grok/images/1.jpg".into(),
+            }),
+        );
+
+        let failed = parse_session_update(&json!({
+            "sessionId": "s1",
+            "update": {
+                "sessionUpdate": "tool_call_update",
+                "status": "failed",
+                "rawOutput": { "path": "/tmp/grok/images/failed.jpg" },
+            },
+        }))
+        .expect("valid update");
+        assert_eq!(failed.generated_media, None);
     }
 }

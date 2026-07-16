@@ -13,7 +13,7 @@ mod protocol;
 mod thread;
 
 pub use config::{
-    ACP_PROVIDER_PREFIX, AcpBridgeConfig, AcpProfileConfig, AcpProxySource,
+    ACP_PROVIDER_PREFIX, AcpBridgeConfig, AcpProfileCapabilities, AcpProfileConfig, AcpProxySource,
     apply_proxy_environment, effective_proxy_source, process_config, profile_id_from_provider_id,
     provider_id_for_profile, resolve_effective_proxy_url,
 };
@@ -22,12 +22,13 @@ pub use process::{
     AcpProcess, AcpProcessConfig, AcpRuntimeError, AcpRuntimeEvent, DEFAULT_REQUEST_TIMEOUT,
 };
 pub use protocol::{
-    AcpAgentInfo, AcpAuthMethod, AcpIncomingMessage, AcpNotification, AcpPromptResult,
-    AcpProtocolError, AcpRequest, AcpRequestId, AcpRpcError, AcpSessionUpdate, AcpStopReason,
-    AcpUsageUpdate, METHOD_AUTHENTICATE, METHOD_INITIALIZE, METHOD_SESSION_CANCEL,
-    METHOD_SESSION_LOAD, METHOD_SESSION_NEW, METHOD_SESSION_PROMPT, METHOD_SESSION_UPDATE,
-    authenticate_request, cancel_notification, initialize_request, load_session_request,
-    new_session_request, parse_incoming_line, parse_initialize_result, parse_prompt_result,
-    parse_session_update, prompt_request, session_id_from_response,
+    AcpAgentInfo, AcpAuthMethod, AcpGeneratedMedia, AcpIncomingMessage, AcpNotification,
+    AcpPromptResult, AcpProtocolError, AcpRequest, AcpRequestId, AcpResourceLink, AcpRpcError,
+    AcpSessionUpdate, AcpStopReason, AcpUsageUpdate, METHOD_AUTHENTICATE, METHOD_INITIALIZE,
+    METHOD_SESSION_CANCEL, METHOD_SESSION_LOAD, METHOD_SESSION_NEW, METHOD_SESSION_PROMPT,
+    METHOD_SESSION_UPDATE, authenticate_request, cancel_notification, initialize_request,
+    load_session_request, new_session_request, parse_incoming_line, parse_initialize_result,
+    parse_prompt_result, parse_session_update, prompt_request, prompt_with_resource_links_request,
+    session_id_from_response,
 };
 pub use thread::AcpThreadProcess;
