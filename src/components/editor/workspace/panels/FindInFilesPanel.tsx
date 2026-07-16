@@ -49,7 +49,12 @@ type SearchStatus = "idle" | "searching" | "done" | "error";
  * default total well below the backend's 10k ceiling.
  */
 const MAX_TOTAL_MATCHES = 2_000;
-const CONTEXT_BEFORE_MATCH = 24;
+/** Prefer keeping text from the line start when the match is near it. */
+const CONTEXT_BEFORE_MATCH = 48;
+/** Cap how much of the line continues past the keyword. */
+const CONTEXT_AFTER_MATCH = 56;
+/** Hard cap on displayed code points (hit always retained in full). */
+const MAX_LINE_CHARS = 120;
 
 function splitGlobs(value: string): string[] {
   return value
@@ -58,22 +63,76 @@ function splitGlobs(value: string): string[] {
     .filter(Boolean);
 }
 
+export interface MatchSegments {
+  before: string;
+  hit: string;
+  after: string;
+  /** Display text without ellipsis markers (code points in the kept window). */
+  text: string;
+  /** Hit range within `text` (code-point indices). */
+  hitStart: number;
+  hitEnd: number;
+  elidedStart: boolean;
+  elidedEnd: boolean;
+}
+
 /**
  * Slice the line around the match. Offsets from the backend are Unicode
  * code-point based, so slice via code points rather than UTF-16 indices.
+ *
+ * Strategy (Find-in-Files readability):
+ * - Drop pure leading indent so results align.
+ * - Keep up to CONTEXT_BEFORE_MATCH before the hit (or from line start when closer).
+ * - Keep up to CONTEXT_AFTER_MATCH after the hit.
+ * - If the window still exceeds MAX_LINE_CHARS, shrink both sides while
+ *   always retaining the full hit.
  */
-export function matchSegments(match: WorkspaceSearchMatch): { before: string; hit: string; after: string } {
+export function matchSegments(match: WorkspaceSearchMatch): MatchSegments {
   const chars = Array.from(match.lineText);
   const trimmed = match.lineText.trimStart();
   const leading = chars.length - Array.from(trimmed).length;
-  const start = Math.max(match.matchStart, leading);
-  const end = Math.max(match.matchEnd, start);
-  const contextStart = Math.max(leading, start - CONTEXT_BEFORE_MATCH);
-  const prefix = contextStart > leading ? "…" : "";
+  const start = Math.min(Math.max(match.matchStart, leading), chars.length);
+  const end = Math.min(Math.max(match.matchEnd, start), chars.length);
+  const hitLen = end - start;
+
+  let contextStart = Math.max(leading, start - CONTEXT_BEFORE_MATCH);
+  let contextEnd = Math.min(chars.length, end + CONTEXT_AFTER_MATCH);
+
+  // Prefer keeping from the (trimmed) line start when the whole prefix fits.
+  if (start - leading <= CONTEXT_BEFORE_MATCH) {
+    contextStart = leading;
+  }
+
+  let windowLen = contextEnd - contextStart;
+  if (windowLen > MAX_LINE_CHARS) {
+    const budget = Math.max(0, MAX_LINE_CHARS - hitLen);
+    const leftWant = start - contextStart;
+    const rightWant = contextEnd - end;
+    const leftKeep = Math.min(leftWant, Math.ceil(budget / 2));
+    const rightKeep = Math.min(rightWant, budget - leftKeep);
+    // If the right side was shorter, give leftover budget back to the left.
+    const leftFinal = Math.min(leftWant, leftKeep + (budget - leftKeep - rightKeep));
+    contextStart = start - leftFinal;
+    contextEnd = end + rightKeep;
+  }
+
+  const elidedStart = contextStart > leading;
+  const elidedEnd = contextEnd < chars.length;
+  const text = chars.slice(contextStart, contextEnd).join("");
+  const hitStart = start - contextStart;
+  const hitEnd = end - contextStart;
+  const prefix = elidedStart ? "…" : "";
+  const suffix = elidedEnd ? "…" : "";
+
   return {
     before: prefix + chars.slice(contextStart, start).join(""),
     hit: chars.slice(start, end).join(""),
-    after: chars.slice(end).join(""),
+    after: chars.slice(end, contextEnd).join("") + suffix,
+    text,
+    hitStart,
+    hitEnd,
+    elidedStart,
+    elidedEnd,
   };
 }
 

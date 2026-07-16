@@ -164,18 +164,57 @@ describe("matchSegments", () => {
       matchStart: 10,
       matchEnd: 16,
     }));
-    expect(segments).toEqual({ before: "const ", hit: "needle", after: " = 1;" });
+    expect(segments.before).toBe("const ");
+    expect(segments.hit).toBe("needle");
+    expect(segments.after).toBe(" = 1;");
+    expect(segments.elidedStart).toBe(false);
+    expect(segments.elidedEnd).toBe(false);
+    expect(segments.text).toBe("const needle = 1;");
+    expect(segments.hitStart).toBe(6);
+    expect(segments.hitEnd).toBe(12);
   });
 
   it("elides long prefixes ahead of the match", () => {
-    const prefix = "x".repeat(60);
+    const prefix = "x".repeat(80);
     const segments = matchSegments(searchMatch({
       lineText: `${prefix}needle`,
-      matchStart: 60,
-      matchEnd: 66,
+      matchStart: 80,
+      matchEnd: 86,
     }));
-    expect(segments.before).toBe(`…${"x".repeat(24)}`);
+    expect(segments.before.startsWith("…")).toBe(true);
     expect(segments.hit).toBe("needle");
+    expect(segments.elidedStart).toBe(true);
+    // Default CONTEXT_BEFORE_MATCH is 48 when after-side is empty.
+    expect(Array.from(segments.text).length).toBeLessThanOrEqual(120);
+    expect(segments.before).toBe(`…${"x".repeat(48)}`);
+  });
+
+  it("elides long suffixes after the match", () => {
+    const suffix = "y".repeat(100);
+    const segments = matchSegments(searchMatch({
+      lineText: `needle${suffix}`,
+      matchStart: 0,
+      matchEnd: 6,
+    }));
+    expect(segments.hit).toBe("needle");
+    expect(segments.after.endsWith("…")).toBe(true);
+    expect(segments.elidedEnd).toBe(true);
+    expect(Array.from(segments.text).length).toBeLessThanOrEqual(120);
+  });
+
+  it("keeps the full hit when the line is long on both sides", () => {
+    const left = "L".repeat(80);
+    const right = "R".repeat(80);
+    const segments = matchSegments(searchMatch({
+      lineText: `${left}HIT${right}`,
+      matchStart: 80,
+      matchEnd: 83,
+    }));
+    expect(segments.hit).toBe("HIT");
+    expect(segments.elidedStart).toBe(true);
+    expect(segments.elidedEnd).toBe(true);
+    expect(Array.from(segments.text).length).toBeLessThanOrEqual(120);
+    expect(segments.text.includes("HIT")).toBe(true);
   });
 
   it("slices by code points so CJK offsets stay aligned", () => {
