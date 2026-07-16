@@ -24,6 +24,7 @@ import {
   RotateCcw,
   Save,
   BookOpen,
+  PanelLeft,
   PanelRight,
   Columns2,
   Rows2,
@@ -473,6 +474,12 @@ export function CodeWorkspaceTab({
   const setBottomDockTab = useCallback((tab: BottomDockTabId | ((prev: BottomDockTabId) => BottomDockTabId)) => {
     const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).bottomDockTab;
     patchWorkspaceUi(workspaceInstanceId, { bottomDockTab: typeof tab === "function" ? tab(prev) : tab });
+  }, [patchWorkspaceUi, workspaceInstanceId]);
+  const setLanguagePanelOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
+    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).languagePanelOpen;
+    patchWorkspaceUi(workspaceInstanceId, {
+      languagePanelOpen: typeof open === "function" ? open(prev) : open,
+    });
   }, [patchWorkspaceUi, workspaceInstanceId]);
   const setRightPaneOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
     const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).rightPaneOpen;
@@ -3071,6 +3078,10 @@ export function CodeWorkspaceTab({
     });
   }, [openFileByKey, revealEditorLocation, setStatusMessage]);
 
+  const toggleProjectTree = useCallback(() => {
+    setLanguagePanelOpen((open) => !open);
+  }, [setLanguagePanelOpen]);
+
   const toggleOutlinePane = useCallback(() => {
     if (rightPaneOpen && rightPaneTab === "outline") {
       setRightPaneOpen(false);
@@ -3292,6 +3303,14 @@ export function CodeWorkspaceTab({
       when: (context) => context.focus === "editor" && !!activeFile && !activeFile.loading
         && (!activeCapabilities || !!activeCapabilities.rename),
       run: () => void renameSymbolRef.current(),
+    },
+    {
+      id: "workspace.toggleProjectTree",
+      title: languagePanelOpen ? "Hide Project Tree" : "Show Project Tree",
+      category: "View",
+      keybinding: "Alt+1",
+      keywords: ["project", "explorer", "files", "tree", "sidebar", "collapse"],
+      run: toggleProjectTree,
     },
     {
       id: "workspace.toggleDocumentationPane",
@@ -3614,6 +3633,8 @@ export function CodeWorkspaceTab({
     toggleInlayHintsForActiveLanguage,
     toggleInlineBlame,
     toggleBookmarkAtCursor,
+    languagePanelOpen,
+    toggleProjectTree,
     toggleOutlinePane,
     toggleTodosPane,
   ]);
@@ -3687,10 +3708,10 @@ export function CodeWorkspaceTab({
       // immediately falling back to word completion (feels "slow"/empty).
       let snapshot = currentSyncedLspDocument(file);
       if (!snapshot) {
-        const deadline = performance.now() + 450;
+        const deadline = performance.now() + 280;
         while (!snapshot && performance.now() < deadline) {
           await new Promise<void>((resolve) => {
-            window.setTimeout(resolve, 24);
+            window.setTimeout(resolve, 16);
           });
           // Drop out if the buffer moved on while we waited.
           if (!openFilesRef.current[file.key] || openFilesRef.current[file.key]?.text !== file.text) {
@@ -4300,6 +4321,13 @@ export function CodeWorkspaceTab({
         )}
         <div className="flex-1" />
         <IconButton
+          label={languagePanelOpen ? "Hide project tree" : "Show project tree"}
+          testId="code-workspace-project-tree-toggle"
+          icon={<PanelLeft className="w-3.5 h-3.5" />}
+          active={languagePanelOpen}
+          onClick={() => executeWorkspaceCommand("workspace.toggleProjectTree")}
+        />
+        <IconButton
           label="Back"
           testId="code-workspace-nav-back"
           icon={<ArrowLeft className="w-3.5 h-3.5" />}
@@ -4417,53 +4445,75 @@ export function CodeWorkspaceTab({
         id={`code-workspace-${workspaceInstanceId}`}
         className="flex-1 min-h-0"
       >
-        <Panel id="project" defaultSize="24%" minSize="15%" maxSize="45%" className="min-w-0">
-          <FileTreePane
-            paneRef={treePaneRef}
-            style={treePaneStyle}
-            onKeyDown={handleTreeKeyDown}
-            filter={treeFilter}
-            onFilterChange={setTreeFilter}
-            viewMode={treeViewMode}
-            onViewModeChange={setTreeViewMode}
-            fontSize={treeFontSize}
-            minFontSize={CODE_WORKSPACE_MIN_TREE_FONT_SIZE}
-            maxFontSize={CODE_WORKSPACE_MAX_TREE_FONT_SIZE}
-            defaultFontSize={CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE}
-            onFontSizeChange={setTreeFontSize}
-            onOpenFile={() => executeWorkspaceCommand("workspace.tree.openLooseFile", { focus: "tree" })}
-            onAddFolder={() => executeWorkspaceCommand("workspace.tree.addFolder", { focus: "tree" })}
-            canCreate={!!selectedRootDirectory}
-            canMutateSelection={!!selected}
-            onCreateFile={() => executeWorkspaceCommand("workspace.tree.newFile", { focus: "tree" })}
-            onCreateDirectory={() => executeWorkspaceCommand("workspace.tree.newDirectory", { focus: "tree" })}
-            onRename={() => executeWorkspaceCommand("workspace.tree.rename", { focus: "tree" })}
-            onDelete={() => executeWorkspaceCommand("workspace.tree.delete", { focus: "tree" })}
-          >
-              <ProjectTree
-                roots={roots}
-                looseFiles={looseFiles}
-                directories={directories}
-                compactChains={compactChains}
-                flatFiles={flatFiles}
-                treeViewMode={treeViewMode}
-                treeFilter={treeFilter}
-                expandedRoots={expandedRoots}
-                expandedDirs={expandedDirs}
-                selected={selected}
-                activeKey={activeKey}
-                openFiles={openFiles}
-                gitChangeByRootPath={gitChangeByRootPath}
-                onToggleRoot={toggleRoot}
-                onToggleDir={toggleDir}
-                onSelect={setSelected}
-                onOpenFile={(ref, options) => { void openFile(ref, options); }}
-                onContextMenu={showTreeContextMenu}
-              />
-          </FileTreePane>
-        </Panel>
-        <PanelResizeHandle className="w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
-        <Panel id="editor" defaultSize={rightPaneOpen ? "56%" : "76%"} minSize="35%" className="min-w-0">
+        {languagePanelOpen && (
+          <>
+            <Panel
+              id="project"
+              defaultSize="24%"
+              minSize="12%"
+              maxSize="45%"
+              className="min-w-0"
+            >
+              <FileTreePane
+                paneRef={treePaneRef}
+                style={treePaneStyle}
+                onKeyDown={handleTreeKeyDown}
+                filter={treeFilter}
+                onFilterChange={setTreeFilter}
+                viewMode={treeViewMode}
+                onViewModeChange={setTreeViewMode}
+                fontSize={treeFontSize}
+                minFontSize={CODE_WORKSPACE_MIN_TREE_FONT_SIZE}
+                maxFontSize={CODE_WORKSPACE_MAX_TREE_FONT_SIZE}
+                defaultFontSize={CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE}
+                onFontSizeChange={setTreeFontSize}
+                onOpenFile={() => executeWorkspaceCommand("workspace.tree.openLooseFile", { focus: "tree" })}
+                onAddFolder={() => executeWorkspaceCommand("workspace.tree.addFolder", { focus: "tree" })}
+                canCreate={!!selectedRootDirectory}
+                canMutateSelection={!!selected}
+                onCreateFile={() => executeWorkspaceCommand("workspace.tree.newFile", { focus: "tree" })}
+                onCreateDirectory={() => executeWorkspaceCommand("workspace.tree.newDirectory", { focus: "tree" })}
+                onRename={() => executeWorkspaceCommand("workspace.tree.rename", { focus: "tree" })}
+                onDelete={() => executeWorkspaceCommand("workspace.tree.delete", { focus: "tree" })}
+              >
+                <ProjectTree
+                  roots={roots}
+                  looseFiles={looseFiles}
+                  directories={directories}
+                  compactChains={compactChains}
+                  flatFiles={flatFiles}
+                  treeViewMode={treeViewMode}
+                  treeFilter={treeFilter}
+                  expandedRoots={expandedRoots}
+                  expandedDirs={expandedDirs}
+                  selected={selected}
+                  activeKey={activeKey}
+                  openFiles={openFiles}
+                  gitChangeByRootPath={gitChangeByRootPath}
+                  onToggleRoot={toggleRoot}
+                  onToggleDir={toggleDir}
+                  onSelect={setSelected}
+                  onOpenFile={(ref, options) => { void openFile(ref, options); }}
+                  onContextMenu={showTreeContextMenu}
+                />
+              </FileTreePane>
+            </Panel>
+            <PanelResizeHandle
+              data-testid="code-workspace-project-resize-handle"
+              className="w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"
+            />
+          </>
+        )}
+        <Panel
+          id="editor"
+          defaultSize={
+            !languagePanelOpen
+              ? (rightPaneOpen ? "80%" : "100%")
+              : (rightPaneOpen ? "56%" : "76%")
+          }
+          minSize={languagePanelOpen ? "35%" : "50%"}
+          className="min-w-0"
+        >
           {splitOrientation ? (
             <div data-testid="code-workspace-editor-split" className="h-full min-h-0">
               <PanelGroup

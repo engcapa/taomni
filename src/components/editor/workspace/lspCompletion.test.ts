@@ -3,9 +3,11 @@ import { EditorState } from "@codemirror/state";
 import { CompletionContext } from "@codemirror/autocomplete";
 import type { LspCompletionResult, LspDocumentStatus } from "../../../lib/editor/lsp";
 import {
+  boostFromSortText,
   completionKindToType,
   createLspCompletionSource,
   lspSnippetToCmSnippet,
+  mergeCompletionTriggers,
 } from "./lspCompletion";
 
 function status(active: boolean): LspDocumentStatus {
@@ -72,8 +74,30 @@ describe("completionKindToType", () => {
     expect(completionKindToType(2)).toBe("method");
     expect(completionKindToType(7)).toBe("class");
     expect(completionKindToType(14)).toBe("keyword");
+    expect(completionKindToType(15)).toBe("text");
+    expect(completionKindToType(17)).toBe("file");
     expect(completionKindToType(null)).toBeUndefined();
     expect(completionKindToType(99)).toBe("text");
+  });
+});
+
+describe("boostFromSortText", () => {
+  it("ranks lower numeric sortText higher", () => {
+    const a = boostFromSortText("0001") ?? 0;
+    const b = boostFromSortText("0010") ?? 0;
+    expect(a).toBeGreaterThan(b);
+  });
+
+  it("returns undefined for empty sortText", () => {
+    expect(boostFromSortText(null)).toBeUndefined();
+    expect(boostFromSortText("")).toBeUndefined();
+  });
+});
+
+describe("mergeCompletionTriggers", () => {
+  it("always includes default triggers and server triggers", () => {
+    expect(mergeCompletionTriggers(["("])).toEqual(expect.arrayContaining([".", ":", "("]));
+    expect(mergeCompletionTriggers(null)).toEqual(expect.arrayContaining([".", ":"]));
   });
 });
 

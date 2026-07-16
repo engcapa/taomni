@@ -49,6 +49,7 @@ import {
   createLspSemanticTokenChrome,
   LSP_INTELLIGENCE_THEME,
 } from "./lspIntelligenceChrome";
+import { createLspHyperlinkExtension } from "./lspHyperlink";
 import { createGitEditorChrome, type GitLineChange } from "./gitEditorChrome";
 import type { GitBlameLine } from "../../../lib/git";
 import { lspPositionFromOffset, offsetFromLspPosition } from "./lspPositions";
@@ -246,19 +247,16 @@ function lspInteractionExtensions(
         };
       });
     }),
-    EditorView.domEventHandlers({
-      mousedown(event, view) {
-        if (event.button !== 0 || (!event.ctrlKey && !event.metaKey)) return false;
-        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
-        if (pos === null) return false;
-        event.preventDefault();
-        void definitionRef.current(lspPositionFromOffset(view.state.doc, pos));
-        return true;
-      },
+    // Ctrl/Cmd+hover underline + pointer cursor; Ctrl/Cmd+click and middle-click jump.
+    createLspHyperlinkExtension({
+      onDefinition: (position) => definitionRef.current(position),
     }),
     keymap.of([
       { key: "F12", run: definitionAtSelection },
       { key: "Shift-F12", run: referencesAtSelection },
+      // IDEA-like: Ctrl+B / Cmd+B go to declaration/definition at caret.
+      { key: "Mod-b", run: definitionAtSelection },
+      { key: "Mod-Alt-B", run: definitionAtSelection },
     ]),
   ];
 }
@@ -494,9 +492,16 @@ export function CodeMirrorHost({
         closeBrackets(),
         indentOnInput(),
         autocompletion({
-          // Slightly above CM's 100ms default so didChange can get ahead of
-          // completion, without feeling as laggy as a full 350ms idle wait.
-          activateOnTypingDelay: 200,
+          // Closer to IDEA: keep a short settle window for didChange, but feel
+          // responsive while typing. Default CM is 100ms.
+          activateOnTyping: true,
+          activateOnTypingDelay: 80,
+          // Prefer the first server-ranked item (sortText / boost) when open.
+          defaultKeymap: true,
+          icons: true,
+          optionClass: (completion) => (
+            completion.type ? `cm-completion-type-${completion.type}` : ""
+          ),
           override: [
             createLspCompletionSource({
               fetch: (position, trigger) =>

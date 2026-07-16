@@ -38,6 +38,7 @@ import {
   type EditorContextMenuRequest,
   type EditorSelectionRange,
 } from "./CodeMirrorHost";
+import { mergeCompletionTriggers } from "./lspCompletion";
 import type { OpenFileViewModel } from "./editorGroupTypes";
 import { useContextMenu } from "../../ContextMenu";
 import type { EditorGroupId } from "../../../stores/codeWorkspaceStore";
@@ -495,7 +496,9 @@ export function EditorGroup({
                         onLightbulb={onLightbulb}
                         onGitChangeClick={setGitDiffPeek}
                         onContextMenu={(request) => onEditorContextMenu(activeFile, request)}
-                        completionTriggers={activeCapabilities?.completionTriggerCharacters ?? []}
+                        completionTriggers={mergeCompletionTriggers(
+                          activeCapabilities?.completionTriggerCharacters,
+                        )}
                         signatureTriggers={activeCapabilities?.signatureTriggerCharacters ?? []}
                       />
                     </div>
@@ -531,7 +534,9 @@ export function EditorGroup({
                     onLightbulb={onLightbulb}
                     onGitChangeClick={setGitDiffPeek}
                     onContextMenu={(request) => onEditorContextMenu(activeFile, request)}
-                    completionTriggers={activeCapabilities?.completionTriggerCharacters ?? []}
+                    completionTriggers={mergeCompletionTriggers(
+                      activeCapabilities?.completionTriggerCharacters,
+                    )}
                     signatureTriggers={activeCapabilities?.signatureTriggerCharacters ?? []}
                   />
                 )}
