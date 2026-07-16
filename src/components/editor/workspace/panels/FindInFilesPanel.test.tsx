@@ -98,6 +98,10 @@ describe("FindInFilesPanel", () => {
     expect(screen.getByText("app/src/a.ts")).toBeInTheDocument();
     expect(screen.getByText("app/src/b.ts")).toBeInTheDocument();
     expect(screen.getByText("3 results · 2 files")).toBeInTheDocument();
+    // Keyword hits use the dedicated find-match styling (not plain text-inherit).
+    const hits = screen.getAllByTestId("code-workspace-find-match-hit");
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits[0].className).toContain("find-match-bg");
 
     fireEvent.click(screen.getByRole("button", { name: /12:7/ }));
     expect(onOpenMatch).toHaveBeenCalledWith(searchMatch(), { preview: true });

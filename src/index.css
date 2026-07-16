@@ -76,6 +76,9 @@
   --taomni-code-selection-text: #0f172a;
   --taomni-code-selection-match-bg: rgba(245, 158, 11, 0.24);
   --taomni-code-selection-match-border: rgba(245, 158, 11, 0.58);
+  --taomni-code-find-match-bg: rgba(245, 158, 11, 0.42);
+  --taomni-code-find-match-fg: #7c2d12;
+  --taomni-code-find-match-border: rgba(217, 119, 6, 0.72);
   --taomni-code-caret: #1d4ed8;
   --taomni-code-bracket-match-bg: rgba(34, 197, 94, 0.18);
   --taomni-code-bracket-match-border: rgba(34, 197, 94, 0.4);
@@ -238,6 +241,9 @@ html[data-app-theme="dark"] {
   --taomni-code-selection-text: #ffffff;
   --taomni-code-selection-match-bg: rgba(225, 177, 75, 0.24);
   --taomni-code-selection-match-border: rgba(225, 177, 75, 0.58);
+  --taomni-code-find-match-bg: rgba(225, 177, 75, 0.5);
+  --taomni-code-find-match-fg: #fff8e7;
+  --taomni-code-find-match-border: rgba(245, 200, 90, 0.78);
   --taomni-code-caret: #aeafad;
   --taomni-code-bracket-match-bg: rgba(77, 141, 94, 0.28);
   --taomni-code-bracket-match-border: rgba(128, 185, 138, 0.42);

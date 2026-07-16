@@ -503,7 +503,10 @@ export function FindInFilesPanel({
                   </span>
                   <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--taomni-code-text)]">
                     {segments.before}
-                    <mark className="rounded-sm bg-[var(--taomni-code-selection-match-bg)] px-px text-inherit">
+                    <mark
+                      className="rounded-sm border border-[var(--taomni-code-find-match-border)] bg-[var(--taomni-code-find-match-bg)] px-0.5 font-semibold text-[var(--taomni-code-find-match-fg)]"
+                      data-testid="code-workspace-find-match-hit"
+                    >
                       {segments.hit}
                     </mark>
                     {segments.after}
