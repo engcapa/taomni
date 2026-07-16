@@ -38,6 +38,8 @@ export interface LspServerStatus {
   selectedCommand: string | null;
   installHint: string;
   error: string | null;
+  /** Runtime probe from the backend (e.g. Java major + path for jdtls). */
+  runtimeStatus?: string | null;
   commands: LspServerCommandStatus[];
 }
 

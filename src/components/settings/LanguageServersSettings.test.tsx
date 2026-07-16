@@ -38,18 +38,20 @@ beforeEach(() => {
       available: false,
       active: false,
       selectedCommandId: "jdtls",
-      selectedCommand: null,
-      installHint: "Requires JDK 17+. Linux: …",
-      error: null,
+      selectedCommand: "jdtls",
+      installHint: "Requires JDK 21+. Linux: …",
+      error:
+        "jdtls requires Java 21+ (current Eclipse JDT LS); found Java 17 at C:\\Program Files\\Java\\jdk-17\\bin\\java.exe",
+      runtimeStatus: "Java 17 — need JDK 21+ for current JDT LS",
       commands: [
         {
           id: "jdtls",
           label: "jdtls",
           command: "jdtls",
           args: [],
-          installHint: "Requires JDK 17+. Linux: …",
+          installHint: "Requires JDK 21+. Linux: …",
           fallback: false,
-          available: false,
+          available: true,
         },
       ],
     },
@@ -63,6 +65,7 @@ beforeEach(() => {
       selectedCommand: "rust-analyzer",
       installHint: "rustup component add rust-analyzer",
       error: null,
+      runtimeStatus: null,
       commands: [
         {
           id: "rust-analyzer",
@@ -90,6 +93,19 @@ describe("LanguageServersSettings", () => {
     expect(screen.getAllByTestId("language-servers-install-toggle")).toHaveLength(2);
   });
 
+  it("surfaces Java runtime version status and JDK 21 requirement for jdtls", async () => {
+    render(<LanguageServersSettings />);
+    const runtime = await screen.findByTestId("language-server-runtime-java");
+    expect(runtime).toHaveAttribute("data-ok", "false");
+    expect(runtime).toHaveTextContent(/Java 17/);
+    expect(runtime).toHaveTextContent(/JDK 21/);
+    expect(screen.getByTestId("language-server-error-java")).toHaveTextContent(
+      /requires Java 21/i,
+    );
+    // Subtitle / permanent note for the Java row.
+    expect(runtime).toHaveTextContent("settings.languageServersJavaRequirement");
+  });
+
   it("expands multi-OS install commands for jdtls with real URLs and copies the script", async () => {
     render(<LanguageServersSettings />);
     const javaRow = await screen.findByTestId("language-server-row-java");
@@ -102,7 +118,7 @@ describe("LanguageServersSettings", () => {
     expect(screen.getByTestId("language-servers-install-line-linux")).toBeInTheDocument();
     expect(screen.getByTestId("language-servers-install-line-macos")).toBeInTheDocument();
     expect(screen.getByTestId("language-servers-install-line-windows")).toBeInTheDocument();
-    expect(screen.getByTestId("language-servers-install-note-linux")).toHaveTextContent(/JDK 17/i);
+    expect(screen.getByTestId("language-servers-install-note-linux")).toHaveTextContent(/JDK 21/i);
     expect(screen.getAllByText(/jdt-language-server-latest\.tar\.gz/).length).toBeGreaterThan(0);
     expect(screen.getByText(/brew install jdtls/)).toBeInTheDocument();
     expect(screen.getByTestId("language-servers-install-hint")).toHaveTextContent("config_linux");

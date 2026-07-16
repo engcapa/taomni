@@ -104,7 +104,7 @@ describe("LspStatusPill", () => {
             available: true,
             active: false,
             displayName: "Java",
-            installHint: "Requires JDK 17+",
+            installHint: "Requires JDK 21+",
             error: "language server request timed out: initialize",
           },
         })}
