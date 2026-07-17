@@ -26,6 +26,11 @@ import {
   closeBracketsKeymap,
   startCompletion,
 } from "@codemirror/autocomplete";
+import {
+  createLiveTemplateCompletionSource,
+  expandLiveTemplateAt,
+  liveTemplateLanguageForPath,
+} from "./liveTemplates";
 import { bracketMatching, foldGutter, indentOnInput } from "@codemirror/language";
 import { openSearchPanel, search, searchKeymap } from "@codemirror/search";
 import { renderFormatted } from "../../../lib/chat/renderFormatted";
@@ -325,6 +330,7 @@ export function CodeMirrorHost({
   const onContextMenuRef = useRef(onContextMenu);
   const completionTriggersRef = useRef(completionTriggers ?? []);
   const signatureTriggersRef = useRef(signatureTriggers ?? []);
+  const pathRef = useRef(path);
   onChangeRef.current = onChange;
   onSaveRef.current = onSave;
   onHoverRef.current = onHover;
@@ -341,6 +347,7 @@ export function CodeMirrorHost({
   onContextMenuRef.current = onContextMenu;
   completionTriggersRef.current = completionTriggers ?? [];
   signatureTriggersRef.current = signatureTriggers ?? [];
+  pathRef.current = path;
 
   const emitSelection = (view: EditorView) => {
     const handler = onSelectionChangeRef.current;
@@ -509,6 +516,9 @@ export function CodeMirrorHost({
             completion.type ? `cm-completion-type-${completion.type}` : ""
           ),
           override: [
+            // Local IDEA-style live/postfix templates (sout, psvm, fori, …).
+            // Ranked above most LSP items via boost so Tab expands them first.
+            createLiveTemplateCompletionSource(() => pathRef.current),
             createLspCompletionSource({
               fetch: (position, trigger) =>
                 onCompleteRef.current?.(position, trigger) ?? Promise.resolve(null),
@@ -564,12 +574,22 @@ export function CodeMirrorHost({
         WORKSPACE_EDITOR_STYLE,
         LSP_EDITOR_STYLE,
         WORKSPACE_SEARCH_STYLE,
-        // IDEA-style Tab-to-accept: high priority so it wins over indent when
-        // a completion is open; returns false otherwise so indentWithTab runs.
-        // Snippet tabstops (also Prec.highest via autocompletion) still win
-        // when a snippet field is active and no completion is open.
+        // IDEA-style Tab:
+        // 1) Accept the active completion (often a live template).
+        // 2) Else expand an exact live/postfix template under the caret
+        //    even when the popup is closed (sout + Tab without waiting).
+        // 3) Else fall through to snippet tabstops / indentWithTab.
         Prec.high(keymap.of([
-          { key: "Tab", run: acceptCompletion },
+          {
+            key: "Tab",
+            run: (view) => {
+              if (acceptCompletion(view)) return true;
+              return expandLiveTemplateAt(
+                view,
+                liveTemplateLanguageForPath(pathRef.current),
+              );
+            },
+          },
         ])),
         keymap.of([
           { key: "Mod-s", run: saveHandler },
