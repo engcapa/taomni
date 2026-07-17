@@ -736,7 +736,10 @@ const dict = {
   tabs: {
     closeTab: "Close tab",
     closeOthers: "Close other tabs",
+    closeLeft: "Close tabs to the left",
     closeRight: "Close tabs to the right",
+    closeLeftShort: "Close left",
+    closeRightShort: "Close right",
     duplicateTab: "Duplicate tab",
     renameTab: "Rename tab…",
     pinTab: "Pin tab",
