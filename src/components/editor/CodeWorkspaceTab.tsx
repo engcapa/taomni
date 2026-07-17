@@ -265,8 +265,11 @@ function initialInlayHintRange(text: string): LspRange {
 // enough that applying them while somebody is still typing is noticeable.
 // Background typing coalesces didChange at this interval; completion/signature
 // force-flush immediately so the server is not one keystroke behind.
-const LSP_CHANGE_SYNC_DELAY_MS = 80;
+// Slightly longer than a single keystroke so jdtls is not flooded while still
+// feeling immediate once ensureLspDocumentSynced force-flushes for completion.
+const LSP_CHANGE_SYNC_DELAY_MS = 140;
 const LSP_FEATURE_SYNC_WAIT_MS = 400;
+const LSP_DIAGNOSTICS_IDLE_DELAY_MS = 750;
 const LSP_HIGHLIGHT_IDLE_DELAY_MS = 500;
 const LSP_INLAY_HINT_IDLE_DELAY_MS = 650;
 const LSP_SEMANTIC_TOKENS_IDLE_DELAY_MS = 900;
@@ -274,7 +277,7 @@ const LSP_DOCUMENT_SYMBOLS_IDLE_DELAY_MS = 650;
 // CodeMirror owns the live text while the user is typing. Publishing every
 // keypress into the workspace-wide Zustand object redraws the file tree,
 // panels, and command chrome, so commit an editing burst as one update.
-const EDITOR_TEXT_COMMIT_IDLE_DELAY_MS = 125;
+const EDITOR_TEXT_COMMIT_IDLE_DELAY_MS = 220;
 
 import {
   type LspFileState,
@@ -305,8 +308,11 @@ import {
   initialLooseFiles,
   initialRoots,
   isExternalHref,
+  isLspFeatureReady,
   isMarkdownPath,
   applyEditorEol,
+  shouldLiveSyncLsp,
+  shouldProbeLsp,
   makeLoadingFile,
   makeLooseFile,
   normalizeEditorText,
@@ -1685,15 +1691,21 @@ export function CodeWorkspaceTab({
   const scheduleLiveLspSync = useCallback((key: string) => {
     const existing = liveLspSyncTimersRef.current[key];
     if (existing) window.clearTimeout(existing);
+    const latestNow = openFilesRef.current[key];
+    // Typing only drives didChange for an *already active* session. Missing
+    // LSP / failed jdtls never schedules idle open probes from keystrokes.
+    if (!latestNow || !shouldLiveSyncLsp(latestNow.languagePath, lspFilesRef.current[key])) {
+      return;
+    }
     liveLspSyncTimersRef.current[key] = window.setTimeout(() => {
       delete liveLspSyncTimersRef.current[key];
       const latest = openFilesRef.current[key];
       if (!latest || latest.loading) return;
       const lspState = lspFilesRef.current[key];
-      // Prefer the session's live syncedTextRef (not store-lagged syncedText)
-      // so mid-burst didChange skips do not re-fire redundant syncs.
-      if (lspState?.status && isLspDocumentSynced(key, latest.text)) return;
-      const mode: "open" | "change" = lspState?.status ? "change" : "open";
+      if (!shouldLiveSyncLsp(latest.languagePath, lspState)) return;
+      if (lspState?.status?.active && isLspDocumentSynced(key, latest.text)) return;
+      // Active → change; still-opening → open (coalesced as pending change once active).
+      const mode: "open" | "change" = lspState?.status?.active ? "change" : "open";
       void syncLspDocument(latest, mode);
     }, LSP_CHANGE_SYNC_DELAY_MS);
   }, [isLspDocumentSynced, syncLspDocument]);
@@ -1716,17 +1728,16 @@ export function CodeWorkspaceTab({
       const latest = openFilesRef.current[fileKey];
       if (!latest || latest.loading) return null;
       const state = lspFilesRef.current[fileKey];
-      if (state?.status && isLspDocumentSynced(fileKey, latest.text)) {
-        return latest;
-      }
-      const mode: "open" | "change" = state?.status ? "change" : "open";
-      // Kick (or re-queue) the latest buffer. If a sync is already running,
-      // syncDocument records pending and returns; the wait loop covers that.
-      void syncLspDocument(latest, mode);
+      // Features require an active session; do not open-from-completion on plain text.
+      if (!isLspFeatureReady(state)) return null;
+      if (isLspDocumentSynced(fileKey, latest.text)) return latest;
+      void syncLspDocument(latest, "change");
       return null;
     };
     const ready = kick();
     if (ready) return ready;
+    // No active server: do not spin-wait 400ms on every completion keystroke.
+    if (!isLspFeatureReady(lspFilesRef.current[fileKey])) return null;
     const deadline = performance.now() + LSP_FEATURE_SYNC_WAIT_MS;
     while (performance.now() < deadline) {
       await new Promise<void>((resolve) => {
@@ -1739,7 +1750,7 @@ export function CodeWorkspaceTab({
     // the live buffer so the feature request can race (CM will re-query on the
     // next keystroke via isIncomplete / abort-on-doc-change).
     const latest = openFilesRef.current[fileKey];
-    if (latest && lspFilesRef.current[fileKey]?.status?.active) return latest;
+    if (latest && isLspFeatureReady(lspFilesRef.current[fileKey])) return latest;
     return null;
   }, [cancelLiveLspSync, isLspDocumentSynced, syncLspDocument]);
 
@@ -1756,8 +1767,8 @@ export function CodeWorkspaceTab({
     // store publication that causes the surrounding workspace to re-render.
     openFilesRef.current = { ...openFilesRef.current, [key]: next };
     pendingEditorTextByFileRef.current.set(key, next);
-    // Drive didChange from the live buffer so LSP does not wait for the
-    // React/Zustand text commit delay before seeing keystrokes.
+    // Drive didChange from the live buffer only when a language server can
+    // actually use it — plain text / missing LSP must not pay IPC cost.
     scheduleLiveLspSync(key);
     if (pendingEditorTextTimerRef.current !== null) {
       window.clearTimeout(pendingEditorTextTimerRef.current);
@@ -2341,20 +2352,54 @@ export function CodeWorkspaceTab({
     setStatusMessage(`Format on save ${enabled ? "enabled" : "disabled"} for this workspace`);
   }, [setIntelligencePreferences, setStatusMessage]);
 
-  // Send the latest document update before scheduling any derived LSP work.
-  // A short debounce coalesces normal typing without leaving the server one
-  // full feature-refresh cycle behind the editor.
+  // Probe / re-open when the active buffer *identity* changes — not on every
+  // text commit. Typing drives didChange through scheduleLiveLspSync only.
+  // Depending on the whole activeFile object used to re-fire open/change IPC
+  // after each EDITOR_TEXT_COMMIT_IDLE flush and made non-LSP files feel laggy.
+  const activeFileKey = activeFile?.key ?? null;
+  const activeFileLoading = activeFile?.loading ?? false;
+  const activeFileLanguagePath = activeFile?.languagePath ?? null;
   useEffect(() => {
-    if (!visible || !activeFile || activeFile.loading) return;
-    const lspState = lspFilesRef.current[activeFile.key];
-    if (lspState?.status && isLspDocumentSynced(activeFile.key, activeFile.text)) return;
-    const mode: "open" | "change" = lspState?.status ? "change" : "open";
+    if (!visible || !activeFileKey || activeFileLoading || !activeFileLanguagePath) return;
+    const lspState = lspFilesRef.current[activeFileKey];
+    if (!shouldProbeLsp(activeFileLanguagePath, lspState)) return;
+    if (lspState?.status?.active) {
+      // Active session: typing / store-text effects own didChange.
+      return;
+    }
     const timer = window.setTimeout(() => {
-      const latest = openFilesRef.current[activeFile.key];
-      if (latest) void syncLspDocument(latest, mode);
-    }, mode === "open" ? 0 : LSP_CHANGE_SYNC_DELAY_MS);
+      const latest = openFilesRef.current[activeFileKey];
+      if (!latest || !shouldProbeLsp(latest.languagePath, lspFilesRef.current[activeFileKey])) return;
+      void syncLspDocument(latest, "open");
+    }, 0);
     return () => window.clearTimeout(timer);
-  }, [activeFile, isLspDocumentSynced, syncLspDocument, visible]);
+  }, [
+    activeFileKey,
+    activeFileLanguagePath,
+    activeFileLoading,
+    syncLspDocument,
+    visible,
+  ]);
+
+  // Non-CodeMirror text updates (format, AI rewrite, store patches in tests)
+  // still need didChange once the server is active. Gated so plain-text /
+  // unavailable presets never schedule IPC from store flushes.
+  const activeFileText = activeFile?.text;
+  useEffect(() => {
+    if (!visible || !activeFileKey || activeFileLoading || activeFileText == null) return;
+    const lspState = lspFilesRef.current[activeFileKey];
+    if (!shouldLiveSyncLsp(activeFileLanguagePath ?? "", lspState)) return;
+    if (isLspDocumentSynced(activeFileKey, activeFileText)) return;
+    scheduleLiveLspSync(activeFileKey);
+  }, [
+    activeFileKey,
+    activeFileLanguagePath,
+    activeFileLoading,
+    activeFileText,
+    isLspDocumentSynced,
+    scheduleLiveLspSync,
+    visible,
+  ]);
 
   useEffect(() => {
     const groupId = activeEditorGroupId;
@@ -3991,8 +4036,11 @@ export function CodeWorkspaceTab({
       // prop — typing is batched into the store and the prop is often one
       // burst behind CodeMirror. Force-flush didChange so the server sees the
       // same text the caret is in (IDEA-like: no empty popup mid-edit).
+      // Bail before any wait loop when this buffer has no usable language server.
+      if (!shouldLiveSyncLsp(file.languagePath, lspFilesRef.current[file.key])) return null;
       const live = await ensureLspDocumentSynced(file.key);
       if (!live) return null;
+      if (!isLspFeatureReady(lspFilesRef.current[live.key])) return null;
       const descriptor = lspDescriptorForFile(live);
       if (!descriptor) return null;
       const epoch = lspDocumentEpochRef.current[live.key] ?? 0;
@@ -4035,8 +4083,10 @@ export function CodeWorkspaceTab({
       position: LspPosition,
       triggerCharacter: string | null,
     ): Promise<LspSignatureHelpResult | null> => {
+      if (!shouldLiveSyncLsp(file.languagePath, lspFilesRef.current[file.key])) return null;
       const live = await ensureLspDocumentSynced(file.key);
       if (!live) return null;
+      if (!isLspFeatureReady(lspFilesRef.current[live.key])) return null;
       const descriptor = lspDescriptorForFile(live);
       if (!descriptor) return null;
       try {

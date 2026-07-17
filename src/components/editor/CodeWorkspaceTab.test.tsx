@@ -1860,7 +1860,8 @@ describe("CodeWorkspaceTab", () => {
       fireEvent.keyDown(content!, { key: "d", code: "KeyD", ctrlKey: true });
       expect(getBufferText()).toBe("one\ntwo");
 
-      act(() => vi.advanceTimersByTime(124));
+      // EDITOR_TEXT_COMMIT_IDLE_DELAY_MS is 220ms — stay under it first.
+      act(() => vi.advanceTimersByTime(219));
       expect(getBufferText()).toBe("one\ntwo");
 
       act(() => vi.advanceTimersByTime(1));

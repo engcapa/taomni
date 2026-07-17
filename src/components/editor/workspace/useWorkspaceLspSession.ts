@@ -342,8 +342,10 @@ export function useWorkspaceLspSession({
     diagnosticsTimersRef.current[key] = window.setTimeout(() => {
       delete diagnosticsTimersRef.current[key];
       const latest = openFilesRef.current[key];
-      if (latest) void refreshDiagnostics(latest);
-    }, 500);
+      // Only poll diagnostics while the server is actually serving this file.
+      if (!latest || !documentActiveRef.current[key]) return;
+      void refreshDiagnostics(latest);
+    }, 750);
   }, [openFilesRef, refreshDiagnostics]);
 
   /**
@@ -360,6 +362,17 @@ export function useWorkspaceLspSession({
 
   const syncDocument = useCallback(async (file: OpenFileState, mode: "open" | "change") => {
     if (file.loading) return;
+    // No language-server preset for this extension → never open an IPC path.
+    if (!lspPresetIdForPath(file.languagePath)) return;
+    // didChange without an active session (and not mid-open) is a no-op.
+    if (
+      mode === "change"
+      && !documentActiveRef.current[file.key]
+      && !syncQueuesRef.current[file.key]
+    ) {
+      return;
+    }
+
     const running = syncQueuesRef.current[file.key];
     if (running) {
       running.pending = { file, mode };
@@ -440,6 +453,11 @@ export function useWorkspaceLspSession({
             syncedTextRef.current[currentSync.file.key] = currentSync.file.text;
             incrementalSyncRef.current[currentSync.file.key] =
               status.capabilities?.textDocumentSyncKind === 2;
+          } else {
+            // Unavailable / failed start: clear so typing does not keep a stale
+            // "synced" view that features might misread.
+            delete syncedTextRef.current[currentSync.file.key];
+            delete incrementalSyncRef.current[currentSync.file.key];
           }
           const hasPending = queue.pending !== null;
           // Keep the spinner only while the server is still coming up. Once
@@ -482,7 +500,9 @@ export function useWorkspaceLspSession({
               },
             };
           });
-          scheduleDiagnostics(currentSync.file.key);
+          // Diagnostics only matter for a live server; avoid polling after a
+          // failed open (missing binary) on every subsequent keystroke burst.
+          if (active) scheduleDiagnostics(currentSync.file.key);
         } catch (error) {
           if (!mountedRef.current || queue.closed || !openFilesRef.current[currentSync.file.key]) break;
           updateLspFiles((current) => ({
