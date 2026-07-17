@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Copy, FolderOpen, RefreshCw, Server } from "lucide-react";
-import { lspDetectServers, lspSetJavaHome, type LspServerStatus } from "../../lib/editor/lsp";
+import { lspDetectServers, lspSetJavaHome, lspSetJavaVmargs, type LspServerStatus } from "../../lib/editor/lsp";
 import { writeText } from "../../lib/clipboard";
 import { selectFolderPath } from "../../lib/ipc";
 import { useT } from "../../lib/i18n";
@@ -17,12 +17,15 @@ import {
 } from "../../lib/settingsNavigation";
 import {
   CUSTOM_LSP_COMMAND_ID,
+  DEFAULT_LSP_JAVA_VMARGS,
   readLspCommandPrefs,
   readLspCustomCommands,
   readLspJavaHome,
+  readLspJavaVmargs,
   writeLspCommandPrefs,
   writeLspCustomCommands,
   writeLspJavaHome,
+  writeLspJavaVmargs,
   type LspCustomCommandConfig,
 } from "../editor/workspace/codeWorkspaceModel";
 
@@ -41,6 +44,7 @@ export function LanguageServersSettings() {
     () => readLspCustomCommands(),
   );
   const [javaHome, setJavaHome] = useState(() => readLspJavaHome());
+  const [javaVmargs, setJavaVmargs] = useState(() => readLspJavaVmargs());
   /** Expanded install panels keyed by presetId. */
   const [expandedInstall, setExpandedInstall] = useState<Record<string, boolean>>({});
   /** Brief highlight when deep-linked from a Code Workspace file. */
@@ -57,6 +61,7 @@ export function LanguageServersSettings() {
     try {
       // Keep the backend override in sync before probing so jdtls launch + status agree.
       await lspSetJavaHome(home || null);
+      await lspSetJavaVmargs(readLspJavaVmargs());
       const next = await lspDetectServers({ javaHome: home || null });
       setStatuses(next);
     } catch (err) {
@@ -129,6 +134,18 @@ export function LanguageServersSettings() {
     writeLspJavaHome(trimmed);
     void refresh(trimmed);
   }, [refresh]);
+
+  const commitJavaVmargs = useCallback((raw: string) => {
+    const effective = writeLspJavaVmargs(raw.trim() === "" ? null : raw);
+    setJavaVmargs(effective);
+    void (async () => {
+      try {
+        await lspSetJavaVmargs(effective);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    })();
+  }, []);
 
   const browseJavaHome = useCallback(async () => {
     try {
@@ -365,6 +382,44 @@ export function LanguageServersSettings() {
                         </div>
                         <div className="mt-1 text-[10px] leading-snug text-[var(--taomni-text-muted)]">
                           {t("settings.languageServersJavaHomeHint")}
+                        </div>
+                      </label>
+                      <label className="mt-2 block text-[11px] text-[var(--taomni-text-muted)]">
+                        {t("settings.languageServersJavaVmargs")}
+                        <div className="mt-0.5 flex flex-wrap items-start gap-1.5">
+                          <textarea
+                            data-testid="language-servers-java-vmargs"
+                            value={javaVmargs}
+                            rows={2}
+                            spellCheck={false}
+                            className="min-h-14 min-w-0 flex-1 resize-y rounded border border-[var(--taomni-input-border)] bg-[var(--taomni-input-bg)] px-1.5 py-1 font-mono text-[11px] leading-snug text-[var(--taomni-text)] outline-none"
+                            placeholder={t("settings.languageServersJavaVmargsPlaceholder")}
+                            aria-label={t("settings.languageServersJavaVmargs")}
+                            onChange={(event) => setJavaVmargs(event.target.value)}
+                            onBlur={(event) => {
+                              const next = event.target.value.replace(/\s+/g, " ").trim();
+                              const current = readLspJavaVmargs();
+                              if (next === "" || next !== current) {
+                                commitJavaVmargs(next);
+                              } else {
+                                setJavaVmargs(current);
+                              }
+                            }}
+                          />
+                          {javaVmargs.trim() !== ""
+                            && javaVmargs.replace(/\s+/g, " ").trim() !== DEFAULT_LSP_JAVA_VMARGS && (
+                            <button
+                              type="button"
+                              data-testid="language-servers-java-vmargs-clear"
+                              className="taomni-btn h-7 px-2 text-[11px]"
+                              onClick={() => commitJavaVmargs("")}
+                            >
+                              {t("settings.languageServersJavaVmargsClear")}
+                            </button>
+                          )}
+                        </div>
+                        <div className="mt-1 text-[10px] leading-snug text-[var(--taomni-text-muted)]">
+                          {t("settings.languageServersJavaVmargsHint")}
                         </div>
                       </label>
                     </>

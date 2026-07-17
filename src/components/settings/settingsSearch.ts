@@ -72,6 +72,15 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     ],
   },
   {
+    id: "live-templates",
+    titleKeys: ["settings.liveTemplatesTitle", "settings.liveTemplatesSubtitle"],
+    terms: [
+      "live templates", "live template", "postfix", "snippet", "abbreviation", "sout", "psvm", "fori",
+      "code template", "expand", "tab", "intellij", "idea templates",
+      "实时模板", "后缀模板", "代码模板", "缩写", "代码片段", "模板补全",
+    ],
+  },
+  {
     id: "sql-completion",
     titleKeys: ["settings.sqlCompletionTitle", "settings.sqlCompletionTriggerShortcut"],
     terms: [
@@ -204,7 +213,7 @@ export const SETTINGS_GROUPS: SettingsGroupDef[] = [
   {
     id: "code",
     titleKey: "settings.groupCode",
-    entryIds: ["code-view-appearance", "language-servers"],
+    entryIds: ["code-view-appearance", "language-servers", "live-templates"],
   },
   {
     id: "database",

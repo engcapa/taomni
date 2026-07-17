@@ -81,6 +81,13 @@ export function boostFromSortText(sortText: string | null | undefined): number |
 /** Triggers that feel natural even when the server omits completionTriggerCharacters. */
 export const DEFAULT_COMPLETION_TRIGGERS = [".", ":"];
 
+/**
+ * Cap the option list so the popup stays responsive. Servers like jdtls can
+ * return thousands of members; IDEA also truncates the visible list and
+ * re-queries as the user types.
+ */
+export const MAX_COMPLETION_OPTIONS = 200;
+
 export function mergeCompletionTriggers(server: readonly string[] | null | undefined): string[] {
   const set = new Set<string>();
   for (const ch of server ?? []) {
@@ -88,6 +95,41 @@ export function mergeCompletionTriggers(server: readonly string[] | null | undef
   }
   for (const ch of DEFAULT_COMPLETION_TRIGGERS) set.add(ch);
   return [...set];
+}
+
+/**
+ * Extra boost for camelCase / prefix quality when the server did not provide
+ * sortText. Lower = better match; returned as CM boost (higher = better).
+ */
+export function boostFromTypedPrefix(
+  typed: string,
+  filterLabel: string,
+  sortText: string | null | undefined,
+): number | undefined {
+  const fromSort = boostFromSortText(sortText);
+  if (!typed) return fromSort;
+  const label = filterLabel;
+  const lowerTyped = typed.toLowerCase();
+  const lowerLabel = label.toLowerCase();
+  let quality = 0;
+  if (label.startsWith(typed)) quality = 120;
+  else if (lowerLabel.startsWith(lowerTyped)) quality = 100;
+  else if (lowerLabel.includes(lowerTyped)) quality = 40;
+  else {
+    // camelCase initials: "oF" → openFile, "cwt" → CodeWorkspaceTab
+    let ti = 0;
+    for (let i = 0; i < label.length && ti < typed.length; i += 1) {
+      const ch = label[i];
+      const boundary = i === 0
+        || ch !== ch.toLowerCase()
+        || /[^A-Za-z0-9]/.test(label[i - 1] ?? "");
+      if (!boundary && i > 0) continue;
+      if (ch.toLowerCase() === typed[ti].toLowerCase()) ti += 1;
+    }
+    if (ti === typed.length) quality = 80;
+  }
+  if (!quality && fromSort === undefined) return undefined;
+  return (fromSort ?? 0) + quality;
 }
 
 /**
@@ -233,16 +275,26 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
     const triggers = hooks.triggerCharacters();
     // Trigger-only: just typed `.` / `:` with no identifier yet.
     const triggerOnly = !word && !!charBefore && triggers.includes(charBefore);
+    // Also treat typing right after a trigger (e.g. `obj.t`) as a triggered
+    // completion so the server gets triggerKind=2 for member lists.
+    const afterTrigger = !!word
+      && word.from > 0
+      && triggers.includes(context.state.sliceDoc(word.from - 1, word.from));
     if (!context.explicit && !word && !triggerOnly) return null;
 
     // LSP responses are tied to a document version. Do not spend renderer time
     // mapping a response that became stale while the user kept typing.
     context.addEventListener("abort", () => {}, { onDocChange: true });
+    const triggerCharacter = triggerOnly
+      ? charBefore
+      : afterTrigger
+        ? context.state.sliceDoc(word!.from - 1, word!.from)
+        : null;
     let result: LspCompletionResult | null = null;
     try {
       result = await hooks.fetch(
         lspPositionFromOffset(context.state.doc, context.pos),
-        triggerOnly ? charBefore : null,
+        triggerCharacter,
       );
     } catch {
       result = null;
@@ -254,13 +306,14 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
     }
     if (result.items.length === 0) return null;
 
-    const options = result.items.map((item): Completion => {
+    const typed = word ? word.text : "";
+    const mapped = result.items.map((item): Completion => {
       const filterText = item.filterText?.trim() ? item.filterText : null;
       // Match against filterText when the server provides it (e.g. method
       // signatures), but keep the human label visible in the list.
       const label = filterText ?? item.label;
       const displayLabel = filterText && filterText !== item.label ? item.label : undefined;
-      const boost = boostFromSortText(item.sortText);
+      const boost = boostFromTypedPrefix(typed, label, item.sortText);
       return {
         label,
         displayLabel,
@@ -290,12 +343,19 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
       from = offsetFromLspPosition(context.state.doc, firstEdit.range.start);
     }
 
+    // Keep server order for the head of the list, then cap for popup cost.
+    const options = mapped.length > MAX_COMPLETION_OPTIONS
+      ? mapped.slice(0, MAX_COMPLETION_OPTIONS)
+      : mapped;
+
     return {
       from,
       options,
       // Incomplete lists should re-query on further typing (no sticky validFor).
       // Complete lists stay open while the user continues the identifier.
-      filter: !result.isIncomplete,
+      // Always filter client-side for camelCase/prefix quality on the cap —
+      // incomplete lists still re-query because validFor is unset.
+      filter: true,
       validFor: result.isIncomplete ? undefined : /^[\w$@]*$/,
     };
   };

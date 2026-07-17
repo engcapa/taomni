@@ -6,6 +6,7 @@ import { LanguageServersSettings } from "./LanguageServersSettings";
 const writeTextMock = vi.fn(async (_text: string) => {});
 const detectMock = vi.fn();
 const setJavaHomeMock = vi.fn(async (_home?: string | null) => {});
+const setJavaVmargsMock = vi.fn(async (vmargs?: string | null) => vmargs?.trim() || "-Xms1024m -Xmx1024m");
 const selectFolderPathMock = vi.fn(async (_current?: string) => null as string | null);
 
 vi.mock("../../lib/clipboard", () => ({
@@ -15,6 +16,7 @@ vi.mock("../../lib/clipboard", () => ({
 vi.mock("../../lib/editor/lsp", () => ({
   lspDetectServers: (options?: { javaHome?: string | null }) => detectMock(options),
   lspSetJavaHome: (javaHome?: string | null) => setJavaHomeMock(javaHome),
+  lspSetJavaVmargs: (vmargs?: string | null) => setJavaVmargsMock(vmargs),
 }));
 
 vi.mock("../../lib/ipc", () => ({
@@ -216,5 +218,43 @@ describe("LanguageServersSettings", () => {
       expect(window.localStorage.getItem("taomni.codeWorkspace.lspJavaHome.v1")).toBeNull();
       expect(setJavaHomeMock).toHaveBeenCalledWith(null);
     });
+  });
+
+  it("persists free-form jdtls JVM args and pushes them to the backend", async () => {
+    render(<LanguageServersSettings />);
+    const input = await screen.findByTestId("language-servers-java-vmargs");
+    expect(input).toHaveValue("-Xms1024m -Xmx1024m");
+
+    fireEvent.change(input, {
+      target: { value: "-Xmx2G -XX:+UseG1GC -Dlog.level=ALL" },
+    });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(window.localStorage.getItem("taomni.codeWorkspace.lspJavaVmargs.v1")).toBe(
+        "-Xmx2G -XX:+UseG1GC -Dlog.level=ALL",
+      );
+    });
+    await waitFor(() => {
+      expect(setJavaVmargsMock).toHaveBeenCalledWith("-Xmx2G -XX:+UseG1GC -Dlog.level=ALL");
+    });
+
+    fireEvent.click(screen.getByTestId("language-servers-java-vmargs-clear"));
+    await waitFor(() => {
+      expect(window.localStorage.getItem("taomni.codeWorkspace.lspJavaVmargs.v1")).toBeNull();
+      expect(setJavaVmargsMock).toHaveBeenCalledWith("-Xms1024m -Xmx1024m");
+      expect(input).toHaveValue("-Xms1024m -Xmx1024m");
+    });
+  });
+
+  it("migrates the legacy heap-MB preference into JVM args on load", async () => {
+    window.localStorage.setItem("taomni.codeWorkspace.lspJavaHeapMb.v1", "2048");
+    render(<LanguageServersSettings />);
+    const input = await screen.findByTestId("language-servers-java-vmargs");
+    expect(input).toHaveValue("-Xms2048m -Xmx2048m");
+    expect(window.localStorage.getItem("taomni.codeWorkspace.lspJavaVmargs.v1")).toBe(
+      "-Xms2048m -Xmx2048m",
+    );
+    expect(window.localStorage.getItem("taomni.codeWorkspace.lspJavaHeapMb.v1")).toBeNull();
   });
 });

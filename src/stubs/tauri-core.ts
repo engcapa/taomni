@@ -1242,6 +1242,11 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "lsp_set_java_home": {
       return undefined as T;
     }
+    case "lsp_set_java_vmargs": {
+      const raw = (args as { vmargs?: string | null } | undefined)?.vmargs;
+      const trimmed = typeof raw === "string" ? raw.trim() : "";
+      return (trimmed || "-Xms1024m -Xmx1024m") as T;
+    }
     case "lsp_detect_servers": {
       return stubLspServerStatuses() as T;
     }

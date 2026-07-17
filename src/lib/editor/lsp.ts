@@ -232,6 +232,16 @@ export function lspSetJavaHome(javaHome?: string | null): Promise<void> {
   });
 }
 
+/**
+ * Apply free-form jdtls JVM args globally (e.g. `-Xmx2G -XX:+UseG1GC`).
+ * Null/empty restores the default `-Xms1024m -Xmx1024m`.
+ * Returns the effective args string after normalize.
+ */
+export function lspSetJavaVmargs(vmargs?: string | null): Promise<string> {
+  const value = vmargs?.trim() || null;
+  return invoke<string>("lsp_set_java_vmargs", { vmargs: value });
+}
+
 export function lspDocumentStatus(
   descriptor: LspDocumentDescriptor,
 ): Promise<LspDocumentStatus> {
