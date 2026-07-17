@@ -66,8 +66,10 @@
   --taomni-code-bg: #fbfdff;
   --taomni-code-gutter-bg: #f4f7fb;
   --taomni-code-text: #142033;
-  --taomni-code-muted: #6b778c;
-  --taomni-code-line-number: #78859a;
+  /* Secondary labels on light code chrome — keep above WCAG-ish contrast on
+     #f4f7fb / #fbfdff (slate-500 washes out next to pale blues). */
+  --taomni-code-muted: #475569;
+  --taomni-code-line-number: #64748b;
   --taomni-code-line-number-active: #142033;
   --taomni-code-border: #d9e2ef;
   --taomni-code-active-line-bg: rgba(37, 99, 235, 0.07);
@@ -76,6 +78,9 @@
   --taomni-code-selection-text: #0f172a;
   --taomni-code-selection-match-bg: rgba(245, 158, 11, 0.24);
   --taomni-code-selection-match-border: rgba(245, 158, 11, 0.58);
+  --taomni-code-find-match-bg: rgba(245, 158, 11, 0.42);
+  --taomni-code-find-match-fg: #7c2d12;
+  --taomni-code-find-match-border: rgba(217, 119, 6, 0.72);
   --taomni-code-caret: #1d4ed8;
   --taomni-code-bracket-match-bg: rgba(34, 197, 94, 0.18);
   --taomni-code-bracket-match-border: rgba(34, 197, 94, 0.4);
@@ -238,6 +243,9 @@ html[data-app-theme="dark"] {
   --taomni-code-selection-text: #ffffff;
   --taomni-code-selection-match-bg: rgba(225, 177, 75, 0.24);
   --taomni-code-selection-match-border: rgba(225, 177, 75, 0.58);
+  --taomni-code-find-match-bg: rgba(225, 177, 75, 0.5);
+  --taomni-code-find-match-fg: #fff8e7;
+  --taomni-code-find-match-border: rgba(245, 200, 90, 0.78);
   --taomni-code-caret: #aeafad;
   --taomni-code-bracket-match-bg: rgba(77, 141, 94, 0.28);
   --taomni-code-bracket-match-border: rgba(128, 185, 138, 0.42);
@@ -334,6 +342,94 @@ body.notes-detached-document,
 
 .font-mono {
   font-family: var(--taomni-code-font-family);
+}
+
+/* Find-in-Files result lines: Lezer classHighlighter tok-* classes → editor syntax colors */
+.taomni-find-line .tok-keyword,
+.taomni-find-line .tok-modifier,
+.taomni-find-line .tok-operatorKeyword,
+.taomni-find-line .tok-controlKeyword,
+.taomni-find-line .tok-definitionKeyword,
+.taomni-find-line .tok-moduleKeyword {
+  color: var(--taomni-code-syntax-keyword);
+  font-weight: 500;
+}
+.taomni-find-line .tok-atom,
+.taomni-find-line .tok-bool,
+.taomni-find-line .tok-null,
+.taomni-find-line .tok-literal {
+  color: var(--taomni-code-syntax-atom);
+}
+.taomni-find-line .tok-number {
+  color: var(--taomni-code-syntax-number);
+}
+.taomni-find-line .tok-string,
+.taomni-find-line .tok-string2 {
+  color: var(--taomni-code-syntax-string);
+}
+.taomni-find-line .tok-comment,
+.taomni-find-line .tok-meta,
+.taomni-find-line .tok-lineComment,
+.taomni-find-line .tok-blockComment {
+  color: var(--taomni-code-syntax-comment);
+  font-style: italic;
+}
+.taomni-find-line .tok-variableName,
+.taomni-find-line .tok-variableName2,
+.taomni-find-line .tok-local,
+.taomni-find-line .tok-labelName {
+  color: var(--taomni-code-syntax-variable);
+}
+.taomni-find-line .tok-propertyName,
+.taomni-find-line .tok-attributeName {
+  color: var(--taomni-code-syntax-property);
+}
+.taomni-find-line .tok-typeName,
+.taomni-find-line .tok-className,
+.taomni-find-line .tok-namespace,
+.taomni-find-line .tok-tagName {
+  color: var(--taomni-code-syntax-type);
+}
+.taomni-find-line .tok-definition {
+  color: var(--taomni-code-syntax-function);
+}
+.taomni-find-line .tok-operator,
+.taomni-find-line .tok-compareOperator,
+.taomni-find-line .tok-logicOperator,
+.taomni-find-line .tok-arithmeticOperator,
+.taomni-find-line .tok-bitwiseOperator,
+.taomni-find-line .tok-updateOperator,
+.taomni-find-line .tok-definitionOperator,
+.taomni-find-line .tok-typeOperator,
+.taomni-find-line .tok-controlOperator,
+.taomni-find-line .tok-derefOperator {
+  color: var(--taomni-code-syntax-operator);
+}
+.taomni-find-line .tok-punctuation,
+.taomni-find-line .tok-separator,
+.taomni-find-line .tok-bracket,
+.taomni-find-line .tok-angleBracket,
+.taomni-find-line .tok-squareBracket,
+.taomni-find-line .tok-paren,
+.taomni-find-line .tok-brace {
+  color: var(--taomni-code-syntax-punctuation);
+}
+.taomni-find-line .tok-link,
+.taomni-find-line .tok-url {
+  color: var(--taomni-code-syntax-link);
+}
+.taomni-find-line .tok-heading {
+  color: var(--taomni-code-syntax-heading);
+  font-weight: 600;
+}
+.taomni-find-line .tok-inserted {
+  color: var(--taomni-code-syntax-inserted);
+}
+.taomni-find-line .tok-deleted {
+  color: var(--taomni-code-syntax-deleted);
+}
+.taomni-find-line .tok-invalid {
+  color: var(--taomni-code-syntax-invalid);
 }
 
 /* Vertical side tabs */

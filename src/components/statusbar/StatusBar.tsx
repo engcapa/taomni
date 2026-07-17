@@ -33,7 +33,9 @@ function StatusSegment({
   onClick?: () => void;
   children: ReactNode;
 }) {
-  const className = "flex items-center gap-1 text-[11px] max-w-[220px] truncate"
+  // Primary status text (not muted/slate) so language/LSP labels like "Java"
+  // stay readable on the light status bar background.
+  const className = "flex items-center gap-1 text-[11px] font-medium max-w-[220px] truncate text-[var(--taomni-status-text)]"
     + (onClick ? " rounded px-1 hover:bg-[var(--taomni-hover)] cursor-pointer" : "");
   if (onClick) {
     return (
@@ -217,7 +219,9 @@ export function StatusBar() {
               : "Language unknown · open Language Servers settings"}
             onClick={workspaceActions?.openLanguagePanel}
           >
-            {workspaceStatus.languageId ?? "Plain Text"}
+            <span className="rounded border border-[var(--taomni-divider)] bg-[var(--taomni-card-bg)] px-1.5 py-px text-[var(--taomni-text)]">
+              {workspaceStatus.languageId ?? "Plain Text"}
+            </span>
           </StatusSegment>
           <StatusSegment
             testId="status-bar-workspace-lsp"
@@ -225,11 +229,13 @@ export function StatusBar() {
             onClick={workspaceActions?.openLanguagePanel}
           >
             {dot(workspaceStatus.lspError
-              ? "bg-amber-400"
+              ? "bg-amber-500"
               : workspaceStatus.lspActive
-                ? "bg-emerald-400"
-                : "bg-slate-400")}
-            <span className="truncate">{workspaceStatus.lspLabel ?? (workspaceStatus.lspActive ? "LSP" : "No LSP")}</span>
+                ? "bg-emerald-500"
+                : "bg-slate-500")}
+            <span className="truncate text-[var(--taomni-text)]">
+              {workspaceStatus.lspLabel ?? (workspaceStatus.lspActive ? "LSP" : "No LSP")}
+            </span>
           </StatusSegment>
           {workspaceStatus.gitBranch && (
             <StatusSegment

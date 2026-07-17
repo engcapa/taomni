@@ -98,6 +98,9 @@ describe("StatusBar code-workspace segments", () => {
     expect(screen.getByTestId("status-bar-workspace-git")).toHaveTextContent("↑1");
     expect(screen.getByTestId("status-bar-workspace-git")).toHaveTextContent("↓2");
     expect(screen.getByTestId("status-bar-workspace-zoom")).toHaveTextContent("14px");
+    // Language chip uses primary text tokens so Light theme keeps labels readable.
+    expect(screen.getByTestId("status-bar-workspace-language").innerHTML).toContain("var(--taomni-text)");
+    expect(screen.getByTestId("status-bar-workspace-lsp").innerHTML).toContain("var(--taomni-text)");
 
     fireEvent.click(screen.getByTestId("status-bar-workspace-language"));
     fireEvent.click(screen.getByTestId("status-bar-workspace-git"));

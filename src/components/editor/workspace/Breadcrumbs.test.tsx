@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { LspDocumentSymbol } from "../../../lib/editor/lsp";
-import { Breadcrumbs, symbolChainAtPosition } from "./Breadcrumbs";
+import { Breadcrumbs, collapsedBreadcrumbItems, symbolChainAtPosition } from "./Breadcrumbs";
 
 const symbols: LspDocumentSymbol[] = [
   {
@@ -23,6 +23,21 @@ const symbols: LspDocumentSymbol[] = [
 ];
 
 describe("Breadcrumbs", () => {
+  it("collapses intermediate path and symbol segments for narrow editor panes", () => {
+    const segments = [
+      { label: "repo", path: "", kind: "root" as const },
+      { label: "src", path: "src", kind: "directory" as const },
+      { label: "main", path: "src/main", kind: "directory" as const },
+      { label: "java", path: "src/main/java", kind: "directory" as const },
+      { label: "App.java", path: "src/main/java/App.java", kind: "file" as const },
+    ];
+
+    expect(collapsedBreadcrumbItems(segments, symbols).map((item) => {
+      if (item.type === "collapsed") return "…";
+      return item.type === "symbol" ? item.value.name : item.value.label;
+    })).toEqual(["repo", "…", "java", "App.java", "…", "render"]);
+  });
+
   it("derives the nested symbol chain at the cursor", () => {
     expect(symbolChainAtPosition(symbols, { line: 7, character: 1 }).map((item) => item.name))
       .toEqual(["App", "render"]);

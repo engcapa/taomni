@@ -1,11 +1,15 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   WorkspaceSearchEvent,
   WorkspaceSearchMatch,
 } from "../../../../lib/editor/workspaceSearch";
 import type { CodeWorkspaceRootInfo } from "../../../../types";
-import { FindInFilesPanel, matchSegments } from "./FindInFilesPanel";
+import {
+  DEFAULT_MATCHES_PER_FILE,
+  FindInFilesPanel,
+  matchSegments,
+} from "./FindInFilesPanel";
 
 const searchMocks = vi.hoisted(() => ({
   newWorkspaceSearchId: vi.fn(() => "search-1"),
@@ -65,6 +69,11 @@ describe("FindInFilesPanel", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  beforeEach(() => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
   });
 
   it("subscribes before starting and streams grouped results", async () => {
@@ -98,6 +107,10 @@ describe("FindInFilesPanel", () => {
     expect(screen.getByText("app/src/a.ts")).toBeInTheDocument();
     expect(screen.getByText("app/src/b.ts")).toBeInTheDocument();
     expect(screen.getByText("3 results · 2 files")).toBeInTheDocument();
+    // Keyword hits use the dedicated find-match styling (not plain text-inherit).
+    const hits = screen.getAllByTestId("code-workspace-find-match-hit");
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits[0].className).toContain("find-match-bg");
 
     fireEvent.click(screen.getByRole("button", { name: /12:7/ }));
     expect(onOpenMatch).toHaveBeenCalledWith(searchMatch(), { preview: true });
@@ -155,6 +168,88 @@ describe("FindInFilesPanel", () => {
     expect(screen.getByText("Add a folder to the workspace to search its files")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run search" })).toBeDisabled();
   });
+
+  it("limits visible matches per file and expands on demand", async () => {
+    render(<FindInFilesPanel roots={roots} onOpenMatch={vi.fn()} />);
+    const emit = await runSearch();
+    const many = Array.from({ length: DEFAULT_MATCHES_PER_FILE + 5 }, (_, index) =>
+      searchMatch({
+        lineNumber: index + 1,
+        column: 1,
+        matchStart: 0,
+        matchEnd: 6,
+        lineText: `needle at ${index + 1}`,
+      }),
+    );
+
+    act(() => {
+      emit({ ...doneEvent(), kind: "batch", matches: many });
+      emit(doneEvent({ totalMatches: many.length }));
+    });
+
+    expect(screen.getAllByTestId("code-workspace-find-match-hit")).toHaveLength(DEFAULT_MATCHES_PER_FILE);
+    expect(screen.getByTestId("code-workspace-find-file-count")).toHaveTextContent(
+      `${DEFAULT_MATCHES_PER_FILE}/${many.length}`,
+    );
+    expect(screen.getByTestId("code-workspace-find-show-more")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("code-workspace-find-show-all"));
+    expect(screen.getAllByTestId("code-workspace-find-match-hit")).toHaveLength(many.length);
+    expect(screen.queryByTestId("code-workspace-find-show-more")).not.toBeInTheDocument();
+    expect(screen.getByTestId("code-workspace-find-file-count")).toHaveTextContent(`${many.length}`);
+  });
+
+  it("collapses a file group without dropping the full replace set", async () => {
+    const onReplaceMatches = vi.fn();
+    render(
+      <FindInFilesPanel
+        roots={roots}
+        onOpenMatch={vi.fn()}
+        onReplaceMatches={onReplaceMatches}
+      />,
+    );
+    const emit = await runSearch();
+    const matches = [
+      searchMatch({ lineNumber: 1, lineText: "needle one", matchStart: 0, matchEnd: 6, column: 1 }),
+      searchMatch({ lineNumber: 2, lineText: "needle two", matchStart: 0, matchEnd: 6, column: 1 }),
+      searchMatch({ path: "src/b.ts", lineNumber: 3, lineText: "needle three", matchStart: 0, matchEnd: 6, column: 1 }),
+    ];
+
+    act(() => {
+      emit({ ...doneEvent(), kind: "batch", matches });
+      emit(doneEvent({ totalMatches: matches.length }));
+    });
+
+    expect(screen.getAllByTestId("code-workspace-find-match-hit")).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button", { name: "Collapse app/src/a.ts" }));
+    // Two matches in a.ts are hidden; b.ts remains.
+    expect(screen.getAllByTestId("code-workspace-find-match-hit")).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Replace all matches" }));
+    expect(window.confirm).toHaveBeenCalled();
+    // Replace uses the full result set, not just currently visible rows.
+    expect(onReplaceMatches).toHaveBeenCalledWith(matches, "");
+  });
+
+  it("applies editor-style syntax classes on result lines once the language loads", async () => {
+    render(<FindInFilesPanel roots={roots} onOpenMatch={vi.fn()} />);
+    const emit = await runSearch();
+
+    act(() => {
+      emit({
+        ...doneEvent(),
+        kind: "batch",
+        matches: [searchMatch({ lineText: "const needle = 1;", matchStart: 6, matchEnd: 12, column: 7 })],
+      });
+      emit(doneEvent({ totalMatches: 1 }));
+    });
+
+    await waitFor(() => {
+      const line = document.querySelector(".taomni-find-line");
+      expect(line?.querySelector(".tok-keyword")).toBeTruthy();
+    });
+    expect(screen.getByTestId("code-workspace-find-match-hit")).toHaveTextContent("needle");
+  });
 });
 
 describe("matchSegments", () => {
@@ -164,18 +259,57 @@ describe("matchSegments", () => {
       matchStart: 10,
       matchEnd: 16,
     }));
-    expect(segments).toEqual({ before: "const ", hit: "needle", after: " = 1;" });
+    expect(segments.before).toBe("const ");
+    expect(segments.hit).toBe("needle");
+    expect(segments.after).toBe(" = 1;");
+    expect(segments.elidedStart).toBe(false);
+    expect(segments.elidedEnd).toBe(false);
+    expect(segments.text).toBe("const needle = 1;");
+    expect(segments.hitStart).toBe(6);
+    expect(segments.hitEnd).toBe(12);
   });
 
   it("elides long prefixes ahead of the match", () => {
-    const prefix = "x".repeat(60);
+    const prefix = "x".repeat(80);
     const segments = matchSegments(searchMatch({
       lineText: `${prefix}needle`,
-      matchStart: 60,
-      matchEnd: 66,
+      matchStart: 80,
+      matchEnd: 86,
     }));
-    expect(segments.before).toBe(`…${"x".repeat(24)}`);
+    expect(segments.before.startsWith("…")).toBe(true);
     expect(segments.hit).toBe("needle");
+    expect(segments.elidedStart).toBe(true);
+    // Default CONTEXT_BEFORE_MATCH is 48 when after-side is empty.
+    expect(Array.from(segments.text).length).toBeLessThanOrEqual(120);
+    expect(segments.before).toBe(`…${"x".repeat(48)}`);
+  });
+
+  it("elides long suffixes after the match", () => {
+    const suffix = "y".repeat(100);
+    const segments = matchSegments(searchMatch({
+      lineText: `needle${suffix}`,
+      matchStart: 0,
+      matchEnd: 6,
+    }));
+    expect(segments.hit).toBe("needle");
+    expect(segments.after.endsWith("…")).toBe(true);
+    expect(segments.elidedEnd).toBe(true);
+    expect(Array.from(segments.text).length).toBeLessThanOrEqual(120);
+  });
+
+  it("keeps the full hit when the line is long on both sides", () => {
+    const left = "L".repeat(80);
+    const right = "R".repeat(80);
+    const segments = matchSegments(searchMatch({
+      lineText: `${left}HIT${right}`,
+      matchStart: 80,
+      matchEnd: 83,
+    }));
+    expect(segments.hit).toBe("HIT");
+    expect(segments.elidedStart).toBe(true);
+    expect(segments.elidedEnd).toBe(true);
+    expect(Array.from(segments.text).length).toBeLessThanOrEqual(120);
+    expect(segments.text.includes("HIT")).toBe(true);
   });
 
   it("slices by code points so CJK offsets stay aligned", () => {

@@ -7,12 +7,19 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
+import {
+  Group as PanelGroup,
+  Panel,
+  Separator as PanelResizeHandle,
+  type PanelImperativeHandle,
+  type PanelSize,
+} from "react-resizable-panels";
 import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Braces,
+  ChevronRight,
   GitBranch,
   GitCommitHorizontal,
   ListTree,
@@ -24,7 +31,6 @@ import {
   RotateCcw,
   Save,
   BookOpen,
-  PanelLeft,
   PanelRight,
   Columns2,
   Rows2,
@@ -481,6 +487,8 @@ export function CodeWorkspaceTab({
       languagePanelOpen: typeof open === "function" ? open(prev) : open,
     });
   }, [patchWorkspaceUi, workspaceInstanceId]);
+  const projectPanelRef = useRef<PanelImperativeHandle>(null);
+  const lastProjectPanelSizeRef = useRef(24);
   const setRightPaneOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
     const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).rightPaneOpen;
     patchWorkspaceUi(workspaceInstanceId, { rightPaneOpen: typeof open === "function" ? open(prev) : open });
@@ -3082,6 +3090,33 @@ export function CodeWorkspaceTab({
     setLanguagePanelOpen((open) => !open);
   }, [setLanguagePanelOpen]);
 
+  // Keep the resizable project panel in sync with the persisted open flag.
+  // Drag-to-min collapses via onResize; toolbar / Alt+1 toggles go through this effect.
+  useEffect(() => {
+    const panel = projectPanelRef.current;
+    if (!panel) return;
+    const frame = requestAnimationFrame(() => {
+      if (!languagePanelOpen) {
+        panel.collapse();
+      } else {
+        panel.resize(`${lastProjectPanelSizeRef.current}%`);
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [languagePanelOpen]);
+
+  const handleProjectPanelResize = useCallback((size: PanelSize) => {
+    const percentage = size.asPercentage;
+    if (percentage > 2) {
+      lastProjectPanelSizeRef.current = percentage;
+    }
+    // Avoid store churn when the panel is already in the desired open/collapsed state.
+    setLanguagePanelOpen((open) => {
+      const next = percentage > 2;
+      return open === next ? open : next;
+    });
+  }, [setLanguagePanelOpen]);
+
   const toggleOutlinePane = useCallback(() => {
     if (rightPaneOpen && rightPaneTab === "outline") {
       setRightPaneOpen(false);
@@ -4320,13 +4355,8 @@ export function CodeWorkspaceTab({
           </span>
         )}
         <div className="flex-1" />
-        <IconButton
-          label={languagePanelOpen ? "Hide project tree" : "Show project tree"}
-          testId="code-workspace-project-tree-toggle"
-          icon={<PanelLeft className="w-3.5 h-3.5" />}
-          active={languagePanelOpen}
-          onClick={() => executeWorkspaceCommand("workspace.toggleProjectTree")}
-        />
+        {/* Project tree collapse lives on the tree toolbar / collapsed rail — avoid a
+            second top-bar toggle that duplicates the panel-local control. */}
         <IconButton
           label="Back"
           testId="code-workspace-nav-back"
@@ -4440,19 +4470,49 @@ export function CodeWorkspaceTab({
         />
       </header>
 
-      <PanelGroup
-        orientation="horizontal"
-        id={`code-workspace-${workspaceInstanceId}`}
-        className="flex-1 min-h-0"
-      >
-        {languagePanelOpen && (
-          <>
-            <Panel
-              id="project"
-              defaultSize="24%"
-              minSize="12%"
-              maxSize="45%"
-              className="min-w-0"
+      <div className="flex-1 min-h-0 flex">
+        {!languagePanelOpen && (
+          <div
+            data-testid="code-workspace-project-collapsed-rail"
+            className="h-full w-7 shrink-0 flex flex-col items-center border-r border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]"
+          >
+            <button
+              type="button"
+              data-testid="code-workspace-project-expand"
+              title="Show project tree"
+              aria-label="Show project tree"
+              className="mt-1 h-7 w-7 inline-flex items-center justify-center rounded text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
+              onClick={toggleProjectTree}
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+            <span
+              className="mt-2 text-[10px] font-medium tracking-wide text-[var(--taomni-code-muted)]"
+              style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+            >
+              Explorer
+            </span>
+          </div>
+        )}
+        <PanelGroup
+          orientation="horizontal"
+          id={`code-workspace-${workspaceInstanceId}`}
+          className="flex-1 min-h-0 min-w-0"
+        >
+          <Panel
+            panelRef={projectPanelRef}
+            id="project"
+            defaultSize="24%"
+            minSize="12%"
+            maxSize="45%"
+            collapsible
+            collapsedSize={0}
+            onResize={handleProjectPanelResize}
+            className="min-w-0"
+          >
+            <div
+              className="h-full min-h-0 overflow-hidden"
+              style={languagePanelOpen ? undefined : { display: "none" }}
             >
               <FileTreePane
                 paneRef={treePaneRef}
@@ -4467,6 +4527,8 @@ export function CodeWorkspaceTab({
                 maxFontSize={CODE_WORKSPACE_MAX_TREE_FONT_SIZE}
                 defaultFontSize={CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE}
                 onFontSizeChange={setTreeFontSize}
+                collapsed={!languagePanelOpen}
+                onToggleCollapse={toggleProjectTree}
                 onOpenFile={() => executeWorkspaceCommand("workspace.tree.openLooseFile", { focus: "tree" })}
                 onAddFolder={() => executeWorkspaceCommand("workspace.tree.addFolder", { focus: "tree" })}
                 canCreate={!!selectedRootDirectory}
@@ -4497,23 +4559,24 @@ export function CodeWorkspaceTab({
                   onContextMenu={showTreeContextMenu}
                 />
               </FileTreePane>
-            </Panel>
-            <PanelResizeHandle
-              data-testid="code-workspace-project-resize-handle"
-              className="w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"
-            />
-          </>
-        )}
-        <Panel
-          id="editor"
-          defaultSize={
-            !languagePanelOpen
-              ? (rightPaneOpen ? "80%" : "100%")
-              : (rightPaneOpen ? "56%" : "76%")
-          }
-          minSize={languagePanelOpen ? "35%" : "50%"}
-          className="min-w-0"
-        >
+            </div>
+          </Panel>
+          <PanelResizeHandle
+            data-testid="code-workspace-project-resize-handle"
+            className={languagePanelOpen
+              ? "w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"
+              : "hidden"}
+          />
+          <Panel
+            id="editor"
+            defaultSize={
+              !languagePanelOpen
+                ? (rightPaneOpen ? "80%" : "100%")
+                : (rightPaneOpen ? "56%" : "76%")
+            }
+            minSize={languagePanelOpen ? "35%" : "50%"}
+            className="min-w-0"
+          >
           {splitOrientation ? (
             <div data-testid="code-workspace-editor-split" className="h-full min-h-0">
               <PanelGroup
@@ -4610,6 +4673,7 @@ export function CodeWorkspaceTab({
           </>
         )}
       </PanelGroup>
+      </div>
       <BottomDock
         open={bottomDockOpen}
         activeTab={bottomDockTab}

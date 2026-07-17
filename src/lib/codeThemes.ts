@@ -14,6 +14,7 @@ export const CODE_THEME_COLOR_VARS = [
   "--taomni-code-active-line-bg", "--taomni-code-active-line-gutter-bg",
   "--taomni-code-selection-bg", "--taomni-code-selection-text",
   "--taomni-code-selection-match-bg", "--taomni-code-selection-match-border",
+  "--taomni-code-find-match-bg", "--taomni-code-find-match-fg", "--taomni-code-find-match-border",
   "--taomni-code-caret", "--taomni-code-bracket-match-bg", "--taomni-code-bracket-match-border",
   "--taomni-code-bracket-error-bg", "--taomni-code-tooltip-bg",
   "--taomni-code-scrollbar-track", "--taomni-code-scrollbar-thumb",
@@ -99,6 +100,10 @@ export function codeThemeVariablesFromPalette(p: CodeThemePalette): CodeThemeVar
     "--taomni-code-selection-text": fg,
     "--taomni-code-selection-match-bg": mix(p.number, 22, "transparent"),
     "--taomni-code-selection-match-border": mix(p.number, 52, "transparent"),
+    // Find-in-Files keyword hit: stronger than editor selection-match so list rows scan fast.
+    "--taomni-code-find-match-bg": mix(p.number, dark ? 48 : 38, "transparent"),
+    "--taomni-code-find-match-fg": dark ? "#fff8e7" : mix(p.number, 18, "#1a0b00"),
+    "--taomni-code-find-match-border": mix(p.number, dark ? 72 : 62, "transparent"),
     "--taomni-code-caret": p.cursor ?? fg,
     "--taomni-code-bracket-match-bg": mix(green, 24, "transparent"),
     "--taomni-code-bracket-match-border": mix(green, 44, "transparent"),
