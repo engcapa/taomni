@@ -60,6 +60,14 @@ export const LSP_COMMAND_PREFS_KEY = "taomni.codeWorkspace.lspCommandPrefs.v1";
 export const LSP_CUSTOM_COMMANDS_KEY = "taomni.codeWorkspace.lspCustomCommands.v1";
 /** Absolute JDK home or `java`/`java.exe` path used to launch Eclipse JDT LS (needs 21+). */
 export const LSP_JAVA_HOME_KEY = "taomni.codeWorkspace.lspJavaHome.v1";
+/**
+ * Free-form jdtls JVM args (space-separated), e.g. `-Xmx2G -XX:+UseG1GC`.
+ * Empty → [`DEFAULT_LSP_JAVA_VMARGS`].
+ */
+export const LSP_JAVA_VMARGS_KEY = "taomni.codeWorkspace.lspJavaVmargs.v1";
+/** Legacy heap-only key; migrated into vmargs on first read. */
+export const LSP_JAVA_HEAP_MB_KEY = "taomni.codeWorkspace.lspJavaHeapMb.v1";
+export const DEFAULT_LSP_JAVA_VMARGS = "-Xms1024m -Xmx1024m";
 export const CUSTOM_LSP_COMMAND_ID = "__custom__";
 export const TREE_FONT_SIZE_KEY = "taomni.codeWorkspace.treeFontSize.v1";
 export const TREE_VIEW_MODE_KEY = "taomni.codeWorkspace.treeViewMode.v1";
@@ -628,6 +636,8 @@ export function subscribeLspServerPrefs(listener: () => void): () => void {
       && event.key !== LSP_COMMAND_PREFS_KEY
       && event.key !== LSP_CUSTOM_COMMANDS_KEY
       && event.key !== LSP_JAVA_HOME_KEY
+      && event.key !== LSP_JAVA_VMARGS_KEY
+      && event.key !== LSP_JAVA_HEAP_MB_KEY
     ) {
       return;
     }
@@ -707,6 +717,65 @@ export function writeLspJavaHome(javaHome: string): void {
     // Ignore storage failures.
   }
   emitLspPrefsChanged();
+}
+
+/** Normalize free-form jdtls JVM args; empty → null (use default). */
+export function normalizeLspJavaVmargs(raw: string | null | undefined): string | null {
+  if (raw === null || raw === undefined) return null;
+  const trimmed = raw.replace(/\s+/g, " ").trim();
+  return trimmed || null;
+}
+
+/**
+ * Effective jdtls JVM args string.
+ * Migrates the legacy heap-MB setting once into vmargs if present.
+ */
+export function readLspJavaVmargs(): string {
+  try {
+    const stored = normalizeLspJavaVmargs(window.localStorage.getItem(LSP_JAVA_VMARGS_KEY));
+    if (stored) return stored;
+
+    // One-shot migration from the short-lived heap-only preference.
+    const legacyHeap = window.localStorage.getItem(LSP_JAVA_HEAP_MB_KEY);
+    if (legacyHeap) {
+      const mb = Number(legacyHeap.trim());
+      if (Number.isFinite(mb) && mb > 0) {
+        const clamped = Math.min(32768, Math.max(256, Math.round(mb)));
+        const migrated = `-Xms${clamped}m -Xmx${clamped}m`;
+        try {
+          window.localStorage.setItem(LSP_JAVA_VMARGS_KEY, migrated);
+          window.localStorage.removeItem(LSP_JAVA_HEAP_MB_KEY);
+        } catch {
+          // Ignore storage failures; still return migrated value for this session.
+        }
+        return migrated;
+      }
+    }
+    return DEFAULT_LSP_JAVA_VMARGS;
+  } catch {
+    return DEFAULT_LSP_JAVA_VMARGS;
+  }
+}
+
+/**
+ * Persist jdtls JVM args. Empty/null clears to the default 1G heap pair.
+ * Returns the effective string after normalize.
+ */
+export function writeLspJavaVmargs(vmargs: string | null | undefined): string {
+  const normalized = normalizeLspJavaVmargs(vmargs);
+  try {
+    if (normalized === null) {
+      window.localStorage.removeItem(LSP_JAVA_VMARGS_KEY);
+    } else {
+      window.localStorage.setItem(LSP_JAVA_VMARGS_KEY, normalized);
+    }
+    // Drop legacy key once the user manages vmargs explicitly.
+    window.localStorage.removeItem(LSP_JAVA_HEAP_MB_KEY);
+  } catch {
+    // Ignore storage failures.
+  }
+  emitLspPrefsChanged();
+  return normalized ?? DEFAULT_LSP_JAVA_VMARGS;
 }
 
 export function splitCommandArgs(value: string): string[] {

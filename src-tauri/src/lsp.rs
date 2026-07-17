@@ -20,6 +20,8 @@ const JDTLS_INITIALIZE_TIMEOUT_SECS: u64 = 120;
 /// Current Eclipse JDT LS (snapshot/milestones) requires a modern JDK; the
 /// upstream `jdtls.py` launcher refuses anything below this major version.
 const JDTLS_MIN_JAVA_MAJOR: u32 = 21;
+/// Default jdtls JVM args when Settings has no override (matches prior 1G heap).
+const DEFAULT_JDTLS_VMARGS: &str = "-Xms1024m -Xmx1024m";
 const SHUTDOWN_TIMEOUT_SECS: u64 = 3;
 const EXIT_TIMEOUT_SECS: u64 = 2;
 const COMMAND_AVAILABILITY_TTL: Duration = Duration::from_secs(30);
@@ -443,6 +445,9 @@ static COMMAND_AVAILABILITY_CACHE: OnceLock<StdMutex<HashMap<String, CachedComma
 /// Prefer this over auto-detected JAVA_HOME/PATH so GUI-launched Taomni can use
 /// a JDK that is not on the process environment (common on Windows).
 static CONFIGURED_JAVA_HOME: OnceLock<StdMutex<Option<PathBuf>>> = OnceLock::new();
+
+/// User-configured jdtls JVM args (space-separated). `None` / empty → [`DEFAULT_JDTLS_VMARGS`].
+static CONFIGURED_JAVA_VMARGS: OnceLock<StdMutex<Option<String>>> = OnceLock::new();
 
 #[derive(Clone, Debug)]
 struct SemanticTokensCache {
@@ -920,6 +925,11 @@ impl LspSession {
             && let Some(home) = java_home_from_binary(&java)
         {
             process.env("JAVA_HOME", home);
+        }
+        // Non-Windows launches the `jdtls` wrapper; inject JVM args via JAVA_OPTS
+        // so the script's JVM picks up Settings → Language Servers vmargs.
+        if command_is_jdtls(&command) {
+            apply_jdtls_vmargs_to_command(&mut process);
         }
         process
             .current_dir(&root_path)
@@ -1480,8 +1490,10 @@ fn build_jdtls_java_command(
     cmd.arg("-Dosgi.sharedConfiguration.area.readOnly=true");
     cmd.arg("-Dosgi.configuration.cascaded=true");
     cmd.arg("-Dlog.level=ERROR");
-    cmd.arg("-Xms1G");
-    cmd.arg("-Xmx1G");
+    // User/default vmargs (heap, GC, extra -D…, etc.) between product props and JPMS.
+    for arg in jdtls_vmargs() {
+        cmd.arg(arg);
+    }
     cmd.arg("--add-modules=ALL-SYSTEM");
     cmd.arg("--add-opens");
     cmd.arg("java.base/java.util=ALL-UNNAMED");
@@ -1560,6 +1572,82 @@ fn find_equinox_launcher(jdtls_home: &Path) -> Option<PathBuf> {
         .collect();
     matches.sort();
     matches.pop()
+}
+
+fn configured_java_vmargs_lock() -> &'static StdMutex<Option<String>> {
+    CONFIGURED_JAVA_VMARGS.get_or_init(|| StdMutex::new(None))
+}
+
+fn set_configured_java_vmargs(vmargs: Option<&str>) {
+    let normalized = vmargs
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+    if let Ok(mut guard) = configured_java_vmargs_lock().lock() {
+        *guard = normalized;
+    }
+}
+
+fn get_configured_java_vmargs() -> Option<String> {
+    configured_java_vmargs_lock()
+        .lock()
+        .ok()
+        .and_then(|guard| guard.clone())
+}
+
+/// Effective jdtls JVM args string (Settings override or default 1G heap).
+fn jdtls_vmargs_string() -> String {
+    get_configured_java_vmargs().unwrap_or_else(|| DEFAULT_JDTLS_VMARGS.to_string())
+}
+
+/// Split JVM arg strings with simple shell-style quoting (spaces, "…", '…').
+fn split_jvm_args(raw: &str) -> Vec<String> {
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut quote: Option<char> = None;
+    let mut escaped = false;
+    for ch in raw.chars() {
+        if escaped {
+            current.push(ch);
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' && quote != Some('\'') {
+            escaped = true;
+            continue;
+        }
+        if let Some(q) = quote {
+            if ch == q {
+                quote = None;
+            } else {
+                current.push(ch);
+            }
+            continue;
+        }
+        match ch {
+            '"' | '\'' => quote = Some(ch),
+            c if c.is_whitespace() => {
+                if !current.is_empty() {
+                    args.push(std::mem::take(&mut current));
+                }
+            }
+            _ => current.push(ch),
+        }
+    }
+    if !current.is_empty() {
+        args.push(current);
+    }
+    args
+}
+
+fn jdtls_vmargs() -> Vec<String> {
+    split_jvm_args(&jdtls_vmargs_string())
+}
+
+/// Apply Settings JVM args as JAVA_OPTS for the jdtls wrapper (Linux/macOS).
+/// Settings win over a parent-shell JAVA_OPTS so heap/GC overrides are not ignored.
+fn apply_jdtls_vmargs_to_command(cmd: &mut Command) {
+    cmd.env("JAVA_OPTS", jdtls_vmargs_string());
 }
 
 fn configured_java_home_lock() -> &'static StdMutex<Option<PathBuf>> {
@@ -2037,6 +2125,15 @@ pub fn lsp_list_presets() -> Vec<LspServerPreset> {
 pub fn lsp_set_java_home(java_home: Option<String>) -> Result<(), String> {
     set_configured_java_home(java_home.as_deref());
     Ok(())
+}
+
+/// Persist Settings-configured jdtls JVM args (e.g. `-Xmx2G -XX:+UseG1GC`).
+/// Null/empty restores the default (`-Xms1024m -Xmx1024m`). Takes effect on the
+/// next jdtls process start (workspace restart).
+#[tauri::command]
+pub fn lsp_set_java_vmargs(vmargs: Option<String>) -> Result<String, String> {
+    set_configured_java_vmargs(vmargs.as_deref());
+    Ok(jdtls_vmargs_string())
 }
 
 #[tauri::command]
@@ -5476,6 +5573,46 @@ Java(TM) SE Runtime Environment (build 17.0.4+11-LTS-179)
 
         set_configured_java_home(None);
         assert!(get_configured_java_home().is_none());
+    }
+
+    #[test]
+    fn configured_java_vmargs_defaults_and_round_trips() {
+        set_configured_java_vmargs(None);
+        assert_eq!(jdtls_vmargs_string(), DEFAULT_JDTLS_VMARGS);
+        assert!(get_configured_java_vmargs().is_none());
+
+        set_configured_java_vmargs(Some("   "));
+        assert_eq!(jdtls_vmargs_string(), DEFAULT_JDTLS_VMARGS);
+
+        set_configured_java_vmargs(Some("-Xmx2G -XX:+UseG1GC -Dfoo=bar"));
+        assert_eq!(
+            jdtls_vmargs_string(),
+            "-Xmx2G -XX:+UseG1GC -Dfoo=bar"
+        );
+        assert_eq!(
+            jdtls_vmargs(),
+            vec![
+                "-Xmx2G".to_string(),
+                "-XX:+UseG1GC".to_string(),
+                "-Dfoo=bar".to_string(),
+            ]
+        );
+
+        set_configured_java_vmargs(None);
+        assert_eq!(jdtls_vmargs_string(), DEFAULT_JDTLS_VMARGS);
+    }
+
+    #[test]
+    fn split_jvm_args_honors_quotes() {
+        let args = split_jvm_args(r#"-Xmx2G -Dpath="/opt/my jdk" -Dname='a b'"#);
+        assert_eq!(
+            args,
+            vec![
+                "-Xmx2G".to_string(),
+                "-Dpath=/opt/my jdk".to_string(),
+                "-Dname=a b".to_string(),
+            ]
+        );
     }
 
     #[test]

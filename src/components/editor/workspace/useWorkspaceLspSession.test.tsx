@@ -8,6 +8,7 @@ import { useWorkspaceLspSession } from "./useWorkspaceLspSession";
 const lspMocks = vi.hoisted(() => ({
   lspDetectServers: vi.fn(),
   lspSetJavaHome: vi.fn(),
+  lspSetJavaVmargs: vi.fn(),
   lspOpenDocument: vi.fn(),
   lspChangeDocument: vi.fn(),
   lspSaveDocument: vi.fn(),
@@ -91,6 +92,7 @@ describe("useWorkspaceLspSession", () => {
     window.localStorage.clear();
     lspMocks.lspDetectServers.mockReset().mockResolvedValue([]);
     lspMocks.lspSetJavaHome.mockReset().mockResolvedValue(undefined);
+    lspMocks.lspSetJavaVmargs.mockReset().mockResolvedValue("-Xms1024m -Xmx1024m");
     lspMocks.lspOpenDocument.mockReset().mockResolvedValue(status);
     lspMocks.lspChangeDocument.mockReset().mockResolvedValue(status);
     lspMocks.lspSaveDocument.mockReset().mockResolvedValue(status);
@@ -277,5 +279,105 @@ describe("useWorkspaceLspSession", () => {
     expect(lspMocks.lspChangeDocument.mock.calls[0]?.[1]).toBeNull();
     expect(lspMocks.lspChangeDocument.mock.calls[1]?.[1]).toBe(edited.text);
     expect(lspFiles[file.key]?.syncedText).toBe(edited.text);
+  });
+
+  it("does not flip syncing on active didChange so the status pill does not spin per key", async () => {
+    let resolveChange!: (value: LspDocumentStatus) => void;
+    lspMocks.lspOpenDocument.mockResolvedValue(status);
+    lspMocks.lspChangeDocument.mockImplementation(() => new Promise<LspDocumentStatus>((resolve) => {
+      resolveChange = resolve;
+    }));
+    const edited = { ...file, text: "const value = 2;", dirty: true };
+    const openFilesRef: { current: Record<string, OpenFileState> } = {
+      current: { [file.key]: file },
+    };
+    let lspFiles: Record<string, LspFileState> = {};
+    const updateLspFiles = vi.fn((updater: Record<string, LspFileState> | ((current: Record<string, LspFileState>) => Record<string, LspFileState>)) => {
+      lspFiles = typeof updater === "function" ? updater(lspFiles) : updater;
+    });
+    const { result } = renderHook(() => useWorkspaceLspSession({
+      workspaceInstanceId: "workspace-1",
+      roots,
+      openFilesRef,
+      updateLspFiles,
+      onError: vi.fn(),
+    }));
+
+    await act(async () => result.current.syncDocument(file, "open"));
+    expect(lspFiles[file.key]?.syncing).toBe(false);
+    const publishesAfterOpen = updateLspFiles.mock.calls.length;
+
+    openFilesRef.current[file.key] = edited;
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.syncDocument(edited, "change");
+    });
+    // Busy flag stays false while an already-active document is syncing.
+    expect(lspFiles[file.key]?.syncing).toBe(false);
+    expect(result.current.isDocumentSynced(file.key, edited.text)).toBe(false);
+
+    await act(async () => {
+      resolveChange(status);
+      await pending;
+    });
+    expect(lspFiles[file.key]?.syncing).toBe(false);
+    expect(lspFiles[file.key]?.syncedText).toBe(edited.text);
+    expect(result.current.isDocumentSynced(file.key, edited.text)).toBe(true);
+    // At least one publish for the drained change (syncedText).
+    expect(updateLspFiles.mock.calls.length).toBeGreaterThan(publishesAfterOpen);
+  });
+
+  it("skips intermediate store publishes while a typing burst is still queued", async () => {
+    let resolveFirstChange!: (value: LspDocumentStatus) => void;
+    lspMocks.lspOpenDocument.mockResolvedValue(status);
+    lspMocks.lspChangeDocument
+      .mockImplementationOnce(() => new Promise<LspDocumentStatus>((resolve) => {
+        resolveFirstChange = resolve;
+      }))
+      .mockResolvedValue(status);
+    const first = { ...file, text: "const value = 2;", dirty: true };
+    const second = { ...file, text: "const value = 3;", dirty: true };
+    const openFilesRef: { current: Record<string, OpenFileState> } = {
+      current: { [file.key]: file },
+    };
+    let lspFiles: Record<string, LspFileState> = {};
+    const updateLspFiles = vi.fn((updater: Record<string, LspFileState> | ((current: Record<string, LspFileState>) => Record<string, LspFileState>)) => {
+      lspFiles = typeof updater === "function" ? updater(lspFiles) : updater;
+    });
+    const { result } = renderHook(() => useWorkspaceLspSession({
+      workspaceInstanceId: "workspace-1",
+      roots,
+      openFilesRef,
+      updateLspFiles,
+      onError: vi.fn(),
+    }));
+
+    await act(async () => result.current.syncDocument(file, "open"));
+    const publishesAfterOpen = updateLspFiles.mock.calls.length;
+
+    openFilesRef.current[file.key] = first;
+    let firstSync!: Promise<void>;
+    act(() => {
+      firstSync = result.current.syncDocument(first, "change");
+    });
+    openFilesRef.current[file.key] = second;
+    await act(async () => {
+      await result.current.syncDocument(second, "change");
+    });
+
+    // First change still in flight with a pending follow-up — no mid-burst
+    // publish beyond the open lifecycle.
+    const midBurstPublishes = updateLspFiles.mock.calls.length - publishesAfterOpen;
+    expect(midBurstPublishes).toBe(0);
+    expect(lspFiles[file.key]?.syncedText).toBe(file.text);
+
+    await act(async () => {
+      resolveFirstChange(status);
+      await firstSync;
+    });
+    expect(lspMocks.lspChangeDocument).toHaveBeenCalledTimes(2);
+    expect(lspFiles[file.key]?.syncedText).toBe(second.text);
+    expect(lspFiles[file.key]?.syncing).toBe(false);
+    expect(result.current.isDocumentSynced(file.key, second.text)).toBe(true);
   });
 });

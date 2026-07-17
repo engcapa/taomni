@@ -797,6 +797,7 @@ export function CodeWorkspaceTab({
   const runPanelRef = useRef<RunPanelHandle | null>(null);
   const {
     descriptorForFile: lspDescriptorForFile,
+    isDocumentSynced: isLspDocumentSynced,
     syncDocument: syncLspDocument,
     saveDocument: saveLspDocument,
     closeDocument: closeLspDocument,
@@ -1689,11 +1690,13 @@ export function CodeWorkspaceTab({
       const latest = openFilesRef.current[key];
       if (!latest || latest.loading) return;
       const lspState = lspFilesRef.current[key];
-      if (lspState?.syncedText === latest.text && lspState.status) return;
+      // Prefer the session's live syncedTextRef (not store-lagged syncedText)
+      // so mid-burst didChange skips do not re-fire redundant syncs.
+      if (lspState?.status && isLspDocumentSynced(key, latest.text)) return;
       const mode: "open" | "change" = lspState?.status ? "change" : "open";
       void syncLspDocument(latest, mode);
     }, LSP_CHANGE_SYNC_DELAY_MS);
-  }, [syncLspDocument]);
+  }, [isLspDocumentSynced, syncLspDocument]);
 
   const cancelLiveLspSync = useCallback((key: string) => {
     const existing = liveLspSyncTimersRef.current[key];
@@ -1713,7 +1716,7 @@ export function CodeWorkspaceTab({
       const latest = openFilesRef.current[fileKey];
       if (!latest || latest.loading) return null;
       const state = lspFilesRef.current[fileKey];
-      if (state?.status && !state.syncing && state.syncedText === latest.text) {
+      if (state?.status && isLspDocumentSynced(fileKey, latest.text)) {
         return latest;
       }
       const mode: "open" | "change" = state?.status ? "change" : "open";
@@ -1738,7 +1741,7 @@ export function CodeWorkspaceTab({
     const latest = openFilesRef.current[fileKey];
     if (latest && lspFilesRef.current[fileKey]?.status?.active) return latest;
     return null;
-  }, [cancelLiveLspSync, syncLspDocument]);
+  }, [cancelLiveLspSync, isLspDocumentSynced, syncLspDocument]);
 
   const queueEditorTextUpdate = useCallback((key: string, text: string) => {
     const file = openFilesRef.current[key];
@@ -2228,8 +2231,11 @@ export function CodeWorkspaceTab({
     activeFile
     && !activeFile.loading
     && activeLspState?.status
+    // Store-backed fields re-render after the didChange queue drains; the
+    // session helper also covers the silent mid-burst path.
     && !activeLspState.syncing
-    && activeLspState.syncedText === activeFile.text,
+    && (activeLspState.syncedText === activeFile.text
+      || isLspDocumentSynced(activeFile.key, activeFile.text)),
   );
 
   // The backend is responsible for serializing didOpen/didChange calls, but
@@ -2243,12 +2249,10 @@ export function CodeWorkspaceTab({
 
   const isCurrentLspDocumentRequest = useCallback((file: OpenFileState, epoch: number) => {
     const latestFile = openFilesRef.current[file.key];
-    const lspState = lspFilesRef.current[file.key];
     return latestFile?.text === file.text
       && lspDocumentEpochRef.current[file.key] === epoch
-      && lspState?.syncedText === file.text
-      && !lspState.syncing;
-  }, []);
+      && isLspDocumentSynced(file.key, file.text);
+  }, [isLspDocumentSynced]);
 
   const openHierarchy = useCallback(async (mode: "call" | "type") => {
     const file = activeFile;
@@ -2343,14 +2347,14 @@ export function CodeWorkspaceTab({
   useEffect(() => {
     if (!visible || !activeFile || activeFile.loading) return;
     const lspState = lspFilesRef.current[activeFile.key];
-    if (lspState?.syncedText === activeFile.text && lspState.status) return;
+    if (lspState?.status && isLspDocumentSynced(activeFile.key, activeFile.text)) return;
     const mode: "open" | "change" = lspState?.status ? "change" : "open";
     const timer = window.setTimeout(() => {
       const latest = openFilesRef.current[activeFile.key];
       if (latest) void syncLspDocument(latest, mode);
     }, mode === "open" ? 0 : LSP_CHANGE_SYNC_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [activeFile, syncLspDocument, visible]);
+  }, [activeFile, isLspDocumentSynced, syncLspDocument, visible]);
 
   useEffect(() => {
     const groupId = activeEditorGroupId;
