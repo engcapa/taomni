@@ -58,11 +58,17 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
   },
   {
     id: "language-servers",
-    titleKeys: ["settings.languageServersTitle", "settings.languageServersSubtitle"],
+    titleKeys: [
+      "settings.languageServersTitle",
+      "settings.languageServersSubtitle",
+      "settings.languageServersJavaHome",
+    ],
     terms: [
       "language server", "lsp", "jdtls", "rust-analyzer", "gopls", "clangd", "pyright",
       "install", "language intelligence", "code intelligence",
+      "java", "jdk", "java 21", "java home", "runtime",
       "语言服务器", "语言智能", "安装", "补全", "代码智能",
+      "java", "jdk", "java21", "运行时", "java路径",
     ],
   },
   {

@@ -7,12 +7,19 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
+import {
+  Group as PanelGroup,
+  Panel,
+  Separator as PanelResizeHandle,
+  type PanelImperativeHandle,
+  type PanelSize,
+} from "react-resizable-panels";
 import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Braces,
+  ChevronRight,
   GitBranch,
   GitCommitHorizontal,
   ListTree,
@@ -24,7 +31,6 @@ import {
   RotateCcw,
   Save,
   BookOpen,
-  PanelLeft,
   PanelRight,
   Columns2,
   Rows2,
@@ -36,6 +42,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import {
+  workspaceListDir,
   workspaceReadFile,
   workspaceReadLooseFile,
   workspaceWriteFile,
@@ -310,6 +317,7 @@ import {
   resolveLooseMarkdownLink,
   resolveRootMarkdownLink,
   rootDirKey,
+  shouldHideEntry,
   workspacePathForGitPath,
   workspaceTitle,
   writeCodeWorkspaceTreeFontSize,
@@ -320,7 +328,12 @@ import { useWorkspaceLspSession } from "./workspace/useWorkspaceLspSession";
 import { useWorkspaceGitSnapshots } from "./workspace/useWorkspaceGitSnapshots";
 import { useWorkspaceNavigation } from "./workspace/useWorkspaceNavigation";
 import { useWorkspaceFileActions } from "./workspace/useWorkspaceFileActions";
-import { Breadcrumbs, type BreadcrumbPathSegment } from "./workspace/Breadcrumbs";
+import {
+  Breadcrumbs,
+  type BreadcrumbPathAction,
+  type BreadcrumbPathChild,
+  type BreadcrumbPathSegment,
+} from "./workspace/Breadcrumbs";
 import {
   TerminalDockPanel,
   type TerminalDockHandle,
@@ -486,6 +499,8 @@ export function CodeWorkspaceTab({
       languagePanelOpen: typeof open === "function" ? open(prev) : open,
     });
   }, [patchWorkspaceUi, workspaceInstanceId]);
+  const projectPanelRef = useRef<PanelImperativeHandle>(null);
+  const lastProjectPanelSizeRef = useRef(24);
   const setRightPaneOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
     const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).rightPaneOpen;
     patchWorkspaceUi(workspaceInstanceId, { rightPaneOpen: typeof open === "function" ? open(prev) : open });
@@ -1320,6 +1335,171 @@ export function CodeWorkspaceTab({
       .then(() => setStatusMessage(`Opened ${absolute}`))
       .catch((err) => setStatusMessage(errorMessage(err)));
   }, [revealInExplorer, setStatusMessage]);
+
+  /**
+   * IDEA-style breadcrumb: list children of a directory/root segment, or siblings
+   * when the file segment is clicked. Marks the trail's next segment as active.
+   */
+  const loadBreadcrumbPathChildren = useCallback(async (
+    segment: BreadcrumbPathSegment,
+    file: OpenFileState,
+    trail: BreadcrumbPathSegment[],
+  ): Promise<BreadcrumbPathChild[]> => {
+    const segmentIndex = trail.findIndex((item) =>
+      item.path === segment.path && item.kind === segment.kind && item.label === segment.label
+    );
+    const nextSegment = segmentIndex >= 0 ? trail[segmentIndex + 1] ?? null : null;
+    const activeChildPath = nextSegment && nextSegment.kind !== "root" ? nextSegment.path : null;
+
+    const toChildren = (
+      entries: Array<{ name: string; path: string; fileType: string; isHidden?: boolean }>,
+      pathOf: (entry: { name: string; path: string }) => string,
+    ): BreadcrumbPathChild[] => entries
+      .filter((entry) => entry.fileType === "file" || entry.fileType === "dir")
+      .filter((entry) => !shouldHideEntry({
+        name: entry.name,
+        path: entry.path,
+        fileType: entry.fileType as "file" | "dir" | "symlink" | "other",
+        size: 0,
+        mtime: 0,
+        isHidden: entry.isHidden ?? false,
+      }))
+      .map((entry) => {
+        const path = pathOf(entry);
+        const kind = entry.fileType === "dir" ? "directory" as const : "file" as const;
+        return {
+          label: entry.name,
+          path,
+          kind,
+          active: activeChildPath === path,
+        };
+      });
+
+    if (file.ref.kind === "root") {
+      const rootId = file.ref.rootId;
+      const root = rootsRef.current.find((item) => item.id === rootId);
+      if (!root) return [];
+      // File segment → siblings in parent; directory/root → children of that path.
+      const listPath = segment.kind === "file" ? parentPath(segment.path) : segment.path;
+      void loadDir(rootId, listPath);
+      const entries = await workspaceListDir(root.path, listPath);
+      return toChildren(entries, (entry) => entry.path);
+    }
+
+    // Loose file: list an absolute directory via workspace_list_dir(dir, "").
+    const absolute = normalizeFsPath(segment.path);
+    const dirToList = segment.kind === "file" ? parentPath(absolute) : absolute;
+    if (!dirToList) return [];
+    const entries = await workspaceListDir(dirToList, "");
+    return toChildren(entries, (entry) =>
+      normalizeFsPath(`${dirToList.replace(/[/\\]+$/, "")}/${entry.name}`)
+    );
+  }, [loadDir]);
+
+  const navigateBreadcrumbPathChild = useCallback((
+    child: BreadcrumbPathChild,
+    file: OpenFileState,
+  ) => {
+    if (file.ref.kind === "root") {
+      const rootId = file.ref.rootId;
+      if (child.kind === "directory") {
+        setSelected({ kind: "dir", rootId, path: child.path });
+        setExpandedRoots((current) => new Set(current).add(rootId));
+        setExpandedDirs((current) => {
+          const next = new Set(current);
+          let acc = "";
+          for (const part of child.path.split("/").filter(Boolean)) {
+            acc = acc ? `${acc}/${part}` : part;
+            next.add(rootDirKey(rootId, acc));
+          }
+          return next;
+        });
+        void loadDir(rootId, child.path);
+        treePaneRef.current?.focus();
+        return;
+      }
+      void openFile({ kind: "root", rootId, path: child.path });
+      return;
+    }
+    // Loose file sibling/parent navigation: open absolute path as a loose file.
+    if (child.kind === "file") {
+      void addLooseFilePath(child.path);
+      return;
+    }
+    setStatusMessage(`Folder: ${child.path}`);
+  }, [addLooseFilePath, loadDir, openFile, setStatusMessage]);
+
+  const breadcrumbPathActions = useCallback((
+    segment: BreadcrumbPathSegment,
+    file: OpenFileState,
+  ): BreadcrumbPathAction[] => {
+    const actions: BreadcrumbPathAction[] = [];
+    actions.push({
+      id: "reveal-tree",
+      label: "Select in Project Tree",
+      onSelect: () => {
+        if (file.ref.kind !== "root") {
+          setSelected({ kind: "file", ref: file.ref });
+          treePaneRef.current?.focus();
+          return;
+        }
+        const rootId = file.ref.rootId;
+        if (segment.kind === "root") {
+          setSelected({ kind: "root", rootId });
+          setExpandedRoots((current) => new Set(current).add(rootId));
+        } else if (segment.kind === "directory") {
+          setSelected({ kind: "dir", rootId, path: segment.path });
+          setExpandedRoots((current) => new Set(current).add(rootId));
+          setExpandedDirs((current) => new Set(current).add(rootDirKey(rootId, segment.path)));
+          void loadDir(rootId, segment.path);
+        } else {
+          setSelected({ kind: "file", ref: file.ref });
+          revealEditorTabInTree(file.key);
+          return;
+        }
+        treePaneRef.current?.focus();
+      },
+    });
+    if (file.ref.kind === "root") {
+      const rootId = file.ref.rootId;
+      actions.push({
+        id: "copy-path",
+        label: "Copy Path",
+        onSelect: () => { void copyTreePath(rootId, segment.path, true); },
+      });
+      actions.push({
+        id: "copy-relative",
+        label: "Copy Relative Path",
+        onSelect: () => { void copyTreePath(rootId, segment.path, false); },
+      });
+      actions.push({
+        id: "reveal-explorer",
+        label: "Reveal in Explorer",
+        onSelect: () => { void revealInExplorer(rootId, segment.path); },
+      });
+    } else {
+      const absolute = normalizeFsPath(segment.path);
+      actions.push({
+        id: "copy-path",
+        label: "Copy Path",
+        onSelect: () => {
+          void writeText(absolute)
+            .then(() => setStatusMessage(`Copied ${absolute}`))
+            .catch((err) => setStatusMessage(errorMessage(err)));
+        },
+      });
+      actions.push({
+        id: "reveal-explorer",
+        label: "Reveal in Explorer",
+        onSelect: () => {
+          void invoke("sftp_open_path", { path: absolute })
+            .then(() => setStatusMessage(`Opened ${absolute}`))
+            .catch((err) => setStatusMessage(errorMessage(err)));
+        },
+      });
+    }
+    return actions;
+  }, [copyTreePath, loadDir, revealEditorTabInTree, revealInExplorer, setStatusMessage]);
 
   const openEditorTabInTerminal = useCallback((key: string) => {
     const file = openFilesRef.current[key];
@@ -3155,6 +3335,33 @@ export function CodeWorkspaceTab({
     setLanguagePanelOpen((open) => !open);
   }, [setLanguagePanelOpen]);
 
+  // Keep the resizable project panel in sync with the persisted open flag.
+  // Drag-to-min collapses via onResize; toolbar / Alt+1 toggles go through this effect.
+  useEffect(() => {
+    const panel = projectPanelRef.current;
+    if (!panel) return;
+    const frame = requestAnimationFrame(() => {
+      if (!languagePanelOpen) {
+        panel.collapse();
+      } else {
+        panel.resize(`${lastProjectPanelSizeRef.current}%`);
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [languagePanelOpen]);
+
+  const handleProjectPanelResize = useCallback((size: PanelSize) => {
+    const percentage = size.asPercentage;
+    if (percentage > 2) {
+      lastProjectPanelSizeRef.current = percentage;
+    }
+    // Avoid store churn when the panel is already in the desired open/collapsed state.
+    setLanguagePanelOpen((open) => {
+      const next = percentage > 2;
+      return open === next ? open : next;
+    });
+  }, [setLanguagePanelOpen]);
+
   const toggleOutlinePane = useCallback(() => {
     if (rightPaneOpen && rightPaneTab === "outline") {
       setRightPaneOpen(false);
@@ -4275,7 +4482,13 @@ export function CodeWorkspaceTab({
             pathSegments={groupBreadcrumbSegments}
             symbols={breadcrumbSymbolsByGroup[groupId]}
             position={cursorPositions[groupId]}
+            loadPathChildren={(segment) =>
+              loadBreadcrumbPathChildren(segment, groupFile, groupBreadcrumbSegments)
+            }
+            onPathNavigate={(child) => navigateBreadcrumbPathChild(child, groupFile)}
+            pathActionsForSegment={(segment) => breadcrumbPathActions(segment, groupFile)}
             onPathClick={(segment) => {
+              // Fallback when listing is unavailable: reveal the segment in the tree.
               if (groupFile.ref.kind !== "root") return;
               const rootId = groupFile.ref.rootId;
               if (segment.kind === "root") {
@@ -4390,13 +4603,8 @@ export function CodeWorkspaceTab({
           </span>
         )}
         <div className="flex-1" />
-        <IconButton
-          label={languagePanelOpen ? "Hide project tree" : "Show project tree"}
-          testId="code-workspace-project-tree-toggle"
-          icon={<PanelLeft className="w-3.5 h-3.5" />}
-          active={languagePanelOpen}
-          onClick={() => executeWorkspaceCommand("workspace.toggleProjectTree")}
-        />
+        {/* Project tree collapse lives on the tree toolbar / collapsed rail — avoid a
+            second top-bar toggle that duplicates the panel-local control. */}
         <IconButton
           label="Back"
           testId="code-workspace-nav-back"
@@ -4510,19 +4718,49 @@ export function CodeWorkspaceTab({
         />
       </header>
 
-      <PanelGroup
-        orientation="horizontal"
-        id={`code-workspace-${workspaceInstanceId}`}
-        className="flex-1 min-h-0"
-      >
-        {languagePanelOpen && (
-          <>
-            <Panel
-              id="project"
-              defaultSize="24%"
-              minSize="12%"
-              maxSize="45%"
-              className="min-w-0"
+      <div className="flex-1 min-h-0 flex">
+        {!languagePanelOpen && (
+          <div
+            data-testid="code-workspace-project-collapsed-rail"
+            className="h-full w-7 shrink-0 flex flex-col items-center border-r border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]"
+          >
+            <button
+              type="button"
+              data-testid="code-workspace-project-expand"
+              title="Show project tree"
+              aria-label="Show project tree"
+              className="mt-1 h-7 w-7 inline-flex items-center justify-center rounded text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)]"
+              onClick={toggleProjectTree}
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+            <span
+              className="mt-2 text-[10px] font-medium tracking-wide text-[var(--taomni-code-muted)]"
+              style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+            >
+              Explorer
+            </span>
+          </div>
+        )}
+        <PanelGroup
+          orientation="horizontal"
+          id={`code-workspace-${workspaceInstanceId}`}
+          className="flex-1 min-h-0 min-w-0"
+        >
+          <Panel
+            panelRef={projectPanelRef}
+            id="project"
+            defaultSize="24%"
+            minSize="12%"
+            maxSize="45%"
+            collapsible
+            collapsedSize={0}
+            onResize={handleProjectPanelResize}
+            className="min-w-0"
+          >
+            <div
+              className="h-full min-h-0 overflow-hidden"
+              style={languagePanelOpen ? undefined : { display: "none" }}
             >
               <FileTreePane
                 paneRef={treePaneRef}
@@ -4537,6 +4775,8 @@ export function CodeWorkspaceTab({
                 maxFontSize={CODE_WORKSPACE_MAX_TREE_FONT_SIZE}
                 defaultFontSize={CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE}
                 onFontSizeChange={setTreeFontSize}
+                collapsed={!languagePanelOpen}
+                onToggleCollapse={toggleProjectTree}
                 onOpenFile={() => executeWorkspaceCommand("workspace.tree.openLooseFile", { focus: "tree" })}
                 onAddFolder={() => executeWorkspaceCommand("workspace.tree.addFolder", { focus: "tree" })}
                 canCreate={!!selectedRootDirectory}
@@ -4567,23 +4807,24 @@ export function CodeWorkspaceTab({
                   onContextMenu={showTreeContextMenu}
                 />
               </FileTreePane>
-            </Panel>
-            <PanelResizeHandle
-              data-testid="code-workspace-project-resize-handle"
-              className="w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"
-            />
-          </>
-        )}
-        <Panel
-          id="editor"
-          defaultSize={
-            !languagePanelOpen
-              ? (rightPaneOpen ? "80%" : "100%")
-              : (rightPaneOpen ? "56%" : "76%")
-          }
-          minSize={languagePanelOpen ? "35%" : "50%"}
-          className="min-w-0"
-        >
+            </div>
+          </Panel>
+          <PanelResizeHandle
+            data-testid="code-workspace-project-resize-handle"
+            className={languagePanelOpen
+              ? "w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"
+              : "hidden"}
+          />
+          <Panel
+            id="editor"
+            defaultSize={
+              !languagePanelOpen
+                ? (rightPaneOpen ? "80%" : "100%")
+                : (rightPaneOpen ? "56%" : "76%")
+            }
+            minSize={languagePanelOpen ? "35%" : "50%"}
+            className="min-w-0"
+          >
           {splitOrientation ? (
             <div data-testid="code-workspace-editor-split" className="h-full min-h-0">
               <PanelGroup
@@ -4680,6 +4921,7 @@ export function CodeWorkspaceTab({
           </>
         )}
       </PanelGroup>
+      </div>
       <BottomDock
         open={bottomDockOpen}
         activeTab={bottomDockTab}

@@ -111,14 +111,14 @@ fn parse_display(display: &str) -> Result<(String, u32, u32), String> {
 /// platforms with Unix sockets) prefer the Unix socket; everything else, and
 /// all of Windows, resolves to TCP `host:(6000+N)`.
 fn resolve_target(host: &str, disp_num: u32) -> XTarget {
-    let is_local = host.is_empty()
-        || host == "unix"
-        || host == "localhost"
-        || host == "127.0.0.1"
-        || host == "::1";
-
     #[cfg(unix)]
     {
+        let is_local = host.is_empty()
+            || host == "unix"
+            || host == "localhost"
+            || host == "127.0.0.1"
+            || host == "::1";
+
         if is_local {
             // Honor a non-abstract custom socket dir if the platform uses one.
             let path = unix_socket_path(disp_num);

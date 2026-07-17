@@ -32,7 +32,7 @@ export function LspStatusPill({
   const t = useT();
   if (!state?.status) {
     return (
-      <span className="shrink-0 text-[10px] text-[var(--taomni-code-muted)]">
+      <span className="shrink-0 text-[10px] font-medium text-[var(--taomni-code-text)]/75">
         LSP idle
       </span>
     );
@@ -58,12 +58,14 @@ export function LspStatusPill({
   const showSettingsLink = lspNeedsSetup(state) && !!onOpenSettings;
   const settingsLabel = t("settings.languageServersOpenSettings");
   const title = showSettingsLink ? `${label} · ${settingsLabel}` : label;
+  // Use primary code text (not muted) so names like "Java" stay legible on the
+  // light editor chrome. App theming is data-app-theme, not Tailwind `dark:`.
   return (
     <span
       title={title}
       data-active={status.active || undefined}
       data-error={!!state.error || (!status.active && !!status.error) || undefined}
-      className="max-w-[50%] shrink-0 inline-flex min-w-0 items-center gap-1 rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-[10px] bg-[var(--taomni-code-active-line-bg)] text-[var(--taomni-code-muted)] data-[active=true]:text-[var(--taomni-accent)] data-[error=true]:text-amber-500"
+      className="max-w-[50%] shrink-0 inline-flex min-w-0 items-center gap-1 rounded border border-[var(--taomni-code-border)] px-1.5 py-0.5 text-[11px] font-medium bg-[var(--taomni-code-bg)] text-[var(--taomni-code-text)] data-[active=true]:border-[var(--taomni-selected-border)] data-[active=true]:bg-[var(--taomni-selected)] data-[active=true]:font-semibold data-[active=true]:text-[var(--taomni-accent)] data-[error=true]:border-amber-500/50 data-[error=true]:text-amber-700 dark:data-[error=true]:text-amber-400"
     >
       <span className="min-w-0 truncate">{label}</span>
       {showSettingsLink && (
@@ -71,7 +73,7 @@ export function LspStatusPill({
           type="button"
           data-testid="code-workspace-lsp-open-settings"
           title={settingsLabel}
-          className="shrink-0 underline decoration-dotted underline-offset-2 hover:text-[var(--taomni-accent)]"
+          className="shrink-0 underline decoration-dotted underline-offset-2 text-[var(--taomni-code-text)] hover:text-[var(--taomni-accent)]"
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();

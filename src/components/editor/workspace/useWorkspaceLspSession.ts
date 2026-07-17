@@ -6,6 +6,7 @@ import {
   lspGetDiagnostics,
   lspOpenDocument,
   lspSaveDocument,
+  lspSetJavaHome,
   lspStopWorkspace,
   type LspDocumentDescriptor,
   type LspDocumentStatus,
@@ -21,6 +22,7 @@ import {
   lspPresetIdForPath,
   readLspCommandPrefs,
   readLspCustomCommands,
+  readLspJavaHome,
   subscribeLspServerPrefs,
   writeLspCommandPrefs,
   writeLspCustomCommands,
@@ -104,6 +106,7 @@ export function useWorkspaceLspSession({
   const [customCommands, setCustomCommands] = useState<Record<string, LspCustomCommandConfig>>(
     () => readLspCustomCommands(),
   );
+  const [javaHome, setJavaHome] = useState(() => readLspJavaHome());
   const rootsRef = useRef(roots);
   const versionRef = useRef<Record<string, number>>({});
   const syncedTextRef = useRef<Record<string, string>>({});
@@ -135,7 +138,9 @@ export function useWorkspaceLspSession({
 
   const refreshServerStatuses = useCallback(async () => {
     try {
-      const statuses = await lspDetectServers();
+      const home = readLspJavaHome().trim();
+      await lspSetJavaHome(home || null);
+      const statuses = await lspDetectServers({ javaHome: home || null });
       if (mountedRef.current) setServerStatuses(statuses);
     } catch (error) {
       if (mountedRef.current) onError(errorMessage(error));
@@ -147,18 +152,26 @@ export function useWorkspaceLspSession({
   }, [refreshServerStatuses]);
 
   // Settings panel is the primary editor for LSP server prefs; keep live
-  // workspace sessions in sync without remounting the tab.
+  // workspace sessions in sync without remounting the tab. Restart servers so
+  // a new Java home / custom command actually takes effect (session keys are
+  // not keyed by runtime path).
   useEffect(() => subscribeLspServerPrefs(() => {
     if (!mountedRef.current) return;
     setCommandPrefs(readLspCommandPrefs());
     setCustomCommands(readLspCustomCommands());
+    setJavaHome(readLspJavaHome());
     syncedTextRef.current = {};
     incrementalSyncRef.current = {};
+    versionRef.current = {};
     updateLspFiles((current) => Object.fromEntries(
       Object.entries(current).map(([key, state]) => [key, { ...state, syncedText: null }]),
     ));
-    void refreshServerStatuses();
-  }), [refreshServerStatuses, updateLspFiles]);
+    void lspStopWorkspace(workspaceInstanceId)
+      .catch(() => undefined)
+      .finally(() => {
+        if (mountedRef.current) void refreshServerStatuses();
+      });
+  }), [refreshServerStatuses, updateLspFiles, workspaceInstanceId]);
 
   const invalidateSyncedText = useCallback(() => {
     syncedTextRef.current = {};
@@ -197,6 +210,7 @@ export function useWorkspaceLspSession({
     const customServerCommand = presetId && commandPref === CUSTOM_LSP_COMMAND_ID
       ? customServerCommandFromConfig(customCommands[presetId])
       : null;
+    const configuredJavaHome = javaHome.trim() || null;
     if (file.ref.kind === "root") {
       const rootId = file.ref.rootId;
       const root = rootsRef.current.find((candidate) => candidate.id === rootId);
@@ -207,6 +221,7 @@ export function useWorkspaceLspSession({
         filePath: file.ref.path,
         serverCommandId,
         customServerCommand,
+        javaHome: configuredJavaHome,
       };
     }
     return {
@@ -215,8 +230,9 @@ export function useWorkspaceLspSession({
       filePath: file.ref.path,
       serverCommandId,
       customServerCommand,
+      javaHome: configuredJavaHome,
     };
-  }, [commandPrefs, customCommands, workspaceInstanceId]);
+  }, [commandPrefs, customCommands, javaHome, workspaceInstanceId]);
 
   const updateStatus = useCallback((file: OpenFileState, status: LspDocumentStatus) => {
     if (!mountedRef.current) return;

@@ -418,17 +418,21 @@ export function EditorGroup({
           {activeFile ? (
             <div className="absolute inset-0 flex flex-col">
               {breadcrumbs}
-              <div className="min-h-7 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)]">
-                <span className="truncate">{activeFile.subtitle}</span>
-                <span className="shrink-0">{formatBytes(activeFile.size)}</span>
-                {formatMtime(activeFile.mtime) && (
-                  <span className="shrink-0">{formatMtime(activeFile.mtime)}</span>
-                )}
-                {activeFile.loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                {activeLspSyncing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                {lspStatusPill}
+              <div
+                data-testid="code-workspace-file-status"
+                className="min-h-7 shrink-0 flex items-center gap-2 px-3 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-text)]"
+              >
+                <div className="ml-auto flex min-w-0 items-center gap-2">
+                  <span className="shrink-0 text-[var(--taomni-code-muted)]">{formatBytes(activeFile.size)}</span>
+                  {formatMtime(activeFile.mtime) && (
+                    <span className="shrink-0 text-[var(--taomni-code-muted)]">{formatMtime(activeFile.mtime)}</span>
+                  )}
+                  {activeFile.loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-code-muted)]" />}
+                  {activeLspSyncing && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-code-muted)]" />}
+                  {lspStatusPill}
+                </div>
                 {isMarkdownPath(activeFile.languagePath) && (
-                  <div className="ml-auto flex items-center gap-0.5">
+                  <div className="flex items-center gap-0.5">
                     <ModeButton
                       label="Edit"
                       active={activeMarkdownMode === "edit"}

@@ -439,6 +439,11 @@ struct CachedCommandAvailability {
 static COMMAND_AVAILABILITY_CACHE: OnceLock<StdMutex<HashMap<String, CachedCommandAvailability>>> =
     OnceLock::new();
 
+/// User-configured JDK home / `java` binary path from Language Servers settings.
+/// Prefer this over auto-detected JAVA_HOME/PATH so GUI-launched Taomni can use
+/// a JDK that is not on the process environment (common on Windows).
+static CONFIGURED_JAVA_HOME: OnceLock<StdMutex<Option<PathBuf>>> = OnceLock::new();
+
 #[derive(Clone, Debug)]
 struct SemanticTokensCache {
     result_id: String,
@@ -909,6 +914,13 @@ impl LspSession {
     ) -> Result<Arc<Self>, String> {
         let mut process = build_lsp_server_command(&command.command, &command.args, &root_path)
             .map_err(|e| format!("prepare {}: {e}", command.command))?;
+        // Ensure jdtls wrappers (non-Windows) and child tools see the configured JDK.
+        if command_is_jdtls(&command)
+            && let Ok((java, _)) = resolve_java_for_jdtls()
+            && let Some(home) = java_home_from_binary(&java)
+        {
+            process.env("JAVA_HOME", home);
+        }
         process
             .current_dir(&root_path)
             .stdin(Stdio::piped())
@@ -1439,7 +1451,7 @@ fn build_jdtls_java_command(
     let (java, java_major) = resolve_java_for_jdtls()?;
     if java_major < JDTLS_MIN_JAVA_MAJOR {
         return Err(format!(
-            "jdtls requires Java {JDTLS_MIN_JAVA_MAJOR}+ (current Eclipse JDT LS); found Java {java_major} at {}. Install JDK {JDTLS_MIN_JAVA_MAJOR}+ and set JAVA_HOME, then restart Taomni",
+            "jdtls requires Java {JDTLS_MIN_JAVA_MAJOR}+ (current Eclipse JDT LS); found Java {java_major} at {}. Install JDK {JDTLS_MIN_JAVA_MAJOR}+, configure it in Settings → Language Servers, or set JAVA_HOME",
             java.display()
         ));
     }
@@ -1478,8 +1490,11 @@ fn build_jdtls_java_command(
     cmd.arg("-jar");
     cmd.arg(launcher);
     cmd.arg("-data");
-    cmd.arg(data_dir);
+    cmd.arg(&data_dir);
     cmd.args(extra_args);
+    if let Some(home) = java_home_from_binary(&java) {
+        cmd.env("JAVA_HOME", home);
+    }
     log::info!(
         "lsp: launching jdtls via {} (Java {java_major}), home={}, data={}",
         java.display(),
@@ -1547,20 +1562,94 @@ fn find_equinox_launcher(jdtls_home: &Path) -> Option<PathBuf> {
     matches.pop()
 }
 
+fn configured_java_home_lock() -> &'static StdMutex<Option<PathBuf>> {
+    CONFIGURED_JAVA_HOME.get_or_init(|| StdMutex::new(None))
+}
+
+/// Store the Settings-configured JDK path (or clear with `None`).
+fn set_configured_java_home(java_home: Option<&str>) {
+    let path = java_home
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from);
+    if let Ok(mut guard) = configured_java_home_lock().lock() {
+        *guard = path;
+    }
+}
+
+fn get_configured_java_home() -> Option<PathBuf> {
+    configured_java_home_lock()
+        .lock()
+        .ok()
+        .and_then(|guard| guard.clone())
+}
+
+/// Expand a user/env path that may be a JDK home, `bin/`, or the `java` binary.
+fn resolve_java_binary_from_user_path(path: &Path) -> Option<PathBuf> {
+    let bin_name = if cfg!(windows) { "java.exe" } else { "java" };
+    if path.is_file() {
+        return Some(path.to_path_buf());
+    }
+    if !path.is_dir() {
+        return None;
+    }
+    let direct = path.join(bin_name);
+    if direct.is_file() {
+        return Some(direct);
+    }
+    let in_bin = path.join("bin").join(bin_name);
+    if in_bin.is_file() {
+        return Some(in_bin);
+    }
+    // macOS `.jdk` bundles: Contents/Home/bin/java
+    let mac = path.join("Contents").join("Home").join("bin").join(bin_name);
+    if mac.is_file() {
+        return Some(mac);
+    }
+    None
+}
+
+fn java_home_from_binary(java: &Path) -> Option<PathBuf> {
+    let parent = java.parent()?;
+    if parent
+        .file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.eq_ignore_ascii_case("bin"))
+    {
+        return parent.parent().map(|p| p.to_path_buf());
+    }
+    Some(parent.to_path_buf())
+}
+
+fn push_java_candidate(candidates: &mut Vec<PathBuf>, path: PathBuf) {
+    if !candidates.iter().any(|c| c == &path) {
+        candidates.push(path);
+    }
+}
+
 /// Pick a Java executable for jdtls, preferring the highest major >= 21.
+/// Order: configured Settings path → JAVA_HOME → PATH → common install layouts.
 fn resolve_java_for_jdtls() -> Result<(PathBuf, u32), String> {
     let mut candidates: Vec<PathBuf> = Vec::new();
+
+    if let Some(configured) = get_configured_java_home() {
+        if let Some(bin) = resolve_java_binary_from_user_path(&configured) {
+            push_java_candidate(&mut candidates, bin);
+        } else {
+            return Err(format!(
+                "configured Java runtime path is invalid: {} (expected JDK home or java binary, JDK {JDTLS_MIN_JAVA_MAJOR}+)",
+                configured.display()
+            ));
+        }
+    }
+
     if let Ok(home) = std::env::var("JAVA_HOME") {
-        let bin = if cfg!(windows) { "java.exe" } else { "java" };
-        let candidate = PathBuf::from(home).join("bin").join(bin);
-        if candidate.is_file() {
-            candidates.push(candidate);
+        if let Some(bin) = resolve_java_binary_from_user_path(Path::new(&home)) {
+            push_java_candidate(&mut candidates, bin);
         }
     }
     if let Ok(path) = which::which("java") {
-        if !candidates.iter().any(|c| c == &path) {
-            candidates.push(path);
-        }
+        push_java_candidate(&mut candidates, path);
     }
     // GUI-launched apps sometimes inherit a PATH that lacks the JDK even when
     // an interactive shell sees it. Probe common install layouts.
@@ -1578,8 +1667,8 @@ fn resolve_java_for_jdtls() -> Result<(PathBuf, u32), String> {
                 if let Ok(entries) = std::fs::read_dir(&root) {
                     for entry in entries.flatten() {
                         let candidate = entry.path().join("bin").join("java.exe");
-                        if candidate.is_file() && !candidates.iter().any(|c| c == &candidate) {
-                            candidates.push(candidate);
+                        if candidate.is_file() {
+                            push_java_candidate(&mut candidates, candidate);
                         }
                     }
                 }
@@ -1596,14 +1685,13 @@ fn resolve_java_for_jdtls() -> Result<(PathBuf, u32), String> {
         ] {
             let root = Path::new(dir);
             if root.is_file() {
-                // e.g. homebrew openjdk/bin is already a bin path
-                let candidate = if root.ends_with("bin") {
-                    root.join("java")
-                } else {
-                    root.join("java")
-                };
-                if candidate.is_file() && !candidates.iter().any(|c| c == &candidate) {
-                    candidates.push(candidate);
+                push_java_candidate(&mut candidates, root.to_path_buf());
+                continue;
+            }
+            if root.is_dir() && root.ends_with("bin") {
+                let candidate = root.join("java");
+                if candidate.is_file() {
+                    push_java_candidate(&mut candidates, candidate);
                 }
                 continue;
             }
@@ -1612,8 +1700,8 @@ fn resolve_java_for_jdtls() -> Result<(PathBuf, u32), String> {
                     let path = entry.path();
                     for rel in ["bin/java", "Contents/Home/bin/java"] {
                         let candidate = path.join(rel);
-                        if candidate.is_file() && !candidates.iter().any(|c| c == &candidate) {
-                            candidates.push(candidate);
+                        if candidate.is_file() {
+                            push_java_candidate(&mut candidates, candidate);
                         }
                     }
                 }
@@ -1623,14 +1711,23 @@ fn resolve_java_for_jdtls() -> Result<(PathBuf, u32), String> {
 
     if candidates.is_empty() {
         return Err(format!(
-            "java not found for jdtls; install JDK {JDTLS_MIN_JAVA_MAJOR}+ and set JAVA_HOME or PATH"
+            "java not found for jdtls; install JDK {JDTLS_MIN_JAVA_MAJOR}+ and set it in Settings → Language Servers, JAVA_HOME, or PATH"
         ));
     }
+
+    // If the user configured a path, only evaluate that first candidate so a
+    // wrong/old override cannot silently fall back to another JDK on PATH.
+    let configured_only = get_configured_java_home().is_some();
+    let search: Vec<PathBuf> = if configured_only {
+        candidates.into_iter().take(1).collect()
+    } else {
+        candidates
+    };
 
     let mut best_ok: Option<(PathBuf, u32)> = None;
     let mut best_any: Option<(PathBuf, u32)> = None;
     let mut last_err = String::new();
-    for path in candidates {
+    for path in search {
         match java_major_version(&path) {
             Ok(major) => {
                 if major >= JDTLS_MIN_JAVA_MAJOR {
@@ -1659,7 +1756,7 @@ fn resolve_java_for_jdtls() -> Result<(PathBuf, u32), String> {
     }
     if let Some((path, major)) = best_any {
         return Err(format!(
-            "jdtls requires Java {JDTLS_MIN_JAVA_MAJOR}+ (current Eclipse JDT LS); found Java {major} at {}. Install JDK {JDTLS_MIN_JAVA_MAJOR}+, set JAVA_HOME, restart Taomni",
+            "jdtls requires Java {JDTLS_MIN_JAVA_MAJOR}+ (current Eclipse JDT LS); found Java {major} at {}. Install JDK {JDTLS_MIN_JAVA_MAJOR}+ and configure it in Settings → Language Servers (or JAVA_HOME)",
             path.display()
         ));
     }
@@ -1676,9 +1773,11 @@ fn jdtls_runtime_probe() -> (Option<String>, Option<String>) {
     match resolve_java_for_jdtls() {
         Ok((path, major)) => {
             let short = path.display().to_string();
+            let configured = get_configured_java_home().is_some();
             (
                 Some(format!(
-                    "Java {major} · {short} (JDK {JDTLS_MIN_JAVA_MAJOR}+ required)"
+                    "Java {major} · {short}{} (JDK {JDTLS_MIN_JAVA_MAJOR}+ required)",
+                    if configured { " · configured" } else { "" }
                 )),
                 None,
             )
@@ -1694,7 +1793,9 @@ fn jdtls_runtime_probe() -> (Option<String>, Option<String>) {
                 Some(format!(
                     "Java {major} — need JDK {JDTLS_MIN_JAVA_MAJOR}+ for current JDT LS"
                 ))
-            } else if error.contains("java not found") {
+            } else if error.contains("java not found")
+                || error.contains("invalid")
+            {
                 Some(format!(
                     "Java not found — need JDK {JDTLS_MIN_JAVA_MAJOR}+ for jdtls"
                 ))
@@ -1930,8 +2031,21 @@ pub fn lsp_list_presets() -> Vec<LspServerPreset> {
     lsp_presets()
 }
 
+/// Persist the Settings-configured Java runtime for jdtls (JDK home or java binary).
+/// Empty / null clears the override and falls back to JAVA_HOME / PATH discovery.
 #[tauri::command]
-pub fn lsp_detect_servers() -> Vec<LspServerStatus> {
+pub fn lsp_set_java_home(java_home: Option<String>) -> Result<(), String> {
+    set_configured_java_home(java_home.as_deref());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn lsp_detect_servers(java_home: Option<String>) -> Vec<LspServerStatus> {
+    // Accept an optional override so Settings can probe without waiting for a
+    // separate set-home round-trip; also keep the process-global config in sync.
+    if let Some(ref home) = java_home {
+        set_configured_java_home(Some(home.as_str()));
+    }
     clear_command_availability_cache();
     lsp_presets()
         .iter()
@@ -5311,6 +5425,57 @@ Java(TM) SE Runtime Environment (build 17.0.4+11-LTS-179)
         let java = find_preset("java").expect("java preset");
         assert!(preset_uses_jdtls(&java, java.commands.first()));
         assert!(command_is_jdtls(&java.commands[0]));
+    }
+
+    #[test]
+    fn resolve_java_binary_from_user_path_accepts_home_or_binary_shape() {
+        let temp = std::env::temp_dir().join(format!(
+            "taomni-jdtls-java-home-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&temp);
+        let bin_dir = temp.join("bin");
+        std::fs::create_dir_all(&bin_dir).expect("mkdir");
+        let bin_name = if cfg!(windows) { "java.exe" } else { "java" };
+        let java_bin = bin_dir.join(bin_name);
+        std::fs::write(&java_bin, b"stub").expect("write stub java");
+
+        assert_eq!(
+            resolve_java_binary_from_user_path(&temp),
+            Some(java_bin.clone())
+        );
+        assert_eq!(
+            resolve_java_binary_from_user_path(&bin_dir),
+            Some(java_bin.clone())
+        );
+        assert_eq!(
+            resolve_java_binary_from_user_path(&java_bin),
+            Some(java_bin.clone())
+        );
+        assert_eq!(
+            java_home_from_binary(&java_bin).as_deref(),
+            Some(temp.as_path())
+        );
+
+        let _ = std::fs::remove_dir_all(&temp);
+    }
+
+    #[test]
+    fn configured_java_home_round_trips_and_rejects_missing_path() {
+        set_configured_java_home(None);
+        assert!(get_configured_java_home().is_none());
+
+        let missing = PathBuf::from("/definitely/missing/jdk-for-taomni-test");
+        set_configured_java_home(Some(missing.to_string_lossy().as_ref()));
+        assert_eq!(get_configured_java_home(), Some(missing.clone()));
+        let err = resolve_java_for_jdtls().expect_err("missing configured path must fail");
+        assert!(
+            err.contains("invalid") || err.contains("not found") || err.contains("configured"),
+            "unexpected error: {err}"
+        );
+
+        set_configured_java_home(None);
+        assert!(get_configured_java_home().is_none());
     }
 
     #[test]

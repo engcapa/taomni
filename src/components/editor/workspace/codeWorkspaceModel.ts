@@ -58,6 +58,8 @@ export interface WorkspaceTreeCommandPayload {
 
 export const LSP_COMMAND_PREFS_KEY = "taomni.codeWorkspace.lspCommandPrefs.v1";
 export const LSP_CUSTOM_COMMANDS_KEY = "taomni.codeWorkspace.lspCustomCommands.v1";
+/** Absolute JDK home or `java`/`java.exe` path used to launch Eclipse JDT LS (needs 21+). */
+export const LSP_JAVA_HOME_KEY = "taomni.codeWorkspace.lspJavaHome.v1";
 export const CUSTOM_LSP_COMMAND_ID = "__custom__";
 export const TREE_FONT_SIZE_KEY = "taomni.codeWorkspace.treeFontSize.v1";
 export const TREE_VIEW_MODE_KEY = "taomni.codeWorkspace.treeViewMode.v1";
@@ -625,6 +627,7 @@ export function subscribeLspServerPrefs(listener: () => void): () => void {
       event.key !== null
       && event.key !== LSP_COMMAND_PREFS_KEY
       && event.key !== LSP_CUSTOM_COMMANDS_KEY
+      && event.key !== LSP_JAVA_HOME_KEY
     ) {
       return;
     }
@@ -680,6 +683,26 @@ export function readLspCustomCommands(): Record<string, LspCustomCommandConfig> 
 export function writeLspCustomCommands(commands: Record<string, LspCustomCommandConfig>): void {
   try {
     window.localStorage.setItem(LSP_CUSTOM_COMMANDS_KEY, JSON.stringify(commands));
+  } catch {
+    // Ignore storage failures.
+  }
+  emitLspPrefsChanged();
+}
+
+/** Configured JDK home / java binary for jdtls (empty string means auto-detect). */
+export function readLspJavaHome(): string {
+  try {
+    return window.localStorage.getItem(LSP_JAVA_HOME_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function writeLspJavaHome(javaHome: string): void {
+  try {
+    const trimmed = javaHome.trim();
+    if (trimmed) window.localStorage.setItem(LSP_JAVA_HOME_KEY, trimmed);
+    else window.localStorage.removeItem(LSP_JAVA_HOME_KEY);
   } catch {
     // Ignore storage failures.
   }
