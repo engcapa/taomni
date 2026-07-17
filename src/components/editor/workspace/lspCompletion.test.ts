@@ -4,9 +4,11 @@ import { CompletionContext } from "@codemirror/autocomplete";
 import type { LspCompletionResult, LspDocumentStatus } from "../../../lib/editor/lsp";
 import {
   boostFromSortText,
+  boostFromTypedPrefix,
   completionKindToType,
   createLspCompletionSource,
   lspSnippetToCmSnippet,
+  MAX_COMPLETION_OPTIONS,
   mergeCompletionTriggers,
 } from "./lspCompletion";
 
@@ -101,6 +103,23 @@ describe("mergeCompletionTriggers", () => {
   });
 });
 
+describe("boostFromTypedPrefix", () => {
+  it("prefers exact and camelCase prefix matches", () => {
+    const exact = boostFromTypedPrefix("open", "openFile", null) ?? 0;
+    const camel = boostFromTypedPrefix("oF", "openFile", null) ?? 0;
+    const weak = boostFromTypedPrefix("zz", "openFile", null);
+    expect(exact).toBeGreaterThan(camel);
+    expect(camel).toBeGreaterThan(0);
+    expect(weak).toBeUndefined();
+  });
+
+  it("stacks with sortText boost", () => {
+    const withSort = boostFromTypedPrefix("to", "toString", "0001") ?? 0;
+    const sortOnly = boostFromSortText("0001") ?? 0;
+    expect(withSort).toBeGreaterThan(sortOnly);
+  });
+});
+
 describe("createLspCompletionSource", () => {
   it("skips silently when there is nothing to complete", async () => {
     const fetch = vi.fn();
@@ -164,5 +183,23 @@ describe("createLspCompletionSource", () => {
     expect(result?.options[0]?.label).toBe("toString");
     expect(result?.options[0]?.displayLabel).toBe("toString(): string");
     expect(result?.options[0]?.sortText).toBe("0001");
+    expect(result?.options[0]?.boost).toBeGreaterThan(0);
+  });
+
+  it("passes the member-access trigger when typing after a trigger character", async () => {
+    const fetch = vi.fn(async () => completionResult(["toString"]));
+    const source = createLspCompletionSource({ fetch, triggerCharacters: () => ["."] });
+
+    await source(contextAt("value.to", 8));
+
+    expect(fetch).toHaveBeenCalledWith({ line: 0, character: 8 }, ".");
+  });
+
+  it("caps very large completion lists for popup performance", async () => {
+    const labels = Array.from({ length: MAX_COMPLETION_OPTIONS + 50 }, (_, i) => `item${i}`);
+    const fetch = vi.fn(async () => completionResult(labels));
+    const source = createLspCompletionSource({ fetch, triggerCharacters: () => [] });
+    const result = await source(contextAt("it", 2));
+    expect(result?.options).toHaveLength(MAX_COMPLETION_OPTIONS);
   });
 });

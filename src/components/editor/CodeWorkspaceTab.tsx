@@ -256,7 +256,10 @@ function initialInlayHintRange(text: string): LspRange {
 // Keep document synchronization ahead of the comparatively expensive derived
 // LSP features.  In particular, rust-analyzer semantic tokens can be large
 // enough that applying them while somebody is still typing is noticeable.
-const LSP_CHANGE_SYNC_DELAY_MS = 150;
+// Background typing coalesces didChange at this interval; completion/signature
+// force-flush immediately so the server is not one keystroke behind.
+const LSP_CHANGE_SYNC_DELAY_MS = 80;
+const LSP_FEATURE_SYNC_WAIT_MS = 400;
 const LSP_HIGHLIGHT_IDLE_DELAY_MS = 500;
 const LSP_INLAY_HINT_IDLE_DELAY_MS = 650;
 const LSP_SEMANTIC_TOKENS_IDLE_DELAY_MS = 900;
@@ -466,6 +469,8 @@ export function CodeWorkspaceTab({
   const lspFilesRef = useRef(lspFiles);
   const pendingEditorTextByFileRef = useRef(new Map<string, OpenFileState>());
   const pendingEditorTextTimerRef = useRef<number | null>(null);
+  /** Debounced didChange timers keyed by open-file key (live buffer path). */
+  const liveLspSyncTimersRef = useRef<Record<string, number>>({});
 
   const setBottomDockOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
     const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).bottomDockOpen;
@@ -643,6 +648,10 @@ export function CodeWorkspaceTab({
     // be rebound to a different workspace without unmounting, and a ref read
     // during cleanup would then point at the new instance.
     flushPendingEditorText();
+    for (const timer of Object.values(liveLspSyncTimersRef.current)) {
+      window.clearTimeout(timer);
+    }
+    liveLspSyncTimersRef.current = {};
     disposeWorkspaceUi(workspaceInstanceId);
   }, [disposeWorkspaceUi, flushPendingEditorText, workspaceInstanceId]);
 
@@ -804,7 +813,18 @@ export function CodeWorkspaceTab({
   }, [looseFiles]);
 
   useEffect(() => {
-    openFilesRef.current = openFiles;
+    // Store-backed openFiles can lag the live editor buffer while typing is
+    // batched. Never clobber pending keystrokes with a stale store snapshot —
+    // that used to drop mid-edit text right as completion asked for a sync.
+    if (pendingEditorTextByFileRef.current.size === 0) {
+      openFilesRef.current = openFiles;
+      return;
+    }
+    const merged = { ...openFiles };
+    for (const [key, file] of pendingEditorTextByFileRef.current) {
+      if (key in merged) merged[key] = file;
+    }
+    openFilesRef.current = merged;
   }, [openFiles]);
 
   useEffect(() => {
@@ -1481,6 +1501,65 @@ export function CodeWorkspaceTab({
     setOpenFiles((current) => ({ ...current, [key]: next }));
   }, [setOpenFiles]);
 
+  const scheduleLiveLspSync = useCallback((key: string) => {
+    const existing = liveLspSyncTimersRef.current[key];
+    if (existing) window.clearTimeout(existing);
+    liveLspSyncTimersRef.current[key] = window.setTimeout(() => {
+      delete liveLspSyncTimersRef.current[key];
+      const latest = openFilesRef.current[key];
+      if (!latest || latest.loading) return;
+      const lspState = lspFilesRef.current[key];
+      if (lspState?.syncedText === latest.text && lspState.status) return;
+      const mode: "open" | "change" = lspState?.status ? "change" : "open";
+      void syncLspDocument(latest, mode);
+    }, LSP_CHANGE_SYNC_DELAY_MS);
+  }, [syncLspDocument]);
+
+  const cancelLiveLspSync = useCallback((key: string) => {
+    const existing = liveLspSyncTimersRef.current[key];
+    if (!existing) return;
+    window.clearTimeout(existing);
+    delete liveLspSyncTimersRef.current[key];
+  }, []);
+
+  /**
+   * Bring the language server up to the live editor buffer before a latency-
+   * sensitive feature (completion / signature). Bypasses the typing debounce
+   * and waits for the in-flight sync queue to drain for this file.
+   */
+  const ensureLspDocumentSynced = useCallback(async (fileKey: string): Promise<OpenFileState | null> => {
+    cancelLiveLspSync(fileKey);
+    const kick = () => {
+      const latest = openFilesRef.current[fileKey];
+      if (!latest || latest.loading) return null;
+      const state = lspFilesRef.current[fileKey];
+      if (state?.status && !state.syncing && state.syncedText === latest.text) {
+        return latest;
+      }
+      const mode: "open" | "change" = state?.status ? "change" : "open";
+      // Kick (or re-queue) the latest buffer. If a sync is already running,
+      // syncDocument records pending and returns; the wait loop covers that.
+      void syncLspDocument(latest, mode);
+      return null;
+    };
+    const ready = kick();
+    if (ready) return ready;
+    const deadline = performance.now() + LSP_FEATURE_SYNC_WAIT_MS;
+    while (performance.now() < deadline) {
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 8);
+      });
+      const readyAgain = kick();
+      if (readyAgain) return readyAgain;
+    }
+    // Best effort: if the server is active but still catching up, still return
+    // the live buffer so the feature request can race (CM will re-query on the
+    // next keystroke via isIncomplete / abort-on-doc-change).
+    const latest = openFilesRef.current[fileKey];
+    if (latest && lspFilesRef.current[fileKey]?.status?.active) return latest;
+    return null;
+  }, [cancelLiveLspSync, syncLspDocument]);
+
   const queueEditorTextUpdate = useCallback((key: string, text: string) => {
     const file = openFilesRef.current[key];
     if (!file || file.text === text) return;
@@ -1494,6 +1573,9 @@ export function CodeWorkspaceTab({
     // store publication that causes the surrounding workspace to re-render.
     openFilesRef.current = { ...openFilesRef.current, [key]: next };
     pendingEditorTextByFileRef.current.set(key, next);
+    // Drive didChange from the live buffer so LSP does not wait for the
+    // React/Zustand text commit delay before seeing keystrokes.
+    scheduleLiveLspSync(key);
     if (pendingEditorTextTimerRef.current !== null) {
       window.clearTimeout(pendingEditorTextTimerRef.current);
     }
@@ -1501,7 +1583,7 @@ export function CodeWorkspaceTab({
       flushPendingEditorText,
       EDITOR_TEXT_COMMIT_IDLE_DELAY_MS,
     );
-  }, [flushPendingEditorText]);
+  }, [flushPendingEditorText, scheduleLiveLspSync]);
 
   const absolutePathForOpenFile = useCallback((file: OpenFileState): string | null => {
     if (file.ref.kind === "loose") return normalizeFsPath(file.ref.path);
@@ -1988,15 +2070,6 @@ export function CodeWorkspaceTab({
       && !lspState.syncing;
   }, []);
 
-  const currentSyncedLspDocument = useCallback((file: OpenFileState) => {
-    const latestFile = openFilesRef.current[file.key];
-    const lspState = lspFilesRef.current[file.key];
-    if (!latestFile || lspState?.syncing || lspState?.syncedText !== latestFile.text) return null;
-    return {
-      file: latestFile,
-      epoch: lspDocumentEpochRef.current[file.key] ?? 0,
-    };
-  }, []);
   const openHierarchy = useCallback(async (mode: "call" | "type") => {
     const file = activeFile;
     if (!file || file.loading) return;
@@ -3703,38 +3776,30 @@ export function CodeWorkspaceTab({
       position: LspPosition,
       triggerCharacter: string | null,
     ): Promise<LspCompletionResult | null> => {
-      // CodeMirror can ask for completion while an edit is still crossing the
-      // IPC boundary.  Wait briefly for didChange to settle instead of
-      // immediately falling back to word completion (feels "slow"/empty).
-      let snapshot = currentSyncedLspDocument(file);
-      if (!snapshot) {
-        const deadline = performance.now() + 280;
-        while (!snapshot && performance.now() < deadline) {
-          await new Promise<void>((resolve) => {
-            window.setTimeout(resolve, 16);
-          });
-          // Drop out if the buffer moved on while we waited.
-          if (!openFilesRef.current[file.key] || openFilesRef.current[file.key]?.text !== file.text) {
-            return null;
-          }
-          snapshot = currentSyncedLspDocument(file);
-        }
-      }
-      if (!snapshot) return null;
-      const descriptor = lspDescriptorForFile(snapshot.file);
+      // Always resolve against the live buffer (openFilesRef), not the React
+      // prop — typing is batched into the store and the prop is often one
+      // burst behind CodeMirror. Force-flush didChange so the server sees the
+      // same text the caret is in (IDEA-like: no empty popup mid-edit).
+      const live = await ensureLspDocumentSynced(file.key);
+      if (!live) return null;
+      const descriptor = lspDescriptorForFile(live);
       if (!descriptor) return null;
+      const epoch = lspDocumentEpochRef.current[live.key] ?? 0;
       try {
         const result = await lspCompletion(descriptor, position, triggerCharacter);
-        if (!isCurrentLspDocumentRequest(snapshot.file, snapshot.epoch)) return null;
-        updateLspStatusForFile(snapshot.file, result.status);
+        // Drop only when the buffer moved again while IPC was in flight; CM
+        // re-queries on the next keystroke / incomplete list.
+        if (!openFilesRef.current[live.key]) return null;
+        if (openFilesRef.current[live.key]?.text !== live.text) return null;
+        if (lspDocumentEpochRef.current[live.key] !== epoch) return null;
+        updateLspStatusForFile(live, result.status);
         return result;
       } catch {
         return null;
       }
     },
     [
-      currentSyncedLspDocument,
-      isCurrentLspDocumentRequest,
+      ensureLspDocumentSynced,
       lspDescriptorForFile,
       updateLspStatusForFile,
     ],
@@ -3759,17 +3824,22 @@ export function CodeWorkspaceTab({
       position: LspPosition,
       triggerCharacter: string | null,
     ): Promise<LspSignatureHelpResult | null> => {
-      const descriptor = lspDescriptorForFile(file);
+      const live = await ensureLspDocumentSynced(file.key);
+      if (!live) return null;
+      const descriptor = lspDescriptorForFile(live);
       if (!descriptor) return null;
       try {
         const result = await lspSignatureHelp(descriptor, position, triggerCharacter);
-        updateLspStatusForFile(file, result.status);
+        if (!openFilesRef.current[live.key] || openFilesRef.current[live.key]?.text !== live.text) {
+          return null;
+        }
+        updateLspStatusForFile(live, result.status);
         return result;
       } catch {
         return null;
       }
     },
-    [lspDescriptorForFile, updateLspStatusForFile],
+    [ensureLspDocumentSynced, lspDescriptorForFile, updateLspStatusForFile],
   );
 
   const getLspHover = useCallback(
