@@ -96,6 +96,26 @@ function props(overrides: Partial<ComponentProps<typeof EditorGroup>> = {}): Com
 }
 
 describe("EditorGroup tabs", () => {
+  it("uses the metadata row for file details without repeating the breadcrumb path", () => {
+    const activeFile = {
+      ...file("BackupManager"),
+      subtitle: "persis-g2 / persis-g2-server/src/main/java/com/deepzero/ads/persis/backup/BackupManager.java",
+      size: 12_500,
+    };
+    render(<EditorGroup {...props({
+      activeFile,
+      lspStatusPill: <span>Java</span>,
+      formatBytes: () => "12.5 KB",
+      formatMtime: () => "2026/3/29 08:28:53",
+    })} />);
+
+    const status = screen.getByTestId("code-workspace-file-status");
+    expect(status).toHaveTextContent("12.5 KB");
+    expect(status).toHaveTextContent("2026/3/29 08:28:53");
+    expect(status).toHaveTextContent("Java");
+    expect(status).not.toHaveTextContent(activeFile.subtitle);
+  });
+
   it("renders pinned tabs first, marks previews, promotes on double click, and middle-closes", () => {
     const onPromotePreview = vi.fn();
     const onClose = vi.fn();
