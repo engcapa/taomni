@@ -93,12 +93,47 @@ describe("splitSqlStatements", () => {
     ]);
   });
 
-  it("does not split engines that still rely on backend single-call execution semantics", () => {
-    expect(sqlStatementsForExecution("Oracle", "select 1; select 2;")).toEqual([
-      "select 1; select 2;",
+  it("splits Oracle scripts so each statement is executed alone", () => {
+    expect(sqlStatementsForExecution("Oracle", "select 1 from dual; select 2 from dual;")).toEqual([
+      "select 1 from dual",
+      "select 2 from dual",
     ]);
+    expect(
+      sqlStatementsForExecution(
+        "Oracle",
+        'create table t1(id number);\ncreate table t2(id number);\ndrop table t1;',
+      ),
+    ).toEqual([
+      "create table t1(id number)",
+      "create table t2(id number)",
+      "drop table t1",
+    ]);
+  });
+
+  it("splits ClickHouse scripts so each statement is executed alone", () => {
     expect(sqlStatementsForExecution("ClickHouse", "select 1; select 2;")).toEqual([
-      "select 1; select 2;",
+      "select 1",
+      "select 2",
+    ]);
+    expect(
+      sqlStatementsForExecution(
+        "ClickHouse",
+        "create table t1(id UInt32) engine=Memory;\ncreate table t2(id UInt32) engine=Memory;",
+      ),
+    ).toEqual([
+      "create table t1(id UInt32) engine=Memory",
+      "create table t2(id UInt32) engine=Memory",
+    ]);
+  });
+
+  it("preserves quoted identifiers that contain semicolons for Oracle and ClickHouse", () => {
+    expect(sqlStatementsForExecution("Oracle", 'select "a;b" from dual; select 2 from dual;')).toEqual([
+      'select "a;b" from dual',
+      "select 2 from dual",
+    ]);
+    expect(sqlStatementsForExecution("ClickHouse", "select `a;b`; select 2;")).toEqual([
+      "select `a;b`",
+      "select 2",
     ]);
   });
 
