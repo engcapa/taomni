@@ -9,6 +9,7 @@ import {
   type RefObject,
 } from "react";
 import {
+  ChevronLeft,
   Columns2,
   File,
   FilePlus,
@@ -45,6 +46,9 @@ interface FileTreePaneProps {
   maxFontSize: number;
   defaultFontSize: number;
   onFontSizeChange: (size: number) => void;
+  /** When provided, show a panel-local collapse control (like BottomDock). */
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
   onOpenFile: () => void;
   onAddFolder: () => void;
   canCreate: boolean;
@@ -113,6 +117,8 @@ export function FileTreePane({
   maxFontSize,
   defaultFontSize,
   onFontSizeChange,
+  collapsed = false,
+  onToggleCollapse,
   onOpenFile,
   onAddFolder,
   canCreate,
@@ -256,6 +262,14 @@ export function FileTreePane({
             icon={<MoreHorizontal className="w-3.5 h-3.5" />}
             onClick={openToolbarOverflow}
           />
+          {onToggleCollapse && (
+            <TreeIconButton
+              label={collapsed ? "Show project tree" : "Hide project tree"}
+              testId="code-workspace-tree-collapse"
+              icon={<ChevronLeft className="w-3.5 h-3.5" />}
+              onClick={onToggleCollapse}
+            />
+          )}
         </div>
         <div
           data-testid="code-workspace-tree-toolbar-browse"

@@ -2108,11 +2108,46 @@ describe("CodeWorkspaceTab", () => {
       expect(ui.bottomDockOpen).toBe(false);
       expect(ui.bottomDockTab).toBe("search");
       expect(ui.rightPaneOpen).toBe(true);
+      expect(ui.languagePanelOpen).toBe(false);
       expect(ui.splitOrientation).toBe("vertical");
       expect(ui.editorGroups.primary.openOrder).toContain("root:app:src/main.ts");
       expect(ui.editorGroups.secondary.openOrder).toContain("root:app:src/util.ts");
     });
+    expect(screen.getByTestId("code-workspace-project-collapsed-rail")).toBeInTheDocument();
+    expect(screen.getByTestId("code-workspace-project-expand")).toBeInTheDocument();
     expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/main.ts");
     expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/util.ts");
+  });
+
+  it("toggles the project tree from the panel-local collapse control and collapsed rail", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-tree-collapse",
+      workspaceInstanceId: "instance-tree-collapse",
+      name: "Tree Collapse",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+    };
+    renderWorkspace(workspace);
+
+    await screen.findByTestId("code-workspace-tree-pane");
+    expect(screen.getByTestId("code-workspace-tree-collapse")).toBeInTheDocument();
+    expect(screen.getByTestId("code-workspace-project-resize-handle")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("code-workspace-tree-collapse"));
+    await waitFor(() => {
+      expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-collapse").languagePanelOpen)
+        .toBe(false);
+    });
+    expect(screen.getByTestId("code-workspace-project-collapsed-rail")).toBeInTheDocument();
+    expect(screen.getByTestId("code-workspace-project-expand")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("code-workspace-project-expand"));
+    await waitFor(() => {
+      expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-collapse").languagePanelOpen)
+        .toBe(true);
+    });
+    expect(screen.queryByTestId("code-workspace-project-collapsed-rail")).toBeNull();
+    expect(screen.getByTestId("code-workspace-tree-collapse")).toBeInTheDocument();
   });
 });

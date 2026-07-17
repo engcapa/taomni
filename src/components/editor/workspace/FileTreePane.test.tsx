@@ -9,6 +9,7 @@ function renderPane(overrides: {
   canCreate?: boolean;
   canMutateSelection?: boolean;
   paneWidth?: number;
+  onToggleCollapse?: () => void;
 } = {}) {
   const callbacks = {
     onFilterChange: vi.fn(),
@@ -20,6 +21,7 @@ function renderPane(overrides: {
     onCreateDirectory: vi.fn(),
     onRename: vi.fn(),
     onDelete: vi.fn(),
+    onToggleCollapse: overrides.onToggleCollapse ?? vi.fn(),
   };
   const paneRef = createRef<HTMLElement>();
   render(
@@ -35,6 +37,7 @@ function renderPane(overrides: {
       maxFontSize={20}
       defaultFontSize={12}
       onFontSizeChange={callbacks.onFontSizeChange}
+      onToggleCollapse={callbacks.onToggleCollapse}
       onOpenFile={callbacks.onOpenFile}
       onAddFolder={callbacks.onAddFolder}
       canCreate={overrides.canCreate ?? true}
@@ -176,5 +179,15 @@ describe("FileTreePane", () => {
     expect(screen.getByRole("button", { name: "Delete or remove" })).toBeDisabled();
     // Language Servers live in Settings now — not in every workspace tree.
     expect(screen.queryByText("Language Servers")).toBeNull();
+  });
+
+  it("places a panel-local collapse control on the tree toolbar row", () => {
+    const onToggleCollapse = vi.fn();
+    renderPane({ onToggleCollapse });
+
+    const collapse = screen.getByTestId("code-workspace-tree-collapse");
+    expect(collapse).toHaveAttribute("aria-label", "Hide project tree");
+    fireEvent.click(collapse);
+    expect(onToggleCollapse).toHaveBeenCalledOnce();
   });
 });

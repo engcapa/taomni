@@ -66,8 +66,10 @@
   --taomni-code-bg: #fbfdff;
   --taomni-code-gutter-bg: #f4f7fb;
   --taomni-code-text: #142033;
-  --taomni-code-muted: #6b778c;
-  --taomni-code-line-number: #78859a;
+  /* Secondary labels on light code chrome — keep above WCAG-ish contrast on
+     #f4f7fb / #fbfdff (slate-500 washes out next to pale blues). */
+  --taomni-code-muted: #475569;
+  --taomni-code-line-number: #64748b;
   --taomni-code-line-number-active: #142033;
   --taomni-code-border: #d9e2ef;
   --taomni-code-active-line-bg: rgba(37, 99, 235, 0.07);
