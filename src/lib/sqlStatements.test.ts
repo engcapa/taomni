@@ -67,11 +67,37 @@ describe("splitSqlStatements", () => {
     ]);
   });
 
-  it("does not split engines that still rely on backend single-call execution semantics", () => {
+  it("splits PostgreSQL scripts so each statement is prepared/executed alone", () => {
+    // Backend uses sqlx query()/execute() (extended protocol). PostgreSQL rejects
+    // multiple commands in one prepared statement (#403).
     expect(sqlStatementsForExecution("PostgreSQL", "select 1; select 2;")).toEqual([
+      "select 1",
+      "select 2",
+    ]);
+    expect(
+      sqlStatementsForExecution(
+        "PostgreSQL",
+        "create table t1(id int);\ncreate table t2(id int);\ndrop table if exists t1;",
+      ),
+    ).toEqual([
+      "create table t1(id int)",
+      "create table t2(id int)",
+      "drop table if exists t1",
+    ]);
+  });
+
+  it("splits PanWeiDB scripts like PostgreSQL-compatible sessions", () => {
+    expect(sqlStatementsForExecution("PanWeiDB", "select 1; select 2;")).toEqual([
+      "select 1",
+      "select 2",
+    ]);
+  });
+
+  it("does not split engines that still rely on backend single-call execution semantics", () => {
+    expect(sqlStatementsForExecution("Oracle", "select 1; select 2;")).toEqual([
       "select 1; select 2;",
     ]);
-    expect(sqlStatementsForExecution("PanWeiDB", "select 1; select 2;")).toEqual([
+    expect(sqlStatementsForExecution("ClickHouse", "select 1; select 2;")).toEqual([
       "select 1; select 2;",
     ]);
   });
@@ -108,8 +134,29 @@ describe("splitSqlStatements", () => {
       sql: "select 2",
     });
     expect(sqlStatementRangeAt("MySQL", sql, sql.indexOf("\n\n"))).toBeNull();
-    expect(sqlStatementRangeAt("PostgreSQL", sql, sql.indexOf("\n\n"))).toMatchObject({
-      sql: "select 1;\n\nselect 2;",
+    expect(sqlStatementRangeAt("PostgreSQL", sql, sql.indexOf("2"))).toMatchObject({
+      sql: "select 2",
     });
+    expect(sqlStatementRangeAt("PostgreSQL", sql, sql.indexOf("\n\n"))).toBeNull();
+  });
+
+  it("keeps PostgreSQL dollar-quoted function bodies intact when splitting for execution", () => {
+    const sql = `
+CREATE FUNCTION add_one(i int) RETURNS int AS $$
+BEGIN
+  RETURN i + 1;
+END;
+$$ LANGUAGE plpgsql;
+SELECT add_one(1);
+`.trim();
+
+    expect(sqlStatementsForExecution("PostgreSQL", sql)).toEqual([
+      `CREATE FUNCTION add_one(i int) RETURNS int AS $$
+BEGIN
+  RETURN i + 1;
+END;
+$$ LANGUAGE plpgsql`,
+      "SELECT add_one(1)",
+    ]);
   });
 });

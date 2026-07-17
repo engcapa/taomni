@@ -364,14 +364,25 @@ describe("DbClientTab connection lifecycle", () => {
     });
     fireEvent.click(screen.getByTitle("Run (F5)"));
 
+    // PostgreSQL scripts are split client-side so each statement is prepared alone (#403).
     await waitFor(() => {
-      expect(ipcMock.dbExecuteStream).toHaveBeenCalledWith(
+      expect(ipcMock.dbExecuteStream).toHaveBeenCalledTimes(2);
+      expect(ipcMock.dbExecuteStream).toHaveBeenNthCalledWith(
+        1,
         expect.stringMatching(/^saved-pg::/),
-        "-- Claude Code ok\nselect * from foo;\n\n-- Claude Code captured\nselect * from bar;",
+        "-- Claude Code ok\nselect * from foo",
+        1000,
+        expect.any(Function),
+      );
+      expect(ipcMock.dbExecuteStream).toHaveBeenNthCalledWith(
+        2,
+        expect.stringMatching(/^saved-pg::/),
+        "-- Claude Code captured\nselect * from bar",
         1000,
         expect.any(Function),
       );
     });
+    expect(screen.getAllByTestId("result-sheet-tab")).toHaveLength(2);
   });
 
   it("shows the execution start time on result sheets", async () => {
@@ -396,7 +407,7 @@ describe("DbClientTab connection lifecycle", () => {
 
     await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
 
-    // PostgreSQL does not auto-split multi-statement SQL; run three times to open three sheets.
+    // Open three result sheets (one Run per statement for a stable tab order).
     for (let count = 1; count <= 3; count += 1) {
       fireEvent.click(screen.getByTitle("Run (F5)"));
       await waitFor(() => {

@@ -260,7 +260,18 @@ export function sqlStatementRangeAt(engine: string, sql: string, position: numbe
 }
 
 function shouldSplitSqlForExecution(engine: string): boolean {
-  return engine === "MySQL" || engine === "StarRocks" || engine === "SQLServer" || engine === "Presto";
+  // Engines that reject multi-command prepared statements (or prefer one statement
+  // per request) must be split on the client before execute/stream.
+  // PostgreSQL / PanWeiDB: sqlx extended protocol → "cannot insert multiple commands
+  // into a prepared statement" for batch DDL/DML scripts (#403).
+  return (
+    engine === "MySQL" ||
+    engine === "StarRocks" ||
+    engine === "SQLServer" ||
+    engine === "Presto" ||
+    engine === "PostgreSQL" ||
+    engine === "PanWeiDB"
+  );
 }
 
 function hasExecutableSql(statement: string): boolean {
