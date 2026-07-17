@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { CompletionContext } from "@codemirror/autocomplete";
+import {
+  DEFAULT_LIVE_TEMPLATE_PREFERENCES,
+  LIVE_TEMPLATE_PREFERENCES_STORAGE_KEY,
+  saveLiveTemplatePreferences,
+} from "../../../lib/liveTemplatePreferences";
 import {
   createLiveTemplateCompletionSource,
   expandLiveTemplateAt,
@@ -10,8 +15,17 @@ import {
   matchLiveTemplateAbbreviation,
   matchPostfixTemplate,
   materializeTemplateBody,
+  refreshLiveTemplatePreferencesCache,
   LIVE_TEMPLATES,
 } from "./liveTemplates";
+
+afterEach(() => {
+  window.localStorage.removeItem(LIVE_TEMPLATE_PREFERENCES_STORAGE_KEY);
+  refreshLiveTemplatePreferencesCache({
+    ...DEFAULT_LIVE_TEMPLATE_PREFERENCES,
+    customTemplates: [],
+  });
+});
 
 function docAt(text: string, pos = text.length) {
   const state = EditorState.create({ doc: text });
@@ -154,5 +168,60 @@ describe("catalog coverage", () => {
     ]) {
       expect(javaAbbr.has(abbr)).toBe(true);
     }
+  });
+});
+
+describe("preferences", () => {
+  it("hides disabled built-ins and honors custom templates", () => {
+    saveLiveTemplatePreferences({
+      enabled: true,
+      postfixEnabled: true,
+      disabledBuiltinKeys: ["java|l|sout"],
+      customTemplates: [{
+        id: "c1",
+        abbreviation: "mysout",
+        body: "System.out.println(\"custom\");",
+        description: "custom",
+        languages: ["java"],
+        postfix: false,
+        enabled: true,
+      }],
+    });
+    refreshLiveTemplatePreferencesCache();
+
+    const listed = listLiveTemplateCompletions(docAt("sout").state.doc, 4, "java");
+    const abbrs = listed?.matches.map((m) => m.template.abbreviation) ?? [];
+    // Exact built-in `sout` is off; longer siblings (soutm/…) may still prefix-match.
+    expect(abbrs).not.toContain("sout");
+    expect(abbrs).toEqual(expect.arrayContaining(["soutm", "soutv"]));
+
+    const custom = matchLiveTemplateAbbreviation(docAt("mysout").state.doc, 6, "java");
+    expect(custom?.template.abbreviation).toBe("mysout");
+    expect(custom?.exact).toBe(true);
+
+    // Tab expand on exact "sout" must not resurrect the disabled template.
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const view = new EditorView({
+      state: EditorState.create({ doc: "sout", selection: { anchor: 4 } }),
+      parent,
+    });
+    expect(expandLiveTemplateAt(view, "java")).toBe(false);
+    expect(view.state.doc.toString()).toBe("sout");
+    view.destroy();
+  });
+
+  it("disables all templates when master switch is off", () => {
+    saveLiveTemplatePreferences({
+      ...DEFAULT_LIVE_TEMPLATE_PREFERENCES,
+      enabled: false,
+      customTemplates: [],
+    });
+    refreshLiveTemplatePreferencesCache();
+    expect(matchLiveTemplateAbbreviation(docAt("sout").state.doc, 4, "java")).toBeNull();
+    expect(expandLiveTemplateAt(
+      new EditorView({ state: EditorState.create({ doc: "sout", selection: { anchor: 4 } }) }),
+      "java",
+    )).toBe(false);
   });
 });

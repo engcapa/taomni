@@ -14,18 +14,15 @@ import {
 } from "@codemirror/autocomplete";
 import type { Text } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
+import {
+  loadLiveTemplatePreferences,
+  subscribeLiveTemplatePreferences,
+  type CustomLiveTemplate,
+  type LiveTemplateLanguage,
+  type LiveTemplatePreferences,
+} from "../../../lib/liveTemplatePreferences";
 
-export type LiveTemplateLanguage =
-  | "java"
-  | "kotlin"
-  | "javascript"
-  | "typescript"
-  | "python"
-  | "rust"
-  | "go"
-  | "csharp"
-  | "php"
-  | "generic";
+export type { LiveTemplateLanguage };
 
 export interface LiveTemplate {
   /** Typed abbreviation, e.g. `sout`. */
@@ -980,6 +977,46 @@ export const LIVE_TEMPLATES: readonly LiveTemplate[] = [
   ...PHP_TEMPLATES,
 ];
 
+/**
+ * Stable key for a built-in template (used by Settings to enable/disable).
+ * Custom templates use their own `id` field instead.
+ */
+export function builtinTemplateKey(template: LiveTemplate): string {
+  const langs = [...template.languages].sort().join(",");
+  return `${langs}|${template.postfix ? "p" : "l"}|${template.abbreviation}`;
+}
+
+export function customTemplateToLiveTemplate(custom: CustomLiveTemplate): LiveTemplate {
+  return {
+    abbreviation: custom.abbreviation,
+    body: custom.body,
+    description: custom.description || "Custom template",
+    languages: custom.languages,
+    postfix: custom.postfix || undefined,
+  };
+}
+
+// Preferences cache so completion stays sync and settings apply immediately.
+let preferencesCache: LiveTemplatePreferences = loadLiveTemplatePreferences();
+
+export function getLiveTemplatePreferencesCache(): LiveTemplatePreferences {
+  return preferencesCache;
+}
+
+/** Test / settings helper: re-read storage into the in-memory cache. */
+export function refreshLiveTemplatePreferencesCache(
+  preferences?: LiveTemplatePreferences,
+): LiveTemplatePreferences {
+  preferencesCache = preferences ?? loadLiveTemplatePreferences();
+  return preferencesCache;
+}
+
+if (typeof window !== "undefined") {
+  subscribeLiveTemplatePreferences((next) => {
+    preferencesCache = next;
+  });
+}
+
 // ── Matching ─────────────────────────────────────────────────────────────
 
 export interface LiveTemplateMatch {
@@ -998,10 +1035,44 @@ function languageMatches(template: LiveTemplate, language: LiveTemplateLanguage)
     || template.languages.includes("generic");
 }
 
-function templatesFor(language: LiveTemplateLanguage, postfix: boolean): LiveTemplate[] {
-  return LIVE_TEMPLATES.filter(
-    (template) => languageMatches(template, language) && !!template.postfix === postfix,
-  );
+/**
+ * Built-ins + enabled custom templates for a language, respecting Settings.
+ */
+export function templatesFor(
+  language: LiveTemplateLanguage,
+  postfix: boolean,
+  preferences: LiveTemplatePreferences = preferencesCache,
+): LiveTemplate[] {
+  if (!preferences.enabled) return [];
+  if (postfix && !preferences.postfixEnabled) return [];
+
+  const disabled = new Set(preferences.disabledBuiltinKeys);
+  const builtins = LIVE_TEMPLATES.filter((template) => (
+    languageMatches(template, language)
+    && !!template.postfix === postfix
+    && !disabled.has(builtinTemplateKey(template))
+  ));
+
+  const customs = preferences.customTemplates
+    .filter((custom) => custom.enabled && !!custom.postfix === postfix)
+    .map(customTemplateToLiveTemplate)
+    .filter((template) => languageMatches(template, language));
+
+  return [...builtins, ...customs];
+}
+
+/** All built-ins for Settings UI, annotated with enable state. */
+export function listBuiltinTemplatesForSettings(
+  preferences: LiveTemplatePreferences = preferencesCache,
+): Array<LiveTemplate & { key: string; enabled: boolean }> {
+  return LIVE_TEMPLATES.map((template) => {
+    const key = builtinTemplateKey(template);
+    return {
+      ...template,
+      key,
+      enabled: !preferences.disabledBuiltinKeys.includes(key),
+    };
+  });
 }
 
 /**

@@ -61,6 +61,7 @@ import { TerminalAppearanceSettings } from "../terminal/TerminalAppearanceSettin
 import { SqlCompletionSettings } from "./SqlCompletionSettings";
 import { SqlExecutionSettings } from "./SqlExecutionSettings";
 import { LanguageServersSettings } from "./LanguageServersSettings";
+import { LiveTemplatesSettings } from "./LiveTemplatesSettings";
 import { SftpSettings } from "./SftpSettings";
 import { FontPickerSelect, type FontPickerOption } from "../terminal/FontPickerPanel";
 import {
@@ -686,6 +687,10 @@ export function SettingsPanel() {
 
             <SettingsAnchor id="language-servers" className="mt-4">
               <LanguageServersSettings />
+            </SettingsAnchor>
+
+            <SettingsAnchor id="live-templates" className="mt-4">
+              <LiveTemplatesSettings />
             </SettingsAnchor>
           </SettingsGroup>
 
