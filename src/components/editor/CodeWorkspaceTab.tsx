@@ -42,6 +42,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import {
+  workspaceListDir,
   workspaceReadFile,
   workspaceReadLooseFile,
   workspaceWriteFile,
@@ -313,6 +314,7 @@ import {
   resolveLooseMarkdownLink,
   resolveRootMarkdownLink,
   rootDirKey,
+  shouldHideEntry,
   workspacePathForGitPath,
   workspaceTitle,
   writeCodeWorkspaceTreeFontSize,
@@ -323,7 +325,12 @@ import { useWorkspaceLspSession } from "./workspace/useWorkspaceLspSession";
 import { useWorkspaceGitSnapshots } from "./workspace/useWorkspaceGitSnapshots";
 import { useWorkspaceNavigation } from "./workspace/useWorkspaceNavigation";
 import { useWorkspaceFileActions } from "./workspace/useWorkspaceFileActions";
-import { Breadcrumbs, type BreadcrumbPathSegment } from "./workspace/Breadcrumbs";
+import {
+  Breadcrumbs,
+  type BreadcrumbPathAction,
+  type BreadcrumbPathChild,
+  type BreadcrumbPathSegment,
+} from "./workspace/Breadcrumbs";
 import {
   TerminalDockPanel,
   type TerminalDockHandle,
@@ -1308,6 +1315,171 @@ export function CodeWorkspaceTab({
       .then(() => setStatusMessage(`Opened ${absolute}`))
       .catch((err) => setStatusMessage(errorMessage(err)));
   }, [revealInExplorer, setStatusMessage]);
+
+  /**
+   * IDEA-style breadcrumb: list children of a directory/root segment, or siblings
+   * when the file segment is clicked. Marks the trail's next segment as active.
+   */
+  const loadBreadcrumbPathChildren = useCallback(async (
+    segment: BreadcrumbPathSegment,
+    file: OpenFileState,
+    trail: BreadcrumbPathSegment[],
+  ): Promise<BreadcrumbPathChild[]> => {
+    const segmentIndex = trail.findIndex((item) =>
+      item.path === segment.path && item.kind === segment.kind && item.label === segment.label
+    );
+    const nextSegment = segmentIndex >= 0 ? trail[segmentIndex + 1] ?? null : null;
+    const activeChildPath = nextSegment && nextSegment.kind !== "root" ? nextSegment.path : null;
+
+    const toChildren = (
+      entries: Array<{ name: string; path: string; fileType: string; isHidden?: boolean }>,
+      pathOf: (entry: { name: string; path: string }) => string,
+    ): BreadcrumbPathChild[] => entries
+      .filter((entry) => entry.fileType === "file" || entry.fileType === "dir")
+      .filter((entry) => !shouldHideEntry({
+        name: entry.name,
+        path: entry.path,
+        fileType: entry.fileType as "file" | "dir" | "symlink" | "other",
+        size: 0,
+        mtime: 0,
+        isHidden: entry.isHidden ?? false,
+      }))
+      .map((entry) => {
+        const path = pathOf(entry);
+        const kind = entry.fileType === "dir" ? "directory" as const : "file" as const;
+        return {
+          label: entry.name,
+          path,
+          kind,
+          active: activeChildPath === path,
+        };
+      });
+
+    if (file.ref.kind === "root") {
+      const rootId = file.ref.rootId;
+      const root = rootsRef.current.find((item) => item.id === rootId);
+      if (!root) return [];
+      // File segment → siblings in parent; directory/root → children of that path.
+      const listPath = segment.kind === "file" ? parentPath(segment.path) : segment.path;
+      void loadDir(rootId, listPath);
+      const entries = await workspaceListDir(root.path, listPath);
+      return toChildren(entries, (entry) => entry.path);
+    }
+
+    // Loose file: list an absolute directory via workspace_list_dir(dir, "").
+    const absolute = normalizeFsPath(segment.path);
+    const dirToList = segment.kind === "file" ? parentPath(absolute) : absolute;
+    if (!dirToList) return [];
+    const entries = await workspaceListDir(dirToList, "");
+    return toChildren(entries, (entry) =>
+      normalizeFsPath(`${dirToList.replace(/[/\\]+$/, "")}/${entry.name}`)
+    );
+  }, [loadDir]);
+
+  const navigateBreadcrumbPathChild = useCallback((
+    child: BreadcrumbPathChild,
+    file: OpenFileState,
+  ) => {
+    if (file.ref.kind === "root") {
+      const rootId = file.ref.rootId;
+      if (child.kind === "directory") {
+        setSelected({ kind: "dir", rootId, path: child.path });
+        setExpandedRoots((current) => new Set(current).add(rootId));
+        setExpandedDirs((current) => {
+          const next = new Set(current);
+          let acc = "";
+          for (const part of child.path.split("/").filter(Boolean)) {
+            acc = acc ? `${acc}/${part}` : part;
+            next.add(rootDirKey(rootId, acc));
+          }
+          return next;
+        });
+        void loadDir(rootId, child.path);
+        treePaneRef.current?.focus();
+        return;
+      }
+      void openFile({ kind: "root", rootId, path: child.path });
+      return;
+    }
+    // Loose file sibling/parent navigation: open absolute path as a loose file.
+    if (child.kind === "file") {
+      void addLooseFilePath(child.path);
+      return;
+    }
+    setStatusMessage(`Folder: ${child.path}`);
+  }, [addLooseFilePath, loadDir, openFile, setStatusMessage]);
+
+  const breadcrumbPathActions = useCallback((
+    segment: BreadcrumbPathSegment,
+    file: OpenFileState,
+  ): BreadcrumbPathAction[] => {
+    const actions: BreadcrumbPathAction[] = [];
+    actions.push({
+      id: "reveal-tree",
+      label: "Select in Project Tree",
+      onSelect: () => {
+        if (file.ref.kind !== "root") {
+          setSelected({ kind: "file", ref: file.ref });
+          treePaneRef.current?.focus();
+          return;
+        }
+        const rootId = file.ref.rootId;
+        if (segment.kind === "root") {
+          setSelected({ kind: "root", rootId });
+          setExpandedRoots((current) => new Set(current).add(rootId));
+        } else if (segment.kind === "directory") {
+          setSelected({ kind: "dir", rootId, path: segment.path });
+          setExpandedRoots((current) => new Set(current).add(rootId));
+          setExpandedDirs((current) => new Set(current).add(rootDirKey(rootId, segment.path)));
+          void loadDir(rootId, segment.path);
+        } else {
+          setSelected({ kind: "file", ref: file.ref });
+          revealEditorTabInTree(file.key);
+          return;
+        }
+        treePaneRef.current?.focus();
+      },
+    });
+    if (file.ref.kind === "root") {
+      const rootId = file.ref.rootId;
+      actions.push({
+        id: "copy-path",
+        label: "Copy Path",
+        onSelect: () => { void copyTreePath(rootId, segment.path, true); },
+      });
+      actions.push({
+        id: "copy-relative",
+        label: "Copy Relative Path",
+        onSelect: () => { void copyTreePath(rootId, segment.path, false); },
+      });
+      actions.push({
+        id: "reveal-explorer",
+        label: "Reveal in Explorer",
+        onSelect: () => { void revealInExplorer(rootId, segment.path); },
+      });
+    } else {
+      const absolute = normalizeFsPath(segment.path);
+      actions.push({
+        id: "copy-path",
+        label: "Copy Path",
+        onSelect: () => {
+          void writeText(absolute)
+            .then(() => setStatusMessage(`Copied ${absolute}`))
+            .catch((err) => setStatusMessage(errorMessage(err)));
+        },
+      });
+      actions.push({
+        id: "reveal-explorer",
+        label: "Reveal in Explorer",
+        onSelect: () => {
+          void invoke("sftp_open_path", { path: absolute })
+            .then(() => setStatusMessage(`Opened ${absolute}`))
+            .catch((err) => setStatusMessage(errorMessage(err)));
+        },
+      });
+    }
+    return actions;
+  }, [copyTreePath, loadDir, revealEditorTabInTree, revealInExplorer, setStatusMessage]);
 
   const openEditorTabInTerminal = useCallback((key: string) => {
     const file = openFilesRef.current[key];
@@ -4240,7 +4412,13 @@ export function CodeWorkspaceTab({
             pathSegments={groupBreadcrumbSegments}
             symbols={breadcrumbSymbolsByGroup[groupId]}
             position={cursorPositions[groupId]}
+            loadPathChildren={(segment) =>
+              loadBreadcrumbPathChildren(segment, groupFile, groupBreadcrumbSegments)
+            }
+            onPathNavigate={(child) => navigateBreadcrumbPathChild(child, groupFile)}
+            pathActionsForSegment={(segment) => breadcrumbPathActions(segment, groupFile)}
             onPathClick={(segment) => {
+              // Fallback when listing is unavailable: reveal the segment in the tree.
               if (groupFile.ref.kind !== "root") return;
               const rootId = groupFile.ref.rootId;
               if (segment.kind === "root") {
