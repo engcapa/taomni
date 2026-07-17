@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import {
   AlertTriangle,
   Ban,
@@ -11,6 +11,7 @@ import {
   Play,
   Plus,
   SquareDashedMousePointer,
+  Trash2,
   X,
 } from "lucide-react";
 import {
@@ -47,6 +48,7 @@ import {
 import { useAppStore } from "../../stores/appStore";
 import { useT } from "../../lib/i18n";
 import { useConfirmDialog } from "../sidebar/ConfirmDialog";
+import { useContextMenu, type MenuItem } from "../ContextMenu";
 import {
   QueryResultGrid,
   type QueryRefreshMode,
@@ -126,6 +128,7 @@ function ResultArea({
   panel,
   onSheetSelect,
   onSheetClose,
+  onCloseSheets,
   onTabChange,
   onRefreshSheet,
   onCancel,
@@ -134,15 +137,65 @@ function ResultArea({
   panel: PanelState;
   onSheetSelect: (sheetId: string) => void;
   onSheetClose: (sheetId: string) => void;
+  onCloseSheets: (sheetIds: string[]) => void;
   onTabChange: (sheetId: string, tab: ResultSubTab) => void;
   onRefreshSheet: (sheetId: string, mode: QueryRefreshMode) => void;
   onCancel: () => void;
   onStatus: (message: string) => void;
 }) {
+  const t = useT();
+  const sheetMenu = useContextMenu();
   const sheet = activeSheet(panel);
   const tab = "h-6 px-3 text-[11px] inline-flex items-center";
+
+  const openSheetMenu = (event: ReactMouseEvent, sheetId: string) => {
+    const idx = panel.sheets.findIndex((candidate) => candidate.id === sheetId);
+    if (idx < 0) return;
+    const isFirst = idx === 0;
+    const isLast = idx === panel.sheets.length - 1;
+    const onlyOne = panel.sheets.length <= 1;
+    const items: MenuItem[] = [
+      {
+        label: t("tabs.close"),
+        testId: "result-sheet-close",
+        icon: <X className="w-3 h-3" />,
+        onClick: () => onSheetClose(sheetId),
+      },
+      {
+        label: t("tabs.closeOthersShort"),
+        testId: "result-sheet-close-others",
+        icon: <Trash2 className="w-3 h-3" />,
+        onClick: () =>
+          onCloseSheets(panel.sheets.filter((candidate) => candidate.id !== sheetId).map((candidate) => candidate.id)),
+        disabled: onlyOne,
+      },
+      {
+        label: t("tabs.closeLeftShort"),
+        testId: "result-sheet-close-left",
+        icon: <Trash2 className="w-3 h-3" />,
+        onClick: () => onCloseSheets(panel.sheets.slice(0, idx).map((candidate) => candidate.id)),
+        disabled: isFirst,
+      },
+      {
+        label: t("tabs.closeRightShort"),
+        testId: "result-sheet-close-right",
+        icon: <Trash2 className="w-3 h-3" />,
+        onClick: () => onCloseSheets(panel.sheets.slice(idx + 1).map((candidate) => candidate.id)),
+        disabled: isLast,
+      },
+      {
+        label: t("tabs.closeAll"),
+        testId: "result-sheet-close-all",
+        icon: <Trash2 className="w-3 h-3" />,
+        onClick: () => onCloseSheets(panel.sheets.map((candidate) => candidate.id)),
+      },
+    ];
+    sheetMenu.show(event, items);
+  };
+
   return (
     <div className="h-full flex flex-col min-h-0" style={{ background: "var(--taomni-bg)", fontSize: "var(--taomni-db-font-size, 12px)" }}>
+      {sheetMenu.render}
       <div className="h-7 shrink-0 flex items-end gap-1 px-1 overflow-hidden" style={{ background: "var(--taomni-chrome-bg)", borderBottom: "1px solid var(--taomni-divider)" }}>
         {panel.sheets.length === 0 ? (
           <span className="px-2 pb-1 text-[11px] text-[var(--taomni-text-muted)]">Result sheets</span>
@@ -153,6 +206,8 @@ function ResultArea({
               <button
                 key={rs.id}
                 type="button"
+                data-testid="result-sheet-tab"
+                data-sheet-id={rs.id}
                 className="h-6 max-w-[170px] px-2 inline-flex items-center gap-1 text-[11px]"
                 style={{
                   background: active ? "var(--taomni-tab-active)" : "var(--taomni-tab-inactive)",
@@ -163,6 +218,7 @@ function ResultArea({
                   borderTopRightRadius: 4,
                 }}
                 onClick={() => onSheetSelect(rs.id)}
+                onContextMenu={(event) => openSheetMenu(event, rs.id)}
                 title={rs.command}
               >
                 <span className="truncate">{rs.title}</span>
@@ -590,16 +646,29 @@ export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabPro
     [panels, executeIntoSheet],
   );
 
-  const closeResultSheet = useCallback((panelId: string, sheetId: string) => {
+  const closeResultSheets = useCallback((panelId: string, sheetIds: string[]) => {
+    if (sheetIds.length === 0) return;
+    const idSet = new Set(sheetIds);
     setPanels((prev) =>
       prev.map((p) => {
         if (p.id !== panelId) return p;
-        const sheets = p.sheets.filter((s) => s.id !== sheetId);
-        const activeSheetId = p.activeSheetId === sheetId ? (sheets[sheets.length - 1]?.id ?? null) : p.activeSheetId;
-        return { ...p, sheets, activeSheetId };
+        const sheets = p.sheets.filter((s) => !idSet.has(s.id));
+        const activeClosed = !!p.activeSheetId && idSet.has(p.activeSheetId);
+        return {
+          ...p,
+          sheets,
+          activeSheetId: activeClosed ? sheets[sheets.length - 1]?.id ?? null : p.activeSheetId,
+        };
       }),
     );
   }, []);
+
+  const closeResultSheet = useCallback(
+    (panelId: string, sheetId: string) => {
+      closeResultSheets(panelId, [sheetId]);
+    },
+    [closeResultSheets],
+  );
 
   const addPanel = useCallback(
     (doc = "") => {
@@ -875,6 +944,7 @@ export default function HBaseShellTab({ tabId, info, visible }: HBaseShellTabPro
                     panel={activePanel}
                     onSheetSelect={(sheetId) => patchPanel(activePanel.id, { activeSheetId: sheetId })}
                     onSheetClose={(sheetId) => closeResultSheet(activePanel.id, sheetId)}
+                    onCloseSheets={(sheetIds) => closeResultSheets(activePanel.id, sheetIds)}
                     onTabChange={(sheetId, tab) => patchSheet(activePanel.id, sheetId, { resultTab: tab })}
                     onRefreshSheet={(sheetId, mode) => refreshSheet(activePanel.id, sheetId, mode)}
                     onCancel={() => cancelQuery(activePanel.id)}

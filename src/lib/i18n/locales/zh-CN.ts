@@ -735,7 +735,10 @@ export const zhCN: DeepPartial<typeof en> = {
   tabs: {
     closeTab: "关闭标签页",
     closeOthers: "关闭其他标签页",
+    closeLeft: "关闭左侧标签页",
     closeRight: "关闭右侧标签页",
+    closeLeftShort: "关闭左边",
+    closeRightShort: "关闭右边",
     duplicateTab: "复制标签页",
     renameTab: "重命名标签页…",
     pinTab: "固定标签页",

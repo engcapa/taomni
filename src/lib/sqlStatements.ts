@@ -259,8 +259,12 @@ export function sqlStatementRangeAt(engine: string, sql: string, position: numbe
   return ranges.length === 1 ? ranges[0] : null;
 }
 
-function shouldSplitSqlForExecution(engine: string): boolean {
-  return engine === "MySQL" || engine === "StarRocks" || engine === "SQLServer" || engine === "Presto";
+function shouldSplitSqlForExecution(_engine: string): boolean {
+  // All SQL client engines are split client-side so each statement is executed
+  // alone (result sheet per statement, safe for drivers that reject multi-command
+  // prepared statements or one-request multi-SQL). SQL Server also splits on GO
+  // (see splitGo below). Redis / HBase use other statement helpers.
+  return true;
 }
 
 function hasExecutableSql(statement: string): boolean {

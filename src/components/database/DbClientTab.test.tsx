@@ -185,8 +185,10 @@ vi.mock("../tabbar/TabActionSlot", () => ({
     active ? <div data-testid="tab-action-slot">{children}</div> : null,
 }));
 
+const contextMenuShow = vi.hoisted(() => vi.fn());
+
 vi.mock("../ContextMenu", () => ({
-  useContextMenu: () => ({ show: vi.fn(), render: null }),
+  useContextMenu: () => ({ show: contextMenuShow, render: null, showAt: vi.fn(), refreshItems: vi.fn(), close: vi.fn(), isOpen: false }),
 }));
 
 vi.mock("../../lib/capture", () => ({
@@ -240,6 +242,7 @@ describe("DbClientTab connection lifecycle", () => {
     dbChildProps.editorInitialDocFallback = "select 1";
     dbChildProps.generatedSql = "select 1\nORDER BY \"one\" DESC;";
     dbChildProps.generatedRequest = null;
+    contextMenuShow.mockClear();
   });
 
   it("keeps queries on the latest runtime connection when a stale StrictMode connect resolves late", async () => {
@@ -361,14 +364,25 @@ describe("DbClientTab connection lifecycle", () => {
     });
     fireEvent.click(screen.getByTitle("Run (F5)"));
 
+    // PostgreSQL scripts are split client-side so each statement is prepared alone (#403).
     await waitFor(() => {
-      expect(ipcMock.dbExecuteStream).toHaveBeenCalledWith(
+      expect(ipcMock.dbExecuteStream).toHaveBeenCalledTimes(2);
+      expect(ipcMock.dbExecuteStream).toHaveBeenNthCalledWith(
+        1,
         expect.stringMatching(/^saved-pg::/),
-        "-- Claude Code ok\nselect * from foo;\n\n-- Claude Code captured\nselect * from bar;",
+        "-- Claude Code ok\nselect * from foo",
+        1000,
+        expect.any(Function),
+      );
+      expect(ipcMock.dbExecuteStream).toHaveBeenNthCalledWith(
+        2,
+        expect.stringMatching(/^saved-pg::/),
+        "-- Claude Code captured\nselect * from bar",
         1000,
         expect.any(Function),
       );
     });
+    expect(screen.getAllByTestId("result-sheet-tab")).toHaveLength(2);
   });
 
   it("shows the execution start time on result sheets", async () => {
@@ -383,6 +397,85 @@ describe("DbClientTab connection lifecycle", () => {
     await waitFor(() => {
       expect(screen.getByText("11:12:13")).toBeInTheDocument();
       expect(screen.getAllByTitle(/Started: 2026-07-02 11:12:13/).length).toBeGreaterThan(0);
+    });
+  });
+
+  it("supports batch close actions from the result sheet context menu", async () => {
+    ipcMock.dbConnect.mockResolvedValue({ ok: true });
+
+    render(<DbClientTab tabId="tab-1" info={postgresInfo} visible />);
+
+    await waitFor(() => expect(screen.getByTestId("schema-tree")).toBeInTheDocument());
+
+    // Open three result sheets (one Run per statement for a stable tab order).
+    for (let count = 1; count <= 3; count += 1) {
+      fireEvent.click(screen.getByTitle("Run (F5)"));
+      await waitFor(() => {
+        expect(screen.getAllByTestId("result-sheet-tab")).toHaveLength(count);
+      });
+    }
+
+    type MenuItem = {
+      label: string;
+      testId?: string;
+      disabled?: boolean;
+      onClick?: () => void;
+    };
+    const lastSheetMenu = (): MenuItem[] => {
+      const menuCalls = contextMenuShow.mock.calls as Array<[unknown, MenuItem[]]>;
+      const sheetMenuCall = [...menuCalls].reverse().find(([, items]) =>
+        items.some((item) => item.testId === "result-sheet-close-others"),
+      );
+      expect(sheetMenuCall).toBeTruthy();
+      return sheetMenuCall![1];
+    };
+
+    const sheets = screen.getAllByTestId("result-sheet-tab");
+    fireEvent.contextMenu(sheets[1]);
+    const items = lastSheetMenu();
+    expect(items.find((item) => item.testId === "result-sheet-close-left")?.disabled).toBe(false);
+    expect(items.find((item) => item.testId === "result-sheet-close-right")?.disabled).toBe(false);
+    expect(items.find((item) => item.testId === "result-sheet-close-others")?.disabled).toBe(false);
+
+    act(() => {
+      items.find((item) => item.testId === "result-sheet-close-others")?.onClick?.();
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId("result-sheet-tab")).toHaveLength(1);
+      expect(screen.getByText("Result 2")).toBeInTheDocument();
+    });
+
+    // Rebuild more sheets and verify close left / right / all.
+    for (let count = 2; count <= 4; count += 1) {
+      fireEvent.click(screen.getByTitle("Run (F5)"));
+      await waitFor(() => {
+        expect(screen.getAllByTestId("result-sheet-tab")).toHaveLength(count);
+      });
+    }
+
+    fireEvent.contextMenu(screen.getAllByTestId("result-sheet-tab")[1]);
+    act(() => {
+      lastSheetMenu().find((item) => item.testId === "result-sheet-close-left")?.onClick?.();
+    });
+    await waitFor(() => {
+      expect(screen.getAllByTestId("result-sheet-tab")).toHaveLength(3);
+    });
+
+    fireEvent.contextMenu(screen.getAllByTestId("result-sheet-tab")[0]);
+    act(() => {
+      lastSheetMenu().find((item) => item.testId === "result-sheet-close-right")?.onClick?.();
+    });
+    await waitFor(() => {
+      expect(screen.getAllByTestId("result-sheet-tab")).toHaveLength(1);
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("result-sheet-tab"));
+    act(() => {
+      lastSheetMenu().find((item) => item.testId === "result-sheet-close-all")?.onClick?.();
+    });
+    await waitFor(() => {
+      expect(screen.queryAllByTestId("result-sheet-tab")).toHaveLength(0);
     });
   });
 
