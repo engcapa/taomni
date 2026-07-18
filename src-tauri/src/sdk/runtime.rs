@@ -1,4 +1,4 @@
-use super::resolve::{ResolvedSdk, ResolvedSdkStatus, WorkspaceSdkResolution};
+use super::resolve::{ResolvedSdkStatus, WorkspaceSdkResolution};
 use super::{SdkBindingMode, SdkInstallation, SdkKind, SdkRegistry, SdkRole, SdkStatus};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -527,7 +527,7 @@ mod tests {
     use super::super::detect::{
         ProjectBuildSystem, ProjectSdkProfile, SdkConfidence, SdkRequirement, WorkspaceSdkAnalysis,
     };
-    use super::super::resolve::{ResolvedSdkSource, WorkspaceSdkResolution};
+    use super::super::resolve::{ResolvedSdk, ResolvedSdkSource, WorkspaceSdkResolution};
     use super::super::{SdkDefault, SdkOrigin, WorkspaceSdkBinding};
     use super::*;
 
