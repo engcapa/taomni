@@ -1,0 +1,61 @@
+id: TC-auto-F-SOCKSCAP-4-rules
+title: Sockscap manages rule sources and explains target decisions
+description: |
+  Refreshes the seeded last-good source, persists and imports a custom URL
+  source, edits ordered manual overrides, and runs a complete target decision
+  request with application, PID/start token, protocol, and hostname source.
+  It finishes by opening the local-source draft so both supported source entry
+  points are covered without reading a user file.
+covers: [F-SOCKSCAP-4]
+tags: [auto-generated, smoke, p0, needs-review, sockscap, rules]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 75
+steps:
+  - open: "${cfg.app.base_url}?sockscap=1&section=rules"
+  - wait_for: '[data-testid="sockscap-rules-page"]'
+
+  - click: '[data-testid="sockscap-rule-source-row"][data-source-id="gfwlist-official"]'
+  - click: '[data-testid="sockscap-rule-source-refresh"]'
+  - wait_for: '[data-testid="sockscap-refresh-report"]'
+
+  - click: '[data-testid="sockscap-rule-source-new-url"]'
+  - fill: {selector: '[data-testid="sockscap-rule-source-name"]', value: "QA URL rules"}
+  - set_check: {selector: '[data-testid="sockscap-rule-source-enabled"]', checked: true}
+  - fill: {selector: '[data-testid="sockscap-rule-source-interval"]', value: "12"}
+  - fill: {selector: '[data-testid="sockscap-rule-source-url"]', value: "https://rules.example.test/gfwlist.txt"}
+  - click: '[data-testid="sockscap-rule-source-save"]'
+  - fill:
+      selector: '[data-testid="sockscap-rule-payload"]'
+      value: "||blocked.example\n@@||direct.example"
+  - click: '[data-testid="sockscap-rule-source-import"]'
+  - wait_for: '[data-testid="sockscap-rule-source-state"]'
+
+  - select_option: {selector: '[data-testid="sockscap-manual-profile"]', value: "browser-demo"}
+  - click: '[data-testid="sockscap-manual-rule-add"]'
+  - click: '[data-testid="sockscap-manual-rule-add"]'
+  - assert_count: {selector: '[data-testid="sockscap-manual-rule-row"]', equal: 2}
+  - set_check: {selector: '[data-testid="sockscap-manual-rule-enabled"]', checked: true}
+  - select_option: {selector: '[data-testid="sockscap-manual-rule-action"]', value: "block"}
+  - select_option: {selector: '[data-testid="sockscap-manual-rule-kind"]', value: "domain_exact"}
+  - fill: {selector: '[data-testid^="sockscap-manual-rule-pattern-"]', value: "manual.blocked.example"}
+  - fill: {selector: '[data-testid^="sockscap-manual-rule-pattern-"] >> nth=1', value: "second.example"}
+  - click: '[data-testid="sockscap-manual-rule-down"]'
+  - click: '[data-testid="sockscap-manual-rule-up"] >> nth=1'
+  - click: '[data-testid="sockscap-manual-rule-remove"] >> nth=1'
+  - click: '[data-testid="sockscap-manual-rules-save"]'
+
+  - fill: {selector: '[data-testid="sockscap-target-app"]', value: "/usr/bin/browser"}
+  - select_option: {selector: '[data-testid="sockscap-target-selector-kind"]', value: "executable_path"}
+  - fill: {selector: '[data-testid="sockscap-target-pid"]', value: "4100"}
+  - fill: {selector: '[data-testid="sockscap-target-process-start"]', value: "1700000000"}
+  - fill: {selector: '[data-testid="sockscap-target-host"]', value: "blocked.example"}
+  - fill: {selector: '[data-testid="sockscap-target-port"]', value: "443"}
+  - select_option: {selector: '[data-testid="sockscap-target-protocol"]', value: "tcp"}
+  - select_option: {selector: '[data-testid="sockscap-target-hostname-source"]', value: "tls_sni"}
+  - set_check: {selector: '[data-testid="sockscap-target-hard-bypass"]', checked: false}
+  - click: '[data-testid="sockscap-target-run"]'
+  - wait_for: '[data-testid="sockscap-target-result"]'
+
+  - click: '[data-testid="sockscap-rule-source-new-local"]'
+  - screenshot: sockscap-rules.png

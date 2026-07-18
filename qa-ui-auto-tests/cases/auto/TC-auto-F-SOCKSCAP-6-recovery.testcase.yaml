@@ -1,0 +1,32 @@
+id: TC-auto-F-SOCKSCAP-6-recovery
+title: Sockscap lifecycle blocks login restore until network recovery
+description: |
+  Starts from a deterministic browser recovery marker, opts in to login
+  restore, verifies the recovery gate and journal phase, then invokes the
+  upstream-independent recovery action and confirms the journal returns to
+  clean. Native tray clicks, helper acknowledgement, and process exit remain
+  explicit Tauri/native release gates.
+covers: [F-SOCKSCAP-6]
+tags: [auto-generated, smoke, p0, needs-review, sockscap, recovery]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 35
+steps:
+  - open: "${cfg.app.base_url}?sockscap=1&section=lifecycle&sockscapRecovery=1"
+  - wait_for: '[data-testid="sockscap-lifecycle"]'
+  - assert_visible: '[data-testid="sockscap-auto-restore-panel"]'
+  - assert_visible: '[data-testid="sockscap-recovery-journal"]'
+  - click: '[data-testid="sockscap-lifecycle-refresh"]'
+  - set_check: {selector: '[data-testid="sockscap-auto-restore"]', checked: true}
+  - assert_text:
+      selector: '[data-testid="sockscap-auto-restore-panel"]'
+      contains: "Network cleanup is required"
+  - assert_text:
+      selector: '[data-testid="sockscap-recovery-journal"]'
+      contains: "recovery required"
+  - click: '[data-testid="sockscap-lifecycle-recover"]'
+  - wait_for: {selector: '[data-testid="sockscap-lifecycle-recover"]', state: hidden}
+  - assert_text:
+      selector: '[data-testid="sockscap-recovery-journal"]'
+      contains: "clean"
+  - screenshot: sockscap-recovery.png

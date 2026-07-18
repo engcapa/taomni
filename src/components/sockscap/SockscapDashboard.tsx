@@ -124,6 +124,7 @@ export function SockscapDashboard() {
           <label className="flex items-center gap-2 text-[11px]">
             <span className="text-[var(--taomni-text-muted)]">{t("sockscap.timeRange")}</span>
             <select
+              data-testid="sockscap-dashboard-range"
               aria-label={t("sockscap.timeRange")}
               value={range}
               onChange={(event) => setRange(event.target.value as SockscapDashboardRange)}
@@ -164,7 +165,7 @@ export function SockscapDashboard() {
       {notice && (
         <Notice tone="success">
           <span className="min-w-0 flex-1">{notice}</span>
-          <button type="button" aria-label={t("common.close")} onClick={() => setNotice(null)}>
+          <button type="button" data-testid="sockscap-dashboard-notice-dismiss" aria-label={t("common.close")} onClick={() => setNotice(null)}>
             <X className="h-3.5 w-3.5" />
           </button>
         </Notice>
@@ -198,6 +199,7 @@ export function SockscapDashboard() {
         </span>
         <button
           type="button"
+          data-testid="sockscap-dashboard-privacy-settings"
           onClick={() => setSection("profiles")}
           className="text-[10px] font-medium text-[var(--taomni-accent)] hover:underline"
         >
@@ -262,7 +264,7 @@ export function SockscapDashboard() {
                     <div className="mt-0.5 break-words text-[10px] leading-4 text-[var(--taomni-text-muted)]">{alert.message}</div>
                     <time className="mt-1 block text-[9px] text-[var(--taomni-text-muted)]">{formatTime(alert.createdAtUnix)}</time>
                   </div>
-                  <button type="button" aria-label={t("sockscap.dismissAlert")} onClick={() => dismissAlert(alert.createdAtUnix, alert.code)}>
+                  <button type="button" data-testid="sockscap-dashboard-alert-dismiss" aria-label={t("sockscap.dismissAlert")} onClick={() => dismissAlert(alert.createdAtUnix, alert.code)}>
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>

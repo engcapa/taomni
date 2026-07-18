@@ -1,0 +1,45 @@
+id: TC-auto-F-SOCKSCAP-1-dashboard
+title: Sockscap independent window and privacy dashboard
+description: |
+  Browser-stub smoke for the independent Sockscap shell. It traverses every
+  section, enables domain aggregation in the saved profile, exercises bounded
+  dashboard controls, and clears aggregate statistics through the shared
+  confirmation dialog. Native window chrome and tray behavior remain native
+  smoke responsibilities.
+covers: [F-SOCKSCAP-1]
+tags: [auto-generated, smoke, p0, needs-review, sockscap]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 60
+steps:
+  - open: "${cfg.app.base_url}?sockscap=1"
+  - wait_for: '[data-testid="sockscap-window"]'
+  - assert_visible: '[data-testid="sockscap-status"]'
+  - assert_visible: '[data-testid="sockscap-overview"]'
+  - click: '[data-testid="sockscap-refresh"]'
+
+  - click: '[data-testid="sockscap-nav-profiles"]'
+  - wait_for: '[data-testid="sockscap-profiles-page"]'
+  - set_check: {selector: '[data-testid="sockscap-domain-aggregation"]', checked: true}
+  - click: '[data-testid="sockscap-profile-save"]'
+
+  - click: '[data-testid="sockscap-nav-rules"]'
+  - wait_for: '[data-testid="sockscap-rules-page"]'
+  - click: '[data-testid="sockscap-nav-lifecycle"]'
+  - wait_for: '[data-testid="sockscap-lifecycle"]'
+  - click: '[data-testid="sockscap-nav-overview"]'
+  - wait_for: '[data-testid="sockscap-overview"]'
+
+  - click: '[data-testid="sockscap-nav-dashboard"]'
+  - wait_for: '[data-testid="sockscap-dashboard"]'
+  - select_option: {selector: '[data-testid="sockscap-dashboard-range"]', value: "6h"}
+  - click: '[data-testid="sockscap-dashboard-refresh"]'
+  - set_check: {selector: '[data-testid="sockscap-domain-aggregation-toggle"]', checked: true}
+  - click: '[data-testid="sockscap-clear-stats"]'
+  - wait_for: '[data-testid="confirm-dialog"]'
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  - wait_for: '[data-testid="sockscap-dashboard-notice-dismiss"]'
+  - click: '[data-testid="sockscap-dashboard-notice-dismiss"]'
+  - click: '[data-testid="sockscap-dashboard-privacy-settings"]'
+  - wait_for: '[data-testid="sockscap-profiles-page"]'
+  - screenshot: sockscap-dashboard.png

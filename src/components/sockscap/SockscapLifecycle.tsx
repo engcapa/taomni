@@ -54,7 +54,7 @@ export function SockscapLifecycle() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <LifecyclePanel title={t("sockscap.autoRestoreTitle")} icon={<Laptop2 className="h-4 w-4" />}>
+        <LifecyclePanel testId="sockscap-auto-restore-panel" title={t("sockscap.autoRestoreTitle")} icon={<Laptop2 className="h-4 w-4" />}>
           <label className="flex items-start justify-between gap-4" htmlFor="sockscap-auto-restore">
             <span className="min-w-0">
               <span className="block text-[12px] font-semibold">{t("sockscap.autoRestoreLogin")}</span>
@@ -94,7 +94,7 @@ export function SockscapLifecycle() {
           )}
         </LifecyclePanel>
 
-        <LifecyclePanel title={t("sockscap.recoveryJournalTitle")} icon={<HardDrive className="h-4 w-4" />}>
+        <LifecyclePanel testId="sockscap-recovery-journal" title={t("sockscap.recoveryJournalTitle")} icon={<HardDrive className="h-4 w-4" />}>
           <div className="grid grid-cols-2 gap-2">
             <Fact label={t("sockscap.recoveryPhase")} value={lifecycle.recovery.phase.replaceAll("_", " ")} />
             <Fact label={t("sockscap.recoveryGeneration")} value={String(lifecycle.recovery.generation)} />
@@ -147,9 +147,9 @@ export function SockscapLifecycle() {
   );
 }
 
-function LifecyclePanel({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
+function LifecyclePanel({ title, icon, children, testId }: { title: string; icon: ReactNode; children: ReactNode; testId?: string }) {
   return (
-    <section className="rounded-lg border" style={{ background: "var(--taomni-card-bg)", borderColor: "var(--taomni-card-border)" }}>
+    <section data-testid={testId} className="rounded-lg border" style={{ background: "var(--taomni-card-bg)", borderColor: "var(--taomni-card-border)" }}>
       <div className="flex items-center gap-2 border-b px-4 py-3 text-[12px] font-semibold" style={{ borderColor: "var(--taomni-card-border)" }}>
         <span className="text-[var(--taomni-accent)]">{icon}</span>
         {title}

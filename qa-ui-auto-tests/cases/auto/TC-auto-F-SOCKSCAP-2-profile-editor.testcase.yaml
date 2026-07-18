@@ -1,0 +1,58 @@
+id: TC-auto-F-SOCKSCAP-2-profile-editor
+title: Sockscap profile editor persists routing and privacy policy
+description: |
+  Creates a disabled profile so it cannot conflict with the seeded global
+  profile, exercises every scope and saved SSH egress field, validates the
+  bounded egress test path, and persists routing, failure, DNS, LAN, UDP, and
+  statistics privacy choices.
+covers: [F-SOCKSCAP-2]
+tags: [auto-generated, smoke, p0, needs-review, sockscap, profiles]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 75
+steps:
+  - open: "${cfg.app.base_url}?sockscap=1&section=profiles"
+  - wait_for: '[data-testid="sockscap-profiles-page"]'
+  - click: '[data-testid="sockscap-profile-row"][data-profile-id="browser-demo"]'
+  - click: '[data-testid="sockscap-profile-new"]'
+
+  - fill: {selector: '[data-testid="sockscap-profile-name"]', value: "QA policy profile"}
+  - fill: {selector: '[data-testid="sockscap-profile-priority"]', value: "42"}
+  - set_check: {selector: '[data-testid="sockscap-profile-enabled"]', checked: false}
+
+  - click: '[data-testid="sockscap-scope-applications"]'
+  - select_option: {selector: '[data-testid="sockscap-selector-kind"]', value: "executable_path"}
+  - fill: {selector: '[data-testid="sockscap-selector-value"]', value: "/opt/qa/browser"}
+  - click: '[data-testid="sockscap-selector-add"]'
+  - set_check: {selector: '[data-testid="sockscap-include-children"]', checked: false}
+  - click: '[data-testid="sockscap-selector-remove"]'
+  - click: '[data-testid="sockscap-scope-runtime_processes"]'
+  - click: '[data-testid="sockscap-scope-global"]'
+
+  - select_option: {selector: '[data-testid="sockscap-egress-kind"]', value: "ssh_jump"}
+  - select_option: {selector: '[data-testid="sockscap-egress-session"]', value: "stub-ssh"}
+  - fill: {selector: '[data-testid="sockscap-ssh-control-connections"]', value: "3"}
+  - fill: {selector: '[data-testid="sockscap-ssh-channels"]', value: "64"}
+  - fill: {selector: '[data-testid="sockscap-ssh-keepalive"]', value: "20"}
+  - fill: {selector: '[data-testid="sockscap-ssh-connect-timeout"]', value: "12"}
+  - fill: {selector: '[data-testid="sockscap-egress-test-host"]', value: "example.com"}
+  - fill: {selector: '[data-testid="sockscap-egress-test-port"]', value: "443"}
+  - click: '[data-testid="sockscap-egress-test"]'
+
+  - set_check: {selector: '[data-testid="sockscap-profile-rule-source"]', checked: true}
+  - select_option: {selector: '[data-testid="sockscap-default-action"]', value: "proxy"}
+  - select_option: {selector: '[data-testid="sockscap-unknown-action"]', value: "block"}
+  - select_option: {selector: '[data-testid="sockscap-failure-action"]', value: "fail_closed"}
+  - select_option: {selector: '[data-testid="sockscap-udp-policy"]', value: "direct"}
+  - select_option: {selector: '[data-testid="sockscap-dns-mode"]', value: "strict_proxy"}
+  - select_option: {selector: '[data-testid="sockscap-lan-policy"]', value: "rules"}
+
+  - select_option: {selector: '[data-testid="sockscap-stats-collection"]', value: "session_only"}
+  - fill: {selector: '[data-testid="sockscap-minute-retention"]', value: "14"}
+  - fill: {selector: '[data-testid="sockscap-hourly-retention"]', value: "180"}
+  - set_check: {selector: '[data-testid="sockscap-domain-aggregation"]', checked: true}
+  - fill: {selector: '[data-testid="sockscap-domain-retention"]', value: "5"}
+
+  - click: '[data-testid="sockscap-profile-save"]'
+  - assert_count: {selector: '[data-testid="sockscap-profile-row"]', equal: 2}
+  - screenshot: sockscap-profile-editor.png

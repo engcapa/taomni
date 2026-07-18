@@ -305,7 +305,8 @@ export function SockscapRules() {
               <button
                 key={view.record.source.id}
                 type="button"
-                data-testid={`sockscap-rule-source-${view.record.source.id}`}
+                data-testid="sockscap-rule-source-row"
+                data-source-id={view.record.source.id}
                 onClick={() => void selectSource(view)}
                 className="w-full rounded-md border px-3 py-2 text-left"
                 style={selectedSourceId === view.record.source.id
@@ -339,12 +340,12 @@ export function SockscapRules() {
                 </RuleField>
                 <RuleField label={t("sockscap.ruleSourceState")}>
                   <label className="flex h-8 items-center gap-2 rounded-md border px-2.5 text-[10px]" style={{ borderColor: "var(--taomni-input-border)" }}>
-                    <input type="checkbox" checked={sourceDraft.enabled} disabled={sourceDraft.kind === "gfwlist_official"} onChange={(event) => setSourceDraft({ ...sourceDraft, enabled: event.target.checked })} />
+                    <input data-testid="sockscap-rule-source-enabled" type="checkbox" checked={sourceDraft.enabled} disabled={sourceDraft.kind === "gfwlist_official"} onChange={(event) => setSourceDraft({ ...sourceDraft, enabled: event.target.checked })} />
                     {sourceDraft.enabled ? t("common.enabled") : t("common.disabled")}
                   </label>
                 </RuleField>
                 <RuleField label={t("sockscap.refreshIntervalHours")}>
-                  <input type="number" min={0.25} max={720} step={0.25} disabled={sourceDraft.kind === "gfwlist_official"} value={sourceDraft.refreshIntervalSeconds / 3600} onChange={(event) => setSourceDraft({ ...sourceDraft, refreshIntervalSeconds: Math.round(numberValue(event.target.value) * 3600) })} className={inputClass} />
+                  <input data-testid="sockscap-rule-source-interval" type="number" min={0.25} max={720} step={0.25} disabled={sourceDraft.kind === "gfwlist_official"} value={sourceDraft.refreshIntervalSeconds / 3600} onChange={(event) => setSourceDraft({ ...sourceDraft, refreshIntervalSeconds: Math.round(numberValue(event.target.value) * 3600) })} className={inputClass} />
                 </RuleField>
               </div>
               <div className="flex items-end gap-2">
@@ -383,7 +384,7 @@ export function SockscapRules() {
                     </div>
                     <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[9px]" style={{ borderColor: "var(--taomni-input-border)" }}>
                       <FileInput className="h-3.5 w-3.5" />{t("sockscap.chooseLocalFile")}
-                      <input type="file" accept=".txt,.list,text/plain" className="sr-only" onChange={(event) => void readFile(event)} />
+                      <input data-testid="sockscap-rule-file" type="file" accept=".txt,.list,text/plain" className="sr-only" onChange={(event) => void readFile(event)} />
                     </label>
                   </div>
                   <textarea data-testid="sockscap-rule-payload" value={payload} onChange={(event) => setPayload(event.target.value)} rows={5} placeholder={t("sockscap.rulePayloadPlaceholder")} className={`${inputClass} mt-3 h-auto resize-y py-2 font-mono`} />
@@ -405,7 +406,7 @@ export function SockscapRules() {
           <div className="space-y-3">
             <div className="flex flex-wrap items-end justify-between gap-2">
               <RuleField label={t("sockscap.routingProfile")}>
-                <select value={overrideProfileId ?? ""} onChange={(event) => void selectOverrideProfile(event.target.value)} className={`${inputClass} min-w-64`}>
+                <select data-testid="sockscap-manual-profile" value={overrideProfileId ?? ""} onChange={(event) => void selectOverrideProfile(event.target.value)} className={`${inputClass} min-w-64`}>
                   {profiles.map((record) => <option key={record.profile.id} value={record.profile.id}>{record.profile.name} · r{record.revision}</option>)}
                 </select>
               </RuleField>
@@ -419,19 +420,19 @@ export function SockscapRules() {
             <p className="text-[9px] text-[var(--taomni-text-muted)]">{t("sockscap.firstMatchNotice")}</p>
             <div className="space-y-1.5">
               {overrideRules.map((rule, index) => (
-                <div key={rule.id} data-testid={`sockscap-manual-rule-${index}`} className="grid gap-2 rounded-md border p-2 md:grid-cols-[32px_110px_150px_minmax(0,1fr)_92px]" style={{ borderColor: "var(--taomni-card-border)" }}>
-                  <label className="flex items-center justify-center"><input type="checkbox" aria-label={t("sockscap.ruleEnabled", { index: index + 1 })} checked={rule.enabled} onChange={(event) => updateRule(setOverrideRules, index, { enabled: event.target.checked })} /></label>
-                  <select aria-label={t("sockscap.ruleAction", { index: index + 1 })} value={rule.action} onChange={(event) => updateRule(setOverrideRules, index, { action: event.target.value as SockscapCustomRuleDraft["action"] })} className={inputClass}>
+                <div key={rule.id} data-testid="sockscap-manual-rule-row" data-rule-index={index} className="grid gap-2 rounded-md border p-2 md:grid-cols-[32px_110px_150px_minmax(0,1fr)_92px]" style={{ borderColor: "var(--taomni-card-border)" }}>
+                  <label className="flex items-center justify-center"><input data-testid="sockscap-manual-rule-enabled" type="checkbox" aria-label={t("sockscap.ruleEnabled", { index: index + 1 })} checked={rule.enabled} onChange={(event) => updateRule(setOverrideRules, index, { enabled: event.target.checked })} /></label>
+                  <select data-testid="sockscap-manual-rule-action" aria-label={t("sockscap.ruleAction", { index: index + 1 })} value={rule.action} onChange={(event) => updateRule(setOverrideRules, index, { action: event.target.value as SockscapCustomRuleDraft["action"] })} className={inputClass}>
                     <option value="direct">DIRECT</option><option value="proxy">PROXY</option><option value="block">BLOCK</option>
                   </select>
-                  <select aria-label={t("sockscap.ruleKind", { index: index + 1 })} value={rule.kind} onChange={(event) => updateRule(setOverrideRules, index, { kind: event.target.value as SockscapCustomRuleDraft["kind"] })} className={inputClass}>
+                  <select data-testid="sockscap-manual-rule-kind" aria-label={t("sockscap.ruleKind", { index: index + 1 })} value={rule.kind} onChange={(event) => updateRule(setOverrideRules, index, { kind: event.target.value as SockscapCustomRuleDraft["kind"] })} className={inputClass}>
                     <option value="domain_suffix">domain suffix</option><option value="domain_exact">domain exact</option><option value="domain_keyword">domain keyword</option><option value="ip_cidr">IP / CIDR</option>
                   </select>
-                  <input data-testid={`sockscap-manual-rule-pattern-${index}`} aria-label={t("sockscap.rulePattern", { index: index + 1 })} value={rule.pattern} onChange={(event) => updateRule(setOverrideRules, index, { pattern: event.target.value })} placeholder="example.com" className={inputClass} />
+                  <input data-testid={`sockscap-manual-rule-pattern-${index}`} data-rule-index={index} aria-label={t("sockscap.rulePattern", { index: index + 1 })} value={rule.pattern} onChange={(event) => updateRule(setOverrideRules, index, { pattern: event.target.value })} placeholder="example.com" className={inputClass} />
                   <div className="flex items-center justify-end gap-0.5">
-                    <IconButton label={t("sockscap.moveRuleEarlier")} disabled={index === 0} onClick={() => setOverrideRules((current) => moveItem(current, index, index - 1))}><ArrowUp className="h-3.5 w-3.5" /></IconButton>
-                    <IconButton label={t("sockscap.moveRuleLater")} disabled={index === overrideRules.length - 1} onClick={() => setOverrideRules((current) => moveItem(current, index, index + 1))}><ArrowDown className="h-3.5 w-3.5" /></IconButton>
-                    <IconButton label={t("common.remove")} disabled={false} onClick={() => setOverrideRules((current) => current.filter((_, candidate) => candidate !== index))}><Trash2 className="h-3.5 w-3.5" /></IconButton>
+                    <IconButton testId="sockscap-manual-rule-up" label={t("sockscap.moveRuleEarlier")} disabled={index === 0} onClick={() => setOverrideRules((current) => moveItem(current, index, index - 1))}><ArrowUp className="h-3.5 w-3.5" /></IconButton>
+                    <IconButton testId="sockscap-manual-rule-down" label={t("sockscap.moveRuleLater")} disabled={index === overrideRules.length - 1} onClick={() => setOverrideRules((current) => moveItem(current, index, index + 1))}><ArrowDown className="h-3.5 w-3.5" /></IconButton>
+                    <IconButton testId="sockscap-manual-rule-remove" label={t("common.remove")} disabled={false} onClick={() => setOverrideRules((current) => current.filter((_, candidate) => candidate !== index))}><Trash2 className="h-3.5 w-3.5" /></IconButton>
                   </div>
                 </div>
               ))}
@@ -448,35 +449,35 @@ export function SockscapRules() {
             <input data-testid="sockscap-target-app" value={targetDraft.appIdentity} onChange={(event) => setTargetDraft({ ...targetDraft, appIdentity: event.target.value })} placeholder={t("sockscap.optional")} className={inputClass} />
           </RuleField>
           <RuleField label={t("sockscap.selectorKind")}>
-            <select value={targetDraft.appSelectorKind ?? "executable_path"} onChange={(event) => setTargetDraft({ ...targetDraft, appSelectorKind: event.target.value as SockscapTargetDraft["appSelectorKind"] })} className={inputClass}>
+            <select data-testid="sockscap-target-selector-kind" value={targetDraft.appSelectorKind ?? "executable_path"} onChange={(event) => setTargetDraft({ ...targetDraft, appSelectorKind: event.target.value as SockscapTargetDraft["appSelectorKind"] })} className={inputClass}>
               <option value="executable_path">{t("sockscap.selectorExecutable")}</option><option value="macos_signing_identity">{t("sockscap.selectorSigningIdentity")}</option><option value="linux_cgroup">{t("sockscap.selectorCgroup")}</option>
             </select>
           </RuleField>
           <RuleField label="PID">
-            <input type="number" min={1} value={targetDraft.pid ?? ""} onChange={(event) => setTargetDraft({ ...targetDraft, pid: optionalNumber(event.target.value) })} placeholder={t("sockscap.optional")} className={inputClass} />
+            <input data-testid="sockscap-target-pid" type="number" min={1} value={targetDraft.pid ?? ""} onChange={(event) => setTargetDraft({ ...targetDraft, pid: optionalNumber(event.target.value) })} placeholder={t("sockscap.optional")} className={inputClass} />
           </RuleField>
           <RuleField label={t("sockscap.processStartToken")}>
-            <input type="number" min={1} value={targetDraft.processStartTime ?? ""} onChange={(event) => setTargetDraft({ ...targetDraft, processStartTime: optionalNumber(event.target.value) })} placeholder={t("sockscap.optional")} className={inputClass} />
+            <input data-testid="sockscap-target-process-start" type="number" min={1} value={targetDraft.processStartTime ?? ""} onChange={(event) => setTargetDraft({ ...targetDraft, processStartTime: optionalNumber(event.target.value) })} placeholder={t("sockscap.optional")} className={inputClass} />
           </RuleField>
           <RuleField label={t("sockscap.hostnameOrIp")}>
             <input data-testid="sockscap-target-host" value={targetDraft.target} onChange={(event) => setTargetDraft({ ...targetDraft, target: event.target.value })} className={inputClass} />
           </RuleField>
           <RuleField label={t("sockscap.port")}>
-            <input type="number" min={1} max={65535} value={targetDraft.port} onChange={(event) => setTargetDraft({ ...targetDraft, port: numberValue(event.target.value) })} className={inputClass} />
+            <input data-testid="sockscap-target-port" type="number" min={1} max={65535} value={targetDraft.port} onChange={(event) => setTargetDraft({ ...targetDraft, port: numberValue(event.target.value) })} className={inputClass} />
           </RuleField>
           <RuleField label={t("sockscap.protocol")}>
-            <select value={targetDraft.protocol} onChange={(event) => setTargetDraft({ ...targetDraft, protocol: event.target.value as SockscapTargetDraft["protocol"] })} className={inputClass}>
+            <select data-testid="sockscap-target-protocol" value={targetDraft.protocol} onChange={(event) => setTargetDraft({ ...targetDraft, protocol: event.target.value as SockscapTargetDraft["protocol"] })} className={inputClass}>
               <option value="tcp">TCP</option><option value="udp">UDP</option><option value="quic">QUIC</option>
             </select>
           </RuleField>
           <RuleField label={t("sockscap.hostnameSource")}>
-            <select value={targetDraft.hostnameSource ?? "unknown"} onChange={(event) => setTargetDraft({ ...targetDraft, hostnameSource: event.target.value as SockscapTargetDraft["hostnameSource"] })} className={inputClass}>
+            <select data-testid="sockscap-target-hostname-source" value={targetDraft.hostnameSource ?? "unknown"} onChange={(event) => setTargetDraft({ ...targetDraft, hostnameSource: event.target.value as SockscapTargetDraft["hostnameSource"] })} className={inputClass}>
               <option value="platform_remote_hostname">platform remote hostname</option><option value="fake_ip_dns_map">Fake-IP DNS map</option><option value="tls_sni">TLS SNI</option><option value="http_host">HTTP Host</option><option value="ip_only">IP only</option><option value="unknown">unknown</option>
             </select>
           </RuleField>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <label className="flex items-center gap-2 text-[10px]"><input type="checkbox" checked={targetDraft.hardBypass} onChange={(event) => setTargetDraft({ ...targetDraft, hardBypass: event.target.checked })} />{t("sockscap.forceHardBypass")}</label>
+          <label className="flex items-center gap-2 text-[10px]"><input data-testid="sockscap-target-hard-bypass" type="checkbox" checked={targetDraft.hardBypass} onChange={(event) => setTargetDraft({ ...targetDraft, hardBypass: event.target.checked })} />{t("sockscap.forceHardBypass")}</label>
           <RuleButton testId="sockscap-target-run" label={t("sockscap.runTargetTest")} icon={<FlaskConical className="h-3.5 w-3.5" />} disabled={ruleActionPending !== null} primary onClick={() => void runTargetTest()} />
         </div>
         {targetError && <RuleNotice tone="error">{targetError}</RuleNotice>}
@@ -618,8 +619,8 @@ function RuleButton({ label, icon, testId, disabled, primary = false, danger = f
   );
 }
 
-function IconButton({ label, disabled, onClick, children }: { label: string; disabled: boolean; onClick: () => void; children: ReactNode }) {
-  return <button type="button" aria-label={label} disabled={disabled} onClick={onClick} className="rounded p-1 disabled:opacity-30">{children}</button>;
+function IconButton({ label, disabled, onClick, children, testId }: { label: string; disabled: boolean; onClick: () => void; children: ReactNode; testId?: string }) {
+  return <button type="button" data-testid={testId} aria-label={label} disabled={disabled} onClick={onClick} className="rounded p-1 disabled:opacity-30">{children}</button>;
 }
 
 function RuleNotice({ tone, children }: { tone: "success" | "warning" | "error"; children: ReactNode }) {

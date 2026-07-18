@@ -166,7 +166,7 @@ export function SockscapWindow() {
           {error && (
             <InlineNotice tone="error" icon={<AlertTriangle className="h-4 w-4" />}>
               <span className="min-w-0 flex-1 break-words">{error}</span>
-              <button type="button" aria-label={t("common.close")} onClick={dismissError}>
+              <button type="button" data-testid="sockscap-error-dismiss" aria-label={t("common.close")} onClick={dismissError}>
                 <X className="h-4 w-4" />
               </button>
             </InlineNotice>
@@ -245,7 +245,7 @@ function Overview({
   const t = useT();
   const running = statusState === "active" || statusState === "degraded" || statusState === "user_action_required";
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
+    <div className="mx-auto max-w-6xl space-y-5" data-testid="sockscap-overview">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">{t("sockscap.overviewTitle")}</h1>
@@ -289,7 +289,7 @@ function Overview({
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <Panel title={t("sockscap.capabilities")} icon={<ShieldCheck className="h-4 w-4" />}>
+        <Panel testId="sockscap-capabilities" title={t("sockscap.capabilities")} icon={<ShieldCheck className="h-4 w-4" />}>
           {!capabilities ? (
             <EmptyText>{t("common.loading")}</EmptyText>
           ) : (
@@ -365,9 +365,9 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Panel({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
+function Panel({ title, icon, children, testId }: { title: string; icon: ReactNode; children: ReactNode; testId?: string }) {
   return (
-    <section className="rounded-lg border" style={{ background: "var(--taomni-card-bg)", borderColor: "var(--taomni-card-border)" }}>
+    <section data-testid={testId} className="rounded-lg border" style={{ background: "var(--taomni-card-bg)", borderColor: "var(--taomni-card-border)" }}>
       <div className="flex items-center gap-2 border-b px-4 py-3 text-[12px] font-semibold" style={{ borderColor: "var(--taomni-card-border)" }}>
         <span className="text-[var(--taomni-accent)]">{icon}</span>
         {title}

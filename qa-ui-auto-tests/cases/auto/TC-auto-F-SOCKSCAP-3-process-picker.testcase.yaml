@@ -1,0 +1,37 @@
+id: TC-auto-F-SOCKSCAP-3-process-picker
+title: Sockscap selects remembered applications and runtime processes
+description: |
+  Uses the privacy-bounded browser process catalog for both application
+  identity and PID/start-token selectors, verifies search and removal, and
+  closes the modal explicitly. The real OS identity fields and PID reuse
+  semantics remain covered by Rust and native tests.
+covers: [F-SOCKSCAP-3]
+tags: [auto-generated, smoke, p0, needs-review, sockscap, process-picker]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: "${cfg.app.base_url}?sockscap=1&section=profiles"
+  - wait_for: '[data-testid="sockscap-profiles-page"]'
+
+  - click: '[data-testid="sockscap-scope-applications"]'
+  - click: '[data-testid="sockscap-pick-application"]'
+  - wait_for: '[data-testid="sockscap-process-picker"]'
+  - fill: {selector: '[data-testid="sockscap-process-search"]', value: "Browser"}
+  - click: '[data-testid^="sockscap-process-"][data-pid]'
+  - wait_for: '[data-testid="sockscap-selector-remove"]'
+  - click: '[data-testid="sockscap-selector-remove"]'
+
+  - click: '[data-testid="sockscap-scope-runtime_processes"]'
+  - click: '[data-testid="sockscap-pick-runtime"]'
+  - wait_for: '[data-testid="sockscap-process-picker"]'
+  - fill: {selector: '[data-testid="sockscap-process-search"]', value: "4100"}
+  - click: '[data-testid^="sockscap-process-"][data-pid]'
+  - wait_for: '[data-testid="sockscap-selector-remove"]'
+  - click: '[data-testid="sockscap-selector-remove"]'
+
+  - click: '[data-testid="sockscap-pick-runtime"]'
+  - wait_for: '[data-testid="sockscap-process-picker"]'
+  - click: '[data-testid="sockscap-process-picker-close"]'
+  - wait_for: {selector: '[data-testid="sockscap-process-picker"]', state: hidden}
+  - screenshot: sockscap-process-picker.png

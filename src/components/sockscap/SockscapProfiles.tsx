@@ -248,7 +248,8 @@ export function SockscapProfiles() {
             <button
               key={record.profile.id}
               type="button"
-              data-testid={`sockscap-profile-${record.profile.id}`}
+              data-testid="sockscap-profile-row"
+              data-profile-id={record.profile.id}
               onClick={() => void openRecord(record)}
               className="w-full rounded-md border px-2.5 py-2 text-left"
               style={selectedId === record.profile.id
@@ -395,6 +396,7 @@ export function SockscapProfiles() {
                   />
                   <div className="grid gap-2 md:grid-cols-[170px_minmax(0,1fr)_auto_auto]">
                     <select
+                      data-testid="sockscap-selector-kind"
                       aria-label={t("sockscap.selectorKind")}
                       value={selectorKind}
                       onChange={(event) => setSelectorKind(event.target.value as SockscapAppSelectorKind)}
@@ -405,6 +407,7 @@ export function SockscapProfiles() {
                       <option value="linux_cgroup">{t("sockscap.selectorCgroup")}</option>
                     </select>
                     <input
+                      data-testid="sockscap-selector-value"
                       aria-label={t("sockscap.selectorValue")}
                       value={selectorValue}
                       onChange={(event) => setSelectorValue(event.target.value)}
@@ -417,11 +420,12 @@ export function SockscapProfiles() {
                       placeholder={t("sockscap.selectorPlaceholder")}
                       className={inputClass}
                     />
-                    <EditorButton label={t("common.add")} icon={<Plus className="h-3.5 w-3.5" />} disabled={!selectorValue.trim()} onClick={addManualSelector} />
+                    <EditorButton testId="sockscap-selector-add" label={t("common.add")} icon={<Plus className="h-3.5 w-3.5" />} disabled={!selectorValue.trim()} onClick={addManualSelector} />
                     <EditorButton testId="sockscap-pick-application" label={t("sockscap.chooseProcess")} disabled={!capabilities?.canStartAppGroup && capabilities !== null} onClick={() => openPicker("application")} />
                   </div>
                   <label className="flex items-center gap-2 text-[11px]">
                     <input
+                      data-testid="sockscap-include-children"
                       type="checkbox"
                       checked={draft.includeChildren}
                       onChange={(event) => updateDraft((current) => ({ ...current, includeChildren: event.target.checked }))}
@@ -509,18 +513,18 @@ export function SockscapProfiles() {
                   {selectedEgress.issue && <EditorNotice tone={selectedEgress.issue.userActionRequired ? "warning" : "error"}>{selectedEgress.issue.message}</EditorNotice>}
                   {draft.egressKind === "ssh_jump" && (
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                      <NumberField label={t("sockscap.sshControlConnections")} value={draft.sshPoolOptions.maxControlConnections} min={1} max={16} onChange={(value) => updateDraft((current) => ({ ...current, sshPoolOptions: { ...current.sshPoolOptions, maxControlConnections: value } }))} />
-                      <NumberField label={t("sockscap.sshChannels")} value={draft.sshPoolOptions.maxChannelsPerConnection} min={1} max={4096} onChange={(value) => updateDraft((current) => ({ ...current, sshPoolOptions: { ...current.sshPoolOptions, maxChannelsPerConnection: value } }))} />
-                      <NumberField label={t("sockscap.sshKeepalive")} value={draft.sshPoolOptions.keepaliveSeconds} min={1} max={3600} onChange={(value) => updateDraft((current) => ({ ...current, sshPoolOptions: { ...current.sshPoolOptions, keepaliveSeconds: value } }))} />
-                      <NumberField label={t("sockscap.sshConnectTimeout")} value={draft.sshPoolOptions.connectTimeoutSeconds} min={1} max={300} onChange={(value) => updateDraft((current) => ({ ...current, sshPoolOptions: { ...current.sshPoolOptions, connectTimeoutSeconds: value } }))} />
+                      <NumberField testId="sockscap-ssh-control-connections" label={t("sockscap.sshControlConnections")} value={draft.sshPoolOptions.maxControlConnections} min={1} max={16} onChange={(value) => updateDraft((current) => ({ ...current, sshPoolOptions: { ...current.sshPoolOptions, maxControlConnections: value } }))} />
+                      <NumberField testId="sockscap-ssh-channels" label={t("sockscap.sshChannels")} value={draft.sshPoolOptions.maxChannelsPerConnection} min={1} max={4096} onChange={(value) => updateDraft((current) => ({ ...current, sshPoolOptions: { ...current.sshPoolOptions, maxChannelsPerConnection: value } }))} />
+                      <NumberField testId="sockscap-ssh-keepalive" label={t("sockscap.sshKeepalive")} value={draft.sshPoolOptions.keepaliveSeconds} min={1} max={3600} onChange={(value) => updateDraft((current) => ({ ...current, sshPoolOptions: { ...current.sshPoolOptions, keepaliveSeconds: value } }))} />
+                      <NumberField testId="sockscap-ssh-connect-timeout" label={t("sockscap.sshConnectTimeout")} value={draft.sshPoolOptions.connectTimeoutSeconds} min={1} max={300} onChange={(value) => updateDraft((current) => ({ ...current, sshPoolOptions: { ...current.sshPoolOptions, connectTimeoutSeconds: value } }))} />
                     </div>
                   )}
                   <div className="flex flex-wrap items-end gap-2">
                     <EditorField label={t("sockscap.testHost")} compact>
-                      <input value={testHost} onChange={(event) => setTestHost(event.target.value)} className={`${inputClass} w-52`} />
+                      <input data-testid="sockscap-egress-test-host" value={testHost} onChange={(event) => setTestHost(event.target.value)} className={`${inputClass} w-52`} />
                     </EditorField>
                     <EditorField label={t("sockscap.port")} compact>
-                      <input type="number" min={1} max={65535} value={testPort} onChange={(event) => setTestPort(numericValue(event.target.value))} className={`${inputClass} w-24`} />
+                      <input data-testid="sockscap-egress-test-port" type="number" min={1} max={65535} value={testPort} onChange={(event) => setTestPort(numericValue(event.target.value))} className={`${inputClass} w-24`} />
                     </EditorField>
                     <EditorButton
                       testId="sockscap-egress-test"
@@ -553,6 +557,8 @@ export function SockscapProfiles() {
                     return (
                       <div key={source.id} className="flex items-start gap-2 rounded-md border p-2.5" style={{ borderColor: "var(--taomni-card-border)" }}>
                         <input
+                          data-testid="sockscap-profile-rule-source"
+                          data-source-id={source.id}
                           aria-label={source.name}
                           type="checkbox"
                           checked={selected}
@@ -575,6 +581,7 @@ export function SockscapProfiles() {
                           <span className="flex shrink-0 items-center gap-0.5">
                             <button
                               type="button"
+                              data-testid="sockscap-profile-rule-source-up"
                               aria-label={t("sockscap.moveRuleSourceUp", { name: source.name })}
                               disabled={selectedIndex <= 0}
                               onClick={() => updateDraft((current) => ({
@@ -587,6 +594,7 @@ export function SockscapProfiles() {
                             </button>
                             <button
                               type="button"
+                              data-testid="sockscap-profile-rule-source-down"
                               aria-label={t("sockscap.moveRuleSourceDown", { name: source.name })}
                               disabled={selectedIndex < 0 || selectedIndex >= draft.ruleSourceIds.length - 1}
                               onClick={() => updateDraft((current) => ({
@@ -605,28 +613,28 @@ export function SockscapProfiles() {
                   {ruleSources.length === 0 && <p className="text-[10px] text-[var(--taomni-text-muted)]">{t("sockscap.noRuleSources")}</p>}
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <PolicySelect label={t("sockscap.defaultAction")} value={draft.defaultAction} options={routeActionOptions(t)} onChange={(value) => updateDraft((current) => ({ ...current, defaultAction: value as SockscapRoutingProfileDraft["defaultAction"] }))} />
-                  <PolicySelect label={t("sockscap.unknownDomainAction")} value={draft.unknownDomainAction} options={routeActionOptions(t)} onChange={(value) => updateDraft((current) => ({ ...current, unknownDomainAction: value as SockscapRoutingProfileDraft["unknownDomainAction"] }))} />
+                  <PolicySelect testId="sockscap-default-action" label={t("sockscap.defaultAction")} value={draft.defaultAction} options={routeActionOptions(t)} onChange={(value) => updateDraft((current) => ({ ...current, defaultAction: value as SockscapRoutingProfileDraft["defaultAction"] }))} />
+                  <PolicySelect testId="sockscap-unknown-action" label={t("sockscap.unknownDomainAction")} value={draft.unknownDomainAction} options={routeActionOptions(t)} onChange={(value) => updateDraft((current) => ({ ...current, unknownDomainAction: value as SockscapRoutingProfileDraft["unknownDomainAction"] }))} />
                 </div>
               </EditorCard>
 
               <EditorCard title={t("sockscap.advancedPoliciesTitle")} icon={<ShieldAlert className="h-4 w-4" />}>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <PolicySelect label={t("sockscap.failureAction")} value={draft.egressFailureAction} options={[
+                  <PolicySelect testId="sockscap-failure-action" label={t("sockscap.failureAction")} value={draft.egressFailureAction} options={[
                     ["fail_open", t("sockscap.failOpen")],
                     ["fail_closed", t("sockscap.failClosed")],
                   ]} onChange={(value) => updateDraft((current) => ({ ...current, egressFailureAction: value as SockscapRoutingProfileDraft["egressFailureAction"] }))} />
-                  <PolicySelect label="UDP / QUIC" value={draft.udpPolicy} options={[
+                  <PolicySelect testId="sockscap-udp-policy" label="UDP / QUIC" value={draft.udpPolicy} options={[
                     ["proxy_if_supported", t("sockscap.proxyIfSupported")],
                     ["direct", "DIRECT"],
                     ["block", "BLOCK"],
                   ]} onChange={(value) => updateDraft((current) => ({ ...current, udpPolicy: value as SockscapRoutingProfileDraft["udpPolicy"] }))} />
-                  <PolicySelect label={t("sockscap.dnsMode")} value={draft.dnsMode} options={[
+                  <PolicySelect testId="sockscap-dns-mode" label={t("sockscap.dnsMode")} value={draft.dnsMode} options={[
                     ["system_capture", t("sockscap.systemCapture")],
                     ["virtual_dns", t("sockscap.virtualDns")],
                     ["strict_proxy", t("sockscap.strictProxy")],
                   ]} onChange={(value) => updateDraft((current) => ({ ...current, dnsMode: value as SockscapRoutingProfileDraft["dnsMode"] }))} />
-                  <PolicySelect label={t("sockscap.localNetwork")} value={draft.localNetworkPolicy.lanAction} options={[
+                  <PolicySelect testId="sockscap-lan-policy" label={t("sockscap.localNetwork")} value={draft.localNetworkPolicy.lanAction} options={[
                     ["direct", "DIRECT"],
                     ["rules", t("sockscap.followRules")],
                     ["block", "BLOCK"],
@@ -640,20 +648,20 @@ export function SockscapProfiles() {
 
             <EditorCard title={t("sockscap.statisticsPrivacyTitle")} icon={<CheckCircle2 className="h-4 w-4" />}>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <PolicySelect label={t("sockscap.collectionMode")} value={draft.statsPrivacy.collectionMode} options={[
+                <PolicySelect testId="sockscap-stats-collection" label={t("sockscap.collectionMode")} value={draft.statsPrivacy.collectionMode} options={[
                   ["persisted", t("sockscap.persistedStats")],
                   ["session_only", t("sockscap.sessionOnlyStats")],
                   ["disabled", t("common.disabled")],
                 ]} onChange={(value) => updateDraft((current) => ({ ...current, statsPrivacy: { ...current.statsPrivacy, collectionMode: value as SockscapRoutingProfileDraft["statsPrivacy"]["collectionMode"] } }))} />
-                <NumberField label={t("sockscap.minuteRetention")} value={draft.statsPrivacy.minuteRetentionDays} min={1} max={365} onChange={(value) => updateDraft((current) => ({ ...current, statsPrivacy: { ...current.statsPrivacy, minuteRetentionDays: value } }))} />
-                <NumberField label={t("sockscap.hourlyRetention")} value={draft.statsPrivacy.hourlyRetentionDays} min={1} max={3650} onChange={(value) => updateDraft((current) => ({ ...current, statsPrivacy: { ...current.statsPrivacy, hourlyRetentionDays: value } }))} />
+                <NumberField testId="sockscap-minute-retention" label={t("sockscap.minuteRetention")} value={draft.statsPrivacy.minuteRetentionDays} min={1} max={365} onChange={(value) => updateDraft((current) => ({ ...current, statsPrivacy: { ...current.statsPrivacy, minuteRetentionDays: value } }))} />
+                <NumberField testId="sockscap-hourly-retention" label={t("sockscap.hourlyRetention")} value={draft.statsPrivacy.hourlyRetentionDays} min={1} max={3650} onChange={(value) => updateDraft((current) => ({ ...current, statsPrivacy: { ...current.statsPrivacy, hourlyRetentionDays: value } }))} />
                 <EditorField label={t("sockscap.domainAggregation")}>
                   <label className="flex h-8 items-center gap-2 rounded-md border px-2.5 text-[10px]" style={{ borderColor: "var(--taomni-input-border)" }}>
-                    <input type="checkbox" checked={draft.statsPrivacy.domainAggregationEnabled} onChange={(event) => updateDraft((current) => ({ ...current, statsPrivacy: { ...current.statsPrivacy, domainAggregationEnabled: event.target.checked } }))} />
+                    <input data-testid="sockscap-domain-aggregation" type="checkbox" checked={draft.statsPrivacy.domainAggregationEnabled} onChange={(event) => updateDraft((current) => ({ ...current, statsPrivacy: { ...current.statsPrivacy, domainAggregationEnabled: event.target.checked } }))} />
                     {draft.statsPrivacy.domainAggregationEnabled ? t("common.enabled") : t("common.disabled")}
                   </label>
                 </EditorField>
-                <NumberField label={t("sockscap.domainRetention")} value={draft.statsPrivacy.domainRetentionDays} min={1} max={365} disabled={!draft.statsPrivacy.domainAggregationEnabled} onChange={(value) => updateDraft((current) => ({ ...current, statsPrivacy: { ...current.statsPrivacy, domainRetentionDays: value } }))} />
+                <NumberField testId="sockscap-domain-retention" label={t("sockscap.domainRetention")} value={draft.statsPrivacy.domainRetentionDays} min={1} max={365} disabled={!draft.statsPrivacy.domainAggregationEnabled} onChange={(value) => updateDraft((current) => ({ ...current, statsPrivacy: { ...current.statsPrivacy, domainRetentionDays: value } }))} />
               </div>
               <p className="mt-3 text-[10px] leading-4 text-[var(--taomni-text-muted)]">{t("sockscap.privacyBoundary")}</p>
             </EditorCard>
@@ -725,16 +733,16 @@ function ProcessPicker({
     <div className="fixed inset-0 z-[900] flex items-center justify-center bg-black/45 p-4" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
-      <div role="dialog" aria-modal="true" aria-label={t("sockscap.processPickerTitle")} className="flex max-h-[76vh] w-[680px] flex-col rounded-lg border shadow-xl" style={{ background: "var(--taomni-bg)", borderColor: "var(--taomni-card-border)" }}>
+      <div data-testid="sockscap-process-picker" role="dialog" aria-modal="true" aria-label={t("sockscap.processPickerTitle")} className="flex max-h-[76vh] w-[680px] flex-col rounded-lg border shadow-xl" style={{ background: "var(--taomni-bg)", borderColor: "var(--taomni-card-border)" }}>
         <header className="flex items-center gap-3 border-b px-4 py-3" style={{ borderColor: "var(--taomni-card-border)" }}>
           <div className="min-w-0 flex-1">
             <h2 className="text-[13px] font-semibold">{mode === "runtime" ? t("sockscap.chooseRunningProcess") : t("sockscap.rememberApplication")}</h2>
             <p className="mt-0.5 text-[9px] text-[var(--taomni-text-muted)]">{mode === "runtime" ? t("sockscap.runtimePickerDescription") : t("sockscap.applicationPickerDescription")}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label={t("common.close")}><X className="h-4 w-4" /></button>
+          <button type="button" data-testid="sockscap-process-picker-close" onClick={onClose} aria-label={t("common.close")}><X className="h-4 w-4" /></button>
         </header>
         <div className="p-3">
-          <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("sockscap.searchProcesses")} className={inputClass} />
+          <input data-testid="sockscap-process-search" autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("sockscap.searchProcesses")} className={inputClass} />
         </div>
         <div className="min-h-0 flex-1 overflow-auto px-3 pb-3">
           {catalog === null ? (
@@ -748,6 +756,7 @@ function ProcessPicker({
                     key={`${process.pid}-${process.processStartTime}`}
                     type="button"
                     data-testid={`sockscap-process-${process.pid}`}
+                    data-pid={process.pid}
                     disabled={!allowed}
                     onClick={() => onChoose(process)}
                     className="flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-45"
@@ -792,18 +801,18 @@ function EditorField({ label, hint, compact = false, children }: { label: string
   );
 }
 
-function NumberField({ label, value, min, max, disabled = false, onChange }: { label: string; value: number; min: number; max: number; disabled?: boolean; onChange: (value: number) => void }) {
+function NumberField({ label, value, min, max, disabled = false, onChange, testId }: { label: string; value: number; min: number; max: number; disabled?: boolean; onChange: (value: number) => void; testId?: string }) {
   return (
     <EditorField label={label}>
-      <input type="number" min={min} max={max} step={1} disabled={disabled} value={value} onChange={(event) => onChange(numericValue(event.target.value))} className={inputClass} />
+      <input data-testid={testId} type="number" min={min} max={max} step={1} disabled={disabled} value={value} onChange={(event) => onChange(numericValue(event.target.value))} className={inputClass} />
     </EditorField>
   );
 }
 
-function PolicySelect({ label, value, options, onChange }: { label: string; value: string; options: Array<[string, string]>; onChange: (value: string) => void }) {
+function PolicySelect({ label, value, options, onChange, testId }: { label: string; value: string; options: Array<[string, string]>; onChange: (value: string) => void; testId?: string }) {
   return (
     <EditorField label={label}>
-      <select value={value} onChange={(event) => onChange(event.target.value)} className={inputClass}>
+      <select data-testid={testId} value={value} onChange={(event) => onChange(event.target.value)} className={inputClass}>
         {options.map(([option, name]) => <option key={option} value={option}>{name}</option>)}
       </select>
     </EditorField>
@@ -821,7 +830,7 @@ function SelectorRows({ selectors, empty }: { selectors: Array<{ id: string; tit
             <div className="text-[10px] font-medium">{selector.title}</div>
             <div className="truncate text-[9px] text-[var(--taomni-text-muted)]">{selector.detail}</div>
           </div>
-          <button type="button" onClick={selector.onRemove} aria-label={t("common.remove")}><X className="h-3.5 w-3.5" /></button>
+          <button type="button" data-testid="sockscap-selector-remove" data-selector-id={selector.id} onClick={selector.onRemove} aria-label={t("common.remove")}><X className="h-3.5 w-3.5" /></button>
         </div>
       ))}
     </div>

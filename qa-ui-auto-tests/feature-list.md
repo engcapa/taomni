@@ -4319,6 +4319,502 @@ controls:
 
 ---
 
+## 14. Sockscap 流量路由
+
+### 14.1 独立窗口与隐私 Dashboard ✅
+
+<!-- feature
+id: F-SOCKSCAP-1
+status: done
+area: sockscap/dashboard
+components: [SockscapWindow, SockscapDashboard]
+files:
+  - src/App.tsx
+  - src/components/sockscap/SockscapWindow.tsx
+  - src/components/sockscap/SockscapDashboard.tsx
+  - src/lib/sockscap.ts
+  - src/lib/sockscapDashboard.ts
+  - src/stores/sockscapStore.ts
+  - src/stubs/sockscap.ts
+controls:
+  - id: window
+    selector: '[data-testid="sockscap-window"]'
+    kind: display
+  - id: status
+    selector: '[data-testid="sockscap-status"]'
+    kind: display
+  - id: overview
+    selector: '[data-testid="sockscap-overview"]'
+    kind: display
+  - id: nav-overview
+    selector: '[data-testid="sockscap-nav-overview"]'
+    kind: interactive
+  - id: nav-profiles
+    selector: '[data-testid="sockscap-nav-profiles"]'
+    kind: interactive
+  - id: nav-rules
+    selector: '[data-testid="sockscap-nav-rules"]'
+    kind: interactive
+  - id: nav-dashboard
+    selector: '[data-testid="sockscap-nav-dashboard"]'
+    kind: interactive
+  - id: nav-lifecycle
+    selector: '[data-testid="sockscap-nav-lifecycle"]'
+    kind: interactive
+  - id: refresh
+    selector: '[data-testid="sockscap-refresh"]'
+    kind: interactive
+  - id: start
+    selector: '[data-testid="sockscap-start"]'
+    kind: interactive
+    optional: true       # replaced by Stop while the engine is running
+  - id: stop
+    selector: '[data-testid="sockscap-stop"]'
+    kind: interactive
+    optional: true       # only rendered while the engine is running
+  - id: error-dismiss
+    selector: '[data-testid="sockscap-error-dismiss"]'
+    kind: interactive
+    optional: true
+  - id: dashboard
+    selector: '[data-testid="sockscap-dashboard"]'
+    kind: display
+  - id: dashboard-range
+    selector: '[data-testid="sockscap-dashboard-range"]'
+    kind: interactive
+  - id: dashboard-refresh
+    selector: '[data-testid="sockscap-dashboard-refresh"]'
+    kind: interactive
+  - id: clear-stats
+    selector: '[data-testid="sockscap-clear-stats"]'
+    kind: interactive
+  - id: domain-aggregation-toggle
+    selector: '[data-testid="sockscap-domain-aggregation-toggle"]'
+    kind: interactive
+  - id: privacy-settings
+    selector: '[data-testid="sockscap-dashboard-privacy-settings"]'
+    kind: interactive
+  - id: notice-dismiss
+    selector: '[data-testid="sockscap-dashboard-notice-dismiss"]'
+    kind: interactive
+    optional: true
+  - id: alert-dismiss
+    selector: '[data-testid="sockscap-dashboard-alert-dismiss"]'
+    kind: interactive
+    optional: true
+-->
+
+- 独立 Sockscap 窗口提供 Overview、Profiles、Rules、Dashboard 与 Lifecycle 五个导航区，并通过状态事件保持同步。
+- Dashboard 展示有界的流量聚合、动作分布、应用排行、可选域名聚合、上游健康、最近连接与告警；支持时间范围、刷新、清空统计和隐私状态说明。
+- 浏览器模式使用可控 Stub 完成完整路径；域名聚合默认关闭，统计不记录 payload、完整 URL 或凭据。
+
+### 14.2 配置组与上游编辑器 ✅
+
+<!-- feature
+id: F-SOCKSCAP-2
+status: done
+area: sockscap/profiles
+components: [SockscapProfiles]
+files:
+  - src/components/sockscap/SockscapProfiles.tsx
+  - src/lib/sockscapProfiles.ts
+  - src/stores/sockscapStore.ts
+  - src-tauri/src/sockscap/commands.rs
+  - src-tauri/src/sockscap/egress.rs
+  - src-tauri/src/sockscap/storage.rs
+  - src-tauri/src/sockscap/types.rs
+controls:
+  - id: page
+    selector: '[data-testid="sockscap-profiles-page"]'
+    kind: display
+  - id: profile-new
+    selector: '[data-testid="sockscap-profile-new"]'
+    kind: interactive
+  - id: profile-row
+    selector: '[data-testid="sockscap-profile-row"]'
+    kind: interactive
+  - id: profile-delete
+    selector: '[data-testid="sockscap-profile-delete"]'
+    kind: interactive
+    optional: true       # absent until the draft has been persisted
+  - id: profile-save
+    selector: '[data-testid="sockscap-profile-save"]'
+    kind: interactive
+  - id: profile-name
+    selector: '[data-testid="sockscap-profile-name"]'
+    kind: interactive
+  - id: profile-priority
+    selector: '[data-testid="sockscap-profile-priority"]'
+    kind: interactive
+  - id: profile-enabled
+    selector: '[data-testid="sockscap-profile-enabled"]'
+    kind: interactive
+  - id: scope-global
+    selector: '[data-testid="sockscap-scope-global"]'
+    kind: interactive
+  - id: scope-applications
+    selector: '[data-testid="sockscap-scope-applications"]'
+    kind: interactive
+  - id: scope-runtime
+    selector: '[data-testid="sockscap-scope-runtime_processes"]'
+    kind: interactive
+  - id: selector-kind
+    selector: '[data-testid="sockscap-selector-kind"]'
+    kind: interactive
+    optional: true
+  - id: selector-value
+    selector: '[data-testid="sockscap-selector-value"]'
+    kind: interactive
+    optional: true
+  - id: selector-add
+    selector: '[data-testid="sockscap-selector-add"]'
+    kind: interactive
+    optional: true
+  - id: include-children
+    selector: '[data-testid="sockscap-include-children"]'
+    kind: interactive
+    optional: true
+  - id: egress-kind
+    selector: '[data-testid="sockscap-egress-kind"]'
+    kind: interactive
+  - id: egress-session
+    selector: '[data-testid="sockscap-egress-session"]'
+    kind: interactive
+  - id: egress-test-host
+    selector: '[data-testid="sockscap-egress-test-host"]'
+    kind: interactive
+  - id: egress-test-port
+    selector: '[data-testid="sockscap-egress-test-port"]'
+    kind: interactive
+  - id: egress-test
+    selector: '[data-testid="sockscap-egress-test"]'
+    kind: interactive
+  - id: ssh-control-connections
+    selector: '[data-testid="sockscap-ssh-control-connections"]'
+    kind: interactive
+    optional: true       # SSH Jump only
+  - id: ssh-channels
+    selector: '[data-testid="sockscap-ssh-channels"]'
+    kind: interactive
+    optional: true
+  - id: ssh-keepalive
+    selector: '[data-testid="sockscap-ssh-keepalive"]'
+    kind: interactive
+    optional: true
+  - id: ssh-connect-timeout
+    selector: '[data-testid="sockscap-ssh-connect-timeout"]'
+    kind: interactive
+    optional: true
+  - id: profile-rule-source
+    selector: '[data-testid="sockscap-profile-rule-source"]'
+    kind: interactive
+  - id: profile-rule-source-up
+    selector: '[data-testid="sockscap-profile-rule-source-up"]'
+    kind: interactive
+    optional: true       # requires multiple selected sources
+  - id: profile-rule-source-down
+    selector: '[data-testid="sockscap-profile-rule-source-down"]'
+    kind: interactive
+    optional: true
+  - id: default-action
+    selector: '[data-testid="sockscap-default-action"]'
+    kind: interactive
+  - id: unknown-action
+    selector: '[data-testid="sockscap-unknown-action"]'
+    kind: interactive
+  - id: failure-action
+    selector: '[data-testid="sockscap-failure-action"]'
+    kind: interactive
+  - id: udp-policy
+    selector: '[data-testid="sockscap-udp-policy"]'
+    kind: interactive
+  - id: dns-mode
+    selector: '[data-testid="sockscap-dns-mode"]'
+    kind: interactive
+  - id: lan-policy
+    selector: '[data-testid="sockscap-lan-policy"]'
+    kind: interactive
+  - id: stats-collection
+    selector: '[data-testid="sockscap-stats-collection"]'
+    kind: interactive
+  - id: minute-retention
+    selector: '[data-testid="sockscap-minute-retention"]'
+    kind: interactive
+  - id: hourly-retention
+    selector: '[data-testid="sockscap-hourly-retention"]'
+    kind: interactive
+  - id: domain-aggregation
+    selector: '[data-testid="sockscap-domain-aggregation"]'
+    kind: interactive
+  - id: domain-retention
+    selector: '[data-testid="sockscap-domain-retention"]'
+    kind: interactive
+-->
+
+- 创建、编辑、删除配置组，设置优先级、启用状态、全局/程序/运行进程范围和后续新连接语义。
+- 选择 Proxy Session 或 SSH Jump Session，配置 DNS、unknown、UDP、LAN、故障策略、SSH 池和统计隐私，并可执行上游连通性测试。
+- Rust 写入路径重新校验引用、能力与冲突，浏览器 Stub 保持同一 IPC 契约。
+
+### 14.3 程序与运行进程选择器 ✅
+
+<!-- feature
+id: F-SOCKSCAP-3
+status: done
+area: sockscap/process-picker
+components: [SockscapProfiles, ProcessPicker]
+files:
+  - src/components/sockscap/SockscapProfiles.tsx
+  - src/lib/sockscapProfiles.ts
+  - src-tauri/src/sockscap/processes.rs
+controls:
+  - id: pick-application
+    selector: '[data-testid="sockscap-pick-application"]'
+    kind: interactive
+  - id: pick-runtime
+    selector: '[data-testid="sockscap-pick-runtime"]'
+    kind: interactive
+  - id: picker
+    selector: '[data-testid="sockscap-process-picker"]'
+    kind: display
+  - id: picker-close
+    selector: '[data-testid="sockscap-process-picker-close"]'
+    kind: interactive
+  - id: process-search
+    selector: '[data-testid="sockscap-process-search"]'
+    kind: interactive
+  - id: process-row
+    selector: '[data-testid^="sockscap-process-"][data-pid]'
+    kind: interactive
+  - id: selector-remove
+    selector: '[data-testid="sockscap-selector-remove"]'
+    kind: interactive
+    optional: true       # only after a program or process selector is chosen
+-->
+
+- 程序范围可按可执行路径、应用 ID 或路径 glob 添加持续匹配规则；运行进程范围保存 PID 与启动时间以防 PID 重用。
+- 进程目录按隐私边界返回有界字段，支持子进程选项，并在平台能力不足时显示可解释降级。
+
+### 14.4 规则源、手工覆盖与目标解释 ✅
+
+<!-- feature
+id: F-SOCKSCAP-4
+status: done
+area: sockscap/rules
+components: [SockscapRules]
+files:
+  - src/components/sockscap/SockscapRules.tsx
+  - src/lib/sockscapRules.ts
+  - src/stores/sockscapStore.ts
+  - src-tauri/src/sockscap/policy/gfwlist.rs
+  - src-tauri/src/sockscap/policy/matcher.rs
+  - src-tauri/src/sockscap/policy/rules.rs
+  - src-tauri/src/sockscap/policy/test_target.rs
+controls:
+  - id: page
+    selector: '[data-testid="sockscap-rules-page"]'
+    kind: display
+  - id: source-new-url
+    selector: '[data-testid="sockscap-rule-source-new-url"]'
+    kind: interactive
+  - id: source-new-local
+    selector: '[data-testid="sockscap-rule-source-new-local"]'
+    kind: interactive
+  - id: source-row
+    selector: '[data-testid="sockscap-rule-source-row"]'
+    kind: interactive
+  - id: source-name
+    selector: '[data-testid="sockscap-rule-source-name"]'
+    kind: interactive
+  - id: source-enabled
+    selector: '[data-testid="sockscap-rule-source-enabled"]'
+    kind: interactive
+    optional: true       # built-in source is immutable
+  - id: source-interval
+    selector: '[data-testid="sockscap-rule-source-interval"]'
+    kind: interactive
+    optional: true
+  - id: source-url
+    selector: '[data-testid="sockscap-rule-source-url"]'
+    kind: interactive
+    optional: true       # custom URL source only
+  - id: source-save
+    selector: '[data-testid="sockscap-rule-source-save"]'
+    kind: interactive
+    optional: true
+  - id: source-refresh
+    selector: '[data-testid="sockscap-rule-source-refresh"]'
+    kind: interactive
+  - id: source-delete
+    selector: '[data-testid="sockscap-rule-source-delete"]'
+    kind: interactive
+    optional: true
+  - id: source-file
+    selector: '[data-testid="sockscap-rule-file"]'
+    kind: interactive
+    optional: true       # local import source only
+  - id: source-payload
+    selector: '[data-testid="sockscap-rule-payload"]'
+    kind: interactive
+    optional: true
+  - id: source-import
+    selector: '[data-testid="sockscap-rule-source-import"]'
+    kind: interactive
+    optional: true
+  - id: source-state
+    selector: '[data-testid="sockscap-rule-source-state"]'
+    kind: display
+    optional: true       # appears after a last-good snapshot exists
+  - id: refresh-report
+    selector: '[data-testid="sockscap-refresh-report"]'
+    kind: display
+    optional: true
+  - id: manual-profile
+    selector: '[data-testid="sockscap-manual-profile"]'
+    kind: interactive
+  - id: manual-add
+    selector: '[data-testid="sockscap-manual-rule-add"]'
+    kind: interactive
+  - id: manual-save
+    selector: '[data-testid="sockscap-manual-rules-save"]'
+    kind: interactive
+  - id: manual-row
+    selector: '[data-testid="sockscap-manual-rule-row"]'
+    kind: display
+  - id: manual-enabled
+    selector: '[data-testid="sockscap-manual-rule-enabled"]'
+    kind: interactive
+  - id: manual-action
+    selector: '[data-testid="sockscap-manual-rule-action"]'
+    kind: interactive
+  - id: manual-kind
+    selector: '[data-testid="sockscap-manual-rule-kind"]'
+    kind: interactive
+  - id: manual-pattern
+    selector: '[data-testid^="sockscap-manual-rule-pattern-"]'
+    kind: interactive
+  - id: manual-up
+    selector: '[data-testid="sockscap-manual-rule-up"]'
+    kind: interactive
+    optional: true       # enabled when a second rule exists
+  - id: manual-down
+    selector: '[data-testid="sockscap-manual-rule-down"]'
+    kind: interactive
+    optional: true
+  - id: manual-remove
+    selector: '[data-testid="sockscap-manual-rule-remove"]'
+    kind: interactive
+  - id: target-app
+    selector: '[data-testid="sockscap-target-app"]'
+    kind: interactive
+  - id: target-selector-kind
+    selector: '[data-testid="sockscap-target-selector-kind"]'
+    kind: interactive
+  - id: target-pid
+    selector: '[data-testid="sockscap-target-pid"]'
+    kind: interactive
+  - id: target-process-start
+    selector: '[data-testid="sockscap-target-process-start"]'
+    kind: interactive
+  - id: target-host
+    selector: '[data-testid="sockscap-target-host"]'
+    kind: interactive
+  - id: target-port
+    selector: '[data-testid="sockscap-target-port"]'
+    kind: interactive
+  - id: target-protocol
+    selector: '[data-testid="sockscap-target-protocol"]'
+    kind: interactive
+  - id: target-hostname-source
+    selector: '[data-testid="sockscap-target-hostname-source"]'
+    kind: interactive
+  - id: target-hard-bypass
+    selector: '[data-testid="sockscap-target-hard-bypass"]'
+    kind: interactive
+  - id: target-run
+    selector: '[data-testid="sockscap-target-run"]'
+    kind: interactive
+  - id: target-result
+    selector: '[data-testid="sockscap-target-result"]'
+    kind: display
+-->
+
+- 管理内置 GFWList、自定义 URL 与本地规则源，展示镜像、last-good、更新时间、解析与 unsupported 报告。
+- 编辑 first-match-wins 手工覆盖规则，并用目标测试展示配置组、hostname source、匹配原文、规则源和最终 DIRECT/PROXY/BLOCK 判定链。
+
+### 14.5 平台能力与降级告警 ✅
+
+<!-- feature
+id: F-SOCKSCAP-5
+status: done
+area: sockscap/capabilities
+components: [SockscapWindow, SockscapLifecycle]
+files:
+  - src/components/sockscap/SockscapWindow.tsx
+  - src/components/sockscap/SockscapLifecycle.tsx
+  - src-tauri/src/sockscap/capabilities.rs
+  - src-tauri/src/sockscap/preflight.rs
+  - src-tauri/src/sockscap/types.rs
+controls:
+  - id: capabilities
+    selector: '[data-testid="sockscap-capabilities"]'
+    kind: display
+  - id: lifecycle-gates
+    selector: '[data-testid="sockscap-lifecycle-gates"]'
+    kind: display
+-->
+
+- Overview 与 Lifecycle 展示当前平台的 global/application/PID、DNS、IPv6、UDP、权限与 capture adapter 能力。
+- 未满足的启动 Gate、TCP-only 上游、未知域名和权限限制均显式降级；当前没有真实捕获适配器的平台保持 preview-only，不能误报为可用。
+
+### 14.6 恢复、登录恢复与原生托盘生命周期 ✅
+
+<!-- feature
+id: F-SOCKSCAP-6
+status: done
+area: sockscap/lifecycle
+components: [SockscapLifecycle, SockscapWindow]
+files:
+  - src/components/sockscap/SockscapLifecycle.tsx
+  - src/components/sockscap/SockscapWindow.tsx
+  - src/lib/sockscapEvents.ts
+  - src/lib/sockscapWindowing.ts
+  - src/layouts/MainLayout.tsx
+  - src-tauri/src/sockscap/orchestrator.rs
+  - src-tauri/src/sockscap/storage.rs
+  - src-tauri/src/sockscap/tray.rs
+controls:
+  - id: lifecycle
+    selector: '[data-testid="sockscap-lifecycle"]'
+    kind: display
+  - id: refresh
+    selector: '[data-testid="sockscap-lifecycle-refresh"]'
+    kind: interactive
+  - id: auto-restore-panel
+    selector: '[data-testid="sockscap-auto-restore-panel"]'
+    kind: display
+  - id: auto-restore
+    selector: '[data-testid="sockscap-auto-restore"]'
+    kind: interactive
+  - id: recovery-journal
+    selector: '[data-testid="sockscap-recovery-journal"]'
+    kind: display
+  - id: recover
+    selector: '[data-testid="sockscap-lifecycle-recover"]'
+    kind: interactive
+    optional: true       # only rendered when cleanup is required
+  - id: inline-recover
+    selector: '[data-testid="sockscap-recover"]'
+    kind: interactive
+    optional: true
+-->
+
+- Lifecycle 展示 recovery journal、cleanup marker、helper heartbeat、上次成功配置与登录恢复 Gate；恢复网络不依赖上游可用。
+- 登录恢复必须同时满足用户 opt-in、系统注册、干净 journal 与成功提交快照；host key、MFA、Vault 或凭据问题进入 UserActionRequired。
+- 原生托盘按生命周期动态着色并提供打开、隐藏、启动、停止、恢复和退出；显式退出必须在有界时间内确认内存状态和 journal 均干净，否则保持应用运行并显示错误。
+- 浏览器 YAML 只验证 Stub 可达路径；独立原生窗口、托盘点击和系统退出行为必须由 Tauri/native smoke 单独验证。
+
+---
+
 
 > 下述入口已经在 UI 中可见但点击会显示 "not active in this phase" 占位面板，对应能力**尚未实装**，本清单不视为完成项，仅在此说明以解释 UI 为何存在：
 >

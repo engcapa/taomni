@@ -678,6 +678,136 @@
 - `[aria-label="Permissions"]` — display — F7.5.chmod-dialog
 - `role=button[name="Apply"]` — interactive — F7.5.chmod-apply
 
+## sockscap/capabilities (F-SOCKSCAP-5)
+
+- `[data-testid="sockscap-capabilities"]` — display — F-SOCKSCAP-5.capabilities
+- `[data-testid="sockscap-lifecycle-gates"]` — display — F-SOCKSCAP-5.lifecycle-gates
+
+## sockscap/dashboard (F-SOCKSCAP-1)
+
+- `[data-testid="sockscap-window"]` — display — F-SOCKSCAP-1.window
+- `[data-testid="sockscap-status"]` — display — F-SOCKSCAP-1.status
+- `[data-testid="sockscap-overview"]` — display — F-SOCKSCAP-1.overview
+- `[data-testid="sockscap-nav-overview"]` — interactive — F-SOCKSCAP-1.nav-overview
+- `[data-testid="sockscap-nav-profiles"]` — interactive — F-SOCKSCAP-1.nav-profiles
+- `[data-testid="sockscap-nav-rules"]` — interactive — F-SOCKSCAP-1.nav-rules
+- `[data-testid="sockscap-nav-dashboard"]` — interactive — F-SOCKSCAP-1.nav-dashboard
+- `[data-testid="sockscap-nav-lifecycle"]` — interactive — F-SOCKSCAP-1.nav-lifecycle
+- `[data-testid="sockscap-refresh"]` — interactive — F-SOCKSCAP-1.refresh
+- `[data-testid="sockscap-start"]` — interactive [optional] — F-SOCKSCAP-1.start
+- `[data-testid="sockscap-stop"]` — interactive [optional] — F-SOCKSCAP-1.stop
+- `[data-testid="sockscap-error-dismiss"]` — interactive [optional] — F-SOCKSCAP-1.error-dismiss
+- `[data-testid="sockscap-dashboard"]` — display — F-SOCKSCAP-1.dashboard
+- `[data-testid="sockscap-dashboard-range"]` — interactive — F-SOCKSCAP-1.dashboard-range
+- `[data-testid="sockscap-dashboard-refresh"]` — interactive — F-SOCKSCAP-1.dashboard-refresh
+- `[data-testid="sockscap-clear-stats"]` — interactive — F-SOCKSCAP-1.clear-stats
+- `[data-testid="sockscap-domain-aggregation-toggle"]` — interactive — F-SOCKSCAP-1.domain-aggregation-toggle
+- `[data-testid="sockscap-dashboard-privacy-settings"]` — interactive — F-SOCKSCAP-1.privacy-settings
+- `[data-testid="sockscap-dashboard-notice-dismiss"]` — interactive [optional] — F-SOCKSCAP-1.notice-dismiss
+- `[data-testid="sockscap-dashboard-alert-dismiss"]` — interactive [optional] — F-SOCKSCAP-1.alert-dismiss
+
+## sockscap/lifecycle (F-SOCKSCAP-6)
+
+- `[data-testid="sockscap-lifecycle"]` — display — F-SOCKSCAP-6.lifecycle
+- `[data-testid="sockscap-lifecycle-refresh"]` — interactive — F-SOCKSCAP-6.refresh
+- `[data-testid="sockscap-auto-restore-panel"]` — display — F-SOCKSCAP-6.auto-restore-panel
+- `[data-testid="sockscap-auto-restore"]` — interactive — F-SOCKSCAP-6.auto-restore
+- `[data-testid="sockscap-recovery-journal"]` — display — F-SOCKSCAP-6.recovery-journal
+- `[data-testid="sockscap-lifecycle-recover"]` — interactive [optional] — F-SOCKSCAP-6.recover
+- `[data-testid="sockscap-recover"]` — interactive [optional] — F-SOCKSCAP-6.inline-recover
+
+## sockscap/process-picker (F-SOCKSCAP-3)
+
+- `[data-testid="sockscap-pick-application"]` — interactive — F-SOCKSCAP-3.pick-application
+- `[data-testid="sockscap-pick-runtime"]` — interactive — F-SOCKSCAP-3.pick-runtime
+- `[data-testid="sockscap-process-picker"]` — display — F-SOCKSCAP-3.picker
+- `[data-testid="sockscap-process-picker-close"]` — interactive — F-SOCKSCAP-3.picker-close
+- `[data-testid="sockscap-process-search"]` — interactive — F-SOCKSCAP-3.process-search
+- `[data-testid^="sockscap-process-"][data-pid]` — interactive — F-SOCKSCAP-3.process-row
+- `[data-testid="sockscap-selector-remove"]` — interactive [optional] — F-SOCKSCAP-3.selector-remove
+
+## sockscap/profiles (F-SOCKSCAP-2)
+
+- `[data-testid="sockscap-profiles-page"]` — display — F-SOCKSCAP-2.page
+- `[data-testid="sockscap-profile-new"]` — interactive — F-SOCKSCAP-2.profile-new
+- `[data-testid="sockscap-profile-row"]` — interactive — F-SOCKSCAP-2.profile-row
+- `[data-testid="sockscap-profile-delete"]` — interactive [optional] — F-SOCKSCAP-2.profile-delete
+- `[data-testid="sockscap-profile-save"]` — interactive — F-SOCKSCAP-2.profile-save
+- `[data-testid="sockscap-profile-name"]` — interactive — F-SOCKSCAP-2.profile-name
+- `[data-testid="sockscap-profile-priority"]` — interactive — F-SOCKSCAP-2.profile-priority
+- `[data-testid="sockscap-profile-enabled"]` — interactive — F-SOCKSCAP-2.profile-enabled
+- `[data-testid="sockscap-scope-global"]` — interactive — F-SOCKSCAP-2.scope-global
+- `[data-testid="sockscap-scope-applications"]` — interactive — F-SOCKSCAP-2.scope-applications
+- `[data-testid="sockscap-scope-runtime_processes"]` — interactive — F-SOCKSCAP-2.scope-runtime
+- `[data-testid="sockscap-selector-kind"]` — interactive [optional] — F-SOCKSCAP-2.selector-kind
+- `[data-testid="sockscap-selector-value"]` — interactive [optional] — F-SOCKSCAP-2.selector-value
+- `[data-testid="sockscap-selector-add"]` — interactive [optional] — F-SOCKSCAP-2.selector-add
+- `[data-testid="sockscap-include-children"]` — interactive [optional] — F-SOCKSCAP-2.include-children
+- `[data-testid="sockscap-egress-kind"]` — interactive — F-SOCKSCAP-2.egress-kind
+- `[data-testid="sockscap-egress-session"]` — interactive — F-SOCKSCAP-2.egress-session
+- `[data-testid="sockscap-egress-test-host"]` — interactive — F-SOCKSCAP-2.egress-test-host
+- `[data-testid="sockscap-egress-test-port"]` — interactive — F-SOCKSCAP-2.egress-test-port
+- `[data-testid="sockscap-egress-test"]` — interactive — F-SOCKSCAP-2.egress-test
+- `[data-testid="sockscap-ssh-control-connections"]` — interactive [optional] — F-SOCKSCAP-2.ssh-control-connections
+- `[data-testid="sockscap-ssh-channels"]` — interactive [optional] — F-SOCKSCAP-2.ssh-channels
+- `[data-testid="sockscap-ssh-keepalive"]` — interactive [optional] — F-SOCKSCAP-2.ssh-keepalive
+- `[data-testid="sockscap-ssh-connect-timeout"]` — interactive [optional] — F-SOCKSCAP-2.ssh-connect-timeout
+- `[data-testid="sockscap-profile-rule-source"]` — interactive — F-SOCKSCAP-2.profile-rule-source
+- `[data-testid="sockscap-profile-rule-source-up"]` — interactive [optional] — F-SOCKSCAP-2.profile-rule-source-up
+- `[data-testid="sockscap-profile-rule-source-down"]` — interactive [optional] — F-SOCKSCAP-2.profile-rule-source-down
+- `[data-testid="sockscap-default-action"]` — interactive — F-SOCKSCAP-2.default-action
+- `[data-testid="sockscap-unknown-action"]` — interactive — F-SOCKSCAP-2.unknown-action
+- `[data-testid="sockscap-failure-action"]` — interactive — F-SOCKSCAP-2.failure-action
+- `[data-testid="sockscap-udp-policy"]` — interactive — F-SOCKSCAP-2.udp-policy
+- `[data-testid="sockscap-dns-mode"]` — interactive — F-SOCKSCAP-2.dns-mode
+- `[data-testid="sockscap-lan-policy"]` — interactive — F-SOCKSCAP-2.lan-policy
+- `[data-testid="sockscap-stats-collection"]` — interactive — F-SOCKSCAP-2.stats-collection
+- `[data-testid="sockscap-minute-retention"]` — interactive — F-SOCKSCAP-2.minute-retention
+- `[data-testid="sockscap-hourly-retention"]` — interactive — F-SOCKSCAP-2.hourly-retention
+- `[data-testid="sockscap-domain-aggregation"]` — interactive — F-SOCKSCAP-2.domain-aggregation
+- `[data-testid="sockscap-domain-retention"]` — interactive — F-SOCKSCAP-2.domain-retention
+
+## sockscap/rules (F-SOCKSCAP-4)
+
+- `[data-testid="sockscap-rules-page"]` — display — F-SOCKSCAP-4.page
+- `[data-testid="sockscap-rule-source-new-url"]` — interactive — F-SOCKSCAP-4.source-new-url
+- `[data-testid="sockscap-rule-source-new-local"]` — interactive — F-SOCKSCAP-4.source-new-local
+- `[data-testid="sockscap-rule-source-row"]` — interactive — F-SOCKSCAP-4.source-row
+- `[data-testid="sockscap-rule-source-name"]` — interactive — F-SOCKSCAP-4.source-name
+- `[data-testid="sockscap-rule-source-enabled"]` — interactive [optional] — F-SOCKSCAP-4.source-enabled
+- `[data-testid="sockscap-rule-source-interval"]` — interactive [optional] — F-SOCKSCAP-4.source-interval
+- `[data-testid="sockscap-rule-source-url"]` — interactive [optional] — F-SOCKSCAP-4.source-url
+- `[data-testid="sockscap-rule-source-save"]` — interactive [optional] — F-SOCKSCAP-4.source-save
+- `[data-testid="sockscap-rule-source-refresh"]` — interactive — F-SOCKSCAP-4.source-refresh
+- `[data-testid="sockscap-rule-source-delete"]` — interactive [optional] — F-SOCKSCAP-4.source-delete
+- `[data-testid="sockscap-rule-file"]` — interactive [optional] — F-SOCKSCAP-4.source-file
+- `[data-testid="sockscap-rule-payload"]` — interactive [optional] — F-SOCKSCAP-4.source-payload
+- `[data-testid="sockscap-rule-source-import"]` — interactive [optional] — F-SOCKSCAP-4.source-import
+- `[data-testid="sockscap-rule-source-state"]` — display [optional] — F-SOCKSCAP-4.source-state
+- `[data-testid="sockscap-refresh-report"]` — display [optional] — F-SOCKSCAP-4.refresh-report
+- `[data-testid="sockscap-manual-profile"]` — interactive — F-SOCKSCAP-4.manual-profile
+- `[data-testid="sockscap-manual-rule-add"]` — interactive — F-SOCKSCAP-4.manual-add
+- `[data-testid="sockscap-manual-rules-save"]` — interactive — F-SOCKSCAP-4.manual-save
+- `[data-testid="sockscap-manual-rule-row"]` — display — F-SOCKSCAP-4.manual-row
+- `[data-testid="sockscap-manual-rule-enabled"]` — interactive — F-SOCKSCAP-4.manual-enabled
+- `[data-testid="sockscap-manual-rule-action"]` — interactive — F-SOCKSCAP-4.manual-action
+- `[data-testid="sockscap-manual-rule-kind"]` — interactive — F-SOCKSCAP-4.manual-kind
+- `[data-testid^="sockscap-manual-rule-pattern-"]` — interactive — F-SOCKSCAP-4.manual-pattern
+- `[data-testid="sockscap-manual-rule-up"]` — interactive [optional] — F-SOCKSCAP-4.manual-up
+- `[data-testid="sockscap-manual-rule-down"]` — interactive [optional] — F-SOCKSCAP-4.manual-down
+- `[data-testid="sockscap-manual-rule-remove"]` — interactive — F-SOCKSCAP-4.manual-remove
+- `[data-testid="sockscap-target-app"]` — interactive — F-SOCKSCAP-4.target-app
+- `[data-testid="sockscap-target-selector-kind"]` — interactive — F-SOCKSCAP-4.target-selector-kind
+- `[data-testid="sockscap-target-pid"]` — interactive — F-SOCKSCAP-4.target-pid
+- `[data-testid="sockscap-target-process-start"]` — interactive — F-SOCKSCAP-4.target-process-start
+- `[data-testid="sockscap-target-host"]` — interactive — F-SOCKSCAP-4.target-host
+- `[data-testid="sockscap-target-port"]` — interactive — F-SOCKSCAP-4.target-port
+- `[data-testid="sockscap-target-protocol"]` — interactive — F-SOCKSCAP-4.target-protocol
+- `[data-testid="sockscap-target-hostname-source"]` — interactive — F-SOCKSCAP-4.target-hostname-source
+- `[data-testid="sockscap-target-hard-bypass"]` — interactive — F-SOCKSCAP-4.target-hard-bypass
+- `[data-testid="sockscap-target-run"]` — interactive — F-SOCKSCAP-4.target-run
+- `[data-testid="sockscap-target-result"]` — display — F-SOCKSCAP-4.target-result
+
 ## terminal/appearance (F5.2)
 
 - `[data-testid="terminal-appearance-settings"]` — display — F5.2.appearance-root

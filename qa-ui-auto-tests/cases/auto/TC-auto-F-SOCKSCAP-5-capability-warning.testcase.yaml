@@ -1,0 +1,24 @@
+id: TC-auto-F-SOCKSCAP-5-capability-warning
+title: Sockscap exposes unsupported platform capability gates
+description: |
+  Opens the browser-only Linux unsupported scenario through whitelisted Stub
+  URL parameters and verifies that both Overview and Lifecycle retain the
+  adapter failure detail. This is a deterministic warning-path smoke, not a
+  substitute for platform entitlement, helper, driver, or capture testing.
+covers: [F-SOCKSCAP-5]
+tags: [auto-generated, smoke, p0, needs-review, sockscap, capabilities]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 30
+steps:
+  - open: "${cfg.app.base_url}?sockscap=1&sockscapPlatform=linux&sockscapCapability=unsupported"
+  - wait_for: '[data-testid="sockscap-capabilities"]'
+  - assert_text:
+      selector: '[data-testid="sockscap-capabilities"]'
+      contains: "Simulated adapter unavailable"
+  - click: '[data-testid="sockscap-nav-lifecycle"]'
+  - wait_for: '[data-testid="sockscap-lifecycle-gates"]'
+  - assert_text:
+      selector: '[data-testid="sockscap-lifecycle-gates"]'
+      contains: "Simulated adapter unavailable"
+  - screenshot: sockscap-capability-warning.png

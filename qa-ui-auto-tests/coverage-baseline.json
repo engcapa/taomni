@@ -1,9 +1,9 @@
 {
   "version": 1,
   "totals": {
-    "features_with_controls": 53,
-    "required": 228,
-    "covered_required": 228,
+    "features_with_controls": 59,
+    "required": 309,
+    "covered_required": 309,
     "shallow": 21,
     "orphans": 112
   },
@@ -271,6 +271,36 @@
     "F-DB-2": {
       "required": 0,
       "covered_required": 0,
+      "shallow": 0
+    },
+    "F-SOCKSCAP-1": {
+      "required": 15,
+      "covered_required": 15,
+      "shallow": 0
+    },
+    "F-SOCKSCAP-2": {
+      "required": 27,
+      "covered_required": 27,
+      "shallow": 0
+    },
+    "F-SOCKSCAP-3": {
+      "required": 6,
+      "covered_required": 6,
+      "shallow": 0
+    },
+    "F-SOCKSCAP-4": {
+      "required": 26,
+      "covered_required": 26,
+      "shallow": 0
+    },
+    "F-SOCKSCAP-5": {
+      "required": 2,
+      "covered_required": 2,
+      "shallow": 0
+    },
+    "F-SOCKSCAP-6": {
+      "required": 5,
+      "covered_required": 5,
       "shallow": 0
     }
   }

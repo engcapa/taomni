@@ -91,13 +91,46 @@ export type SockscapStubInvokeResult =
   | { handled: false }
   | { handled: true; value: unknown };
 
-const defaultScenario = (): SockscapStubScenario => ({
+const baseScenario = (): SockscapStubScenario => ({
   platform: "windows",
   capabilityMode: "supported",
   proxyHealth: "healthy",
   sshHealth: "healthy",
   trafficMode: "steady",
   recoveryRequired: false,
+});
+
+export function sockscapStubScenarioOverrides(search: string): Partial<SockscapStubScenario> {
+  const params = new URLSearchParams(search);
+  const overrides: Partial<SockscapStubScenario> = {};
+  const platform = params.get("sockscapPlatform");
+  const capabilityMode = params.get("sockscapCapability");
+  const proxyHealth = params.get("sockscapProxy");
+  const sshHealth = params.get("sockscapSsh");
+  const trafficMode = params.get("sockscapTraffic");
+  if (isOneOf(platform, ["windows", "macos", "linux"] as const)) overrides.platform = platform;
+  if (isOneOf(capabilityMode, ["supported", "degraded", "permission_required", "unsupported"] as const)) {
+    overrides.capabilityMode = capabilityMode;
+  }
+  if (isOneOf(proxyHealth, ["healthy", "degraded", "user_action_required", "invalid"] as const)) {
+    overrides.proxyHealth = proxyHealth;
+  }
+  if (isOneOf(sshHealth, ["healthy", "degraded", "user_action_required", "invalid"] as const)) {
+    overrides.sshHealth = sshHealth;
+  }
+  if (isOneOf(trafficMode, ["idle", "steady", "burst"] as const)) overrides.trafficMode = trafficMode;
+  if (params.get("sockscapRecovery") === "1") overrides.recoveryRequired = true;
+  if (params.get("sockscapRecovery") === "0") overrides.recoveryRequired = false;
+  return overrides;
+}
+
+function currentScenarioOverrides(): Partial<SockscapStubScenario> {
+  return typeof window === "undefined" ? {} : sockscapStubScenarioOverrides(window.location.search);
+}
+
+const defaultScenario = (): SockscapStubScenario => ({
+  ...baseScenario(),
+  ...currentScenarioOverrides(),
 });
 
 const zeroTotals = (): SockscapStatsTotals => ({
@@ -125,6 +158,10 @@ const nowUnix = (): number => Math.floor(Date.now() / 1000);
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function isOneOf<const T extends readonly string[]>(value: string | null, options: T): value is T[number] {
+  return value !== null && (options as readonly string[]).includes(value);
 }
 
 function makeDefaultProfile(): SockscapPersistedRoutingProfile {
@@ -203,7 +240,7 @@ function loadPersistedState(): StubPersistedState {
     const parsed = JSON.parse(globalThis.localStorage?.getItem(STORAGE_KEY) ?? "null") as Partial<StubPersistedState> | null;
     if (parsed && parsed.scenario && Array.isArray(parsed.profiles) && Array.isArray(parsed.ruleSources)) {
       return {
-        scenario: { ...defaultScenario(), ...parsed.scenario },
+        scenario: { ...baseScenario(), ...parsed.scenario, ...currentScenarioOverrides() },
         profiles: parsed.profiles,
         ruleSources: parsed.ruleSources,
         restoreOnSystemLogin: parsed.restoreOnSystemLogin === true,

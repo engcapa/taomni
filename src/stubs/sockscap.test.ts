@@ -6,7 +6,11 @@ import type {
   SockscapTestEgressResult,
 } from "../lib/sockscap";
 import { listen } from "./tauri-event";
-import { invokeSockscapStub, sockscapStubController } from "./sockscap";
+import {
+  invokeSockscapStub,
+  sockscapStubController,
+  sockscapStubScenarioOverrides,
+} from "./sockscap";
 
 async function invokeValue<T>(command: string, args?: unknown): Promise<T> {
   const result = await invokeSockscapStub(command, args);
@@ -15,6 +19,22 @@ async function invokeValue<T>(command: string, args?: unknown): Promise<T> {
 }
 
 describe("Sockscap browser stub", () => {
+  it("parses only whitelisted URL scenario overrides for deterministic browser QA", () => {
+    expect(sockscapStubScenarioOverrides(
+      "?sockscapPlatform=linux&sockscapCapability=unsupported&sockscapProxy=invalid&sockscapSsh=user_action_required&sockscapTraffic=idle&sockscapRecovery=1",
+    )).toEqual({
+      platform: "linux",
+      capabilityMode: "unsupported",
+      proxyHealth: "invalid",
+      sshHealth: "user_action_required",
+      trafficMode: "idle",
+      recoveryRequired: true,
+    });
+    expect(sockscapStubScenarioOverrides(
+      "?sockscapPlatform=plan9&sockscapCapability=yes&sockscapRecovery=maybe",
+    )).toEqual({});
+  });
+
   beforeEach(async () => {
     vi.useRealTimers();
     await sockscapStubController.reset();
