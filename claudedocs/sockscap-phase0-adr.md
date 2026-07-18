@@ -28,7 +28,7 @@ This ADR records decisions that are **safe to lock now** and gates that remain
 | Windows capture | Global: Wintun/TUN baseline; app/PID: WinDivert SOCKET/FLOW/NETWORK **vs** WFP ALE dual spike | **Open** — ADR amendment after spikes |
 | macOS capture | NETransparentProxyProvider system extension | Intent locked; entitlement is a hard gate |
 | Linux capture | cgroup v2 + nft socket cgroup match + fwmark; managed launch netns fallback | Intent locked; host probe required |
-| SSH host key | known_hosts / fingerprint confirmation is a **release gate**; current unconditional accept must be fixed before SSH egress ships | Frozen |
+| SSH host key | App-owned known-hosts store with exact `TRUST` / `REPLACE` fingerprint confirmation; background reconnect fails closed | Frozen; security gate closed |
 | Phase 0 code in tree | Types, capability probe, preflight, orchestrator state machine, Tauri commands | Landed on this branch |
 
 ## License and third-party inventory (Phase 0)
@@ -40,7 +40,7 @@ This ADR records decisions that are **safe to lock now** and gates that remain
 | Wintun | Special / open (check current) | Windows global TUN | Signature + redistribution review |
 | WFP callout / helper | Custom / first-party preferred | Alternative to WinDivert | Prefer if WinDivert license/EDR fails |
 | GFWList | LGPL-2.1 list content | Downloaded at runtime, not compiled into install package | Do not vendor list into MIT binary |
-| russh (existing) | Apache-2.0 | SSH Jump `direct-tcpip` | Host-key verification gap is product risk, not license |
+| russh (existing) | Apache-2.0 | Shared, bounded SSH Jump `direct-tcpip` controls/channels | Strict host-key verification and user-action errors landed |
 | Existing proxy/tunnel modules | MIT (Taomni) | Reuse ResolvedProxy + direct-tcpip patterns | No second credential store |
 
 **Rule:** any third-party network kernel must pass SBOM + license review before
@@ -70,9 +70,14 @@ routing works before adapters exist.
 1. **Windows ADR amendment**: choose WinDivert vs WFP after license, signature, reinjection correctness, IPv6, EDR/VPN, and uninstall recovery spikes.
 2. **macOS entitlement**: obtain Network Extension entitlement; without it, macOS vertical is blocked.
 3. **tun2proxy fitness**: per-flow route hook + lifecycle callback + cancel; if too invasive, build local FlowEngine on ipstack / own connectors.
-4. **SSH known_hosts**: fix `terminal/ssh.rs::SshHandler::check_server_key` (currently accepts all keys) before any SSH Jump egress release.
-5. **Recovery journal + helper heartbeat**: design landed; implementation required before Active on any platform.
-6. **VPN / sleep / NIC switch conflict matrix**: documented test plan; not yet executed.
+4. **Recovery journal + helper heartbeat**: design landed; implementation required before Active on any platform.
+5. **VPN / sleep / NIC switch conflict matrix**: documented test plan; not yet executed.
+
+Closed security gate: `terminal::hostkey` now stores canonical host/port entries in
+an app-owned, permission-hardened JSON known-hosts file. First use and key changes
+require exact fingerprint confirmation on an interactive path; unattended starts
+and reconnects return stable user-action-required errors. The shared SSH pool
+reuses only verified controls and never turns a failed check into implicit trust.
 
 ## Exit criteria (from design plan §13 Phase 0)
 
@@ -104,6 +109,10 @@ src-tauri/src/sockscap/
   preflight.rs      # fail-fast start gate
   orchestrator.rs   # state machine (no capture install)
   commands.rs       # Tauri IPC surface
+
+src-tauri/src/terminal/
+  hostkey.rs        # strict app-owned known-hosts and confirmation gate
+  ssh_pool.rs       # bounded shared control/channel pool for direct-tcpip
 ```
 
 Commands registered in `lib.rs`:
@@ -113,6 +122,7 @@ Commands registered in `lib.rs`:
 ## Follow-ups
 
 - Phase 1: immutable policy matcher + GFWList projection + profile schema
-- Phase 2: FlowEngine + egress connectors + SshChannelPool extraction
+- Phase 2: FlowEngine + egress connectors + SshChannelPool extraction (core landed;
+  production profile/session orchestration remains in Phase 3)
 - Phase 3: sockscap.db + recovery journal + browser stubs
 - Phase 0 spikes: Windows dual path, Linux cgroup vertical slice, tun2proxy evaluation
