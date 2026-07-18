@@ -17,9 +17,12 @@
 pub mod autoproxy;
 pub mod conflict;
 pub mod download;
+pub mod egress;
+pub mod known_hosts;
 pub mod matcher;
 pub mod model;
 pub mod policy;
+pub mod ssh_pool;
 
 use serde::{Deserialize, Serialize};
 
