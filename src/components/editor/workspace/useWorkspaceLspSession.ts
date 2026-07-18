@@ -58,6 +58,8 @@ interface DocumentSyncQueue {
   pending: PendingDocumentSync | null;
 }
 
+const LSP_DIAGNOSTICS_IDLE_DELAY_MS = 750;
+
 /**
  * LSP feature responses all carry a document status.  Most responses for an
  * already-open document repeat that exact status, and publishing a new store
@@ -356,7 +358,7 @@ export function useWorkspaceLspSession({
       // Only poll diagnostics while the server is actually serving this file.
       if (!latest || !documentActiveRef.current[key]) return;
       void refreshDiagnostics(latest);
-    }, 750);
+    }, LSP_DIAGNOSTICS_IDLE_DELAY_MS);
   }, [openFilesRef, refreshDiagnostics]);
 
   /**

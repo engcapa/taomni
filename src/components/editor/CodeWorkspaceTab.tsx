@@ -270,7 +270,6 @@ function initialInlayHintRange(text: string): LspRange {
 // feeling immediate once ensureLspDocumentSynced force-flushes for completion.
 const LSP_CHANGE_SYNC_DELAY_MS = 140;
 const LSP_FEATURE_SYNC_WAIT_MS = 400;
-const LSP_DIAGNOSTICS_IDLE_DELAY_MS = 750;
 const LSP_HIGHLIGHT_IDLE_DELAY_MS = 500;
 const LSP_INLAY_HINT_IDLE_DELAY_MS = 650;
 const LSP_SEMANTIC_TOKENS_IDLE_DELAY_MS = 900;
