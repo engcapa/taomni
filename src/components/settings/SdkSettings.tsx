@@ -351,7 +351,7 @@ export function SdkSettings() {
                 {t("settings.sdkAddAll")}
               </button>
             )}
-            <button type="button" aria-label={t("settings.sdkCloseDiscoveries")} className={`${availableDiscoveries.length <= 1 ? "ml-auto" : ""} inline-flex h-6 w-6 items-center justify-center rounded`} onClick={() => setDiscoveries(null)}>
+            <button type="button" data-testid="sdk-discovery-close" aria-label={t("settings.sdkCloseDiscoveries")} className={`${availableDiscoveries.length <= 1 ? "ml-auto" : ""} inline-flex h-6 w-6 items-center justify-center rounded`} onClick={() => setDiscoveries(null)}>
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -364,7 +364,7 @@ export function SdkSettings() {
                 <span className="rounded bg-[var(--taomni-selected)] px-1.5 py-0.5 text-[10px] font-semibold">{kindLabel(candidate.kind)}</span>
                 <span className="min-w-0 flex-1 truncate font-mono text-[10px]" title={candidate.location}>{candidate.location}</span>
                 <span className="shrink-0 text-[10px] text-[var(--taomni-text-muted)]">{candidate.version ?? "?"}</span>
-                <button type="button" className="taomni-btn h-6 px-2 text-[10px]" disabled={busy !== null} onClick={() => void addDiscovery(candidate)}>
+                <button type="button" data-testid="sdk-discovery-add" className="taomni-btn h-6 px-2 text-[10px]" disabled={busy !== null} onClick={() => void addDiscovery(candidate)}>
                   {busy === `discover:${key}` ? t("settings.sdkAdding") : t("settings.sdkAdd")}
                 </button>
               </div>
@@ -388,7 +388,7 @@ export function SdkSettings() {
                 <div className="mb-2 flex items-center gap-2">
                   <span className="text-[12px] font-semibold">{kindLabel(kind)}</span>
                   <span className="text-[10px] text-[var(--taomni-text-muted)]">{installations.length}</span>
-                  <button type="button" aria-label={`${t("settings.sdkAdd")} ${kindLabel(kind)}`} className="ml-auto inline-flex h-6 w-6 items-center justify-center rounded hover:bg-[var(--taomni-control-hover)]" onClick={() => openNew(kind)}>
+                  <button type="button" data-testid={`sdk-add-${kind}`} aria-label={`${t("settings.sdkAdd")} ${kindLabel(kind)}`} className="ml-auto inline-flex h-6 w-6 items-center justify-center rounded hover:bg-[var(--taomni-control-hover)]" onClick={() => openNew(kind)}>
                     <Plus className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -419,13 +419,13 @@ export function SdkSettings() {
                       </span>
                       <span className="min-w-0 flex-1 truncate text-[11px] font-medium" title={installation.name}>{installation.name}</span>
                       {defaultId === installation.id && <span className="text-[9px] font-semibold text-[var(--taomni-accent)]">{t("settings.sdkDefaultBadge")}</span>}
-                      <button type="button" aria-label={`${t("settings.sdkRefresh")} ${installation.name}`} className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-[var(--taomni-control-hover)]" disabled={busy !== null} onClick={() => void runMutation(`refresh:${installation.id}`, () => sdkRefreshInstallations(installation.id))}>
+                      <button type="button" data-testid="sdk-installation-refresh" aria-label={`${t("settings.sdkRefresh")} ${installation.name}`} className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-[var(--taomni-control-hover)]" disabled={busy !== null} onClick={() => void runMutation(`refresh:${installation.id}`, () => sdkRefreshInstallations(installation.id))}>
                         <RefreshCw className={`h-3 w-3 ${busy === `refresh:${installation.id}` ? "animate-spin" : ""}`} />
                       </button>
-                      <button type="button" aria-label={`${t("settings.sdkEdit")} ${installation.name}`} className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-[var(--taomni-control-hover)]" disabled={busy !== null} onClick={() => openEdit(installation)}>
+                      <button type="button" data-testid="sdk-installation-edit" aria-label={`${t("settings.sdkEdit")} ${installation.name}`} className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-[var(--taomni-control-hover)]" disabled={busy !== null} onClick={() => openEdit(installation)}>
                         <Pencil className="h-3 w-3" />
                       </button>
-                      <button type="button" aria-label={`${t("settings.sdkRemove")} ${installation.name}`} className="inline-flex h-6 w-6 items-center justify-center rounded text-red-500 hover:bg-red-500/10" disabled={busy !== null} onClick={() => remove(installation)}>
+                      <button type="button" data-testid="sdk-installation-remove" aria-label={`${t("settings.sdkRemove")} ${installation.name}`} className="inline-flex h-6 w-6 items-center justify-center rounded text-red-500 hover:bg-red-500/10" disabled={busy !== null} onClick={() => remove(installation)}>
                         <Trash2 className="h-3 w-3" />
                       </button>
                     </div>

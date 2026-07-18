@@ -519,6 +519,7 @@ export function WorkspaceSdkStatus({ roots }: WorkspaceSdkStatusProps) {
               </button>
               <button
                 type="button"
+                data-testid="workspace-sdk-close"
                 aria-label={t("settings.workspaceSdkClose")}
                 className="inline-flex h-7 w-7 items-center justify-center rounded hover:bg-[var(--taomni-code-active-line-bg)]"
                 onClick={() => setOpen(false)}

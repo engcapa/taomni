@@ -1378,10 +1378,6 @@ controls:
     selector: '[data-testid="terminal-settings"]'
     kind: display
     optional: true        # not used by Mail Appearance
-  - id: mail-appearance-body
-    selector: '[data-testid="mail-appearance-settings"]'
-    kind: display
-    optional: true        # only visible for Mail Appearance
   - id: network-body
     selector: '[data-testid="network-settings"]'
     kind: display
@@ -2316,6 +2312,176 @@ controls:
 - Database / SQL Editor 设置支持输入时补全开关、可录制的触发快捷键、Tab/Enter 接受方式与冲突提示；设置通过 localStorage 在主窗口和分离窗口间同步
 - 设置项即时持久化
 
+### 11.2 多版本 SDK 与工作区工具链 ✅
+
+<!-- feature
+id: F11.2
+status: done
+area: settings/code-workspace
+components: [SdkSettings, WorkspaceSdkStatus]
+files:
+  - src/components/settings/SdkSettings.tsx
+  - src/components/editor/workspace/WorkspaceSdkStatus.tsx
+  - src/lib/editor/sdk.ts
+  - src-tauri/src/sdk/
+controls:
+  # Global SDK manager (always present in Settings -> Code)
+  - id: sdk-settings
+    selector: '[data-testid="sdk-settings"]'
+    kind: display
+  - id: sdk-discover
+    selector: '[data-testid="sdk-discover"]'
+    kind: interactive
+  - id: sdk-add
+    selector: '[data-testid="sdk-add"]'
+    kind: interactive
+  - id: sdk-refresh-all
+    selector: '[data-testid="sdk-refresh-all"]'
+    kind: interactive
+  - id: sdk-kind-java
+    selector: '[data-testid="sdk-kind-java"]'
+    kind: display
+  - id: sdk-kind-kotlin
+    selector: '[data-testid="sdk-kind-kotlin"]'
+    kind: display
+  - id: sdk-kind-scala
+    selector: '[data-testid="sdk-kind-scala"]'
+    kind: display
+  - id: sdk-kind-python
+    selector: '[data-testid="sdk-kind-python"]'
+    kind: display
+  - id: sdk-default-java
+    selector: '[data-testid="sdk-default-java"]'
+    kind: interactive
+    optional: true
+  - id: sdk-default-kotlin
+    selector: '[data-testid="sdk-default-kotlin"]'
+    kind: interactive
+  - id: sdk-default-scala
+    selector: '[data-testid="sdk-default-scala"]'
+    kind: interactive
+    optional: true
+  - id: sdk-default-python
+    selector: '[data-testid="sdk-default-python"]'
+    kind: interactive
+    optional: true
+  - id: sdk-add-kind
+    selector: '[data-testid^="sdk-add-"]'
+    kind: interactive
+    optional: true
+  - id: sdk-settings-error
+    selector: '[data-testid="sdk-settings-error"]'
+    kind: display
+    optional: true
+  # Add/edit and discovery states are conditional.
+  - id: sdk-editor
+    selector: '[data-testid="sdk-editor"]'
+    kind: display
+    optional: true
+  - id: sdk-editor-kind
+    selector: '[data-testid="sdk-editor-kind"]'
+    kind: interactive
+    optional: true
+  - id: sdk-editor-name
+    selector: '[data-testid="sdk-editor-name"]'
+    kind: interactive
+    optional: true
+  - id: sdk-editor-location
+    selector: '[data-testid="sdk-editor-location"]'
+    kind: interactive
+    optional: true
+  - id: sdk-editor-browse
+    selector: '[data-testid="sdk-editor-browse"]'
+    kind: interactive
+    optional: true
+  - id: sdk-editor-probe
+    selector: '[data-testid="sdk-editor-probe"]'
+    kind: display
+    optional: true
+  - id: sdk-editor-probe-button
+    selector: '[data-testid="sdk-editor-probe-button"]'
+    kind: interactive
+    optional: true
+  - id: sdk-editor-save
+    selector: '[data-testid="sdk-editor-save"]'
+    kind: interactive
+    optional: true
+  - id: sdk-discovery-results
+    selector: '[data-testid="sdk-discovery-results"]'
+    kind: display
+    optional: true
+  - id: sdk-discovery-add-all
+    selector: '[data-testid="sdk-discovery-add-all"]'
+    kind: interactive
+    optional: true
+  - id: sdk-discovery-add
+    selector: '[data-testid="sdk-discovery-add"]'
+    kind: interactive
+    optional: true
+  - id: sdk-discovery-close
+    selector: '[data-testid="sdk-discovery-close"]'
+    kind: interactive
+    optional: true
+  - id: sdk-installation-row
+    selector: '[data-testid^="sdk-row-"]'
+    kind: display
+    optional: true
+  - id: sdk-installation-refresh
+    selector: '[data-testid="sdk-installation-refresh"]'
+    kind: interactive
+    optional: true
+  - id: sdk-installation-edit
+    selector: '[data-testid="sdk-installation-edit"]'
+    kind: interactive
+    optional: true
+  - id: sdk-installation-remove
+    selector: '[data-testid="sdk-installation-remove"]'
+    kind: interactive
+    optional: true
+  # Code Workspace status and per-project bindings are present only in a workspace tab.
+  - id: workspace-sdk-status
+    selector: '[data-testid="code-workspace-sdk-status"]'
+    kind: interactive
+    optional: true
+  - id: workspace-sdk-dialog
+    selector: '[data-testid="workspace-sdk-dialog"]'
+    kind: display
+    optional: true
+  - id: workspace-sdk-refresh
+    selector: '[data-testid="workspace-sdk-refresh"]'
+    kind: interactive
+    optional: true
+  - id: workspace-sdk-open-settings
+    selector: '[data-testid="workspace-sdk-open-settings"]'
+    kind: interactive
+    optional: true
+  - id: workspace-sdk-close
+    selector: '[data-testid="workspace-sdk-close"]'
+    kind: interactive
+    optional: true
+  - id: workspace-sdk-error
+    selector: '[data-testid="workspace-sdk-error"]'
+    kind: display
+    optional: true
+  - id: workspace-sdk-root
+    selector: '[data-testid^="workspace-sdk-root-"]'
+    kind: display
+    optional: true
+  - id: workspace-kotlin-profile
+    selector: '[data-testid^="workspace-kotlin-profile-"]'
+    kind: display
+    optional: true
+  - id: workspace-sdk-binding
+    selector: '[data-testid^="workspace-sdk-binding-"]'
+    kind: interactive
+    optional: true
+-->
+
+- 全局 SDK 管理支持登记、探测、自动发现、刷新和移除多个 Java/JDK、Kotlin、Scala 与 Python 安装，并为每类工具链设置兼容默认项。
+- 工作区扫描 Maven、Gradle、sbt、pyproject、版本管理器及独立源码配置，按嵌套项目作用域解析版本要求、配置证据和有效 SDK；用户可在工作区状态面板中覆盖或恢复自动匹配。
+- Kotlin 项目配置独立展示平台、构建托管/独立编译器模式、编译器版本、language/apiVersion、JVM target、Java toolchain 与 Gradle launcher JDK；Gradle/Maven 管理的 Kotlin 编译器不会误要求本机 `kotlinc`。
+- 项目 JDK、构建 launcher JDK、JDT LS 工具 JDK（JDK 21+）相互独立。解析结果统一注入语言服务器、本地终端与 Run Tasks，SDK 绑定变化会重启已打开的 LSP 会话。
+
 ---
 
 ## 12. 凭证保险库（Credential Vault）
@@ -3169,14 +3335,16 @@ files:
   - src/components/sidebar/Sidebar.tsx
   - src/layouts/MainLayout.tsx
 controls:
-  - id: set-terminal-theme
-    selector: '[data-testid="context-menu-item-set-terminal-theme"]'
+  # Base SessionTree rows/context actions are owned by F6.2. These selectors
+  # describe only the state/action introduced by multi-selection.
+  - id: selected-session-row
+    selector: '[data-testid="session-tree-item"][data-selected="true"]'
     kind: interactive
-    optional: true       # visible after opening a selected saved-session context menu
-  - id: terminal-theme-options
-    selector: '[data-testid^="session-terminal-theme-option-"]'
+    optional: true
+  - id: connect-selected-sessions
+    selector: '[data-testid^="context-menu-item-connect-selected-sessions-"]'
     kind: interactive
-    optional: true       # visible while the terminal theme flyout is open
+    optional: true
 -->
 
 - 在 SessionTree 中按住 Ctrl / Meta 单击会话条目可累加选中

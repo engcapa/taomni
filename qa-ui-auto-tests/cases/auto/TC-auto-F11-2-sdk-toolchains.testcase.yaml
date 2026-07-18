@@ -1,0 +1,68 @@
+id: TC-auto-F11-2-sdk-toolchains
+title: Register and manage a Kotlin SDK toolchain
+description: |
+  Exercises the browser-backed SDK registry from Settings. The case verifies
+  all four supported SDK families are present, probes and registers a Kotlin
+  installation, promotes it to the Kotlin default, refreshes and edits it,
+  verifies persistence, then removes it to leave the registry clean.
+covers: [F11.2]
+tags: [auto-generated, smoke, needs-review, settings, sdk, kotlin]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="ribbon-settings"]'
+  - click: '[data-testid="ribbon-settings"]'
+  - wait_for: '[data-testid="settings-panel"]'
+  - fill: {selector: '[data-testid="settings-search-input"]', value: kotlin}
+  - assert_visible: '[data-testid="sdk-settings"]'
+
+  # Every requested SDK family has its own registry/default surface.
+  - assert_text: {selector: '[data-testid="sdk-kind-java"]', contains: "Java / JDK"}
+  - assert_text: {selector: '[data-testid="sdk-kind-kotlin"]', contains: Kotlin}
+  - assert_text: {selector: '[data-testid="sdk-kind-scala"]', contains: Scala}
+  - assert_text: {selector: '[data-testid="sdk-kind-python"]', contains: Python}
+
+  # Browser discovery is deterministic and empty, but the interaction and
+  # explicit empty result are still part of the supported workflow.
+  - click: '[data-testid="sdk-discover"]'
+  - wait_for: '[data-testid="sdk-discovery-results"]'
+  - assert_text: {selector: '[data-testid="sdk-discovery-results"]', contains: "No new ready installations were found."}
+  - click: '[data-testid="sdk-discovery-close"]'
+
+  # Register a Kotlin compiler separately from Java/JDK.
+  - click: '[data-testid="sdk-add"]'
+  - wait_for: '[data-testid="sdk-editor"]'
+  - select_option: {selector: '[data-testid="sdk-editor-kind"]', value: kotlin}
+  - fill: {selector: '[data-testid="sdk-editor-name"]', value: "QA Kotlin 2.1"}
+  - fill: {selector: '[data-testid="sdk-editor-location"]', value: "/opt/kotlin-2.1.20"}
+  - click: '[data-testid="sdk-editor-probe-button"]'
+  - assert_text: {selector: '[data-testid="sdk-editor-probe"]', contains: "2.1.20"}
+  - click: '[data-testid="sdk-editor-save"]'
+  - wait_for: '[data-testid^="sdk-row-"]'
+  - assert_text: {selector: '[data-testid^="sdk-row-"]', contains: "QA Kotlin 2.1"}
+
+  # Default selection is persisted and shared with workspace resolution.
+  - select_option: {selector: '[data-testid="sdk-default-kotlin"]', label: "QA Kotlin 2.1"}
+  - assert_localstorage:
+      key: taomni.stub.sdkRegistry.v1
+      contains: '"defaults":[{"kind":"kotlin"'
+  - click: '[data-testid="sdk-refresh-all"]'
+  - click: '[data-testid="sdk-installation-refresh"]'
+
+  # Edit uses the same probe/save path and preserves the installation id.
+  - click: '[data-testid="sdk-installation-edit"]'
+  - wait_for: '[data-testid="sdk-editor"]'
+  - fill: {selector: '[data-testid="sdk-editor-name"]', value: "QA Kotlin 2.1 updated"}
+  - click: '[data-testid="sdk-editor-save"]'
+  - assert_text: {selector: '[data-testid^="sdk-row-"]', contains: "QA Kotlin 2.1 updated"}
+
+  # Remove is confirmed and also clears the default binding.
+  - seed_dialog: {prompt: [], confirm: true}
+  - click: '[data-testid="sdk-installation-remove"]'
+  - wait_for: {selector: '[data-testid^="sdk-row-"]', state: detached}
+  - assert_localstorage:
+      key: taomni.stub.sdkRegistry.v1
+      contains: '"installations":[]'
+  - screenshot: F11.2-sdk-toolchains.png
