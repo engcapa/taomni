@@ -208,6 +208,34 @@ async fn relays_native_permission_requests_and_returns_the_selected_option() {
 }
 
 #[tokio::test]
+async fn auto_allows_taomni_mcp_permissions_without_a_second_ui_gate() {
+    let process = initialized_process("mcp-permission-request").await;
+    let session_id = process.new_session("/workspace", vec![]).await.unwrap();
+    let mut updates = process.subscribe();
+    let prompt_process = process.clone();
+    let prompt_session = session_id.clone();
+    let prompt =
+        tokio::spawn(async move { prompt_process.prompt(&prompt_session, "run it").await });
+
+    let result = tokio::time::timeout(Duration::from_secs(2), prompt)
+        .await
+        .expect("MCP-deferred permission should not wait on the UI")
+        .unwrap()
+        .unwrap();
+    assert_eq!(result.stop_reason, AcpStopReason::EndTurn);
+
+    // Drain any events that raced the prompt completion. A Taomni MCP tool
+    // must never open the native ACP safety gate — the MCP ActionCard owns it.
+    while let Ok(update) = updates.try_recv() {
+        assert!(
+            !matches!(update, AcpRuntimeEvent::PermissionRequest(_)),
+            "Taomni MCP tools must not open a second ACP permission gate"
+        );
+    }
+    process.stop().await;
+}
+
+#[tokio::test]
 async fn cancelling_a_native_permission_flushes_its_outcome_before_session_cancel() {
     let process = initialized_process("permission-request").await;
     let session_id = process.new_session("/workspace", vec![]).await.unwrap();

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MessageBubble } from "./MessageBubble";
 import type { ChatMessage } from "../../stores/chatStore";
@@ -9,6 +9,49 @@ const coreMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@tauri-apps/api/core", () => coreMocks);
+
+describe("MessageBubble tool activity collapse", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("collapses tool transcript by default and expands on click", () => {
+    const message: ChatMessage = {
+      id: "msg-tools",
+      thread_id: "thread-1",
+      role: "assistant",
+      content: [
+        "Working on it.",
+        "",
+        "> 🔧 `search_tool`",
+        "> ↳ completed",
+        "> 🔧 `run_terminal_command` — rm -v /tmp/x",
+        "> ↳ removed",
+        "",
+        "Done.",
+      ].join("\n"),
+      created_at: 1,
+      redacted: false,
+    };
+
+    render(<MessageBubble message={message} />);
+
+    expect(screen.getByText("Working on it.")).toBeInTheDocument();
+    expect(screen.getByText("Done.")).toBeInTheDocument();
+    // Collapsed: summary visible, individual tool rows hidden.
+    expect(screen.getByTestId("chat-tool-activity-toggle")).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("chat-tool-activity-list")).not.toBeInTheDocument();
+    expect(screen.queryByText("search_tool")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("chat-tool-activity-toggle"));
+
+    expect(screen.getByTestId("chat-tool-activity-toggle")).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByTestId("chat-tool-activity-list")).toBeInTheDocument();
+    expect(screen.getByText("search_tool")).toBeInTheDocument();
+    expect(screen.getByText("run_terminal_command")).toBeInTheDocument();
+  });
+});
 
 describe("MessageBubble media previews", () => {
   afterEach(() => {

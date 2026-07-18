@@ -263,6 +263,10 @@ pub struct AcpPermissionRequest {
     pub title: String,
     pub kind: String,
     pub options: Vec<AcpPermissionOption>,
+    /// When true, the tool targets Taomni's scoped MCP surface, which already
+    /// owns the human-in-the-loop ActionCard for side effects. The ACP runtime
+    /// auto-selects an allow option so the user is not asked twice.
+    pub deferred_to_mcp: bool,
 }
 
 /// Parse a standard ACP `session/request_permission` request without
@@ -319,13 +323,142 @@ pub fn parse_permission_request(params: &Value) -> Result<AcpPermissionRequest, 
         ));
     }
 
+    let deferred_to_mcp = tool_call_targets_taomni_mcp(tool_call);
+
     Ok(AcpPermissionRequest {
         session_id,
         tool_call_id,
         title,
         kind,
         options,
+        deferred_to_mcp,
     })
+}
+
+/// Detect whether a permission request is for a Taomni-scoped MCP tool.
+///
+/// Grok (and other ACP agents) prompt via `session/request_permission` before
+/// every non-auto-approved tool. Taomni MCP write tools then run the audited
+/// ActionCard pipeline again. Identifying our MCP surface lets the runtime
+/// skip the first card so the user only confirms once.
+///
+/// Only stable tool-name identifiers are inspected — never free-form argument
+/// values — so secrets in `rawInput` never leave this check.
+pub fn tool_call_targets_taomni_mcp(tool_call: &serde_json::Map<String, Value>) -> bool {
+    for candidate in permission_tool_name_candidates(tool_call) {
+        if is_taomni_mcp_tool_name(&candidate) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Return true for fully-qualified Taomni MCP tool names in either Grok's
+/// `server__tool` form or Claude's `mcp__server__tool` form, plus a small set
+/// of bare tool names that only exist on Taomni's MCP surface (so a dispatcher
+/// that drops the server prefix still defers correctly).
+pub fn is_taomni_mcp_tool_name(name: &str) -> bool {
+    let name = name.trim();
+    if name.is_empty() || name.chars().count() > 256 {
+        return false;
+    }
+    let lower = name.to_ascii_lowercase();
+    if lower.starts_with("taomni__")
+        || lower.starts_with("taomni_sql__")
+        || lower.starts_with("taomni_redis__")
+        || lower.starts_with("taomni_control__")
+        || lower.starts_with("mcp__taomni__")
+        || lower.starts_with("mcp__taomni_sql__")
+        || lower.starts_with("mcp__taomni_redis__")
+        || lower.starts_with("mcp__taomni_control__")
+    {
+        return true;
+    }
+    // Bare names that do not collide with Grok-native tools
+    // (`run_terminal_command`, `search_replace`, …). Keep this list narrow.
+    matches!(
+        lower.as_str(),
+        "run_in_terminal"
+            | "run_captured"
+            | "read_capture"
+            | "read_terminal_tail"
+            | "sftp_upload"
+            | "sftp_download"
+            | "save_as_runbook"
+            | "open_session_editor"
+            | "switch_tab"
+            | "run_sql"
+            | "run_sql_captured"
+            | "export_result"
+            | "redis_set_key"
+            | "redis_del_key"
+            | "redis_exec"
+            | "session_open"
+            | "session_create"
+            | "session_update"
+            | "session_delete"
+            | "tab_switch"
+            | "tab_close"
+            | "quick_connect"
+    )
+}
+
+fn permission_tool_name_candidates(tool_call: &serde_json::Map<String, Value>) -> Vec<String> {
+    let mut out = Vec::new();
+    let push = |out: &mut Vec<String>, value: Option<&str>| {
+        if let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) {
+            if !out.iter().any(|existing| existing == value) {
+                out.push(value.to_string());
+            }
+        }
+    };
+
+    push(&mut out, tool_call.get("title").and_then(Value::as_str));
+    for key in ["name", "toolName", "tool_name", "serverToolName"] {
+        push(&mut out, tool_call.get(key).and_then(Value::as_str));
+    }
+    if let Some(meta_name) = tool_call
+        .get("_meta")
+        .and_then(|meta| meta.pointer("/x.ai/tool/name"))
+        .and_then(Value::as_str)
+    {
+        push(&mut out, Some(meta_name));
+    }
+
+    // Dispatcher wrappers (use_tool / CallMcpTool) may nest the real name.
+    // Only read known identifier keys — never arbitrary argument values.
+    if let Some(raw) = tool_call.get("rawInput").and_then(Value::as_object) {
+        for key in [
+            "name",
+            "tool",
+            "toolName",
+            "tool_name",
+            "serverToolName",
+            "qualifiedName",
+            "qualified_name",
+        ] {
+            push(&mut out, raw.get(key).and_then(Value::as_str));
+        }
+        if let (Some(server), Some(tool)) = (
+            raw.get("server")
+                .or_else(|| raw.get("serverName"))
+                .or_else(|| raw.get("server_name"))
+                .and_then(Value::as_str),
+            raw.get("tool")
+                .or_else(|| raw.get("toolName"))
+                .or_else(|| raw.get("tool_name"))
+                .and_then(Value::as_str),
+        ) {
+            let server = server.trim();
+            let tool = tool.trim();
+            if !server.is_empty() && !tool.is_empty() {
+                push(&mut out, Some(&format!("{server}__{tool}")));
+                push(&mut out, Some(&format!("mcp__{server}__{tool}")));
+            }
+        }
+    }
+
+    out
 }
 
 /// Build the ACP success response for a human-selected permission option.
@@ -1095,6 +1228,7 @@ mod tests {
         assert_eq!(request.session_id, "session-1");
         assert_eq!(request.tool_call_id, "tool-1");
         assert_eq!(request.title, "Edit README.md");
+        assert!(!request.deferred_to_mcp);
         assert_eq!(request.options[0].kind, AcpPermissionOptionKind::AllowOnce);
         assert!(!format!("{request:?}").contains("must-not-retain"));
         assert_eq!(
@@ -1113,6 +1247,61 @@ mod tests {
                 "result": { "outcome": { "outcome": "cancelled" } },
             }),
         );
+    }
+
+    #[test]
+    fn defers_taomni_mcp_permission_requests_without_retaining_raw_input() {
+        let request = parse_permission_request(&json!({
+            "sessionId": "session-1",
+            "toolCall": {
+                "toolCallId": "tool-mcp-1",
+                "title": "taomni__run_in_terminal",
+                "kind": "execute",
+                "rawInput": {
+                    "command": "rm -rf /",
+                    "session_id": "tab-1",
+                    "api_key": "must-not-retain",
+                },
+            },
+            "options": [
+                {
+                    "optionId": "allow-once",
+                    "name": "Allow once",
+                    "kind": "allow_once",
+                },
+            ],
+        }))
+        .unwrap();
+        assert!(request.deferred_to_mcp);
+        assert!(!format!("{request:?}").contains("must-not-retain"));
+        assert!(!format!("{request:?}").contains("rm -rf"));
+
+        let nested = parse_permission_request(&json!({
+            "sessionId": "session-1",
+            "toolCall": {
+                "toolCallId": "tool-mcp-2",
+                "title": "use_tool",
+                "kind": "execute",
+                "rawInput": {
+                    "server": "taomni_control",
+                    "tool": "session_open",
+                },
+            },
+            "options": [
+                {
+                    "optionId": "allow-once",
+                    "name": "Allow once",
+                    "kind": "allow_once",
+                },
+            ],
+        }))
+        .unwrap();
+        assert!(nested.deferred_to_mcp);
+
+        assert!(is_taomni_mcp_tool_name("mcp__taomni_sql__run_sql"));
+        assert!(is_taomni_mcp_tool_name("run_in_terminal"));
+        assert!(!is_taomni_mcp_tool_name("run_terminal_command"));
+        assert!(!is_taomni_mcp_tool_name("search_replace"));
     }
 
     #[test]
