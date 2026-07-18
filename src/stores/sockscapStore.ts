@@ -10,14 +10,19 @@ import {
   sockscapListProcesses,
   sockscapListProfiles,
   sockscapListRuleSources,
+  sockscapImportRuleSource,
+  sockscapDeleteRuleSource,
   sockscapRecover,
   sockscapDeleteProfile,
+  sockscapRefreshRuleSource,
   sockscapStart,
   sockscapStatsSnapshot,
   sockscapStatus,
   sockscapStop,
   sockscapTestEgress,
+  sockscapTestTarget,
   sockscapUpsertProfile,
+  sockscapUpsertRuleSource,
   type SockscapAlertEvent,
   type SockscapCapabilitiesReport,
   type SockscapEgressSessionSummary,
@@ -25,15 +30,21 @@ import {
   type SockscapPersistedRoutingProfile,
   type SockscapProcessCatalog,
   type SockscapProfileHealthEvent,
+  type SockscapPersistedRuleSource,
+  type SockscapRefreshOutcome,
+  type SockscapRuleSourceDraft,
   type SockscapRuleSourceView,
   type SockscapStatsSnapshot,
   type SockscapTestEgressRequest,
   type SockscapTestEgressResult,
+  type SockscapTestTargetRequest,
+  type SockscapTestTargetResult,
 } from "../lib/sockscap";
 
 export type SockscapSection = "overview" | "profiles" | "rules" | "dashboard" | "lifecycle";
 export type SockscapLifecycleAction = "start" | "stop" | "recover";
 export type SockscapProfileAction = "save" | "delete" | "test_egress";
+export type SockscapRuleAction = "save_source" | "delete_source" | "refresh_source" | "import_source" | "test_target";
 
 interface SockscapStoreState {
   section: SockscapSection;
@@ -41,6 +52,7 @@ interface SockscapStoreState {
   loading: boolean;
   actionPending: SockscapLifecycleAction | null;
   profileActionPending: SockscapProfileAction | null;
+  ruleActionPending: SockscapRuleAction | null;
   error: string | null;
   lastUpdatedAt: number | null;
   capabilities: SockscapCapabilitiesReport | null;
@@ -63,6 +75,11 @@ interface SockscapStoreState {
   ) => Promise<SockscapPersistedRoutingProfile>;
   deleteProfile: (profileId: string, expectedRevision: number) => Promise<void>;
   testEgress: (request: SockscapTestEgressRequest) => Promise<SockscapTestEgressResult>;
+  saveRuleSource: (source: SockscapRuleSourceDraft, expectedRevision: number) => Promise<SockscapPersistedRuleSource>;
+  deleteRuleSource: (sourceId: string, expectedRevision: number) => Promise<void>;
+  refreshRuleSource: (sourceId: string) => Promise<SockscapRefreshOutcome>;
+  importRuleSource: (sourceId: string, payload: string) => Promise<SockscapRefreshOutcome>;
+  testTarget: (request: SockscapTestTargetRequest) => Promise<SockscapTestTargetResult>;
   start: () => Promise<void>;
   stop: () => Promise<void>;
   recover: () => Promise<void>;
@@ -77,6 +94,7 @@ const initialData = {
   loading: false,
   actionPending: null,
   profileActionPending: null,
+  ruleActionPending: null,
   error: null,
   lastUpdatedAt: null,
   capabilities: null,
@@ -194,6 +212,52 @@ export const useSockscapStore = create<SockscapStoreState>((set, get) => ({
       throw error;
     }
   },
+  saveRuleSource: async (source, expectedRevision) => {
+    set({ ruleActionPending: "save_source", error: null });
+    try {
+      const saved = await sockscapUpsertRuleSource(source, expectedRevision);
+      set((current) => {
+        const previous = current.ruleSources.find((view) => view.record.source.id === saved.source.id);
+        return {
+          ruleActionPending: null,
+          ruleSources: sortRuleSources([
+            ...current.ruleSources.filter((view) => view.record.source.id !== saved.source.id),
+            { record: saved, state: previous?.state ?? null },
+          ]),
+        };
+      });
+      return saved;
+    } catch (error) {
+      set({ ruleActionPending: null, error: errorMessage(error) });
+      throw error;
+    }
+  },
+  deleteRuleSource: async (sourceId, expectedRevision) => {
+    set({ ruleActionPending: "delete_source", error: null });
+    try {
+      await sockscapDeleteRuleSource(sourceId, expectedRevision);
+      set((current) => ({
+        ruleActionPending: null,
+        ruleSources: current.ruleSources.filter((view) => view.record.source.id !== sourceId),
+      }));
+    } catch (error) {
+      set({ ruleActionPending: null, error: errorMessage(error) });
+      throw error;
+    }
+  },
+  refreshRuleSource: async (sourceId) => runRuleSourceUpdate(set, "refresh_source", () => sockscapRefreshRuleSource(sourceId)),
+  importRuleSource: async (sourceId, payload) => runRuleSourceUpdate(set, "import_source", () => sockscapImportRuleSource(sourceId, payload)),
+  testTarget: async (request) => {
+    set({ ruleActionPending: "test_target", error: null });
+    try {
+      const result = await sockscapTestTarget(request);
+      set({ ruleActionPending: null });
+      return result;
+    } catch (error) {
+      set({ ruleActionPending: null, error: errorMessage(error) });
+      throw error;
+    }
+  },
   start: async () => runLifecycle(set, "start", sockscapStart),
   stop: async () => runLifecycle(set, "stop", sockscapStop),
   recover: async () => runLifecycle(set, "recover", sockscapRecover),
@@ -211,6 +275,42 @@ function sortProfiles(profiles: SockscapPersistedRoutingProfile[]): SockscapPers
   return [...profiles].sort((left, right) => left.profile.priority - right.profile.priority
     || left.profile.name.localeCompare(right.profile.name)
     || left.profile.id.localeCompare(right.profile.id));
+}
+
+function sortRuleSources(sources: SockscapRuleSourceView[]): SockscapRuleSourceView[] {
+  return [...sources].sort((left, right) => {
+    const leftOfficial = left.record.source.kind === "gfwlist_official" ? 0 : 1;
+    const rightOfficial = right.record.source.kind === "gfwlist_official" ? 0 : 1;
+    return leftOfficial - rightOfficial
+      || left.record.source.name.localeCompare(right.record.source.name)
+      || left.record.source.id.localeCompare(right.record.source.id);
+  });
+}
+
+async function runRuleSourceUpdate(
+  set: (patch: Partial<SockscapStoreState> | ((state: SockscapStoreState) => Partial<SockscapStoreState>)) => void,
+  action: Extract<SockscapRuleAction, "refresh_source" | "import_source">,
+  command: () => Promise<SockscapRefreshOutcome>,
+): Promise<SockscapRefreshOutcome> {
+  set({ ruleActionPending: action, error: null });
+  try {
+    const outcome = await command();
+    let refreshed: SockscapRuleSourceView[] | null = null;
+    try {
+      refreshed = await sockscapListRuleSources();
+    } catch {
+      // The refresh/import result remains authoritative even if the follow-up
+      // view reload fails; the next normal window refresh will reconcile it.
+    }
+    set((current) => ({
+      ruleActionPending: null,
+      ruleSources: refreshed ? sortRuleSources(refreshed) : current.ruleSources,
+    }));
+    return outcome;
+  } catch (error) {
+    set({ ruleActionPending: null, error: errorMessage(error) });
+    throw error;
+  }
 }
 
 async function runLifecycle(

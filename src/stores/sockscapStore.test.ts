@@ -15,6 +15,11 @@ const mocks = vi.hoisted(() => ({
   saveProfile: vi.fn(),
   deleteProfile: vi.fn(),
   testEgress: vi.fn(),
+  saveRuleSource: vi.fn(),
+  deleteRuleSource: vi.fn(),
+  refreshRuleSource: vi.fn(),
+  importRuleSource: vi.fn(),
+  testTarget: vi.fn(),
   listeners: new Map<string, (payload: unknown) => void>(),
   unlisten: vi.fn(),
 }));
@@ -33,6 +38,11 @@ vi.mock("../lib/sockscap", () => ({
   sockscapUpsertProfile: mocks.saveProfile,
   sockscapDeleteProfile: mocks.deleteProfile,
   sockscapTestEgress: mocks.testEgress,
+  sockscapUpsertRuleSource: mocks.saveRuleSource,
+  sockscapDeleteRuleSource: mocks.deleteRuleSource,
+  sockscapRefreshRuleSource: mocks.refreshRuleSource,
+  sockscapImportRuleSource: mocks.importRuleSource,
+  sockscapTestTarget: mocks.testTarget,
   listenSockscapStatus: (callback: (payload: unknown) => void) => {
     mocks.listeners.set("status", callback);
     return Promise.resolve(mocks.unlisten);
@@ -108,6 +118,7 @@ describe("Sockscap store", () => {
       egressHealth: [],
     });
     mocks.deleteProfile.mockResolvedValue(undefined);
+    mocks.deleteRuleSource.mockResolvedValue(undefined);
   });
 
   it("hydrates independent snapshots while preserving partial successes", async () => {
@@ -219,5 +230,68 @@ describe("Sockscap store", () => {
     await useSockscapStore.getState().deleteProfile("profile-a", 1);
     expect(mocks.deleteProfile).toHaveBeenCalledWith("profile-a", 1);
     expect(useSockscapStore.getState().profiles).toEqual([first]);
+  });
+
+  it("keeps last-good rule source views after refresh and exposes authoritative target decisions", async () => {
+    const sourceView = {
+      record: {
+        source: {
+          id: "source-a",
+          name: "A",
+          enabled: true,
+          kind: "custom_url" as const,
+          url: "https://rules.example/list.txt",
+          refreshIntervalSeconds: 21_600,
+        },
+        revision: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      state: null,
+    };
+    useSockscapStore.setState({ ruleSources: [sourceView] });
+    mocks.refreshRuleSource.mockResolvedValueOnce({
+      ok: false,
+      usedLastGood: true,
+      notModified: false,
+      mirror: "https://rules.example/list.txt",
+      sha256: "abc",
+      parseStats: null,
+      error: "network timeout",
+      report: null,
+    });
+    mocks.rules.mockResolvedValueOnce([{ ...sourceView, state: { sourceId: "source-a", lastError: "network timeout" } }]);
+    const outcome = await useSockscapStore.getState().refreshRuleSource("source-a");
+    expect(outcome.usedLastGood).toBe(true);
+    expect(useSockscapStore.getState().ruleSources[0].state?.lastError).toBe("network timeout");
+
+    const decision = {
+      selectedProfileId: "profile-a",
+      selectedProfileName: "A",
+      selectionReason: "application selector",
+      decision: {
+        action: "proxy" as const,
+        matchedRuleOriginal: "||example.com",
+        matchedRuleSourceId: "source-a",
+        matchedStage: "subscription_proxy",
+        hostnameSource: "tls_sni" as const,
+        profileId: "profile-a",
+      },
+      conflicts: [],
+      notes: [],
+    };
+    mocks.testTarget.mockResolvedValueOnce(decision);
+    await expect(useSockscapStore.getState().testTarget({
+      appIdentity: null,
+      appSelectorKind: null,
+      pid: null,
+      processStartTime: null,
+      hostname: "example.com",
+      ip: null,
+      port: 443,
+      protocol: "tcp",
+      hostnameSource: "tls_sni",
+      hardBypass: false,
+    })).resolves.toEqual(decision);
   });
 });

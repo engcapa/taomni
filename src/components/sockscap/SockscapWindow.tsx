@@ -28,6 +28,7 @@ import { LanguageSwitcher } from "../window/LanguageSwitcher";
 import { WindowControls } from "../window/WindowControls";
 import { WindowResizeHandles } from "../window/WindowResizeHandles";
 import { SockscapProfiles } from "./SockscapProfiles";
+import { SockscapRules } from "./SockscapRules";
 
 export function SockscapWindow() {
   const t = useT();
@@ -197,7 +198,8 @@ export function SockscapWindow() {
             />
           )}
           {section === "profiles" && <SockscapProfiles />}
-          {section !== "overview" && section !== "profiles" && (
+          {section === "rules" && <SockscapRules />}
+          {section !== "overview" && section !== "profiles" && section !== "rules" && (
             <SectionScaffold section={section} />
           )}
         </main>
@@ -339,10 +341,9 @@ function Overview({
   );
 }
 
-function SectionScaffold({ section }: { section: Exclude<SockscapSection, "overview" | "profiles"> }) {
+function SectionScaffold({ section }: { section: Exclude<SockscapSection, "overview" | "profiles" | "rules"> }) {
   const t = useT();
-  const details: Record<Exclude<SockscapSection, "overview" | "profiles">, { icon: ReactNode; title: string; description: string }> = {
-    rules: { icon: <FileKey2 className="h-5 w-5" />, title: t("sockscap.rulesTitle"), description: t("sockscap.rulesDescription") },
+  const details: Record<Exclude<SockscapSection, "overview" | "profiles" | "rules">, { icon: ReactNode; title: string; description: string }> = {
     dashboard: { icon: <BarChart3 className="h-5 w-5" />, title: t("sockscap.dashboardTitle"), description: t("sockscap.dashboardDescription") },
     lifecycle: { icon: <Settings2 className="h-5 w-5" />, title: t("sockscap.lifecycleTitle"), description: t("sockscap.lifecycleDescription") },
   };
