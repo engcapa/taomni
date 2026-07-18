@@ -18,6 +18,7 @@ pub mod flow;
 pub mod orchestrator;
 pub mod policy;
 pub mod preflight;
+pub mod processes;
 pub mod storage;
 pub mod types;
 

@@ -177,6 +177,9 @@ hmac = "0.13.0"
 mdns-sd = "0.20.0"
 if-addrs = "0.15.0"
 socket2 = { version = "0.6", features = ["all"] }
+# Sockscap process picker: request only the cross-platform process/system
+# surface, not disks, networks, components, users, command lines, or env vars.
+sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
 tauri-plugin-notification = "2.3.3"
 xcap = { version = "0.9.6", optional = true }
 image = { version = "0.25", default-features = false, features = ["png"] }
