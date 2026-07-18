@@ -167,6 +167,23 @@ export interface TrafficTotals {
   block: number;
 }
 
+export interface TrafficMinutePoint {
+  minuteTs: number;
+  bytesUp: number;
+  bytesDown: number;
+  connections: number;
+  direct: number;
+  proxy: number;
+  block: number;
+  errors: number;
+}
+
+export interface DomainStatRow {
+  domain: string;
+  bytes: number;
+  connections: number;
+}
+
 export interface StatsSnapshot {
   bytesUp: number;
   bytesDown: number;
@@ -175,6 +192,15 @@ export interface StatsSnapshot {
   proxy: number;
   block: number;
   errors: number;
+}
+
+export interface EgressTestResult {
+  ok: boolean;
+  sessionId: string;
+  kind: string;
+  endpoint: string;
+  latencyMs?: number | null;
+  message: string;
 }
 
 export interface TestTargetInput {
@@ -236,8 +262,15 @@ export const sockscap = {
   recover: () => invoke<EngineState>("sockscap_recover"),
 
   statsSnapshot: () => invoke<TrafficTotals>("sockscap_stats_snapshot"),
+  statsSeries: (minutes?: number) =>
+    invoke<TrafficMinutePoint[]>("sockscap_stats_series", { minutes }),
+  topDomains: (limit?: number) =>
+    invoke<DomainStatRow[]>("sockscap_top_domains", { limit }),
   liveStats: () => invoke<StatsSnapshot>("sockscap_live_stats"),
   clearStats: () => invoke<void>("sockscap_clear_stats"),
+  hideWindow: () => invoke<void>("sockscap_hide_window"),
+  testEgress: (sessionId: string) =>
+    invoke<EgressTestResult>("sockscap_test_egress", { sessionId }),
 
   listProcesses: () => invoke<ProcessInfo[]>("sockscap_list_processes"),
   listEgressSessions: () => invoke<EgressSession[]>("sockscap_list_egress_sessions"),

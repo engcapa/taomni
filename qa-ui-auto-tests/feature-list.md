@@ -4319,10 +4319,73 @@ controls:
 
 ---
 
+## 25. Sockscap 系统流量路由 🟡
+
+> 独立窗口 + 配置/Dashboard/规则 UI 与 IPC 已接入主流程；三平台真实捕获驱动仍
+> 需签名/helper 装载（capability 常为 `requires-setup`）。浏览器 stub 可完整演示 UI。
+
+### 25.1 独立窗口与托盘入口 🟡
+
+<!-- feature
+id: F-SOCKSCAP-1
+status: partial
+area: sockscap
+components: [SockscapWindow, SockscapDashboard, SockscapProfiles, SockscapRules]
+files:
+  - src/components/sockscap/SockscapWindow.tsx
+  - src/components/sockscap/SockscapDashboard.tsx
+  - src/components/sockscap/SockscapProfiles.tsx
+  - src/components/sockscap/SockscapRules.tsx
+  - src/lib/sockscapRoute.ts
+  - src-tauri/src/sockscap/tray.rs
+controls:
+  - id: sockscap-header
+    selector: '[data-testid="sockscap-header"]'
+    kind: display
+  - id: sockscap-state
+    selector: '[data-testid="sockscap-state"]'
+    kind: display
+  - id: sockscap-tabs
+    selector: '[data-testid="sockscap-tabs"]'
+    kind: display
+  - id: sockscap-tab-dashboard
+    selector: '[data-testid="sockscap-tab-dashboard"]'
+    kind: interactive
+  - id: sockscap-tab-profiles
+    selector: '[data-testid="sockscap-tab-profiles"]'
+    kind: interactive
+  - id: sockscap-tab-rules
+    selector: '[data-testid="sockscap-tab-rules"]'
+    kind: interactive
+  - id: sockscap-start
+    selector: '[data-testid="sockscap-start"]'
+    kind: interactive
+    optional: true
+  - id: sockscap-dashboard
+    selector: '[data-testid="sockscap-dashboard"]'
+    kind: display
+  - id: sockscap-hide-to-tray
+    selector: '[data-testid="sockscap-hide-to-tray"]'
+    kind: interactive
+  - id: sockscap-rules
+    selector: '[data-testid="sockscap-rules"]'
+    kind: display
+    optional: true
+-->
+
+- Tools / 系统托盘打开独立 Sockscap 窗口（Rust 侧创建，关闭仅隐藏）
+- Dashboard：KPI、30 分钟带宽、决策分布、配置组状态、Top domains、清空统计
+- Profiles：scope global / applications / runtime-processes，应用与进程选择器，egress、策略、隐私
+- Rules：规则源 CRUD/刷新/导入、自定义 override 规则、egress TCP 预检、test target
+- 未完成：真实 WinDivert/WFP、macOS NE provider、Linux cgroup 捕获装载与签名发布
+
+---
+
 
 > 下述入口已经在 UI 中可见但点击会显示 "not active in this phase" 占位面板，对应能力**尚未实装**，本清单不视为完成项，仅在此说明以解释 UI 为何存在：
 >
-> - Ribbon `Tools`（除 Tunneling 之外的网络工具）
+> - Ribbon `Tools`（除 Tunneling / Sockscap 之外的网络工具）
 > - Ribbon `Packages`、`Macros`
 > - QuickConnect 的 VNC URL 入口（已保存 VNC 会话可连接，QuickConnect 尚未接入 VNC client）
 > - SFTP 底部的 "Cross-host transfer (remote ↔ remote)" 按钮（disabled 占位）
+

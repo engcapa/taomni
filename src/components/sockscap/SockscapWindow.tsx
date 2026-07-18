@@ -78,11 +78,16 @@ export function SockscapWindow() {
 
   return (
     <div className="flex h-screen flex-col bg-neutral-950 text-neutral-100">
-      <header className="flex items-center gap-4 border-b border-neutral-800 px-5 py-3">
+      <header
+        className="flex items-center gap-4 border-b border-neutral-800 px-5 py-3"
+        data-testid="sockscap-header"
+      >
         <div className="flex items-center gap-2">
           <span className={`h-2.5 w-2.5 rounded-full ${STATE_DOT[stateName]}`} />
           <span className="font-semibold">Sockscap</span>
-          <span className="text-sm text-neutral-400">{STATE_LABEL[stateName]}</span>
+          <span className="text-sm text-neutral-400" data-testid="sockscap-state">
+            {STATE_LABEL[stateName]}
+          </span>
           {status?.detail ? (
             <span className="text-xs text-neutral-500">— {status.detail}</span>
           ) : null}
@@ -93,6 +98,7 @@ export function SockscapWindow() {
               disabled={busy}
               onClick={() => void start()}
               className="rounded bg-green-600 px-3 py-1.5 text-sm font-medium hover:bg-green-500 disabled:opacity-50"
+              data-testid="sockscap-start"
             >
               Start
             </button>
@@ -101,6 +107,7 @@ export function SockscapWindow() {
               disabled={busy}
               onClick={() => void stop()}
               className="rounded bg-neutral-700 px-3 py-1.5 text-sm font-medium hover:bg-neutral-600 disabled:opacity-50"
+              data-testid="sockscap-stop"
             >
               Stop
             </button>
@@ -110,6 +117,7 @@ export function SockscapWindow() {
             onClick={() => void recover()}
             className="rounded border border-red-500/60 px-3 py-1.5 text-sm text-red-300 hover:bg-red-500/10 disabled:opacity-50"
             title="Restore direct networking regardless of upstream availability"
+            data-testid="sockscap-recover"
           >
             Restore network
           </button>
@@ -132,11 +140,12 @@ export function SockscapWindow() {
         </div>
       ) : null}
 
-      <nav className="flex gap-1 border-b border-neutral-800 px-3">
+      <nav className="flex gap-1 border-b border-neutral-800 px-3" data-testid="sockscap-tabs">
         {(["dashboard", "profiles", "rules"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
+            data-testid={`sockscap-tab-${t}`}
             className={`px-4 py-2 text-sm capitalize ${
               tab === t
                 ? "border-b-2 border-blue-500 text-neutral-100"

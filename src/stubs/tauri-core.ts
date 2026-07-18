@@ -2880,6 +2880,40 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         proxy: 51,
         block: 3,
       } as unknown) as T;
+    case "sockscap_stats_series": {
+      const nowMin = Math.floor(Date.now() / 1000 / 60) * 60;
+      const n = Math.min(Number(args?.minutes) || 30, 60);
+      const points = [];
+      for (let i = n - 1; i >= 0; i -= 1) {
+        points.push({
+          minuteTs: nowMin - i * 60,
+          bytesUp: 10_000 + i * 100,
+          bytesDown: 40_000 + i * 200,
+          connections: 2 + (i % 5),
+          direct: 1,
+          proxy: 1,
+          block: 0,
+          errors: 0,
+        });
+      }
+      return points as T;
+    }
+    case "sockscap_top_domains":
+      return ([
+        { domain: "example.com", bytes: 120_000, connections: 12 },
+        { domain: "cdn.example.net", bytes: 80_000, connections: 5 },
+      ] as unknown) as T;
+    case "sockscap_hide_window":
+      return undefined as T;
+    case "sockscap_test_egress":
+      return ({
+        ok: true,
+        sessionId: args?.sessionId ?? "proxy-demo",
+        kind: "proxy",
+        endpoint: "127.0.0.1:1080",
+        latencyMs: 12,
+        message: "TCP connect ok (proxy) [browser stub]",
+      } as unknown) as T;
     case "sockscap_clear_stats":
       return undefined as T;
     case "sockscap_list_processes":

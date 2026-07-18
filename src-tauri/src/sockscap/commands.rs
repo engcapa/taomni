@@ -8,7 +8,7 @@
 use std::net::IpAddr;
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 
 use super::attribution::{attribute, AttributionInputs};
 use super::capability::{self, Capabilities};
@@ -544,6 +544,42 @@ pub fn sockscap_stats_snapshot(
     db::query_traffic_totals(&conn, 0).map_err(|e| e.to_string())
 }
 
+/// Minute-resolution series for the Dashboard trend chart (plan §11 — default
+/// last 30 minutes). `minutes` is clamped to 1..=24*60.
+#[tauri::command]
+pub fn sockscap_stats_series(
+    state: State<'_, SockscapState>,
+    minutes: Option<u32>,
+) -> Result<Vec<db::TrafficMinutePoint>, String> {
+    let window = minutes.unwrap_or(30).clamp(1, 24 * 60) as i64;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    // Bucket timestamps are minute-aligned seconds.
+    let since = now - window * 60;
+    let conn = state.conn.lock().unwrap();
+    db::query_traffic_series(&conn, since).map_err(|e| e.to_string())
+}
+
+/// Top domains by connections (plan §11). Empty when domain aggregates are off
+/// or no data has been recorded.
+#[tauri::command]
+pub fn sockscap_top_domains(
+    state: State<'_, SockscapState>,
+    limit: Option<u32>,
+) -> Result<Vec<db::DomainStatRow>, String> {
+    let lim = limit.unwrap_or(10).clamp(1, 100) as i64;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    // Day buckets use unix day start; query last 7 days of day_ts values.
+    let since_day = now - 7 * 24 * 60 * 60;
+    let conn = state.conn.lock().unwrap();
+    db::query_top_domains(&conn, since_day, lim).map_err(|e| e.to_string())
+}
+
 /// Live in-memory counters (process lifetime) — complements the persisted
 /// totals from `sockscap_stats_snapshot`.
 #[tauri::command]
@@ -555,6 +591,110 @@ pub fn sockscap_live_stats(state: State<'_, SockscapState>) -> StatsSnapshot {
 pub fn sockscap_clear_stats(state: State<'_, SockscapState>) -> Result<(), String> {
     let conn = state.conn.lock().unwrap();
     db::clear_stats(&conn).map_err(|e| e.to_string())
+}
+
+/// Hide the Sockscap window without destroying it (plan §9 hide-to-tray).
+#[tauri::command]
+pub fn sockscap_hide_window(app: AppHandle) -> Result<(), String> {
+    if let Some(win) = app.get_webview_window("sockscap") {
+        win.hide().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// Result of a lightweight egress preflight (plan §12 `sockscap_test_egress`).
+/// Does not open a full SSH channel or send credentials over the wire beyond a
+/// TCP connect to the session host:port — secrets stay in Vault.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EgressTestResult {
+    pub ok: bool,
+    pub session_id: String,
+    pub kind: String,
+    pub endpoint: String,
+    pub latency_ms: Option<u64>,
+    pub message: String,
+}
+
+/// TCP reachability preflight for a Proxy/SSH egress session (plan §11 egress
+/// test). Full protocol handshake remains the engine's job at Start.
+#[tauri::command]
+pub async fn sockscap_test_egress(
+    app_state: State<'_, AppState>,
+    session_id: String,
+) -> Result<EgressTestResult, String> {
+    let (kind, host, port) = {
+        let conn = app_state
+            .db
+            .lock()
+            .map_err(|_| "db lock poisoned".to_string())?;
+        let row = conn
+            .query_row(
+                "SELECT session_type, host, port FROM sessions WHERE id = ?1",
+                rusqlite::params![session_id],
+                |r| {
+                    Ok((
+                        r.get::<_, String>(0)?,
+                        r.get::<_, String>(1)?,
+                        r.get::<_, i64>(2)?,
+                    ))
+                },
+            )
+            .map_err(|_| format!("egress session not found: {session_id}"))?;
+        row
+    };
+    let st = kind.to_ascii_lowercase();
+    let kind_label = if st.contains("ssh") {
+        "ssh"
+    } else if st.contains("proxy") {
+        "proxy"
+    } else {
+        return Err(format!("session {session_id} is not a Proxy/SSH egress candidate"));
+    };
+    if host.trim().is_empty() || port <= 0 || port > u16::MAX as i64 {
+        return Ok(EgressTestResult {
+            ok: false,
+            session_id,
+            kind: kind_label.into(),
+            endpoint: format!("{host}:{port}"),
+            latency_ms: None,
+            message: "session host/port is incomplete".into(),
+        });
+    }
+    let endpoint = format!("{host}:{port}");
+    let addr = endpoint.clone();
+    let started = std::time::Instant::now();
+    let connect = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        tokio::net::TcpStream::connect(addr),
+    )
+    .await;
+    match connect {
+        Ok(Ok(_stream)) => Ok(EgressTestResult {
+            ok: true,
+            session_id,
+            kind: kind_label.into(),
+            endpoint,
+            latency_ms: Some(started.elapsed().as_millis() as u64),
+            message: format!("TCP connect ok ({kind_label})"),
+        }),
+        Ok(Err(e)) => Ok(EgressTestResult {
+            ok: false,
+            session_id,
+            kind: kind_label.into(),
+            endpoint,
+            latency_ms: Some(started.elapsed().as_millis() as u64),
+            message: format!("TCP connect failed: {e}"),
+        }),
+        Err(_) => Ok(EgressTestResult {
+            ok: false,
+            session_id,
+            kind: kind_label.into(),
+            endpoint,
+            latency_ms: Some(5000),
+            message: "TCP connect timed out after 5s".into(),
+        }),
+    }
 }
 
 /// List running processes for the picker. Runs the platform lister and parses

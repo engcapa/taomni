@@ -1530,6 +1530,49 @@ export function MainLayout() {
     exitRequestInFlightRef.current = true;
     void (async () => {
       try {
+        // Plan §9 / §16.6-21: when Sockscap is Active, offer hide-to-tray vs stop+exit.
+        let sockscapActive = false;
+        try {
+          const { sockscap } = await import("../lib/sockscap");
+          const st = await sockscap.status();
+          const name = st.state?.state;
+          sockscapActive = name === "active" || name === "degraded";
+        } catch {
+          sockscapActive = false;
+        }
+        if (sockscapActive) {
+          const { choiceAppDialog } = await import("../lib/appDialogs");
+          const choice = await choiceAppDialog({
+            title: "Sockscap is running",
+            message:
+              "Traffic routing is active. Hide Taomni to the tray and keep Sockscap running, or stop the engine and restore direct networking before exit.",
+            primaryLabel: "Hide to tray",
+            secondaryLabel: "Stop and exit",
+            cancelLabel: "Cancel",
+            danger: true,
+          });
+          if (choice === null) return;
+          if (choice === "primary") {
+            try {
+              const { getCurrentWindow } = await import("@tauri-apps/api/window");
+              await getCurrentWindow().hide();
+            } catch {
+              // Fall through if hide is unavailable.
+            }
+            return;
+          }
+          // secondary: stop engine then continue normal exit confirm.
+          try {
+            const { sockscap } = await import("../lib/sockscap");
+            await sockscap.stop();
+          } catch (e) {
+            console.warn("sockscap stop before exit failed", e);
+            setStatusMessage(
+              typeof e === "string" ? e : e instanceof Error ? e.message : "Failed to stop Sockscap",
+            );
+            return;
+          }
+        }
         if (await confirmExitWithOpenTabs()) {
           await exitApp();
         }
@@ -1539,7 +1582,7 @@ export function MainLayout() {
         exitRequestInFlightRef.current = false;
       }
     })();
-  }, [confirmExitWithOpenTabs]);
+  }, [confirmExitWithOpenTabs, setStatusMessage]);
 
   useEffect(() => {
     const appWindow = getCurrentWindow();

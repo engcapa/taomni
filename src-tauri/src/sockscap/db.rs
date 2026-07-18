@@ -410,6 +410,93 @@ pub fn query_traffic_totals(conn: &Connection, since_ts: i64) -> SqlResult<Traff
     Ok(totals)
 }
 
+/// One minute of traffic for the Dashboard 30-minute trend (plan §11).
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrafficMinutePoint {
+    pub minute_ts: i64,
+    pub bytes_up: i64,
+    pub bytes_down: i64,
+    pub connections: i64,
+    pub direct: i64,
+    pub proxy: i64,
+    pub block: i64,
+    pub errors: i64,
+}
+
+/// Domain aggregate row (plan §10 — only present when privacy allows).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DomainStatRow {
+    pub domain: String,
+    pub bytes: i64,
+    pub connections: i64,
+}
+
+/// Per-minute series from `since_ts` inclusive, ordered ascending.
+/// Minutes with no rows are omitted (UI fills gaps as zero).
+pub fn query_traffic_series(conn: &Connection, since_ts: i64) -> SqlResult<Vec<TrafficMinutePoint>> {
+    let mut stmt = conn.prepare(
+        "SELECT minute_ts, action,
+                SUM(bytes_up), SUM(bytes_down), SUM(connections), SUM(errors)
+         FROM traffic_minute_buckets
+         WHERE minute_ts >= ?1
+         GROUP BY minute_ts, action
+         ORDER BY minute_ts ASC",
+    )?;
+    let rows = stmt.query_map(params![since_ts], |row| {
+        Ok((
+            row.get::<_, i64>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, i64>(2)?,
+            row.get::<_, i64>(3)?,
+            row.get::<_, i64>(4)?,
+            row.get::<_, i64>(5)?,
+        ))
+    })?;
+
+    use std::collections::BTreeMap;
+    let mut map: BTreeMap<i64, TrafficMinutePoint> = BTreeMap::new();
+    for r in rows {
+        let (ts, action, up, down, conns, errs) = r?;
+        let p = map.entry(ts).or_insert_with(|| TrafficMinutePoint {
+            minute_ts: ts,
+            ..Default::default()
+        });
+        p.bytes_up += up;
+        p.bytes_down += down;
+        p.connections += conns;
+        p.errors += errs;
+        match action.as_str() {
+            "direct" => p.direct += conns,
+            "proxy" => p.proxy += conns,
+            "block" => p.block += conns,
+            _ => {}
+        }
+    }
+    Ok(map.into_values().collect())
+}
+
+/// Top domains by connections for the last `days` days (plan §11 Top Domains).
+pub fn query_top_domains(conn: &Connection, since_day_ts: i64, limit: i64) -> SqlResult<Vec<DomainStatRow>> {
+    let mut stmt = conn.prepare(
+        "SELECT domain, SUM(bytes), SUM(connections)
+         FROM domain_day_buckets
+         WHERE day_ts >= ?1
+         GROUP BY domain
+         ORDER BY SUM(connections) DESC, SUM(bytes) DESC
+         LIMIT ?2",
+    )?;
+    let rows = stmt.query_map(params![since_day_ts, limit], |row| {
+        Ok(DomainStatRow {
+            domain: row.get(0)?,
+            bytes: row.get(1)?,
+            connections: row.get(2)?,
+        })
+    })?;
+    rows.collect()
+}
+
 /// Wipe all collected statistics immediately (plan §10 "立即清空统计").
 pub fn clear_stats(conn: &Connection) -> SqlResult<()> {
     conn.execute_batch(
@@ -649,6 +736,22 @@ mod tests {
         assert_eq!(totals.errors, 1);
         assert_eq!(totals.proxy, 2);
         assert_eq!(totals.direct, 1);
+    }
+
+    #[test]
+    fn traffic_series_groups_by_minute() {
+        let c = mem();
+        record_traffic(&c, 1000, "p1", Action::Proxy, Protocol::Tcp, 10, 20, 2, 0).unwrap();
+        record_traffic(&c, 1000, "p1", Action::Direct, Protocol::Tcp, 5, 5, 1, 0).unwrap();
+        record_traffic(&c, 1060, "p1", Action::Block, Protocol::Tcp, 0, 0, 3, 1).unwrap();
+        let series = query_traffic_series(&c, 1000).unwrap();
+        assert_eq!(series.len(), 2);
+        assert_eq!(series[0].minute_ts, 1000);
+        assert_eq!(series[0].proxy, 2);
+        assert_eq!(series[0].direct, 1);
+        assert_eq!(series[0].bytes_up, 15);
+        assert_eq!(series[1].block, 3);
+        assert_eq!(series[1].errors, 1);
     }
 
     #[test]

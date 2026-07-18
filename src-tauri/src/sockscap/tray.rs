@@ -191,8 +191,15 @@ fn spawn_engine<R: Runtime>(app: &AppHandle<R>, action: EngineAction) {
                 EngineAction::Stop => state.stop_engine().await,
                 EngineAction::Recover => state.recover_engine().await,
             };
-            if let Err(e) = result {
-                log::warn!("sockscap tray engine action failed: {e}");
+            match result {
+                Ok(new_state) => {
+                    // Refresh tooltip from the pure tray_view mapping (plan §9 colors).
+                    if let Some(tray) = app.try_state::<tauri::tray::TrayIcon<R>>() {
+                        let view = tray_view(&new_state);
+                        let _ = tray.set_tooltip(Some(view.tooltip.as_str()));
+                    }
+                }
+                Err(e) => log::warn!("sockscap tray engine action failed: {e}"),
             }
         }
     });
