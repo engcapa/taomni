@@ -25,6 +25,7 @@ pub mod download;
 pub mod egress;
 pub mod engine;
 pub mod flow;
+pub mod helper;
 pub mod runtime;
 pub mod known_hosts;
 pub mod matcher;
