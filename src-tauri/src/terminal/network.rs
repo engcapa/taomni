@@ -7,10 +7,10 @@
 
 use std::time::Duration;
 
-use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{lookup_host, TcpStream};
+use tokio::net::{TcpStream, lookup_host};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -261,7 +261,7 @@ pub async fn establish_transport(
             return Err(format!(
                 "Proxy type '{}' is not implemented in this build (supported: none, http, socks5).",
                 other,
-            ))
+            ));
         }
     };
 
@@ -288,10 +288,13 @@ async fn http_connect_handshake(
     user: &str,
     pass: &str,
 ) -> Result<(), String> {
+    let authority = if host.parse::<std::net::Ipv6Addr>().is_ok() {
+        format!("[{host}]:{port}")
+    } else {
+        format!("{host}:{port}")
+    };
     let mut req = format!(
-        "CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\nProxy-Connection: keep-alive\r\n",
-        host = host,
-        port = port,
+        "CONNECT {authority} HTTP/1.1\r\nHost: {authority}\r\nProxy-Connection: keep-alive\r\n",
     );
     if !user.is_empty() {
         let token = B64.encode(format!("{}:{}", user, pass));
@@ -842,7 +845,7 @@ mod tests {
             assert_eq!(uname, b"alice");
             assert_eq!(passwd, b"s3cret");
             c.write_all(&[0x01, 0x00]).await.unwrap(); // auth ok
-                                                       // Request.
+            // Request.
             let mut req = [0u8; 4];
             c.read_exact(&mut req).await.unwrap();
             let host = match req[3] {

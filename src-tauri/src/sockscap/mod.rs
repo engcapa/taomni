@@ -12,6 +12,7 @@
 
 pub mod capabilities;
 pub mod commands;
+pub mod flow;
 pub mod orchestrator;
 pub mod policy;
 pub mod preflight;

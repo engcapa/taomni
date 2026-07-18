@@ -104,7 +104,7 @@ pub fn default_app_proxy_path() -> PathBuf {
 /// already-decrypted credentials. This is the shape every consuming module
 /// works with, so none of them need to know about config files, sessions, or
 /// the vault.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct ResolvedProxy {
     /// "http" | "socks5".
     pub kind: String,
@@ -113,6 +113,19 @@ pub struct ResolvedProxy {
     pub username: String,
     /// Plaintext password (already resolved from the vault); empty = no auth.
     pub password: String,
+}
+
+impl std::fmt::Debug for ResolvedProxy {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ResolvedProxy")
+            .field("kind", &self.kind)
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .field("has_auth", &!self.username.is_empty())
+            .field("password", &"[REDACTED]")
+            .finish()
+    }
 }
 
 impl ResolvedProxy {
@@ -361,5 +374,20 @@ mod tests {
             password: String::new(),
         };
         assert_eq!(p.to_url(), "http://h:8080");
+    }
+
+    #[test]
+    fn resolved_proxy_debug_redacts_credentials() {
+        let proxy = ResolvedProxy {
+            kind: "http".into(),
+            host: "proxy.example".into(),
+            port: 8080,
+            username: "alice".into(),
+            password: "never-log-this".into(),
+        };
+        let debug = format!("{proxy:?}");
+        assert!(!debug.contains("alice"));
+        assert!(!debug.contains("never-log-this"));
+        assert!(debug.contains("[REDACTED]"));
     }
 }
