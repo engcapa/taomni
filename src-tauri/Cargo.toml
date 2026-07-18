@@ -206,6 +206,10 @@ screen-capture = ["dep:xcap"]
 # claudedocs/lanchat-linux-native-av-transport.md.
 native-av = ["dep:cpal", "dep:audiopus", "dep:openh264", "dep:nokhwa"]
 asr-sherpa-onnx = []
+# Sockscap Windows transparent capture via WinDivert (sockscap/windivert.rs).
+# Off by default: enabling it links WinDivert.dll/.lib and needs the signed
+# WinDivert kernel driver present at runtime (see claudedocs/sockscap-adr).
+sockscap-windivert = []
 vulkan-detect = ["dep:ash"]
 local-llm-fim = ["dep:llama-cpp-2"]
 hbase-kerberos = ["dep:cross-krb5"]

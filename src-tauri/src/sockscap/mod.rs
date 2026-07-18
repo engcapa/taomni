@@ -31,10 +31,13 @@ pub mod runtime;
 pub mod known_hosts;
 pub mod matcher;
 pub mod model;
+pub mod packet;
 pub mod policy;
 pub mod ssh_pool;
 pub mod transparent;
 pub mod tray;
+#[cfg(all(windows, feature = "sockscap-windivert"))]
+pub mod windivert;
 
 use serde::{Deserialize, Serialize};
 
