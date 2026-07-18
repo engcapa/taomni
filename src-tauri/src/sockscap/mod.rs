@@ -6,6 +6,7 @@
 //!
 //! Phase 0: types, capability probes, preflight, orchestrator state machine.
 //! Phase 1: pure Rust policy core (rules, matcher, GFWList last-good, test_target).
+//! Phase 3: standalone WAL persistence, recovery journal, and aggregate stats.
 //!
 //! See `claudedocs/sockscap-cross-platform-design-plan.md` and
 //! `claudedocs/sockscap-phase0-adr.md`.
@@ -16,6 +17,7 @@ pub mod flow;
 pub mod orchestrator;
 pub mod policy;
 pub mod preflight;
+pub mod storage;
 pub mod types;
 
 pub use commands::*;

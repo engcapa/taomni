@@ -369,7 +369,7 @@ impl Default for EngineStatus {
 
 /// Minimal routing-profile shape used by preflight conflict checks in Phase 0.
 /// Full CRUD + sockscap.db persistence lands in Phase 1/3.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RoutingProfileDraft {
     pub id: String,

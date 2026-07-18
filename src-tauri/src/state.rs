@@ -21,6 +21,7 @@ use crate::rdp::ws::RdpSession;
 use crate::sdk::SdkManager;
 use crate::servers::ServerRegistry;
 use crate::sockscap::SockscapEngine;
+use crate::sockscap::storage::SockscapStore;
 use crate::terminal::{ActiveTerminal, TerminalOutputChannel};
 use crate::tunnel::TunnelRegistry;
 use crate::vault::Vault;
@@ -181,9 +182,11 @@ pub struct AppState {
     /// and the lanchat.sqlite path; populated by the lanchat background service.
     pub lanchat: Arc<LanChatState>,
     /// Sockscap system traffic-routing engine. Independent of Application Proxy
-    /// (`proxy::`). Phase 0 holds the state machine + capability probes only;
-    /// the capture plane is not installed yet.
+    /// (`proxy::`). The capture plane is not installed yet.
     pub sockscap: Arc<SockscapEngine>,
+    /// Dedicated WAL-backed Sockscap configuration/recovery/statistics store.
+    /// Proxy/SSH sessions and credentials deliberately remain outside it.
+    pub sockscap_store: Arc<SockscapStore>,
 }
 
 impl AppState {
@@ -194,6 +197,7 @@ impl AppState {
         vault: Arc<Vault>,
         ai_ctx: AppAiCtx,
         lanchat: Arc<LanChatState>,
+        sockscap_store: Arc<SockscapStore>,
     ) -> Self {
         let sdk = Arc::new(SdkManager::load(crate::sdk::default_sdk_registry_path()));
         Self {
@@ -239,6 +243,7 @@ impl AppState {
             ai_ctx: Arc::new(RwLock::new(ai_ctx)),
             lanchat,
             sockscap: Arc::new(SockscapEngine::new()),
+            sockscap_store,
         }
     }
 

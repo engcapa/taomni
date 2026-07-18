@@ -116,6 +116,13 @@ pub fn run() {
             // Decentralized LAN messenger state (separate lanchat.sqlite).
             let lanchat_state = Arc::new(lanchat::LanChatState::new(&app_data));
 
+            // Sockscap owns a standalone WAL database so frequent aggregate
+            // writes and recovery markers cannot block the main session DB.
+            let sockscap_store = Arc::new(
+                sockscap::storage::SockscapStore::open(&app_data)
+                    .expect("failed to open sockscap database"),
+            );
+
             app.manage(AppState::new(
                 conn,
                 notes_conn,
@@ -123,6 +130,7 @@ pub fn run() {
                 vault_arc,
                 ai_ctx,
                 lanchat_state,
+                sockscap_store,
             ));
             app.manage(workspace_search::WorkspaceSearchState::default());
             let local_history = local_history::init_local_history(app.handle())
