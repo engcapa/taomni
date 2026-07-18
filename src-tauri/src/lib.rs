@@ -24,6 +24,7 @@ mod rdp;
 mod serial;
 mod servers;
 mod session;
+mod sdk;
 mod state;
 mod tab;
 mod terminal;
@@ -432,6 +433,15 @@ pub fn run() {
             git::git_delete_remote,
             git::git_save_settings,
             git::git_save_remote_auth,
+            sdk::sdk_get_registry,
+            sdk::sdk_probe_installation,
+            sdk::sdk_discover_installations,
+            sdk::sdk_save_installation,
+            sdk::sdk_remove_installation,
+            sdk::sdk_refresh_installations,
+            sdk::sdk_set_default,
+            sdk::sdk_save_workspace_binding,
+            sdk::sdk_remove_workspace_binding,
             workspace::workspace_list_dir,
             workspace::workspace_compact_chain,
             workspace::workspace_list_files_recursive,
