@@ -109,13 +109,9 @@ pub fn run() {
             sockscap::init_db(&sockscap_conn).expect("failed to init sockscap database");
             // Startup recovery: if a previous run left an Active marker, surface
             // RecoveryRequired so the user can one-click restore (Phase 0/3).
-            if let Ok(Some(journal)) = sockscap::db::read_recovery_journal(&sockscap_conn) {
-                if journal.marker == "active" || journal.state == "Active" {
-                    tracing::warn!(
-                        "sockscap recovery journal indicates leftover capture state: {:?}",
-                        journal
-                    );
-                }
+            match sockscap::helper::startup_recovery_pass(&sockscap_conn) {
+                Ok(msg) => tracing::info!("sockscap: {msg}"),
+                Err(e) => tracing::error!("sockscap: {e}"),
             }
 
             let vault_path = vault::default_vault_path(app.handle());

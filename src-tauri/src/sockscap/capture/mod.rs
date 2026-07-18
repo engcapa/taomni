@@ -2,13 +2,6 @@
 //!
 //! Design plan §4.1 CaptureAdapter: capture identity + original destination only.
 //! Product rules stay in PolicyEngine / FlowEngine.
-//!
-//! Phase status on this branch:
-//! - Trait + no-op / probe-only implementations land so Orchestrator can call a
-//!   uniform install/uninstall API.
-//! - Real TUN/WFP/WinDivert/NE/cgroup rule installation remains gated by Phase 0
-//!   spikes (see sockscap-phase0-adr.md). Adapters refuse install until that gate
-//!   is closed — fail loud, never silent pretend.
 
 pub mod linux;
 pub mod macos;
@@ -16,6 +9,7 @@ pub mod windows;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, OnceLock};
 
 use crate::sockscap::types::{CapturePlatform, RoutingProfileDraft};
 
@@ -57,23 +51,33 @@ pub trait CaptureAdapter: Send + Sync {
     async fn uninstall(&self) -> CaptureOpResult;
 }
 
-/// Select the adapter for the current OS.
-pub fn current_adapter() -> Box<dyn CaptureAdapter> {
+/// Process-wide adapter so install state survives start/stop across calls.
+pub fn current_adapter() -> Arc<dyn CaptureAdapter> {
     #[cfg(target_os = "windows")]
     {
-        Box::new(windows::WindowsCaptureAdapter::default())
+        static A: OnceLock<Arc<windows::WindowsCaptureAdapter>> = OnceLock::new();
+        return A
+            .get_or_init(|| Arc::new(windows::WindowsCaptureAdapter::default()))
+            .clone();
     }
     #[cfg(target_os = "macos")]
     {
-        Box::new(macos::MacosCaptureAdapter::default())
+        static A: OnceLock<Arc<macos::MacosCaptureAdapter>> = OnceLock::new();
+        return A
+            .get_or_init(|| Arc::new(macos::MacosCaptureAdapter::default()))
+            .clone();
     }
     #[cfg(target_os = "linux")]
     {
-        Box::new(linux::LinuxCaptureAdapter::default())
+        static A: OnceLock<Arc<linux::LinuxCaptureAdapter>> = OnceLock::new();
+        return A
+            .get_or_init(|| Arc::new(linux::LinuxCaptureAdapter::default()))
+            .clone();
     }
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     {
-        Box::new(UnsupportedAdapter)
+        static A: OnceLock<Arc<UnsupportedAdapter>> = OnceLock::new();
+        A.get_or_init(|| Arc::new(UnsupportedAdapter)).clone()
     }
 }
 
@@ -125,11 +129,17 @@ mod tests {
             bypass_hosts: vec!["127.0.0.1".into()],
         };
         let inst = adapter.install(&plan).await;
-        // Empty profiles or missing privileges → fail without mutation.
         if !inst.ok {
             assert!(!inst.mutated_system);
         }
         let un = adapter.uninstall().await;
         assert!(un.ok);
+    }
+
+    #[test]
+    fn adapter_is_singleton() {
+        let a = current_adapter();
+        let b = current_adapter();
+        assert_eq!(a.name(), b.name());
     }
 }

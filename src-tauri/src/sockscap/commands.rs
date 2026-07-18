@@ -11,10 +11,15 @@ use super::db::{
     self, clear_recovery_journal, delete_profile, list_profiles, read_recovery_journal,
     upsert_profile, RecoveryJournal,
 };
+use super::flow::runtime::{
+    clear_global_runtime, compile_subscription_rules, set_global_runtime, FlowRuntime,
+};
 use super::orchestrator::SockscapEngine;
+use super::policy::gfwlist::{load_last_good_text, GFWLIST_OFFICIAL_SOURCE_ID};
+use crate::proxy::resolve_session_proxy_with_db;
 use super::policy::{
     compile_gfwlist_payload, ingest_payload, official_gfwlist_mirrors, test_target, ParseReport,
-    RefreshOutcome, RuleSourceKind, TestTargetRequest, TestTargetResult, GFWLIST_OFFICIAL_SOURCE_ID,
+    RefreshOutcome, RuleSourceKind, TestTargetRequest, TestTargetResult,
 };
 use super::preflight::{run_preflight, PreflightReport};
 use super::types::{
@@ -63,8 +68,43 @@ pub fn sockscap_preflight(
 
 /// Attempt to start the engine. Phase 0 always fails preflight (capture not
 /// implemented) but exercises the full start error path and recovery journal.
+fn build_runtime_for(
+    state: &State<'_, AppState>,
+    profiles: &[RoutingProfileDraft],
+    app_data: &std::path::Path,
+) -> FlowRuntime {
+    let (sub_direct, sub_proxy) =
+        if let Some(text) = load_last_good_text(app_data, GFWLIST_OFFICIAL_SOURCE_ID) {
+            compile_subscription_rules(GFWLIST_OFFICIAL_SOURCE_ID, &text)
+        } else {
+            (Vec::new(), Vec::new())
+        };
+    let vault = state.vault.clone();
+    let resolve = |id: &str| -> Option<crate::proxy::ResolvedProxy> {
+        let db = state.db.lock().ok()?;
+        resolve_session_proxy_with_db(&db, &vault, id).ok().flatten()
+    };
+    let mut bypass = vec![
+        "127.0.0.1".into(),
+        "::1".into(),
+        "localhost".into(),
+    ];
+    // Collect proxy hosts for hard bypass.
+    for p in profiles.iter().filter(|p| p.enabled) {
+        if matches!(p.egress_kind, Some(crate::sockscap::types::EgressKind::ProxySession)) {
+            if let Some(id) = p.egress_ref_id.as_deref() {
+                if let Some(px) = resolve(id) {
+                    bypass.push(px.host);
+                }
+            }
+        }
+    }
+    FlowRuntime::from_profiles(profiles, &sub_direct, &sub_proxy, &resolve, &bypass)
+}
+
 #[tauri::command]
 pub fn sockscap_start(
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
     profiles: Option<Vec<RoutingProfileDraft>>,
 ) -> Result<EngineStatus, String> {
@@ -75,6 +115,11 @@ pub fn sockscap_start(
             list_profiles(&db).map_err(|e| format!("list profiles: {e}"))?
         }
     };
+    let app_data = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("app data dir: {e}"))?;
+    set_global_runtime(build_runtime_for(&state, &profiles, &app_data));
     {
         let db = lock_sockscap_db(&state)?;
         let _ = db::write_recovery_journal(&db, "preparing", "Preparing", None);
@@ -86,6 +131,7 @@ pub fn sockscap_start(
             Ok(status)
         }
         Err(e) => {
+            clear_global_runtime();
             let db = lock_sockscap_db(&state)?;
             let _ = clear_recovery_journal(&db);
             Err(e)
@@ -97,6 +143,7 @@ pub fn sockscap_start(
 #[tauri::command]
 pub fn sockscap_stop(state: State<'_, AppState>) -> Result<EngineStatus, String> {
     let status = state.sockscap.stop()?;
+    clear_global_runtime();
     let db = lock_sockscap_db(&state)?;
     let _ = clear_recovery_journal(&db);
     Ok(status)
@@ -106,6 +153,7 @@ pub fn sockscap_stop(state: State<'_, AppState>) -> Result<EngineStatus, String>
 #[tauri::command]
 pub fn sockscap_recover(state: State<'_, AppState>) -> Result<EngineStatus, String> {
     let status = state.sockscap.recover()?;
+    clear_global_runtime();
     let db = lock_sockscap_db(&state)?;
     let _ = clear_recovery_journal(&db);
     Ok(status)

@@ -195,12 +195,19 @@ impl LinuxCaptureAdapter {
             .profiles
             .iter()
             .any(|p| p.enabled && p.scope == ProfileScope::Global);
-        let has_app = plan.profiles.iter().any(|p| {
-            p.enabled && matches!(p.scope, ProfileScope::Applications | ProfileScope::RuntimeProcesses)
-        });
+        let app_profiles: Vec<&crate::sockscap::types::RoutingProfileDraft> = plan
+            .profiles
+            .iter()
+            .filter(|p| {
+                p.enabled
+                    && matches!(
+                        p.scope,
+                        ProfileScope::Applications | ProfileScope::RuntimeProcesses
+                    )
+            })
+            .collect();
 
-        if has_global || !has_app {
-            // Redirect all remaining TCP to local listener.
+        if has_global || app_profiles.is_empty() {
             Self::run_nft(&[
                 "add",
                 "rule",
@@ -214,10 +221,49 @@ impl LinuxCaptureAdapter {
                 "to",
                 &port_s,
             ])?;
+        } else if cgroup_v2_available() {
+            // Create a sockscap cgroup and match sockets from it. Callers may
+            // move PIDs into this cgroup later ("remember process" / attach).
+            let cgroup_path = ensure_sockscap_cgroup()?;
+            // nft socket cgroupv2 match requires the path relative to cgroup root.
+            let rel = cgroup_path
+                .strip_prefix("/sys/fs/cgroup/")
+                .unwrap_or(std::path::Path::new("taomni-sockscap"));
+            let rel_s = rel.to_string_lossy().into_owned();
+            // socket cgroupv2 "path" level — level 2 is a common default for leaf.
+            let rule = format!(
+                "add rule inet {NFT_TABLE} {NFT_CHAIN} socket cgroupv2 level 2 \"{rel_s}\" meta l4proto tcp redirect to {port_s}"
+            );
+            // Use `nft -f -` style via sh -c for quoted path.
+            let status = Command::new("sh")
+                .arg("-c")
+                .arg(format!("nft {rule}"))
+                .status()
+                .map_err(|e| format!("nft cgroup rule: {e}"))?;
+            if !status.success() {
+                tracing::warn!(
+                    "linux capture: cgroup socket match rule failed; falling back to global TCP redirect"
+                );
+                Self::run_nft(&[
+                    "add",
+                    "rule",
+                    "inet",
+                    NFT_TABLE,
+                    NFT_CHAIN,
+                    "meta",
+                    "l4proto",
+                    "tcp",
+                    "redirect",
+                    "to",
+                    &port_s,
+                ])?;
+            } else {
+                tracing::info!(
+                    cgroup = %cgroup_path.display(),
+                    "linux capture: app-group mode using cgroupv2 socket match"
+                );
+            }
         } else {
-            // App-group without full cgroup plumbing yet: still install a
-            // global TCP redirect so the vertical slice works; document that
-            // true cgroup match lands with privileged helper refinement.
             Self::run_nft(&[
                 "add",
                 "rule",
@@ -232,12 +278,29 @@ impl LinuxCaptureAdapter {
                 &port_s,
             ])?;
             tracing::warn!(
-                "linux capture: app-group profiles present; using global TCP redirect until cgroup match helper ships"
+                "linux capture: cgroup v2 unavailable; using global TCP redirect for app-group profiles"
             );
         }
 
         Ok(())
     }
+}
+
+fn cgroup_v2_available() -> bool {
+    std::path::Path::new("/sys/fs/cgroup/cgroup.controllers").exists()
+}
+
+fn ensure_sockscap_cgroup() -> Result<std::path::PathBuf, String> {
+    let path = std::path::PathBuf::from("/sys/fs/cgroup/taomni-sockscap");
+    if !path.exists() {
+        std::fs::create_dir_all(&path).map_err(|e| format!("create cgroup: {e}"))?;
+    }
+    // Enable controllers if possible (best-effort).
+    let subtree = path.join("cgroup.subtree_control");
+    if subtree.exists() {
+        let _ = std::fs::write(&subtree, "+pids +memory");
+    }
+    Ok(path)
 }
 
 #[cfg(target_os = "linux")]
@@ -295,17 +358,26 @@ async fn accept_loop(listener: TcpListener, cancel: CancellationToken) {
     }
 }
 
-async fn handle_one(mut inbound: TcpStream, peer: SocketAddr) -> Result<(), String> {
+async fn handle_one(inbound: TcpStream, peer: SocketAddr) -> Result<(), String> {
     let dest = original_dst(&inbound).map_err(|e| format!("SO_ORIGINAL_DST: {e}"))?;
     // Hard safety: never open a loop back into our own listener via redirect.
     if dest.ip().is_loopback() && dest.port() == LISTEN_PORT.load(Ordering::SeqCst) {
         return Err("refusing redirect loop".into());
     }
     tracing::debug!(%peer, %dest, "sockscap linux redirected flow");
-    let mut outbound = TcpStream::connect(dest)
-        .await
-        .map_err(|e| format!("direct connect {dest}: {e}"))?;
-    let _ = copy_bidirectional(&mut inbound, &mut outbound).await;
+    let rt = crate::sockscap::flow::runtime::global_runtime();
+    if rt.engines.is_empty() {
+        // Fallback DIRECT when no runtime configured (should not happen after start).
+        let mut inbound = inbound;
+        let mut outbound = TcpStream::connect(dest)
+            .await
+            .map_err(|e| format!("direct connect {dest}: {e}"))?;
+        let _ = copy_bidirectional(&mut inbound, &mut outbound).await;
+        return Ok(());
+    }
+    let _action = rt
+        .bridge_inbound(inbound, dest, None, None)
+        .await?;
     Ok(())
 }
 
