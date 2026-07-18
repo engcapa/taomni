@@ -141,7 +141,14 @@ Without CAP_NET_ADMIN, Start fails preflight with a clear message and mutates no
 
 - Windows dual spike ADR + signed driver path
 - macOS Network Extension entitlement + provider
-- Linux cgroup socket-match refinement (currently global TCP redirect)
-- FlowEngine PROXY path inside redirect accept loop (today DIRECT relay)
-- SshChannelPool for production SSH Jump concurrency
-- Helper binary with polkit / capability drop
+- Separate polkit/setuid helper **binary** packaging (in-process helper contract is done)
+- SshJumpConnector credential resolution UI path (pool exists; needs session id → auth wiring)
+- Multi-profile app-identity selection in FlowRuntime (currently priority-first)
+
+### Recently closed on this branch
+
+- FlowRuntime bridges captured TCP via PROXY/DIRECT/BLOCK
+- CaptureAdapter process singleton
+- Linux cgroupv2 socket match attempt with global fallback
+- SshChannelPool + PrivilegedHelper handshake/recovery contract
+- SSH known_hosts, Linux nft redirect, system tray
