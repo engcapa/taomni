@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { SockscapPersistedRoutingProfile } from "../lib/sockscap";
 
 const mocks = vi.hoisted(() => ({
   capabilities: vi.fn(),
@@ -11,6 +12,9 @@ const mocks = vi.hoisted(() => ({
   start: vi.fn(),
   stop: vi.fn(),
   recover: vi.fn(),
+  saveProfile: vi.fn(),
+  deleteProfile: vi.fn(),
+  testEgress: vi.fn(),
   listeners: new Map<string, (payload: unknown) => void>(),
   unlisten: vi.fn(),
 }));
@@ -26,6 +30,9 @@ vi.mock("../lib/sockscap", () => ({
   sockscapStart: mocks.start,
   sockscapStop: mocks.stop,
   sockscapRecover: mocks.recover,
+  sockscapUpsertProfile: mocks.saveProfile,
+  sockscapDeleteProfile: mocks.deleteProfile,
+  sockscapTestEgress: mocks.testEgress,
   listenSockscapStatus: (callback: (payload: unknown) => void) => {
     mocks.listeners.set("status", callback);
     return Promise.resolve(mocks.unlisten);
@@ -100,6 +107,7 @@ describe("Sockscap store", () => {
       topDomains: [],
       egressHealth: [],
     });
+    mocks.deleteProfile.mockResolvedValue(undefined);
   });
 
   it("hydrates independent snapshots while preserving partial successes", async () => {
@@ -155,5 +163,61 @@ describe("Sockscap store", () => {
     expect(useSockscapStore.getState().alerts[0].code).toBe("TEST_ALERT");
     detach();
     expect(mocks.unlisten).toHaveBeenCalledTimes(5);
+  });
+
+  it("applies optimistic profile saves and deletes to the ordered snapshot", async () => {
+    const first: SockscapPersistedRoutingProfile = {
+      profile: {
+        id: "profile-b",
+        name: "B",
+        enabled: false,
+        priority: 20,
+        scope: "global",
+        appSelectors: [],
+        runtimeProcesses: [],
+        includeChildren: true,
+        egressKind: null,
+        egressRefId: null,
+        egressFailureAction: "fail_open",
+        sshPoolOptions: {
+          maxControlConnections: 2,
+          maxChannelsPerConnection: 128,
+          keepaliveSeconds: 30,
+          connectTimeoutSeconds: 15,
+        },
+        ruleSourceIds: [],
+        customRules: [],
+        defaultAction: "direct",
+        dnsMode: "system_capture",
+        unknownDomainAction: "direct",
+        udpPolicy: "block",
+        localNetworkPolicy: { lanAction: "direct" },
+        statsPrivacy: {
+          collectionMode: "persisted",
+          minuteRetentionDays: 7,
+          hourlyRetentionDays: 90,
+          domainAggregationEnabled: false,
+          domainRetentionDays: 7,
+        },
+      },
+      revision: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    const second: SockscapPersistedRoutingProfile = {
+      ...first,
+      profile: { ...first.profile, id: "profile-a", name: "A", priority: 10 },
+    };
+    useSockscapStore.setState({ profiles: [first] });
+    mocks.saveProfile.mockResolvedValueOnce(second);
+    await useSockscapStore.getState().saveProfile(second.profile, 0);
+    expect(mocks.saveProfile).toHaveBeenCalledWith(second.profile, 0);
+    expect(useSockscapStore.getState().profiles.map((record) => record.profile.id)).toEqual([
+      "profile-a",
+      "profile-b",
+    ]);
+    await useSockscapStore.getState().deleteProfile("profile-a", 1);
+    expect(mocks.deleteProfile).toHaveBeenCalledWith("profile-a", 1);
+    expect(useSockscapStore.getState().profiles).toEqual([first]);
   });
 });

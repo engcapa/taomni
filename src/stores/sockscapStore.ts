@@ -11,10 +11,13 @@ import {
   sockscapListProfiles,
   sockscapListRuleSources,
   sockscapRecover,
+  sockscapDeleteProfile,
   sockscapStart,
   sockscapStatsSnapshot,
   sockscapStatus,
   sockscapStop,
+  sockscapTestEgress,
+  sockscapUpsertProfile,
   type SockscapAlertEvent,
   type SockscapCapabilitiesReport,
   type SockscapEgressSessionSummary,
@@ -24,17 +27,20 @@ import {
   type SockscapProfileHealthEvent,
   type SockscapRuleSourceView,
   type SockscapStatsSnapshot,
+  type SockscapTestEgressRequest,
   type SockscapTestEgressResult,
 } from "../lib/sockscap";
 
 export type SockscapSection = "overview" | "profiles" | "rules" | "dashboard" | "lifecycle";
 export type SockscapLifecycleAction = "start" | "stop" | "recover";
+export type SockscapProfileAction = "save" | "delete" | "test_egress";
 
 interface SockscapStoreState {
   section: SockscapSection;
   initialized: boolean;
   loading: boolean;
   actionPending: SockscapLifecycleAction | null;
+  profileActionPending: SockscapProfileAction | null;
   error: string | null;
   lastUpdatedAt: number | null;
   capabilities: SockscapCapabilitiesReport | null;
@@ -51,6 +57,12 @@ interface SockscapStoreState {
   initialize: () => Promise<void>;
   refresh: () => Promise<void>;
   loadProcesses: () => Promise<void>;
+  saveProfile: (
+    profile: SockscapPersistedRoutingProfile["profile"],
+    expectedRevision: number,
+  ) => Promise<SockscapPersistedRoutingProfile>;
+  deleteProfile: (profileId: string, expectedRevision: number) => Promise<void>;
+  testEgress: (request: SockscapTestEgressRequest) => Promise<SockscapTestEgressResult>;
   start: () => Promise<void>;
   stop: () => Promise<void>;
   recover: () => Promise<void>;
@@ -64,6 +76,7 @@ const initialData = {
   initialized: false,
   loading: false,
   actionPending: null,
+  profileActionPending: null,
   error: null,
   lastUpdatedAt: null,
   capabilities: null,
@@ -137,6 +150,50 @@ export const useSockscapStore = create<SockscapStoreState>((set, get) => ({
       set({ error: errorMessage(error) });
     }
   },
+  saveProfile: async (profile, expectedRevision) => {
+    set({ profileActionPending: "save", error: null });
+    try {
+      const saved = await sockscapUpsertProfile(profile, expectedRevision);
+      set((current) => ({
+        profileActionPending: null,
+        profiles: sortProfiles([
+          ...current.profiles.filter((record) => record.profile.id !== saved.profile.id),
+          saved,
+        ]),
+      }));
+      return saved;
+    } catch (error) {
+      set({ profileActionPending: null, error: errorMessage(error) });
+      throw error;
+    }
+  },
+  deleteProfile: async (profileId, expectedRevision) => {
+    set({ profileActionPending: "delete", error: null });
+    try {
+      await sockscapDeleteProfile(profileId, expectedRevision);
+      set((current) => ({
+        profileActionPending: null,
+        profiles: current.profiles.filter((record) => record.profile.id !== profileId),
+      }));
+    } catch (error) {
+      set({ profileActionPending: null, error: errorMessage(error) });
+      throw error;
+    }
+  },
+  testEgress: async (request) => {
+    set({ profileActionPending: "test_egress", error: null });
+    try {
+      const result = await sockscapTestEgress(request);
+      set((current) => ({
+        profileActionPending: null,
+        egressHealth: { ...current.egressHealth, [result.summary.id]: result },
+      }));
+      return result;
+    } catch (error) {
+      set({ profileActionPending: null, error: errorMessage(error) });
+      throw error;
+    }
+  },
   start: async () => runLifecycle(set, "start", sockscapStart),
   stop: async () => runLifecycle(set, "stop", sockscapStop),
   recover: async () => runLifecycle(set, "recover", sockscapRecover),
@@ -149,6 +206,12 @@ export const useSockscapStore = create<SockscapStoreState>((set, get) => ({
     set({ ...initialData });
   },
 }));
+
+function sortProfiles(profiles: SockscapPersistedRoutingProfile[]): SockscapPersistedRoutingProfile[] {
+  return [...profiles].sort((left, right) => left.profile.priority - right.profile.priority
+    || left.profile.name.localeCompare(right.profile.name)
+    || left.profile.id.localeCompare(right.profile.id));
+}
 
 async function runLifecycle(
   set: (patch: Partial<SockscapStoreState>) => void,
