@@ -70,6 +70,108 @@ export interface SaveWorkspaceSdkBindingRequest {
   sdkId?: string | null;
 }
 
+export type SdkConfidence = "high" | "medium" | "low";
+export type SdkConstraintPolicy =
+  | "any"
+  | "exact"
+  | "exactMajor"
+  | "preferredMajor"
+  | "minimum"
+  | "range";
+
+export interface SdkVersionConstraint {
+  raw: string;
+  policy: SdkConstraintPolicy;
+  major: number | null;
+}
+
+export interface SdkEvidence {
+  sourcePath: string;
+  key: string;
+  value: string;
+  confidence: SdkConfidence;
+}
+
+export interface SdkRequirement {
+  kind: SdkKind;
+  role: SdkRole;
+  constraint: SdkVersionConstraint | null;
+  requiredLocation: string | null;
+  managedByBuild: boolean;
+  source: string;
+  confidence: SdkConfidence;
+  evidence: SdkEvidence[];
+}
+
+export type ProjectBuildSystem = "maven" | "gradle" | "sbt" | "pyproject" | "standalone";
+export type KotlinPlatform =
+  | "jvm"
+  | "android"
+  | "multiplatform"
+  | "js"
+  | "wasm"
+  | "native"
+  | "unknown";
+export type KotlinCompilerMode = "buildManaged" | "standalone";
+
+export interface KotlinProjectProfile {
+  platform: KotlinPlatform;
+  compilerMode: KotlinCompilerMode;
+  compilerVersion: string | null;
+  languageVersion: string | null;
+  apiVersion: string | null;
+  jvmTarget: string | null;
+  javaToolchain: string | null;
+  gradleLauncherJavaHome: string | null;
+}
+
+export interface ProjectSdkProfile {
+  scopePath: string;
+  relativePath: string;
+  displayName: string;
+  buildSystems: ProjectBuildSystem[];
+  languages: SdkKind[];
+  requirements: SdkRequirement[];
+  kotlin: KotlinProjectProfile | null;
+}
+
+export interface WorkspaceSdkAnalysis {
+  workspaceRoot: string;
+  profiles: ProjectSdkProfile[];
+  warnings: string[];
+}
+
+export type ResolvedSdkSource =
+  | "manualBinding"
+  | "projectLocation"
+  | "autoMatch"
+  | "default"
+  | "buildManaged"
+  | "unresolved";
+export type ResolvedSdkStatus =
+  | "resolved"
+  | "managed"
+  | "missing"
+  | "invalid"
+  | "incompatible"
+  | "unresolved";
+
+export interface ResolvedSdk {
+  scopePath: string;
+  kind: SdkKind;
+  role: SdkRole;
+  requirement: SdkRequirement;
+  installation: SdkInstallation | null;
+  source: ResolvedSdkSource;
+  status: ResolvedSdkStatus;
+  reason: string;
+}
+
+export interface WorkspaceSdkResolution {
+  analysis: WorkspaceSdkAnalysis;
+  resolved: ResolvedSdk[];
+}
+
 export function sdkGetRegistry(): Promise<SdkRegistry> {
   return invoke<SdkRegistry>("sdk_get_registry");
 }
@@ -114,4 +216,12 @@ export function sdkRemoveWorkspaceBinding(
   role: SdkRole,
 ): Promise<void> {
   return invoke<void>("sdk_remove_workspace_binding", { scopePath, kind, role });
+}
+
+export function sdkAnalyzeWorkspace(workspaceRoot: string): Promise<WorkspaceSdkAnalysis> {
+  return invoke<WorkspaceSdkAnalysis>("sdk_analyze_workspace", { workspaceRoot });
+}
+
+export function sdkResolveWorkspace(workspaceRoot: string): Promise<WorkspaceSdkResolution> {
+  return invoke<WorkspaceSdkResolution>("sdk_resolve_workspace", { workspaceRoot });
 }

@@ -1,4 +1,6 @@
+mod detect;
 mod probe;
+mod resolve;
 
 use crate::state::AppState;
 use chrono::Utc;
@@ -486,6 +488,27 @@ pub async fn sdk_remove_workspace_binding(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state.sdk.remove_binding(&scope_path, kind, role).await
+}
+
+#[tauri::command]
+pub async fn sdk_analyze_workspace(
+    workspace_root: String,
+) -> Result<detect::WorkspaceSdkAnalysis, String> {
+    tokio::task::spawn_blocking(move || detect::analyze_workspace(&workspace_root))
+        .await
+        .map_err(|error| format!("SDK workspace analysis task failed: {error}"))?
+}
+
+#[tauri::command]
+pub async fn sdk_resolve_workspace(
+    workspace_root: String,
+    state: State<'_, AppState>,
+) -> Result<resolve::WorkspaceSdkResolution, String> {
+    let analysis = tokio::task::spawn_blocking(move || detect::analyze_workspace(&workspace_root))
+        .await
+        .map_err(|error| format!("SDK workspace analysis task failed: {error}"))??;
+    let registry = state.sdk.snapshot().await;
+    Ok(resolve::resolve_workspace(analysis, &registry).await)
 }
 
 fn load_registry(path: &Path) -> Result<SdkRegistry, String> {

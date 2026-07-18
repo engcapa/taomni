@@ -442,6 +442,8 @@ pub fn run() {
             sdk::sdk_set_default,
             sdk::sdk_save_workspace_binding,
             sdk::sdk_remove_workspace_binding,
+            sdk::sdk_analyze_workspace,
+            sdk::sdk_resolve_workspace,
             workspace::workspace_list_dir,
             workspace::workspace_compact_chain,
             workspace::workspace_list_files_recursive,

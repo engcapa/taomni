@@ -1357,6 +1357,23 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       saveSdkRegistry(registry);
       return undefined as T;
     }
+    case "sdk_analyze_workspace": {
+      return {
+        workspaceRoot: String(args?.workspaceRoot ?? ""),
+        profiles: [],
+        warnings: [],
+      } as T;
+    }
+    case "sdk_resolve_workspace": {
+      return {
+        analysis: {
+          workspaceRoot: String(args?.workspaceRoot ?? ""),
+          profiles: [],
+          warnings: [],
+        },
+        resolved: [],
+      } as T;
+    }
     case "lsp_list_presets": {
       return STUB_LSP_PRESETS as T;
     }

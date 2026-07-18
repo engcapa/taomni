@@ -9,12 +9,14 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 import {
+  sdkAnalyzeWorkspace,
   sdkDiscoverInstallations,
   sdkGetRegistry,
   sdkRemoveWorkspaceBinding,
   sdkSaveInstallation,
   sdkSaveWorkspaceBinding,
   sdkSetDefault,
+  sdkResolveWorkspace,
 } from "./sdk";
 
 describe("SDK IPC", () => {
@@ -75,6 +77,20 @@ describe("SDK IPC", () => {
       scopePath: "D:\\repo",
       kind: "java",
       role: "project",
+    });
+  });
+
+  it("analyzes and resolves one workspace root", async () => {
+    mocks.invoke.mockResolvedValue({ profiles: [], resolved: [] });
+
+    await sdkAnalyzeWorkspace("D:\\repo");
+    await sdkResolveWorkspace("D:\\repo");
+
+    expect(mocks.invoke).toHaveBeenNthCalledWith(1, "sdk_analyze_workspace", {
+      workspaceRoot: "D:\\repo",
+    });
+    expect(mocks.invoke).toHaveBeenNthCalledWith(2, "sdk_resolve_workspace", {
+      workspaceRoot: "D:\\repo",
     });
   });
 });
