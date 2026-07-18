@@ -12,7 +12,7 @@ use rusqlite::Connection;
 
 use super::autoproxy::{ProjectionStats, UnsupportedRule};
 use super::db;
-use super::engine::{RecoveryJournal, SockscapOrchestrator};
+use super::engine::{EngineState, RecoveryJournal, SockscapOrchestrator};
 use super::known_hosts::HostKeyStore;
 use super::listener::{FlowRouter, LocalCaptureAdapter};
 use super::matcher::CompiledRuleSource;
@@ -194,6 +194,28 @@ impl SockscapState {
             HardBypass::default(),
             self.orchestrator.stats.clone(),
         )
+    }
+
+    /// Build the router from committed config, hand it to the capture adapter,
+    /// and start the engine. Shared by the Tauri command and the tray.
+    pub async fn start_engine(&self) -> Result<EngineState, String> {
+        let profiles = {
+            let conn = self.conn.lock().unwrap();
+            db::list_profiles(&conn).map_err(|e| e.to_string())?
+        };
+        self.adapter.set_router(Arc::new(self.build_router()));
+        self.orchestrator.start(&profiles).await?;
+        Ok(self.orchestrator.state())
+    }
+
+    pub async fn stop_engine(&self) -> Result<EngineState, String> {
+        self.orchestrator.stop().await?;
+        Ok(self.orchestrator.state())
+    }
+
+    pub async fn recover_engine(&self) -> Result<EngineState, String> {
+        self.orchestrator.recover().await?;
+        Ok(self.orchestrator.state())
     }
 }
 

@@ -141,6 +141,10 @@ pub fn run() {
             ) {
                 Ok(sockscap_state) => {
                     app.manage(sockscap_state);
+                    // System-tray icon + menu (start/stop/recover/open/quit).
+                    if let Err(e) = sockscap::tray::install(app.handle()) {
+                        log::warn!("sockscap: tray install failed: {e}");
+                    }
                 }
                 Err(e) => log::warn!("sockscap: init failed, module disabled: {e}"),
             }

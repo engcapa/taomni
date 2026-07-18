@@ -406,33 +406,19 @@ pub fn sockscap_test_target(
 /// "backend not available" error and stays Disabled — never a fake Active.
 #[tauri::command]
 pub async fn sockscap_start(state: State<'_, SockscapState>) -> Result<EngineState, String> {
-    let profiles = {
-        let conn = state.conn.lock().unwrap();
-        db::list_profiles(&conn).map_err(|e| e.to_string())?
-    };
-    // Build the flow router from the committed profiles/rules and hand it to the
-    // local capture adapter before the orchestrator installs capture.
-    let router = std::sync::Arc::new(state.build_router());
-    state.adapter.set_router(router);
-    let orchestrator = state.orchestrator.clone();
-    orchestrator.start(&profiles).await?;
-    Ok(orchestrator.state())
+    state.start_engine().await
 }
 
 #[tauri::command]
 pub async fn sockscap_stop(state: State<'_, SockscapState>) -> Result<EngineState, String> {
-    let orchestrator = state.orchestrator.clone();
-    orchestrator.stop().await?;
-    Ok(orchestrator.state())
+    state.stop_engine().await
 }
 
 /// One-click "restore network" — fail-open uninstall independent of upstream
 /// availability (plan §9, §16.6-23).
 #[tauri::command]
 pub async fn sockscap_recover(state: State<'_, SockscapState>) -> Result<EngineState, String> {
-    let orchestrator = state.orchestrator.clone();
-    orchestrator.recover().await?;
-    Ok(orchestrator.state())
+    state.recover_engine().await
 }
 
 #[tauri::command]

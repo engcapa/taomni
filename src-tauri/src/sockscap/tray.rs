@@ -118,6 +118,123 @@ pub fn left_click_toggles() -> bool {
     !cfg!(target_os = "linux")
 }
 
+/* --------------------------- Tauri tray integration ------------------------ */
+
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::TrayIconBuilder;
+use tauri::{AppHandle, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
+
+use crate::sockscap::runtime::SockscapState;
+
+/// Create the Sockscap system-tray icon and menu (plan §8, §9). The menu always
+/// carries Show/Hide and Quit (Linux has no reliable left-click), and the
+/// engine controls dispatch to the shared start/stop/recover helpers. Icon
+/// color/tooltip updates per state are a follow-up (needs stored item handles);
+/// clicking Start when already active is a safe no-op.
+pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
+    let items = [
+        (MENU_OPEN, "Open Sockscap"),
+        (MENU_START, "Start"),
+        (MENU_STOP, "Stop"),
+        (MENU_RECOVER, "Restore network"),
+        (MENU_TOGGLE, "Show / Hide"),
+        (MENU_QUIT, "Quit Taomni"),
+    ];
+    let built: Vec<MenuItem<R>> = items
+        .iter()
+        .map(|(id, label)| MenuItem::with_id(app, *id, *label, true, None::<&str>))
+        .collect::<tauri::Result<_>>()?;
+    let refs: Vec<&dyn tauri::menu::IsMenuItem<R>> =
+        built.iter().map(|i| i as &dyn tauri::menu::IsMenuItem<R>).collect();
+    let menu = Menu::with_items(app, &refs)?;
+
+    let mut builder = TrayIconBuilder::new()
+        .tooltip("Sockscap")
+        .menu(&menu)
+        .on_menu_event(|app, event| handle_menu_event(app, event.id.0.as_str()));
+    if let Some(icon) = app.default_window_icon().cloned() {
+        builder = builder.icon(icon);
+    }
+    builder.build(app)?;
+    Ok(())
+}
+
+fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
+    match id {
+        MENU_OPEN => open_window(app),
+        MENU_TOGGLE => toggle_window(app),
+        MENU_START => spawn_engine(app, EngineAction::Start),
+        MENU_STOP => spawn_engine(app, EngineAction::Stop),
+        MENU_RECOVER => spawn_engine(app, EngineAction::Recover),
+        MENU_QUIT => quit(app),
+        _ => {}
+    }
+}
+
+enum EngineAction {
+    Start,
+    Stop,
+    Recover,
+}
+
+fn spawn_engine<R: Runtime>(app: &AppHandle<R>, action: EngineAction) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Some(state) = app.try_state::<SockscapState>() {
+            let result = match action {
+                EngineAction::Start => state.start_engine().await,
+                EngineAction::Stop => state.stop_engine().await,
+                EngineAction::Recover => state.recover_engine().await,
+            };
+            if let Err(e) = result {
+                log::warn!("sockscap tray engine action failed: {e}");
+            }
+        }
+    });
+}
+
+fn open_window<R: Runtime>(app: &AppHandle<R>) {
+    if let Some(win) = app.get_webview_window("sockscap") {
+        let _ = win.show();
+        let _ = win.set_focus();
+        return;
+    }
+    let _ = WebviewWindowBuilder::new(
+        app,
+        "sockscap",
+        WebviewUrl::App("index.html#sockscap".into()),
+    )
+    .title("Sockscap")
+    .inner_size(1100.0, 760.0)
+    .build();
+}
+
+fn toggle_window<R: Runtime>(app: &AppHandle<R>) {
+    match app.get_webview_window("sockscap") {
+        Some(win) => {
+            if win.is_visible().unwrap_or(false) {
+                let _ = win.hide();
+            } else {
+                let _ = win.show();
+                let _ = win.set_focus();
+            }
+        }
+        None => open_window(app),
+    }
+}
+
+/// Quit Taomni: stop the engine (restore direct networking) before exiting so
+/// the user never loses network on exit (plan §9, §16.6-21).
+fn quit<R: Runtime>(app: &AppHandle<R>) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Some(state) = app.try_state::<SockscapState>() {
+            let _ = state.stop_engine().await;
+        }
+        app.exit(0);
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
