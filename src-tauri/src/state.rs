@@ -20,6 +20,7 @@ use crate::objectstorage::ObjectStorageSession;
 use crate::rdp::ws::RdpSession;
 use crate::sdk::SdkManager;
 use crate::servers::ServerRegistry;
+use crate::sockscap::SockscapEngine;
 use crate::terminal::{ActiveTerminal, TerminalOutputChannel};
 use crate::tunnel::TunnelRegistry;
 use crate::vault::Vault;
@@ -179,6 +180,10 @@ pub struct AppState {
     /// AI-assistant `chat`/`voice` modules. Holds node identity, peer roster,
     /// and the lanchat.sqlite path; populated by the lanchat background service.
     pub lanchat: Arc<LanChatState>,
+    /// Sockscap system traffic-routing engine. Independent of Application Proxy
+    /// (`proxy::`). Phase 0 holds the state machine + capability probes only;
+    /// the capture plane is not installed yet.
+    pub sockscap: Arc<SockscapEngine>,
 }
 
 impl AppState {
@@ -233,6 +238,7 @@ impl AppState {
             sdk,
             ai_ctx: Arc::new(RwLock::new(ai_ctx)),
             lanchat,
+            sockscap: Arc::new(SockscapEngine::new()),
         }
     }
 

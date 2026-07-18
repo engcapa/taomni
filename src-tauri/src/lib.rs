@@ -25,6 +25,7 @@ mod serial;
 mod servers;
 mod session;
 mod sdk;
+mod sockscap;
 mod state;
 mod tab;
 mod terminal;
@@ -786,6 +787,14 @@ pub fn run() {
             notes::commands::notes_set_prefs,
             notes::commands::notes_list_alerts,
             notes::commands::notes_ack_alert,
+            // Sockscap (Phase 0 scaffold — capture plane not yet active)
+            sockscap::sockscap_capabilities,
+            sockscap::sockscap_status,
+            sockscap::sockscap_preflight,
+            sockscap::sockscap_start,
+            sockscap::sockscap_stop,
+            sockscap::sockscap_recover,
+            sockscap::sockscap_open_window,
             exit_app,
         ])
         .run(tauri::generate_context!())
