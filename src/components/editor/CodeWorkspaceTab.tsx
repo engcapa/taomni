@@ -183,6 +183,7 @@ import {
 import { type RecentFileEntry } from "./workspace/RecentFilesPopup";
 import { EditorGroup } from "./workspace/EditorGroup";
 import { WorkspacePopupsHost } from "./workspace/WorkspacePopupsHost";
+import { WorkspaceSdkStatus } from "./workspace/WorkspaceSdkStatus";
 import { FileTreePane } from "./workspace/FileTreePane";
 import { ProjectTree } from "./workspace/ProjectTree";
 import { MarkdownPreview } from "./workspace/MarkdownPreview";
@@ -4656,6 +4657,7 @@ export function CodeWorkspaceTab({
             {dirtyCount} unsaved
           </span>
         )}
+        <WorkspaceSdkStatus roots={roots} />
         <div className="flex-1" />
         {/* Project tree collapse lives on the tree toolbar / collapsed rail — avoid a
             second top-bar toggle that duplicates the panel-local control. */}
