@@ -5,7 +5,32 @@ fn main() {
     enforce_asr_llm_isolation();
     compile_hbase_protos();
     configure_macos_rpath();
+    ensure_sockscap_helper_placeholder();
     tauri_build::build();
+}
+
+/// Tauri `externalBin` requires the target-triple-suffixed helper to exist at
+/// build-script time. Create a placeholder so `cargo build` / `tauri dev` work
+/// before `scripts/stage-sockscap-helper.ps1` overwrites it with a real binary.
+fn ensure_sockscap_helper_placeholder() {
+    let triple = std::env::var("TAURI_ENV_TARGET_TRIPLE")
+        .or_else(|_| std::env::var("TARGET"))
+        .unwrap_or_else(|_| "x86_64-pc-windows-msvc".into());
+    if !triple.contains("windows") {
+        return;
+    }
+    let dir = Path::new("binaries");
+    let _ = fs::create_dir_all(dir);
+    let path = dir.join(format!("sockscap-helper-{triple}.exe"));
+    if !path.exists() {
+        // Non-empty so some tools don't treat it as missing; replaced by stage script.
+        let _ = fs::write(
+            &path,
+            b"placeholder-run-scripts/stage-sockscap-helper.ps1\n",
+        );
+        println!("cargo:warning=created placeholder {}; run scripts/stage-sockscap-helper.ps1", path.display());
+    }
+    println!("cargo:rerun-if-changed=binaries");
 }
 
 /// On macOS, add an `@executable_path/../Frameworks` rpath so the krb5 dylibs

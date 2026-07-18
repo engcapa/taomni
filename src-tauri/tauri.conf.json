@@ -54,6 +54,9 @@
       "resources/windivert/VERSION": "windivert/VERSION",
       "resources/windivert/README.md": "windivert/README.md"
     },
+    "externalBin": [
+      "binaries/sockscap-helper"
+    ],
     "macOS": {
       "entitlements": "Entitlements.plist",
       "frameworks": [

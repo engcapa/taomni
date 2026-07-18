@@ -199,7 +199,7 @@ fn install_files_now(bundle_dir: &Path) -> Result<(), String> {
 
 /// ShellExecuteW "runas" — returns the HINSTANCE cast value (>=32 means success
 /// launching the elevated process, not that the child succeeded).
-fn shell_execute_runas(file: &str, params: &str) -> Result<isize, String> {
+pub fn shell_execute_runas_status(file: &str, params: &str) -> Result<isize, String> {
     let file_w = wide(file);
     let params_w = wide(params);
     let op = wide("runas");
@@ -214,6 +214,10 @@ fn shell_execute_runas(file: &str, params: &str) -> Result<isize, String> {
         ) as isize
     };
     Ok(rc)
+}
+
+fn shell_execute_runas(file: &str, params: &str) -> Result<isize, String> {
+    shell_execute_runas_status(file, params)
 }
 
 fn wide(s: &str) -> Vec<u16> {

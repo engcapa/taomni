@@ -20,6 +20,14 @@ path = "tests/support/acp_fake_agent.rs"
 test = false
 bench = false
 
+# Elevated Windows capture helper (plan §4.1 PrivilegedHelper). Packaged next
+# to the main binary; launched with UAC from the non-elevated main process.
+[[bin]]
+name = "sockscap-helper"
+path = "src/bin/sockscap_helper.rs"
+test = false
+bench = false
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 prost-build = "0.14"
@@ -228,6 +236,7 @@ winapi = { version = "0.3", features = [
   "iphlpapi",
   "tcpmib",
   "iptypes",
+  "namedpipeapi",
 ] }
 winreg = "0.55"
 

@@ -25,7 +25,7 @@ mod serial;
 mod servers;
 mod session;
 mod sdk;
-mod sockscap;
+pub mod sockscap;
 mod state;
 mod tab;
 mod terminal;

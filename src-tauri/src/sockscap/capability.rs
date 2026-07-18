@@ -80,13 +80,13 @@ fn detect_windows() -> Capabilities {
     let divert = super::platform::windivert_driver_present();
     let mut notes = vec![
         "Windows transparent capture: WinDivert ships in the app package (resources/windivert)".into(),
-        "Start Sockscap triggers UAC if the driver is not yet installed; Administrator required for capture".into(),
+        "Start Sockscap launches elevated sockscap-helper via UAC; the main Taomni process stays non-elevated".into(),
         "Local SOCKS5 also listens on 127.0.0.1:1080 for apps that can set a proxy".into(),
     ];
     if divert {
         notes.push("WinDivert runtime detected on this machine".into());
     } else {
-        notes.push("WinDivert not installed yet — will install from the app package on first Start (UAC)".into());
+        notes.push("WinDivert ships in the app package; helper installs it on first Start (UAC)".into());
     }
     Capabilities {
         platform: "windows".into(),
@@ -95,7 +95,8 @@ fn detect_windows() -> Capabilities {
         pid_capture: CaptureSupport::Supported,
         child_follow: true,
         tray_left_click_toggle: true,
-        requires_privilege: true,
+        // Privilege is isolated in sockscap-helper, not the main process.
+        requires_privilege: false,
         notes,
     }
 }

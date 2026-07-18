@@ -42,6 +42,8 @@ pub mod windivert;
 #[cfg(windows)]
 pub mod windows_capture;
 #[cfg(windows)]
+pub mod windows_helper_client;
+#[cfg(windows)]
 pub mod windows_install;
 #[cfg(windows)]
 pub mod windows_pid;

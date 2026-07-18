@@ -1,23 +1,18 @@
-//! Windows Sockscap capture plane (plan Phase 5): local SOCKS + WinDivert NAT.
+//! Windows Sockscap capture plane (plan Phase 5) — main process side.
 //!
-//! - **Global**: divert all outbound TCP (except loopback / capture port) to the
-//!   local transparent listener.
-//! - **Applications / runtime processes**: same divert path, but only NAT when
-//!   the owning PID/exe matches the active selectors (see `windows_pid`).
-//! - **Always** also binds the local SOCKS5 front-end for apps that can be
-//!   pointed at 127.0.0.1:1080 without transparent capture.
-//!
-//! Start requires Administrator so WinDivert can load. Missing runtime is
-//! installed from bundled `resources/windivert` via UAC
-//! (`windows_install::ensure_windivert_installed`).
+//! The **main Taomni process stays non-elevated**. Transparent capture runs in
+//! elevated `sockscap-helper.exe` (UAC only for that helper). The main process:
+//! - Spawns the helper via `runas` and talks JSON-lines over a named pipe
+//! - Binds local SOCKS5 + transparent accept on 127.0.0.1:1080 (no admin)
+//! - Queries the helper for conntrack (original dest + PID/exe) per flow
 
 #![cfg(windows)]
 
-use std::collections::HashSet;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use tokio::net::{TcpListener, TcpStream};
@@ -28,25 +23,23 @@ use super::capture::{CaptureAdapter, CaptureMode};
 use super::capability::{detect, Capabilities, CaptureSupport};
 use super::egress::Endpoint;
 use super::flow::dispatch;
-use super::listener::{serve_socks5, FlowRouter, LocalCaptureAdapter};
+use super::helper::ProcessFilterSpec;
+use super::listener::FlowRouter;
 use super::model::{AppSelector, RoutingProfile, Scope};
-use super::runtime::DEFAULT_LOCAL_CAPTURE_PORT;
-use super::windivert::{ProcessFilter, WinDivertEngine};
-use super::windows_install::{
-    ensure_windivert_installed, find_bundled_windivert, is_process_elevated,
-};
 use super::policy::AppIdentity;
-use super::{Action, Protocol};
+use super::runtime::DEFAULT_LOCAL_CAPTURE_PORT;
+use super::windows_helper_client::HelperClient;
+use super::windows_install::find_bundled_windivert;
 
-/// Combined Windows capture backend.
+/// Combined Windows capture backend (helper-backed WinDivert + local accept).
 pub struct WindowsCaptureAdapter {
     listen_port: u16,
     resource_dir: StdMutex<Option<PathBuf>>,
     router: StdMutex<Option<Arc<FlowRouter>>>,
     profiles: StdMutex<Vec<RoutingProfile>>,
-    socks: LocalCaptureAdapter,
-    divert: AsyncMutex<Option<WinDivertEngine>>,
-    transparent_task: AsyncMutex<Option<(tokio::task::JoinHandle<()>, Arc<Notify>)>>,
+    helper: AsyncMutex<Option<Arc<HelperClient>>>,
+    accept_task: AsyncMutex<Option<(tokio::task::JoinHandle<()>, Arc<Notify>)>>,
+    hb_task: AsyncMutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
 impl WindowsCaptureAdapter {
@@ -56,9 +49,9 @@ impl WindowsCaptureAdapter {
             resource_dir: StdMutex::new(None),
             router: StdMutex::new(None),
             profiles: StdMutex::new(Vec::new()),
-            socks: LocalCaptureAdapter::new("127.0.0.1", DEFAULT_LOCAL_CAPTURE_PORT),
-            divert: AsyncMutex::new(None),
-            transparent_task: AsyncMutex::new(None),
+            helper: AsyncMutex::new(None),
+            accept_task: AsyncMutex::new(None),
+            hb_task: AsyncMutex::new(None),
         }
     }
 
@@ -67,8 +60,7 @@ impl WindowsCaptureAdapter {
     }
 
     pub fn set_router(&self, router: Arc<FlowRouter>) {
-        *self.router.lock().unwrap() = Some(router.clone());
-        self.socks.set_router(router);
+        *self.router.lock().unwrap() = Some(router);
     }
 
     pub fn set_profiles(&self, profiles: Vec<RoutingProfile>) {
@@ -76,57 +68,45 @@ impl WindowsCaptureAdapter {
     }
 
     pub fn bound_port(&self) -> Option<u16> {
-        self.socks.bound_port().or(Some(self.listen_port))
+        Some(self.listen_port)
     }
 
-    fn build_process_filter(profiles: &[RoutingProfile]) -> ProcessFilter {
+    fn build_filter_spec(profiles: &[RoutingProfile]) -> ProcessFilterSpec {
         let mut has_global = false;
-        let mut exes: HashSet<String> = HashSet::new();
-        let mut pids: HashSet<u32> = HashSet::new();
+        let mut paths: Vec<String> = Vec::new();
+        let mut pids: Vec<u32> = Vec::new();
         for p in profiles.iter().filter(|p| p.enabled) {
             match p.scope {
                 Scope::Global => has_global = true,
                 Scope::Applications => {
                     for s in &p.app_selectors {
                         if let AppSelector::WindowsExecutable(path) = s {
-                            let lower = path.replace('/', "\\").to_ascii_lowercase();
-                            exes.insert(lower.clone());
-                            if let Some(name) = std::path::Path::new(&lower)
-                                .file_name()
-                                .and_then(|n| n.to_str())
-                            {
-                                exes.insert(name.to_string());
-                            }
+                            paths.push(path.replace('/', "\\").to_ascii_lowercase());
                         }
                     }
                 }
                 Scope::RuntimeProcesses => {
                     for rp in &p.runtime_processes {
-                        pids.insert(rp.pid);
+                        pids.push(rp.pid);
                     }
                 }
             }
         }
-        if has_global || (exes.is_empty() && pids.is_empty()) {
-            // Global profile or nothing specific → capture all TCP (policy still
-            // decides DIRECT/PROXY/BLOCK per destination).
-            ProcessFilter::All
-        } else if !pids.is_empty() && exes.is_empty() {
-            ProcessFilter::Pids(pids)
-        } else if !exes.is_empty() && pids.is_empty() {
-            ProcessFilter::Executables(exes)
+        if has_global || (paths.is_empty() && pids.is_empty()) {
+            ProcessFilterSpec::All
+        } else if !pids.is_empty() && paths.is_empty() {
+            ProcessFilterSpec::Pids { pids }
+        } else if !paths.is_empty() && pids.is_empty() {
+            ProcessFilterSpec::Executables { paths }
         } else {
-            // Mixed app + PID: treat as All and let policy drop non-matches by
-            // only applying non-global profiles when identity matches (divert
-            // more, decide carefully in the transparent handler).
-            ProcessFilter::All
+            ProcessFilterSpec::All
         }
     }
 
     fn bundle_dir(&self) -> Result<PathBuf, String> {
         let hint = self.resource_dir.lock().unwrap().clone();
         find_bundled_windivert(hint.as_deref()).ok_or_else(|| {
-            "WinDivert runtime not found in app resources (expected resources/windivert/WinDivert.dll)"
+            "WinDivert runtime not found in app resources (expected windivert/WinDivert.dll)"
                 .into()
         })
     }
@@ -146,21 +126,20 @@ impl CaptureAdapter for WindowsCaptureAdapter {
         caps.app_capture = CaptureSupport::Supported;
         caps.pid_capture = CaptureSupport::Supported;
         caps.child_follow = true;
-        caps.requires_privilege = true;
+        // Main process does NOT need admin; only the helper does.
+        caps.requires_privilege = false;
         caps.notes.insert(
             0,
-            format!(
-                "Windows transparent capture via WinDivert + local SOCKS on 127.0.0.1:{} (Administrator required to Start)",
-                self.listen_port
-            ),
+            "Transparent capture runs in elevated sockscap-helper (UAC on Start only). \
+             Main Taomni stays non-elevated. Local SOCKS also on 127.0.0.1:1080."
+                .into(),
         );
         caps
     }
 
     fn is_ready(&self) -> bool {
-        // Ready once the redistributable is bundled; install/elevation happens
-        // in install() so Start can trigger UAC.
         find_bundled_windivert(self.resource_dir.lock().unwrap().as_deref()).is_some()
+            || HelperClient::find_helper_exe().is_some()
             || super::windows_install::windivert_files_installed()
     }
 
@@ -170,18 +149,16 @@ impl CaptureAdapter for WindowsCaptureAdapter {
 
     async fn install(&self) -> Result<(), String> {
         let bundle = self.bundle_dir()?;
-        ensure_windivert_installed(&bundle)?;
-        if !is_process_elevated() {
-            return Err(
-                "Administrator privileges required for transparent capture. \
-                 Allow the UAC prompt to install the driver, then click Start again \
-                 (or restart Taomni as Administrator)."
-                    .into(),
-            );
-        }
+        let resource_hint = self.resource_dir.lock().unwrap().clone();
 
-        // Smoke-open after install.
-        super::windivert::smoke_open(Some(&bundle))?;
+        // Spawn elevated helper (UAC). Main process remains non-elevated.
+        let client = HelperClient::spawn_elevated(
+            resource_hint.as_deref().or(Some(bundle.as_path())),
+        )?;
+
+        let profiles = self.profiles.lock().unwrap().clone();
+        let filter = Self::build_filter_spec(&profiles);
+        client.install_capture("active", self.listen_port, filter, &bundle)?;
 
         let router = self
             .router
@@ -189,60 +166,59 @@ impl CaptureAdapter for WindowsCaptureAdapter {
             .unwrap()
             .clone()
             .ok_or_else(|| "router not configured".to_string())?;
-        let profiles = self.profiles.lock().unwrap().clone();
-        let filter = Self::build_process_filter(&profiles);
 
-        // SOCKS front-end (explicit proxy clients).
-        self.socks.set_router(router.clone());
-        // Bind may fail if port busy — try install socks after divert listener.
-        // Transparent listener shares the same port: only ONE bind. Prefer
-        // transparent accept + SOCKS on same port is impossible. Strategy:
-        // transparent TCP accept handles NAT'd flows; SOCKS needs separate port
-        // OR only transparent. Spec: local SOCKS on 1080 AND transparent.
-        // WinDivert redirects to 1080; SOCKS also 1080 — conflict!
-        //
-        // Fix: transparent listener on 1080 receives NAT connections (raw TCP,
-        // not SOCKS). Explicit SOCKS clients also connect to 1080 — they send
-        // SOCKS greeting. Detect protocol: if first byte 0x05 treat as SOCKS,
-        // else treat as transparent original-dest flow via conntrack.
+        // Accept SOCKS + transparent TCP in the main process (no admin).
         let listener = TcpListener::bind(("127.0.0.1", self.listen_port))
             .await
             .map_err(|e| format!("bind 127.0.0.1:{}: {e}", self.listen_port))?;
 
-        let engine = WinDivertEngine::start(self.listen_port, Some(&bundle), filter)?;
-        let conntrack = engine.conntrack.clone();
-        *self.divert.lock().await = Some(engine);
-
+        let helper = Arc::new(client);
         let cancel = Arc::new(Notify::new());
         let cancel_t = cancel.clone();
-        let port = self.listen_port;
+        let helper_accept = helper.clone();
         let handle = tokio::spawn(async move {
-            serve_mixed(listener, router, conntrack, cancel_t, port).await;
+            serve_mixed(listener, router, helper_accept, cancel_t).await;
         });
-        *self.transparent_task.lock().await = Some((handle, cancel));
+        *self.accept_task.lock().await = Some((handle, cancel));
+
+        // Heartbeat so the helper fails open if the main process dies.
+        let helper_hb = helper.clone();
+        let hb = tokio::spawn(async move {
+            let mut n = 1u64;
+            loop {
+                tokio::time::sleep(Duration::from_secs(3)).await;
+                if helper_hb.heartbeat(n).is_err() {
+                    break;
+                }
+                n = n.wrapping_add(1);
+            }
+        });
+        *self.hb_task.lock().await = Some(hb);
+        *self.helper.lock().await = Some(helper);
         Ok(())
     }
 
     async fn uninstall(&self) -> Result<(), String> {
-        if let Some((handle, cancel)) = self.transparent_task.lock().await.take() {
+        if let Some(h) = self.hb_task.lock().await.take() {
+            h.abort();
+        }
+        if let Some((handle, cancel)) = self.accept_task.lock().await.take() {
             cancel.notify_waiters();
             handle.abort();
         }
-        if let Some(engine) = self.divert.lock().await.take() {
-            engine.stop();
+        if let Some(client) = self.helper.lock().await.take() {
+            let _ = client.revoke_capture();
+            client.shutdown();
         }
-        let _ = self.socks.uninstall().await;
         Ok(())
     }
 }
 
-/// Accept loop: SOCKS5 clients (VER=5) vs transparent NAT'd TCP (conntrack).
 async fn serve_mixed(
     listener: TcpListener,
     router: Arc<FlowRouter>,
-    conntrack: super::windivert::ConnTrack,
+    helper: Arc<HelperClient>,
     cancel: Arc<Notify>,
-    _local_port: u16,
 ) {
     loop {
         tokio::select! {
@@ -251,9 +227,9 @@ async fn serve_mixed(
                 match accepted {
                     Ok((stream, peer)) => {
                         let router = router.clone();
-                        let conntrack = conntrack.clone();
+                        let helper = helper.clone();
                         tokio::spawn(async move {
-                            if let Err(e) = handle_mixed(stream, peer, router, conntrack).await {
+                            if let Err(e) = handle_mixed(stream, peer, router, helper).await {
                                 tracing::debug!("sockscap windows conn: {e}");
                             }
                         });
@@ -272,28 +248,27 @@ async fn handle_mixed(
     mut stream: TcpStream,
     peer: SocketAddr,
     router: Arc<FlowRouter>,
-    conntrack: super::windivert::ConnTrack,
+    helper: Arc<HelperClient>,
 ) -> Result<(), String> {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-    // Peek first byte to distinguish SOCKS5 (0x05) from transparent TCP.
     let mut first = [0u8; 1];
     stream.read_exact(&mut first).await.map_err(|e| e.to_string())?;
     if first[0] == 0x05 {
-        // Rebuild SOCKS by prepending the byte — hand-roll a minimal path:
-        // we already consumed 0x05; continue SOCKS handshake.
         return handle_socks_after_ver(&mut stream, router).await;
     }
 
-    // Transparent: recover original destination from conntrack by peer port.
     let sport = peer.port();
-    let info = conntrack
-        .lock()
-        .unwrap()
-        .get(&sport)
-        .cloned()
+    // Blocking lookup on helper pipe — offload to spawn_blocking.
+    let info = tokio::task::spawn_blocking(move || helper.lookup_conntrack(sport))
+        .await
+        .map_err(|e| e.to_string())??
         .ok_or_else(|| format!("no conntrack for sport {sport}"))?;
 
+    let dst: IpAddr = info
+        .dst
+        .parse()
+        .map_err(|e| format!("bad dst {}: {e}", info.dst))?;
     let app = AppIdentity {
         windows_exe: info.exe.clone(),
         pid: info.pid,
@@ -304,23 +279,13 @@ async fn handle_mixed(
         router.stats.record_app(exe.clone());
     }
 
-    let decision = router.decide_for_app(
-        &app,
-        None,
-        Some(IpAddr::V4(info.dst)),
-        info.dport,
-    );
+    let decision = router.decide_for_app(&app, None, Some(dst), info.dport);
     router.stats.record_decision(decision.action);
-    // Re-inject first byte into a buffered path — we already read 1 byte of
-    // payload; for SYN-only accepts the app sends data after connect. Put the
-    // byte back by writing to a chain: use a custom prefix stream.
-    let endpoint = Endpoint::from_ip(IpAddr::V4(info.dst), info.dport);
     let connector = match router.connector_for(decision.action) {
         Some(c) => c,
-        None => return Ok(()), // BLOCK
+        None => return Ok(()),
     };
-
-    // Prefix stream with the already-read byte.
+    let endpoint = Endpoint::from_ip(dst, info.dport);
     let mut prefixed = PrefixedStream {
         prefix: Some(first[0]),
         inner: stream,
@@ -329,7 +294,6 @@ async fn handle_mixed(
     Ok(())
 }
 
-/// SOCKS5 after the version byte 0x05 was consumed.
 async fn handle_socks_after_ver(
     stream: &mut TcpStream,
     router: Arc<FlowRouter>,
@@ -345,7 +309,9 @@ async fn handle_socks_after_ver(
     let mut req = [0u8; 4];
     stream.read_exact(&mut req).await.map_err(|e| e.to_string())?;
     if req[1] != 0x01 {
-        let _ = stream.write_all(&[0x05, 0x07, 0x00, 0x01, 0, 0, 0, 0, 0, 0]).await;
+        let _ = stream
+            .write_all(&[0x05, 0x07, 0x00, 0x01, 0, 0, 0, 0, 0, 0])
+            .await;
         return Err("unsupported SOCKS command".into());
     }
     let (host, ip) = match req[3] {
@@ -377,7 +343,9 @@ async fn handle_socks_after_ver(
     let connector = match router.connector_for(decision.action) {
         Some(c) => c,
         None => {
-            let _ = stream.write_all(&[0x05, 0x02, 0x00, 0x01, 0, 0, 0, 0, 0, 0]).await;
+            let _ = stream
+                .write_all(&[0x05, 0x02, 0x00, 0x01, 0, 0, 0, 0, 0, 0])
+                .await;
             return Ok(());
         }
     };
@@ -386,12 +354,13 @@ async fn handle_socks_after_ver(
         (None, Some(ip)) => Endpoint::from_ip(ip, port),
         _ => return Err("no target".into()),
     };
-    let _ = stream.write_all(&[0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0]).await;
+    let _ = stream
+        .write_all(&[0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0])
+        .await;
     dispatch(connector, &endpoint, stream, &router.stats).await?;
     Ok(())
 }
 
-/// TcpStream wrapper that yields one prefix byte then the inner stream.
 struct PrefixedStream {
     prefix: Option<u8>,
     inner: TcpStream,

@@ -128,3 +128,7 @@ output
 src-tauri/resources/windivert/*.exe
 src-tauri/resources/windivert/*.lib
 src-tauri/resources/windivert/include/
+
+# Staged Tauri externalBin helpers (rebuilt by scripts/stage-sockscap-helper.ps1)
+src-tauri/binaries/sockscap-helper-*.exe
+
