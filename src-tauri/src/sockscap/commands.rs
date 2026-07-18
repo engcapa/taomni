@@ -238,6 +238,14 @@ pub fn sockscap_recovery_journal(
     read_recovery_journal(&db).map_err(|e| format!("read recovery journal: {e}"))
 }
 
+
+/// Tray icon / menu presentation for the current engine state (Phase 8).
+#[tauri::command]
+pub fn sockscap_tray_presentation(state: State<'_, AppState>) -> super::tray::TrayPresentation {
+    let status = state.sockscap.status();
+    super::tray::tray_presentation(status.state, &status.message)
+}
+
 /// Expose engine type construction for AppState wiring / tests.
 pub fn new_engine() -> SockscapEngine {
     SockscapEngine::new()

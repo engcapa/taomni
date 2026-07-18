@@ -11,12 +11,14 @@
 //! `claudedocs/sockscap-phase0-adr.md`.
 
 pub mod capabilities;
+pub mod capture;
 pub mod commands;
 pub mod db;
 pub mod flow;
 pub mod orchestrator;
 pub mod policy;
 pub mod preflight;
+pub mod tray;
 pub mod types;
 
 pub use commands::*;

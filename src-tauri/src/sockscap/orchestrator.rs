@@ -1,7 +1,8 @@
-//! Sockscap engine orchestrator — state machine only in Phase 0.
+//! Sockscap engine orchestrator — state machine + capture adapter hooks.
 //!
-//! Design plan §4.1 / §9. Real capture install/teardown and recovery journal
-//! land in later phases. This type is process-global and held on `AppState`.
+//! Design plan §4.1 / §9. Start runs preflight then asks the platform
+//! CaptureAdapter to install rules. Until Phase 0 gates close, adapters refuse
+//! install without mutating the system.
 
 use std::sync::Mutex;
 
@@ -100,11 +101,34 @@ impl SockscapEngine {
             return Err(format!("sockscap preflight failed: {msg}"));
         }
 
-        // Unreachable in Phase 0 (preflight always fails), but kept as the
-        // intended success path for later phases.
+        // Capture adapter install (Phases 5–7). Adapters currently refuse with
+        // mutated_system=false until platform spikes close the Phase 0 gate.
+        drop(guard);
+        let plan = super::capture::CapturePlan {
+            profiles: profiles.to_vec(),
+            bypass_hosts: vec![
+                "127.0.0.1".into(),
+                "::1".into(),
+                "localhost".into(),
+            ],
+        };
+        let adapter = super::capture::current_adapter();
+        let install = tauri::async_runtime::block_on(adapter.install(&plan));
+        let mut guard = self
+            .inner
+            .lock()
+            .map_err(|_| "sockscap engine lock poisoned".to_string())?;
+        if !install.ok {
+            guard.status.state = EngineState::Disabled;
+            guard.status.message = "Capture adapter refused install".into();
+            guard.status.last_error = Some(install.message.clone());
+            guard.status.capture_active = false;
+            guard.status.active_profile_ids.clear();
+            return Err(format!("sockscap capture install failed: {}", install.message));
+        }
         guard.status.state = EngineState::Active;
         guard.status.message = "Sockscap is active".into();
-        guard.status.capture_active = true;
+        guard.status.capture_active = install.mutated_system;
         guard.status.active_profile_ids = profiles
             .iter()
             .filter(|p| p.enabled)
@@ -133,8 +157,22 @@ impl SockscapEngine {
 
         guard.status.state = EngineState::Stopping;
         guard.status.message = "Stopping Sockscap".into();
+        drop(guard);
 
-        // Phase 0: no capture rules to tear down.
+        let adapter = super::capture::current_adapter();
+        let uninstall = tauri::async_runtime::block_on(adapter.uninstall());
+        let mut guard = self
+            .inner
+            .lock()
+            .map_err(|_| "sockscap engine lock poisoned".to_string())?;
+        if !uninstall.ok {
+            guard.status.state = EngineState::RecoveryRequired;
+            guard.status.recovery_required = true;
+            guard.status.message = "Stop failed; recovery required".into();
+            guard.status.last_error = Some(uninstall.message);
+            return Ok(guard.status.clone());
+        }
+
         guard.status.state = EngineState::Disabled;
         guard.status.message = "Sockscap engine is disabled".into();
         guard.status.capture_active = false;
@@ -151,9 +189,22 @@ impl SockscapEngine {
             .lock()
             .map_err(|_| "sockscap engine lock poisoned".to_string())?;
 
-        // Later phases: read recovery journal, revoke leftover rules via helper.
+        drop(guard);
+        let adapter = super::capture::current_adapter();
+        let uninstall = tauri::async_runtime::block_on(adapter.uninstall());
+        let mut guard = self
+            .inner
+            .lock()
+            .map_err(|_| "sockscap engine lock poisoned".to_string())?;
+        if !uninstall.ok {
+            guard.status.state = EngineState::RecoveryRequired;
+            guard.status.recovery_required = true;
+            guard.status.message = "Recovery failed".into();
+            guard.status.last_error = Some(uninstall.message);
+            return Ok(guard.status.clone());
+        }
         guard.status.state = EngineState::Disabled;
-        guard.status.message = "Recovery complete (no capture rules present in Phase 0)".into();
+        guard.status.message = format!("Recovery complete: {}", uninstall.message);
         guard.status.recovery_required = false;
         guard.status.capture_active = false;
         guard.status.active_profile_ids.clear();

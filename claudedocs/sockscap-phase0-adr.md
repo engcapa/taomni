@@ -110,9 +110,28 @@ Commands registered in `lib.rs`:
 `sockscap_capabilities`, `sockscap_status`, `sockscap_preflight`,
 `sockscap_start`, `sockscap_stop`, `sockscap_recover`, `sockscap_open_window`.
 
+## Implementation progress (feat/sockscap-implementation)
+
+As of 2026-07-18 on branch `feat/sockscap-implementation`:
+
+| Phase | Status | Notes |
+|---|---|---|
+| 0 scaffold | Done | types, probes, preflight, orchestrator, ADR |
+| 1 policy | Done | rules, matcher, GFWList last-good, test_target |
+| 2 flow | Done | attribution, bypass, DIRECT/SOCKS5/HTTP CONNECT, SSH host-key gate |
+| 3 persistence | Done | sockscap.db, profile CRUD, recovery journal, browser stubs |
+| 4 UI | Done | independent window, settings entry, en/zh-CN |
+| 5–7 adapters | Scaffold | CaptureAdapter trait + Win/macOS/Linux refuse-install implementations |
+| 8 tray | Scaffold | color/menu presentation + IPC; not yet bound to app tray |
+
+**Still open for true Active routing:** Windows dual spike ADR, macOS entitlement, Linux nft/cgroup install path, SSH known_hosts, helper heartbeat.
+
 ## Follow-ups
 
 - Phase 1: immutable policy matcher + GFWList projection + profile schema
 - Phase 2: FlowEngine + egress connectors + SshChannelPool extraction
 - Phase 3: sockscap.db + recovery journal + browser stubs
 - Phase 0 spikes: Windows dual path, Linux cgroup vertical slice, tun2proxy evaluation
+- Bind `sockscap_tray_presentation` to the main Tauri tray
+- Implement Linux CaptureAdapter install/uninstall with recovery journal
+- Fix `terminal/ssh.rs` host-key verification before enabling SshJumpConnector

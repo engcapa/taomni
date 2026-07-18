@@ -821,6 +821,7 @@ pub fn run() {
             sockscap::sockscap_upsert_profile,
             sockscap::sockscap_delete_profile,
             sockscap::sockscap_recovery_journal,
+            sockscap::sockscap_tray_presentation,
             exit_app,
         ])
         .run(tauri::generate_context!())
