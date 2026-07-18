@@ -97,7 +97,7 @@ pub fn normalize_host(host: &str) -> String {
     host.trim().trim_end_matches('.').to_ascii_lowercase()
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct TrieNode {
     children: HashMap<String, TrieNode>,
     /// Original pattern text if a suffix rule terminates here (matches this
@@ -108,7 +108,7 @@ struct TrieNode {
 }
 
 /// A reverse-label domain trie. Lookups are O(number of labels).
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct DomainTrie {
     root: TrieNode,
     len: usize,
@@ -179,7 +179,7 @@ impl DomainTrie {
 
 /// Most-specific-first IP prefix matcher. Prefixes are kept sorted by
 /// descending prefix length so the first containing entry is the most specific.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct IpMatcher {
     v4: Vec<(IpCidr, String)>,
     v6: Vec<(IpCidr, String)>,
@@ -238,6 +238,7 @@ impl IpMatcher {
 /// entries are kept separate and consulted first, since within one source an
 /// exception outranks a proxy entry (plan §6.3 step 3 before step 4,
 /// §16.3-11).
+#[derive(Clone)]
 pub struct CompiledRuleSource {
     pub source_id: String,
     exception_domains: DomainTrie,

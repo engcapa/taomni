@@ -16,10 +16,16 @@
 
 pub mod attribution;
 pub mod autoproxy;
+pub mod capability;
+pub mod capture;
+pub mod commands;
 pub mod conflict;
+pub mod db;
 pub mod download;
 pub mod egress;
+pub mod engine;
 pub mod flow;
+pub mod runtime;
 pub mod known_hosts;
 pub mod matcher;
 pub mod model;

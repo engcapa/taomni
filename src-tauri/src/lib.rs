@@ -129,6 +129,22 @@ pub fn run() {
                 .expect("failed to init local history store");
             app.manage(local_history);
 
+            // Sockscap traffic-routing module. Its own SQLite (sockscap.db, WAL)
+            // keeps high-frequency stats writes off the main session DB lock; the
+            // SSH known_hosts store and compiled rule cache live alongside it. No
+            // secrets are stored here — egress sessions/credentials stay in
+            // taomni.db + Vault (see src/sockscap, sockscap-cross-platform-design).
+            match sockscap::runtime::SockscapState::new(
+                app_data.join("sockscap.db"),
+                app_data.join("sockscap").join("known_hosts"),
+                app_data.join("sockscap").join("rules"),
+            ) {
+                Ok(sockscap_state) => {
+                    app.manage(sockscap_state);
+                }
+                Err(e) => log::warn!("sockscap: init failed, module disabled: {e}"),
+            }
+
             let handle_for_reaper = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 loop {
@@ -787,6 +803,27 @@ pub fn run() {
             notes::commands::notes_set_prefs,
             notes::commands::notes_list_alerts,
             notes::commands::notes_ack_alert,
+            sockscap::commands::sockscap_capabilities,
+            sockscap::commands::sockscap_status,
+            sockscap::commands::sockscap_list_profiles,
+            sockscap::commands::sockscap_upsert_profile,
+            sockscap::commands::sockscap_delete_profile,
+            sockscap::commands::sockscap_get_custom_rules,
+            sockscap::commands::sockscap_set_custom_rules,
+            sockscap::commands::sockscap_list_rule_sources,
+            sockscap::commands::sockscap_upsert_rule_source,
+            sockscap::commands::sockscap_delete_rule_source,
+            sockscap::commands::sockscap_refresh_rule_source,
+            sockscap::commands::sockscap_import_rule_source,
+            sockscap::commands::sockscap_test_target,
+            sockscap::commands::sockscap_start,
+            sockscap::commands::sockscap_stop,
+            sockscap::commands::sockscap_recover,
+            sockscap::commands::sockscap_stats_snapshot,
+            sockscap::commands::sockscap_live_stats,
+            sockscap::commands::sockscap_clear_stats,
+            sockscap::commands::sockscap_list_processes,
+            sockscap::commands::sockscap_list_egress_sessions,
             exit_app,
         ])
         .run(tauri::generate_context!())
