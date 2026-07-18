@@ -33,6 +33,7 @@ import { AppThemeSwitcher } from "./AppThemeSwitcher";
 import { LanguageSection } from "./LanguageSection";
 import { VaultSettings } from "../vault/VaultSettings";
 import { AppProxyPanel } from "./AppProxyPanel";
+import { SockscapSettingsPanel } from "./SockscapSettingsPanel";
 import { LanChatSettings } from "./LanChatSettings";
 import { useAppStore } from "../../stores/appStore";
 import { useSystemFonts } from "../../lib/systemFonts";
@@ -788,6 +789,12 @@ export function SettingsPanel() {
             <SettingsAnchor id="app-proxy">
               <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
                 <AppProxyPanel />
+              </section>
+            </SettingsAnchor>
+
+            <SettingsAnchor id="sockscap">
+              <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
+                <SockscapSettingsPanel />
               </section>
             </SettingsAnchor>
 

@@ -2817,7 +2817,12 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       } as T;
     }
     case "sockscap_open_window": {
-      throw new Error("sockscap_open_window is not implemented yet (Phase 4)");
+      // Browser preview: navigate the current tab to the Sockscap route.
+      if (typeof window !== "undefined") {
+        window.location.hash = "sockscap=main";
+        window.location.reload();
+      }
+      return undefined as T;
     }
     case "sockscap_list_profiles": {
       return loadSockscapProfiles() as T;

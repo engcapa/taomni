@@ -111,13 +111,20 @@ pub fn sockscap_recover(state: State<'_, AppState>) -> Result<EngineStatus, Stri
     Ok(status)
 }
 
-/// Placeholder for the independent Sockscap window (Phase 4).
+/// Open or focus the independent Sockscap window (`#sockscap=main`).
 #[tauri::command]
-pub fn sockscap_open_window() -> Result<(), String> {
-    Err(
-        "sockscap_open_window is not implemented yet (Phase 4: independent Sockscap window)"
-            .into(),
+pub async fn sockscap_open_window(app_handle: tauri::AppHandle) -> Result<(), String> {
+    crate::windowing::open_detached_window(
+        app_handle,
+        "sockscap".into(),
+        "main".into(),
+        Some("Sockscap".into()),
+        None,
+        None,
+        Some(1100.0),
+        Some(760.0),
     )
+    .await
 }
 
 /// Explain how a synthetic target would be routed (design plan §12 test_target).

@@ -112,6 +112,10 @@ export interface TestTargetResult {
   notes: string[];
 }
 
+export async function sockscapOpenWindow(): Promise<void> {
+  return invoke("sockscap_open_window");
+}
+
 export async function sockscapCapabilities(): Promise<CapabilitiesReport> {
   return invoke<CapabilitiesReport>("sockscap_capabilities");
 }

@@ -25,7 +25,7 @@
  * sitting in localStorage indefinitely.
  */
 
-export type DetachedKind = "sftp" | "rdp" | "vnc" | "terminal" | "database" | "lan-chat" | "notes";
+export type DetachedKind = "sftp" | "rdp" | "vnc" | "terminal" | "database" | "lan-chat" | "notes" | "sockscap";
 
 const STORAGE_PREFIX = "taomni.detached.";
 const REATTACH_PREFIX = "taomni.reattach.";
@@ -188,7 +188,7 @@ export function detectDetachedRoute():
       }
     }
     const url = new URL(window.location.href);
-    for (const kind of ["sftp", "rdp", "vnc", "terminal", "database", "lan-chat", "notes"] as const) {
+    for (const kind of ["sftp", "rdp", "vnc", "terminal", "database", "lan-chat", "notes", "sockscap"] as const) {
       const value = url.searchParams.get(kind);
       if (value) return { kind, id: value };
     }
@@ -206,7 +206,8 @@ function isDetachedKind(value: string): value is DetachedKind {
     value === "terminal" ||
     value === "database" ||
     value === "lan-chat" ||
-    value === "notes"
+    value === "notes" ||
+    value === "sockscap"
   );
 }
 
