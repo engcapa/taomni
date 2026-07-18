@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Taomni Sockscap — Profile Editor HTML Prototype</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="prototype.css">
+  </head>
+  <body data-engine-state="active">
+    <header class="topbar">
+      <a class="brand" href="index.html">
+        <span class="brand-mark">T</span>
+        <span class="brand-copy"><strong>Taomni</strong><span>Sockscap 设计原型</span></span>
+      </a>
+      <nav class="topnav" aria-label="原型页面">
+        <a data-nav href="index.html">Dashboard</a>
+        <a data-nav href="architecture.html">目标架构</a>
+        <a data-nav href="profile-editor.html">配置组编辑器</a>
+        <a data-nav href="rules-lifecycle.html">规则与生命周期</a>
+      </nav>
+      <div class="top-actions">
+        <button class="button ghost-dark" data-show-toast="配置已暂存；重启配置组后仅影响新连接">暂存更改</button>
+        <button class="button primary" data-show-toast="配置校验通过，已提交 immutable snapshot">保存并应用</button>
+      </div>
+    </header>
+
+    <main class="page">
+      <section class="page-heading">
+        <div>
+          <h1>路由配置组编辑器</h1>
+          <p>配置范围、出站、域名规则和显式降级策略。多个配置组共享一个系统捕获面。</p>
+        </div>
+        <span class="prototype-badge">Interactive Form Prototype</span>
+      </section>
+
+      <div class="split-layout">
+        <aside class="card profile-sidebar">
+          <header class="card-header"><h2>路由配置组</h2><button class="button small primary" data-show-toast="已创建空白配置组草稿">＋ 新建</button></header>
+          <div class="profile-list">
+            <button class="profile-item active" data-profile-item data-profile-title="Browsers — GFWList">
+              <strong>1 · Browsers — GFWList</strong><span>ACTIVE · SSH HK-Bastion · 4 apps</span>
+            </button>
+            <button class="profile-item" data-profile-item data-profile-title="Developer Tools">
+              <strong>2 · Developer Tools</strong><span>ACTIVE · US HTTP · 6 apps</span>
+            </button>
+            <button class="profile-item" data-profile-item data-profile-title="Global fallback">
+              <strong>3 · Global fallback</strong><span>OFF · Direct by default</span>
+            </button>
+          </div>
+          <div class="card-body" style="padding-top: 2px">
+            <aside class="callout" style="margin: 0">
+              <span>!</span><div><strong>优先级冲突</strong>同一个应用不能被两个相同 priority 的活动配置组选中。</div>
+            </aside>
+          </div>
+        </aside>
+
+        <section class="editor">
+          <div class="editor-toolbar">
+            <div><h1 data-profile-title>Browsers — GFWList</h1><span class="muted">Priority 1 · 新连接生效</span></div>
+            <div class="segment" data-segment aria-label="配置启用状态">
+              <button class="active">Enabled</button><button>Disabled</button>
+            </div>
+          </div>
+
+          <section class="two-column">
+            <article class="card">
+              <header class="card-header"><h2>1. 捕获范围</h2><span class="tag blue">Windows capability ready</span></header>
+              <div class="card-body">
+                <div class="segment" data-segment>
+                  <button>全局</button><button class="active">程序组</button><button>运行中进程</button>
+                </div>
+                <div class="selector-list">
+                  <div class="selector-row"><span class="app-icon">CH</span><strong>Chrome.exe</strong><span class="muted tiny">C:\Program Files\Google\Chrome\Application\chrome.exe</span><span class="tag">包含子进程</span></div>
+                  <div class="selector-row"><span class="app-icon">FF</span><strong>Firefox.exe</strong><span class="muted tiny">C:\Program Files\Mozilla Firefox\firefox.exe</span><span class="tag">包含子进程</span></div>
+                  <div class="selector-row"><span class="app-icon">SL</span><strong>Slack.exe</strong><span class="muted tiny">C:\Users\demo\AppData\Local\slack\slack.exe</span><span class="tag">包含子进程</span></div>
+                </div>
+                <div style="display: flex; gap: 9px; flex-wrap: wrap">
+                  <button class="button small" data-show-toast="原型演示：打开可执行文件选择器">＋ 添加程序</button>
+                  <button class="button small" data-show-toast="原型演示：打开运行中进程选择器；保存 PID + process_start_time">选择运行中进程</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="card">
+              <header class="card-header"><h2>2. 出站连接器</h2><span class="health-pill">预检通过</span></header>
+              <div class="card-body">
+                <div class="field">
+                  <label for="egress-kind">出站类型</label>
+                  <select id="egress-kind" data-egress-kind>
+                    <option value="ssh" selected>SSH Jump Session</option>
+                    <option value="proxy">Proxy Session（SOCKS5 / HTTP CONNECT）</option>
+                  </select>
+                </div>
+
+                <div class="egress-panel" data-egress-panel="ssh">
+                  <div class="form-grid" style="margin-top: 12px">
+                    <div class="field full">
+                      <label for="ssh-session">已保存 SSH Session</label>
+                      <select id="ssh-session">
+                        <option>HK-Bastion · ops@bastion.example:22 · Agent</option>
+                        <option>Tokyo-Jump · deploy@jump-tokyo.example:2222 · Private key</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="egress-summary">
+                    <div class="summary-cell"><span>认证</span><strong>SSH Agent</strong></div>
+                    <div class="summary-cell"><span>Host key</span><strong>SHA256:m3…9Q ✓</strong></div>
+                    <div class="summary-cell"><span>DNS</span><strong>SSH Remote</strong></div>
+                    <div class="summary-cell"><span>UDP / QUIC</span><strong>BLOCK</strong></div>
+                  </div>
+                  <div class="form-grid">
+                    <div class="field"><label for="ssh-channels">每控制连接最大 Channel</label><input id="ssh-channels" value="128"></div>
+                    <div class="field"><label for="ssh-keepalive">Keepalive</label><select id="ssh-keepalive"><option>15 秒</option><option>30 秒</option></select></div>
+                  </div>
+                  <aside class="callout" style="margin: 13px 0">
+                    <span>!</span><div><strong>单跳且 TCP-only</strong>该 SSH Session 自身不能再配置 Proxy/Jump 链。UDP 默认 BLOCK，避免被误认为已通过 SSH 代理。</div>
+                  </aside>
+                  <div class="arch-node egress" data-egress-test-result>
+                    <strong>Ready · SSH 42 ms</strong><span>Host key 已匹配 · 0 reconnect · 27 active channels · Remote DNS</span>
+                  </div>
+                  <div style="display: flex; gap: 9px; margin-top: 12px; flex-wrap: wrap">
+                    <button class="button primary" data-test-egress>测试 SSH 跳板</button>
+                    <button class="button" data-show-toast="原型演示：跳转到 SSH Session 编辑器">编辑 SSH Session</button>
+                  </div>
+                </div>
+
+                <div class="egress-panel" data-egress-panel="proxy" hidden>
+                  <div class="form-grid" style="margin-top: 12px">
+                    <div class="field full"><label for="proxy-session">已保存 Proxy Session</label><select id="proxy-session"><option>Tokyo SOCKS5 · 10.0.0.8:1080</option><option>US CONNECT · proxy.example:3128</option></select></div>
+                  </div>
+                  <div class="egress-summary">
+                    <div class="summary-cell"><span>协议</span><strong>SOCKS5</strong></div>
+                    <div class="summary-cell"><span>认证</span><strong>Vault</strong></div>
+                    <div class="summary-cell"><span>DNS</span><strong>Remote</strong></div>
+                    <div class="summary-cell"><span>UDP</span><strong>ASSOCIATE ✓</strong></div>
+                  </div>
+                  <button class="button primary" data-show-toast="Proxy Session 测试通过 · 58 ms">测试 Proxy</button>
+                </div>
+              </div>
+            </article>
+          </section>
+
+          <section class="two-column">
+            <article class="card">
+              <header class="card-header"><h2>3. 域名路由</h2><span class="tag">Official GFWList</span></header>
+              <div class="card-body">
+                <div class="segment" data-segment>
+                  <button>全部代理</button><button class="active">GFWList</button><button>自定义规则</button>
+                </div>
+                <div class="action-row" style="margin-top: 13px">
+                  <strong><span>Official GFWList</span><span class="health-pill">Last-good</span></strong>
+                  <div class="muted tiny">GitLab · 7,614 行 · 3,623 domain anchors · 123 exceptions · 17 unsupported</div>
+                </div>
+                <div class="form-grid" style="margin-top: 13px">
+                  <div class="field"><label for="unknown-action">未知域名</label><select id="unknown-action"><option>DIRECT（默认）</option><option>PROXY（严格）</option><option>BLOCK</option></select></div>
+                  <div class="field"><label for="local-network">本地网络</label><select id="local-network"><option>DIRECT</option><option>按规则</option></select></div>
+                </div>
+                <a class="button" style="display: inline-block; margin-top: 12px; text-decoration: none" href="rules-lifecycle.html">测试目标与查看解析报告</a>
+              </div>
+            </article>
+
+            <article class="card">
+              <header class="card-header"><h2>4. 故障、DNS 与隐私</h2><span class="tag purple">显式策略</span></header>
+              <div class="card-body">
+                <div class="form-grid">
+                  <div class="field"><label for="failure-action">出站不可用</label><select id="failure-action"><option>Fail-open：DIRECT</option><option>Fail-closed：BLOCK</option></select></div>
+                  <div class="field"><label for="udp-policy">UDP / QUIC</label><select id="udp-policy"><option>BLOCK（SSH 推荐）</option><option>DIRECT</option></select></div>
+                  <div class="field"><label for="dns-mode">域名来源</label><select id="dns-mode"><option>Virtual DNS + SSH remote</option><option>System DNS capture</option></select></div>
+                  <div class="field"><label for="domain-stats">域名统计</label><select id="domain-stats"><option>关闭（默认）</option><option>开启 · 保留 7 天</option></select></div>
+                </div>
+                <aside class="callout info" style="margin: 14px 0 0">
+                  <span>ℹ</span><div><strong>只影响新连接</strong>保存后不会迁移现有 TCP/SSH channels；配置快照原子替换。</div>
+                </aside>
+              </div>
+            </article>
+          </section>
+        </section>
+      </div>
+    </main>
+
+    <div class="toast" role="status" aria-live="polite" data-toast></div>
+    <script src="prototype.js"></script>
+  </body>
+</html>
