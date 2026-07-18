@@ -1,3 +1,4 @@
+use crate::sdk::{JavaRuntimeConfiguration, SdkManager, WorkspaceSdkEnvironment};
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -415,13 +416,18 @@ struct LspSessionKey {
     preset_id: String,
     root_path: String,
     command_id: String,
+    sdk_fingerprint: String,
 }
 
 impl LspSessionKey {
     fn map_key(&self) -> String {
         format!(
-            "{}\n{}\n{}\n{}",
-            self.workspace_id, self.preset_id, self.root_path, self.command_id
+            "{}\n{}\n{}\n{}\n{}",
+            self.workspace_id,
+            self.preset_id,
+            self.root_path,
+            self.command_id,
+            self.sdk_fingerprint
         )
     }
 }
@@ -464,6 +470,7 @@ pub struct LspManager {
     /// `document_status` so the UI does not stick on a silent "starting…"
     /// after the process dies with `available=true, active=false`.
     last_errors: LspLastErrorRegistry,
+    sdk: Arc<SdkManager>,
 }
 
 enum LspSessionEntry {
@@ -511,7 +518,6 @@ struct ResolvedDocument {
     path: PathBuf,
     uri: String,
     root_path: PathBuf,
-    root_uri: String,
     workspace_id: String,
     preset: Option<LspServerPreset>,
     language_id: Option<String>,
@@ -520,9 +526,34 @@ struct ResolvedDocument {
 
 impl LspManager {
     pub fn new() -> Self {
+        Self::with_sdk(Arc::new(SdkManager::load(
+            crate::sdk::default_sdk_registry_path(),
+        )))
+    }
+
+    pub fn with_sdk(sdk: Arc<SdkManager>) -> Self {
         Self {
             sessions: Arc::new(Mutex::new(HashMap::new())),
             last_errors: Arc::new(Mutex::new(HashMap::new())),
+            sdk,
+        }
+    }
+
+    async fn sdk_environment(&self, document: &ResolvedDocument) -> WorkspaceSdkEnvironment {
+        let scope_path = document.path.parent().unwrap_or(&document.root_path);
+        match self
+            .sdk
+            .resolve_environment(&document.root_path, scope_path)
+            .await
+        {
+            Ok(environment) => environment,
+            Err(error) => {
+                log::warn!(
+                    "failed to resolve SDK environment for {}: {error}",
+                    document.root_path.display()
+                );
+                WorkspaceSdkEnvironment::passthrough(&document.root_path, scope_path)
+            }
         }
     }
 
@@ -549,6 +580,8 @@ impl LspManager {
             };
         };
 
+        let sdk_environment = self.sdk_environment(document).await;
+
         let configured_command = configured_command(preset, preferred_command_id, custom_command);
         let command = select_available_command(preset, preferred_command_id, custom_command);
         let selected_command_id = command
@@ -561,9 +594,9 @@ impl LspManager {
             .map(|cmd| command_line(&cmd.command, &cmd.args));
         let map_key = command
             .as_ref()
-            .map(|cmd| session_key(document, preset, cmd).map_key());
+            .map(|cmd| session_key(document, preset, cmd, &sdk_environment).map_key());
         let (active, starting, capabilities) = if let Some(cmd) = command.as_ref() {
-            let key = session_key(document, preset, cmd);
+            let key = session_key(document, preset, cmd, &sdk_environment);
             match self.sessions.lock().await.get(&key.map_key()) {
                 Some(LspSessionEntry::Ready(session)) => {
                     (true, false, session.capabilities.read().await.clone())
@@ -579,7 +612,11 @@ impl LspManager {
         let jdtls_runtime_error = if !active
             && command.as_ref().is_some_and(command_is_jdtls)
         {
-            resolve_java_for_jdtls().err()
+            resolve_java_for_jdtls_with_sdk(
+                sdk_environment.tooling_java_home.as_deref().map(Path::new),
+                sdk_environment.tooling_java_error.as_deref(),
+            )
+            .err()
         } else {
             None
         };
@@ -666,7 +703,8 @@ impl LspManager {
                 .document_status(document, preferred_command_id, custom_command)
                 .await);
         };
-        let key = session_key(document, preset, &command);
+        let sdk_environment = self.sdk_environment(document).await;
+        let key = session_key(document, preset, &command, &sdk_environment);
         let map_key = key.map_key();
         let start = match self.claim_session(&map_key, &document.workspace_id).await {
             LspSessionClaim::Ready(session) => {
@@ -698,7 +736,10 @@ impl LspManager {
         // Fail fast with a Settings-visible message before spawning when the
         // JDK is too old for current Eclipse JDT LS (all platforms).
         if command_is_jdtls(&command)
-            && let Err(error) = resolve_java_for_jdtls()
+            && let Err(error) = resolve_java_for_jdtls_with_sdk(
+                sdk_environment.tooling_java_home.as_deref().map(Path::new),
+                sdk_environment.tooling_java_error.as_deref(),
+            )
         {
             let _ = self
                 .finish_session_start(&map_key, &start, Err(error.clone()))
@@ -709,12 +750,28 @@ impl LspManager {
             ));
         }
 
+        let session_root = PathBuf::from(&sdk_environment.project_scope_path);
+        let session_root_uri = match url::Url::from_directory_path(&session_root) {
+            Ok(uri) => uri.to_string(),
+            Err(_) => {
+                let error = format!(
+                    "Cannot convert SDK project scope to file URI: {}",
+                    session_root.display()
+                );
+                let _ = self
+                    .finish_session_start(&map_key, &start, Err(error.clone()))
+                    .await;
+                self.remember_error(&map_key, error.clone()).await;
+                return Err(session_start_error_status(document, preset, &command, error));
+            }
+        };
         let result = LspSession::spawn(
             key.clone(),
             preset.clone(),
             command.clone(),
-            document.root_path.clone(),
-            document.root_uri.clone(),
+            session_root,
+            session_root_uri,
+            sdk_environment,
             self.sessions.clone(),
             self.last_errors.clone(),
             map_key.clone(),
@@ -814,7 +871,8 @@ impl LspManager {
     ) -> Option<Arc<LspSession>> {
         let preset = document.preset.as_ref()?;
         let command = select_available_command(preset, preferred_command_id, custom_command)?;
-        let key = session_key(document, preset, &command);
+        let sdk_environment = self.sdk_environment(document).await;
+        let key = session_key(document, preset, &command, &sdk_environment);
         match self.sessions.lock().await.get(&key.map_key()) {
             Some(LspSessionEntry::Ready(session)) => Some(session.clone()),
             Some(LspSessionEntry::Starting(_)) | None => None,
@@ -912,25 +970,45 @@ impl LspSession {
         command: LspServerCommandPreset,
         root_path: PathBuf,
         root_uri: String,
+        sdk_environment: WorkspaceSdkEnvironment,
         sessions: LspSessionRegistry,
         last_errors: LspLastErrorRegistry,
         map_key: String,
         start: Arc<LspSessionStart>,
     ) -> Result<Arc<Self>, String> {
-        let mut process = build_lsp_server_command(&command.command, &command.args, &root_path)
-            .map_err(|e| format!("prepare {}: {e}", command.command))?;
-        // Ensure jdtls wrappers (non-Windows) and child tools see the configured JDK.
-        if command_is_jdtls(&command)
-            && let Ok((java, _)) = resolve_java_for_jdtls()
+        let is_jdtls = command_is_jdtls(&command);
+        let tooling_java_home = sdk_environment.tooling_java_home.as_deref().map(Path::new);
+        let mut process = build_lsp_server_command(
+            &command.command,
+            &command.args,
+            &root_path,
+            tooling_java_home,
+            sdk_environment.tooling_java_error.as_deref(),
+        )
+        .map_err(|e| format!("prepare {}: {e}", command.command))?;
+        for (key, value) in &sdk_environment.environment {
+            process.env(key, value);
+        }
+        if let Some(path) = sdk_environment.prepend_path(std::env::var_os("PATH").as_deref()) {
+            process.env("PATH", path);
+        }
+        // Ensure jdtls wrappers (non-Windows) use the tooling JDK. The project
+        // JDK is delivered independently through java.configuration.runtimes.
+        if is_jdtls
+            && let Ok((java, _)) = resolve_java_for_jdtls_with_sdk(
+                tooling_java_home,
+                sdk_environment.tooling_java_error.as_deref(),
+            )
             && let Some(home) = java_home_from_binary(&java)
         {
             process.env("JAVA_HOME", home);
         }
         // Non-Windows launches the `jdtls` wrapper; inject JVM args via JAVA_OPTS
         // so the script's JVM picks up Settings → Language Servers vmargs.
-        if command_is_jdtls(&command) {
+        if is_jdtls {
             apply_jdtls_vmargs_to_command(&mut process);
         }
+        let initialization_options = lsp_initialization_options(is_jdtls, &sdk_environment);
         process
             .current_dir(&root_path)
             .stdin(Stdio::piped())
@@ -987,6 +1065,7 @@ impl LspSession {
         let initialize_params = json!({
             "processId": Value::Null,
             "rootUri": session.root_uri,
+            "initializationOptions": initialization_options,
             "workspaceFolders": [{
                 "uri": session.root_uri,
                 "name": root_path
@@ -1333,6 +1412,8 @@ fn build_lsp_server_command(
     program: &str,
     args: &[String],
     workspace_root: &Path,
+    tooling_java_home: Option<&Path>,
+    tooling_java_error: Option<&str>,
 ) -> Result<Command, String> {
     let program = program.trim();
     #[cfg(windows)]
@@ -1342,7 +1423,13 @@ fn build_lsp_server_command(
             // Always expand jdtls ourselves. Falling back to jdtls.cmd hides
             // actionable errors (wrong JDK, missing config) as plain
             // "stdout closed" and reintroduces the cmd.exe stdio problems.
-            return build_jdtls_java_command(&resolved, args, workspace_root);
+            return build_jdtls_java_command(
+                &resolved,
+                args,
+                workspace_root,
+                tooling_java_home,
+                tooling_java_error,
+            );
         }
         let is_batch = resolved
             .extension()
@@ -1366,7 +1453,7 @@ fn build_lsp_server_command(
     }
     #[cfg(not(windows))]
     {
-        let _ = workspace_root;
+        let _ = (workspace_root, tooling_java_home, tooling_java_error);
         let mut cmd = Command::new(program);
         cmd.args(args);
         Ok(cmd)
@@ -1438,6 +1525,8 @@ fn build_jdtls_java_command(
     jdtls_path: &Path,
     extra_args: &[String],
     workspace_root: &Path,
+    tooling_java_home: Option<&Path>,
+    tooling_java_error: Option<&str>,
 ) -> Result<Command, String> {
     let jdtls_home = resolve_jdtls_home(jdtls_path).ok_or_else(|| {
         format!(
@@ -1458,7 +1547,8 @@ fn build_jdtls_java_command(
             jdtls_home.display()
         ));
     }
-    let (java, java_major) = resolve_java_for_jdtls()?;
+    let (java, java_major) =
+        resolve_java_for_jdtls_with_sdk(tooling_java_home, tooling_java_error)?;
     if java_major < JDTLS_MIN_JAVA_MAJOR {
         return Err(format!(
             "jdtls requires Java {JDTLS_MIN_JAVA_MAJOR}+ (current Eclipse JDT LS); found Java {java_major} at {}. Install JDK {JDTLS_MIN_JAVA_MAJOR}+, configure it in Settings → Language Servers, or set JAVA_HOME",
@@ -1718,9 +1808,20 @@ fn push_java_candidate(candidates: &mut Vec<PathBuf>, path: PathBuf) {
 /// Pick a Java executable for jdtls, preferring the highest major >= 21.
 /// Order: configured Settings path → JAVA_HOME → PATH → common install layouts.
 fn resolve_java_for_jdtls() -> Result<(PathBuf, u32), String> {
+    resolve_java_for_jdtls_with_sdk(None, None)
+}
+
+/// Resolve the JVM that runs JDT LS. The legacy Language Servers override is
+/// retained as the highest-precedence migration path; otherwise an explicit
+/// workspace tooling-JDK binding wins over process JAVA_HOME/PATH discovery.
+fn resolve_java_for_jdtls_with_sdk(
+    tooling_java_home: Option<&Path>,
+    tooling_java_error: Option<&str>,
+) -> Result<(PathBuf, u32), String> {
     let mut candidates: Vec<PathBuf> = Vec::new();
 
-    if let Some(configured) = get_configured_java_home() {
+    let configured_java_home = get_configured_java_home();
+    if let Some(configured) = configured_java_home.as_ref() {
         if let Some(bin) = resolve_java_binary_from_user_path(&configured) {
             push_java_candidate(&mut candidates, bin);
         } else {
@@ -1728,6 +1829,20 @@ fn resolve_java_for_jdtls() -> Result<(PathBuf, u32), String> {
                 "configured Java runtime path is invalid: {} (expected JDK home or java binary, JDK {JDTLS_MIN_JAVA_MAJOR}+)",
                 configured.display()
             ));
+        }
+    } else {
+        if let Some(error) = tooling_java_error {
+            return Err(error.to_string());
+        }
+        if let Some(tooling) = tooling_java_home {
+            if let Some(bin) = resolve_java_binary_from_user_path(tooling) {
+                push_java_candidate(&mut candidates, bin);
+            } else {
+                return Err(format!(
+                    "workspace tooling JDK path is invalid: {} (expected JDK home or java binary, JDK {JDTLS_MIN_JAVA_MAJOR}+)",
+                    tooling.display()
+                ));
+            }
         }
     }
 
@@ -1805,7 +1920,7 @@ fn resolve_java_for_jdtls() -> Result<(PathBuf, u32), String> {
 
     // If the user configured a path, only evaluate that first candidate so a
     // wrong/old override cannot silently fall back to another JDK on PATH.
-    let configured_only = get_configured_java_home().is_some();
+    let configured_only = configured_java_home.is_some() || tooling_java_home.is_some();
     let search: Vec<PathBuf> = if configured_only {
         candidates.into_iter().take(1).collect()
     } else {
@@ -3977,9 +4092,6 @@ fn resolve_document(
     let uri = url::Url::from_file_path(&path)
         .map_err(|_| format!("Cannot convert path to file URI: {}", path.display()))?
         .to_string();
-    let root_uri = url::Url::from_directory_path(&root_path)
-        .map_err(|_| format!("Cannot convert root to file URI: {}", root_path.display()))?
-        .to_string();
     let detected = language_id
         .as_deref()
         .and_then(detect_language_id)
@@ -3991,7 +4103,6 @@ fn resolve_document(
         path,
         uri,
         root_path,
-        root_uri,
         workspace_id,
         preset,
         language_id: detected.map(|detected| detected.language_id),
@@ -4027,13 +4138,34 @@ fn session_key(
     document: &ResolvedDocument,
     preset: &LspServerPreset,
     command: &LspServerCommandPreset,
+    sdk_environment: &WorkspaceSdkEnvironment,
 ) -> LspSessionKey {
     LspSessionKey {
         workspace_id: document.workspace_id.clone(),
         preset_id: preset.id.clone(),
-        root_path: document.root_path.to_string_lossy().into_owned(),
+        root_path: sdk_environment.project_scope_path.clone(),
         command_id: command.id.clone(),
+        sdk_fingerprint: sdk_environment.fingerprint.clone(),
     }
+}
+
+fn lsp_initialization_options(
+    is_jdtls: bool,
+    sdk_environment: &WorkspaceSdkEnvironment,
+) -> Value {
+    if !is_jdtls {
+        return Value::Null;
+    }
+    let runtimes: &[JavaRuntimeConfiguration] = &sdk_environment.java_runtimes;
+    json!({
+        "settings": {
+            "java": {
+                "configuration": {
+                    "runtimes": runtimes
+                }
+            }
+        }
+    })
 }
 
 fn server_status(
@@ -5229,6 +5361,10 @@ Arch: pacman -S jdtls (if available)."
                     .into()
             }
         },
+        "kotlin-lsp" => {
+            "Install JetBrains' official Kotlin LSP release and put `kotlin-lsp` on PATH: https://github.com/Kotlin/kotlin-lsp/releases"
+                .into()
+        }
         "kotlin-language-server" => match os {
             "macos" => {
                 "brew install kotlin-language-server  # or download from \
@@ -5387,14 +5523,24 @@ pub fn lsp_presets() -> Vec<LspServerPreset> {
             document_language_ids: vec!["kotlin".into()],
             file_extensions: vec!["kt".into(), "kts".into()],
             file_names: vec![],
-            commands: vec![cmd(
-                "kotlin-language-server",
-                "kotlin-language-server",
-                "kotlin-language-server",
-                &[],
-                &install_hint_for("kotlin-language-server"),
-                false,
-            )],
+            commands: vec![
+                cmd(
+                    "kotlin-lsp",
+                    "Kotlin LSP (official)",
+                    "kotlin-lsp",
+                    &[],
+                    &install_hint_for("kotlin-lsp"),
+                    false,
+                ),
+                cmd(
+                    "kotlin-language-server",
+                    "kotlin-language-server (community)",
+                    "kotlin-language-server",
+                    &[],
+                    &install_hint_for("kotlin-language-server"),
+                    true,
+                ),
+            ],
         },
         LspServerPreset {
             id: "scala".into(),
@@ -5480,6 +5626,61 @@ mod tests {
         );
         let rust = find_preset("rust").expect("rust preset");
         assert_eq!(initialize_timeout_secs(&rust.commands[0]), INITIALIZE_TIMEOUT_SECS);
+    }
+
+    #[test]
+    fn jdtls_initialization_uses_project_java_runtimes() {
+        let root = PathBuf::from(if cfg!(windows) { r"C:\repo" } else { "/repo" });
+        let mut environment = WorkspaceSdkEnvironment::passthrough(&root, &root);
+        environment.java_runtimes = vec![JavaRuntimeConfiguration {
+            name: "JavaSE-17".to_string(),
+            path: "/sdk/jdk-17".to_string(),
+            default: true,
+        }];
+
+        let options = lsp_initialization_options(true, &environment);
+
+        assert_eq!(
+            options["settings"]["java"]["configuration"]["runtimes"][0],
+            json!({ "name": "JavaSE-17", "path": "/sdk/jdk-17", "default": true })
+        );
+        assert_eq!(lsp_initialization_options(false, &environment), Value::Null);
+    }
+
+    #[test]
+    fn session_key_changes_with_sdk_fingerprint_and_project_scope() {
+        let root = PathBuf::from(if cfg!(windows) { r"C:\repo" } else { "/repo" });
+        let document = ResolvedDocument {
+            path: root.join("module/src/Main.kt"),
+            uri: "file:///repo/module/src/Main.kt".to_string(),
+            root_path: root.clone(),
+            workspace_id: "workspace".to_string(),
+            preset: find_preset("kotlin"),
+            language_id: Some("kotlin".to_string()),
+            version: 1,
+        };
+        let preset = document.preset.as_ref().expect("kotlin preset");
+        let command = &preset.commands[0];
+        let mut first = WorkspaceSdkEnvironment::passthrough(&root, &root);
+        first.project_scope_path = root.join("module").to_string_lossy().into_owned();
+        first.fingerprint = "jdk-17".to_string();
+        let mut second = first.clone();
+        second.fingerprint = "jdk-21".to_string();
+
+        let first_key = session_key(&document, preset, command, &first);
+        let second_key = session_key(&document, preset, command, &second);
+
+        assert_ne!(first_key.map_key(), second_key.map_key());
+        assert_eq!(first_key.root_path, first.project_scope_path);
+    }
+
+    #[test]
+    fn kotlin_prefers_official_lsp_and_keeps_community_fallback() {
+        let kotlin = find_preset("kotlin").expect("kotlin preset");
+        assert_eq!(kotlin.commands[0].id, "kotlin-lsp");
+        assert!(!kotlin.commands[0].fallback);
+        assert_eq!(kotlin.commands[1].id, "kotlin-language-server");
+        assert!(kotlin.commands[1].fallback);
     }
 
     #[test]
@@ -5621,8 +5822,14 @@ Java(TM) SE Runtime Environment (build 17.0.4+11-LTS-179)
         // Windows batch routing is covered by platform integration; here we only
         // assert the builder returns a Command without panicking for a plain binary.
         let root = PathBuf::from("/tmp/workspace");
-        let _cmd = build_lsp_server_command("rust-analyzer", &["--version".into()], &root)
-            .expect("command builder");
+        let _cmd = build_lsp_server_command(
+            "rust-analyzer",
+            &["--version".into()],
+            &root,
+            None,
+            None,
+        )
+        .expect("command builder");
     }
 
     #[test]

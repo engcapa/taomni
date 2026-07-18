@@ -1,16 +1,21 @@
 mod detect;
 mod probe;
 mod resolve;
+mod runtime;
+
+pub use runtime::{JavaRuntimeConfiguration, WorkspaceSdkEnvironment};
 
 use crate::state::AppState;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant};
 use tauri::State;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
 const SDK_REGISTRY_SCHEMA_VERSION: u32 = 1;
 
@@ -169,7 +174,17 @@ pub struct SaveWorkspaceSdkBindingRequest {
 pub struct SdkManager {
     path: PathBuf,
     registry: RwLock<SdkRegistry>,
+    revision: AtomicU64,
+    resolution_cache: Mutex<HashMap<String, CachedWorkspaceResolution>>,
 }
+
+struct CachedWorkspaceResolution {
+    revision: u64,
+    resolved_at: Instant,
+    resolution: resolve::WorkspaceSdkResolution,
+}
+
+const WORKSPACE_RESOLUTION_CACHE_TTL: Duration = Duration::from_secs(5);
 
 impl SdkManager {
     pub fn load(path: PathBuf) -> Self {
@@ -180,11 +195,63 @@ impl SdkManager {
         Self {
             path,
             registry: RwLock::new(registry),
+            revision: AtomicU64::new(1),
+            resolution_cache: Mutex::new(HashMap::new()),
         }
     }
 
     pub async fn snapshot(&self) -> SdkRegistry {
         self.registry.read().await.clone()
+    }
+
+    pub async fn resolve_workspace(
+        &self,
+        workspace_root: &str,
+    ) -> Result<resolve::WorkspaceSdkResolution, String> {
+        let root = normalize_scope_path(workspace_root)?;
+        let revision = self.revision.load(Ordering::SeqCst);
+        if let Some(cached) = self.resolution_cache.lock().await.get(&root)
+            && cached.revision == revision
+            && cached.resolved_at.elapsed() <= WORKSPACE_RESOLUTION_CACHE_TTL
+        {
+            return Ok(cached.resolution.clone());
+        }
+
+        let analysis_root = root.clone();
+        let analysis = tokio::task::spawn_blocking(move || detect::analyze_workspace(&analysis_root))
+            .await
+            .map_err(|error| format!("SDK workspace analysis task failed: {error}"))??;
+        let registry = self.snapshot().await;
+        let resolution = resolve::resolve_workspace(analysis, &registry).await;
+        self.resolution_cache.lock().await.insert(
+            root,
+            CachedWorkspaceResolution {
+                revision,
+                resolved_at: Instant::now(),
+                resolution: resolution.clone(),
+            },
+        );
+        Ok(resolution)
+    }
+
+    pub async fn resolve_environment(
+        &self,
+        workspace_root: &Path,
+        scope_path: &Path,
+    ) -> Result<WorkspaceSdkEnvironment, String> {
+        let resolution = self
+            .resolve_workspace(&workspace_root.to_string_lossy())
+            .await?;
+        let registry = self.snapshot().await;
+        Ok(runtime::build_workspace_environment(
+            &resolution,
+            &registry,
+            scope_path,
+        ))
+    }
+
+    fn registry_changed(&self) {
+        self.revision.fetch_add(1, Ordering::SeqCst);
     }
 
     pub async fn save_installation(
@@ -257,6 +324,7 @@ impl SdkManager {
         sort_registry(&mut next);
         persist_registry(&self.path, &next)?;
         *registry = next;
+        self.registry_changed();
         Ok(installation)
     }
 
@@ -274,6 +342,7 @@ impl SdkManager {
             .retain(|binding| binding.sdk_id.as_deref() != Some(id));
         persist_registry(&self.path, &next)?;
         *registry = next;
+        self.registry_changed();
         Ok(())
     }
 
@@ -296,6 +365,7 @@ impl SdkManager {
         sort_registry(&mut next);
         persist_registry(&self.path, &next)?;
         *registry = next;
+        self.registry_changed();
         Ok(())
     }
 
@@ -336,6 +406,7 @@ impl SdkManager {
         sort_registry(&mut next);
         persist_registry(&self.path, &next)?;
         *registry = next;
+        self.registry_changed();
         Ok(binding)
     }
 
@@ -355,6 +426,7 @@ impl SdkManager {
         });
         persist_registry(&self.path, &next)?;
         *registry = next;
+        self.registry_changed();
         Ok(())
     }
 
@@ -407,6 +479,7 @@ impl SdkManager {
             .cloned()
             .collect();
         *registry = next;
+        self.registry_changed();
         Ok(refreshed)
     }
 }
@@ -504,11 +577,7 @@ pub async fn sdk_resolve_workspace(
     workspace_root: String,
     state: State<'_, AppState>,
 ) -> Result<resolve::WorkspaceSdkResolution, String> {
-    let analysis = tokio::task::spawn_blocking(move || detect::analyze_workspace(&workspace_root))
-        .await
-        .map_err(|error| format!("SDK workspace analysis task failed: {error}"))??;
-    let registry = state.sdk.snapshot().await;
-    Ok(resolve::resolve_workspace(analysis, &registry).await)
+    state.sdk.resolve_workspace(&workspace_root).await
 }
 
 fn load_registry(path: &Path) -> Result<SdkRegistry, String> {
