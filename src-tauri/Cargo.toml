@@ -77,6 +77,10 @@ jaq-json = "2.0.1"
 rig-core = { version = "=0.38.1", default-features = false, features = ["derive"] }
 urlencoding = "2"
 url = "2"
+# Sockscap rule engine (sockscap/autoproxy.rs): IDNA/punycode normalization so
+# GFWList IDN domains compile into the reverse-label matcher trie the same way a
+# browser would resolve them. Already in the tree transitively via `url`.
+idna = "1"
 which = "8"
 shellexpand = "3"
 libc = "0.2"
