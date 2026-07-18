@@ -1,6 +1,6 @@
 # Taomni 跨平台 Sockscap 设计与实施计划
 
-状态：Draft for review — Revision 2  
+状态：Review decisions confirmed — Revision 3
 日期：2026-07-18  
 本轮范围：仅设计与原型，不修改业务代码、依赖、构建或测试配置。
 
@@ -8,7 +8,7 @@ HTML 评审入口：[原型总览 / Dashboard](./sockscap-prototype/index.html) 
 
 ## 1. 结论先行
 
-建议把该能力命名为 “Sockscap（暂名）”，作为 Taomni 的独立网络流量路由模块，而不是扩展现有的 “Application Proxy” 开关。
+该能力命名为 “Sockscap”，作为 Taomni 的独立网络流量路由模块，而不是扩展现有的 “Application Proxy” 开关。
 
 核心设计是：
 
@@ -199,7 +199,7 @@ SSH Dashboard 指标包括控制连接状态、握手 RTT、活跃 channel、cha
 | dns_mode | system-capture、virtual-dns、strict-proxy |
 | unknown_domain_action | DIRECT、PROXY 或 BLOCK |
 | udp_policy | proxy-if-supported、direct 或 block |
-| local_network_policy | 默认绕过 loopback、LAN、链路本地和上游端点 |
+| local_network_policy | loopback、Taomni/helper 和上游端点强制绕过；LAN/链路本地默认 DIRECT，可配置按规则或 BLOCK |
 | stats_privacy | 是否保留域名聚合及保留时长 |
 
 约束：
@@ -552,24 +552,56 @@ UI/QA：
 | 第三方许可证 | 与 MIT 发布冲突 | Phase 0 SBOM/许可证 Gate；优先 MIT；不直接静态链接未批准 GPL 核心 |
 | `wsstun` 参考实现继续演进 | 设计与复制代码漂移 | 固定参考 commit；以行为测试和 ADR 为准，不建立源码目录间隐式依赖 |
 
-## 16. 需要评审确认的决策
+## 16. 评审决策（已确认）
 
-建议按以下默认值进入 Phase 0，评审时可逐项修改：
+以下结论已于 2026-07-18 完成评审，作为 Phase 0 和后续实现基线。若实现验证需要改变结论，必须通过新的 ADR 或设计评审更新本节。
 
-1. 产品名：界面叫 “Sockscap”，设置搜索关键词同时包含“流量路由/进程代理”。
-2. 初始平台顺序：Phase 0 同时验证三平台，正式纵向先 Windows，再 macOS，再 Linux。
-3. 故障策略：默认 fail-open。
-4. GFWList 未知域名：默认 DIRECT，但显示 unknown/DNS leak 指标；提供 strict PROXY。
-5. HTTP CONNECT 的 UDP：默认 BLOCK，以促使 QUIC 回退 TCP；用户可改 DIRECT。
-6. 域名统计：默认关闭。
-7. 主窗口退出：Sockscap Active 时默认“隐藏到托盘并继续”，明确菜单退出才停止。
-8. GFWList：内置使用当前官方 GitHub raw/GitLab/Repo.or.cz 健康源；用户给出的 Bitbucket URL 作为来源记录和兼容候选，失败后使用 last-good/健康镜像。
-9. 不承诺既有连接迁移：程序/PID 选择只影响后续新连接。
-10. SSH Jump：首版选择一个已保存 SSH Session 作为 egress，不允许嵌套 Proxy/Jump 链。
-11. SSH UDP：默认 BLOCK，以促使 QUIC 回退 TCP；可显式 DIRECT。
-12. SSH 信任：known_hosts/指纹校验是发布 Gate；需要 MFA 的后台重连进入 UserActionRequired。
-13. Windows 捕获：Phase 0 对照 `wsstun` 的 WinDivert 路径与 WFP ALE 双 spike 后由 ADR 决定，不在评审阶段拍脑袋锁死。
-14. 首个 release Gate：三平台都通过恢复测试后才称“跨平台稳定”；Windows 先行版本必须标 Beta。
+### 16.1 产品、平台与发布
+
+1. 产品名：界面叫 “Sockscap”，设置搜索关键词同时包含“流量路由”“进程代理”和“上游代理”。
+2. 平台顺序：Phase 0 同时验证 Windows、Linux、macOS；正式纵向实现顺序为 Windows → Linux → macOS。
+3. 发布口径：Windows 可以先发布 Beta；三平台均通过 stop、crash、restart、upgrade、uninstall 恢复测试后才标记为“跨平台稳定”。
+
+### 16.2 故障、未知流量与协议降级
+
+4. 故障策略：全局默认 fail-open，恢复 DIRECT；每个配置组可以显式选择 fail-closed BLOCK。
+5. 未知域名：普通模式默认 DIRECT，并显示 unknown/DNS leak 指标；严格模式可以选择 PROXY 或 BLOCK。
+6. TCP-only 上游：HTTP CONNECT 和 SSH Jump 的 UDP/QUIC 默认 BLOCK，以促使 QUIC 回退 TCP；用户可以显式改为 DIRECT，UI 必须标示潜在泄漏。
+7. 本地网络：loopback、Taomni/helper 自身连接、Proxy/SSH 上游端点属于强制硬绕过；LAN、私有地址和链路本地默认 DIRECT，但配置组可以改为按规则或 BLOCK。
+8. 不可代理协议：ICMP 及所选上游无法承载的协议默认 DIRECT，strict/fail-closed 配置组可以 BLOCK；IPv4、IPv6 使用相同策略，不允许静默漏掉 IPv6。
+9. SOCKS5 UDP：上游能力探测通过时支持标准 UDP ASSOCIATE，关联生命周期绑定 TCP control connection；失败时严格执行配置组 UDP policy，不静默降级。TCP CONNECT 与 DNS 是 Windows Beta Gate，SOCKS5 UDP 是跨平台稳定版 Gate。
+
+### 16.3 GFWList 与规则语义
+
+10. GFWList 来源：内置 `gfwlist-official` 使用官方 GitHub raw、GitLab、Repo.or.cz 健康镜像；Bitbucket URL 保留为来源记录和兼容候选；失败时继续使用 last-good。允许本地文件和自定义 URL，首版不把列表内容打包进安装包。
+11. 规则顺序：用户有序 override 采用 first-match wins，优先于订阅规则；订阅 DIRECT 例外优先于 PROXY 条目，最后使用配置组 default_action。
+12. 规则投影：URL、路径、通配符和正则只有能无歧义提取 hostname 时才转换；其余标记 unsupported 并展示数量和示例。部分 unsupported 不阻止更新，Base64、结构或完整性校验失败则拒绝新快照并保留 last-good。
+13. 可解释性：测试目标必须返回配置组、规则原文、规则源、hostname_source 和最终动作；不得宣称 GFWList URL 语义被完整等价实现。
+
+### 16.4 配置组、程序与进程
+
+14. 新连接语义：配置组、程序/PID、规则和上游变更只影响后续新连接，不迁移已有 TCP 连接或 SSH channel。
+15. 配置组冲突：同时最多一个启用的 global 配置组；多个程序组按较小 priority 数字优先；同优先级选择器重叠时拒绝保存并显示冲突来源。
+16. 程序选择：程序身份规则持续匹配后续实例，默认包含子进程，用户可以关闭。
+17. 运行进程：默认只匹配所选 PID，可显式包含后续子进程；保存 PID 与 process_start_time 防止 PID 重用。“记住这个进程”转换成程序身份规则，不持久化短生命周期 PID。
+
+### 16.5 SSH Jump 与信任
+
+18. SSH 范围：首版选择一个已保存 SSH Session 作为 egress，每条 TCP 流使用一个 direct-tcpip channel，并共享控制连接池；不支持嵌套 Proxy/Jump、多跳、负载均衡或自动切换跳板。
+19. SSH 信任：known_hosts/指纹严格校验是发布 Gate；首次信任需要用户确认，host key 变化立即阻断。当前无条件接受 server key 的实现必须在发布前修复。
+20. SSH 认证状态：Agent、私钥和已保存密码可以后台重连；需要交互式 MFA 时，手工启动允许提示，后台启动或重连进入 UserActionRequired。Session 删除、Vault 锁定或认证失效时不切换到其他上游，按配置组 fail-open/fail-closed 处理。
+
+### 16.6 窗口、自动恢复与统计隐私
+
+21. 窗口与托盘：Sockscap Active 时关闭窗口默认隐藏到托盘并继续运行；托盘提供打开、启动/停止、恢复网络和退出。明确退出时必须等待 helper 确认网络恢复。
+22. 自动启动：首次安装默认不自动启用；用户可以显式开启“登录系统后恢复 Sockscap”。自动恢复只使用上次成功提交的配置快照，不加载草稿。
+23. 故障恢复：helper 启动时先检查 recovery journal 并清理遗留捕获/路由状态，再决定是否恢复上次 Active 状态；host key、MFA、Vault 或凭据问题进入 UserActionRequired。helper 心跳丢失时优先撤销捕获恢复直连；一键恢复网络不依赖上游可用。
+24. 聚合统计：不含域名的分钟聚合默认保留 7 天、小时聚合保留 90 天；支持“仅本次运行，不落盘”、修改期限、停止采集和立即清空。
+25. 域名与敏感数据：域名聚合默认关闭，开启后默认保留 7 天。不记录 payload、完整 URL、DNS response body、用户名、密码、私钥路径或 MFA 回答；SSH 仅保存 channel、重连和 RTT 等非敏感聚合。
+
+### 16.7 Windows 技术选型
+
+26. Windows 捕获：全局模式以 Wintun/TUN 为基线；程序/PID 模式在 Phase 0 对照 `wsstun` 的 WinDivert SOCKET/FLOW/NETWORK 路径与 WFP ALE 双 spike，由 ADR 根据许可证、签名、性能、回注正确性、IPv6、EDR/VPN 兼容和故障恢复结果决定。
 
 ## 17. Definition of Done
 
