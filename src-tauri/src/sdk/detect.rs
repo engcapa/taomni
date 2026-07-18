@@ -484,11 +484,14 @@ fn detect_maven(scope: &Path, builder: &mut ProfileBuilder, warnings: &mut Vec<S
     builder.add_build_system(ProjectBuildSystem::Maven);
     let properties = maven_properties(&contents);
 
-    let kotlin_plugin_version = maven_plugin_version(&contents, "kotlin-maven-plugin", &properties)
-        .or_else(|| property_value(&properties, "kotlin.version"));
-    let has_kotlin = kotlin_plugin_version.is_some()
-        || contents.contains("kotlin-maven-plugin")
-        || directory_has_extension(scope, &["kt", "kts"]);
+    let has_kotlin =
+        contents.contains("kotlin-maven-plugin") || directory_has_extension(scope, &["kt", "kts"]);
+    let kotlin_plugin_version = has_kotlin
+        .then(|| {
+            maven_plugin_version(&contents, "kotlin-maven-plugin", &properties)
+                .or_else(|| property_value(&properties, "kotlin.version"))
+        })
+        .flatten();
     if has_kotlin {
         builder.add_language(SdkKind::Kotlin);
         let version = kotlin_plugin_version.clone();
@@ -543,9 +546,15 @@ fn detect_maven(scope: &Path, builder: &mut ProfileBuilder, warnings: &mut Vec<S
         });
     }
 
-    let scala_version = property_value(&properties, "scala.version")
-        .or_else(|| maven_plugin_version(&contents, "scala-maven-plugin", &properties));
-    if scala_version.is_some() || contents.contains("scala-maven-plugin") {
+    let has_scala =
+        contents.contains("scala-maven-plugin") || directory_has_extension(scope, &["scala"]);
+    let scala_version = has_scala
+        .then(|| {
+            property_value(&properties, "scala.version")
+                .or_else(|| maven_plugin_version(&contents, "scala-maven-plugin", &properties))
+        })
+        .flatten();
+    if has_scala {
         builder.add_language(SdkKind::Scala);
         builder.add_requirement(
             90,
@@ -605,7 +614,7 @@ fn detect_maven(scope: &Path, builder: &mut ProfileBuilder, warnings: &mut Vec<S
             "source",
         ],
     );
-    if java_source || has_kotlin || scala_version.is_some() {
+    if java_source || has_kotlin || has_scala {
         let selected_version = jdk_toolchain.as_deref().or(jdk_release.as_deref());
         builder.add_requirement(
             if jdk_home.is_some() {
@@ -686,9 +695,10 @@ fn detect_gradle(
 
     let catalog = find_version_catalog(workspace_root, scope)
         .and_then(|path| read_text(&path, warnings).map(|text| (path, text)));
-    let catalog_kotlin = catalog
+    let (catalog_kotlin_id, catalog_kotlin_version) = catalog
         .as_ref()
-        .and_then(|(_, text)| kotlin_version_from_catalog(text));
+        .map(|(_, text)| kotlin_plugin_from_catalog(&contents, text))
+        .unwrap_or((None, None));
     let kotlin_version = first_capture(
         &contents,
         &[
@@ -696,28 +706,41 @@ fn detect_gradle(
             r#"id\s*\(?\s*[\"']org\.jetbrains\.kotlin\.[^\"']+[\"']\s*\)?\s*version\s*[\"']([^\"']+)[\"']"#,
         ],
     )
-    .or(catalog_kotlin);
+    .or(catalog_kotlin_version);
     let has_kotlin = kotlin_version.is_some()
-        || contents.contains("org.jetbrains.kotlin")
-        || contents.contains("kotlin(")
+        || catalog_kotlin_id.is_some()
+        || gradle_applies_kotlin_plugin(&contents)
         || directory_has_extension(scope, &["kt", "kts"]);
     let platform = if contents.contains("org.jetbrains.kotlin.multiplatform")
         || contents.contains("kotlin(\"multiplatform\")")
+        || contents.contains("kotlin('multiplatform')")
+        || catalog_kotlin_id.as_deref() == Some("org.jetbrains.kotlin.multiplatform")
     {
         KotlinPlatform::Multiplatform
     } else if contents.contains("org.jetbrains.kotlin.android")
         || contents.contains("com.android.application")
         || contents.contains("com.android.library")
+        || catalog_kotlin_id.as_deref() == Some("org.jetbrains.kotlin.android")
     {
         KotlinPlatform::Android
-    } else if contents.contains("org.jetbrains.kotlin.js") || contents.contains("kotlin(\"js\")") {
+    } else if contents.contains("org.jetbrains.kotlin.js")
+        || contents.contains("kotlin(\"js\")")
+        || contents.contains("kotlin('js')")
+        || catalog_kotlin_id.as_deref() == Some("org.jetbrains.kotlin.js")
+    {
         KotlinPlatform::Js
     } else if contents.contains("org.jetbrains.kotlin.wasm")
         || contents.contains("kotlin(\"wasm\")")
+        || contents.contains("kotlin('wasm')")
+        || catalog_kotlin_id
+            .as_deref()
+            .is_some_and(|id| id.starts_with("org.jetbrains.kotlin.wasm"))
     {
         KotlinPlatform::Wasm
     } else if contents.contains("org.jetbrains.kotlin.native")
         || contents.contains("kotlin(\"native\")")
+        || contents.contains("kotlin('native')")
+        || catalog_kotlin_id.as_deref() == Some("org.jetbrains.kotlin.native")
     {
         KotlinPlatform::Native
     } else if has_kotlin {
@@ -773,11 +796,14 @@ fn detect_gradle(
             && Regex::new(r"(?m)\bjvm\s*\(")
                 .ok()
                 .is_some_and(|pattern| pattern.is_match(&contents)));
-    let has_java = contents.contains("id(\"java\")")
-        || contents.contains("id 'java'")
+    let has_scala =
+        gradle_applies_scala_plugin(&contents) || directory_has_extension(scope, &["scala"]);
+    let has_java = gradle_applies_java_plugin(&contents)
+        || toolchain.is_some()
+        || source_compatibility.is_some()
         || directory_has_extension(scope, &["java"])
         || kotlin_needs_java
-        || contents.contains("scala");
+        || has_scala;
     if has_java {
         builder.add_language(SdkKind::Java);
         let selected_version = toolchain.as_deref().or(source_compatibility.as_deref());
@@ -878,10 +904,7 @@ fn detect_gradle(
             gradle_launcher_java_home: launcher_home,
         });
     }
-    if contents.contains("id(\"scala\")")
-        || contents.contains("id 'scala'")
-        || contents.contains("scala-library")
-    {
+    if has_scala {
         builder.add_language(SdkKind::Scala);
         let scala_version = first_capture(
             &contents,
@@ -1309,14 +1332,34 @@ fn find_version_catalog(workspace_root: &Path, scope: &Path) -> Option<PathBuf> 
     }
 }
 
-fn kotlin_version_from_catalog(contents: &str) -> Option<String> {
-    let value: toml::Value = toml::from_str(contents).ok()?;
-    let versions = value.get("versions")?.as_table()?;
-    if let Some(version) = versions.get("kotlin").and_then(toml::Value::as_str) {
-        return Some(version.to_string());
-    }
-    let plugins = value.get("plugins")?.as_table()?;
-    for plugin in plugins.values() {
+fn kotlin_plugin_from_catalog(
+    build_contents: &str,
+    catalog_contents: &str,
+) -> (Option<String>, Option<String>) {
+    let Some(value) = toml::from_str::<toml::Value>(catalog_contents).ok() else {
+        return (None, None);
+    };
+    let versions = value.get("versions").and_then(toml::Value::as_table);
+    let Some(plugins) = value.get("plugins").and_then(toml::Value::as_table) else {
+        return (None, None);
+    };
+    for (alias, plugin) in plugins {
+        let accessor = alias.replace(['-', '_'], ".");
+        if !build_contents.contains(&format!("libs.plugins.{accessor}")) {
+            continue;
+        }
+        if let Some(shorthand) = plugin.as_str() {
+            let Some((id, version)) = shorthand.split_once(':') else {
+                continue;
+            };
+            if id.starts_with("org.jetbrains.kotlin") {
+                return (
+                    Some(id.to_string()),
+                    (!version.is_empty()).then(|| version.to_string()),
+                );
+            }
+            continue;
+        }
         let Some(table) = plugin.as_table() else {
             continue;
         };
@@ -1328,7 +1371,7 @@ fn kotlin_version_from_catalog(contents: &str) -> Option<String> {
             continue;
         }
         if let Some(version) = table.get("version").and_then(toml::Value::as_str) {
-            return Some(version.to_string());
+            return (Some(id.to_string()), Some(version.to_string()));
         }
         let reference = table
             .get("version")
@@ -1336,13 +1379,35 @@ fn kotlin_version_from_catalog(contents: &str) -> Option<String> {
             .and_then(|version| version.get("ref"))
             .and_then(toml::Value::as_str)
             .or_else(|| table.get("version.ref").and_then(toml::Value::as_str));
-        if let Some(version) = reference.and_then(|reference| versions.get(reference)) {
-            if let Some(version) = version.as_str() {
-                return Some(version.to_string());
-            }
-        }
+        let version = reference
+            .and_then(|reference| versions.and_then(|versions| versions.get(reference)))
+            .and_then(toml::Value::as_str)
+            .map(str::to_string);
+        return (Some(id.to_string()), version);
     }
-    None
+    (None, None)
+}
+
+fn gradle_applies_kotlin_plugin(contents: &str) -> bool {
+    Regex::new(
+        r#"(?m)(?:id\s*\(?\s*[\"']org\.jetbrains\.kotlin\.[^\"']+[\"']|kotlin\s*\(\s*[\"'](?:jvm|android|multiplatform|js|wasm|native)[\"']\s*\))"#,
+    )
+    .ok()
+    .is_some_and(|pattern| pattern.is_match(contents))
+}
+
+fn gradle_applies_java_plugin(contents: &str) -> bool {
+    Regex::new(
+        r#"(?ms)(?:id\s*\(?\s*[\"'](?:java|java-library|application)[\"']|plugins\s*\{[^}]*\b(?:java|javaLibrary|application)\b|\bjava\s*\{)"#,
+    )
+    .ok()
+    .is_some_and(|pattern| pattern.is_match(contents))
+}
+
+fn gradle_applies_scala_plugin(contents: &str) -> bool {
+    Regex::new(r#"(?ms)(?:id\s*\(?\s*[\"']scala[\"']|plugins\s*\{[^}]*\bscala\b|scala-library)"#)
+        .ok()
+        .is_some_and(|pattern| pattern.is_match(contents))
 }
 
 fn read_gradle_property(scope: &Path, key: &str, warnings: &mut Vec<String>) -> Option<String> {
@@ -1523,6 +1588,8 @@ mod tests {
             r#"<project>
               <properties>
                 <kotlin.version>2.1.20</kotlin.version>
+                <kotlin.compiler.languageVersion>2.1</kotlin.compiler.languageVersion>
+                <kotlin.compiler.apiVersion>2.0</kotlin.compiler.apiVersion>
                 <maven.compiler.release>17</maven.compiler.release>
                 <kotlin.compiler.jvmTarget>8</kotlin.compiler.jvmTarget>
               </properties>
@@ -1542,6 +1609,8 @@ mod tests {
         );
         let kotlin = profile.kotlin.as_ref().unwrap();
         assert_eq!(kotlin.compiler_version.as_deref(), Some("2.1.20"));
+        assert_eq!(kotlin.language_version.as_deref(), Some("2.1"));
+        assert_eq!(kotlin.api_version.as_deref(), Some("2.0"));
         assert_eq!(kotlin.jvm_target.as_deref(), Some("8"));
         assert!(requirement_for(profile, SdkKind::Kotlin, SdkRole::Compiler).managed_by_build);
     }
@@ -1573,7 +1642,15 @@ mod tests {
             &directory.path().join("build.gradle.kts"),
             r#"plugins { alias(libs.plugins.kotlin.jvm) }
                kotlin { jvmToolchain(17) }
-               kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_8) } }"#,
+               kotlin { compilerOptions {
+                 languageVersion.set(KotlinVersion.KOTLIN_2_1)
+                 apiVersion.set(KotlinVersion.KOTLIN_2_0)
+                 jvmTarget.set(JvmTarget.JVM_8)
+               } }"#,
+        );
+        write(
+            &directory.path().join("gradle.properties"),
+            "org.gradle.java.home=/opt/jdk-21\n",
         );
         write(
             &directory.path().join("gradle/libs.versions.toml"),
@@ -1593,7 +1670,83 @@ mod tests {
         assert_eq!(java.constraint.as_ref().unwrap().major, Some(17));
         let kotlin = profile.kotlin.as_ref().unwrap();
         assert_eq!(kotlin.compiler_version.as_deref(), Some("2.2.0"));
+        assert_eq!(kotlin.language_version.as_deref(), Some("2.1"));
+        assert_eq!(kotlin.api_version.as_deref(), Some("2.0"));
         assert_eq!(kotlin.jvm_target.as_deref(), Some("8"));
+        assert_eq!(kotlin.java_toolchain.as_deref(), Some("17"));
+        assert_eq!(
+            kotlin.gradle_launcher_java_home.as_deref(),
+            Some("/opt/jdk-21")
+        );
+    }
+
+    #[test]
+    fn ignores_unused_kotlin_version_hints() {
+        let maven = tempfile::tempdir().unwrap();
+        write(
+            &maven.path().join("pom.xml"),
+            r#"<project><properties>
+              <java.version>21</java.version>
+              <kotlin.version>2.2.0</kotlin.version>
+            </properties></project>"#,
+        );
+        let analysis = analyze_workspace(&path_string(maven.path())).unwrap();
+        let profile = &analysis.profiles[0];
+        assert!(!profile.languages.contains(&SdkKind::Kotlin));
+        assert!(profile.kotlin.is_none());
+
+        let gradle = tempfile::tempdir().unwrap();
+        write(
+            &gradle.path().join("build.gradle.kts"),
+            "plugins { java }\njava { toolchain.languageVersion.set(JavaLanguageVersion.of(21)) }\n",
+        );
+        write(
+            &gradle.path().join("gradle/libs.versions.toml"),
+            r#"[versions]
+              kotlin = "2.2.0"
+              [plugins]
+              kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }"#,
+        );
+        let analysis = analyze_workspace(&path_string(gradle.path())).unwrap();
+        let profile = &analysis.profiles[0];
+        assert!(!profile.languages.contains(&SdkKind::Kotlin));
+        assert!(profile.kotlin.is_none());
+    }
+
+    #[test]
+    fn detects_bare_gradle_java_plugin_and_toolchain() {
+        let directory = tempfile::tempdir().unwrap();
+        write(
+            &directory.path().join("build.gradle.kts"),
+            "plugins { java }\njava { toolchain.languageVersion.set(JavaLanguageVersion.of(17)) }\n",
+        );
+
+        let analysis = analyze_workspace(&path_string(directory.path())).unwrap();
+        let profile = &analysis.profiles[0];
+        assert!(profile.languages.contains(&SdkKind::Java));
+        let java = requirement_for(profile, SdkKind::Java, SdkRole::Project);
+        assert_eq!(
+            java.constraint.as_ref().unwrap().policy,
+            SdkConstraintPolicy::ExactMajor
+        );
+        assert_eq!(java.constraint.as_ref().unwrap().major, Some(17));
+    }
+
+    #[test]
+    fn maven_scala_sources_require_java_without_an_explicit_plugin_version() {
+        let directory = tempfile::tempdir().unwrap();
+        write(&directory.path().join("pom.xml"), "<project />");
+        write(
+            &directory.path().join("src/main/scala/App.scala"),
+            "object App extends App {}\n",
+        );
+
+        let analysis = analyze_workspace(&path_string(directory.path())).unwrap();
+        let profile = &analysis.profiles[0];
+        assert!(profile.languages.contains(&SdkKind::Scala));
+        assert!(requirement_for(profile, SdkKind::Scala, SdkRole::Compiler).managed_by_build);
+        let java = requirement_for(profile, SdkKind::Java, SdkRole::Project);
+        assert!(java.constraint.is_none());
     }
 
     #[test]
@@ -1653,6 +1806,35 @@ mod tests {
             profile.kotlin.as_ref().unwrap().platform,
             KotlinPlatform::Multiplatform
         );
+        assert!(
+            !profile
+                .requirements
+                .iter()
+                .any(|requirement| requirement.kind == SdkKind::Java)
+        );
+    }
+
+    #[test]
+    fn detects_kotlin_platform_from_an_applied_catalog_alias() {
+        let directory = tempfile::tempdir().unwrap();
+        write(
+            &directory.path().join("build.gradle.kts"),
+            r#"plugins { alias(libs.plugins.kotlin.multiplatform) }
+               kotlin { js(); linuxX64() }"#,
+        );
+        write(
+            &directory.path().join("gradle/libs.versions.toml"),
+            r#"[versions]
+               kotlin = "2.2.0"
+               [plugins]
+               kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }"#,
+        );
+
+        let analysis = analyze_workspace(&path_string(directory.path())).unwrap();
+        let profile = &analysis.profiles[0];
+        let kotlin = profile.kotlin.as_ref().unwrap();
+        assert_eq!(kotlin.platform, KotlinPlatform::Multiplatform);
+        assert_eq!(kotlin.compiler_version.as_deref(), Some("2.2.0"));
         assert!(
             !profile
                 .requirements

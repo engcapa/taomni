@@ -148,8 +148,8 @@ pub fn build_workspace_environment(
     }
 
     let selected = [
-        project_java.as_ref(),
         launcher_java.as_ref(),
+        project_java.as_ref(),
         python.as_ref(),
         kotlin.as_ref(),
         scala.as_ref(),
@@ -656,6 +656,116 @@ mod tests {
                 .tooling_java_error
                 .as_deref()
                 .is_some_and(|error| error.contains("requires JDK 21+"))
+        );
+    }
+
+    #[test]
+    fn applies_all_standalone_sdks_and_keeps_java_home_aligned_with_path() {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path();
+        let project_java_path = root.join("jdk-17");
+        let launcher_java_path = root.join("jdk-21");
+        let python_path = root.join(".venv");
+        let kotlin_path = root.join("kotlin");
+        let scala_path = root.join("scala");
+        for path in [
+            &project_java_path,
+            &launcher_java_path,
+            &python_path,
+            &kotlin_path,
+            &scala_path,
+        ] {
+            std::fs::create_dir_all(path.join("bin")).unwrap();
+        }
+        std::fs::write(python_path.join("pyvenv.cfg"), "home = test\n").unwrap();
+
+        let project_java = installation(
+            "jdk-17",
+            SdkKind::Java,
+            "17.0.12",
+            &path_string(&project_java_path),
+        );
+        let launcher_java = installation(
+            "jdk-21",
+            SdkKind::Java,
+            "21.0.6",
+            &path_string(&launcher_java_path),
+        );
+        let python = installation(
+            "python",
+            SdkKind::Python,
+            "3.12.9",
+            &path_string(&python_path),
+        );
+        let kotlin = installation(
+            "kotlin",
+            SdkKind::Kotlin,
+            "2.1.20",
+            &path_string(&kotlin_path),
+        );
+        let scala = installation("scala", SdkKind::Scala, "3.6.4", &path_string(&scala_path));
+        let registry = SdkRegistry {
+            installations: vec![
+                project_java.clone(),
+                launcher_java.clone(),
+                python.clone(),
+                kotlin.clone(),
+                scala.clone(),
+            ],
+            ..SdkRegistry::default()
+        };
+        let root_string = path_string(root);
+        let resolution = resolution(
+            &root_string,
+            &root_string,
+            vec![
+                resolved(&root_string, SdkKind::Java, SdkRole::Project, project_java),
+                resolved(
+                    &root_string,
+                    SdkKind::Java,
+                    SdkRole::Launcher,
+                    launcher_java,
+                ),
+                resolved(&root_string, SdkKind::Python, SdkRole::Project, python),
+                resolved(&root_string, SdkKind::Kotlin, SdkRole::Compiler, kotlin),
+                resolved(&root_string, SdkKind::Scala, SdkRole::Compiler, scala),
+            ],
+        );
+
+        let environment = build_workspace_environment(&resolution, &registry, root);
+
+        assert_eq!(
+            environment.environment.get("JAVA_HOME").map(String::as_str),
+            Some(path_string(&launcher_java_path).as_str())
+        );
+        assert_eq!(
+            environment
+                .environment
+                .get("VIRTUAL_ENV")
+                .map(String::as_str),
+            Some(path_string(&python_path).as_str())
+        );
+        assert_eq!(
+            environment
+                .environment
+                .get("KOTLIN_HOME")
+                .map(String::as_str),
+            Some(path_string(&kotlin_path).as_str())
+        );
+        assert_eq!(
+            environment
+                .environment
+                .get("SCALA_HOME")
+                .map(String::as_str),
+            Some(path_string(&scala_path).as_str())
+        );
+        assert_eq!(
+            environment.path_entries.first().map(String::as_str),
+            Some(path_string(&launcher_java_path.join("bin")).as_str())
+        );
+        assert_eq!(
+            environment.path_entries.get(1).map(String::as_str),
+            Some(path_string(&project_java_path.join("bin")).as_str())
         );
     }
 }
