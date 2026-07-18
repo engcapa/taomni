@@ -148,14 +148,19 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         built.iter().map(|i| i as &dyn tauri::menu::IsMenuItem<R>).collect();
     let menu = Menu::with_items(app, &refs)?;
 
-    let mut builder = TrayIconBuilder::new()
+    let mut builder = TrayIconBuilder::with_id("sockscap-tray")
         .tooltip("Sockscap")
         .menu(&menu)
+        // Show the menu on any click (Windows/macOS); Linux uses the menu only.
+        .show_menu_on_left_click(true)
         .on_menu_event(|app, event| handle_menu_event(app, event.id.0.as_str()));
-    if let Some(icon) = app.default_window_icon().cloned() {
-        builder = builder.icon(icon);
+    match app.default_window_icon().cloned() {
+        Some(icon) => builder = builder.icon(icon),
+        None => log::warn!("sockscap: no default window icon; tray icon may be invisible"),
     }
-    builder.build(app)?;
+    let tray = builder.build(app)?;
+    // The TrayIcon must be kept alive — a dropped handle removes the OS icon.
+    app.manage(tray);
     Ok(())
 }
 

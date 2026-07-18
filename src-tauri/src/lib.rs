@@ -141,12 +141,14 @@ pub fn run() {
             ) {
                 Ok(sockscap_state) => {
                     app.manage(sockscap_state);
-                    // System-tray icon + menu (start/stop/recover/open/quit).
-                    if let Err(e) = sockscap::tray::install(app.handle()) {
-                        log::warn!("sockscap: tray install failed: {e}");
-                    }
                 }
                 Err(e) => log::warn!("sockscap: init failed, module disabled: {e}"),
+            }
+            // Install the system-tray icon + menu regardless of module init so the
+            // tray (Open window / Quit) is always available; engine controls use
+            // try_state and no-op if the module failed to initialize.
+            if let Err(e) = sockscap::tray::install(app.handle()) {
+                log::warn!("sockscap: tray install failed: {e}");
             }
 
             let handle_for_reaper = app.handle().clone();
