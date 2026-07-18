@@ -24,6 +24,7 @@ import { useSessionImportExport } from "../components/menubar/useSessionImportEx
 import type { AppCommand } from "../components/menubar/commands";
 import { buildAppMenuSpec, installAppMenu, type MenuActionId } from "../lib/nativeAppMenu";
 import { QuickConnect } from "../components/quickconnect/QuickConnect";
+import { openSockscapWindow } from "../lib/sockscapRoute";
 import { Sidebar } from "../components/sidebar/Sidebar";
 import { useConfirmDialog } from "../components/sidebar/ConfirmDialog";
 import { ControlBar } from "../components/tabbar/ControlBar";
@@ -2985,6 +2986,9 @@ export function MainLayout() {
       }
       case "tools":
         openPlaceholderTab(t("tabs.networkTools"), t("status.commandUnavailable"));
+        break;
+      case "sockscap":
+        void openSockscapWindow();
         break;
       case "git":
         void openGitRepository();

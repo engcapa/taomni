@@ -24,6 +24,7 @@ export type AppCommand =
   | "macros"
   | "help"
   | "toggle-xserver"
+  | "sockscap"
   | "exit"
   | "close-active"
   | "reload-sessions"
