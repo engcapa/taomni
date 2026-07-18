@@ -13,10 +13,14 @@ use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedSender;
 
+use crate::terminal::hostkey::{self, HostKeyStatus};
 use crate::terminal::network::{NetworkSettings, establish_transport};
 use crate::terminal::x11_forward::{self, XForward};
 
 pub const MISSING_JUMP_PASSWORD_ERROR: &str = "TAOMNI_MISSING_JUMP_PASSWORD";
+pub const SSH_HOST_KEY_UNKNOWN_ERROR: &str = "TAOMNI_SSH_HOST_KEY_UNKNOWN";
+pub const SSH_HOST_KEY_CHANGED_ERROR: &str = "TAOMNI_SSH_HOST_KEY_CHANGED";
+pub const SSH_HOST_KEY_STORE_ERROR: &str = "TAOMNI_SSH_HOST_KEY_STORE_ERROR";
 
 pub struct SshSession {
     pub handle: client::Handle<SshHandler>,
@@ -27,6 +31,18 @@ pub struct SshHandler {
     /// X11 forwarding config for this session, if enabled. When set, inbound
     /// `x11` channels opened by the server are bridged to the local X server.
     pub x11: Option<Arc<XForward>>,
+    host: String,
+    port: u16,
+    host_key_prompter: Option<KbdInteractivePrompter>,
+    host_key_failure: HostKeyFailureState,
+}
+
+type HostKeyFailureState = Arc<std::sync::Mutex<Option<HostKeyFailure>>>;
+
+#[derive(Clone, Debug)]
+enum HostKeyFailure {
+    Rejected(HostKeyStatus),
+    Store(String),
 }
 
 impl client::Handler for SshHandler {
@@ -34,11 +50,71 @@ impl client::Handler for SshHandler {
 
     fn check_server_key(
         &mut self,
-        _server_public_key: &PublicKey,
+        server_public_key: &PublicKey,
     ) -> impl Future<Output = Result<bool, Self::Error>> + Send {
-        async {
-            // TODO: proper host key verification
-            Ok(true)
+        let host = self.host.clone();
+        let port = self.port;
+        let prompter = self.host_key_prompter.clone();
+        let failure = self.host_key_failure.clone();
+        let presented = server_public_key.clone();
+        async move {
+            let store = match hostkey::default_store() {
+                Ok(store) => store,
+                Err(error) => {
+                    record_host_key_failure(&failure, HostKeyFailure::Store(error));
+                    return Ok(false);
+                }
+            };
+            let status = match store.inspect(&host, port, &presented) {
+                Ok(status) => status,
+                Err(error) => {
+                    tracing::error!(%host, port, error = %error, "SSH host-key store rejected verification");
+                    record_host_key_failure(&failure, HostKeyFailure::Store(error));
+                    return Ok(false);
+                }
+            };
+
+            if let HostKeyStatus::Known {
+                algorithm,
+                fingerprint,
+            } = &status
+            {
+                tracing::debug!(%host, port, %algorithm, %fingerprint, "SSH host key matched");
+                return Ok(true);
+            }
+
+            let Some(prompter) = prompter else {
+                tracing::warn!(%host, port, status = ?status, "SSH host key requires explicit user confirmation");
+                record_host_key_failure(&failure, HostKeyFailure::Rejected(status));
+                return Ok(false);
+            };
+            let (request, confirmation_word) = host_key_confirmation_request(&host, port, &status);
+            let responses = prompter(request).await;
+            if !host_key_confirmation_matches(responses.as_deref(), confirmation_word) {
+                tracing::warn!(%host, port, "SSH host-key confirmation was declined or invalid");
+                record_host_key_failure(&failure, HostKeyFailure::Rejected(status));
+                return Ok(false);
+            }
+
+            match store.confirm(&host, port, &presented, &status) {
+                Ok(HostKeyStatus::Known {
+                    algorithm,
+                    fingerprint,
+                }) => {
+                    tracing::info!(%host, port, %algorithm, %fingerprint, "SSH host key explicitly confirmed and saved");
+                    Ok(true)
+                }
+                Ok(other) => {
+                    let error = format!("unexpected post-confirmation host-key status: {other:?}");
+                    record_host_key_failure(&failure, HostKeyFailure::Store(error));
+                    Ok(false)
+                }
+                Err(error) => {
+                    tracing::error!(%host, port, error = %error, "SSH host-key confirmation could not be saved");
+                    record_host_key_failure(&failure, HostKeyFailure::Store(error));
+                    Ok(false)
+                }
+            }
         }
     }
 
@@ -285,6 +361,112 @@ pub type KbdInteractivePrompter = Arc<
         + Sync,
 >;
 
+fn host_key_confirmation_request(
+    host: &str,
+    port: u16,
+    status: &HostKeyStatus,
+) -> (KbdInteractiveRequest, &'static str) {
+    let endpoint = display_endpoint(host, port);
+    match status {
+        HostKeyStatus::Unknown {
+            algorithm,
+            fingerprint,
+        } => (
+            KbdInteractiveRequest {
+                name: "SSH host key confirmation".to_string(),
+                instructions: format!(
+                    "The identity of {endpoint} has not been trusted. Verify this {algorithm} fingerprint through a trusted channel before continuing:\n\n{fingerprint}"
+                ),
+                prompts: vec![KbdPrompt {
+                    prompt: "Type TRUST to save this host key: ".to_string(),
+                    echo: true,
+                }],
+            },
+            "TRUST",
+        ),
+        HostKeyStatus::Changed {
+            algorithm,
+            expected_fingerprint,
+            presented_fingerprint,
+        } => (
+            KbdInteractiveRequest {
+                name: "SSH HOST KEY CHANGED".to_string(),
+                instructions: format!(
+                    "The {algorithm} host key for {endpoint} differs from the saved key. This can indicate a man-in-the-middle attack. Confirm the change with the host administrator before replacing it.\n\nSaved: {expected_fingerprint}\nPresented: {presented_fingerprint}"
+                ),
+                prompts: vec![KbdPrompt {
+                    prompt: "Type REPLACE to replace the saved host key: ".to_string(),
+                    echo: true,
+                }],
+            },
+            "REPLACE",
+        ),
+        HostKeyStatus::Known { .. } => (
+            KbdInteractiveRequest {
+                name: "SSH host key already trusted".to_string(),
+                instructions: String::new(),
+                prompts: Vec::new(),
+            },
+            "",
+        ),
+    }
+}
+
+fn host_key_confirmation_matches(responses: Option<&[String]>, expected: &str) -> bool {
+    matches!(responses, Some([answer]) if answer == expected)
+}
+
+fn record_host_key_failure(state: &HostKeyFailureState, failure: HostKeyFailure) {
+    match state.lock() {
+        Ok(mut guard) => *guard = Some(failure),
+        Err(poisoned) => *poisoned.into_inner() = Some(failure),
+    }
+}
+
+fn host_key_failure_message(state: &HostKeyFailureState, host: &str, port: u16) -> Option<String> {
+    let failure = match state.lock() {
+        Ok(guard) => guard.clone(),
+        Err(poisoned) => poisoned.into_inner().clone(),
+    }?;
+    let endpoint = display_endpoint(host, port);
+    Some(match failure {
+        HostKeyFailure::Rejected(HostKeyStatus::Unknown {
+            algorithm,
+            fingerprint,
+        }) => format!(
+            "{SSH_HOST_KEY_UNKNOWN_ERROR}: explicit confirmation is required for {endpoint} ({algorithm} {fingerprint})"
+        ),
+        HostKeyFailure::Rejected(HostKeyStatus::Changed {
+            algorithm,
+            expected_fingerprint,
+            presented_fingerprint,
+        }) => format!(
+            "{SSH_HOST_KEY_CHANGED_ERROR}: possible man-in-the-middle attack for {endpoint} ({algorithm}; saved {expected_fingerprint}; presented {presented_fingerprint})"
+        ),
+        HostKeyFailure::Rejected(HostKeyStatus::Known { .. }) => {
+            format!(
+                "{SSH_HOST_KEY_STORE_ERROR}: inconsistent known host-key rejection for {endpoint}"
+            )
+        }
+        HostKeyFailure::Store(error) => {
+            format!("{SSH_HOST_KEY_STORE_ERROR}: could not verify {endpoint}: {error}")
+        }
+    })
+}
+
+fn display_endpoint(host: &str, port: u16) -> String {
+    let safe_host: String = host
+        .chars()
+        .filter(|character| !character.is_control())
+        .take(253)
+        .collect();
+    if safe_host.contains(':') && !safe_host.starts_with('[') {
+        format!("[{safe_host}]:{port}")
+    } else {
+        format!("{safe_host}:{port}")
+    }
+}
+
 const COMPAT_KEX_ORDER: &[kex::Name] = &[
     kex::CURVE25519,
     kex::CURVE25519_PRE_RFC_8731,
@@ -404,6 +586,42 @@ fn build_client_config(network: Option<&NetworkSettings>) -> Arc<client::Config>
         }
     }
     Arc::new(cfg)
+}
+
+fn build_ssh_handler(
+    host: &str,
+    port: u16,
+    prompter: Option<&KbdInteractivePrompter>,
+    x11: Option<Arc<XForward>>,
+) -> (SshHandler, HostKeyFailureState) {
+    let host_key_failure = Arc::new(std::sync::Mutex::new(None));
+    (
+        SshHandler {
+            output_tx: Arc::new(Mutex::new(None)),
+            x11,
+            host: host.to_string(),
+            port,
+            host_key_prompter: prompter.cloned(),
+            host_key_failure: host_key_failure.clone(),
+        },
+        host_key_failure,
+    )
+}
+
+async fn connect_client(
+    config: Arc<client::Config>,
+    stream: SshTransport,
+    handler: SshHandler,
+    host_key_failure: &HostKeyFailureState,
+    host: &str,
+    port: u16,
+) -> Result<client::Handle<SshHandler>, String> {
+    client::connect_stream(config, stream, handler)
+        .await
+        .map_err(|error| {
+            host_key_failure_message(host_key_failure, host, port)
+                .unwrap_or_else(|| format!("SSH handshake failed: {error}"))
+        })
 }
 
 async fn authenticate(
@@ -621,15 +839,10 @@ pub async fn connect_ssh(
 
     let config = build_client_config(network);
 
-    let handler = SshHandler {
-        output_tx: Arc::new(Mutex::new(None)),
-        x11: x11.clone(),
-    };
+    let (handler, host_key_failure) = build_ssh_handler(host, port, prompter, x11.clone());
 
     let stream = build_ssh_transport(host, port, network).await?;
-    let mut handle = client::connect_stream(config, stream, handler)
-        .await
-        .map_err(|e| format!("SSH handshake failed: {}", e))?;
+    let mut handle = connect_client(config, stream, handler, &host_key_failure, host, port).await?;
 
     authenticate(&mut handle, username, auth, prompter).await?;
 
@@ -752,15 +965,10 @@ pub async fn connect_ssh_authenticated_with_prompter(
     prompter: Option<&KbdInteractivePrompter>,
 ) -> Result<client::Handle<SshHandler>, String> {
     let config = build_client_config(network);
-    let handler = SshHandler {
-        output_tx: Arc::new(Mutex::new(None)),
-        x11: None,
-    };
+    let (handler, host_key_failure) = build_ssh_handler(host, port, prompter, None);
 
     let stream = build_ssh_transport(host, port, network).await?;
-    let mut handle = client::connect_stream(config, stream, handler)
-        .await
-        .map_err(|e| format!("SSH handshake failed: {}", e))?;
+    let mut handle = connect_client(config, stream, handler, &host_key_failure, host, port).await?;
 
     authenticate(&mut handle, username, auth, prompter).await?;
     Ok(handle)
@@ -770,6 +978,46 @@ pub async fn connect_ssh_authenticated_with_prompter(
 mod tests {
     use super::*;
     use tokio::time::{Duration, timeout};
+
+    #[test]
+    fn host_key_confirmation_requires_one_exact_response() {
+        let trust = vec!["TRUST".to_string()];
+        let lower = vec!["trust".to_string()];
+        let padded = vec![" TRUST ".to_string()];
+        let extra = vec!["TRUST".to_string(), "TRUST".to_string()];
+
+        assert!(host_key_confirmation_matches(Some(&trust), "TRUST"));
+        assert!(!host_key_confirmation_matches(Some(&lower), "TRUST"));
+        assert!(!host_key_confirmation_matches(Some(&padded), "TRUST"));
+        assert!(!host_key_confirmation_matches(Some(&extra), "TRUST"));
+        assert!(!host_key_confirmation_matches(None, "TRUST"));
+    }
+
+    #[test]
+    fn host_key_rejections_have_stable_machine_readable_codes() {
+        let state = Arc::new(std::sync::Mutex::new(Some(HostKeyFailure::Rejected(
+            HostKeyStatus::Unknown {
+                algorithm: "ssh-ed25519".to_string(),
+                fingerprint: "SHA256:unknown".to_string(),
+            },
+        ))));
+        let message = host_key_failure_message(&state, "2001:db8::1", 22).unwrap();
+        assert!(message.starts_with(SSH_HOST_KEY_UNKNOWN_ERROR));
+        assert!(message.contains("[2001:db8::1]:22"));
+
+        record_host_key_failure(
+            &state,
+            HostKeyFailure::Rejected(HostKeyStatus::Changed {
+                algorithm: "ssh-ed25519".to_string(),
+                expected_fingerprint: "SHA256:old".to_string(),
+                presented_fingerprint: "SHA256:new".to_string(),
+            }),
+        );
+        let message = host_key_failure_message(&state, "host.test", 2222).unwrap();
+        assert!(message.starts_with(SSH_HOST_KEY_CHANGED_ERROR));
+        assert!(message.contains("SHA256:old"));
+        assert!(message.contains("SHA256:new"));
+    }
 
     fn live_ssh_target() -> Option<(String, u16, String, String)> {
         let host = std::env::var("TAOMNI_LIVE_SSH_HOST").ok()?;

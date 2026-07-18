@@ -1,5 +1,6 @@
 pub mod client;
 pub mod forwards;
+pub mod hostkey;
 pub mod network;
 pub mod pty;
 pub mod shell_integration;
