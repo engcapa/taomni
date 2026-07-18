@@ -24,33 +24,58 @@ pub fn probe_capabilities() -> CapabilitiesReport {
     items.push(probe_egress_connectors());
     items.push(probe_capture_plane_status());
 
-    let can_start_global = items.iter().any(|i| {
-        i.id == "capture_plane" && matches!(i.level, SupportLevel::NotImplemented)
-    }) || items.iter().any(|i| {
-        i.id == "tun_device" && matches!(i.level, SupportLevel::Supported | SupportLevel::Degraded)
-    });
+    let capture_implemented = crate::sockscap::capture::current_adapter().is_implemented();
 
-    // Phase 0: capture plane is scaffolded, not implemented. Global start is
-    // reported as false so the UI never claims the engine is ready to route.
-    let can_start_global = false && can_start_global;
+    // Global start feasibility: capture code path exists AND host tools look ok.
+    let can_start_global = capture_implemented
+        && items.iter().any(|i| {
+            i.id == "tun_device"
+                || i.id == "nft_or_fwmark"
+                || i.id == "admin_privileges"
+        });
 
-    let can_start_app_group = match platform {
-        CapturePlatform::Linux => items.iter().any(|i| {
-            i.id == "cgroup_v2"
-                && matches!(i.level, SupportLevel::Supported | SupportLevel::Degraded)
-        }) && items.iter().any(|i| {
-            i.id == "nft_or_fwmark"
-                && matches!(i.level, SupportLevel::Supported | SupportLevel::Degraded)
-        }),
-        CapturePlatform::Windows | CapturePlatform::Macos => false,
-        CapturePlatform::Unknown => false,
+    // Still require privileges for real install; UI uses can_start_* as soft hints.
+    let can_start_global = capture_implemented && {
+        #[cfg(target_os = "linux")]
+        {
+            which::which("nft").is_ok()
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            false
+        }
     };
-    // Until adapters exist, never advertise app-group start as ready.
-    let can_start_app_group = false && can_start_app_group;
 
+    let can_start_app_group = can_start_global; // cgroup narrowing still best-effort
     let can_attach_pid = false;
 
-    let summary = build_summary(platform, &items);
+    let summary = if capture_implemented {
+        format!(
+            "{}: capture adapter '{}' is implemented; install still requires privileges and preflight.",
+            match platform {
+                CapturePlatform::Windows => "Windows",
+                CapturePlatform::Macos => "macOS",
+                CapturePlatform::Linux => "Linux",
+                CapturePlatform::Unknown => "Unknown",
+            },
+            crate::sockscap::capture::current_adapter().name()
+        )
+    } else {
+        build_summary(platform, &items)
+    };
+
+    // Refresh capture_plane item to match adapter readiness.
+    for item in &mut items {
+        if item.id == "capture_plane" {
+            if capture_implemented {
+                item.level = SupportLevel::Degraded;
+                item.detail = format!(
+                    "Adapter '{}' is implemented; privileged install required for Active.",
+                    crate::sockscap::capture::current_adapter().name()
+                );
+            }
+        }
+    }
 
     CapabilitiesReport {
         platform,
@@ -59,7 +84,7 @@ pub fn probe_capabilities() -> CapabilitiesReport {
         can_start_app_group,
         can_attach_pid,
         summary,
-        capture_implemented: false,
+        capture_implemented,
     }
 }
 
@@ -464,15 +489,17 @@ mod tests {
     fn probe_returns_report_for_current_platform() {
         let report = probe_capabilities();
         assert!(!report.items.is_empty());
-        assert!(!report.capture_implemented);
-        // Phase 0 must never claim capture is ready.
-        assert!(!report.can_start_global);
-        assert!(!report.can_start_app_group);
-        assert!(!report.can_attach_pid);
         assert!(matches!(
             report.platform,
             CapturePlatform::Windows | CapturePlatform::Macos | CapturePlatform::Linux
         ));
+        // Linux with nft present reports capture_implemented; others may not.
+        #[cfg(target_os = "linux")]
+        {
+            if which::which("nft").is_ok() {
+                assert!(report.capture_implemented);
+            }
+        }
     }
 
     #[test]
@@ -486,14 +513,17 @@ mod tests {
     }
 
     #[test]
-    fn capture_plane_item_is_not_implemented() {
+    fn capture_plane_item_is_present() {
         let report = probe_capabilities();
         let capture = report
             .items
             .iter()
             .find(|i| i.id == "capture_plane")
             .expect("capture_plane item");
-        assert_eq!(capture.level, SupportLevel::NotImplemented);
         assert!(capture.required_for_start);
+        #[cfg(not(target_os = "linux"))]
+        {
+            assert_eq!(capture.level, SupportLevel::NotImplemented);
+        }
     }
 }

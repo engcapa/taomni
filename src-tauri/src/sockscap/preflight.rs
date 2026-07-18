@@ -52,8 +52,31 @@ pub fn run_preflight(profiles: &[RoutingProfileDraft]) -> PreflightReport {
         findings.push(PreflightFinding {
             code: "capture_not_implemented".into(),
             severity: PreflightSeverity::Error,
-            message: "Capture plane is not implemented in this build (Phase 0 scaffold). Engine cannot enter Active.".into(),
+            message: "Capture plane is not implemented on this platform/build. Engine cannot enter Active.".into(),
         });
+    } else {
+        findings.push(PreflightFinding {
+            code: "capture_adapter_ready".into(),
+            severity: PreflightSeverity::Info,
+            message: "Capture adapter is implemented; checking install preflight…".into(),
+        });
+        let plan = super::capture::CapturePlan {
+            profiles: profiles.to_vec(),
+            bypass_hosts: vec![
+                "127.0.0.1".into(),
+                "::1".into(),
+                "localhost".into(),
+            ],
+        };
+        let adapter = super::capture::current_adapter();
+        let cap = tauri::async_runtime::block_on(adapter.preflight(&plan));
+        if !cap.ok {
+            findings.push(PreflightFinding {
+                code: "capture_adapter_preflight".into(),
+                severity: PreflightSeverity::Error,
+                message: cap.message,
+            });
+        }
     }
 
     for item in &capabilities.items {
@@ -172,15 +195,10 @@ mod tests {
     }
 
     #[test]
-    fn phase0_preflight_always_blocks_start() {
+    fn phase0_preflight_blocks_when_capture_missing_or_unprivileged() {
         let report = run_preflight(&[sample_global()]);
+        // Without root, preflight should still fail (capability or capture).
         assert!(!report.ok);
-        assert!(
-            report
-                .findings
-                .iter()
-                .any(|f| f.code == "capture_not_implemented")
-        );
         assert_eq!(report.suggested_state, EngineState::Disabled);
     }
 
