@@ -315,6 +315,13 @@ describe("TerminalPanel focus behavior", () => {
     });
   });
 
+  it("passes the workspace root when launching an SDK-aware local terminal", async () => {
+    render(<TerminalPanel visible initialCwd="/repo/app" workspaceRoot="/repo" />);
+
+    await waitFor(() => expect(ipcMocks.createLocalTerminal).toHaveBeenCalled());
+    expect(ipcMocks.createLocalTerminal.mock.calls[0]?.[7]).toBe("/repo");
+  });
+
   it("tracks a submitted program and returns to idle on the next shell prompt", async () => {
     render(<TerminalPanel tabId="term-activity" visible />);
 

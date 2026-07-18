@@ -17,9 +17,25 @@ interface WorkspaceTerminalInstance {
   id: string;
   title: string;
   initialCwd: string;
+  workspaceRoot: string | null;
   cwd: string;
   pendingCommand: string | null;
   onTaskExit: ((exitCode: number) => void) | null;
+}
+
+function rootForCwd(roots: CodeWorkspaceRootInfo[], cwd: string): string | null {
+  const windows = getAppPlatform() === "windows";
+  const normalize = (value: string) => {
+    const normalized = value.replace(/\\/g, "/").replace(/\/+$/, "");
+    return windows ? normalized.toLowerCase() : normalized;
+  };
+  const normalizedCwd = normalize(cwd);
+  return roots
+    .filter((root) => {
+      const path = normalize(root.path);
+      return normalizedCwd === path || normalizedCwd.startsWith(`${path}/`);
+    })
+    .sort((left, right) => right.path.length - left.path.length)[0]?.path ?? null;
 }
 
 export interface TerminalDockHandle {
@@ -69,6 +85,7 @@ export const TerminalDockPanel = forwardRef<TerminalDockHandle, TerminalDockPane
         id,
         title: title?.trim() || `Terminal ${sequenceRef.current}`,
         initialCwd: cwd,
+        workspaceRoot: rootForCwd(roots, cwd),
         cwd,
         pendingCommand,
         onTaskExit,
@@ -76,7 +93,7 @@ export const TerminalDockPanel = forwardRef<TerminalDockHandle, TerminalDockPane
       setInstances((current) => [...current, next]);
       setActiveId(id);
       return id;
-    }, [workspaceInstanceId]);
+    }, [roots, workspaceInstanceId]);
 
     useEffect(() => {
       if (!active || instances.length > 0) return;
@@ -201,6 +218,7 @@ export const TerminalDockPanel = forwardRef<TerminalDockHandle, TerminalDockPane
                 tabId={instance.id}
                 tabTitle={instance.title}
                 initialCwd={instance.initialCwd || undefined}
+                workspaceRoot={instance.workspaceRoot ?? undefined}
                 visible={active && instance.id === activeId}
                 activeForShortcuts={active && instance.id === activeId}
                 onCwdChange={(cwd) => setInstances((current) => current.map((item) => item.id === instance.id

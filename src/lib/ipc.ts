@@ -88,6 +88,7 @@ export async function createLocalTerminal(
   shellArgs?: string[],
   cwd?: string,
   onOutput?: (data: Uint8Array) => void,
+  workspaceRoot?: string,
 ): Promise<LocalTerminalCreated> {
   return invoke<LocalTerminalCreated>("create_local_terminal", {
     sessionId,
@@ -96,6 +97,7 @@ export async function createLocalTerminal(
     shell,
     shellArgs,
     cwd,
+    workspaceRoot,
     onOutput: createBinaryOutputChannel(onOutput ?? (() => undefined)),
   });
 }

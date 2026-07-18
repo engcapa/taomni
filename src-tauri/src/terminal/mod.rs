@@ -205,12 +205,42 @@ pub async fn create_local_terminal(
     shell: Option<String>,
     shell_args: Option<Vec<String>>,
     cwd: Option<String>,
+    workspace_root: Option<String>,
     on_output: TerminalOutputChannel,
     state: State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<LocalTerminalCreated, String> {
     validate_session_id(&session_id)?;
-    let (handle, reader, shell_id) = pty::create_pty(cols, rows, shell, shell_args, cwd)?;
+    let sdk_environment = if let Some(root) = workspace_root
+        .as_deref()
+        .map(str::trim)
+        .filter(|root| !root.is_empty())
+    {
+        let root_path = std::path::Path::new(root);
+        let scope_path = cwd
+            .as_deref()
+            .map(std::path::Path::new)
+            .unwrap_or(root_path);
+        match state.sdk.resolve_environment(root_path, scope_path).await {
+            Ok(environment) => Some(environment),
+            Err(error) => {
+                log::warn!(
+                    "failed to resolve workspace terminal SDK environment for {root}: {error}"
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+    let (handle, reader, shell_id) = pty::create_pty_with_environment(
+        cols,
+        rows,
+        shell,
+        shell_args,
+        cwd,
+        sdk_environment.as_ref(),
+    )?;
 
     let terminal = ActiveTerminal::Local {
         writer: Mutex::new(handle.writer),

@@ -808,6 +808,17 @@ pub fn create_pty(
     shell_args: Option<Vec<String>>,
     cwd: Option<String>,
 ) -> Result<(PtyHandle, Box<dyn Read + Send>, String), String> {
+    create_pty_with_environment(cols, rows, shell, shell_args, cwd, None)
+}
+
+pub fn create_pty_with_environment(
+    cols: u16,
+    rows: u16,
+    shell: Option<String>,
+    shell_args: Option<Vec<String>>,
+    cwd: Option<String>,
+    sdk_environment: Option<&crate::sdk::WorkspaceSdkEnvironment>,
+) -> Result<(PtyHandle, Box<dyn Read + Send>, String), String> {
     let (shell_launch, shell_id) = resolve_shell_with_id(shell, shell_args);
     let integration = super::shell_integration::integration_for(
         &shell_launch.program,
@@ -821,6 +832,7 @@ pub fn create_pty(
         &shell_launch.args,
         Some(integration),
         cwd,
+        sdk_environment,
     )?;
 
     Ok((handle, reader, shell_id))
@@ -832,7 +844,7 @@ pub fn create_command_pty(
     program: &str,
     args: &[String],
 ) -> Result<(PtyHandle, Box<dyn Read + Send>), String> {
-    create_pty_for_launch(cols, rows, program, args, None, None)
+    create_pty_for_launch(cols, rows, program, args, None, None, None)
 }
 
 fn create_pty_for_launch(
@@ -842,6 +854,7 @@ fn create_pty_for_launch(
     args: &[String],
     integration: Option<super::shell_integration::Integration>,
     cwd: Option<String>,
+    sdk_environment: Option<&crate::sdk::WorkspaceSdkEnvironment>,
 ) -> Result<(PtyHandle, Box<dyn Read + Send>), String> {
     let pty_system = native_pty_system();
 
@@ -872,6 +885,15 @@ fn create_pty_for_launch(
 
     #[cfg(unix)]
     apply_terminal_environment(&mut cmd);
+
+    if let Some(sdk_environment) = sdk_environment {
+        for (key, value) in &sdk_environment.environment {
+            cmd.env(key, value);
+        }
+        if let Some(path) = sdk_environment.prepend_path(std::env::var_os("PATH").as_deref()) {
+            cmd.env("PATH", path);
+        }
+    }
 
     // Shell-integration env (e.g. bash's `PROMPT_COMMAND`). Set after the
     // terminal environment so it can't be clobbered by it.
