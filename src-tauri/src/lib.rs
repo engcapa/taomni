@@ -832,6 +832,8 @@ pub fn run() {
             sockscap::commands::sockscap_stats_snapshot,
             sockscap::commands::sockscap_stats_series,
             sockscap::commands::sockscap_top_domains,
+            sockscap::commands::sockscap_top_apps,
+            sockscap::commands::sockscap_egress_health,
             sockscap::commands::sockscap_live_stats,
             sockscap::commands::sockscap_clear_stats,
             sockscap::commands::sockscap_hide_window,

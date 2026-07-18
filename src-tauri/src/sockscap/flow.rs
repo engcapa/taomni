@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
 
 use serde::Serialize;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -100,6 +101,10 @@ pub struct StatsAggregator {
     proxy: AtomicU64,
     block: AtomicU64,
     errors: AtomicU64,
+    /// Flows whose hostname could not be attributed (plan §6.4 / §11).
+    unknown_host: AtomicU64,
+    /// Per-app identity connection counts for Dashboard Top Applications (§11).
+    app_hits: Mutex<HashMap<String, u64>>,
 }
 
 /// A point-in-time stats snapshot for a `sockscap://traffic-summary` event.
@@ -113,6 +118,15 @@ pub struct StatsSnapshot {
     pub proxy: u64,
     pub block: u64,
     pub errors: u64,
+    pub unknown_host: u64,
+}
+
+/// One row of the Dashboard "Top Applications" list (plan §11).
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AppStatRow {
+    pub app: String,
+    pub connections: u64,
 }
 
 impl StatsAggregator {
@@ -132,6 +146,21 @@ impl StatsAggregator {
 
     pub fn record_connection_open(&self) {
         self.connections.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn record_unknown_host(&self) {
+        self.unknown_host.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Record a hit for an application identity label (exe path / signing id).
+    pub fn record_app(&self, label: impl Into<String>) {
+        let label = label.into();
+        if label.is_empty() {
+            return;
+        }
+        if let Ok(mut map) = self.app_hits.lock() {
+            *map.entry(label).or_insert(0) += 1;
+        }
     }
 
     pub fn add_up(&self, n: u64) {
@@ -155,7 +184,25 @@ impl StatsAggregator {
             proxy: self.proxy.load(Ordering::Relaxed),
             block: self.block.load(Ordering::Relaxed),
             errors: self.errors.load(Ordering::Relaxed),
+            unknown_host: self.unknown_host.load(Ordering::Relaxed),
         }
+    }
+
+    /// Top application identities by connection count (plan §11).
+    pub fn top_apps(&self, limit: usize) -> Vec<AppStatRow> {
+        let Ok(map) = self.app_hits.lock() else {
+            return Vec::new();
+        };
+        let mut rows: Vec<AppStatRow> = map
+            .iter()
+            .map(|(app, n)| AppStatRow {
+                app: app.clone(),
+                connections: *n,
+            })
+            .collect();
+        rows.sort_by(|a, b| b.connections.cmp(&a.connections).then_with(|| a.app.cmp(&b.app)));
+        rows.truncate(limit.max(1));
+        rows
     }
 }
 

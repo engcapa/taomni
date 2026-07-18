@@ -135,7 +135,7 @@ mod linux {
 
     use super::{build_nft_redirect_ruleset, nft_flush_command, parse_original_dst};
     use crate::sockscap::capability::{detect, Capabilities};
-    use crate::sockscap::capture::CaptureAdapter;
+    use crate::sockscap::capture::{CaptureAdapter, CaptureMode};
     use crate::sockscap::egress::Endpoint;
     use crate::sockscap::flow::dispatch;
     use crate::sockscap::listener::FlowRouter;
@@ -161,6 +161,15 @@ mod linux {
 
         pub fn set_router(&self, router: Arc<FlowRouter>) {
             *self.router.lock().unwrap() = Some(router);
+        }
+
+        /// Cheap readiness probe for Linux transparent capture (nft binary).
+        pub fn probe_nft() -> bool {
+            std::process::Command::new("nft")
+                .arg("--version")
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false)
         }
 
         fn apply_nft(&self) -> Result<(), String> {
@@ -239,11 +248,11 @@ mod linux {
 
         fn is_ready(&self) -> bool {
             // Needs CAP_NET_ADMIN and the nft binary; probe cheaply.
-            std::process::Command::new("nft")
-                .arg("--version")
-                .output()
-                .map(|o| o.status.success())
-                .unwrap_or(false)
+            Self::probe_nft()
+        }
+
+        fn mode(&self) -> CaptureMode {
+            CaptureMode::LinuxNft
         }
 
         async fn install(&self) -> Result<(), String> {

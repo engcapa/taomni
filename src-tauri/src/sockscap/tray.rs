@@ -120,17 +120,20 @@ pub fn left_click_toggles() -> bool {
 
 /* --------------------------- Tauri tray integration ------------------------ */
 
+use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
-use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
 
+use crate::sockscap::commands::EVT_STATUS;
 use crate::sockscap::runtime::SockscapState;
 
-/// Create the Sockscap system-tray icon and menu (plan §8, §9). The menu always
-/// carries Show/Hide and Quit (Linux has no reliable left-click), and the
-/// engine controls dispatch to the shared start/stop/recover helpers. Icon
-/// color/tooltip updates per state are a follow-up (needs stored item handles);
-/// clicking Start when already active is a safe no-op.
+/// Create the Sockscap system-tray icon and menu (plan §8, §9, Phase 8).
+///
+/// - Menu always carries Open / Start / Stop / Restore / Show-Hide / Quit.
+/// - Windows/macOS: left-click toggles the window; menu still available.
+/// - Linux: menu-only (no reliable left-click); `show_menu_on_left_click`.
+/// - Tooltip + solid color icon update after engine Start/Stop/Recover.
 pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let items = [
         (MENU_OPEN, "Open Sockscap"),
@@ -148,20 +151,60 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         built.iter().map(|i| i as &dyn tauri::menu::IsMenuItem<R>).collect();
     let menu = Menu::with_items(app, &refs)?;
 
-    let mut builder = TrayIconBuilder::with_id("sockscap-tray")
-        .tooltip("Sockscap")
+    let initial = EngineState::Disabled;
+    let view = tray_view(&initial);
+    // Linux: menu on left click only. Win/mac: left-click toggles window; menu via right-click.
+    let builder = TrayIconBuilder::with_id("sockscap-tray")
+        .tooltip(view.tooltip.as_str())
+        .icon(color_icon(view.color))
         .menu(&menu)
-        // Show the menu on any click (Windows/macOS); Linux uses the menu only.
-        .show_menu_on_left_click(true)
-        .on_menu_event(|app, event| handle_menu_event(app, event.id.0.as_str()));
-    match app.default_window_icon().cloned() {
-        Some(icon) => builder = builder.icon(icon),
-        None => log::warn!("sockscap: no default window icon; tray icon may be invisible"),
-    }
+        .show_menu_on_left_click(!left_click_toggles())
+        .on_menu_event(|app, event| handle_menu_event(app, event.id.0.as_str()))
+        .on_tray_icon_event(|tray, event| {
+            if !left_click_toggles() {
+                return;
+            }
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                toggle_window(tray.app_handle());
+            }
+        });
     let tray = builder.build(app)?;
-    // The TrayIcon must be kept alive — a dropped handle removes the OS icon.
     app.manage(tray);
     Ok(())
+}
+
+/// Solid RGBA tray icon for a state color (plan §9 gray/blue/green/yellow/red).
+fn color_icon(color: TrayColor) -> Image<'static> {
+    let (r, g, b) = match color {
+        TrayColor::Gray => (128, 128, 128),
+        TrayColor::Blue => (59, 130, 246),
+        TrayColor::Green => (34, 197, 94),
+        TrayColor::Yellow => (234, 179, 8),
+        TrayColor::Red => (239, 68, 68),
+    };
+    const SIZE: u32 = 32;
+    let mut rgba = vec![0u8; (SIZE * SIZE * 4) as usize];
+    for px in rgba.chunks_exact_mut(4) {
+        px[0] = r;
+        px[1] = g;
+        px[2] = b;
+        px[3] = 255;
+    }
+    Image::new_owned(rgba, SIZE, SIZE)
+}
+
+fn apply_tray_presentation<R: Runtime>(app: &AppHandle<R>, state: &EngineState) {
+    let view = tray_view(state);
+    if let Some(tray) = app.try_state::<tauri::tray::TrayIcon<R>>() {
+        let _ = tray.set_tooltip(Some(view.tooltip.as_str()));
+        let _ = tray.set_icon(Some(color_icon(view.color)));
+    }
+    let _ = app.emit(EVT_STATUS, state);
 }
 
 fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
@@ -192,13 +235,7 @@ fn spawn_engine<R: Runtime>(app: &AppHandle<R>, action: EngineAction) {
                 EngineAction::Recover => state.recover_engine().await,
             };
             match result {
-                Ok(new_state) => {
-                    // Refresh tooltip from the pure tray_view mapping (plan §9 colors).
-                    if let Some(tray) = app.try_state::<tauri::tray::TrayIcon<R>>() {
-                        let view = tray_view(&new_state);
-                        let _ = tray.set_tooltip(Some(view.tooltip.as_str()));
-                    }
-                }
+                Ok(new_state) => apply_tray_presentation(&app, &new_state),
                 Err(e) => log::warn!("sockscap tray engine action failed: {e}"),
             }
         }

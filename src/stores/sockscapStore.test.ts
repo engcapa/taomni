@@ -39,6 +39,8 @@ beforeEach(() => {
   useSockscapStore.setState({
     status: null,
     capabilities: null,
+    captureMode: null,
+    capturePort: null,
     profiles: [],
     ruleSources: [],
     stats: null,
@@ -50,7 +52,12 @@ beforeEach(() => {
 
 describe("sockscapStore", () => {
   it("refreshAll populates status, profiles, sources and stats", async () => {
-    mocked.status.mockResolvedValue({ state: { state: "disabled" }, capabilities });
+    mocked.status.mockResolvedValue({
+      state: { state: "disabled" },
+      capabilities,
+      captureMode: "local-socks",
+      capturePort: 1080,
+    });
     mocked.listProfiles.mockResolvedValue([]);
     mocked.listRuleSources.mockResolvedValue([]);
     mocked.statsSnapshot.mockResolvedValue({
@@ -67,13 +74,20 @@ describe("sockscapStore", () => {
 
     expect(get().status).toEqual({ state: "disabled" });
     expect(get().capabilities?.platform).toBe("windows");
+    expect(get().captureMode).toBe("local-socks");
+    expect(get().capturePort).toBe(1080);
     expect(get().loading).toBe(false);
     expect(get().error).toBeNull();
   });
 
   it("surfaces a start failure and re-reads status (fail-open, no fake active)", async () => {
     mocked.start.mockRejectedValue("capture backend not available");
-    mocked.status.mockResolvedValue({ state: { state: "disabled" }, capabilities });
+    mocked.status.mockResolvedValue({
+      state: { state: "disabled" },
+      capabilities,
+      captureMode: "local-socks",
+      capturePort: 1080,
+    });
 
     await get().start();
 

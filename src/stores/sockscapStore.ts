@@ -15,6 +15,8 @@ import {
 interface SockscapStore {
   status: EngineState | null;
   capabilities: Capabilities | null;
+  captureMode: string | null;
+  capturePort: number | null;
   profiles: RoutingProfile[];
   ruleSources: RuleSource[];
   stats: TrafficTotals | null;
@@ -44,6 +46,8 @@ function message(e: unknown): string {
 export const useSockscapStore = create<SockscapStore>((set, get) => ({
   status: null,
   capabilities: null,
+  captureMode: null,
+  capturePort: null,
   profiles: [],
   ruleSources: [],
   stats: null,
@@ -63,6 +67,8 @@ export const useSockscapStore = create<SockscapStore>((set, get) => ({
       set({
         status: status.state,
         capabilities: status.capabilities,
+        captureMode: status.captureMode ?? null,
+        capturePort: status.capturePort ?? null,
         profiles,
         ruleSources,
         stats,
@@ -76,7 +82,12 @@ export const useSockscapStore = create<SockscapStore>((set, get) => ({
   refreshStatus: async () => {
     try {
       const status = await sockscap.status();
-      set({ status: status.state, capabilities: status.capabilities });
+      set({
+        status: status.state,
+        capabilities: status.capabilities,
+        captureMode: status.captureMode ?? null,
+        capturePort: status.capturePort ?? null,
+      });
     } catch (e) {
       set({ error: message(e) });
     }

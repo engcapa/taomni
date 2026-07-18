@@ -1051,17 +1051,19 @@ function sockscapEngineState(): { state: string; detail?: string } {
 }
 
 function sockscapCapabilities() {
-  // A representative mixed capability set so the preview UI exercises the
-  // "supported / requires-setup / degraded" paths.
+  // Local SOCKS is Supported; transparent scopes still need setup — matches
+  // the desktop capability report after Phases 5–7 scaffolding.
   return {
     platform: "browser-preview",
-    globalCapture: "requires-setup",
+    globalCapture: "supported",
     appCapture: "requires-setup",
     pidCapture: "degraded",
     childFollow: true,
     trayLeftClickToggle: false,
-    requiresPrivilege: true,
-    notes: ["Browser preview: capture is simulated; install the desktop app for real routing"],
+    requiresPrivilege: false,
+    notes: [
+      "Browser preview: local SOCKS front-end is simulated; transparent capture needs the desktop app",
+    ],
   };
 }
 
@@ -2777,7 +2779,12 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
     case "sockscap_capabilities":
       return sockscapCapabilities() as T;
     case "sockscap_status":
-      return ({ state: sockscapEngineState(), capabilities: sockscapCapabilities() } as unknown) as T;
+      return ({
+        state: sockscapEngineState(),
+        capabilities: sockscapCapabilities(),
+        captureMode: "local-socks",
+        capturePort: 1080,
+      } as unknown) as T;
     case "sockscap_list_profiles":
       return (jsonLoad(SOCKSCAP_PROFILES_KEY, []) as unknown) as T;
     case "sockscap_upsert_profile": {
@@ -2879,6 +2886,20 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         direct: 88,
         proxy: 51,
         block: 3,
+        unknownHost: 7,
+      } as unknown) as T;
+    case "sockscap_top_apps":
+      return ([
+        { app: "chrome.exe", connections: 40 },
+        { app: "node.exe", connections: 12 },
+      ] as unknown) as T;
+    case "sockscap_egress_health":
+      return ({
+        sshProfiles: 1,
+        proxyProfiles: 1,
+        knownHosts: 2,
+        hostKeyChanges: 0,
+        note: "SSH jump profiles use known_hosts verification [browser stub]",
       } as unknown) as T;
     case "sockscap_stats_series": {
       const nowMin = Math.floor(Date.now() / 1000 / 60) * 60;

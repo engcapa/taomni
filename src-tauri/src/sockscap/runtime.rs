@@ -11,12 +11,14 @@ use std::sync::{Arc, Mutex as StdMutex};
 use rusqlite::Connection;
 
 use super::autoproxy::{ProjectionStats, UnsupportedRule};
+use super::capture::CaptureMode;
 use super::db;
 use super::engine::{EngineState, RecoveryJournal, SockscapOrchestrator};
 use super::known_hosts::HostKeyStore;
-use super::listener::{FlowRouter, LocalCaptureAdapter};
+use super::listener::FlowRouter;
 use super::matcher::CompiledRuleSource;
 use super::model::{CustomRule, RoutingProfile, Scope};
+use super::platform::{self, CaptureBackend};
 use super::policy::{select_profile, AppIdentity, CompiledCustomRule, CompiledProfile, HardBypass};
 
 /// A shared, lockable SQLite connection to `sockscap.db`.
@@ -123,10 +125,8 @@ pub const DEFAULT_LOCAL_CAPTURE_PORT: u16 = 1080;
 pub struct SockscapState {
     pub conn: SharedConn,
     pub orchestrator: Arc<SockscapOrchestrator>,
-    /// The concrete local capture adapter (also held as the orchestrator's
-    /// `dyn CaptureAdapter`) so the command layer can set its router before
-    /// starting.
-    pub adapter: Arc<LocalCaptureAdapter>,
+    /// Selected capture plane (local SOCKS5 and/or platform transparent).
+    pub backend: CaptureBackend,
     pub host_keys: Arc<StdMutex<HostKeyStore>>,
     pub rule_cache: Arc<StdMutex<RuleCache>>,
     /// Directory for downloaded/compiled rule files (atomic replace).
@@ -135,9 +135,8 @@ pub struct SockscapState {
 
 impl SockscapState {
     /// Open `sockscap.db`, initialize the schema, load the known_hosts store and
-    /// wire the orchestrator with the local SOCKS5 capture adapter (a real,
-    /// driver-free backend; transparent per-app backends plug into the same
-    /// trait — see `capture.rs` / the ADRs).
+    /// wire the orchestrator with the best available capture adapter (plan
+    /// Phases 5–7 selection; always has a ready local-SOCKS fallback).
     pub fn new(
         db_path: PathBuf,
         known_hosts_path: PathBuf,
@@ -148,8 +147,8 @@ impl SockscapState {
         let conn: SharedConn = Arc::new(StdMutex::new(conn));
 
         let recovery = Arc::new(DbRecoveryJournal { conn: conn.clone() });
-        let adapter = Arc::new(LocalCaptureAdapter::new("127.0.0.1", DEFAULT_LOCAL_CAPTURE_PORT));
-        let orchestrator = Arc::new(SockscapOrchestrator::new(adapter.clone(), recovery));
+        let backend = platform::select_backend();
+        let orchestrator = Arc::new(SockscapOrchestrator::new(backend.adapter(), recovery));
 
         let host_keys = HostKeyStore::load(&known_hosts_path)
             .map_err(|e| format!("load known_hosts: {e}"))?;
@@ -159,11 +158,15 @@ impl SockscapState {
         Ok(SockscapState {
             conn,
             orchestrator,
-            adapter,
+            backend,
             host_keys: Arc::new(StdMutex::new(host_keys)),
             rule_cache: Arc::new(StdMutex::new(RuleCache::default())),
             rules_dir,
         })
+    }
+
+    pub fn capture_mode(&self) -> CaptureMode {
+        self.backend.mode()
     }
 
     /// Build the FlowRouter from the current profiles + rule cache: the enabled
@@ -203,7 +206,7 @@ impl SockscapState {
             let conn = self.conn.lock().unwrap();
             db::list_profiles(&conn).map_err(|e| e.to_string())?
         };
-        self.adapter.set_router(Arc::new(self.build_router()));
+        self.backend.set_router(Arc::new(self.build_router()));
         self.orchestrator.start(&profiles).await?;
         Ok(self.orchestrator.state())
     }

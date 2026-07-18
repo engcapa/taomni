@@ -32,6 +32,7 @@ pub mod known_hosts;
 pub mod matcher;
 pub mod model;
 pub mod packet;
+pub mod platform;
 pub mod policy;
 pub mod ssh_pool;
 pub mod transparent;

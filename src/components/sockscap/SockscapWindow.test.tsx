@@ -46,6 +46,8 @@ beforeEach(() => {
   useSockscapStore.setState({
     status: null,
     capabilities: null,
+    captureMode: null,
+    capturePort: null,
     profiles: [],
     ruleSources: [],
     stats: null,
@@ -53,7 +55,12 @@ beforeEach(() => {
     busy: false,
     error: null,
   });
-  ipc.status.mockResolvedValue({ state: { state: "disabled" }, capabilities: caps });
+  ipc.status.mockResolvedValue({
+    state: { state: "disabled" },
+    capabilities: caps,
+    captureMode: "local-socks",
+    capturePort: 1080,
+  });
   ipc.listProfiles.mockResolvedValue([]);
   ipc.listRuleSources.mockResolvedValue([]);
   ipc.statsSnapshot.mockResolvedValue(zeroStats);

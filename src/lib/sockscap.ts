@@ -123,6 +123,23 @@ export interface EngineState {
 export interface SockscapStatus {
   state: EngineState;
   capabilities: Capabilities;
+  /** Selected capture plane: local-socks | linux-nft | windows-windivert | … */
+  captureMode?: string;
+  /** Bound local capture port when listening. */
+  capturePort?: number | null;
+}
+
+export interface AppStatRow {
+  app: string;
+  connections: number;
+}
+
+export interface EgressHealthSnapshot {
+  sshProfiles: number;
+  proxyProfiles: number;
+  knownHosts: number;
+  hostKeyChanges: number;
+  note: string;
 }
 
 export interface ProcessInfo {
@@ -192,6 +209,7 @@ export interface StatsSnapshot {
   proxy: number;
   block: number;
   errors: number;
+  unknownHost?: number;
 }
 
 export interface EgressTestResult {
@@ -266,6 +284,9 @@ export const sockscap = {
     invoke<TrafficMinutePoint[]>("sockscap_stats_series", { minutes }),
   topDomains: (limit?: number) =>
     invoke<DomainStatRow[]>("sockscap_top_domains", { limit }),
+  topApps: (limit?: number) =>
+    invoke<AppStatRow[]>("sockscap_top_apps", { limit }),
+  egressHealth: () => invoke<EgressHealthSnapshot>("sockscap_egress_health"),
   liveStats: () => invoke<StatsSnapshot>("sockscap_live_stats"),
   clearStats: () => invoke<void>("sockscap_clear_stats"),
   hideWindow: () => invoke<void>("sockscap_hide_window"),

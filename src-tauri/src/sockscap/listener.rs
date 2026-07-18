@@ -208,7 +208,7 @@ use std::sync::Mutex as StdMutex;
 use tokio::sync::Mutex as AsyncMutex;
 
 use super::capability::{detect, Capabilities};
-use super::capture::CaptureAdapter;
+use super::capture::{CaptureAdapter, CaptureMode};
 
 /// A real, driver-free capture backend: a local SOCKS5 listener driving the
 /// FlowRouter. `install` binds the listener and starts serving; `uninstall`
@@ -263,6 +263,10 @@ impl CaptureAdapter for LocalCaptureAdapter {
 
     fn is_ready(&self) -> bool {
         true
+    }
+
+    fn mode(&self) -> CaptureMode {
+        CaptureMode::LocalSocks
     }
 
     async fn install(&self) -> Result<(), String> {

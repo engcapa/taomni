@@ -36,6 +36,21 @@ pub const EVT_ALERT: &str = "sockscap://alert";
 pub struct SockscapStatus {
     pub state: EngineState,
     pub capabilities: Capabilities,
+    /// Selected capture plane (local-socks / linux-nft / …).
+    pub capture_mode: String,
+    /// Bound local capture port when the plane is listening.
+    pub capture_port: Option<u16>,
+}
+
+/// SSH / egress health card for the Dashboard (plan §11).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EgressHealthSnapshot {
+    pub ssh_profiles: usize,
+    pub proxy_profiles: usize,
+    pub known_hosts: usize,
+    pub host_key_changes: usize,
+    pub note: String,
 }
 
 /// A running process for the picker (`sockscap_list_processes`).
@@ -297,6 +312,8 @@ pub fn sockscap_status(state: State<'_, SockscapState>) -> SockscapStatus {
     SockscapStatus {
         state: state.orchestrator.state(),
         capabilities: capability::detect(),
+        capture_mode: state.capture_mode().as_str().into(),
+        capture_port: state.backend.bound_port(),
     }
 }
 
@@ -517,8 +534,8 @@ pub fn sockscap_test_target(
 }
 
 /// Start the engine using the persisted profiles (plan §9 start transaction).
-/// On the current build the capture backend is absent, so this returns a clear
-/// "backend not available" error and stays Disabled — never a fake Active.
+/// Uses the selected capture plane (local SOCKS5 always ready; Linux nft when
+/// available). Failures stay honest — never a fake Active without install.
 #[tauri::command]
 pub async fn sockscap_start(state: State<'_, SockscapState>) -> Result<EngineState, String> {
     state.start_engine().await
@@ -585,6 +602,48 @@ pub fn sockscap_top_domains(
 #[tauri::command]
 pub fn sockscap_live_stats(state: State<'_, SockscapState>) -> StatsSnapshot {
     state.orchestrator.stats.snapshot()
+}
+
+/// Top applications by connection count (plan §11).
+#[tauri::command]
+pub fn sockscap_top_apps(
+    state: State<'_, SockscapState>,
+    limit: Option<u32>,
+) -> Vec<super::flow::AppStatRow> {
+    state
+        .orchestrator
+        .stats
+        .top_apps(limit.unwrap_or(8).clamp(1, 50) as usize)
+}
+
+/// Dashboard egress / SSH health summary (plan §11 SSH card).
+#[tauri::command]
+pub fn sockscap_egress_health(state: State<'_, SockscapState>) -> EgressHealthSnapshot {
+    let (ssh_profiles, proxy_profiles) = {
+        let conn = state.conn.lock().unwrap();
+        let profiles = db::list_profiles(&conn).unwrap_or_default();
+        let ssh = profiles
+            .iter()
+            .filter(|p| p.enabled && matches!(p.egress_kind, super::model::EgressKind::SshJump))
+            .count();
+        let proxy = profiles
+            .iter()
+            .filter(|p| p.enabled && matches!(p.egress_kind, super::model::EgressKind::ProxySession))
+            .count();
+        (ssh, proxy)
+    };
+    let known_hosts = state.host_keys.lock().unwrap().len();
+    EgressHealthSnapshot {
+        ssh_profiles,
+        proxy_profiles,
+        known_hosts,
+        host_key_changes: 0, // populated when a pool reports a changed-key block
+        note: if ssh_profiles > 0 {
+            "SSH jump profiles use known_hosts verification; host-key change blocks reconnect".into()
+        } else {
+            "No enabled SSH jump profiles".into()
+        },
+    }
 }
 
 #[tauri::command]

@@ -77,35 +77,52 @@ pub fn detect() -> Capabilities {
 
 #[cfg(target_os = "windows")]
 fn detect_windows() -> Capabilities {
+    let divert = super::platform::windivert_driver_present();
+    let mut notes = vec![
+        "Global routing via local SOCKS5 front-end is available without a driver (point apps at 127.0.0.1:1080)".into(),
+    ];
+    if divert {
+        notes.push("WinDivert driver/DLL detected — transparent app/PID capture can be enabled with a signed build".into());
+    } else {
+        notes.push("Transparent app/PID capture requires a signed WinDivert/WFP driver (not installed)".into());
+    }
     Capabilities {
         platform: "windows".into(),
-        // Global uses Wintun/TUN; app/PID uses WinDivert or a WFP callout —
-        // both need a signed driver installed (plan §8, §16.7-26).
-        global_capture: CaptureSupport::RequiresSetup,
-        app_capture: CaptureSupport::RequiresSetup,
+        // Local SOCKS front-end: global is Supported; transparent still needs driver.
+        global_capture: CaptureSupport::Supported,
+        app_capture: if divert {
+            CaptureSupport::RequiresSetup
+        } else {
+            CaptureSupport::RequiresSetup
+        },
         pid_capture: CaptureSupport::RequiresSetup,
         child_follow: true,
         tray_left_click_toggle: true,
-        requires_privilege: true,
-        notes: vec![
-            "Requires an installed, signed capture driver (Wintun/WinDivert or WFP)".into(),
-        ],
+        requires_privilege: !divert, // local socks doesn't need admin; transparent does
+        notes,
     }
 }
 
 #[cfg(target_os = "macos")]
 fn detect_macos() -> Capabilities {
+    let provider = super::platform::macos_provider_socket_present();
+    let mut notes = vec![
+        "Global routing via local SOCKS5 front-end is available (point apps at 127.0.0.1:1080)".into(),
+    ];
+    if provider {
+        notes.push("Sockscap Network Extension control socket present".into());
+    } else {
+        notes.push("Transparent app capture requires approving the Network Extension (NETransparentProxyProvider)".into());
+    }
     Capabilities {
         platform: "macos".into(),
-        global_capture: CaptureSupport::RequiresSetup,
+        global_capture: CaptureSupport::Supported,
         app_capture: CaptureSupport::RequiresSetup,
         pid_capture: CaptureSupport::RequiresSetup,
         child_follow: true,
         tray_left_click_toggle: true,
         requires_privilege: true,
-        notes: vec![
-            "Requires approving the Network Extension (NETransparentProxyProvider)".into(),
-        ],
+        notes,
     }
 }
 
@@ -134,10 +151,12 @@ pub fn linux_caps(cgroup_v2: bool) -> Capabilities {
             ],
         )
     };
+    notes.push("Global routing via local SOCKS5 front-end is always available".into());
     notes.push("Tray left-click toggle not supported on Linux; use the tray menu".into());
     Capabilities {
         platform: "linux".into(),
-        global_capture: CaptureSupport::RequiresSetup,
+        // Local SOCKS front-end always works; nft transparent is a bonus when ready.
+        global_capture: CaptureSupport::Supported,
         app_capture: app,
         pid_capture: pid,
         child_follow: cgroup_v2,
