@@ -7,6 +7,8 @@ import {
 import DetachedSessionWindow from "./components/detached/DetachedSessionWindow";
 import LanChatDetachedWindow from "./components/detached/LanChatDetachedWindow";
 import { NotesDetachedWindow } from "./components/notes/NotesDetachedWindow";
+import { SockscapWindow } from "./components/sockscap/SockscapWindow";
+import { detectSockscapRoute } from "./lib/sockscapRoute";
 import { detectDetachedRoute } from "./lib/detachedSession";
 import { useAppTheme } from "./lib/appTheme";
 import { applyCodeViewProfile, loadCodeViewProfile } from "./lib/codeViewProfile";
@@ -144,7 +146,9 @@ function App() {
 
   let content: ReactNode;
   const detachedSftpId = detectDetachedSftpRoute();
-  if (detachedSftpId) {
+  if (detectSockscapRoute()) {
+    content = <SockscapWindow />;
+  } else if (detachedSftpId) {
     content = <SftpDetachedWindow sessionId={detachedSftpId} />;
   } else {
     const detachedRoute = detectDetachedRoute();
