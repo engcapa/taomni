@@ -14,10 +14,12 @@
 //! system routing, drivers, or privileged helpers — that arrives in later
 //! phases behind the `CaptureAdapter` boundary.
 
+pub mod attribution;
 pub mod autoproxy;
 pub mod conflict;
 pub mod download;
 pub mod egress;
+pub mod flow;
 pub mod known_hosts;
 pub mod matcher;
 pub mod model;
