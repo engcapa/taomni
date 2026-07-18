@@ -9,7 +9,8 @@
     "vnc-*",
     "terminal-*",
     "lan-chat-*",
-    "notes-*"
+    "notes-*",
+    "sockscap"
   ],
   "permissions": [
     "core:default",

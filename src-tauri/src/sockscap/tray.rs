@@ -198,7 +198,11 @@ fn spawn_engine<R: Runtime>(app: &AppHandle<R>, action: EngineAction) {
     });
 }
 
-fn open_window<R: Runtime>(app: &AppHandle<R>) {
+/// Create (or show + focus) the standalone Sockscap window. Shared by the tray
+/// menu and the `sockscap_open_window` command so the menu path matches the
+/// codebase precedent of opening detached windows from Rust (the webview lacks
+/// the ACL permission to create windows itself).
+pub fn open_window<R: Runtime>(app: &AppHandle<R>) {
     if let Some(win) = app.get_webview_window("sockscap") {
         let _ = win.show();
         let _ = win.set_focus();

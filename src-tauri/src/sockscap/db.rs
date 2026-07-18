@@ -15,12 +15,31 @@ use serde::Serialize;
 use super::model::{CustomRule, RoutingProfile, RuleSource};
 use super::{Action, Protocol};
 
+/// Current `sockscap.db` schema version, stored in `PRAGMA user_version`.
+/// Bump this whenever the schema below changes incompatibly.
+const SCHEMA_VERSION: i64 = 1;
+
 /// Create all tables and enable WAL. Idempotent.
+///
+/// Reconciles a pre-release schema change: an earlier build of this
+/// (unreleased) feature stored a different, incompatible layout (json-blob
+/// tables, a `schema_version` table, `settings`, `engine_recovery`). Because
+/// this store holds only rebuildable config/stats and NEVER secrets (egress
+/// credentials live in the Vault), we drop and recreate the tables when that
+/// legacy layout is present rather than migrate a throwaway dev schema. Fresh
+/// or already-current databases are left untouched and just stamped with the
+/// current `user_version`.
 pub fn init_db(conn: &Connection) -> SqlResult<()> {
     // WAL so stats writes don't block reads; NORMAL sync is fine for a
     // rebuildable stats/config store.
     conn.pragma_update(None, "journal_mode", "WAL")?;
     conn.pragma_update(None, "synchronous", "NORMAL")?;
+
+    let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+    if version < SCHEMA_VERSION && legacy_schema_present(conn)? {
+        drop_all_tables(conn)?;
+    }
+
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS routing_profiles (
             id TEXT PRIMARY KEY,
@@ -94,6 +113,36 @@ pub fn init_db(conn: &Connection) -> SqlResult<()> {
             ON engine_recovery_journal(active);
         ",
     )?;
+    // Stamp the schema version so future runs skip reconciliation.
+    conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+    Ok(())
+}
+
+/// True when the file predates the current schema. The pre-release layout is
+/// recognizable by tables the current schema never creates.
+fn legacy_schema_present(conn: &Connection) -> SqlResult<bool> {
+    conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' \
+         AND name IN ('schema_version', 'settings', 'engine_recovery'))",
+        [],
+        |r| r.get(0),
+    )
+}
+
+/// Drop every user table (the file is dedicated to Sockscap) so the CREATE
+/// statements start from a clean slate. Dropping a table also drops its
+/// indexes; `sqlite_%` internal tables are left alone.
+fn drop_all_tables(conn: &Connection) -> SqlResult<()> {
+    let names: Vec<String> = {
+        let mut stmt = conn.prepare(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+        )?;
+        let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
+        rows.collect::<SqlResult<Vec<_>>>()?
+    };
+    for name in names {
+        conn.execute_batch(&format!("DROP TABLE IF EXISTS \"{name}\";"))?;
+    }
     Ok(())
 }
 
@@ -406,6 +455,46 @@ mod tests {
         let c = Connection::open_in_memory().unwrap();
         init_db(&c).unwrap();
         c
+    }
+
+    /// The pre-release layout that shipped on this branch before the columnar
+    /// schema. `init_db` must reconcile it instead of failing on
+    /// "no such column: profile_id" (which left SockscapState unmanaged).
+    fn legacy_schema(conn: &Connection) {
+        conn.execute_batch(
+            "CREATE TABLE schema_version (version INTEGER NOT NULL);
+             CREATE TABLE routing_profiles (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);
+             CREATE TABLE rule_sources (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);
+             CREATE TABLE custom_rules (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);
+             CREATE TABLE engine_recovery (id INTEGER PRIMARY KEY CHECK (id = 1), json TEXT NOT NULL);
+             CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+             INSERT INTO schema_version (version) VALUES (0);",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn init_db_reconciles_legacy_schema() {
+        let c = Connection::open_in_memory().unwrap();
+        legacy_schema(&c);
+        // Must not error on the incompatible custom_rules layout.
+        init_db(&c).unwrap();
+        // Version stamped, and the new columnar schema is usable.
+        let v: i64 = c.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
+        assert_eq!(v, SCHEMA_VERSION);
+        upsert_profile(&c, &profile("p1")).unwrap();
+        assert_eq!(list_profiles(&c).unwrap().len(), 1);
+        // Legacy-only tables are gone.
+        assert!(!legacy_schema_present(&c).unwrap());
+    }
+
+    #[test]
+    fn init_db_is_idempotent_and_preserves_data() {
+        let c = mem();
+        upsert_profile(&c, &profile("keep")).unwrap();
+        // A second init on an already-current db must not drop data.
+        init_db(&c).unwrap();
+        assert_eq!(list_profiles(&c).unwrap().len(), 1);
     }
 
     fn profile(id: &str) -> RoutingProfile {

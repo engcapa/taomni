@@ -8,7 +8,7 @@
 use std::net::IpAddr;
 
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use super::attribution::{attribute, AttributionInputs};
 use super::capability::{self, Capabilities};
@@ -171,6 +171,15 @@ pub fn parse_ps(out: &str) -> Vec<ProcessInfo> {
 }
 
 /* -------------------------------- commands -------------------------------- */
+
+/// Open (or focus) the standalone Sockscap window. The window is created on the
+/// Rust side — like the SFTP/notes detached windows — because the main webview
+/// isn't granted the ACL permission to create windows itself. Available even if
+/// the module failed to initialize, so it never depends on `SockscapState`.
+#[tauri::command]
+pub fn sockscap_open_window(app: AppHandle) {
+    super::tray::open_window(&app);
+}
 
 #[tauri::command]
 pub fn sockscap_capabilities() -> Capabilities {

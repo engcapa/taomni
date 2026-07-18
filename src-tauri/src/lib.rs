@@ -142,7 +142,10 @@ pub fn run() {
                 Ok(sockscap_state) => {
                     app.manage(sockscap_state);
                 }
-                Err(e) => log::warn!("sockscap: init failed, module disabled: {e}"),
+                // eprintln, not log::warn: the log plugin is only installed
+                // later in setup, so a warn! here would be dropped and the UI
+                // would show a cryptic "state not managed" on every command.
+                Err(e) => eprintln!("sockscap: init failed, module disabled: {e}"),
             }
             // Install the system-tray icon + menu regardless of module init so the
             // tray (Open window / Quit) is always available; engine controls use
@@ -809,6 +812,7 @@ pub fn run() {
             notes::commands::notes_set_prefs,
             notes::commands::notes_list_alerts,
             notes::commands::notes_ack_alert,
+            sockscap::commands::sockscap_open_window,
             sockscap::commands::sockscap_capabilities,
             sockscap::commands::sockscap_status,
             sockscap::commands::sockscap_list_profiles,

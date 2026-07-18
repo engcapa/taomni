@@ -27,27 +27,15 @@ export function sockscapWindowUrl(): string {
 }
 
 /**
- * Open (or focus) the Sockscap window. Uses the Tauri window API when
- * available and falls back to `window.open` in browser preview.
+ * Open (or focus) the Sockscap window. The window is created on the Rust side
+ * (`sockscap_open_window`) — matching the SFTP/notes detached windows — because
+ * the main webview isn't granted the ACL permission to create windows itself.
+ * Falls back to `window.open` in browser preview, where there's no backend.
  */
 export async function openSockscapWindow(): Promise<void> {
   try {
-    const mod = await import("@tauri-apps/api/webviewWindow");
-    const existing = await mod.WebviewWindow.getByLabel("sockscap");
-    if (existing) {
-      await existing.show();
-      await existing.setFocus();
-      return;
-    }
-    const win = new mod.WebviewWindow("sockscap", {
-      url: `index.html#${SOCKSCAP_HASH}`,
-      title: "Sockscap",
-      width: 1100,
-      height: 760,
-    });
-    win.once("tauri://error", () => {
-      window.open(sockscapWindowUrl(), "sockscap", "width=1100,height=760");
-    });
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("sockscap_open_window");
   } catch {
     window.open(sockscapWindowUrl(), "sockscap", "width=1100,height=760");
   }

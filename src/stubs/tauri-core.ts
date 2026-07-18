@@ -2766,6 +2766,14 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       return undefined as T;
     }
     // ── Sockscap (browser-preview doubles; real capture needs the desktop app) ──
+    case "sockscap_open_window": {
+      // No Tauri window API in preview — open the route in a plain window.
+      const u = new URL(location.href);
+      u.searchParams.set("sockscap", "1");
+      u.hash = "";
+      window.open(u.toString(), "sockscap", "width=1100,height=760");
+      return undefined as T;
+    }
     case "sockscap_capabilities":
       return sockscapCapabilities() as T;
     case "sockscap_status":
