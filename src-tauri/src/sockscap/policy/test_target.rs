@@ -30,7 +30,9 @@ pub struct TestTargetRequest {
     pub hostname_source: Option<HostnameSource>,
     /// When true, treat as hard-bypass (loopback/upstream).
     pub hard_bypass: bool,
-    /// Profile drafts currently configured (Phase 1 has no sockscap.db yet).
+    /// Saved profile drafts injected by the Rust command after deserialization.
+    /// Webview-supplied profiles are never accepted as a policy source.
+    #[serde(skip)]
     pub profiles: Vec<RoutingProfileDraft>,
     /// Optional precompiled matchers keyed by profile id. When absent, only
     /// default_action / unknown_domain_action are applied for the selected profile.

@@ -242,7 +242,7 @@ impl AppState {
             sdk,
             ai_ctx: Arc::new(RwLock::new(ai_ctx)),
             lanchat,
-            sockscap: Arc::new(SockscapEngine::new()),
+            sockscap: Arc::new(SockscapEngine::with_store(Arc::clone(&sockscap_store))),
             sockscap_store,
         }
     }

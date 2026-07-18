@@ -333,6 +333,35 @@ pub fn list_egress_sessions(
     Ok(summaries)
 }
 
+/// Inspect one saved egress without constructing a connector or exposing
+/// credential material. Structural errors are returned; Vault lock/setup is a
+/// serializable UserActionRequired summary so profiles can remain editable.
+pub fn inspect_egress_session(
+    db: &Connection,
+    vault: &Vault,
+    session_id: &str,
+) -> Result<EgressSessionSummary, EgressResolveError> {
+    validate_session_id(session_id)?;
+    let session = crate::session::db::get_session(db, session_id).map_err(|_| {
+        EgressResolveError::invalid(
+            EGRESS_SESSION_NOT_FOUND,
+            "the selected egress session no longer exists",
+        )
+    })?;
+    let descriptor = parse_descriptor(&session)?;
+    match credential_issue(descriptor.credential(), vault) {
+        Ok(()) => Ok(descriptor.summary(EgressSessionAvailability::Ready, None)),
+        Err(error) => {
+            let availability = if error.user_action_required {
+                EgressSessionAvailability::UserActionRequired
+            } else {
+                EgressSessionAvailability::Invalid
+            };
+            Ok(descriptor.summary(availability, Some(error.issue())))
+        }
+    }
+}
+
 /// Resolve one saved session and build a runtime connector. This is the only
 /// path from persisted egress ids to live Sockscap credentials.
 pub fn build_egress_runtime(

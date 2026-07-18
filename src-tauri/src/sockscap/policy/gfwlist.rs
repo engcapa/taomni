@@ -520,6 +520,29 @@ pub fn refresh_official_gfwlist(app_data: &Path) -> RefreshOutcome {
 }
 
 fn refresh_gfwlist_from_mirrors(app_data: &Path, mirrors: &[&str]) -> RefreshOutcome {
+    refresh_source_from_mirrors(
+        app_data,
+        GFWLIST_OFFICIAL_SOURCE_ID,
+        RuleSourceKind::GfwlistOfficial,
+        mirrors,
+    )
+}
+
+/// Refresh one persisted custom URL under the same bounded, conditional,
+/// last-good pipeline as the official source.
+pub fn refresh_custom_url(app_data: &Path, source_id: &str, url: &str) -> RefreshOutcome {
+    if let Err(error) = validate_provenance(source_id, RuleSourceKind::CustomUrl, Some(url)) {
+        return failed_outcome(Some(url), error);
+    }
+    refresh_source_from_mirrors(app_data, source_id, RuleSourceKind::CustomUrl, &[url])
+}
+
+fn refresh_source_from_mirrors(
+    app_data: &Path,
+    source_id: &str,
+    kind: RuleSourceKind,
+    mirrors: &[&str],
+) -> RefreshOutcome {
     let client = match reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .redirect(reqwest::redirect::Policy::limited(3))
@@ -527,15 +550,11 @@ fn refresh_gfwlist_from_mirrors(app_data: &Path, mirrors: &[&str]) -> RefreshOut
     {
         Ok(client) => client,
         Err(error) => {
-            return fallback_last_good(
-                app_data,
-                GFWLIST_OFFICIAL_SOURCE_ID,
-                Some(error.to_string()),
-            );
+            return fallback_last_good(app_data, source_id, Some(error.to_string()));
         }
     };
 
-    let previous = load_source_state(app_data, GFWLIST_OFFICIAL_SOURCE_ID);
+    let previous = load_source_state(app_data, source_id);
     let mut last_error = None;
     for &mirror in mirrors {
         let mut request = client
@@ -565,7 +584,7 @@ fn refresh_gfwlist_from_mirrors(app_data: &Path, mirrors: &[&str]) -> RefreshOut
             }
         };
         if response.status() == reqwest::StatusCode::NOT_MODIFIED {
-            return not_modified_outcome(app_data, GFWLIST_OFFICIAL_SOURCE_ID);
+            return not_modified_outcome(app_data, source_id);
         }
         if !response.status().is_success() {
             last_error = Some(format!("mirror {mirror} status {}", response.status()));
@@ -612,8 +631,8 @@ fn refresh_gfwlist_from_mirrors(app_data: &Path, mirrors: &[&str]) -> RefreshOut
         };
         let outcome = ingest_payload_with_validators(
             app_data,
-            GFWLIST_OFFICIAL_SOURCE_ID,
-            RuleSourceKind::GfwlistOfficial,
+            source_id,
+            kind,
             Some(mirror),
             &payload,
             validators,
@@ -623,7 +642,7 @@ fn refresh_gfwlist_from_mirrors(app_data: &Path, mirrors: &[&str]) -> RefreshOut
         }
         last_error = outcome.error;
     }
-    fallback_last_good(app_data, GFWLIST_OFFICIAL_SOURCE_ID, last_error)
+    fallback_last_good(app_data, source_id, last_error)
 }
 
 #[cfg(test)]
@@ -784,6 +803,24 @@ mod tests {
         let mirrors = official_gfwlist_mirrors();
         assert!(mirrors.len() >= 3);
         assert!(mirrors.iter().all(|mirror| mirror.starts_with("https://")));
+    }
+
+    #[test]
+    fn custom_url_uses_bounded_last_good_refresh_pipeline() {
+        let directory = temp_app_data();
+        let (base, server) = serve_documents(vec![(
+            "/custom",
+            "[AutoProxy 0.2.9]\n||custom.example\n".into(),
+        )]);
+        let url = format!("{base}/custom");
+        let outcome = refresh_custom_url(directory.path(), "custom-source", &url);
+        server.join().expect("test HTTP server");
+        assert!(outcome.ok, "{:?}", outcome.error);
+        assert!(!outcome.used_last_good);
+        let state =
+            load_source_state(directory.path(), "custom-source").expect("custom source state");
+        assert_eq!(state.kind, RuleSourceKind::CustomUrl);
+        assert_eq!(state.url.as_deref(), Some(url.as_str()));
     }
 
     #[test]

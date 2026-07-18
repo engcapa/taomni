@@ -51,7 +51,7 @@ impl SockscapStore {
     }
 
     #[cfg(test)]
-    fn open_in_memory() -> Result<Self, String> {
+    pub(crate) fn open_in_memory() -> Result<Self, String> {
         let conn = Connection::open_in_memory().map_err(|error| error.to_string())?;
         configure_connection(&conn, false)?;
         migrate(&conn)?;

@@ -1,16 +1,22 @@
-//! Sockscap engine orchestrator — state machine only in Phase 0.
+//! Sockscap engine lifecycle coordinator.
 //!
-//! Design plan §4.1 / §9. Real capture install/teardown and recovery journal
-//! land in later phases. This type is process-global and held on `AppState`.
+//! Configuration always comes from an immutable `sockscap.db` snapshot. The
+//! capture marker is intentionally not written until every preflight and
+//! upstream gate passes; because platform capture is not implemented in this
+//! phase, start discards its prepared snapshot and remains Disabled. A marker
+//! left by another process is never cleared without a platform/helper cleanup
+//! confirmation.
 
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
-use super::preflight::{run_preflight, PreflightReport};
-use super::types::{EngineState, EngineStatus, RoutingProfileDraft};
+use super::preflight::{PreflightReport, PreflightSeverity, run_preflight};
+use super::storage::{RecoveryJournal, RecoveryPhase, SockscapStore};
+use super::types::{EngineState, EngineStatus};
 
-/// In-process Sockscap engine handle.
+/// Process-global Sockscap engine handle.
 pub struct SockscapEngine {
     inner: Mutex<EngineInner>,
+    store: Option<Arc<SockscapStore>>,
 }
 
 struct EngineInner {
@@ -26,159 +32,328 @@ impl Default for SockscapEngine {
 }
 
 impl SockscapEngine {
+    /// Test/fallback constructor without persistence.
     pub fn new() -> Self {
         Self {
             inner: Mutex::new(EngineInner {
                 status: EngineStatus::default(),
                 last_preflight: None,
             }),
+            store: None,
+        }
+    }
+
+    /// Production constructor. Any non-clean journal is treated as crash
+    /// recovery state because no live runtime has been attached yet.
+    pub fn with_store(store: Arc<SockscapStore>) -> Self {
+        let status = match store.recovery_journal() {
+            Ok(journal) => startup_status(&journal),
+            Err(error) => recovery_error_status(
+                "RECOVERY_JOURNAL_UNAVAILABLE",
+                format!("Sockscap recovery journal could not be read: {error}"),
+                Vec::new(),
+            ),
+        };
+        Self {
+            inner: Mutex::new(EngineInner {
+                status,
+                last_preflight: None,
+            }),
+            store: Some(store),
         }
     }
 
     pub fn status(&self) -> EngineStatus {
-        self.inner
+        let current = self
+            .inner
             .lock()
-            .map(|g| g.status.clone())
-            .unwrap_or_else(|e| e.into_inner().status.clone())
+            .map(|guard| guard.status.clone())
+            .unwrap_or_else(|poisoned| poisoned.into_inner().status.clone());
+        let Some(store) = &self.store else {
+            return current;
+        };
+        match store.recovery_journal() {
+            Ok(journal)
+                if journal.phase == RecoveryPhase::RecoveryRequired
+                    || (journal.cleanup_required
+                        && matches!(
+                            current.state,
+                            EngineState::Disabled
+                                | EngineState::Degraded
+                                | EngineState::UserActionRequired
+                                | EngineState::RecoveryRequired
+                        )) =>
+            {
+                recovery_status(&journal)
+            }
+            Ok(_) => current,
+            Err(error) => recovery_error_status(
+                "RECOVERY_JOURNAL_UNAVAILABLE",
+                format!("Sockscap recovery journal could not be read: {error}"),
+                current.active_profile_ids,
+            ),
+        }
     }
 
     pub fn last_preflight(&self) -> Option<PreflightReport> {
         self.inner
             .lock()
-            .map(|g| g.last_preflight.clone())
-            .unwrap_or_else(|e| e.into_inner().last_preflight.clone())
+            .map(|guard| guard.last_preflight.clone())
+            .unwrap_or_else(|poisoned| poisoned.into_inner().last_preflight.clone())
     }
 
-    /// Attempt to start the engine. Phase 0 always refuses because the capture
-    /// plane is not implemented; the transition path and error surface are real.
-    pub fn start(&self, profiles: &[RoutingProfileDraft]) -> Result<EngineStatus, String> {
-        let mut guard = self
-            .inner
-            .lock()
-            .map_err(|_| "sockscap engine lock poisoned".to_string())?;
-
-        match guard.status.state {
-            EngineState::Preparing | EngineState::Active | EngineState::Stopping => {
-                return Err(format!(
-                    "cannot start while engine is in state {:?}",
-                    guard.status.state
-                ));
-            }
-            EngineState::RecoveryRequired => {
-                return Err(
-                    "engine requires recovery before start; call sockscap_recover first".into(),
-                );
-            }
-            EngineState::Disabled | EngineState::Degraded | EngineState::UserActionRequired => {}
+    /// Prepare and validate one immutable snapshot of the saved profiles.
+    /// Capture remains unavailable, so a successful pure preflight would still
+    /// be refused before any recovery marker or system state is created.
+    pub fn start(&self) -> Result<EngineStatus, String> {
+        let store = self.store.as_ref().ok_or_else(|| {
+            "SOCKSCAP_STORE_UNAVAILABLE: saved configuration store is not attached".to_string()
+        })?;
+        let journal = store.recovery_journal()?;
+        if journal.cleanup_required || journal.phase != RecoveryPhase::Clean {
+            let status = recovery_status(&journal);
+            self.replace_status(status);
+            return Err(format!(
+                "RECOVERY_REQUIRED: generation {} must be cleaned before start",
+                journal.generation
+            ));
         }
 
-        guard.status.state = EngineState::Preparing;
-        guard.status.message = "Running preflight checks".into();
-        guard.status.last_error = None;
-
-        let preflight = run_preflight(profiles);
-        guard.last_preflight = Some(preflight.clone());
-
-        if !preflight.ok {
-            let msg = preflight
-                .findings
-                .iter()
-                .filter(|f| {
-                    matches!(
-                        f.severity,
-                        super::preflight::PreflightSeverity::Error
-                    )
-                })
-                .map(|f| f.message.clone())
-                .collect::<Vec<_>>()
-                .join("; ");
-            guard.status.state = EngineState::Disabled;
-            guard.status.message = "Preflight failed".into();
-            guard.status.last_error = Some(msg.clone());
+        {
+            let mut guard = self
+                .inner
+                .lock()
+                .map_err(|_| "sockscap engine lock poisoned".to_string())?;
+            match guard.status.state {
+                EngineState::Preparing | EngineState::Active | EngineState::Stopping => {
+                    return Err(format!(
+                        "ENGINE_STATE_CONFLICT: cannot start while engine is {:?}",
+                        guard.status.state
+                    ));
+                }
+                EngineState::RecoveryRequired => {
+                    return Err(
+                        "RECOVERY_REQUIRED: recover network state before starting Sockscap".into(),
+                    );
+                }
+                EngineState::Disabled | EngineState::Degraded | EngineState::UserActionRequired => {
+                }
+            }
+            guard.status.state = EngineState::Preparing;
+            guard.status.message = "Preparing immutable Sockscap configuration".into();
+            guard.status.last_error = None;
+            guard.status.recovery_required = false;
             guard.status.capture_active = false;
             guard.status.active_profile_ids.clear();
-            return Err(format!("sockscap preflight failed: {msg}"));
         }
 
-        // Unreachable in Phase 0 (preflight always fails), but kept as the
-        // intended success path for later phases.
-        guard.status.state = EngineState::Active;
-        guard.status.message = "Sockscap is active".into();
-        guard.status.capture_active = true;
-        guard.status.active_profile_ids = profiles
-            .iter()
-            .filter(|p| p.enabled)
-            .map(|p| p.id.clone())
-            .collect();
-        Ok(guard.status.clone())
+        let snapshot = match store.prepare_config_snapshot() {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                self.fail_start("Configuration snapshot failed", &error);
+                return Err(error);
+            }
+        };
+        let preflight = run_preflight(&snapshot.profiles);
+        {
+            let mut guard = self
+                .inner
+                .lock()
+                .map_err(|_| "sockscap engine lock poisoned".to_string())?;
+            guard.last_preflight = Some(preflight.clone());
+            guard.status.active_profile_ids = snapshot
+                .profiles
+                .iter()
+                .map(|profile| profile.id.clone())
+                .collect();
+        }
+
+        if !preflight.ok {
+            let message = preflight_error_message(&preflight);
+            let discard_error = store
+                .discard_prepared_config_snapshot(snapshot.revision)
+                .err();
+            let message = match discard_error {
+                Some(error) => format!("{message}; CONFIG_SNAPSHOT_DISCARD_FAILED: {error}"),
+                None => message,
+            };
+            self.fail_start("Sockscap preflight failed", &message);
+            return Err(format!("SOCKSCAP_PREFLIGHT_FAILED: {message}"));
+        }
+
+        // This phase has no capture adapter/helper. Do not create a recovery
+        // marker and do not publish the snapshot as committed/Active.
+        let discard = store.discard_prepared_config_snapshot(snapshot.revision);
+        let message = match discard {
+            Ok(()) => "CAPTURE_ADAPTER_NOT_READY: platform capture is not available in this build"
+                .to_string(),
+            Err(error) => format!(
+                "CAPTURE_ADAPTER_NOT_READY: platform capture is unavailable; CONFIG_SNAPSHOT_DISCARD_FAILED: {error}"
+            ),
+        };
+        self.fail_start("Sockscap capture is unavailable", &message);
+        Err(message)
     }
 
-    /// Stop the engine. Idempotent when already disabled.
+    /// Stop is idempotent while both the in-memory runtime and recovery
+    /// journal are clean. It cannot clear a real marker without helper proof.
     pub fn stop(&self) -> Result<EngineStatus, String> {
+        if let Some(store) = &self.store {
+            let journal = store.recovery_journal()?;
+            if journal.cleanup_required || journal.phase != RecoveryPhase::Clean {
+                let status = recovery_status(&journal);
+                self.replace_status(status);
+                return Err(
+                    "RECOVERY_HELPER_REQUIRED: platform cleanup must complete before stop can be confirmed"
+                        .into(),
+                );
+            }
+        }
         let mut guard = self
             .inner
             .lock()
             .map_err(|_| "sockscap engine lock poisoned".to_string())?;
-
         match guard.status.state {
-            EngineState::Disabled => {
-                guard.status.message = "Sockscap engine is disabled".into();
-                return Ok(guard.status.clone());
+            EngineState::Preparing => {
+                return Err(
+                    "ENGINE_STATE_CONFLICT: start is still preparing; cancellation is not available in this build"
+                        .into(),
+                );
             }
             EngineState::Stopping => {
-                return Err("stop already in progress".into());
+                return Err("ENGINE_STATE_CONFLICT: stop is already in progress".into());
             }
             _ => {}
         }
-
-        guard.status.state = EngineState::Stopping;
-        guard.status.message = "Stopping Sockscap".into();
-
-        // Phase 0: no capture rules to tear down.
         guard.status.state = EngineState::Disabled;
         guard.status.message = "Sockscap engine is disabled".into();
         guard.status.capture_active = false;
+        guard.status.recovery_required = false;
         guard.status.active_profile_ids.clear();
         guard.status.last_error = None;
         Ok(guard.status.clone())
     }
 
-    /// Best-effort recovery path. Phase 0 has no system state to repair; it
-    /// clears RecoveryRequired / errors and returns to Disabled.
+    /// One-click recovery is wired now, but cannot claim success until a
+    /// platform adapter/helper explicitly confirms that system rules are gone.
     pub fn recover(&self) -> Result<EngineStatus, String> {
+        if let Some(store) = &self.store {
+            let journal = store.recovery_journal()?;
+            if journal.cleanup_required || journal.phase != RecoveryPhase::Clean {
+                let status = recovery_status(&journal);
+                self.replace_status(status);
+                return Err(
+                    "RECOVERY_HELPER_REQUIRED: this build has no platform cleanup adapter; the recovery marker was preserved"
+                        .into(),
+                );
+            }
+        }
         let mut guard = self
             .inner
             .lock()
             .map_err(|_| "sockscap engine lock poisoned".to_string())?;
-
-        // Later phases: read recovery journal, revoke leftover rules via helper.
-        guard.status.state = EngineState::Disabled;
-        guard.status.message = "Recovery complete (no capture rules present in Phase 0)".into();
-        guard.status.recovery_required = false;
-        guard.status.capture_active = false;
-        guard.status.active_profile_ids.clear();
-        guard.status.last_error = None;
+        if matches!(
+            guard.status.state,
+            EngineState::Preparing | EngineState::Active | EngineState::Stopping
+        ) {
+            return Err(format!(
+                "ENGINE_STATE_CONFLICT: cannot recover while engine is {:?}",
+                guard.status.state
+            ));
+        }
+        guard.status = EngineStatus::default();
         Ok(guard.status.clone())
     }
 
-    /// Mark the engine as needing recovery (used by helper heartbeat loss later).
+    /// Mark an in-process runtime failure. The persistent marker is owned by
+    /// the capture/helper transaction and is updated there with a stable code.
     #[allow(dead_code)]
     pub fn mark_recovery_required(&self, reason: impl Into<String>) {
+        let status = recovery_error_status(
+            "ENGINE_RUNTIME_FAILURE",
+            reason.into(),
+            self.status().active_profile_ids,
+        );
+        self.replace_status(status);
+    }
+
+    fn fail_start(&self, message: &str, error: &str) {
         if let Ok(mut guard) = self.inner.lock() {
-            guard.status.state = EngineState::RecoveryRequired;
-            guard.status.recovery_required = true;
+            guard.status.state = EngineState::Disabled;
+            guard.status.message = message.to_string();
+            guard.status.last_error = Some(error.to_string());
+            guard.status.recovery_required = false;
             guard.status.capture_active = false;
-            let reason = reason.into();
-            guard.status.message = "Recovery required".into();
-            guard.status.last_error = Some(reason);
+            guard.status.active_profile_ids.clear();
         }
+    }
+
+    fn replace_status(&self, status: EngineStatus) {
+        match self.inner.lock() {
+            Ok(mut guard) => guard.status = status,
+            Err(poisoned) => poisoned.into_inner().status = status,
+        }
+    }
+}
+
+fn preflight_error_message(preflight: &PreflightReport) -> String {
+    let message = preflight
+        .findings
+        .iter()
+        .filter(|finding| finding.severity == PreflightSeverity::Error)
+        .map(|finding| finding.message.clone())
+        .collect::<Vec<_>>()
+        .join("; ");
+    if message.is_empty() {
+        "preflight did not pass".into()
+    } else {
+        message
+    }
+}
+
+fn startup_status(journal: &RecoveryJournal) -> EngineStatus {
+    if journal.cleanup_required || journal.phase != RecoveryPhase::Clean {
+        recovery_status(journal)
+    } else {
+        EngineStatus::default()
+    }
+}
+
+fn recovery_status(journal: &RecoveryJournal) -> EngineStatus {
+    recovery_error_status(
+        journal
+            .last_error_code
+            .as_deref()
+            .unwrap_or("RECOVERY_REQUIRED"),
+        format!(
+            "Sockscap recovery generation {} is {:?}; platform cleanup is required",
+            journal.generation, journal.phase
+        ),
+        journal.active_profile_ids.clone(),
+    )
+}
+
+fn recovery_error_status(
+    code: &str,
+    message: String,
+    active_profile_ids: Vec<String>,
+) -> EngineStatus {
+    EngineStatus {
+        state: EngineState::RecoveryRequired,
+        message: "Sockscap network recovery is required".into(),
+        active_profile_ids,
+        last_error: Some(format!("{code}: {message}")),
+        recovery_required: true,
+        capture_active: false,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sockscap::types::{EgressKind, ProfileScope, RouteAction};
+    use crate::sockscap::types::{
+        CapturePlatform, EgressKind, ProfileScope, RouteAction, RoutingProfileDraft,
+    };
 
     fn profile() -> RoutingProfileDraft {
         RoutingProfileDraft {
@@ -193,30 +368,60 @@ mod tests {
         }
     }
 
+    fn store_with_profile() -> Arc<SockscapStore> {
+        let store = Arc::new(SockscapStore::open_in_memory().expect("open Sockscap store"));
+        store
+            .upsert_profile(&profile(), Some(0))
+            .expect("save routing profile");
+        store
+    }
+
     #[test]
-    fn start_fails_in_phase0_and_stays_disabled() {
-        let engine = SockscapEngine::new();
-        let err = engine.start(&[profile()]).unwrap_err();
-        assert!(err.contains("preflight"));
+    fn start_uses_saved_snapshot_and_discards_it_after_preflight_failure() {
+        let store = store_with_profile();
+        let engine = SockscapEngine::with_store(Arc::clone(&store));
+        let error = engine.start().expect_err("capture preflight must fail");
+        assert!(error.contains("SOCKSCAP_PREFLIGHT_FAILED"));
         let status = engine.status();
         assert_eq!(status.state, EngineState::Disabled);
         assert!(!status.capture_active);
         assert!(engine.last_preflight().is_some());
+        let discard_again = store
+            .discard_prepared_config_snapshot(1)
+            .expect_err("failed-start snapshot must already be discarded");
+        assert!(discard_again.contains("CONFIG_SNAPSHOT_NOT_FOUND"));
     }
 
     #[test]
-    fn stop_is_idempotent_when_disabled() {
-        let engine = SockscapEngine::new();
-        let status = engine.stop().unwrap();
+    fn stop_is_idempotent_when_journal_is_clean() {
+        let store = store_with_profile();
+        let engine = SockscapEngine::with_store(store);
+        let status = engine.stop().expect("stop clean engine");
         assert_eq!(status.state, EngineState::Disabled);
     }
 
     #[test]
-    fn recover_clears_recovery_flag() {
-        let engine = SockscapEngine::new();
-        engine.mark_recovery_required("test leftover rules");
+    fn startup_preserves_recovery_marker_and_recover_cannot_fake_cleanup() {
+        let store = store_with_profile();
+        let journal = store
+            .begin_prepare(&["p1".into()], 1, CapturePlatform::current(), true)
+            .expect("write recovery marker");
+        let engine = SockscapEngine::with_store(Arc::clone(&store));
         assert_eq!(engine.status().state, EngineState::RecoveryRequired);
-        let status = engine.recover().unwrap();
+        let error = engine.recover().expect_err("helper cleanup is unavailable");
+        assert!(error.contains("RECOVERY_HELPER_REQUIRED"));
+        let persisted = store.recovery_journal().expect("read recovery journal");
+        assert_eq!(persisted.generation, journal.generation);
+        assert!(persisted.cleanup_required);
+        assert_eq!(persisted.phase, RecoveryPhase::Preparing);
+    }
+
+    #[test]
+    fn in_memory_test_engine_can_clear_only_its_nonpersistent_flag() {
+        let engine = SockscapEngine::new();
+        engine.mark_recovery_required("test-only failure");
+        assert_eq!(engine.status().state, EngineState::RecoveryRequired);
+        let status = engine.recover().expect("clear in-memory status");
         assert_eq!(status.state, EngineState::Disabled);
         assert!(!status.recovery_required);
     }
