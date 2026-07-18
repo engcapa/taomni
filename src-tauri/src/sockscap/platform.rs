@@ -89,16 +89,44 @@ pub fn select_backend() -> CaptureBackend {
 }
 
 /// Probe for a WinDivert driver/DLL without linking the SDK (Phase 5 readiness).
+///
+/// Looks in: cwd, System32, next to the running executable, the Taomni resources
+/// tree (`src-tauri/resources/windivert` / bundled `resources/windivert`), and PATH.
 #[cfg(windows)]
 pub fn windivert_driver_present() -> bool {
-    // Common install locations / PATH names.
-    let candidates = [
+    let mut candidates: Vec<std::path::PathBuf> = [
         "WinDivert.dll",
         "WinDivert64.sys",
         r"C:\Windows\System32\drivers\WinDivert64.sys",
         r"C:\Windows\System32\WinDivert.dll",
-    ];
-    candidates.iter().any(|p| std::path::Path::new(p).exists())
+        r"C:\Windows\System32\WinDivert64.sys",
+    ]
+    .iter()
+    .map(std::path::PathBuf::from)
+    .collect();
+
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            candidates.push(dir.join("WinDivert.dll"));
+            candidates.push(dir.join("WinDivert64.sys"));
+            candidates.push(dir.join("resources").join("windivert").join("WinDivert.dll"));
+            candidates.push(dir.join("resources").join("windivert").join("WinDivert64.sys"));
+        }
+    }
+    // Dev-tree layout when running `tauri dev` from the repo.
+    candidates.push(
+        std::path::PathBuf::from("src-tauri")
+            .join("resources")
+            .join("windivert")
+            .join("WinDivert.dll"),
+    );
+    candidates.push(
+        std::path::PathBuf::from("resources")
+            .join("windivert")
+            .join("WinDivert.dll"),
+    );
+
+    candidates.iter().any(|p| p.exists())
         || std::env::var_os("PATH").is_some_and(|path| {
             std::env::split_paths(&path).any(|dir| dir.join("WinDivert.dll").exists())
         })
