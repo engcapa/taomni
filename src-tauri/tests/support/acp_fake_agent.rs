@@ -87,8 +87,25 @@ fn main() {
                     }),
                 );
             }
-            Some("session/prompt") if scenario == "permission-request" => {
+            Some("session/prompt")
+                if scenario == "permission-request" || scenario == "mcp-permission-request" =>
+            {
                 pending_prompt_id = id;
+                let tool_call = if scenario == "mcp-permission-request" {
+                    json!({
+                        "toolCallId": "tool-permission-mcp-1",
+                        "title": "taomni__run_in_terminal",
+                        "kind": "execute",
+                        "rawInput": { "command": "echo ok", "secret": "must-not-reach-ui" },
+                    })
+                } else {
+                    json!({
+                        "toolCallId": "tool-permission-1",
+                        "title": "Write README.md",
+                        "kind": "edit",
+                        "rawInput": { "secret": "must-not-reach-ui" },
+                    })
+                };
                 send(
                     &mut stdout,
                     json!({
@@ -97,12 +114,7 @@ fn main() {
                         "method": "session/request_permission",
                         "params": {
                             "sessionId": "fake-session",
-                            "toolCall": {
-                                "toolCallId": "tool-permission-1",
-                                "title": "Write README.md",
-                                "kind": "edit",
-                                "rawInput": { "secret": "must-not-reach-ui" },
-                            },
+                            "toolCall": tool_call,
                             "options": [
                                 {
                                     "optionId": "allow-once",

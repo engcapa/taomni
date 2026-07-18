@@ -1,12 +1,12 @@
 use super::protocol::{
     self, ACP_PROTOCOL_VERSION, AcpAgentInfo, AcpIncomingMessage, AcpNotification,
-    AcpPermissionOption, AcpPermissionRequest, AcpPromptResult, AcpRequest, AcpRequestId,
-    AcpResourceLink, METHOD_SESSION_REQUEST_PERMISSION, METHOD_SESSION_UPDATE,
-    authenticate_request, cancel_notification, initialize_request, load_session_request,
-    new_session_request, parse_incoming_line, parse_initialize_result, parse_permission_request,
-    parse_prompt_result, parse_session_update, permission_cancelled_response,
-    permission_selected_response, prompt_request, prompt_with_resource_links_request,
-    session_id_from_response,
+    AcpPermissionOption, AcpPermissionOptionKind, AcpPermissionRequest, AcpPromptResult,
+    AcpRequest, AcpRequestId, AcpResourceLink, METHOD_SESSION_REQUEST_PERMISSION,
+    METHOD_SESSION_UPDATE, authenticate_request, cancel_notification, initialize_request,
+    load_session_request, new_session_request, parse_incoming_line, parse_initialize_result,
+    parse_permission_request, parse_prompt_result, parse_session_update,
+    permission_cancelled_response, permission_selected_response, prompt_request,
+    prompt_with_resource_links_request, session_id_from_response,
 };
 use regex::Regex;
 use serde::Serialize;
@@ -793,6 +793,17 @@ async fn spawn_permission_response(
         return;
     }
 
+    // Taomni MCP write tools already show the audited ActionCard. Auto-select
+    // an allow option here so Grok ACP does not open a second, less-detailed
+    // safety gate for the same side effect.
+    if request.deferred_to_mcp
+        && let Some(option_id) = preferred_mcp_allow_option_id(&request.options)
+    {
+        let response = permission_selected_response(id, &option_id);
+        let _ = write_message(&stdin, &response, &stopped).await;
+        return;
+    }
+
     let call_id = uuid::Uuid::new_v4().to_string();
     let prompt = AcpPermissionPrompt {
         call_id: call_id.clone(),
@@ -853,6 +864,20 @@ async fn spawn_permission_response(
         // could drop that receiver before the WebView hears to remove its card.
         completion.finish();
     });
+}
+
+/// Prefer a one-shot allow for MCP-deferred prompts. Fall back to allow-always
+/// only when the agent did not offer allow-once, so we never invent an option.
+fn preferred_mcp_allow_option_id(options: &[AcpPermissionOption]) -> Option<String> {
+    options
+        .iter()
+        .find(|option| option.kind == AcpPermissionOptionKind::AllowOnce)
+        .or_else(|| {
+            options
+                .iter()
+                .find(|option| option.kind == AcpPermissionOptionKind::AllowAlways)
+        })
+        .map(|option| option.option_id.clone())
 }
 
 fn spawn_stderr_reader(

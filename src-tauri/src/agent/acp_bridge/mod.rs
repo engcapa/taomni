@@ -29,9 +29,10 @@ pub use protocol::{
     AcpStopReason, AcpUsageUpdate, METHOD_AUTHENTICATE, METHOD_INITIALIZE, METHOD_SESSION_CANCEL,
     METHOD_SESSION_LOAD, METHOD_SESSION_NEW, METHOD_SESSION_PROMPT,
     METHOD_SESSION_REQUEST_PERMISSION, METHOD_SESSION_UPDATE, authenticate_request,
-    cancel_notification, initialize_request, load_session_request, new_session_request,
-    parse_incoming_line, parse_initialize_result, parse_permission_request, parse_prompt_result,
-    parse_session_update, permission_cancelled_response, permission_selected_response,
-    prompt_request, prompt_with_resource_links_request, session_id_from_response,
+    cancel_notification, initialize_request, is_taomni_mcp_tool_name, load_session_request,
+    new_session_request, parse_incoming_line, parse_initialize_result, parse_permission_request,
+    parse_prompt_result, parse_session_update, permission_cancelled_response,
+    permission_selected_response, prompt_request, prompt_with_resource_links_request,
+    session_id_from_response, tool_call_targets_taomni_mcp,
 };
 pub use thread::AcpThreadProcess;
