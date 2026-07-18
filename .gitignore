@@ -124,8 +124,7 @@ qa-ui-auto-tests/controls-drafts/
 # testing
 output
 
-# WinDivert redistributable binaries (install via scripts/install-windivert-windows.ps1)
-src-tauri/resources/windivert/**
-!src-tauri/resources/windivert/README.md
-!src-tauri/resources/windivert/LICENSE
-!src-tauri/resources/windivert/VERSION
+# WinDivert sample tools (not shipped); keep runtime DLL/SYS for packaging.
+src-tauri/resources/windivert/*.exe
+src-tauri/resources/windivert/*.lib
+src-tauri/resources/windivert/include/

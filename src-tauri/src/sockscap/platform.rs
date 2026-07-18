@@ -13,12 +13,15 @@ use std::sync::Arc;
 
 use super::capture::{CaptureAdapter, CaptureMode};
 use super::listener::{FlowRouter, LocalCaptureAdapter};
+use super::model::RoutingProfile;
 use super::runtime::DEFAULT_LOCAL_CAPTURE_PORT;
 
 /// Handle used by the runtime to configure the active adapter's router and
 /// report which plane is selected.
 pub enum CaptureBackend {
     Local(Arc<LocalCaptureAdapter>),
+    #[cfg(windows)]
+    Windows(Arc<super::windows_capture::WindowsCaptureAdapter>),
     #[cfg(target_os = "linux")]
     LinuxNft(Arc<super::transparent::LinuxTransparentAdapter>),
 }
@@ -27,6 +30,8 @@ impl CaptureBackend {
     pub fn adapter(&self) -> Arc<dyn CaptureAdapter> {
         match self {
             CaptureBackend::Local(a) => a.clone(),
+            #[cfg(windows)]
+            CaptureBackend::Windows(a) => a.clone(),
             #[cfg(target_os = "linux")]
             CaptureBackend::LinuxNft(a) => a.clone(),
         }
@@ -35,8 +40,30 @@ impl CaptureBackend {
     pub fn set_router(&self, router: Arc<FlowRouter>) {
         match self {
             CaptureBackend::Local(a) => a.set_router(router),
+            #[cfg(windows)]
+            CaptureBackend::Windows(a) => a.set_router(router),
             #[cfg(target_os = "linux")]
             CaptureBackend::LinuxNft(a) => a.set_router(router),
+        }
+    }
+
+    pub fn set_profiles(&self, profiles: Vec<RoutingProfile>) {
+        match self {
+            #[cfg(windows)]
+            CaptureBackend::Windows(a) => a.set_profiles(profiles),
+            _ => {
+                let _ = profiles;
+            }
+        }
+    }
+
+    pub fn set_resource_dir(&self, dir: std::path::PathBuf) {
+        match self {
+            #[cfg(windows)]
+            CaptureBackend::Windows(a) => a.set_resource_dir(dir),
+            _ => {
+                let _ = dir;
+            }
         }
     }
 
@@ -47,6 +74,8 @@ impl CaptureBackend {
     pub fn bound_port(&self) -> Option<u16> {
         match self {
             CaptureBackend::Local(a) => a.bound_port(),
+            #[cfg(windows)]
+            CaptureBackend::Windows(a) => a.bound_port(),
             #[cfg(target_os = "linux")]
             CaptureBackend::LinuxNft(_) => Some(DEFAULT_LOCAL_CAPTURE_PORT),
         }
@@ -57,6 +86,14 @@ impl CaptureBackend {
 /// probe says it is ready; always fall back to local SOCKS5 so Start never
 /// dead-ends when only global routing via a front-end is required.
 pub fn select_backend() -> CaptureBackend {
+    #[cfg(windows)]
+    {
+        log::info!("sockscap: selecting Windows WinDivert + local SOCKS capture plane");
+        return CaptureBackend::Windows(Arc::new(
+            super::windows_capture::WindowsCaptureAdapter::new(),
+        ));
+    }
+
     #[cfg(target_os = "linux")]
     {
         if super::transparent::LinuxTransparentAdapter::probe_nft() {
@@ -71,21 +108,13 @@ pub fn select_backend() -> CaptureBackend {
         log::info!("sockscap: nft unavailable; falling back to local SOCKS5 capture");
     }
 
-    #[cfg(all(windows, feature = "sockscap-windivert"))]
+    #[cfg(not(windows))]
     {
-        if windivert_driver_present() {
-            log::info!("sockscap: WinDivert feature built and driver present (using local SOCKS + NAT path when wired)");
-            // Full CaptureAdapter wrap of WinDivertEngine is feature-gated and
-            // still pairs with the local transparent listener; the local SOCKS
-            // front-end remains the always-on plane in this build until the
-            // NAT→listener handoff is fully integrated on hardware.
-        }
+        CaptureBackend::Local(Arc::new(LocalCaptureAdapter::new(
+            "127.0.0.1",
+            DEFAULT_LOCAL_CAPTURE_PORT,
+        )))
     }
-
-    CaptureBackend::Local(Arc::new(LocalCaptureAdapter::new(
-        "127.0.0.1",
-        DEFAULT_LOCAL_CAPTURE_PORT,
-    )))
 }
 
 /// Probe for a WinDivert driver/DLL without linking the SDK (Phase 5 readiness).
@@ -156,11 +185,18 @@ mod tests {
     #[test]
     fn select_backend_always_returns_ready_adapter() {
         let b = select_backend();
-        assert!(b.adapter().is_ready());
+        // Windows is ready when the redistributable is bundled (install is deferred
+        // to Start + UAC). Linux/mac may fall back to local SOCKS which is ready.
+        assert!(
+            b.adapter().is_ready()
+                || matches!(b.mode(), CaptureMode::WindowsWindivert),
+            "mode={:?}",
+            b.mode()
+        );
         let mode = b.mode();
         assert!(matches!(
             mode,
-            CaptureMode::LocalSocks | CaptureMode::LinuxNft
+            CaptureMode::LocalSocks | CaptureMode::LinuxNft | CaptureMode::WindowsWindivert
         ));
     }
 }

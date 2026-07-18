@@ -23,13 +23,21 @@ use tokio::sync::Notify;
 use super::attribution::{attribute, AttributionInputs};
 use super::egress::{DirectConnector, EgressConnector, Endpoint};
 use super::flow::{dispatch, StatsAggregator};
-use super::policy::{CompiledProfile, Decision, FlowTarget, HardBypass};
+use super::policy::{
+    select_profile, AppIdentity, CompiledProfile, Decision, FlowTarget, HardBypass,
+};
+use super::model::RoutingProfile;
 use super::{Action, Protocol};
 
 /// Routes one captured flow to a decision + the connector that should carry it.
 pub struct FlowRouter {
     /// The active global profile snapshot, if any (None ⇒ everything DIRECT).
+    /// Used by the SOCKS front-end which cannot attribute a peer process.
     compiled: Option<CompiledProfile>,
+    /// All enabled profiles compiled by id (transparent Windows/Linux capture).
+    compiled_by_id: std::collections::HashMap<String, CompiledProfile>,
+    /// Profile metas for [`select_profile`] (transparent app/PID selection).
+    profile_metas: Vec<RoutingProfile>,
     bypass: HardBypass,
     /// The upstream connector for PROXY decisions (Socks5/HttpConnect/SshJump).
     /// None ⇒ PROXY decisions fall back per egress-failure policy (here: direct).
@@ -47,6 +55,8 @@ impl FlowRouter {
     ) -> FlowRouter {
         FlowRouter {
             compiled,
+            compiled_by_id: std::collections::HashMap::new(),
+            profile_metas: Vec::new(),
             bypass,
             upstream,
             direct: DirectConnector,
@@ -54,13 +64,38 @@ impl FlowRouter {
         }
     }
 
+    /// Attach multi-profile snapshots for transparent capture (plan §5).
+    pub fn with_profiles(
+        mut self,
+        metas: Vec<RoutingProfile>,
+        by_id: std::collections::HashMap<String, CompiledProfile>,
+    ) -> Self {
+        self.profile_metas = metas;
+        self.compiled_by_id = by_id;
+        self
+    }
+
     /// Decide the action for a target (TCP; SOCKS CONNECT is TCP only).
     pub fn decide(&self, host: Option<&str>, ip: Option<IpAddr>, port: u16) -> Decision {
+        self.decide_for_app(&AppIdentity::default(), host, ip, port)
+    }
+
+    /// Decide using process/app identity (transparent capture, plan §5).
+    pub fn decide_for_app(
+        &self,
+        app: &AppIdentity,
+        host: Option<&str>,
+        ip: Option<IpAddr>,
+        port: u16,
+    ) -> Decision {
         let (attr_host, source) = attribute(&AttributionInputs {
             platform_hostname: host.map(|h| h.to_string()),
             has_ip: ip.is_some(),
             ..Default::default()
         });
+        if source.is_unknown() {
+            self.stats.record_unknown_host();
+        }
         let target = FlowTarget {
             host: attr_host,
             hostname_source: source,
@@ -68,6 +103,24 @@ impl FlowRouter {
             port,
             protocol: Protocol::Tcp,
         };
+
+        // Prefer multi-profile selection when metas are present.
+        if !self.profile_metas.is_empty() {
+            if let Some(p) = select_profile(&self.profile_metas, app) {
+                if let Some(cp) = self.compiled_by_id.get(&p.id) {
+                    return cp.decide(&self.bypass, &target);
+                }
+            }
+            return Decision {
+                action: Action::Direct,
+                reason: super::policy::DecisionReason::DefaultAction,
+                hostname_source: source,
+                matched_source_id: None,
+                matched_pattern: None,
+                note: Some("no matching profile — direct".into()),
+            };
+        }
+
         match &self.compiled {
             Some(cp) => cp.decide(&self.bypass, &target),
             None => Decision {

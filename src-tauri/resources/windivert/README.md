@@ -2,39 +2,31 @@
 
 Official **WinDivert 2.2.2** redistributable for transparent capture (plan Phase 5 / ADR-0002).
 
+These files are **bundled into the Taomni installer** (`tauri.conf.json` → `bundle.resources`)
+so customers never download WinDivert by hand. On first **Sockscap → Start**, the app:
+
+1. Locates `windivert/WinDivert.dll` + `WinDivert64.sys` from the package resources
+2. Prompts **UAC** if needed and copies them into `C:\Windows\System32\`
+3. Smoke-opens the driver, then starts global / app / process transparent capture
+
 ## License
 
-WinDivert is dual-licensed **LGPLv3 / GPLv2**. See `LICENSE` in this directory after install.
-Do not static-link into the MIT Taomni binary without a license review; we load it as a
-side-by-side DLL at runtime when the `sockscap-windivert` feature is enabled.
+WinDivert is dual-licensed **LGPLv3 / GPLv2** (see `LICENSE`). Taomni loads the DLL
+dynamically at runtime and does not static-link it into the MIT binary.
 
-## Install on a Windows host
-
-From an elevated PowerShell (UAC):
+## Dev machine reinstall
 
 ```powershell
-# Repo root
+# Repo root (optional; Start also installs from resources)
 powershell -ExecutionPolicy Bypass -File scripts/install-windivert-windows.ps1
 ```
 
-This will:
-
-1. Download `WinDivert-2.2.2-A.zip` from https://reqrypt.org/windivert.html if missing
-2. Place `WinDivert.dll` + `WinDivert64.sys` under this folder
-3. Copy them into `C:\Windows\System32\`
-4. Smoke-test `WinDivertOpen("false", …)` so the signed driver is loaded once
-
-## What you get without WinDivert
-
-Sockscap still starts in **local SOCKS5** mode (`127.0.0.1:1080`) with no driver.
-Point browsers/apps at that proxy for global-style routing. Per-app transparent
-capture is what needs WinDivert.
-
-## Files (after install)
+## Runtime files shipped
 
 | File | Role |
 |------|------|
 | `WinDivert.dll` | User-mode library |
 | `WinDivert64.sys` | Signed kernel driver (x64) |
-| `WinDivert.lib` / `include/windivert.h` | Optional link/build |
-| sample `*.exe` | Vendor samples (optional) |
+| `LICENSE` / `VERSION` | Redistribution notice |
+
+Sample tools (`*.exe`) are not required at runtime and are gitignored.

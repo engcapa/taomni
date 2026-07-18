@@ -37,8 +37,14 @@ pub mod policy;
 pub mod ssh_pool;
 pub mod transparent;
 pub mod tray;
-#[cfg(all(windows, feature = "sockscap-windivert"))]
+#[cfg(windows)]
 pub mod windivert;
+#[cfg(windows)]
+pub mod windows_capture;
+#[cfg(windows)]
+pub mod windows_install;
+#[cfg(windows)]
+pub mod windows_pid;
 
 use serde::{Deserialize, Serialize};
 

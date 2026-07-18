@@ -140,6 +140,10 @@ pub fn run() {
                 app_data.join("sockscap").join("rules"),
             ) {
                 Ok(sockscap_state) => {
+                    // Bundle path for WinDivert redistributable (Windows packaging).
+                    if let Ok(res) = app.path().resource_dir() {
+                        sockscap_state.set_resource_dir(res);
+                    }
                     app.manage(sockscap_state);
                 }
                 // eprintln, not log::warn: the log plugin is only installed

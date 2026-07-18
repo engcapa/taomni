@@ -47,6 +47,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": {
+      "resources/windivert/WinDivert.dll": "windivert/WinDivert.dll",
+      "resources/windivert/WinDivert64.sys": "windivert/WinDivert64.sys",
+      "resources/windivert/LICENSE": "windivert/LICENSE",
+      "resources/windivert/VERSION": "windivert/VERSION",
+      "resources/windivert/README.md": "windivert/README.md"
+    },
     "macOS": {
       "entitlements": "Entitlements.plist",
       "frameworks": [
@@ -56,6 +63,11 @@
         "frameworks/libcom_err.3.0.dylib",
         "frameworks/libkrb5support.1.1.dylib"
       ]
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
     }
   },
   "plugins": {

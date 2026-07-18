@@ -197,6 +197,8 @@ tauri-utils = { path = "vendor/tauri-utils" }
 winscard = { path = "vendor/winscard" }
 
 [features]
+# sockscap-windivert is empty on non-Windows; on Windows the capture code is
+# always compiled under cfg(windows) with dynamic LoadLibrary of WinDivert.dll.
 default = ["hbase-kerberos"]
 voice-capture = ["dep:cpal"]
 screen-capture = ["dep:xcap"]
@@ -206,16 +208,27 @@ screen-capture = ["dep:xcap"]
 # claudedocs/lanchat-linux-native-av-transport.md.
 native-av = ["dep:cpal", "dep:audiopus", "dep:openh264", "dep:nokhwa"]
 asr-sherpa-onnx = []
-# Sockscap Windows transparent capture via WinDivert (sockscap/windivert.rs).
-# Off by default: enabling it links WinDivert.dll/.lib and needs the signed
-# WinDivert kernel driver present at runtime (see claudedocs/sockscap-adr).
 sockscap-windivert = []
 vulkan-detect = ["dep:ash"]
 local-llm-fim = ["dep:llama-cpp-2"]
 hbase-kerberos = ["dep:cross-krb5"]
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["fileapi", "commdlg", "shellapi", "winbase", "winuser"] }
+winapi = { version = "0.3", features = [
+  "fileapi",
+  "commdlg",
+  "shellapi",
+  "winbase",
+  "winuser",
+  "processthreadsapi",
+  "securitybaseapi",
+  "handleapi",
+  "errhandlingapi",
+  "libloaderapi",
+  "iphlpapi",
+  "tcpmib",
+  "iptypes",
+] }
 winreg = "0.55"
 
 [target.'cfg(target_os = "linux")'.dependencies]

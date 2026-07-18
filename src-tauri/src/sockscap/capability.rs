@@ -79,26 +79,23 @@ pub fn detect() -> Capabilities {
 fn detect_windows() -> Capabilities {
     let divert = super::platform::windivert_driver_present();
     let mut notes = vec![
-        "Global routing via local SOCKS5 front-end is available without a driver (point apps at 127.0.0.1:1080)".into(),
+        "Windows transparent capture: WinDivert ships in the app package (resources/windivert)".into(),
+        "Start Sockscap triggers UAC if the driver is not yet installed; Administrator required for capture".into(),
+        "Local SOCKS5 also listens on 127.0.0.1:1080 for apps that can set a proxy".into(),
     ];
     if divert {
-        notes.push("WinDivert driver/DLL detected — transparent app/PID capture can be enabled with a signed build".into());
+        notes.push("WinDivert runtime detected on this machine".into());
     } else {
-        notes.push("Transparent app/PID capture requires a signed WinDivert/WFP driver (not installed)".into());
+        notes.push("WinDivert not installed yet — will install from the app package on first Start (UAC)".into());
     }
     Capabilities {
         platform: "windows".into(),
-        // Local SOCKS front-end: global is Supported; transparent still needs driver.
         global_capture: CaptureSupport::Supported,
-        app_capture: if divert {
-            CaptureSupport::RequiresSetup
-        } else {
-            CaptureSupport::RequiresSetup
-        },
-        pid_capture: CaptureSupport::RequiresSetup,
+        app_capture: CaptureSupport::Supported,
+        pid_capture: CaptureSupport::Supported,
         child_follow: true,
         tray_left_click_toggle: true,
-        requires_privilege: !divert, // local socks doesn't need admin; transparent does
+        requires_privilege: true,
         notes,
     }
 }

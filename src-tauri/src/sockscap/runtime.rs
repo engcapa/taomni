@@ -169,34 +169,42 @@ impl SockscapState {
         self.backend.mode()
     }
 
-    /// Build the FlowRouter from the current profiles + rule cache: the enabled
-    /// global profile (the only scope a SOCKS front-end can attribute) is
-    /// compiled with its cached sources. `None` when no global profile is
-    /// enabled (everything routes DIRECT). Called before `install` so capture
-    /// uses the committed config.
+    /// Build the FlowRouter from the current profiles + rule cache.
+    /// Includes multi-profile snapshots for transparent app/PID selection and
+    /// a global snapshot for the SOCKS front-end.
     pub fn build_router(&self) -> FlowRouter {
-        let (global, custom) = {
+        let (profiles, global, customs) = {
             let conn = self.conn.lock().unwrap();
             let profiles = db::list_profiles(&conn).unwrap_or_default();
             let global = select_profile(&profiles, &AppIdentity::default())
                 .filter(|p| p.scope == Scope::Global)
                 .cloned();
-            let custom = match &global {
-                Some(p) => db::list_custom_rules(&conn, &p.id).unwrap_or_default(),
-                None => Vec::new(),
-            };
-            (global, custom)
+            let mut customs = std::collections::HashMap::new();
+            for p in &profiles {
+                if p.enabled {
+                    let c = db::list_custom_rules(&conn, &p.id).unwrap_or_default();
+                    customs.insert(p.id.clone(), c);
+                }
+            }
+            (profiles, global, customs)
         };
-        let compiled = global.map(|p| {
-            let cache = self.rule_cache.lock().unwrap();
-            compile_profile(p, &custom, &cache)
+        let cache = self.rule_cache.lock().unwrap();
+        let mut by_id = std::collections::HashMap::new();
+        for p in profiles.iter().filter(|p| p.enabled) {
+            let custom = customs.get(&p.id).cloned().unwrap_or_default();
+            by_id.insert(p.id.clone(), compile_profile(p.clone(), &custom, &cache));
+        }
+        let global_compiled = global.map(|g| {
+            let custom = customs.get(&g.id).cloned().unwrap_or_default();
+            compile_profile(g, &custom, &cache)
         });
         FlowRouter::new(
-            compiled,
+            global_compiled,
             None,
             HardBypass::default(),
             self.orchestrator.stats.clone(),
         )
+        .with_profiles(profiles, by_id)
     }
 
     /// Build the router from committed config, hand it to the capture adapter,
@@ -206,9 +214,15 @@ impl SockscapState {
             let conn = self.conn.lock().unwrap();
             db::list_profiles(&conn).map_err(|e| e.to_string())?
         };
+        self.backend.set_profiles(profiles.clone());
         self.backend.set_router(Arc::new(self.build_router()));
         self.orchestrator.start(&profiles).await?;
         Ok(self.orchestrator.state())
+    }
+
+    /// Point the capture backend at bundled WinDivert resources (Windows).
+    pub fn set_resource_dir(&self, dir: std::path::PathBuf) {
+        self.backend.set_resource_dir(dir);
     }
 
     pub async fn stop_engine(&self) -> Result<EngineState, String> {
