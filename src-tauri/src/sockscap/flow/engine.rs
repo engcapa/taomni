@@ -11,7 +11,7 @@ use super::attribution::{AttributedHost, AttributionHints, FakeIpMap, attribute_
 use super::bypass::HardBypassSet;
 use super::connectors::{
     ConnectControl, DirectConnector, EgressConnector, EgressError, EgressMetadata, EgressStream,
-    EgressTarget, SshJumpConnector, UdpEgressCapability, connect_controlled, proxy_connector,
+    EgressTarget, UdpEgressCapability, connect_controlled, proxy_connector,
 };
 use super::stats::{FlowOutcomeKind, FlowStatsEvent, FlowStatsSink, NoopFlowStatsSink};
 use crate::proxy::ResolvedProxy;
@@ -72,17 +72,16 @@ impl EgressProvider {
     pub fn from_kind(
         kind: Option<EgressKind>,
         proxy: Option<ResolvedProxy>,
-        ssh_session_id: Option<String>,
-        host_key_ready: bool,
     ) -> Result<Self, EgressError> {
         let connector = match kind {
             Some(EgressKind::ProxySession) => proxy_connector(proxy.ok_or_else(|| {
                 EgressError::Unavailable("referenced Proxy session could not be resolved".into())
             })?)?,
-            Some(EgressKind::SshJump) => Arc::new(SshJumpConnector::new(
-                ssh_session_id.unwrap_or_default(),
-                host_key_ready,
-            )?) as Arc<dyn EgressConnector>,
+            Some(EgressKind::SshJump) => {
+                return Err(EgressError::Unavailable(
+                    "SSH Jump requires a resolved shared SSH channel pool".into(),
+                ));
+            }
             None => {
                 return Err(EgressError::Unavailable(
                     "profile has no egress configured for PROXY actions".into(),
@@ -815,10 +814,9 @@ mod tests {
 
     #[test]
     fn missing_proxy_configuration_is_rejected_not_direct() {
-        let error = EgressProvider::from_kind(Some(EgressKind::ProxySession), None, None, false)
-            .unwrap_err();
+        let error = EgressProvider::from_kind(Some(EgressKind::ProxySession), None).unwrap_err();
         assert!(matches!(error, EgressError::Unavailable(_)));
-        assert!(EgressProvider::from_kind(None, None, None, false).is_err());
+        assert!(EgressProvider::from_kind(None, None).is_err());
     }
 
     #[tokio::test]

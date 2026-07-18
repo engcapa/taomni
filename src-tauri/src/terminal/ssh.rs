@@ -1,8 +1,12 @@
 use russh::ChannelStream;
-use russh::client::{self, KeyboardInteractiveAuthResponse};
+use russh::client::{self, AuthResult, KeyboardInteractiveAuthResponse};
+use russh::keys::agent::{AgentIdentity, client::AgentClient};
 use russh::keys::ssh_key::{Algorithm as SshAlgorithm, EcdsaCurve, HashAlg};
 use russh::keys::{self, PrivateKey, PrivateKeyWithHashAlg, PublicKey};
-use russh::{ChannelId, ChannelMsg, ChannelReadHalf, ChannelWriteHalf, Pty, client::Msg, kex, mac};
+use russh::{
+    ChannelId, ChannelMsg, ChannelReadHalf, ChannelWriteHalf, MethodKind, Pty, client::Msg, kex,
+    mac,
+};
 use std::borrow::Cow;
 use std::future::Future;
 use std::pin::Pin;
@@ -12,6 +16,7 @@ use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedSender;
+use zeroize::Zeroizing;
 
 use crate::terminal::hostkey::{self, HostKeyStatus};
 use crate::terminal::network::{NetworkSettings, establish_transport};
@@ -21,6 +26,11 @@ pub const MISSING_JUMP_PASSWORD_ERROR: &str = "TAOMNI_MISSING_JUMP_PASSWORD";
 pub const SSH_HOST_KEY_UNKNOWN_ERROR: &str = "TAOMNI_SSH_HOST_KEY_UNKNOWN";
 pub const SSH_HOST_KEY_CHANGED_ERROR: &str = "TAOMNI_SSH_HOST_KEY_CHANGED";
 pub const SSH_HOST_KEY_STORE_ERROR: &str = "TAOMNI_SSH_HOST_KEY_STORE_ERROR";
+pub const SSH_MFA_REQUIRED_ERROR: &str = "TAOMNI_SSH_MFA_REQUIRED";
+pub const SSH_AGENT_UNAVAILABLE_ERROR: &str = "TAOMNI_SSH_AGENT_UNAVAILABLE";
+pub const SSH_AUTH_REJECTED_ERROR: &str = "TAOMNI_SSH_AUTH_REJECTED";
+pub const SSH_AUTH_CANCELLED_ERROR: &str = "TAOMNI_SSH_AUTH_CANCELLED";
+pub const SSH_CREDENTIAL_ERROR: &str = "TAOMNI_SSH_CREDENTIAL_ERROR";
 
 pub struct SshSession {
     pub handle: client::Handle<SshHandler>,
@@ -174,9 +184,15 @@ impl client::Handler for SshHandler {
 }
 
 pub enum SshAuth {
-    Password(String),
+    Password(Zeroizing<String>),
     PrivateKey(String),
     Agent,
+}
+
+impl SshAuth {
+    pub fn password(password: impl Into<String>) -> Self {
+        Self::Password(Zeroizing::new(password.into()))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -281,7 +297,7 @@ pub(crate) async fn build_ssh_transport(
                     };
                     SshAuth::PrivateKey(path)
                 }
-                _ => SshAuth::Password(n.jump_password.clone()),
+                _ => SshAuth::password(n.jump_password.clone()),
             };
             if let SshAuth::Password(password) = &jump_auth {
                 if password.is_empty() {
@@ -639,31 +655,37 @@ async fn authenticate(
             // we fall through to keyboard-interactive while the connection is
             // still alive, mirroring how OpenSSH / MobaXterm behave.
             let ok = handle
-                .authenticate_password(username, &password)
+                .authenticate_password(username, password.as_str())
                 .await
                 .map_err(|e| format!("SSH auth failed: {}", e))?;
             if ok.success() {
                 return Ok(());
             }
-            if let Some(prompter) = prompter {
+            if auth_requires_interactive(&ok) {
                 return authenticate_keyboard_interactive(
                     handle,
                     username,
-                    Some(&password),
+                    Some(password.as_str()),
                     prompter,
                 )
                 .await;
             }
-            return Err("SSH password authentication rejected".to_string());
+            return Err(format!(
+                "{SSH_AUTH_REJECTED_ERROR}: password authentication rejected"
+            ));
         }
         SshAuth::PrivateKey(key_path) => {
             let key_path = shellexpand::tilde(&key_path).to_string();
-            let key = keys::load_secret_key(&key_path, None)
-                .map_err(|e| format!("Failed to load key {}: {}", key_path, e))?;
-            authenticate_private_key(handle, username, key).await?;
+            let key = keys::load_secret_key(&key_path, None).map_err(|e| {
+                format!(
+                    "{SSH_CREDENTIAL_ERROR}: failed to load key {}: {}",
+                    key_path, e
+                )
+            })?;
+            authenticate_private_key(handle, username, key, prompter).await?;
         }
         SshAuth::Agent => {
-            return Err("SSH agent auth not yet implemented".to_string());
+            authenticate_agent(handle, username, prompter).await?;
         }
     }
     Ok(())
@@ -681,7 +703,7 @@ async fn authenticate_keyboard_interactive(
     handle: &mut client::Handle<SshHandler>,
     username: &str,
     known_password: Option<&str>,
-    prompter: &KbdInteractivePrompter,
+    prompter: Option<&KbdInteractivePrompter>,
 ) -> Result<(), String> {
     let mut response = handle
         .authenticate_keyboard_interactive_start(username, None)
@@ -694,7 +716,9 @@ async fn authenticate_keyboard_interactive(
         match response {
             KeyboardInteractiveAuthResponse::Success => return Ok(()),
             KeyboardInteractiveAuthResponse::Failure { .. } => {
-                return Err("SSH authentication rejected (MFA/keyboard-interactive)".to_string());
+                return Err(format!(
+                    "{SSH_AUTH_REJECTED_ERROR}: keyboard-interactive authentication rejected"
+                ));
             }
             KeyboardInteractiveAuthResponse::InfoRequest {
                 name,
@@ -740,9 +764,16 @@ async fn authenticate_keyboard_interactive(
                         })
                         .collect(),
                 };
-                let answers = prompter(request)
+                let answers = prompter
+                    .ok_or_else(|| {
+                        format!(
+                            "{SSH_MFA_REQUIRED_ERROR}: keyboard-interactive authentication requires user input"
+                        )
+                    })?(request)
                     .await
-                    .ok_or_else(|| "SSH authentication cancelled".to_string())?;
+                    .ok_or_else(|| {
+                        format!("{SSH_AUTH_CANCELLED_ERROR}: authentication cancelled")
+                    })?;
 
                 response = handle
                     .authenticate_keyboard_interactive_respond(answers)
@@ -765,6 +796,7 @@ async fn authenticate_private_key(
     handle: &mut client::Handle<SshHandler>,
     username: &str,
     key: PrivateKey,
+    prompter: Option<&KbdInteractivePrompter>,
 ) -> Result<(), String> {
     let best_rsa_hash = handle
         .best_supported_rsa_hash()
@@ -784,12 +816,156 @@ async fn authenticate_private_key(
         if ok.success() {
             return Ok(());
         }
+        if auth_partial_success(&ok) {
+            return authenticate_keyboard_interactive(handle, username, None, prompter).await;
+        }
     }
 
     Err(format!(
-        "SSH key authentication rejected (tried {})",
+        "{SSH_AUTH_REJECTED_ERROR}: key authentication rejected (tried {})",
         tried.join(", ")
     ))
+}
+
+fn auth_requires_interactive(result: &AuthResult) -> bool {
+    match result {
+        AuthResult::Success => false,
+        AuthResult::Failure {
+            remaining_methods,
+            partial_success,
+        } => {
+            *partial_success
+                || remaining_methods
+                    .iter()
+                    .any(|method| *method == MethodKind::KeyboardInteractive)
+        }
+    }
+}
+
+fn auth_partial_success(result: &AuthResult) -> bool {
+    matches!(
+        result,
+        AuthResult::Failure {
+            partial_success: true,
+            ..
+        }
+    )
+}
+
+async fn authenticate_agent(
+    handle: &mut client::Handle<SshHandler>,
+    username: &str,
+    prompter: Option<&KbdInteractivePrompter>,
+) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        let mut agent = AgentClient::connect_env().await.map_err(|error| {
+            format!("{SSH_AGENT_UNAVAILABLE_ERROR}: could not connect to SSH_AUTH_SOCK: {error}")
+        })?;
+        return authenticate_agent_client(handle, username, prompter, &mut agent).await;
+    }
+
+    #[cfg(windows)]
+    {
+        const OPENSSH_AGENT_PIPE: &str = r"\\.\pipe\openssh-ssh-agent";
+        if let Ok(mut agent) = AgentClient::connect_named_pipe(OPENSSH_AGENT_PIPE).await {
+            return authenticate_agent_client(handle, username, prompter, &mut agent).await;
+        }
+        let mut agent = AgentClient::connect_pageant().await.map_err(|error| {
+            format!(
+                "{SSH_AGENT_UNAVAILABLE_ERROR}: neither Windows OpenSSH agent nor Pageant is available: {error}"
+            )
+        })?;
+        return authenticate_agent_client(handle, username, prompter, &mut agent).await;
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = (handle, username, prompter);
+        Err(format!(
+            "{SSH_AGENT_UNAVAILABLE_ERROR}: SSH agent authentication is unsupported on this platform"
+        ))
+    }
+}
+
+async fn authenticate_agent_client<S>(
+    handle: &mut client::Handle<SshHandler>,
+    username: &str,
+    prompter: Option<&KbdInteractivePrompter>,
+    agent: &mut AgentClient<S>,
+) -> Result<(), String>
+where
+    S: russh::keys::agent::client::AgentStream + Send + Unpin,
+{
+    const MAX_AGENT_IDENTITIES: usize = 256;
+    let identities = agent.request_identities().await.map_err(|error| {
+        format!("{SSH_AGENT_UNAVAILABLE_ERROR}: could not list SSH agent identities: {error}")
+    })?;
+    if identities.is_empty() {
+        return Err(format!(
+            "{SSH_AGENT_UNAVAILABLE_ERROR}: SSH agent contains no identities"
+        ));
+    }
+
+    let best_rsa_hash = handle
+        .best_supported_rsa_hash()
+        .await
+        .map_err(|error| format!("SSH agent auth could not probe RSA algorithms: {error}"))?
+        .flatten();
+    for identity in identities.into_iter().take(MAX_AGENT_IDENTITIES) {
+        let public_key = identity.public_key();
+        let hashes = agent_hash_attempts(public_key.algorithm(), best_rsa_hash);
+        drop(public_key);
+        for hash in hashes {
+            let result = match &identity {
+                AgentIdentity::PublicKey { key, .. } => {
+                    handle
+                        .authenticate_publickey_with(username, key.clone(), hash, &mut *agent)
+                        .await
+                }
+                AgentIdentity::Certificate { certificate, .. } => {
+                    handle
+                        .authenticate_certificate_with(
+                            username,
+                            certificate.clone(),
+                            hash,
+                            &mut *agent,
+                        )
+                        .await
+                }
+            }
+            .map_err(|error| format!("SSH agent signing failed: {error}"))?;
+            if result.success() {
+                return Ok(());
+            }
+            if auth_partial_success(&result) {
+                return authenticate_keyboard_interactive(handle, username, None, prompter).await;
+            }
+        }
+    }
+
+    Err(format!(
+        "{SSH_AUTH_REJECTED_ERROR}: agent authentication rejected all available identities"
+    ))
+}
+
+fn agent_hash_attempts(
+    algorithm: SshAlgorithm,
+    best_rsa_hash: Option<HashAlg>,
+) -> Vec<Option<HashAlg>> {
+    if !matches!(algorithm, SshAlgorithm::Rsa { .. }) {
+        return vec![None];
+    }
+    let mut hashes = Vec::new();
+    if let Some(hash) = best_rsa_hash {
+        hashes.push(Some(hash));
+    }
+    for hash in [Some(HashAlg::Sha512), Some(HashAlg::Sha256), None] {
+        if !hashes.contains(&hash) {
+            hashes.push(hash);
+        }
+    }
+    hashes
 }
 
 fn private_key_auth_attempts(
@@ -980,6 +1156,24 @@ mod tests {
     use tokio::time::{Duration, timeout};
 
     #[test]
+    fn keyboard_interactive_offer_is_distinct_from_partial_key_success() {
+        let offered = AuthResult::Failure {
+            remaining_methods: russh::MethodSet::from(
+                &[MethodKind::PublicKey, MethodKind::KeyboardInteractive][..],
+            ),
+            partial_success: false,
+        };
+        assert!(auth_requires_interactive(&offered));
+        assert!(!auth_partial_success(&offered));
+
+        let accepted_first_factor = AuthResult::Failure {
+            remaining_methods: russh::MethodSet::from(&[MethodKind::KeyboardInteractive][..]),
+            partial_success: true,
+        };
+        assert!(auth_partial_success(&accepted_first_factor));
+    }
+
+    #[test]
     fn host_key_confirmation_requires_one_exact_response() {
         let trust = vec!["TRUST".to_string()];
         let lower = vec!["trust".to_string()];
@@ -1076,7 +1270,7 @@ mod tests {
             &host,
             port,
             &username,
-            SshAuth::Password(password),
+            SshAuth::password(password),
             80,
             24,
             None,
@@ -1207,7 +1401,7 @@ mod tests {
             &host,
             port,
             &username,
-            SshAuth::Password(password),
+            SshAuth::password(password),
             Some(&net),
         )
         .await
@@ -1251,7 +1445,7 @@ mod tests {
             &inner_host,
             inner_port,
             &inner_user,
-            SshAuth::Password(inner_pass),
+            SshAuth::password(inner_pass),
             Some(&net),
         )
         .await

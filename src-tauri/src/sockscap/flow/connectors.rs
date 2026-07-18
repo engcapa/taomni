@@ -1,5 +1,5 @@
 //! Protocol-neutral egress connectors for DIRECT, SOCKS5, HTTP CONNECT, and
-//! the SSH Jump release gate.
+//! SSH Jump.
 //!
 //! Successful connectors return a boxed bidirectional byte stream so the
 //! FlowEngine can later carry either a `TcpStream` or an SSH `direct-tcpip`
@@ -18,7 +18,12 @@ use zeroize::{Zeroize, Zeroizing};
 use super::bypass::BypassEndpoint;
 use crate::proxy::ResolvedProxy;
 use crate::sockscap::policy::rules::normalize_hostname;
+use crate::sockscap::types::SshPoolOptions;
 use crate::terminal::network::{NetworkSettings, establish_transport};
+use crate::terminal::ssh_pool::{
+    SshChannelPool, SshConnectionFactory, SshDirectTcpipTarget, SshPoolConfig, SshPoolError,
+    SshPoolKey, SshPoolSnapshot,
+};
 
 /// Target of an egress connect attempt.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -75,9 +80,11 @@ pub enum EgressError {
     Timeout { connector: String, timeout_ms: u64 },
     #[error("{connector} connect cancelled")]
     Cancelled { connector: String },
-    /// SSH Jump cannot ship until host-key verification is real.
-    #[error("SSH Jump blocked: host-key verification is not ready")]
-    SshHostKeyGate,
+    #[error("{connector} requires user action ({action_code})")]
+    UserActionRequired {
+        connector: String,
+        action_code: String,
+    },
 }
 
 impl EgressError {
@@ -89,7 +96,7 @@ impl EgressError {
             Self::Connect(_) => "connect_failed",
             Self::Timeout { .. } => "timeout",
             Self::Cancelled { .. } => "cancelled",
-            Self::SshHostKeyGate => "ssh_host_key_gate",
+            Self::UserActionRequired { .. } => "user_action_required",
         }
     }
 }
@@ -336,29 +343,49 @@ impl EgressConnector for HttpConnectConnector {
     }
 }
 
-/// SSH Jump connector scaffold. A shared channel pool replaces this gate once
-/// strict host-key verification and authentication state are wired.
-#[derive(Debug)]
+/// SSH Jump connector backed by the shared, bounded control-connection pool.
 pub struct SshJumpConnector {
-    session_id: String,
-    host_key_verification_ready: bool,
+    pool: Arc<SshChannelPool>,
+    key: SshPoolKey,
+    factory: Arc<dyn SshConnectionFactory>,
+    lifecycle: CancellationToken,
 }
 
 impl SshJumpConnector {
-    pub fn new(
-        session_id: impl Into<String>,
-        host_key_verification_ready: bool,
-    ) -> Result<Self, EgressError> {
-        let session_id = session_id.into();
-        if session_id.trim().is_empty() {
-            return Err(EgressError::Unavailable(
-                "SSH Jump session reference is missing".into(),
-            ));
+    pub fn from_pool(
+        pool: Arc<SshChannelPool>,
+        key: SshPoolKey,
+        factory: Arc<dyn SshConnectionFactory>,
+        lifecycle: CancellationToken,
+    ) -> Self {
+        Self {
+            pool,
+            key,
+            factory,
+            lifecycle,
         }
-        Ok(Self {
-            session_id,
-            host_key_verification_ready,
-        })
+    }
+
+    pub async fn warm_up(&self) -> Result<(), EgressError> {
+        self.pool
+            .warm_up(&self.key, self.factory.as_ref(), &self.lifecycle)
+            .await
+            .map_err(|error| map_ssh_pool_error(error, self.pool.connect_timeout()))
+    }
+
+    pub fn snapshot(&self) -> SshPoolSnapshot {
+        self.pool.snapshot()
+    }
+}
+
+impl std::fmt::Debug for SshJumpConnector {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SshJumpConnector")
+            .field("pool", &self.pool)
+            .field("key", &self.key)
+            .field("cancelled", &self.lifecycle.is_cancelled())
+            .finish()
     }
 }
 
@@ -368,14 +395,75 @@ impl EgressConnector for SshJumpConnector {
         "ssh_jump"
     }
 
-    async fn connect(&self, _target: &EgressTarget) -> Result<EgressStream, EgressError> {
-        if !self.host_key_verification_ready {
-            return Err(EgressError::SshHostKeyGate);
+    fn upstream_endpoint(&self) -> Option<BypassEndpoint> {
+        Some(BypassEndpoint {
+            host: self.key.host().to_string(),
+            port: Some(self.key.port()),
+        })
+    }
+
+    async fn connect(&self, target: &EgressTarget) -> Result<EgressStream, EgressError> {
+        let target = validate_target(target)?;
+        let ssh_target = SshDirectTcpipTarget::new(&target.host, target.port)
+            .map_err(|error| map_ssh_pool_error(error, self.pool.connect_timeout()))?;
+        let stream = self
+            .pool
+            .open_direct_tcpip(
+                &self.key,
+                self.factory.as_ref(),
+                &ssh_target,
+                &self.lifecycle,
+            )
+            .await
+            .map_err(|error| map_ssh_pool_error(error, self.pool.connect_timeout()))?;
+        Ok(EgressStream {
+            stream: Box::new(stream),
+            meta: EgressMetadata {
+                connector: "ssh_jump".into(),
+                remote_dns: target.remote_dns,
+                tcp_only: true,
+                detail: "SSH direct-tcpip channel established".into(),
+            },
+        })
+    }
+}
+
+/// Translate profile-owned, non-sensitive settings into the shared pool's
+/// bounded runtime configuration.
+pub fn ssh_pool_config(options: &SshPoolOptions) -> Result<SshPoolConfig, EgressError> {
+    let mut config = SshPoolConfig::default();
+    config.max_control_connections = usize::from(options.max_control_connections);
+    config.max_channels_per_connection = usize::try_from(options.max_channels_per_connection)
+        .map_err(|_| EgressError::Unavailable("SSH channel limit is not supported".into()))?;
+    config.keepalive_interval = Duration::from_secs(options.keepalive_seconds);
+    config.connect_timeout = Duration::from_secs(options.connect_timeout_seconds);
+    config
+        .validate()
+        .map_err(|error| EgressError::Unavailable(error.to_string()))?;
+    Ok(config)
+}
+
+fn map_ssh_pool_error(error: SshPoolError, connect_timeout: Duration) -> EgressError {
+    match error {
+        SshPoolError::InvalidTarget(message) => EgressError::InvalidTarget(message),
+        SshPoolError::Timeout { .. } => EgressError::Timeout {
+            connector: "ssh_jump".into(),
+            timeout_ms: connect_timeout.as_millis().min(u64::MAX as u128) as u64,
+        },
+        SshPoolError::Cancelled => EgressError::Cancelled {
+            connector: "ssh_jump".into(),
+        },
+        SshPoolError::UserActionRequired { code, .. } => EgressError::UserActionRequired {
+            connector: "ssh_jump".into(),
+            action_code: code,
+        },
+        SshPoolError::Closed => EgressError::Unavailable("SSH channel pool is stopped".to_string()),
+        SshPoolError::InvalidConfig(message) | SshPoolError::InvalidKey(message) => {
+            EgressError::Unavailable(message)
         }
-        let _ = &self.session_id;
-        Err(EgressError::Unavailable(
-            "SSH channel pool is not configured".into(),
-        ))
+        SshPoolError::Connect(message) | SshPoolError::ChannelOpen(message) => {
+            EgressError::Connect(message)
+        }
     }
 }
 
@@ -453,6 +541,8 @@ fn canonical_network_host(input: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use std::future::pending;
+    use std::sync::Mutex as StdMutex;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     use base64::Engine as _;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -739,10 +829,100 @@ mod tests {
         assert!(matches!(error, EgressError::Cancelled { .. }));
     }
 
+    #[derive(Default)]
+    struct RecordingSshControl {
+        targets: StdMutex<Vec<(String, u16)>>,
+    }
+
+    #[async_trait]
+    impl crate::terminal::ssh_pool::SshControlConnection for RecordingSshControl {
+        fn is_closed(&self) -> bool {
+            false
+        }
+
+        async fn open_direct_tcpip(
+            &self,
+            target: &SshDirectTcpipTarget,
+        ) -> Result<
+            crate::terminal::ssh_pool::BoxedSshChannelStream,
+            crate::terminal::ssh_pool::ControlOpenError,
+        > {
+            self.targets
+                .lock()
+                .unwrap()
+                .push((target.host().to_string(), target.port()));
+            let (stream, peer) = tokio::io::duplex(64);
+            tokio::spawn(async move {
+                pending::<()>().await;
+                drop(peer);
+            });
+            Ok(Box::new(stream))
+        }
+    }
+
+    struct RecordingSshFactory {
+        control: Arc<RecordingSshControl>,
+        connects: AtomicUsize,
+    }
+
+    #[async_trait]
+    impl SshConnectionFactory for RecordingSshFactory {
+        async fn connect(
+            &self,
+            _key: &SshPoolKey,
+            _keepalive_interval: Duration,
+        ) -> Result<Arc<dyn crate::terminal::ssh_pool::SshControlConnection>, SshPoolError>
+        {
+            self.connects.fetch_add(1, Ordering::AcqRel);
+            Ok(self.control.clone())
+        }
+    }
+
     #[tokio::test]
-    async fn ssh_jump_stays_behind_host_key_gate() {
-        let connector = SshJumpConnector::new("ssh-1", false).unwrap();
-        let error = connector.connect(&inert_target()).await.unwrap_err();
-        assert_eq!(error, EgressError::SshHostKeyGate);
+    async fn ssh_jump_uses_remote_dns_and_shared_pool() {
+        let config = ssh_pool_config(&SshPoolOptions {
+            max_control_connections: 1,
+            max_channels_per_connection: 2,
+            keepalive_seconds: 15,
+            connect_timeout_seconds: 2,
+        })
+        .unwrap();
+        let pool = Arc::new(SshChannelPool::new(config).unwrap());
+        let control = Arc::new(RecordingSshControl::default());
+        let factory = Arc::new(RecordingSshFactory {
+            control: control.clone(),
+            connects: AtomicUsize::new(0),
+        });
+        let key = SshPoolKey::new("session:ssh-1", "SSH.EXAMPLE.", 22, "private-user").unwrap();
+        let connector =
+            SshJumpConnector::from_pool(pool, key, factory.clone(), CancellationToken::new());
+
+        connector.warm_up().await.unwrap();
+        let egress = connector
+            .connect(&EgressTarget {
+                host: "BÜCHER.example".into(),
+                port: 443,
+                ip: Some("192.0.2.1".into()),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(factory.connects.load(Ordering::Acquire), 1);
+        assert_eq!(
+            control.targets.lock().unwrap().as_slice(),
+            &[("xn--bcher-kva.example".into(), 443)]
+        );
+        assert_eq!(
+            connector.upstream_endpoint(),
+            Some(BypassEndpoint {
+                host: "ssh.example".into(),
+                port: Some(22),
+            })
+        );
+        assert!(egress.meta.remote_dns);
+        assert!(egress.meta.tcp_only);
+        assert_eq!(connector.snapshot().active_channels, 1);
+        drop(egress);
+        assert_eq!(connector.snapshot().active_channels, 0);
     }
 }

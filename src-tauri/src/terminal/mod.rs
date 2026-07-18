@@ -5,11 +5,12 @@ pub mod network;
 pub mod pty;
 pub mod shell_integration;
 pub mod ssh;
+pub mod ssh_pool;
 pub mod x11;
 pub mod x11_forward;
 
 use crate::state::AppState;
-use base64::{engine::general_purpose::STANDARD as B64, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD as B64};
 use russh::Sig;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -413,7 +414,11 @@ pub(crate) fn resolve_proxy_session(
     // Read proxyKind from options_json
     let proxy_kind = serde_json::from_str::<serde_json::Value>(&proxy_session.options_json)
         .ok()
-        .and_then(|v| v.get("proxyKind").and_then(|k| k.as_str()).map(|s| s.to_string()))
+        .and_then(|v| {
+            v.get("proxyKind")
+                .and_then(|k| k.as_str())
+                .map(|s| s.to_string())
+        })
         .unwrap_or_else(|| "http".to_string());
 
     network.proxy_kind = proxy_kind;
@@ -424,7 +429,11 @@ pub(crate) fn resolve_proxy_session(
     // Read password from vault ref in options_json
     let pass_ref = serde_json::from_str::<serde_json::Value>(&proxy_session.options_json)
         .ok()
-        .and_then(|v| v.get("passwordRef").and_then(|r| r.as_str()).map(|s| s.to_string()))
+        .and_then(|v| {
+            v.get("passwordRef")
+                .and_then(|r| r.as_str())
+                .map(|s| s.to_string())
+        })
         .unwrap_or_default();
     network.proxy_pass = pass_ref;
 
@@ -462,7 +471,7 @@ pub async fn create_ssh_terminal(
         "Password" => {
             let raw = auth_data.unwrap_or_default();
             let resolved = state.vault.resolve(&raw)?;
-            ssh::SshAuth::Password(resolved.map(|z| (*z).clone()).unwrap_or(raw))
+            ssh::SshAuth::password(resolved.map(|z| (*z).clone()).unwrap_or(raw))
         }
         "PrivateKey" => {
             ssh::SshAuth::PrivateKey(auth_data.unwrap_or_else(|| "~/.ssh/id_ed25519".to_string()))
@@ -471,7 +480,7 @@ pub async fn create_ssh_terminal(
         _ => {
             let raw = auth_data.unwrap_or_default();
             let resolved = state.vault.resolve(&raw)?;
-            ssh::SshAuth::Password(resolved.map(|z| (*z).clone()).unwrap_or(raw))
+            ssh::SshAuth::password(resolved.map(|z| (*z).clone()).unwrap_or(raw))
         }
     };
 
@@ -868,7 +877,7 @@ pub async fn test_ssh_connection(
         "Password" => {
             let raw = auth_data.unwrap_or_default();
             let resolved = state.vault.resolve(&raw)?;
-            ssh::SshAuth::Password(resolved.map(|z| (*z).clone()).unwrap_or(raw))
+            ssh::SshAuth::password(resolved.map(|z| (*z).clone()).unwrap_or(raw))
         }
         "PrivateKey" => {
             ssh::SshAuth::PrivateKey(auth_data.unwrap_or_else(|| "~/.ssh/id_ed25519".to_string()))
@@ -877,7 +886,7 @@ pub async fn test_ssh_connection(
         _ => {
             let raw = auth_data.unwrap_or_default();
             let resolved = state.vault.resolve(&raw)?;
-            ssh::SshAuth::Password(resolved.map(|z| (*z).clone()).unwrap_or(raw))
+            ssh::SshAuth::password(resolved.map(|z| (*z).clone()).unwrap_or(raw))
         }
     };
 

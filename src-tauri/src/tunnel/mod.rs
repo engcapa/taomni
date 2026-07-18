@@ -22,9 +22,14 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
 use crate::state::AppState;
-use crate::terminal::ssh::{connect_ssh_authenticated, SshAuth, SshHandler};
+use crate::terminal::ssh_pool::{
+    PooledSshStream, RusshConnectionFactory, SshChannelPool, SshConnectionFactory,
+    SshCredentialSource, SshDirectTcpipTarget, SshPoolConfig, SshPoolKey,
+};
+use crate::vault::Vault;
 
 /* ---------------------------- data model ---------------------------- */
 
@@ -114,6 +119,8 @@ pub struct ActiveTunnel {
     /// also tears down in-flight forwarded connections instead of
     /// leaking them past the listener.
     pub bridges: Arc<AsyncMutex<Vec<JoinHandle<()>>>>,
+    pub cancellation: CancellationToken,
+    pub ssh_pool: Option<Arc<SshChannelPool>>,
 }
 
 #[derive(Default)]
@@ -185,59 +192,110 @@ fn save_all(app: &AppHandle, list: &[TunnelConfig]) -> Result<(), String> {
 
 /* ---------------------------- helpers ------------------------------- */
 
-fn ssh_auth_from(creds: &TunnelSshCreds) -> Result<SshAuth, String> {
-    match creds.auth_method {
-        TunnelAuthMethod::Password => {
-            let pwd = creds
-                .auth_data
-                .clone()
-                .ok_or_else(|| "Password is empty".to_string())?;
-            Ok(SshAuth::Password(pwd))
-        }
-        TunnelAuthMethod::PrivateKey => {
-            let path = creds
-                .auth_data
-                .clone()
-                .ok_or_else(|| "Private key path is empty".to_string())?;
-            Ok(SshAuth::PrivateKey(path))
-        }
-        TunnelAuthMethod::Agent => Ok(SshAuth::Agent),
+#[derive(Clone)]
+struct TunnelSshRuntime {
+    pool: Arc<SshChannelPool>,
+    key: SshPoolKey,
+    factory: Arc<dyn SshConnectionFactory>,
+    cancellation: CancellationToken,
+}
+
+impl TunnelSshRuntime {
+    async fn warm_up(&self) -> Result<(), String> {
+        self.pool
+            .warm_up(&self.key, self.factory.as_ref(), &self.cancellation)
+            .await
+            .map_err(|error| error.to_string())
+    }
+
+    async fn open_direct_tcpip(
+        &self,
+        host: &str,
+        port: u16,
+        originator: std::net::SocketAddr,
+    ) -> Result<PooledSshStream, String> {
+        let target = SshDirectTcpipTarget::with_originator(
+            host,
+            port,
+            originator.ip().to_string(),
+            originator.port(),
+        )
+        .map_err(|error| error.to_string())?;
+        self.pool
+            .open_direct_tcpip(
+                &self.key,
+                self.factory.as_ref(),
+                &target,
+                &self.cancellation,
+            )
+            .await
+            .map_err(|error| error.to_string())
     }
 }
 
-/// Replace `config.ssh.auth_data` with the resolved plaintext when it is
-/// `vault:<id>`. Called by command entrypoints before spawning the forward
-/// task, so the spawned task never needs to carry a `Vault` handle.
-///
-/// When the persisted `auth_data` is `None` (which happens whenever the
-/// user saves a Password tunnel with `save_auth=false` — see
-/// [`save_all`]), look for a session-cached plaintext password keyed by
-/// `config.id` so the user can Save → Start within a single session
-/// without being asked to re-enter the password.
-fn resolve_tunnel_creds(
+/// Build a reconnect-capable credential source without resolving a saved
+/// Vault reference into a long-lived plaintext field. Transient passwords are
+/// moved into zeroizing storage and removed from the spawned tunnel config.
+fn build_tunnel_ssh_runtime(
     config: &mut TunnelConfig,
-    vault: &crate::vault::Vault,
+    vault: Arc<Vault>,
     session_password: Option<String>,
-) -> Result<(), String> {
-    if !matches!(config.ssh.auth_method, TunnelAuthMethod::Password) {
-        return Ok(());
-    }
-    let raw = match config.ssh.auth_data.as_deref() {
-        Some(s) if !s.is_empty() => s.to_string(),
-        _ => {
-            // No persisted secret. Use the in-memory password if we have one;
-            // otherwise leave auth_data as-is and let `ssh_auth_from` raise
-            // a clear "Password is empty" error.
-            if let Some(pwd) = session_password {
-                config.ssh.auth_data = Some(pwd);
-            }
-            return Ok(());
+    cancellation: CancellationToken,
+) -> Result<TunnelSshRuntime, String> {
+    let credentials = match config.ssh.auth_method {
+        TunnelAuthMethod::Password => {
+            let persisted = config
+                .ssh
+                .auth_data
+                .take()
+                .filter(|value| !value.is_empty());
+            let raw = persisted
+                .or(session_password)
+                .ok_or_else(|| "Password is empty".to_string())?;
+            SshCredentialSource::password(vault, raw).map_err(|error| error.to_string())?
         }
+        TunnelAuthMethod::PrivateKey => {
+            let path = config
+                .ssh
+                .auth_data
+                .clone()
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| "Private key path is empty".to_string())?;
+            SshCredentialSource::PrivateKey(path)
+        }
+        TunnelAuthMethod::Agent => SshCredentialSource::Agent,
     };
-    if let Some(plain) = vault.resolve(&raw)? {
-        config.ssh.auth_data = Some((*plain).clone());
+    let key = SshPoolKey::new(
+        format!("tunnel:{}", config.id),
+        &config.ssh.host,
+        config.ssh.port,
+        &config.ssh.username,
+    )
+    .map_err(|error| error.to_string())?;
+    let pool = Arc::new(
+        SshChannelPool::new(SshPoolConfig::default())
+            .map_err(|error| format!("could not initialize shared SSH channel pool: {error}"))?,
+    );
+    let factory: Arc<dyn SshConnectionFactory> =
+        Arc::new(RusshConnectionFactory::background(credentials));
+    Ok(TunnelSshRuntime {
+        pool,
+        key,
+        factory,
+        cancellation,
+    })
+}
+
+async fn shutdown_active_tunnel(active: ActiveTunnel) {
+    active.cancellation.cancel();
+    if let Some(pool) = &active.ssh_pool {
+        pool.shutdown().await;
     }
-    Ok(())
+    active.task.abort();
+    let bridges = active.bridges.lock().await;
+    for bridge in bridges.iter() {
+        bridge.abort();
+    }
 }
 
 fn emit_status(app: &AppHandle, info: &TunnelStatusInfo) {
@@ -259,20 +317,12 @@ async fn run_local_forward(
     registry: Arc<TunnelRegistry>,
     bridges: Arc<AsyncMutex<Vec<JoinHandle<()>>>>,
     config: TunnelConfig,
+    runtime: TunnelSshRuntime,
 ) -> Result<(), String> {
     let listener = TcpListener::bind((config.listen_host.as_str(), config.listen_port))
         .await
         .map_err(|e| format!("bind {}:{}: {}", config.listen_host, config.listen_port, e))?;
-
-    let auth = ssh_auth_from(&config.ssh)?;
-    let handle = connect_ssh_authenticated(
-        &config.ssh.host,
-        config.ssh.port,
-        &config.ssh.username,
-        auth,
-    )
-    .await?;
-    let handle = Arc::new(handle);
+    runtime.warm_up().await?;
 
     set_status(
         &app,
@@ -290,84 +340,36 @@ async fn run_local_forward(
     let dest_port = config.dest_port;
     let id = config.id.clone();
     loop {
-        let (mut stream, peer) = match listener.accept().await {
+        let accepted = tokio::select! {
+            biased;
+            _ = runtime.cancellation.cancelled() => return Ok(()),
+            result = listener.accept() => result,
+        };
+        let (mut stream, peer) = match accepted {
             Ok(v) => v,
             Err(e) => {
                 tracing::warn!("tunnel {}: accept failed: {}", id, e);
                 continue;
             }
         };
-        let h = handle.clone();
+        let ssh = runtime.clone();
         let dh = dest_host.clone();
         let dp = dest_port;
         let task = tokio::spawn(async move {
-            let originator = peer.ip().to_string();
-            let originator_port = peer.port() as u32;
-            let channel = match h
-                .channel_open_direct_tcpip(
-                    dh.as_str(),
-                    dp as u32,
-                    originator.as_str(),
-                    originator_port,
-                )
-                .await
-            {
-                Ok(c) => c,
+            let mut channel = match ssh.open_direct_tcpip(&dh, dp, peer).await {
+                Ok(channel) => channel,
                 Err(e) => {
                     tracing::warn!("direct-tcpip open failed: {}", e);
                     let _ = stream.shutdown().await;
                     return;
                 }
             };
-            if let Err(e) = bridge_stream_channel(&mut stream, channel).await {
+            if let Err(e) = tokio::io::copy_bidirectional(&mut stream, &mut channel).await {
                 tracing::debug!("bridge ended: {}", e);
             }
         });
         bridges.lock().await.push(task);
     }
-}
-
-async fn bridge_stream_channel(
-    stream: &mut tokio::net::TcpStream,
-    mut channel: russh::Channel<russh::client::Msg>,
-) -> Result<(), String> {
-    use tokio::io::AsyncWriteExt as _;
-    let (mut rx, mut tx) = stream.split();
-
-    let mut buf = vec![0u8; 16 * 1024];
-    let mut local_eof = false;
-    let mut remote_eof = false;
-    while !(local_eof && remote_eof) {
-        tokio::select! {
-            n = rx.read(&mut buf), if !local_eof => {
-                let n = n.map_err(|e| format!("local read: {}", e))?;
-                if n == 0 {
-                    local_eof = true;
-                    let _ = channel.eof().await;
-                } else if let Err(e) = channel.data(&buf[..n]).await {
-                    return Err(format!("ssh write: {}", e));
-                }
-            }
-            msg = channel.wait(), if !remote_eof => {
-                use russh::ChannelMsg;
-                let Some(m) = msg else { remote_eof = true; let _ = tx.shutdown().await; continue; };
-                match m {
-                    ChannelMsg::Data { data } => {
-                        tx.write_all(&data).await.map_err(|e| format!("local write: {}", e))?;
-                    }
-                    ChannelMsg::ExtendedData { data, .. } => {
-                        tx.write_all(&data).await.map_err(|e| format!("local write: {}", e))?;
-                    }
-                    ChannelMsg::Eof | ChannelMsg::Close => {
-                        remote_eof = true;
-                        let _ = tx.shutdown().await;
-                    }
-                    _ => {}
-                }
-            }
-        }
-    }
-    Ok(())
 }
 
 /* ---------------------------- Dynamic SOCKS5 ------------------------ */
@@ -377,20 +379,12 @@ async fn run_dynamic_forward(
     registry: Arc<TunnelRegistry>,
     bridges: Arc<AsyncMutex<Vec<JoinHandle<()>>>>,
     config: TunnelConfig,
+    runtime: TunnelSshRuntime,
 ) -> Result<(), String> {
     let listener = TcpListener::bind((config.listen_host.as_str(), config.listen_port))
         .await
         .map_err(|e| format!("bind {}:{}: {}", config.listen_host, config.listen_port, e))?;
-
-    let auth = ssh_auth_from(&config.ssh)?;
-    let handle = connect_ssh_authenticated(
-        &config.ssh.host,
-        config.ssh.port,
-        &config.ssh.username,
-        auth,
-    )
-    .await?;
-    let handle = Arc::new(handle);
+    runtime.warm_up().await?;
 
     set_status(
         &app,
@@ -406,16 +400,21 @@ async fn run_dynamic_forward(
 
     let id = config.id.clone();
     loop {
-        let (mut stream, peer) = match listener.accept().await {
+        let accepted = tokio::select! {
+            biased;
+            _ = runtime.cancellation.cancelled() => return Ok(()),
+            result = listener.accept() => result,
+        };
+        let (mut stream, peer) = match accepted {
             Ok(v) => v,
             Err(e) => {
                 tracing::warn!("socks {}: accept: {}", id, e);
                 continue;
             }
         };
-        let h = handle.clone();
+        let ssh = runtime.clone();
         let task = tokio::spawn(async move {
-            if let Err(e) = handle_socks5(&mut stream, peer, h).await {
+            if let Err(e) = handle_socks5(&mut stream, peer, ssh).await {
                 tracing::debug!("socks5 client ended: {}", e);
             }
         });
@@ -426,7 +425,7 @@ async fn run_dynamic_forward(
 async fn handle_socks5(
     stream: &mut tokio::net::TcpStream,
     peer: std::net::SocketAddr,
-    ssh: Arc<russh::client::Handle<SshHandler>>,
+    ssh: TunnelSshRuntime,
 ) -> Result<(), String> {
     // --- greeting ---
     let mut greet = [0u8; 2];
@@ -443,6 +442,10 @@ async fn handle_socks5(
         .await
         .map_err(|e| e.to_string())?;
     // We support "no authentication" (0x00) only.
+    if !methods.contains(&0x00) {
+        let _ = stream.write_all(&[0x05, 0xff]).await;
+        return Err("SOCKS5 client did not offer no-authentication".to_string());
+    }
     stream
         .write_all(&[0x05, 0x00])
         .await
@@ -502,18 +505,8 @@ async fn handle_socks5(
         .map_err(|e| e.to_string())?;
     let port = u16::from_be_bytes(port_bytes);
 
-    let originator = peer.ip().to_string();
-    let originator_port = peer.port() as u32;
-    let channel = match ssh
-        .channel_open_direct_tcpip(
-            host.as_str(),
-            port as u32,
-            originator.as_str(),
-            originator_port,
-        )
-        .await
-    {
-        Ok(c) => c,
+    let mut channel = match ssh.open_direct_tcpip(&host, port, peer).await {
+        Ok(channel) => channel,
         Err(e) => {
             // 0x05 = connection refused
             let _ = stream
@@ -528,7 +521,10 @@ async fn handle_socks5(
         .await
         .map_err(|e| e.to_string())?;
 
-    bridge_stream_channel(stream, channel).await
+    tokio::io::copy_bidirectional(stream, &mut channel)
+        .await
+        .map(|_| ())
+        .map_err(|error| error.to_string())
 }
 
 /* ---------------------------- Remote (server-side bind) ------------- */
@@ -658,13 +654,9 @@ pub async fn delete_tunnel(
         save_all(&app, &all)?;
     }
     state.tunnels.session_passwords.lock().await.remove(&id);
-    let mut running = state.tunnels.running.lock().await;
-    if let Some(active) = running.remove(&id) {
-        active.task.abort();
-        let bridges = active.bridges.lock().await;
-        for b in bridges.iter() {
-            b.abort();
-        }
+    let active = state.tunnels.running.lock().await.remove(&id);
+    if let Some(active) = active {
+        shutdown_active_tunnel(active).await;
     }
     state.tunnels.statuses.lock().await.remove(&id);
     Ok(())
@@ -727,7 +719,19 @@ pub async fn start_tunnel(
         .await
         .get(&id)
         .cloned();
-    resolve_tunnel_creds(&mut config, &state.vault, session_pwd)?;
+    let kind = config.kind.clone();
+    let cancellation = CancellationToken::new();
+    let ssh_runtime = if matches!(kind, TunnelKind::Local | TunnelKind::Dynamic) {
+        Some(build_tunnel_ssh_runtime(
+            &mut config,
+            state.vault.clone(),
+            session_pwd,
+            cancellation.clone(),
+        )?)
+    } else {
+        None
+    };
+    let ssh_pool = ssh_runtime.as_ref().map(|runtime| runtime.pool.clone());
 
     let starting = TunnelStatusInfo {
         id: id.clone(),
@@ -735,36 +739,42 @@ pub async fn start_tunnel(
         error: None,
         active_connections: Some(0),
     };
-    set_status(&app, &state.tunnels, starting.clone()).await;
 
     // Spawn the actual forwarder. It updates status to Running on success.
     let registry = state.tunnels.clone();
     let app_for_task = app.clone();
     let task_id = id.clone();
-    let kind = config.kind.clone();
     let bridges: Arc<AsyncMutex<Vec<JoinHandle<()>>>> = Arc::new(AsyncMutex::new(Vec::new()));
     let bridges_for_task = bridges.clone();
+    let pool_for_task = ssh_pool.clone();
+    let cancellation_for_task = cancellation.clone();
+    let (start_sender, start_receiver) = tokio::sync::oneshot::channel::<()>();
     let task = tokio::spawn(async move {
-        let result = match kind {
-            TunnelKind::Local => {
+        if start_receiver.await.is_err() {
+            return;
+        }
+        let result = match (kind, ssh_runtime) {
+            (TunnelKind::Local, Some(runtime)) => {
                 run_local_forward(
                     app_for_task.clone(),
                     registry.clone(),
                     bridges_for_task.clone(),
                     config,
+                    runtime,
                 )
                 .await
             }
-            TunnelKind::Dynamic => {
+            (TunnelKind::Dynamic, Some(runtime)) => {
                 run_dynamic_forward(
                     app_for_task.clone(),
                     registry.clone(),
                     bridges_for_task.clone(),
                     config,
+                    runtime,
                 )
                 .await
             }
-            TunnelKind::Remote => {
+            (TunnelKind::Remote, _) => {
                 run_remote_forward(
                     app_for_task.clone(),
                     registry.clone(),
@@ -773,6 +783,7 @@ pub async fn start_tunnel(
                 )
                 .await
             }
+            (_, None) => Err("shared SSH channel pool is not configured".to_string()),
         };
         if let Err(e) = result {
             let info = TunnelStatusInfo {
@@ -787,11 +798,15 @@ pub async fn start_tunnel(
             }
             let _ = app_for_task.emit("tunnel-status", info);
         }
-        // Cancel any in-flight bridges, then drop ourselves.
+        cancellation_for_task.cancel();
+        if let Some(pool) = &pool_for_task {
+            pool.shutdown().await;
+        }
+        // Cancel any in-flight bridges, then remove this runtime.
         {
             let bridges = bridges_for_task.lock().await;
-            for b in bridges.iter() {
-                b.abort();
+            for bridge in bridges.iter() {
+                bridge.abort();
             }
         }
         let mut running = registry.running.lock().await;
@@ -799,7 +814,33 @@ pub async fn start_tunnel(
     });
 
     let mut running = state.tunnels.running.lock().await;
-    running.insert(id.clone(), ActiveTunnel { task, bridges });
+    if running.contains_key(&id) {
+        drop(running);
+        cancellation.cancel();
+        if let Some(pool) = &ssh_pool {
+            pool.shutdown().await;
+        }
+        task.abort();
+        let statuses = state.tunnels.statuses.lock().await;
+        return Ok(statuses.get(&id).cloned().unwrap_or(TunnelStatusInfo {
+            id,
+            status: TunnelStatus::Running,
+            error: None,
+            active_connections: None,
+        }));
+    }
+    running.insert(
+        id.clone(),
+        ActiveTunnel {
+            task,
+            bridges,
+            cancellation,
+            ssh_pool,
+        },
+    );
+    set_status(&app, &state.tunnels, starting.clone()).await;
+    drop(running);
+    let _ = start_sender.send(());
     Ok(starting)
 }
 
@@ -809,15 +850,9 @@ pub async fn stop_tunnel(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<TunnelStatusInfo, String> {
-    {
-        let mut running = state.tunnels.running.lock().await;
-        if let Some(active) = running.remove(&id) {
-            active.task.abort();
-            let bridges = active.bridges.lock().await;
-            for b in bridges.iter() {
-                b.abort();
-            }
-        }
+    let active = state.tunnels.running.lock().await.remove(&id);
+    if let Some(active) = active {
+        shutdown_active_tunnel(active).await;
     }
     let info = TunnelStatusInfo {
         id: id.clone(),
@@ -899,16 +934,15 @@ pub async fn test_tunnel(
         .await
         .get(&id)
         .cloned();
-    resolve_tunnel_creds(&mut config, &state.vault, session_pwd)?;
-    let auth = ssh_auth_from(&config.ssh)?;
-    let handle = connect_ssh_authenticated(
-        &config.ssh.host,
-        config.ssh.port,
-        &config.ssh.username,
-        auth,
-    )
-    .await?;
-    drop(handle);
+    let runtime = build_tunnel_ssh_runtime(
+        &mut config,
+        state.vault.clone(),
+        session_pwd,
+        CancellationToken::new(),
+    )?;
+    let result = runtime.warm_up().await;
+    runtime.pool.shutdown().await;
+    result?;
     Ok(format!(
         "SSH connection to {}@{}:{} succeeded",
         config.ssh.username, config.ssh.host, config.ssh.port
@@ -958,4 +992,141 @@ pub async fn stop_all_tunnels(
         }
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Mutex as StdMutex;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Duration;
+
+    use async_trait::async_trait;
+    use tokio::net::TcpStream;
+
+    use super::*;
+    use crate::terminal::ssh_pool::{
+        BoxedSshChannelStream, ControlOpenError, SshControlConnection, SshPoolError,
+    };
+
+    #[derive(Default)]
+    struct EchoControl {
+        targets: StdMutex<Vec<(String, u16)>>,
+    }
+
+    #[async_trait]
+    impl SshControlConnection for EchoControl {
+        fn is_closed(&self) -> bool {
+            false
+        }
+
+        async fn open_direct_tcpip(
+            &self,
+            target: &SshDirectTcpipTarget,
+        ) -> Result<BoxedSshChannelStream, ControlOpenError> {
+            self.targets
+                .lock()
+                .unwrap()
+                .push((target.host().to_string(), target.port()));
+            let (stream, mut remote) = tokio::io::duplex(1024);
+            tokio::spawn(async move {
+                let mut buffer = [0_u8; 256];
+                loop {
+                    let read = match remote.read(&mut buffer).await {
+                        Ok(0) | Err(_) => return,
+                        Ok(read) => read,
+                    };
+                    if remote.write_all(&buffer[..read]).await.is_err() {
+                        return;
+                    }
+                }
+            });
+            Ok(Box::new(stream))
+        }
+    }
+
+    struct EchoFactory {
+        control: Arc<EchoControl>,
+        connects: AtomicUsize,
+    }
+
+    #[async_trait]
+    impl SshConnectionFactory for EchoFactory {
+        async fn connect(
+            &self,
+            _key: &SshPoolKey,
+            _keepalive_interval: Duration,
+        ) -> Result<Arc<dyn SshControlConnection>, SshPoolError> {
+            self.connects.fetch_add(1, Ordering::AcqRel);
+            Ok(self.control.clone())
+        }
+    }
+
+    fn echo_runtime() -> (TunnelSshRuntime, Arc<EchoControl>, Arc<EchoFactory>) {
+        let control = Arc::new(EchoControl::default());
+        let factory = Arc::new(EchoFactory {
+            control: control.clone(),
+            connects: AtomicUsize::new(0),
+        });
+        let config = SshPoolConfig {
+            max_control_connections: 1,
+            max_channels_per_connection: 4,
+            connect_timeout: Duration::from_secs(2),
+            ..SshPoolConfig::default()
+        };
+        let runtime = TunnelSshRuntime {
+            pool: Arc::new(SshChannelPool::new(config).unwrap()),
+            key: SshPoolKey::new("tunnel:test", "ssh.example", 22, "private-user").unwrap(),
+            factory: factory.clone(),
+            cancellation: CancellationToken::new(),
+        };
+        (runtime, control, factory)
+    }
+
+    #[tokio::test]
+    async fn dynamic_socks_uses_shared_pool_and_remote_dns() {
+        let (runtime, control, factory) = echo_runtime();
+        runtime.warm_up().await.unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server_runtime = runtime.clone();
+        let server = tokio::spawn(async move {
+            let (mut stream, peer) = listener.accept().await.unwrap();
+            handle_socks5(&mut stream, peer, server_runtime).await
+        });
+
+        let mut client = TcpStream::connect(address).await.unwrap();
+        client.write_all(&[5, 1, 0]).await.unwrap();
+        let mut greeting = [0_u8; 2];
+        client.read_exact(&mut greeting).await.unwrap();
+        assert_eq!(greeting, [5, 0]);
+
+        let host = b"SERVICE.INTERNAL";
+        let mut request = vec![5, 1, 0, 3, host.len() as u8];
+        request.extend_from_slice(host);
+        request.extend_from_slice(&443_u16.to_be_bytes());
+        client.write_all(&request).await.unwrap();
+        let mut reply = [0_u8; 10];
+        client.read_exact(&mut reply).await.unwrap();
+        assert_eq!(&reply[..2], &[5, 0]);
+
+        client.write_all(b"ping").await.unwrap();
+        let mut echo = [0_u8; 4];
+        client.read_exact(&mut echo).await.unwrap();
+        assert_eq!(&echo, b"ping");
+        client.shutdown().await.unwrap();
+        drop(client);
+
+        tokio::time::timeout(Duration::from_secs(1), server)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(factory.connects.load(Ordering::Acquire), 1);
+        assert_eq!(
+            control.targets.lock().unwrap().as_slice(),
+            &[("service.internal".into(), 443)]
+        );
+        assert_eq!(runtime.pool.snapshot().active_channels, 0);
+        runtime.pool.shutdown().await;
+    }
 }

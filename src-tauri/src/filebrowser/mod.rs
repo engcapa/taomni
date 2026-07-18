@@ -17,7 +17,7 @@ pub mod transfer;
 use crate::state::AppState;
 use crate::terminal::ssh::SshAuth;
 use crate::terminal::{build_kbd_prompter, clear_session_auth_responders};
-use base64::{engine::general_purpose::STANDARD as B64, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD as B64};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -38,12 +38,12 @@ pub struct AttachResultPayload {
 
 fn auth_from(method: &str, data: Option<String>) -> SshAuth {
     match method {
-        "Password" => SshAuth::Password(data.unwrap_or_default()),
+        "Password" => SshAuth::password(data.unwrap_or_default()),
         "PrivateKey" => {
             SshAuth::PrivateKey(data.unwrap_or_else(|| "~/.ssh/id_ed25519".to_string()))
         }
         "Agent" => SshAuth::Agent,
-        _ => SshAuth::Password(data.unwrap_or_default()),
+        _ => SshAuth::password(data.unwrap_or_default()),
     }
 }
 
@@ -55,7 +55,7 @@ fn auth_from_with_vault(
     if method == "Password" {
         let raw = data.unwrap_or_default();
         let resolved = vault.resolve(&raw)?;
-        return Ok(SshAuth::Password(
+        return Ok(SshAuth::password(
             resolved.map(|z| (*z).clone()).unwrap_or(raw),
         ));
     }

@@ -373,7 +373,7 @@ fn validate_file(file: &KnownHostsFile) -> Result<(), String> {
     Ok(())
 }
 
-fn canonical_host(host: &str, port: u16) -> Result<String, String> {
+pub(crate) fn canonical_host(host: &str, port: u16) -> Result<String, String> {
     if port == 0 {
         return Err("SSH host port must be greater than zero".to_string());
     }
