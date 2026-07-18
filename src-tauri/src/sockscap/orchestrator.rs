@@ -9,6 +9,9 @@
 
 use std::sync::{Arc, Mutex};
 
+use super::flow::stats::{
+    FlowStatsSink, LiveConnectionsQuery, LiveConnectionsSnapshot, LiveFlowSampler,
+};
 use super::preflight::{PreflightReport, PreflightSeverity, run_preflight};
 use super::storage::{RecoveryJournal, RecoveryPhase, SockscapStore};
 use super::types::{EngineState, EngineStatus};
@@ -17,6 +20,7 @@ use super::types::{EngineState, EngineStatus};
 pub struct SockscapEngine {
     inner: Mutex<EngineInner>,
     store: Option<Arc<SockscapStore>>,
+    live_flows: Arc<LiveFlowSampler>,
 }
 
 struct EngineInner {
@@ -40,6 +44,7 @@ impl SockscapEngine {
                 last_preflight: None,
             }),
             store: None,
+            live_flows: Arc::new(LiveFlowSampler::default()),
         }
     }
 
@@ -60,7 +65,34 @@ impl SockscapEngine {
                 last_preflight: None,
             }),
             store: Some(store),
+            live_flows: Arc::new(LiveFlowSampler::default()),
         }
+    }
+
+    pub fn live_connections(
+        &self,
+        query: &LiveConnectionsQuery,
+    ) -> Result<LiveConnectionsSnapshot, String> {
+        self.live_flows.snapshot(query)
+    }
+
+    pub fn clear_live_connections(&self) -> u64 {
+        self.live_flows.clear()
+    }
+
+    /// Capture adapters use this sink only after enabling profiles whose
+    /// collection mode permits session-memory statistics.
+    #[allow(dead_code)]
+    pub fn live_flow_sink(&self) -> Arc<dyn FlowStatsSink> {
+        Arc::clone(&self.live_flows) as Arc<dyn FlowStatsSink>
+    }
+
+    #[allow(dead_code)]
+    pub fn set_live_sampling_profiles<I>(&self, profile_ids: I)
+    where
+        I: IntoIterator<Item = String>,
+    {
+        self.live_flows.set_enabled_profiles(profile_ids);
     }
 
     pub fn status(&self) -> EngineStatus {
@@ -198,6 +230,7 @@ impl SockscapEngine {
     /// Stop is idempotent while both the in-memory runtime and recovery
     /// journal are clean. It cannot clear a real marker without helper proof.
     pub fn stop(&self) -> Result<EngineStatus, String> {
+        self.live_flows.disable();
         if let Some(store) = &self.store {
             let journal = store.recovery_journal()?;
             if journal.cleanup_required || journal.phase != RecoveryPhase::Clean {
@@ -237,6 +270,7 @@ impl SockscapEngine {
     /// One-click recovery is wired now, but cannot claim success until a
     /// platform adapter/helper explicitly confirms that system rules are gone.
     pub fn recover(&self) -> Result<EngineStatus, String> {
+        self.live_flows.disable();
         if let Some(store) = &self.store {
             let journal = store.recovery_journal()?;
             if journal.cleanup_required || journal.phase != RecoveryPhase::Clean {

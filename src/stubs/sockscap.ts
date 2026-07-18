@@ -6,6 +6,9 @@ import type {
   SockscapEgressIssue,
   SockscapEgressSessionSummary,
   SockscapEngineStatus,
+  SockscapLiveConnectionSample,
+  SockscapLiveConnectionsQuery,
+  SockscapLiveConnectionsSnapshot,
   SockscapParseReport,
   SockscapPersistedRoutingProfile,
   SockscapPersistedRuleSource,
@@ -71,6 +74,9 @@ interface StubRuntimeState extends StubPersistedState {
   status: SockscapEngineStatus;
   statsTotals: SockscapStatsTotals;
   statsSeries: SockscapStatsSeriesPoint[];
+  liveSamples: SockscapLiveConnectionSample[];
+  liveSampleSequence: number;
+  droppedLiveSamples: number;
   lastTrafficEmitMillis: number;
   trafficTimer: ReturnType<typeof globalThis.setInterval> | null;
 }
@@ -227,6 +233,9 @@ function makeRuntimeState(): StubRuntimeState {
       : disabledStatus(),
     statsTotals: zeroTotals(),
     statsSeries: [],
+    liveSamples: [],
+    liveSampleSequence: 0,
+    droppedLiveSamples: 0,
     lastTrafficEmitMillis: 0,
     trafficTimer: null,
   };
@@ -705,6 +714,52 @@ function statsSnapshot(query: SockscapStatsSnapshotQuery): SockscapStatsSnapshot
   };
 }
 
+function liveConnections(query: SockscapLiveConnectionsQuery): SockscapLiveConnectionsSnapshot {
+  if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 200) {
+    throw new Error("LIVE_CONNECTIONS_INVALID_LIMIT: limit must be between 1 and 200");
+  }
+  const since = query.sinceUnix ?? 0;
+  return {
+    generatedAtUnix: nowUnix(),
+    capacity: 256,
+    droppedSamples: runtime.droppedLiveSamples,
+    samples: clone(runtime.liveSamples
+      .filter((sample) => sample.observedAtUnix >= since)
+      .slice(0, query.limit)),
+  };
+}
+
+function appendLiveSamples(count: number): void {
+  const profile = runtime.profiles.find((record) => (
+    runtime.status.activeProfileIds.includes(record.profile.id)
+    && record.profile.statsPrivacy.collectionMode !== "disabled"
+  ));
+  if (!profile) return;
+  for (let index = 0; index < count; index += 1) {
+    runtime.liveSampleSequence += 1;
+    const action = index % 6 === 5 ? "block" : index % 3 === 2 ? "direct" : "proxy";
+    runtime.liveSamples.unshift({
+      sampleId: runtime.liveSampleSequence,
+      observedAtUnix: nowUnix(),
+      profileId: profile.profile.id,
+      protocol: index % 5 === 4 ? "udp" : "tcp",
+      hostnameSource: index % 4 === 3 ? "unknown" : "tls_sni",
+      policyAction: action,
+      effectiveAction: action,
+      outcome: action === "block" ? "blocked" : "established",
+      connector: action === "proxy"
+        ? profile.profile.egressKind ?? "proxy_session"
+        : action === "direct" ? "direct" : null,
+      errorCode: null,
+      connectMillis: action === "block" ? 0 : 12 + (index % 20),
+    });
+  }
+  if (runtime.liveSamples.length > 256) {
+    runtime.droppedLiveSamples += runtime.liveSamples.length - 256;
+    runtime.liveSamples = runtime.liveSamples.slice(0, 256);
+  }
+}
+
 async function publishStatus(): Promise<void> {
   await emit(SOCKSCAP_EVENTS.status, clone(runtime.status));
 }
@@ -771,6 +826,7 @@ async function emitTraffic(force: boolean): Promise<SockscapTrafficSummaryEvent 
   runtime.statsTotals.connections += connections;
   runtime.statsTotals.proxyConnections += connections;
   runtime.statsTotals.connectMillisTotal += 24 * connections;
+  appendLiveSamples(connections);
   const bucketStart = Math.floor(nowUnix() / 60) * 60;
   let point = runtime.statsSeries.find((candidate) => candidate.bucketStart === bucketStart);
   if (!point) {
@@ -944,13 +1000,18 @@ export async function invokeSockscapStub(command: string, rawArgs?: unknown): Pr
     }
     case "sockscap_stats_snapshot":
       return { handled: true, value: statsSnapshot(args.query as SockscapStatsSnapshotQuery) };
+    case "sockscap_live_connections":
+      return { handled: true, value: liveConnections(args.query as SockscapLiveConnectionsQuery) };
     case "sockscap_clear_stats": {
       const removedRows = runtime.statsSeries.length;
+      const removedLiveSamples = runtime.liveSamples.length;
       runtime.statsTotals = zeroTotals();
       runtime.statsSeries = [];
+      runtime.liveSamples = [];
+      runtime.droppedLiveSamples = 0;
       const event: SockscapTrafficSummaryEvent = { generatedAtUnix: nowUnix(), totals: zeroTotals(), cleared: true };
       await emit(SOCKSCAP_EVENTS.trafficSummary, event);
-      return { handled: true, value: { removedRows } satisfies SockscapClearStatsResult };
+      return { handled: true, value: { removedRows, removedLiveSamples } satisfies SockscapClearStatsResult };
     }
     case "sockscap_gfwlist_official_info":
       return {

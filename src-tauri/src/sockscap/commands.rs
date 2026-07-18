@@ -18,6 +18,7 @@ use super::egress::{
     inspect_egress_session, list_egress_sessions,
 };
 use super::flow::connectors::{EgressMetadata, EgressTarget};
+use super::flow::stats::{LiveConnectionsQuery, LiveConnectionsSnapshot};
 use super::policy::rules::normalize_hostname;
 use super::policy::{
     GFWLIST_OFFICIAL_SOURCE_ID, ParseReport, RefreshOutcome, RuleSourceKind, RuleSourceState,
@@ -507,10 +508,19 @@ pub fn sockscap_stats_snapshot(
     state.sockscap_store.stats_snapshot(&query)
 }
 
+#[tauri::command]
+pub fn sockscap_live_connections(
+    state: State<'_, AppState>,
+    query: LiveConnectionsQuery,
+) -> Result<LiveConnectionsSnapshot, String> {
+    state.sockscap.live_connections(&query)
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClearStatsResult {
     pub removed_rows: u64,
+    pub removed_live_samples: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -528,6 +538,7 @@ pub fn sockscap_clear_stats(
 ) -> Result<ClearStatsResult, String> {
     let result = ClearStatsResult {
         removed_rows: state.sockscap_store.clear_stats()?,
+        removed_live_samples: state.sockscap.clear_live_connections(),
     };
     emit_best_effort(
         &app,
@@ -781,6 +792,7 @@ mod tests {
         refresh_outcome: RefreshOutcome,
         target_result: TestTargetResult,
         stats: StatsSnapshot,
+        live_connections: LiveConnectionsSnapshot,
         events: ContractEvents,
     }
 
@@ -906,6 +918,13 @@ mod tests {
             Some("contract-profile")
         );
         assert_eq!(fixture.stats.totals.connections, 2);
+        assert_eq!(fixture.live_connections.capacity, 256);
+        assert_eq!(fixture.live_connections.samples.len(), 1);
+        let live_sample = serde_json::to_value(&fixture.live_connections.samples[0])
+            .expect("serialize live sample");
+        assert!(live_sample.get("hostname").is_none());
+        assert!(live_sample.get("application").is_none());
+        assert!(live_sample.get("payload").is_none());
         assert!(!fixture.events.traffic_summary.cleared);
         assert!(fixture.events.profile_health.enabled);
         assert!(!fixture.events.egress_health.ok);

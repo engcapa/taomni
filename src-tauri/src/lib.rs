@@ -818,6 +818,7 @@ pub fn run() {
             sockscap::sockscap_import_rule_source,
             sockscap::sockscap_refresh_rule_source,
             sockscap::sockscap_stats_snapshot,
+            sockscap::sockscap_live_connections,
             sockscap::sockscap_clear_stats,
             sockscap::sockscap_gfwlist_official_info,
             exit_app,

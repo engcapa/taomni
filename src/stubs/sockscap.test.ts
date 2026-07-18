@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SockscapPersistedRoutingProfile, SockscapTestEgressResult } from "../lib/sockscap";
+import type {
+  SockscapLiveConnectionsSnapshot,
+  SockscapPersistedRoutingProfile,
+  SockscapTestEgressResult,
+} from "../lib/sockscap";
 import { listen } from "./tauri-event";
 import { invokeSockscapStub, sockscapStubController } from "./sockscap";
 
@@ -110,11 +114,34 @@ describe("Sockscap browser stub", () => {
     });
     expect(snapshot).toMatchObject({ totals: { connections: 2 }, topDomains: [] });
 
-    const cleared = await invokeValue<{ removedRows: number }>("sockscap_clear_stats");
+    const live = await invokeValue<SockscapLiveConnectionsSnapshot>("sockscap_live_connections", {
+      query: { sinceUnix: null, limit: 50 },
+    });
+    expect(live).toMatchObject({ capacity: 256, droppedSamples: 0 });
+    expect(live.samples).toHaveLength(2);
+    expect(JSON.stringify(live.samples)).not.toMatch(/hostname["']|domain|application|executable|payload|url|username|password/i);
+
+    const cleared = await invokeValue<{ removedRows: number; removedLiveSamples: number }>("sockscap_clear_stats");
     expect(cleared.removedRows).toBe(1);
+    expect(cleared.removedLiveSamples).toBe(2);
     expect(events).toHaveLength(2);
     expect(events[1]).toMatchObject({ cleared: true, totals: { connections: 0 } });
     unlisten();
+  });
+
+  it("bounds recent flow outcomes and rejects unbounded queries", async () => {
+    await sockscapStubController.configure({ trafficMode: "burst", capabilityMode: "supported" });
+    await invokeValue("sockscap_start");
+    for (let index = 0; index < 12; index += 1) await sockscapStubController.emitTraffic();
+    const live = await invokeValue<SockscapLiveConnectionsSnapshot>("sockscap_live_connections", {
+      query: { sinceUnix: 0, limit: 200 },
+    });
+    expect(live.samples).toHaveLength(200);
+    expect(live.droppedSamples).toBeGreaterThan(0);
+    expect(live.samples[0].sampleId).toBeGreaterThan(live.samples[199].sampleId);
+    await expect(invokeValue("sockscap_live_connections", {
+      query: { sinceUnix: null, limit: 201 },
+    })).rejects.toThrow("LIVE_CONNECTIONS_INVALID_LIMIT");
   });
 
   it("automatically publishes at most one traffic summary per second", async () => {

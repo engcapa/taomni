@@ -435,8 +435,42 @@ export interface SockscapStatsSnapshot {
   egressHealth: SockscapEgressHealthPoint[];
 }
 
+export type SockscapFlowOutcome = "established" | "blocked" | "failed" | "fallback_direct";
+
+export interface SockscapLiveConnectionsQuery {
+  sinceUnix: number | null;
+  limit: number;
+}
+
+/**
+ * A bounded, privacy-safe completed-flow outcome. It intentionally omits
+ * endpoint/domain, application identity, filesystem paths, credentials, and
+ * payload data; it is not a packet-capture or current-socket record.
+ */
+export interface SockscapLiveConnectionSample {
+  sampleId: number;
+  observedAtUnix: number;
+  profileId: string;
+  protocol: string;
+  hostnameSource: SockscapHostnameSource;
+  policyAction: SockscapRouteAction;
+  effectiveAction: SockscapRouteAction;
+  outcome: SockscapFlowOutcome;
+  connector: string | null;
+  errorCode: string | null;
+  connectMillis: number;
+}
+
+export interface SockscapLiveConnectionsSnapshot {
+  generatedAtUnix: number;
+  capacity: number;
+  droppedSamples: number;
+  samples: SockscapLiveConnectionSample[];
+}
+
 export interface SockscapClearStatsResult {
   removedRows: number;
+  removedLiveSamples: number;
 }
 
 export interface SockscapGfwlistOfficialInfo {
@@ -560,6 +594,12 @@ export function sockscapStatsSnapshot(query: SockscapStatsSnapshotQuery): Promis
   return invoke("sockscap_stats_snapshot", { query });
 }
 
+export function sockscapLiveConnections(
+  query: SockscapLiveConnectionsQuery,
+): Promise<SockscapLiveConnectionsSnapshot> {
+  return invoke("sockscap_live_connections", { query });
+}
+
 export function sockscapClearStats(): Promise<SockscapClearStatsResult> {
   return invoke("sockscap_clear_stats", {});
 }
@@ -610,6 +650,7 @@ export interface SockscapIpcContractFixture {
   refreshOutcome: SockscapRefreshOutcome;
   targetResult: SockscapTestTargetResult;
   stats: SockscapStatsSnapshot;
+  liveConnections: SockscapLiveConnectionsSnapshot;
   events: {
     trafficSummary: SockscapTrafficSummaryEvent;
     profileHealth: SockscapProfileHealthEvent;
@@ -632,6 +673,7 @@ export function isSockscapIpcContractFixture(value: unknown): value is SockscapI
   const egress = value.egressSession;
   const ruleSource = value.ruleSource;
   const stats = value.stats;
+  const liveConnections = value.liveConnections;
   const events = value.events;
   return (
     isRecord(capabilities)
@@ -655,6 +697,14 @@ export function isSockscapIpcContractFixture(value: unknown): value is SockscapI
     && isRecord(stats)
     && isRecord(stats.totals)
     && Array.isArray(stats.series)
+    && isRecord(liveConnections)
+    && typeof liveConnections.capacity === "number"
+    && Array.isArray(liveConnections.samples)
+    && liveConnections.samples.every((sample) => isRecord(sample)
+      && typeof sample.sampleId === "number"
+      && !("hostname" in sample)
+      && !("application" in sample)
+      && !("payload" in sample))
     && isRecord(events)
     && isRecord(events.trafficSummary)
     && isRecord(events.profileHealth)

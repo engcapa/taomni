@@ -19,6 +19,7 @@ import {
   isSockscapIpcContractFixture,
   listenSockscapTrafficSummary,
   sockscapDeleteProfile,
+  sockscapLiveConnections,
   sockscapStatsSnapshot,
   sockscapTestEgress,
   sockscapTestTarget,
@@ -75,6 +76,10 @@ describe("Sockscap IPC contract", () => {
     expect(fixture.ruleSource.state?.lastGoodPath).toBeNull();
     expect(fixture.egressSession).not.toHaveProperty("username");
     expect(fixture.egressSession).not.toHaveProperty("password");
+    expect(fixture.liveConnections.capacity).toBe(256);
+    expect(fixture.liveConnections.samples[0]).not.toHaveProperty("hostname");
+    expect(fixture.liveConnections.samples[0]).not.toHaveProperty("application");
+    expect(fixture.liveConnections.samples[0]).not.toHaveProperty("payload");
   });
 
   it("uses exact Tauri argument names for optimistic profile writes", async () => {
@@ -144,6 +149,11 @@ describe("Sockscap IPC contract", () => {
     mocks.invoke.mockResolvedValueOnce({});
     await sockscapStatsSnapshot(query);
     expect(mocks.invoke).toHaveBeenCalledWith("sockscap_stats_snapshot", { query });
+
+    const liveQuery = { sinceUnix: null, limit: 50 };
+    mocks.invoke.mockResolvedValueOnce({});
+    await sockscapLiveConnections(liveQuery);
+    expect(mocks.invoke).toHaveBeenCalledWith("sockscap_live_connections", { query: liveQuery });
   });
 
   it("unwraps typed Tauri event payloads", async () => {

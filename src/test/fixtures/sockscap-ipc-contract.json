@@ -306,6 +306,26 @@
       }
     ]
   },
+  "liveConnections": {
+    "generatedAtUnix": 1700000120,
+    "capacity": 256,
+    "droppedSamples": 0,
+    "samples": [
+      {
+        "sampleId": 7,
+        "observedAtUnix": 1700000118,
+        "profileId": "contract-profile",
+        "protocol": "tcp",
+        "hostnameSource": "tls_sni",
+        "policyAction": "proxy",
+        "effectiveAction": "proxy",
+        "outcome": "established",
+        "connector": "ssh_jump",
+        "errorCode": null,
+        "connectMillis": 37
+      }
+    ]
+  },
   "events": {
     "trafficSummary": {
       "generatedAtUnix": 1700000120,
