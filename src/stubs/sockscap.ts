@@ -694,14 +694,16 @@ function processCatalog(): SockscapProcessCatalog {
 }
 
 function statsSnapshot(query: SockscapStatsSnapshotQuery): SockscapStatsSnapshot {
+  if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 100) {
+    throw new Error("statistics top-entry limit must be 1-100");
+  }
   const series = runtime.statsSeries.filter((point) => point.bucketStart >= query.fromUnix && point.bucketStart <= query.toUnix);
-  const limit = Math.max(1, Math.min(query.limit, 1000));
   return {
     generatedAt: nowUnix(),
     fromUnix: query.fromUnix,
     toUnix: query.toUnix,
     totals: clone(runtime.statsTotals),
-    series: clone(series.slice(-limit)),
+    series: clone(series),
     topApplications: runtime.statsTotals.connections === 0
       ? []
       : [{ key: "Browser", bytesUp: runtime.statsTotals.bytesUp, bytesDown: runtime.statsTotals.bytesDown, connections: runtime.statsTotals.connections }],
@@ -710,8 +712,33 @@ function statsSnapshot(query: SockscapStatsSnapshotQuery): SockscapStatsSnapshot
       && runtime.statsTotals.connections > 0
       ? [{ key: "blocked.example", bytesUp: Math.floor(runtime.statsTotals.bytesUp / 2), bytesDown: Math.floor(runtime.statsTotals.bytesDown / 2), connections: Math.max(1, Math.floor(runtime.statsTotals.connections / 2)) }]
       : [],
-    egressHealth: [],
+    egressHealth: stubEgressHealth(),
   };
+}
+
+function stubEgressHealth(): SockscapStatsSnapshot["egressHealth"] {
+  if (runtime.statsTotals.connections === 0) return [];
+  const profile = runtime.profiles.find((record) => runtime.status.activeProfileIds.includes(record.profile.id));
+  if (!profile || !profile.profile.egressKind) return [];
+  const isSsh = profile.profile.egressKind === "ssh_jump";
+  const health = isSsh ? runtime.scenario.sshHealth : runtime.scenario.proxyHealth;
+  const issue = egressIssue(health);
+  return [{
+    bucketStart: Math.floor(nowUnix() / 60) * 60,
+    profileId: profile.profile.id,
+    egressKind: profile.profile.egressKind,
+    controlState: health === "healthy" ? "healthy" : health === "user_action_required" ? "user_action_required" : "degraded",
+    activeControlsMax: health === "healthy" ? 1 : 0,
+    activeChannelsMax: health === "healthy" ? Math.min(8, runtime.statsTotals.connections) : 0,
+    channelErrors: health === "healthy" ? 0 : 1,
+    reconnects: health === "degraded" ? 2 : 0,
+    bytesUp: runtime.statsTotals.bytesUp,
+    bytesDown: runtime.statsTotals.bytesDown,
+    handshakeMillisTotal: isSsh && health === "healthy" ? 38 : 0,
+    handshakeSamples: isSsh && health === "healthy" ? 1 : 0,
+    hostKeyState: isSsh ? (health === "invalid" ? "changed" : "verified") : null,
+    lastErrorCode: issue?.code ?? null,
+  }];
 }
 
 function liveConnections(query: SockscapLiveConnectionsQuery): SockscapLiveConnectionsSnapshot {
@@ -737,7 +764,7 @@ function appendLiveSamples(count: number): void {
   if (!profile) return;
   for (let index = 0; index < count; index += 1) {
     runtime.liveSampleSequence += 1;
-    const action = index % 6 === 5 ? "block" : index % 3 === 2 ? "direct" : "proxy";
+    const action = stubFlowAction(index);
     runtime.liveSamples.unshift({
       sampleId: runtime.liveSampleSequence,
       observedAtUnix: nowUnix(),
@@ -758,6 +785,25 @@ function appendLiveSamples(count: number): void {
     runtime.droppedLiveSamples += runtime.liveSamples.length - 256;
     runtime.liveSamples = runtime.liveSamples.slice(0, 256);
   }
+}
+
+function stubFlowAction(index: number): "direct" | "proxy" | "block" {
+  return index % 6 === 5 ? "block" : index % 3 === 2 ? "direct" : "proxy";
+}
+
+function stubFlowCounts(count: number): { direct: number; proxy: number; block: number; unknown: number } {
+  let direct = 0;
+  let proxy = 0;
+  let block = 0;
+  let unknown = 0;
+  for (let index = 0; index < count; index += 1) {
+    const action = stubFlowAction(index);
+    if (action === "direct") direct += 1;
+    else if (action === "block") block += 1;
+    else proxy += 1;
+    if (index % 4 === 3) unknown += 1;
+  }
+  return { direct, proxy, block, unknown };
 }
 
 async function publishStatus(): Promise<void> {
@@ -821,10 +867,14 @@ async function emitTraffic(force: boolean): Promise<SockscapTrafficSummaryEvent 
   const bytesUp = 8_192 * scale;
   const bytesDown = 32_768 * scale;
   const connections = 2 * scale;
+  const flowCounts = stubFlowCounts(connections);
   runtime.statsTotals.bytesUp += bytesUp;
   runtime.statsTotals.bytesDown += bytesDown;
   runtime.statsTotals.connections += connections;
-  runtime.statsTotals.proxyConnections += connections;
+  runtime.statsTotals.directConnections += flowCounts.direct;
+  runtime.statsTotals.proxyConnections += flowCounts.proxy;
+  runtime.statsTotals.blockedConnections += flowCounts.block;
+  runtime.statsTotals.unknownHostnameConnections += flowCounts.unknown;
   runtime.statsTotals.connectMillisTotal += 24 * connections;
   appendLiveSamples(connections);
   const bucketStart = Math.floor(nowUnix() / 60) * 60;
@@ -847,7 +897,9 @@ async function emitTraffic(force: boolean): Promise<SockscapTrafficSummaryEvent 
   point.bytesUp += bytesUp;
   point.bytesDown += bytesDown;
   point.connections += connections;
-  point.proxyConnections += connections;
+  point.directConnections += flowCounts.direct;
+  point.proxyConnections += flowCounts.proxy;
+  point.blockedConnections += flowCounts.block;
   const event: SockscapTrafficSummaryEvent = {
     generatedAtUnix: nowUnix(),
     totals: clone(runtime.statsTotals),

@@ -8,6 +8,9 @@ const mocks = vi.hoisted(() => ({
   start: vi.fn(async () => undefined),
   stop: vi.fn(async () => undefined),
   recover: vi.fn(async () => undefined),
+  refreshDashboard: vi.fn(async () => undefined),
+  clearStats: vi.fn(async () => ({ removedRows: 0, removedLiveSamples: 0 })),
+  dismissAlert: vi.fn(),
   dismissError: vi.fn(),
   bridgeCleanup: vi.fn(),
   closeWindow: vi.fn(async () => "closed"),
@@ -38,7 +41,11 @@ const mocks = vi.hoisted(() => ({
     egressSessions: [],
     ruleSources: [],
     stats: null,
+    liveConnections: null,
     alerts: [],
+    dashboardLoading: false,
+    dashboardActionPending: null,
+    dashboardError: null,
   } as Record<string, unknown>,
 }));
 
@@ -51,6 +58,9 @@ vi.mock("../../stores/sockscapStore", () => ({
     start: mocks.start,
     stop: mocks.stop,
     recover: mocks.recover,
+    refreshDashboard: mocks.refreshDashboard,
+    clearStats: mocks.clearStats,
+    dismissAlert: mocks.dismissAlert,
     dismissError: mocks.dismissError,
   }),
   attachSockscapEventBridge: () => mocks.bridgeCleanup,
@@ -120,5 +130,12 @@ describe("SockscapWindow shell", () => {
     expect(mocks.initialize).toHaveBeenCalledTimes(1);
     view.unmount();
     expect(mocks.bridgeCleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it("mounts the real dashboard section inside the independent window", () => {
+    mocks.state.section = "dashboard";
+    render(<SockscapWindow />);
+    expect(screen.getByTestId("sockscap-dashboard")).toBeInTheDocument();
+    expect(mocks.refreshDashboard).toHaveBeenCalledWith(24 * 60 * 60, false);
   });
 });

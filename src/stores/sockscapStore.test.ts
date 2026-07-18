@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SockscapPersistedRoutingProfile } from "../lib/sockscap";
 
 const mocks = vi.hoisted(() => ({
@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   egress: vi.fn(),
   rules: vi.fn(),
   stats: vi.fn(),
+  liveConnections: vi.fn(),
+  clearStats: vi.fn(),
   start: vi.fn(),
   stop: vi.fn(),
   recover: vi.fn(),
@@ -32,6 +34,8 @@ vi.mock("../lib/sockscap", () => ({
   sockscapListEgressSessions: mocks.egress,
   sockscapListRuleSources: mocks.rules,
   sockscapStatsSnapshot: mocks.stats,
+  sockscapLiveConnections: mocks.liveConnections,
+  sockscapClearStats: mocks.clearStats,
   sockscapStart: mocks.start,
   sockscapStop: mocks.stop,
   sockscapRecover: mocks.recover,
@@ -89,6 +93,8 @@ const totals = {
 };
 
 describe("Sockscap store", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.listeners.clear();
@@ -117,6 +123,13 @@ describe("Sockscap store", () => {
       topDomains: [],
       egressHealth: [],
     });
+    mocks.liveConnections.mockResolvedValue({
+      generatedAtUnix: 1,
+      capacity: 256,
+      droppedSamples: 0,
+      samples: [],
+    });
+    mocks.clearStats.mockResolvedValue({ removedRows: 4, removedLiveSamples: 2 });
     mocks.deleteProfile.mockResolvedValue(undefined);
     mocks.deleteRuleSource.mockResolvedValue(undefined);
   });
@@ -293,5 +306,75 @@ describe("Sockscap store", () => {
       hostnameSource: "tls_sni",
       hardBypass: false,
     })).resolves.toEqual(decision);
+  });
+
+  it("loads dashboard aggregates and bounded outcomes with independent partial success", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+    mocks.liveConnections.mockRejectedValueOnce(new Error("sampler unavailable"));
+    await useSockscapStore.getState().refreshDashboard(6 * 60 * 60, true);
+    expect(mocks.stats).toHaveBeenCalledWith({
+      fromUnix: 1_699_978_400,
+      toUnix: 1_700_000_000,
+      includeDomains: true,
+      limit: 20,
+    });
+    expect(mocks.liveConnections).toHaveBeenCalledWith({
+      sinceUnix: 1_699_978_400,
+      limit: 100,
+    });
+    expect(useSockscapStore.getState().stats?.generatedAt).toBe(1);
+    expect(useSockscapStore.getState().dashboardError).toContain("sampler unavailable");
+    expect(useSockscapStore.getState().dashboardLoading).toBe(false);
+  });
+
+  it("clears persisted and live dashboard statistics together", async () => {
+    useSockscapStore.setState({
+      stats: {
+        generatedAt: 1,
+        fromUnix: 0,
+        toUnix: 1,
+        totals: { ...totals, connections: 7 },
+        series: [{
+          bucketStart: 1,
+          resolutionSeconds: 60,
+          bytesUp: 1,
+          bytesDown: 2,
+          connections: 7,
+          errors: 0,
+          directConnections: 0,
+          proxyConnections: 7,
+          blockedConnections: 0,
+        }],
+        topApplications: [{ key: "Browser", bytesUp: 1, bytesDown: 2, connections: 7 }],
+        topDomains: [],
+        egressHealth: [],
+      },
+      liveConnections: {
+        generatedAtUnix: 1,
+        capacity: 256,
+        droppedSamples: 3,
+        samples: [{
+          sampleId: 1,
+          observedAtUnix: 1,
+          profileId: "profile-1",
+          protocol: "tcp",
+          hostnameSource: "tls_sni",
+          policyAction: "proxy",
+          effectiveAction: "proxy",
+          outcome: "established",
+          connector: "socks5",
+          errorCode: null,
+          connectMillis: 3,
+        }],
+      },
+    });
+    await expect(useSockscapStore.getState().clearStats()).resolves.toEqual({
+      removedRows: 4,
+      removedLiveSamples: 2,
+    });
+    expect(useSockscapStore.getState().stats?.totals.connections).toBe(0);
+    expect(useSockscapStore.getState().stats?.series).toEqual([]);
+    expect(useSockscapStore.getState().liveConnections?.samples).toEqual([]);
+    expect(useSockscapStore.getState().liveConnections?.droppedSamples).toBe(0);
   });
 });

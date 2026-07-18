@@ -6,10 +6,12 @@ import {
   listenSockscapStatus,
   listenSockscapTrafficSummary,
   sockscapCapabilities,
+  sockscapClearStats,
   sockscapListEgressSessions,
   sockscapListProcesses,
   sockscapListProfiles,
   sockscapListRuleSources,
+  sockscapLiveConnections,
   sockscapImportRuleSource,
   sockscapDeleteRuleSource,
   sockscapRecover,
@@ -25,8 +27,10 @@ import {
   sockscapUpsertRuleSource,
   type SockscapAlertEvent,
   type SockscapCapabilitiesReport,
+  type SockscapClearStatsResult,
   type SockscapEgressSessionSummary,
   type SockscapEngineStatus,
+  type SockscapLiveConnectionsSnapshot,
   type SockscapPersistedRoutingProfile,
   type SockscapProcessCatalog,
   type SockscapProfileHealthEvent,
@@ -45,6 +49,7 @@ export type SockscapSection = "overview" | "profiles" | "rules" | "dashboard" | 
 export type SockscapLifecycleAction = "start" | "stop" | "recover";
 export type SockscapProfileAction = "save" | "delete" | "test_egress";
 export type SockscapRuleAction = "save_source" | "delete_source" | "refresh_source" | "import_source" | "test_target";
+export type SockscapDashboardAction = "clear_stats";
 
 interface SockscapStoreState {
   section: SockscapSection;
@@ -53,6 +58,9 @@ interface SockscapStoreState {
   actionPending: SockscapLifecycleAction | null;
   profileActionPending: SockscapProfileAction | null;
   ruleActionPending: SockscapRuleAction | null;
+  dashboardLoading: boolean;
+  dashboardActionPending: SockscapDashboardAction | null;
+  dashboardError: string | null;
   error: string | null;
   lastUpdatedAt: number | null;
   capabilities: SockscapCapabilitiesReport | null;
@@ -62,6 +70,7 @@ interface SockscapStoreState {
   egressSessions: SockscapEgressSessionSummary[];
   ruleSources: SockscapRuleSourceView[];
   stats: SockscapStatsSnapshot | null;
+  liveConnections: SockscapLiveConnectionsSnapshot | null;
   alerts: SockscapAlertEvent[];
   profileHealth: Record<string, SockscapProfileHealthEvent>;
   egressHealth: Record<string, SockscapTestEgressResult>;
@@ -80,6 +89,8 @@ interface SockscapStoreState {
   refreshRuleSource: (sourceId: string) => Promise<SockscapRefreshOutcome>;
   importRuleSource: (sourceId: string, payload: string) => Promise<SockscapRefreshOutcome>;
   testTarget: (request: SockscapTestTargetRequest) => Promise<SockscapTestTargetResult>;
+  refreshDashboard: (rangeSeconds: number, includeDomains: boolean) => Promise<void>;
+  clearStats: () => Promise<SockscapClearStatsResult>;
   start: () => Promise<void>;
   stop: () => Promise<void>;
   recover: () => Promise<void>;
@@ -95,6 +106,9 @@ const initialData = {
   actionPending: null,
   profileActionPending: null,
   ruleActionPending: null,
+  dashboardLoading: false,
+  dashboardActionPending: null,
+  dashboardError: null,
   error: null,
   lastUpdatedAt: null,
   capabilities: null,
@@ -104,12 +118,14 @@ const initialData = {
   egressSessions: [] as SockscapEgressSessionSummary[],
   ruleSources: [] as SockscapRuleSourceView[],
   stats: null as SockscapStatsSnapshot | null,
+  liveConnections: null as SockscapLiveConnectionsSnapshot | null,
   alerts: [] as SockscapAlertEvent[],
   profileHealth: {} as Record<string, SockscapProfileHealthEvent>,
   egressHealth: {} as Record<string, SockscapTestEgressResult>,
 };
 
 let refreshSequence = 0;
+let dashboardSequence = 0;
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -141,7 +157,7 @@ export const useSockscapStore = create<SockscapStoreState>((set, get) => ({
         fromUnix: now - 24 * 60 * 60,
         toUnix: now,
         includeDomains: false,
-        limit: 1440,
+        limit: 100,
       }),
     ] as const);
     if (sequence !== refreshSequence) return;
@@ -157,7 +173,7 @@ export const useSockscapStore = create<SockscapStoreState>((set, get) => ({
       profiles: profiles.status === "fulfilled" ? profiles.value : current.profiles,
       egressSessions: egressSessions.status === "fulfilled" ? egressSessions.value : current.egressSessions,
       ruleSources: ruleSources.status === "fulfilled" ? ruleSources.value : current.ruleSources,
-      stats: stats.status === "fulfilled" ? stats.value : current.stats,
+      stats: stats.status === "fulfilled" && current.section !== "dashboard" ? stats.value : current.stats,
     }));
   },
   loadProcesses: async () => {
@@ -258,6 +274,64 @@ export const useSockscapStore = create<SockscapStoreState>((set, get) => ({
       throw error;
     }
   },
+  refreshDashboard: async (rangeSeconds, includeDomains) => {
+    const sequence = ++dashboardSequence;
+    set({ dashboardLoading: true, dashboardError: null });
+    const toUnix = Math.floor(Date.now() / 1000);
+    const safeRangeSeconds = Number.isInteger(rangeSeconds)
+      && rangeSeconds > 0
+      && rangeSeconds <= 366 * 24 * 60 * 60
+      ? rangeSeconds
+      : 24 * 60 * 60;
+    const fromUnix = Math.max(0, toUnix - safeRangeSeconds);
+    const results = await Promise.allSettled([
+      sockscapStatsSnapshot({
+        fromUnix,
+        toUnix,
+        includeDomains,
+        limit: 20,
+      }),
+      sockscapLiveConnections({ sinceUnix: fromUnix, limit: 100 }),
+    ] as const);
+    if (sequence !== dashboardSequence) return;
+    const [stats, liveConnections] = results;
+    const errors = results.map(settledError).filter((value): value is string => value !== null);
+    set((current) => ({
+      dashboardLoading: false,
+      dashboardError: errors.length > 0 ? errors.join("; ") : null,
+      stats: stats.status === "fulfilled" ? stats.value : current.stats,
+      liveConnections: liveConnections.status === "fulfilled" ? liveConnections.value : current.liveConnections,
+    }));
+  },
+  clearStats: async () => {
+    dashboardSequence += 1;
+    set({ dashboardLoading: false, dashboardActionPending: "clear_stats", dashboardError: null });
+    try {
+      const result = await sockscapClearStats();
+      set((current) => ({
+        dashboardActionPending: null,
+        stats: current.stats ? {
+          ...current.stats,
+          generatedAt: Math.floor(Date.now() / 1000),
+          totals: emptyStatsTotals(),
+          series: [],
+          topApplications: [],
+          topDomains: [],
+          egressHealth: [],
+        } : null,
+        liveConnections: current.liveConnections ? {
+          ...current.liveConnections,
+          generatedAtUnix: Math.floor(Date.now() / 1000),
+          droppedSamples: 0,
+          samples: [],
+        } : null,
+      }));
+      return result;
+    } catch (error) {
+      set({ dashboardActionPending: null, dashboardError: errorMessage(error) });
+      throw error;
+    }
+  },
   start: async () => runLifecycle(set, "start", sockscapStart),
   stop: async () => runLifecycle(set, "stop", sockscapStop),
   recover: async () => runLifecycle(set, "recover", sockscapRecover),
@@ -267,9 +341,24 @@ export const useSockscapStore = create<SockscapStoreState>((set, get) => ({
   })),
   reset: () => {
     refreshSequence += 1;
+    dashboardSequence += 1;
     set({ ...initialData });
   },
 }));
+
+function emptyStatsTotals(): SockscapStatsSnapshot["totals"] {
+  return {
+    bytesUp: 0,
+    bytesDown: 0,
+    connections: 0,
+    errors: 0,
+    directConnections: 0,
+    proxyConnections: 0,
+    blockedConnections: 0,
+    unknownHostnameConnections: 0,
+    connectMillisTotal: 0,
+  };
+}
 
 function sortProfiles(profiles: SockscapPersistedRoutingProfile[]): SockscapPersistedRoutingProfile[] {
   return [...profiles].sort((left, right) => left.profile.priority - right.profile.priority
@@ -352,7 +441,16 @@ export function attachSockscapEventBridge(): () => void {
 
   subscribe(listenSockscapStatus((status) => useSockscapStore.setState({ status })));
   subscribe(listenSockscapTrafficSummary((event) => useSockscapStore.setState((current) => {
-    if (!current.stats) return {};
+    if (!current.stats) {
+      return {
+        liveConnections: event.cleared && current.liveConnections ? {
+          ...current.liveConnections,
+          generatedAtUnix: event.generatedAtUnix,
+          droppedSamples: 0,
+          samples: [],
+        } : current.liveConnections,
+      };
+    }
     return {
       stats: {
         ...current.stats,
@@ -363,6 +461,12 @@ export function attachSockscapEventBridge(): () => void {
         topDomains: event.cleared ? [] : current.stats.topDomains,
         egressHealth: event.cleared ? [] : current.stats.egressHealth,
       },
+      liveConnections: event.cleared && current.liveConnections ? {
+        ...current.liveConnections,
+        generatedAtUnix: event.generatedAtUnix,
+        droppedSamples: 0,
+        samples: [],
+      } : current.liveConnections,
     };
   })));
   subscribe(listenSockscapProfileHealth((event) => useSockscapStore.setState((current) => ({
