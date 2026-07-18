@@ -101,6 +101,23 @@ pub fn run() {
                 rusqlite::Connection::open(&notes_db_path).expect("failed to open notes database");
             notes::init_db(&notes_conn).expect("failed to init notes database");
 
+            // Sockscap profiles / recovery journal / traffic aggregates live in
+            // sockscap.db so high-frequency stats cannot lock taomni.db.
+            let sockscap_db_path = app_data.join("sockscap.db");
+            let sockscap_conn = rusqlite::Connection::open(&sockscap_db_path)
+                .expect("failed to open sockscap database");
+            sockscap::init_db(&sockscap_conn).expect("failed to init sockscap database");
+            // Startup recovery: if a previous run left an Active marker, surface
+            // RecoveryRequired so the user can one-click restore (Phase 0/3).
+            if let Ok(Some(journal)) = sockscap::db::read_recovery_journal(&sockscap_conn) {
+                if journal.marker == "active" || journal.state == "Active" {
+                    tracing::warn!(
+                        "sockscap recovery journal indicates leftover capture state: {:?}",
+                        journal
+                    );
+                }
+            }
+
             let vault_path = vault::default_vault_path(app.handle());
             let v = vault::Vault::open(&vault_path).expect("failed to open vault");
             let vault_arc = Arc::new(v);
@@ -119,6 +136,7 @@ pub fn run() {
             app.manage(AppState::new(
                 conn,
                 notes_conn,
+                sockscap_conn,
                 mail_db_dir,
                 vault_arc,
                 ai_ctx,
@@ -799,6 +817,10 @@ pub fn run() {
             sockscap::sockscap_compile_rules,
             sockscap::sockscap_ingest_rule_source,
             sockscap::sockscap_gfwlist_official_info,
+            sockscap::sockscap_list_profiles,
+            sockscap::sockscap_upsert_profile,
+            sockscap::sockscap_delete_profile,
+            sockscap::sockscap_recovery_journal,
             exit_app,
         ])
         .run(tauri::generate_context!())

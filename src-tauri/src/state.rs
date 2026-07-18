@@ -101,6 +101,10 @@ pub struct AppState {
     /// Dedicated connection to the standalone Tao Notes database (`notes.db`),
     /// kept separate from `taomni.db` so note storage can evolve independently.
     pub notes_db: Mutex<rusqlite::Connection>,
+    /// Dedicated connection to `sockscap.db` (profiles, recovery journal, stats).
+    /// Isolated from `taomni.db` so high-frequency traffic aggregates cannot lock
+    /// session CRUD (design plan §10).
+    pub sockscap_db: Mutex<rusqlite::Connection>,
     /// Directory containing one SQLite cache database per saved or transient mail
     /// session. Mail caches are intentionally isolated from `taomni.db`, and
     /// from each other, so mailbox refresh writes cannot block session CRUD.
@@ -190,6 +194,7 @@ impl AppState {
     pub fn new(
         db: rusqlite::Connection,
         notes_db: rusqlite::Connection,
+        sockscap_db: rusqlite::Connection,
         mail_db_dir: PathBuf,
         vault: Arc<Vault>,
         ai_ctx: AppAiCtx,
@@ -214,6 +219,7 @@ impl AppState {
             clipboard: Arc::new(Mutex::new(None)),
             db: Mutex::new(db),
             notes_db: Mutex::new(notes_db),
+            sockscap_db: Mutex::new(sockscap_db),
             mail_db_dir,
             mail_dbs: Arc::new(Mutex::new(HashMap::new())),
             mail_imap_pool: Arc::new(MailImapPool::new()),

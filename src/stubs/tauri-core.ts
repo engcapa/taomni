@@ -53,6 +53,7 @@ const NOTES_STORAGE_KEY = "taomni.stub.notes.v1";
 const NOTE_TAGS_STORAGE_KEY = "taomni.stub.noteTags.v1";
 const NOTE_PREFS_STORAGE_KEY = "taomni.stub.notePrefs.v1";
 const NOTE_ALERT_ACK_STORAGE_KEY = "taomni.stub.noteAlertAcks.v1";
+const SOCKSCAP_PROFILES_KEY = "taomni.stub.sockscapProfiles.v1";
 const MAIL_DRAFTS_STORAGE_KEY = "taomni.stub.mailDrafts.v1";
 const SDK_REGISTRY_STORAGE_KEY = "taomni.stub.sdkRegistry.v1";
 
@@ -274,6 +275,20 @@ function loadNotes(): StubNote[] {
 function saveNotes(notes: StubNote[]): void {
   localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notes));
 }
+
+function loadSockscapProfiles(): Array<Record<string, unknown>> {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SOCKSCAP_PROFILES_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSockscapProfiles(profiles: Array<Record<string, unknown>>): void {
+  localStorage.setItem(SOCKSCAP_PROFILES_KEY, JSON.stringify(profiles));
+}
+
 function loadNoteTags(): StubNoteTag[] {
   try {
     const parsed = JSON.parse(localStorage.getItem(NOTE_TAGS_STORAGE_KEY) ?? "[]");
@@ -2723,6 +2738,185 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         saveNoteAcks(acks);
       }
       return undefined as T;
+    }
+    // --- Sockscap browser stubs (Phase 3) ---------------------------------
+    case "sockscap_capabilities": {
+      return {
+        platform: "linux",
+        items: [
+          {
+            id: "capture_plane",
+            name: "Capture plane",
+            level: "not_implemented",
+            detail: "Browser stub: capture plane not available.",
+            requiredForStart: true,
+          },
+          {
+            id: "egress_connectors",
+            name: "Egress connectors",
+            level: "degraded",
+            detail: "Stub reports simulated DIRECT/SOCKS5/HTTP CONNECT health.",
+            requiredForStart: false,
+          },
+        ],
+        canStartGlobal: false,
+        canStartAppGroup: false,
+        canAttachPid: false,
+        summary: "Browser preview: Sockscap capture is not available (pnpm dev stub).",
+        captureImplemented: false,
+      } as T;
+    }
+    case "sockscap_status": {
+      return {
+        state: "disabled",
+        message: "Sockscap engine is disabled (browser stub)",
+        activeProfileIds: [],
+        lastError: null,
+        recoveryRequired: false,
+        captureActive: false,
+      } as T;
+    }
+    case "sockscap_preflight": {
+      const profiles =
+        ((args as InvokeArgs | undefined)?.profiles as Array<Record<string, unknown>> | undefined) ??
+        loadSockscapProfiles();
+      const findings: Array<Record<string, unknown>> = [
+        {
+          code: "capture_not_implemented",
+          severity: "error",
+          message: "Browser stub: capture plane not implemented.",
+        },
+      ];
+      if (!profiles.some((p) => p.enabled)) {
+        findings.push({
+          code: "no_enabled_profiles",
+          severity: "error",
+          message: "No enabled routing profiles.",
+        });
+      }
+      return {
+        ok: false,
+        capabilities: await invoke("sockscap_capabilities"),
+        conflicts: [],
+        findings,
+        suggestedState: "disabled",
+      } as T;
+    }
+    case "sockscap_start": {
+      throw new Error("sockscap preflight failed: capture not implemented (browser stub)");
+    }
+    case "sockscap_stop":
+    case "sockscap_recover": {
+      return {
+        state: "disabled",
+        message: "Sockscap engine is disabled (browser stub)",
+        activeProfileIds: [],
+        lastError: null,
+        recoveryRequired: false,
+        captureActive: false,
+      } as T;
+    }
+    case "sockscap_open_window": {
+      throw new Error("sockscap_open_window is not implemented yet (Phase 4)");
+    }
+    case "sockscap_list_profiles": {
+      return loadSockscapProfiles() as T;
+    }
+    case "sockscap_upsert_profile": {
+      const profile = (args as InvokeArgs | undefined)?.profile as Record<string, unknown> | undefined;
+      if (!profile || !profile.id || !profile.name) {
+        throw new Error("profile id and name are required");
+      }
+      const list = loadSockscapProfiles();
+      const idx = list.findIndex((p) => p.id === profile.id);
+      if (idx >= 0) list[idx] = profile;
+      else list.push(profile);
+      // Conflict: two enabled globals
+      const globals = list.filter((p) => p.enabled && p.scope === "global");
+      if (globals.length > 1) {
+        throw new Error("profile conflict: at most one enabled global routing profile is allowed");
+      }
+      saveSockscapProfiles(list);
+      return profile as T;
+    }
+    case "sockscap_delete_profile": {
+      const id = String((args as InvokeArgs | undefined)?.id ?? "");
+      saveSockscapProfiles(loadSockscapProfiles().filter((p) => p.id !== id));
+      return undefined as T;
+    }
+    case "sockscap_recovery_journal": {
+      return null as T;
+    }
+    case "sockscap_gfwlist_official_info": {
+      return {
+        sourceId: "gfwlist-official",
+        mirrors: [
+          "https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt",
+          "https://gitlab.com/gfwlist/gfwlist/raw/master/gfwlist.txt",
+          "https://repo.or.cz/gfwlist.git/blob_plain/HEAD:/gfwlist.txt",
+        ],
+      } as T;
+    }
+    case "sockscap_compile_rules": {
+      const payload = String((args as InvokeArgs | undefined)?.payload ?? "");
+      const lines = payload.split(/\r?\n/).filter((l) => l.trim() && !l.trim().startsWith("!"));
+      return {
+        proxyRules: lines
+          .filter((l) => !l.startsWith("@@"))
+          .slice(0, 50)
+          .map((l) => ({
+            action: "proxy",
+            kind: "domain_suffix",
+            pattern: l.replace(/^\|\|/, "").replace(/\^$/, ""),
+            original: l,
+            sourceId: String((args as InvokeArgs | undefined)?.sourceId ?? "stub"),
+          })),
+        directRules: lines
+          .filter((l) => l.startsWith("@@"))
+          .slice(0, 20)
+          .map((l) => ({
+            action: "direct",
+            kind: "domain_suffix",
+            pattern: l.replace(/^@@\|\|?/, "").replace(/\^$/, ""),
+            original: l,
+            sourceId: String((args as InvokeArgs | undefined)?.sourceId ?? "stub"),
+          })),
+        unsupported: [],
+        ignoredComments: 0,
+        totalLines: payload.split(/\r?\n/).length,
+      } as T;
+    }
+    case "sockscap_test_target": {
+      const request = (args as InvokeArgs | undefined)?.request as Record<string, unknown> | undefined;
+      return {
+        selectedProfileId: "stub-global",
+        selectedProfileName: "Stub Global",
+        selectionReason: "browser stub default profile",
+        decision: {
+          action: "direct",
+          matchedRuleOriginal: null,
+          matchedRuleSourceId: null,
+          matchedStage: "default_action",
+          hostnameSource: "platform_remote_hostname",
+          profileId: "stub-global",
+        },
+        conflicts: [],
+        notes: [
+          "Browser stub decision — not the real policy engine.",
+          `target=${String(request?.hostname ?? request?.ip ?? "unknown")}`,
+        ],
+      } as T;
+    }
+    case "sockscap_ingest_rule_source": {
+      return {
+        ok: true,
+        usedLastGood: false,
+        mirror: "stub://local",
+        sha256: null,
+        parseStats: { totalLines: 0, proxyRules: 0, directRules: 0, unsupported: 0, ignoredComments: 0 },
+        error: null,
+        report: null,
+      } as T;
     }
     default:
       console.warn(`[tauri-stub] Unknown invoke command: ${cmd}`, args);

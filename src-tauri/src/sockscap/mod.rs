@@ -12,6 +12,7 @@
 
 pub mod capabilities;
 pub mod commands;
+pub mod db;
 pub mod flow;
 pub mod orchestrator;
 pub mod policy;
@@ -19,4 +20,5 @@ pub mod preflight;
 pub mod types;
 
 pub use commands::*;
+pub use db::init_db;
 pub use orchestrator::SockscapEngine;
