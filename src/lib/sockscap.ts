@@ -75,6 +75,55 @@ export interface SockscapEngineStatus {
   captureActive: boolean;
 }
 
+export type SockscapRecoveryPhase =
+  | "clean"
+  | "preparing"
+  | "capture_installed"
+  | "active"
+  | "stopping"
+  | "recovery_required";
+
+export interface SockscapLifecyclePreferences {
+  restoreOnSystemLogin: boolean;
+  updatedAt: number | null;
+}
+
+/** Sanitized recovery metadata; capture artifact JSON never crosses IPC. */
+export interface SockscapRecoverySummary {
+  generation: number;
+  phase: SockscapRecoveryPhase;
+  cleanupRequired: boolean;
+  restoreAfterRecovery: boolean;
+  configRevision: number;
+  platform: SockscapPlatform;
+  activeProfileIds: string[];
+  artifactStatePresent: boolean;
+  helperPid: number | null;
+  lastHeartbeatAt: number | null;
+  lastErrorCode: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SockscapCommittedConfigSummary {
+  revision: number;
+  profileIds: string[];
+  committedAt: number | null;
+}
+
+export interface SockscapLifecycleSnapshot {
+  capabilities: SockscapCapabilitiesReport;
+  status: SockscapEngineStatus;
+  preferences: SockscapLifecyclePreferences;
+  systemLoginRegistered: boolean;
+  systemLoginRegistrationErrorCode: string | null;
+  canEnableAutoRestore: boolean;
+  autoRestoreReady: boolean;
+  autoRestoreStatusCode: string;
+  lastCommittedConfig: SockscapCommittedConfigSummary | null;
+  recovery: SockscapRecoverySummary;
+}
+
 export interface SockscapAppSelector {
   kind: SockscapAppSelectorKind;
   value: string;
@@ -541,6 +590,14 @@ export function sockscapRecover(): Promise<SockscapEngineStatus> {
   return invoke("sockscap_recover", {});
 }
 
+export function sockscapLifecycleSnapshot(): Promise<SockscapLifecycleSnapshot> {
+  return invoke("sockscap_lifecycle_snapshot", {});
+}
+
+export function sockscapSetRestoreOnSystemLogin(enabled: boolean): Promise<SockscapLifecycleSnapshot> {
+  return invoke("sockscap_set_restore_on_system_login", { enabled });
+}
+
 export function sockscapOpenWindow(): Promise<void> {
   return invoke("sockscap_open_window", {});
 }
@@ -641,6 +698,7 @@ export function listenSockscapAlert(handler: (payload: SockscapAlertEvent) => vo
 export interface SockscapIpcContractFixture {
   capabilities: SockscapCapabilitiesReport;
   status: SockscapEngineStatus;
+  lifecycle: SockscapLifecycleSnapshot;
   preflight: SockscapPreflightReport;
   profile: SockscapPersistedRoutingProfile;
   processCatalog: SockscapProcessCatalog;
@@ -668,6 +726,7 @@ export function isSockscapIpcContractFixture(value: unknown): value is SockscapI
   if (!isRecord(value)) return false;
   const capabilities = value.capabilities;
   const status = value.status;
+  const lifecycle = value.lifecycle;
   const profile = value.profile;
   const processCatalog = value.processCatalog;
   const egress = value.egressSession;
@@ -682,6 +741,12 @@ export function isSockscapIpcContractFixture(value: unknown): value is SockscapI
     && isRecord(status)
     && typeof status.recoveryRequired === "boolean"
     && Array.isArray(status.activeProfileIds)
+    && isRecord(lifecycle)
+    && isRecord(lifecycle.preferences)
+    && typeof lifecycle.preferences.restoreOnSystemLogin === "boolean"
+    && isRecord(lifecycle.recovery)
+    && !("artifactState" in lifecycle.recovery)
+    && typeof lifecycle.autoRestoreReady === "boolean"
     && isRecord(profile)
     && isRecord(profile.profile)
     && Array.isArray(profile.profile.appSelectors)

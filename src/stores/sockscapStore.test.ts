@@ -4,6 +4,7 @@ import type { SockscapPersistedRoutingProfile } from "../lib/sockscap";
 const mocks = vi.hoisted(() => ({
   capabilities: vi.fn(),
   status: vi.fn(),
+  lifecycle: vi.fn(),
   profiles: vi.fn(),
   processes: vi.fn(),
   egress: vi.fn(),
@@ -14,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   start: vi.fn(),
   stop: vi.fn(),
   recover: vi.fn(),
+  setAutoRestore: vi.fn(),
   saveProfile: vi.fn(),
   deleteProfile: vi.fn(),
   testEgress: vi.fn(),
@@ -29,6 +31,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../lib/sockscap", () => ({
   sockscapCapabilities: mocks.capabilities,
   sockscapStatus: mocks.status,
+  sockscapLifecycleSnapshot: mocks.lifecycle,
   sockscapListProfiles: mocks.profiles,
   sockscapListProcesses: mocks.processes,
   sockscapListEgressSessions: mocks.egress,
@@ -39,6 +42,7 @@ vi.mock("../lib/sockscap", () => ({
   sockscapStart: mocks.start,
   sockscapStop: mocks.stop,
   sockscapRecover: mocks.recover,
+  sockscapSetRestoreOnSystemLogin: mocks.setAutoRestore,
   sockscapUpsertProfile: mocks.saveProfile,
   sockscapDeleteProfile: mocks.deleteProfile,
   sockscapTestEgress: mocks.testEgress,
@@ -92,6 +96,41 @@ const totals = {
   connectMillisTotal: 0,
 };
 
+const lifecycleSnapshot = () => ({
+  capabilities: {
+    platform: "linux",
+    items: [],
+    canStartGlobal: true,
+    canStartAppGroup: true,
+    canAttachPid: true,
+    summary: "ready",
+    captureImplemented: true,
+  },
+  status,
+  preferences: { restoreOnSystemLogin: false, updatedAt: null },
+  systemLoginRegistered: false,
+  systemLoginRegistrationErrorCode: null,
+  canEnableAutoRestore: true,
+  autoRestoreReady: false,
+  autoRestoreStatusCode: "DISABLED_BY_USER",
+  lastCommittedConfig: null,
+  recovery: {
+    generation: 0,
+    phase: "clean",
+    cleanupRequired: false,
+    restoreAfterRecovery: false,
+    configRevision: 0,
+    platform: "linux",
+    activeProfileIds: [],
+    artifactStatePresent: false,
+    helperPid: null,
+    lastHeartbeatAt: null,
+    lastErrorCode: null,
+    createdAt: 1,
+    updatedAt: 1,
+  },
+});
+
 describe("Sockscap store", () => {
   afterEach(() => vi.restoreAllMocks());
 
@@ -109,6 +148,7 @@ describe("Sockscap store", () => {
       captureImplemented: true,
     });
     mocks.status.mockResolvedValue(status);
+    mocks.lifecycle.mockResolvedValue(lifecycleSnapshot());
     mocks.profiles.mockResolvedValue([]);
     mocks.processes.mockResolvedValue({ processes: [], truncated: false, maxRows: 4096 });
     mocks.egress.mockResolvedValue([]);
@@ -132,6 +172,12 @@ describe("Sockscap store", () => {
     mocks.clearStats.mockResolvedValue({ removedRows: 4, removedLiveSamples: 2 });
     mocks.deleteProfile.mockResolvedValue(undefined);
     mocks.deleteRuleSource.mockResolvedValue(undefined);
+    mocks.setAutoRestore.mockImplementation(async (enabled: boolean) => ({
+      ...lifecycleSnapshot(),
+      preferences: { restoreOnSystemLogin: enabled, updatedAt: 2 },
+      systemLoginRegistered: enabled,
+      autoRestoreStatusCode: enabled ? "LAST_COMMITTED_CONFIG_MISSING" : "DISABLED_BY_USER",
+    }));
   });
 
   it("hydrates independent snapshots while preserving partial successes", async () => {
@@ -153,6 +199,14 @@ describe("Sockscap store", () => {
     expect(state.actionPending).toBeNull();
     expect(state.error).toContain("SOCKSCAP_PREFLIGHT_FAILED");
     expect(state.status?.lastError).toBe("capture unavailable");
+  });
+
+  it("persists login-restore intent through the typed lifecycle snapshot", async () => {
+    await useSockscapStore.getState().setRestoreOnSystemLogin(true);
+    expect(mocks.setAutoRestore).toHaveBeenCalledWith(true);
+    expect(useSockscapStore.getState().lifecycle?.preferences.restoreOnSystemLogin).toBe(true);
+    expect(useSockscapStore.getState().lifecycle?.systemLoginRegistered).toBe(true);
+    expect(useSockscapStore.getState().actionPending).toBeNull();
   });
 
   it("bridges typed aggregate events and cleans up StrictMode races", async () => {

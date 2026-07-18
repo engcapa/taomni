@@ -10,7 +10,6 @@ import {
   Play,
   RefreshCw,
   RotateCcw,
-  Settings2,
   ShieldCheck,
   Square,
   Workflow,
@@ -28,6 +27,7 @@ import { LanguageSwitcher } from "../window/LanguageSwitcher";
 import { WindowControls } from "../window/WindowControls";
 import { WindowResizeHandles } from "../window/WindowResizeHandles";
 import { SockscapDashboard } from "./SockscapDashboard";
+import { SockscapLifecycle } from "./SockscapLifecycle";
 import { SockscapProfiles } from "./SockscapProfiles";
 import { SockscapRules } from "./SockscapRules";
 
@@ -201,9 +201,7 @@ export function SockscapWindow() {
           {section === "profiles" && <SockscapProfiles />}
           {section === "rules" && <SockscapRules />}
           {section === "dashboard" && <SockscapDashboard />}
-          {section === "lifecycle" && (
-            <SectionScaffold section={section} />
-          )}
+          {section === "lifecycle" && <SockscapLifecycle />}
         </main>
       </div>
     </div>
@@ -339,21 +337,6 @@ function Overview({
           {t("sockscap.alertCount", { count: alerts })}
         </InlineNotice>
       )}
-    </div>
-  );
-}
-
-function SectionScaffold({ section }: { section: "lifecycle" }) {
-  const t = useT();
-  const details: Record<"lifecycle", { icon: ReactNode; title: string; description: string }> = {
-    lifecycle: { icon: <Settings2 className="h-5 w-5" />, title: t("sockscap.lifecycleTitle"), description: t("sockscap.lifecycleDescription") },
-  };
-  const detail = details[section];
-  return (
-    <div className="mx-auto max-w-4xl">
-      <Panel title={detail.title} icon={detail.icon}>
-        <p className="text-[12px] leading-5 text-[var(--taomni-text-muted)]">{detail.description}</p>
-      </Panel>
     </div>
   );
 }

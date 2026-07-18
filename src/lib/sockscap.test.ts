@@ -20,6 +20,8 @@ import {
   listenSockscapTrafficSummary,
   sockscapDeleteProfile,
   sockscapLiveConnections,
+  sockscapLifecycleSnapshot,
+  sockscapSetRestoreOnSystemLogin,
   sockscapStatsSnapshot,
   sockscapTestEgress,
   sockscapTestTarget,
@@ -80,6 +82,8 @@ describe("Sockscap IPC contract", () => {
     expect(fixture.liveConnections.samples[0]).not.toHaveProperty("hostname");
     expect(fixture.liveConnections.samples[0]).not.toHaveProperty("application");
     expect(fixture.liveConnections.samples[0]).not.toHaveProperty("payload");
+    expect(fixture.lifecycle.recovery).not.toHaveProperty("artifactState");
+    expect(fixture.lifecycle.lastCommittedConfig?.revision).toBe(9);
   });
 
   it("uses exact Tauri argument names for optimistic profile writes", async () => {
@@ -154,6 +158,18 @@ describe("Sockscap IPC contract", () => {
     mocks.invoke.mockResolvedValueOnce({});
     await sockscapLiveConnections(liveQuery);
     expect(mocks.invoke).toHaveBeenCalledWith("sockscap_live_connections", { query: liveQuery });
+  });
+
+  it("keeps lifecycle diagnostics read-only and sends an explicit login preference", async () => {
+    mocks.invoke.mockResolvedValueOnce({});
+    await sockscapLifecycleSnapshot();
+    expect(mocks.invoke).toHaveBeenCalledWith("sockscap_lifecycle_snapshot", {});
+
+    mocks.invoke.mockResolvedValueOnce({});
+    await sockscapSetRestoreOnSystemLogin(true);
+    expect(mocks.invoke).toHaveBeenCalledWith("sockscap_set_restore_on_system_login", {
+      enabled: true,
+    });
   });
 
   it("unwraps typed Tauri event payloads", async () => {

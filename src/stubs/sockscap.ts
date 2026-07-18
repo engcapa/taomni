@@ -2,6 +2,7 @@ import type {
   SockscapAlertEvent,
   SockscapCapabilitiesReport,
   SockscapClearStatsResult,
+  SockscapCommittedConfigSummary,
   SockscapCompiledRule,
   SockscapEgressIssue,
   SockscapEgressSessionSummary,
@@ -9,6 +10,7 @@ import type {
   SockscapLiveConnectionSample,
   SockscapLiveConnectionsQuery,
   SockscapLiveConnectionsSnapshot,
+  SockscapLifecycleSnapshot,
   SockscapParseReport,
   SockscapPersistedRoutingProfile,
   SockscapPersistedRuleSource,
@@ -68,6 +70,10 @@ interface StubPersistedState {
   scenario: SockscapStubScenario;
   profiles: SockscapPersistedRoutingProfile[];
   ruleSources: SockscapPersistedRuleSource[];
+  restoreOnSystemLogin: boolean;
+  restoreOnSystemLoginUpdatedAt: number | null;
+  systemLoginRegistered: boolean;
+  lastCommittedConfig: SockscapCommittedConfigSummary | null;
 }
 
 interface StubRuntimeState extends StubPersistedState {
@@ -185,6 +191,10 @@ function defaultPersistedState(): StubPersistedState {
     scenario: defaultScenario(),
     profiles: [makeDefaultProfile()],
     ruleSources: [makeDefaultRuleSource()],
+    restoreOnSystemLogin: false,
+    restoreOnSystemLoginUpdatedAt: null,
+    systemLoginRegistered: false,
+    lastCommittedConfig: null,
   };
 }
 
@@ -196,6 +206,10 @@ function loadPersistedState(): StubPersistedState {
         scenario: { ...defaultScenario(), ...parsed.scenario },
         profiles: parsed.profiles,
         ruleSources: parsed.ruleSources,
+        restoreOnSystemLogin: parsed.restoreOnSystemLogin === true,
+        restoreOnSystemLoginUpdatedAt: parsed.restoreOnSystemLoginUpdatedAt ?? null,
+        systemLoginRegistered: parsed.systemLoginRegistered === true,
+        lastCommittedConfig: parsed.lastCommittedConfig ?? null,
       };
     }
   } catch {
@@ -210,6 +224,10 @@ function savePersistedState(state: StubRuntimeState): void {
       scenario: state.scenario,
       profiles: state.profiles,
       ruleSources: state.ruleSources,
+      restoreOnSystemLogin: state.restoreOnSystemLogin,
+      restoreOnSystemLoginUpdatedAt: state.restoreOnSystemLoginUpdatedAt,
+      systemLoginRegistered: state.systemLoginRegistered,
+      lastCommittedConfig: state.lastCommittedConfig,
     };
     globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(persisted));
   } catch {
@@ -296,6 +314,64 @@ function capabilities(): SockscapCapabilitiesReport {
     summary: `${platform} browser capability scenario: ${capabilityMode}`,
     captureImplemented: capabilityMode !== "unsupported",
   };
+}
+
+function lifecycleSnapshot(): SockscapLifecycleSnapshot {
+  const report = capabilities();
+  const recoveryRequired = runtime.status.recoveryRequired || runtime.scenario.recoveryRequired;
+  const captureActive = runtime.status.captureActive;
+  const autoRestoreStatusCode = !report.captureImplemented
+    ? "CAPTURE_ADAPTER_NOT_READY"
+    : !runtime.restoreOnSystemLogin
+      ? "DISABLED_BY_USER"
+      : !runtime.systemLoginRegistered
+        ? "AUTOSTART_REGISTRATION_MISMATCH"
+        : recoveryRequired
+          ? "RECOVERY_REQUIRED"
+          : runtime.lastCommittedConfig === null
+            ? "LAST_COMMITTED_CONFIG_MISSING"
+            : "READY";
+  const now = nowUnix();
+  return {
+    capabilities: report,
+    status: clone(runtime.status),
+    preferences: {
+      restoreOnSystemLogin: runtime.restoreOnSystemLogin,
+      updatedAt: runtime.restoreOnSystemLoginUpdatedAt,
+    },
+    systemLoginRegistered: runtime.systemLoginRegistered,
+    systemLoginRegistrationErrorCode: null,
+    canEnableAutoRestore: report.captureImplemented,
+    autoRestoreReady: autoRestoreStatusCode === "READY",
+    autoRestoreStatusCode,
+    lastCommittedConfig: clone(runtime.lastCommittedConfig),
+    recovery: {
+      generation: captureActive || recoveryRequired ? 1 : 0,
+      phase: recoveryRequired ? "recovery_required" : captureActive ? "active" : "clean",
+      cleanupRequired: captureActive || recoveryRequired,
+      restoreAfterRecovery: runtime.restoreOnSystemLogin,
+      configRevision: runtime.lastCommittedConfig?.revision ?? 0,
+      platform: runtime.scenario.platform,
+      activeProfileIds: clone(runtime.status.activeProfileIds),
+      artifactStatePresent: captureActive || recoveryRequired,
+      helperPid: captureActive ? 4243 : null,
+      lastHeartbeatAt: captureActive ? now : null,
+      lastErrorCode: recoveryRequired ? "STUB_RECOVERY_REQUIRED" : null,
+      createdAt: now,
+      updatedAt: now,
+    },
+  };
+}
+
+function setRestoreOnSystemLogin(enabled: boolean): SockscapLifecycleSnapshot {
+  if (enabled && !capabilities().captureImplemented) {
+    throw new Error("CAPTURE_ADAPTER_NOT_READY: login restore cannot be enabled in this build");
+  }
+  runtime.restoreOnSystemLogin = enabled;
+  runtime.restoreOnSystemLoginUpdatedAt = nowUnix();
+  runtime.systemLoginRegistered = enabled;
+  savePersistedState(runtime);
+  return lifecycleSnapshot();
 }
 
 function egressIssue(health: SockscapStubEgressHealth): SockscapEgressIssue | null {
@@ -933,6 +1009,12 @@ async function startEngine(): Promise<SockscapEngineStatus> {
     recoveryRequired: false,
     captureActive: true,
   };
+  runtime.lastCommittedConfig = {
+    revision: (runtime.lastCommittedConfig?.revision ?? 0) + 1,
+    profileIds: clone(activeProfileIds),
+    committedAt: nowUnix(),
+  };
+  savePersistedState(runtime);
   startTrafficTimer();
   await publishStatus();
   return clone(runtime.status);
@@ -963,6 +1045,10 @@ export async function invokeSockscapStub(command: string, rawArgs?: unknown): Pr
       return { handled: true, value: capabilities() };
     case "sockscap_status":
       return { handled: true, value: clone(runtime.status) };
+    case "sockscap_lifecycle_snapshot":
+      return { handled: true, value: lifecycleSnapshot() };
+    case "sockscap_set_restore_on_system_login":
+      return { handled: true, value: setRestoreOnSystemLogin(args.enabled === true) };
     case "sockscap_preflight":
       return { handled: true, value: preflight() };
     case "sockscap_list_profiles":

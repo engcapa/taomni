@@ -184,6 +184,7 @@ tauri-plugin-notification = "2.3.3"
 xcap = { version = "0.9.6", optional = true }
 image = { version = "0.25", default-features = false, features = ["png"] }
 tauri-plugin-dialog = "2.7.1"
+tauri-plugin-autostart = "2.5.1"
 sqlparser = "0.62.0"
 
 [patch.crates-io]

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   SockscapLiveConnectionsSnapshot,
+  SockscapLifecycleSnapshot,
   SockscapPersistedRoutingProfile,
   SockscapTestEgressResult,
 } from "../lib/sockscap";
@@ -168,6 +169,38 @@ describe("Sockscap browser stub", () => {
       state: "disabled",
       recoveryRequired: false,
     });
+  });
+
+  it("models opt-in login restore from only a successful committed snapshot", async () => {
+    const initial = await invokeValue<SockscapLifecycleSnapshot>("sockscap_lifecycle_snapshot");
+    expect(initial).toMatchObject({
+      preferences: { restoreOnSystemLogin: false },
+      systemLoginRegistered: false,
+      autoRestoreStatusCode: "DISABLED_BY_USER",
+      lastCommittedConfig: null,
+    });
+
+    const enabled = await invokeValue<SockscapLifecycleSnapshot>(
+      "sockscap_set_restore_on_system_login",
+      { enabled: true },
+    );
+    expect(enabled).toMatchObject({
+      preferences: { restoreOnSystemLogin: true },
+      systemLoginRegistered: true,
+      autoRestoreStatusCode: "LAST_COMMITTED_CONFIG_MISSING",
+    });
+
+    await invokeValue("sockscap_start");
+    const ready = await invokeValue<SockscapLifecycleSnapshot>("sockscap_lifecycle_snapshot");
+    expect(ready.autoRestoreReady).toBe(true);
+    expect(ready.lastCommittedConfig).toMatchObject({ profileIds: ["browser-demo"] });
+    expect(ready.recovery).not.toHaveProperty("artifactState");
+  });
+
+  it("refuses login restore when the simulated capture adapter is unavailable", async () => {
+    await sockscapStubController.configure({ capabilityMode: "unsupported" });
+    await expect(invokeValue("sockscap_set_restore_on_system_login", { enabled: true }))
+      .rejects.toThrow("CAPTURE_ADAPTER_NOT_READY");
   });
 
   it("opens the dedicated browser route and keeps active capture alive on close", async () => {

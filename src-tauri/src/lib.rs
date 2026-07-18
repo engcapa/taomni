@@ -73,6 +73,10 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![sockscap::AUTO_RESTORE_ARG]),
+        ))
         .setup(|app| {
             let app_data = app
                 .path()
@@ -132,6 +136,7 @@ pub fn run() {
                 lanchat_state,
                 sockscap_store,
             ));
+            sockscap::maybe_restore_after_system_login(app.handle());
             app.manage(workspace_search::WorkspaceSearchState::default());
             let local_history = local_history::init_local_history(app.handle())
                 .expect("failed to init local history store");
@@ -806,6 +811,8 @@ pub fn run() {
             sockscap::sockscap_start,
             sockscap::sockscap_stop,
             sockscap::sockscap_recover,
+            sockscap::sockscap_lifecycle_snapshot,
+            sockscap::sockscap_set_restore_on_system_login,
             sockscap::sockscap_open_window,
             sockscap::sockscap_close_window,
             sockscap::sockscap_list_egress_sessions,

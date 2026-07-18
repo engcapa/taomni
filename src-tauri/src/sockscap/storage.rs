@@ -24,6 +24,7 @@ use super::types::{
 
 pub const SOCKSCAP_DB_FILE: &str = "sockscap.db";
 pub const SOCKSCAP_SCHEMA_VERSION: i64 = 1;
+const RESTORE_ON_SYSTEM_LOGIN_SETTING: &str = "restore_on_system_login";
 const MAX_RECOVERY_ARTIFACT_BYTES: usize = 64 * 1024;
 const DEFAULT_MINUTE_RETENTION_DAYS: i64 = 7;
 const DEFAULT_HOURLY_RETENTION_DAYS: i64 = 90;
@@ -505,6 +506,54 @@ impl SockscapStore {
     pub fn recovery_journal(&self) -> Result<RecoveryJournal, String> {
         let conn = self.lock_conn()?;
         load_recovery_journal(&conn)
+    }
+
+    /// Read the opt-in login restore preference. A missing row is the secure
+    /// first-install default and never enables operating-system autostart.
+    pub fn lifecycle_preferences(&self) -> Result<LifecyclePreferences, String> {
+        let conn = self.lock_conn()?;
+        conn.query_row(
+            "SELECT value_json, updated_at FROM engine_settings WHERE key = ?1",
+            params![RESTORE_ON_SYSTEM_LOGIN_SETTING],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
+        )
+        .optional()
+        .map_err(|error| format!("read Sockscap lifecycle preferences: {error}"))?
+        .map(|(value_json, updated_at)| {
+            serde_json::from_str::<bool>(&value_json)
+                .map(|restore_on_system_login| LifecyclePreferences {
+                    restore_on_system_login,
+                    updated_at: Some(updated_at),
+                })
+                .map_err(|error| format!("decode Sockscap lifecycle preferences: {error}"))
+        })
+        .transpose()
+        .map(|value| value.unwrap_or_default())
+    }
+
+    /// Persist only the user's intent. The command boundary owns the matching
+    /// OS autostart registration and writes this row only after that succeeds.
+    pub fn set_restore_on_system_login(
+        &self,
+        enabled: bool,
+    ) -> Result<LifecyclePreferences, String> {
+        let now = unix_now();
+        let value_json = serde_json::to_string(&enabled)
+            .map_err(|error| format!("encode Sockscap lifecycle preferences: {error}"))?;
+        let conn = self.lock_conn()?;
+        conn.execute(
+            "INSERT INTO engine_settings (key, value_json, updated_at)
+             VALUES (?1, ?2, ?3)
+             ON CONFLICT(key) DO UPDATE SET
+               value_json = excluded.value_json,
+               updated_at = excluded.updated_at",
+            params![RESTORE_ON_SYSTEM_LOGIN_SETTING, value_json, now],
+        )
+        .map_err(|error| format!("write Sockscap lifecycle preferences: {error}"))?;
+        Ok(LifecyclePreferences {
+            restore_on_system_login: enabled,
+            updated_at: Some(now),
+        })
     }
 
     pub fn begin_prepare(
@@ -1190,6 +1239,13 @@ pub struct RecoveryJournal {
     pub last_error_code: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LifecyclePreferences {
+    pub restore_on_system_login: bool,
+    pub updated_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -2540,13 +2596,14 @@ mod tests {
                    'engine_config_snapshots',
                    'traffic_minute_buckets', 'traffic_hour_buckets',
                    'optional_domain_day_buckets',
-                   'engine_recovery_journal', 'egress_health_minute_buckets'
+                   'engine_recovery_journal', 'egress_health_minute_buckets',
+                   'engine_settings'
                  )",
                 [],
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(tables, 11);
+        assert_eq!(tables, 12);
     }
 
     #[test]
@@ -2565,6 +2622,36 @@ mod tests {
             .query_row("PRAGMA journal_mode", [], |row| row.get(0))
             .unwrap();
         assert_ne!(mode.to_ascii_lowercase(), "wal");
+    }
+
+    #[test]
+    fn login_restore_is_explicit_and_round_trips_in_engine_settings() {
+        let store = store();
+        assert_eq!(
+            store.lifecycle_preferences().unwrap(),
+            LifecyclePreferences::default()
+        );
+
+        let enabled = store.set_restore_on_system_login(true).unwrap();
+        assert!(enabled.restore_on_system_login);
+        assert!(enabled.updated_at.is_some());
+        assert_eq!(store.lifecycle_preferences().unwrap(), enabled);
+
+        let disabled = store.set_restore_on_system_login(false).unwrap();
+        assert!(!disabled.restore_on_system_login);
+        assert!(disabled.updated_at.is_some());
+        assert_eq!(store.lifecycle_preferences().unwrap(), disabled);
+
+        let rows: i64 = store
+            .lock_conn()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM engine_settings WHERE key = ?1",
+                params![RESTORE_ON_SYSTEM_LOGIN_SETTING],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(rows, 1);
     }
 
     #[test]

@@ -227,6 +227,39 @@ impl SockscapEngine {
         Err(message)
     }
 
+    /// Restore after an operating-system login from the last snapshot that
+    /// reached Active. Draft rows are deliberately never consulted here.
+    /// This build still has no capture adapter, so the method stops at the
+    /// capability gate without creating a recovery marker or system state.
+    pub fn restore_last_committed(&self) -> Result<EngineStatus, String> {
+        let store = self.store.as_ref().ok_or_else(|| {
+            "SOCKSCAP_STORE_UNAVAILABLE: saved configuration store is not attached".to_string()
+        })?;
+        let journal = store.recovery_journal()?;
+        if journal.cleanup_required || journal.phase != RecoveryPhase::Clean {
+            let status = recovery_status(&journal);
+            self.replace_status(status);
+            return Err(format!(
+                "RECOVERY_REQUIRED: generation {} must be cleaned before automatic restore",
+                journal.generation
+            ));
+        }
+        let Some(snapshot) = store.last_committed_config_snapshot()? else {
+            let message = "LAST_COMMITTED_CONFIG_MISSING: start Sockscap successfully once before enabling automatic restore";
+            self.fail_start(
+                "Sockscap automatic restore has no committed configuration",
+                message,
+            );
+            return Err(message.into());
+        };
+        let message = format!(
+            "CAPTURE_ADAPTER_NOT_READY: automatic restore of committed revision {} is unavailable in this build",
+            snapshot.revision
+        );
+        self.fail_start("Sockscap automatic restore is unavailable", &message);
+        Err(message)
+    }
+
     /// Stop is idempotent while both the in-memory runtime and recovery
     /// journal are clean. It cannot clear a real marker without helper proof.
     pub fn stop(&self) -> Result<EngineStatus, String> {
@@ -432,6 +465,43 @@ mod tests {
         let engine = SockscapEngine::with_store(store);
         let status = engine.stop().expect("stop clean engine");
         assert_eq!(status.state, EngineState::Disabled);
+    }
+
+    #[test]
+    fn login_restore_reads_only_the_last_committed_snapshot_and_stays_gated() {
+        let store = store_with_profile();
+        let prepared = store.prepare_config_snapshot().expect("prepare config");
+        let committed = store
+            .commit_config_snapshot(prepared.revision)
+            .expect("commit config");
+        let current = store.get_profile("p1").unwrap().unwrap();
+        let mut draft = current.profile;
+        draft.name = "Uncommitted draft edit".into();
+        store
+            .upsert_profile(&draft, Some(current.revision))
+            .expect("edit draft after commit");
+
+        let engine = SockscapEngine::with_store(Arc::clone(&store));
+        let error = engine
+            .restore_last_committed()
+            .expect_err("capture adapter must remain a hard gate");
+        assert!(error.contains(&format!("committed revision {}", committed.revision)));
+        assert_eq!(
+            store
+                .last_committed_config_snapshot()
+                .unwrap()
+                .unwrap()
+                .profiles[0]
+                .name,
+            "Test"
+        );
+        assert_eq!(
+            store.recovery_journal().unwrap().phase,
+            RecoveryPhase::Clean
+        );
+        assert!(!store.recovery_journal().unwrap().cleanup_required);
+        assert_eq!(engine.status().state, EngineState::Disabled);
+        assert!(!engine.status().capture_active);
     }
 
     #[test]

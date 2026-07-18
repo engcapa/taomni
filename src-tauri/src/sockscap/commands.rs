@@ -10,6 +10,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri_plugin_autostart::ManagerExt as AutostartManagerExt;
 use tokio_util::sync::CancellationToken;
 
 use super::capabilities::probe_capabilities;
@@ -29,8 +30,8 @@ use super::policy::{
 use super::preflight::{PreflightReport, run_preflight};
 use super::processes::{ProcessCatalog, list_processes};
 use super::storage::{
-    PersistedRoutingProfile, PersistedRuleSource, RuleSourceDraft, StatsSnapshot,
-    StatsSnapshotQuery, StatsTotals,
+    LifecyclePreferences, PersistedRoutingProfile, PersistedRuleSource, RecoveryJournal,
+    RoutingConfigSnapshot, RuleSourceDraft, StatsSnapshot, StatsSnapshotQuery, StatsTotals,
 };
 use super::types::{
     CapabilitiesReport, EgressKind, EngineStatus, RoutingProfileDraft, SshPoolOptions,
@@ -44,6 +45,7 @@ pub const TRAFFIC_SUMMARY_EVENT: &str = "sockscap://traffic-summary";
 pub const PROFILE_HEALTH_EVENT: &str = "sockscap://profile-health";
 pub const EGRESS_HEALTH_EVENT: &str = "sockscap://egress-health";
 pub const ALERT_EVENT: &str = "sockscap://alert";
+pub const AUTO_RESTORE_ARG: &str = "--sockscap-auto-restore";
 
 /// Probe host capabilities without mutating system network state.
 #[tauri::command]
@@ -55,6 +57,130 @@ pub fn sockscap_capabilities() -> CapabilitiesReport {
 #[tauri::command]
 pub fn sockscap_status(state: State<'_, AppState>) -> EngineStatus {
     state.sockscap.status()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SockscapRecoverySummary {
+    pub generation: u64,
+    pub phase: super::storage::RecoveryPhase,
+    pub cleanup_required: bool,
+    pub restore_after_recovery: bool,
+    pub config_revision: u64,
+    pub platform: super::types::CapturePlatform,
+    pub active_profile_ids: Vec<String>,
+    pub artifact_state_present: bool,
+    pub helper_pid: Option<u32>,
+    pub last_heartbeat_at: Option<i64>,
+    pub last_error_code: Option<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SockscapCommittedConfigSummary {
+    pub revision: u64,
+    pub profile_ids: Vec<String>,
+    pub committed_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SockscapLifecycleSnapshot {
+    pub capabilities: CapabilitiesReport,
+    pub status: EngineStatus,
+    pub preferences: LifecyclePreferences,
+    pub system_login_registered: bool,
+    pub system_login_registration_error_code: Option<String>,
+    pub can_enable_auto_restore: bool,
+    pub auto_restore_ready: bool,
+    pub auto_restore_status_code: String,
+    pub last_committed_config: Option<SockscapCommittedConfigSummary>,
+    pub recovery: SockscapRecoverySummary,
+}
+
+/// Return lifecycle diagnostics without exposing the recovery artifact JSON or
+/// any saved routing drafts. This is the single UI source for login-restore and
+/// cleanup gates.
+#[tauri::command]
+pub fn sockscap_lifecycle_snapshot(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<SockscapLifecycleSnapshot, String> {
+    build_lifecycle_snapshot(&app, &state)
+}
+
+/// Register/unregister Taomni with the operating system first, then persist
+/// the matching opt-in. Enabling stays blocked until a real capture adapter is
+/// present so a capability-gated build cannot advertise a non-working login
+/// restore path.
+#[tauri::command]
+pub fn sockscap_set_restore_on_system_login(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<SockscapLifecycleSnapshot, String> {
+    let capabilities = probe_capabilities();
+    if enabled && !capabilities.capture_implemented {
+        return Err(
+            "CAPTURE_ADAPTER_NOT_READY: login restore cannot be enabled in this build".into(),
+        );
+    }
+
+    let autolaunch = app.autolaunch();
+    let previous_registration = autolaunch.is_enabled().map_err(|error| {
+        tracing::warn!(%error, "could not inspect Sockscap login registration before update");
+        "AUTOSTART_REGISTRATION_UNAVAILABLE: operating-system login registration was not changed"
+            .to_string()
+    })?;
+    let registration = if enabled {
+        autolaunch.enable()
+    } else {
+        autolaunch.disable()
+    };
+    if let Err(error) = registration {
+        tracing::warn!(%error, enabled, "could not update Sockscap login registration");
+        return Err(
+            "AUTOSTART_UPDATE_FAILED: operating-system login registration was not changed".into(),
+        );
+    }
+
+    if let Err(error) = state.sockscap_store.set_restore_on_system_login(enabled) {
+        let rollback = if previous_registration {
+            autolaunch.enable()
+        } else {
+            autolaunch.disable()
+        };
+        if let Err(rollback_error) = rollback {
+            tracing::error!(%rollback_error, "could not roll back Sockscap login registration");
+        }
+        return Err(error);
+    }
+    build_lifecycle_snapshot(&app, &state)
+}
+
+/// Called once during app setup. The autostart argument alone is insufficient:
+/// the persisted opt-in must still be true. The orchestrator then reads only
+/// the last committed snapshot and preserves every recovery gate.
+pub fn maybe_restore_after_system_login(app: &AppHandle) {
+    if !std::env::args_os().any(|argument| argument == AUTO_RESTORE_ARG) {
+        return;
+    }
+    let state = app.state::<AppState>();
+    let preferences = match state.sockscap_store.lifecycle_preferences() {
+        Ok(preferences) => preferences,
+        Err(error) => {
+            let result = Err(format!("LIFECYCLE_PREFERENCES_UNAVAILABLE: {error}"));
+            publish_engine_result(app, &state, &result);
+            return;
+        }
+    };
+    if !preferences.restore_on_system_login {
+        return;
+    }
+    let result = state.sockscap.restore_last_committed();
+    publish_engine_result(app, &state, &result);
 }
 
 /// Run preflight against saved profiles only. Caller-supplied drafts are never
@@ -689,6 +815,116 @@ fn find_rule_source(
         .ok_or_else(|| format!("RULE_SOURCE_NOT_FOUND: rule source '{source_id}' does not exist"))
 }
 
+fn build_lifecycle_snapshot(
+    app: &AppHandle,
+    state: &State<'_, AppState>,
+) -> Result<SockscapLifecycleSnapshot, String> {
+    let capabilities = probe_capabilities();
+    let status = state.sockscap.status();
+    let preferences = state.sockscap_store.lifecycle_preferences()?;
+    let recovery = state.sockscap_store.recovery_journal()?;
+    let committed = state.sockscap_store.last_committed_config_snapshot()?;
+    let (system_login_registered, system_login_registration_error_code) =
+        match app.autolaunch().is_enabled() {
+            Ok(registered) => (registered, None),
+            Err(error) => {
+                tracing::warn!(%error, "could not inspect Sockscap login registration");
+                (false, Some("AUTOSTART_REGISTRATION_UNAVAILABLE".into()))
+            }
+        };
+    let auto_restore_status_code = auto_restore_status_code(
+        &preferences,
+        &capabilities,
+        system_login_registered,
+        system_login_registration_error_code.is_some(),
+        &status,
+        &recovery,
+        committed.as_ref(),
+    )
+    .to_string();
+    let can_enable_auto_restore =
+        capabilities.capture_implemented && system_login_registration_error_code.is_none();
+    let auto_restore_ready = auto_restore_status_code == "READY";
+
+    Ok(SockscapLifecycleSnapshot {
+        capabilities,
+        status,
+        preferences,
+        system_login_registered,
+        system_login_registration_error_code,
+        can_enable_auto_restore,
+        auto_restore_ready,
+        auto_restore_status_code,
+        last_committed_config: committed.as_ref().map(committed_config_summary),
+        recovery: recovery_summary(&recovery),
+    })
+}
+
+fn committed_config_summary(snapshot: &RoutingConfigSnapshot) -> SockscapCommittedConfigSummary {
+    SockscapCommittedConfigSummary {
+        revision: snapshot.revision,
+        profile_ids: snapshot
+            .profiles
+            .iter()
+            .map(|profile| profile.id.clone())
+            .collect(),
+        committed_at: snapshot.committed_at,
+    }
+}
+
+fn recovery_summary(journal: &RecoveryJournal) -> SockscapRecoverySummary {
+    SockscapRecoverySummary {
+        generation: journal.generation,
+        phase: journal.phase,
+        cleanup_required: journal.cleanup_required,
+        restore_after_recovery: journal.restore_after_recovery,
+        config_revision: journal.config_revision,
+        platform: journal.platform,
+        active_profile_ids: journal.active_profile_ids.clone(),
+        artifact_state_present: journal
+            .artifact_state
+            .as_object()
+            .map(|object| !object.is_empty())
+            .unwrap_or(true),
+        helper_pid: journal.helper_pid,
+        last_heartbeat_at: journal.last_heartbeat_at,
+        last_error_code: journal.last_error_code.clone(),
+        created_at: journal.created_at,
+        updated_at: journal.updated_at,
+    }
+}
+
+fn auto_restore_status_code(
+    preferences: &LifecyclePreferences,
+    capabilities: &CapabilitiesReport,
+    registered: bool,
+    registration_error: bool,
+    status: &EngineStatus,
+    recovery: &RecoveryJournal,
+    committed: Option<&RoutingConfigSnapshot>,
+) -> &'static str {
+    if !capabilities.capture_implemented {
+        "CAPTURE_ADAPTER_NOT_READY"
+    } else if !preferences.restore_on_system_login {
+        "DISABLED_BY_USER"
+    } else if registration_error {
+        "AUTOSTART_REGISTRATION_UNAVAILABLE"
+    } else if !registered {
+        "AUTOSTART_REGISTRATION_MISMATCH"
+    } else if status.recovery_required {
+        "RECOVERY_REQUIRED"
+    } else if matches!(
+        recovery.phase,
+        super::storage::RecoveryPhase::Preparing | super::storage::RecoveryPhase::Stopping
+    ) {
+        "ENGINE_TRANSITION_IN_PROGRESS"
+    } else if committed.is_none() {
+        "LAST_COMMITTED_CONFIG_MISSING"
+    } else {
+        "READY"
+    }
+}
+
 fn publish_engine_result(
     app: &AppHandle,
     state: &State<'_, AppState>,
@@ -783,6 +1019,7 @@ mod tests {
     struct ContractFixture {
         capabilities: CapabilitiesReport,
         status: EngineStatus,
+        lifecycle: SockscapLifecycleSnapshot,
         preflight: PreflightReport,
         profile: PersistedRoutingProfile,
         process_catalog: ProcessCatalog,
@@ -852,6 +1089,132 @@ mod tests {
     }
 
     #[test]
+    fn automatic_restore_status_reports_each_hard_gate_without_fallback() {
+        let mut preferences = LifecyclePreferences::default();
+        let mut capabilities = CapabilitiesReport {
+            platform: super::super::types::CapturePlatform::Linux,
+            items: Vec::new(),
+            can_start_global: true,
+            can_start_app_group: true,
+            can_attach_pid: true,
+            summary: "test".into(),
+            capture_implemented: false,
+        };
+        let mut status = EngineStatus::default();
+        let recovery = RecoveryJournal {
+            generation: 1,
+            phase: super::super::storage::RecoveryPhase::Clean,
+            cleanup_required: false,
+            restore_after_recovery: false,
+            config_revision: 0,
+            platform: super::super::types::CapturePlatform::Linux,
+            active_profile_ids: Vec::new(),
+            artifact_state: serde_json::json!({}),
+            helper_pid: None,
+            last_heartbeat_at: None,
+            last_error_code: None,
+            created_at: 1,
+            updated_at: 1,
+        };
+        let committed = RoutingConfigSnapshot {
+            revision: 2,
+            state: super::super::storage::ConfigSnapshotState::Committed,
+            profiles: Vec::new(),
+            created_at: 1,
+            committed_at: Some(2),
+        };
+
+        assert_eq!(
+            auto_restore_status_code(
+                &preferences,
+                &capabilities,
+                false,
+                false,
+                &status,
+                &recovery,
+                None,
+            ),
+            "CAPTURE_ADAPTER_NOT_READY"
+        );
+        capabilities.capture_implemented = true;
+        assert_eq!(
+            auto_restore_status_code(
+                &preferences,
+                &capabilities,
+                false,
+                false,
+                &status,
+                &recovery,
+                None,
+            ),
+            "DISABLED_BY_USER"
+        );
+        preferences.restore_on_system_login = true;
+        assert_eq!(
+            auto_restore_status_code(
+                &preferences,
+                &capabilities,
+                false,
+                false,
+                &status,
+                &recovery,
+                None,
+            ),
+            "AUTOSTART_REGISTRATION_MISMATCH"
+        );
+        assert_eq!(
+            auto_restore_status_code(
+                &preferences,
+                &capabilities,
+                false,
+                true,
+                &status,
+                &recovery,
+                None,
+            ),
+            "AUTOSTART_REGISTRATION_UNAVAILABLE"
+        );
+        status.recovery_required = true;
+        assert_eq!(
+            auto_restore_status_code(
+                &preferences,
+                &capabilities,
+                true,
+                false,
+                &status,
+                &recovery,
+                None,
+            ),
+            "RECOVERY_REQUIRED"
+        );
+        status.recovery_required = false;
+        assert_eq!(
+            auto_restore_status_code(
+                &preferences,
+                &capabilities,
+                true,
+                false,
+                &status,
+                &recovery,
+                None,
+            ),
+            "LAST_COMMITTED_CONFIG_MISSING"
+        );
+        assert_eq!(
+            auto_restore_status_code(
+                &preferences,
+                &capabilities,
+                true,
+                false,
+                &status,
+                &recovery,
+                Some(&committed),
+            ),
+            "READY"
+        );
+    }
+
+    #[test]
     fn webview_cannot_inject_profiles_into_test_target_contract() {
         let request: TestTargetRequest = serde_json::from_value(serde_json::json!({
             "hostname": "example.com",
@@ -898,6 +1261,17 @@ mod tests {
         assert_eq!(
             fixture.status.state,
             super::super::types::EngineState::Active
+        );
+        assert!(fixture.lifecycle.auto_restore_ready);
+        assert_eq!(fixture.lifecycle.auto_restore_status_code, "READY");
+        assert!(fixture.lifecycle.recovery.artifact_state_present);
+        assert_eq!(
+            fixture
+                .lifecycle
+                .last_committed_config
+                .as_ref()
+                .map(|snapshot| snapshot.revision),
+            Some(9)
         );
         assert!(fixture.preflight.ok);
         assert_eq!(fixture.profile.profile.id, "contract-profile");

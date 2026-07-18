@@ -12,11 +12,13 @@ import {
   sockscapListProfiles,
   sockscapListRuleSources,
   sockscapLiveConnections,
+  sockscapLifecycleSnapshot,
   sockscapImportRuleSource,
   sockscapDeleteRuleSource,
   sockscapRecover,
   sockscapDeleteProfile,
   sockscapRefreshRuleSource,
+  sockscapSetRestoreOnSystemLogin,
   sockscapStart,
   sockscapStatsSnapshot,
   sockscapStatus,
@@ -30,6 +32,7 @@ import {
   type SockscapClearStatsResult,
   type SockscapEgressSessionSummary,
   type SockscapEngineStatus,
+  type SockscapLifecycleSnapshot,
   type SockscapLiveConnectionsSnapshot,
   type SockscapPersistedRoutingProfile,
   type SockscapProcessCatalog,
@@ -46,7 +49,7 @@ import {
 } from "../lib/sockscap";
 
 export type SockscapSection = "overview" | "profiles" | "rules" | "dashboard" | "lifecycle";
-export type SockscapLifecycleAction = "start" | "stop" | "recover";
+export type SockscapLifecycleAction = "start" | "stop" | "recover" | "set_auto_restore";
 export type SockscapProfileAction = "save" | "delete" | "test_egress";
 export type SockscapRuleAction = "save_source" | "delete_source" | "refresh_source" | "import_source" | "test_target";
 export type SockscapDashboardAction = "clear_stats";
@@ -65,6 +68,7 @@ interface SockscapStoreState {
   lastUpdatedAt: number | null;
   capabilities: SockscapCapabilitiesReport | null;
   status: SockscapEngineStatus | null;
+  lifecycle: SockscapLifecycleSnapshot | null;
   profiles: SockscapPersistedRoutingProfile[];
   processes: SockscapProcessCatalog | null;
   egressSessions: SockscapEgressSessionSummary[];
@@ -94,6 +98,7 @@ interface SockscapStoreState {
   start: () => Promise<void>;
   stop: () => Promise<void>;
   recover: () => Promise<void>;
+  setRestoreOnSystemLogin: (enabled: boolean) => Promise<void>;
   dismissError: () => void;
   dismissAlert: (createdAtUnix: number, code: string) => void;
   reset: () => void;
@@ -113,6 +118,7 @@ const initialData = {
   lastUpdatedAt: null,
   capabilities: null,
   status: null,
+  lifecycle: null as SockscapLifecycleSnapshot | null,
   profiles: [] as SockscapPersistedRoutingProfile[],
   processes: null as SockscapProcessCatalog | null,
   egressSessions: [] as SockscapEgressSessionSummary[],
@@ -150,6 +156,7 @@ export const useSockscapStore = create<SockscapStoreState>((set, get) => ({
     const results = await Promise.allSettled([
       sockscapCapabilities(),
       sockscapStatus(),
+      sockscapLifecycleSnapshot(),
       sockscapListProfiles(),
       sockscapListEgressSessions(),
       sockscapListRuleSources(),
@@ -161,7 +168,7 @@ export const useSockscapStore = create<SockscapStoreState>((set, get) => ({
       }),
     ] as const);
     if (sequence !== refreshSequence) return;
-    const [capabilities, status, profiles, egressSessions, ruleSources, stats] = results;
+    const [capabilities, status, lifecycle, profiles, egressSessions, ruleSources, stats] = results;
     const errors = results.map(settledError).filter((value): value is string => value !== null);
     set((current) => ({
       loading: false,
@@ -170,6 +177,7 @@ export const useSockscapStore = create<SockscapStoreState>((set, get) => ({
       error: errors.length > 0 ? errors.join("; ") : null,
       capabilities: capabilities.status === "fulfilled" ? capabilities.value : current.capabilities,
       status: status.status === "fulfilled" ? status.value : current.status,
+      lifecycle: lifecycle.status === "fulfilled" ? lifecycle.value : current.lifecycle,
       profiles: profiles.status === "fulfilled" ? profiles.value : current.profiles,
       egressSessions: egressSessions.status === "fulfilled" ? egressSessions.value : current.egressSessions,
       ruleSources: ruleSources.status === "fulfilled" ? ruleSources.value : current.ruleSources,
@@ -335,6 +343,21 @@ export const useSockscapStore = create<SockscapStoreState>((set, get) => ({
   start: async () => runLifecycle(set, "start", sockscapStart),
   stop: async () => runLifecycle(set, "stop", sockscapStop),
   recover: async () => runLifecycle(set, "recover", sockscapRecover),
+  setRestoreOnSystemLogin: async (enabled) => {
+    set({ actionPending: "set_auto_restore", error: null });
+    try {
+      const lifecycle = await sockscapSetRestoreOnSystemLogin(enabled);
+      set({
+        actionPending: null,
+        lifecycle,
+        capabilities: lifecycle.capabilities,
+        status: lifecycle.status,
+      });
+    } catch (error) {
+      set({ actionPending: null, error: errorMessage(error) });
+      throw error;
+    }
+  },
   dismissError: () => set({ error: null }),
   dismissAlert: (createdAtUnix, code) => set((current) => ({
     alerts: current.alerts.filter((alert) => alert.createdAtUnix !== createdAtUnix || alert.code !== code),
@@ -419,6 +442,11 @@ async function runLifecycle(
       // The original lifecycle error is more actionable than a follow-up status failure.
     }
   }
+  try {
+    set({ lifecycle: await sockscapLifecycleSnapshot() });
+  } catch {
+    // The status/action outcome remains usable if diagnostics cannot refresh.
+  }
 }
 
 /**
@@ -439,7 +467,10 @@ export function attachSockscapEventBridge(): () => void {
       });
   };
 
-  subscribe(listenSockscapStatus((status) => useSockscapStore.setState({ status })));
+  subscribe(listenSockscapStatus((status) => useSockscapStore.setState((current) => ({
+    status,
+    lifecycle: current.lifecycle ? { ...current.lifecycle, status } : null,
+  }))));
   subscribe(listenSockscapTrafficSummary((event) => useSockscapStore.setState((current) => {
     if (!current.stats) {
       return {

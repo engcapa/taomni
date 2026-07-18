@@ -24,6 +24,54 @@
     "recoveryRequired": false,
     "captureActive": true
   },
+  "lifecycle": {
+    "capabilities": {
+      "platform": "linux",
+      "items": [],
+      "canStartGlobal": true,
+      "canStartAppGroup": true,
+      "canAttachPid": true,
+      "summary": "contract fixture",
+      "captureImplemented": true
+    },
+    "status": {
+      "state": "active",
+      "message": "Sockscap is active",
+      "activeProfileIds": ["contract-profile"],
+      "lastError": null,
+      "recoveryRequired": false,
+      "captureActive": true
+    },
+    "preferences": {
+      "restoreOnSystemLogin": true,
+      "updatedAt": 1700000060
+    },
+    "systemLoginRegistered": true,
+    "systemLoginRegistrationErrorCode": null,
+    "canEnableAutoRestore": true,
+    "autoRestoreReady": true,
+    "autoRestoreStatusCode": "READY",
+    "lastCommittedConfig": {
+      "revision": 9,
+      "profileIds": ["contract-profile"],
+      "committedAt": 1700000050
+    },
+    "recovery": {
+      "generation": 4,
+      "phase": "active",
+      "cleanupRequired": true,
+      "restoreAfterRecovery": true,
+      "configRevision": 9,
+      "platform": "linux",
+      "activeProfileIds": ["contract-profile"],
+      "artifactStatePresent": true,
+      "helperPid": 4243,
+      "lastHeartbeatAt": 1700000060,
+      "lastErrorCode": null,
+      "createdAt": 1700000000,
+      "updatedAt": 1700000060
+    }
+  },
   "preflight": {
     "ok": true,
     "capabilities": {
