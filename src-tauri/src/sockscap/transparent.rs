@@ -58,6 +58,38 @@ pub fn nft_flush_command() -> [&'static str; 4] {
     ["delete", "table", "ip", "sockscap"]
 }
 
+/// WinDivert filter (plan §4.1/§8, ADR-0002) for the Windows backend. WinDivert
+/// itself needs a signed `.sys` driver + its SDK to link, so the FFI adapter is
+/// external; this is the driver-independent filter/config core, which is
+/// unit-tested here. Captures outbound TCP while hard-bypassing loopback and
+/// the capture port so the engine can't recurse into its own traffic.
+pub fn build_windivert_filter(capture_port: u16) -> String {
+    format!(
+        "outbound and ip and tcp and remoteAddr != 127.0.0.1 and tcp.DstPort != {capture_port}"
+    )
+}
+
+/// The macOS `NETransparentProxyProvider` per-flow decision (plan §4.1, §8,
+/// ADR-0003): handle a flow only when its source app's signing identity is in
+/// the selected set, otherwise pass through (return DIRECT). The provider
+/// system-extension shell + entitlement are external; this is the decision
+/// core it drives, unit-tested here.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProviderAction {
+    /// Sockscap handles (routes) this flow.
+    Handle,
+    /// Let the OS carry it directly (unselected app).
+    PassThrough,
+}
+
+pub fn macos_provider_decision(app_signing_id: &str, selected_ids: &[String]) -> ProviderAction {
+    if selected_ids.iter().any(|id| id == app_signing_id) {
+        ProviderAction::Handle
+    } else {
+        ProviderAction::PassThrough
+    }
+}
+
 /// Parse the raw sockaddr returned by `getsockopt(SO_ORIGINAL_DST)` into a
 /// `SocketAddr`. Handles IPv4 (`AF_INET`) and IPv6 (`AF_INET6`); the family is
 /// the first 2 bytes (host byte order), the port is big-endian.
@@ -302,5 +334,27 @@ mod tests {
     fn parse_original_dst_rejects_short_or_unknown() {
         assert!(parse_original_dst(2, &[2, 0, 1]).is_none());
         assert!(parse_original_dst(99, &[0u8; 32]).is_none());
+    }
+
+    #[test]
+    fn windivert_filter_captures_outbound_tcp_with_bypass() {
+        let f = build_windivert_filter(1080);
+        assert!(f.contains("outbound"));
+        assert!(f.contains("tcp"));
+        assert!(f.contains("remoteAddr != 127.0.0.1")); // loopback bypass
+        assert!(f.contains("tcp.DstPort != 1080")); // don't re-capture ourselves
+    }
+
+    #[test]
+    fn macos_provider_handles_only_selected_apps() {
+        let selected = vec!["ABCDE12345.com.example.app".to_string()];
+        assert_eq!(
+            macos_provider_decision("ABCDE12345.com.example.app", &selected),
+            ProviderAction::Handle
+        );
+        assert_eq!(
+            macos_provider_decision("ZZZ.com.other.app", &selected),
+            ProviderAction::PassThrough
+        );
     }
 }
