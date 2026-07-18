@@ -191,19 +191,22 @@ impl EgressConnector for HttpConnectConnector {
     }
 }
 
-/// SSH Jump connector scaffold.
-///
-/// Design constraints (plan §4.3 / §16.5):
-/// - One TCP flow → one `direct-tcpip` channel on a shared control connection
-/// - known_hosts / fingerprint confirmation is a **release gate**
-/// - Current `SshHandler::check_server_key` accepts all keys — must be fixed
-///   before this connector may dial
-///
-/// Phase 2 returns [`EgressError::SshHostKeyGate`] until that gate is closed.
+/// Phase 2 historically returned [`EgressError::SshHostKeyGate`] until known_hosts
+/// landed. Host-key verification is now implemented (`terminal::hostkey`); the
+/// remaining gap is SshChannelPool / direct-tcpip pooling.
 pub struct SshJumpConnector {
     pub session_id: String,
-    /// When false (default), connect refuses with SshHostKeyGate.
+    /// When false, connect refuses with SshHostKeyGate.
     pub host_key_verification_ready: bool,
+}
+
+impl Default for SshJumpConnector {
+    fn default() -> Self {
+        Self {
+            session_id: String::new(),
+            host_key_verification_ready: crate::terminal::hostkey::verification_ready(),
+        }
+    }
 }
 
 #[async_trait]

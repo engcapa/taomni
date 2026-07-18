@@ -13,6 +13,7 @@ use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::UnboundedSender;
 
+use crate::terminal::hostkey::{default_store, HostKeyDecision, HostKeyPolicy};
 use crate::terminal::network::{NetworkSettings, establish_transport};
 use crate::terminal::x11_forward::{self, XForward};
 
@@ -27,6 +28,10 @@ pub struct SshHandler {
     /// X11 forwarding config for this session, if enabled. When set, inbound
     /// `x11` channels opened by the server are bridged to the local X server.
     pub x11: Option<Arc<XForward>>,
+    /// Remote host used for known_hosts lookup (lowercased at connect).
+    pub host: String,
+    pub port: u16,
+    pub host_key_policy: HostKeyPolicy,
 }
 
 impl client::Handler for SshHandler {
@@ -34,11 +39,54 @@ impl client::Handler for SshHandler {
 
     fn check_server_key(
         &mut self,
-        _server_public_key: &PublicKey,
+        server_public_key: &PublicKey,
     ) -> impl Future<Output = Result<bool, Self::Error>> + Send {
-        async {
-            // TODO: proper host key verification
-            Ok(true)
+        let host = self.host.clone();
+        let port = self.port;
+        let policy = self.host_key_policy;
+        let presented = server_public_key.clone();
+        async move {
+            match default_store().verify(&host, port, &presented, policy) {
+                Ok(HostKeyDecision::AcceptedKnown) => {
+                    tracing::debug!(%host, port, "SSH host key matched known_hosts");
+                    Ok(true)
+                }
+                Ok(HostKeyDecision::AcceptedNew { fingerprint }) => {
+                    tracing::warn!(
+                        %host,
+                        port,
+                        %fingerprint,
+                        "SSH host key trusted on first use and saved to known_hosts"
+                    );
+                    Ok(true)
+                }
+                Ok(HostKeyDecision::RejectedMismatch {
+                    expected,
+                    presented,
+                }) => {
+                    tracing::error!(
+                        %host,
+                        port,
+                        %expected,
+                        %presented,
+                        "SSH HOST KEY MISMATCH — connection rejected"
+                    );
+                    Ok(false)
+                }
+                Ok(HostKeyDecision::RejectedUnknown { fingerprint }) => {
+                    tracing::error!(
+                        %host,
+                        port,
+                        %fingerprint,
+                        "SSH host key unknown under Strict policy — connection rejected"
+                    );
+                    Ok(false)
+                }
+                Err(e) => {
+                    tracing::error!(%host, port, error = %e, "SSH host key verification failed");
+                    Ok(false)
+                }
+            }
         }
     }
 
@@ -624,6 +672,9 @@ pub async fn connect_ssh(
     let handler = SshHandler {
         output_tx: Arc::new(Mutex::new(None)),
         x11: x11.clone(),
+        host: host.to_string(),
+        port,
+        host_key_policy: HostKeyPolicy::TrustOnFirstUse,
     };
 
     let stream = build_ssh_transport(host, port, network).await?;
@@ -755,6 +806,9 @@ pub async fn connect_ssh_authenticated_with_prompter(
     let handler = SshHandler {
         output_tx: Arc::new(Mutex::new(None)),
         x11: None,
+        host: host.to_string(),
+        port,
+        host_key_policy: HostKeyPolicy::TrustOnFirstUse,
     };
 
     let stream = build_ssh_transport(host, port, network).await?;
