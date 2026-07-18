@@ -118,20 +118,30 @@ As of 2026-07-18 on branch `feat/sockscap-implementation`:
 |---|---|---|
 | 0 scaffold | Done | types, probes, preflight, orchestrator, ADR |
 | 1 policy | Done | rules, matcher, GFWList last-good, test_target |
-| 2 flow | Done | attribution, bypass, DIRECT/SOCKS5/HTTP CONNECT, SSH host-key gate |
+| 2 flow | Done | attribution, bypass, DIRECT/SOCKS5/HTTP CONNECT |
+| 2 SSH trust | Done | `terminal/hostkey` TOFU + mismatch reject; gate closed |
 | 3 persistence | Done | sockscap.db, profile CRUD, recovery journal, browser stubs |
 | 4 UI | Done | independent window, settings entry, en/zh-CN |
-| 5–7 adapters | Scaffold | CaptureAdapter trait + Win/macOS/Linux refuse-install implementations |
-| 8 tray | Scaffold | color/menu presentation + IPC; not yet bound to app tray |
+| 5 Windows adapter | Scaffold | refuse until WinDivert/WFP ADR on Windows hosts |
+| 6 macOS adapter | Scaffold | refuse until NE entitlement |
+| 7 Linux adapter | **Implemented** | nft transparent redirect + SO_ORIGINAL_DST + DIRECT relay; needs root |
+| 8 tray | **Implemented** | main tray menu Open/Start/Stop/Recover/Exit |
 
-**Still open for true Active routing:** Windows dual spike ADR, macOS entitlement, Linux nft/cgroup install path, SSH known_hosts, helper heartbeat.
+### How to reach Active on Linux
 
-## Follow-ups
+```bash
+# run desktop app as root (or future privileged helper)
+sudo pnpm tauri dev
+# Settings → Sockscap → configure global profile with egress → Start
+```
 
-- Phase 1: immutable policy matcher + GFWList projection + profile schema
-- Phase 2: FlowEngine + egress connectors + SshChannelPool extraction
-- Phase 3: sockscap.db + recovery journal + browser stubs
-- Phase 0 spikes: Windows dual path, Linux cgroup vertical slice, tun2proxy evaluation
-- Bind `sockscap_tray_presentation` to the main Tauri tray
-- Implement Linux CaptureAdapter install/uninstall with recovery journal
-- Fix `terminal/ssh.rs` host-key verification before enabling SshJumpConnector
+Without CAP_NET_ADMIN, Start fails preflight with a clear message and mutates nothing.
+
+### Still open
+
+- Windows dual spike ADR + signed driver path
+- macOS Network Extension entitlement + provider
+- Linux cgroup socket-match refinement (currently global TCP redirect)
+- FlowEngine PROXY path inside redirect accept loop (today DIRECT relay)
+- SshChannelPool for production SSH Jump concurrency
+- Helper binary with polkit / capability drop
