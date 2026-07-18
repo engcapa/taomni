@@ -42,6 +42,7 @@ import {
 } from "./localVfs";
 import { emit } from "./tauri-event";
 import { promptAppDialog } from "../lib/appDialogs";
+import { invokeSockscapStub } from "./sockscap";
 
 const SESSION_STORAGE_KEY = "taomni.sessions.v1";
 const GROUP_STORAGE_KEY = "taomni.groups.v1";
@@ -1025,6 +1026,8 @@ function stubSaveMailDraft(accountId: string, draft: Record<string, unknown>): S
 }
 
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
+  const sockscap = await invokeSockscapStub(cmd, args);
+  if (sockscap.handled) return sockscap.value as T;
   switch (cmd) {
     case "list_sessions": {
       return loadSessions() as T;

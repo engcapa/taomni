@@ -1,0 +1,389 @@
+{
+  "capabilities": {
+    "platform": "linux",
+    "items": [
+      {
+        "id": "capture_global",
+        "name": "Global capture",
+        "level": "supported",
+        "detail": "contract fixture",
+        "requiredForStart": true
+      }
+    ],
+    "canStartGlobal": true,
+    "canStartAppGroup": true,
+    "canAttachPid": true,
+    "summary": "contract fixture",
+    "captureImplemented": true
+  },
+  "status": {
+    "state": "active",
+    "message": "Sockscap is active",
+    "activeProfileIds": ["contract-profile"],
+    "lastError": null,
+    "recoveryRequired": false,
+    "captureActive": true
+  },
+  "preflight": {
+    "ok": true,
+    "capabilities": {
+      "platform": "linux",
+      "items": [],
+      "canStartGlobal": true,
+      "canStartAppGroup": true,
+      "canAttachPid": true,
+      "summary": "contract fixture",
+      "captureImplemented": true
+    },
+    "conflicts": [],
+    "findings": [],
+    "suggestedState": "preparing"
+  },
+  "profile": {
+    "profile": {
+      "id": "contract-profile",
+      "name": "Contract profile",
+      "enabled": true,
+      "priority": 100,
+      "scope": "applications",
+      "appSelectors": [
+        {
+          "kind": "executable_path",
+          "value": "/usr/bin/browser"
+        }
+      ],
+      "runtimeProcesses": [
+        {
+          "pid": 4242,
+          "processStartTime": 1700000000
+        }
+      ],
+      "includeChildren": true,
+      "egressKind": "ssh_jump",
+      "egressRefId": "contract-ssh",
+      "egressFailureAction": "fail_closed",
+      "sshPoolOptions": {
+        "maxControlConnections": 2,
+        "maxChannelsPerConnection": 64,
+        "keepaliveSeconds": 30,
+        "connectTimeoutSeconds": 15
+      },
+      "ruleSourceIds": ["contract-source"],
+      "customRules": [
+        {
+          "id": "custom-1",
+          "enabled": true,
+          "action": "direct",
+          "kind": "domain_suffix",
+          "pattern": "direct.example"
+        }
+      ],
+      "defaultAction": "proxy",
+      "dnsMode": "virtual_dns",
+      "unknownDomainAction": "block",
+      "udpPolicy": "block",
+      "localNetworkPolicy": {
+        "lanAction": "rules"
+      },
+      "statsPrivacy": {
+        "collectionMode": "persisted",
+        "minuteRetentionDays": 7,
+        "hourlyRetentionDays": 90,
+        "domainAggregationEnabled": false,
+        "domainRetentionDays": 7
+      }
+    },
+    "revision": 3,
+    "createdAt": 1700000000,
+    "updatedAt": 1700000060
+  },
+  "processCatalog": {
+    "processes": [
+      {
+        "pid": 4242,
+        "parentPid": 1,
+        "name": "Browser",
+        "executablePath": "/usr/bin/browser",
+        "processStartTime": 1700000000,
+        "selectable": true,
+        "rememberable": true,
+        "issueCode": null
+      }
+    ],
+    "truncated": false,
+    "maxRows": 4096
+  },
+  "egressSession": {
+    "id": "contract-ssh",
+    "name": "Contract SSH",
+    "kind": "ssh_jump",
+    "protocol": "ssh_jump",
+    "endpointHost": "ssh.example.test",
+    "endpointPort": 22,
+    "authKind": "agent",
+    "remoteDns": true,
+    "tcpOnly": true,
+    "availability": "ready",
+    "issue": null
+  },
+  "egressTest": {
+    "ok": true,
+    "summary": {
+      "id": "contract-ssh",
+      "name": "Contract SSH",
+      "kind": "ssh_jump",
+      "protocol": "ssh_jump",
+      "endpointHost": "ssh.example.test",
+      "endpointPort": 22,
+      "authKind": "agent",
+      "remoteDns": true,
+      "tcpOnly": true,
+      "availability": "ready",
+      "issue": null
+    },
+    "elapsedMillis": 42,
+    "metadata": {
+      "connector": "ssh_jump",
+      "remoteDns": true,
+      "tcpOnly": true,
+      "detail": "contract fixture"
+    },
+    "issue": null,
+    "sshPool": {
+      "state": "healthy",
+      "activeControlConnections": 1,
+      "activeChannels": 1,
+      "lastHandshakeRttMs": 37,
+      "channelOpenErrors": 0,
+      "reconnects": 0,
+      "bytesUp": 1024,
+      "bytesDown": 4096,
+      "lastErrorCode": null,
+      "lastHostKeyStatus": "verified"
+    }
+  },
+  "ruleSource": {
+    "record": {
+      "source": {
+        "id": "contract-source",
+        "name": "Contract source",
+        "enabled": true,
+        "kind": "custom_url",
+        "url": "https://example.test/gfwlist.txt",
+        "refreshIntervalSeconds": 21600
+      },
+      "revision": 2,
+      "createdAt": 1700000000,
+      "updatedAt": 1700000060
+    },
+    "state": {
+      "sourceId": "contract-source",
+      "kind": "custom_url",
+      "url": "https://example.test/gfwlist.txt",
+      "lastGoodPath": null,
+      "lastSuccessUnix": 1700000060,
+      "lastMirror": "https://example.test/gfwlist.txt",
+      "lastSha256": "0123456789abcdef",
+      "etag": "contract-etag",
+      "lastModified": null,
+      "refreshAfterUnix": 1700021660,
+      "lastError": null,
+      "parseStats": {
+        "totalLines": 3,
+        "proxyRules": 1,
+        "directRules": 1,
+        "unsupported": 0,
+        "ignoredComments": 1
+      }
+    }
+  },
+  "refreshOutcome": {
+    "ok": true,
+    "usedLastGood": false,
+    "notModified": false,
+    "mirror": "https://example.test/gfwlist.txt",
+    "sha256": "0123456789abcdef",
+    "parseStats": {
+      "totalLines": 3,
+      "proxyRules": 1,
+      "directRules": 1,
+      "unsupported": 0,
+      "ignoredComments": 1
+    },
+    "error": null,
+    "report": {
+      "proxyRules": [
+        {
+          "action": "proxy",
+          "kind": "domain_suffix",
+          "pattern": "blocked.example",
+          "original": "||blocked.example",
+          "sourceId": "contract-source"
+        }
+      ],
+      "directRules": [
+        {
+          "action": "direct",
+          "kind": "domain_suffix",
+          "pattern": "direct.example",
+          "original": "@@||direct.example",
+          "sourceId": "contract-source"
+        }
+      ],
+      "unsupported": [],
+      "ignoredComments": 1,
+      "totalLines": 3
+    }
+  },
+  "targetResult": {
+    "selectedProfileId": "contract-profile",
+    "selectedProfileName": "Contract profile",
+    "selectionReason": "application selector matched",
+    "decision": {
+      "action": "proxy",
+      "matchedRuleOriginal": "||blocked.example",
+      "matchedRuleSourceId": "contract-source",
+      "matchedStage": "subscription_proxy",
+      "hostnameSource": "tls_sni",
+      "profileId": "contract-profile"
+    },
+    "conflicts": [],
+    "notes": []
+  },
+  "stats": {
+    "generatedAt": 1700000120,
+    "fromUnix": 1700000000,
+    "toUnix": 1700000120,
+    "totals": {
+      "bytesUp": 1024,
+      "bytesDown": 4096,
+      "connections": 2,
+      "errors": 0,
+      "directConnections": 1,
+      "proxyConnections": 1,
+      "blockedConnections": 0,
+      "unknownHostnameConnections": 0,
+      "connectMillisTotal": 42
+    },
+    "series": [
+      {
+        "bucketStart": 1700000040,
+        "resolutionSeconds": 60,
+        "bytesUp": 1024,
+        "bytesDown": 4096,
+        "connections": 2,
+        "errors": 0,
+        "directConnections": 1,
+        "proxyConnections": 1,
+        "blockedConnections": 0
+      }
+    ],
+    "topApplications": [
+      {
+        "key": "Browser",
+        "bytesUp": 1024,
+        "bytesDown": 4096,
+        "connections": 2
+      }
+    ],
+    "topDomains": [],
+    "egressHealth": [
+      {
+        "bucketStart": 1700000040,
+        "profileId": "contract-profile",
+        "egressKind": "ssh_jump",
+        "controlState": "healthy",
+        "activeControlsMax": 1,
+        "activeChannelsMax": 1,
+        "channelErrors": 0,
+        "reconnects": 0,
+        "bytesUp": 1024,
+        "bytesDown": 4096,
+        "handshakeMillisTotal": 37,
+        "handshakeSamples": 1,
+        "hostKeyState": "verified",
+        "lastErrorCode": null
+      }
+    ]
+  },
+  "events": {
+    "trafficSummary": {
+      "generatedAtUnix": 1700000120,
+      "totals": {
+        "bytesUp": 1024,
+        "bytesDown": 4096,
+        "connections": 2,
+        "errors": 0,
+        "directConnections": 1,
+        "proxyConnections": 1,
+        "blockedConnections": 0,
+        "unknownHostnameConnections": 0,
+        "connectMillisTotal": 42
+      },
+      "cleared": false
+    },
+    "profileHealth": {
+      "profileId": "contract-profile",
+      "enabled": true,
+      "egress": {
+        "id": "contract-ssh",
+        "name": "Contract SSH",
+        "kind": "ssh_jump",
+        "protocol": "ssh_jump",
+        "endpointHost": "ssh.example.test",
+        "endpointPort": 22,
+        "authKind": "agent",
+        "remoteDns": true,
+        "tcpOnly": true,
+        "availability": "ready",
+        "issue": null
+      },
+      "issue": null
+    },
+    "egressHealth": {
+      "ok": false,
+      "summary": {
+        "id": "contract-ssh",
+        "name": "Contract SSH",
+        "kind": "ssh_jump",
+        "protocol": "ssh_jump",
+        "endpointHost": "ssh.example.test",
+        "endpointPort": 22,
+        "authKind": "agent",
+        "remoteDns": true,
+        "tcpOnly": true,
+        "availability": "user_action_required",
+        "issue": {
+          "code": "SSH_MFA_REQUIRED",
+          "message": "interactive authentication required",
+          "userActionRequired": true
+        }
+      },
+      "elapsedMillis": 75,
+      "metadata": null,
+      "issue": {
+        "code": "SSH_MFA_REQUIRED",
+        "message": "interactive authentication required",
+        "userActionRequired": true
+      },
+      "sshPool": {
+        "state": "user_action_required",
+        "activeControlConnections": 0,
+        "activeChannels": 0,
+        "lastHandshakeRttMs": null,
+        "channelOpenErrors": 1,
+        "reconnects": 0,
+        "bytesUp": 0,
+        "bytesDown": 0,
+        "lastErrorCode": "SSH_MFA_REQUIRED",
+        "lastHostKeyStatus": "verified"
+      }
+    },
+    "alert": {
+      "code": "RECOVERY_REQUIRED",
+      "message": "network recovery is required",
+      "severity": "error",
+      "createdAtUnix": 1700000120
+    }
+  }
+}

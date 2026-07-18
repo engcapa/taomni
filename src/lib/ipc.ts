@@ -24,6 +24,10 @@ import type {
   LanTransferProgress,
 } from "../types";
 
+// Keep the historical IPC entry point while the Sockscap contract lives in a
+// focused module shared by its UI and browser preview implementation.
+export * from "./sockscap";
+
 export interface LocalShellOption {
   id: string;
   name: string;

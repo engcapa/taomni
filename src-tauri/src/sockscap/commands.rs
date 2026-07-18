@@ -29,7 +29,7 @@ use super::preflight::{PreflightReport, run_preflight};
 use super::processes::{ProcessCatalog, list_processes};
 use super::storage::{
     PersistedRoutingProfile, PersistedRuleSource, RuleSourceDraft, StatsSnapshot,
-    StatsSnapshotQuery,
+    StatsSnapshotQuery, StatsTotals,
 };
 use super::types::{
     CapabilitiesReport, EgressKind, EngineStatus, RoutingProfileDraft, SshPoolOptions,
@@ -461,6 +461,14 @@ pub struct ClearStatsResult {
     pub removed_rows: u64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TrafficSummaryEvent {
+    generated_at_unix: u64,
+    totals: StatsTotals,
+    cleared: bool,
+}
+
 #[tauri::command]
 pub fn sockscap_clear_stats(
     app: AppHandle,
@@ -469,7 +477,15 @@ pub fn sockscap_clear_stats(
     let result = ClearStatsResult {
         removed_rows: state.sockscap_store.clear_stats()?,
     };
-    emit_best_effort(&app, TRAFFIC_SUMMARY_EVENT, result);
+    emit_best_effort(
+        &app,
+        TRAFFIC_SUMMARY_EVENT,
+        TrafficSummaryEvent {
+            generated_at_unix: unix_now(),
+            totals: StatsTotals::default(),
+            cleared: true,
+        },
+    );
     Ok(result)
 }
 
@@ -500,7 +516,7 @@ struct ProfileHealthEvent {
     issue: Option<EgressIssue>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SockscapAlert {
     code: String,
@@ -690,6 +706,32 @@ fn public_rule_source_state(mut state: RuleSourceState) -> RuleSourceState {
 mod tests {
     use super::*;
 
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct ContractEvents {
+        traffic_summary: TrafficSummaryEvent,
+        profile_health: ProfileHealthEvent,
+        egress_health: TestEgressResult,
+        alert: SockscapAlert,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct ContractFixture {
+        capabilities: CapabilitiesReport,
+        status: EngineStatus,
+        preflight: PreflightReport,
+        profile: PersistedRoutingProfile,
+        process_catalog: ProcessCatalog,
+        egress_session: EgressSessionSummary,
+        egress_test: TestEgressResult,
+        rule_source: RuleSourceView,
+        refresh_outcome: RefreshOutcome,
+        target_result: TestTargetResult,
+        stats: StatsSnapshot,
+        events: ContractEvents,
+    }
+
     fn target_request() -> TestTargetRequest {
         TestTargetRequest {
             app_identity: None,
@@ -777,5 +819,48 @@ mod tests {
             parse_stats: None,
         };
         assert!(public_rule_source_state(state).last_good_path.is_none());
+    }
+
+    #[test]
+    fn shared_typescript_contract_fixture_deserializes_at_the_rust_boundary() {
+        let raw = include_str!("../../../src/test/fixtures/sockscap-ipc-contract.json");
+        let fixture: ContractFixture =
+            serde_json::from_str(raw).expect("deserialize shared Sockscap IPC fixture");
+
+        assert_eq!(
+            fixture.capabilities.platform,
+            super::super::types::CapturePlatform::Linux
+        );
+        assert_eq!(
+            fixture.status.state,
+            super::super::types::EngineState::Active
+        );
+        assert!(fixture.preflight.ok);
+        assert_eq!(fixture.profile.profile.id, "contract-profile");
+        assert_eq!(fixture.process_catalog.processes[0].pid, 4242);
+        assert_eq!(fixture.egress_session.id, "contract-ssh");
+        assert!(fixture.egress_test.ok);
+        assert_eq!(fixture.rule_source.record.source.id, "contract-source");
+        assert!(
+            fixture
+                .rule_source
+                .state
+                .as_ref()
+                .is_some_and(|state| state.last_good_path.is_none())
+        );
+        assert!(fixture.refresh_outcome.ok);
+        assert_eq!(
+            fixture.target_result.selected_profile_id.as_deref(),
+            Some("contract-profile")
+        );
+        assert_eq!(fixture.stats.totals.connections, 2);
+        assert!(!fixture.events.traffic_summary.cleared);
+        assert!(fixture.events.profile_health.enabled);
+        assert!(!fixture.events.egress_health.ok);
+        assert_eq!(fixture.events.alert.code, "RECOVERY_REQUIRED");
+
+        assert!(!raw.contains("\"username\""));
+        assert!(!raw.contains("\"password\""));
+        assert!(!raw.contains("privateKeyPath"));
     }
 }
