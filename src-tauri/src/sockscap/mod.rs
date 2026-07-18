@@ -12,6 +12,7 @@
 //! `claudedocs/sockscap-phase0-adr.md`.
 
 pub mod capabilities;
+pub mod capture;
 pub mod commands;
 pub mod egress;
 pub mod flow;
