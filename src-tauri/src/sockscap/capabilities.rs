@@ -100,7 +100,7 @@ fn build_summary(platform: CapturePlatform, items: &[CapabilityItem]) -> String 
 fn probe_admin_privileges() -> CapabilityItem {
     #[cfg(target_os = "linux")]
     {
-        let euid = unsafe { libc_euid() };
+        let euid = libc_euid();
         if euid == 0 {
             return CapabilityItem {
                 id: "admin_privileges".into(),

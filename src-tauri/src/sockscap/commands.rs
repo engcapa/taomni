@@ -1,12 +1,18 @@
-//! Tauri commands for Sockscap Phase 0.
+//! Tauri commands for Sockscap Phase 0/1.
 //!
 //! Command surface follows design plan §12. Write commands re-validate on the
 //! Rust side; capture install is not available yet.
 
-use tauri::State;
+use tauri::{Manager, State};
+use serde::Serialize;
 
 use super::capabilities::probe_capabilities;
 use super::orchestrator::SockscapEngine;
+use super::policy::{
+    compile_gfwlist_payload, ingest_payload, official_gfwlist_mirrors, test_target,
+    ParseReport, RefreshOutcome, RuleSourceKind, TestTargetRequest, TestTargetResult,
+    GFWLIST_OFFICIAL_SOURCE_ID,
+};
 use super::preflight::{run_preflight, PreflightReport};
 use super::types::{CapabilitiesReport, EngineStatus, RoutingProfileDraft};
 use crate::state::AppState;
@@ -65,6 +71,63 @@ pub fn sockscap_open_window() -> Result<(), String> {
         "sockscap_open_window is not implemented yet (Phase 4: independent Sockscap window)"
             .into(),
     )
+}
+
+/// Explain how a synthetic target would be routed (design plan §12 test_target).
+///
+/// Phase 1: profiles are provided by the caller (no sockscap.db yet). Matchers
+/// are synthesized from default/unknown actions unless a compiled snapshot is
+/// supplied in-process by later phases.
+#[tauri::command]
+pub fn sockscap_test_target(request: TestTargetRequest) -> TestTargetResult {
+    test_target(request)
+}
+
+/// Compile AutoProxy / GFWList text (or Base64) without network I/O.
+#[tauri::command]
+pub fn sockscap_compile_rules(source_id: String, payload: String) -> Result<ParseReport, String> {
+    compile_gfwlist_payload(&source_id, &payload)
+}
+
+/// Ingest a rule payload into last-good storage under the app data directory.
+#[tauri::command]
+pub fn sockscap_ingest_rule_source(
+    app: tauri::AppHandle,
+    source_id: String,
+    kind: RuleSourceKind,
+    mirror: Option<String>,
+    payload: String,
+) -> Result<RefreshOutcome, String> {
+    let app_data = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("app data dir: {e}"))?;
+    Ok(ingest_payload(
+        &app_data,
+        &source_id,
+        kind,
+        mirror.as_deref(),
+        &payload,
+    ))
+}
+
+/// Metadata about the built-in GFWList official source (mirrors, source id).
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GfwlistOfficialInfo {
+    pub source_id: String,
+    pub mirrors: Vec<String>,
+}
+
+#[tauri::command]
+pub fn sockscap_gfwlist_official_info() -> GfwlistOfficialInfo {
+    GfwlistOfficialInfo {
+        source_id: GFWLIST_OFFICIAL_SOURCE_ID.to_string(),
+        mirrors: official_gfwlist_mirrors()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+    }
 }
 
 /// Expose engine type construction for AppState wiring / tests.
