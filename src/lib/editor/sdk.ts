@@ -1,5 +1,24 @@
 import { invoke } from "@tauri-apps/api/core";
 
+export const SDK_REGISTRY_CHANGED_EVENT = "taomni:sdk-registry-changed";
+
+function notifySdkRegistryChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(SDK_REGISTRY_CHANGED_EVENT));
+}
+
+export function subscribeSdkRegistryChanged(listener: () => void): () => void {
+  if (typeof window === "undefined") return () => undefined;
+  window.addEventListener(SDK_REGISTRY_CHANGED_EVENT, listener);
+  return () => window.removeEventListener(SDK_REGISTRY_CHANGED_EVENT, listener);
+}
+
+async function mutatingInvoke<T>(command: string, args: Record<string, unknown>): Promise<T> {
+  const result = await invoke<T>(command, args);
+  notifySdkRegistryChanged();
+  return result;
+}
+
 export type SdkKind = "java" | "kotlin" | "scala" | "python";
 export type SdkOrigin = "manual" | "discovered";
 export type SdkStatus = "ready" | "missing" | "invalid";
@@ -187,19 +206,19 @@ export function sdkDiscoverInstallations(kinds?: SdkKind[]): Promise<SdkProbe[]>
 export function sdkSaveInstallation(
   request: SaveSdkInstallationRequest,
 ): Promise<SdkInstallation> {
-  return invoke<SdkInstallation>("sdk_save_installation", { request });
+  return mutatingInvoke<SdkInstallation>("sdk_save_installation", { request });
 }
 
 export function sdkRemoveInstallation(id: string): Promise<void> {
-  return invoke<void>("sdk_remove_installation", { id });
+  return mutatingInvoke<void>("sdk_remove_installation", { id });
 }
 
 export function sdkRefreshInstallations(id?: string | null): Promise<SdkInstallation[]> {
-  return invoke<SdkInstallation[]>("sdk_refresh_installations", { id: id ?? null });
+  return mutatingInvoke<SdkInstallation[]>("sdk_refresh_installations", { id: id ?? null });
 }
 
 export function sdkSetDefault(kind: SdkKind, sdkId?: string | null): Promise<void> {
-  return invoke<void>("sdk_set_default", {
+  return mutatingInvoke<void>("sdk_set_default", {
     request: { kind, sdkId: sdkId ?? null },
   });
 }
@@ -207,7 +226,7 @@ export function sdkSetDefault(kind: SdkKind, sdkId?: string | null): Promise<voi
 export function sdkSaveWorkspaceBinding(
   request: SaveWorkspaceSdkBindingRequest,
 ): Promise<WorkspaceSdkBinding> {
-  return invoke<WorkspaceSdkBinding>("sdk_save_workspace_binding", { request });
+  return mutatingInvoke<WorkspaceSdkBinding>("sdk_save_workspace_binding", { request });
 }
 
 export function sdkRemoveWorkspaceBinding(
@@ -215,7 +234,7 @@ export function sdkRemoveWorkspaceBinding(
   kind: SdkKind,
   role: SdkRole,
 ): Promise<void> {
-  return invoke<void>("sdk_remove_workspace_binding", { scopePath, kind, role });
+  return mutatingInvoke<void>("sdk_remove_workspace_binding", { scopePath, kind, role });
 }
 
 export function sdkAnalyzeWorkspace(workspaceRoot: string): Promise<WorkspaceSdkAnalysis> {

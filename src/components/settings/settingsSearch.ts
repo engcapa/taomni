@@ -57,6 +57,16 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     ],
   },
   {
+    id: "sdks",
+    titleKeys: ["settings.sdkTitle", "settings.sdkSubtitle"],
+    terms: [
+      "sdk", "toolchain", "runtime", "interpreter", "compiler", "jdk", "java home",
+      "kotlin", "kotlinc", "scala", "scalac", "python", "virtual environment", "venv",
+      "软件开发工具包", "工具链", "运行时", "解释器", "编译器", "jdk", "java",
+      "kotlin", "scala", "python", "虚拟环境",
+    ],
+  },
+  {
     id: "language-servers",
     titleKeys: [
       "settings.languageServersTitle",
@@ -213,7 +223,7 @@ export const SETTINGS_GROUPS: SettingsGroupDef[] = [
   {
     id: "code",
     titleKey: "settings.groupCode",
-    entryIds: ["code-view-appearance", "language-servers", "live-templates"],
+    entryIds: ["code-view-appearance", "sdks", "language-servers", "live-templates"],
   },
   {
     id: "database",

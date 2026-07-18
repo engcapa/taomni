@@ -63,6 +63,7 @@ import { SqlExecutionSettings } from "./SqlExecutionSettings";
 import { LanguageServersSettings } from "./LanguageServersSettings";
 import { LiveTemplatesSettings } from "./LiveTemplatesSettings";
 import { SftpSettings } from "./SftpSettings";
+import { SdkSettings } from "./SdkSettings";
 import { FontPickerSelect, type FontPickerOption } from "../terminal/FontPickerPanel";
 import {
   consumePendingSettingsSection,
@@ -683,6 +684,10 @@ export function SettingsPanel() {
                 fontState={systemFonts}
                 onRequestSystemFonts={requestSystemFonts}
               />
+            </SettingsAnchor>
+
+            <SettingsAnchor id="sdks" className="mt-4">
+              <SdkSettings />
             </SettingsAnchor>
 
             <SettingsAnchor id="language-servers" className="mt-4">

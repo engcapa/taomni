@@ -17,6 +17,7 @@ import {
   sdkSaveWorkspaceBinding,
   sdkSetDefault,
   sdkResolveWorkspace,
+  subscribeSdkRegistryChanged,
 } from "./sdk";
 
 describe("SDK IPC", () => {
@@ -47,6 +48,19 @@ describe("SDK IPC", () => {
     await sdkSaveInstallation(request);
 
     expect(mocks.invoke).toHaveBeenCalledWith("sdk_save_installation", { request });
+  });
+
+  it("notifies live workspaces after a registry mutation", async () => {
+    mocks.invoke.mockResolvedValue({});
+    const listener = vi.fn();
+    const unsubscribe = subscribeSdkRegistryChanged(listener);
+
+    await sdkSaveInstallation({ kind: "java", location: "C:\\jdk-21" });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    unsubscribe();
+    await sdkSaveInstallation({ kind: "java", location: "C:\\jdk-22" });
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it("updates defaults and workspace bindings", async () => {
