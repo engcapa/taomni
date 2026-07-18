@@ -13,6 +13,7 @@
 
 pub mod capabilities;
 pub mod commands;
+pub mod egress;
 pub mod flow;
 pub mod orchestrator;
 pub mod policy;
