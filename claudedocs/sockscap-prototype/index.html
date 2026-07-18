@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Taomni Sockscap — Dashboard HTML Prototype</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="prototype.css">
+  </head>
+  <body data-engine-state="active">
+    <header class="topbar">
+      <a class="brand" href="index.html">
+        <span class="brand-mark">T</span>
+        <span class="brand-copy"><strong>Taomni</strong><span>Sockscap 设计原型</span></span>
+      </a>
+      <nav class="topnav" aria-label="原型页面">
+        <a data-nav href="index.html">Dashboard</a>
+        <a data-nav href="architecture.html">目标架构</a>
+        <a data-nav href="profile-editor.html">配置组编辑器</a>
+        <a data-nav href="rules-lifecycle.html">规则与生命周期</a>
+      </nav>
+      <div class="top-actions">
+        <span class="status-pill"><span class="status-dot"></span><span data-engine-label>运行中</span></span>
+        <button class="button ghost-dark" data-hide-window>隐藏到托盘</button>
+        <button class="button danger" data-engine-toggle>停止路由</button>
+      </div>
+    </header>
+
+    <main class="page">
+      <section class="page-heading">
+        <div>
+          <h1>流量总览</h1>
+          <p data-engine-subtext>3 个配置组 · 当前主出站 SSH Jump HK-Bastion · 单一系统捕获面</p>
+        </div>
+        <span class="prototype-badge">HTML Prototype · Review</span>
+      </section>
+
+      <aside class="callout info">
+        <span>ℹ</span>
+        <div>
+          <strong>这是设计原型，不代表功能已经实现</strong>
+          页面用于评审信息架构、状态语义和交互。SSH host-key 校验、三平台捕获与恢复仍是 Phase 0 发布 Gate。
+        </div>
+      </aside>
+
+      <section class="metric-grid" aria-label="关键指标">
+        <article class="metric">
+          <div class="metric-label">上传</div>
+          <div class="metric-value">18.4 Mbps</div>
+          <div class="metric-trend">↑ 今日 2.1 GB</div>
+        </article>
+        <article class="metric">
+          <div class="metric-label">下载</div>
+          <div class="metric-value">74.8 Mbps</div>
+          <div class="metric-trend">↓ 今日 8.7 GB</div>
+        </article>
+        <article class="metric">
+          <div class="metric-label">活动连接</div>
+          <div class="metric-value">126</div>
+          <div class="muted tiny">34 个应用 · 27 SSH channels</div>
+        </article>
+        <article class="metric">
+          <div class="metric-label">代理比例</div>
+          <div class="metric-value">68%</div>
+          <div class="muted tiny">86 PROXY · 40 DIRECT</div>
+        </article>
+        <article class="metric warn">
+          <div class="metric-label">告警</div>
+          <div class="metric-value">3</div>
+          <div class="muted tiny">1 SSH 重连 · 1 unknown · 1 UDP</div>
+        </article>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="card">
+          <header class="card-header">
+            <h2>带宽趋势 · 最近 30 分钟</h2>
+            <select aria-label="统计时间范围">
+              <option>最近 30 分钟</option>
+              <option>最近 6 小时</option>
+              <option>今天</option>
+            </select>
+          </header>
+          <div class="card-body">
+            <div class="chart" aria-label="模拟带宽柱状图">
+              <span class="bar" style="--bar-height: 30%"></span>
+              <span class="bar" style="--bar-height: 47%"></span>
+              <span class="bar" style="--bar-height: 38%"></span>
+              <span class="bar" style="--bar-height: 73%"></span>
+              <span class="bar" style="--bar-height: 62%"></span>
+              <span class="bar" style="--bar-height: 86%"></span>
+              <span class="bar" style="--bar-height: 68%"></span>
+              <span class="bar" style="--bar-height: 51%"></span>
+              <span class="bar" style="--bar-height: 78%"></span>
+              <span class="bar" style="--bar-height: 56%"></span>
+              <span class="bar" style="--bar-height: 42%"></span>
+              <span class="bar" style="--bar-height: 65%"></span>
+            </div>
+            <div class="legend">
+              <span><i class="legend-dot"></i>下载</span>
+              <span><i class="legend-dot teal"></i>上传</span>
+              <span>统计事件 ≤ 1 Hz，不向 Webview 发送 payload</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <header class="card-header"><h2>路由动作</h2><span class="tag">新连接</span></header>
+          <div class="card-body action-stack">
+            <div class="action-row">
+              <strong><span>PROXY</span><span>68%</span></strong>
+              <div class="progress teal" style="--progress: 68%"><span></span></div>
+            </div>
+            <div class="action-row">
+              <strong><span>DIRECT</span><span>31%</span></strong>
+              <div class="progress" style="--progress: 31%"><span></span></div>
+            </div>
+            <div class="action-row">
+              <strong><span>BLOCK</span><span>1%</span></strong>
+              <div class="progress red" style="--progress: 8%"><span></span></div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="card" style="margin-bottom: 16px">
+        <header class="card-header">
+          <h2>出站健康</h2>
+          <a class="button small" href="profile-editor.html">管理配置组</a>
+        </header>
+        <div class="card-body" style="padding: 0; overflow-x: auto">
+          <table class="data-table">
+            <thead>
+              <tr><th>出站</th><th>类型</th><th>状态</th><th>延迟 / Channel</th><th>DNS / UDP</th><th>今日流量</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>HK-Bastion</strong><div class="muted tiny">ssh-prod-hk · ops@bastion.example</div></td>
+                <td><span class="tag purple">SSH Jump</span></td>
+                <td><span class="health-pill">Host key 已匹配</span></td>
+                <td>42 ms · 27 / 128</td>
+                <td>SSH remote · UDP BLOCK</td>
+                <td>5.8 GB</td>
+              </tr>
+              <tr>
+                <td><strong>Tokyo SOCKS5</strong><div class="muted tiny">proxy-tokyo-01</div></td>
+                <td><span class="tag teal">SOCKS5</span></td>
+                <td><span class="health-pill">Healthy</span></td>
+                <td>58 ms · 19 flows</td>
+                <td>Remote · UDP ASSOCIATE</td>
+                <td>3.2 GB</td>
+              </tr>
+              <tr>
+                <td><strong>US CONNECT</strong><div class="muted tiny">proxy-us-http</div></td>
+                <td><span class="tag blue">HTTP CONNECT</span></td>
+                <td><span class="health-pill warn">1 UDP block</span></td>
+                <td>106 ms · 12 flows</td>
+                <td>TCP DNS · UDP BLOCK</td>
+                <td>1.8 GB</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="three-column">
+        <article class="card">
+          <header class="card-header"><h2>Top Applications</h2><span class="tag">30 min</span></header>
+          <div class="card-body">
+            <table class="data-table">
+              <tbody>
+                <tr><td>Chrome.exe</td><td>5.8 GB</td><td>71% proxy</td></tr>
+                <tr><td>Code.exe</td><td>2.1 GB</td><td>46% proxy</td></tr>
+                <tr><td>Slack.exe</td><td>1.4 GB</td><td>82% proxy</td></tr>
+                <tr><td>curl.exe</td><td>640 MB</td><td>100% proxy</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <header class="card-header"><h2>Top Domains</h2><span class="tag">隐私开关已启用</span></header>
+          <div class="card-body">
+            <table class="data-table">
+              <tbody>
+                <tr><td>github.com</td><td>SSH Jump</td><td>1.8 GB</td></tr>
+                <tr><td>youtube.com</td><td>SSH Jump</td><td>1.2 GB</td></tr>
+                <tr><td>office.local</td><td>DIRECT</td><td>720 MB</td></tr>
+                <tr><td>unknown</td><td>DIRECT</td><td>6.4%</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="card">
+          <header class="card-header"><h2>健康与告警</h2><a href="rules-lifecycle.html">查看诊断</a></header>
+          <div class="card-body action-stack">
+            <div class="action-row"><strong>SSH 控制连接曾重连</strong><span class="muted tiny">12:16 · 1.2 秒恢复 · 4 个 channel 结束</span></div>
+            <div class="action-row"><strong>GFWList 镜像已切换</strong><span class="muted tiny">Bitbucket 404 → GitLab last-good</span></div>
+            <div class="action-row"><strong>Hostname coverage 93.6%</strong><span class="muted tiny">8 个连接为 unknown，按 DIRECT 处理</span></div>
+          </div>
+        </article>
+      </section>
+
+      <p class="footer-note">评审提示：所有数值均为原型数据。现有连接不迁移；配置修改仅影响提交后建立的新连接。</p>
+    </main>
+
+    <div class="toast" role="status" aria-live="polite" data-toast></div>
+    <script src="prototype.js"></script>
+  </body>
+</html>
