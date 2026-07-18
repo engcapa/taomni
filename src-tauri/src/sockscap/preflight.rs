@@ -4,9 +4,10 @@
 //! capture rules when the host or configuration is invalid.
 
 use super::capabilities::probe_capabilities;
+use super::policy::compile_custom_rules;
 use super::types::{
-    detect_profile_conflicts, CapabilitiesReport, EngineState, ProfileConflict,
-    RoutingProfileDraft, SupportLevel,
+    CapabilitiesReport, EngineState, ProfileConflict, RoutingProfileDraft, SupportLevel,
+    detect_profile_conflicts, validate_profile_draft,
 };
 use serde::{Deserialize, Serialize};
 
@@ -97,29 +98,33 @@ pub fn run_preflight(profiles: &[RoutingProfileDraft]) -> PreflightReport {
     }
 
     for p in profiles.iter().filter(|p| p.enabled) {
-        if matches!(
-            p.scope,
-            super::types::ProfileScope::Applications | super::types::ProfileScope::RuntimeProcesses
-        ) && p.app_selectors.is_empty()
-            && p.scope == super::types::ProfileScope::Applications
-        {
+        for issue in validate_profile_draft(p) {
             findings.push(PreflightFinding {
-                code: "empty_app_selectors".into(),
+                code: format!("invalid_profile_{}", issue.field),
+                severity: PreflightSeverity::Error,
+                message: format!("profile '{}': {}", p.id, issue.message),
+            });
+        }
+        for unsupported in compile_custom_rules(&p.id, &p.custom_rules).unsupported {
+            findings.push(PreflightFinding {
+                code: "invalid_custom_rule".into(),
                 severity: PreflightSeverity::Error,
                 message: format!(
-                    "profile '{}': application scope requires at least one app selector",
-                    p.id
+                    "profile '{}': custom rule '{}' is invalid: {}",
+                    p.id, unsupported.original, unsupported.reason
                 ),
             });
         }
 
         // Egress required when default or unknown action is PROXY.
-        if matches!(
-            p.default_action,
-            super::types::RouteAction::Proxy
-        ) || matches!(p.unknown_domain_action, super::types::RouteAction::Proxy)
+        if matches!(p.default_action, super::types::RouteAction::Proxy)
+            || matches!(p.unknown_domain_action, super::types::RouteAction::Proxy)
         {
-            if p.egress_kind.is_none() || p.egress_ref_id.as_ref().map(|s| s.is_empty()).unwrap_or(true)
+            if p.egress_kind.is_none()
+                || p.egress_ref_id
+                    .as_ref()
+                    .map(|s| s.trim().is_empty())
+                    .unwrap_or(true)
             {
                 findings.push(PreflightFinding {
                     code: "missing_egress".into(),
@@ -155,7 +160,7 @@ pub fn run_preflight(profiles: &[RoutingProfileDraft]) -> PreflightReport {
 mod tests {
     use super::*;
     use crate::sockscap::types::{
-        EgressKind, ProfileScope, RouteAction, RoutingProfileDraft,
+        CustomRuleDraft, CustomRuleKind, EgressKind, ProfileScope, RouteAction, RoutingProfileDraft,
     };
 
     fn sample_global() -> RoutingProfileDraft {
@@ -212,5 +217,24 @@ mod tests {
         let report = run_preflight(&[a, b]);
         assert!(report.findings.iter().any(|f| f.code == "profile_conflict"));
         assert!(!report.conflicts.is_empty());
+    }
+
+    #[test]
+    fn invalid_custom_rule_blocks_preflight() {
+        let mut profile = sample_global();
+        profile.custom_rules.push(CustomRuleDraft {
+            id: "bad".into(),
+            enabled: true,
+            action: RouteAction::Proxy,
+            kind: CustomRuleKind::IpCidr,
+            pattern: "10.0.0.0/99".into(),
+        });
+        let report = run_preflight(&[profile]);
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| finding.code == "invalid_custom_rule")
+        );
     }
 }

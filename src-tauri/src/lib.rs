@@ -795,6 +795,11 @@ pub fn run() {
             sockscap::sockscap_stop,
             sockscap::sockscap_recover,
             sockscap::sockscap_open_window,
+            sockscap::sockscap_test_target,
+            sockscap::sockscap_compile_rules,
+            sockscap::sockscap_ingest_rule_source,
+            sockscap::sockscap_refresh_rule_source,
+            sockscap::sockscap_gfwlist_official_info,
             exit_app,
         ])
         .run(tauri::generate_context!())

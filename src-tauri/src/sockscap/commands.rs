@@ -1,13 +1,19 @@
-//! Tauri commands for Sockscap Phase 0.
+//! Tauri commands for Sockscap Phase 0/1.
 //!
 //! Command surface follows design plan §12. Write commands re-validate on the
 //! Rust side; capture install is not available yet.
 
-use tauri::State;
+use serde::Serialize;
+use tauri::{Manager, State};
 
 use super::capabilities::probe_capabilities;
 use super::orchestrator::SockscapEngine;
-use super::preflight::{run_preflight, PreflightReport};
+use super::policy::{
+    GFWLIST_OFFICIAL_SOURCE_ID, ParseReport, RefreshOutcome, RuleSourceKind, TestTargetRequest,
+    TestTargetResult, build_cached_profile_matchers, compile_gfwlist_payload, ingest_payload,
+    official_gfwlist_mirrors, refresh_official_gfwlist, test_target,
+};
+use super::preflight::{PreflightReport, run_preflight};
 use super::types::{CapabilitiesReport, EngineStatus, RoutingProfileDraft};
 use crate::state::AppState;
 
@@ -61,10 +67,94 @@ pub fn sockscap_recover(state: State<'_, AppState>) -> Result<EngineStatus, Stri
 /// without implementing window creation in Phase 0.
 #[tauri::command]
 pub fn sockscap_open_window() -> Result<(), String> {
-    Err(
-        "sockscap_open_window is not implemented yet (Phase 4: independent Sockscap window)"
-            .into(),
-    )
+    Err("sockscap_open_window is not implemented yet (Phase 4: independent Sockscap window)".into())
+}
+
+/// Explain how a synthetic target would be routed (design plan §12 test_target).
+///
+/// Phase 1: profiles are provided by the caller (no sockscap.db yet). Matchers
+/// are synthesized from default/unknown actions unless a compiled snapshot is
+/// supplied in-process by later phases.
+#[tauri::command]
+pub fn sockscap_test_target(
+    app: tauri::AppHandle,
+    mut request: TestTargetRequest,
+) -> Result<TestTargetResult, String> {
+    let app_data = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("app data dir: {error}"))?;
+    let (matchers, cache_notes) = build_cached_profile_matchers(&app_data, &request.profiles);
+    request.matchers = matchers;
+    let mut result = test_target(request);
+    result.notes.extend(cache_notes);
+    Ok(result)
+}
+
+/// Compile AutoProxy / GFWList text (or Base64) without network I/O.
+#[tauri::command]
+pub fn sockscap_compile_rules(source_id: String, payload: String) -> Result<ParseReport, String> {
+    compile_gfwlist_payload(&source_id, &payload)
+}
+
+/// Ingest a rule payload into last-good storage under the app data directory.
+#[tauri::command]
+pub fn sockscap_ingest_rule_source(
+    app: tauri::AppHandle,
+    source_id: String,
+    kind: RuleSourceKind,
+    mirror: Option<String>,
+    payload: String,
+) -> Result<RefreshOutcome, String> {
+    let app_data = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("app data dir: {e}"))?;
+    Ok(ingest_payload(
+        &app_data,
+        &source_id,
+        kind,
+        mirror.as_deref(),
+        &payload,
+    ))
+}
+
+/// Manually refresh the built-in source. Blocking HTTP runs outside the Tauri
+/// command thread; persisted custom-URL refresh is added with Phase 3 CRUD.
+#[tauri::command]
+pub async fn sockscap_refresh_rule_source(
+    app: tauri::AppHandle,
+    source_id: String,
+) -> Result<RefreshOutcome, String> {
+    if source_id != GFWLIST_OFFICIAL_SOURCE_ID {
+        return Err("only the built-in GFWList source can be refreshed in Phase 1".into());
+    }
+    let app_data = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("app data dir: {error}"))?;
+    tokio::task::spawn_blocking(move || refresh_official_gfwlist(&app_data))
+        .await
+        .map_err(|error| format!("GFWList refresh task failed: {error}"))
+}
+
+/// Metadata about the built-in GFWList official source (mirrors, source id).
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GfwlistOfficialInfo {
+    pub source_id: String,
+    pub mirrors: Vec<String>,
+}
+
+#[tauri::command]
+pub fn sockscap_gfwlist_official_info() -> GfwlistOfficialInfo {
+    GfwlistOfficialInfo {
+        source_id: GFWLIST_OFFICIAL_SOURCE_ID.to_string(),
+        mirrors: official_gfwlist_mirrors()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+    }
 }
 
 /// Expose engine type construction for AppState wiring / tests.
