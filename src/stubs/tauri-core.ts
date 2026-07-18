@@ -2884,9 +2884,19 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       return undefined as T;
     case "sockscap_list_processes":
       return ([
-        { pid: 4242, name: "chrome.exe" },
-        { pid: 1337, name: "node.exe" },
-        { pid: 900, name: "curl.exe" },
+        {
+          pid: 4242,
+          name: "chrome.exe",
+          path: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+          processStartTime: "2026-07-01T12:00:00",
+        },
+        {
+          pid: 1337,
+          name: "node.exe",
+          path: "C:\\Program Files\\nodejs\\node.exe",
+          processStartTime: "2026-07-01T12:05:00",
+        },
+        { pid: 900, name: "curl.exe", path: null, processStartTime: "listed:900:curl.exe" },
       ] as unknown) as T;
     case "sockscap_list_egress_sessions":
       return ([

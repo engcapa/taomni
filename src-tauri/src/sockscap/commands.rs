@@ -39,11 +39,20 @@ pub struct SockscapStatus {
 }
 
 /// A running process for the picker (`sockscap_list_processes`).
+///
+/// `process_start_time` is an opaque token captured at list time and persisted
+/// with runtime-process selectors so a recycled PID cannot silently match a
+/// different process (plan §5, §16.4-17). `path` is best-effort (often empty
+/// without elevation) and used by "Remember as application".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProcessInfo {
     pub pid: u32,
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub process_start_time: Option<String>,
 }
 
 /// An egress session candidate (Proxy or SSH) from the main session DB.
@@ -145,29 +154,125 @@ pub fn parse_tasklist_csv(out: &str) -> Vec<ProcessInfo> {
         let pid = fields[1].trim_matches('"').trim().parse::<u32>();
         if let Ok(pid) = pid {
             if !name.is_empty() {
-                v.push(ProcessInfo { pid, name });
+                // tasklist has no creation time; use a stable opaque token so a
+                // selector saved from this listing still has a non-empty stamp.
+                let process_start_time = Some(format!("tasklist:{pid}:{name}"));
+                v.push(ProcessInfo {
+                    pid,
+                    name,
+                    path: None,
+                    process_start_time,
+                });
             }
         }
     }
     v
 }
 
-/// Parse Unix `ps -eo pid=,comm=` output into processes.
+/// Parse Unix `ps -eo pid=,lstart=,comm=` (or plain `pid=,comm=`) output.
 pub fn parse_ps(out: &str) -> Vec<ProcessInfo> {
     let mut v = Vec::new();
     for line in out.lines() {
         let line = line.trim();
-        let Some((pid_s, name)) = line.split_once(char::is_whitespace) else {
+        if line.is_empty() {
+            continue;
+        }
+        let mut parts = line.split_whitespace();
+        let Some(pid_s) = parts.next() else {
             continue;
         };
-        if let Ok(pid) = pid_s.trim().parse::<u32>() {
-            let name = name.trim().to_string();
-            if !name.is_empty() {
-                v.push(ProcessInfo { pid, name });
-            }
+        let Ok(pid) = pid_s.parse::<u32>() else {
+            continue;
+        };
+        // With `lstart` the middle is "Day Mon DD HH:MM:SS YYYY" (5 fields), then comm.
+        // Without it, the rest is just the command name.
+        let rest: Vec<&str> = parts.collect();
+        if rest.is_empty() {
+            continue;
         }
+        let (name, process_start_time) = if rest.len() >= 6 {
+            // lstart present: first 5 tokens are the start time.
+            let start = rest[..5].join(" ");
+            let name = rest[5..].join(" ");
+            (name, Some(start))
+        } else {
+            let name = rest.join(" ");
+            (name.clone(), Some(format!("ps:{pid}:{name}")))
+        };
+        if name.is_empty() {
+            continue;
+        }
+        v.push(ProcessInfo {
+            pid,
+            name,
+            path: None,
+            process_start_time,
+        });
     }
     v
+}
+
+/// Parse PowerShell `ConvertTo-Csv` of Id,ProcessName,Path,StartTime.
+pub fn parse_powershell_process_csv(out: &str) -> Vec<ProcessInfo> {
+    let mut v = Vec::new();
+    for (i, line) in out.lines().enumerate() {
+        // Skip header row.
+        if i == 0 && line.to_ascii_lowercase().contains("processname") {
+            continue;
+        }
+        let fields = split_csv_line(line);
+        if fields.len() < 2 {
+            continue;
+        }
+        let Ok(pid) = fields[0].trim().parse::<u32>() else {
+            continue;
+        };
+        let name = fields[1].trim().to_string();
+        if name.is_empty() {
+            continue;
+        }
+        let path = fields
+            .get(2)
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+        let process_start_time = fields
+            .get(3)
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .or_else(|| Some(format!("ps1:{pid}:{name}")));
+        v.push(ProcessInfo {
+            pid,
+            name,
+            path,
+            process_start_time,
+        });
+    }
+    v
+}
+
+fn split_csv_line(line: &str) -> Vec<String> {
+    let mut fields = Vec::new();
+    let mut cur = String::new();
+    let mut in_quotes = false;
+    let mut chars = line.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => {
+                if in_quotes && chars.peek() == Some(&'"') {
+                    cur.push('"');
+                    chars.next();
+                } else {
+                    in_quotes = !in_quotes;
+                }
+            }
+            ',' if !in_quotes => {
+                fields.push(std::mem::take(&mut cur));
+            }
+            _ => cur.push(c),
+        }
+    }
+    fields.push(cur);
+    fields
 }
 
 /* -------------------------------- commands -------------------------------- */
@@ -177,8 +282,9 @@ pub fn parse_ps(out: &str) -> Vec<ProcessInfo> {
 /// isn't granted the ACL permission to create windows itself. Available even if
 /// the module failed to initialize, so it never depends on `SockscapState`.
 #[tauri::command]
-pub fn sockscap_open_window(app: AppHandle) {
+pub fn sockscap_open_window(app: AppHandle) -> Result<(), String> {
     super::tray::open_window(&app);
+    Ok(())
 }
 
 #[tauri::command]
@@ -453,32 +559,64 @@ pub fn sockscap_clear_stats(state: State<'_, SockscapState>) -> Result<(), Strin
 
 /// List running processes for the picker. Runs the platform lister and parses
 /// it; returns an empty list (not an error) if the lister is unavailable.
+///
+/// On Windows prefers PowerShell so we can surface executable path + start time
+/// for "Remember as application" and PID-reuse protection; falls back to
+/// `tasklist`. On Unix uses `ps` with `lstart` when available.
 #[tauri::command]
 pub fn sockscap_list_processes() -> Vec<ProcessInfo> {
     #[cfg(target_os = "windows")]
-    let output = std::process::Command::new("tasklist")
-        .args(["/fo", "csv", "/nh"])
-        .output();
-    #[cfg(not(target_os = "windows"))]
-    let output = std::process::Command::new("ps")
-        .args(["-eo", "pid=,comm="])
-        .output();
-
-    match output {
-        Ok(o) if o.status.success() => {
-            let text = String::from_utf8_lossy(&o.stdout);
-            #[cfg(target_os = "windows")]
-            {
-                parse_tasklist_csv(&text)
-            }
-            #[cfg(not(target_os = "windows"))]
-            {
-                parse_ps(&text)
+    {
+        // Prefer richer listing; fall back to tasklist if PowerShell is locked down.
+        let ps = std::process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                "Get-Process | Select-Object Id,ProcessName,Path,StartTime | ConvertTo-Csv -NoTypeInformation",
+            ])
+            .output();
+        if let Ok(o) = ps {
+            if o.status.success() {
+                let text = String::from_utf8_lossy(&o.stdout);
+                let procs = parse_powershell_process_csv(&text);
+                if !procs.is_empty() {
+                    return procs;
+                }
             }
         }
-        _ => {
-            tracing::warn!("sockscap: process lister unavailable");
-            Vec::new()
+        match std::process::Command::new("tasklist")
+            .args(["/fo", "csv", "/nh"])
+            .output()
+        {
+            Ok(o) if o.status.success() => parse_tasklist_csv(&String::from_utf8_lossy(&o.stdout)),
+            _ => {
+                tracing::warn!("sockscap: process lister unavailable");
+                Vec::new()
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let with_lstart = std::process::Command::new("ps")
+            .args(["-eo", "pid=,lstart=,comm="])
+            .output();
+        if let Ok(o) = with_lstart {
+            if o.status.success() {
+                let procs = parse_ps(&String::from_utf8_lossy(&o.stdout));
+                if !procs.is_empty() {
+                    return procs;
+                }
+            }
+        }
+        match std::process::Command::new("ps")
+            .args(["-eo", "pid=,comm="])
+            .output()
+        {
+            Ok(o) if o.status.success() => parse_ps(&String::from_utf8_lossy(&o.stdout)),
+            _ => {
+                tracing::warn!("sockscap: process lister unavailable");
+                Vec::new()
+            }
         }
     }
 }
@@ -532,7 +670,12 @@ mod tests {
                    \"svchost.exe\",\"56\",\"Services\",\"0\",\"8,000 K\"";
         let procs = parse_tasklist_csv(out);
         assert_eq!(procs.len(), 2);
-        assert_eq!(procs[0], ProcessInfo { pid: 1234, name: "chrome.exe".into() });
+        assert_eq!(procs[0].pid, 1234);
+        assert_eq!(procs[0].name, "chrome.exe");
+        assert_eq!(
+            procs[0].process_start_time.as_deref(),
+            Some("tasklist:1234:chrome.exe")
+        );
         assert_eq!(procs[1].pid, 56);
     }
 
@@ -540,10 +683,46 @@ mod tests {
     fn parses_ps_output() {
         let out = "  1234 chrome\n   56 sshd\ngarbage line\n 78  my app";
         let procs = parse_ps(out);
-        assert_eq!(procs[0], ProcessInfo { pid: 1234, name: "chrome".into() });
-        assert_eq!(procs[1], ProcessInfo { pid: 56, name: "sshd".into() });
+        assert_eq!(procs[0].pid, 1234);
+        assert_eq!(procs[0].name, "chrome");
+        assert_eq!(procs[1].pid, 56);
+        assert_eq!(procs[1].name, "sshd");
         // "my app" keeps the internal space.
-        assert_eq!(procs[2], ProcessInfo { pid: 78, name: "my app".into() });
+        assert_eq!(procs[2].pid, 78);
+        assert_eq!(procs[2].name, "my app");
+    }
+
+    #[test]
+    fn parses_ps_with_lstart() {
+        let out = "  1234 Wed Jul  1 12:00:00 2026 chrome";
+        let procs = parse_ps(out);
+        assert_eq!(procs.len(), 1);
+        assert_eq!(procs[0].pid, 1234);
+        assert_eq!(procs[0].name, "chrome");
+        assert_eq!(
+            procs[0].process_start_time.as_deref(),
+            Some("Wed Jul 1 12:00:00 2026")
+        );
+    }
+
+    #[test]
+    fn parses_powershell_process_csv() {
+        let out = "\"Id\",\"ProcessName\",\"Path\",\"StartTime\"\n\
+                   \"4242\",\"chrome\",\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\",\"7/1/2026 12:00:00 PM\"\n\
+                   \"56\",\"svchost\",,\"\"";
+        let procs = parse_powershell_process_csv(out);
+        assert_eq!(procs.len(), 2);
+        assert_eq!(procs[0].pid, 4242);
+        assert_eq!(
+            procs[0].path.as_deref(),
+            Some(r"C:\Program Files\Google\Chrome\Application\chrome.exe")
+        );
+        assert_eq!(
+            procs[0].process_start_time.as_deref(),
+            Some("7/1/2026 12:00:00 PM")
+        );
+        assert_eq!(procs[1].pid, 56);
+        assert!(procs[1].path.is_none());
     }
 
     #[test]

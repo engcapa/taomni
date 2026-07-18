@@ -113,13 +113,22 @@ export function SockscapRules() {
 function TestTarget() {
   const [host, setHost] = useState("");
   const [port, setPort] = useState(443);
+  const [appIdentity, setAppIdentity] = useState("");
   const [result, setResult] = useState<TestTargetResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const run = async () => {
     setError(null);
     try {
-      const r = await sockscap.testTarget({ host: host || undefined, port });
+      const app = appIdentity.trim()
+        ? {
+            // Populate the common platform fields; unused ones are ignored by matchers.
+            windowsExe: appIdentity.trim(),
+            macosAppPath: appIdentity.trim(),
+            linuxPath: appIdentity.trim(),
+          }
+        : undefined;
+      const r = await sockscap.testTarget({ host: host || undefined, port, app });
       setResult(r);
     } catch (e) {
       setError(typeof e === "string" ? e : String(e));
@@ -136,7 +145,20 @@ function TestTarget() {
   return (
     <section className="rounded-lg border border-neutral-800 p-4">
       <h3 className="mb-3 text-sm font-medium text-neutral-300">Test target</h3>
+      <p className="mb-3 text-xs text-neutral-500">
+        Explains which profile and rule would apply (plan §6.3). Optional app identity selects the
+        applications / runtime-processes profile the same way live traffic would.
+      </p>
       <div className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col">
+          <span className="mb-1 text-xs text-neutral-500">App identity (optional)</span>
+          <input
+            className={`${inputCls} min-w-[220px]`}
+            placeholder="C:\…\chrome.exe or /usr/bin/curl"
+            value={appIdentity}
+            onChange={(e) => setAppIdentity(e.target.value)}
+          />
+        </label>
         <label className="flex flex-col">
           <span className="mb-1 text-xs text-neutral-500">Host or IP</span>
           <input

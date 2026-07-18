@@ -12,7 +12,8 @@
 use rusqlite::{params, Connection, OptionalExtension, Result as SqlResult};
 use serde::Serialize;
 
-use super::model::{CustomRule, RoutingProfile, RuleSource};
+use super::download::GFWLIST_MIRRORS;
+use super::model::{CustomRule, RoutingProfile, RuleSource, RuleSourceKind};
 use super::{Action, Protocol};
 
 /// Current `sockscap.db` schema version, stored in `PRAGMA user_version`.
@@ -115,7 +116,33 @@ pub fn init_db(conn: &Connection) -> SqlResult<()> {
     )?;
     // Stamp the schema version so future runs skip reconciliation.
     conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+    // Built-in GFWList source (plan §6.1, §16.3-10). Idempotent: only inserted
+    // when missing so user edits to the row are preserved.
+    seed_builtin_gfwlist(conn)?;
     Ok(())
+}
+
+/// Ensure the built-in `gfwlist-official` rule source exists with the healthy
+/// official mirrors. Does not overwrite an existing row.
+fn seed_builtin_gfwlist(conn: &Connection) -> SqlResult<()> {
+    let exists: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM rule_sources WHERE id = 'gfwlist-official')",
+        [],
+        |r| r.get(0),
+    )?;
+    if exists {
+        return Ok(());
+    }
+    let src = RuleSource {
+        id: "gfwlist-official".into(),
+        name: "Official GFWList".into(),
+        kind: RuleSourceKind::GfwlistOfficial,
+        urls: GFWLIST_MIRRORS.iter().map(|s| (*s).to_string()).collect(),
+        local_path: None,
+        enabled: true,
+        min_refresh_secs: 6 * 60 * 60,
+    };
+    upsert_rule_source(conn, &src)
 }
 
 /// True when the file predates the current schema. The pre-release layout is
@@ -495,6 +522,27 @@ mod tests {
         // A second init on an already-current db must not drop data.
         init_db(&c).unwrap();
         assert_eq!(list_profiles(&c).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn init_db_seeds_builtin_gfwlist() {
+        let c = mem();
+        let sources = list_rule_sources(&c).unwrap();
+        assert!(
+            sources.iter().any(|s| s.id == "gfwlist-official"),
+            "expected gfwlist-official seed"
+        );
+        // Re-init must not duplicate or clobber a renamed row.
+        let mut custom = sources
+            .into_iter()
+            .find(|s| s.id == "gfwlist-official")
+            .unwrap();
+        custom.name = "My GFWList".into();
+        upsert_rule_source(&c, &custom).unwrap();
+        init_db(&c).unwrap();
+        let again = list_rule_sources(&c).unwrap();
+        assert_eq!(again.len(), 1);
+        assert_eq!(again[0].name, "My GFWList");
     }
 
     fn profile(id: &str) -> RoutingProfile {

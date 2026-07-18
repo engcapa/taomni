@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSockscapStore } from "../../stores/sockscapStore";
 import type { EngineStateName } from "../../lib/sockscap";
+import { isTauriRuntime } from "../../lib/runtime";
 import { SockscapDashboard } from "./SockscapDashboard";
 import { SockscapProfiles } from "./SockscapProfiles";
 import { SockscapRules } from "./SockscapRules";
@@ -44,6 +45,33 @@ export function SockscapWindow() {
   useEffect(() => {
     void refreshAll();
   }, [refreshAll]);
+
+  // Plan §9 / §16.6-21: closing the Sockscap window only hides it; the engine
+  // keeps running until Stop or tray Quit. Without this, X would destroy the
+  // webview and lose UI state while capture might still be active.
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void (async () => {
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        const win = getCurrentWindow();
+        const fn = await win.onCloseRequested(async (event) => {
+          event.preventDefault();
+          await win.hide();
+        });
+        if (disposed) fn();
+        else unlisten = fn;
+      } catch (err) {
+        console.warn("sockscap: close-to-hide hook unavailable", err);
+      }
+    })();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
 
   const stateName: EngineStateName = status?.state ?? "disabled";
   const active = stateName === "active" || stateName === "degraded";

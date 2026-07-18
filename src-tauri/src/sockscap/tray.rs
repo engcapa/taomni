@@ -202,20 +202,32 @@ fn spawn_engine<R: Runtime>(app: &AppHandle<R>, action: EngineAction) {
 /// menu and the `sockscap_open_window` command so the menu path matches the
 /// codebase precedent of opening detached windows from Rust (the webview lacks
 /// the ACL permission to create windows itself).
+///
+/// Uses `WebviewUrl::App(PathBuf)` with a `#sockscap` fragment (same SFTP
+/// pattern) so Tauri resolves the correct base URL in dev and production
+/// without percent-encoding the fragment. Close only hides the window so the
+/// engine keeps running (plan §9, §16.6-21).
 pub fn open_window<R: Runtime>(app: &AppHandle<R>) {
     if let Some(win) = app.get_webview_window("sockscap") {
         let _ = win.show();
         let _ = win.set_focus();
         return;
     }
-    let _ = WebviewWindowBuilder::new(
-        app,
-        "sockscap",
-        WebviewUrl::App("index.html#sockscap".into()),
-    )
-    .title("Sockscap")
-    .inner_size(1100.0, 760.0)
-    .build();
+    // Match filebrowser/SFTP: PathBuf + hash fragment (not query string).
+    // Close-to-hide is enforced in the Sockscap webview (onCloseRequested →
+    // hide) so the engine keeps running when the user clicks X (plan §9).
+    let url = WebviewUrl::App(std::path::PathBuf::from("index.html#sockscap"));
+    let builder = WebviewWindowBuilder::new(app, "sockscap", url)
+        .title("Sockscap")
+        .inner_size(1100.0, 760.0)
+        .min_inner_size(720.0, 480.0)
+        .resizable(true)
+        .enable_clipboard_access();
+    #[cfg(windows)]
+    let builder = builder.disable_drag_drop_handler();
+    if let Err(e) = builder.build() {
+        log::error!("sockscap: failed to open window: {e}");
+    }
 }
 
 fn toggle_window<R: Runtime>(app: &AppHandle<R>) {

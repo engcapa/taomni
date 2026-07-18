@@ -128,6 +128,10 @@ export interface SockscapStatus {
 export interface ProcessInfo {
   pid: number;
   name: string;
+  /** Best-effort absolute path (often empty without elevation). */
+  path?: string | null;
+  /** Opaque start-time token for PID-reuse protection (plan §16.4-17). */
+  processStartTime?: string | null;
 }
 
 export interface EgressSession {

@@ -119,6 +119,35 @@ pub fn validate_upsert(
     existing: &[RoutingProfile],
     candidate: &RoutingProfile,
 ) -> Result<(), SockscapError> {
+    // Enabled non-global profiles must name at least one target (plan §5, §16.4).
+    if candidate.enabled {
+        match candidate.scope {
+            Scope::Applications if candidate.app_selectors.is_empty() => {
+                return Err(SockscapError::Conflict(
+                    "applications scope requires at least one app selector (executable / app identity)"
+                        .into(),
+                ));
+            }
+            Scope::RuntimeProcesses if candidate.runtime_processes.is_empty() => {
+                return Err(SockscapError::Conflict(
+                    "runtime-processes scope requires at least one selected process (pid + start time)"
+                        .into(),
+                ));
+            }
+            Scope::RuntimeProcesses => {
+                for rp in &candidate.runtime_processes {
+                    if rp.process_start_time.trim().is_empty() {
+                        return Err(SockscapError::Conflict(format!(
+                            "runtime process pid {} is missing process_start_time (required to prevent PID reuse)",
+                            rp.pid
+                        )));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
     let mut set: Vec<RoutingProfile> = existing
         .iter()
         .filter(|p| p.id != candidate.id)
@@ -207,5 +236,32 @@ mod tests {
         // Replacing the same id is allowed (id excluded from the set).
         let replace = base("g1", Scope::Global, 0);
         assert!(validate_upsert(&existing, &replace).is_ok());
+    }
+
+    #[test]
+    fn validate_upsert_requires_app_selectors_for_applications_scope() {
+        let mut p = base("app", Scope::Applications, 100);
+        p.app_selectors.clear();
+        assert!(validate_upsert(&[], &p).is_err());
+        p.app_selectors = vec![AppSelector::WindowsExecutable("C:/App/Foo.exe".into())];
+        assert!(validate_upsert(&[], &p).is_ok());
+        // Disabled profiles may stay empty (drafts).
+        p.app_selectors.clear();
+        p.enabled = false;
+        assert!(validate_upsert(&[], &p).is_ok());
+    }
+
+    #[test]
+    fn validate_upsert_requires_runtime_processes_with_start_time() {
+        let mut p = base("rt", Scope::RuntimeProcesses, 100);
+        assert!(validate_upsert(&[], &p).is_err());
+        p.runtime_processes = vec![super::super::model::RuntimeProcessSelector {
+            pid: 42,
+            process_start_time: String::new(),
+            label: Some("x".into()),
+        }];
+        assert!(validate_upsert(&[], &p).is_err());
+        p.runtime_processes[0].process_start_time = "t0".into();
+        assert!(validate_upsert(&[], &p).is_ok());
     }
 }

@@ -2988,7 +2988,16 @@ export function MainLayout() {
         openPlaceholderTab(t("tabs.networkTools"), t("status.commandUnavailable"));
         break;
       case "sockscap":
-        void openSockscapWindow();
+        void openSockscapWindow().catch((err) => {
+          console.error("Failed to open Sockscap window:", err);
+          setStatusMessage(
+            typeof err === "string"
+              ? err
+              : err instanceof Error
+                ? err.message
+                : "Failed to open Sockscap window",
+          );
+        });
         break;
       case "git":
         void openGitRepository();
