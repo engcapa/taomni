@@ -147,6 +147,10 @@ pub fn run() {
                 .expect("failed to init local history store");
             app.manage(local_history);
 
+            if let Err(e) = sockscap::tray::install_main_tray(app.handle()) {
+                tracing::warn!("sockscap tray install failed: {e}");
+            }
+
             let handle_for_reaper = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 loop {
