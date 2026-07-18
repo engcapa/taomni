@@ -410,6 +410,10 @@ pub async fn sockscap_start(state: State<'_, SockscapState>) -> Result<EngineSta
         let conn = state.conn.lock().unwrap();
         db::list_profiles(&conn).map_err(|e| e.to_string())?
     };
+    // Build the flow router from the committed profiles/rules and hand it to the
+    // local capture adapter before the orchestrator installs capture.
+    let router = std::sync::Arc::new(state.build_router());
+    state.adapter.set_router(router);
     let orchestrator = state.orchestrator.clone();
     orchestrator.start(&profiles).await?;
     Ok(orchestrator.state())

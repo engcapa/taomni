@@ -11,13 +11,13 @@ use std::sync::{Arc, Mutex as StdMutex};
 use rusqlite::Connection;
 
 use super::autoproxy::{ProjectionStats, UnsupportedRule};
-use super::capture::NoopCaptureAdapter;
 use super::db;
 use super::engine::{RecoveryJournal, SockscapOrchestrator};
 use super::known_hosts::HostKeyStore;
+use super::listener::{FlowRouter, LocalCaptureAdapter};
 use super::matcher::CompiledRuleSource;
-use super::model::{CustomRule, RoutingProfile};
-use super::policy::{CompiledCustomRule, CompiledProfile};
+use super::model::{CustomRule, RoutingProfile, Scope};
+use super::policy::{select_profile, AppIdentity, CompiledCustomRule, CompiledProfile, HardBypass};
 
 /// A shared, lockable SQLite connection to `sockscap.db`.
 pub type SharedConn = Arc<StdMutex<Connection>>;
@@ -116,10 +116,17 @@ pub fn compile_profile(
     CompiledProfile::new(profile, compiled_custom, sources)
 }
 
+/// Default local SOCKS5 capture port (plan §7 — apps point here for routing).
+pub const DEFAULT_LOCAL_CAPTURE_PORT: u16 = 1080;
+
 /// The single Tauri-managed Sockscap runtime.
 pub struct SockscapState {
     pub conn: SharedConn,
     pub orchestrator: Arc<SockscapOrchestrator>,
+    /// The concrete local capture adapter (also held as the orchestrator's
+    /// `dyn CaptureAdapter`) so the command layer can set its router before
+    /// starting.
+    pub adapter: Arc<LocalCaptureAdapter>,
     pub host_keys: Arc<StdMutex<HostKeyStore>>,
     pub rule_cache: Arc<StdMutex<RuleCache>>,
     /// Directory for downloaded/compiled rule files (atomic replace).
@@ -128,8 +135,9 @@ pub struct SockscapState {
 
 impl SockscapState {
     /// Open `sockscap.db`, initialize the schema, load the known_hosts store and
-    /// wire the orchestrator with the Noop capture adapter (real adapters plug
-    /// in later — see `capture.rs`).
+    /// wire the orchestrator with the local SOCKS5 capture adapter (a real,
+    /// driver-free backend; transparent per-app backends plug into the same
+    /// trait — see `capture.rs` / the ADRs).
     pub fn new(
         db_path: PathBuf,
         known_hosts_path: PathBuf,
@@ -140,8 +148,8 @@ impl SockscapState {
         let conn: SharedConn = Arc::new(StdMutex::new(conn));
 
         let recovery = Arc::new(DbRecoveryJournal { conn: conn.clone() });
-        let adapter = Arc::new(NoopCaptureAdapter::new());
-        let orchestrator = Arc::new(SockscapOrchestrator::new(adapter, recovery));
+        let adapter = Arc::new(LocalCaptureAdapter::new("127.0.0.1", DEFAULT_LOCAL_CAPTURE_PORT));
+        let orchestrator = Arc::new(SockscapOrchestrator::new(adapter.clone(), recovery));
 
         let host_keys = HostKeyStore::load(&known_hosts_path)
             .map_err(|e| format!("load known_hosts: {e}"))?;
@@ -151,10 +159,41 @@ impl SockscapState {
         Ok(SockscapState {
             conn,
             orchestrator,
+            adapter,
             host_keys: Arc::new(StdMutex::new(host_keys)),
             rule_cache: Arc::new(StdMutex::new(RuleCache::default())),
             rules_dir,
         })
+    }
+
+    /// Build the FlowRouter from the current profiles + rule cache: the enabled
+    /// global profile (the only scope a SOCKS front-end can attribute) is
+    /// compiled with its cached sources. `None` when no global profile is
+    /// enabled (everything routes DIRECT). Called before `install` so capture
+    /// uses the committed config.
+    pub fn build_router(&self) -> FlowRouter {
+        let (global, custom) = {
+            let conn = self.conn.lock().unwrap();
+            let profiles = db::list_profiles(&conn).unwrap_or_default();
+            let global = select_profile(&profiles, &AppIdentity::default())
+                .filter(|p| p.scope == Scope::Global)
+                .cloned();
+            let custom = match &global {
+                Some(p) => db::list_custom_rules(&conn, &p.id).unwrap_or_default(),
+                None => Vec::new(),
+            };
+            (global, custom)
+        };
+        let compiled = global.map(|p| {
+            let cache = self.rule_cache.lock().unwrap();
+            compile_profile(p, &custom, &cache)
+        });
+        FlowRouter::new(
+            compiled,
+            None,
+            HardBypass::default(),
+            self.orchestrator.stats.clone(),
+        )
     }
 }
 
