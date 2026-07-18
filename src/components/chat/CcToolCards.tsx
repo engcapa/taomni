@@ -1,42 +1,38 @@
+import { useMemo } from "react";
 import { useChatStore } from "../../stores/chatStore";
+import { ToolActivityBlock } from "./ToolActivityBlock";
+import type { ToolActivityEntry } from "./toolActivity";
 
 /**
- * Live, display-only Claude Code tool-activity cards + usage footer (3.5).
+ * Live, display-only Claude Code / ACP tool-activity cards + usage footer (3.5).
  *
  * These render *only while the assistant message is streaming*: the backend
  * emits structured `cc_tool_activity` events for rich display and clears them
  * on `end`, at which point the persisted message content carries the compact
- * text transcript instead. Nothing here is re-executable — confirmation already
- * happened live via the MCP permission prompt — so this never triggers a tool
- * call. The usage footer persists for the in-session message.
+ * text transcript instead (rendered collapsed via `ToolActivityBlock` in
+ * MessageBubble). Nothing here is re-executable — confirmation already happened
+ * live via the in-app permission prompt — so this never triggers a tool call.
+ * The usage footer persists for the in-session message.
  */
 export function CcToolCards({ messageId }: { messageId: string }) {
   const cards = useChatStore((s) => s.ccToolCards[messageId]);
   const usage = useChatStore((s) => s.ccUsage[messageId]);
 
-  const hasCards = cards && cards.length > 0;
+  const tools = useMemo<ToolActivityEntry[]>(() => {
+    if (!cards || cards.length === 0) return [];
+    return cards.map((c) => ({
+      tool: c.tool,
+      detail: c.detail || undefined,
+      result: c.result,
+    }));
+  }, [cards]);
+
+  const hasCards = tools.length > 0;
   if (!hasCards && !usage) return null;
 
   return (
     <div className="ml-7 mb-1 flex flex-col gap-1">
-      {hasCards &&
-        cards!.map((c, i) => (
-          <div
-            key={`${c.call_id}-${i}`}
-            className="rounded border border-[var(--taomni-border)] bg-[var(--taomni-bg)] px-2 py-1 text-[10px] font-mono"
-          >
-            <div className="flex items-center gap-1 text-[var(--taomni-accent)]">
-              <span>🔧</span>
-              {c.tool && <span className="font-semibold">{c.tool}</span>}
-              {c.detail && (
-                <span className="truncate text-[var(--taomni-text-muted)]">{c.detail}</span>
-              )}
-            </div>
-            {c.result !== undefined && c.result !== "" && (
-              <div className="mt-0.5 truncate text-[var(--taomni-text-muted)]">↳ {c.result}</div>
-            )}
-          </div>
-        ))}
+      {hasCards && <ToolActivityBlock tools={tools} />}
       {usage && <UsageFooter usage={usage} />}
     </div>
   );

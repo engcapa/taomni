@@ -12,6 +12,8 @@ import {
   splitFencedBlocks,
   type PreparedTerminalInput,
 } from "./CodeBlockToolbar";
+import { ToolActivityBlock } from "./ToolActivityBlock";
+import { splitToolActivitySegments } from "./toolActivity";
 import { useAppStore } from "../../stores/appStore";
 import {
   getTerminal,
@@ -140,18 +142,6 @@ export function MessageBubble({
     return splitFencedBlocks(stripped);
   }, [isUser, format, stripped]);
 
-  // Single rendered block (used for "html" mode and as a fallback when
-  // there are no fenced code blocks in Markdown mode).
-  const renderedHtml = useMemo(() => {
-    if (isUser || format === "plain") return null;
-    try {
-      return renderFormatted(stripped, format);
-    } catch (e) {
-      console.warn("renderFormatted failed:", e);
-      return null;
-    }
-  }, [isUser, stripped, format]);
-
   const handleDecide = async (idx: number, call: InlineToolCall, decision: ActionCardDecision) => {
     if (decision === "deny") {
       setExecuted((s) => ({ ...s, [idx]: "denied" }));
@@ -274,7 +264,7 @@ export function MessageBubble({
           isUser
             ? "bg-[var(--taomni-accent)] text-white rounded-br-sm whitespace-pre-wrap"
             : `bg-[var(--taomni-panel-bg)] border border-[var(--taomni-divider)] rounded-bl-sm ${
-                renderedHtml || segments ? "taomni-chat-md" : "whitespace-pre-wrap"
+                format === "plain" ? "whitespace-pre-wrap" : "taomni-chat-md"
               }`
         }`}
       >
@@ -334,39 +324,35 @@ export function MessageBubble({
           </button>
         </div>
 
-        {/* Body — three rendering modes. */}
+        {/* Body — three rendering modes. Tool-activity transcript lines
+            (`> 🔧 …` / `> ↳ …`) are lifted into a collapsed-by-default block. */}
         <div ref={bodyRef}>
-          {segments
-            ? segments.map((seg, i) => {
-              if (seg.kind === "code") {
+          {isUser
+            ? stripped
+            : segments
+              ? segments.map((seg, i) => {
+                if (seg.kind === "code") {
+                  return (
+                    <CodeBlockToolbar
+                      key={i}
+                      code={seg.value}
+                      lang={seg.lang}
+                      preferredTabId={preferredTerminalTabId}
+                      preferredQueryTabId={preferredQueryTabId}
+                    />
+                  );
+                }
                 return (
-                  <CodeBlockToolbar
+                  <AssistantTextWithTools
                     key={i}
-                    code={seg.value}
-                    lang={seg.lang}
-                    preferredTabId={preferredTerminalTabId}
-                    preferredQueryTabId={preferredQueryTabId}
+                    text={seg.value}
+                    format="md"
                   />
                 );
-              }
-              // Render the prose chunk through marked+sanitize so inline
-              // formatting (bold, links, inline code) still works.
-              const html = (() => {
-                try {
-                  return renderFormatted(seg.value, "md");
-                } catch (e) {
-                  console.warn("renderFormatted segment failed:", e);
-                  return null;
-                }
-              })();
-              if (!html) {
-                return <span key={i} className="whitespace-pre-wrap">{seg.value}</span>;
-              }
-              return <div key={i} dangerouslySetInnerHTML={{ __html: html }} />;
-            })
-            : renderedHtml
-              ? <div dangerouslySetInnerHTML={{ __html: renderedHtml }} />
-              : stripped}
+              })
+              : (
+                <AssistantTextWithTools text={stripped} format={format} />
+              )}
         </div>
         {mediaAttachments.length > 0 && (
           <div className="mt-2 flex flex-col gap-2">
@@ -441,6 +427,63 @@ export function MessageBubble({
 interface PendingMessageTerminalSend {
   entry: TerminalRegistryEntry;
   payload: PreparedTerminalInput;
+}
+
+/**
+ * Render an assistant prose chunk, lifting embedded tool-activity transcript
+ * lines into a collapsed-by-default `ToolActivityBlock`.
+ */
+function AssistantTextWithTools({
+  text,
+  format,
+}: {
+  text: string;
+  format: ChatOutputFormat;
+}) {
+  const parts = useMemo(() => splitToolActivitySegments(text), [text]);
+
+  if (parts.length === 0) return null;
+
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.kind === "tools") {
+          return <ToolActivityBlock key={`tools-${i}`} tools={part.tools} />;
+        }
+        if (!part.value) return null;
+        if (format === "plain") {
+          return (
+            <span key={`text-${i}`} className="whitespace-pre-wrap">
+              {part.value}
+            </span>
+          );
+        }
+        try {
+          const html = renderFormatted(part.value, format);
+          if (!html) {
+            return (
+              <span key={`text-${i}`} className="whitespace-pre-wrap">
+                {part.value}
+              </span>
+            );
+          }
+          return (
+            <div
+              key={`text-${i}`}
+              dangerouslySetInnerHTML={{ __html: html }}
+            />
+          );
+        } catch (e) {
+          console.warn("renderFormatted segment failed:", e);
+          return (
+            <span key={`text-${i}`} className="whitespace-pre-wrap">
+              {part.value}
+            </span>
+          );
+        }
+      })}
+    </>
+  );
 }
 
 function isMediaAttachment(attachment: ChatAttachment): attachment is ChatAttachment {
