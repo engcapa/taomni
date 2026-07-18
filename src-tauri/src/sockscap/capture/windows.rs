@@ -30,7 +30,7 @@ impl CaptureAdapter for WindowsCaptureAdapter {
         CaptureOpResult {
             ok: false,
             platform: CapturePlatform::Windows,
-            message: "Windows capture not implemented: complete Phase 0 dual spike ADR (WinDivert vs WFP) before install".into(),
+            message: "Windows capture not implemented yet; when ready, Start will show a UAC prompt (app does not need to run as admin).".into(),
             mutated_system: false,
         }
     }

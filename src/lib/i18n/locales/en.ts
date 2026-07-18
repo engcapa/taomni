@@ -1807,7 +1807,8 @@ const dict = {
     appProxyVaultLocked: "Unlock the vault to store the proxy password.",
     appProxyUpdaterNote: "Note: HTTP proxies work for updates on all platforms; SOCKS5 support for the updater depends on your platform.",
     sockscapTitle: "Sockscap",
-    sockscapSubtitle: "Route system traffic by application, process, and domain rules",
+    sockscapSubtitle:
+      "Route system traffic by application, process, and domain rules. The app stays unprivileged; Start prompts for admin only when enabling capture.",
     sockscapOpen: "Open Sockscap",
     languageTitle: "Application Language",
     languageCurrent: "Current language: {label}",

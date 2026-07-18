@@ -11,6 +11,7 @@ pub mod capabilities;
 pub mod capture;
 pub mod commands;
 pub mod db;
+pub mod elevate;
 pub mod flow;
 pub mod helper;
 pub mod orchestrator;

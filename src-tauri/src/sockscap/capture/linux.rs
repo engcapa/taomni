@@ -12,12 +12,12 @@
 //! and cgroup v2 is available, rules can be narrowed; global profiles use
 //! broad TCP redirect with bypass set.
 //!
-//! Requires CAP_NET_ADMIN (or root) plus `nft` on PATH. Without privileges,
-//! install fails loudly and mutates nothing.
+//! Privileged nft rules are applied via on-demand elevation (`pkexec`/`sudo`)
+//! so Taomni can run as a normal user and only prompt when Sockscap starts.
+//! The local redirect listener stays in-process (unprivileged bind to 127.0.0.1).
 
 use async_trait::async_trait;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::process::Command;
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::Arc;
 use tokio::io::copy_bidirectional;
@@ -55,234 +55,88 @@ impl LinuxCaptureAdapter {
         which::which("nft").is_ok()
     }
 
-    fn is_privileged() -> bool {
-        // euid 0 is sufficient; CAP_NET_ADMIN without root is not probed deeply.
-        if let Ok(status) = std::fs::read_to_string("/proc/self/status") {
-            for line in status.lines() {
-                if let Some(rest) = line.strip_prefix("Uid:") {
-                    let parts: Vec<&str> = rest.split_whitespace().collect();
-                    if parts.len() >= 2 {
-                        if let Ok(euid) = parts[1].parse::<u32>() {
-                            return euid == 0;
-                        }
-                    }
-                }
-            }
-        }
-        false
+    fn can_install_rules() -> bool {
+        // Either already elevated, or we can prompt (pkexec/sudo).
+        crate::sockscap::elevate::is_currently_elevated()
+            || crate::sockscap::elevate::elevation_prompt_available()
     }
 
-    fn run_nft(args: &[&str]) -> Result<String, String> {
-        let out = Command::new("nft")
-            .args(args)
-            .output()
-            .map_err(|e| format!("spawn nft: {e}"))?;
-        if out.status.success() {
-            Ok(String::from_utf8_lossy(&out.stdout).into_owned())
-        } else {
-            Err(format!(
-                "nft {}: {}",
-                args.join(" "),
-                String::from_utf8_lossy(&out.stderr).trim()
-            ))
-        }
-    }
-
-    fn uninstall_nft() -> Result<(), String> {
-        // Idempotent delete.
-        let _ = Self::run_nft(&["delete", "table", "inet", NFT_TABLE]);
-        Ok(())
-    }
-
-    fn install_nft(listen_port: u16, plan: &CapturePlan) -> Result<(), String> {
-        Self::uninstall_nft()?;
-
-        Self::run_nft(&["add", "table", "inet", NFT_TABLE])?;
-        Self::run_nft(&[
-            "add",
-            "chain",
-            "inet",
-            NFT_TABLE,
-            NFT_CHAIN,
-            "{",
-            "type",
-            "route",
-            "hook",
-            "output",
-            "priority",
-            "0;",
-            "policy",
-            "accept;",
-            "}",
-        ])?;
-
-        // Always skip loopback destinations.
-        Self::run_nft(&[
-            "add",
-            "rule",
-            "inet",
-            NFT_TABLE,
-            NFT_CHAIN,
-            "ip",
-            "daddr",
-            "127.0.0.0/8",
-            "accept",
-        ])?;
-        Self::run_nft(&[
-            "add",
-            "rule",
-            "inet",
-            NFT_TABLE,
-            NFT_CHAIN,
-            "ip6",
-            "daddr",
-            "::1",
-            "accept",
-        ])?;
-
-        // Bypass configured hosts (best-effort IP literals only in nft).
+    /// Build a single shell script that installs the full nft table (one auth prompt).
+    fn build_install_script(listen_port: u16, plan: &CapturePlan) -> String {
+        let mut s = String::new();
+        s.push_str("command -v nft >/dev/null 2>&1 || { echo 'nft not found' >&2; exit 1; }\n");
+        s.push_str(&format!("nft delete table inet {NFT_TABLE} 2>/dev/null || true\n"));
+        s.push_str(&format!("nft add table inet {NFT_TABLE}\n"));
+        s.push_str(&format!(
+            "nft 'add chain inet {NFT_TABLE} {NFT_CHAIN} {{ type route hook output priority 0; policy accept; }}'\n"
+        ));
+        s.push_str(&format!(
+            "nft add rule inet {NFT_TABLE} {NFT_CHAIN} ip daddr 127.0.0.0/8 accept\n"
+        ));
+        s.push_str(&format!(
+            "nft add rule inet {NFT_TABLE} {NFT_CHAIN} ip6 daddr ::1 accept\n"
+        ));
         for host in &plan.bypass_hosts {
             if let Ok(ip) = host.parse::<IpAddr>() {
                 match ip {
-                    IpAddr::V4(v4) => {
-                        let _ = Self::run_nft(&[
-                            "add",
-                            "rule",
-                            "inet",
-                            NFT_TABLE,
-                            NFT_CHAIN,
-                            "ip",
-                            "daddr",
-                            &v4.to_string(),
-                            "accept",
-                        ]);
-                    }
-                    IpAddr::V6(v6) => {
-                        let _ = Self::run_nft(&[
-                            "add",
-                            "rule",
-                            "inet",
-                            NFT_TABLE,
-                            NFT_CHAIN,
-                            "ip6",
-                            "daddr",
-                            &v6.to_string(),
-                            "accept",
-                        ]);
-                    }
+                    IpAddr::V4(v4) => s.push_str(&format!(
+                        "nft add rule inet {NFT_TABLE} {NFT_CHAIN} ip daddr {v4} accept\n"
+                    )),
+                    IpAddr::V6(v6) => s.push_str(&format!(
+                        "nft add rule inet {NFT_TABLE} {NFT_CHAIN} ip6 daddr {v6} accept\n"
+                    )),
                 }
             }
         }
-
-        // Skip our own redirect target port on loopback.
-        let port_s = listen_port.to_string();
-        Self::run_nft(&[
-            "add",
-            "rule",
-            "inet",
-            NFT_TABLE,
-            NFT_CHAIN,
-            "tcp",
-            "dport",
-            &port_s,
-            "ip",
-            "daddr",
-            "127.0.0.0/8",
-            "accept",
-        ])?;
+        s.push_str(&format!(
+            "nft add rule inet {NFT_TABLE} {NFT_CHAIN} tcp dport {listen_port} ip daddr 127.0.0.0/8 accept\n"
+        ));
 
         let has_global = plan
             .profiles
             .iter()
             .any(|p| p.enabled && p.scope == ProfileScope::Global);
-        let app_profiles: Vec<&crate::sockscap::types::RoutingProfileDraft> = plan
-            .profiles
-            .iter()
-            .filter(|p| {
-                p.enabled
-                    && matches!(
-                        p.scope,
-                        ProfileScope::Applications | ProfileScope::RuntimeProcesses
-                    )
-            })
-            .collect();
+        let has_app = plan.profiles.iter().any(|p| {
+            p.enabled
+                && matches!(
+                    p.scope,
+                    ProfileScope::Applications | ProfileScope::RuntimeProcesses
+                )
+        });
 
-        if has_global || app_profiles.is_empty() {
-            Self::run_nft(&[
-                "add",
-                "rule",
-                "inet",
-                NFT_TABLE,
-                NFT_CHAIN,
-                "meta",
-                "l4proto",
-                "tcp",
-                "redirect",
-                "to",
-                &port_s,
-            ])?;
-        } else if cgroup_v2_available() {
-            // Create a sockscap cgroup and match sockets from it. Callers may
-            // move PIDs into this cgroup later ("remember process" / attach).
-            let cgroup_path = ensure_sockscap_cgroup()?;
-            // nft socket cgroupv2 match requires the path relative to cgroup root.
-            let rel = cgroup_path
-                .strip_prefix("/sys/fs/cgroup/")
-                .unwrap_or(std::path::Path::new("taomni-sockscap"));
-            let rel_s = rel.to_string_lossy().into_owned();
-            // socket cgroupv2 "path" level — level 2 is a common default for leaf.
-            let rule = format!(
-                "add rule inet {NFT_TABLE} {NFT_CHAIN} socket cgroupv2 level 2 \"{rel_s}\" meta l4proto tcp redirect to {port_s}"
-            );
-            // Use `nft -f -` style via sh -c for quoted path.
-            let status = Command::new("sh")
-                .arg("-c")
-                .arg(format!("nft {rule}"))
-                .status()
-                .map_err(|e| format!("nft cgroup rule: {e}"))?;
-            if !status.success() {
-                tracing::warn!(
-                    "linux capture: cgroup socket match rule failed; falling back to global TCP redirect"
-                );
-                Self::run_nft(&[
-                    "add",
-                    "rule",
-                    "inet",
-                    NFT_TABLE,
-                    NFT_CHAIN,
-                    "meta",
-                    "l4proto",
-                    "tcp",
-                    "redirect",
-                    "to",
-                    &port_s,
-                ])?;
-            } else {
-                tracing::info!(
-                    cgroup = %cgroup_path.display(),
-                    "linux capture: app-group mode using cgroupv2 socket match"
-                );
-            }
+        // Prefer simple global TCP redirect (reliable). Cgroup match is optional.
+        if has_global || !has_app || !cgroup_v2_available() {
+            s.push_str(&format!(
+                "nft add rule inet {NFT_TABLE} {NFT_CHAIN} meta l4proto tcp redirect to {listen_port}\n"
+            ));
         } else {
-            Self::run_nft(&[
-                "add",
-                "rule",
-                "inet",
-                NFT_TABLE,
-                NFT_CHAIN,
-                "meta",
-                "l4proto",
-                "tcp",
-                "redirect",
-                "to",
-                &port_s,
-            ])?;
-            tracing::warn!(
-                "linux capture: cgroup v2 unavailable; using global TCP redirect for app-group profiles"
-            );
+            // Best-effort cgroup: create + match, else global redirect.
+            s.push_str("mkdir -p /sys/fs/cgroup/taomni-sockscap 2>/dev/null || true\n");
+            s.push_str(&format!(
+                "if ! nft add rule inet {NFT_TABLE} {NFT_CHAIN} socket cgroupv2 level 2 \"taomni-sockscap\" meta l4proto tcp redirect to {listen_port} 2>/dev/null; then\n"
+            ));
+            s.push_str(&format!(
+                "  nft add rule inet {NFT_TABLE} {NFT_CHAIN} meta l4proto tcp redirect to {listen_port}\n"
+            ));
+            s.push_str("fi\n");
         }
+        s.push_str("exit 0\n");
+        s
+    }
 
-        Ok(())
+    fn install_nft(listen_port: u16, plan: &CapturePlan) -> Result<(), String> {
+        let script = Self::build_install_script(listen_port, plan);
+        crate::sockscap::elevate::run_script_elevated(&script, "Sockscap capture install")
+            .map_err(|e| format!("elevated nft install: {e}"))
+    }
+
+    fn uninstall_nft() -> Result<(), String> {
+        let script = format!(
+            "command -v nft >/dev/null 2>&1 || exit 0\nnft delete table inet {NFT_TABLE} 2>/dev/null || true\nexit 0\n"
+        );
+        // Uninstall should also elevate so non-root stop works after elevated start.
+        crate::sockscap::elevate::run_script_elevated(&script, "Sockscap capture uninstall")
+            .map_err(|e| format!("elevated nft uninstall: {e}"))
     }
 }
 
@@ -290,18 +144,6 @@ fn cgroup_v2_available() -> bool {
     std::path::Path::new("/sys/fs/cgroup/cgroup.controllers").exists()
 }
 
-fn ensure_sockscap_cgroup() -> Result<std::path::PathBuf, String> {
-    let path = std::path::PathBuf::from("/sys/fs/cgroup/taomni-sockscap");
-    if !path.exists() {
-        std::fs::create_dir_all(&path).map_err(|e| format!("create cgroup: {e}"))?;
-    }
-    // Enable controllers if possible (best-effort).
-    let subtree = path.join("cgroup.subtree_control");
-    if subtree.exists() {
-        let _ = std::fs::write(&subtree, "+pids +memory");
-    }
-    Ok(path)
-}
 
 #[cfg(target_os = "linux")]
 fn original_dst(stream: &TcpStream) -> std::io::Result<SocketAddr> {
@@ -405,11 +247,14 @@ impl CaptureAdapter for LinuxCaptureAdapter {
                 mutated_system: false,
             };
         }
-        if !Self::is_privileged() {
+        if !Self::can_install_rules() {
             return CaptureOpResult {
                 ok: false,
                 platform: CapturePlatform::Linux,
-                message: "CAP_NET_ADMIN/root required to install nft redirect rules".into(),
+                message: format!(
+                    "cannot install capture rules: {}",
+                    crate::sockscap::elevate::elevation_status_detail()
+                ),
                 mutated_system: false,
             };
         }
@@ -421,10 +266,15 @@ impl CaptureAdapter for LinuxCaptureAdapter {
                 mutated_system: false,
             };
         }
+        let elev = if crate::sockscap::elevate::is_currently_elevated() {
+            "already elevated".to_string()
+        } else {
+            crate::sockscap::elevate::elevation_status_detail()
+        };
         CaptureOpResult {
             ok: true,
             platform: CapturePlatform::Linux,
-            message: "linux nft redirect preflight ok".into(),
+            message: format!("linux nft redirect ready; {elev}"),
             mutated_system: false,
         }
     }
@@ -556,8 +406,8 @@ mod tests {
             bypass_hosts: vec!["127.0.0.1".into()],
         };
         let r = a.preflight(&plan).await;
-        // Either missing nft or missing root — must not claim ok without privileges.
-        if !LinuxCaptureAdapter::is_privileged() || !LinuxCaptureAdapter::has_tools() {
+        // Without nft tools, preflight must fail. With elevation available, ok is possible.
+        if !LinuxCaptureAdapter::has_tools() {
             assert!(!r.ok);
             assert!(!r.mutated_system);
         }

@@ -58,7 +58,10 @@ pub fn run_preflight(profiles: &[RoutingProfileDraft]) -> PreflightReport {
         findings.push(PreflightFinding {
             code: "capture_adapter_ready".into(),
             severity: PreflightSeverity::Info,
-            message: "Capture adapter is implemented; checking install preflight…".into(),
+            message: format!(
+                "Capture adapter ready. {}",
+                super::elevate::elevation_status_detail()
+            ),
         });
         let plan = super::capture::CapturePlan {
             profiles: profiles.to_vec(),

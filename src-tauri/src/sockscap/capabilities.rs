@@ -123,85 +123,44 @@ fn build_summary(platform: CapturePlatform, items: &[CapabilityItem]) -> String 
 }
 
 fn probe_admin_privileges() -> CapabilityItem {
-    #[cfg(target_os = "linux")]
-    {
-        let euid = libc_euid();
-        if euid == 0 {
-            return CapabilityItem {
-                id: "admin_privileges".into(),
-                name: "Elevated privileges".into(),
-                level: SupportLevel::Supported,
-                detail: "Running as root (euid=0).".into(),
-                required_for_start: true,
-            };
-        }
-        // CAP_NET_ADMIN is the real requirement; without libcap we only report
-        // whether we are root. Helper will re-check at install time.
+    use crate::sockscap::elevate::{
+        elevation_prompt_available, elevation_status_detail, is_currently_elevated,
+    };
+
+    if is_currently_elevated() {
         return CapabilityItem {
             id: "admin_privileges".into(),
             name: "Elevated privileges".into(),
-            level: SupportLevel::Degraded,
-            detail: format!(
-                "euid={euid}; CAP_NET_ADMIN / polkit helper required for capture install."
-            ),
-            required_for_start: true,
+            level: SupportLevel::Supported,
+            detail: elevation_status_detail(),
+            // Not required at process start — only at Sockscap Start.
+            required_for_start: false,
         };
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        CapabilityItem {
+    if elevation_prompt_available() {
+        return CapabilityItem {
             id: "admin_privileges".into(),
-            name: "Elevated privileges".into(),
-            level: SupportLevel::Unknown,
-            detail: "Windows elevation probe deferred to helper (Phase 5).".into(),
-            required_for_start: true,
-        }
+            name: "On-demand elevation".into(),
+            level: SupportLevel::Supported,
+            detail: format!(
+                "{} Taomni stays unprivileged until you start Sockscap.",
+                elevation_status_detail()
+            ),
+            // Prompt happens at start; preflight must not block the whole app.
+            required_for_start: false,
+        };
     }
 
-    #[cfg(target_os = "macos")]
-    {
-        CapabilityItem {
-            id: "admin_privileges".into(),
-            name: "System extension approval".into(),
-            level: SupportLevel::Unknown,
-            detail: "macOS NETransparentProxyProvider entitlement + user approval required (Phase 6).".into(),
-            required_for_start: true,
-        }
-    }
-
-    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
-    {
-        CapabilityItem {
-            id: "admin_privileges".into(),
-            name: "Elevated privileges".into(),
-            level: SupportLevel::Unsupported,
-            detail: "Unsupported platform.".into(),
-            required_for_start: true,
-        }
+    CapabilityItem {
+        id: "admin_privileges".into(),
+        name: "Elevated privileges".into(),
+        level: SupportLevel::Unsupported,
+        detail: elevation_status_detail(),
+        required_for_start: true,
     }
 }
 
-#[cfg(target_os = "linux")]
-fn libc_euid() -> u32 {
-    // Avoid adding a libc crate dep just for geteuid; use the raw syscall via
-    // nix is also not required — std has no euid, so call libc if linked, else
-    // parse /proc/self/status.
-    if let Ok(status) = std::fs::read_to_string("/proc/self/status") {
-        for line in status.lines() {
-            if let Some(rest) = line.strip_prefix("Uid:") {
-                // Uid: real effective saved fs
-                let parts: Vec<&str> = rest.split_whitespace().collect();
-                if parts.len() >= 2 {
-                    if let Ok(euid) = parts[1].parse::<u32>() {
-                        return euid;
-                    }
-                }
-            }
-        }
-    }
-    1
-}
 
 fn probe_tun_device() -> CapabilityItem {
     #[cfg(target_os = "linux")]

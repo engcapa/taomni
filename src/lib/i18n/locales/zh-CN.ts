@@ -1803,7 +1803,8 @@ export const zhCN: DeepPartial<typeof en> = {
     appProxyVaultLocked: "请先解锁密钥库以保存代理密码。",
     appProxyUpdaterNote: "提示：HTTP 代理在所有平台都可用于更新；更新器对 SOCKS5 的支持取决于平台。",
     sockscapTitle: "Sockscap 流量路由",
-    sockscapSubtitle: "按程序、进程和域名规则路由系统流量（独立于应用代理）",
+    sockscapSubtitle:
+      "按程序、进程和域名规则路由系统流量。日常无需 root/管理员；仅在启动 Sockscap 时弹出系统提权确认。",
     sockscapOpen: "打开 Sockscap",
     languageTitle: "应用语言",
     languageCurrent: "当前语言：{label}",

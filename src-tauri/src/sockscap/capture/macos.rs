@@ -29,7 +29,7 @@ impl CaptureAdapter for MacosCaptureAdapter {
         CaptureOpResult {
             ok: false,
             platform: CapturePlatform::Macos,
-            message: "macOS capture not implemented: NETransparentProxyProvider entitlement required".into(),
+            message: "macOS capture not implemented yet; when ready, Start will prompt for administrator approval (app does not need to run as root).".into(),
             mutated_system: false,
         }
     }

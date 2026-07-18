@@ -524,11 +524,17 @@ export function SockscapWindow() {
                   Delete
                 </button>
               </div>
-              {!caps?.captureImplemented && (
+              {caps?.captureImplemented ? (
+                <p className="mt-3 text-xs text-sky-300/90">
+                  Taomni runs as a normal user. Starting Sockscap will prompt for
+                  administrator authentication only when installing capture rules
+                  (Linux polkit/sudo, Windows UAC, macOS admin password). Stop and
+                  Recover use the same one-shot elevation.
+                </p>
+              ) : (
                 <p className="mt-3 text-xs text-amber-300/90">
-                  Capture plane is not implemented on this build. Profiles and
-                  preflight work; Start will fail closed until Phase 0 platform
-                  adapters land.
+                  Capture plane is not available on this platform yet. Profiles and
+                  preflight still work; Start will explain what is missing.
                 </p>
               )}
             </section>
