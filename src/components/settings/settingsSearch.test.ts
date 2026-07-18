@@ -36,6 +36,12 @@ describe("settingsSearch groups", () => {
     expect(groupIdForEntry("sftp")).toBe("terminal");
   });
 
+  it("matches Kotlin toolchain settings under the code group", () => {
+    const ids = matchingIds("kotlin", t);
+    expect(ids).toEqual(["sdks"]);
+    expect(groupIdForEntry("sdks")).toBe("code");
+  });
+
   it("preserves group order even when entry list is reordered", () => {
     expect(matchingGroupIds(["ai-acp", "app-proxy", "language"])).toEqual([
       "ai",

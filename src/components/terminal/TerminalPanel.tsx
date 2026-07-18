@@ -205,6 +205,8 @@ interface TerminalPanelProps {
    * when a terminal tab is duplicated so the copy lands in the source's cwd.
    */
   initialCwd?: string;
+  /** Enables backend-owned SDK environment injection for workspace terminals. */
+  workspaceRoot?: string;
   preserveSessionOnUnmount?: boolean;
   detachedWindowControls?: DetachedTerminalWindowControls;
   onDetachedStateChange?: (state: TerminalReattachState) => void;
@@ -308,6 +310,7 @@ export function TerminalPanel({
   onTerminalProfileChange,
   adoptedTerminal,
   initialCwd,
+  workspaceRoot,
   preserveSessionOnUnmount = false,
   detachedWindowControls,
   onDetachedStateChange,
@@ -341,6 +344,7 @@ export function TerminalPanel({
   const onDetachedStateChangeRef = useRef<typeof onDetachedStateChange>(onDetachedStateChange);
   const preserveSessionOnUnmountRef = useRef(preserveSessionOnUnmount);
   const adoptedTerminalRef = useRef(adoptedTerminal);
+  const workspaceRootRef = useRef(workspaceRoot);
   const multiExecActiveRef = useRef(multiExecActive);
   useEffect(() => {
     cwdCallbackRef.current = onCwdChange;
@@ -352,6 +356,7 @@ export function TerminalPanel({
     onTerminalProfileChangeRef.current = onTerminalProfileChange;
     onDetachedStateChangeRef.current = onDetachedStateChange;
     preserveSessionOnUnmountRef.current = preserveSessionOnUnmount;
+    workspaceRootRef.current = workspaceRoot;
     multiExecActiveRef.current = multiExecActive;
   }, [
     onCwdChange,
@@ -363,6 +368,7 @@ export function TerminalPanel({
     onTerminalProfileChange,
     onDetachedStateChange,
     preserveSessionOnUnmount,
+    workspaceRoot,
     multiExecActive,
   ]);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -3040,6 +3046,7 @@ export function TerminalPanel({
         localShell?.args,
         startCwd,
         handleRawOutput,
+        workspaceRootRef.current,
       )
         .then(({ sessionId, shellId }) => handleConnected({ sessionId, shellId }, "initial"))
         .catch((err) => handleConnectFailure(err, "initial"));

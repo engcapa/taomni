@@ -27,6 +27,7 @@ LOCAL_STORAGE_KEYS = [
     "taomni.appTheme.v1",
     "taomni.terminalProfile.v1",
     "taomni.compactMode",
+    "taomni.stub.sdkRegistry.v1",
 ]
 LOCAL_STORAGE_PREFIXES = [
     "taomni.sftp.",
@@ -100,7 +101,7 @@ def _reset_browser(ctx: Any) -> None:
 def _reset_native(ctx: Any) -> None:
     data_dir = _native_app_data_dir()
     db = data_dir / "taomni.db"
-    for path in (db, data_dir / "taomni.db-wal", data_dir / "taomni.db-shm"):
+    for path in (db, data_dir / "taomni.db-wal", data_dir / "taomni.db-shm", data_dir / "sdk.json"):
         try:
             if path.exists():
                 path.unlink()

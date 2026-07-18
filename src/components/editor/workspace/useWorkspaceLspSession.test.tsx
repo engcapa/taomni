@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LspDocumentStatus } from "../../../lib/editor/lsp";
+import { SDK_REGISTRY_CHANGED_EVENT } from "../../../lib/editor/sdk";
 import type { CodeWorkspaceRootInfo } from "../../../types";
 import type { LspFileState, OpenFileState } from "./codeWorkspaceModel";
 import { useWorkspaceLspSession } from "./useWorkspaceLspSession";
@@ -190,6 +191,26 @@ describe("useWorkspaceLspSession", () => {
     unmount();
     expect(lspMocks.lspStopWorkspace).toHaveBeenCalledOnce();
     expect(lspMocks.lspStopWorkspace).toHaveBeenCalledWith("workspace-stop");
+  });
+
+  it("restarts the workspace LSP session when SDK bindings change", async () => {
+    const updateLspFiles = vi.fn();
+    renderHook(() => useWorkspaceLspSession({
+      workspaceInstanceId: "workspace-sdk-change",
+      roots,
+      openFilesRef: { current: {} },
+      updateLspFiles,
+      onError: vi.fn(),
+    }));
+
+    await waitFor(() => expect(lspMocks.lspDetectServers).toHaveBeenCalled());
+    lspMocks.lspStopWorkspace.mockClear();
+    window.dispatchEvent(new Event(SDK_REGISTRY_CHANGED_EVENT));
+
+    await waitFor(() => expect(lspMocks.lspStopWorkspace).toHaveBeenCalledWith(
+      "workspace-sdk-change",
+    ));
+    expect(updateLspFiles).toHaveBeenCalled();
   });
 
   it("coalesces edits during open and follows with only the latest buffer", async () => {

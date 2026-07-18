@@ -18,6 +18,7 @@ use crate::lsp::LspManager;
 use crate::mail::MailImapPool;
 use crate::objectstorage::ObjectStorageSession;
 use crate::rdp::ws::RdpSession;
+use crate::sdk::SdkManager;
 use crate::servers::ServerRegistry;
 use crate::terminal::{ActiveTerminal, TerminalOutputChannel};
 use crate::tunnel::TunnelRegistry;
@@ -169,6 +170,8 @@ pub struct AppState {
         Arc<RwLock<HashMap<String, crate::agent::context::AgentCodeWorkspace>>>,
     /// Local language-server process registry for code-workspace editor tabs.
     pub lsp: Arc<LspManager>,
+    /// Versioned SDK installations, defaults and per-workspace manual bindings.
+    pub sdk: Arc<SdkManager>,
     /// Top-level AI context — holds AsrManager + LlmRouter.
     /// Wrapped in RwLock so save_ai_config can hot-rebuild the router.
     pub ai_ctx: Arc<RwLock<AppAiCtx>>,
@@ -187,6 +190,7 @@ impl AppState {
         ai_ctx: AppAiCtx,
         lanchat: Arc<LanChatState>,
     ) -> Self {
+        let sdk = Arc::new(SdkManager::load(crate::sdk::default_sdk_registry_path()));
         Self {
             terminals: Arc::new(RwLock::new(HashMap::new())),
             terminal_outputs: Arc::new(Mutex::new(HashMap::new())),
@@ -225,7 +229,8 @@ impl AppState {
             agent_db_bindings: Arc::new(RwLock::new(HashMap::new())),
             agent_db_selected_objects: Arc::new(RwLock::new(HashMap::new())),
             agent_code_workspaces: Arc::new(RwLock::new(HashMap::new())),
-            lsp: Arc::new(LspManager::new()),
+            lsp: Arc::new(LspManager::with_sdk(sdk.clone())),
+            sdk,
             ai_ctx: Arc::new(RwLock::new(ai_ctx)),
             lanchat,
         }

@@ -103,7 +103,16 @@ const ipcMocks = vi.hoisted(() => {
   return {
     terminalExitHandlers,
     closeTerminal: vi.fn(async () => undefined),
-    createLocalTerminal: vi.fn(async (sessionId: string) => ({ sessionId, shellId: "default" })),
+    createLocalTerminal: vi.fn(async (
+      sessionId: string,
+      _cols?: number,
+      _rows?: number,
+      _shell?: string,
+      _shellArgs?: string[],
+      _cwd?: string,
+      _onOutput?: (data: Uint8Array) => void,
+      _workspaceRoot?: string,
+    ) => ({ sessionId, shellId: "default" })),
     createSshTerminal: vi.fn(async (sessionId: string) => sessionId),
     listenSshAuthPrompt: vi.fn(async () => vi.fn()),
     submitSshAuthResponse: vi.fn(async () => undefined),
@@ -313,6 +322,13 @@ describe("TerminalPanel focus behavior", () => {
     await waitFor(() => {
       expect(terminalMocks.focus).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("passes the workspace root when launching an SDK-aware local terminal", async () => {
+    render(<TerminalPanel visible initialCwd="/repo/app" workspaceRoot="/repo" />);
+
+    await waitFor(() => expect(ipcMocks.createLocalTerminal).toHaveBeenCalled());
+    expect(ipcMocks.createLocalTerminal.mock.calls[0]?.[7]).toBe("/repo");
   });
 
   it("tracks a submitted program and returns to idle on the next shell prompt", async () => {

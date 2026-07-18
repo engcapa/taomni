@@ -14,15 +14,22 @@ vi.mock("../../../terminal/TerminalPanel", () => ({
   TerminalPanel: ({
     tabId,
     initialCwd,
+    workspaceRoot,
     onSessionReady,
     onTaskExit,
   }: {
     tabId?: string;
     initialCwd?: string;
+    workspaceRoot?: string;
     onSessionReady?: (sessionId: string) => void;
     onTaskExit?: (exitCode: number) => void;
   }) => (
-    <div data-testid="mock-terminal" data-tab-id={tabId} data-initial-cwd={initialCwd}>
+    <div
+      data-testid="mock-terminal"
+      data-tab-id={tabId}
+      data-initial-cwd={initialCwd}
+      data-workspace-root={workspaceRoot}
+    >
       <button type="button" onClick={() => onSessionReady?.(tabId ?? "")}>ready</button>
       <button type="button" onClick={() => onTaskExit?.(0)}>task-exit</button>
     </div>
@@ -57,11 +64,13 @@ describe("TerminalDockPanel", () => {
       />,
     );
     expect(await screen.findByTestId("mock-terminal")).toHaveAttribute("data-initial-cwd", "/repo/app");
+    expect(screen.getByTestId("mock-terminal")).toHaveAttribute("data-workspace-root", "/repo/app");
 
     fireEvent.change(screen.getByLabelText("Terminal root directory"), { target: { value: "lib" } });
     fireEvent.click(screen.getByLabelText("New workspace terminal"));
     await waitFor(() => expect(screen.getAllByTestId("mock-terminal")).toHaveLength(2));
     expect(screen.getAllByTestId("mock-terminal")[1]).toHaveAttribute("data-initial-cwd", "/repo/lib");
+    expect(screen.getAllByTestId("mock-terminal")[1]).toHaveAttribute("data-workspace-root", "/repo/lib");
   });
 
   it("exposes open-at and closes instances by tab", async () => {
@@ -78,6 +87,7 @@ describe("TerminalDockPanel", () => {
     handle.current?.openAt("/repo/app/src", "src");
     expect(await screen.findByText("src")).toBeInTheDocument();
     expect(screen.getByTestId("mock-terminal")).toHaveAttribute("data-initial-cwd", "/repo/app/src");
+    expect(screen.getByTestId("mock-terminal")).toHaveAttribute("data-workspace-root", "/repo/app");
     fireEvent.click(screen.getByLabelText("Close src"));
     expect(screen.queryByTestId("mock-terminal")).not.toBeInTheDocument();
   });

@@ -15,6 +15,7 @@ import {
   type LspServerStatus,
 } from "../../../lib/editor/lsp";
 import type { CodeWorkspaceRootInfo } from "../../../types";
+import { subscribeSdkRegistryChanged } from "../../../lib/editor/sdk";
 import { buildIncrementalContentChange } from "./lspTextEdits";
 import {
   CUSTOM_LSP_COMMAND_ID,
@@ -56,6 +57,8 @@ interface DocumentSyncQueue {
   closed: boolean;
   pending: PendingDocumentSync | null;
 }
+
+const LSP_DIAGNOSTICS_IDLE_DELAY_MS = 750;
 
 /**
  * LSP feature responses all carry a document status.  Most responses for an
@@ -182,15 +185,8 @@ export function useWorkspaceLspSession({
     void refreshServerStatuses();
   }, [refreshServerStatuses]);
 
-  // Settings panel is the primary editor for LSP server prefs; keep live
-  // workspace sessions in sync without remounting the tab. Restart servers so
-  // a new Java home / custom command actually takes effect (session keys are
-  // not keyed by runtime path).
-  useEffect(() => subscribeLspServerPrefs(() => {
+  const restartWorkspaceServers = useCallback(() => {
     if (!mountedRef.current) return;
-    setCommandPrefs(readLspCommandPrefs());
-    setCustomCommands(readLspCustomCommands());
-    setJavaHome(readLspJavaHome());
     syncedTextRef.current = {};
     incrementalSyncRef.current = {};
     documentActiveRef.current = {};
@@ -203,7 +199,24 @@ export function useWorkspaceLspSession({
       .finally(() => {
         if (mountedRef.current) void refreshServerStatuses();
       });
-  }), [refreshServerStatuses, updateLspFiles, workspaceInstanceId]);
+  }, [refreshServerStatuses, updateLspFiles, workspaceInstanceId]);
+
+  // Settings is the primary editor for LSP preferences. Keep open workspaces
+  // in sync without remounting and restart servers so command/runtime changes
+  // take effect for already-open documents.
+  useEffect(() => subscribeLspServerPrefs(() => {
+    setCommandPrefs(readLspCommandPrefs());
+    setCustomCommands(readLspCustomCommands());
+    setJavaHome(readLspJavaHome());
+    restartWorkspaceServers();
+  }), [restartWorkspaceServers]);
+
+  // SDK defaults and workspace bindings affect process environments and the
+  // LSP session fingerprint. Restart now instead of waiting for another file
+  // to be opened before the selected project/tooling SDK becomes effective.
+  useEffect(() => subscribeSdkRegistryChanged(() => {
+    restartWorkspaceServers();
+  }), [restartWorkspaceServers]);
 
   const invalidateSyncedText = useCallback(() => {
     syncedTextRef.current = {};
@@ -345,7 +358,7 @@ export function useWorkspaceLspSession({
       // Only poll diagnostics while the server is actually serving this file.
       if (!latest || !documentActiveRef.current[key]) return;
       void refreshDiagnostics(latest);
-    }, 750);
+    }, LSP_DIAGNOSTICS_IDLE_DELAY_MS);
   }, [openFilesRef, refreshDiagnostics]);
 
   /**

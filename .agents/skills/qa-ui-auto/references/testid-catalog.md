@@ -468,7 +468,6 @@
 - `[data-testid="session-section-database"]` — interactive [optional] — F6.3.section-database
 - `[data-testid="advanced-ssh-settings"]` — display — F6.3.advanced-body
 - `[data-testid="terminal-settings"]` — display [optional] — F6.3.terminal-body
-- `[data-testid="mail-appearance-settings"]` — display [optional] — F6.3.mail-appearance-body
 - `[data-testid="network-settings"]` — display — F6.3.network-body
 - `[data-testid="bookmark-settings"]` — display — F6.3.bookmark-body
 - `input[aria-label="Execute command"]` — interactive — F6.3.advanced-execute-command
@@ -551,8 +550,8 @@
 
 ## sessions/multiselect (F-Sidebar-1)
 
-- `[data-testid="context-menu-item-set-terminal-theme"]` — interactive [optional] — F-Sidebar-1.set-terminal-theme
-- `[data-testid^="session-terminal-theme-option-"]` — interactive [optional] — F-Sidebar-1.terminal-theme-options
+- `[data-testid="session-tree-item"][data-selected="true"]` — interactive [optional] — F-Sidebar-1.selected-session-row
+- `[data-testid^="context-menu-item-connect-selected-sessions-"]` — interactive [optional] — F-Sidebar-1.connect-selected-sessions
 
 ## settings (F11.1)
 
@@ -570,6 +569,48 @@
 - `[data-testid="sql-completion-accept-tab"]` — interactive — F11.1.sql-completion-accept-tab
 - `[data-testid="sql-completion-accept-enter"]` — interactive — F11.1.sql-completion-accept-enter
 - `[data-testid="sql-completion-reset"]` — interactive — F11.1.sql-completion-reset
+
+## settings/code-workspace (F11.2)
+
+- `[data-testid="sdk-settings"]` — display — F11.2.sdk-settings
+- `[data-testid="sdk-discover"]` — interactive — F11.2.sdk-discover
+- `[data-testid="sdk-add"]` — interactive — F11.2.sdk-add
+- `[data-testid="sdk-refresh-all"]` — interactive — F11.2.sdk-refresh-all
+- `[data-testid="sdk-kind-java"]` — display — F11.2.sdk-kind-java
+- `[data-testid="sdk-kind-kotlin"]` — display — F11.2.sdk-kind-kotlin
+- `[data-testid="sdk-kind-scala"]` — display — F11.2.sdk-kind-scala
+- `[data-testid="sdk-kind-python"]` — display — F11.2.sdk-kind-python
+- `[data-testid="sdk-default-java"]` — interactive [optional] — F11.2.sdk-default-java
+- `[data-testid="sdk-default-kotlin"]` — interactive — F11.2.sdk-default-kotlin
+- `[data-testid="sdk-default-scala"]` — interactive [optional] — F11.2.sdk-default-scala
+- `[data-testid="sdk-default-python"]` — interactive [optional] — F11.2.sdk-default-python
+- `[data-testid^="sdk-add-"]` — interactive [optional] — F11.2.sdk-add-kind
+- `[data-testid="sdk-settings-error"]` — display [optional] — F11.2.sdk-settings-error
+- `[data-testid="sdk-editor"]` — display [optional] — F11.2.sdk-editor
+- `[data-testid="sdk-editor-kind"]` — interactive [optional] — F11.2.sdk-editor-kind
+- `[data-testid="sdk-editor-name"]` — interactive [optional] — F11.2.sdk-editor-name
+- `[data-testid="sdk-editor-location"]` — interactive [optional] — F11.2.sdk-editor-location
+- `[data-testid="sdk-editor-browse"]` — interactive [optional] — F11.2.sdk-editor-browse
+- `[data-testid="sdk-editor-probe"]` — display [optional] — F11.2.sdk-editor-probe
+- `[data-testid="sdk-editor-probe-button"]` — interactive [optional] — F11.2.sdk-editor-probe-button
+- `[data-testid="sdk-editor-save"]` — interactive [optional] — F11.2.sdk-editor-save
+- `[data-testid="sdk-discovery-results"]` — display [optional] — F11.2.sdk-discovery-results
+- `[data-testid="sdk-discovery-add-all"]` — interactive [optional] — F11.2.sdk-discovery-add-all
+- `[data-testid="sdk-discovery-add"]` — interactive [optional] — F11.2.sdk-discovery-add
+- `[data-testid="sdk-discovery-close"]` — interactive [optional] — F11.2.sdk-discovery-close
+- `[data-testid^="sdk-row-"]` — display [optional] — F11.2.sdk-installation-row
+- `[data-testid="sdk-installation-refresh"]` — interactive [optional] — F11.2.sdk-installation-refresh
+- `[data-testid="sdk-installation-edit"]` — interactive [optional] — F11.2.sdk-installation-edit
+- `[data-testid="sdk-installation-remove"]` — interactive [optional] — F11.2.sdk-installation-remove
+- `[data-testid="code-workspace-sdk-status"]` — interactive [optional] — F11.2.workspace-sdk-status
+- `[data-testid="workspace-sdk-dialog"]` — display [optional] — F11.2.workspace-sdk-dialog
+- `[data-testid="workspace-sdk-refresh"]` — interactive [optional] — F11.2.workspace-sdk-refresh
+- `[data-testid="workspace-sdk-open-settings"]` — interactive [optional] — F11.2.workspace-sdk-open-settings
+- `[data-testid="workspace-sdk-close"]` — interactive [optional] — F11.2.workspace-sdk-close
+- `[data-testid="workspace-sdk-error"]` — display [optional] — F11.2.workspace-sdk-error
+- `[data-testid^="workspace-sdk-root-"]` — display [optional] — F11.2.workspace-sdk-root
+- `[data-testid^="workspace-kotlin-profile-"]` — display [optional] — F11.2.workspace-kotlin-profile
+- `[data-testid^="workspace-sdk-binding-"]` — interactive [optional] — F11.2.workspace-sdk-binding
 
 ## sftp (F7.2)
 
