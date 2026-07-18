@@ -19,6 +19,8 @@ import { AppDialogProvider } from "./lib/appDialogs";
 import { VaultGateProvider } from "./lib/vaultGate";
 import { StartupVaultUnlockGate } from "./components/vault/StartupVaultUnlockGate";
 import { DEFAULT_TERMINAL_PROFILE } from "./lib/terminalProfile";
+import { SockscapWindow } from "./components/sockscap/SockscapWindow";
+import { detectSockscapWindowRoute } from "./lib/sockscapWindowing";
 
 function App() {
   const { mode, resolvedTheme } = useAppTheme();
@@ -143,8 +145,11 @@ function App() {
   }, []);
 
   let content: ReactNode;
-  const detachedSftpId = detectDetachedSftpRoute();
-  if (detachedSftpId) {
+  const sockscapWindow = detectSockscapWindowRoute();
+  const detachedSftpId = sockscapWindow ? null : detectDetachedSftpRoute();
+  if (sockscapWindow) {
+    content = <SockscapWindow />;
+  } else if (detachedSftpId) {
     content = <SftpDetachedWindow sessionId={detachedSftpId} />;
   } else {
     const detachedRoute = detectDetachedRoute();

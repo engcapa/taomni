@@ -511,6 +511,12 @@ export function sockscapOpenWindow(): Promise<void> {
   return invoke("sockscap_open_window", {});
 }
 
+export type SockscapWindowCloseOutcome = "hidden" | "closed";
+
+export function sockscapCloseWindow(): Promise<SockscapWindowCloseOutcome> {
+  return invoke("sockscap_close_window", {});
+}
+
 export function sockscapListEgressSessions(): Promise<SockscapEgressSessionSummary[]> {
   return invoke("sockscap_list_egress_sessions", {});
 }

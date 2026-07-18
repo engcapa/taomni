@@ -18,6 +18,7 @@ describe("Sockscap browser stub", () => {
   afterEach(async () => {
     await invokeValue("sockscap_stop");
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it.each(["windows", "macos", "linux"] as const)("provides a controllable %s capability report", async (platform) => {
@@ -140,5 +141,26 @@ describe("Sockscap browser stub", () => {
       state: "disabled",
       recoveryRequired: false,
     });
+  });
+
+  it("opens the dedicated browser route and keeps active capture alive on close", async () => {
+    const focus = vi.fn();
+    const popup = { focus } as unknown as Window;
+    const open = vi.spyOn(window, "open").mockReturnValue(popup);
+    const close = vi.spyOn(window, "close").mockImplementation(() => undefined);
+    await invokeValue("sockscap_open_window");
+    expect(open).toHaveBeenCalledWith(
+      expect.stringContaining("sockscap=1"),
+      "taomni-sockscap",
+      "popup,width=1280,height=820",
+    );
+    expect(focus).toHaveBeenCalledTimes(1);
+
+    await invokeValue("sockscap_start");
+    await expect(invokeValue("sockscap_close_window")).resolves.toBe("hidden");
+    expect(close).not.toHaveBeenCalled();
+    await invokeValue("sockscap_stop");
+    await expect(invokeValue("sockscap_close_window")).resolves.toBe("closed");
+    expect(close).toHaveBeenCalledTimes(1);
   });
 });

@@ -29,6 +29,7 @@ import type {
   SockscapTrafficSummaryEvent,
 } from "../lib/sockscap";
 import { SOCKSCAP_EVENTS } from "../lib/sockscapEvents";
+import { sockscapBrowserWindowUrl } from "../lib/sockscapWindowing";
 import { emit } from "./tauri-event";
 
 const STORAGE_KEY = "taomni.stub.sockscap.v1";
@@ -888,8 +889,19 @@ export async function invokeSockscapStub(command: string, rawArgs?: unknown): Pr
       return { handled: true, value: await stopEngine() };
     case "sockscap_recover":
       return { handled: true, value: await recoverEngine() };
-    case "sockscap_open_window":
+    case "sockscap_open_window": {
+      const popup = globalThis.window?.open(
+        sockscapBrowserWindowUrl(globalThis.window.location.href),
+        "taomni-sockscap",
+        "popup,width=1280,height=820",
+      );
+      popup?.focus();
       return { handled: true, value: undefined };
+    }
+    case "sockscap_close_window":
+      if (runtime.status.captureActive) return { handled: true, value: "hidden" };
+      globalThis.window?.close();
+      return { handled: true, value: "closed" };
     case "sockscap_list_egress_sessions":
       return { handled: true, value: [makeEgressSummary("proxy"), makeEgressSummary("ssh")] };
     case "sockscap_test_egress": {

@@ -807,6 +807,7 @@ pub fn run() {
             sockscap::sockscap_stop,
             sockscap::sockscap_recover,
             sockscap::sockscap_open_window,
+            sockscap::sockscap_close_window,
             sockscap::sockscap_list_egress_sessions,
             sockscap::sockscap_test_egress,
             sockscap::sockscap_test_target,

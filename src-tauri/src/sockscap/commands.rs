@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tokio_util::sync::CancellationToken;
 
 use super::capabilities::probe_capabilities;
@@ -161,10 +161,62 @@ pub fn sockscap_recover(
     result
 }
 
-/// Placeholder until the independent window lands in Phase 4.
 #[tauri::command]
-pub fn sockscap_open_window() -> Result<(), String> {
-    Err("SOCKSCAP_WINDOW_NOT_READY: independent Sockscap window is not implemented yet".into())
+pub fn sockscap_open_window(app: AppHandle) -> Result<(), String> {
+    const LABEL: &str = "sockscap";
+    if let Some(existing) = app.get_webview_window(LABEL) {
+        let _ = existing.unminimize();
+        let _ = existing.show();
+        let _ = existing.set_focus();
+        return Ok(());
+    }
+
+    let url = WebviewUrl::App(std::path::PathBuf::from("index.html#sockscap"));
+    let builder = WebviewWindowBuilder::new(&app, LABEL, url)
+        .title("Sockscap — Taomni")
+        .inner_size(1280.0, 820.0)
+        .min_inner_size(960.0, 640.0)
+        .decorations(false)
+        .resizable(true)
+        .enable_clipboard_access();
+    #[cfg(windows)]
+    let builder = builder.disable_drag_drop_handler();
+    builder
+        .build()
+        .map_err(|error| format!("SOCKSCAP_WINDOW_OPEN_FAILED: {error}"))?;
+    Ok(())
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SockscapWindowCloseOutcome {
+    Hidden,
+    Closed,
+}
+
+/// Active capture is process-global and must survive closing its dashboard.
+/// Inactive windows are destroyed so the next open gets a clean UI instance.
+#[tauri::command]
+pub fn sockscap_close_window(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+) -> Result<SockscapWindowCloseOutcome, String> {
+    if window.label() != "sockscap" {
+        return Err(
+            "SOCKSCAP_WINDOW_INVALID_CALLER: only the Sockscap window can close itself".into(),
+        );
+    }
+    if state.sockscap.status().capture_active {
+        window
+            .hide()
+            .map_err(|error| format!("SOCKSCAP_WINDOW_HIDE_FAILED: {error}"))?;
+        Ok(SockscapWindowCloseOutcome::Hidden)
+    } else {
+        window
+            .destroy()
+            .map_err(|error| format!("SOCKSCAP_WINDOW_CLOSE_FAILED: {error}"))?;
+        Ok(SockscapWindowCloseOutcome::Closed)
+    }
 }
 
 #[tauri::command]
