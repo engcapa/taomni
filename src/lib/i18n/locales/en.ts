@@ -704,6 +704,8 @@ const dict = {
     promptOneTerminal: "There is {count} open tab, including {terminals} terminal session. Exit Taomni and close them?",
     promptMany: "There are {count} open tabs. Exit Taomni and close them?",
     promptManyTerminals: "There are {count} open tabs, including {terminals} terminal sessions. Exit Taomni and close them?",
+    cleanupFailedTitle: "Taomni could not exit safely",
+    cleanupFailed: "Sockscap network cleanup was not confirmed, so Taomni stayed open. {error}",
   },
   about: {
     title: "About Taomni",

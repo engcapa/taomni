@@ -602,7 +602,7 @@ export function sockscapOpenWindow(): Promise<void> {
   return invoke("sockscap_open_window", {});
 }
 
-export type SockscapWindowCloseOutcome = "hidden" | "closed";
+export type SockscapWindowCloseOutcome = "hidden";
 
 export function sockscapCloseWindow(): Promise<SockscapWindowCloseOutcome> {
   return invoke("sockscap_close_window", {});
@@ -693,6 +693,10 @@ export function listenSockscapEgressHealth(
 
 export function listenSockscapAlert(handler: (payload: SockscapAlertEvent) => void): Promise<UnlistenFn> {
   return listenPayload(SOCKSCAP_EVENTS.alert, handler);
+}
+
+export function listenSockscapNavigate(handler: (payload: string) => void): Promise<UnlistenFn> {
+  return listenPayload(SOCKSCAP_EVENTS.navigate, handler);
 }
 
 export interface SockscapIpcContractFixture {

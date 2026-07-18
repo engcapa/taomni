@@ -468,6 +468,24 @@ mod tests {
     }
 
     #[test]
+    fn stop_refuses_exit_cleanup_without_clearing_a_dirty_marker() {
+        let store = store_with_profile();
+        let marker = store
+            .begin_prepare(&["p1".into()], 1, CapturePlatform::current(), false)
+            .expect("write recovery marker");
+        let engine = SockscapEngine::with_store(Arc::clone(&store));
+
+        let error = engine
+            .stop()
+            .expect_err("stop must wait for platform helper proof");
+        assert!(error.contains("RECOVERY_HELPER_REQUIRED"));
+        let persisted = store.recovery_journal().expect("read recovery marker");
+        assert_eq!(persisted.generation, marker.generation);
+        assert_eq!(persisted.phase, RecoveryPhase::Preparing);
+        assert!(persisted.cleanup_required);
+    }
+
+    #[test]
     fn login_restore_reads_only_the_last_committed_snapshot_and_stays_gated() {
         let store = store_with_profile();
         let prepared = store.prepare_config_snapshot().expect("prepare config");

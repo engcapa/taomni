@@ -20,6 +20,7 @@ pub mod policy;
 pub mod preflight;
 pub mod processes;
 pub mod storage;
+pub mod tray;
 pub mod types;
 
 pub use commands::*;

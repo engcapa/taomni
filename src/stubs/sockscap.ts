@@ -1038,6 +1038,16 @@ function argsRecord(args: unknown): Record<string, unknown> {
 }
 
 export async function invokeSockscapStub(command: string, rawArgs?: unknown): Promise<SockscapStubInvokeResult> {
+  if (command === "exit_app") {
+    if (runtime.scenario.recoveryRequired || runtime.status.recoveryRequired) {
+      const error = "RECOVERY_HELPER_REQUIRED: simulated network cleanup was not confirmed";
+      await publishAlert("RECOVERY_HELPER_REQUIRED", error);
+      throw new Error(error);
+    }
+    await stopEngine();
+    globalThis.window?.close();
+    return { handled: true, value: undefined };
+  }
   if (!command.startsWith("sockscap_")) return { handled: false };
   const args = argsRecord(rawArgs);
   switch (command) {
@@ -1093,9 +1103,7 @@ export async function invokeSockscapStub(command: string, rawArgs?: unknown): Pr
       return { handled: true, value: undefined };
     }
     case "sockscap_close_window":
-      if (runtime.status.captureActive) return { handled: true, value: "hidden" };
-      globalThis.window?.close();
-      return { handled: true, value: "closed" };
+      return { handled: true, value: "hidden" };
     case "sockscap_list_egress_sessions":
       return { handled: true, value: [makeEgressSummary("proxy"), makeEgressSummary("ssh")] };
     case "sockscap_test_egress": {

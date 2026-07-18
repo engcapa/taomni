@@ -2,6 +2,7 @@ import { create } from "zustand";
 import {
   listenSockscapAlert,
   listenSockscapEgressHealth,
+  listenSockscapNavigate,
   listenSockscapProfileHealth,
   listenSockscapStatus,
   listenSockscapTrafficSummary,
@@ -47,8 +48,12 @@ import {
   type SockscapTestTargetRequest,
   type SockscapTestTargetResult,
 } from "../lib/sockscap";
+import {
+  isSockscapWindowSection,
+  type SockscapWindowSection,
+} from "../lib/sockscapWindowing";
 
-export type SockscapSection = "overview" | "profiles" | "rules" | "dashboard" | "lifecycle";
+export type SockscapSection = SockscapWindowSection;
 export type SockscapLifecycleAction = "start" | "stop" | "recover" | "set_auto_restore";
 export type SockscapProfileAction = "save" | "delete" | "test_egress";
 export type SockscapRuleAction = "save_source" | "delete_source" | "refresh_source" | "import_source" | "test_target";
@@ -509,6 +514,9 @@ export function attachSockscapEventBridge(): () => void {
   subscribe(listenSockscapAlert((event) => useSockscapStore.setState((current) => ({
     alerts: [event, ...current.alerts].slice(0, 50),
   }))));
+  subscribe(listenSockscapNavigate((section) => {
+    if (isSockscapWindowSection(section)) useSockscapStore.setState({ section });
+  }));
 
   return () => {
     disposed = true;

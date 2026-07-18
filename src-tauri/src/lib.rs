@@ -44,7 +44,7 @@ mod wsl;
 use state::AppState;
 use std::collections::HashSet;
 use std::sync::Arc;
-use tauri::{AppHandle, Manager, WebviewWindowBuilder};
+use tauri::{Manager, WebviewWindowBuilder};
 
 const AI_PROCESS_REAPER_INTERVAL_SECS: u64 = 30;
 const AI_PROCESS_IDLE_REAP_SECS: u64 = 300;
@@ -55,11 +55,6 @@ fn should_reap_ai_process(
     idle_secs: u64,
 ) -> bool {
     !chat_turn_active && !process_turn_active && idle_secs >= AI_PROCESS_IDLE_REAP_SECS
-}
-
-#[tauri::command]
-fn exit_app(app_handle: AppHandle) {
-    app_handle.exit(0);
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -136,6 +131,7 @@ pub fn run() {
                 lanchat_state,
                 sockscap_store,
             ));
+            sockscap::tray::initialize_sockscap_tray(app)?;
             sockscap::maybe_restore_after_system_login(app.handle());
             app.manage(workspace_search::WorkspaceSearchState::default());
             let local_history = local_history::init_local_history(app.handle())
@@ -265,6 +261,9 @@ pub fn run() {
                     // Required on Linux/Windows for navigator.clipboard.readText().
                     // Terminal right-click paste and Shift+Insert use that API.
                     .enable_clipboard_access();
+                if sockscap::should_launch_in_background(app.handle()) {
+                    builder = builder.visible(false);
+                }
                 // On macOS use the native traffic-light controls with an overlay
                 // title bar so the window feels native (the frontend reserves a
                 // left inset and hides its custom min/max/close there). Windows
@@ -800,7 +799,7 @@ pub fn run() {
             notes::commands::notes_set_prefs,
             notes::commands::notes_list_alerts,
             notes::commands::notes_ack_alert,
-            // Sockscap (Phase 0 scaffold — capture plane not yet active)
+            // Sockscap (capture plane remains capability-gated)
             sockscap::sockscap_capabilities,
             sockscap::sockscap_status,
             sockscap::sockscap_preflight,
@@ -828,7 +827,7 @@ pub fn run() {
             sockscap::sockscap_live_connections,
             sockscap::sockscap_clear_stats,
             sockscap::sockscap_gfwlist_official_info,
-            exit_app,
+            sockscap::tray::exit_app,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

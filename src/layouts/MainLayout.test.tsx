@@ -74,10 +74,13 @@ const vaultMock = vi.hoisted(() => {
   return mock;
 });
 
+const appWindowMock = vi.hoisted(() => ({
+  hide: vi.fn(async () => undefined),
+  onCloseRequested: vi.fn(async () => vi.fn()),
+}));
+
 vi.mock("@tauri-apps/api/window", () => ({
-  getCurrentWindow: () => ({
-    onCloseRequested: vi.fn(async () => vi.fn()),
-  }),
+  getCurrentWindow: () => appWindowMock,
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -402,7 +405,10 @@ describe("MainLayout attached SFTP sidebar", () => {
     vaultMock.unlock.mockClear();
     vi.mocked(exitApp).mockClear();
     vi.mocked(markSessionConnected).mockClear();
-    vi.mocked(tauriInvoke).mockClear();
+    vi.mocked(tauriInvoke).mockReset();
+    vi.mocked(tauriInvoke).mockResolvedValue(undefined);
+    appWindowMock.hide.mockClear();
+    appWindowMock.onCloseRequested.mockClear();
     vi.mocked(listSessions).mockResolvedValue([]);
     useSessionStore.setState({
       sessions: [],
@@ -626,7 +632,7 @@ describe("MainLayout attached SFTP sidebar", () => {
 
     fireEvent.click(screen.getByTestId("window-close"));
 
-    expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("confirm-dialog")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
 
     await waitFor(() => {
@@ -645,6 +651,29 @@ describe("MainLayout attached SFTP sidebar", () => {
     await waitFor(() => {
       expect(exitApp).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("hides the main window when its close button sees active Sockscap capture", async () => {
+    vi.mocked(tauriInvoke).mockImplementation(async (command) => {
+      if (command === "sockscap_status") {
+        return {
+          state: "active",
+          message: "active",
+          activeProfileIds: ["profile-1"],
+          lastError: null,
+          recoveryRequired: false,
+          captureActive: true,
+        } as never;
+      }
+      return undefined as never;
+    });
+    render(<MainLayout />);
+
+    fireEvent.click(screen.getByTestId("window-close"));
+
+    await waitFor(() => expect(appWindowMock.hide).toHaveBeenCalledTimes(1));
+    expect(exitApp).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("confirm-dialog")).not.toBeInTheDocument();
   });
 
   it("opens a local terminal from Ctrl+Shift+T outside the welcome tab", async () => {

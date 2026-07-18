@@ -18,6 +18,7 @@ import {
 import { sockscapCloseWindow, type SockscapEngineState } from "../../lib/sockscap";
 import { useT } from "../../lib/i18n";
 import { isTauriRuntime } from "../../lib/runtime";
+import { detectSockscapWindowSection } from "../../lib/sockscapWindowing";
 import {
   attachSockscapEventBridge,
   useSockscapStore,
@@ -58,9 +59,11 @@ export function SockscapWindow() {
   }, [t]);
 
   useEffect(() => {
+    const initialSection = detectSockscapWindowSection();
+    if (initialSection) setSection(initialSection);
     void initialize();
     return attachSockscapEventBridge();
-  }, [initialize]);
+  }, [initialize, setSection]);
 
   const closeWindow = useCallback(() => {
     void sockscapCloseWindow().catch(() => window.close());

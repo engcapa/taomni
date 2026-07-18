@@ -5,4 +5,5 @@ export const SOCKSCAP_EVENTS = {
   profileHealth: "sockscap://profile-health",
   egressHealth: "sockscap://egress-health",
   alert: "sockscap://alert",
+  navigate: "sockscap://navigate",
 } as const;

@@ -71,6 +71,10 @@ vi.mock("../lib/sockscap", () => ({
     mocks.listeners.set("alert", callback);
     return Promise.resolve(mocks.unlisten);
   },
+  listenSockscapNavigate: (callback: (payload: unknown) => void) => {
+    mocks.listeners.set("navigate", callback);
+    return Promise.resolve(mocks.unlisten);
+  },
 }));
 
 import { attachSockscapEventBridge, useSockscapStore } from "./sockscapStore";
@@ -236,11 +240,15 @@ describe("Sockscap store", () => {
       severity: "error",
       createdAtUnix: 2,
     });
+    mocks.listeners.get("navigate")?.("dashboard");
     expect(useSockscapStore.getState().status?.state).toBe("active");
     expect(useSockscapStore.getState().stats?.totals.connections).toBe(3);
     expect(useSockscapStore.getState().alerts[0].code).toBe("TEST_ALERT");
+    expect(useSockscapStore.getState().section).toBe("dashboard");
+    mocks.listeners.get("navigate")?.("secrets");
+    expect(useSockscapStore.getState().section).toBe("dashboard");
     detach();
-    expect(mocks.unlisten).toHaveBeenCalledTimes(5);
+    expect(mocks.unlisten).toHaveBeenCalledTimes(6);
   });
 
   it("applies optimistic profile saves and deletes to the ordered snapshot", async () => {

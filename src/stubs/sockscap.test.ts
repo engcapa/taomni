@@ -203,7 +203,7 @@ describe("Sockscap browser stub", () => {
       .rejects.toThrow("CAPTURE_ADAPTER_NOT_READY");
   });
 
-  it("opens the dedicated browser route and keeps active capture alive on close", async () => {
+  it("opens the dedicated browser route and always hides instead of terminating on close", async () => {
     const focus = vi.fn();
     const popup = { focus } as unknown as Window;
     const open = vi.spyOn(window, "open").mockReturnValue(popup);
@@ -220,7 +220,27 @@ describe("Sockscap browser stub", () => {
     await expect(invokeValue("sockscap_close_window")).resolves.toBe("hidden");
     expect(close).not.toHaveBeenCalled();
     await invokeValue("sockscap_stop");
-    await expect(invokeValue("sockscap_close_window")).resolves.toBe("closed");
+    await expect(invokeValue("sockscap_close_window")).resolves.toBe("hidden");
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  it("stops before explicit exit and refuses to close with a recovery marker", async () => {
+    const close = vi.spyOn(window, "close").mockImplementation(() => undefined);
+    await invokeValue("sockscap_start");
+    await invokeValue("exit_app");
     expect(close).toHaveBeenCalledTimes(1);
+    await expect(invokeValue("sockscap_status")).resolves.toMatchObject({
+      state: "disabled",
+      captureActive: false,
+    });
+
+    close.mockClear();
+    await sockscapStubController.configure({ recoveryRequired: true });
+    await expect(invokeValue("exit_app")).rejects.toThrow("RECOVERY_HELPER_REQUIRED");
+    expect(close).not.toHaveBeenCalled();
+    await expect(invokeValue("sockscap_status")).resolves.toMatchObject({
+      state: "recovery_required",
+      recoveryRequired: true,
+    });
   });
 });

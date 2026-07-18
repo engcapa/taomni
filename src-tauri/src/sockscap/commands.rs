@@ -45,7 +45,9 @@ pub const TRAFFIC_SUMMARY_EVENT: &str = "sockscap://traffic-summary";
 pub const PROFILE_HEALTH_EVENT: &str = "sockscap://profile-health";
 pub const EGRESS_HEALTH_EVENT: &str = "sockscap://egress-health";
 pub const ALERT_EVENT: &str = "sockscap://alert";
+pub const NAVIGATE_EVENT: &str = "sockscap://navigate";
 pub const AUTO_RESTORE_ARG: &str = "--sockscap-auto-restore";
+pub const WINDOW_LABEL: &str = "sockscap";
 
 /// Probe host capabilities without mutating system network state.
 #[tauri::command]
@@ -164,7 +166,7 @@ pub fn sockscap_set_restore_on_system_login(
 /// the persisted opt-in must still be true. The orchestrator then reads only
 /// the last committed snapshot and preserves every recovery gate.
 pub fn maybe_restore_after_system_login(app: &AppHandle) {
-    if !std::env::args_os().any(|argument| argument == AUTO_RESTORE_ARG) {
+    if !is_auto_restore_launch() {
         return;
     }
     let state = app.state::<AppState>();
@@ -181,6 +183,22 @@ pub fn maybe_restore_after_system_login(app: &AppHandle) {
     }
     let result = state.sockscap.restore_last_committed();
     publish_engine_result(app, &state, &result);
+}
+
+pub fn is_auto_restore_launch() -> bool {
+    std::env::args_os().any(|argument| argument == AUTO_RESTORE_ARG)
+}
+
+/// Login launches stay in the tray only after the persisted opt-in is present;
+/// manually passing the internal CLI argument is not enough to hide Taomni.
+pub fn should_launch_in_background(app: &AppHandle) -> bool {
+    is_auto_restore_launch()
+        && app
+            .state::<AppState>()
+            .sockscap_store
+            .lifecycle_preferences()
+            .map(|preferences| preferences.restore_on_system_login)
+            .unwrap_or(false)
 }
 
 /// Run preflight against saved profiles only. Caller-supplied drafts are never
@@ -290,16 +308,42 @@ pub fn sockscap_recover(
 
 #[tauri::command]
 pub fn sockscap_open_window(app: AppHandle) -> Result<(), String> {
-    const LABEL: &str = "sockscap";
-    if let Some(existing) = app.get_webview_window(LABEL) {
+    open_sockscap_window_at(&app, None)
+}
+
+pub(crate) fn open_sockscap_window_at(
+    app: &AppHandle,
+    section: Option<&str>,
+) -> Result<(), String> {
+    let section = match section {
+        Some(section @ ("overview" | "profiles" | "rules" | "dashboard" | "lifecycle")) => {
+            Some(section)
+        }
+        Some(_) => return Err("SOCKSCAP_WINDOW_INVALID_SECTION: unknown window section".into()),
+        None => None,
+    };
+    if let Some(existing) = app.get_webview_window(WINDOW_LABEL) {
         let _ = existing.unminimize();
-        let _ = existing.show();
-        let _ = existing.set_focus();
+        existing
+            .show()
+            .map_err(|error| format!("SOCKSCAP_WINDOW_SHOW_FAILED: {error}"))?;
+        existing
+            .set_focus()
+            .map_err(|error| format!("SOCKSCAP_WINDOW_FOCUS_FAILED: {error}"))?;
+        if let Some(section) = section {
+            if let Err(error) = existing.emit(NAVIGATE_EVENT, section) {
+                tracing::warn!(%error, section, "could not navigate existing Sockscap window");
+            }
+        }
+        super::tray::refresh_sockscap_tray(app);
         return Ok(());
     }
 
-    let url = WebviewUrl::App(std::path::PathBuf::from("index.html#sockscap"));
-    let builder = WebviewWindowBuilder::new(&app, LABEL, url)
+    let route = section
+        .map(|section| format!("index.html#sockscap/{section}"))
+        .unwrap_or_else(|| "index.html#sockscap".into());
+    let url = WebviewUrl::App(std::path::PathBuf::from(route));
+    let builder = WebviewWindowBuilder::new(app, WINDOW_LABEL, url)
         .title("Sockscap — Taomni")
         .inner_size(1280.0, 820.0)
         .min_inner_size(960.0, 640.0)
@@ -311,39 +355,54 @@ pub fn sockscap_open_window(app: AppHandle) -> Result<(), String> {
     builder
         .build()
         .map_err(|error| format!("SOCKSCAP_WINDOW_OPEN_FAILED: {error}"))?;
+    super::tray::refresh_sockscap_tray(app);
     Ok(())
+}
+
+pub(crate) fn hide_sockscap_window(app: &AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(WINDOW_LABEL) {
+        window
+            .hide()
+            .map_err(|error| format!("SOCKSCAP_WINDOW_HIDE_FAILED: {error}"))?;
+    }
+    super::tray::refresh_sockscap_tray(app);
+    Ok(())
+}
+
+pub(crate) fn toggle_sockscap_window(app: &AppHandle) -> Result<(), String> {
+    if sockscap_window_is_visible(app) {
+        hide_sockscap_window(app)
+    } else {
+        open_sockscap_window_at(app, None)
+    }
+}
+
+pub(crate) fn sockscap_window_is_visible(app: &AppHandle) -> bool {
+    app.get_webview_window(WINDOW_LABEL)
+        .and_then(|window| window.is_visible().ok())
+        .unwrap_or(false)
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SockscapWindowCloseOutcome {
     Hidden,
-    Closed,
 }
 
-/// Active capture is process-global and must survive closing its dashboard.
-/// Inactive windows are destroyed so the next open gets a clean UI instance.
+/// The close affordance always hides the process-global Sockscap window. Only
+/// the explicit guarded Taomni exit command stops capture and terminates.
 #[tauri::command]
-pub fn sockscap_close_window(
-    window: WebviewWindow,
-    state: State<'_, AppState>,
-) -> Result<SockscapWindowCloseOutcome, String> {
-    if window.label() != "sockscap" {
+pub fn sockscap_close_window(window: WebviewWindow) -> Result<SockscapWindowCloseOutcome, String> {
+    if window.label() != WINDOW_LABEL {
         return Err(
             "SOCKSCAP_WINDOW_INVALID_CALLER: only the Sockscap window can close itself".into(),
         );
     }
-    if state.sockscap.status().capture_active {
-        window
-            .hide()
-            .map_err(|error| format!("SOCKSCAP_WINDOW_HIDE_FAILED: {error}"))?;
-        Ok(SockscapWindowCloseOutcome::Hidden)
-    } else {
-        window
-            .destroy()
-            .map_err(|error| format!("SOCKSCAP_WINDOW_CLOSE_FAILED: {error}"))?;
-        Ok(SockscapWindowCloseOutcome::Closed)
-    }
+    window
+        .hide()
+        .map_err(|error| format!("SOCKSCAP_WINDOW_HIDE_FAILED: {error}"))?;
+    super::tray::refresh_sockscap_tray(window.app_handle());
+    Ok(SockscapWindowCloseOutcome::Hidden)
 }
 
 #[tauri::command]
@@ -925,9 +984,9 @@ fn auto_restore_status_code(
     }
 }
 
-fn publish_engine_result(
+pub(crate) fn publish_engine_result(
     app: &AppHandle,
-    state: &State<'_, AppState>,
+    state: &AppState,
     result: &Result<EngineStatus, String>,
 ) {
     let status = result
@@ -938,6 +997,13 @@ fn publish_engine_result(
     if let Err(error) = result {
         emit_alert(app, error);
     }
+    super::tray::refresh_sockscap_tray(app);
+}
+
+pub(crate) fn publish_external_error(app: &AppHandle, error: String) {
+    let state = app.state::<AppState>();
+    let result = Err(error);
+    publish_engine_result(app, &state, &result);
 }
 
 fn emit_alert(app: &AppHandle, error: &str) {

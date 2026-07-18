@@ -703,6 +703,8 @@ export const zhCN: DeepPartial<typeof en> = {
     promptOneTerminal: "当前有 {count} 个打开的标签页，其中包含 {terminals} 个终端会话。确认退出 Taomni 并关闭它们？",
     promptMany: "当前有 {count} 个打开的标签页。确认退出 Taomni 并关闭它们？",
     promptManyTerminals: "当前有 {count} 个打开的标签页，其中包含 {terminals} 个终端会话。确认退出 Taomni 并关闭它们？",
+    cleanupFailedTitle: "Taomni 无法安全退出",
+    cleanupFailed: "Sockscap 尚未确认网络清理完成，因此 Taomni 保持运行。{error}",
   },
   about: {
     title: "关于 Taomni",

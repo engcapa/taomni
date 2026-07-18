@@ -86,6 +86,7 @@ import { ServersDialog } from "../components/servers/ServersDialog";
 import { useServersStore } from "../stores/serversStore";
 import { parseQuickConnectInput } from "../lib/quickConnect";
 import { exitApp, selectFolderPath, type SessionConfig } from "../lib/ipc";
+import { sockscapStatus } from "../lib/sockscap";
 import {
   vaultPut,
   VAULT_LOCKED_EVENT,
@@ -1524,21 +1525,41 @@ export function MainLayout() {
     });
   }, [confirmAppExit]);
 
-  const requestAppExit = useCallback(() => {
+  const runExitRequest = useCallback((hideWhenSockscapActive: boolean) => {
     if (exitRequestInFlightRef.current) return;
     exitRequestInFlightRef.current = true;
     void (async () => {
       try {
+        if (hideWhenSockscapActive) {
+          let captureActive = false;
+          try {
+            captureActive = (await sockscapStatus())?.captureActive === true;
+          } catch {
+            // If status cannot be read, fall through to the guarded exit path.
+          }
+          if (captureActive) {
+            await getCurrentWindow().hide();
+            return;
+          }
+        }
         if (await confirmExitWithOpenTabs()) {
           await exitApp();
         }
-      } catch {
-        // Keep exit failure non-fatal; the user stays in the app.
+      } catch (error) {
+        void alertAppDialog({
+          title: tr("exit.cleanupFailedTitle"),
+          message: tr("exit.cleanupFailed", {
+            error: error instanceof Error ? error.message : String(error),
+          }),
+        });
       } finally {
         exitRequestInFlightRef.current = false;
       }
     })();
   }, [confirmExitWithOpenTabs]);
+
+  const requestAppExit = useCallback(() => runExitRequest(false), [runExitRequest]);
+  const requestWindowClose = useCallback(() => runExitRequest(true), [runExitRequest]);
 
   useEffect(() => {
     const appWindow = getCurrentWindow();
@@ -1546,7 +1567,7 @@ export function MainLayout() {
 
     void appWindow.onCloseRequested((event) => {
       event.preventDefault();
-      requestAppExit();
+      requestWindowClose();
     }).then((fn) => {
       unlisten = fn;
     });
@@ -1554,7 +1575,7 @@ export function MainLayout() {
     return () => {
       unlisten?.();
     };
-  }, [requestAppExit]);
+  }, [requestWindowClose]);
 
   const handleNewSession = useCallback((groupPath: string | null = null) => {
     setEditingSession(undefined);
@@ -3314,7 +3335,7 @@ export function MainLayout() {
             ? handleDetachActiveTab
             : undefined
         }
-        onCloseWindow={requestAppExit}
+        onCloseWindow={requestWindowClose}
         slotRef={setTabActionSlot}
       />
       {quickConnectVisible && (
