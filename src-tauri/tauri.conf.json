@@ -47,16 +47,6 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": {
-      "resources/windivert/WinDivert.dll": "windivert/WinDivert.dll",
-      "resources/windivert/WinDivert64.sys": "windivert/WinDivert64.sys",
-      "resources/windivert/LICENSE": "windivert/LICENSE",
-      "resources/windivert/VERSION": "windivert/VERSION",
-      "resources/windivert/README.md": "windivert/README.md"
-    },
-    "externalBin": [
-      "binaries/sockscap-helper"
-    ],
     "macOS": {
       "entitlements": "Entitlements.plist",
       "frameworks": [

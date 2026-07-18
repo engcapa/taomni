@@ -82,6 +82,14 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      # Sockscap privileged helper is Windows-only (tauri.windows.conf.json externalBin).
+      # binaries/ is gitignored; stage a real release binary before tauri-action packs.
+      - name: Stage sockscap-helper (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File scripts/stage-sockscap-helper.ps1 -Release
+
       - name: Resolve release version
         id: version
         shell: bash

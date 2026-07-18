@@ -9,9 +9,10 @@ fn main() {
     tauri_build::build();
 }
 
-/// Tauri `externalBin` requires the target-triple-suffixed helper to exist at
-/// build-script time. Create a placeholder so `cargo build` / `tauri dev` work
-/// before `scripts/stage-sockscap-helper.ps1` overwrites it with a real binary.
+/// Windows-only `externalBin` (see `tauri.windows.conf.json`) requires the
+/// target-triple-suffixed helper to exist at build-script time. Create a
+/// placeholder so `cargo build` / `tauri dev` work before
+/// `scripts/stage-sockscap-helper.ps1` overwrites it with a real binary.
 fn ensure_sockscap_helper_placeholder() {
     let triple = std::env::var("TAURI_ENV_TARGET_TRIPLE")
         .or_else(|_| std::env::var("TARGET"))
