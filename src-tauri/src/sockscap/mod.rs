@@ -33,6 +33,7 @@ pub mod matcher;
 pub mod model;
 pub mod policy;
 pub mod ssh_pool;
+pub mod transparent;
 pub mod tray;
 
 use serde::{Deserialize, Serialize};

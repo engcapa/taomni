@@ -82,8 +82,9 @@ impl FlowRouter {
     }
 
     /// The connector for a decided action: DIRECT/BLOCK use direct-or-none;
-    /// PROXY uses the upstream if present, else DIRECT (fail-open).
-    fn connector_for(&self, action: Action) -> Option<&dyn EgressConnector> {
+    /// PROXY uses the upstream if present, else DIRECT (fail-open). `None` ⇒
+    /// BLOCK (drop the flow). Public so transparent backends can reuse routing.
+    pub fn connector_for(&self, action: Action) -> Option<&dyn EgressConnector> {
         match action {
             Action::Direct => Some(&self.direct),
             Action::Block => None,
