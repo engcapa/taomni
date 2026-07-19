@@ -41,8 +41,8 @@ use std::net::SocketAddr;
 use ironrdp::server::{Credentials, DesktopSize, RdpServer, ServerEvent, TlsIdentityCtx};
 use tokio_util::sync::CancellationToken;
 
-use super::engine::{LogEmitter, ServerCtx, ServerStarted};
 use super::ServerConfig;
+use super::engine::{LogEmitter, ServerCtx, ServerStarted};
 
 mod auth;
 /// Screen-capture backends (X11 / Wayland). Exposed crate-wide so the LanChat
@@ -153,6 +153,28 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
         width: 1920,
         height: 1080,
     };
+
+    // R0: announce capture capability so logs make "placeholder vs real desktop"
+    // obvious before a client connects.
+    ctx.log.line(format!(
+        "RDP capture: {}",
+        capture::capture_capability_summary()
+    ));
+    match capture::create_capturer(&ctx.log) {
+        Ok(cap) => {
+            let (w, h) = cap.desktop_size();
+            ctx.log.line(format!(
+                "RDP capture probe OK — desktop {}x{} (real frames will be served)",
+                w, h
+            ));
+        }
+        Err(e) => {
+            ctx.log.line(format!(
+                "RDP capture probe FAILED — clients will see a placeholder checkerboard \
+                 until a backend is available: {e}"
+            ));
+        }
+    }
 
     // Phase 7 (Linux advanced): independent/headless virtual sessions. The base
     // server mirrors the current console desktop; when the user asks for a

@@ -19,9 +19,9 @@ use ironrdp::server::{
     RdpServerDisplayUpdates,
 };
 use tokio::sync::mpsc;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
-use super::capture::{create_capturer, Capturer, Frame};
+use super::capture::{Capturer, Frame, create_capturer};
 use crate::servers::engine::LogEmitter;
 
 /// Display handler handed to the IronRDP builder. Probes the capture backend to
@@ -173,16 +173,50 @@ impl DisplayUpdatesImpl {
     }
 
     async fn next_synthetic(&mut self) -> anyhow::Result<Option<DisplayUpdate>> {
-        sleep(Duration::from_millis(500)).await;
-        let palette: [[u8; 3]; 4] = [
-            [0xC0, 0x40, 0x40],
-            [0x40, 0xC0, 0x40],
-            [0x40, 0x40, 0xC0],
-            [0x40, 0xC0, 0xC0],
-        ];
-        let color = palette[usize::from(self.tick % 4)];
+        sleep(Duration::from_millis(750)).await;
+        // Checkerboard + shifting accent stripe so "placeholder" is obvious
+        // even if the client is silent (no real desktop capture on this OS).
         self.tick = self.tick.wrapping_add(1);
-        Ok(self.solid_frame(color).map(DisplayUpdate::Bitmap))
+        Ok(self.placeholder_frame().map(DisplayUpdate::Bitmap))
+    }
+
+    /// High-contrast placeholder so users never mistake empty capture for a
+    /// frozen desktop. Stripe position advances with `tick`.
+    fn placeholder_frame(&self) -> Option<BitmapUpdate> {
+        let width = NonZeroU16::new(self.size.width)?;
+        let height = NonZeroU16::new(self.size.height)?;
+        let w = usize::from(self.size.width);
+        let h = usize::from(self.size.height);
+        let stride = NonZeroUsize::new(w.checked_mul(4)?)?;
+        let stripe = (usize::from(self.tick).saturating_mul(8)) % w.max(1);
+
+        let mut data = Vec::with_capacity(stride.get().checked_mul(h)?);
+        for y in 0..h {
+            for x in 0..w {
+                let cell = ((x / 32) + (y / 32)) % 2 == 0;
+                let on_stripe = x.abs_diff(stripe) < 6;
+                let (b, g, r) = if on_stripe {
+                    (0x20, 0xA0, 0xFF)
+                } else if cell {
+                    (0x38, 0x38, 0x48)
+                } else {
+                    (0x22, 0x22, 0x2E)
+                };
+                data.push(b);
+                data.push(g);
+                data.push(r);
+                data.push(255);
+            }
+        }
+        Some(BitmapUpdate {
+            x: 0,
+            y: 0,
+            width,
+            height,
+            format: PixelFormat::BgrA32,
+            data: data.into(),
+            stride,
+        })
     }
 }
 

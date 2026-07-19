@@ -12,8 +12,8 @@
 ## 1. 一句话现状
 
 **Linux X11 全链路可用**（连接 → 真桌面 → 键鼠 → 文本剪贴板 → TLS/NLA）。  
-**Windows / macOS 能连上但画面是占位帧**（捕获未实现）；输入有结构性映射、剪贴板/TLS 跨平台。  
-进阶（Wayland 原生捕获、Linux 独立会话/无头 sesman、音频、登录屏）为脚手架或明确不做。
+**Linux X11 全链路可用**；**macOS 已接 xcap 真桌面采集**（需屏幕录制权限）；**Linux 纯 Wayland** 走 xcap 门户回退。  
+**Windows 捕获仍为占位**（本分支按产品优先级暂缓 DXGI）。输入/剪贴板/TLS 跨平台。
 
 ---
 
@@ -52,14 +52,14 @@
 
 | 优先级 | 缺口 | 平台 |
 |--------|------|------|
-| **P0** | Windows 屏幕捕获（DXGI Desktop Duplication 或 WGC） | Win |
-| **P0** | macOS 屏幕捕获（ScreenCaptureKit 优先，或 CGDisplayStream） | macOS |
-| **P0** | 捕获失败时 UI/日志明确，避免用户以为「黑屏=连上了」 | 全平台 |
-| **P1** | macOS 键盘 scancode 表补全 | macOS |
-| **P1** | Windows 输入运行时回归（DPI/多显示器坐标） | Win |
-| **P1** | Linux 纯 Wayland 捕获（PipeWire portal） | Linux |
-| **P1** | 硬件光标下发（X11 xfixes cursor → RGBAPointer） | 至少 Linux |
-| **P2** | `Synchronize` 锁定键状态 | 全平台 |
+| **P0** | Windows 屏幕捕获（DXGI/WGC） | Win — **本分支暂缓** |
+| **P0** | ~~macOS 屏幕捕获~~ | macOS — ✅ `xcap` |
+| **P0** | ~~捕获失败 UI/日志明确~~ | 全平台 — ✅ R0 |
+| **P1** | ~~macOS 键盘 scancode 表补全~~ | macOS — ✅ 扩展映射 |
+| **P1** | Windows 输入运行时回归 | Win — 暂缓 |
+| **P1** | ~~Linux 纯 Wayland 捕获~~ | Linux — ✅ xcap 门户回退 |
+| **P1** | 硬件光标下发（X11 xfixes → RGBAPointer） | 仍待做 |
+| **P2** | ~~`Synchronize` 锁定键~~ | ✅ 尽力脉冲 Caps/Num/Scroll |
 | **P2** | 客户端 resize / 多显示器 | 全平台 |
 | **P2** | 连接失败/权限引导（macOS 录屏权限、Win 高 DPI） | Win/mac |
 | **P3** | Linux sesman 独立会话 + 无头（T-11） | Linux |
@@ -75,12 +75,12 @@
 
 **目标**：用户立刻知道当前平台能不能看桌面。
 
-| 任务 ID | 内容 | 验收 |
+| 任务 ID | 内容 | 状态 |
 |---------|------|------|
-| R0-1 | 启动时探测捕获后端；失败则 `server://output` 明确打印平台缺失与后果 | Win/mac 启动日志含 “placeholder” 与实现路径提示 |
-| R0-2 | 前端 `RdpSettings` 按平台显示能力说明（i18n）：Win/mac「画面捕获未实现」/ Linux X11「可用」/ Wayland「有限」 | 设置页可见，非仅日志 |
-| R0-3 | 占位帧叠加文字（可选）：“Screen capture unavailable on this platform” | 客户端一眼能懂 |
-| R0-4 | 同步更新 `rust_rdp_server_feature_dev_task.md` 状态表（本计划落地后） | 任务文档与代码一致 |
+| R0-1 | 启动时 `create_capturer` 探测 + capability summary 日志 | ✅ |
+| R0-2 | 前端 `RdpSettings` 按平台 i18n 能力说明 | ✅ |
+| R0-3 | 占位帧改为高对比棋盘 + 移动色条 | ✅ |
+| R0-4 | 本计划文档状态同步 | ✅ |
 
 **依赖**：无  
 **风险**：低
@@ -115,14 +115,14 @@
 
 **目标**：macOS 上 FreeRDP/微软客户端看到并操控桌面。
 
-| 任务 ID | 内容 | 验收 |
+| 任务 ID | 内容 | 状态 |
 |---------|------|------|
-| R2-1 | 新增 `capture/mac.rs`：**ScreenCaptureKit**（macOS 12.3+）或 CGDisplayStream 回退 | 捕获 Ok |
-| R2-2 | 首次启动触发/引导 **Screen Recording** 权限；拒绝时明确错误 | 用户可知去系统设置开启 |
-| R2-3 | Retina：逻辑/物理像素与 RDP DesktopSize、鼠标坐标一致 | 点击不偏移 |
-| R2-4 | 补全 `macos_scancode_to_keycode` 常用键与扩展键；必要时 Unicode 路径 | 文本输入可用 |
-| R2-5 | Accessibility 权限对 enigo 的说明与降级 view-only | 无权限时日志清晰 |
-| R2-6 | 手测：macOS + FreeRDP / Microsoft Remote Desktop | 检查表 |
+| R2-1 | `capture/mac.rs` + `xcap_backend`（CGDisplay 路径） | ✅ |
+| R2-2 | 捕获失败错误文案引导 Screen Recording | ✅ |
+| R2-3 | Retina：xcap 返回物理像素；坐标依赖 enigo（手测） | ⚠️ 手测 |
+| R2-4 | 扩展 scancode→CGKeyCode + E0 方向键 | ✅ |
+| R2-5 | enigo 初始化失败 view-only 日志（既有） | ✅ |
+| R2-6 | 手测 macOS + FreeRDP | 待本机 |
 
 **依赖**：R0  
 **风险**：高（权限、Retina、SCK API 演进）
@@ -133,12 +133,12 @@
 
 **目标**：Wayland 主机可用；X11 体验打磨。
 
-| 任务 ID | 内容 | 验收 |
+| 任务 ID | 内容 | 状态 |
 |---------|------|------|
-| R3-1 | Wayland：`ashpd` ScreenCast + PipeWire 拉帧 → BGRA `Frame`（可选 feature 或系统 lib 探测） | 纯 Wayland 会话非占位 |
-| R3-2 | X11 硬件光标：`xfixes_get_cursor_image` → `DisplayUpdate` 指针 | 远程可见光标形状 |
-| R3-3 | 多显示器：选主屏或虚拟拼桌（先做主屏即可） | 文档说明范围 |
-| R3-4 | 锁定键 `Synchronize` | Caps 状态与本地一致 |
+| R3-1 | Wayland：X11 失败后 `xcap` 门户回退 | ✅ |
+| R3-2 | X11 硬件光标 → RGBAPointer | ⬜ 未做 |
+| R3-3 | 多显示器：xcap/X11 先主屏 | ✅ 主屏 |
+| R3-4 | 锁定键 `Synchronize` 尽力脉冲 | ✅ |
 
 **依赖**：R1/R2 不阻塞；可与 R1 并行由不同人做  
 **风险**：中–高（PipeWire 构建依赖、portal 用户授权）

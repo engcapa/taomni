@@ -34,13 +34,13 @@ use std::os::unix::io::OwnedFd;
 use std::ptr::NonNull;
 use std::time::{Duration, Instant};
 
-use anyhow::{bail, Context as _};
+use anyhow::{Context as _, bail};
 use x11rb::connection::{Connection, RequestConnection as _};
+use x11rb::protocol::Event;
 use x11rb::protocol::damage::{self, ConnectionExt as _};
 use x11rb::protocol::shm::{self, ConnectionExt as _};
 use x11rb::protocol::xfixes::{self, ConnectionExt as _};
 use x11rb::protocol::xproto::{self, ConnectionExt as _, ImageFormat};
-use x11rb::protocol::Event;
 use x11rb::rust_connection::RustConnection;
 
 use super::{Capturer, Frame};
