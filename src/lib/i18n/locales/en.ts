@@ -1333,8 +1333,12 @@ const dict = {
       startOnLaunch: "Start on app launch",
       browse: "Browse…",
       authMethod: "Auth method",
-      authMethodOs: "OS credentials",
+      authMethodOs: "Password",
+      authMethodPassword: "Password",
       authMethodKey: "Key file",
+      authMethodBoth: "Password + key file",
+      loginShell: "Login shell",
+      maxSessions: "Max sessions",
       allowedUsers: "Allowed users",
       sftpRootDir: "SFTP root directory",
       rootDir: "Root directory",
@@ -1374,6 +1378,10 @@ const dict = {
         "Uses a self-signed certificate stored in app data; clients will see a trust warning on first connect.",
       rdpInsecure:
         "No security means traffic is unencrypted and, without credentials, anyone who can reach the port gets full control. Use only on an isolated network.",
+      sshPortForward:
+        "Port forwarding is enabled: clients may use -L (local), -R (remote), and -D (dynamic SOCKS). Remote (-R) listeners bound off-loopback are logged as a warning.",
+      sshAuthHint:
+        "Password is checked against the value configured here (not OS/PAM accounts). Key file may contain multiple OpenSSH public keys (authorized_keys format). Host key is stored under app data and reused across restarts.",
     },
     types: {
       ssh: { label: "SSH / SFTP", desc: "Secure shell and SFTP file server" },

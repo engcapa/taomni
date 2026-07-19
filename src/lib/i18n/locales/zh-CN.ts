@@ -1332,8 +1332,12 @@ export const zhCN: DeepPartial<typeof en> = {
       startOnLaunch: "应用启动时启动",
       browse: "浏览……",
       authMethod: "认证方式",
-      authMethodOs: "操作系统凭据",
+      authMethodOs: "密码",
+      authMethodPassword: "密码",
       authMethodKey: "密钥文件",
+      authMethodBoth: "密码 + 密钥文件",
+      loginShell: "登录 Shell",
+      maxSessions: "最大会话数",
       allowedUsers: "允许的用户",
       sftpRootDir: "SFTP 根目录",
       rootDir: "根目录",
@@ -1370,6 +1374,10 @@ export const zhCN: DeepPartial<typeof en> = {
       rdpSelfSigned: "使用存储在应用数据中的自签名证书；客户端首次连接时会看到信任警告。",
       rdpInsecure:
         "无安全模式意味着流量不加密；若未设置凭据，任何能访问该端口的人都可完全控制本机桌面。请仅在隔离网络中使用。",
+      sshPortForward:
+        "已启用端口转发：客户端可使用 -L（本地）、-R（远程）与 -D（动态 SOCKS）。远程转发若监听非本机回环地址，会在日志中给出警告。",
+      sshAuthHint:
+        "密码与此处配置值比对（不是操作系统/PAM 账号）。密钥文件支持多行 OpenSSH 公钥（authorized_keys 格式）。主机密钥保存在应用数据目录并跨重启复用。",
     },
     types: {
       ssh: { label: "SSH / SFTP", desc: "安全外壳与 SFTP 文件服务器" },

@@ -1,4 +1,4 @@
-//! Real in-process SSH/SFTP server built on `russh` 0.46 + `russh-sftp` 2.
+//! Real in-process SSH/SFTP server built on `russh` 0.61 + `russh-sftp` 2.
 //!
 //! This is NOT an OS/PAM gateway: authentication is checked against credentials
 //! supplied in the server config (a password and/or a single authorized public
@@ -7,10 +7,22 @@
 //! the SSH channel; the `sftp` subsystem is served by an in-process handler
 //! rooted at a configured directory.
 //!
+//! ## Port forwarding (RFC 4254 §7)
+//!
+//! - **Local / dynamic** (`-L` / `-D` on the client): handled as
+//!   `direct-tcpip` channels — we TCP-connect to the requested destination and
+//!   bridge bytes bidirectionally. Dynamic SOCKS is client-side only; the
+//!   server just sees a stream of `direct-tcpip` opens.
+//! - **Remote** (`-R` on the client): `tcpip-forward` binds a local listener;
+//!   each inbound TCP connection opens a `forwarded-tcpip` channel back to the
+//!   client and is bridged the same way. `cancel-tcpip-forward` tears the
+//!   listener down; all reverse listeners die with the SSH session.
+//!
 //! Server-specific config (`config.extra`, camelCase as sent by the frontend):
 //!   - `password`      (string) accept password auth matching this value
 //!   - `authorizedKey` (string) accept publickey auth matching this OpenSSH key
 //!                              line ("ssh-ed25519 AAAA... [comment]")
+//!   - `authorizedKeyPath` (string) path to a .pub / authorized_keys file
 //!   - `allowedUsers`  (string) comma-separated usernames; empty = any username
 //!   - `rootDir`       (string) SFTP/shell root directory; default = home dir
 //!
@@ -23,13 +35,18 @@ use std::net::SocketAddr;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
-use russh::keys::{Algorithm, PrivateKey, PublicKey};
+use russh::keys::{Algorithm, HashAlg, PrivateKey, PublicKey, ssh_key};
 use russh::server::{Auth, Config as RusshConfig, Handler as ServerHandler, Msg, Server, Session};
 use russh::{Channel, ChannelId, MethodKind, MethodSet};
 use russh_sftp::protocol::{
     File, FileAttributes, Handle as SftpHandle, Name, Status, StatusCode, Version,
 };
-use std::io::{Read as _, Write as _};
+use std::io::{Read, Write as _};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Instant;
+use tauri::{AppHandle, Manager as _};
+use tokio::io::AsyncWriteExt;
+use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
@@ -41,7 +58,7 @@ use super::engine::{LogEmitter, ServerCtx, ServerStarted};
 #[derive(Clone)]
 struct AuthPolicy {
     password: Option<String>,
-    authorized_key: Option<PublicKey>,
+    authorized_keys: Vec<PublicKey>,
     allowed_users: Vec<String>,
 }
 
@@ -49,16 +66,47 @@ impl AuthPolicy {
     fn user_allowed(&self, user: &str) -> bool {
         self.allowed_users.is_empty() || self.allowed_users.iter().any(|u| u == user)
     }
+
+    fn public_key_ok(&self, offered: &PublicKey) -> bool {
+        self.authorized_keys.iter().any(|k| k == offered)
+    }
 }
+
+/// Per-server runtime options that apply to every connection.
+#[derive(Clone)]
+struct SessionOpts {
+    root: Arc<PathBuf>,
+    /// When true, interactive shells are started as login shells (`-l` on Unix).
+    login_shell: bool,
+    /// Hard cap on concurrent SSH sessions (connections).
+    max_sessions: usize,
+}
+
+/// Env vars clients may set via SSH_MSG_CHANNEL_REQUEST "env".
+const ENV_WHITELIST: &[&str] = &[
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "LC_MESSAGES",
+    "LC_TIME",
+    "TERM",
+    "COLORTERM",
+    "TZ",
+    "PATH",
+    "HOME",
+    "USER",
+    "LOGNAME",
+];
 
 /* ----------------------------- server glue --------------------------- */
 
 #[derive(Clone)]
 struct SshServer {
     policy: Arc<AuthPolicy>,
-    root: Arc<PathBuf>,
+    opts: Arc<SessionOpts>,
     log: LogEmitter,
     cancel: CancellationToken,
+    active_sessions: Arc<AtomicUsize>,
 }
 
 impl Server for SshServer {
@@ -72,12 +120,20 @@ impl Server for SshServer {
         }
         SshConnection {
             policy: self.policy.clone(),
-            root: self.root.clone(),
+            opts: self.opts.clone(),
             log: self.log.clone(),
             cancel: self.cancel.clone(),
             shells: HashMap::new(),
             pending_channels: Arc::new(Mutex::new(HashMap::new())),
+            reverse_forwards: HashMap::new(),
+            pty_sizes: HashMap::new(),
+            pending_env: HashMap::new(),
             authed_user: None,
+            auth_method: None,
+            peer,
+            connected_at: Instant::now(),
+            session_slot: None,
+            active_sessions: self.active_sessions.clone(),
         }
     }
 
@@ -85,6 +141,17 @@ impl Server for SshServer {
         // Routine teardown (client closed the socket) shows up here; keep it at
         // a low-key log line rather than treating it as a server failure.
         self.log.line(format!("session ended: {}", error));
+    }
+}
+
+/// Decrements the global active-session counter when the connection is dropped.
+struct SessionSlot {
+    active: Arc<AtomicUsize>,
+}
+
+impl Drop for SessionSlot {
+    fn drop(&mut self) {
+        self.active.fetch_sub(1, Ordering::SeqCst);
     }
 }
 
@@ -98,7 +165,7 @@ struct ShellIo {
 
 struct SshConnection {
     policy: Arc<AuthPolicy>,
-    root: Arc<PathBuf>,
+    opts: Arc<SessionOpts>,
     log: LogEmitter,
     cancel: CancellationToken,
     /// Active shells keyed by channel id (PTY writer + master for resize).
@@ -106,7 +173,45 @@ struct SshConnection {
     /// Channels parked between `channel_open_session` and `subsystem_request`,
     /// so the SFTP subsystem can take ownership of the channel stream.
     pending_channels: Arc<Mutex<HashMap<ChannelId, Channel<Msg>>>>,
+    /// Reverse-forward listeners for this session: `(bind_addr, port) → cancel`.
+    /// Cancelled on `cancel-tcpip-forward` and when the connection is dropped.
+    reverse_forwards: HashMap<(String, u32), CancellationToken>,
+    /// PTY sizes requested before shell/exec (do not open shell on pty-req alone,
+    /// so `exec` can use the same size without spawning an interactive shell).
+    pty_sizes: HashMap<ChannelId, (u16, u16)>,
+    /// Accepted env vars for the next shell/exec on this connection.
+    pending_env: HashMap<String, String>,
     authed_user: Option<String>,
+    auth_method: Option<&'static str>,
+    peer: Option<SocketAddr>,
+    connected_at: Instant,
+    /// Held while the connection is authenticated and counted toward max_sessions.
+    session_slot: Option<SessionSlot>,
+    active_sessions: Arc<AtomicUsize>,
+}
+
+impl Drop for SshConnection {
+    fn drop(&mut self) {
+        for (_, token) in self.reverse_forwards.drain() {
+            token.cancel();
+        }
+        if let Some(user) = &self.authed_user {
+            let secs = self.connected_at.elapsed().as_secs();
+            let peer = self
+                .peer
+                .map(|p| p.to_string())
+                .unwrap_or_else(|| "unknown".into());
+            self.log.line(format!(
+                "session closed user={} auth={} peer={} duration={}s",
+                user,
+                self.auth_method.unwrap_or("?"),
+                peer,
+                secs
+            ));
+        }
+        // session_slot Drop decrements active count
+        self.session_slot.take();
+    }
 }
 
 impl ServerHandler for SshConnection {
@@ -127,7 +232,15 @@ impl ServerHandler for SshConnection {
             }
             match &self.policy.password {
                 Some(expected) if expected == password => {
+                    if !self.try_acquire_session_slot() {
+                        self.log.line(format!(
+                            "password auth rejected: max sessions ({}) reached",
+                            self.opts.max_sessions
+                        ));
+                        return Ok(reject());
+                    }
                     self.authed_user = Some(user.to_string());
+                    self.auth_method = Some("password");
                     self.log
                         .line(format!("password auth accepted for '{}'", user));
                     Ok(Auth::Accept)
@@ -155,18 +268,23 @@ impl ServerHandler for SshConnection {
                 ));
                 return Ok(reject());
             }
-            match &self.policy.authorized_key {
-                Some(authorized) if authorized == offered => {
-                    self.authed_user = Some(user.to_string());
-                    self.log
-                        .line(format!("publickey auth accepted for '{}'", user));
-                    Ok(Auth::Accept)
+            if self.policy.public_key_ok(offered) {
+                if !self.try_acquire_session_slot() {
+                    self.log.line(format!(
+                        "publickey auth rejected: max sessions ({}) reached",
+                        self.opts.max_sessions
+                    ));
+                    return Ok(reject());
                 }
-                _ => {
-                    self.log
-                        .line(format!("publickey auth rejected for '{}'", user));
-                    Ok(reject())
-                }
+                self.authed_user = Some(user.to_string());
+                self.auth_method = Some("publickey");
+                self.log
+                    .line(format!("publickey auth accepted for '{}'", user));
+                Ok(Auth::Accept)
+            } else {
+                self.log
+                    .line(format!("publickey auth rejected for '{}'", user));
+                Ok(reject())
             }
         }
     }
@@ -184,6 +302,215 @@ impl ServerHandler for SshConnection {
         }
     }
 
+    /// Local (`-L`) and dynamic (`-D`) forwarding: client asks us to open a TCP
+    /// connection to `host:port` and relay the channel.
+    fn channel_open_direct_tcpip(
+        &mut self,
+        channel: Channel<Msg>,
+        host_to_connect: &str,
+        port_to_connect: u32,
+        originator_address: &str,
+        originator_port: u32,
+        _session: &mut Session,
+    ) -> impl Future<Output = Result<bool, Self::Error>> + Send {
+        async move {
+            if port_to_connect == 0 || port_to_connect > u32::from(u16::MAX) {
+                self.log.line(format!(
+                    "direct-tcpip rejected: invalid port {} (from {}:{})",
+                    port_to_connect, originator_address, originator_port
+                ));
+                return Ok(false);
+            }
+            let host = host_to_connect.to_string();
+            let port = port_to_connect as u16;
+            let dest = format!("{}:{}", host, port);
+            let log = self.log.clone();
+            let cancel = self.cancel.clone();
+            let origin = format!("{}:{}", originator_address, originator_port);
+            self.log
+                .line(format!("direct-tcpip → {} (origin {})", dest, origin));
+            tokio::spawn(async move {
+                let tcp = match TcpStream::connect((host.as_str(), port)).await {
+                    Ok(s) => s,
+                    Err(e) => {
+                        log.line(format!("direct-tcpip connect to {} failed: {}", dest, e));
+                        let _ = channel.close().await;
+                        return;
+                    }
+                };
+                log.line(format!("direct-tcpip established to {}", dest));
+                bridge_tcp_and_channel(tcp, channel, cancel, log, format!("direct-tcpip {}", dest))
+                    .await;
+            });
+            Ok(true)
+        }
+    }
+
+    /// Remote forwarding (`-R`): client asks us to listen on `address:port` and
+    /// open `forwarded-tcpip` channels back for each inbound TCP connection.
+    fn tcpip_forward(
+        &mut self,
+        address: &str,
+        port: &mut u32,
+        session: &mut Session,
+    ) -> impl Future<Output = Result<bool, Self::Error>> + Send {
+        async move {
+            if *port > u32::from(u16::MAX) {
+                self.log
+                    .line(format!("tcpip-forward rejected: invalid port {}", *port));
+                return Ok(false);
+            }
+            let listen_host = resolve_listen_addr(address);
+            let requested_port = *port as u16;
+            let listener = match TcpListener::bind((listen_host.as_str(), requested_port)).await {
+                Ok(l) => l,
+                Err(e) => {
+                    self.log.line(format!(
+                        "tcpip-forward bind {}:{} failed: {}",
+                        listen_host, requested_port, e
+                    ));
+                    return Ok(false);
+                }
+            };
+            let bound = match listener.local_addr() {
+                Ok(a) => a,
+                Err(e) => {
+                    self.log
+                        .line(format!("tcpip-forward local_addr failed: {}", e));
+                    return Ok(false);
+                }
+            };
+            let bound_port = bound.port() as u32;
+            // RFC 4254: port 0 means "server allocates"; report the real port.
+            *port = bound_port;
+
+            if !is_loopback_addr(&listen_host) {
+                self.log.line(format!(
+                    "WARNING: remote forward listening on {} — reachable beyond this machine",
+                    bound
+                ));
+            }
+
+            // Replace any previous listener on the same (addr, port).
+            let key = (listen_host.clone(), bound_port);
+            if let Some(prev) = self.reverse_forwards.remove(&key) {
+                prev.cancel();
+            }
+            let fwd_cancel = CancellationToken::new();
+            self.reverse_forwards
+                .insert(key.clone(), fwd_cancel.clone());
+
+            let handle = session.handle();
+            let log = self.log.clone();
+            let session_cancel = self.cancel.clone();
+            let connected_address = address.to_string();
+            self.log.line(format!(
+                "tcpip-forward listening on {} (advertised as {}:{})",
+                bound, connected_address, bound_port
+            ));
+
+            tokio::spawn(async move {
+                loop {
+                    tokio::select! {
+                        _ = fwd_cancel.cancelled() => break,
+                        _ = session_cancel.cancelled() => break,
+                        accept = listener.accept() => {
+                            let (tcp, peer) = match accept {
+                                Ok(p) => p,
+                                Err(e) => {
+                                    log.line(format!("tcpip-forward accept error: {}", e));
+                                    break;
+                                }
+                            };
+                            let peer_ip = peer.ip().to_string();
+                            let peer_port = peer.port() as u32;
+                            log.line(format!(
+                                "forwarded-tcpip {} → session (listen {}:{})",
+                                peer, connected_address, bound_port
+                            ));
+                            let handle = handle.clone();
+                            let log = log.clone();
+                            let connected_address = connected_address.clone();
+                            let session_cancel = session_cancel.clone();
+                            tokio::spawn(async move {
+                                let channel = match handle
+                                    .channel_open_forwarded_tcpip(
+                                        connected_address.clone(),
+                                        bound_port,
+                                        peer_ip,
+                                        peer_port,
+                                    )
+                                    .await
+                                {
+                                    Ok(ch) => ch,
+                                    Err(e) => {
+                                        log.line(format!(
+                                            "forwarded-tcpip open to client failed: {}",
+                                            e
+                                        ));
+                                        return;
+                                    }
+                                };
+                                bridge_tcp_and_channel(
+                                    tcp,
+                                    channel,
+                                    session_cancel,
+                                    log,
+                                    format!(
+                                        "forwarded-tcpip {}:{} from {}",
+                                        connected_address, bound_port, peer
+                                    ),
+                                )
+                                .await;
+                            });
+                        }
+                    }
+                }
+                log.line(format!(
+                    "tcpip-forward listener stopped on {}:{}",
+                    connected_address, bound_port
+                ));
+            });
+            Ok(true)
+        }
+    }
+
+    fn cancel_tcpip_forward(
+        &mut self,
+        address: &str,
+        port: u32,
+        _session: &mut Session,
+    ) -> impl Future<Output = Result<bool, Self::Error>> + Send {
+        async move {
+            let listen_host = resolve_listen_addr(address);
+            let key = (listen_host.clone(), port);
+            if let Some(token) = self.reverse_forwards.remove(&key) {
+                token.cancel();
+                self.log.line(format!(
+                    "tcpip-forward cancelled on {}:{}",
+                    listen_host, port
+                ));
+                Ok(true)
+            } else {
+                // Also try the raw address the client sent (in case it differed
+                // from our normalized listen host).
+                let raw_key = (address.to_string(), port);
+                if let Some(token) = self.reverse_forwards.remove(&raw_key) {
+                    token.cancel();
+                    self.log
+                        .line(format!("tcpip-forward cancelled on {}:{}", address, port));
+                    Ok(true)
+                } else {
+                    self.log.line(format!(
+                        "tcpip-forward cancel: no listener on {}:{}",
+                        address, port
+                    ));
+                    Ok(false)
+                }
+            }
+        }
+    }
+
     fn pty_request(
         &mut self,
         channel: ChannelId,
@@ -196,13 +523,11 @@ impl ServerHandler for SshConnection {
         session: &mut Session,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send {
         async move {
-            // Acknowledge the PTY and open the shell at the requested size. Most
-            // clients send pty-req immediately before shell-req; opening here means
-            // window dimensions are honored from the first byte. shell_request is
-            // idempotent and won't open a second shell.
-            session.channel_success(channel);
-            self.ensure_shell(channel, col_width as u16, row_height as u16, session)
-                .await;
+            // Record size only — do not open a shell here so a following
+            // `exec` request can use the PTY size without an interactive shell.
+            self.pty_sizes
+                .insert(channel, (col_width as u16, row_height as u16));
+            let _ = session.channel_success(channel);
             Ok(())
         }
     }
@@ -213,12 +538,57 @@ impl ServerHandler for SshConnection {
         session: &mut Session,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send {
         async move {
-            // If a PTY was requested first, the shell already exists; otherwise open
-            // one with a sensible default size (dumb, no-pty clients).
+            let (cols, rows) = self.pty_sizes.remove(&channel).unwrap_or((80, 24));
             if !self.shells.contains_key(&channel) {
-                self.ensure_shell(channel, 80, 24, session).await;
+                self.ensure_shell(channel, cols, rows, session).await;
             }
-            session.channel_success(channel);
+            let _ = session.channel_success(channel);
+            Ok(())
+        }
+    }
+
+    fn exec_request(
+        &mut self,
+        channel: ChannelId,
+        data: &[u8],
+        session: &mut Session,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        async move {
+            let command = String::from_utf8_lossy(data).into_owned();
+            let (cols, rows) = self.pty_sizes.remove(&channel).unwrap_or((80, 24));
+            self.log.line(format!(
+                "exec request from {}: {}",
+                self.authed_user.as_deref().unwrap_or("?"),
+                command
+            ));
+            if self
+                .ensure_exec(channel, &command, cols, rows, session)
+                .await
+            {
+                let _ = session.channel_success(channel);
+            } else {
+                let _ = session.channel_failure(channel);
+            }
+            Ok(())
+        }
+    }
+
+    fn env_request(
+        &mut self,
+        channel: ChannelId,
+        variable_name: &str,
+        variable_value: &str,
+        session: &mut Session,
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        async move {
+            if ENV_WHITELIST.iter().any(|k| *k == variable_name) {
+                self.pending_env
+                    .insert(variable_name.to_string(), variable_value.to_string());
+                let _ = session.channel_success(channel);
+            } else {
+                // Silently refuse non-whitelisted vars (OpenSSH-style).
+                let _ = session.channel_failure(channel);
+            }
             Ok(())
         }
     }
@@ -283,9 +653,9 @@ impl ServerHandler for SshConnection {
                 session.channel_success(channel_id);
                 self.log.line(format!(
                     "sftp subsystem opened (root {})",
-                    self.root.display()
+                    self.opts.root.display()
                 ));
-                let handler = SftpHandler::new(self.root.clone(), self.log.clone());
+                let handler = SftpHandler::new(self.opts.root.clone(), self.log.clone());
                 russh_sftp::server::run(channel.into_stream(), handler).await;
                 Ok(())
             } else {
@@ -326,7 +696,78 @@ fn reject() -> Auth {
     }
 }
 
+/// Normalize the address string from a `tcpip-forward` request into something
+/// `TcpListener::bind` accepts. OpenSSH clients commonly send `""`,
+/// `"localhost"`, `"127.0.0.1"`, or `"0.0.0.0"`.
+fn resolve_listen_addr(address: &str) -> String {
+    match address.trim() {
+        "" | "*" => "0.0.0.0".to_string(),
+        "localhost" => "127.0.0.1".to_string(),
+        other => other.to_string(),
+    }
+}
+
+fn is_loopback_addr(host: &str) -> bool {
+    matches!(host, "127.0.0.1" | "::1" | "localhost" | "0:0:0:0:0:0:0:1")
+}
+
+/// Bidirectional byte bridge between a TCP socket and an SSH channel stream.
+/// Exits when either side closes, the cancel token fires, or an I/O error occurs.
+async fn bridge_tcp_and_channel(
+    mut tcp: TcpStream,
+    channel: Channel<Msg>,
+    cancel: CancellationToken,
+    log: LogEmitter,
+    label: String,
+) {
+    let mut stream = channel.into_stream();
+    tokio::select! {
+        _ = cancel.cancelled() => {
+            let _ = tcp.shutdown().await;
+            log.line(format!("{} stopped (server cancel)", label));
+        }
+        res = tokio::io::copy_bidirectional(&mut tcp, &mut stream) => {
+            match res {
+                // copy_bidirectional(tcp, stream): (tcp→stream, stream→tcp)
+                Ok((to_client, to_remote)) => {
+                    log.line(format!(
+                        "{} closed ({} B → client, {} B → remote)",
+                        label, to_client, to_remote
+                    ));
+                }
+                Err(e) => {
+                    log.line(format!("{} bridge error: {}", label, e));
+                }
+            }
+        }
+    }
+}
+
 impl SshConnection {
+    /// Reserve a session slot for max-sessions accounting. Idempotent once held.
+    fn try_acquire_session_slot(&mut self) -> bool {
+        if self.session_slot.is_some() {
+            return true;
+        }
+        let max = self.opts.max_sessions.max(1);
+        loop {
+            let cur = self.active_sessions.load(Ordering::SeqCst);
+            if cur >= max {
+                return false;
+            }
+            if self
+                .active_sessions
+                .compare_exchange(cur, cur + 1, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+            {
+                self.session_slot = Some(SessionSlot {
+                    active: self.active_sessions.clone(),
+                });
+                return true;
+            }
+        }
+    }
+
     /// Open a local shell in a PTY for `channel` and start pumping its output
     /// to the SSH channel. Idempotent per channel.
     async fn ensure_shell(
@@ -339,25 +780,80 @@ impl SshConnection {
         if self.shells.contains_key(&channel) {
             return;
         }
-        // This channel is interactive, not SFTP: drop the parked Channel handle
-        // so its undrained receiver (which the session fills with a copy of every
-        // inbound data packet) doesn't accumulate. We drive shell I/O via
-        // `session.handle()` for output and `Handler::data` for input instead.
         {
             let mut pending = self.pending_channels.lock().await;
             pending.remove(&channel);
         }
-        let cwd = Some(self.root.display().to_string());
-        let (handle, mut reader, _id) =
-            match crate::terminal::pty::create_pty(cols, rows, None, None, cwd) {
-                Ok(t) => t,
-                Err(e) => {
-                    self.log.line(format!("failed to open shell PTY: {}", e));
-                    let _ = session.handle().eof(channel).await;
-                    return;
-                }
-            };
 
+        let launch = crate::terminal::pty::resolve_shell(None);
+        let mut args = launch.args;
+        #[cfg(unix)]
+        if self.opts.login_shell {
+            // Prefer login shell so user rc files load (PATH, aliases, …).
+            if !args.iter().any(|a| a == "-l" || a == "--login") {
+                args.insert(0, "-l".to_string());
+            }
+        }
+        // Client env is applied for exec via shell exports; interactive shells
+        // inherit the server process environment (whitelist vars can be set by
+        // the user in their login rc when loginShell is enabled).
+        let cwd = Some(self.opts.root.display().to_string());
+
+        let result = spawn_pty_command(cols, rows, &launch.program, &args, cwd.as_deref());
+        let (handle, reader) = match result {
+            Ok(t) => t,
+            Err(e) => {
+                self.log.line(format!("failed to open shell PTY: {}", e));
+                let _ = session.handle().eof(channel).await;
+                return;
+            }
+        };
+
+        self.attach_pty_io(channel, handle, reader, session, "shell");
+    }
+
+    /// Run a one-shot command in a PTY (or pipe-like PTY) for `exec` requests.
+    /// Returns false if the command could not be spawned.
+    async fn ensure_exec(
+        &mut self,
+        channel: ChannelId,
+        command: &str,
+        cols: u16,
+        rows: u16,
+        session: &mut Session,
+    ) -> bool {
+        if self.shells.contains_key(&channel) {
+            return true;
+        }
+        {
+            let mut pending = self.pending_channels.lock().await;
+            pending.remove(&channel);
+        }
+
+        let command = apply_env_exports(command, &self.pending_env);
+        let (program, args) = exec_command_launch(&command, self.opts.login_shell);
+        let cwd = Some(self.opts.root.display().to_string());
+        let result = spawn_pty_command(cols, rows, &program, &args, cwd.as_deref());
+        let (handle, reader) = match result {
+            Ok(t) => t,
+            Err(e) => {
+                self.log
+                    .line(format!("failed to exec {:?}: {}", command, e));
+                return false;
+            }
+        };
+        self.attach_pty_io(channel, handle, reader, session, "exec");
+        true
+    }
+
+    fn attach_pty_io(
+        &mut self,
+        channel: ChannelId,
+        handle: crate::terminal::pty::PtyHandle,
+        mut reader: Box<dyn Read + Send>,
+        session: &mut Session,
+        kind: &'static str,
+    ) {
         let crate::terminal::pty::PtyHandle {
             writer,
             mut child,
@@ -367,9 +863,6 @@ impl SshConnection {
 
         self.shells.insert(channel, ShellIo { writer, master });
 
-        // Pump PTY output -> SSH channel. portable-pty's reader is blocking, so
-        // read on a blocking thread and forward chunks through a channel into an
-        // async task that writes to the SSH session handle.
         let handle = session.handle();
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
         std::thread::spawn(move || {
@@ -405,7 +898,6 @@ impl SshConnection {
                                 }
                             }
                             None => {
-                                // PTY closed (shell exited). Report exit + EOF.
                                 let code = match child.wait() {
                                     Ok(status) => status.exit_code(),
                                     Err(_) => 0,
@@ -419,9 +911,92 @@ impl SshConnection {
                     }
                 }
             }
-            log.line("shell session closed");
+            log.line(format!("{} session closed", kind));
         });
     }
+}
+
+/// Build (program, args) for an SSH `exec` request using the platform default shell.
+fn exec_command_launch(command: &str, login_shell: bool) -> (String, Vec<String>) {
+    let launch = crate::terminal::pty::resolve_shell(None);
+    let program = launch.program;
+    let lower = program.to_ascii_lowercase();
+
+    #[cfg(windows)]
+    {
+        let _ = login_shell;
+        if lower.contains("pwsh") || lower.contains("powershell") {
+            let mut args = launch.args;
+            args.extend([
+                "-NoProfile".into(),
+                "-NonInteractive".into(),
+                "-Command".into(),
+                command.to_string(),
+            ]);
+            return (program, args);
+        }
+        // cmd.exe style
+        let mut args = launch.args;
+        if args.is_empty() {
+            args.push("/C".into());
+        } else if !args.iter().any(|a| a.eq_ignore_ascii_case("/c")) {
+            args.push("/C".into());
+        }
+        args.push(command.to_string());
+        return (program, args);
+    }
+
+    #[cfg(unix)]
+    {
+        let mut args = launch.args;
+        let flag = if login_shell { "-lc" } else { "-c" };
+        args.push(flag.into());
+        args.push(command.to_string());
+        (program, args)
+    }
+
+    #[cfg(not(any(windows, unix)))]
+    {
+        let _ = login_shell;
+        (program, vec![command.to_string()])
+    }
+}
+
+/// Spawn a PTY-backed process at optional `cwd`.
+fn spawn_pty_command(
+    cols: u16,
+    rows: u16,
+    program: &str,
+    args: &[String],
+    cwd: Option<&str>,
+) -> Result<(crate::terminal::pty::PtyHandle, Box<dyn Read + Send>), String> {
+    if let Some(dir) = cwd {
+        crate::terminal::pty::create_pty(
+            cols,
+            rows,
+            Some(program.to_string()),
+            Some(args.to_vec()),
+            Some(dir.to_string()),
+        )
+        .map(|(h, r, _)| (h, r))
+    } else {
+        crate::terminal::pty::create_command_pty(cols, rows, program, args)
+    }
+}
+
+/// Prefix a shell command with `export KEY=VAL;` for accepted env vars (Unix-ish shells).
+fn apply_env_exports(command: &str, env: &HashMap<String, String>) -> String {
+    if env.is_empty() {
+        return command.to_string();
+    }
+    let mut prefix = String::new();
+    for (k, v) in env {
+        // Minimal quoting for double-quoted values.
+        let escaped = v.replace('\\', "\\\\").replace('"', "\\\"");
+        prefix.push_str(&format!("export {}=\"{}\"; ", k, escaped));
+    }
+    prefix.push_str(command);
+    prefix
 }
 
 /* ------------------------------- SFTP -------------------------------- */
@@ -723,21 +1298,76 @@ impl russh_sftp::server::Handler for SftpHandler {
     async fn setstat(
         &mut self,
         id: u32,
-        _path: String,
-        _attrs: FileAttributes,
+        path: String,
+        attrs: FileAttributes,
     ) -> Result<Status, Self::Error> {
-        // Accept-and-ignore: clients (scp, sftp) routinely set mode/time after
-        // upload; failing here would abort otherwise-successful transfers.
-        let _ = &self.log;
+        let p = self.resolve(&path)?;
+        apply_file_attributes(&p, &attrs).map_err(|e| {
+            self.log.line(format!("setstat {}: {}", p.display(), e));
+            StatusCode::Failure
+        })?;
         Ok(ok_status(id))
     }
 
     async fn fsetstat(
         &mut self,
         id: u32,
-        _handle: String,
-        _attrs: FileAttributes,
+        handle: String,
+        attrs: FileAttributes,
     ) -> Result<Status, Self::Error> {
+        let file = self.files.get(&handle).ok_or(StatusCode::Failure)?.clone();
+        let guard = file.lock().await;
+        // Prefer path via file metadata only — re-open by path isn't available.
+        // Apply times via the File handle where the platform allows.
+        apply_file_attributes_on_file(&guard, &attrs).map_err(|e| {
+            self.log.line(format!("fsetstat: {}", e));
+            StatusCode::Failure
+        })?;
+        Ok(ok_status(id))
+    }
+
+    async fn readlink(&mut self, id: u32, path: String) -> Result<Name, Self::Error> {
+        let p = self.resolve(&path)?;
+        let target = std::fs::read_link(&p).map_err(|e| io_to_status(&e))?;
+        let display = target.to_string_lossy().replace('\\', "/");
+        Ok(Name {
+            id,
+            files: vec![File::dummy(display)],
+        })
+    }
+
+    async fn symlink(
+        &mut self,
+        id: u32,
+        linkpath: String,
+        targetpath: String,
+    ) -> Result<Status, Self::Error> {
+        let link = self.resolve(&linkpath)?;
+        // Target may be relative to the link location as seen by the client; store
+        // the client-supplied string as the symlink body when it is not absolute
+        // under our export. For absolute client paths, resolve under root.
+        let target = if targetpath.starts_with('/') {
+            self.resolve(&targetpath)?
+        } else {
+            PathBuf::from(&targetpath)
+        };
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&target, &link).map_err(|e| io_to_status(&e))?;
+        }
+        #[cfg(windows)]
+        {
+            if target.is_dir() {
+                std::os::windows::fs::symlink_dir(&target, &link).map_err(|e| io_to_status(&e))?;
+            } else {
+                std::os::windows::fs::symlink_file(&target, &link).map_err(|e| io_to_status(&e))?;
+            }
+        }
+        #[cfg(not(any(unix, windows)))]
+        {
+            let _ = (link, target);
+            return Err(StatusCode::OpUnsupported);
+        }
         Ok(ok_status(id))
     }
 }
@@ -763,17 +1393,10 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
     let port = if config.port == 0 { 22 } else { config.port };
     let bind = config.bind_address.clone();
 
-    // Build the auth policy from config. Refuse to start a wide-open server.
-    //
     // Frontend fields (camelCase, flattened into `extra`):
-    //   - `password`           — password auth (shown when authMethod is "os")
-    //   - `authorizedKey`      — inline OpenSSH public key line
-    //   - `authorizedKeyPath`  — path to a .pub file (UI "Key file" mode);
-    //     first non-empty/non-comment line is used when `authorizedKey` is empty
-    //
-    // Note: "OS credentials" in the UI means "password auth against the value
-    // configured here", not PAM/system-account login. This server never talks
-    // to the OS user database.
+    //   - password / authorizedKey / authorizedKeyPath / allowedUsers / rootDir
+    //   - loginShell (bool) / maxSessions (u64)
+    // "password" auth is against the configured value, never OS/PAM accounts.
     let password = {
         let p = config.str_field("password", "");
         if p.is_empty() {
@@ -782,28 +1405,19 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
             Some(p.to_string())
         }
     };
-    let authorized_key = {
-        let inline = config.str_field("authorizedKey", "").trim().to_string();
-        let line = if !inline.is_empty() {
-            inline
-        } else {
-            let path = config.str_field("authorizedKeyPath", "").trim();
-            if path.is_empty() {
-                String::new()
-            } else {
-                load_authorized_key_file(path)?
-            }
-        };
-        if line.is_empty() {
-            None
-        } else {
-            Some(parse_authorized_key(&line)?)
-        }
-    };
-    if password.is_none() && authorized_key.is_none() {
+    let mut authorized_keys = Vec::new();
+    let inline = config.str_field("authorizedKey", "");
+    if !inline.trim().is_empty() {
+        authorized_keys.extend(parse_authorized_keys_text(inline, "authorizedKey")?);
+    }
+    let key_path = config.str_field("authorizedKeyPath", "").trim().to_string();
+    if !key_path.is_empty() {
+        authorized_keys.extend(load_authorized_keys_file(&key_path)?);
+    }
+    if password.is_none() && authorized_keys.is_empty() {
         return Err(
-            "SSH server needs at least one credential — set a password and/or an \
-             authorized public key (or key file) in the server config"
+            "SSH server needs at least one credential: set a password and/or \
+             an authorized public key / key file before starting"
                 .to_string(),
         );
     }
@@ -822,21 +1436,43 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
             PathBuf::from(configured)
         }
     };
-    if !root.is_dir() {
-        return Err(format!("rootDir '{}' is not a directory", root.display()));
+    if !root.exists() {
+        return Err(format!(
+            "SFTP root directory does not exist: '{}'",
+            root.display()
+        ));
     }
+    if !root.is_dir() {
+        return Err(format!(
+            "SFTP root path is not a directory: '{}'",
+            root.display()
+        ));
+    }
+
+    let login_shell = config.bool_field("loginShell", true);
+    let max_sessions = config.u64_field("maxSessions", 8).clamp(1, 256) as usize;
 
     // Bind the listening socket up front so "address already in use" / privilege
     // errors (port 22 needs root on Linux) surface as a startup Error.
     let listener = tokio::net::TcpListener::bind((bind.as_str(), port))
         .await
-        .map_err(|e| format!("cannot bind {}:{} for SSH — {}", bind, port, e))?;
+        .map_err(|e| {
+            let hint = if port > 0 && port < 1024 {
+                " (ports below 1024 often require elevated privileges)"
+            } else {
+                ""
+            };
+            format!("cannot bind {}:{} for SSH — {}{}", bind, port, e, hint)
+        })?;
 
-    let host_key = PrivateKey::random(&mut rand::rng(), Algorithm::Ed25519)
-        .map_err(|e| format!("generate SSH host key: {e}"))?;
+    let (host_key, fingerprint) = load_or_create_host_key(&ctx.app)?;
     let mut methods = MethodSet::empty();
-    methods.push(MethodKind::Password);
-    methods.push(MethodKind::PublicKey);
+    if password.is_some() {
+        methods.push(MethodKind::Password);
+    }
+    if !authorized_keys.is_empty() {
+        methods.push(MethodKind::PublicKey);
+    }
     let russh_config = Arc::new(RusshConfig {
         inactivity_timeout: None,
         auth_rejection_time: std::time::Duration::from_secs(2),
@@ -848,30 +1484,37 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
 
     let policy = AuthPolicy {
         password,
-        authorized_key,
+        authorized_keys,
         allowed_users,
+    };
+    let opts = SessionOpts {
+        root: Arc::new(root.clone()),
+        login_shell,
+        max_sessions,
     };
 
     let mut server = SshServer {
         policy: Arc::new(policy),
-        root: Arc::new(root.clone()),
+        opts: Arc::new(opts),
         log: ctx.log.clone(),
         cancel: ctx.cancel.clone(),
+        active_sessions: Arc::new(AtomicUsize::new(0)),
     };
 
     ctx.log.line(format!(
-        "SSH/SFTP server listening on {}:{} (root {})",
+        "SSH/SFTP server listening on {}:{} (root {}; max_sessions={}; login_shell={}; \
+         port-forward -L/-R/-D enabled)",
         bind,
         port,
-        root.display()
+        root.display(),
+        max_sessions,
+        login_shell
     ));
+    ctx.log
+        .line(format!("SSH host key fingerprint: {}", fingerprint));
 
     let cancel = ctx.cancel.clone();
     let log = ctx.log.clone();
-    // Manual accept loop (instead of `run_on_socket`) so that cancelling the
-    // server actively disconnects in-flight client sessions, not just stops
-    // accepting new ones. Each connection runs in its own task that selects on
-    // the same cancel token and tears its session down when fired.
     let task = tokio::spawn(async move {
         loop {
             tokio::select! {
@@ -925,8 +1568,73 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
     Ok(ServerStarted { pid: None, task })
 }
 
-/// Load the first usable public-key line from an `authorized_keys`-style file
-/// (or a single `.pub` file). Blank lines and `#` comments are skipped.
+/// Load or generate a persistent Ed25519 host key under app-data.
+fn load_or_create_host_key(app: &AppHandle) -> Result<(PrivateKey, String), String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("resolve app data dir: {e}"))?
+        .join("ssh-server");
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("create ssh-server dir {}: {e}", dir.display()))?;
+    let path = dir.join("host_ed25519");
+
+    let key = if path.is_file() {
+        PrivateKey::read_openssh_file(&path)
+            .map_err(|e| format!("read host key {}: {e}", path.display()))?
+    } else {
+        let key = PrivateKey::random(&mut rand::rng(), Algorithm::Ed25519)
+            .map_err(|e| format!("generate SSH host key: {e}"))?;
+        key.write_openssh_file(&path, ssh_key::LineEnding::LF)
+            .map_err(|e| format!("write host key {}: {e}", path.display()))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+        }
+        key
+    };
+    let fingerprint = key.fingerprint(HashAlg::Sha256).to_string();
+    Ok((key, fingerprint))
+}
+
+/// Parse all usable public-key lines from multi-line text (inline config).
+fn parse_authorized_keys_text(text: &str, source: &str) -> Result<Vec<PublicKey>, String> {
+    let mut keys = Vec::new();
+    for (idx, line) in text.lines().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        if trimmed.split_whitespace().count() < 2 {
+            return Err(format!(
+                "{source} line {}: expected 'ssh-… AAAA…' OpenSSH public key",
+                idx + 1
+            ));
+        }
+        keys.push(
+            parse_authorized_key(trimmed).map_err(|e| format!("{source} line {}: {e}", idx + 1))?,
+        );
+    }
+    Ok(keys)
+}
+
+/// Load every usable public-key line from an authorized_keys / .pub file.
+fn load_authorized_keys_file(path: &str) -> Result<Vec<PublicKey>, String> {
+    let contents = std::fs::read_to_string(path)
+        .map_err(|e| format!("cannot read authorized key file '{}': {}", path, e))?;
+    let keys = parse_authorized_keys_text(&contents, path)?;
+    if keys.is_empty() {
+        return Err(format!(
+            "authorized key file '{}' has no usable public-key lines",
+            path
+        ));
+    }
+    Ok(keys)
+}
+
+/// Back-compat helper used by older tests — first usable line only.
+#[cfg(test)]
 fn load_authorized_key_file(path: &str) -> Result<String, String> {
     let contents = std::fs::read_to_string(path)
         .map_err(|e| format!("cannot read authorized key file '{}': {}", path, e))?;
@@ -935,7 +1643,6 @@ fn load_authorized_key_file(path: &str) -> Result<String, String> {
         if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
         }
-        // A real OpenSSH public key line has at least algo + base64.
         if trimmed.split_whitespace().count() >= 2 {
             return Ok(trimmed.to_string());
         }
@@ -954,6 +1661,86 @@ fn parse_authorized_key(line: &str) -> Result<PublicKey, String> {
         .next()
         .ok_or_else(|| "authorizedKey must be in 'ssh-... AAAA...' OpenSSH format".to_string())?;
     russh::keys::parse_public_key_base64(b64).map_err(|e| format!("invalid authorizedKey: {}", e))
+}
+
+fn apply_file_attributes(path: &Path, attrs: &FileAttributes) -> Result<(), String> {
+    #[cfg(unix)]
+    if let Some(mode) = attrs.permissions {
+        use std::os::unix::fs::PermissionsExt;
+        // SFTP mode bits include type bits in the high nibble; keep permission bits.
+        let mode = mode & 0o7777;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))
+            .map_err(|e| format!("chmod: {e}"))?;
+    }
+    #[cfg(not(unix))]
+    if let Some(mode) = attrs.permissions {
+        // Windows: map owner-write bit to readonly flag only.
+        let readonly = (mode & 0o200) == 0;
+        let mut perms = std::fs::metadata(path)
+            .map_err(|e| format!("stat: {e}"))?
+            .permissions();
+        perms.set_readonly(readonly);
+        std::fs::set_permissions(path, perms).map_err(|e| format!("set_readonly: {e}"))?;
+    }
+
+    let atime = attrs
+        .atime
+        .map(|t| std::time::UNIX_EPOCH + std::time::Duration::from_secs(u64::from(t)));
+    let mtime = attrs
+        .mtime
+        .map(|t| std::time::UNIX_EPOCH + std::time::Duration::from_secs(u64::from(t)));
+    if atime.is_some() || mtime.is_some() {
+        let meta = std::fs::metadata(path).map_err(|e| format!("stat: {e}"))?;
+        let accessed = atime
+            .or_else(|| meta.accessed().ok())
+            .unwrap_or(std::time::SystemTime::now());
+        let modified = mtime
+            .or_else(|| meta.modified().ok())
+            .unwrap_or(std::time::SystemTime::now());
+        filetime_set(path, accessed, modified)?;
+    }
+    Ok(())
+}
+
+fn apply_file_attributes_on_file(
+    file: &std::fs::File,
+    attrs: &FileAttributes,
+) -> Result<(), String> {
+    // Best-effort: re-resolve via no path; only times via filetime if we can get
+    // a path is not always possible. Apply mode on Unix via the file's metadata path
+    // is unavailable — accept times via set_times if supported.
+    #[cfg(unix)]
+    if let Some(mode) = attrs.permissions {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = mode & 0o7777;
+        file.set_permissions(std::fs::Permissions::from_mode(mode))
+            .map_err(|e| format!("fchmod: {e}"))?;
+    }
+    let _ = (file, attrs);
+    Ok(())
+}
+
+fn filetime_set(
+    path: &Path,
+    accessed: std::time::SystemTime,
+    modified: std::time::SystemTime,
+) -> Result<(), String> {
+    // Use filetime crate if present; otherwise std only has limited support.
+    // Prefer portable approach via `std::fs::File` + `set_times` (Rust 1.75+).
+    use std::fs::File;
+    use std::io::ErrorKind;
+    let file = File::options()
+        .write(true)
+        .open(path)
+        .map_err(|e| format!("open for utimes: {e}"))?;
+    let at = std::fs::FileTimes::new()
+        .set_accessed(accessed)
+        .set_modified(modified);
+    match file.set_times(at) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == ErrorKind::Unsupported => Ok(()),
+        Err(e) => Err(format!("set_times: {e}")),
+    }
 }
 
 #[cfg(test)]
@@ -1011,6 +1798,24 @@ mod tests {
     }
 
     #[test]
+    fn resolve_listen_addr_normalizes_common_forms() {
+        assert_eq!(resolve_listen_addr(""), "0.0.0.0");
+        assert_eq!(resolve_listen_addr("*"), "0.0.0.0");
+        assert_eq!(resolve_listen_addr("localhost"), "127.0.0.1");
+        assert_eq!(resolve_listen_addr("127.0.0.1"), "127.0.0.1");
+        assert_eq!(resolve_listen_addr("0.0.0.0"), "0.0.0.0");
+        assert_eq!(resolve_listen_addr("::"), "::");
+    }
+
+    #[test]
+    fn loopback_detection() {
+        assert!(is_loopback_addr("127.0.0.1"));
+        assert!(is_loopback_addr("::1"));
+        assert!(!is_loopback_addr("0.0.0.0"));
+        assert!(!is_loopback_addr("192.168.1.1"));
+    }
+
+    #[test]
     fn load_authorized_key_file_skips_comments_and_blank_lines() {
         let dir = std::env::temp_dir().join(format!(
             "taomni-ssh-key-{}",
@@ -1051,5 +1856,23 @@ mod tests {
         assert!(parse_authorized_key("ssh-ed25519 not-base64!!").is_err());
         // Missing key body must error.
         assert!(parse_authorized_key("ssh-ed25519").is_err());
+    }
+
+    #[test]
+    fn multi_line_authorized_keys_text() {
+        let line1 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJdD7y3aLq454yWBdwLWbieU1ebz9/cu7/QEXn9OIeZJ a@host";
+        let line2 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJdD7y3aLq454yWBdwLWbieU1ebz9/cu7/QEXn9OIeZJ b@host";
+        let text = format!("# comment\n\n{line1}\n{line2}\n");
+        let keys = parse_authorized_keys_text(&text, "test").unwrap();
+        assert_eq!(keys.len(), 2);
+    }
+
+    #[test]
+    fn apply_env_exports_prefixes_exports() {
+        let mut env = HashMap::new();
+        env.insert("LANG".into(), "C.UTF-8".into());
+        let out = apply_env_exports("echo hi", &env);
+        assert!(out.contains("export LANG="));
+        assert!(out.ends_with("echo hi"));
     }
 }

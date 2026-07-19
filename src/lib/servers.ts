@@ -82,7 +82,14 @@ export function defaultConfig(type: ServerType): ServerConfig {
 
   switch (type) {
     case "ssh":
-      return { ...base, authMethod: "os", allowedUsers: "", rootDir: "" };
+      return {
+        ...base,
+        authMethod: "password",
+        allowedUsers: "",
+        rootDir: "",
+        loginShell: true,
+        maxSessions: 8,
+      };
     case "ftp":
       return { ...base, rootDir: "", allowAnonymous: false, maxConnections: 10 };
     case "tftp":
