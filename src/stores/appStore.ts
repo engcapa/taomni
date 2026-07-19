@@ -13,7 +13,7 @@ import { detectXServer, type XServerStatus } from "../lib/ipc";
 import type { TabFilter } from "../lib/tabFilter";
 import { terminalCwdTitlePrefix } from "../lib/terminalCwd";
 
-export type SideTab = "sessions" | "tools" | "macros";
+export type SideTab = "sessions" | "tools";
 export type TerminalSplitLayout = "horizontal" | "vertical" | "grid";
 export type VaultUnlockMode = "startup" | "on-demand";
 

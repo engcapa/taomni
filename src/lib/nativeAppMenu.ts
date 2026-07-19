@@ -182,12 +182,12 @@ export function buildAppMenuSpec(params: BuildAppMenuParams): AppMenuSpec {
   ];
 
   const toolsMenu: MenuNodeSpec[] = [
+    { type: "item", id: "servers", label: t("servers.dialogTitle"), action: "servers" },
     { type: "item", id: "tunneling", label: t("menu.tunneling"), action: "tunneling" },
-    { type: "item", id: "code-workspace", label: "Code Workspace...", action: "code-workspace" },
+    { type: "item", id: "git", label: t("menu.gitRepository"), action: "git" },
+    { type: "item", id: "code-workspace", label: t("menu.codeWorkspace"), action: "code-workspace" },
     { type: "item", id: "lan-chat", label: t("tabs.lanChat"), action: "lan-chat" },
     { type: "item", id: "network-tools", label: t("menu.networkTools"), action: "tools" },
-    { type: "item", id: "packages", label: t("menu.packages"), action: "packages" },
-    { type: "item", id: "macros", label: t("menu.macros"), action: "macros" },
     { type: "separator" },
     { type: "item", id: "settings", label: t("menu.settings"), action: "settings", accelerator: "CmdOrCtrl+," },
   ];
@@ -197,7 +197,7 @@ export function buildAppMenuSpec(params: BuildAppMenuParams): AppMenuSpec {
       {
         type: "submenu",
         id: "code-workspace-actions",
-        label: "Code Workspace Actions",
+        label: t("menu.codeWorkspaceActions"),
         items: workspaceCommands.map((command): MenuNodeSpec => ({
           type: "item",
           id: `workspace-command-${command.id}`,

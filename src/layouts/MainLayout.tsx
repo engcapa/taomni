@@ -2992,17 +2992,11 @@ export function MainLayout() {
       case "code-workspace":
         openEmptyCodeWorkspaceTab();
         break;
-      case "packages":
-        openPlaceholderTab(t("tabs.packages"), t("status.commandUnavailable"));
-        break;
       case "settings":
         openSettingsTab();
         break;
       case "lan-chat":
         openLanChatTab();
-        break;
-      case "macros":
-        openPlaceholderTab(t("tabs.macros"), t("status.commandUnavailable"));
         break;
       case "help":
         setShowAbout(true);
@@ -3337,6 +3331,7 @@ export function MainLayout() {
               onEditSession={handleEditSession}
               onConnectSession={handleConnectSession}
               onOpenSettings={() => handleCommand("settings")}
+              onCommand={handleCommand}
               gitAction={activeTerminalGitAction}
             />
           </div>
@@ -3378,6 +3373,7 @@ export function MainLayout() {
                 onEditSession={handleEditSession}
                 onConnectSession={handleConnectSession}
                 onOpenSettings={() => handleCommand("settings")}
+                onCommand={handleCommand}
                 gitAction={activeTerminalGitAction}
               />
             </div>

@@ -143,6 +143,19 @@ describe("buildAppMenuSpec", () => {
     }
   });
 
+  it("lists local servers and omits packages/macros under Tools", () => {
+    const tools = submenu(buildAppMenuSpec(baseParams), "tools");
+    const toolActions = actions(tools.items);
+    expect(toolActions).toContain("servers");
+    expect(toolActions).toContain("tunneling");
+    expect(toolActions).toContain("git");
+    expect(toolActions).toContain("code-workspace");
+    expect(toolActions).toContain("lan-chat");
+    expect(toolActions).toContain("tools");
+    expect(toolActions).not.toContain("packages");
+    expect(toolActions).not.toContain("macros");
+  });
+
   it("adds active Code Workspace commands as a dynamic Tools submenu", () => {
     const spec = buildAppMenuSpec({
       ...baseParams,
