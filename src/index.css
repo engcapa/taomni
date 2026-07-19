@@ -499,7 +499,17 @@ body.notes-detached-document,
   }
 }
 
-/* Form inputs */
+/* Form inputs
+ *
+ * Native control interaction policy (app-wide):
+ * - Search / filter: use type="search" so the platform can show a native clear
+ *   control (e.g. Win11 WebView2 ×). Never layer a custom clear on top — that
+ *   doubles with the system decoration. If the platform has no native clear,
+ *   do not polyfill one.
+ * - Password: use type="password" so the platform can show a native reveal
+ *   (eye). Never layer a custom eye/toggle. Do not set appearance:none on
+ *   password fields — that can hide ::-ms-reveal.
+ */
 .taomni-input {
   height: 22px;
   font-size: var(--taomni-ui-font-size);
@@ -511,6 +521,18 @@ body.notes-detached-document,
   outline: none;
   transition: var(--taomni-transition);
 }
+
+/* Keep native search cancel / password reveal; only strip the old search field
+   chrome that some engines add (inner spin-button styling, etc.). */
+input.taomni-input[type="search"] {
+  /* Do not use appearance:none — it can suppress the cancel control. */
+  -webkit-appearance: textfield;
+}
+input.taomni-input[type="search"]::-webkit-search-decoration {
+  -webkit-appearance: none;
+}
+/* Leave ::-webkit-search-cancel-button and ::-ms-clear at platform defaults. */
+/* Leave input[type=password]::-ms-reveal at platform defaults. */
 select.taomni-input {
   background-color: var(--taomni-input-bg);
 }

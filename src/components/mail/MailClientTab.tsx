@@ -3502,6 +3502,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
           <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
           <input
             ref={searchInputRef}
+            type="search"
             className="taomni-input h-7 w-full pl-7 text-[12px]"
             placeholder="Search cached headers"
             aria-label="Search cached mail headers"

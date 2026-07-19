@@ -109,8 +109,9 @@ describe("FileTreePane", () => {
   it("delegates filter, view, and zoom while Open stays inline", () => {
     const callbacks = renderPane({ paneWidth: TREE_TOOLBAR_WIDE_MIN_PX + 20 });
 
-    fireEvent.change(screen.getByRole("textbox", { name: "Filter files" }), { target: { value: "lib" } });
-    fireEvent.click(screen.getByRole("button", { name: "Clear file filter" }));
+    const filter = screen.getByRole("searchbox", { name: "Filter files" });
+    fireEvent.change(filter, { target: { value: "lib" } });
+    fireEvent.change(filter, { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: "Flat file view" }));
     fireEvent.click(screen.getByRole("button", { name: "Tree zoom in" }));
     fireEvent.click(screen.getByRole("button", { name: "Open file" }));
@@ -152,7 +153,7 @@ describe("FileTreePane", () => {
     );
     expect(screen.getByRole("button", { name: "Open file" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add folder" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Filter files" })).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Filter files" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "New file" })).toBeNull();
     expect(screen.queryByTestId("code-workspace-view-tree")).toBeNull();
     expect(screen.getByTestId("code-workspace-view-cycle")).toBeInTheDocument();

@@ -269,22 +269,13 @@ export function BookmarksPanel({
           <div className="relative flex-1">
             <Search className="absolute left-2 top-[5px] w-3.5 h-3.5 text-[var(--taomni-text-muted)]" />
             <input
-              type="text"
+              type="search"
               placeholder="Search bookmarks..."
-              className="taomni-input w-full pr-2 h-6 text-[11px]"
+              className="taomni-input w-full h-6 text-[11px]"
               style={{ paddingLeft: "24px" }}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-            {searchTerm && (
-              <button
-                type="button"
-                className="absolute right-2 top-1.5 text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)]"
-                onClick={() => setSearchTerm("")}
-              >
-                <X className="w-3 h-3" />
-              </button>
-            )}
           </div>
           <button
             type="button"

@@ -23,7 +23,6 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { useContextMenu, type MenuItem } from "../../ContextMenu";
-import { FilterClearButton } from "./workspaceChrome";
 import {
   nextTreeViewMode,
   treeToolbarDensity,
@@ -278,18 +277,13 @@ export function FileTreePane({
           <Search className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
           <div className="min-w-0 flex-1 flex items-center gap-0.5">
             <input
+              type="search"
               value={filter}
               onChange={(event) => onFilterChange(event.target.value)}
               placeholder="Filter"
               aria-label="Filter files"
               className="min-w-0 flex-1 bg-transparent outline-none text-[var(--taomni-code-text)] placeholder:text-[var(--taomni-code-muted)]"
               style={{ fontSize: "var(--taomni-code-tree-font-size)" }}
-            />
-            <FilterClearButton
-              value={filter}
-              label="Clear file filter"
-              testId="code-workspace-tree-filter-clear"
-              onClear={() => onFilterChange("")}
             />
           </div>
           {visibility.showViewModes && (

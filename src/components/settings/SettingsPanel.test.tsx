@@ -222,8 +222,8 @@ describe("SettingsPanel", () => {
     expect(screen.getByTestId("settings-group-ai")).toHaveAttribute("data-group-match", "true");
     expect(screen.getByTestId("settings-group-general")).toHaveAttribute("data-group-match", "false");
 
-    // Clearing the search drops the active state entirely.
-    await user.click(screen.getByRole("button", { name: "Clear search" }));
+    // Clearing the search (native type=search / Escape) drops the active state.
+    await user.clear(search);
     expect(search).toHaveValue("");
     expect(
       container.querySelector('[data-search-id="app-proxy"]'),

@@ -31,7 +31,6 @@ import {
   Download,
 } from "lucide-react";
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
-import { FilterClearButton } from "../editor/workspace/workspaceChrome";
 import {
   gitCheckoutBranch,
   gitCherryPick,
@@ -1389,19 +1388,12 @@ function BranchesView({
         <div className="relative w-56 min-w-40 shrink-0">
           <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
           <input
-            className="taomni-input h-7 w-full pl-7 pr-7"
+            type="search"
+            className="taomni-input h-7 w-full pl-7"
             placeholder="Search branches"
             aria-label="Search branches"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-          />
-          <FilterClearButton
-            value={query}
-            variant="app"
-            placement="absolute"
-            label="Clear branch search"
-            testId="git-branch-search-clear"
-            onClear={() => setQuery("")}
           />
         </div>
         <IconButton label="New" icon={<Plus className="w-3.5 h-3.5" />} disabled={busy} onClick={onCreate} />
@@ -1580,19 +1572,12 @@ function TagsView({
         <div className="relative w-56 min-w-40 shrink-0">
           <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
           <input
-            className="taomni-input h-7 w-full pl-7 pr-7"
+            type="search"
+            className="taomni-input h-7 w-full pl-7"
             placeholder="Search tags"
             aria-label="Search tags"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-          />
-          <FilterClearButton
-            value={query}
-            variant="app"
-            placement="absolute"
-            label="Clear tag search"
-            testId="git-tag-search-clear"
-            onClear={() => setQuery("")}
           />
         </div>
         <IconButton label="New tag" icon={<Plus className="w-3.5 h-3.5" />} disabled={busy} onClick={onCreate} />

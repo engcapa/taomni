@@ -72,14 +72,14 @@ describe("OutlinePane", () => {
     expect(screen.getByText("render")).toBeInTheDocument();
   });
 
-  it("clears the outline filter from the trailing icon", () => {
+  it("clears the outline filter when the search value is emptied", () => {
     render(
       <OutlinePane symbols={symbols} position={{ line: 0, character: 0 }} loading={false} onPick={() => {}} />,
     );
-    const input = screen.getByRole("textbox", { name: "Filter outline" });
+    const input = screen.getByRole("searchbox", { name: "Filter outline" });
     fireEvent.change(input, { target: { value: "render" } });
     expect(screen.queryByText("alpha")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Clear outline filter" }));
+    fireEvent.change(input, { target: { value: "" } });
     expect(input).toHaveValue("");
     expect(screen.getByText("alpha")).toBeInTheDocument();
   });

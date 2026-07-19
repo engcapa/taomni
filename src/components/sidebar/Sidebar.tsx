@@ -190,6 +190,7 @@ export function Sidebar({
               <div className="relative">
                 <Search className="w-3 h-3 absolute left-1.5 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
                 <input
+                  type="search"
                   data-testid="session-search"
                   aria-label={t("sidebar.searchSessions")}
                   className="taomni-input pl-6 w-[140px]"

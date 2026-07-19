@@ -114,8 +114,8 @@ export function NotesPanel({ showPanelModeToggle = true }: NotesPanelProps = {})
             <div className="relative flex-1 min-w-0">
               <Search className="w-3 h-3 absolute left-1.5 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
               <input
-                type="text"
-                className="taomni-input h-6 w-full text-[11px] pl-6 pr-2"
+                type="search"
+                className="taomni-input h-6 w-full text-[11px] pl-6"
                 placeholder={t("notes.searchPlaceholder")}
                 aria-label={t("notes.searchAria")}
                 value={search}

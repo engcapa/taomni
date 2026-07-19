@@ -322,6 +322,7 @@ function SegmentPopup({
       <div className="border-b border-[var(--taomni-code-border)] px-2 py-1.5">
         <input
           ref={inputRef}
+          type="search"
           data-testid="code-workspace-breadcrumb-popup-filter"
           aria-label="Filter breadcrumb entries"
           className="taomni-input h-6 w-full text-[11px]"

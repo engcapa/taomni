@@ -11,7 +11,6 @@ import {
   type GitLogEntry,
 } from "../../lib/git";
 import { buildGraph, graphColor, type GraphRow } from "../../lib/gitGraph";
-import { FilterClearButton } from "../editor/workspace/workspaceChrome";
 import { DiffViewer } from "./DiffViewer";
 
 const ROW_H = 88;
@@ -192,19 +191,12 @@ export function CommitLog({ repoRoot, headOid, branches = [], busy, onContextMen
           <div className="relative flex-1 min-w-0">
             <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
             <input
-              className="taomni-input h-7 w-full pl-7 pr-7"
+              type="search"
+              className="taomni-input h-7 w-full pl-7"
               placeholder="Filter messages"
               aria-label="Filter messages"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-            />
-            <FilterClearButton
-              value={query}
-              variant="app"
-              placement="absolute"
-              label="Clear message filter"
-              testId="git-commit-message-filter-clear"
-              onClear={() => setQuery("")}
             />
           </div>
           <label className="flex items-center gap-1 text-[12px] select-none whitespace-nowrap">

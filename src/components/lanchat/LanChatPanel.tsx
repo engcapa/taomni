@@ -332,6 +332,7 @@ export function LanChatPanel({ readOnly = false }: { readOnly?: boolean } = {}) 
           {/* search + new group */}
           <div className="mx-2 mb-2 flex items-center gap-1.5">
             <input
+              type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="搜索成员 / 群组…"

@@ -10,7 +10,6 @@ import {
   Terminal,
   Type,
   Undo,
-  X,
 } from "lucide-react";
 import { useAppTheme } from "../../lib/appTheme";
 import { useT } from "../../lib/i18n";
@@ -450,7 +449,7 @@ export function SettingsPanel() {
                   data-testid="settings-search-input"
                   type="search"
                   className="taomni-input h-8 w-full"
-                  style={{ paddingLeft: "2rem", paddingRight: "2rem" }}
+                  style={{ paddingLeft: "2rem" }}
                   placeholder={t("settings.searchPlaceholder")}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
@@ -464,19 +463,6 @@ export function SettingsPanel() {
                     }
                   }}
                 />
-                {query && (
-                  <button
-                    type="button"
-                    aria-label={t("settings.searchClear")}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex h-5 w-5 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-control-hover)]"
-                    onClick={() => {
-                      setQuery("");
-                      searchInputRef.current?.focus();
-                    }}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
               </div>
               {searching && matchIds.length > 0 && (
                 <div className="flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]">

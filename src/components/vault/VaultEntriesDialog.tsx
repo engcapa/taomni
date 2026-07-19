@@ -102,7 +102,7 @@ export function VaultEntriesDialog({ onClose }: VaultEntriesDialogProps) {
           <div className="relative flex-1 flex items-center">
             <Search className="w-3.5 h-3.5 absolute left-2 text-[var(--taomni-text-muted)] pointer-events-none" />
             <input
-              type="text"
+              type="search"
               placeholder={t("vaultSettings.searchPlaceholder")}
               className="taomni-input w-full text-[12px] h-7"
               value={searchQuery}

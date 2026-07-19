@@ -192,6 +192,7 @@ export function CommonCommandsPalette({
         <div className="p-2 border-b" style={{ borderColor: "var(--taomni-divider)" }}>
           <input
             ref={inputRef}
+            type="search"
             data-testid="commands-search"
             className="taomni-input w-full"
             placeholder={t("terminal.commandPaletteSearchPlaceholder")}

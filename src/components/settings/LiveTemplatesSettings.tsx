@@ -259,6 +259,7 @@ export function LiveTemplatesSettings() {
             </label>
             <input
               id="live-templates-search"
+              type="search"
               data-testid="live-templates-search"
               className="taomni-input h-8 w-full text-[12px]"
               value={query}

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, Search, X } from "lucide-react";
+import { Check, ChevronDown, Search } from "lucide-react";
 import { useT } from "../../lib/i18n";
 
 export interface FontPickerOption {
@@ -230,23 +230,10 @@ export function FontPickerPanel({
             type="search"
             aria-label={t("fontPicker.searchPlaceholder")}
             placeholder={t("fontPicker.searchPlaceholder")}
-            className="taomni-input h-7 w-full pl-7 pr-7 text-[12px] font-normal"
+            className="taomni-input h-7 w-full pl-7 text-[12px] font-normal"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
           />
-          {searchQuery && (
-            <button
-              type="button"
-              aria-label="Clear font search"
-              className="absolute right-2 rounded-full p-0.5 text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
-              onClick={() => {
-                setSearchQuery("");
-                inputRef.current?.focus();
-              }}
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
         </div>
       </div>
 

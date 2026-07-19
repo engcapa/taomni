@@ -377,6 +377,7 @@ export default function LanChatDetachedWindow({ id }: { id: string }) {
               <div className="mx-2 mb-2 flex items-center gap-1.5">
                 <Search className="h-3.5 w-3.5 flex-none" style={{ color: "var(--taomni-text-muted)" }} />
                 <input
+                  type="search"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="搜索成员 / 群组…"

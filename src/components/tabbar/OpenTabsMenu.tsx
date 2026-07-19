@@ -2,7 +2,6 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject }
 import { createPortal } from "react-dom";
 import {
   Search,
-  X,
   ChevronDown,
   ChevronRight,
   Check,
@@ -233,11 +232,6 @@ export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab }: Op
     onClose();
   };
 
-  const showAll = () => {
-    setQuery("");
-    setTabFilter(null);
-  };
-
   const closeAllTerminals = () => {
     removeTabs(
       tabs.filter((tab) => tab.type === "terminal" && tab.closable).map((tab) => tab.id),
@@ -300,22 +294,14 @@ export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab }: Op
         <Search className={`w-3.5 h-3.5 flex-shrink-0 ${muted}`} />
         <input
           ref={inputRef}
+          type="search"
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
           placeholder={t("tabs.filterPlaceholder")}
           data-testid="open-tabs-filter"
           className="flex-1 min-w-0 bg-transparent outline-none"
+          aria-label={t("tabs.filterPlaceholder")}
         />
-        <button
-          type="button"
-          title={t("tabs.filterShowAll")}
-          onClick={showAll}
-          disabled={tabFilter === null}
-          data-testid="open-tabs-show-all"
-          className="p-0.5 disabled:opacity-30 hover:opacity-80"
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
       </div>
 
       <div className="h-px mx-2" style={{ background: "var(--taomni-divider)" }} />

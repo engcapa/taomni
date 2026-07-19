@@ -2449,6 +2449,7 @@ export function QueryResultGrid({
           <label className="h-6 inline-flex items-center gap-1 px-1 text-[11px] text-[var(--taomni-text-muted)]">
             <Filter className="w-3.5 h-3.5" />
             <input
+              type="search"
               value={filterText}
               onChange={(event) => setFilterText(event.target.value)}
               className="taomni-input h-6 w-[150px] text-[11px]"
@@ -2471,6 +2472,7 @@ export function QueryResultGrid({
         <label className="ml-auto h-6 inline-flex items-center gap-1 px-1 text-[11px] text-[var(--taomni-text-muted)]">
           <Search className="w-3.5 h-3.5" />
           <input
+            type="search"
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
             className="taomni-input h-6 w-[150px] text-[11px]"
@@ -2883,6 +2885,7 @@ export function QueryResultGrid({
             </button>
           </div>
           <input
+            type="search"
             autoFocus
             value={openFilterConfig.text}
             onChange={(event) => updateDraftColumnFilter({ text: event.target.value })}

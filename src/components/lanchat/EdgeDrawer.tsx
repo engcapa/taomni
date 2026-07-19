@@ -310,6 +310,7 @@ export function EdgeDrawer() {
               <div className="mx-2 my-2 flex items-center gap-1.5">
                 <Search className="h-3.5 w-3.5 flex-none" style={{ color: "var(--taomni-text-muted)" }} />
                 <input
+                  type="search"
                   autoFocus
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}

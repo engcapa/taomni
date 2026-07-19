@@ -56,11 +56,13 @@ describe("HBaseSchemaTree", () => {
   it("filters table names and can clear the filter", async () => {
     render(<HBaseSchemaTree sessionId="s1" transport="native" />);
     expect(await screen.findByText("users")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Filter HBase tables"), { target: { value: "log" } });
+    const filter = screen.getByLabelText("Filter HBase tables");
+    fireEvent.change(filter, { target: { value: "log" } });
     expect(screen.getByText("logs")).toBeInTheDocument();
     expect(screen.queryByText("users")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText("Clear filter"));
+    // Native type=search clear — no custom × button.
+    fireEvent.change(filter, { target: { value: "" } });
     expect(screen.getByText("users")).toBeInTheDocument();
     expect(screen.getByText("logs")).toBeInTheDocument();
   });

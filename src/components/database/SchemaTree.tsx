@@ -17,7 +17,6 @@ import {
   ListOrdered,
   BookText,
   Search,
-  X,
 } from "lucide-react";
 import {
   dbListObjects,
@@ -1152,8 +1151,9 @@ export function SchemaTree({
         <div className="relative flex-1">
           <Search className="w-3 h-3 absolute left-1.5 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)] pointer-events-none" />
           <input
+            type="search"
             className="taomni-input h-5 w-full text-[11px]"
-            style={{ paddingLeft: 22, paddingRight: filterActive ? 22 : undefined }}
+            style={{ paddingLeft: 22 }}
             value={filterText}
             placeholder={t("dbObjects.filterPlaceholder")}
             aria-label={t("dbObjects.filterLabel")}
@@ -1163,17 +1163,6 @@ export function SchemaTree({
               if (e.key === "Escape") setFilterText("");
             }}
           />
-          {filterActive && (
-            <button
-              type="button"
-              className="h-5 w-5 absolute right-0.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
-              title={t("dbObjects.clearFilter")}
-              aria-label={t("dbObjects.clearFilter")}
-              onClick={() => setFilterText("")}
-            >
-              <X className="w-3 h-3" />
-            </button>
-          )}
         </div>
       </div>
 

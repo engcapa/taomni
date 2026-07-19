@@ -36,7 +36,7 @@ describe("CodeMirrorHost search", () => {
 
     fireEvent.keyDown(content, { key: "f", code: "KeyF", ctrlKey: true });
 
-    const search = await screen.findByRole("textbox", { name: "Find" });
+    const search = await screen.findByRole("searchbox", { name: "Find" });
     fireEvent.input(search, { target: { value: "alpha" } });
     expect(screen.getByText("2 matches")).toBeInTheDocument();
 
@@ -46,7 +46,8 @@ describe("CodeMirrorHost search", () => {
     fireEvent.click(screen.getByRole("button", { name: "Previous match" }));
     expect(screen.getByText("2 / 2")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Clear find" }));
+    // Native type=search clear — no custom × button.
+    fireEvent.input(search, { target: { value: "" } });
     expect(search).toHaveValue("");
     expect(screen.getByText("0 matches")).toBeInTheDocument();
   });
@@ -55,7 +56,7 @@ describe("CodeMirrorHost search", () => {
     const { content } = renderEditor("Alpha alpha alphabet ALPHA");
     fireEvent.keyDown(content, { key: "f", code: "KeyF", ctrlKey: true });
 
-    const search = await screen.findByRole("textbox", { name: "Find" });
+    const search = await screen.findByRole("searchbox", { name: "Find" });
     fireEvent.input(search, { target: { value: "alpha" } });
     expect(screen.getByText("4 matches")).toBeInTheDocument();
 
@@ -80,7 +81,7 @@ describe("CodeMirrorHost search", () => {
     const { content } = renderEditor("alpha beta alpha", onChange);
     fireEvent.keyDown(content, { key: "f", code: "KeyF", ctrlKey: true });
 
-    fireEvent.input(await screen.findByRole("textbox", { name: "Find" }), {
+    fireEvent.input(await screen.findByRole("searchbox", { name: "Find" }), {
       target: { value: "alpha" },
     });
     fireEvent.input(screen.getByRole("textbox", { name: "Replace" }), {
