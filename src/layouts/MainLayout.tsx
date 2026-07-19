@@ -82,7 +82,6 @@ import { WelcomePanel } from "../components/WelcomePanel";
 import { AboutDialog } from "../components/AboutDialog";
 import { UpdateDialog } from "../components/UpdateDialog";
 import { useUpdateStore } from "../stores/updateStore";
-import { ServersDialog } from "../components/servers/ServersDialog";
 import { useServersStore } from "../stores/serversStore";
 import { parseQuickConnectInput } from "../lib/quickConnect";
 import { exitApp, selectFolderPath, type SessionConfig } from "../lib/ipc";
@@ -1473,7 +1472,7 @@ export function MainLayout() {
     const handler = (event: KeyboardEvent) => {
       if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        useServersStore.getState().openDialog();
+        useServersStore.getState().openDialog(tr("servers.dialogTitle"));
         return;
       }
       const primary = event.ctrlKey || event.metaKey;
@@ -2955,7 +2954,7 @@ export function MainLayout() {
         toggleQuickConnectVisible();
         break;
       case "servers":
-        useServersStore.getState().openDialog();
+        useServersStore.getState().openDialog(tr("servers.dialogTitle"));
         break;
       case "sessions":
         setSidebarCollapsed(false);
@@ -4130,7 +4129,6 @@ export function MainLayout() {
           its own). */}
       {nativeMenu && importExport.previewNode}
 
-      <ServersDialog />
       {appExitConfirmDialog}
       <CallOverlay />
       <WhiteboardOverlay />

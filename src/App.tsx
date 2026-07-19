@@ -7,6 +7,7 @@ import {
 import DetachedSessionWindow from "./components/detached/DetachedSessionWindow";
 import LanChatDetachedWindow from "./components/detached/LanChatDetachedWindow";
 import { NotesDetachedWindow } from "./components/notes/NotesDetachedWindow";
+import { ServersDialog } from "./components/servers/ServersDialog";
 import { detectDetachedRoute } from "./lib/detachedSession";
 import { useAppTheme } from "./lib/appTheme";
 import { applyCodeViewProfile, loadCodeViewProfile } from "./lib/codeViewProfile";
@@ -152,6 +153,8 @@ function App() {
       content = <LanChatDetachedWindow id={detachedRoute.id} />;
     } else if (detachedRoute?.kind === "notes") {
       content = <NotesDetachedWindow />;
+    } else if (detachedRoute?.kind === "servers") {
+      content = <ServersDialog />;
     } else {
       content =
         detachedRoute && detachedRoute.kind !== "sftp"

@@ -33,8 +33,8 @@ use std::io::{Read as _, Write as _};
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
-use super::engine::{LogEmitter, ServerCtx, ServerStarted};
 use super::ServerConfig;
+use super::engine::{LogEmitter, ServerCtx, ServerStarted};
 
 /* ----------------------------- auth model ---------------------------- */
 
@@ -764,6 +764,16 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
     let bind = config.bind_address.clone();
 
     // Build the auth policy from config. Refuse to start a wide-open server.
+    //
+    // Frontend fields (camelCase, flattened into `extra`):
+    //   - `password`           — password auth (shown when authMethod is "os")
+    //   - `authorizedKey`      — inline OpenSSH public key line
+    //   - `authorizedKeyPath`  — path to a .pub file (UI "Key file" mode);
+    //     first non-empty/non-comment line is used when `authorizedKey` is empty
+    //
+    // Note: "OS credentials" in the UI means "password auth against the value
+    // configured here", not PAM/system-account login. This server never talks
+    // to the OS user database.
     let password = {
         let p = config.str_field("password", "");
         if p.is_empty() {
@@ -773,7 +783,17 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
         }
     };
     let authorized_key = {
-        let line = config.str_field("authorizedKey", "").trim().to_string();
+        let inline = config.str_field("authorizedKey", "").trim().to_string();
+        let line = if !inline.is_empty() {
+            inline
+        } else {
+            let path = config.str_field("authorizedKeyPath", "").trim();
+            if path.is_empty() {
+                String::new()
+            } else {
+                load_authorized_key_file(path)?
+            }
+        };
         if line.is_empty() {
             None
         } else {
@@ -783,7 +803,7 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
     if password.is_none() && authorized_key.is_none() {
         return Err(
             "SSH server needs at least one credential — set a password and/or an \
-             authorized public key in the server config"
+             authorized public key (or key file) in the server config"
                 .to_string(),
         );
     }
@@ -905,6 +925,27 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
     Ok(ServerStarted { pid: None, task })
 }
 
+/// Load the first usable public-key line from an `authorized_keys`-style file
+/// (or a single `.pub` file). Blank lines and `#` comments are skipped.
+fn load_authorized_key_file(path: &str) -> Result<String, String> {
+    let contents = std::fs::read_to_string(path)
+        .map_err(|e| format!("cannot read authorized key file '{}': {}", path, e))?;
+    for line in contents.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        // A real OpenSSH public key line has at least algo + base64.
+        if trimmed.split_whitespace().count() >= 2 {
+            return Ok(trimmed.to_string());
+        }
+    }
+    Err(format!(
+        "authorized key file '{}' has no usable public-key line",
+        path
+    ))
+}
+
 /// Parse a single OpenSSH `authorized_keys`-style line ("<algo> <base64> [comment]").
 fn parse_authorized_key(line: &str) -> Result<PublicKey, String> {
     let mut parts = line.split_whitespace();
@@ -967,6 +1008,28 @@ mod tests {
             confine_path(root, "/a//b").unwrap(),
             PathBuf::from("/srv/share/a/b")
         );
+    }
+
+    #[test]
+    fn load_authorized_key_file_skips_comments_and_blank_lines() {
+        let dir = std::env::temp_dir().join(format!(
+            "taomni-ssh-key-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("id_ed25519.pub");
+        // Fake base64 blob — parse is tested separately; load only extracts the line.
+        std::fs::write(
+            &path,
+            "# comment\n\nssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakeKeyMaterialHere user@host\n",
+        )
+        .unwrap();
+        let line = load_authorized_key_file(path.to_str().unwrap()).unwrap();
+        assert!(line.starts_with("ssh-ed25519 "));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

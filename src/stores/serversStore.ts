@@ -4,6 +4,7 @@ import {
   defaultConfig,
   loadServerConfigs,
   listServerStatuses,
+  openServersWindow,
   saveServerConfig,
   startLocalServer,
   stopLocalServer,
@@ -24,7 +25,6 @@ export interface ServerRuntime {
 }
 
 interface ServersStore {
-  isOpen: boolean;
   selectedServer: ServerType;
   configs: Record<ServerType, ServerConfig>;
   runtimes: Record<ServerType, ServerRuntime>;
@@ -32,8 +32,8 @@ interface ServersStore {
   /** True when configs have unsaved edits since the last Apply / load. */
   dirty: boolean;
 
-  openDialog: () => void;
-  closeDialog: () => void;
+  /** Open (or focus) the Local servers OS window. Optional localized title. */
+  openDialog: (title?: string) => void;
   selectServer: (t: ServerType) => void;
   setConfig: (t: ServerType, cfg: ServerConfig) => void;
   patchConfig: (t: ServerType, patch: Partial<ServerConfig>) => void;
@@ -74,15 +74,17 @@ function timestampLine(line: string): string {
 }
 
 export const useServersStore = create<ServersStore>((set, get) => ({
-  isOpen: false,
   selectedServer: "ssh",
   configs: initialConfigs(),
   runtimes: initialRuntimes(),
   loaded: false,
   dirty: false,
 
-  openDialog: () => set({ isOpen: true }),
-  closeDialog: () => set({ isOpen: false }),
+  openDialog: (title) => {
+    void openServersWindow(title).catch((err) => {
+      console.error("[servers] failed to open Local servers window", err);
+    });
+  },
   selectServer: (t) => set({ selectedServer: t }),
 
   setConfig: (t, cfg) =>

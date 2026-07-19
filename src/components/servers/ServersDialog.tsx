@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { Server, X } from "lucide-react";
+import { useCallback, useEffect, useRef } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   SERVER_ORDER,
   saveServerConfig,
@@ -10,6 +10,8 @@ import {
 import { useServersStore } from "../../stores/serversStore";
 import { useT } from "../../lib/i18n";
 import { confirmAppDialog } from "../../lib/appDialogs";
+import { closeCurrentDetachedWindow } from "../../lib/detachWindowing";
+import { isTauriRuntime } from "../../lib/runtime";
 import { ServerList } from "./ServerList";
 import { ServerSettings } from "./ServerSettings";
 
@@ -23,27 +25,31 @@ function timestampLine(line: string): string {
 }
 
 /**
- * Modal shell for the local-servers manager. Mirrors the TunnelEditor chrome:
- * a gradient title bar, a two-pane body (server list + settings), and a
- * Cancel/Apply footer. Self-gates on the store's `isOpen` so callers can
- * render it unconditionally. While open it subscribes to output and status
- * events for all server types and tears the listeners down on close.
+ * Local servers manager — intended to run as a **standalone OS window** with
+ * native title bar / borders (opened via `open_detached_window` kind
+ * `"servers"`). The shell fills the webview; move/resize come from the OS.
+ *
+ * Subscribes to output + status events for every server type while mounted,
+ * hydrates configs from the backend, and confirms discard on close when dirty.
  */
 export function ServersDialog() {
-  const isOpen = useServersStore((s) => s.isOpen);
-  if (!isOpen) return null;
-  return <ServersDialogInner />;
-}
-
-function ServersDialogInner() {
   const t = useT();
-  const closeDialog = useServersStore((s) => s.closeDialog);
   const appendLog = useServersStore((s) => s.appendLog);
   const clearDirty = useServersStore((s) => s.clearDirty);
+  const loadAll = useServersStore((s) => s.loadAll);
 
   // Snapshot of the port each server was last saved with, so Apply can warn
   // when a running server's port changed (it won't take effect until restart).
   const appliedPorts = useRef<Partial<Record<ServerType, number>>>({});
+
+  useEffect(() => {
+    document.title = t("servers.dialogTitle");
+  }, [t]);
+
+  // Hydrate configs + live statuses when the window mounts.
+  useEffect(() => {
+    void loadAll();
+  }, [loadAll]);
 
   // Subscribe to output + status events for every server type while open.
   useEffect(() => {
@@ -75,12 +81,15 @@ function ServersDialogInner() {
       cancelled = true;
       for (const un of unlisteners) un();
     };
-    // appendLog/setStatus are referenced via getState() so the listeners stay
-    // stable; this effect should run exactly once per open.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const attemptClose = async () => {
+  const closeWindow = useCallback(() => {
+    void closeCurrentDetachedWindow().catch(() => {
+      window.close();
+    });
+  }, []);
+
+  const attemptClose = useCallback(async () => {
     if (useServersStore.getState().dirty) {
       const confirmed = await confirmAppDialog({
         message: t("servers.confirmDiscard"),
@@ -88,8 +97,8 @@ function ServersDialogInner() {
       if (!confirmed) return;
     }
     clearDirty();
-    closeDialog();
-  };
+    closeWindow();
+  }, [clearDirty, closeWindow, t]);
 
   // Escape closes (confirming when there are unsaved edits).
   useEffect(() => {
@@ -101,8 +110,38 @@ function ServersDialogInner() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [attemptClose]);
+
+  // OS title-bar close: same discard confirm as Cancel.
+  useEffect(() => {
+    if (!isTauriRuntime()) return undefined;
+    let disposed = false;
+    let unlisten: (() => void) | null = null;
+    void getCurrentWindow()
+      .onCloseRequested((event) => {
+        if (!useServersStore.getState().dirty) return;
+        event.preventDefault();
+        void (async () => {
+          const confirmed = await confirmAppDialog({
+            message: t("servers.confirmDiscard"),
+          });
+          if (!confirmed) return;
+          clearDirty();
+          closeWindow();
+        })();
+      })
+      .then((next) => {
+        if (disposed) next();
+        else unlisten = next;
+      })
+      .catch(() => {
+        /* close hook unavailable in some stubs */
+      });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [clearDirty, closeWindow, t]);
 
   const handleApply = async () => {
     const { configs, runtimes } = useServersStore.getState();
@@ -132,80 +171,54 @@ function ServersDialogInner() {
 
   return (
     <div
-      className="fixed inset-0 z-[400] flex items-center justify-center"
-      style={{ background: "rgba(20,30,45,0.45)" }}
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) void attemptClose();
+      role="dialog"
+      aria-labelledby="servers-dialog-title"
+      data-testid="servers-dialog"
+      className="h-screen min-h-0 w-screen flex flex-col overflow-hidden"
+      style={{
+        background: "var(--taomni-panel-bg)",
+        color: "var(--taomni-text)",
       }}
     >
+      {/* Visually quiet page header — OS window title carries the real name */}
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="servers-dialog-title"
-        data-testid="servers-dialog"
-        className="flex flex-col rounded-[6px] shadow-2xl border overflow-hidden"
+        className="h-8 flex items-center px-3 shrink-0 border-b text-[12px] font-semibold"
         style={{
-          width: 720,
-          height: 520,
-          minWidth: 600,
-          minHeight: 420,
-          maxWidth: "96%",
-          maxHeight: "92vh",
-          background: "var(--taomni-panel-bg)",
-          borderColor: "var(--taomni-chrome-border)",
-          color: "var(--taomni-text)",
+          background: "var(--taomni-quick-bg)",
+          borderColor: "var(--taomni-divider)",
         }}
       >
-        {/* Title bar */}
-        <div
-          className="h-7 flex items-center px-2 rounded-t-[5px] shrink-0"
-          style={{ background: "linear-gradient(to bottom,#5895c8,#2b5d8b)", color: "white" }}
-        >
-          <Server className="w-3.5 h-3.5 mr-1.5" />
-          <div id="servers-dialog-title" className="text-[12px] font-semibold">
-            {t("servers.dialogTitle")}
-          </div>
-          <button
-            type="button"
-            data-testid="servers-dialog-close"
-            title={t("servers.cancel")}
-            aria-label={t("servers.cancel")}
-            className="ml-auto hover:bg-red-500 rounded p-0.5"
-            onClick={() => void attemptClose()}
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        <span id="servers-dialog-title">{t("servers.dialogTitle")}</span>
+      </div>
 
-        {/* Body */}
-        <div className="flex-1 min-h-0 flex flex-row">
-          <ServerList />
-          <ServerSettings />
-        </div>
+      {/* Body */}
+      <div className="flex-1 min-h-0 flex flex-row">
+        <ServerList />
+        <ServerSettings />
+      </div>
 
-        {/* Footer */}
-        <div
-          className="h-9 flex items-center justify-end gap-2 px-3 border-t shrink-0"
-          style={{ background: "var(--taomni-quick-bg)", borderColor: "var(--taomni-divider)" }}
+      {/* Footer */}
+      <div
+        className="h-9 flex items-center justify-end gap-2 px-3 border-t shrink-0"
+        style={{ background: "var(--taomni-quick-bg)", borderColor: "var(--taomni-divider)" }}
+      >
+        <button
+          type="button"
+          data-testid="servers-dialog-cancel"
+          className="taomni-btn"
+          onClick={() => void attemptClose()}
         >
-          <button
-            type="button"
-            data-testid="servers-dialog-cancel"
-            className="taomni-btn"
-            onClick={() => void attemptClose()}
-          >
-            {t("servers.cancel")}
-          </button>
-          <button
-            type="button"
-            data-testid="servers-dialog-apply"
-            className="taomni-btn"
-            data-primary="true"
-            onClick={() => void handleApply()}
-          >
-            {t("servers.apply")}
-          </button>
-        </div>
+          {t("servers.cancel")}
+        </button>
+        <button
+          type="button"
+          data-testid="servers-dialog-apply"
+          className="taomni-btn"
+          data-primary="true"
+          onClick={() => void handleApply()}
+        >
+          {t("servers.apply")}
+        </button>
       </div>
     </div>
   );

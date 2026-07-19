@@ -3529,7 +3529,7 @@ controls:
 
 ## 22. 本地服务器管理（Local Servers）
 
-### 22.1 本地服务器管理对话框 `ServersDialog` ✅
+### 22.1 本地服务器管理窗口 `ServersDialog` ✅
 
 <!-- feature
 id: F-Servers-1
@@ -3546,16 +3546,15 @@ files:
   - src/components/servers/fields.tsx
   - src/lib/servers.ts
   - src/stores/serversStore.ts
+  - src/lib/detachedSession.ts
+  - src-tauri/src/windowing/mod.rs
 controls:
-  # Modal shell — opened by ribbon "servers" button (F1.9) or Ctrl+Shift+S.
+  # Standalone OS window — opened by ribbon "servers" / Ctrl+Shift+S via
+  # open_detached_window(kind=servers). Browser smoke uses ?servers=main.
   - id: dialog
     selector: '[data-testid="servers-dialog"]'
     kind: display
-    optional: true       # only after openDialog()
-  - id: dialog-close
-    selector: '[data-testid="servers-dialog-close"]'
-    kind: interactive
-    optional: true
+    optional: true       # only inside the servers detached window
   - id: dialog-cancel
     selector: '[data-testid="servers-dialog-cancel"]'
     kind: interactive
@@ -3617,11 +3616,12 @@ controls:
     optional: true
 -->
 
-- 从 Ribbon `Servers` 按钮（`ribbon-servers`）或 `Ctrl+Shift+S` 打开 `ServersDialog` 模态：渐变标题栏 + 左侧服务器列表 + 右侧设置面板 + Cancel/Apply 页脚，仿 TunnelEditor chrome
-- 支持 9 类本地服务器（`SERVER_DEFS` 顺序）：ssh/sftp、ftp、tftp、http、telnet、vnc、nfs、cron、iperf、rdp；每行（`server-row-${type}`）显示运行状态点 + Start/Stop/Settings 按钮
+- 从 Ribbon `Servers` 按钮（`ribbon-servers`）或 `Ctrl+Shift+S` 打开**独立 OS 窗口**（`open_detached_window` kind=`servers`，系统标题栏/边框可移动可缩放；已打开则 focus 单例窗口 `servers-main`）；浏览器预览走 `window.open(?servers=main)`
+- 窗口内：左侧服务器列表 + 右侧设置面板 + Cancel/Apply 页脚；无自定义模态标题栏（由系统 chrome 承担）
+- 支持 10 类本地服务器（`SERVER_DEFS` 顺序）：ssh/sftp、ftp、tftp、http、telnet、vnc、nfs、cron、iperf、rdp；每行（`server-row-${type}`）显示运行状态点 + Start/Stop/Settings 按钮
 - 右栏：`CommonSettings`（监听端口 / 绑定地址 / 自动停止 / 开机自启）+ 每类专属设置表单（`settings/<X>Settings.tsx`，复用 `fields.tsx` 受控原语）+ `ServerOutputLog` 实时输出控制台（自动滚动 `server-log-autoscroll` / 清空 `server-log-clear`）
 - 后端 `src-tauri/src/servers/`：`ServerRegistry` 镜像 Tunnel 架构，配置持久化到 SQLite `server_configs` 表并在启动时 `autostart_servers()`；in-process 纯 Rust（ssh/sftp/http/ftp/tftp/telnet/cron）与受监管系统二进制（vnc/nfs/iperf 经 `which` + `spawn_supervised`，缺工具返回明确错误而非假「运行中」）
-- 输出/状态分别通过 `server://output/<type>` / `server://status/<type>` 事件流推送；Apply 保存所有 dirty 配置，对运行中且端口已改的服务器提示需重启生效
+- 输出/状态分别通过 `server://output/<type>` / `server://status/<type>` 事件流推送（`app.emit` 全局，detached 窗口可收）；Apply 保存所有 dirty 配置，对运行中且端口已改的服务器提示需重启生效；有未保存修改时 Cancel / 系统关闭按钮会确认丢弃
 - i18n key 在 `servers.*`（en / zh-CN 双语）；前端 store 为 `serversStore`，IPC + 类型 + `SERVER_DEFS` 在 `src/lib/servers.ts`
 - **e2e 测试限制**：真正 start/stop 一个服务器会绑定真实端口 / 拉起系统二进制，属带副作用操作；浏览器冒烟只验证对话框 chrome（打开 → 选行 → 设置面板/输出控制台挂载 → Cancel 关闭），实际启停留待 native/手动回归
 
