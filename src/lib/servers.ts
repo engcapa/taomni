@@ -113,7 +113,26 @@ export function defaultConfig(type: ServerType): ServerConfig {
   }
 }
 
-// --- IPC wrappers ---------------------------------------------------------
+// --- Window / IPC wrappers ------------------------------------------------
+
+/** Singleton id for the local-servers OS window (`#servers=main`). */
+export const SERVERS_WINDOW_ID = "main";
+
+/**
+ * Open (or focus) the Local servers manager as a native OS window with system
+ * chrome. Reuses the generic detached-window path; the label is fixed so a
+ * second open focuses the existing window instead of spawning a duplicate.
+ */
+export async function openServersWindow(title?: string): Promise<void> {
+  const { openDetachedWindow } = await import("./detachWindowing");
+  return openDetachedWindow({
+    kind: "servers",
+    sessionId: SERVERS_WINDOW_ID,
+    title,
+    width: 720,
+    height: 520,
+  });
+}
 
 export async function startLocalServer(
   serverType: ServerType,

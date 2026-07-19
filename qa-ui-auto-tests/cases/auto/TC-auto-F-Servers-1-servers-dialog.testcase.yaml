@@ -1,11 +1,15 @@
 id: TC-auto-F-Servers-1-servers-dialog
-title: Local servers dialog opens, selects a server, shows settings and console
+title: Local servers window opens, selects a server, shows settings and console
 description: |
-  Coverage smoke for F-Servers-1 (Local servers manager). Opens the
-  ServersDialog from the Ribbon "Servers" button, verifies the modal chrome
-  (server list + settings pane + output console), selects a couple of server
-  rows, and confirms the per-row Start/Stop/Settings actions and the live
-  console controls are mounted.
+  Coverage smoke for F-Servers-1 (Local servers manager). The manager lives in a
+  standalone OS window (Tauri) / popup (browser) opened via open_detached_window
+  with kind "servers". This case navigates directly to the detached route
+  (`?servers=main`) so browser smoke can exercise the shell without relying on
+  popup-switch support.
+
+  Verifies the chrome (server list + settings pane + output console), selects a
+  couple of server rows, and confirms the per-row Start/Stop/Settings actions
+  and the live console controls are mounted.
 
   Actually starting/stopping a server binds a real port or spawns a system
   binary (x11vnc / nfsd / iperf3) — a side-effecting action that browser
@@ -19,10 +23,8 @@ modes: [browser]
 fixtures: [reset_db]
 timeout_sec: 30
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="ribbon"]'
-  # Ribbon "Servers" button → serversStore.openDialog()
-  - click: '[data-testid="ribbon-servers"]'
+  # Detached route: same URL shape the browser stub / Tauri window uses.
+  - open: ${cfg.app.base_url}?servers=main
   - wait_for:
       selector: '[data-testid="servers-dialog"]'
       timeout_sec: 5
@@ -52,9 +54,8 @@ steps:
   - click: '[data-testid="server-log-autoscroll"]'
   - click: '[data-testid="server-log-clear"]'
   - screenshot: servers-1-dialog.png
-  # Cancel closes the dialog without persisting (no edits were made).
+  # Cancel closes the window (browser: window.close may be blocked for
+  # scripted popups that were not opened by a user gesture — still assert
+  # the button is wired and clickable).
+  - assert_visible: '[data-testid="servers-dialog-cancel"]'
   - click: '[data-testid="servers-dialog-cancel"]'
-  - wait_for:
-      selector: '[data-testid="servers-dialog"]'
-      state: detached
-      timeout_sec: 5

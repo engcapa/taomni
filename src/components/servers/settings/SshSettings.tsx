@@ -9,8 +9,9 @@ interface Props {
 
 /**
  * SSH / SFTP server form. The auth method drives which credential field is
- * shown: "OS credentials" exposes an optional account password, "Key file"
- * exposes the authorized key file path.
+ * shown: "OS credentials" exposes a server password (matched against the
+ * configured value — not PAM / system accounts), "Key file" exposes the
+ * authorized public-key file path (read at server start).
  */
 export function SshSettings({ config, onChange }: Props) {
   const t = useT();

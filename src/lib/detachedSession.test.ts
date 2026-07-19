@@ -113,6 +113,11 @@ describe("detectDetachedRoute", () => {
     expect(detectDetachedRoute()).toEqual({ kind: "notes", id: "panel" });
   });
 
+  it("parses servers detached routes", () => {
+    window.history.replaceState(null, "", "/index.html#servers=main");
+    expect(detectDetachedRoute()).toEqual({ kind: "servers", id: "main" });
+  });
+
   it("ignores unknown kinds", () => {
     window.history.replaceState(null, "", "/index.html#bogus=oops");
     expect(detectDetachedRoute()).toBeNull();
