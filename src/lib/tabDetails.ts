@@ -95,3 +95,59 @@ export function buildTabDetailSummary(
     cwd: cwd ?? null,
   };
 }
+
+/**
+ * Format the hover-card summary plus extra identifiers into a multi-line
+ * clipboard payload. Field labels stay English so the text is easy to paste
+ * into tickets / chat regardless of UI language.
+ */
+export function formatTabSessionInfo(
+  tab: Tab,
+  sessions: readonly SessionConfig[],
+  runtime: TerminalRuntimeInfo | undefined,
+  cwd: string | undefined,
+  t: Translate,
+): string {
+  const summary = buildTabDetailSummary(tab, sessions, runtime, cwd, t);
+  const session = tab.sessionId ? sessions.find((item) => item.id === tab.sessionId) : undefined;
+  const host = session?.host || tab.ssh?.host || tab.commandTerminal?.host || tab.sftp?.host
+    || tab.vnc?.host || tab.rdp?.host || tab.db?.host || null;
+  const port = session?.port ?? tab.ssh?.port ?? tab.commandTerminal?.port ?? tab.sftp?.port
+    ?? tab.vnc?.port ?? tab.rdp?.port ?? tab.db?.port ?? null;
+  const username = session?.username ?? tab.ssh?.username ?? tab.commandTerminal?.username
+    ?? tab.sftp?.username ?? tab.vnc?.username ?? tab.rdp?.username ?? tab.db?.username ?? null;
+
+  const lines: string[] = [
+    `Title: ${tab.title}`,
+    `Type: ${tab.type}`,
+    `Connection: ${summary.connectionLabel}`,
+    `Session: ${summary.sessionLabel}`,
+  ];
+
+  if (summary.endpoint) lines.push(`Endpoint: ${summary.endpoint}`);
+  if (host) lines.push(`Host: ${host}`);
+  if (port != null && port > 0) lines.push(`Port: ${port}`);
+  if (username) lines.push(`Username: ${username}`);
+  if (session?.group_path) lines.push(`Group: ${session.group_path}`);
+  if (session?.session_type) lines.push(`Session type: ${session.session_type}`);
+
+  if (tab.type === "terminal") {
+    lines.push(`CWD: ${summary.cwd ?? t("tabs.detailsCwdUnknown")}`);
+    lines.push(`Activity: ${summary.activityLabel}`);
+    if (summary.activityState) lines.push(`State: ${summary.activityState}`);
+    if (summary.program) lines.push(`Program: ${summary.program}`);
+    if (runtime?.activitySource) lines.push(`Activity source: ${runtime.activitySource}`);
+    if (tab.localShell?.name) lines.push(`Shell: ${tab.localShell.name}`);
+    if (tab.commandTerminal?.kind) lines.push(`Protocol: ${tab.commandTerminal.kind}`);
+  } else {
+    lines.push(`Activity: ${summary.activityLabel}`);
+  }
+
+  lines.push(`Tab ID: ${tab.id}`);
+  if (tab.sessionId) lines.push(`Session ID: ${tab.sessionId}`);
+  if (tab.connectionId) lines.push(`Connection ID: ${tab.connectionId}`);
+  if (runtime?.backendSessionId) lines.push(`Backend session: ${runtime.backendSessionId}`);
+  if (tab.chatTabId && tab.chatTabId !== tab.id) lines.push(`Chat tab ID: ${tab.chatTabId}`);
+
+  return lines.join("\n");
+}

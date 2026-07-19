@@ -7,6 +7,7 @@ import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import type { Tab } from "../../types";
 import type { SessionConfig } from "../../lib/ipc";
+import { writeText } from "../../lib/clipboard";
 
 const ipcMocks = vi.hoisted(() => ({
   listLocalShells: vi.fn(async () => []),
@@ -14,6 +15,10 @@ const ipcMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../../lib/ipc", () => ipcMocks);
+
+vi.mock("../../lib/clipboard", () => ({
+  writeText: vi.fn(async () => undefined),
+}));
 
 const makeTab = (index: number): Tab => ({
   id: `tab-${index}`,
@@ -327,5 +332,72 @@ describe("TabBar overflow navigation", () => {
 
     fireEvent.keyDown(window, { key: "H", code: "KeyH", ctrlKey: true, shiftKey: true });
     await waitFor(() => expect(screen.queryByTestId("tab-details-overlay")).not.toBeInTheDocument());
+  });
+
+  it("copies hover summary fields and extra session info from the tab context menu", async () => {
+    const session: SessionConfig = {
+      id: "prod",
+      name: "Production",
+      session_type: "SSH",
+      group_path: "Work / prod",
+      host: "10.0.0.8",
+      port: 22,
+      username: "root",
+      auth_method: "None",
+      options_json: "{}",
+      created_at: 0,
+      updated_at: 0,
+      last_connected_at: null,
+      sort_order: 0,
+    };
+    useSessionStore.setState({ sessions: [session] });
+    useAppStore.setState({
+      tabs: [{
+        id: "term",
+        type: "terminal",
+        title: "taomni",
+        sessionId: "prod",
+        connectionId: "conn-1",
+        closable: true,
+        ssh: {
+          sessionId: "prod",
+          host: "10.0.0.8",
+          port: 22,
+          username: "root",
+          authMethod: "None",
+          authData: null,
+        },
+      }],
+      activeTabId: "term",
+      cwdByTab: { term: "/srv/taomni" },
+      terminalRuntimeByTab: {
+        term: {
+          state: "running",
+          program: "vite",
+          backendSessionId: "runtime-1",
+          activitySource: "shell-integration",
+          updatedAt: 1,
+        },
+      },
+      statusMessage: "",
+    });
+    renderTabBar();
+
+    fireEvent.contextMenu(screen.getByTestId("tab-item"));
+    fireEvent.click(screen.getByTestId("tab-context-copy-session-info"));
+
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledTimes(1);
+    });
+    const payload = vi.mocked(writeText).mock.calls[0][0];
+    expect(payload).toContain("Title: taomni");
+    expect(payload).toContain("Session: Production");
+    expect(payload).toContain("Endpoint: root@10.0.0.8:22");
+    expect(payload).toContain("CWD: /srv/taomni");
+    expect(payload).toContain("Program: vite");
+    expect(payload).toContain("Tab ID: term");
+    expect(payload).toContain("Session ID: prod");
+    expect(payload).toContain("Backend session: runtime-1");
+    expect(useAppStore.getState().statusMessage).toBe("Tab session info copied");
   });
 });

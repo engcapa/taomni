@@ -7,6 +7,7 @@ import {
   Network as NetworkIcon,
   Search,
   Copy,
+  ClipboardCopy,
   Trash2,
   FileText,
   Pencil,
@@ -39,6 +40,8 @@ import {
   type LocalShellOption,
   type SessionConfig,
 } from "../../lib/ipc";
+import { writeText } from "../../lib/clipboard";
+import { formatTabSessionInfo } from "../../lib/tabDetails";
 import { getAppPlatform } from "../../lib/runtime";
 import { filterVisibleTabs, getFilterChipText } from "../../lib/tabFilter";
 import { TabDetailsOverlay } from "./TabDetailsOverlay";
@@ -104,6 +107,9 @@ export function TabBar({
     multiExecActive,
     multiExecSelectedTabIds,
     toggleMultiExecTab,
+    setStatusMessage,
+    terminalRuntimeByTab,
+    cwdByTab,
   } = useAppStore();
   const sessions = useSessionStore((s) => s.sessions);
   const ctx = useContextMenu();
@@ -404,6 +410,24 @@ export function TabBar({
     }
   };
 
+  const copyTabSessionInfo = useCallback(
+    (tab: Tab) => {
+      const text = formatTabSessionInfo(
+        tab,
+        sessions,
+        terminalRuntimeByTab[tab.id],
+        cwdByTab[tab.id],
+        t,
+      );
+      void writeText(text)
+        .then(() => setStatusMessage(t("tabs.sessionInfoCopied")))
+        .catch((error) =>
+          setStatusMessage(t("tabs.sessionInfoCopyFailed", { error: String(error) })),
+        );
+    },
+    [cwdByTab, sessions, setStatusMessage, t, terminalRuntimeByTab],
+  );
+
   const handleTabContext = (e: React.MouseEvent, tab: Tab) => {
     const idx = tabs.findIndex((t) => t.id === tab.id);
     const isFirst = idx === 0;
@@ -417,6 +441,12 @@ export function TabBar({
       { label: t("tabs.duplicate"), icon: <Copy className="w-3 h-3" />, onClick: () => {
         (onDuplicateTab ?? duplicateTab)(tab.id);
       }, disabled: tab.type === "welcome" },
+      {
+        label: t("tabs.copySessionInfo"),
+        testId: "tab-context-copy-session-info",
+        icon: <ClipboardCopy className="w-3 h-3" />,
+        onClick: () => copyTabSessionInfo(tab),
+      },
       { label: "", separator: true, onClick: () => {} },
       { label: t("tabs.moveToFirst"), icon: <ChevronFirst className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, 0), disabled: isFirst },
       { label: t("tabs.moveLeft"), icon: <ChevronLeft className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, idx - 1), disabled: isFirst },
