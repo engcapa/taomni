@@ -20,6 +20,12 @@ path = "tests/support/acp_fake_agent.rs"
 test = false
 bench = false
 
+[[bin]]
+name = "sockscap-helper"
+path = "src/bin/sockscap_helper.rs"
+test = false
+bench = false
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 prost-build = "0.14"

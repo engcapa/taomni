@@ -12,8 +12,12 @@ pub mod helper_protocol;
 #[cfg(target_os = "linux")]
 pub mod linux;
 #[cfg(target_os = "linux")]
+pub mod linux_helper;
+#[cfg(target_os = "linux")]
 pub mod linux_process;
 #[cfg(target_os = "linux")]
 pub mod linux_system;
+#[cfg(target_os = "linux")]
+pub mod unix_transport;
 
 pub use adapter::*;

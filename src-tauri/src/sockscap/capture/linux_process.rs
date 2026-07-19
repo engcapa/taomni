@@ -1,6 +1,7 @@
 //! Linux privileged capture transaction and process/cgroup ownership.
 
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System, UpdateKind};
@@ -20,6 +21,7 @@ pub struct LinuxProcessIdentity {
     pub pid: u32,
     pub parent_pid: Option<u32>,
     pub process_start_time: u64,
+    pub owner_uid: u32,
     pub executable_path: Option<PathBuf>,
     pub cgroup_relative: String,
 }
@@ -61,7 +63,7 @@ pub async fn prepare_linux_capture(
         return rollback_error(runner, &artifact, error).await;
     }
     let snapshot = snapshot_processes()?;
-    let selected = processes_for_install(spec, &snapshot)?;
+    let selected = processes_for_install(spec, &snapshot, owner_uid)?;
     match move_processes(&plan, spec.mode, selected, &mut artifact.process_restores) {
         Ok(()) => artifact.validate()?,
         Err(error) => return rollback_error(runner, &artifact, error).await,
@@ -118,7 +120,7 @@ pub fn refresh_linux_membership(
         return Ok(prepared.artifact.clone());
     }
     let snapshot = snapshot_processes()?;
-    let selected = processes_for_install(&prepared.spec, &snapshot)?;
+    let selected = processes_for_install(&prepared.spec, &snapshot, prepared.plan.owner_uid)?;
     let known = prepared
         .artifact
         .process_restores
@@ -173,6 +175,7 @@ pub async fn stop_linux_capture(
 fn processes_for_install(
     spec: &CaptureInstallSpec,
     snapshot: &[LinuxProcessIdentity],
+    owner_uid: u32,
 ) -> Result<Vec<LinuxProcessIdentity>, CaptureError> {
     let by_pid = snapshot
         .iter()
@@ -186,12 +189,19 @@ fn processes_for_install(
             [spec.taomni_pid, helper_pid]
                 .into_iter()
                 .map(|pid| {
-                    by_pid.get(&pid).cloned().cloned().ok_or_else(|| {
+                    let process = by_pid.get(&pid).cloned().cloned().ok_or_else(|| {
                         CaptureError::invalid(
                             "LINUX_BYPASS_PROCESS_MISSING",
                             format!("required bypass process {pid} no longer exists"),
                         )
-                    })
+                    })?;
+                    if pid == spec.taomni_pid && process.owner_uid != owner_uid {
+                        return Err(CaptureError::invalid(
+                            "LINUX_PROCESS_OWNER_MISMATCH",
+                            "Taomni process does not belong to the authorized desktop user",
+                        ));
+                    }
+                    Ok(process)
                 })
                 .collect()
         }
@@ -222,20 +232,29 @@ fn processes_for_install(
                         format!("selected PID {pid} no longer identifies the same process"),
                     ));
                 }
+                if process.owner_uid != owner_uid {
+                    return Err(CaptureError::invalid(
+                        "LINUX_PROCESS_OWNER_MISMATCH",
+                        format!("selected PID {pid} belongs to another user"),
+                    ));
+                }
                 seeds.push(((*process).clone(), selector.include_children));
             }
-            Ok(expand_children(seeds, snapshot))
+            Ok(expand_children(seeds, snapshot, owner_uid))
         }
         CaptureMode::ApplicationGroup => {
             let mut seeds = Vec::new();
             for selector in &spec.selectors {
-                for process in snapshot {
+                for process in snapshot
+                    .iter()
+                    .filter(|process| process.owner_uid == owner_uid)
+                {
                     if application_selector_matches(selector, process)? {
                         seeds.push((process.clone(), selector.include_children));
                     }
                 }
             }
-            Ok(expand_children(seeds, snapshot))
+            Ok(expand_children(seeds, snapshot, owner_uid))
         }
     }
 }
@@ -270,6 +289,7 @@ fn application_selector_matches(
 fn expand_children(
     seeds: Vec<(LinuxProcessIdentity, bool)>,
     snapshot: &[LinuxProcessIdentity],
+    owner_uid: u32,
 ) -> Vec<LinuxProcessIdentity> {
     let mut selected = HashMap::<u32, LinuxProcessIdentity>::new();
     let mut queue = VecDeque::new();
@@ -282,7 +302,7 @@ fn expand_children(
     while let Some(parent) = queue.pop_front() {
         for process in snapshot
             .iter()
-            .filter(|process| process.parent_pid == Some(parent))
+            .filter(|process| process.parent_pid == Some(parent) && process.owner_uid == owner_uid)
         {
             if selected.insert(process.pid, process.clone()).is_none() {
                 queue.push_back(process.pid);
@@ -312,6 +332,9 @@ fn snapshot_processes() -> Result<Vec<LinuxProcessIdentity>, CaptureError> {
             pid,
             parent_pid: process.parent().map(Pid::as_u32),
             process_start_time: process.start_time(),
+            owner_uid: std::fs::metadata(format!("/proc/{pid}"))
+                .map(|metadata| metadata.uid())
+                .unwrap_or(u32::MAX),
             executable_path: process.exe().map(Path::to_path_buf),
             cgroup_relative,
         });
@@ -379,6 +402,15 @@ fn move_processes(
                 format!("PID {} changed while capture was preparing", process.pid),
             ));
         }
+        if current.owner_uid != process.owner_uid {
+            return Err(CaptureError::recovery(
+                "LINUX_CAPTURE_PROCESS_OWNER_CHANGED",
+                format!(
+                    "PID {} owner changed while capture was preparing",
+                    process.pid
+                ),
+            ));
+        }
         std::fs::write(target.join("cgroup.procs"), process.pid.to_string()).map_err(|error| {
             CaptureError::recovery(
                 "LINUX_CGROUP_MOVE_FAILED",
@@ -388,11 +420,17 @@ fn move_processes(
                 ),
             )
         })?;
-        restores.push(CaptureProcessRestore {
-            pid: process.pid,
-            process_start_time: process.process_start_time,
-            original_group: process.cgroup_relative,
-        });
+        // The root helper is moved into the bypass cgroup for global mode but
+        // is lifetime-bound to this transaction. Cleanup drains it to cgroup
+        // root; only authorized desktop-user processes need exact restoration.
+        if process.owner_uid == plan.owner_uid {
+            restores.push(CaptureProcessRestore {
+                pid: process.pid,
+                process_start_time: process.process_start_time,
+                owner_uid: process.owner_uid,
+                original_group: process.cgroup_relative,
+            });
+        }
     }
     Ok(())
 }
@@ -423,6 +461,9 @@ fn current_process_identity(pid: u32) -> Result<LinuxProcessIdentity, CaptureErr
         pid,
         parent_pid: process.parent().map(|parent| parent.as_u32()),
         process_start_time: process.start_time(),
+        owner_uid: std::fs::metadata(format!("/proc/{pid}"))
+            .map(|metadata| metadata.uid())
+            .unwrap_or(u32::MAX),
         executable_path: process.exe().map(Path::to_path_buf),
         cgroup_relative,
     })
@@ -442,6 +483,13 @@ fn restore_process_groups(
             continue;
         };
         if process.process_start_time != restore.process_start_time {
+            continue;
+        }
+        if restore.owner_uid != plan.owner_uid || process.owner_uid != restore.owner_uid {
+            failures.push(format!(
+                "refused to restore PID {} owned by a different user",
+                restore.pid
+            ));
             continue;
         }
         if let Err(error) = validate_cgroup_relative(&restore.original_group) {
@@ -592,6 +640,7 @@ mod tests {
             pid,
             parent_pid,
             process_start_time: start,
+            owner_uid: 1000,
             executable_path: Some(executable.into()),
             cgroup_relative: cgroup.into(),
         }
@@ -629,6 +678,7 @@ mod tests {
         let selected = processes_for_install(
             &spec(CaptureMode::RuntimeProcesses, vec![selector.clone()]),
             &snapshot,
+            1000,
         )
         .unwrap();
         assert_eq!(
@@ -644,11 +694,54 @@ mod tests {
         assert_eq!(
             processes_for_install(
                 &spec(CaptureMode::RuntimeProcesses, vec![reused]),
-                &snapshot
+                &snapshot,
+                1000,
             )
             .unwrap_err()
             .code,
             "LINUX_RUNTIME_PID_REUSED"
+        );
+    }
+
+    #[test]
+    fn runtime_selection_rejects_other_users_and_does_not_follow_their_children() {
+        let selector = CaptureSelector {
+            profile_id: "p1".into(),
+            kind: AppSelectorKind::ExecutablePath,
+            value: "/usr/bin/app".into(),
+            pid: Some(20),
+            process_start_time: Some(50),
+            include_children: true,
+        };
+        let mut foreign_seed = process(20, Some(1), 50, "/usr/bin/app", "/user.slice/app.scope");
+        foreign_seed.owner_uid = 2000;
+        assert_eq!(
+            processes_for_install(
+                &spec(CaptureMode::RuntimeProcesses, vec![selector.clone()]),
+                &[foreign_seed],
+                1000,
+            )
+            .unwrap_err()
+            .code,
+            "LINUX_PROCESS_OWNER_MISMATCH"
+        );
+
+        let seed = process(20, Some(1), 50, "/usr/bin/app", "/user.slice/app.scope");
+        let mut foreign_child =
+            process(21, Some(20), 51, "/usr/bin/child", "/user.slice/app.scope");
+        foreign_child.owner_uid = 2000;
+        let selected = processes_for_install(
+            &spec(CaptureMode::RuntimeProcesses, vec![selector]),
+            &[seed, foreign_child],
+            1000,
+        )
+        .unwrap();
+        assert_eq!(
+            selected
+                .iter()
+                .map(|process| process.pid)
+                .collect::<Vec<_>>(),
+            vec![20]
         );
     }
 
@@ -682,9 +775,12 @@ mod tests {
                 include_children: false,
             },
         ];
-        let selected =
-            processes_for_install(&spec(CaptureMode::ApplicationGroup, selectors), &snapshot)
-                .unwrap();
+        let selected = processes_for_install(
+            &spec(CaptureMode::ApplicationGroup, selectors),
+            &snapshot,
+            1000,
+        )
+        .unwrap();
         assert_eq!(selected.len(), 2);
     }
 
@@ -698,7 +794,7 @@ mod tests {
             "/user.slice/app.scope",
         )];
         assert_eq!(
-            processes_for_install(&spec(CaptureMode::Global, Vec::new()), &snapshot)
+            processes_for_install(&spec(CaptureMode::Global, Vec::new()), &snapshot, 1000)
                 .unwrap_err()
                 .code,
             "LINUX_BYPASS_PROCESS_MISSING"

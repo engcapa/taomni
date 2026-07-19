@@ -400,6 +400,7 @@ mod tests {
             CaptureArtifactState {
                 adapter: "fake_linux".into(),
                 generation,
+                owner_uid: Some(1000),
                 interface_names: vec![format!("tun-{generation}")],
                 rule_ids: Vec::new(),
                 route_ids: Vec::new(),

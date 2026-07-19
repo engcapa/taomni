@@ -174,6 +174,10 @@ impl CaptureInstallSpec {
 pub struct CaptureArtifactState {
     pub adapter: String,
     pub generation: u64,
+    /// Authorized Unix desktop user. Other platform adapters may leave this
+    /// unset when ownership is enforced by a signed driver/extension instead.
+    #[serde(default)]
+    pub owner_uid: Option<u32>,
     pub interface_names: Vec<String>,
     pub rule_ids: Vec<String>,
     pub route_ids: Vec<String>,
@@ -191,6 +195,7 @@ pub struct CaptureArtifactState {
 pub struct CaptureProcessRestore {
     pub pid: u32,
     pub process_start_time: u64,
+    pub owner_uid: u32,
     pub original_group: String,
 }
 
@@ -229,6 +234,7 @@ impl CaptureArtifactState {
         for restore in &self.process_restores {
             if restore.pid == 0
                 || restore.process_start_time == 0
+                || self.owner_uid != Some(restore.owner_uid)
                 || restore.original_group.is_empty()
                 || restore.original_group.len() > MAX_PATH_BYTES
                 || restore.original_group.contains('\0')
@@ -438,6 +444,7 @@ mod tests {
         let artifact = CaptureArtifactState {
             adapter: "linux_nft_tun".into(),
             generation: 1,
+            owner_uid: Some(1000),
             interface_names: vec!["taomni-sc-1".into()],
             rule_ids: vec!["inet:taomni_sockscap_1".into()],
             route_ids: vec!["table:42101".into()],
@@ -447,6 +454,7 @@ mod tests {
             process_restores: vec![CaptureProcessRestore {
                 pid: 42,
                 process_start_time: 1234,
+                owner_uid: 1000,
                 original_group: "/user.slice/example.scope".into(),
             }],
         };

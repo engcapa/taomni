@@ -99,8 +99,16 @@ pub fn verify_peer_identity(
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum HelperRequest {
     Probe,
-    Install {
+    /// Create owned cgroups/TUN state but do not activate marking or routes.
+    Prepare {
         spec: CaptureInstallSpec,
+    },
+    /// Activate a prepared generation only after the unprivileged TUN runtime
+    /// has opened the persistent interface and its local gateway is ready.
+    Activate {
+        generation: u64,
+        runtime_pid: u32,
+        runtime_start_token: u64,
     },
     Update {
         handle: CaptureHandle,
@@ -111,6 +119,11 @@ pub enum HelperRequest {
     },
     Recover {
         artifact: CaptureArtifactState,
+    },
+    /// Linux crash fallback when the app died before receiving its prepared
+    /// artifact. The root-owned helper receipt supplies deterministic state.
+    RecoverGeneration {
+        generation: u64,
     },
     Heartbeat {
         generation: u64,
@@ -123,6 +136,9 @@ pub enum HelperRequest {
 pub enum HelperResponse {
     Probe {
         report: AdapterProbe,
+    },
+    Prepared {
+        handle: CaptureHandle,
     },
     Installed {
         handle: CaptureHandle,
@@ -373,6 +389,8 @@ pub enum ProtocolError {
     MessageTooLarge(usize),
     #[error("helper protocol encoding failed: {0}")]
     Encoding(String),
+    #[error("helper transport failed: {0}")]
+    Transport(String),
     #[error("helper protocol sequence exhausted")]
     SequenceExhausted,
 }

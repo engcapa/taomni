@@ -382,6 +382,7 @@ impl LinuxCapturePlan {
         CaptureArtifactState {
             adapter: LINUX_ADAPTER_ID.into(),
             generation: self.generation,
+            owner_uid: Some(self.owner_uid),
             interface_names: vec![self.tun_name.clone()],
             rule_ids: vec![format!("inet:{}", self.nft_table)],
             route_ids: self.expected_route_ids(),
@@ -409,6 +410,12 @@ impl LinuxCapturePlan {
         for restore in &artifact.process_restores {
             validate_cgroup_relative(&restore.original_group)?;
         }
+        let owner_uid = artifact.owner_uid.ok_or_else(|| {
+            CaptureError::invalid(
+                "LINUX_ARTIFACT_OWNER_INVALID",
+                "Linux recovery artifact has no authorized owner UID",
+            )
+        })?;
         let placeholder = CaptureInstallSpec {
             generation: artifact.generation,
             config_revision: 1,
@@ -421,7 +428,7 @@ impl LinuxCapturePlan {
             taomni_pid: 1,
             helper_pid: Some(2),
         };
-        let plan = Self::from_spec(&placeholder, 0)?;
+        let plan = Self::from_spec(&placeholder, owner_uid)?;
         let expected = plan.artifact(Vec::new());
         if artifact.interface_names != expected.interface_names
             || artifact.rule_ids != expected.rule_ids
@@ -638,6 +645,7 @@ mod tests {
         let artifact = plan.artifact(vec![CaptureProcessRestore {
             pid: 42,
             process_start_time: 11,
+            owner_uid: 1000,
             original_group: "/user.slice/example.scope".into(),
         }]);
         let recovered = LinuxCapturePlan::from_artifact(&artifact).unwrap();
