@@ -15,6 +15,7 @@
 //! UDP/ICMP protocol policy is then layered onto the chosen action.
 
 use std::net::IpAddr;
+use std::path::Path;
 
 use super::matcher::{CompiledRuleSource, IpCidr};
 use super::model::{
@@ -100,13 +101,34 @@ pub struct AppIdentity {
     pub process_start_time: Option<String>,
 }
 
+/// Normalize Windows paths for comparison: `/` → `\`, ASCII lowercase.
+pub fn normalize_windows_path(path: &str) -> String {
+    path.replace('/', "\\").to_ascii_lowercase()
+}
+
+/// Match Windows executables: full path (normalized) or same file name.
+///
+/// Real Edge may live under `Program Files` while the profile was saved with
+/// `Program Files (x86)` (or vice versa). Basename matching keeps capture
+/// working; full-path match still preferred when both sides agree.
+pub fn windows_exe_paths_match(actual: &str, selector: &str) -> bool {
+    let a = normalize_windows_path(actual);
+    let s = normalize_windows_path(selector);
+    if a == s {
+        return true;
+    }
+    let a_name = Path::new(&a).file_name().and_then(|n| n.to_str());
+    let s_name = Path::new(&s).file_name().and_then(|n| n.to_str());
+    matches!((a_name, s_name), (Some(x), Some(y)) if x == y)
+}
+
 impl AppIdentity {
     fn matches_selector(&self, sel: &AppSelector) -> bool {
         match sel {
             AppSelector::WindowsExecutable(p) => self
                 .windows_exe
                 .as_deref()
-                .map(|e| e.eq_ignore_ascii_case(p))
+                .map(|e| windows_exe_paths_match(e, p))
                 .unwrap_or(false),
             AppSelector::MacosSigningIdentity(s) => {
                 self.macos_signing_id.as_deref() == Some(s.as_str())
@@ -616,6 +638,58 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(select_profile(&set, &app).unwrap().id, "low");
+    }
+
+    #[test]
+    fn windows_exe_matches_by_basename_when_install_dir_differs() {
+        // Edge often ships under Program Files; UI may have saved x86 path.
+        let mut p = profile(Action::Proxy);
+        p.id = "edge".into();
+        p.scope = Scope::Applications;
+        p.app_selectors = vec![AppSelector::WindowsExecutable(
+            r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe".into(),
+        )];
+        let set = vec![p];
+        let app = AppIdentity {
+            windows_exe: Some(
+                r"C:\Program Files\Microsoft\Edge\Application\msedge.exe".into(),
+            ),
+            ..Default::default()
+        };
+        assert_eq!(select_profile(&set, &app).unwrap().id, "edge");
+        assert!(windows_exe_paths_match(
+            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+            r"C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+        ));
+    }
+
+    #[test]
+    fn windows_exe_matches_filename_only_selector() {
+        // Users may type just "msedge.exe" without a full install path.
+        assert!(windows_exe_paths_match(
+            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+            "msedge.exe",
+        ));
+        assert!(windows_exe_paths_match(
+            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+            "MSEDGE.EXE",
+        ));
+        assert!(!windows_exe_paths_match(
+            r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+            "chrome.exe",
+        ));
+
+        let mut p = profile(Action::Proxy);
+        p.id = "by-name".into();
+        p.scope = Scope::Applications;
+        p.app_selectors = vec![AppSelector::WindowsExecutable("msedge.exe".into())];
+        let app = AppIdentity {
+            windows_exe: Some(
+                r"C:\Program Files\Microsoft\Edge\Application\msedge.exe".into(),
+            ),
+            ..Default::default()
+        };
+        assert_eq!(select_profile(&[p], &app).unwrap().id, "by-name");
     }
 
     #[test]

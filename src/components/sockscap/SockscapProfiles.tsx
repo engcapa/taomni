@@ -103,7 +103,7 @@ function selectorKindHint(): string {
   const platform = getAppPlatform();
   if (platform === "macos") return "macOS: .app path or signing identity / Team ID";
   if (platform === "linux") return "Linux: executable path or cgroup v2 fragment";
-  return "Windows: full path to .exe (case-insensitive match)";
+  return "Windows: full path or file name only (e.g. msedge.exe), case-insensitive";
 }
 
 /**
@@ -433,7 +433,7 @@ export function SockscapProfiles() {
                     className={selectCls}
                     placeholder={
                       getAppPlatform() === "windows"
-                        ? String.raw`C:\Program Files\App\app.exe`
+                        ? "msedge.exe  or  C:\\Program Files\\...\\msedge.exe"
                         : "/usr/bin/app"
                     }
                     value={pathDraft}

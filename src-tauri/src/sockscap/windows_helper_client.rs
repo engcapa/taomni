@@ -32,20 +32,55 @@ impl HelperClient {
                 candidates.push(dir.join("sockscap-helper-x86_64-pc-windows-msvc.exe"));
             }
         }
+        // `cargo tauri dev` / staged externalBin layouts.
         candidates.push(PathBuf::from("target/debug/sockscap-helper.exe"));
         candidates.push(PathBuf::from("target/release/sockscap-helper.exe"));
         candidates.push(PathBuf::from("src-tauri/target/debug/sockscap-helper.exe"));
         candidates.push(PathBuf::from("src-tauri/target/release/sockscap-helper.exe"));
-        candidates.into_iter().find(|p| p.exists())
+        candidates.push(PathBuf::from(
+            "binaries/sockscap-helper-x86_64-pc-windows-msvc.exe",
+        ));
+        candidates.push(PathBuf::from(
+            "src-tauri/binaries/sockscap-helper-x86_64-pc-windows-msvc.exe",
+        ));
+        candidates.into_iter().find_map(|p| {
+            if !p.exists() {
+                return None;
+            }
+            // ShellExecute "runas" needs an absolute path; relative paths
+            // resolve against System32 under elevation and fail silently.
+            let abs = std::fs::canonicalize(&p).unwrap_or_else(|_| {
+                if p.is_absolute() {
+                    p
+                } else {
+                    std::env::current_dir()
+                        .map(|cwd| cwd.join(&p))
+                        .unwrap_or(p)
+                }
+            });
+            Some(strip_verbatim_prefix(abs))
+        })
     }
 
     /// Bind control socket, UAC-spawn helper, accept connection, handshake.
     pub fn spawn_elevated(resources: Option<&Path>) -> Result<HelperClient, String> {
         let helper = Self::find_helper_exe().ok_or_else(|| {
             "sockscap-helper.exe not found. Build with:\n  cargo build --bin sockscap-helper\n\
+             then: scripts/stage-sockscap-helper.ps1\n\
              (or package it as a Tauri externalBin next to the main exe)"
                 .to_string()
         })?;
+        // Refuse placeholder staged files (a few dozen bytes of ASCII).
+        if let Ok(meta) = std::fs::metadata(&helper) {
+            if meta.len() < 1024 {
+                return Err(format!(
+                    "sockscap-helper at {} looks like a placeholder ({} bytes). \
+                     Run: scripts/stage-sockscap-helper.ps1",
+                    helper.display(),
+                    meta.len()
+                ));
+            }
+        }
 
         let listener = TcpListener::bind(("127.0.0.1", 0))
             .map_err(|e| format!("bind control socket: {e}"))?;
@@ -59,9 +94,15 @@ impl HelperClient {
 
         let mut args = format!("--control-port {port}");
         if let Some(r) = resources {
-            args.push_str(&format!(" --resources \"{}\"", r.display()));
+            let res = std::fs::canonicalize(r).unwrap_or_else(|_| r.to_path_buf());
+            args.push_str(&format!(" --resources \"{}\"", res.display()));
         }
 
+        tracing::info!(
+            "sockscap: elevating helper {} with {}",
+            helper.display(),
+            args
+        );
         let status = shell_execute_runas_status(&helper.to_string_lossy(), &args)?;
         if status < 32 {
             return Err(format!(
@@ -193,6 +234,20 @@ pub struct ConntrackInfo {
     pub dport: u16,
     pub pid: Option<u32>,
     pub exe: Option<String>,
+}
+
+/// `fs::canonicalize` on Windows returns `\\?\C:\...` which ShellExecute can
+/// reject; strip the verbatim prefix for elevation.
+fn strip_verbatim_prefix(path: PathBuf) -> PathBuf {
+    let s = path.to_string_lossy();
+    if let Some(rest) = s.strip_prefix(r"\\?\") {
+        // `\\?\UNC\server\share` → `\\server\share`
+        if let Some(unc) = rest.strip_prefix("UNC\\") {
+            return PathBuf::from(format!(r"\\{unc}"));
+        }
+        return PathBuf::from(rest);
+    }
+    path
 }
 
 fn wait_accept(listener: &TcpListener, timeout: Duration) -> Result<TcpStream, String> {

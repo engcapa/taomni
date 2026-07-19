@@ -36,6 +36,15 @@ pub fn is_tcp(pkt: &[u8]) -> bool {
     pkt.len() > 9 && pkt[9] == 6
 }
 
+/// The TCP source port (requires a TCP IPv4 packet).
+pub fn tcp_src_port(pkt: &[u8]) -> Option<u16> {
+    let ihl = ipv4_header_len(pkt)?;
+    if !is_tcp(pkt) || pkt.len() < ihl + 2 {
+        return None;
+    }
+    Some(u16::from_be_bytes([pkt[ihl], pkt[ihl + 1]]))
+}
+
 /// The TCP destination port (requires a TCP IPv4 packet).
 pub fn tcp_dst_port(pkt: &[u8]) -> Option<u16> {
     let ihl = ipv4_header_len(pkt)?;

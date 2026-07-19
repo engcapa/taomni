@@ -81,7 +81,17 @@ impl WindowsCaptureAdapter {
                 Scope::Applications => {
                     for s in &p.app_selectors {
                         if let AppSelector::WindowsExecutable(path) = s {
-                            paths.push(path.replace('/', "\\").to_ascii_lowercase());
+                            let norm = path.replace('/', "\\").to_ascii_lowercase();
+                            // Full path + basename so WinDivert filter still
+                            // matches when install dir differs (e.g. Edge
+                            // Program Files vs Program Files (x86)).
+                            paths.push(norm.clone());
+                            if let Some(name) = std::path::Path::new(&norm)
+                                .file_name()
+                                .and_then(|n| n.to_str())
+                            {
+                                paths.push(name.to_string());
+                            }
                         }
                     }
                 }
@@ -158,6 +168,11 @@ impl CaptureAdapter for WindowsCaptureAdapter {
 
         let profiles = self.profiles.lock().unwrap().clone();
         let filter = Self::build_filter_spec(&profiles);
+        tracing::info!(
+            "sockscap: install_capture port={} filter={filter:?} windivert={}",
+            self.listen_port,
+            bundle.display()
+        );
         client.install_capture("active", self.listen_port, filter, &bundle)?;
 
         let router = self

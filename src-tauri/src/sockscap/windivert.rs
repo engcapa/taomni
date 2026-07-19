@@ -35,6 +35,11 @@ struct WinDivertAddress {
 }
 
 impl WinDivertAddress {
+    // WINDIVERT_ADDRESS bit layout after Timestamp (WinDivert 2.x):
+    // Layer:8 Event:8 Sniffed:1 Outbound:1 Loopback:1 Impostor:1 IPv6:1 …
+    const OUTBOUND: u32 = 1 << 17;
+    const LOOPBACK: u32 = 1 << 18;
+
     fn zeroed() -> Self {
         Self {
             timestamp: 0,
@@ -44,7 +49,21 @@ impl WinDivertAddress {
         }
     }
     fn is_outbound(&self) -> bool {
-        (self.flags & (1 << 17)) != 0
+        (self.flags & Self::OUTBOUND) != 0
+    }
+    fn set_outbound(&mut self, outbound: bool) {
+        if outbound {
+            self.flags |= Self::OUTBOUND;
+        } else {
+            self.flags &= !Self::OUTBOUND;
+        }
+    }
+    fn set_loopback(&mut self, loopback: bool) {
+        if loopback {
+            self.flags |= Self::LOOPBACK;
+        } else {
+            self.flags &= !Self::LOOPBACK;
+        }
     }
 }
 
@@ -154,11 +173,23 @@ impl ProcessFilter {
                 if set.contains(&lower) {
                     return true;
                 }
-                Path::new(&lower)
-                    .file_name()
-                    .and_then(|s| s.to_str())
-                    .map(|n| set.contains(n))
-                    .unwrap_or(false)
+                // Basename match: set may contain "msedge.exe" and/or a full
+                // path whose leaf equals the live process image name.
+                if let Some(name) = Path::new(&lower).file_name().and_then(|s| s.to_str()) {
+                    if set.contains(name) {
+                        return true;
+                    }
+                    for cand in set {
+                        if Path::new(cand)
+                            .file_name()
+                            .and_then(|s| s.to_str())
+                            == Some(name)
+                        {
+                            return true;
+                        }
+                    }
+                }
+                false
             }
         }
     }
@@ -237,11 +268,11 @@ fn run_loop(
 ) {
     let mut buf = vec![0u8; 65535];
     let mut addr = WinDivertAddress::zeroed();
-    let mut owners = HashMap::new();
+    let mut owners = tcp_owner_map();
     let mut owner_refresh = std::time::Instant::now();
 
     while running.load(Ordering::Relaxed) {
-        if owner_refresh.elapsed() > std::time::Duration::from_millis(500) {
+        if owner_refresh.elapsed() > std::time::Duration::from_millis(200) {
             owners = tcp_owner_map();
             owner_refresh = std::time::Instant::now();
         }
@@ -259,11 +290,29 @@ fn run_loop(
             continue;
         }
         let pkt = &mut buf[..recv_len as usize];
-        if addr.is_outbound() {
-            nat_forward(pkt, local_port, &conntrack, &filter, &owners);
+
+        // Classify by TCP ports, NOT only Outbound flag.
+        // Loopback replies from the local accept port are often still marked
+        // Outbound on Windows; treating them as forward breaks the NAT path.
+        let sport = packet::tcp_src_port(pkt);
+        let is_reverse = sport == Some(local_port);
+        if is_reverse {
+            nat_reverse(pkt, &conntrack);
+            // Reply must look like it came from the original remote host.
+            addr.set_outbound(false);
+            addr.set_loopback(false);
+        } else if addr.is_outbound() {
+            let redirected = nat_forward(pkt, local_port, &conntrack, &filter, &mut owners);
+            if redirected {
+                // Deliver rewritten packet into the local TCP stack as inbound
+                // loopback so 127.0.0.1:local_port accept() sees it.
+                addr.set_outbound(false);
+                addr.set_loopback(true);
+            }
         } else {
             nat_reverse(pkt, &conntrack);
         }
+
         let mut send_len: u32 = 0;
         unsafe {
             (api.send)(
@@ -280,28 +329,36 @@ fn run_loop(
     }
 }
 
+/// Returns true when the packet was rewritten to the local transparent port.
 fn nat_forward(
     pkt: &mut [u8],
     local_port: u16,
     conntrack: &ConnTrack,
     filter: &ProcessFilter,
-    owners: &HashMap<u16, u32>,
-) {
+    owners: &mut HashMap<u16, u32>,
+) -> bool {
     let (Some(dst), Some(dport)) = (packet::ipv4_dst(pkt), packet::tcp_dst_port(pkt)) else {
-        return;
+        return false;
     };
-    let Some(ihl) = packet::ipv4_header_len(pkt) else {
-        return;
-    };
-    if pkt.len() < ihl + 2 {
-        return;
+    // Never re-capture traffic already aimed at our local listener.
+    if dst.is_loopback() || dport == local_port {
+        return false;
     }
-    let sport = u16::from_be_bytes([pkt[ihl], pkt[ihl + 1]]);
+    let Some(sport) = packet::tcp_src_port(pkt) else {
+        return false;
+    };
+
+    // Fresh TCP owner map when the ephemeral sport is missing — SYN often
+    // arrives before the 200ms refresh, which previously skipped all filters.
+    if !matches!(filter, ProcessFilter::All) && !owners.contains_key(&sport) {
+        *owners = tcp_owner_map();
+    }
     let pid = owners.get(&sport).copied();
-    let exe = pid.and_then(process_image_path).map(|p| p.to_string_lossy().into_owned());
+    let exe = pid
+        .and_then(process_image_path)
+        .map(|p| p.to_string_lossy().into_owned());
     if !filter.allows(pid, exe.as_deref()) {
-        // Not selected — reinject unmodified (already will be sent as-is).
-        return;
+        return false;
     }
     conntrack.lock().unwrap().insert(
         sport,
@@ -312,20 +369,22 @@ fn nat_forward(
             exe,
         },
     );
-    let _ = packet::redirect_ipv4_tcp(pkt, Ipv4Addr::LOCALHOST, local_port);
+    packet::redirect_ipv4_tcp(pkt, Ipv4Addr::LOCALHOST, local_port).is_some()
 }
 
 fn nat_reverse(pkt: &mut [u8], conntrack: &ConnTrack) {
-    let Some(ihl) = packet::ipv4_header_len(pkt) else {
+    let Some(dport) = packet::tcp_dst_port(pkt) else {
         return;
     };
-    if pkt.len() < ihl + 4 {
-        return;
-    }
-    let dport = u16::from_be_bytes([pkt[ihl + 2], pkt[ihl + 3]]);
     if let Some(info) = conntrack.lock().unwrap().get(&dport).cloned() {
+        // Rewrite source to the original remote so the client TCP stack
+        // associates the segment with the original 4-tuple.
         pkt[12..16].copy_from_slice(&info.dst.octets());
-        pkt[ihl..ihl + 2].copy_from_slice(&info.dport.to_be_bytes());
+        if let Some(ihl) = packet::ipv4_header_len(pkt) {
+            if pkt.len() >= ihl + 2 {
+                pkt[ihl..ihl + 2].copy_from_slice(&info.dport.to_be_bytes());
+            }
+        }
         let _ = packet::fix_ipv4_checksum(pkt);
         let _ = packet::fix_tcp_checksum(pkt);
     }
