@@ -1,6 +1,14 @@
 import { useT } from "../../../lib/i18n";
 import type { ServerConfig } from "../../../lib/servers";
-import { PasswordField, PathField, SelectField, TextField } from "../fields";
+import {
+  CheckboxField,
+  FieldNote,
+  NumberField,
+  PasswordField,
+  PathField,
+  SelectField,
+  TextField,
+} from "../fields";
 
 interface Props {
   config: ServerConfig;
@@ -8,19 +16,32 @@ interface Props {
 }
 
 /**
- * SSH / SFTP server form. The auth method drives which credential field is
- * shown: "OS credentials" exposes a server password (matched against the
- * configured value — not PAM / system accounts), "Key file" exposes the
- * authorized public-key file path (read at server start).
+ * SSH / SFTP server form.
+ *
+ * Auth modes:
+ * - password: configured password (not PAM / OS accounts)
+ * - key: authorized public-key file (multi-line authorized_keys supported)
+ * - both: password and key file fields together
  */
 export function SshSettings({ config, onChange }: Props) {
   const t = useT();
-  const authMethod = config.authMethod === "key" ? "key" : "os";
+  const authMethod =
+    config.authMethod === "key" || config.authMethod === "both"
+      ? (config.authMethod as string)
+      : "password";
   const allowedUsers = typeof config.allowedUsers === "string" ? config.allowedUsers : "";
   const rootDir = typeof config.rootDir === "string" ? config.rootDir : "";
   const password = typeof config.password === "string" ? config.password : "";
   const authorizedKeyPath =
     typeof config.authorizedKeyPath === "string" ? config.authorizedKeyPath : "";
+  const loginShell = config.loginShell !== false;
+  const maxSessions =
+    typeof config.maxSessions === "number" && Number.isFinite(config.maxSessions)
+      ? Math.max(1, Math.min(256, Math.floor(config.maxSessions as number)))
+      : 8;
+
+  const showPassword = authMethod === "password" || authMethod === "both";
+  const showKey = authMethod === "key" || authMethod === "both";
 
   return (
     <div className="flex flex-col">
@@ -29,18 +50,21 @@ export function SshSettings({ config, onChange }: Props) {
         value={authMethod}
         onChange={(v) => onChange({ authMethod: v })}
         options={[
-          { value: "os", label: t("servers.fields.authMethodOs") },
+          { value: "password", label: t("servers.fields.authMethodPassword") },
           { value: "key", label: t("servers.fields.authMethodKey") },
+          { value: "both", label: t("servers.fields.authMethodBoth") },
         ]}
       />
 
-      {authMethod === "os" ? (
+      {showPassword ? (
         <PasswordField
           label={t("servers.fields.password")}
           value={password}
           onChange={(v) => onChange({ password: v })}
         />
-      ) : (
+      ) : null}
+
+      {showKey ? (
         <PathField
           label={t("servers.fields.authorizedKeyPath")}
           value={authorizedKeyPath}
@@ -48,7 +72,7 @@ export function SshSettings({ config, onChange }: Props) {
           browseLabel={t("servers.fields.browse")}
           onChange={(v) => onChange({ authorizedKeyPath: v })}
         />
-      )}
+      ) : null}
 
       <TextField
         label={t("servers.fields.allowedUsers")}
@@ -64,6 +88,24 @@ export function SshSettings({ config, onChange }: Props) {
         browseLabel={t("servers.fields.browse")}
         onChange={(v) => onChange({ rootDir: v })}
       />
+
+      <CheckboxField
+        label={t("servers.fields.loginShell")}
+        checkboxLabel={t("servers.fields.loginShell")}
+        value={loginShell}
+        onChange={(v) => onChange({ loginShell: v })}
+      />
+
+      <NumberField
+        label={t("servers.fields.maxSessions")}
+        value={maxSessions}
+        min={1}
+        max={256}
+        onChange={(v) => onChange({ maxSessions: v })}
+      />
+
+      <FieldNote>{t("servers.notes.sshAuthHint")}</FieldNote>
+      <FieldNote>{t("servers.notes.sshPortForward")}</FieldNote>
     </div>
   );
 }
