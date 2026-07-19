@@ -3411,6 +3411,7 @@ export function MainLayout() {
                   style={{ display: (activeTab?.type === "welcome" || !activeTab) ? "block" : "none" }}
                 >
                   <WelcomePanel
+                    active={activeTab?.type === "welcome" || !activeTab}
                     onStartLocalTerminal={(localShell, cwd) => openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell, cwd)}
                     onNewSession={handleNewSession}
                     onOpenLocalPath={(path, opts) => void handleOpenLocalPath(path, opts)}

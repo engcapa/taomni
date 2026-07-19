@@ -982,7 +982,7 @@ impl AcpEventAccumulator {
                         call_id: id,
                         phase: "use".into(),
                         tool: name,
-                        detail: cc_tool_arg_summary(&input).unwrap_or("").into(),
+                        detail: cc_tool_arg_summary(&input).unwrap_or_default(),
                     },
                 );
             }

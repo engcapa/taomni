@@ -65,6 +65,12 @@ interface WelcomePanelProps {
   onRevealRecentWorkspace?: (workspace: RecentWorkspace) => void;
   onOpenNewWorkspace?: () => void;
   onOpenSettings?: () => void;
+  /**
+   * Whether the Welcome tab is currently visible. The panel stays mounted so
+   * shell/filter state survives tab switches; when it becomes active we
+   * refresh recent local directories from command history / shell cwd.
+   */
+  active?: boolean;
 }
 
 const EMPTY_RECENT_SESSIONS: SessionConfig[] = [];
@@ -99,6 +105,7 @@ export function WelcomePanel({
   onRevealRecentWorkspace,
   onOpenNewWorkspace,
   onOpenSettings,
+  active = true,
 }: WelcomePanelProps) {
   const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
   const [selectedShellId, setSelectedShellId] = useState("");
@@ -133,17 +140,6 @@ export function WelcomePanel({
         setStatusMessage(t("status.localShellDetectionFailed", { error: String(error) }));
       });
 
-    listCommonLocalDirectories()
-      .then((directories) => {
-        if (cancelled) return;
-        setLocalDirectories(Array.isArray(directories) ? directories : []);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        setLocalDirectories([]);
-        setStatusMessage(t("welcome.localDirectoriesLoadFailed", { error: String(error) }));
-      });
-
     if (getAppPlatform() === "windows") {
       listWslDistros()
         .then((distros) => {
@@ -166,6 +162,26 @@ export function WelcomePanel({
       cancelled = true;
     };
   }, [setStatusMessage, t]);
+
+  // Welcome stays mounted across tab switches; reload recent folders whenever
+  // the tab becomes visible so local `cd` / OSC-7 cwd history shows up promptly.
+  useEffect(() => {
+    if (!active) return;
+    let cancelled = false;
+    listCommonLocalDirectories()
+      .then((directories) => {
+        if (cancelled) return;
+        setLocalDirectories(Array.isArray(directories) ? directories : []);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setLocalDirectories([]);
+        setStatusMessage(t("welcome.localDirectoriesLoadFailed", { error: String(error) }));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [active, setStatusMessage, t]);
 
   const mergedShells = useMemo<LocalShellOption[]>(() => {
     if (wslDistros.length === 0) return localShells;

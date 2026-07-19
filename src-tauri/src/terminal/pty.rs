@@ -995,6 +995,14 @@ mod directory_shortcut_tests {
             directory_from_history_command(r#"Set-Location "C:\Users\ada\work""#, None),
             Some(PathBuf::from(r"C:\Users\ada\work")),
         );
+        assert_eq!(
+            directory_from_history_command(r#"cd D:\code\person\taomni"#, None),
+            Some(PathBuf::from(r"D:\code\person\taomni")),
+        );
+        assert_eq!(
+            directory_from_history_command(r#"cd "D:\code\my app""#, None),
+            Some(PathBuf::from(r"D:\code\my app")),
+        );
     }
 }
 

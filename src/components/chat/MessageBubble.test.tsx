@@ -39,12 +39,15 @@ describe("MessageBubble tool activity collapse", () => {
 
     expect(screen.getByText("Working on it.")).toBeInTheDocument();
     expect(screen.getByText("Done.")).toBeInTheDocument();
-    // Collapsed: summary visible, individual tool rows hidden.
-    expect(screen.getByTestId("chat-tool-activity-toggle")).toHaveAttribute("aria-expanded", "false");
+    // Collapsed: summary chip visible with tool previews; detail rows hidden.
+    const toggle = screen.getByTestId("chat-tool-activity-toggle");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByTestId("chat-tool-activity-list")).not.toBeInTheDocument();
-    expect(screen.queryByText("search_tool")).not.toBeInTheDocument();
+    // Summary embeds tool names for scanability even while collapsed.
+    expect(toggle.textContent).toMatch(/search_tool/);
+    expect(toggle.textContent).toMatch(/run_terminal_command/);
 
-    fireEvent.click(screen.getByTestId("chat-tool-activity-toggle"));
+    fireEvent.click(toggle);
 
     expect(screen.getByTestId("chat-tool-activity-toggle")).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByTestId("chat-tool-activity-list")).toBeInTheDocument();

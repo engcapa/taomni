@@ -813,11 +813,15 @@ export function TerminalPanel({
   const historyRef = useRef(history);
   const suggestionsActiveRef = useRef(suggestionsActive);
   const inlineSuggestionsSourceRef = useRef(inlineSuggestionsSource);
+  const isLocalRef = useRef(isLocal);
+  /** Last absolute local cwd we already recorded into command history. */
+  const lastRecordedLocalDirRef = useRef<string | null>(null);
   useEffect(() => {
     historyRef.current = history;
     suggestionsActiveRef.current = suggestionsActive;
     inlineSuggestionsSourceRef.current = inlineSuggestionsSource;
-  }, [history, suggestionsActive, inlineSuggestionsSource]);
+    isLocalRef.current = isLocal;
+  }, [history, suggestionsActive, inlineSuggestionsSource, isLocal]);
 
   // AI suggestion source resolver (data sources 2 + 3).
   // The resolver caches its options on every render; passing a thunk for
@@ -887,17 +891,22 @@ export function TerminalPanel({
   }, [bumpGhost]);
 
   const trackPending = useCallback((data: string) => {
-    if (!suggestionsActiveRef.current) return;
+    // History commit on Enter is always needed (Welcome recent-folders reads
+    // host_key=local command history). Ghost-text suggestion tracking is
+    // separate and only runs when suggestions are enabled — PowerShell local
+    // shells disable suggestions (PSReadLine owns that UX) but still must
+    // record typed commands.
+    const suggestionsOn = suggestionsActiveRef.current;
 
     // Bracketed paste: whole block is shell input, never a typed command.
     if (data.startsWith("\x1b[200~")) {
-      invalidatePending();
+      if (suggestionsOn) invalidatePending();
       return;
     }
 
     // Defensive: large chunk with any control char → treat as paste, invalidate.
     if (data.length > 64) {
-      invalidatePending();
+      if (suggestionsOn) invalidatePending();
       return;
     }
 
@@ -921,6 +930,11 @@ export function TerminalPanel({
         pendingRef.current = "";
         invalidatedRef.current = false;
         changed = true;
+        continue;
+      }
+
+      // Below: only track keystrokes for ghost-text when suggestions are on.
+      if (!suggestionsOn) {
         continue;
       }
 
@@ -964,7 +978,7 @@ export function TerminalPanel({
       }
     }
 
-    if (changed) refreshSuggestion();
+    if (changed && suggestionsOn) refreshSuggestion();
   }, [invalidatePending, refreshSuggestion]);
 
   // Rerun suggestion matching whenever the live cache or the on/off toggles
@@ -2412,6 +2426,9 @@ export function TerminalPanel({
 
     // OSC 7 — host writes its current working directory as `file://host/path`.
     // We listen for this so explicit SFTP "Sync" requests can learn the shell cwd.
+    // For local shells we also record absolute path changes into command history
+    // so Welcome "Recent folders" works even when the user `cd`s with a relative
+    // path (history only stores the typed line, which may not be absolute).
     try {
       term.parser.registerOscHandler(7, (data) => {
         const cwd = parseOsc7(data);
@@ -2424,6 +2441,16 @@ export function TerminalPanel({
               program: undefined,
               activitySource: "shell-integration",
             });
+          }
+          if (isLocalRef.current) {
+            const normalized = normalizeLocalStartCwd(cwd, getAppPlatform());
+            if (
+              normalized
+              && normalized !== lastRecordedLocalDirRef.current
+            ) {
+              lastRecordedLocalDirRef.current = normalized;
+              historyRef.current.commit(formatHistoryCdCommand(normalized));
+            }
           }
         }
         return true;
@@ -4499,6 +4526,16 @@ function parseOsc7(data: string): string | null {
   } catch {
     return match[1];
   }
+}
+
+/** Build a history line the Welcome recent-folders parser can turn into a path. */
+function formatHistoryCdCommand(path: string): string {
+  const trimmed = path.trim();
+  if (!trimmed) return "cd";
+  if (/[\s"'`]/.test(trimmed) || /[&|;<>]/.test(trimmed)) {
+    return `cd "${trimmed.replace(/"/g, '\\"')}"`;
+  }
+  return `cd ${trimmed}`;
 }
 
 function parseOsc52ClipboardText(data: string): string | null {

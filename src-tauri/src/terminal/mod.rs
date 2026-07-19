@@ -61,20 +61,60 @@ pub fn list_common_local_directories(
         }
         Err(e) => return Err(e.to_string()),
     };
+    // Prefer directory-changing commands, ordered by recency, so Welcome's
+    // "Recent folders" reflects where the user actually `cd`s — not the most
+    // frequently run non-cd commands. Fall back to a broader recent window so
+    // shells that record `Set-Location` / `pushd` / relative forms still feed
+    // the parser.
     let mut stmt = db
         .prepare(
             "SELECT command FROM command_history
              WHERE host_key = 'local'
-             ORDER BY use_count DESC, last_used_at DESC
-             LIMIT 500",
+               AND (
+                 lower(command) LIKE 'cd %'
+                 OR lower(command) LIKE 'cd\t%'
+                 OR lower(command) = 'cd'
+                 OR lower(command) LIKE 'chdir %'
+                 OR lower(command) LIKE 'pushd %'
+                 OR lower(command) LIKE 'set-location %'
+                 OR lower(command) LIKE 'sl %'
+               )
+             ORDER BY last_used_at DESC
+             LIMIT 300",
         )
         .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map([], |row| row.get::<_, String>(0))
         .map_err(|e| e.to_string())?;
-    let commands = rows
+    let mut commands = rows
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
+
+    // If history has few explicit cd lines (new install / PowerShell gap),
+    // also scan a recency-ordered general window so we don't miss paths that
+    // arrived via other directory forms.
+    if commands.len() < 24 {
+        let mut broad = db
+            .prepare(
+                "SELECT command FROM command_history
+                 WHERE host_key = 'local'
+                 ORDER BY last_used_at DESC
+                 LIMIT 500",
+            )
+            .map_err(|e| e.to_string())?;
+        let broad_rows = broad
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| e.to_string())?;
+        let extra = broad_rows
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?;
+        for cmd in extra {
+            if !commands.iter().any(|c| c == &cmd) {
+                commands.push(cmd);
+            }
+        }
+    }
+
     Ok(pty::list_common_local_directories(&commands))
 }
 
