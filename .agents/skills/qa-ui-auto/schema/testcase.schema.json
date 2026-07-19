@@ -107,7 +107,10 @@
         "assert_enabled":     { "$ref": "#/$defs/selector" },
         "set_check":          { "$ref": "#/$defs/set_check_arg" },
         "send_text_via_label": { "$ref": "#/$defs/send_text_via_label_arg" },
-        "eval_readonly":      { "$ref": "#/$defs/eval_readonly_arg" }
+        "eval_readonly":      { "$ref": "#/$defs/eval_readonly_arg" },
+        "native_wait_for_window_count": { "$ref": "#/$defs/native_window_count_arg" },
+        "native_switch_window": { "$ref": "#/$defs/native_switch_window_arg" },
+        "native_click_may_hide": { "$ref": "#/$defs/selector" }
       }
     },
     "url_or_app": {
@@ -343,6 +346,38 @@
         "label_contains": { "type": "string", "minLength": 1 },
         "checked":        { "type": "boolean" }
       }
+    },
+    "native_window_count_arg": {
+      "oneOf": [
+        { "type": "integer", "minimum": 1, "maximum": 16 },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["count"],
+          "properties": {
+            "count": { "type": "integer", "minimum": 1, "maximum": 16 },
+            "timeout_sec": { "type": "number", "minimum": 0.5, "maximum": 120 }
+          }
+        }
+      ]
+    },
+    "native_switch_window_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "title_equals": { "type": "string", "minLength": 1 },
+        "title_contains": { "type": "string", "minLength": 1 },
+        "index": { "type": "integer", "minimum": -16, "maximum": 15 },
+        "initial": { "const": true },
+        "timeout_sec": { "type": "number", "minimum": 0.5, "maximum": 120 }
+      },
+      "oneOf": [
+        { "required": ["title_equals"] },
+        { "required": ["title_contains"] },
+        { "required": ["index"] },
+        { "required": ["initial"] }
+      ]
     }
   }
 }

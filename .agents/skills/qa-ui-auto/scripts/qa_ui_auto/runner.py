@@ -2,7 +2,7 @@
 
 Browser mode is the primary path: each worker owns a Chromium context.
 Native mode delegates to .agents/skills/qa-ui-auto/scripts/tauri_webdriver.py
-(legacy harness) and only runs cases tagged `modes: [native]`.
+and only runs cases tagged `modes: [native]`.
 
 Usage:
 
@@ -271,21 +271,154 @@ def _serialize_case(c: tc_mod.TestCase) -> dict:
 
 def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root: Path,
                 dry_run: bool) -> list[dict]:
-    """Native mode (P1 scope): delegate to tauri_webdriver.py for the smoke subset.
+    """Run the bounded native smoke DSL through tauri-driver.
 
-    For P1 we keep the behavior simple: import the legacy harness and run cases
-    sequentially. P3 (covers expansion) will rewrite this with an upgraded driver.
+    Native mode deliberately supports only deterministic DOM interactions and
+    explicit window switching. It never evaluates mutating JavaScript or
+    invokes Tauri IPC directly, so cases still exercise user-visible controls.
     """
-    from tauri_webdriver import NativeHarness, WebDriverError  # type: ignore[no-redef]
+    from tauri_webdriver import NativeHarness  # type: ignore[no-redef]
+
+    supported = {
+        "open", "goto", "wait", "wait_for", "screenshot", "click", "dblclick",
+        "hover", "assert_visible", "assert_not_visible", "assert_text",
+        "assert_pattern", "assert_attribute", "assert_disabled", "assert_enabled",
+        "native_wait_for_window_count", "native_switch_window", "native_click_may_hide",
+    }
+
+    def selector_arg(args: Any) -> str:
+        if isinstance(args, str):
+            return args
+        if isinstance(args, dict) and isinstance(args.get("selector"), str):
+            return args["selector"]
+        raise StepError(f"expected selector string or object, got {args!r}")
+
+    def poll(predicate, timeout: float, failure: str) -> None:
+        deadline = time.time() + timeout
+        last_error: Exception | None = None
+        while time.time() < deadline:
+            try:
+                if predicate():
+                    return
+            except Exception as error:  # noqa: BLE001
+                last_error = error
+            time.sleep(0.25)
+        if last_error:
+            raise StepError(f"{failure}: {last_error}") from last_error
+        raise StepError(failure)
+
+    def execute_step(session: Any, case_dir: Path, verb: str, args: Any) -> None:
+        if verb in ("open", "goto"):
+            return  # tauri-driver launches the configured application itself
+        if verb == "wait":
+            time.sleep(float(args))
+            return
+        if verb == "wait_for":
+            selector = selector_arg(args)
+            state = str(args.get("state", "visible")) if isinstance(args, dict) else "visible"
+            timeout = float(args.get("timeout_sec", 15)) if isinstance(args, dict) else 15.0
+            session.wait_for(selector, state=state, timeout=timeout)
+            return
+        if verb == "click":
+            session.click(selector_arg(args))
+            return
+        if verb == "dblclick":
+            session.dblclick(selector_arg(args))
+            return
+        if verb == "hover":
+            session.hover(selector_arg(args))
+            return
+        if verb == "screenshot":
+            name = args.get("path") if isinstance(args, dict) else str(args)
+            session.screenshot(case_dir / str(name))
+            return
+        if verb == "assert_visible":
+            session.wait_for(selector_arg(args), state="visible", timeout=15)
+            return
+        if verb == "assert_not_visible":
+            session.wait_for(selector_arg(args), state="hidden", timeout=15)
+            return
+        if verb == "assert_text":
+            selector = selector_arg(args)
+            expected = str(args["contains"])
+            timeout = float(args.get("timeout_sec", 10))
+            poll(
+                lambda: expected in session.text(selector),
+                timeout,
+                f"{selector} text does not contain {expected!r}",
+            )
+            return
+        if verb == "assert_pattern":
+            import re
+            selector = selector_arg(args)
+            pattern = re.compile(str(args["regex"]))
+            timeout = float(args.get("timeout_sec", 10))
+            poll(
+                lambda: bool(pattern.search(session.text(selector))),
+                timeout,
+                f"{selector} text does not match {args['regex']!r}",
+            )
+            return
+        if verb == "assert_attribute":
+            actual = session.attribute(args["selector"], args["name"])
+            if actual != str(args["equals"]):
+                raise StepError(
+                    f"{args['selector']} attribute {args['name']!r}: "
+                    f"expected {args['equals']!r}, got {actual!r}"
+                )
+            return
+        if verb in ("assert_disabled", "assert_enabled"):
+            selector = selector_arg(args)
+            expected = verb == "assert_enabled"
+            actual = session.is_enabled(selector)
+            if actual != expected:
+                raise StepError(
+                    f"{selector}: expected {'enabled' if expected else 'disabled'}"
+                )
+            return
+        if verb == "native_wait_for_window_count":
+            count = int(args.get("count")) if isinstance(args, dict) else int(args)
+            timeout = float(args.get("timeout_sec", 15)) if isinstance(args, dict) else 15.0
+            session.wait_for_window_count(count, timeout)
+            return
+        if verb == "native_switch_window":
+            if args.get("initial") is True:
+                session.switch_initial_window()
+                return
+            session.switch_window_matching(
+                title_equals=args.get("title_equals"),
+                title_contains=args.get("title_contains"),
+                index=args.get("index"),
+                timeout=float(args.get("timeout_sec", 15)),
+            )
+            return
+        if verb == "native_click_may_hide":
+            session.click_may_hide_window(selector_arg(args))
+            return
+        raise StepError(f"native runner does not support {verb!r}")
 
     results: list[dict] = []
     if dry_run:
         for c in cases:
+            failure = None
+            try:
+                for step in c.steps:
+                    verb, raw_args = tc_mod.step_verb_and_args(step)
+                    if verb not in supported:
+                        raise StepError(f"native runner does not support {verb!r}")
+                    cfg_mod.resolve(raw_args, cfg=cfg, env=env)
+            except Exception as error:  # noqa: BLE001
+                failure = {
+                    "step_index": None, "verb": None, "args": None,
+                    "message": f"native dry-run validation failed: {error}",
+                    "artifacts": {},
+                }
             results.append({
-                "id": c.id, "title": c.title, "status": "passed",
+                "id": c.id, "title": c.title,
+                "status": "failed" if failure else ("skipped" if c.skip else "passed"),
                 "tags": c.tags, "covers": c.covers, "modes": c.modes,
                 "duration_sec": 0.0, "step_count": len(c.steps),
-                "worker_id": 0, "failure": None, "fixtures_skipped": None,
+                "worker_id": 0, "failure": failure, "fixtures_skipped": c.skip,
             })
         return results
 
@@ -295,45 +428,56 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
             case_dir.mkdir(parents=True, exist_ok=True)
             started = time.time()
             r: dict[str, Any] = {
-                "id": c.id, "title": c.title, "status": "passed",
+                "id": c.id, "title": c.title,
+                "status": "skipped" if c.skip else "passed",
                 "tags": c.tags, "covers": c.covers, "modes": c.modes,
                 "duration_sec": 0.0, "step_count": len(c.steps),
-                "worker_id": 0, "failure": None, "fixtures_skipped": None,
+                "worker_id": 0, "failure": None, "fixtures_skipped": c.skip,
             }
+            if c.skip:
+                results.append(r)
+                continue
+            session = None
+            last_step = 0
+            last_verb = "<setup>"
+            last_args: Any = None
             try:
                 session = harness.create_session()
-                try:
-                    # Native is intentionally minimal in P1 — only screenshots + open.
-                    # Cases with non-native verbs are recorded as failed so they're
-                    # visible (rather than silently skipped).
-                    for i, step in enumerate(c.steps, start=1):
-                        verb, args = tc_mod.step_verb_and_args(step)
-                        if verb in ("open", "goto"):
-                            continue  # tauri-driver auto-launches the binary
-                        if verb == "screenshot":
-                            target = case_dir / (
-                                args["path"] if isinstance(args, dict) else str(args)
-                            )
-                            session.screenshot(target)
-                            continue
-                        raise StepError(
-                            f"native runner P1 supports only `open` and `screenshot`; "
-                            f"got {verb!r}"
+                for i, step in enumerate(c.steps, start=1):
+                    verb, raw_args = tc_mod.step_verb_and_args(step)
+                    last_step = i
+                    last_verb = verb
+                    args = cfg_mod.resolve(raw_args, cfg=cfg, env=env)
+                    last_args = args
+                    if verb not in supported:
+                        raise StepError(f"native runner does not support {verb!r}")
+                    execute_step(session, case_dir, verb, args)
+            except Exception as e:  # noqa: BLE001
+                r["status"] = "failed"
+                artifacts: dict[str, str] = {}
+                if session is not None and session.session_id:
+                    with suppress(Exception):
+                        failure_png = case_dir / f"_failure-step{last_step}.png"
+                        session.screenshot(failure_png)
+                        artifacts["screenshot"] = failure_png.name
+                    with suppress(Exception):
+                        console = session.execute(
+                            "return window.__QA_UI_AUTO_CONSOLE__ || [];"
                         )
-                finally:
-                    session.close()
-            except WebDriverError as e:
-                r["status"] = "failed"
+                        console_path = case_dir / f"_failure-step{last_step}.console.json"
+                        console_path.write_text(
+                            json.dumps(console, indent=2, ensure_ascii=False),
+                            encoding="utf-8",
+                        )
+                        artifacts["console"] = console_path.name
                 r["failure"] = {
-                    "step_index": None, "verb": None, "args": None,
-                    "message": f"WebDriverError: {e}", "artifacts": {},
+                    "step_index": last_step, "verb": last_verb, "args": last_args,
+                    "message": f"{type(e).__name__}: {e}", "artifacts": artifacts,
                 }
-            except StepError as e:
-                r["status"] = "failed"
-                r["failure"] = {
-                    "step_index": None, "verb": None, "args": None,
-                    "message": str(e), "artifacts": {},
-                }
+            finally:
+                if session is not None:
+                    with suppress(Exception):
+                        session.close()
             r["duration_sec"] = time.time() - started
             results.append(r)
     return results

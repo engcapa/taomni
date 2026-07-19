@@ -685,6 +685,10 @@
 
 ## sockscap/dashboard (F-SOCKSCAP-1)
 
+- `[data-testid="control-bar"]` — display — F-SOCKSCAP-1.main-control-bar
+- `[data-testid="app-main-menu"]` — interactive — F-SOCKSCAP-1.app-main-menu
+- `[data-testid="context-menu-item-tools"]` — interactive — F-SOCKSCAP-1.tools-menu-parent
+- `[data-testid="context-menu-item-sockscap"]` — interactive — F-SOCKSCAP-1.main-menu-entry
 - `[data-testid="sockscap-window"]` — display — F-SOCKSCAP-1.window
 - `[data-testid="sockscap-status"]` — display — F-SOCKSCAP-1.status
 - `[data-testid="sockscap-overview"]` — display — F-SOCKSCAP-1.overview

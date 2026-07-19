@@ -1,0 +1,35 @@
+id: TC-SOCKSCAP-native-window-smoke
+title: Sockscap opens, hides, and reopens as an independent native window
+description: |
+  Native Tauri smoke through the visible main-window Tools menu. It verifies
+  that the real Rust capability IPC hydrates the independent Sockscap window,
+  that navigation works, and that the close affordance hides rather than
+  destroys the window. It never starts capture or mutates host networking.
+covers: [F-SOCKSCAP-1]
+tags: [native, smoke, p0, sockscap]
+modes: [native]
+timeout_sec: 90
+steps:
+  - open: native://launch
+  - wait_for: '[data-testid="control-bar"]'
+  - click: '[data-testid="app-main-menu"]'
+  - hover: '[data-testid="context-menu-item-tools"]'
+  - click: '[data-testid="context-menu-item-sockscap"]'
+  - native_wait_for_window_count: {count: 2, timeout_sec: 30}
+  - native_switch_window: {title_contains: "Sockscap", timeout_sec: 30}
+  - wait_for: {selector: '[data-testid="sockscap-window"]', timeout_sec: 30}
+  - assert_visible: '[data-testid="sockscap-status"]'
+  - wait_for: {selector: '[data-testid="sockscap-capabilities"]', timeout_sec: 30}
+  - click: '[data-testid="sockscap-nav-lifecycle"]'
+  - wait_for: '[data-testid="sockscap-lifecycle-gates"]'
+  - screenshot: sockscap-native-lifecycle.png
+  - native_click_may_hide: '[data-testid="window-close"]'
+  - native_switch_window: {initial: true, timeout_sec: 15}
+  - assert_visible: '[data-testid="control-bar"]'
+  - click: '[data-testid="app-main-menu"]'
+  - hover: '[data-testid="context-menu-item-tools"]'
+  - click: '[data-testid="context-menu-item-sockscap"]'
+  - native_switch_window: {title_contains: "Sockscap", timeout_sec: 30}
+  - wait_for: '[data-testid="sockscap-lifecycle"]'
+  - screenshot: sockscap-native-reopened.png
+  - native_click_may_hide: '[data-testid="window-close"]'

@@ -10,6 +10,7 @@ export type AppCommand =
   | "new-terminal"
   | "new-sftp"
   | "servers"
+  | "sockscap"
   | "tools"
   | "sessions"
   | "view"

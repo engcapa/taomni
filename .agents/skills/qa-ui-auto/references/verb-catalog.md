@@ -83,6 +83,17 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `assert_disabled` | selector | Pass when element is disabled. |
 | `assert_enabled` | selector | Pass when element is enabled. |
 
+## Native window smoke
+
+These verbs are accepted only by cases tagged `modes: [native]`. They operate
+through W3C WebDriver endpoints and never invoke Tauri IPC from JavaScript.
+
+| Verb | Args | Notes |
+|------|------|-------|
+| `native_wait_for_window_count` | integer **or** `{count, timeout_sec?}` | Wait for an exact number of native window handles. |
+| `native_switch_window` | `{initial: true}` **or** `{title_equals}` / `{title_contains}` / `{index}`, plus `timeout_sec?` | Prefer the recorded initial handle or title matching; index is for diagnostics only. |
+| `native_click_may_hide` | selector | Real element click for a control that hides its own webview; accepts only the transport timeout caused by the successful hide. |
+
 ## Last-resort escape hatch
 
 | Verb | Args | Notes |

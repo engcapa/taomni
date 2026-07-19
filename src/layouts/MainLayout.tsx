@@ -86,7 +86,7 @@ import { ServersDialog } from "../components/servers/ServersDialog";
 import { useServersStore } from "../stores/serversStore";
 import { parseQuickConnectInput } from "../lib/quickConnect";
 import { exitApp, selectFolderPath, type SessionConfig } from "../lib/ipc";
-import { sockscapStatus } from "../lib/sockscap";
+import { sockscapOpenWindow, sockscapStatus } from "../lib/sockscap";
 import {
   vaultPut,
   VAULT_LOCKED_EVENT,
@@ -2977,6 +2977,11 @@ export function MainLayout() {
         break;
       case "servers":
         useServersStore.getState().openDialog();
+        break;
+      case "sockscap":
+        void sockscapOpenWindow().catch((error) => {
+          setStatusMessage(error instanceof Error ? error.message : String(error));
+        });
         break;
       case "sessions":
         setSidebarCollapsed(false);

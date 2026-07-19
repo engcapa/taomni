@@ -143,6 +143,16 @@ describe("buildAppMenuSpec", () => {
     }
   });
 
+  it("exposes Sockscap from the native Tools menu", () => {
+    const spec = buildAppMenuSpec(baseParams);
+    const tools = submenu(spec, "tools");
+    expect(tools.items).toContainEqual(expect.objectContaining({
+      type: "item",
+      id: "sockscap",
+      action: "sockscap",
+    }));
+  });
+
   it("adds active Code Workspace commands as a dynamic Tools submenu", () => {
     const spec = buildAppMenuSpec({
       ...baseParams,

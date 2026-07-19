@@ -17,6 +17,7 @@ webdriver:
   tauri_driver: tauri-driver        # cargo install tauri-driver --locked
   # native_driver: C:/path/to/msedgedriver.exe  # optional; otherwise PATH
   startup_timeout: 20
+  isolate_app_data: true            # use a per-run app-data directory
 
 ssh:
   host: 127.0.0.1

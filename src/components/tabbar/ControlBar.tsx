@@ -197,6 +197,12 @@ export function ControlBar({
             })),
             onClick: () => {},
           } satisfies MenuItem] : []),
+          {
+            label: t("sockscap.title"),
+            testId: "context-menu-item-sockscap",
+            icon: <Wrench className="w-3 h-3" />,
+            onClick: () => onCommand("sockscap"),
+          },
           { label: t("tabs.lanChat"), icon: <MessageSquare className="w-3 h-3" />, onClick: () => onCommand("lan-chat") },
           { label: t("tabs.networkTools"), onClick: () => onCommand("tools") },
           { label: t("ribbon.packages"), onClick: () => onCommand("packages") },

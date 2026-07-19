@@ -107,9 +107,16 @@ class TauriDriverProcess:
         self.command = str(webdriver.get("tauri_driver", "tauri-driver"))
         self.native_driver = webdriver.get("native_driver")
         self.startup_timeout = float(webdriver.get("startup_timeout", 20))
+        self.isolate_app_data = bool(webdriver.get("isolate_app_data", False))
+        self.app_data_root = report_root / "_native-app-data"
 
     def start(self) -> None:
         if _tcp_ok(self.host, self.port):
+            if self.isolate_app_data:
+                raise WebDriverError(
+                    "an external tauri-driver is already listening, so the native "
+                    "app-data isolation environment cannot be guaranteed"
+                )
             self.external = True
             return
         cmd = [self.command]
@@ -118,9 +125,26 @@ class TauriDriverProcess:
         out = self.report_root / "tauri-driver.out.log"
         err = self.report_root / "tauri-driver.err.log"
         out.parent.mkdir(parents=True, exist_ok=True)
+        child_env = os.environ.copy()
+        if self.isolate_app_data:
+            self.app_data_root.mkdir(parents=True, exist_ok=True)
+            if platform.system() == "Linux":
+                child_env["XDG_DATA_HOME"] = str(self.app_data_root.resolve())
+            elif platform.system() == "Windows":
+                roaming = self.app_data_root / "Roaming"
+                local = self.app_data_root / "Local"
+                roaming.mkdir(parents=True, exist_ok=True)
+                local.mkdir(parents=True, exist_ok=True)
+                child_env["APPDATA"] = str(roaming.resolve())
+                child_env["LOCALAPPDATA"] = str(local.resolve())
+            else:
+                raise WebDriverError(
+                    "isolated native app data is not implemented for this platform"
+                )
         self.proc = subprocess.Popen(
             cmd,
             cwd=ROOT,
+            env=child_env,
             stdout=out.open("w", encoding="utf-8"),
             stderr=err.open("w", encoding="utf-8"),
             text=True,
@@ -152,8 +176,16 @@ class NativeSession:
         self.driver_url = driver_url.rstrip("/")
         self.application = application
         self.session_id: str | None = None
+        self.initial_window_handle: str | None = None
 
-    def request(self, method: str, path: str, payload: dict | None = None) -> Any:
+    def request(
+        self,
+        method: str,
+        path: str,
+        payload: dict | None = None,
+        *,
+        timeout: float = 30,
+    ) -> Any:
         body = None
         headers = {"Content-Type": "application/json"}
         if payload is not None:
@@ -162,7 +194,7 @@ class NativeSession:
             f"{self.driver_url}{path}", data=body, headers=headers, method=method
         )
         try:
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
                 data = r.read().decode("utf-8")
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", errors="replace")
@@ -190,6 +222,7 @@ class NativeSession:
         if not sid:
             raise WebDriverError(f"could not create WebDriver session: {value}")
         self.session_id = sid
+        self.initial_window_handle = self.current_window_handle()
         self.install_console_hook()
 
     def close(self) -> None:
@@ -198,6 +231,7 @@ class NativeSession:
                 self.request("DELETE", f"/session/{self.session_id}")
             finally:
                 self.session_id = None
+                self.initial_window_handle = None
 
     def endpoint(self, suffix: str) -> str:
         if not self.session_id:
@@ -235,6 +269,69 @@ class NativeSession:
         element = self.find(selector, interactive=True)
         self.request("POST", self.element_path(element, "/click"), {})
         return f"clicked {selector}"
+
+    def click_may_hide_window(self, selector: str, timeout: float = 2.0) -> str:
+        """Click a control whose success hides the current native window.
+
+        WebKitWebDriver can leave the element-click response pending after the
+        webview disappears. A transport timeout is accepted here only after a
+        real element was found and the click request was sent; all WebDriver
+        protocol errors still fail the case.
+        """
+        element = self.find(selector, interactive=True)
+        try:
+            self.request(
+                "POST",
+                self.element_path(element, "/click"),
+                {},
+                timeout=timeout,
+            )
+        except TimeoutError:
+            return f"clicked {selector}; window hid before WebDriver replied"
+        except urllib.error.URLError as error:
+            if isinstance(error.reason, TimeoutError):
+                return f"clicked {selector}; window hid before WebDriver replied"
+            raise
+        return f"clicked {selector}"
+
+    def hover(self, selector: str) -> str:
+        element = self.find(selector, interactive=True)
+        rect = self.request("GET", self.element_path(element, "/rect"))
+        if not isinstance(rect, dict):
+            raise WebDriverError(f"could not read element rectangle: {selector}")
+        x = int(rect.get("x", 0) + rect.get("width", 0) / 2)
+        y = int(rect.get("y", 0) + rect.get("height", 0) / 2)
+        self.request(
+            "POST",
+            self.endpoint("/actions"),
+            {
+                "actions": [
+                    {
+                        "type": "pointer",
+                        "id": "mouse",
+                        "parameters": {"pointerType": "mouse"},
+                        "actions": [
+                            {
+                                "type": "pointerMove",
+                                "duration": 50,
+                                "x": max(0, x - 24),
+                                "y": y,
+                                "origin": "viewport",
+                            },
+                            {"type": "pause", "duration": 50},
+                            {
+                                "type": "pointerMove",
+                                "duration": 100,
+                                "x": x,
+                                "y": y,
+                                "origin": "viewport",
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
+        return f"hovered {selector}"
 
     def dblclick(self, selector: str) -> str:
         element = self.find(selector, interactive=True)
@@ -319,6 +416,116 @@ class NativeSession:
             pass
         element = self.find(selector)
         return str(self.request("GET", self.element_path(element, "/text")) or "")
+
+    def is_displayed(self, selector: str) -> bool:
+        try:
+            element = self.find(selector, timeout=0.5)
+            return bool(
+                self.request("GET", self.element_path(element, "/displayed"))
+            )
+        except WebDriverError:
+            return False
+
+    def wait_for(
+        self, selector: str, *, state: str = "visible", timeout: float = 15.0
+    ) -> str:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            displayed = self.is_displayed(selector)
+            if state in ("visible", "attached") and displayed:
+                return f"{selector} is {state}"
+            if state in ("hidden", "detached") and not displayed:
+                return f"{selector} is {state}"
+            time.sleep(0.25)
+        raise WebDriverError(f"timed out waiting for {selector} to be {state}")
+
+    def attribute(self, selector: str, name: str) -> str | None:
+        element = self.find(selector)
+        value = self.request(
+            "GET", self.element_path(element, f"/attribute/{name}")
+        )
+        return None if value is None else str(value)
+
+    def is_enabled(self, selector: str) -> bool:
+        element = self.find(selector)
+        return bool(self.request("GET", self.element_path(element, "/enabled")))
+
+    def window_handles(self) -> list[str]:
+        value = self.request("GET", self.endpoint("/window/handles"))
+        if not isinstance(value, list):
+            raise WebDriverError(f"invalid window handles response: {value!r}")
+        return [str(handle) for handle in value]
+
+    def current_window_handle(self) -> str:
+        return str(self.request("GET", self.endpoint("/window")))
+
+    def switch_window(self, handle: str, *, install_console: bool = True) -> None:
+        self.request("POST", self.endpoint("/window"), {"handle": handle})
+        if install_console:
+            self.install_console_hook()
+
+    def switch_initial_window(self) -> str:
+        if self.initial_window_handle is None:
+            raise WebDriverError("initial native window handle was not recorded")
+        self.switch_window(self.initial_window_handle)
+        return self.initial_window_handle
+
+    def title(self) -> str:
+        return str(self.request("GET", self.endpoint("/title")) or "")
+
+    def wait_for_window_count(self, expected: int, timeout: float = 15.0) -> list[str]:
+        deadline = time.time() + timeout
+        last: list[str] = []
+        while time.time() < deadline:
+            last = self.window_handles()
+            if len(last) == expected:
+                return last
+            time.sleep(0.25)
+        raise WebDriverError(
+            f"expected {expected} window handle(s), got {len(last)}: {last}"
+        )
+
+    def switch_window_matching(
+        self,
+        *,
+        title_equals: str | None = None,
+        title_contains: str | None = None,
+        index: int | None = None,
+        timeout: float = 15.0,
+    ) -> str:
+        deadline = time.time() + timeout
+        last_titles: dict[str, str] = {}
+        while time.time() < deadline:
+            handles = self.window_handles()
+            if index is not None:
+                resolved = index if index >= 0 else len(handles) + index
+                if 0 <= resolved < len(handles):
+                    handle = handles[resolved]
+                    self.switch_window(handle)
+                    return handle
+            else:
+                for handle in handles:
+                    try:
+                        self.switch_window(handle, install_console=False)
+                        actual = self.title()
+                        last_titles[handle] = actual
+                        if title_equals is not None and actual == title_equals:
+                            self.install_console_hook()
+                            return handle
+                        if title_contains is not None and title_contains in actual:
+                            self.install_console_hook()
+                            return handle
+                    except WebDriverError:
+                        continue
+            time.sleep(0.25)
+        criterion = (
+            f"index={index}"
+            if index is not None
+            else f"title_equals={title_equals!r}, title_contains={title_contains!r}"
+        )
+        raise WebDriverError(
+            f"no native window matched {criterion}; observed titles={last_titles}"
+        )
 
     def screenshot(self, target: Path) -> str:
         data = self.request("GET", self.endpoint("/screenshot"))

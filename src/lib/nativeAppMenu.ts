@@ -184,6 +184,7 @@ export function buildAppMenuSpec(params: BuildAppMenuParams): AppMenuSpec {
   const toolsMenu: MenuNodeSpec[] = [
     { type: "item", id: "tunneling", label: t("menu.tunneling"), action: "tunneling" },
     { type: "item", id: "code-workspace", label: "Code Workspace...", action: "code-workspace" },
+    { type: "item", id: "sockscap", label: t("sockscap.title"), action: "sockscap" },
     { type: "item", id: "lan-chat", label: t("tabs.lanChat"), action: "lan-chat" },
     { type: "item", id: "network-tools", label: t("menu.networkTools"), action: "tools" },
     { type: "item", id: "packages", label: t("menu.packages"), action: "packages" },

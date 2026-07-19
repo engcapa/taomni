@@ -134,6 +134,16 @@ describe("ControlBar settings button", () => {
     expect(onWorkspaceCommand).toHaveBeenCalledWith("workspace.findInFiles");
   });
 
+  it("opens Sockscap from the visible tools menu", () => {
+    const onCommand = vi.fn();
+    renderControlBar(onCommand);
+
+    fireEvent.click(screen.getByTestId("app-main-menu"));
+    fireEvent.mouseEnter(screen.getByTestId("context-menu-item-tools"));
+    fireEvent.click(screen.getByTestId("context-menu-item-sockscap"));
+    expect(onCommand).toHaveBeenCalledWith("sockscap");
+  });
+
   it("uses the button before More to reveal tab details on hover", () => {
     renderControlBar(vi.fn());
     const button = screen.getByTestId("tab-details-hover");

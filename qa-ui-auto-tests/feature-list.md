@@ -4330,6 +4330,7 @@ area: sockscap/dashboard
 components: [SockscapWindow, SockscapDashboard]
 files:
   - src/App.tsx
+  - src/components/tabbar/ControlBar.tsx
   - src/components/sockscap/SockscapWindow.tsx
   - src/components/sockscap/SockscapDashboard.tsx
   - src/lib/sockscap.ts
@@ -4337,6 +4338,18 @@ files:
   - src/stores/sockscapStore.ts
   - src/stubs/sockscap.ts
 controls:
+  - id: main-control-bar
+    selector: '[data-testid="control-bar"]'
+    kind: display
+  - id: app-main-menu
+    selector: '[data-testid="app-main-menu"]'
+    kind: interactive
+  - id: tools-menu-parent
+    selector: '[data-testid="context-menu-item-tools"]'
+    kind: interactive
+  - id: main-menu-entry
+    selector: '[data-testid="context-menu-item-sockscap"]'
+    kind: interactive
   - id: window
     selector: '[data-testid="sockscap-window"]'
     kind: display
@@ -4404,7 +4417,7 @@ controls:
     optional: true
 -->
 
-- 独立 Sockscap 窗口提供 Overview、Profiles、Rules、Dashboard 与 Lifecycle 五个导航区，并通过状态事件保持同步。
+- 主窗口 Tools 菜单和 macOS 原生 Tools 菜单都能打开独立 Sockscap 窗口；窗口提供 Overview、Profiles、Rules、Dashboard 与 Lifecycle 五个导航区，并通过状态事件保持同步。
 - Dashboard 展示有界的流量聚合、动作分布、应用排行、可选域名聚合、上游健康、最近连接与告警；支持时间范围、刷新、清空统计和隐私状态说明。
 - 浏览器模式使用可控 Stub 完成完整路径；域名聚合默认关闭，统计不记录 payload、完整 URL 或凭据。
 
