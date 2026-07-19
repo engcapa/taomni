@@ -616,16 +616,49 @@ function LocalDirectoriesPanel({
   directories: LocalDirectoryShortcut[];
   onStartInDirectory: (directory: LocalDirectoryShortcut) => void;
 }) {
+  const [query, setQuery] = useState("");
+  const filteredDirectories = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return directories;
+    return directories.filter((directory) =>
+      [directory.label, directory.path, directory.kind]
+        .join(" ")
+        .toLowerCase()
+        .includes(needle),
+    );
+  }, [directories, query]);
+  const hasFilter = query.trim().length > 0;
+
   return (
     <section data-testid="welcome-local-directories" className="min-w-0">
+      <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2">
+        <div className="relative min-w-[min(100%,240px)] flex-[1_1_240px]">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--taomni-text-muted)]" />
+          <input
+            data-testid="welcome-local-directory-filter"
+            className="taomni-input h-8 w-full"
+            style={{ paddingLeft: "2rem" }}
+            type="search"
+            aria-label={t("welcome.localDirectoriesSearch")}
+            placeholder={t("welcome.localDirectoriesSearch")}
+            value={query}
+            disabled={directories.length === 0}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
+      </div>
       <div className="max-h-[320px] overflow-auto pr-1">
         {directories.length === 0 ? (
           <div className="py-4 text-[12px] text-[var(--taomni-text-muted)]">
             {t("welcome.localDirectoriesEmpty")}
           </div>
+        ) : filteredDirectories.length === 0 ? (
+          <div className="py-4 text-[12px] text-[var(--taomni-text-muted)]" data-testid="welcome-local-directories-no-matches">
+            {t("welcome.localDirectoriesNoMatches")}
+          </div>
         ) : (
           <div className="space-y-1">
-            {directories.map((directory) => (
+            {filteredDirectories.map((directory) => (
               <button
                 key={`${directory.kind}:${directory.path}`}
                 data-testid="welcome-local-directory"
@@ -654,6 +687,14 @@ function LocalDirectoriesPanel({
           </div>
         )}
       </div>
+      {hasFilter && filteredDirectories.length > 0 ? (
+        <div className="mt-2 text-[11px] text-[var(--taomni-text-muted)]" data-testid="welcome-local-directories-filter-count">
+          {t("welcome.localDirectoriesFilterCount", {
+            visible: filteredDirectories.length,
+            total: directories.length,
+          })}
+        </div>
+      ) : null}
     </section>
   );
 }

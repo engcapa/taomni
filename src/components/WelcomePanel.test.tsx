@@ -131,6 +131,7 @@ describe("WelcomePanel", () => {
     });
     fireEvent.click(screen.getByTestId("welcome-history-tab-directories"));
     expect(screen.getByTestId("welcome-local-directories")).toBeInTheDocument();
+    expect(screen.getByTestId("welcome-local-directory-filter")).toBeInTheDocument();
 
     const rows = screen.getAllByTestId("welcome-local-directory");
     expect(rows).toHaveLength(2);
@@ -141,6 +142,35 @@ describe("WelcomePanel", () => {
       { id: "powershell.exe", name: "PowerShell" },
       "/home/test/projects",
     );
+  });
+
+  it("filters local directory shortcuts by name and path", async () => {
+    render(
+      <WelcomePanel
+        onStartLocalTerminal={vi.fn()}
+        onNewSession={vi.fn()}
+        onOpenLocalPath={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("PowerShell")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("welcome-history-tab-directories"));
+
+    const filter = screen.getByTestId("welcome-local-directory-filter");
+    fireEvent.change(filter, { target: { value: "projects" } });
+    expect(screen.getAllByTestId("welcome-local-directory")).toHaveLength(1);
+    expect(screen.getByText("Projects")).toBeInTheDocument();
+    expect(screen.queryByText("Home")).not.toBeInTheDocument();
+    expect(screen.getByTestId("welcome-local-directories-filter-count")).toHaveTextContent("1 of 2");
+
+    fireEvent.change(filter, { target: { value: "no-such-dir" } });
+    expect(screen.queryAllByTestId("welcome-local-directory")).toHaveLength(0);
+    expect(screen.getByTestId("welcome-local-directories-no-matches")).toBeInTheDocument();
+
+    fireEvent.change(filter, { target: { value: "" } });
+    expect(screen.getAllByTestId("welcome-local-directory")).toHaveLength(2);
   });
 
   it("shows recent sessions with filter, select, bulk open, and single open actions", async () => {
