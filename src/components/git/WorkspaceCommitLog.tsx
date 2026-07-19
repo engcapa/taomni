@@ -11,8 +11,11 @@ import {
   type GitSnapshot,
 } from "../../lib/git";
 import { buildGraph, graphColor, type GraphRow } from "../../lib/gitGraph";
+import { dateMs } from "../../lib/gitRefList";
 import type { GitWorkspaceRootInfo } from "../../types";
 import { DiffViewer } from "./DiffViewer";
+import { BranchFilterSelect, type BranchFilterOption } from "./shared/BranchFilterSelect";
+import { CommitMessageHover } from "./shared/CommitMessageHover";
 
 const ROW_H = 88;
 const LANE_W = 14;
@@ -219,19 +222,12 @@ export function WorkspaceCommitLog({ roots, snapshots, busy }: WorkspaceCommitLo
                 onChange={(event) => setQuery(event.target.value)}
               />
             </div>
-            <select
-              className="taomni-input h-7 w-40"
+            <BranchFilterSelect
               value={branchFilter}
-              onChange={(event) => setBranchFilter(event.target.value)}
-            >
-              <option value="__current__">Current branch</option>
-              <option value="__all__">All branches</option>
-              {branchOptions.map((branch) => (
-                <option key={branch.name} value={branch.name}>
-                  {branch.name}{branch.count > 1 ? ` (${branch.count})` : ""}
-                </option>
-              ))}
-            </select>
+              onChange={setBranchFilter}
+              branches={branchOptions}
+              aria-label="Branch"
+            />
             {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
           </div>
           {error && (
@@ -253,43 +249,53 @@ export function WorkspaceCommitLog({ roots, snapshots, busy }: WorkspaceCommitLo
                 width: 1,
               };
               return (
-              <div
+              <CommitMessageHover
                 key={entryKey(entry)}
-                role="button"
-                tabIndex={0}
-                style={{ height: ROW_H }}
+                content={commitHoverContent(entry)}
                 className={`w-full flex items-start gap-2 pr-2 text-left overflow-hidden cursor-pointer border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] ${
                   selectedKey === entryKey(entry) ? "bg-[var(--taomni-hover)]" : ""
                 }`}
-                title={commitTooltip(entry)}
-                onClick={() => setSelectedKey(entryKey(entry))}
               >
-                <GraphCell row={graphRow} maxWidth={maxGraphWidth} />
-                <div className="min-w-0 flex-1 py-2">
-                  <div className="flex items-start gap-1 min-w-0">
-                    <span className="shrink-0 mt-0.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1 text-[10px] text-[var(--taomni-text-muted)]">
-                      {entry.repoName}
-                    </span>
-                    {entry.refs.slice(0, 3).map((ref) => (
-                      <span
-                        key={ref}
-                        className="shrink-0 mt-0.5 text-[10px] px-1 rounded bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)] border border-[var(--taomni-accent)]/30"
-                      >
-                        {ref}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  style={{ height: ROW_H }}
+                  className="w-full flex items-start gap-2 overflow-hidden"
+                  onClick={() => setSelectedKey(entryKey(entry))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelectedKey(entryKey(entry));
+                    }
+                  }}
+                >
+                  <GraphCell row={graphRow} maxWidth={maxGraphWidth} />
+                  <div className="min-w-0 flex-1 py-2">
+                    <div className="flex items-start gap-1 min-w-0">
+                      <span className="shrink-0 mt-0.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)] px-1 text-[10px] text-[var(--taomni-text-muted)]">
+                        {entry.repoName}
                       </span>
-                    ))}
-                    <span className="min-w-0 text-[12px] leading-4 font-medium line-clamp-2">{entry.subject}</span>
-                  </div>
-                  {commitBodyPreview(entry) && (
-                    <div className="mt-0.5 text-[11px] leading-4 text-[var(--taomni-text-muted)] line-clamp-1">
-                      {commitBodyPreview(entry)}
+                      {entry.refs.slice(0, 3).map((ref) => (
+                        <span
+                          key={ref}
+                          className="shrink-0 mt-0.5 text-[10px] px-1 rounded bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)] border border-[var(--taomni-accent)]/30"
+                        >
+                          {ref}
+                        </span>
+                      ))}
+                      <span className="min-w-0 text-[12px] leading-4 font-medium line-clamp-2">{entry.subject}</span>
                     </div>
-                  )}
-                  <div className="mt-1 text-[11px] text-[var(--taomni-text-muted)] truncate">
-                    <span className="taomni-mono text-[var(--taomni-accent)]">{entry.shortOid}</span> · {entry.authorName} · {formatDate(entry.date)}
+                    {commitBodyPreview(entry) && (
+                      <div className="mt-0.5 text-[11px] leading-4 text-[var(--taomni-text-muted)] line-clamp-1">
+                        {commitBodyPreview(entry)}
+                      </div>
+                    )}
+                    <div className="mt-1 text-[11px] text-[var(--taomni-text-muted)] truncate">
+                      <span className="taomni-mono text-[var(--taomni-accent)]">{entry.shortOid}</span> · {entry.authorName} · {formatDate(entry.date)}
+                    </div>
                   </div>
                 </div>
-              </div>
+              </CommitMessageHover>
               );
             })}
             {entries.length >= limit && (
@@ -318,21 +324,6 @@ export function WorkspaceCommitLog({ roots, snapshots, busy }: WorkspaceCommitLo
                   </>
                 ) : "Commit"}
               </div>
-              {selected && (
-                <div className="shrink-0 px-3 py-2 border-b border-[var(--taomni-divider)]">
-                  <div className="text-[12px] leading-5 font-semibold text-[var(--taomni-text)] whitespace-pre-wrap">
-                    {selected.subject}
-                  </div>
-                  {selected.body.trim() && (
-                    <div className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap text-[11px] leading-4 text-[var(--taomni-text-muted)]">
-                      {selected.body.trim()}
-                    </div>
-                  )}
-                  <div className="mt-1 text-[11px] text-[var(--taomni-text-muted)] truncate">
-                    {selected.authorName} &lt;{selected.authorEmail}&gt; · {formatDate(selected.date)}
-                  </div>
-                </div>
-              )}
               <div className="flex-1 min-h-0 overflow-auto">
                 {files.length === 0 ? (
                   <div className="h-full min-h-16 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
@@ -370,28 +361,31 @@ function entryKey(entry: WorkspaceCommit): string {
   return `${entry.repoRoot}\u0000${entry.oid}`;
 }
 
-interface WorkspaceBranchOption {
-  name: string;
-  count: number;
-}
-
 function workspaceBranchOptions(
   roots: GitWorkspaceRootInfo[],
   snapshots: Record<string, { snapshot: GitSnapshot | null } | undefined>,
-): WorkspaceBranchOption[] {
-  const counts = new Map<string, number>();
+): BranchFilterOption[] {
+  const byName = new Map<string, { count: number; date: string | null }>();
   for (const root of roots) {
     const branches = snapshots[root.repoRoot]?.snapshot?.branches ?? [];
     const seenInRepo = new Set<string>();
     for (const branch of branches) {
       if (seenInRepo.has(branch.name)) continue;
       seenInRepo.add(branch.name);
-      counts.set(branch.name, (counts.get(branch.name) ?? 0) + 1);
+      const prev = byName.get(branch.name);
+      const nextCount = (prev?.count ?? 0) + 1;
+      const prevMs = dateMs(prev?.date);
+      const branchMs = dateMs(branch.date);
+      const nextDate = branchMs >= prevMs ? (branch.date ?? prev?.date ?? null) : (prev?.date ?? null);
+      byName.set(branch.name, { count: nextCount, date: nextDate });
     }
   }
-  return [...counts.entries()]
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  return [...byName.entries()].map(([name, info]) => ({
+    value: name,
+    name,
+    date: info.date,
+    label: info.count > 1 ? `${name} (${info.count})` : name,
+  }));
 }
 
 function workspaceGraphRows(entries: WorkspaceCommit[], roots: GitWorkspaceRootInfo[]): Map<string, GraphRow> {
@@ -430,9 +424,12 @@ function commitBodyPreview(entry: GitLogEntry): string {
   return entry.body.trim().replace(/\s+/g, " ");
 }
 
-function commitTooltip(entry: WorkspaceCommit): string {
-  const message = [entry.subject, entry.body.trim()].filter(Boolean).join("\n\n");
-  return `${entry.repoName} · ${message}\n\n${entry.shortOid} · ${entry.authorName} · ${formatDate(entry.date)}`;
+function commitHoverContent(entry: WorkspaceCommit) {
+  return {
+    subject: entry.subject,
+    body: entry.body,
+    meta: `${entry.repoName} · ${entry.shortOid} · ${entry.authorName} <${entry.authorEmail}> · ${formatDate(entry.date)}`,
+  };
 }
 
 function formatDate(value: string): string {
