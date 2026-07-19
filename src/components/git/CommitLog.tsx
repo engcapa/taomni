@@ -12,6 +12,8 @@ import {
 } from "../../lib/git";
 import { buildGraph, graphColor, type GraphRow } from "../../lib/gitGraph";
 import { DiffViewer } from "./DiffViewer";
+import { BranchFilterSelect, type BranchFilterOption } from "./shared/BranchFilterSelect";
+import { CommitMessageHover } from "./shared/CommitMessageHover";
 
 const ROW_H = 88;
 const LANE_W = 14;
@@ -165,6 +167,15 @@ export function CommitLog({ repoRoot, headOid, branches = [], busy, onContextMen
 
   const graph = useMemo(() => buildGraph(entries), [entries]);
   const maxWidth = useMemo(() => graph.reduce((m, r) => Math.max(m, r.width), 1), [graph]);
+  const branchOptions = useMemo<BranchFilterOption[]>(
+    () => branches.map((branch) => ({
+      value: branch.name,
+      name: branch.name,
+      date: branch.date,
+      label: branch.current ? `${branch.name} (current)` : branch.name,
+    })),
+    [branches],
+  );
   const diffEmptyLabel =
     files.length > AUTO_PREVIEW_FILE_LIMIT && !filePath
       ? `Large commit (${files.length} files). Select a file to preview its diff.`
@@ -201,19 +212,12 @@ export function CommitLog({ repoRoot, headOid, branches = [], busy, onContextMen
           </div>
           <label className="flex items-center gap-1 text-[12px] select-none whitespace-nowrap">
             Branch
-            <select
-              className="taomni-input h-7 w-40"
+            <BranchFilterSelect
               value={branchFilter}
-              onChange={(event) => setBranchFilter(event.target.value)}
-            >
-              <option value="__current__">Current branch</option>
-              <option value="__all__">All branches</option>
-              {branches.map((branch) => (
-                <option key={branch.fullName} value={branch.name}>
-                  {branch.name}{branch.current ? " (current)" : ""}
-                </option>
-              ))}
-            </select>
+              onChange={setBranchFilter}
+              branches={branchOptions}
+              aria-label="Branch"
+            />
           </label>
           {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
         </div>
@@ -224,45 +228,55 @@ export function CommitLog({ repoRoot, headOid, branches = [], busy, onContextMen
             </div>
           ) : (
             entries.map((entry, i) => (
-              <div
+              <CommitMessageHover
                 key={entry.oid}
-                role="button"
-                tabIndex={0}
-                style={{ height: ROW_H }}
-                title={commitTooltip(entry)}
+                content={commitHoverContent(entry)}
                 className={`w-full flex items-start gap-2 pr-2 overflow-hidden cursor-pointer border-b border-[var(--taomni-divider)] ${
                   selectedOid === entry.oid ? "bg-[var(--taomni-hover)]" : "hover:bg-[var(--taomni-hover)]"
                 }`}
-                onClick={() => setSelectedOid(entry.oid)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setSelectedOid(entry.oid);
-                  onContextMenu(entry, e.clientX, e.clientY);
-                }}
               >
-                <GraphCell row={graph[i]} maxWidth={maxWidth} />
-                <div className="min-w-0 flex-1 py-2">
-                  <div className="flex items-start gap-1 min-w-0">
-                    {entry.refs.map((ref) => (
-                      <span
-                        key={ref}
-                        className="shrink-0 mt-0.5 text-[10px] px-1 rounded bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)] border border-[var(--taomni-accent)]/30"
-                      >
-                        {ref}
-                      </span>
-                    ))}
-                    <span className="min-w-0 text-[12px] leading-4 font-medium line-clamp-2">{entry.subject}</span>
-                  </div>
-                  {commitBodyPreview(entry) && (
-                    <div className="mt-0.5 text-[11px] leading-4 text-[var(--taomni-text-muted)] line-clamp-1">
-                      {commitBodyPreview(entry)}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  style={{ height: ROW_H }}
+                  className="w-full flex items-start gap-2 overflow-hidden"
+                  onClick={() => setSelectedOid(entry.oid)}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setSelectedOid(entry.oid);
+                    onContextMenu(entry, e.clientX, e.clientY);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelectedOid(entry.oid);
+                    }
+                  }}
+                >
+                  <GraphCell row={graph[i]} maxWidth={maxWidth} />
+                  <div className="min-w-0 flex-1 py-2">
+                    <div className="flex items-start gap-1 min-w-0">
+                      {entry.refs.map((ref) => (
+                        <span
+                          key={ref}
+                          className="shrink-0 mt-0.5 text-[10px] px-1 rounded bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)] border border-[var(--taomni-accent)]/30"
+                        >
+                          {ref}
+                        </span>
+                      ))}
+                      <span className="min-w-0 text-[12px] leading-4 font-medium line-clamp-2">{entry.subject}</span>
                     </div>
-                  )}
-                  <div className="mt-1 text-[11px] text-[var(--taomni-text-muted)] truncate">
-                    <span className="taomni-mono text-[var(--taomni-accent)]">{entry.shortOid}</span> · {entry.authorName} · {formatDate(entry.date)}
+                    {commitBodyPreview(entry) && (
+                      <div className="mt-0.5 text-[11px] leading-4 text-[var(--taomni-text-muted)] line-clamp-1">
+                        {commitBodyPreview(entry)}
+                      </div>
+                    )}
+                    <div className="mt-1 text-[11px] text-[var(--taomni-text-muted)] truncate">
+                      <span className="taomni-mono text-[var(--taomni-accent)]">{entry.shortOid}</span> · {entry.authorName} · {formatDate(entry.date)}
+                    </div>
                   </div>
                 </div>
-              </div>
+              </CommitMessageHover>
             ))
           )}
           {entries.length >= limit && (
@@ -284,21 +298,6 @@ export function CommitLog({ repoRoot, headOid, branches = [], busy, onContextMen
             <div className="h-8 shrink-0 flex items-center px-3 border-b border-[var(--taomni-divider)] text-[12px] font-semibold">
               {selected ? `${selected.shortOid} · ${files.length} file(s)` : "Commit"}
             </div>
-            {selected && (
-              <div className="shrink-0 px-3 py-2 border-b border-[var(--taomni-divider)]">
-                <div className="text-[12px] leading-5 font-semibold text-[var(--taomni-text)] whitespace-pre-wrap">
-                  {selected.subject}
-                </div>
-                {selected.body.trim() && (
-                  <div className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap text-[11px] leading-4 text-[var(--taomni-text-muted)]">
-                    {selected.body.trim()}
-                  </div>
-                )}
-                <div className="mt-1 text-[11px] text-[var(--taomni-text-muted)] truncate">
-                  {selected.authorName} &lt;{selected.authorEmail}&gt; · {formatDate(selected.date)}
-                </div>
-              </div>
-            )}
             <div className="flex-1 min-h-0 overflow-auto">
               {files.length === 0 ? (
                 <div className="h-full min-h-16 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
@@ -353,9 +352,12 @@ function commitBodyPreview(entry: GitLogEntry): string {
   return entry.body.trim().replace(/\s+/g, " ");
 }
 
-function commitTooltip(entry: GitLogEntry): string {
-  const message = [entry.subject, entry.body.trim()].filter(Boolean).join("\n\n");
-  return `${message}\n\n${entry.shortOid} · ${entry.authorName} · ${formatDate(entry.date)}`;
+function commitHoverContent(entry: GitLogEntry) {
+  return {
+    subject: entry.subject,
+    body: entry.body,
+    meta: `${entry.shortOid} · ${entry.authorName} <${entry.authorEmail}> · ${formatDate(entry.date)}`,
+  };
 }
 
 function formatDate(value: string): string {
