@@ -54,8 +54,6 @@ const DEFAULT_VIDEO_NUM_FRAMES: u32 = 121;
 const DEFAULT_VIDEO_FRAME_RATE: u32 = 24;
 const VIDEO_POLL_ATTEMPTS: usize = 90;
 const VIDEO_POLL_INTERVAL_SECS: u64 = 4;
-const DIRECT_LLM_TOOL_MAX_ROUNDS: usize = 8;
-
 #[tauri::command]
 pub async fn chat_stat_attachment_paths(
     paths: Vec<String>,
@@ -3164,7 +3162,9 @@ pub async fn chat_stream(
                     let mut messages = llm_req.messages.clone();
                     let mut completed = false;
 
-                    'tool_rounds: for round in 0..DIRECT_LLM_TOOL_MAX_ROUNDS {
+                    // No hard tool-round cap: keep calling tools until the model
+                    // returns a final answer (empty tool_calls) or the user cancels.
+                    'tool_rounds: loop {
                         let turn_req = ChatRequest {
                             messages: messages.clone(),
                             max_tokens: llm_req.max_tokens,
@@ -3201,16 +3201,6 @@ pub async fn chat_stream(
                         if resp.tool_calls.is_empty() {
                             completed = true;
                             break;
-                        }
-                        if round + 1 == DIRECT_LLM_TOOL_MAX_ROUNDS {
-                            emit(&StreamEventOut::Error {
-                                id: assistant_id,
-                                message: format!(
-                                    "Tool call limit exceeded after {DIRECT_LLM_TOOL_MAX_ROUNDS} rounds"
-                                ),
-                            });
-                            state.chat_runs.lock().await.remove(&req.thread_id);
-                            return Ok(());
                         }
 
                         messages.push(assistant_tool_message(&resp.content, &resp.tool_calls));
