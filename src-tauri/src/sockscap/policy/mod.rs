@@ -5,9 +5,11 @@
 pub mod gfwlist;
 pub mod matcher;
 pub mod rules;
+pub mod selector;
 pub mod test_target;
 
 pub use gfwlist::*;
 pub use matcher::*;
 pub use rules::*;
+pub use selector::*;
 pub use test_target::*;

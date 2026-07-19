@@ -1,10 +1,16 @@
 //! FlowEngine: attribute → policy → controlled egress for one flow.
 
+use std::io;
 use std::net::IpAddr;
+use std::num::NonZeroU64;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context as TaskContext, Poll};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio_util::sync::CancellationToken;
 
 use super::attribution::{AttributedHost, AttributionHints, FakeIpMap, attribute_hostname};
@@ -13,19 +19,89 @@ use super::connectors::{
     ConnectControl, DirectConnector, EgressConnector, EgressError, EgressMetadata, EgressStream,
     EgressTarget, UdpEgressCapability, connect_controlled, proxy_connector,
 };
+use super::ingress::{FlowDescriptor, IngressError};
 use super::stats::{FlowOutcomeKind, FlowStatsEvent, FlowStatsSink, NoopFlowStatsSink};
 use crate::proxy::ResolvedProxy;
 use crate::sockscap::policy::matcher::{FlowMatchInput, PolicyDecision, ProfileMatcher};
 use crate::sockscap::policy::rules::normalize_hostname;
 use crate::sockscap::types::{
     AppSelectorKind, CapturePlatform, EgressFailureAction, EgressKind, HostnameSource,
-    LocalNetworkAction, LocalNetworkPolicy, RouteAction, UdpPolicy,
+    LocalNetworkAction, LocalNetworkPolicy, RouteAction, RoutingProfileDraft, UdpPolicy,
 };
 
 const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 
+/// Immutable identity of the configuration snapshot used to build one
+/// [`FlowEngine`]. The profile fingerprint covers the complete serialized
+/// [`RoutingProfileDraft`], including ordered selectors and rules.
+#[derive(Clone, PartialEq, Eq)]
+pub struct FlowEngineSnapshot {
+    config_revision: NonZeroU64,
+    profile_fingerprint: [u8; 32],
+}
+
+impl FlowEngineSnapshot {
+    pub fn from_profile(
+        config_revision: u64,
+        profile: &RoutingProfileDraft,
+    ) -> Result<Self, FlowEngineSnapshotError> {
+        let config_revision =
+            NonZeroU64::new(config_revision).ok_or(FlowEngineSnapshotError::ZeroConfigRevision)?;
+        let encoded = serde_json::to_vec(profile)
+            .map_err(|_| FlowEngineSnapshotError::ProfileSerialization)?;
+        let profile_fingerprint = Sha256::digest(encoded).into();
+        Ok(Self {
+            config_revision,
+            profile_fingerprint,
+        })
+    }
+
+    pub fn config_revision(&self) -> u64 {
+        self.config_revision.get()
+    }
+
+    pub fn profile_fingerprint(&self) -> [u8; 32] {
+        self.profile_fingerprint
+    }
+
+    /// Recompute and compare both identity dimensions. Runtime builders use
+    /// this to reject an engine built from an older revision or a different
+    /// draft that happens to reuse the same profile id.
+    pub fn matches_profile(&self, config_revision: u64, profile: &RoutingProfileDraft) -> bool {
+        Self::from_profile(config_revision, profile).is_ok_and(|candidate| candidate == *self)
+    }
+}
+
+impl std::fmt::Debug for FlowEngineSnapshot {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("FlowEngineSnapshot")
+            .field("config_revision", &self.config_revision)
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlowEngineSnapshotError {
+    ZeroConfigRevision,
+    ProfileSerialization,
+}
+
+impl std::fmt::Display for FlowEngineSnapshotError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ZeroConfigRevision => formatter.write_str("config revision must be non-zero"),
+            Self::ProfileSerialization => {
+                formatter.write_str("routing profile snapshot could not be serialized")
+            }
+        }
+    }
+}
+
+impl std::error::Error for FlowEngineSnapshotError {}
+
 /// Identity, source, destination, and attribution signals for a new flow.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FlowContext {
     #[serde(default = "CapturePlatform::current")]
@@ -42,6 +118,221 @@ pub struct FlowContext {
     pub dest_port: u16,
     #[serde(default)]
     pub attribution: AttributionHints,
+}
+
+/// Privacy-safe diagnostics for flow routing. Presence flags retain enough
+/// information to diagnose a malformed adapter contract without logging
+/// process identity, executable paths, hostnames, or network endpoints.
+impl std::fmt::Debug for FlowContext {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let protocol = if self.protocol.eq_ignore_ascii_case("tcp") {
+            "tcp"
+        } else if self.protocol.eq_ignore_ascii_case("udp") {
+            "udp"
+        } else {
+            "<invalid>"
+        };
+        formatter
+            .debug_struct("FlowContext")
+            .field("platform", &self.platform)
+            .field(
+                "has_process_identity",
+                &(self.pid.is_some() || self.process_start_time.is_some()),
+            )
+            .field("app_selector_kind", &self.app_selector_kind)
+            .field("has_app_identity", &self.app_identity.is_some())
+            .field("protocol", &protocol)
+            .field(
+                "has_source_endpoint",
+                &(self.source_ip.is_some() || self.source_port.is_some()),
+            )
+            .field(
+                "has_destination",
+                &(self.dest_host.is_some() || self.dest_ip.is_some()),
+            )
+            .field(
+                "has_attribution_hints",
+                &(self.attribution.platform_hostname.is_some()
+                    || self.attribution.fake_ip_hostname.is_some()
+                    || self.attribution.tls_sni.is_some()
+                    || self.attribution.http_host.is_some()
+                    || self.attribution.destination_ip.is_some()),
+            )
+            .finish()
+    }
+}
+
+/// Project the typed ingress contract into the policy/egress context in one
+/// place. Platform adapters must not construct `FlowContext` independently,
+/// otherwise identity and original-destination rules can drift by platform.
+impl TryFrom<&FlowDescriptor> for FlowContext {
+    type Error = IngressError;
+
+    fn try_from(descriptor: &FlowDescriptor) -> Result<Self, Self::Error> {
+        // This validates every invariant other than staleness against an
+        // external runtime. `FlowRuntime` performs the authoritative generation
+        // check before calling this projection.
+        descriptor.validate_for(descriptor.generation)?;
+        Ok(Self {
+            platform: descriptor.platform,
+            pid: descriptor.pid,
+            process_start_time: descriptor.process_start_time,
+            app_selector_kind: descriptor.app_kind,
+            app_identity: descriptor.app_identity.clone(),
+            protocol: "tcp".into(),
+            source_ip: Some(descriptor.source.ip().to_string()),
+            source_port: Some(descriptor.source.port()),
+            dest_host: None,
+            dest_ip: Some(descriptor.destination.ip().to_string()),
+            dest_port: descriptor.destination.port(),
+            attribution: descriptor.effective_attribution(),
+        })
+    }
+}
+
+/// An I/O failure from [`copy_bidirectional_counted`] together with every byte
+/// successfully written before the failure. Counts retain Tokio's direction
+/// convention: `a_to_b` is data read from `a` and written to `b`.
+#[derive(Debug)]
+pub struct BidirectionalCopyError {
+    source: io::Error,
+    bytes_a_to_b: u64,
+    bytes_b_to_a: u64,
+}
+
+impl BidirectionalCopyError {
+    pub fn bytes_a_to_b(&self) -> u64 {
+        self.bytes_a_to_b
+    }
+
+    pub fn bytes_b_to_a(&self) -> u64 {
+        self.bytes_b_to_a
+    }
+
+    pub fn io_error(&self) -> &io::Error {
+        &self.source
+    }
+
+    pub fn into_io_error(self) -> io::Error {
+        self.source
+    }
+}
+
+impl std::fmt::Display for BidirectionalCopyError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "bidirectional copy failed: {}", self.source)
+    }
+}
+
+impl std::error::Error for BidirectionalCopyError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
+/// Relay two full-duplex streams while retaining successfully written byte
+/// counts even when one direction fails. Tokio's standard helper returns only
+/// the I/O error on failure, which would otherwise erase partial accounting.
+pub async fn copy_bidirectional_counted<A, B>(
+    a: &mut A,
+    b: &mut B,
+) -> Result<(u64, u64), BidirectionalCopyError>
+where
+    A: AsyncRead + AsyncWrite + Unpin + ?Sized,
+    B: AsyncRead + AsyncWrite + Unpin + ?Sized,
+{
+    let mut counted_a = CountingIo::new(a);
+    let mut counted_b = CountingIo::new(b);
+    let result = tokio::io::copy_bidirectional(&mut counted_a, &mut counted_b).await;
+    let bytes_a_to_b = counted_b.bytes_written();
+    let bytes_b_to_a = counted_a.bytes_written();
+
+    match result {
+        Ok(_) => Ok((bytes_a_to_b, bytes_b_to_a)),
+        Err(source) => Err(BidirectionalCopyError {
+            source,
+            bytes_a_to_b,
+            bytes_b_to_a,
+        }),
+    }
+}
+
+struct CountingIo<T> {
+    inner: T,
+    bytes_written: u64,
+}
+
+impl<T> CountingIo<T> {
+    fn new(inner: T) -> Self {
+        Self {
+            inner,
+            bytes_written: 0,
+        }
+    }
+
+    fn bytes_written(&self) -> u64 {
+        self.bytes_written
+    }
+}
+
+impl<T> AsyncRead for CountingIo<T>
+where
+    T: AsyncRead + Unpin,
+{
+    fn poll_read(
+        self: Pin<&mut Self>,
+        context: &mut TaskContext<'_>,
+        buffer: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.get_mut().inner).poll_read(context, buffer)
+    }
+}
+
+impl<T> AsyncWrite for CountingIo<T>
+where
+    T: AsyncWrite + Unpin,
+{
+    fn poll_write(
+        self: Pin<&mut Self>,
+        context: &mut TaskContext<'_>,
+        buffer: &[u8],
+    ) -> Poll<io::Result<usize>> {
+        let this = self.get_mut();
+        match Pin::new(&mut this.inner).poll_write(context, buffer) {
+            Poll::Ready(Ok(written)) => {
+                this.bytes_written = this.bytes_written.saturating_add(written as u64);
+                Poll::Ready(Ok(written))
+            }
+            other => other,
+        }
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, context: &mut TaskContext<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.get_mut().inner).poll_flush(context)
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, context: &mut TaskContext<'_>) -> Poll<io::Result<()>> {
+        Pin::new(&mut self.get_mut().inner).poll_shutdown(context)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        self.inner.is_write_vectored()
+    }
+
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        context: &mut TaskContext<'_>,
+        buffers: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        let this = self.get_mut();
+        match Pin::new(&mut this.inner).poll_write_vectored(context, buffers) {
+            Poll::Ready(Ok(written)) => {
+                this.bytes_written = this.bytes_written.saturating_add(written as u64);
+                Poll::Ready(Ok(written))
+            }
+            other => other,
+        }
+    }
 }
 
 /// Validated provider for a profile's PROXY action. DIRECT is deliberately not
@@ -144,6 +435,7 @@ pub struct UdpFlowOutcome {
 
 /// Per-profile immutable policy and egress runtime.
 pub struct FlowEngine {
+    snapshot: FlowEngineSnapshot,
     pub matcher: Arc<ProfileMatcher>,
     bypass: HardBypassSet,
     fake_ip: FakeIpMap,
@@ -158,6 +450,7 @@ pub struct FlowEngine {
 
 impl FlowEngine {
     pub fn new(
+        snapshot: FlowEngineSnapshot,
         matcher: Arc<ProfileMatcher>,
         mut bypass: HardBypassSet,
         fake_ip: FakeIpMap,
@@ -172,6 +465,7 @@ impl FlowEngine {
             }
         }
         Self {
+            snapshot,
             matcher,
             bypass,
             fake_ip,
@@ -183,6 +477,10 @@ impl FlowEngine {
             connect_timeout: DEFAULT_CONNECT_TIMEOUT,
             stats: Arc::new(NoopFlowStatsSink),
         }
+    }
+
+    pub fn snapshot(&self) -> &FlowEngineSnapshot {
+        &self.snapshot
     }
 
     pub fn with_connect_timeout(mut self, timeout: Duration) -> Self {
@@ -631,10 +929,11 @@ fn is_local_network_ip(ip: IpAddr) -> bool {
 #[cfg(test)]
 mod tests {
     use std::future::pending;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
     use async_trait::async_trait;
-    use tokio::io::duplex;
+    use futures::task::AtomicWaker;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt, duplex};
 
     use super::*;
     use crate::sockscap::flow::stats::InMemoryFlowStats;
@@ -652,8 +951,22 @@ mod tests {
         ))
     }
 
+    fn profile() -> RoutingProfileDraft {
+        RoutingProfileDraft {
+            id: "profile-1".into(),
+            name: "Profile 1".into(),
+            scope: crate::sockscap::types::ProfileScope::Global,
+            ..Default::default()
+        }
+    }
+
+    fn snapshot() -> FlowEngineSnapshot {
+        FlowEngineSnapshot::from_profile(7, &profile()).unwrap()
+    }
+
     fn engine(document: &str, egress: EgressProvider) -> FlowEngine {
         FlowEngine::new(
+            snapshot(),
             matcher(document),
             HardBypassSet::new(),
             FakeIpMap::new(),
@@ -747,6 +1060,72 @@ mod tests {
     }
 
     #[test]
+    fn flow_context_debug_redacts_process_and_network_identity() {
+        let mut flow = context("private-destination.example", "tcp");
+        flow.pid = Some(4_294_000_001);
+        flow.process_start_time = Some(9_876_543_210);
+        flow.app_identity = Some("/sensitive/bin/private-app".into());
+        flow.protocol = "private-protocol-value".into();
+        flow.source_ip = Some("198.51.100.217".into());
+        flow.dest_ip = Some("203.0.113.219".into());
+        flow.attribution.platform_hostname = Some("private-attribution.example".into());
+
+        let debug = format!("{flow:?}");
+        for secret in [
+            "4294000001",
+            "9876543210",
+            "/sensitive/bin/private-app",
+            "private-protocol-value",
+            "198.51.100.217",
+            "203.0.113.219",
+            "private-destination.example",
+            "private-attribution.example",
+        ] {
+            assert!(!debug.contains(secret), "debug leaked {secret}: {debug}");
+        }
+        assert!(debug.contains("has_process_identity: true"));
+        assert!(debug.contains("has_destination: true"));
+    }
+
+    #[test]
+    fn engine_snapshot_rejects_zero_stale_and_changed_profile_content() {
+        let draft = profile();
+        assert_eq!(
+            FlowEngineSnapshot::from_profile(0, &draft).unwrap_err(),
+            FlowEngineSnapshotError::ZeroConfigRevision
+        );
+
+        let identity = FlowEngineSnapshot::from_profile(7, &draft).unwrap();
+        let repeated = FlowEngineSnapshot::from_profile(7, &draft).unwrap();
+        assert_eq!(identity, repeated);
+        assert_eq!(identity.config_revision(), 7);
+        assert!(identity.matches_profile(7, &draft));
+        assert!(!identity.matches_profile(8, &draft));
+
+        let mut changed = draft.clone();
+        changed.default_action = RouteAction::Block;
+        assert_eq!(changed.id, draft.id);
+        assert!(!identity.matches_profile(7, &changed));
+        assert_ne!(
+            identity.profile_fingerprint(),
+            FlowEngineSnapshot::from_profile(7, &changed)
+                .unwrap()
+                .profile_fingerprint()
+        );
+
+        let debug = format!("{identity:?}");
+        assert!(debug.contains("config_revision"));
+        assert!(!debug.contains("profile_fingerprint"));
+
+        let built = engine("", EgressProvider::unavailable("unused"));
+        assert_eq!(built.snapshot().config_revision(), 7);
+        assert_eq!(
+            built.snapshot().profile_fingerprint(),
+            identity.profile_fingerprint()
+        );
+    }
+
+    #[test]
     fn domain_attribution_drives_proxy_policy() {
         let engine = engine(
             "||google.com\n",
@@ -786,6 +1165,7 @@ mod tests {
         flow.dest_ip = Some("192.168.1.10".into());
 
         let direct = FlowEngine::new(
+            snapshot(),
             matcher("||nas.example\n"),
             HardBypassSet::new(),
             FakeIpMap::new(),
@@ -799,6 +1179,7 @@ mod tests {
         assert_eq!(direct.decide(&flow).matched_stage, "local_network_direct");
 
         let block = FlowEngine::new(
+            snapshot(),
             matcher(""),
             HardBypassSet::new(),
             FakeIpMap::new(),
@@ -878,6 +1259,109 @@ mod tests {
         }
     }
 
+    struct ReadFailureTrigger {
+        failed: AtomicBool,
+        waker: AtomicWaker,
+    }
+
+    impl ReadFailureTrigger {
+        fn new() -> Arc<Self> {
+            Arc::new(Self {
+                failed: AtomicBool::new(false),
+                waker: AtomicWaker::new(),
+            })
+        }
+
+        fn fail(&self) {
+            self.failed.store(true, Ordering::SeqCst);
+            self.waker.wake();
+        }
+    }
+
+    struct TriggeredReadError<T> {
+        inner: T,
+        trigger: Arc<ReadFailureTrigger>,
+    }
+
+    impl<T> AsyncRead for TriggeredReadError<T>
+    where
+        T: AsyncRead + Unpin,
+    {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            task: &mut TaskContext<'_>,
+            buffer: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            let this = self.get_mut();
+            if this.trigger.failed.load(Ordering::SeqCst) {
+                return Poll::Ready(Err(io::Error::other("injected read failure")));
+            }
+            this.trigger.waker.register(task.waker());
+            if this.trigger.failed.load(Ordering::SeqCst) {
+                return Poll::Ready(Err(io::Error::other("injected read failure")));
+            }
+            Pin::new(&mut this.inner).poll_read(task, buffer)
+        }
+    }
+
+    impl<T> AsyncWrite for TriggeredReadError<T>
+    where
+        T: AsyncWrite + Unpin,
+    {
+        fn poll_write(
+            self: Pin<&mut Self>,
+            task: &mut TaskContext<'_>,
+            buffer: &[u8],
+        ) -> Poll<io::Result<usize>> {
+            Pin::new(&mut self.get_mut().inner).poll_write(task, buffer)
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, task: &mut TaskContext<'_>) -> Poll<io::Result<()>> {
+            Pin::new(&mut self.get_mut().inner).poll_flush(task)
+        }
+
+        fn poll_shutdown(self: Pin<&mut Self>, task: &mut TaskContext<'_>) -> Poll<io::Result<()>> {
+            Pin::new(&mut self.get_mut().inner).poll_shutdown(task)
+        }
+    }
+
+    #[tokio::test]
+    async fn copy_error_retains_successful_writes_in_both_directions() {
+        let (a, mut a_peer) = duplex(64);
+        let (mut b, mut b_peer) = duplex(64);
+        let trigger = ReadFailureTrigger::new();
+        let relay_trigger = trigger.clone();
+        let relay = tokio::spawn(async move {
+            let mut a = TriggeredReadError {
+                inner: a,
+                trigger: relay_trigger,
+            };
+            copy_bidirectional_counted(&mut a, &mut b).await
+        });
+
+        let from_a = b"upstream-short";
+        let from_b = b"downstream-is-deliberately-longer";
+        a_peer.write_all(from_a).await.unwrap();
+        b_peer.write_all(from_b).await.unwrap();
+
+        let mut received_from_a = vec![0; from_a.len()];
+        b_peer.read_exact(&mut received_from_a).await.unwrap();
+        let mut received_from_b = vec![0; from_b.len()];
+        a_peer.read_exact(&mut received_from_b).await.unwrap();
+        assert_eq!(received_from_a, from_a);
+        assert_eq!(received_from_b, from_b);
+
+        trigger.fail();
+        let error = tokio::time::timeout(Duration::from_secs(1), relay)
+            .await
+            .expect("relay should observe the injected failure")
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(error.io_error().kind(), io::ErrorKind::Other);
+        assert_eq!(error.bytes_a_to_b(), from_a.len() as u64);
+        assert_eq!(error.bytes_b_to_a(), from_b.len() as u64);
+    }
+
     #[tokio::test]
     async fn cancellation_never_triggers_fail_open_direct() {
         let (direct, direct_calls) = memory_connector("direct", None);
@@ -934,6 +1418,7 @@ mod tests {
         };
         let (socks_like, _) = memory_connector("socks5", None);
         let blocked_engine = FlowEngine::new(
+            snapshot(),
             blocked_matcher,
             HardBypassSet::new(),
             FakeIpMap::new(),

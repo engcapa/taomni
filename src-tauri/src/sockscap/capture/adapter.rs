@@ -361,6 +361,16 @@ pub trait CaptureAdapter: Send + Sync {
     /// artifact identifiers.
     async fn recover(&self, artifact: &CaptureArtifactState) -> Result<(), CaptureError>;
 
+    /// Recover a generation when the app crashed before it received a typed
+    /// artifact. Platform adapters with a root-owned generation receipt may
+    /// override this; the default stays fail-closed.
+    async fn recover_generation(&self, _generation: u64) -> Result<(), CaptureError> {
+        Err(CaptureError::recovery(
+            "CAPTURE_RECOVERY_RECEIPT_MISSING",
+            "adapter cannot recover a generation without an application artifact",
+        ))
+    }
+
     /// Prove helper liveness and return the latest complete recovery receipt.
     /// Selected-application adapters may attach newly launched children during
     /// this call, so callers must persist the returned handle before accepting

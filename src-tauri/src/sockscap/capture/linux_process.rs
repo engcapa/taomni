@@ -10,11 +10,14 @@ use super::linux::{
     CGROUP_PARENT, CGROUP_ROOT, LinuxCapturePlan, LinuxPrerequisites, validate_cgroup_relative,
 };
 use super::linux_system::{LinuxCommandRunner, cleanup_network, run_checked};
+use super::unix_transport::linux_process_start_token;
 use super::{
     CaptureArtifactState, CaptureError, CaptureHandle, CaptureInstallSpec, CaptureMode,
     CaptureProcessRestore, CaptureSelector,
 };
 use crate::sockscap::types::AppSelectorKind;
+
+const MAX_PROCESS_IDENTITY_SNAPSHOT: usize = 65_536;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinuxProcessIdentity {
@@ -33,14 +36,46 @@ pub struct LinuxPreparedCapture {
     pub artifact: CaptureArtifactState,
 }
 
-/// Create cgroups, move exact process incarnations, and create a persistent TUN
-/// owned by the authorized desktop user. No nft/routing activation happens
-/// until the unprivileged TUN runtime has opened the device.
-pub async fn prepare_linux_capture(
-    runner: &dyn LinuxCommandRunner,
+/// Immutable, side-effect-free description of the exact process incarnations
+/// a prepare transaction may move. The recovery artifact is complete before
+/// this value can be applied, so the privileged helper can durably publish it
+/// as a write-ahead record first.
+#[derive(Debug, Clone)]
+pub struct LinuxCapturePreparation {
+    prepared: LinuxPreparedCapture,
+    processes: Vec<LinuxProcessIdentity>,
+}
+
+impl LinuxCapturePreparation {
+    pub fn artifact(&self) -> &CaptureArtifactState {
+        &self.prepared.artifact
+    }
+}
+
+/// Immutable process-membership delta. As with initial preparation, every
+/// exact restore record is present before any `cgroup.procs` write occurs.
+#[derive(Debug, Clone)]
+pub struct LinuxMembershipRefresh {
+    artifact: CaptureArtifactState,
+    processes: Vec<LinuxProcessIdentity>,
+}
+
+impl LinuxMembershipRefresh {
+    pub fn artifact(&self) -> &CaptureArtifactState {
+        &self.artifact
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.processes.is_empty()
+    }
+}
+
+/// Resolve and validate the complete prepare mutation without changing cgroup,
+/// TUN, nftables, or routing state.
+pub fn plan_linux_capture(
     spec: &CaptureInstallSpec,
     owner_uid: u32,
-) -> Result<LinuxPreparedCapture, CaptureError> {
+) -> Result<LinuxCapturePreparation, CaptureError> {
     let prerequisites = LinuxPrerequisites::probe();
     if !prerequisites.ready_for_privileged_mutation() {
         return Err(CaptureError::invalid(
@@ -57,28 +92,43 @@ pub async fn prepare_linux_capture(
         ));
     }
     let plan = LinuxCapturePlan::from_spec(spec, owner_uid)?;
-    let mut artifact = plan.artifact(Vec::new());
-
-    if let Err(error) = create_owned_cgroups(&plan) {
-        return rollback_error(runner, &artifact, error).await;
-    }
     let snapshot = snapshot_processes()?;
-    let selected = processes_for_install(spec, &snapshot, owner_uid)?;
-    match move_processes(&plan, spec.mode, selected, &mut artifact.process_restores) {
-        Ok(()) => artifact.validate()?,
-        Err(error) => return rollback_error(runner, &artifact, error).await,
+    let processes = processes_for_install(spec, &snapshot, owner_uid)?;
+    let artifact = plan.artifact(process_restores_for_plan(&plan, &processes)?);
+    artifact.validate()?;
+    Ok(LinuxCapturePreparation {
+        prepared: LinuxPreparedCapture {
+            spec: spec.clone(),
+            plan,
+            artifact,
+        },
+        processes,
+    })
+}
+
+/// Apply a previously resolved prepare mutation. Process identity, ownership,
+/// and original cgroup are revalidated immediately before each write.
+pub async fn apply_linux_capture(
+    runner: &dyn LinuxCommandRunner,
+    preparation: LinuxCapturePreparation,
+) -> Result<LinuxPreparedCapture, CaptureError> {
+    let LinuxCapturePreparation {
+        prepared,
+        processes,
+    } = preparation;
+    if let Err(error) = create_owned_cgroups(&prepared.plan) {
+        return rollback_error(runner, &prepared.artifact, error).await;
+    }
+    if let Err(error) = apply_process_moves(&prepared.plan, prepared.spec.mode, &processes) {
+        return rollback_error(runner, &prepared.artifact, error).await;
     }
 
-    for command in plan.device_setup_commands() {
+    for command in prepared.plan.device_setup_commands() {
         if let Err(error) = run_checked(runner, &command).await {
-            return rollback_error(runner, &artifact, error).await;
+            return rollback_error(runner, &prepared.artifact, error).await;
         }
     }
-    Ok(LinuxPreparedCapture {
-        spec: spec.clone(),
-        plan,
-        artifact,
-    })
+    Ok(prepared)
 }
 
 /// Atomically validate/apply nftables, then add policy routing. A failed
@@ -110,14 +160,16 @@ pub async fn activate_linux_capture(
     })
 }
 
-/// Discover newly launched matching applications/children and attach them to
-/// the existing capture cgroup. The returned artifact must replace the journal
-/// copy before the helper acknowledges its next heartbeat.
-pub fn refresh_linux_membership(
+/// Discover newly launched matching applications/children without moving
+/// them. The helper must publish `artifact()` before calling apply.
+pub fn plan_linux_membership_refresh(
     prepared: &LinuxPreparedCapture,
-) -> Result<CaptureArtifactState, CaptureError> {
+) -> Result<LinuxMembershipRefresh, CaptureError> {
     if prepared.spec.mode == CaptureMode::Global {
-        return Ok(prepared.artifact.clone());
+        return Ok(LinuxMembershipRefresh {
+            artifact: prepared.artifact.clone(),
+            processes: Vec::new(),
+        });
     }
     let snapshot = snapshot_processes()?;
     let selected = processes_for_install(&prepared.spec, &snapshot, prepared.plan.owner_uid)?;
@@ -132,14 +184,31 @@ pub fn refresh_linux_membership(
         .filter(|process| !known.contains(&(process.pid, process.process_start_time)))
         .collect::<Vec<_>>();
     let mut artifact = prepared.artifact.clone();
-    move_processes(
-        &prepared.plan,
-        prepared.spec.mode,
-        selected,
-        &mut artifact.process_restores,
-    )?;
+    artifact
+        .process_restores
+        .extend(process_restores_for_plan(&prepared.plan, &selected)?);
     artifact.validate()?;
-    Ok(artifact)
+    Ok(LinuxMembershipRefresh {
+        artifact,
+        processes: selected,
+    })
+}
+
+/// Apply an already-journaled membership delta.
+pub fn apply_linux_membership_refresh(
+    prepared: &LinuxPreparedCapture,
+    refresh: &LinuxMembershipRefresh,
+) -> Result<CaptureArtifactState, CaptureError> {
+    apply_process_moves(&prepared.plan, prepared.spec.mode, &refresh.processes).map_err(
+        |error| {
+            CaptureError::recovery_with_artifact(
+                error.code,
+                error.message,
+                refresh.artifact.clone(),
+            )
+        },
+    )?;
+    Ok(refresh.artifact.clone())
 }
 
 pub async fn stop_linux_capture(
@@ -315,6 +384,7 @@ fn expand_children(
 }
 
 fn snapshot_processes() -> Result<Vec<LinuxProcessIdentity>, CaptureError> {
+    let start_tokens = snapshot_linux_start_tokens();
     let refresh = ProcessRefreshKind::nothing()
         .without_tasks()
         .with_exe(UpdateKind::Always);
@@ -322,24 +392,58 @@ fn snapshot_processes() -> Result<Vec<LinuxProcessIdentity>, CaptureError> {
     let mut processes = Vec::new();
     for (pid, process) in system.processes() {
         let pid = pid.as_u32();
-        if pid == 0 || process.start_time() == 0 {
+        if pid == 0 {
+            continue;
+        }
+        let Some(before_start_time) = start_tokens.get(&pid) else {
+            continue;
+        };
+        let Ok(process_start_time) = linux_process_start_token(pid) else {
+            continue;
+        };
+        if process_start_time == 0 || process_start_time != *before_start_time {
             continue;
         }
         let Some(cgroup_relative) = read_process_cgroup(pid) else {
             continue;
         };
+        let owner_uid = std::fs::metadata(format!("/proc/{pid}"))
+            .map(|metadata| metadata.uid())
+            .unwrap_or(u32::MAX);
+        let executable_path = process.exe().map(Path::to_path_buf);
+        if linux_process_start_token(pid).ok() != Some(process_start_time) {
+            continue;
+        }
         processes.push(LinuxProcessIdentity {
             pid,
             parent_pid: process.parent().map(Pid::as_u32),
-            process_start_time: process.start_time(),
-            owner_uid: std::fs::metadata(format!("/proc/{pid}"))
-                .map(|metadata| metadata.uid())
-                .unwrap_or(u32::MAX),
-            executable_path: process.exe().map(Path::to_path_buf),
+            process_start_time,
+            owner_uid,
+            executable_path,
             cgroup_relative,
         });
     }
     Ok(processes)
+}
+
+fn snapshot_linux_start_tokens() -> HashMap<u32, u64> {
+    let mut tokens = HashMap::new();
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return tokens;
+    };
+    for entry in entries.flatten().take(MAX_PROCESS_IDENTITY_SNAPSHOT) {
+        let Some(pid) = entry
+            .file_name()
+            .to_str()
+            .and_then(|value| value.parse::<u32>().ok())
+        else {
+            continue;
+        };
+        if let Ok(token) = linux_process_start_token(pid) {
+            tokens.insert(pid, token);
+        }
+    }
+    tokens
 }
 
 fn create_owned_cgroups(plan: &LinuxCapturePlan) -> Result<(), CaptureError> {
@@ -376,17 +480,11 @@ fn create_owned_cgroups(plan: &LinuxCapturePlan) -> Result<(), CaptureError> {
     })
 }
 
-fn move_processes(
+fn process_restores_for_plan(
     plan: &LinuxCapturePlan,
-    mode: CaptureMode,
-    processes: Vec<LinuxProcessIdentity>,
-    restores: &mut Vec<CaptureProcessRestore>,
-) -> Result<(), CaptureError> {
-    let target = if mode == CaptureMode::Global {
-        plan.bypass_cgroup_path()
-    } else {
-        plan.capture_cgroup_path()
-    };
+    processes: &[LinuxProcessIdentity],
+) -> Result<Vec<CaptureProcessRestore>, CaptureError> {
+    let mut restores = Vec::new();
     for process in processes {
         if process.pid <= 1 {
             return Err(CaptureError::invalid(
@@ -395,7 +493,60 @@ fn move_processes(
             ));
         }
         validate_cgroup_relative(&process.cgroup_relative)?;
-        let current = current_process_identity(process.pid)?;
+        // The root helper is moved into the bypass cgroup for global mode but
+        // is lifetime-bound to this transaction. Cleanup drains it to cgroup
+        // root; only authorized desktop-user processes need exact restoration.
+        if process.owner_uid == plan.owner_uid {
+            restores.push(CaptureProcessRestore {
+                pid: process.pid,
+                process_start_time: process.process_start_time,
+                owner_uid: process.owner_uid,
+                original_group: process.cgroup_relative.clone(),
+            });
+        }
+    }
+    Ok(restores)
+}
+
+fn apply_process_moves(
+    plan: &LinuxCapturePlan,
+    mode: CaptureMode,
+    processes: &[LinuxProcessIdentity],
+) -> Result<(), CaptureError> {
+    let (target, target_relative) = if mode == CaptureMode::Global {
+        (
+            plan.bypass_cgroup_path(),
+            plan.bypass_cgroup_relative.as_str(),
+        )
+    } else {
+        (
+            plan.capture_cgroup_path(),
+            plan.capture_cgroup_relative.as_str(),
+        )
+    };
+    apply_process_moves_with(
+        processes,
+        target_relative,
+        |pid| current_process_identity(pid),
+        |pid| {
+            std::fs::write(target.join("cgroup.procs"), pid.to_string()).map_err(|error| {
+                CaptureError::recovery(
+                    "LINUX_CGROUP_MOVE_FAILED",
+                    format!("could not attach PID {pid} to capture cgroup: {error}"),
+                )
+            })
+        },
+    )
+}
+
+fn apply_process_moves_with(
+    processes: &[LinuxProcessIdentity],
+    expected_target: &str,
+    mut current_identity: impl FnMut(u32) -> Result<LinuxProcessIdentity, CaptureError>,
+    mut write_process: impl FnMut(u32) -> Result<(), CaptureError>,
+) -> Result<(), CaptureError> {
+    for process in processes {
+        let current = current_identity(process.pid)?;
         if current.process_start_time != process.process_start_time {
             return Err(CaptureError::recovery(
                 "LINUX_CAPTURE_PID_REUSED",
@@ -411,31 +562,48 @@ fn move_processes(
                 ),
             ));
         }
-        std::fs::write(target.join("cgroup.procs"), process.pid.to_string()).map_err(|error| {
-            CaptureError::recovery(
-                "LINUX_CGROUP_MOVE_FAILED",
+        if current.cgroup_relative != process.cgroup_relative {
+            return Err(CaptureError::recovery(
+                "LINUX_CAPTURE_PROCESS_CGROUP_CHANGED",
                 format!(
-                    "could not attach PID {} to capture cgroup: {error}",
+                    "PID {} changed cgroup between planning and apply",
                     process.pid
                 ),
-            )
-        })?;
-        // The root helper is moved into the bypass cgroup for global mode but
-        // is lifetime-bound to this transaction. Cleanup drains it to cgroup
-        // root; only authorized desktop-user processes need exact restoration.
-        if process.owner_uid == plan.owner_uid {
-            restores.push(CaptureProcessRestore {
-                pid: process.pid,
-                process_start_time: process.process_start_time,
-                owner_uid: process.owner_uid,
-                original_group: process.cgroup_relative,
-            });
+            ));
+        }
+        write_process(process.pid)?;
+        let after = current_identity(process.pid)?;
+        if after.process_start_time != process.process_start_time
+            || after.owner_uid != process.owner_uid
+        {
+            return Err(CaptureError::recovery(
+                "LINUX_CAPTURE_PROCESS_CHANGED_DURING_MOVE",
+                format!(
+                    "PID {} changed identity while entering the capture cgroup",
+                    process.pid
+                ),
+            ));
+        }
+        if !cgroup_paths_equal(&after.cgroup_relative, expected_target) {
+            return Err(CaptureError::recovery(
+                "LINUX_CAPTURE_PROCESS_MOVE_UNCONFIRMED",
+                format!(
+                    "PID {} did not remain in the expected capture cgroup",
+                    process.pid
+                ),
+            ));
         }
     }
     Ok(())
 }
 
 fn current_process_identity(pid: u32) -> Result<LinuxProcessIdentity, CaptureError> {
+    let start_time_before = linux_process_start_token(pid).map_err(|error| {
+        CaptureError::recovery(
+            "LINUX_CAPTURE_PROCESS_IDENTITY_UNAVAILABLE",
+            format!("process {pid} has no stable kernel start token: {error}"),
+        )
+    })?;
     let pid_key = Pid::from_u32(pid);
     let mut system = System::new();
     system.refresh_processes_specifics(
@@ -457,14 +625,28 @@ fn current_process_identity(pid: u32) -> Result<LinuxProcessIdentity, CaptureErr
             format!("process {pid} has no readable unified cgroup identity"),
         )
     })?;
+    let owner_uid = std::fs::metadata(format!("/proc/{pid}"))
+        .map(|metadata| metadata.uid())
+        .unwrap_or(u32::MAX);
+    let executable_path = process.exe().map(Path::to_path_buf);
+    let process_start_time = linux_process_start_token(pid).map_err(|error| {
+        CaptureError::recovery(
+            "LINUX_CAPTURE_PROCESS_IDENTITY_UNAVAILABLE",
+            format!("process {pid} has no stable kernel start token: {error}"),
+        )
+    })?;
+    if process_start_time != start_time_before {
+        return Err(CaptureError::recovery(
+            "LINUX_CAPTURE_PID_REUSED",
+            format!("PID {pid} changed while its identity was being read"),
+        ));
+    }
     Ok(LinuxProcessIdentity {
         pid,
         parent_pid: process.parent().map(|parent| parent.as_u32()),
-        process_start_time: process.start_time(),
-        owner_uid: std::fs::metadata(format!("/proc/{pid}"))
-            .map(|metadata| metadata.uid())
-            .unwrap_or(u32::MAX),
-        executable_path: process.exe().map(Path::to_path_buf),
+        process_start_time,
+        owner_uid,
+        executable_path,
         cgroup_relative,
     })
 }
@@ -473,25 +655,8 @@ fn restore_process_groups(
     plan: &LinuxCapturePlan,
     artifact: &CaptureArtifactState,
 ) -> Result<(), CaptureError> {
-    let current = snapshot_processes()?
-        .into_iter()
-        .map(|process| (process.pid, process))
-        .collect::<HashMap<_, _>>();
     let mut failures = Vec::new();
     for restore in artifact.process_restores.iter().rev() {
-        let Some(process) = current.get(&restore.pid) else {
-            continue;
-        };
-        if process.process_start_time != restore.process_start_time {
-            continue;
-        }
-        if restore.owner_uid != plan.owner_uid || process.owner_uid != restore.owner_uid {
-            failures.push(format!(
-                "refused to restore PID {} owned by a different user",
-                restore.pid
-            ));
-            continue;
-        }
         if let Err(error) = validate_cgroup_relative(&restore.original_group) {
             failures.push(error.message);
             continue;
@@ -506,12 +671,31 @@ fn restore_process_groups(
         } else {
             Path::new(CGROUP_ROOT).join("cgroup.procs")
         };
-        if let Err(error) = std::fs::write(&target, restore.pid.to_string()) {
-            failures.push(format!(
-                "could not restore PID {} to {}: {error}",
-                restore.pid,
-                target.display()
-            ));
+        let expected_target = target
+            .parent()
+            .and_then(|path| path.strip_prefix(CGROUP_ROOT).ok())
+            .map(|path| path.to_string_lossy().into_owned())
+            .filter(|path| !path.is_empty())
+            .unwrap_or_else(|| "/".into());
+        if let Err(error) = cleanup_process_move_with(
+            plan,
+            restore.pid,
+            Some(restore),
+            &expected_target,
+            current_cleanup_process_identity,
+            |pid| {
+                std::fs::write(&target, pid.to_string()).map_err(|error| {
+                    CaptureError::recovery(
+                        "LINUX_CGROUP_RESTORE_FAILED",
+                        format!(
+                            "could not restore PID {pid} to {}: {error}",
+                            target.display()
+                        ),
+                    )
+                })
+            },
+        ) {
+            failures.push(error.message);
         }
     }
 
@@ -520,10 +704,22 @@ fn restore_process_groups(
     let root_procs = Path::new(CGROUP_ROOT).join("cgroup.procs");
     for group in plan.cgroup_paths() {
         for pid in read_cgroup_procs(&group) {
-            if let Err(error) = std::fs::write(&root_procs, pid.to_string()) {
-                failures.push(format!(
-                    "could not release PID {pid} from capture cgroup: {error}"
-                ));
+            if let Err(error) = cleanup_process_move_with(
+                plan,
+                pid,
+                None,
+                "/",
+                current_cleanup_process_identity,
+                |pid| {
+                    std::fs::write(&root_procs, pid.to_string()).map_err(|error| {
+                        CaptureError::recovery(
+                            "LINUX_CGROUP_RESTORE_FAILED",
+                            format!("could not release PID {pid} from capture cgroup: {error}"),
+                        )
+                    })
+                },
+            ) {
+                failures.push(error.message);
             }
         }
     }
@@ -536,6 +732,78 @@ fn restore_process_groups(
             failures.join("; "),
         ))
     }
+}
+
+/// Revalidate the exact kernel process incarnation immediately around every
+/// cleanup write. The write-ahead receipt may contain a process whose move was
+/// never attempted, while a PID read from `cgroup.procs` may exit concurrently;
+/// neither case authorizes moving a later process that reused the numeric PID.
+fn cleanup_process_move_with(
+    plan: &LinuxCapturePlan,
+    pid: u32,
+    restore: Option<&CaptureProcessRestore>,
+    expected_target: &str,
+    mut current_identity: impl FnMut(u32) -> Result<Option<LinuxProcessIdentity>, CaptureError>,
+    mut write_process: impl FnMut(u32) -> Result<(), CaptureError>,
+) -> Result<(), CaptureError> {
+    let Some(before) = current_identity(pid)? else {
+        return Ok(());
+    };
+    if !process_is_in_owned_cgroup(plan, &before.cgroup_relative) {
+        return Ok(());
+    }
+    if let Some(restore) = restore {
+        if before.process_start_time != restore.process_start_time {
+            return Ok(());
+        }
+        if restore.owner_uid != plan.owner_uid || before.owner_uid != restore.owner_uid {
+            return Err(CaptureError::recovery(
+                "LINUX_CGROUP_RESTORE_OWNER_CHANGED",
+                format!("refused to restore PID {pid} owned by a different user"),
+            ));
+        }
+    }
+
+    write_process(pid)?;
+    let Some(after) = current_identity(pid)? else {
+        // The exact incarnation exited after the write. It no longer owns any
+        // cgroup membership, so there is no process residue to restore.
+        return Ok(());
+    };
+    if after.process_start_time != before.process_start_time || after.owner_uid != before.owner_uid
+    {
+        return Err(CaptureError::recovery(
+            "LINUX_CGROUP_RESTORE_PID_REUSED",
+            format!("PID {pid} changed identity during cgroup cleanup"),
+        ));
+    }
+    if !cgroup_paths_equal(&after.cgroup_relative, expected_target) {
+        return Err(CaptureError::recovery(
+            "LINUX_CGROUP_RESTORE_UNCONFIRMED",
+            format!("PID {pid} did not remain in the expected cleanup cgroup"),
+        ));
+    }
+    Ok(())
+}
+
+fn current_cleanup_process_identity(
+    pid: u32,
+) -> Result<Option<LinuxProcessIdentity>, CaptureError> {
+    match current_process_identity(pid) {
+        Ok(identity) => Ok(Some(identity)),
+        Err(_) if !Path::new(&format!("/proc/{pid}")).exists() => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+fn process_is_in_owned_cgroup(plan: &LinuxCapturePlan, current: &str) -> bool {
+    let relative = current.strip_prefix('/').unwrap_or(current);
+    let current = Path::new(CGROUP_ROOT).join(relative);
+    plan.cgroup_paths().iter().any(|owned| owned == &current)
+}
+
+fn cgroup_paths_equal(left: &str, right: &str) -> bool {
+    left.trim_matches('/') == right.trim_matches('/')
 }
 
 fn remove_owned_cgroups(plan: &LinuxCapturePlan, failures: &mut Vec<String>) {
@@ -811,5 +1079,182 @@ mod tests {
             "/user.slice/browser.scope-evil",
             "/user.slice/browser.scope"
         ));
+    }
+
+    #[test]
+    fn prepare_plan_contains_complete_restore_intent_before_apply() {
+        let plan =
+            LinuxCapturePlan::from_spec(&spec(CaptureMode::Global, Vec::new()), 1000).unwrap();
+        let mut root_helper = process(101, Some(1), 70, "/opt/taomni-helper", "/system.slice");
+        root_helper.owner_uid = 0;
+        let selected = vec![
+            process(20, Some(1), 50, "/usr/bin/app", "/user.slice/app.scope"),
+            root_helper,
+        ];
+
+        let restores = process_restores_for_plan(&plan, &selected).unwrap();
+
+        assert_eq!(restores.len(), 1);
+        assert_eq!(restores[0].pid, 20);
+        assert_eq!(restores[0].process_start_time, 50);
+        assert_eq!(restores[0].original_group, "/user.slice/app.scope");
+    }
+
+    #[test]
+    fn apply_revalidates_original_cgroup_before_first_write() {
+        let planned = process(20, Some(1), 50, "/usr/bin/app", "/user.slice/app.scope");
+        let mut changed = planned.clone();
+        changed.cgroup_relative = "/user.slice/changed.scope".into();
+        let mut writes = Vec::new();
+
+        let error = apply_process_moves_with(
+            &[planned],
+            "taomni.sockscap/g7/bypass",
+            |_| Ok(changed.clone()),
+            |pid| {
+                writes.push(pid);
+                Ok(())
+            },
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "LINUX_CAPTURE_PROCESS_CGROUP_CHANGED");
+        assert!(writes.is_empty());
+    }
+
+    #[test]
+    fn apply_stops_after_partial_failure_and_never_writes_failing_identity() {
+        let first = process(20, Some(1), 50, "/usr/bin/a", "/user.slice/a.scope");
+        let second = process(21, Some(1), 51, "/usr/bin/b", "/user.slice/b.scope");
+        let mut moved_first = first.clone();
+        moved_first.cgroup_relative = "/taomni.sockscap/g7/capture".into();
+        let mut reused_second = second.clone();
+        reused_second.process_start_time += 1;
+        let mut identities = VecDeque::from([first.clone(), moved_first, reused_second]);
+        let mut writes = Vec::new();
+
+        let error = apply_process_moves_with(
+            &[first.clone(), second.clone()],
+            "taomni.sockscap/g7/capture",
+            |_| Ok(identities.pop_front().expect("identity read is bounded")),
+            |pid| {
+                writes.push(pid);
+                Ok(())
+            },
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "LINUX_CAPTURE_PID_REUSED");
+        assert_eq!(writes, vec![20]);
+    }
+
+    #[test]
+    fn apply_requires_the_process_to_land_in_the_exact_target_cgroup() {
+        let planned = process(20, Some(1), 50, "/usr/bin/app", "/user.slice/app.scope");
+        let after = planned.clone();
+        let mut identities = VecDeque::from([planned.clone(), after]);
+
+        let error = apply_process_moves_with(
+            &[planned],
+            "taomni.sockscap/g7/capture",
+            |_| Ok(identities.pop_front().expect("two identity reads")),
+            |_| Ok(()),
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "LINUX_CAPTURE_PROCESS_MOVE_UNCONFIRMED");
+    }
+
+    #[test]
+    fn cleanup_exact_restore_is_limited_to_owned_generation_cgroups() {
+        let plan =
+            LinuxCapturePlan::from_spec(&spec(CaptureMode::Global, Vec::new()), 1000).unwrap();
+        let capture_relative = format!(
+            "/{}",
+            plan.capture_cgroup_path()
+                .strip_prefix(CGROUP_ROOT)
+                .unwrap()
+                .display()
+        );
+        let bypass_relative = format!(
+            "/{}",
+            plan.bypass_cgroup_path()
+                .strip_prefix(CGROUP_ROOT)
+                .unwrap()
+                .display()
+        );
+
+        assert!(process_is_in_owned_cgroup(&plan, &capture_relative));
+        assert!(process_is_in_owned_cgroup(&plan, &bypass_relative));
+        assert!(!process_is_in_owned_cgroup(&plan, "/user.slice/app.scope"));
+    }
+
+    #[test]
+    fn cleanup_skips_a_reused_pid_before_restore_without_writing() {
+        let plan =
+            LinuxCapturePlan::from_spec(&spec(CaptureMode::Global, Vec::new()), 1000).unwrap();
+        let restore = CaptureProcessRestore {
+            pid: 20,
+            process_start_time: 50,
+            owner_uid: 1000,
+            original_group: "/user.slice/app.scope".into(),
+        };
+        let mut reused = process(
+            20,
+            Some(1),
+            51,
+            "/usr/bin/other",
+            &format!("/{}", plan.capture_cgroup_relative),
+        );
+        reused.owner_uid = 1000;
+        let mut writes = Vec::new();
+
+        cleanup_process_move_with(
+            &plan,
+            restore.pid,
+            Some(&restore),
+            &restore.original_group,
+            |_| Ok(Some(reused.clone())),
+            |pid| {
+                writes.push(pid);
+                Ok(())
+            },
+        )
+        .unwrap();
+
+        assert!(writes.is_empty());
+    }
+
+    #[test]
+    fn cleanup_detects_pid_reuse_across_the_restore_write() {
+        let plan =
+            LinuxCapturePlan::from_spec(&spec(CaptureMode::Global, Vec::new()), 1000).unwrap();
+        let restore = CaptureProcessRestore {
+            pid: 20,
+            process_start_time: 50,
+            owner_uid: 1000,
+            original_group: "/user.slice/app.scope".into(),
+        };
+        let before = process(
+            20,
+            Some(1),
+            50,
+            "/usr/bin/app",
+            &format!("/{}", plan.capture_cgroup_relative),
+        );
+        let after = process(20, Some(1), 51, "/usr/bin/other", "/user.slice/app.scope");
+        let mut identities = VecDeque::from([Some(before), Some(after)]);
+
+        let error = cleanup_process_move_with(
+            &plan,
+            restore.pid,
+            Some(&restore),
+            &restore.original_group,
+            |_| Ok(identities.pop_front().expect("two identity reads")),
+            |_| Ok(()),
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "LINUX_CGROUP_RESTORE_PID_REUSED");
     }
 }

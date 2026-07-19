@@ -1,6 +1,6 @@
 # Taomni 自动化升级方案
 
-> **状态:** 代码已实施(待人工配置签名密钥与 GitHub Secrets,见 §6)
+> **状态:** 基础 updater 代码已实施(待人工配置签名密钥与 GitHub Secrets,见 §6)；Sockscap 生产发布运维 Gate 尚未完成(见 §7)
 > **创建日期:** 2026-06-13
 > **关联 roadmap 项:** "Auto-update via `tauri-plugin-updater`" / 代码签名 / 灰度发布
 
@@ -20,7 +20,8 @@
 | 分发端点 | **GitHub Releases**(复用现有流水线,`tauri-action` 生成并上传 `latest.json`) |
 | 安装行为 | **始终需用户显式确认**(启动静默检查 + About 手动检查;检测到新版**仅提示**,不确认则**不下载、不安装、不重启**) |
 | 安装包/架构选择 | **允许用户选择架构产物**(macOS:arm64 / x86_64;依当前运行架构与 Rosetta 状态给出"推荐"与可运行候选,默认选中当前架构) |
-| OS 代码签名 | **本期不做**,后续单独推进(仅做 updater 必需的 minisign 验签) |
+| OS 代码签名 | 基础 updater 实施期不做；这只允许开发/预览验证。Sockscap 生产发布必须另行完成 Windows 用户态 Authenticode、macOS Developer ID/notarization 与 Linux package trust Gate |
+| 生产放量/撤回 | 当前 GitHub `latest.json` 仅是功能底座；Sockscap 生产发布前必须完成私钥生命周期、分阶段放量、停止放量、签名回滚和组件兼容演练 |
 
 **目标:** 已安装客户端能发现新版本 → 提示用户 → 用户确认(并可选架构)→ 下载验签 → 安装 → 用户确认后重启。
 
@@ -200,7 +201,7 @@ target key 规则:`{os}-{arch}`,`os ∈ {darwin, windows, linux}`,`arch` 取 `st
 
 - 🔴 **私钥即生命线**:minisign 私钥丢失 = 之后所有客户端验签失败、无法再推任何更新。必须离线安全备份。
 - 🟡 **存量用户断层**:现有 0.2.13 无 updater,无法自动升级。用户需**手动安装一次**带 updater 的版本,之后才进入自动更新链。需在发布说明中告知。
-- 🟡 **未签名的代价(本期接受)**:macOS Gatekeeper / Windows SmartScreen 首次安装会警告;更新流程本身可跑通。
+- 🔴 **未签名只适用于预览验证**:macOS Gatekeeper / Windows SmartScreen 警告不满足 Sockscap 生产分发要求；正式标签必须通过各平台 OS artifact Gate。updater minisign 不能替代 Authenticode、Developer ID/notarization 或 Linux package trust。
 - 🟡 **Linux 限制**:updater 仅支持 AppImage(deb/rpm 不支持),需确认产物含 `.AppImage` 及其 `.tar.gz` updater 包。
 - 🟡 **CI latest.json 合并**:见 4.6,首次发布必须验证四平台条目齐全且签名正确。
 
@@ -213,11 +214,21 @@ target key 规则:`{os}-{arch}`,`os ∈ {darwin, windows, linux}`,`arch` 取 `st
 
 > 其余代码改动(依赖、配置、权限、后端注册、CI env、前端 service/store/UI、i18n、测试)均可由实现阶段完成。
 
-## 7. 灰度发布 / 回滚(后续,非本期)
+## 7. Sockscap 生产发布运维 Gate(基础 updater 之外，BLOCKED)
 
-- GitHub 单一 `latest.json` 难以原生灰度;roadmap 的 5%→25%→100% 需自建分发端点按比例返回不同清单。
-- 回滚:可手工编辑 `latest.json` 做版本固定(pin)/指回旧版。
-- 标记为后续独立任务,与 OS 代码签名一并推进。
+以下事项不是基础 updater 功能完成的前提，但会阻塞 Sockscap 的任何生产发布标签：
+
+- **密钥托管**：为 minisign 私钥指定 owner；优先采用受控 CI/HSM 或等价不可导出方案；保留受控离线恢复副本、访问审计、双人恢复流程，不把私钥写入仓库、日志或普通构建机。
+- **轮换/吊销**：定义旧公钥到新公钥的可信迁移、私钥泄漏后的停止发布与恢复 runbook，并在隔离 release 环境实际演练。只有“离线备份”而没有恢复/轮换演练不能关闭 Gate。
+- **分阶段放量**：GitHub 单一 `latest.json` 不能直接证明 5%→25%→100% 灰度。选择并实现可审计的 channel/分发 manifest，记录 cohort、release commit、开始/停止时间和批准人。
+- **停止放量 kill switch**：kill switch 只停止新客户端获得坏版本，不远程关闭已安装 Sockscap 或扩大控制权限；触发、权限、审计和恢复条件必须可测试。
+- **签名回滚与数据面兼容**：不能只手工编辑未审计的 `latest.json`。回滚 manifest/package 必须经过与升级相同的 minisign、SHA-256、兼容性和批准链；兼容矩阵必须固定 app/helper/provider/driver 的精确 source pin/ABI、control protocol/schema、recovery journal/tombstone 版本和 packet-stack ready handshake。升级/回滚前先显式停止并 join Active capture，撤销系统 artifact；新旧组件组合若不能重新完成组合 ready/health 与恢复 audit，必须拒绝激活，不能依赖 Drop emergency reaper 或静默沿用旧 capability。
+- **平台签名分工**：Windows Taomni app/helper/service/installer 使用受信任、带时间戳的用户态 Authenticode；该路线不要求 EV，也不授权自建 kernel driver。macOS/Linux 继续分别通过其正式 artifact Gate。
+- **候选与分发物绑定**：artifact/native/performance receipt 只能描述同一不可变候选。macOS artifact/aggregate/native 以完整 `.app` canonical tree digest 对齐；受保护的 build provenance 还必须证明最终 DMG/PKG/updater payload 对应这个 `.app`。Windows/Linux 同样绑定最终 installer/package 与已验 app/helper/provider hashes，不能只信任自报 JSON 或一个没有 payload 对照的包 hash。
+- **证据签发**：保护 self-hosted lab/CI producer，为 artifact、native、performance 和 raw evidence 生成可验证的签名 provenance/attestation（in-toto/SLSA 或等价机制），记录 host identity、candidate ID 与最终分发摘要。schema、同机重哈希和 JSON 自洽不能单独解锁生产 capability。
+- **安全与支持联动**：每个正式 release 关联 SBOM/license/CVE/EOL 结果、crash symbols、脱敏支持包 schema 和日志/receipt 上限；高危未豁免项或不兼容 native component 必须停止放量。
+
+关闭证据：在隔离环境对同一候选 release 完成正常升级、Active capture clean-stop 后升级、暂停放量、坏版本签名回滚、私钥轮换/吊销恢复和旧组件不兼容拒绝；逐项验证 provider pin/ABI、protocol/schema、journal/tombstone 与 ready handshake 的前后向组合，并证明失败不会留下 route/filter/TUN/provider state 或错误解锁 capability。保存签名 manifest、artifact hashes、审计记录与测试 receipt。详见 `sockscap-cross-platform-design-plan.md` Revision 6 的 `P0-RELEASE-OPS/P0-SECURITY/P0-SUPPORT`。
 
 ## 8. 验收标准
 
@@ -228,6 +239,10 @@ target key 规则:`{os}-{arch}`,`os ∈ {darwin, windows, linux}`,`arch` 取 `st
 - [ ] 单候选平台(当前 win-x64 / linux-x64)不显示选择器,流程不受影响。
 - [ ] 用户确认后能下载(进度可见)、验签通过、安装并重启到新版本。
 - [ ] 四个平台(win-x64 / mac-arm64 / mac-x64 / linux-x64)的 `latest.json` 条目与签名齐全。
+- [ ] Sockscap 生产发布前完成 minisign 私钥托管、恢复、轮换/吊销演练；CI 不导出私钥。
+- [ ] 分阶段放量、停止放量 kill switch、签名回滚和 native component 兼容矩阵在隔离 release 环境通过；矩阵覆盖 provider pin/ABI、protocol/schema、journal/tombstone、ready handshake，以及 Active capture 的显式停止、升级/回滚和失败后网络恢复。
+- [ ] updater release 关联平台 OS 签名 Gate、持续 SBOM/CVE、安全评审和脱敏支持证据；基础 updater PASS 不单独授予生产标签。
+- [ ] protected lab/CI attestation 将同一 candidate、host、raw evidence、app/helper/provider 与最终 installer/DMG/PKG/updater 摘要绑定；macOS payload 与 full-`.app` digest 的关系可验证。
 - [ ] dev 模式(`pnpm dev`)下不报错,检查更新 no-op。
 - [ ] `pnpm build` 与 `pnpm test` 通过。
 
@@ -236,4 +251,3 @@ target key 规则:`{os}-{arch}`,`os ∈ {darwin, windows, linux}`,`arch` 取 `st
 **修改:** `src-tauri/Cargo.toml`、`package.json`、`src-tauri/tauri.conf.json`、`src-tauri/capabilities/default.json`、`src-tauri/src/lib.rs`、`.github/workflows/release.yml`、`src/components/AboutDialog.tsx`、`src/components/window/TitleBarTrayControls.tsx`、`src/layouts/MainLayout.tsx`、`src/stubs/tauri-core.ts`、`src/lib/i18n/locales/en.ts`、`src/lib/i18n/locales/zh-CN.ts`
 
 **新增:** `src-tauri/src/update.rs`(架构探测命令)、`src/lib/updateService.ts`、`src/stores/updateStore.ts`、`src/components/UpdateDialog.tsx`、`src/stores/updateStore.test.ts`
-

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "configurationState": "unconfigured",
+  "appBundleIdentifier": "com.taomni.app",
+  "providerBundleIdentifier": "com.taomni.app.sockscap",
+  "teamIdentifier": "UNCONFIGURED",
+  "signerIdentityContains": "Developer ID Application:",
+  "signerCertificateSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "candidateBundleDigestAlgorithm": "taomni-directory-tree-sha256-v1",
+  "requiredArchitectures": []
+}

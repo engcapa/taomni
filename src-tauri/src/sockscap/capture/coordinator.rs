@@ -196,6 +196,32 @@ impl CaptureTransactionCoordinator {
         if !journal.cleanup_required && journal.phase == RecoveryPhase::Clean {
             return Ok(journal);
         }
+        if journal.artifact_state == serde_json::json!({})
+            && matches!(
+                journal.phase,
+                RecoveryPhase::Preparing | RecoveryPhase::RecoveryRequired
+            )
+        {
+            self.store
+                .begin_stop(journal.generation)
+                .map_err(|error| store_error("CAPTURE_RECOVERY_JOURNAL_FAILED", error, true))?;
+            return match adapter.recover_generation(journal.generation).await {
+                Ok(()) => self.complete(journal.generation),
+                Err(error) => {
+                    let mark_result = self
+                        .store
+                        .mark_recovery_required(journal.generation, &error.code);
+                    if let Err(mark_error) = mark_result {
+                        Err(combine_errors(
+                            error,
+                            store_error("CAPTURE_RECOVERY_MARK_FAILED", mark_error, true),
+                        ))
+                    } else {
+                        Err(error)
+                    }
+                }
+            };
+        }
         let artifact: CaptureArtifactState = serde_json::from_value(journal.artifact_state.clone())
             .map_err(|error| {
                 CaptureError::recovery(
@@ -392,6 +418,7 @@ mod tests {
     struct FakeAdapter {
         fail_install: bool,
         fail_stop: bool,
+        generation_recovery: bool,
         calls: Mutex<Vec<&'static str>>,
     }
 
@@ -470,6 +497,17 @@ mod tests {
             Ok(())
         }
 
+        async fn recover_generation(&self, _generation: u64) -> Result<(), CaptureError> {
+            if !self.generation_recovery {
+                return Err(CaptureError::recovery(
+                    "CAPTURE_RECOVERY_RECEIPT_MISSING",
+                    "fake adapter has no generation-only recovery receipt",
+                ));
+            }
+            self.calls.lock().unwrap().push("recover_generation");
+            Ok(())
+        }
+
         async fn heartbeat(&self, handle: &CaptureHandle) -> Result<CaptureHandle, CaptureError> {
             self.calls.lock().unwrap().push("heartbeat");
             let mut refreshed = handle.clone();
@@ -518,6 +556,23 @@ mod tests {
         assert_eq!(clean.phase, RecoveryPhase::Clean);
         assert!(!clean.cleanup_required);
         assert_eq!(adapter.calls(), vec!["install", "heartbeat", "stop"]);
+    }
+
+    #[tokio::test]
+    async fn empty_preparing_marker_uses_generation_only_recovery() {
+        let store = Arc::new(SockscapStore::open_in_memory().unwrap());
+        let coordinator = CaptureTransactionCoordinator::new(Arc::clone(&store));
+        let adapter = FakeAdapter {
+            generation_recovery: true,
+            ..Default::default()
+        };
+        store
+            .begin_prepare(&["global".into()], 7, CapturePlatform::current(), false)
+            .unwrap();
+        let clean = coordinator.recover(&adapter).await.unwrap();
+        assert_eq!(clean.phase, RecoveryPhase::Clean);
+        assert!(!clean.cleanup_required);
+        assert_eq!(adapter.calls(), vec!["recover_generation"]);
     }
 
     #[tokio::test]

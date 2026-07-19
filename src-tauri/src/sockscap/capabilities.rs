@@ -11,6 +11,9 @@ pub fn probe_capabilities() -> CapabilitiesReport {
     let platform = CapturePlatform::current();
     let mut items = Vec::new();
 
+    if let Some(item) = probe_platform_architecture() {
+        items.push(item);
+    }
     items.push(probe_admin_privileges());
     items.push(probe_tun_device());
     items.push(probe_process_identity());
@@ -41,6 +44,11 @@ pub fn probe_capabilities() -> CapabilitiesReport {
 }
 
 fn build_summary(platform: CapturePlatform, items: &[CapabilityItem]) -> String {
+    if let Some(architecture) = items.iter().find(|item| {
+        item.id == "platform_architecture" && matches!(item.level, SupportLevel::Unsupported)
+    }) {
+        return format!("Windows: {}", architecture.detail);
+    }
     let unsupported: Vec<&str> = items
         .iter()
         .filter(|i| matches!(i.level, SupportLevel::Unsupported))
@@ -73,6 +81,40 @@ fn build_summary(platform: CapturePlatform, items: &[CapabilityItem]) -> String 
         format!(
             "{platform_name}: host probes look healthy; installed capture adapter is not enabled."
         )
+    }
+}
+
+fn windows_architecture_item(architecture: &str) -> CapabilityItem {
+    if architecture == "x86_64" {
+        CapabilityItem {
+            id: "platform_architecture".into(),
+            name: "Windows architecture".into(),
+            level: SupportLevel::Supported,
+            detail: "Windows Sockscap Beta source scope permits x86_64; installed adapter and artifact gates are still required."
+                .into(),
+            required_for_start: true,
+        }
+    } else {
+        CapabilityItem {
+            id: "platform_architecture".into(),
+            name: "Windows architecture".into(),
+            level: SupportLevel::Unsupported,
+            detail: format!(
+                "WINDOWS_CAPTURE_ARCH_UNSUPPORTED: Windows Sockscap Beta supports only x86_64; host architecture {architecture} must remain capability-disabled."
+            ),
+            required_for_start: true,
+        }
+    }
+}
+
+fn probe_platform_architecture() -> Option<CapabilityItem> {
+    #[cfg(target_os = "windows")]
+    {
+        Some(windows_architecture_item(std::env::consts::ARCH))
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        None
     }
 }
 
@@ -235,7 +277,7 @@ fn probe_process_identity() -> CapabilityItem {
             id: "process_identity".into(),
             name: "Process identity".into(),
             level: SupportLevel::NotImplemented,
-            detail: "WinDivert SOCKET/FLOW or WFP ALE will provide PID ownership (Phase 0 ADR)."
+            detail: "The frozen WinDivert SOCKET/FLOW contract will provide PID ownership for new connections; no first-party WFP fallback is in the current release scope."
                 .into(),
             required_for_start: false,
         }
@@ -330,9 +372,10 @@ fn probe_nft_or_equivalent() -> CapabilityItem {
     {
         CapabilityItem {
             id: "nft_or_fwmark".into(),
-            name: "WFP / WinDivert".into(),
+            name: "WinDivert filter plane".into(),
             level: SupportLevel::NotImplemented,
-            detail: "Windows filter plane selection is a Phase 0 ADR open gate.".into(),
+            detail: "Windows app/PID capture is frozen to an unmodified, hash-pinned official WinDivert distribution; the installed artifact and data-plane probes are not implemented."
+                .into(),
             required_for_start: false,
         }
     }
@@ -477,7 +520,7 @@ fn probe_capture_plane_status() -> CapabilityItem {
     #[cfg(target_os = "linux")]
     let detail = "Linux cgroup v2+nft+fwmark/TUN planning, execution, receipt cleanup, and authenticated root helper are compiled, but no installed client adapter/TUN pump is attached to the product orchestrator.";
     #[cfg(target_os = "windows")]
-    let detail = "Windows source/signature gates exist, but Wintun plus WinDivert/WFP adapter selection and signed provider integration are not implemented.";
+    let detail = "Windows source/signature gates exist and the provider is frozen to Wintun global plus WinDivert app/PID, but the adapters, signed service integration, and installed artifact probes are not implemented.";
     #[cfg(target_os = "macos")]
     let detail = "macOS entitlement/signing gates exist, but the Swift NETransparentProxyProvider target and Rust bridge are not implemented or enrolled.";
     #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
@@ -534,5 +577,21 @@ mod tests {
             .expect("capture_plane item");
         assert_eq!(capture.level, SupportLevel::NotImplemented);
         assert!(capture.required_for_start);
+    }
+
+    #[test]
+    fn windows_x86_64_architecture_contract_is_explicit() {
+        let item = windows_architecture_item("x86_64");
+        assert_eq!(item.level, SupportLevel::Supported);
+        assert!(item.required_for_start);
+    }
+
+    #[test]
+    fn windows_arm64_architecture_fails_with_stable_reason() {
+        let item = windows_architecture_item("aarch64");
+        assert_eq!(item.level, SupportLevel::Unsupported);
+        assert!(item.detail.starts_with("WINDOWS_CAPTURE_ARCH_UNSUPPORTED:"));
+        let summary = build_summary(CapturePlatform::Windows, &[item]);
+        assert!(summary.contains("WINDOWS_CAPTURE_ARCH_UNSUPPORTED"));
     }
 }

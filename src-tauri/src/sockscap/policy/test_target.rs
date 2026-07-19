@@ -6,9 +6,12 @@
 use super::gfwlist::{compile_gfwlist_payload, load_last_good_text};
 use super::matcher::{FlowMatchInput, PolicyDecision, PolicySnapshot, ProfileMatcher};
 use super::rules::compile_custom_rules;
+use super::selector::{
+    ApplicationIdentity, ProfileSelectionInput, ProfileSelectionIntent, ProfileSelectionSource,
+    ProfileSelector, RuntimeProcessIdentity,
+};
 use crate::sockscap::types::{
-    AppSelectorKind, HostnameSource, ProfileScope, RouteAction, RoutingProfileDraft,
-    detect_profile_conflicts,
+    AppSelectorKind, HostnameSource, RouteAction, RoutingProfileDraft, detect_profile_conflicts,
 };
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -115,8 +118,7 @@ pub fn test_target(req: TestTargetRequest) -> TestTargetResult {
         notes.push("enabled profile conflicts detected; fix before start".into());
     }
 
-    let enabled: Vec<&RoutingProfileDraft> = req.profiles.iter().filter(|p| p.enabled).collect();
-    if enabled.is_empty() {
+    if !req.profiles.iter().any(|profile| profile.enabled) {
         return TestTargetResult {
             selected_profile_id: None,
             selected_profile_name: None,
@@ -127,67 +129,83 @@ pub fn test_target(req: TestTargetRequest) -> TestTargetResult {
         };
     }
 
-    // Pick the most specific runtime/application match by priority. The single
-    // global profile is a fallback, otherwise it would shadow every app group.
-    let global = enabled
-        .iter()
-        .find(|p| p.scope == ProfileScope::Global)
-        .copied();
-
-    let mut specific_matches: Vec<(&RoutingProfileDraft, u8, String)> = Vec::new();
-    if let (Some(pid), Some(start_time)) = (req.pid, req.process_start_time) {
-        specific_matches.extend(
-            enabled
-                .iter()
-                .copied()
-                .filter(|profile| profile.scope == ProfileScope::RuntimeProcesses)
-                .filter(|profile| {
-                    profile.runtime_processes.iter().any(|selector| {
-                        selector.pid == pid && selector.process_start_time == start_time
-                    })
-                })
-                .map(|profile| {
-                    (
-                        profile,
-                        0,
-                        format!("runtime selector matched PID {pid} and start time {start_time}"),
-                    )
-                }),
-        );
-    }
-    if let Some(app) = req.app_identity.as_deref() {
-        specific_matches.extend(
-            enabled
-                .iter()
-                .copied()
-                .filter(|profile| profile.scope == ProfileScope::Applications)
-                .filter(|profile| {
-                    profile
-                        .app_selectors
-                        .iter()
-                        .any(|selector| selector.matches(req.app_selector_kind, app))
-                })
-                .map(|profile| (profile, 1, format!("application selector matched '{app}'"))),
-        );
-    }
-    specific_matches.sort_by_key(|(profile, specificity, _)| (profile.priority, *specificity));
-    let selected = specific_matches
-        .into_iter()
-        .next()
-        .map(|(profile, _, reason)| (profile, reason))
-        .or_else(|| global.map(|profile| (profile, "enabled global fallback profile".into())));
-
-    let Some((profile, reason)) = selected else {
+    if req.pid.is_some() != req.process_start_time.is_some() {
         return TestTargetResult {
             selected_profile_id: None,
             selected_profile_name: None,
-            selection_reason:
-                "no profile matched the given application identity (and no global profile)".into(),
+            selection_reason: "runtime PID and process start token must be supplied together"
+                .into(),
             decision: None,
             conflicts,
             notes,
         };
+    }
+    if req.app_identity.is_some() != req.app_selector_kind.is_some() {
+        return TestTargetResult {
+            selected_profile_id: None,
+            selected_profile_name: None,
+            selection_reason: "application identity and selector kind must be supplied together"
+                .into(),
+            decision: None,
+            conflicts,
+            notes,
+        };
+    }
+
+    let selector = match ProfileSelector::from_profiles(&req.profiles) {
+        Ok(selector) => selector,
+        Err(error) => {
+            return TestTargetResult {
+                selected_profile_id: None,
+                selected_profile_name: None,
+                selection_reason: format!("profile selection unavailable ({})", error.code()),
+                decision: None,
+                conflicts,
+                notes,
+            };
+        }
     };
+    let selection_input = ProfileSelectionInput {
+        binding: Default::default(),
+        // `test_target` has no native capture queue or scoped-capture intent;
+        // it simulates the ordinary global-eligible policy plane while using
+        // any supplied identity as preferred specific-match evidence.
+        intent: ProfileSelectionIntent::AllowGlobalFallback,
+        runtime_process: req
+            .pid
+            .zip(req.process_start_time)
+            .map(|(pid, process_start_time)| RuntimeProcessIdentity {
+                pid,
+                process_start_time,
+            }),
+        application: req
+            .app_selector_kind
+            .zip(req.app_identity.as_deref())
+            .map(|(kind, value)| ApplicationIdentity { kind, value }),
+    };
+    let selection = match selector.select(&selection_input) {
+        Ok(selection) => selection,
+        Err(error) => {
+            return TestTargetResult {
+                selected_profile_id: None,
+                selected_profile_name: None,
+                selection_reason: format!("no profile selected ({})", error.code()),
+                decision: None,
+                conflicts,
+                notes,
+            };
+        }
+    };
+    let profile = selection.profile();
+    let reason = match selection.source() {
+        ProfileSelectionSource::RuntimeProcess => {
+            "runtime process identity matched an enabled profile"
+        }
+        ProfileSelectionSource::Application => "application identity matched an enabled profile",
+        ProfileSelectionSource::GlobalFallback => "enabled global fallback profile",
+        ProfileSelectionSource::TrustedQueue => "trusted capture queue selected an enabled profile",
+    }
+    .to_string();
 
     let hostname_source = req.hostname_source.unwrap_or_else(|| {
         if req.hostname.is_some() {
@@ -344,7 +362,7 @@ mod tests {
         let result = test_target(TestTargetRequest {
             app_identity: Some("/usr/bin/curl".into()),
             app_selector_kind: Some(AppSelectorKind::ExecutablePath),
-            pid: Some(1234),
+            pid: None,
             process_start_time: None,
             hostname: Some("example.com".into()),
             ip: None,
@@ -429,7 +447,7 @@ mod tests {
         );
         assert_eq!(
             test_target(request(None)).selected_profile_id.as_deref(),
-            Some("g")
+            None
         );
     }
 

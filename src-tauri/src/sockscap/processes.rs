@@ -9,6 +9,9 @@
 use serde::{Deserialize, Serialize};
 use sysinfo::{ProcessRefreshKind, RefreshKind, System, UpdateKind};
 
+#[cfg(target_os = "linux")]
+use std::collections::HashMap;
+
 const MAX_PROCESS_ROWS: usize = 4096;
 const MAX_PROCESS_NAME_CHARS: usize = 256;
 const MAX_EXECUTABLE_PATH_BYTES: usize = 4096;
@@ -20,8 +23,9 @@ pub struct ProcessSummary {
     pub parent_pid: Option<u32>,
     pub name: String,
     pub executable_path: Option<String>,
-    /// Seconds since the Unix epoch as reported by the native process table.
-    /// Combined with PID, this identifies one process incarnation.
+    /// Platform-native process-incarnation token. On Linux this is the kernel
+    /// start-time tick from `/proc/<pid>/stat`, not a second-resolution epoch.
+    /// Combined with PID, it identifies one process incarnation.
     pub process_start_time: u64,
     pub selectable: bool,
     pub rememberable: bool,
@@ -43,6 +47,7 @@ pub fn list_processes() -> Result<ProcessCatalog, String> {
     if !sysinfo::IS_SUPPORTED_SYSTEM {
         return Err("PROCESS_CATALOG_UNSUPPORTED: this operating system is not supported".into());
     }
+    let start_tokens = snapshot_platform_start_tokens();
     let refresh = ProcessRefreshKind::nothing()
         .without_tasks()
         .with_exe(UpdateKind::OnlyIfNotSet);
@@ -62,7 +67,7 @@ pub fn list_processes() -> Result<ProcessCatalog, String> {
                         .exe()
                         .filter(|path| !path.as_os_str().is_empty())
                         .map(|path| path.to_string_lossy().into_owned()),
-                    process.start_time(),
+                    platform_process_start_token(pid, process.start_time(), &start_tokens),
                     current_pid,
                 )
             })
@@ -81,6 +86,53 @@ pub fn list_processes() -> Result<ProcessCatalog, String> {
         truncated,
         max_rows: MAX_PROCESS_ROWS,
     })
+}
+
+#[cfg(target_os = "linux")]
+type PlatformStartTokens = HashMap<u32, u64>;
+
+#[cfg(not(target_os = "linux"))]
+type PlatformStartTokens = ();
+
+#[cfg(target_os = "linux")]
+fn snapshot_platform_start_tokens() -> PlatformStartTokens {
+    let mut tokens = HashMap::new();
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return tokens;
+    };
+    for entry in entries.flatten().take(MAX_PROCESS_ROWS * 16) {
+        let Some(pid) = entry
+            .file_name()
+            .to_str()
+            .and_then(|value| value.parse::<u32>().ok())
+        else {
+            continue;
+        };
+        if let Ok(token) = crate::sockscap::capture::unix_transport::linux_process_start_token(pid)
+        {
+            tokens.insert(pid, token);
+        }
+    }
+    tokens
+}
+
+#[cfg(not(target_os = "linux"))]
+fn snapshot_platform_start_tokens() -> PlatformStartTokens {}
+
+#[cfg(target_os = "linux")]
+fn platform_process_start_token(pid: u32, _fallback: u64, before: &PlatformStartTokens) -> u64 {
+    let Some(before) = before.get(&pid) else {
+        return 0;
+    };
+    match crate::sockscap::capture::unix_transport::linux_process_start_token(pid) {
+        Ok(after) if *before == after => after,
+        _ => 0,
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn platform_process_start_token(_pid: u32, fallback: u64, _before: &PlatformStartTokens) -> u64 {
+    fallback
 }
 
 fn project_process(
@@ -145,6 +197,12 @@ mod tests {
         assert!(!current.selectable);
         assert_eq!(current.issue_code.as_deref(), Some("PROCESS_IS_TAOMNI"));
         assert!(current.process_start_time > 0);
+        #[cfg(target_os = "linux")]
+        assert_eq!(
+            current.process_start_time,
+            crate::sockscap::capture::unix_transport::linux_process_start_token(std::process::id())
+                .unwrap()
+        );
     }
 
     #[test]

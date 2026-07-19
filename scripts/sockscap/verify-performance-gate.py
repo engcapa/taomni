@@ -12,6 +12,16 @@ import re
 import sys
 from typing import Any
 
+SCRIPT_DIRECTORY = Path(__file__).resolve().parent
+if not sys.path or sys.path[0] != str(SCRIPT_DIRECTORY):
+    sys.path.insert(0, str(SCRIPT_DIRECTORY))
+
+from candidate_digest import (  # noqa: E402
+    BUNDLE_DIGEST_ALGORITHM,
+    CandidateDigestError,
+    directory_tree_sha256,
+)
+
 
 SCHEMA_VERSION = 1
 RULE_COUNT = 10_000
@@ -34,7 +44,7 @@ MIN_THROUGHPUT_RATIO = 0.80
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 COMMIT_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 PROVIDERS = {
-    "windows": {"wfp", "windivert"},
+    "windows": {"windivert"},
     "macos": {"network_extension_transparent_proxy"},
     "linux": {"cgroup_v2_nft_tun"},
 }
@@ -43,6 +53,14 @@ PLATFORM_NAMES = {
     "darwin": "macos",
     "linux": "linux",
 }
+WINDOWS_RELEASE_POLICY_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "src-tauri/platform/sockscap/windows/release-policy.json"
+)
+MACOS_RELEASE_POLICY_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "src-tauri/platform/sockscap/macos/release-policy.json"
+)
 
 
 class GateFailure(RuntimeError):
@@ -475,6 +493,104 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def windows_release_policy() -> tuple[dict[str, Any], str]:
+    policy = load_json(WINDOWS_RELEASE_POLICY_PATH)
+    require(
+        integer(policy, "schemaVersion", "windowsReleasePolicy") == 1,
+        "WINDOWS_RELEASE_POLICY_INVALID",
+        "unsupported Windows release policy schema",
+    )
+    require(
+        text(policy, "architecture", "windowsReleasePolicy") == "x86_64"
+        and text(
+            policy, "applicationCaptureProvider", "windowsReleasePolicy"
+        )
+        == "windivert",
+        "WINDOWS_RELEASE_POLICY_INVALID",
+        "Windows release policy must remain x86_64 and WinDivert-only",
+    )
+    wintun = mapping(policy, "wintun", "windowsReleasePolicy")
+    windivert = mapping(policy, "windivert", "windowsReleasePolicy")
+    for where, item, fields in (
+        (
+            "windowsReleasePolicy.wintun",
+            wintun,
+            (
+                "packageSha256",
+                "userModeSha256",
+                "licenseSha256",
+                "signerCertificateSha256",
+            ),
+        ),
+        (
+            "windowsReleasePolicy.windivert",
+            windivert,
+            (
+                "packageSha256",
+                "userModeSha256",
+                "driverSha256",
+                "licenseSha256",
+                "driverSignerCertificateSha256",
+            ),
+        ),
+    ):
+        for field in fields:
+            require(
+                bool(SHA256_RE.fullmatch(text(item, field, where))),
+                "WINDOWS_RELEASE_POLICY_INVALID",
+                f"{where}.{field} is not an exact SHA-256 pin",
+            )
+    return policy, sha256_file(WINDOWS_RELEASE_POLICY_PATH)
+
+
+def macos_release_policy() -> tuple[dict[str, Any], str]:
+    policy = load_json(MACOS_RELEASE_POLICY_PATH)
+    require(
+        integer(policy, "schemaVersion", "macosReleasePolicy") == 1,
+        "MACOS_RELEASE_POLICY_INVALID",
+        "unsupported macOS release policy schema",
+    )
+    for key in (
+        "configurationState",
+        "appBundleIdentifier",
+        "providerBundleIdentifier",
+        "teamIdentifier",
+        "signerIdentityContains",
+        "signerCertificateSha256",
+        "candidateBundleDigestAlgorithm",
+    ):
+        text(policy, key, "macosReleasePolicy")
+    require(
+        text(policy, "candidateBundleDigestAlgorithm", "macosReleasePolicy")
+        == BUNDLE_DIGEST_ALGORITHM,
+        "MACOS_RELEASE_POLICY_INVALID",
+        "macOS candidate bundle digest algorithm is unsupported",
+    )
+    architectures = policy.get("requiredArchitectures")
+    require(
+        isinstance(architectures, list)
+        and all(isinstance(item, str) for item in architectures)
+        and len(set(architectures)) == len(architectures)
+        and set(architectures) <= {"arm64", "x86_64"},
+        "MACOS_RELEASE_POLICY_INVALID",
+        "macOS release policy architectures are invalid",
+    )
+    return policy, sha256_file(MACOS_RELEASE_POLICY_PATH)
+
+
+def require_policy_text(
+    receipt: dict[str, Any],
+    policy: dict[str, Any],
+    field: str,
+    where: str,
+) -> None:
+    require(
+        text(receipt, field, where) == text(policy, field, where),
+        "WINDOWS_RELEASE_POLICY_MISMATCH",
+        f"{where}.{field} differs from the committed Windows release policy",
+    )
+
+
 def verify_evidence_item(base: Path, item: dict[str, Any], label: str) -> Path:
     require(
         boolean(item, "passed", label), "PLATFORM_SUBGATE_FAILED", f"{label} is red"
@@ -494,8 +610,63 @@ def verify_evidence_item(base: Path, item: dict[str, Any], label: str) -> Path:
     return path
 
 
+def verify_receipt_artifact_file(path_value: str, expected_hash: str, label: str) -> None:
+    path = Path(path_value)
+    require(
+        path.is_absolute(),
+        "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+        f"{label} must be an absolute path on the verifier host",
+    )
+    require(
+        path.is_file(),
+        "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+        f"{label} is no longer present on the verifier host",
+    )
+    require(
+        sha256_file(path).lower() == expected_hash.lower(),
+        "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+        f"{label} no longer matches the artifact-gate hash",
+    )
+
+
+def verify_receipt_artifact_directory(
+    path_value: str, expected_hash: str, label: str
+) -> None:
+    path = Path(path_value)
+    require(
+        path.is_absolute(),
+        "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+        f"{label} must be an absolute path on the verifier host",
+    )
+    require(
+        path.is_dir(),
+        "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+        f"{label} is no longer present on the verifier host",
+    )
+    try:
+        actual_hash = directory_tree_sha256(path)
+    except (CandidateDigestError, OSError) as error:
+        fail(
+            "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+            f"cannot digest {label}: {error}",
+        )
+    require(
+        actual_hash.lower() == expected_hash.lower(),
+        "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+        f"{label} no longer matches the artifact-gate bundle digest",
+    )
+
+
 def verify_artifact_gate_receipt(
-    path: Path, *, platform: str, architecture: str, provider: str
+    path: Path,
+    *,
+    platform: str,
+    architecture: str,
+    provider: str,
+    expected_commit: str | None = None,
+    verify_artifact_files: bool = True,
+    windows_policy_override: tuple[dict[str, Any], str] | None = None,
+    macos_policy_override: tuple[dict[str, Any], str] | None = None,
 ) -> None:
     receipt = load_json(path)
     require(
@@ -514,6 +685,29 @@ def verify_artifact_gate_receipt(
         "a source-lint receipt cannot be used as signed-artifact evidence",
     )
     if platform == "windows":
+        policy, policy_sha256 = (
+            windows_policy_override
+            if windows_policy_override is not None
+            else windows_release_policy()
+        )
+        require(
+            architecture == "x86_64",
+            "PLATFORM_ARCH_UNSUPPORTED",
+            "the pinned official WinDivert delivery supports only Windows x86_64",
+        )
+        require(
+            provider == "windivert",
+            "PLATFORM_PROVIDER_INVALID",
+            "Windows application capture provider must be windivert",
+        )
+        require(
+            integer(receipt, "gateSchemaVersion", "artifactGate") == 1
+            and text(receipt, "gateKind", "artifactGate")
+            == "sockscap_windows_artifact"
+            and text(receipt, "mode", "artifactGate") == "release",
+            "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+            "Windows artifact receipt is not a versioned release-mode receipt",
+        )
         require(
             text(receipt, "architecture", "artifactGate") == architecture,
             "PLATFORM_ARTIFACT_RECEIPT_INVALID",
@@ -524,27 +718,360 @@ def verify_artifact_gate_receipt(
             "PLATFORM_ARTIFACT_RECEIPT_INVALID",
             "Windows artifact receipt provider does not match",
         )
-        for key in ("application", "helper", "wintun"):
+        receipt_commit = text(receipt, "gitCommit", "artifactGate")
+        require(
+            bool(COMMIT_RE.fullmatch(receipt_commit)),
+            "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+            "Windows artifact receipt gitCommit is invalid",
+        )
+        if expected_commit is not None:
+            require(
+                receipt_commit.lower() == expected_commit.lower(),
+                "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+                "Windows artifact receipt belongs to another commit",
+            )
+        require(
+            bool(
+                re.fullmatch(
+                    r"[A-Za-z0-9._-]{1,128}",
+                    text(receipt, "buildId", "artifactGate"),
+                )
+            ),
+            "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+            "Windows artifact receipt buildId is invalid",
+        )
+        for field in (
+            "artifactManifestSha256",
+            "releasePolicySha256",
+            "applicationSha256",
+            "helperSha256",
+            "applicationSignerCertificateSha256",
+            "helperSignerCertificateSha256",
+        ):
+            require(
+                bool(SHA256_RE.fullmatch(text(receipt, field, "artifactGate"))),
+                "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+                f"Windows artifact receipt {field} is invalid",
+            )
+        require(
+            integer(receipt, "releasePolicySchemaVersion", "artifactGate")
+            == integer(policy, "schemaVersion", "windowsReleasePolicy")
+            and text(receipt, "releasePolicySha256", "artifactGate").lower()
+            == policy_sha256,
+            "WINDOWS_RELEASE_POLICY_MISMATCH",
+            "Windows artifact receipt is not bound to the committed release policy",
+        )
+        for key in ("application", "helper"):
             require(
                 bool(text(receipt, key, "artifactGate").strip()),
                 "PLATFORM_ARTIFACT_RECEIPT_INVALID",
                 f"Windows artifact receipt {key} path is empty",
             )
+        for key in ("applicationSignerSubject", "helperSignerSubject"):
+            require(
+                bool(text(receipt, key, "artifactGate").strip()),
+                "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+                f"Windows artifact receipt {key} is empty",
+            )
+        first_party = mapping(policy, "firstParty", "windowsReleasePolicy")
+        require(
+            text(first_party, "configurationState", "windowsReleasePolicy.firstParty")
+            == "configured",
+            "WINDOWS_FIRST_PARTY_POLICY_UNCONFIGURED",
+            "committed Windows first-party signing identity is not configured",
+        )
+        policy_publisher = text(
+            first_party, "publisherSubject", "windowsReleasePolicy.firstParty"
+        )
+        policy_publisher_certificate = text(
+            first_party,
+            "signerCertificateSha256",
+            "windowsReleasePolicy.firstParty",
+        )
+        require(
+            bool(policy_publisher.strip())
+            and policy_publisher != "UNCONFIGURED"
+            and bool(SHA256_RE.fullmatch(policy_publisher_certificate))
+            and policy_publisher_certificate.lower() != "0" * 64
+            and text(receipt, "applicationSignerSubject", "artifactGate")
+            == policy_publisher
+            and text(receipt, "helperSignerSubject", "artifactGate")
+            == policy_publisher
+            and text(
+                receipt, "applicationSignerCertificateSha256", "artifactGate"
+            ).lower()
+            == policy_publisher_certificate.lower()
+            and text(receipt, "helperSignerCertificateSha256", "artifactGate").lower()
+            == policy_publisher_certificate.lower(),
+            "WINDOWS_RELEASE_POLICY_MISMATCH",
+            "Windows app/helper signer identity differs from the committed policy",
+        )
+        wintun = mapping(receipt, "wintun", "artifactGate")
+        policy_wintun = mapping(policy, "wintun", "windowsReleasePolicy")
+        for field in (
+            "version",
+            "packageUrl",
+            "packageSha256",
+            "userModeSha256",
+            "licenseSha256",
+            "signerCertificateSha256",
+        ):
+            require_policy_text(wintun, policy_wintun, field, "artifactGate.wintun")
+        for key in ("package", "userMode", "license", "signerSubject"):
+            require(
+                bool(text(wintun, key, "artifactGate.wintun").strip()),
+                "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+                f"Windows artifact receipt wintun.{key} is empty",
+            )
+        windivert = mapping(receipt, "windivert", "artifactGate")
+        policy_windivert = mapping(policy, "windivert", "windowsReleasePolicy")
+        for field in (
+            "version",
+            "variant",
+            "packageUrl",
+            "packageSha256",
+            "userModeSha256",
+            "driverSha256",
+            "licenseSha256",
+            "userModeSignatureMode",
+            "userModeSignerSubject",
+            "driverSignerSubject",
+            "driverSignerCertificateSha256",
+        ):
+            require_policy_text(
+                windivert, policy_windivert, field, "artifactGate.windivert"
+            )
+        for key in (
+            "package",
+            "userMode",
+            "driver",
+            "license",
+            "driverSignerSubject",
+        ):
+            require(
+                bool(text(windivert, key, "artifactGate.windivert").strip()),
+                "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+                f"Windows artifact receipt windivert.{key} is empty",
+            )
+        if verify_artifact_files:
+            for path_value, expected_hash, label in (
+                (
+                    text(receipt, "application", "artifactGate"),
+                    text(receipt, "applicationSha256", "artifactGate"),
+                    "artifactGate.application",
+                ),
+                (
+                    text(receipt, "helper", "artifactGate"),
+                    text(receipt, "helperSha256", "artifactGate"),
+                    "artifactGate.helper",
+                ),
+                (
+                    text(wintun, "package", "artifactGate.wintun"),
+                    text(wintun, "packageSha256", "artifactGate.wintun"),
+                    "artifactGate.wintun.package",
+                ),
+                (
+                    text(wintun, "userMode", "artifactGate.wintun"),
+                    text(wintun, "userModeSha256", "artifactGate.wintun"),
+                    "artifactGate.wintun.userMode",
+                ),
+                (
+                    text(wintun, "license", "artifactGate.wintun"),
+                    text(wintun, "licenseSha256", "artifactGate.wintun"),
+                    "artifactGate.wintun.license",
+                ),
+                (
+                    text(windivert, "package", "artifactGate.windivert"),
+                    text(windivert, "packageSha256", "artifactGate.windivert"),
+                    "artifactGate.windivert.package",
+                ),
+                (
+                    text(windivert, "userMode", "artifactGate.windivert"),
+                    text(windivert, "userModeSha256", "artifactGate.windivert"),
+                    "artifactGate.windivert.userMode",
+                ),
+                (
+                    text(windivert, "driver", "artifactGate.windivert"),
+                    text(windivert, "driverSha256", "artifactGate.windivert"),
+                    "artifactGate.windivert.driver",
+                ),
+                (
+                    text(windivert, "license", "artifactGate.windivert"),
+                    text(windivert, "licenseSha256", "artifactGate.windivert"),
+                    "artifactGate.windivert.license",
+                ),
+            ):
+                verify_receipt_artifact_file(path_value, expected_hash, label)
     elif platform == "macos":
+        policy, policy_sha256 = (
+            macos_policy_override
+            if macos_policy_override is not None
+            else macos_release_policy()
+        )
+        require(
+            integer(receipt, "gateSchemaVersion", "artifactGate") == 1
+            and text(receipt, "gateKind", "artifactGate")
+            == "sockscap_macos_artifact"
+            and text(receipt, "mode", "artifactGate") == "release",
+            "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+            "macOS artifact receipt is not a versioned release-mode receipt",
+        )
+        require(
+            integer(receipt, "releasePolicySchemaVersion", "artifactGate")
+            == integer(policy, "schemaVersion", "macosReleasePolicy")
+            and text(receipt, "releasePolicySha256", "artifactGate").lower()
+            == policy_sha256,
+            "MACOS_RELEASE_POLICY_MISMATCH",
+            "macOS artifact receipt is not bound to the committed release policy",
+        )
+        require(
+            text(policy, "configurationState", "macosReleasePolicy")
+            == "configured",
+            "MACOS_FIRST_PARTY_POLICY_UNCONFIGURED",
+            "committed macOS signing identity and architecture scope are not configured",
+        )
+        receipt_commit = text(receipt, "gitCommit", "artifactGate")
+        require(
+            bool(COMMIT_RE.fullmatch(receipt_commit))
+            and (
+                expected_commit is None
+                or receipt_commit.lower() == expected_commit.lower()
+            ),
+            "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+            "macOS artifact receipt belongs to another commit",
+        )
+        require(
+            bool(
+                re.fullmatch(
+                    r"[A-Za-z0-9._-]{1,128}",
+                    text(receipt, "buildId", "artifactGate"),
+                )
+            ),
+            "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+            "macOS artifact receipt buildId is invalid",
+        )
         architectures = receipt.get("architectures")
+        provider_architectures = receipt.get("providerArchitectures")
+        policy_architectures = policy.get("requiredArchitectures")
         expected_architecture = "arm64" if architecture == "aarch64" else architecture
         require(
-            isinstance(architectures, list) and expected_architecture in architectures,
+            isinstance(architectures, list)
+            and expected_architecture in architectures
+            and isinstance(provider_architectures, list)
+            and expected_architecture in provider_architectures
+            and isinstance(policy_architectures, list)
+            and bool(policy_architectures)
+            and len(architectures) == len(set(architectures))
+            and len(provider_architectures) == len(set(provider_architectures))
+            and set(architectures) == set(policy_architectures)
+            and set(provider_architectures) == set(policy_architectures),
             "PLATFORM_ARTIFACT_RECEIPT_INVALID",
-            "macOS artifact receipt does not contain the manifest architecture",
+            "macOS app/provider architectures do not exactly match the committed policy",
         )
-        for key in ("app", "provider"):
+        for key in ("app", "provider", "appExecutable", "providerExecutable"):
             require(
                 bool(text(receipt, key, "artifactGate").strip()),
                 "PLATFORM_ARTIFACT_RECEIPT_INVALID",
                 f"macOS artifact receipt {key} path is empty",
             )
+        policy_team = text(policy, "teamIdentifier", "macosReleasePolicy")
+        policy_certificate = text(
+            policy, "signerCertificateSha256", "macosReleasePolicy"
+        )
+        require(
+            policy_team != "UNCONFIGURED"
+            and bool(policy_team.strip())
+            and bool(SHA256_RE.fullmatch(policy_certificate))
+            and policy_certificate.lower() != "0" * 64
+            and text(receipt, "teamIdentifier", "artifactGate") == policy_team
+            and text(receipt, "appBundleIdentifier", "artifactGate")
+            == text(policy, "appBundleIdentifier", "macosReleasePolicy")
+            and text(receipt, "providerBundleIdentifier", "artifactGate")
+            == text(policy, "providerBundleIdentifier", "macosReleasePolicy"),
+            "MACOS_RELEASE_POLICY_MISMATCH",
+            "macOS receipt identity differs from the committed release policy",
+        )
+        require(
+            text(receipt, "candidateBundleDigestAlgorithm", "artifactGate")
+            == text(
+                policy, "candidateBundleDigestAlgorithm", "macosReleasePolicy"
+            )
+            == BUNDLE_DIGEST_ALGORITHM,
+            "MACOS_RELEASE_POLICY_MISMATCH",
+            "macOS candidate bundle digest algorithm differs from policy",
+        )
+        for key in (
+            "candidateBundleSha256",
+            "appExecutableSha256",
+            "providerExecutableSha256",
+            "appSignerCertificateSha256",
+            "providerSignerCertificateSha256",
+            "appEntitlementsSha256",
+            "providerEntitlementsSha256",
+            "appProvisioningProfileSha256",
+            "providerProvisioningProfileSha256",
+        ):
+            require(
+                bool(SHA256_RE.fullmatch(text(receipt, key, "artifactGate"))),
+                "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+                f"macOS artifact receipt {key} is invalid",
+            )
+        require(
+            text(receipt, "appSignerCertificateSha256", "artifactGate").lower()
+            == policy_certificate.lower()
+            and text(
+                receipt, "providerSignerCertificateSha256", "artifactGate"
+            ).lower()
+            == policy_certificate.lower(),
+            "MACOS_RELEASE_POLICY_MISMATCH",
+            "macOS signer certificate differs from the committed release policy",
+        )
+        for key in ("provisioningProfilesVerified", "notarizationTicketVerified"):
+            require(
+                boolean(receipt, key, "artifactGate"),
+                "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+                f"macOS artifact receipt {key} is false",
+            )
+        if verify_artifact_files:
+            verify_receipt_artifact_directory(
+                text(receipt, "app", "artifactGate"),
+                text(receipt, "candidateBundleSha256", "artifactGate"),
+                "artifactGate.app",
+            )
+            for path_key, hash_key in (
+                ("appExecutable", "appExecutableSha256"),
+                ("providerExecutable", "providerExecutableSha256"),
+            ):
+                verify_receipt_artifact_file(
+                    text(receipt, path_key, "artifactGate"),
+                    text(receipt, hash_key, "artifactGate"),
+                    f"artifactGate.{path_key}",
+                )
     else:
+        require(
+            integer(receipt, "gateSchemaVersion", "artifactGate") == 1
+            and text(receipt, "gateKind", "artifactGate")
+            == "sockscap_linux_artifact"
+            and text(receipt, "mode", "artifactGate") == "release",
+            "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+            "Linux artifact receipt is not a versioned release-mode receipt",
+        )
+        receipt_commit = text(receipt, "gitCommit", "artifactGate")
+        require(
+            bool(COMMIT_RE.fullmatch(receipt_commit))
+            and (
+                expected_commit is None
+                or receipt_commit.lower() == expected_commit.lower()
+            )
+            and bool(
+                re.fullmatch(
+                    r"[A-Za-z0-9._-]{1,128}",
+                    text(receipt, "buildId", "artifactGate"),
+                )
+            ),
+            "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+            "Linux artifact receipt build identity is invalid",
+        )
         require(
             text(receipt, "architecture", "artifactGate") == architecture,
             "PLATFORM_ARTIFACT_RECEIPT_INVALID",
@@ -571,20 +1098,133 @@ def verify_artifact_gate_receipt(
                 "PLATFORM_ARTIFACT_RECEIPT_INVALID",
                 f"Linux artifact receipt {key} path is empty",
             )
+        for key in (
+            "applicationSha256",
+            "helperSha256",
+            "helperPolicySha256",
+            "packageManifestSha256",
+        ):
+            require(
+                bool(SHA256_RE.fullmatch(text(receipt, key, "artifactGate"))),
+                "PLATFORM_ARTIFACT_RECEIPT_INVALID",
+                f"Linux artifact receipt {key} is invalid",
+            )
+        if verify_artifact_files:
+            for path_key, hash_key in (
+                ("application", "applicationSha256"),
+                ("helper", "helperSha256"),
+                ("helperPolicy", "helperPolicySha256"),
+            ):
+                verify_receipt_artifact_file(
+                    text(receipt, path_key, "artifactGate"),
+                    text(receipt, hash_key, "artifactGate"),
+                    f"artifactGate.{path_key}",
+                )
 
 
-def verify_native_smoke_receipt(path: Path) -> None:
+def verify_native_smoke_receipt(
+    path: Path,
+    *,
+    expected_commit: str | None = None,
+    expected_platform: str | None = None,
+    expected_architecture: str | None = None,
+    expected_provider: str | None = None,
+    expected_build_id: str | None = None,
+    expected_artifact_gate_sha256: str | None = None,
+    expected_artifact_hashes: dict[str, str] | None = None,
+) -> None:
     receipt = load_json(path)
     require(
-        text(receipt, "schema", "nativeSmoke") == "qa-ui-auto.summary.v1",
+        integer(receipt, "schemaVersion", "nativeSmoke") == 1
+        and text(receipt, "gateKind", "nativeSmoke")
+        == "sockscap_native_capture_smoke"
+        and text(receipt, "evidenceClass", "nativeSmoke") == "real_host_capture"
+        and boolean(receipt, "releaseEligible", "nativeSmoke"),
         "PLATFORM_NATIVE_SMOKE_INVALID",
-        "native smoke is not a qa-ui-auto v1 summary",
+        "native smoke is not release-eligible real-host capture evidence",
     )
     require(
         text(receipt, "mode", "nativeSmoke") == "native",
         "PLATFORM_NATIVE_SMOKE_INVALID",
         "native smoke did not run in native mode",
     )
+    require(
+        text(receipt, "result", "nativeSmoke") == "PASS",
+        "PLATFORM_NATIVE_SMOKE_FAILED",
+        "native capture smoke result is not PASS",
+    )
+    native_platform = text(receipt, "platform", "nativeSmoke")
+    native_architecture = text(receipt, "architecture", "nativeSmoke")
+    native_provider = text(receipt, "captureProvider", "nativeSmoke")
+    native_build_id = text(receipt, "buildId", "nativeSmoke")
+    require(
+        native_platform in PROVIDERS
+        and native_architecture in {"x86_64", "aarch64"}
+        and native_provider in PROVIDERS[native_platform]
+        and (native_platform != "windows" or native_architecture == "x86_64")
+        and bool(re.fullmatch(r"[A-Za-z0-9._-]{1,128}", native_build_id)),
+        "PLATFORM_NATIVE_SMOKE_INVALID",
+        "native smoke platform, architecture, provider, or build identity is invalid",
+    )
+    identity_expectations = (
+        ("gitCommit", expected_commit),
+        ("platform", expected_platform),
+        ("architecture", expected_architecture),
+        ("captureProvider", expected_provider),
+        ("buildId", expected_build_id),
+        ("artifactGateSha256", expected_artifact_gate_sha256),
+    )
+    for field, expected in identity_expectations:
+        actual = text(receipt, field, "nativeSmoke")
+        if expected is None:
+            matches_expected = True
+        elif field in {"gitCommit", "artifactGateSha256"}:
+            matches_expected = actual.lower() == expected.lower()
+        else:
+            matches_expected = actual == expected
+        require(
+            bool(actual.strip())
+            and matches_expected,
+            "PLATFORM_NATIVE_SMOKE_INVALID",
+            f"native capture smoke {field} does not match the candidate",
+        )
+    require(
+        bool(COMMIT_RE.fullmatch(text(receipt, "gitCommit", "nativeSmoke")))
+        and bool(
+            SHA256_RE.fullmatch(
+                text(receipt, "artifactGateSha256", "nativeSmoke")
+            )
+        ),
+        "PLATFORM_NATIVE_SMOKE_INVALID",
+        "native capture smoke candidate hashes are invalid",
+    )
+    artifacts = mapping(receipt, "artifacts", "nativeSmoke")
+    required_artifact_keys = [
+        "applicationSha256",
+        "privilegedComponentSha256",
+        "providerSha256",
+    ]
+    if native_platform == "windows":
+        required_artifact_keys.extend(
+            ("wintunSha256", "providerUserModeSha256", "providerDriverSha256")
+        )
+    elif native_platform == "macos":
+        required_artifact_keys.append("candidateBundleSha256")
+    for key in required_artifact_keys:
+        actual_hash = text(artifacts, key, "nativeSmoke.artifacts")
+        require(
+            bool(SHA256_RE.fullmatch(actual_hash)),
+            "PLATFORM_NATIVE_SMOKE_INVALID",
+            f"native capture smoke artifacts.{key} is invalid",
+        )
+        if expected_artifact_hashes is not None:
+            expected_hash = expected_artifact_hashes.get(key)
+            require(
+                expected_hash is not None
+                and actual_hash.lower() == expected_hash.lower(),
+                "PLATFORM_NATIVE_SMOKE_INVALID",
+                f"native capture smoke artifacts.{key} does not match the artifact gate",
+            )
     totals = mapping(receipt, "totals", "nativeSmoke")
     total = integer(totals, "total", "nativeSmoke.totals")
     require(
@@ -597,16 +1237,27 @@ def verify_native_smoke_receipt(path: Path) -> None:
     )
     cases = receipt.get("cases")
     require(
-        isinstance(cases, list),
+        isinstance(cases, list)
+        and len(cases) == total
+        and all(
+            isinstance(case, dict)
+            and isinstance(case.get("id"), str)
+            and bool(case["id"].strip())
+            and case.get("status") == "passed"
+            and isinstance(case.get("modes"), list)
+            and "native" in case["modes"]
+            for case in cases
+        )
+        and len({case["id"] for case in cases}) == total,
         "PLATFORM_NATIVE_SMOKE_INVALID",
-        "native smoke cases must be an array",
+        "native smoke cases must exactly match the all-passed native totals with unique ids",
     )
     sockscap_case = next(
         (
             case
             for case in cases
             if isinstance(case, dict)
-            and case.get("id") == "TC-SOCKSCAP-native-window-smoke"
+            and case.get("id") == "TC-SOCKSCAP-native-capture-smoke"
         ),
         None,
     )
@@ -619,11 +1270,32 @@ def verify_native_smoke_receipt(path: Path) -> None:
         and isinstance(sockscap_modes, list)
         and "native" in sockscap_modes,
         "PLATFORM_NATIVE_SMOKE_FAILED",
-        "required Sockscap native-window case did not pass",
+        "required real-host Sockscap capture case did not pass",
     )
+    capture_matrix = mapping(receipt, "captureMatrix", "nativeSmoke")
+    for key in (
+        "globalIpv4Tcp",
+        "globalIpv6Tcp",
+        "applicationGroupIpv4Tcp",
+        "runtimePidIpv4Tcp",
+        "dnsCaptured",
+        "udpPolicyEnforced",
+        "hardBypassVerified",
+        "cleanupResidueZero",
+    ):
+        require(
+            boolean(capture_matrix, key, "nativeSmoke.captureMatrix"),
+            "PLATFORM_NATIVE_SMOKE_FAILED",
+            f"native capture smoke captureMatrix.{key} is false",
+        )
 
 
 def verify_platform_manifest(path: Path, expected_commit: str | None) -> None:
+    require(
+        expected_commit is not None and bool(COMMIT_RE.fullmatch(expected_commit)),
+        "PLATFORM_EXPECTED_COMMIT_REQUIRED",
+        "platform release verification requires --expected-commit with a full commit",
+    )
     root = load_json(path)
     require(
         integer(root, "schemaVersion", "manifest") == SCHEMA_VERSION,
@@ -646,6 +1318,12 @@ def verify_platform_manifest(path: Path, expected_commit: str | None) -> None:
         "PLATFORM_ARCH_INVALID",
         f"unsupported architecture {architecture!r}",
     )
+    if platform == "windows":
+        require(
+            architecture == "x86_64",
+            "PLATFORM_ARCH_UNSUPPORTED",
+            "the pinned official WinDivert delivery supports only Windows x86_64",
+        )
     require(
         bool(COMMIT_RE.fullmatch(commit)),
         "PLATFORM_COMMIT_INVALID",
@@ -710,8 +1388,72 @@ def verify_platform_manifest(path: Path, expected_commit: str | None) -> None:
         platform=platform,
         architecture=architecture,
         provider=provider,
+        expected_commit=commit,
     )
-    verify_native_smoke_receipt(smoke_path)
+    artifact_receipt = load_json(artifact_path)
+    artifact_build_id = text(artifact_receipt, "buildId", "artifactGate")
+    if platform == "windows":
+        expected_native_artifacts = {
+            "applicationSha256": text(
+                artifact_receipt, "applicationSha256", "artifactGate"
+            ),
+            "privilegedComponentSha256": text(
+                artifact_receipt, "helperSha256", "artifactGate"
+            ),
+            "providerSha256": text(
+                mapping(artifact_receipt, "windivert", "artifactGate"),
+                "driverSha256",
+                "artifactGate.windivert",
+            ),
+            "wintunSha256": text(
+                mapping(artifact_receipt, "wintun", "artifactGate"),
+                "userModeSha256",
+                "artifactGate.wintun",
+            ),
+            "providerUserModeSha256": text(
+                mapping(artifact_receipt, "windivert", "artifactGate"),
+                "userModeSha256",
+                "artifactGate.windivert",
+            ),
+            "providerDriverSha256": text(
+                mapping(artifact_receipt, "windivert", "artifactGate"),
+                "driverSha256",
+                "artifactGate.windivert",
+            ),
+        }
+    elif platform == "macos":
+        provider_executable_sha256 = text(
+            artifact_receipt, "providerExecutableSha256", "artifactGate"
+        )
+        expected_native_artifacts = {
+            "applicationSha256": text(
+                artifact_receipt, "appExecutableSha256", "artifactGate"
+            ),
+            "privilegedComponentSha256": provider_executable_sha256,
+            "providerSha256": provider_executable_sha256,
+            "candidateBundleSha256": text(
+                artifact_receipt, "candidateBundleSha256", "artifactGate"
+            ),
+        }
+    else:
+        helper_sha256 = text(artifact_receipt, "helperSha256", "artifactGate")
+        expected_native_artifacts = {
+            "applicationSha256": text(
+                artifact_receipt, "applicationSha256", "artifactGate"
+            ),
+            "privilegedComponentSha256": helper_sha256,
+            "providerSha256": helper_sha256,
+        }
+    verify_native_smoke_receipt(
+        smoke_path,
+        expected_commit=commit,
+        expected_platform=platform,
+        expected_architecture=architecture,
+        expected_provider=provider,
+        expected_build_id=artifact_build_id,
+        expected_artifact_gate_sha256=sha256_file(artifact_path),
+        expected_artifact_hashes=expected_native_artifacts,
+    )
     verify_core_receipt(
         quick_path,
         expected_commit=commit,
