@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "captureReleaseEnabled": false,
+  "architecture": "x86_64",
+  "expectedPublisher": "",
+  "applicationCaptureProvider": "unselected",
+  "artifacts": {
+    "application": {
+      "path": "",
+      "sha256": "",
+      "signerSubject": ""
+    },
+    "helper": {
+      "path": "",
+      "sha256": "",
+      "signerSubject": ""
+    },
+    "wintun": {
+      "path": "",
+      "version": "",
+      "sha256": "",
+      "signerSubject": ""
+    },
+    "applicationProvider": {
+      "kind": "unselected",
+      "userModePath": "",
+      "driverPath": "",
+      "catalogPath": "",
+      "infPath": "",
+      "licensePath": "",
+      "userModeSha256": "",
+      "driverSha256": "",
+      "catalogSha256": "",
+      "infSha256": "",
+      "signerSubject": ""
+    }
+  }
+}

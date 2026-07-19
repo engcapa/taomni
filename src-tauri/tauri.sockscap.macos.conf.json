@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "entitlements": "platform/sockscap/macos/TaomniSockscap.release.entitlements.plist",
+      "files": {
+        "Library/SystemExtensions/com.taomni.app.sockscap.systemextension": "platform/sockscap/macos/staged/com.taomni.app.sockscap.systemextension"
+      }
+    }
+  }
+}

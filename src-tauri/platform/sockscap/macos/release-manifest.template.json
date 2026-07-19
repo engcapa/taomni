@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "captureReleaseEnabled": false,
+  "appBundlePath": "staged/Taomni.app",
+  "providerRelativePath": "Contents/Library/SystemExtensions/com.taomni.app.sockscap.systemextension",
+  "appBundleIdentifier": "com.taomni.app",
+  "providerBundleIdentifier": "com.taomni.app.sockscap",
+  "teamIdentifier": "",
+  "signerIdentityContains": "Developer ID Application:",
+  "requiredArchitectures": [],
+  "requireProvisioningProfiles": true,
+  "requireNotarizationTicket": true,
+  "sourceEntitlements": {
+    "application": "TaomniSockscap.release.entitlements.plist",
+    "provider": "TaomniTransparentProxyProvider.entitlements.plist"
+  }
+}

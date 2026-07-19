@@ -15,6 +15,10 @@ perf.data*
 # krb5 dylibs staged by scripts/bundle-krb5-macos.sh (bundled into the macOS app)
 src-tauri/frameworks/
 
+# Signed Sockscap drivers/helpers/system extensions are staged by release jobs.
+# The manifests and entitlement sources are tracked; generated binaries are not.
+src-tauri/platform/sockscap/*/staged/
+
 # =============================================================================
 # Node
 # =============================================================================

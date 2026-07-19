@@ -1,0 +1,59 @@
+name: Sockscap Platform Gates
+
+on:
+  pull_request:
+    paths:
+      - "scripts/sockscap/**"
+      - "src-tauri/platform/sockscap/**"
+      - "src-tauri/tauri.sockscap.macos.conf.json"
+      - ".github/workflows/sockscap-platform-gates.yml"
+  push:
+    branches:
+      - "feat/sockscap-*"
+    paths:
+      - "scripts/sockscap/**"
+      - "src-tauri/platform/sockscap/**"
+      - "src-tauri/tauri.sockscap.macos.conf.json"
+      - ".github/workflows/sockscap-platform-gates.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-gates:
+    name: Gate source contracts (Linux)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate shell and JSON contracts
+        shell: bash
+        run: |
+          bash -n scripts/sockscap/verify-macos-release.sh
+          jq -e . src-tauri/tauri.sockscap.macos.conf.json >/dev/null
+          jq -e . src-tauri/platform/sockscap/windows/release-manifest.template.json >/dev/null
+          bash scripts/sockscap/verify-macos-release.sh --lint \
+            src-tauri/platform/sockscap/macos/release-manifest.template.json
+
+  windows-contract:
+    name: Gate source contracts (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse disabled Windows release template
+        shell: pwsh
+        run: |
+          ./scripts/sockscap/verify-windows-release.ps1 `
+            -ManifestPath ./src-tauri/platform/sockscap/windows/release-manifest.template.json `
+            -LintOnly
+
+  macos-contract:
+    name: Gate source contracts (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse release entitlements and disabled template
+        shell: bash
+        run: |
+          bash scripts/sockscap/verify-macos-release.sh --lint \
+            src-tauri/platform/sockscap/macos/release-manifest.template.json
