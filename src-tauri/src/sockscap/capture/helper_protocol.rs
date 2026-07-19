@@ -135,6 +135,7 @@ pub enum HelperResponse {
     Heartbeat {
         helper_pid: u32,
         generation: u64,
+        artifact: Option<CaptureArtifactState>,
     },
     Shutdown,
     Error {

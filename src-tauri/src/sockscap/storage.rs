@@ -628,6 +628,47 @@ impl SockscapStore {
         )
     }
 
+    /// Replace the non-secret recovery receipt without changing lifecycle
+    /// phase. Helpers use this after a membership refresh or a partial failure
+    /// so every privileged mutation remains recoverable after an app crash.
+    pub fn update_recovery_artifact(
+        &self,
+        generation: u64,
+        artifact_state: &Value,
+    ) -> Result<RecoveryJournal, String> {
+        validate_recovery_artifact(artifact_state)?;
+        let artifact_json = serde_json::to_string(artifact_state)
+            .map_err(|error| format!("serialize recovery artifact: {error}"))?;
+        let mut conn = self.lock_conn()?;
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|error| format!("begin recovery artifact update: {error}"))?;
+        let current = load_recovery_journal(&tx)?;
+        ensure_generation(&current, generation)?;
+        if !current.cleanup_required || current.phase == RecoveryPhase::Clean {
+            return Err(
+                "RECOVERY_STATE_CONFLICT: cannot update an artifact without a recovery marker"
+                    .into(),
+            );
+        }
+        let now = unix_now();
+        tx.execute(
+            "UPDATE engine_recovery_journal
+             SET artifact_state_json = ?1, updated_at = ?2
+             WHERE singleton_id = 1 AND generation = ?3",
+            params![
+                artifact_json,
+                now,
+                to_sql_counter(generation, "recovery generation")?
+            ],
+        )
+        .map_err(|error| format!("write recovery artifact update: {error}"))?;
+        let journal = load_recovery_journal(&tx)?;
+        tx.commit()
+            .map_err(|error| format!("commit recovery artifact update: {error}"))?;
+        Ok(journal)
+    }
+
     pub fn commit_active(&self, generation: u64) -> Result<RecoveryJournal, String> {
         self.transition_recovery(
             generation,
@@ -2865,6 +2906,17 @@ mod tests {
         assert_eq!(installed.phase, RecoveryPhase::CaptureInstalled);
         let active = store.commit_active(installed.generation).unwrap();
         assert_eq!(active.phase, RecoveryPhase::Active);
+        let refreshed = store
+            .update_recovery_artifact(
+                active.generation,
+                &serde_json::json!({"interface": "tun-refreshed"}),
+            )
+            .unwrap();
+        assert_eq!(refreshed.phase, RecoveryPhase::Active);
+        assert_eq!(
+            refreshed.artifact_state,
+            serde_json::json!({"interface": "tun-refreshed"})
+        );
         assert!(store.complete_recovery(active.generation).is_err());
         let stopping = store.begin_stop(active.generation).unwrap();
         assert_eq!(stopping.phase, RecoveryPhase::Stopping);
@@ -2877,6 +2929,14 @@ mod tests {
         assert_eq!(clean.phase, RecoveryPhase::Clean);
         assert!(!clean.cleanup_required);
         assert_eq!(clean.artifact_state, serde_json::json!({}));
+        assert!(
+            store
+                .update_recovery_artifact(
+                    clean.generation,
+                    &serde_json::json!({"interface": "must-fail"})
+                )
+                .is_err()
+        );
     }
 
     #[test]

@@ -253,6 +253,24 @@ pub struct CaptureHandle {
     pub artifact: CaptureArtifactState,
 }
 
+impl CaptureHandle {
+    pub fn validate_for(&self, spec: &CaptureInstallSpec) -> Result<(), CaptureError> {
+        self.artifact.validate()?;
+        if self.generation != spec.generation
+            || self.artifact.generation != spec.generation
+            || self.config_revision != spec.config_revision
+            || self.helper_pid == 0
+        {
+            return Err(CaptureError::recovery_with_artifact(
+                "CAPTURE_HANDLE_INVALID",
+                "helper returned a handle for a different transaction",
+                self.artifact.clone(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AdapterProbe {
@@ -337,7 +355,11 @@ pub trait CaptureAdapter: Send + Sync {
     /// artifact identifiers.
     async fn recover(&self, artifact: &CaptureArtifactState) -> Result<(), CaptureError>;
 
-    async fn heartbeat(&self, handle: &CaptureHandle) -> Result<(), CaptureError>;
+    /// Prove helper liveness and return the latest complete recovery receipt.
+    /// Selected-application adapters may attach newly launched children during
+    /// this call, so callers must persist the returned handle before accepting
+    /// the heartbeat as successful.
+    async fn heartbeat(&self, handle: &CaptureHandle) -> Result<CaptureHandle, CaptureError>;
 }
 
 fn validate_safe_id(label: &str, value: &str) -> Result<(), CaptureError> {
