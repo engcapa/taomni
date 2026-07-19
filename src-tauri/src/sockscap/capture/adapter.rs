@@ -8,6 +8,7 @@ use crate::sockscap::types::{AppSelectorKind, CapturePlatform};
 
 pub const MAX_CAPTURE_SELECTORS: usize = 1024;
 pub const MAX_CAPTURE_BYPASSES: usize = 1024;
+pub const MAX_CAPTURE_PROCESS_RESTORES: usize = 4096;
 const MAX_ID_BYTES: usize = 128;
 const MAX_PATH_BYTES: usize = 4096;
 
@@ -179,6 +180,18 @@ pub struct CaptureArtifactState {
     pub cgroup_paths: Vec<String>,
     pub driver_service: Option<String>,
     pub extension_bundle_id: Option<String>,
+    /// Original cgroup/container membership for exact process incarnations.
+    /// This is non-secret recovery data; a reused PID is never restored.
+    #[serde(default)]
+    pub process_restores: Vec<CaptureProcessRestore>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CaptureProcessRestore {
+    pub pid: u32,
+    pub process_start_time: u64,
+    pub original_group: String,
 }
 
 impl CaptureArtifactState {
@@ -188,6 +201,12 @@ impl CaptureArtifactState {
             return Err(CaptureError::invalid(
                 "CAPTURE_ARTIFACT_INVALID",
                 "artifact generation must be non-zero",
+            ));
+        }
+        if self.process_restores.len() > MAX_CAPTURE_PROCESS_RESTORES {
+            return Err(CaptureError::invalid(
+                "CAPTURE_ARTIFACT_INVALID",
+                format!("artifact exceeds {MAX_CAPTURE_PROCESS_RESTORES} process restore records"),
             ));
         }
         for value in self
@@ -203,6 +222,21 @@ impl CaptureArtifactState {
                 return Err(CaptureError::invalid(
                     "CAPTURE_ARTIFACT_INVALID",
                     "artifact identifier is empty, too long, or contains NUL",
+                ));
+            }
+        }
+        let mut restored_processes = HashSet::new();
+        for restore in &self.process_restores {
+            if restore.pid == 0
+                || restore.process_start_time == 0
+                || restore.original_group.is_empty()
+                || restore.original_group.len() > MAX_PATH_BYTES
+                || restore.original_group.contains('\0')
+                || !restored_processes.insert((restore.pid, restore.process_start_time))
+            {
+                return Err(CaptureError::invalid(
+                    "CAPTURE_ARTIFACT_INVALID",
+                    "process restore records must have a unique PID/start token and bounded group",
                 ));
             }
         }
@@ -239,6 +273,7 @@ pub struct CaptureError {
     pub code: String,
     pub message: String,
     pub recovery_required: bool,
+    pub artifact: Option<CaptureArtifactState>,
 }
 
 impl CaptureError {
@@ -247,6 +282,7 @@ impl CaptureError {
             code: code.into(),
             message: message.into(),
             recovery_required: false,
+            artifact: None,
         }
     }
 
@@ -255,6 +291,20 @@ impl CaptureError {
             code: code.into(),
             message: message.into(),
             recovery_required: true,
+            artifact: None,
+        }
+    }
+
+    pub fn recovery_with_artifact(
+        code: impl Into<String>,
+        message: impl Into<String>,
+        artifact: CaptureArtifactState,
+    ) -> Self {
+        Self {
+            code: code.into(),
+            message: message.into(),
+            recovery_required: true,
+            artifact: Some(artifact),
         }
     }
 }
@@ -372,6 +422,11 @@ mod tests {
             cgroup_paths: vec!["/sys/fs/cgroup/taomni/sockscap-1".into()],
             driver_service: None,
             extension_bundle_id: None,
+            process_restores: vec![CaptureProcessRestore {
+                pid: 42,
+                process_start_time: 1234,
+                original_group: "/user.slice/example.scope".into(),
+            }],
         };
         assert!(artifact.validate().is_ok());
     }

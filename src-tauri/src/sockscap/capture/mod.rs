@@ -8,5 +8,11 @@
 
 mod adapter;
 pub mod helper_protocol;
+#[cfg(target_os = "linux")]
+pub mod linux;
+#[cfg(target_os = "linux")]
+pub mod linux_process;
+#[cfg(target_os = "linux")]
+pub mod linux_system;
 
 pub use adapter::*;

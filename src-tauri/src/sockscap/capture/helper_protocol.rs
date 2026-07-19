@@ -141,6 +141,7 @@ pub enum HelperResponse {
         code: String,
         message: String,
         recovery_required: bool,
+        artifact: Option<CaptureArtifactState>,
     },
 }
 
