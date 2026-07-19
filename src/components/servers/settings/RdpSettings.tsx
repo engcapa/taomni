@@ -1,5 +1,6 @@
 import { useT } from "../../../lib/i18n";
 import type { ServerConfig } from "../../../lib/servers";
+import { getAppPlatform } from "../../../lib/runtime";
 import { CheckboxField, FieldNote, PasswordField, SelectField, TextField } from "../fields";
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
 /**
  * RDP server form: NLA credentials, security mode, and view-only toggle. The
  * server shares this machine's desktop with RDP clients (mstsc / FreeRDP).
+ * Platform capability note reflects capture backend status (R0 honesty).
  */
 export function RdpSettings({ config, onChange }: Props) {
   const t = useT();
@@ -19,9 +21,19 @@ export function RdpSettings({ config, onChange }: Props) {
   const securityMode =
     typeof config.securityMode === "string" ? config.securityMode : "hybrid";
   const viewOnly = config.viewOnly === true;
+  const platform = getAppPlatform();
+  const capabilityNote =
+    platform === "macos"
+      ? t("servers.notes.rdpCapMacos")
+      : platform === "linux"
+        ? t("servers.notes.rdpCapLinux")
+        : platform === "windows"
+          ? t("servers.notes.rdpCapWindows")
+          : t("servers.notes.rdpCapUnknown");
 
   return (
     <div className="flex flex-col">
+      <FieldNote tone={platform === "windows" ? "warning" : "info"}>{capabilityNote}</FieldNote>
       <TextField
         label={t("servers.fields.rdpUsername")}
         value={username}

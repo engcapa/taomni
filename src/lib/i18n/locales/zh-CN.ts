@@ -1374,6 +1374,14 @@ export const zhCN: DeepPartial<typeof en> = {
       rdpSelfSigned: "使用存储在应用数据中的自签名证书；客户端首次连接时会看到信任警告。",
       rdpInsecure:
         "无安全模式意味着流量不加密；若未设置凭据，任何能访问该端口的人都可完全控制本机桌面。请仅在隔离网络中使用。",
+      rdpCapLinux:
+        "桌面采集：Linux X11/XWayland 已完整支持。纯 Wayland 使用门户截屏（需在弹窗中授权）。键鼠注入通过 enigo。",
+      rdpCapMacos:
+        "桌面采集：macOS 使用系统捕获（xcap）。请在「系统设置 → 隐私与安全性 → 屏幕录制」中授权本应用；失败后可重启 Taomni 再试。",
+      rdpCapWindows:
+        "桌面采集：本构建尚未实现 Windows DXGI/WGC，客户端将看到占位棋盘格画面。真实桌面共享请用 Linux/macOS，或等待 Windows 后端。",
+      rdpCapUnknown:
+        "桌面采集能力取决于宿主系统；点击 Start 后请查看 Server output 中的 capture 探测结果。",
       sshPortForward:
         "已启用端口转发：客户端可使用 -L（本地）、-R（远程）与 -D（动态 SOCKS）。远程转发若监听非本机回环地址，会在日志中给出警告。",
       sshAuthHint:

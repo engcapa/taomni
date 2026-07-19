@@ -1,10 +1,11 @@
 //! Platform screen-capture abstraction for the RDP server display side.
 //!
 //! A [`Capturer`] yields full-frame BGRA images. Backends are `#[cfg]`-gated per
-//! platform (the dev plan's §2.5 blueprint, following RustDesk's native-API
-//! choices): X11 uses MIT-SHM via `x11rb`; Windows/macOS/Wayland are structural
-//! placeholders for now (DXGI / CGDisplayStream / PipeWire), to be filled in as
-//! each platform's native backend lands.
+//! platform:
+//! - **Linux X11**: MIT-SHM + XDamage via `x11rb` (`x11.rs`)
+//! - **Linux Wayland**: `xcap` portal fallback when X11 is unreachable (`wayland.rs`)
+//! - **macOS**: `xcap` / CGDisplay path (`mac.rs` + `xcap_backend.rs`)
+//! - **Windows**: still a placeholder (DXGI/WGC not in this branch)
 //!
 //! A captured [`Frame`] is BGRA8888 (`PixelFormat::BgrA32`), top-down, tightly
 //! packed at `stride` bytes per row — exactly what `BitmapUpdate` wants, so the
@@ -12,10 +13,16 @@
 
 use crate::servers::engine::LogEmitter;
 
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+pub(crate) mod xcap_backend;
+
 #[cfg(target_os = "linux")]
 pub(crate) mod wayland;
 #[cfg(target_os = "linux")]
 pub(crate) mod x11;
+
+#[cfg(target_os = "macos")]
+pub(crate) mod mac;
 
 /// One captured frame or sub-region: BGRA8888, `stride` bytes per row,
 /// `height` rows. `x`/`y` are the top-left origin of this region within the
@@ -69,6 +76,37 @@ pub(crate) trait Capturer {
     }
 }
 
+/// Human-readable capture capability for this OS / session (used by start logs
+/// and the settings UI probe). Does not create a long-lived capturer.
+pub(crate) fn capture_capability_summary() -> String {
+    #[cfg(target_os = "linux")]
+    {
+        if std::env::var_os("DISPLAY").is_some() {
+            return "Linux: X11/XWayland capture available when DISPLAY is set; \
+                    pure Wayland falls back to xcap portal"
+                .into();
+        }
+        if wayland::is_wayland_session() {
+            return "Linux Wayland: capture via xcap/portal (user must accept ScreenCast prompt)"
+                .into();
+        }
+        return "Linux: no DISPLAY and not a Wayland session — capture unavailable".into();
+    }
+    #[cfg(target_os = "macos")]
+    {
+        return "macOS: xcap capture (requires Screen Recording permission)".into();
+    }
+    #[cfg(target_os = "windows")]
+    {
+        return "Windows: DXGI/WGC capture not implemented in this build — placeholder frames only"
+            .into();
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+    {
+        "unsupported platform".into()
+    }
+}
+
 /// Build the best available capturer for this platform, or `Err` with a clear
 /// reason. MUST be called on the thread that will own/drive the capturer, since
 /// backends are not `Send`.
@@ -79,19 +117,15 @@ pub(crate) fn create_capturer(log: &LogEmitter) -> anyhow::Result<Box<dyn Captur
         // on a real Xorg session it captures the desktop directly, and on a
         // Wayland session with XWayland it still captures (XWayland exposes the
         // root window). Only when X11 is genuinely unreachable do we fall back to
-        // the Wayland portal path. (Routing on `is_wayland_session()` first was
-        // wrong: it skipped a perfectly working X11/`DISPLAY=:0` and dropped
-        // straight to the unimplemented Wayland message → synthetic placeholder.)
+        // the Wayland/xcap portal path.
         match x11::X11Capturer::new(log) {
             Ok(cap) => return Ok(Box::new(cap)),
             Err(x11_err) => {
                 if wayland::is_wayland_session() {
-                    // No usable X11 but we are on Wayland — report the Wayland
-                    // capture status (currently: not built in).
-                    match wayland::try_new(log) {
-                        Ok(never) => match never {},
-                        Err(e) => return Err(e),
-                    }
+                    log.line(format!(
+                        "X11 capturer unavailable ({x11_err}); trying Wayland/xcap portal fallback"
+                    ));
+                    return wayland::try_new(log);
                 }
                 return Err(x11_err);
             }
@@ -101,23 +135,15 @@ pub(crate) fn create_capturer(log: &LogEmitter) -> anyhow::Result<Box<dyn Captur
     #[cfg(target_os = "windows")]
     {
         let _ = log;
-        // Phase 1 target backend: Windows Graphics Capture / DXGI Desktop
-        // Duplication (see dev plan §2.5). Not yet implemented; the display
-        // layer falls back to a synthetic frame source and logs this.
         anyhow::bail!(
             "Windows screen capture (DXGI/WGC) is not implemented yet — RDP server will \
-             serve a placeholder frame. Implement servers/rdp/capture/win.rs to enable it."
+             serve a placeholder frame. Desktop sharing on Windows is deferred in this branch."
         )
     }
 
     #[cfg(target_os = "macos")]
     {
-        let _ = log;
-        // Phase 1 target backend: CGDisplayStream / ScreenCaptureKit (dev plan §2.5).
-        anyhow::bail!(
-            "macOS screen capture (CGDisplayStream) is not implemented yet — RDP server will \
-             serve a placeholder frame. Implement servers/rdp/capture/mac.rs to enable it."
-        )
+        mac::try_new(log)
     }
 
     #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]

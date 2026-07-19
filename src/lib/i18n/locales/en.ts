@@ -1378,6 +1378,14 @@ const dict = {
         "Uses a self-signed certificate stored in app data; clients will see a trust warning on first connect.",
       rdpInsecure:
         "No security means traffic is unencrypted and, without credentials, anyone who can reach the port gets full control. Use only on an isolated network.",
+      rdpCapLinux:
+        "Desktop capture: Linux X11/XWayland is fully supported. On pure Wayland, capture uses the portal (accept the ScreenCast prompt). Input works via enigo.",
+      rdpCapMacos:
+        "Desktop capture: macOS uses system capture (xcap). Grant Screen Recording permission under System Settings → Privacy & Security, then restart Taomni if capture fails.",
+      rdpCapWindows:
+        "Desktop capture: Windows DXGI/WGC is not implemented in this build — clients see a placeholder checkerboard. Use Linux/macOS for real desktop sharing, or wait for the Windows backend.",
+      rdpCapUnknown:
+        "Desktop capture support depends on the host OS; check Server output after Start for the capture probe result.",
       sshPortForward:
         "Port forwarding is enabled: clients may use -L (local), -R (remote), and -D (dynamic SOCKS). Remote (-R) listeners bound off-loopback are logged as a warning.",
       sshAuthHint:
