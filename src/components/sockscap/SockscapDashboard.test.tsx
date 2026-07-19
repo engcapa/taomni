@@ -19,7 +19,10 @@ vi.mock("../../stores/sockscapStore", () => ({
   }),
 }));
 
-import { SockscapDashboard } from "./SockscapDashboard";
+import {
+  SOCKSCAP_DASHBOARD_POLL_INTERVAL_MS,
+  SockscapDashboard,
+} from "./SockscapDashboard";
 
 describe("SockscapDashboard", () => {
   afterEach(cleanup);
@@ -112,6 +115,10 @@ describe("SockscapDashboard", () => {
       dashboardActionPending: null,
       dashboardError: null,
     };
+  });
+
+  it("keeps active Dashboard IPC polling below two requests per second", () => {
+    expect(SOCKSCAP_DASHBOARD_POLL_INTERVAL_MS).toBeGreaterThanOrEqual(500);
   });
 
   it("renders bounded aggregates, health, alerts, and recent outcomes", async () => {

@@ -26,6 +26,12 @@ path = "src/bin/sockscap_helper.rs"
 test = false
 bench = false
 
+[[bin]]
+name = "sockscap-gate"
+path = "src/bin/sockscap_gate.rs"
+test = false
+bench = false
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 prost-build = "0.14"

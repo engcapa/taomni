@@ -5,6 +5,12 @@ on:
     paths:
       - "scripts/sockscap/**"
       - "src-tauri/platform/sockscap/**"
+      - "src-tauri/src/bin/sockscap_gate.rs"
+      - "src-tauri/src/sockscap/**"
+      - "src-tauri/Cargo.toml"
+      - "src-tauri/Cargo.lock"
+      - "src/components/sockscap/**"
+      - "src/stores/sockscapStore.ts"
       - "src-tauri/tauri.sockscap.macos.conf.json"
       - ".github/workflows/sockscap-platform-gates.yml"
   push:
@@ -13,6 +19,12 @@ on:
     paths:
       - "scripts/sockscap/**"
       - "src-tauri/platform/sockscap/**"
+      - "src-tauri/src/bin/sockscap_gate.rs"
+      - "src-tauri/src/sockscap/**"
+      - "src-tauri/Cargo.toml"
+      - "src-tauri/Cargo.lock"
+      - "src/components/sockscap/**"
+      - "src/stores/sockscapStore.ts"
       - "src-tauri/tauri.sockscap.macos.conf.json"
       - ".github/workflows/sockscap-platform-gates.yml"
   workflow_dispatch:
@@ -32,8 +44,53 @@ jobs:
           bash -n scripts/sockscap/verify-macos-release.sh
           jq -e . src-tauri/tauri.sockscap.macos.conf.json >/dev/null
           jq -e . src-tauri/platform/sockscap/windows/release-manifest.template.json >/dev/null
+          jq -e . src-tauri/platform/sockscap/performance-release-manifest.template.json >/dev/null
+          python3 -m py_compile scripts/sockscap/verify-performance-gate.py
+          python3 scripts/sockscap/test_verify_performance_gate.py
+          python3 scripts/sockscap/verify-performance-gate.py platform \
+            src-tauri/platform/sockscap/performance-release-manifest.template.json \
+            --lint
           bash scripts/sockscap/verify-macos-release.sh --lint \
             src-tauri/platform/sockscap/macos/release-manifest.template.json
+
+  core-performance:
+    name: Gate core performance and lifecycle (optimized Linux build)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libkrb5-dev
+      - name: Run optimized core gate
+        env:
+          SOCKSCAP_GATE_GIT_COMMIT: ${{ github.sha }}
+        run: |
+          cargo run --locked --manifest-path src-tauri/Cargo.toml --release \
+            --bin sockscap-gate -- quick \
+            --output "$RUNNER_TEMP/sockscap-core-quick.json"
+          python3 scripts/sockscap/verify-performance-gate.py core \
+            "$RUNNER_TEMP/sockscap-core-quick.json" \
+            --expected-commit "${{ github.sha }}"
+      - name: Upload core gate receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sockscap-core-quick-${{ github.sha }}
+          path: ${{ runner.temp }}/sockscap-core-quick.json
+          if-no-files-found: error
 
   windows-contract:
     name: Gate source contracts (Windows)

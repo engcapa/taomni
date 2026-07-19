@@ -32,6 +32,8 @@ import { useT } from "../../lib/i18n";
 import { useSockscapStore } from "../../stores/sockscapStore";
 import { useConfirmDialog } from "../sidebar/ConfirmDialog";
 
+export const SOCKSCAP_DASHBOARD_POLL_INTERVAL_MS = 5_000;
+
 export function SockscapDashboard() {
   const t = useT();
   const profiles = useSockscapStore((state) => state.profiles);
@@ -73,7 +75,7 @@ export function SockscapDashboard() {
 
   useEffect(() => {
     if (!captureActive) return undefined;
-    const timer = globalThis.setInterval(load, 5_000);
+    const timer = globalThis.setInterval(load, SOCKSCAP_DASHBOARD_POLL_INTERVAL_MS);
     return () => globalThis.clearInterval(timer);
   }, [captureActive, load]);
 

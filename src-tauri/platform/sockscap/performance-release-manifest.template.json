@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "releaseEvidence": false,
+  "platform": "unconfigured",
+  "architecture": "unconfigured",
+  "gitCommit": "",
+  "captureProvider": "unconfigured",
+  "host": {
+    "id": "",
+    "osVersion": "",
+    "hardware": ""
+  },
+  "startedAtUnix": 0,
+  "finishedAtUnix": 0,
+  "evidence": {
+    "artifactGate": {
+      "passed": false,
+      "path": "",
+      "sha256": ""
+    },
+    "nativeSmoke": {
+      "passed": false,
+      "path": "",
+      "sha256": ""
+    },
+    "coreQuick": {
+      "passed": false,
+      "path": "",
+      "sha256": ""
+    },
+    "coreSoak": {
+      "passed": false,
+      "path": "",
+      "sha256": ""
+    }
+  },
+  "captureMatrix": {
+    "globalIpv4Tcp": false,
+    "globalIpv6Tcp": false,
+    "applicationGroupIpv4Tcp": false,
+    "runtimePidIpv4Tcp": false,
+    "dnsCaptured": false,
+    "udpPolicyEnforced": false,
+    "hardBypassVerified": false
+  },
+  "performance": {
+    "tcpConnect": {
+      "sampleCount": 0,
+      "directMedianMicros": 0,
+      "capturedMedianMicros": 0,
+      "overheadMedianMicros": 0
+    },
+    "throughput": {
+      "sampleSeconds": 0,
+      "linkCapacityMbps": 0,
+      "directMbps": 0,
+      "capturedMbps": 0,
+      "capturedToDirectRatio": 0
+    }
+  },
+  "stability": {
+    "durationSeconds": 0,
+    "startStopCycles": 0,
+    "unexpectedAppExits": 0,
+    "unexpectedHelperExits": 0,
+    "rssGrowthBytes": 0,
+    "openHandleGrowth": 0,
+    "cleanupChecks": 0,
+    "residueFailures": 0,
+    "killMainRecovered": false,
+    "killHelperRecovered": false,
+    "restartRecovered": false,
+    "sleepWakePassed": false,
+    "nicSwitchPassed": false,
+    "vpnCoexistencePassed": false
+  },
+  "leakAudit": {
+    "dnsPassed": false,
+    "ipv4Passed": false,
+    "ipv6Passed": false,
+    "udpPassed": false
+  },
+  "rawEvidence": []
+}

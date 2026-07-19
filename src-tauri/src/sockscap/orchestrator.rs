@@ -3,9 +3,9 @@
 //! Configuration always comes from an immutable `sockscap.db` snapshot. The
 //! capture marker is intentionally not written until every preflight and
 //! upstream gate passes; because platform capture is not implemented in this
-//! phase, start discards its prepared snapshot and remains Disabled. A marker
-//! left by another process is never cleared without a platform/helper cleanup
-//! confirmation.
+//! command/runtime adapter wiring is still disabled, start discards its
+//! prepared snapshot and remains Disabled. A marker left by another process is
+//! never cleared without a platform/helper cleanup confirmation.
 
 use std::sync::{Arc, Mutex};
 
@@ -213,8 +213,9 @@ impl SockscapEngine {
             return Err(format!("SOCKSCAP_PREFLIGHT_FAILED: {message}"));
         }
 
-        // This phase has no capture adapter/helper. Do not create a recovery
-        // marker and do not publish the snapshot as committed/Active.
+        // Capture/helper source modules exist, but this product orchestrator is
+        // not yet attached to an installed platform adapter. Do not create a
+        // recovery marker or publish the snapshot as committed/Active.
         let discard = store.discard_prepared_config_snapshot(snapshot.revision);
         let message = match discard {
             Ok(()) => "CAPTURE_ADAPTER_NOT_READY: platform capture is not available in this build"
@@ -229,8 +230,8 @@ impl SockscapEngine {
 
     /// Restore after an operating-system login from the last snapshot that
     /// reached Active. Draft rows are deliberately never consulted here.
-    /// This build still has no capture adapter, so the method stops at the
-    /// capability gate without creating a recovery marker or system state.
+    /// No installed adapter is attached to this runtime yet, so the method
+    /// stops at the capability gate without creating a marker or system state.
     pub fn restore_last_committed(&self) -> Result<EngineStatus, String> {
         let store = self.store.as_ref().ok_or_else(|| {
             "SOCKSCAP_STORE_UNAVAILABLE: saved configuration store is not attached".to_string()

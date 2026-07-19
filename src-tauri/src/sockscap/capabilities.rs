@@ -1,9 +1,8 @@
-//! Platform capability probes for Sockscap Phase 0.
+//! Read-only platform capability probes for Sockscap.
 //!
-//! Design plan §2.1 / §8 / §13 Phase 0: probe first, fail fast, never pretend a
-//! mode works when the host cannot support it. These probes are intentionally
-//! read-only — they do not install drivers, load kernel modules, or mutate
-//! routing tables.
+//! Probe first, fail fast, and never pretend a mode works when its installed
+//! adapter is incomplete. These probes do not install drivers, launch the
+//! privileged helper, load extensions, or mutate host networking.
 
 use super::types::{CapabilitiesReport, CapabilityItem, CapturePlatform, SupportLevel};
 
@@ -22,34 +21,10 @@ pub fn probe_capabilities() -> CapabilitiesReport {
     items.push(probe_egress_connectors());
     items.push(probe_capture_plane_status());
 
-    let can_start_global = items
-        .iter()
-        .any(|i| i.id == "capture_plane" && matches!(i.level, SupportLevel::NotImplemented))
-        || items.iter().any(|i| {
-            i.id == "tun_device"
-                && matches!(i.level, SupportLevel::Supported | SupportLevel::Degraded)
-        });
-
-    // Phase 0: capture plane is scaffolded, not implemented. Global start is
-    // reported as false so the UI never claims the engine is ready to route.
-    let can_start_global = false && can_start_global;
-
-    let can_start_app_group = match platform {
-        CapturePlatform::Linux => {
-            items.iter().any(|i| {
-                i.id == "cgroup_v2"
-                    && matches!(i.level, SupportLevel::Supported | SupportLevel::Degraded)
-            }) && items.iter().any(|i| {
-                i.id == "nft_or_fwmark"
-                    && matches!(i.level, SupportLevel::Supported | SupportLevel::Degraded)
-            })
-        }
-        CapturePlatform::Windows | CapturePlatform::Macos => false,
-        CapturePlatform::Unknown => false,
-    };
-    // Until adapters exist, never advertise app-group start as ready.
-    let can_start_app_group = false && can_start_app_group;
-
+    // Source contracts and host prerequisites are not proof that a signed or
+    // privileged adapter is installed and wired into the product runtime.
+    let can_start_global = false;
+    let can_start_app_group = false;
     let can_attach_pid = false;
 
     let summary = build_summary(platform, &items);
@@ -86,7 +61,7 @@ fn build_summary(platform: CapturePlatform, items: &[CapabilityItem]) -> String 
 
     if !not_impl.is_empty() {
         format!(
-            "{platform_name}: Phase 0 capability probe complete. Capture plane not yet implemented ({}).",
+            "{platform_name}: host probe complete; release capture remains disabled until installed adapter gates pass ({}).",
             not_impl.join(", ")
         )
     } else if !unsupported.is_empty() {
@@ -95,7 +70,9 @@ fn build_summary(platform: CapturePlatform, items: &[CapabilityItem]) -> String 
             unsupported.join(", ")
         )
     } else {
-        format!("{platform_name}: host probes look healthy; waiting for capture adapter.")
+        format!(
+            "{platform_name}: host probes look healthy; installed capture adapter is not enabled."
+        )
     }
 }
 
@@ -296,7 +273,7 @@ fn probe_pid_attach() -> CapabilityItem {
                 id: "pid_attach".into(),
                 name: "Running PID attach".into(),
                 level: SupportLevel::Degraded,
-                detail: "cgroup v2 present; PID attach will move the process into a managed cgroup for new connections only.".into(),
+                detail: "cgroup v2 is present and the Linux transaction supports PID/start-token moves for new connections; product launcher/client wiring is still gated.".into(),
                 required_for_start: false,
             }
         } else {
@@ -427,33 +404,89 @@ fn probe_cgroup_v2_available() -> bool {
 }
 
 fn probe_helper_channel() -> CapabilityItem {
-    CapabilityItem {
-        id: "privileged_helper".into(),
-        name: "Privileged helper".into(),
-        level: SupportLevel::NotImplemented,
-        detail: "Helper binary, version handshake, caller signature check, and heartbeat are Phase 0/5-7 work.".into(),
-        required_for_start: true,
+    #[cfg(target_os = "linux")]
+    {
+        let installed_policy =
+            std::path::Path::new(super::capture::unix_transport::INSTALLED_HELPER_POLICY).is_file();
+        return CapabilityItem {
+            id: "privileged_helper".into(),
+            name: "Privileged helper".into(),
+            level: if installed_policy {
+                SupportLevel::Degraded
+            } else {
+                SupportLevel::NotImplemented
+            },
+            detail: if installed_policy {
+                "Authenticated Linux helper policy is present, but the product launcher/client and userspace TUN pump are not wired; start remains blocked."
+                    .into()
+            } else {
+                "Root-only Linux helper, SO_PEERCRED/SHA-256 authentication, HMAC protocol, heartbeat, and recovery transactions are compiled; the root-owned release policy, launcher/client, and TUN pump are not installed/wired."
+                    .into()
+            },
+            required_for_start: true,
+        };
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        return CapabilityItem {
+            id: "privileged_helper".into(),
+            name: "Signed helper / driver".into(),
+            level: SupportLevel::NotImplemented,
+            detail: "No release-signed Windows helper/provider package is installed; the signed-artifact manifest gate remains disabled."
+                .into(),
+            required_for_start: true,
+        };
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        return CapabilityItem {
+            id: "privileged_helper".into(),
+            name: "Network Extension provider".into(),
+            level: SupportLevel::NotImplemented,
+            detail: "No entitled, Developer-ID-signed, notarized Network Extension is installed; release verification remains disabled."
+                .into(),
+            required_for_start: true,
+        };
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+    {
+        CapabilityItem {
+            id: "privileged_helper".into(),
+            name: "Privileged helper".into(),
+            level: SupportLevel::Unsupported,
+            detail: "Unsupported platform.".into(),
+            required_for_start: true,
+        }
     }
 }
 
 fn probe_egress_connectors() -> CapabilityItem {
-    // Egress connectors themselves are pure userspace and do not need capture.
-    // Phase 2 implements them; Phase 0 only asserts the dependency surface.
     CapabilityItem {
         id: "egress_connectors".into(),
         name: "Egress connectors".into(),
-        level: SupportLevel::Degraded,
-        detail: "DIRECT/SOCKS5/HTTP CONNECT/SSH Jump planned; implementation starts in Phase 2. Existing proxy:: + tunnel:: code is reusable.".into(),
+        level: SupportLevel::Supported,
+        detail: "DIRECT, SOCKS5 TCP, HTTP CONNECT, and pooled SSH direct-tcpip connectors are compiled; the full real-server compatibility matrix remains a release gate.".into(),
         required_for_start: false,
     }
 }
 
 fn probe_capture_plane_status() -> CapabilityItem {
+    #[cfg(target_os = "linux")]
+    let detail = "Linux cgroup v2+nft+fwmark/TUN planning, execution, receipt cleanup, and authenticated root helper are compiled, but no installed client adapter/TUN pump is attached to the product orchestrator.";
+    #[cfg(target_os = "windows")]
+    let detail = "Windows source/signature gates exist, but Wintun plus WinDivert/WFP adapter selection and signed provider integration are not implemented.";
+    #[cfg(target_os = "macos")]
+    let detail = "macOS entitlement/signing gates exist, but the Swift NETransparentProxyProvider target and Rust bridge are not implemented or enrolled.";
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+    let detail = "No capture implementation is available for this platform.";
     CapabilityItem {
         id: "capture_plane".into(),
         name: "Capture plane".into(),
         level: SupportLevel::NotImplemented,
-        detail: "Single system capture plane not installed in this build. Phase 0 gate must complete before Active.".into(),
+        detail: detail.into(),
         required_for_start: true,
     }
 }
@@ -471,7 +504,7 @@ mod tests {
         let report = probe_capabilities();
         assert!(!report.items.is_empty());
         assert!(!report.capture_implemented);
-        // Phase 0 must never claim capture is ready.
+        // Source scaffolding must never be mistaken for an installed adapter.
         assert!(!report.can_start_global);
         assert!(!report.can_start_app_group);
         assert!(!report.can_attach_pid);
