@@ -31,7 +31,7 @@
           <h1>目标架构与平台数据路径</h1>
           <p>一个系统捕获面、多个有序配置组、统一 PolicyEngine，以及可插拔的 Direct / SOCKS5 / HTTP CONNECT / SSH Jump 出站连接器。</p>
         </div>
-        <span class="prototype-badge">Architecture · Revision 3</span>
+        <span class="prototype-badge">Architecture · Revision 5</span>
       </section>
 
       <aside class="callout success">
@@ -58,7 +58,7 @@
           <div class="arch-node core"><strong>SockscapOrchestrator</strong><span>事务状态机 · capability/preflight · immutable snapshot</span></div>
           <div class="arch-node core"><strong>Profile & Rule Repository</strong><span>冲突校验 · last-good · GFWList matcher</span></div>
           <div class="arch-node core"><strong>DomainAttribution + PolicyEngine</strong><span>应用/PID → 域名/IP → DIRECT / PROXY / BLOCK</span></div>
-          <div class="arch-node core"><strong>FlowEngine</strong><span>TCP/UDP policy · timeout · cancellation · lifecycle events</span></div>
+          <div class="arch-node core"><strong>FlowRuntime + FlowEngine</strong><span>受控 IP-stack adapter · TCP/UDP policy · timeout · cancellation · lifecycle events</span></div>
           <div class="arch-node core"><strong>StatsAggregator</strong><span>内存热计数 · 分钟批次 · 隐私开关</span></div>
           <div class="arch-node warning"><strong>Privileged helper protocol</strong><span>版本握手 · 心跳 · recovery journal · 无 secret</span></div>
         </article>
@@ -86,8 +86,8 @@
         </header>
         <div class="card-body">
           <div class="arch-node warning" data-platform-detail>
-            <strong>Windows 捕获候选</strong>
-            <span>Global：Wintun/TUN。程序/PID：Phase 0 对照 WinDivert SOCKET/FLOW/NETWORK 动态过滤与 WFP ALE redirect，经过许可证、签名、EDR/VPN 和回注正确性 ADR 后定案。</span>
+            <strong>Windows 捕获已冻结</strong>
+            <span>Global：Wintun/TUN。程序/PID：WinDivert SOCKET/FLOW/NETWORK 动态过滤。只分发未修改、hash-pinned 的官方签名驱动；身份 race、许可证、EDR/VPN 和回注正确性是硬 Gate。当前无第一方 WFP fallback。</span>
           </div>
           <div class="three-column" style="margin-top: 13px">
             <div class="summary-cell"><span>输入</span><strong>原始目标、协议、PID、应用身份</strong></div>
@@ -123,8 +123,8 @@
               <thead><tr><th>参考点</th><th>Taomni 处理</th></tr></thead>
               <tbody>
                 <tr><td>RoutePlan + preflight</td><td>采用；启动数据面前发现缺权限/驱动/provider</td></tr>
-                <tr><td>PacketDevice</td><td>采用边界；平台 packet 进入同一 userspace stack</td></tr>
-                <tr><td>WinDivert 动态 flow filter</td><td>Phase 0 spike；与 WFP ALE 比较后 ADR</td></tr>
+                <tr><td>PacketDevice</td><td>采用边界；平台 packet 进入 Taomni FlowRuntime 的受控 IP-stack adapter</td></tr>
+                <tr><td>WinDivert 动态 flow filter</td><td>已选定；重写产品适配器并关闭 PID/start-token race、回注与双捕获 Gate</td></tr>
                 <tr><td>Linux cgroup/nft/fwmark + netns</td><td>首选基线；补 crash recovery helper</td></tr>
                 <tr><td>macOS provider JSON-lines</td><td>采用思路；补认证、心跳与事务版本</td></tr>
               </tbody>
@@ -138,7 +138,7 @@
             <div class="action-row"><strong>selected + route 的后置过滤</strong><span class="muted tiny">能力不足时必须可解释降级，不声称只捕获选中程序。</span></div>
             <div class="action-row"><strong>MITM inspection</strong><span class="muted tiny">Sockscap 不安装根证书、不解密 HTTPS、不保存 body。</span></div>
             <div class="action-row"><strong>仅依赖正常退出 cleanup</strong><span class="muted tiny">补 helper heartbeat、recovery journal、下次启动修复。</span></div>
-            <div class="action-row"><strong>未经审核的 WinDivert 打包</strong><span class="muted tiny">LGPLv3/GPLv2、签名驱动和本地 patch 必须先过 Gate。</span></div>
+            <div class="action-row"><strong>未经审核的 WinDivert 打包</strong><span class="muted tiny">LGPLv3/GPLv2 或商业许可必须过 Gate；不包含自编译、patched 或 test-signed driver。</span></div>
           </div>
         </article>
       </section>
@@ -161,7 +161,7 @@
         </div>
       </section>
 
-      <p class="footer-note">该页面是 HTML 结构原型。实际实现仍需 ADR 冻结 Windows 捕获技术和第三方许可证。</p>
+      <p class="footer-note">该页面是 HTML 结构原型。Windows 捕获 ADR 已冻结；实际发布仍需官方驱动 artifact/许可、身份 race、性能、EDR/VPN 与恢复 Gate。</p>
     </main>
 
     <div class="toast" role="status" aria-live="polite" data-toast></div>

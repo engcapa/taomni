@@ -101,8 +101,8 @@
   const architectureDetail = document.querySelector("[data-platform-detail]");
   const platformDetails = {
     windows: {
-      title: "Windows 捕获候选",
-      body: "Global：Wintun/TUN。程序/PID：Phase 0 对照 WinDivert SOCKET/FLOW/NETWORK 动态过滤与 WFP ALE redirect，经过许可证、签名、EDR/VPN 和回注正确性 ADR 后定案。",
+      title: "Windows 捕获已冻结",
+      body: "Global：Wintun/TUN。程序/PID：WinDivert SOCKET/FLOW/NETWORK 动态过滤。只分发未修改、hash-pinned 的官方签名驱动；身份 race、许可证、EDR/VPN 和回注正确性是硬 Gate。当前无第一方 WFP fallback。",
     },
     macos: {
       title: "macOS 捕获候选",

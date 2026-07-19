@@ -74,12 +74,12 @@ traffic capture.
 
 | Phase | Status | Evidence present | Missing exit evidence |
 |---|---|---|---|
-| Phase 0 — capability/license gate | BLOCKED | Fail-fast capability probes; accepted ADR; source release gates; Linux helper/transaction spike; recovery model. | Three real platform vertical slices; final Windows provider choice; actual certificates/entitlements; repeatable three-egress servers; real stop/kill recovery; DNS/IPv6 leak and VPN/sleep/NIC matrices. |
+| Phase 0 — capability/license gate | BLOCKED | Fail-fast capability probes; accepted ADR with frozen Taomni FlowRuntime/IP-stack adapter and Wintun + WinDivert choices; source release gates; Linux helper/transaction spike; recovery model. | Exact lower-stack and official driver artifact pins/SBOM; three real platform vertical slices; actual certificates/entitlements; repeatable three-egress servers; real stop/kill recovery; DNS/IPv6 leak and VPN/sleep/NIC matrices. |
 | Phase 1 — policy/rule core | PASS for software scope | Profile model, overlap rejection, GFWList projection, exceptions, immutable matcher snapshots, target explanations, and last-good behavior. | Live mirror availability remains an operational gate. |
 | Phase 2 — FlowEngine/egress core | PARTIAL | DIRECT, SOCKS5 TCP, HTTP CONNECT, shared SSH `direct-tcpip`, hard loop-bypass modeling, cancellation/stats boundaries, and strict host-key confirmation. | Repeatable real SOCKS/HTTP/SSH matrix covering auth, DNS, IPv4/IPv6, reconnect, MFA, concurrency, cancellation, and stable SOCKS5 UDP ASSOCIATE. |
 | Phase 3 — persistence/IPC/Stub | PASS for software scope | SQLite/WAL store, recovery journal, bounded statistics/live outcomes, IPC contract fixture, browser Stub, helper heartbeat, authenticated receipts, and cleanup recovery state. | Installed product helper client and real host-artifact recovery can only close in a privileged platform lab. |
 | Phase 4 — independent UI | PARTIAL | Independent route/window shell, complete UI, 67 focused tests, cataloged YAML coverage, and a real Linux WebDriver hide/reopen smoke. | Native tray click/exit smoke on all platforms, accessibility/keyboard review, and permission/recovery system smoke. |
-| Phase 5 — Windows vertical | BLOCKED | Fail-closed manifest and signature verifier; provider contract allows only WFP or WinDivert. | Final provider decision; real Wintun/global and app/PID adapters; signed/timestamped helper, catalog/INF or release-signed driver; install/update/uninstall; EDR/VPN and recovery labs. |
+| Phase 5 — Windows vertical | BLOCKED | Provider is frozen to Wintun/global plus WinDivert app/PID; fail-closed manifest and signature verifier exist. First-party WFP is out of current scope because no releasable EV/Hardware Developer Program path is available. | Pin and approve the unmodified official signed Wintun/WinDivert variants, signer and SHA-256; complete license/NOTICE review; implement real adapters and signed/timestamped helper/service; install/update/uninstall, identity-race, EDR/VPN and recovery labs. |
 | Phase 6 — macOS vertical | BLOCKED | Release-only Tauri overlay, provider plist/entitlement contract, and signed-app/provider/notarization verifier. | Apple-approved Network Extension capability; real Swift Network Extension/system-extension target and Rust bridge; Developer ID provisioning/signing/notarization; permission, upgrade, uninstall, Intel, and Apple Silicon labs. |
 | Phase 7 — Linux vertical | PARTIAL | Real cgroup-v2/nft/fwmark/TUN transaction source; root-only helper; peer credential and executable SHA pinning; HMAC bootstrap; two-phase activate; root-owned receipts; rollback/recovery tests. | Product-side installed launcher/client and TUN packet pump; polkit/package policy; real root smoke with captured TCP/DNS/IPv4/IPv6; managed-netns fallback; distro/kernel/systemd/resolved/NetworkManager matrix. |
 | Phase 8 — tray/reliability/release | PARTIAL | Native Linux window smoke; guarded exit; recovery UI; fixed performance thresholds; 100 synthetic lifecycle cycles; fail-closed quick/24h/platform receipt verifier. | Actual adapter 100-cycle cleanup; native tray/system recovery; 24h core and real-capture soak; throughput/latency/leak gates; signed packages and install/update/uninstall matrices; clean global QA gate. |
@@ -103,13 +103,18 @@ traffic capture.
 
 ### Windows Beta
 
-- Amend the ADR with the WinDivert versus WFP ALE choice and approved licenses.
-- Implement Wintun/global plus application/PID capture with hard self/upstream
+- Implement the frozen Wintun/global plus WinDivert application/PID capture
+  with hard self/upstream
   bypass and reinjection-loop protection.
-- Produce timestamped release-signed Taomni/helper/provider/driver artifacts;
+- Pin the exact unmodified official signed Wintun/WinDivert artifacts, signer
+  and SHA-256; complete LGPL/GPL LICENSE/NOTICE or approved commercial-license
+  review. Do not rebuild, patch or test-sign the drivers.
+- Produce timestamped release-signed Taomni/helper/service artifacts and
   satisfy the committed same-host signature gate.
 - Verify IPv4, IPv6, DNS, TCP, cleanup, EDR/VPN/NIC/sleep compatibility, install,
   upgrade, rollback, reboot, and uninstall.
+- If a WinDivert hard gate fails, keep Windows app/PID capabilities disabled;
+  there is no first-party WFP fallback in the current release plan.
 
 ### Linux release
 

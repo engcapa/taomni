@@ -157,7 +157,7 @@
           <table class="data-table">
             <thead><tr><th>平台</th><th>全局</th><th>程序组</th><th>运行 PID</th><th>首选参考路径</th><th>发布 Gate</th></tr></thead>
             <tbody>
-              <tr><td>Windows</td><td>Yes</td><td>目标 Yes</td><td>目标 Yes · 新连接</td><td>Wintun + WinDivert / WFP ADR</td><td>驱动许可、签名、EDR/VPN、恢复</td></tr>
+              <tr><td>Windows</td><td>Yes</td><td>目标 Yes</td><td>目标 Yes · 新连接</td><td>Wintun global + WinDivert app/PID</td><td>官方驱动 hash/许可、PID race、签名、EDR/VPN、恢复；无 WFP fallback</td></tr>
               <tr><td>macOS</td><td>Yes</td><td>目标 Yes</td><td>目标 Yes · 新连接</td><td>NETransparentProxyProvider</td><td>Entitlement、签名、公证、provider 协议</td></tr>
               <tr><td>Linux</td><td>Yes</td><td>条件 Yes</td><td>条件 Yes · 新连接</td><td>cgroup v2/nft/fwmark；netns fallback</td><td>发行版、权限、cleanup/recovery</td></tr>
             </tbody>
