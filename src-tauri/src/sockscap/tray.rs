@@ -253,24 +253,35 @@ fn spawn_engine<R: Runtime>(app: &AppHandle<R>, action: EngineAction) {
 /// engine keeps running (plan §9, §16.6-21).
 pub fn open_window<R: Runtime>(app: &AppHandle<R>) {
     if let Some(win) = app.get_webview_window("sockscap") {
-        let _ = win.show();
-        let _ = win.set_focus();
-        return;
+        // Existing webview may have been created before route/ACL fixes and can
+        // be stuck blank. Destroy and recreate so Tools → Sockscap always gets a
+        // healthy window instead of re-showing a white undead instance.
+        if win.destroy().is_err() {
+            // Fall back to show/focus if destroy is denied mid-flight.
+            let _ = win.show();
+            let _ = win.set_focus();
+            return;
+        }
     }
     // Match filebrowser/SFTP: PathBuf + hash fragment (not query string).
     // Close-to-hide is enforced in the Sockscap webview (onCloseRequested →
-    // hide) so the engine keeps running when the user clicks X (plan §9).
+    // hide via Rust command) so the engine keeps running when the user clicks X.
+    // decorations(true): main window is frameless; this tool window keeps OS chrome.
     let url = WebviewUrl::App(std::path::PathBuf::from("index.html#sockscap"));
     let builder = WebviewWindowBuilder::new(app, "sockscap", url)
         .title("Sockscap")
         .inner_size(1100.0, 760.0)
         .min_inner_size(720.0, 480.0)
         .resizable(true)
+        .decorations(true)
+        .visible(true)
+        .focused(true)
         .enable_clipboard_access();
     #[cfg(windows)]
     let builder = builder.disable_drag_drop_handler();
     if let Err(e) = builder.build() {
         log::error!("sockscap: failed to open window: {e}");
+        eprintln!("sockscap: failed to open window: {e}");
     }
 }
 

@@ -661,6 +661,16 @@ pub fn sockscap_hide_window(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Destroy the Sockscap window entirely. Used as a fail-safe when hide is
+/// unavailable so the user is never stuck with an undead webview.
+#[tauri::command]
+pub fn sockscap_destroy_window(app: AppHandle) -> Result<(), String> {
+    if let Some(win) = app.get_webview_window("sockscap") {
+        win.destroy().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 /// Result of a lightweight egress preflight (plan §12 `sockscap_test_egress`).
 /// Does not open a full SSH channel or send credentials over the wire beyond a
 /// TCP connect to the session host:port — secrets stay in Vault.

@@ -2928,6 +2928,8 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       ] as unknown) as T;
     case "sockscap_hide_window":
       return undefined as T;
+    case "sockscap_destroy_window":
+      return undefined as T;
     case "sockscap_test_egress":
       return ({
         ok: true,

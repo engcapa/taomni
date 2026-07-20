@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSockscapStore } from "../../stores/sockscapStore";
 import type { EngineStateName } from "../../lib/sockscap";
 import { isTauriRuntime } from "../../lib/runtime";
+import { hideSockscapWindow } from "../../lib/sockscapRoute";
 import { SockscapDashboard } from "./SockscapDashboard";
 import { SockscapProfiles } from "./SockscapProfiles";
 import { SockscapRules } from "./SockscapRules";
@@ -47,8 +48,9 @@ export function SockscapWindow() {
   }, [refreshAll]);
 
   // Plan §9 / §16.6-21: closing the Sockscap window only hides it; the engine
-  // keeps running until Stop or tray Quit. Without this, X would destroy the
-  // webview and lose UI state while capture might still be active.
+  // keeps running until Stop or tray Quit. Hide goes through a Rust command so
+  // it does not depend on webview ACL for window.hide() (missing allow-hide
+  // previously left the window stuck after preventDefault).
   useEffect(() => {
     if (!isTauriRuntime()) return;
     let disposed = false;
@@ -57,9 +59,9 @@ export function SockscapWindow() {
       try {
         const { getCurrentWindow } = await import("@tauri-apps/api/window");
         const win = getCurrentWindow();
-        const fn = await win.onCloseRequested(async (event) => {
+        const fn = await win.onCloseRequested((event) => {
           event.preventDefault();
-          await win.hide();
+          void hideSockscapWindow();
         });
         if (disposed) fn();
         else unlisten = fn;
@@ -77,22 +79,25 @@ export function SockscapWindow() {
   const active = stateName === "active" || stateName === "degraded";
 
   return (
-    <div className="flex h-screen flex-col bg-neutral-950 text-neutral-100">
+    <div
+      className="flex h-screen flex-col bg-neutral-950 text-neutral-100"
+      data-testid="sockscap-window"
+    >
       <header
         className="flex items-center gap-4 border-b border-neutral-800 px-5 py-3"
         data-testid="sockscap-header"
       >
-        <div className="flex items-center gap-2">
-          <span className={`h-2.5 w-2.5 rounded-full ${STATE_DOT[stateName]}`} />
+        <div className="flex min-w-0 items-center gap-2">
+          <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${STATE_DOT[stateName]}`} />
           <span className="font-semibold">Sockscap</span>
           <span className="text-sm text-neutral-400" data-testid="sockscap-state">
             {STATE_LABEL[stateName]}
           </span>
           {status?.detail ? (
-            <span className="text-xs text-neutral-500">— {status.detail}</span>
+            <span className="truncate text-xs text-neutral-500">— {status.detail}</span>
           ) : null}
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           {!active ? (
             <button
               disabled={busy}
@@ -120,6 +125,15 @@ export function SockscapWindow() {
             data-testid="sockscap-recover"
           >
             Restore network
+          </button>
+          <button
+            type="button"
+            onClick={() => void hideSockscapWindow()}
+            className="rounded border border-neutral-600 px-3 py-1.5 text-sm text-neutral-200 hover:bg-neutral-800"
+            title="Hide window (engine keeps running)"
+            data-testid="sockscap-hide"
+          >
+            Hide
           </button>
         </div>
       </header>

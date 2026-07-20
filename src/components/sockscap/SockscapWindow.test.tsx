@@ -17,6 +17,17 @@ vi.mock("../../lib/sockscap", () => ({
   sockscap: ipc,
 }));
 
+vi.mock("../../lib/runtime", () => ({
+  isTauriRuntime: () => false,
+}));
+
+vi.mock("../../lib/sockscapRoute", () => ({
+  hideSockscapWindow: vi.fn(async () => undefined),
+  detectSockscapRoute: () => true,
+  openSockscapWindow: vi.fn(async () => undefined),
+  sockscapWindowUrl: () => "http://localhost/?sockscap=1",
+}));
+
 import { SockscapWindow } from "./SockscapWindow";
 import { useSockscapStore } from "../../stores/sockscapStore";
 

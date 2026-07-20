@@ -834,6 +834,7 @@ pub fn run() {
             sockscap::commands::sockscap_live_stats,
             sockscap::commands::sockscap_clear_stats,
             sockscap::commands::sockscap_hide_window,
+            sockscap::commands::sockscap_destroy_window,
             sockscap::commands::sockscap_test_egress,
             sockscap::commands::sockscap_list_processes,
             sockscap::commands::sockscap_list_egress_sessions,
