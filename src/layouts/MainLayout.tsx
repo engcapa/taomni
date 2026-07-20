@@ -525,10 +525,10 @@ function sessionToMailTabInfo(
 
 /**
  * Build a {@link DbConnectInfo} from a saved DB session. Engine-specific
- * options (ClickHouse HTTP port / protocol, Presto catalog, Redis DB index,
- * SSL, timeout, default database) live in `options_json` under the `db*` keys the session
- * editor writes. `password` is the resolved credential (plaintext or a
- * `vault:` reference) the connect path already worked out.
+ * options (ClickHouse HTTP port / protocol, Presto catalog / dialect, Redis
+ * DB index, SSL, timeout, default database) live in `options_json` under the
+ * `db*` keys the session editor writes. `password` is the resolved credential
+ * (plaintext or a `vault:` reference) the connect path already worked out.
  */
 function sessionToDbConnectInfo(session: SessionConfig, password?: string): DbConnectInfo {
   const opts = parseSessionOptions(session.options_json);
@@ -545,6 +545,7 @@ function sessionToDbConnectInfo(session: SessionConfig, password?: string): DbCo
   // loopback forwarder entirely.
   const ns = getSessionNetworkSettings(session.options_json);
   const networkSettings = ns.proxyKind !== "none" ? toNetworkSettingsPayload(ns) : null;
+  const prestoDialectRaw = str("dbPrestoDialect", "presto").toLowerCase();
   return {
     sessionId: session.id,
     workspaceSessionId: session.id,
@@ -559,6 +560,10 @@ function sessionToDbConnectInfo(session: SessionConfig, password?: string): DbCo
     timeoutSecs: num("dbTimeout"),
     httpPort: engine === "ClickHouse" ? (num("dbHttpPort") ?? 8123) : null,
     protocol: engine === "ClickHouse" ? str("dbChProtocol", "HTTP").toLowerCase() : null,
+    prestoDialect:
+      engine === "Presto"
+        ? (prestoDialectRaw === "trino" ? "trino" : "presto")
+        : null,
     dbIndex: engine === "Redis" ? (num("dbRedisIndex") ?? 0) : null,
     networkSettings,
   };

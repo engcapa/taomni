@@ -167,6 +167,11 @@ export interface DbConnectInfo {
   httpPort?: number | null;
   /** ClickHouse protocol: "http" (default) or "native". */
   protocol?: string | null;
+  /**
+   * Presto/Trino HTTP header dialect. Controls X-Presto-* vs X-Trino-* headers.
+   * Defaults to "presto" when absent (legacy sessions).
+   */
+  prestoDialect?: "presto" | "trino" | null;
   /** Redis logical DB index (0-15). */
   dbIndex?: number | null;
   /** Per-session network settings (proxy / SSH jump host). The backend routes
