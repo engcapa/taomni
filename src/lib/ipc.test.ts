@@ -24,6 +24,8 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 }));
 
 import {
+  dbConnect,
+  dbTestConnection,
   selectFilePath,
   selectFolderPath,
   selectPrivateKeyFile,
@@ -31,6 +33,7 @@ import {
   selectSaveFilePath,
   selectUploadFile,
 } from "./ipc";
+import type { DbConnectInfo } from "../types";
 
 describe("ipc dialog path selectors", () => {
   beforeEach(() => {
@@ -112,5 +115,84 @@ describe("ipc dialog path selectors", () => {
     });
     expect(mocks.invoke).not.toHaveBeenCalledWith("select_save_directory", expect.anything());
     expect(mocks.invoke).not.toHaveBeenCalledWith("select_save_file_path", expect.anything());
+  });
+});
+
+describe("ipc dbConnect payload", () => {
+  beforeEach(() => {
+    mocks.invoke.mockReset();
+  });
+
+  const basePrestoInfo = (): DbConnectInfo => ({
+    sessionId: "sess-presto-1",
+    engine: "Presto",
+    host: "trino.example.com",
+    port: 8080,
+    username: "analyst",
+    password: "secret",
+    catalog: "hive",
+    database: "sales",
+    ssl: true,
+    timeoutSecs: 30,
+    httpPort: null,
+    protocol: null,
+    prestoDialect: "trino",
+    dbIndex: null,
+    networkSettings: null,
+  });
+
+  it("forwards prestoDialect through dbConnect config to the Rust db_connect command", async () => {
+    mocks.invoke.mockResolvedValueOnce({ ok: true });
+
+    await dbConnect(basePrestoInfo());
+
+    expect(mocks.invoke).toHaveBeenCalledTimes(1);
+    expect(mocks.invoke).toHaveBeenCalledWith("db_connect", {
+      sessionId: "sess-presto-1",
+      config: expect.objectContaining({
+        engine: "Presto",
+        host: "trino.example.com",
+        port: 8080,
+        username: "analyst",
+        password: "secret",
+        catalog: "hive",
+        database: "sales",
+        ssl: true,
+        timeoutSecs: 30,
+        // Critical: dialect must reach DbConfig.presto_dialect (camelCase over IPC).
+        prestoDialect: "trino",
+      }),
+    });
+    // Frontend-only sessionId must not be nested inside config.
+    const config = mocks.invoke.mock.calls[0][1].config as Record<string, unknown>;
+    expect(config).not.toHaveProperty("sessionId");
+  });
+
+  it("defaults missing prestoDialect to null so legacy Presto sessions stay Presto-headered", async () => {
+    mocks.invoke.mockResolvedValueOnce({ ok: true });
+    const info = basePrestoInfo();
+    delete info.prestoDialect;
+
+    await dbConnect(info);
+
+    const config = mocks.invoke.mock.calls[0][1].config as Record<string, unknown>;
+    expect(config.prestoDialect).toBeNull();
+  });
+
+  it("forwards prestoDialect on the test-connection path (dbConnect probe)", async () => {
+    mocks.invoke
+      .mockResolvedValueOnce({ ok: true }) // db_connect
+      .mockResolvedValueOnce("Presto connection OK") // db_ping
+      .mockResolvedValueOnce(undefined); // db_disconnect
+
+    await expect(dbTestConnection(basePrestoInfo())).resolves.toBe("Presto connection OK");
+
+    const connectCall = mocks.invoke.mock.calls.find((call) => call[0] === "db_connect");
+    expect(connectCall).toBeDefined();
+    expect(connectCall![1].config).toMatchObject({
+      engine: "Presto",
+      catalog: "hive",
+      prestoDialect: "trino",
+    });
   });
 });
