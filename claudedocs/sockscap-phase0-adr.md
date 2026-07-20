@@ -3,9 +3,9 @@
 - Status: Accepted baseline; data-plane, Windows provider and first Windows
   production architecture choices **frozen**; platform/support release gates open
 - Date: 2026-07-18
-- Last updated: 2026-07-19
+- Last updated: 2026-07-20
 - Branch: `feat/sockscap-gpt-sol-max`
-- Related: `claudedocs/sockscap-cross-platform-design-plan.md` (Revision 6)
+- Related: `claudedocs/sockscap-cross-platform-design-plan.md` (Revision 8)
 
 ## Context
 
@@ -26,16 +26,16 @@ gates that remain **open** until real platform evidence exists.
 | Fail policy | Global default fail-open; per-profile fail-closed allowed | Frozen |
 | Unknown hostname | Default DIRECT; strict PROXY/BLOCK optional; expose unknown metrics | Frozen |
 | TCP-only egress UDP | HTTP CONNECT + SSH Jump default BLOCK for UDP/QUIC | Frozen |
-| Production data plane | Taomni-owned `FlowRuntime`; PacketIngress uses a pinned/audited IP-stack adapter; tun2proxy is reference/test-oracle only | Frozen; bounded decoded-stream ingress, identity selection, strict IPv6 L3 admission, in-memory TCP relay and a replaceable packet-stack supervisor source contract have landed. No concrete controlled TCP/UDP/reassembly/Virtual-DNS provider, product composition or native/performance evidence exists |
+| Production data plane | Taomni-owned `FlowRuntime`; PacketIngress uses a pinned/audited IP-stack adapter; tun2proxy is reference/test-oracle only | Frozen; bounded ingress/L3 admission, in-memory TCP relay and cancellation-safe public `ProductDataPlaneSupervisor` generation ownership have landed. Root-cause diagnostics are separate from retryable cleanup proof. No concrete controlled TCP/UDP/reassembly/Virtual-DNS provider or native/performance evidence exists |
 | Windows capture | Global: Wintun/TUN; app/PID: WinDivert SOCKET/FLOW/NETWORK using an unmodified, hash-pinned official package containing the production-signed kernel driver | Frozen architecture; license, DLL provenance/architecture/hash, driver signer/hash, identity-race, EDR/VPN, performance and recovery evidence remain release gates |
 | Windows first production scope | Sockscap Beta is `x86_64` only. Under the current official WinDivert/no-custom-driver route, Windows ARM64 Sockscap is not released and app/PID remains unavailable | Frozen for the first production Beta; ARM64 probes/manifests must fail closed rather than imply support |
 | Windows user-mode signing | Taomni app/helper/service/installer require trusted, timestamped Authenticode with controlled key custody; this plan does not require EV and does not authorize a custom kernel driver | Fixed first-party policy is deliberately `unconfigured`; publisher/certificate review, route/vendor/account, CI identity, rotation, revocation and clean-host evidence remain external release gates |
 | macOS capture | NETransparentProxyProvider system extension | Intent locked; source entitlement/signing/profile-certificate/full-`.app` digest contract landed, but fixed Team/certificate/architecture policy is `unconfigured`, and Apple capability plus real target remain hard gates |
-| Linux capture | cgroup v2 + nft socket cgroup match + fwmark/TUN; managed launch netns fallback | Mutation-before-WAL root receipt, kernel-incarnation PID checks, fixed-path client/session, exact TUN L3 I/O, bidirectional pump ready-before-activate, cancellation-safe ownership, cleaned tombstone and source terminal-fault withdrawal landed; concrete stack/composition, product adapter/coordinator and privileged lab remain open |
+| Linux capture | cgroup v2 + nft socket cgroup match + fwmark/TUN; managed launch netns fallback | WAL/PID/client/TUN/pump, public generation supervisor, product adapter/coordinator recovery and hardened DEB/RPM package contracts landed. Disk Store uses WAL + `synchronous=FULL`; all runtime owners from one Store share a detached-operation mutex. Canonical directory/lock/DB checks plus the retained OS owner lock are the intended source-level journal boundary; desktop single-instance is activation UX only. Same-process double-open/drop-release and Unix path tests exist, while handle-relative SQLite/VFS, Windows SID/DACL and three-platform cross-process/crash/multi-session native evidence remain open; concrete provider/final builder/default async injection, complete distro dependency/signing policy and privileged lab also remain open |
 | Remaining support matrices | Freeze minimum macOS version/Apple Silicon/Intel scope and Linux distro/kernel/systemd/cgroup/nft/iproute2/resolver/NetworkManager scope only after real lab evidence and a maintenance owner exist | Open; macOS overlay `11.0` is only a provisional build floor, not a frozen production support claim |
-| Production release operations | Updater key custody/rotation/revocation; signed rollback compatibility across component pin/ABI, protocol/schema, journal/tombstone and ready handshake; Active capture clean stop; staged rollout/stop-rollout; continuous SBOM/CVE, threat model, support bounds | Open and blocking for production labels even if the functional updater or platform adapter works |
+| Production release operations | Updater key custody/rotation/revocation; signed rollback compatibility across component pin/ABI, protocol/schema, journal/tombstone and ready handshake; Active capture clean stop; staged rollout/stop-rollout; continuous SBOM/CVE, threat model, support bounds | Open and blocking. Source/Quick Non-Release workflow Actions are commit-SHA pinned and Rust/MSRV is fixed to 1.95.0 after real 1.94 compilation exposed incompatible current dependencies. Windows/macOS source compile/process jobs are configured, but require matching CI runner results before they can be called PASS; formal `release.yml` does not depend on this workflow. Protected build/sign/publish provenance, runner image and update-audit process are not closed |
 | SSH host key | App-owned known-hosts store with exact `TRUST` / `REPLACE` fingerprint confirmation; background reconnect fails closed | Frozen; security gate closed |
-| Phase 0 code in tree | Types, capability probe, preflight, orchestrator, commands, authenticated Linux helper WAL/PID/client/TUN/lifecycle/fault-monitor contracts, signed-release source gates, bounded decoded-stream + L3 packet ingress/profile selection/IP-stack admission/packet-stack supervisor/FlowRuntime relay, native window smoke, performance/soak gates | Landed contracts/memory slices only; complete packet→TCP/UDP provider bridge, product platform composition/fault reconciliation and real release evidence remain open |
+| Phase 0 code in tree | Types, capability probe, preflight, orchestrator, commands, authenticated Linux helper WAL/PID/client/TUN/lifecycle/fault-monitor contracts, generation product adapter/recovery boundary, Linux DEB/RPM package Gate, signed-release source gates, bounded decoded-stream + L3 packet ingress/profile selection/IP-stack admission/packet-stack supervisor/product composition/FlowRuntime relay, native window smoke, performance/soak gates | Landed contracts/memory slices only; complete packet→TCP/UDP provider, default product/async IPC wiring and real release evidence remain open |
 
 ## License and third-party inventory (Phase 0)
 
@@ -83,12 +83,12 @@ requires the pinned signer and a successful target-Windows `signtool /kp` run.
 
 Phase 0 probes in `sockscap::capabilities` report host readiness but keep
 `capture_implemented = false` and `can_start_* = false`. Linux helper/client and
-TUN/pump/lifecycle source primitives are not equivalent to an installed product
-adapter: a concrete controlled TCP/UDP/reassembly/Virtual-DNS provider, a Linux
-composition factory that joins packet stack + the sole `FlowRuntime`, a packaged
-`CaptureAdapter` with coordinator reconciliation, root policy, and privileged
-end-to-end fault/capture smoke must all exist before the UI may claim routing
-works.
+TUN/pump/lifecycle source primitives plus the landed product adapter/public
+supervisor are not equivalent to an installed product path: a concrete
+controlled TCP/UDP/reassembly/Virtual-DNS provider, final snapshot/profile
+builder, trusted tuple side channel, default async AppState/IPC/tray injection,
+complete distro dependency/signing policy, and privileged end-to-end
+fault/capture smoke must all exist before the UI may claim routing works.
 
 ## Reference baseline
 
@@ -128,8 +128,11 @@ works.
    user-mode Authenticode path. EV is not a prerequisite imposed by this plan,
    because Taomni is not signing a first-party kernel driver; key custody,
    timestamping, rotation/revocation and clean-host verification remain open.
-7. macOS and Linux minimum support matrices are release decisions, not guesses.
-   The macOS overlay's `minimumSystemVersion=11.0` is only a provisional build
+7. Concrete Windows OS versions plus macOS and Linux minimum support matrices
+   are release decisions, not guesses. Windows architecture is frozen to
+   x86_64, but each supported Windows version still requires owned Secure
+   Boot/EDR/VPN evidence. The macOS overlay's
+   `minimumSystemVersion=11.0` is only a provisional build
    floor. Production matrices remain open until real entitlement/build/lab
    evidence and a maintenance owner support an explicit list.
 8. The source half of `S0-CONTRACT-ALIGN` is complete: capability copy, schema 2
@@ -141,42 +144,37 @@ works.
    PARTIAL until reviewed identities are committed and final staged artifacts
    pass non-lint runs on their matching hosts, including Windows `/kp` and the
    macOS full verified `.app` digest. Final DMG/PKG/updater binding remains part
-   of protected build provenance. Python verifier tests are 10/10; macOS host
-   and Bash 3.2 syntax/lint pass; PowerShell 7.2.24 AST and disabled-template
-   lint pass. None is a real platform non-lint artifact run.
+   of protected build provenance. Named verifier suites and their current
+   counts are recorded in the release ledger/design plan rather than frozen in
+   this ADR; macOS host and Bash 3.2 syntax/lint pass, and PowerShell 7.2.24 AST
+   plus disabled-template lint pass. None is a real platform non-lint artifact
+   run.
 9. The first owned shared-runtime slice is implemented and lifecycle-hardened:
    bounded/cancellation-safe decoded `FlowIngress`; capture intent that prevents
    missing app/PID evidence from silently reaching global policy; trusted,
    revisioned child-profile queues; immutable selector limits; revision plus
    full-profile-fingerprint `FlowEngine` binding; and supervisor-owned
-   `FlowRuntime` admission, relay, exactly-once close attempts, owner cleanup and
-   absolute shutdown deadline. Final-source focused evidence is ingress 10/10,
-   packet-device 12/12, selector 11/11, runtime 12/12, engine 13/13, IP-stack
-   admission 10/10, packet-stack supervisor 17/17, Linux helper 10/10, Linux
-   process 12/12, Linux TUN 4/4, Linux client 12/12 and Linux adapter source
-   lifecycle 24/24. The complete Sockscap filter is 295/295; the repository lib
-   binary is 1,163 passed, 0 failed, 11 ignored (1,174 total). The
-   scaffold is not a product `CaptureAdapter` and
-   does not unlock any capture capability.
-   The L3 queue/provider/tuple contract is now explicit, but this still does not
-   implement complete IP-stack TCP/UDP reconstruction, UDP, any real adapter,
-   orchestrator wiring, native smoke, performance or 24h evidence; S1 as a
-   whole is therefore not PASS.
+   `FlowRuntime` admission, relay, exactly-once close attempts, retryable owner
+   cleanup and absolute shutdown deadline. Runtime root-cause diagnostics are
+   independent from current cleanup proof: a provider fault may remain visible
+   after every owner joins, while any unobserved task/profile/egress/stack join
+   keeps cleanup pending. Revision 8 focused and full-suite evidence is recorded
+   in the design plan §14.6 after each final run rather than frozen here as a
+   stale count. Product Linux adapter/composition source exists, but no concrete
+   stack or default async product injection does; no capability is unlocked.
 10. `ipstack` 1.0.1 remains an isolated candidate, not a production dependency.
     Its unbounded internal channels conflict with the frozen bounded-queue Gate;
     the next decision is an audited bounded fork/upstream patch versus another
     controlled adapter after an isolated spike, not silent acceptance.
-11. The replaceable packet-stack boundary is now explicit but remains
-    release-neutral source code. `PacketStackSupervisor` checks the exact
-    provider pin, explicit capabilities, generation/config revision/platform
-    identity and a same-device packet-queue `source_id`; provider build and
-    one-shot ready share one absolute deadline. It permits only one ingress
-    handoff and preserves the first terminal event, so provider self-exit cannot
-    later be relabeled as clean caller cancellation. The returned receiver is an
-    `Arc`, so exclusive consumption by one `FlowRuntime` remains a product
-    factory invariant. Shutdown timeout retains the join handle for retry. A
-    bounded emergency reaper used after startup-future cancellation or Drop is
-    not a clean-shutdown, helper-rollback, or release recovery proof.
+11. The replaceable packet-stack boundary is explicit but remains release-neutral
+    source code. `PacketStackSupervisor` checks exact provider/capability/
+    generation/revision/platform/queue identity and preserves first-terminal
+    cause. The only public start boundary is `ProductDataPlaneSupervisor`: its
+    detached generation worker and registry retain startup/recovery ownership
+    even if the caller future is cancelled. Linux delegates to this registry;
+    Windows/macOS must reuse it. Stack/runtime/profile/task shutdown timeout
+    retains retry state, and a bounded emergency reaper is never accepted as
+    clean-shutdown, helper rollback, or release recovery proof.
 12. The Linux source lifecycle now starts native capture and reinject pumps and
     proves both ready before helper activation; it rechecks the combined native
     pump/data-plane identity and health before and after activation, serializes
@@ -194,11 +192,13 @@ works.
     currently remain until `/run` is reset; production GC must be driven by a
     durable coordinator journal/rollback low-water mark, never by age/count
     alone, and must preserve fail-closed response-loss retry. These are source
-    contracts only: there is no concrete stack + `FlowRuntime` composition
-    factory or product `LinuxCaptureAdapter`/coordinator. A source monitor now
-    performs helper-first withdrawal for terminal local faults, but product
-    journal reconciliation and real heartbeat/pump/helper crash/package/GC
-    evidence remain absent. The numeric PID accepted by `cgroup.procs` cannot
+    contracts only: the shared composition and product
+    `LinuxCaptureAdapter`/coordinator/orchestrator recovery boundary now exist,
+    but there is no concrete controlled stack provider, final profile/config
+    builder, trusted tuple side channel or default async product injection. A
+    source monitor performs helper-first withdrawal for terminal local faults,
+    while real heartbeat/pump/helper crash/package/GC evidence remains absent.
+    The numeric PID accepted by `cgroup.procs` cannot
     make identity validation and the write one atomic kernel operation; a real
     PID-reuse stress lab and pidfd/kernel-interface assessment remain mandatory.
 13. `PacketFlowRegistry` now maintains explicit active TCP and UDP counts, so
@@ -211,6 +211,45 @@ works.
     Truncated, malformed, repeated/out-of-order or over-budget chains fail
     closed. Fragment reconstruction is still assigned to the missing bounded
     reassembly provider; this parser is not evidence that reassembly exists.
+15. Linux package source security is fail-closed: `/run/taomni` must be exact
+    root:root 0755; helper sessions hold a shared lifecycle lock while package
+    transactions require the exclusive lock and a crash-persistent sentinel.
+    Stage/build policy cannot be bypassed by a raw Tauri overlay invocation;
+    verifier inputs are private snapshots run through a controlled environment,
+    and DEB/RPM transaction/trigger/sysusers/policies/file-capability/file-flag
+    metadata are rejected unless explicitly frozen. Architecture, both OpenPGP
+    signers and the complete distro GUI/runtime dependency profile remain
+    `unconfigured`, so no production candidate can pass yet.
+16. Capture runtime operations execute as owned detached transactions under a
+    store-scoped mutex shared by every runtime owner derived from the same
+    `SockscapStore`; cancellation of the caller does not release transaction
+    ownership or abort cleanup, and another runtime instance cannot bypass
+    serialization. Prepare durably binds the selected adapter and
+    generation before invoking a privileged adapter; after the call, coordinator
+    checks exact platform/spec/generation/config revision/helper PID and complete
+    handle/artifact lineage. Recovery rereads the journal and applies an
+    expected-generation CAS/revalidation guard before cleanup. A rejected or
+    otherwise untrusted receipt is never passed to privileged `stop(handle)`;
+    only generation-scoped rollback through the already-bound adapter is allowed.
+17. Disk-backed `SockscapStore` uses WAL + `synchronous=FULL` (the memory test
+    store remains `NORMAL`), canonicalizes and holds the app-data directory,
+    validates directory/owner-lock/DB identities before and after open, and
+    keeps the OS lock until SQLite closes. Unix tightens the directory to 0700
+    and DB/WAL/SHM/lock files to 0600 while rejecting unsafe links; Windows
+    source rejects reparse points, excludes delete sharing on directory/lock
+    handles and compares volume/File ID. This retained lock—not Tauri's
+    exact-pinned desktop single-instance plugin—is the intended source-level
+    journal ownership boundary; the plugin remains activation UX only. Current
+    evidence is same-process double-open/drop-release plus Unix path tests.
+    Handle-relative SQLite/VFS opening, Windows SID/DACL, malicious same-user
+    substitution, cross-process/crash/multi-session native tests, WAL/disk-full/
+    I/O/corruption/power-loss and helper/package-lock tests remain required.
+18. The single-instance callback currently provides best-effort focus only. It
+    does not yet queue activation before the main window exists or forward a
+    second launch's `--sockscap-auto-restore` request. Production activation
+    requires a bounded allowlisted intent queue, revalidation of persisted
+    restore opt-in, and native startup/autostart/updater race tests; no CLI
+    argument may bypass the journal or capability Gates.
 
 ## Open gates (must close before leaving Phase 0)
 
@@ -249,8 +288,8 @@ works.
    provider pin/limits, tuple admission, replaceable supervisor and in-memory
    TCP relay have landed. Queue `source_id` prevents cross-device pairing;
    provider readiness is bound to an absolute deadline and the decoded-flow
-   ingress has a one-shot supervisor handoff. Exclusive consumption remains a
-   product-composition invariant because the receiver is reference-counted.
+   ingress has a one-shot handoff. The public generation registry is the sole
+   product start/recovery boundary and retains ownership across caller cancel.
    Strict IPv6 extension parsing rejects malformed chains and routes fragments
    to the still-missing reassembly boundary. These are source contracts, not a
    stack.
@@ -264,15 +303,19 @@ works.
    generation-only recovery API and cleaned-generation tombstone contract have
    landed. Linux source lifecycle keeps local owners across cancellation, waits
    for both pumps before activation and source-tests helper-first withdrawal on
-   terminal faults. Package-integrated composition/`CaptureAdapter`, coordinator
-   reconciliation, and real host heartbeat/pump/helper kill/restart/power-loss/
-   uninstall recovery are still required before Active can be exposed. Add
+   terminal faults. Package-integrated helper/policy/polkit, lifecycle
+   lock/sentinel and product supervisor/`CaptureAdapter`/coordinator
+   reconciliation source contracts now exist; a concrete provider/final
+   builder, complete dependency/signing policy, default async injection and real
+   host heartbeat/pump/helper kill/restart/power-loss/uninstall recovery are
+   still required before Active can be exposed. Add
    durable journal/rollback-low-water-mark tombstone GC and prove response-loss
    retry remains fail-closed; time/count-only deletion is forbidden. Emergency
    task reaping is not cleanup evidence.
 8. **VPN / sleep / NIC switch conflict matrix**: documented test plan; not yet executed.
 9. **Release artifacts and long-run evidence**: the Windows/macOS signature and
-   entitlement/full-app candidate verifiers plus fixed core/platform
+   entitlement/full-app candidate verifiers, Linux DEB/RPM
+   signature/payload/script/installed-file verifier, plus fixed core/platform
    performance gates have landed, but first-party policy remains unconfigured,
    real signed artifacts, typed real-capture smoke, packet measurements and the
    required 24-hour runs have not. The aggregate Gate re-hashes candidate files
@@ -280,6 +323,9 @@ works.
    Protected lab/CI must add signed provenance/attestation binding final
    app/helper/provider/full-app hashes, host and raw evidence; the same
    attestation must also bind the shipped installer/DMG/PKG/updater artifact.
+   Linux package-manager provenance is deliberately blocked until a protected
+   lab-runner identity/public key and signature protocol are reviewed and
+   configured; self-reported lifecycle receipts cannot pass.
 10. **Production operations/security/support**: close updater signing-key
     custody/rotation/revocation, staged rollout/stop-rollout/signed rollback,
     compatibility across app/helper/provider/driver pin+ABI, protocol/schema,
@@ -308,7 +354,8 @@ reuses only verified controls and never turns a failed check into implicit trust
 - [ ] Fixed Windows publisher/certificate and macOS Team/certificate/architecture policies reviewed and configured
 - [ ] Minimum macOS and Linux support matrices frozen from real lab evidence
 - [x] Exact Wintun 0.14.1 and WinDivert 2.2.2-A package/DLL/driver/license hashes recorded in committed `windows/release-policy.json` and this ADR; disabled manifest is not a trust source
-- [ ] Production IP-stack decision and complete release SBOM/license inventory closed
+- [x] Production data-plane/IP-stack architecture decision frozen; tun2proxy remains oracle only
+- [ ] Concrete controlled provider and complete release SBOM/license inventory closed
 - [ ] Typed native-capture producer and protected signed lab/CI attestation bind one candidate and final distribution artifacts
 - [ ] Production updater/security/support work packages closed with exercise evidence
 
@@ -337,23 +384,27 @@ reuses only verified controls and never turns a failed check into implicit trust
 src-tauri/src/sockscap/
   mod.rs
   types.rs          # EngineState, profiles, conflicts
-  capabilities.rs   # read-only, fail-closed installed-capability probes
+  capabilities.rs   # read-only, fail-closed prerequisite probes; installed artifact/signature/data-plane/scope probes remain open
   preflight.rs      # fail-fast start gate
   orchestrator.rs   # state machine; no installed product adapter attached
   commands.rs       # Tauri IPC surface
   capture/
     adapter.rs       # CaptureAdapter transaction contract
-    coordinator.rs   # prepare/activate/stop/recover journal coordination
+    coordinator.rs   # durable platform/spec/handle-bound lifecycle transaction
+    runtime.rs       # serialized async adapter recovery owner
     helper_protocol.rs
     unix_transport.rs # peer credentials, executable pin, HMAC transport
     linux*.rs        # cgroup/nft/fwmark/TUN transaction, helper and client
     linux_tun.rs     # exact-name/owner-verified nonblocking L3 TUN source
+    linux_product.rs # generation-scoped product adapter owner
+    linux_data_plane.rs # Linux bridge to shared product supervisor
     packet_device.rs # bounded native↔stack L3 packet contract
   flow/
     ingress.rs       # bounded decoded TCP ingress + fail-closed FlowDescriptor
     runtime.rs       # owned admission/tasks + in-memory TCP relay
     ip_stack.rs      # pinned provider/admission/tuple lifecycle contract
     packet_stack.rs  # replaceable provider supervisor/readiness/ownership contract
+    composition.rs   # cancellation-safe public generation supervisor/registry
   policy/
     selector.rs      # immutable profile selection from trusted identity
 
@@ -361,7 +412,7 @@ src-tauri/src/bin/
   sockscap_helper.rs # root-only Linux helper server
   sockscap_gate.rs   # synthetic core quick/soak evidence harness
 
-scripts/sockscap/    # Windows/macOS artifact gates + performance verifier
+scripts/sockscap/    # Windows/macOS/Linux artifact gates + performance verifier
 src-tauri/platform/sockscap/ # disabled release manifest templates/contracts
 
 src-tauri/src/terminal/
@@ -381,11 +432,11 @@ Commands registered in `lib.rs`:
 - Phase 3: sockscap.db + recovery journal + browser stubs
 - Shared runtime work: retain the completed bounded decoded-stream ingress,
   identity selector, strict IPv6 admission, memory TCP relay and packet-stack
-  supervisor boundary; keep
+  supervisor/public generation registry; keep
   ipstack 1.0.1 out of production dependencies while an isolated spike decides
   a bounded fork/upstream patch or another controlled adapter; then implement
-  the complete packet→TCP/UDP/reassembly/Virtual-DNS provider, composition
-  factory, orchestrator wiring/product fault reconciliation, fuzzing and
+  the complete packet→TCP/UDP/reassembly/Virtual-DNS provider, final
+  profile/config builder, default async product injection/fault reconciliation, fuzzing and
   differential behavior tests against tun2proxy/reference fixtures
 - Windows product work: Wintun global plus the unmodified official WinDivert
   package/app/PID path on x86_64; validate DLL provenance/architecture/hash and
@@ -396,13 +447,12 @@ Commands registered in `lib.rs`:
   the reviewed non-placeholder publisher/certificate policy
 - Windows release-input work: trusted user-mode Authenticode account/service,
   timestamp, key custody, renewal, rotation and revocation
-- Linux product work: combine the landed fixed-path helper client/session,
-  exact-name TUN source, mutation-before-WAL/PID contracts, bidirectional pump,
-  lifecycle ownership and source fault monitor with the concrete packet stack
-  and sole `FlowRuntime`; expose that factory through a product `CaptureAdapter`,
-  connect coordinator reconciliation, install policy, managed-netns fallback,
-  durable low-water-mark tombstone GC, and the privileged response-loss/
-  heartbeat/pump/helper-crash/distro lab
+- Linux product work: connect the landed fixed-path helper/TUN/pump, public
+  supervisor, generation `CaptureAdapter` and coordinator seam to a concrete
+  packet stack/final snapshot builder and the default async AppState/IPC/tray
+  path; complete distro dependency/OpenPGP policy, signed repository/package,
+  managed-netns fallback, durable tombstone GC, and privileged response-loss/
+  heartbeat/pump/helper-crash/package-manager/distro lab
 - Platform release work: real Windows signatures, Apple capability/signing/
   notarization/full-app digest plus attested DMG/PKG, typed native packet/leak/performance
   matrices, protected provenance/attestation, and 24-hour evidence

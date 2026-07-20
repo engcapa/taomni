@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "configurationState": "unconfigured",
+  "platform": "linux",
+  "captureProvider": "cgroup_v2_nft_tun",
+  "packageName": "taomni",
+  "capturePackageKinds": [
+    "deb",
+    "rpm"
+  ],
+  "packageDependencyContractState": "unconfigured",
+  "packageDependencies": {
+    "deb": [
+      "iproute2",
+      "nftables",
+      "policykit-1"
+    ],
+    "rpm": [
+      "iproute",
+      "nftables",
+      "polkit"
+    ]
+  },
+  "appImageCaptureDisabled": true,
+  "supportedArchitectures": [],
+  "installedArtifacts": {
+    "application": {
+      "path": "/usr/bin/taomni",
+      "uid": 0,
+      "gid": 0,
+      "mode": "0755"
+    },
+    "helper": {
+      "path": "/usr/libexec/taomni/sockscap-helper",
+      "uid": 0,
+      "gid": 0,
+      "mode": "0755",
+      "requireNoFileCapabilities": true
+    },
+    "helperPolicy": {
+      "path": "/etc/taomni/sockscap-helper-policy.json",
+      "uid": 0,
+      "gid": 0,
+      "mode": "0644"
+    },
+    "polkitAction": {
+      "path": "/usr/share/polkit-1/actions/com.taomni.sockscap.policy",
+      "uid": 0,
+      "gid": 0,
+      "mode": "0644"
+    }
+  },
+  "helperPolicy": {
+    "schemaVersion": 1,
+    "productId": "com.taomni.app",
+    "pinMode": "exact_installed_only"
+  },
+  "polkit": {
+    "actionId": "com.taomni.sockscap.helper",
+    "execPath": "/usr/libexec/taomni/sockscap-helper",
+    "allowAny": "no",
+    "allowInactive": "no",
+    "allowActive": "auth_admin",
+    "retainAuthorization": false
+  },
+  "packagePayload": {
+    "desktopFiles": [
+      "/usr/share/applications/Taomni.desktop"
+    ],
+    "iconFiles": [
+      "/usr/share/icons/hicolor/32x32/apps/taomni.png",
+      "/usr/share/icons/hicolor/128x128/apps/taomni.png",
+      "/usr/share/icons/hicolor/256x256@2/apps/taomni.png"
+    ]
+  },
+  "packageSignatures": {
+    "deb": {
+      "scheme": "detached_openpgp",
+      "signerFingerprint": "UNCONFIGURED"
+    },
+    "rpm": {
+      "scheme": "rpm_embedded_openpgp",
+      "signerFingerprint": "UNCONFIGURED"
+    }
+  },
+  "packageScripts": {
+    "normalization": "utf8_lf_single_terminal_newline_v1",
+    "interpreter": "/bin/sh",
+    "definitions": {
+      "require-clean-state": {
+        "normalizedSha256": "feabbe6e6982a6204215c48d8d7adb2eb2128e167e04f0e3d1ca0458fe06317d",
+        "rawSha256": {
+          "deb": "feabbe6e6982a6204215c48d8d7adb2eb2128e167e04f0e3d1ca0458fe06317d",
+          "rpm": "feabbe6e6982a6204215c48d8d7adb2eb2128e167e04f0e3d1ca0458fe06317d"
+        }
+      },
+      "post-install": {
+        "normalizedSha256": "1964dfa1fe47e445b71d94c575163930785764addb427146c8d69407cbcfb173",
+        "rawSha256": {
+          "deb": "1964dfa1fe47e445b71d94c575163930785764addb427146c8d69407cbcfb173",
+          "rpm": "1964dfa1fe47e445b71d94c575163930785764addb427146c8d69407cbcfb173"
+        }
+      },
+      "post-remove": {
+        "normalizedSha256": "0ce1b2968f4e95b85dde8105e5bf93a42b504487783d1e12e13fc5411e6f5277",
+        "rawSha256": {
+          "deb": "0ce1b2968f4e95b85dde8105e5bf93a42b504487783d1e12e13fc5411e6f5277",
+          "rpm": "0ce1b2968f4e95b85dde8105e5bf93a42b504487783d1e12e13fc5411e6f5277"
+        }
+      }
+    },
+    "mappings": {
+      "deb": {
+        "preinst": "require-clean-state",
+        "prerm": "require-clean-state",
+        "postinst": "post-install",
+        "postrm": "post-remove"
+      },
+      "rpm": {
+        "pre": "require-clean-state",
+        "preun": "require-clean-state",
+        "post": "post-install",
+        "postun": "post-remove"
+      }
+    }
+  }
+}

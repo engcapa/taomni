@@ -1,8 +1,8 @@
 # Sockscap Release Gate Ledger
 
-- Snapshot: 2026-07-19
+- Snapshot: 2026-07-20
 - Branch: `feat/sockscap-gpt-sol-max`
-- Design baseline: [sockscap-cross-platform-design-plan.md](./sockscap-cross-platform-design-plan.md) (Revision 6)
+- Design baseline: [sockscap-cross-platform-design-plan.md](./sockscap-cross-platform-design-plan.md) (Revision 8)
 - Capture ADR: [sockscap-phase0-adr.md](./sockscap-phase0-adr.md)
 - Gate commands: [`scripts/sockscap/README.md`](../scripts/sockscap/README.md)
 
@@ -11,46 +11,79 @@
 **Not ready for Windows Beta, macOS release, Linux release, or the
 “cross-platform stable” label.**
 
-The branch now contains more than a UI scaffold: it has the policy/egress/
-persistence core, an authenticated Linux root-helper protocol, real Linux
-cgroup-v2 + nftables + fwmark/TUN transaction code, recovery receipts, source
-gates for Windows signing and macOS signing/entitlements, an isolated Linux
-native-window smoke, fail-closed performance/soak receipt verification, and a
-bounded decoded-stream slice consisting of `FlowDescriptor`, `ProfileSelector`,
-`FlowIngress`, and the owned `FlowRuntime` TCP relay. The source tree now also
-contains a release-neutral `PacketStackSupervisor` contract (exact provider
-pin/capability/identity, absolute ready deadline, one-shot ingress handoff,
-first-terminal-event attribution, retryable shutdown), packet-device
-`source_id` cross-wire protection, a bounded strict IPv6 extension parser, and
-explicit TCP/UDP registry counters that remove the admission-time transport
-scan. The returned ingress is reference-counted, so exclusive downstream use is
-still a product-composition invariant. Fragments are admitted only to the
-bounded reassembly boundary; none of these contracts supplies production TCP,
-UDP, reassembly or Virtual DNS.
+The branch now contains the policy/egress/persistence core, authenticated Linux
+root-helper and cgroup-v2+nft+fwmark/TUN transactions, recovery receipts,
+cross-platform source release Gates, and bounded ingress/`FlowRuntime` code. A
+release-neutral `PacketStackSupervisor` is now owned by the only public
+`ProductDataPlaneSupervisor`. Its detached generation registry retains startup
+and recovery owners across caller cancellation; Linux delegates to it rather
+than maintaining a second registry. `FlowRuntime` keeps root-cause diagnostics
+separate from current cleanup proof, and cannot report clean until stack,
+runtime, profile, egress and task owners are observed joined. This is still
+source/memory evidence: no concrete production TCP/UDP/reassembly/Virtual-DNS
+`PacketStackProvider` exists.
 
 It still intentionally reports `capture_implemented = false` and
 `can_start_global`, `can_start_app_group`, and `can_attach_pid` as false. Linux now
-has source-level fixed-path helper client/session and exact-name,
-owner-verified TUN L3 I/O primitives. Its helper now plans without side effects,
+has fixed-path helper client/session and exact-name, owner-verified TUN L3 I/O
+primitives. Its helper plans without side effects,
 fsyncs a root-owned write-ahead recovery receipt before every first mutation,
 and applies membership changes only after their restore intent is durable.
 Linux process identity uses the kernel start-tick incarnation token with
 pre/post validation. The lifecycle has bidirectional pump readiness before
 activation, combined identity/health checks, serialized mutation,
 cancellation-safe owner retention, cleaned-generation tombstones, and a
-source-level terminal-fault monitor that withdraws helper capture before
-stopping local owners. It still lacks the concrete stack + `FlowRuntime`
-composition factory, product `CaptureAdapter`/coordinator wiring, packaging and
-real privileged fault evidence; no signed Windows provider/helper package or
-entitled/notarized macOS Network Extension is present. The current result is
-therefore a **preview-only foundation with release gates**, not working
-end-to-end host traffic capture.
+terminal-fault monitor that withdraws helper capture before stopping local
+owners. Linux now also has a generation-scoped product `CaptureAdapter`,
+cancellation-safe coordinator/orchestrator recovery injection, and a fixed
+helper-policy/polkit DEB/RPM-only packaging and artifact-verification contract.
+Capture operations execute as detached runtime transactions under one
+store-scoped mutex shared by every `CaptureRuntimeOwner` derived from the same
+`SockscapStore`; caller cancellation therefore neither aborts the transaction
+nor permits a second runtime owner to bypass serialization. Prepare persists
+the adapter and generation binding before a privileged call; recovery uses an
+expected-generation CAS/revalidation guard, returned handles must retain exact
+helper PID and full context lineage, and untrusted receipts can trigger only
+generation-scoped rollback through the bound adapter. Disk-backed
+`SockscapStore` uses WAL with `synchronous=FULL`; the in-memory test store stays
+at `NORMAL`. Before opening SQLite it canonicalizes and holds the app-data
+directory, validates directory/lock/database path identity, rejects unsafe
+links, and retains an OS-level owner lock until SQLite closes. On Unix the
+directory and lock ownership/modes are hardened and checked; Windows source
+uses non-delete-sharing handles and rejects reparse points. This is the current
+source-level journal ownership boundary, not a completed native security proof.
+The exact-pinned Tauri single-instance plugin is activation UX only. Evidence
+currently covers same-process double-open contention/drop-release and source
+path-hardening tests. Handle-relative SQLite/VFS opening, Windows SID/DACL,
+malicious same-user substitution, true cross-process/crash release and
+multi-session validation on all three platforms remain open. Package source
+adds exact runtime-dir
+permissions, shared/exclusive lifecycle locking, a crash-persistent transaction
+sentinel, strict staging, private input snapshots, hermetic verification and
+DEB/RPM semantic-metadata/mode rejection. Default product construction still
+injects no adapter, all probes/capabilities remain false, AppImage/updater
+capture is disabled, and Linux architecture/OpenPGP/complete distro dependency
+policy remains `unconfigured`. There is no signed Linux package or real
+package-manager/root/native evidence. The aggregate verifier also intentionally
+fails Linux release manifests with
+`LINUX_INSTALL_PROVENANCE_ATTESTATION_UNCONFIGURED` until a reviewed protected
+lab-runner identity/public key and signature protocol exist; a self-reported
+receipt cannot bypass that blocker. There is no signed Windows implementation
+and no entitled/notarized macOS provider. The result remains a **preview-only
+foundation with release gates**, not end-to-end host capture.
 
-Revision 6 also freezes the first production Windows Sockscap Beta to
-`x86_64` and adds explicit contract-alignment, user-mode signing,
-support-matrix, release-operations, security-response, and supportability
-gates. These are planned/open gates, not evidence that the corresponding code,
-accounts, packages, labs, or operational exercises exist.
+Revision 8 retains the frozen Taomni-owned data plane and first Windows Beta
+`x86_64` + Wintun/WinDivert decisions. The Sockscap workflow is explicitly a
+Source/Quick Non-Release workflow and pins every third-party Action to a full
+commit SHA and Rust/MSRV to 1.95.0. Windows and macOS source compile/process jobs
+are configured, but no matching CI runner result is recorded in this snapshot;
+they cannot yet be called PASS. The general `.github/workflows/release.yml`
+neither depends on Sockscap Gates nor provides
+protected native/non-lint/24h/7-day promotion, and still contains movable
+Action/toolchain tags; it can only be treated as a capture-disabled ordinary
+bundle path. Protected build/sign/publish provenance, runner-image policy and
+action-update auditing remain open. Planned gates are not evidence that
+accounts, signed packages, labs, or operational exercises exist.
 
 ## Status legend
 
@@ -67,20 +100,22 @@ accounts, packages, labs, or operational exercises exist.
 |---|---|---|
 | `pnpm build` | PASS | TypeScript and Vite production builds complete. Existing chunk-size and ineffective dynamic-import warnings remain. |
 | All Sockscap frontend tests | PASS — 12 files, 67 tests | Components, stores, IPC helpers, routing, privacy bounds, and browser Stub behavior pass. |
-| `cargo test sockscap --lib --quiet` | PASS — 295 passed, 0 failed | Final shared source snapshot. Includes policy/recovery/helper protocol, Linux mutation-before-WAL and kernel-incarnation PID contracts, generation/tombstone recovery, hardened decoded runtime, strict L3/IPv6 admission, packet-stack supervisor/first-event contracts, exact TUN/client and automatic source fault-withdrawal lifecycle. Existing repository warnings remain. |
-| Final Rust lib test binary, unfiltered | PASS — 1,163 passed, 0 failed, 11 ignored (1,174 total) | Covers the repository lib-test binary, but not separate integration-test binaries or any native/root platform lab. Existing unrelated warnings remain. |
-| Shared stream/packet/IP-stack and Linux contract focused tests | PASS — ingress 10/10, packet-device 12/12, selector 11/11, runtime 12/12, engine 13/13, IP-stack admission 10/10, packet-stack supervisor 17/17, Linux helper 10/10, Linux process 12/12, Linux TUN 4/4, Linux client 12/12, Linux adapter source lifecycle 24/24 | Proves bounded queues and identity, strict bounded IPv6 extension parsing, explicit transport limits, one-shot supervisor handoff/first-terminal attribution, runtime relay/shutdown, helper WAL-before-mutation, PID/cgroup revalidation, ready-before-activate, cancellation-safe owners, helper-first terminal/heartbeat fault cleanup, exact active queue/source binding and tombstone retry. The ingress handoff returns an `Arc`, so exclusive downstream consumption is a product-factory invariant. Linux numeric `cgroup.procs` still lacks an atomic process-incarnation handle and requires a real PID-race lab. These tests do not prove a complete TCP/UDP/reassembly/Virtual-DNS stack, product adapter/orchestrator, root/package smoke, or host capture. |
+| `cargo test sockscap --lib --quiet` | PASS — 355 passed, 0 failed | Final shared source snapshot. Includes policy/recovery/helper protocol, Linux mutation-before-WAL and kernel-incarnation PID contracts, generation/tombstone recovery, hardened decoded runtime, strict L3/IPv6 admission, packet-stack supervisor/first-event contracts, exact TUN/client and automatic source fault-withdrawal lifecycle, Store-global/caller-cancel transaction ownership, pre-heartbeat generation binding, invalid-receipt generation cleanup, disk durability and owner/path checks. Existing repository warnings remain. |
+| Final Rust lib test binary, unfiltered | PASS — 1,223 passed, 0 failed, 11 ignored (1,234 total) | Covers the repository lib-test binary, but not separate integration-test binaries or any native/root platform lab. Existing unrelated warnings remain. |
+| Shared stream/packet/IP-stack and Linux contract focused tests | PASS for source-contract scope | Proves bounded queues and identity, strict bounded IPv6 extension parsing, explicit transport limits, one-shot supervisor handoff/first-terminal attribution, runtime relay/shutdown, helper WAL-before-mutation, PID/cgroup revalidation, ready-before-activate, cancellation-safe owners, helper-first terminal/heartbeat fault cleanup, exact active queue/source binding and tombstone retry. A Linux generation-scoped product adapter/coordinator seam exists; what remains unproven is its default product/native execution, while Windows/macOS adapters remain absent. The ingress handoff returns an `Arc`, so exclusive downstream consumption is a product-factory invariant. Linux numeric `cgroup.procs` still lacks an atomic process-incarnation handle and requires a real PID-race lab. These tests do not prove a complete TCP/UDP/reassembly/Virtual-DNS stack, root/package smoke, or host capture. |
 | New packet-stack/Linux lifecycle source contracts | PASS for source-contract scope only | Exact provider/capability/identity readiness, same-device packet identity, one-shot ingress handoff, retryable stack shutdown, strict IPv6 admission, helper WAL/PID checks, dual-pump ready, combined health, automatic source fault withdrawal and cleaned tombstones passed the focused tests above. This is non-native evidence and does not unlock a capability. |
-| `cargo check --bin sockscap-gate` | PASS | The release-profile performance/soak harness compiles against production matcher, sampler, store, and transaction coordinator. |
+| Windows/macOS CI source compile and process jobs | NOT RUN for this snapshot | Jobs are configured in the Source/Quick Non-Release workflow, but matching Windows/macOS runner results are required before either platform compile check can be called PASS. This is not a release, signing, native-capture, entitlement or notarization Gate. |
+| `cargo check --locked --all-targets` | PASS on Linux source snapshot | The application and performance/soak harness compile against the production matcher, sampler, store, runtime owner and private transaction coordinator. This is not a Windows/macOS runner result. |
 | `pnpm tauri build --debug --no-bundle` | PASS — 6m01s | A Linux native debug application was built without packaging. |
 | `qa_ui_auto.lint` | PASS — 133 cases, 79 features, 0 errors | Schema and feature catalog are valid. There are 134 existing repository-wide orphan-selector warnings. |
 | testid catalog check | PASS | Generated catalog is current. |
 | `F-SOCKSCAP-1` control coverage | PASS — 19/19 required, shallow 0 | Native entry/window controls and Dashboard controls have direct coverage. |
 | Sockscap native case dry-run | PASS — 1/1 | YAML verbs/selectors dispatch correctly. |
 | Linux native WebDriver smoke `run-20260719-112341` | PASS — 1/1, case 11.3s | Proves main-menu discovery, exactly two native WebViews, Lifecycle navigation, hide, reopen, and state preservation. It does not prove tray behavior or packet capture. |
-| Core quick performance receipt | PASS | Final-source release run: 10,000 rules compiled in 9ms; 20,000 timed matches had P99 3.405us against the fixed 100us limit; 100/100 start-stop cycles cleaned the journal; RSS and open files both grew by 0. |
+| Prior core quick performance receipt | PASS for its earlier synthetic source snapshot | 10,000 rules compiled in 9ms; 20,000 timed matches had P99 3.405us against the fixed 100us limit; 100/100 start-stop cycles cleaned the journal; RSS and open files both grew by 0. It is not final-candidate-bound evidence and must be rerun against the exact candidate commit. |
 | Short soak execution proof | PASS — 3.213s | Active heartbeat, bounded events, resource sampling, and clean stop execute correctly. This is deliberately **not** 24-hour evidence. |
-| Python performance/artifact/native verifier | PASS/FAIL-CLOSED — 10/10 | Covers fixed policy mismatch/unconfigured identity, exact Windows provenance, macOS release proofs/full-bundle digest, same-host file/tree rehash, case-sensitive build ID, typed real-capture receipt binding, tampered receipts and shortened soak rejection. This is verifier self-test, not platform evidence. |
+| Python Sockscap verifier contracts | PASS/FAIL-CLOSED — 68/68 | Helper policy 5/5, Linux package contract 10/10, Linux release verifier 27/27 and aggregate/performance verifier 26/26. They cover policy/provenance, semantic package metadata, artifact rehashing, typed real-capture binding, tampering and shortened-soak rejection. This is verifier self-test, not platform evidence. |
+| Store ownership/durability source tests | PASS | Same-Store runtime owners serialize through one mutex; caller cancellation retains ownership; disk WAL reads back `synchronous=FULL` while the memory test store reads `NORMAL`; owner-lock contention/drop release, canonical private directory binding and Unix symlink rejection pass. This is configuration/unit evidence, not independent-process, filesystem-controller power-loss or Windows SID/DACL proof. |
 | macOS source release gate | PASS for syntax/template lint only | `bash -n`, Bash 3.2 parse, JSON validation and disabled-template lint pass. Lint reports policy `unconfigured`; no real codesign/profile/Gatekeeper/notary `.app` passed non-lint verification. |
 | Windows PowerShell source gate | PASS for AST/template lint; NOT RUN on Windows release artifacts | PowerShell 7.2.24 parsed the script (3,697 tokens) and executed disabled-template lint successfully. Fixed policy/schema align to x86_64 + WinDivert. This Linux-host lint is not a real Windows non-lint run; final Authenticode artifacts and driver `/kp` remain unrun. |
 | Global `qa_ui_auto.audit --gate` | FAIL — pre-existing repository baseline | Current totals are 367/389 required, 36 shallow, and 134 orphans. Twelve non-Sockscap regressions remain and were not ratcheted into the baseline. |
@@ -95,6 +130,11 @@ accounts, packages, labs, or operational exercises exist.
   `evidenceClass=synthetic_core_no_host_capture`.
 - The Linux native smoke proves the independent window path only. It is not a
   tray, root-helper, permission, cleanup, DNS, IPv6, UDP, or throughput test.
+- The desktop single-instance callback currently focuses an already-created
+  main window and deliberately is not a journal lock. It does not yet queue a
+  focus request before window readiness or forward an allowlisted
+  `--sockscap-auto-restore` intent from a second launch; native autostart,
+  updater-relaunch and startup-race cases remain open.
 - Release `nativeSmoke` is a different typed
   `sockscap_native_capture_smoke` receipt bound to the candidate, platform,
   provider, artifact-Gate digest and component hashes. The existing
@@ -115,24 +155,25 @@ accounts, packages, labs, or operational exercises exist.
   canonical full-`.app` tree digest; the protected build attestation must then
   prove that the shipped DMG/PKG/updater payload contains that same candidate.
   Self-reported JSON cannot unlock a capability.
-- A startup/Drop emergency reaper is a bounded last resort, not evidence that a
-  provider joined cleanly or that privileged capture artifacts were withdrawn.
-  Release evidence must exercise explicit stop/join and automatic Active-fault
+- A startup/Drop emergency reaper is a bounded last resort, not cleanup proof.
+  The public registry must retain each uncertain generation until stack,
+  runtime, profile, egress and task joins are observed; release evidence must
+  exercise retry after caller cancellation/timeout plus automatic Active-fault
   revocation.
 
 ## Phase exit ledger
 
 | Phase | Status | Evidence present | Missing exit evidence |
 |---|---|---|---|
-| Phase 0 — capability/license gate | BLOCKED | Fail-fast capability probes; accepted ADR; WinDivert-only/x86_64 source contract; exact WinDivert/Wintun pins; bounded decoded-stream/L3 admission and replaceable packet-stack supervisor contracts; queue `source_id`; Linux helper WAL/PID/client/TUN/dual-pump/lifecycle/tombstone/fault-monitor source contracts. | Concrete controlled TCP/UDP/reassembly/Virtual-DNS provider/SBOM; Linux composition factory/product adapter/coordinator integration; configured Windows/macOS first-party identity policies; Windows user-mode signing and same-host non-lint `/kp`; frozen macOS/Linux matrices; three real platform vertical slices; real stop/kill recovery; DNS/IPv6 leak and VPN/sleep/NIC matrices. |
+| Phase 0 — capability/license gate | BLOCKED | Fail-fast probes; accepted ADR; WinDivert-only/x86_64 pins; bounded ingress/public generation supervisor; store-global detached capture transactions, expected-generation guard, durable adapter binding/handle lineage; disk WAL `synchronous=FULL`; canonical directory/lock/path validation; Linux helper/TUN/lifecycle and hardened DEB/RPM Gate. The Store owner lock is the intended source-level journal boundary; desktop single-instance is activation UX only. | Concrete controlled TCP/UDP/reassembly/Virtual-DNS provider/SBOM; handle-relative DB/lock binding and Windows SID/DACL; three-platform cross-process/crash/multi-session owner-lock native evidence; configured signing and complete Linux dependency policies; frozen macOS/Linux matrices; three real vertical slices; package/native/stop/kill/leak/compatibility evidence. |
 | Phase 1 — policy/rule core | PASS for software scope | Profile model, overlap rejection, GFWList projection, exceptions, immutable matcher snapshots, target explanations, and last-good behavior. | Live mirror availability remains an operational gate. |
-| Phase 2 — FlowEngine/egress core | PARTIAL | DIRECT, SOCKS5 TCP, HTTP CONNECT, shared SSH `direct-tcpip`, hard loop-bypass modeling, cancellation/stats boundaries, strict host-key confirmation, bounded decoded-stream relay, strict IPv6 admission and the packet-stack supervisor source boundary. | Concrete controlled TCP/UDP/reassembly/Virtual-DNS provider and composition; orchestrator/native adapter wiring; product-level fault propagation; repeatable real SOCKS/HTTP/SSH matrix covering auth, DNS, IPv4/IPv6, reconnect, MFA, concurrency, cancellation, and stable SOCKS5 UDP ASSOCIATE. |
-| Phase 3 — persistence/IPC/Stub | PASS for existing software scope | SQLite/WAL store, recovery journal, bounded statistics/live outcomes, IPC contract fixture, browser Stub, helper heartbeat, authenticated receipts, cleanup recovery state, generation-only recovery, root-helper mutation-before-WAL and cleaned-generation tombstone contracts. | Durable-journal low-water-mark tombstone GC, package-integrated helper client/product `CaptureAdapter`, coordinator reconciliation of the landed source fault monitor, and real host-artifact recovery can only close in a privileged platform lab. |
+| Phase 2 — FlowEngine/egress core | PARTIAL | DIRECT, SOCKS5 TCP, HTTP CONNECT, shared SSH `direct-tcpip`, bypass/cancellation/stats, strict host-key, bounded relay/IPv6 admission and public product supervisor plus Linux injection seam. | Concrete controlled TCP/UDP/reassembly/Virtual-DNS provider, final profile/config builder, default async wiring and product fault propagation; repeatable real SOCKS/HTTP/SSH matrix including stable SOCKS5 UDP ASSOCIATE. |
+| Phase 3 — persistence/IPC/Stub | PASS for existing software scope | SQLite/WAL with disk `synchronous=FULL`, recovery journal, bounded stats, IPC/Stub, helper receipts, store-scoped operation serialization, OS owner lock/path checks, Linux generation adapter and cancellation-safe, durable-context-bound coordinator seam. | `AppState` still uses `with_store`; commands/tray still call synchronous fail-closed recovery. Default adapter/async start-update-heartbeat-stop injection, handle-relative SQLite/lock binding, Windows SID/DACL, native crash/power-loss/fault evidence, durable tombstone GC and real host recovery remain. |
 | Phase 4 — independent UI | PARTIAL | Independent route/window shell, complete UI, 67 focused tests, cataloged YAML coverage, and a real Linux WebDriver hide/reopen smoke. | Native tray click/exit smoke on all platforms, accessibility/keyboard review, and permission/recovery system smoke. |
 | Phase 5 — Windows vertical | BLOCKED | Provider is frozen to Wintun/global plus WinDivert app/PID and first Beta is x86_64 only; source capability/fixed policy/template/verifiers reject other providers/architectures and pin official artifacts. First-party WFP is out of scope. | Replace `unconfigured` publisher/certificate policy through review; implement adapters/service/orchestrator; provision user-mode Authenticode; run Windows non-lint `/kp`; complete license, install/update/uninstall, identity-race, EDR/VPN and recovery labs. |
 | Phase 6 — macOS vertical | BLOCKED | Release-only Tauri overlay, provider plist/entitlement/profile-certificate/full-app-digest contract, and signed-app/provider/notarization verifier. | Replace `unconfigured` Team/certificate/architecture policy through review; Apple-approved capability; real Swift target/Rust bridge; Developer ID provisioning/signing/notarization; final DMG/PKG provenance; permission, upgrade, uninstall and frozen architecture labs. |
-| Phase 7 — Linux vertical | PARTIAL | Real cgroup-v2/nft/fwmark/TUN transaction source; mutation-before-WAL root receipt; kernel-incarnation PID checks; root-only helper; peer/executable pinning; HMAC; two-phase activation; typed fixed-path client; exact TUN source; bidirectional pump ready-before-activate; combined health; serialized operations; cancellation-safe owner retention; cleaned tombstone; source-level automatic terminal-fault withdrawal. | Concrete stack provider and stack+`FlowRuntime` factory; product `LinuxCaptureAdapter`/coordinator and journal reconciliation; pidfd/kernel-interface assessment and real PID-reuse race lab because numeric `cgroup.procs` is not an atomic incarnation+move operation; heartbeat/terminal-fault privileged evidence; tombstone GC/real crash evidence; polkit/package; TCP/UDP/reassembly/Virtual-DNS bridge; root smoke; managed-netns and distro matrix. |
-| Phase 8 — tray/reliability/release | PARTIAL | Native Linux window smoke; guarded exit; recovery UI; fixed performance thresholds; 100 synthetic lifecycle cycles; fail-closed quick/24h/platform receipt verifier. | Actual adapter 100-cycle cleanup; native tray/system recovery; 24h core/real-capture soak and 7-day staged long-stability run; throughput/latency/leak gates; signed packages and install/update/uninstall matrices; updater key/rollout/rollback exercise; continuous SBOM/CVE; threat model; redacted support bundle/symbol/log policy; clean global QA gate. |
+| Phase 7 — Linux vertical | PARTIAL | Helper/TUN/pump/fault/tombstone, public supervisor, generation adapter/coordinator, canonical directory/lock/DB checks and OS-held Store owner lock; desktop single-instance is activation UX only; fixed policy/polkit and DEB/RPM-only lifecycle lock/sentinel/snapshot/hermetic metadata Gate. | Handle-relative SQLite/VFS binding and hostile same-user path tests; three-platform cross-process/crash/multi-session Store-lock native evidence; concrete provider/final builder/tuple side channel/default async IPC; configured signer/architecture/complete distro dependencies, signed apt/RPM repository or mandatory verified installer, trusted lab attestation; package-manager/PID/root/native matrix. |
+| Phase 8 — tray/reliability/release | PARTIAL | Native Linux window smoke; guarded exit; recovery UI; fixed performance thresholds; 100 synthetic lifecycle cycles; fail-closed quick/24h/platform receipt verifier. | Allowlisted second-launch/autostart activation-intent queue with window-ready delivery; actual adapter 100-cycle cleanup; native tray/system recovery; 24h core/real-capture soak and 7-day staged long-stability run; throughput/latency/leak gates; signed packages and install/update/uninstall matrices; updater key/rollout/rollback exercise; continuous SBOM/CVE; threat model; redacted support bundle/symbol/log policy; clean global QA gate. |
 
 ## Definition of Done audit
 
@@ -145,24 +186,35 @@ accounts, packages, labs, or operational exercises exist.
 | DNS/IPv6/UDP state does not silently leak | PARTIAL | Explicit policies and unknown/degraded reporting exist; native packet/leak verification is absent. |
 | Multiple profiles run stably through one capture plane | PARTIAL | Conflict/priority core exists; no product capture plane is active. |
 | Window hide/tray recovery is platform-correct | PARTIAL | Linux native hide/reopen passes; real tray and cross-platform behavior remain open. |
-| stop/crash/restart/upgrade/uninstall leave no network state | PARTIAL | Coordinator journal, helper write-ahead receipts, rollback, owner-retention, cleaned tombstones and source-level automatic terminal-fault withdrawal exist; product coordinator integration, installed-system crash/power-loss tests and durable low-water-mark tombstone GC are absent. |
+| stop/crash/restart/upgrade/uninstall leave no network state | PARTIAL | Coordinator journal, helper WAL/rollback, owner retention, tombstones, automatic withdrawal and Linux product recovery integration exist; installed-system crash/power-loss/package-manager tests and durable tombstone GC are absent. |
 | Secrets stay in Vault and telemetry remains bounded | PARTIAL | Egress references use saved sessions; logs/stats omit payload, URL, and credentials; native package audit remains. |
 | Rust, Vitest, qa-ui-auto, native smoke, performance, and long-run gates all pass | BLOCKED | Focused software and Linux window gates pass; global QA, real platform capture, signed packages, 24h evidence, and the stable 7-day staged actual-capture receipt/verifier remain red. |
 | Production release can be staged, stopped, rolled back and supported securely | BLOCKED | The functional updater foundation exists, but key-lifecycle, staged rollout/stop-rollout/signed rollback, compatibility, continuous SBOM/CVE, threat-model and redacted-support exercises have not passed. |
 
-## Revision 6 production-readiness gates
+## Revision 8 production-readiness gates
 
 | Work package | Status | Required evidence |
 |---|---|---|
 | `S0-CONTRACT-ALIGN` | PARTIAL — source complete, platform evidence open | Capability text, schema/templates, fixed release policies, artifact verifier and performance receipt contract accept only WinDivert/x86_64 on Windows and fail closed for obsolete provider/architecture choices. Exact WinDivert 2.2.2-A and Wintun 0.14.1 package/file hashes are pinned. Windows publisher/certificate and macOS Team/certificate/architecture policies are intentionally `unconfigured`, so non-lint release cannot pass until separately reviewed identities are committed. Closure also requires real same-host Windows `/kp`, macOS signing/profile/notary plus stable full-`.app` digest, and protected provenance binding the shipped DMG/PKG/updater artifact to that candidate. |
-| `S1-STREAM-RUNTIME` | PARTIAL — bounded stream/packet admission slice complete | `FlowDescriptor`, `ProfileSelector`, bounded decoded `FlowIngress`, bounded L3 `PacketIngress`, pinned `IpStackConfig`/`PacketFlowRegistry`, snapshot-bound `FlowEngine`, and supervisor-owned `FlowRuntime` relay are implemented. App/PID capture intent is fail-closed, child inheritance requires a trusted revisioned queue, stale engines/ownerless live egress are rejected, and queue/flow state is bounded. Explicit TCP/UDP counters remove the registry's admission-time transport scan without claiming strict worst-case `HashMap` O(1). Strict bounded IPv6 extension parsing rejects malformed, repeated/out-of-order and over-budget chains; fragments still require the missing controlled reassembly provider. This remains contract/memory evidence only; complete transport reconstruction, platform adapters, native smoke, performance and 24h/7d evidence remain open. |
-| `S1-PACKET-IPSTACK` | PARTIAL — supervisor/admission contracts landed, provider implementation open | `capture/packet_device.rs` supplies bounded native↔stack queues whose opaque same-device `source_id` rejects cross-wiring. `flow/ip_stack.rs` pins provider source and limits flow/reassembly state. `flow/packet_stack.rs` validates exact pin/capabilities/generation/revision/platform, shares one absolute build+ready deadline, offers a one-shot ingress handoff, preserves the first terminal event, and retains the driver handle after shutdown timeout for retry. Because the handed-off receiver is an `Arc`, exclusive consumption remains a factory invariant. Its Drop/startup-cancel emergency reaper is not cleanup proof. `ipstack` 1.0.1 remains excluded for unbounded channels. A concrete controlled TCP/UDP/reassembly/Virtual-DNS provider, composition factory, fuzz/native/performance/long-stability evidence are still required. |
-| `S1-LINUX-LIFECYCLE` | PARTIAL — source contract only | The root helper durably records complete restore intent before cgroup/TUN/network mutation and membership deltas before process moves. Native pumps become ready before activation; lifecycle validates exact queue/source identity and health, serializes mutations, retains joinable owners, and source-tests helper-first withdrawal on terminal and recovery-required heartbeat faults. PID/start-tick/UID/owned-cgroup are checked around apply and cleanup, and exact target cgroup is confirmed. The helper publishes a cleaned tombstone before deleting its receipt and re-audits absence after response loss. Its mutex/root receipt do not replace the product coordinator journal, and numeric `cgroup.procs` cannot make PID incarnation + move one atomic kernel operation. Still required: concrete stack/factory, product adapter/coordinator reconciliation, pidfd/kernel-interface assessment plus race lab, low-water-mark tombstone GC, polkit/package and root crash/power-loss/fault evidence. |
+| `S1-STREAM-RUNTIME` | PARTIAL — bounded stream/packet admission slice complete | `FlowDescriptor`, `ProfileSelector`, bounded decoded `FlowIngress`, bounded L3 `PacketIngress`, pinned `IpStackConfig`/`PacketFlowRegistry`, snapshot-bound `FlowEngine`, and supervisor-owned `FlowRuntime` relay are implemented. App/PID capture intent is fail-closed, child inheritance requires a trusted revisioned queue, stale engines/ownerless live egress are rejected, and queue/flow state is bounded. Explicit TCP/UDP counters remove the registry's admission-time transport scan without claiming strict worst-case `HashMap` O(1). Strict bounded IPv6 extension parsing rejects malformed, repeated/out-of-order and over-budget chains; fragments still require the missing controlled reassembly provider. Linux has a product adapter/coordinator source seam but no default/native proof; Windows/macOS adapters remain absent. Complete transport reconstruction, native smoke, performance and 24h/7d evidence remain open. |
+| `S1-PACKET-IPSTACK` | PARTIAL — public supervisor contract landed, provider open | Bounded native queues/exact `source_id`, provider limits and first-terminal attribution. `ProductDataPlaneSupervisor` is the sole public start path; detached generation ownership survives caller cancel. Runtime root cause and cleanup proof are independent, and timeout retains per-owner retry state. `ipstack` 1.0.1 remains excluded. Concrete TCP/UDP/reassembly/Virtual-DNS provider/final builder plus fuzz/native/performance/long-stability evidence remain required. |
+| `S1-LINUX-LIFECYCLE` | PARTIAL — product/source contract, real evidence open | Helper WAL/PID/pump/withdrawal/tombstone, product adapter/public supervisor, Store-global detached transaction ownership, expected-generation guard, durable adapter binding, helper PID lineage and generation-only rollback for untrusted receipts exist. Disk Store uses WAL + `synchronous=FULL`; canonical directory/lock/DB checks and the retained OS owner lock form the intended source-level journal boundary; desktop single-instance is activation UX only. Same-process double-open/drop-release and Unix path tests exist. Package hooks add exact runtime dir, lifecycle lock/sentinel, strict stage, snapshots/hermetic tools and semantic metadata/mode rejection. Still required: handle-relative SQLite/VFS binding, Windows SID/DACL, three-platform cross-process/crash/multi-session lock evidence, WAL/disk-full/I/O/corruption/power-loss faults, provider/default injection, complete dependency/signing/repository policy, pidfd/PID-race/tombstone GC and signed package-manager/root evidence. |
 | `W0-SUPPORT-MATRIX` | PARTIAL | Windows Beta is frozen to x86_64 and Windows ARM64 must remain unsupported under the current official WinDivert/no-custom-driver route. `minimumSystemVersion=11.0` in the macOS Tauri overlay is only a provisional build floor, not a production support claim. Exact Windows versions, macOS minimum/architecture scope and Linux distro/kernel/userspace-network matrix still require owned lab evidence. |
 | `W0-SIGNING-ACCOUNT` | BLOCKED | Commit a reviewed non-placeholder Windows publisher subject and leaf-certificate SHA-256, then prove trusted timestamped Authenticode for Taomni app/helper/service/installer, controlled/non-exported CI use, clean-host chain verification, renewal/rotation/revocation owner and exercise. EV and a custom kernel-driver signing path are not required or authorized. |
-| `P0-RELEASE-OPS` | BLOCKED | Updater key custody/offline recovery/rotation/revocation; app/helper/provider/driver pin+ABI, protocol/schema, journal/tombstone and ready-handshake compatibility; protected evidence producer plus signed provenance/attestation binding raw evidence, candidate artifacts and shipped package; Active capture explicit stop/join before upgrade/rollback; staged rollout, stop-rollout kill switch and signed rollback exercise. |
+| `P0-RELEASE-OPS` | BLOCKED | The Source/Quick Non-Release workflow Actions are commit-SHA pinned and Rust/MSRV is fixed to 1.95.0; a real 1.94 build exposed incompatible current `sysinfo` and `libsqlite3-sys` code, so the prior declaration was not a valid Gate. Windows/macOS source compile/process jobs are configured but have no matching runner result in this snapshot, so neither may be claimed PASS. The general release workflow does not depend on it, retains movable tags, and has no protected native/non-lint/24h/7-day Sockscap promotion. Still required: capture-disabled release separation, reviewed action-update process, frozen runner images, isolated least-privilege build/sign/publish provenance; updater key custody/offline recovery/rotation/revocation; component compatibility; Active stop/join; staged rollout/kill switch/signed rollback exercise. |
 | `P0-SECURITY` | BLOCKED | Privileged-boundary/parser/bypass/update-chain threat model; per-release SBOM/license/CVE/EOL output; fail-closed severity policy and time-bounded waivers. |
 | `P0-SUPPORT` | BLOCKED | User-approved redacted support bundle, hostile-field redaction tests, bounded logs/receipts, crash-symbol access/retention and field-recovery runbook. |
+
+Store/journal release evidence must additionally cover independent child
+process contention, same-user multi-session ownership, crash release, hostile
+directory/lock/DB substitution, Windows reparse/SID/DACL semantics, and
+WAL/checkpoint behavior under `ENOSPC`, I/O error, corruption, process kill and
+power loss. The current canonical directory handle and pre/post identity checks
+detect and reject known unsafe paths, but SQLite still opens by pathname; fully
+closing the remaining TOCTOU class requires a reviewed handle-relative
+SQLite/VFS design. `synchronous=FULL` must also be profiled under the real stats
+write rate (batch throughput, commit p95/p99, checkpoint latency/size and
+capture/UI jitter) without weakening durability to make a benchmark pass.
 
 ## Platform work required before release labels
 
@@ -200,19 +252,31 @@ accounts, packages, labs, or operational exercises exist.
 - Freeze the explicit distro/kernel/systemd/cgroup/nft/iproute2/resolver/
   NetworkManager support matrix and maintenance owner before issuing a release
   claim; do not substitute an undefined “mainstream Linux” label.
-- Package the fixed-path helper client/session launcher and exact-name TUN L3
-  source plus landed bidirectional pump/lifecycle into a concrete stack + sole
-  `FlowRuntime` composition factory and product `LinuxCaptureAdapter`, keeping
-  capability start flags false until an installed probe and native evidence pass.
-- Package a reviewed root policy/polkit path; exercise real privilege denial,
+- Implement the missing concrete controlled stack provider and final Linux
+  profile/config builder, then wire the landed public composition and product
+  generation adapter into the default async product path. Keep capability
+  start flags false until installed probe, self-test and native evidence pass.
+- Replace the intentionally `unconfigured` Linux signer/architecture policy,
+  and derive/review a complete per-distro/architecture dependency profile from
+  the final app/helper ELF plus scripts; the current three capture-tool
+  dependencies are intentionally not release-complete. Build only through the
+  canonical DEB/RPM overlay, sign and verify the final packages, and exercise
+  real privilege denial,
   stale receipt/tombstone, lost response, main-process kill, helper/data-plane
   kill, restart, power loss, and uninstall cleanup. Add tombstone GC driven only
   by a durable coordinator journal/rollback low-water mark; never delete merely
   by age/count, and preserve fail-closed response-loss retry.
-- Integrate the landed source-level terminal/heartbeat fault withdrawal into
-  the product adapter, coordinator journal and orchestrator; prove helper-first
-  cleanup and recovery on real root failures. Source fake tests and later-user-
-  operation health checks are not sufficient.
+- Distribute DEB through a signed apt `Release/InRelease` chain or a mandatory
+  non-bypassable verified installer; a detached package `.asc` alone is not an
+  apt/dpkg enforcement path. Apply the equivalent repository-GPG requirement
+  to RPM and test tampered downloads, stale metadata, key expiry and rollback.
+- Implement the protected package-manager lab runner, freeze its reviewed
+  identity/public key and signed attestation protocol, and remove the aggregate
+  verifier's `LINUX_INSTALL_PROVENANCE_ATTESTATION_UNCONFIGURED` blocker only
+  after negative forgery/replay/candidate-substitution tests pass.
+- Prove the landed product adapter/coordinator/orchestrator helper-first cleanup
+  and cancellation/retry behavior on real root failures. Source fake tests and
+  later-user-operation health checks are not sufficient.
 - Prove real cgroup app-group/global/PID TCP plus DNS/IPv4/IPv6 behavior, managed
   netns fallback, throughput, leak, and 24h stability across the supported
   distro/kernel/systemd/network-manager matrix.
@@ -245,15 +309,14 @@ cross-platform stable label.
 ## Next executable verification steps
 
 1. Implement and audit the pinned controlled TCP/UDP/reassembly/Virtual-DNS
-   provider, then add the single product composition factory that performs the
-   supervisor's one-shot ingress handoff to one `FlowRuntime` and aggregates
-   provider/runtime/native health. Complete fuzz, conformance and optimized
-   memory/performance checks before a platform capability can use it.
-2. Finish Linux first as the nearest vertical slice: wrap the landed helper,
-   TUN, pump and lifecycle contracts in the installed `LinuxCaptureAdapter`,
-   connect coordinator/journal/orchestrator reconciliation, package polkit and
-   fixed artifacts, and prove WAL/PID/fault/kill/power-loss cleanup in a
-   disposable root lab.
+   provider and final snapshot/profile builder behind the landed single product
+   composition. Complete fuzz, conformance and optimized memory/performance
+   checks before any platform capability can use it.
+2. Finish Linux first as the nearest vertical slice: wire that provider into
+   the landed generation adapter/default async runtime, configure reviewed
+   architecture/OpenPGP policy, build/sign the fixed DEB/RPM candidates, and
+   prove install/dirty blocker/upgrade/rollback/uninstall plus WAL/PID/fault/
+   kill/power-loss cleanup in disposable root VMs.
 3. In parallel, implement Windows x86_64 Wintun global + WinDivert app/PID and
    the signed service/helper, and implement the macOS Xcode system-extension/
    Network Extension provider plus Rust bridge. Freeze owned support matrices
@@ -276,8 +339,10 @@ cross-platform stable label.
    recovery/100-cycle evidence, and the staged 7-day actual-capture receipt for
    the same immutable candidate.
 7. Protect the lab/CI producer and sign/record provenance or equivalent
-   attestation for artifact, native, performance and raw evidence; JSON
-   consistency alone is insufficient.
+   attestation for artifact, native, performance and raw evidence; for Linux,
+   implement and pin the package-manager runner identity/public key and
+   verification protocol before removing the committed fail-closed attestation
+   blocker. JSON consistency alone is insufficient.
 8. Exercise updater key recovery/rotation/revocation, staged rollout,
    stop-rollout and signed rollback; close threat-model/SBOM/CVE/support-bundle
    gates against the same candidate.

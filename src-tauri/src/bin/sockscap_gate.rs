@@ -18,7 +18,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use async_trait::async_trait;
 use serde::Serialize;
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, get_current_pid};
-use taomni_lib::sockscap::capture::coordinator::CaptureTransactionCoordinator;
+use taomni_lib::sockscap::capture::runtime::CaptureRuntimeOwner;
 use taomni_lib::sockscap::capture::{
     AdapterProbe, CaptureAdapter, CaptureArtifactState, CaptureError, CaptureHandle,
     CaptureInstallSpec, CaptureMode,
@@ -522,13 +522,13 @@ fn run_dashboard_gate() -> Result<DashboardGate, String> {
 async fn run_quick_lifecycle() -> Result<(LifecycleGate, ResourceGate), String> {
     let workspace = GateWorkspace::create()?;
     let store = Arc::new(SockscapStore::open(&workspace.path)?);
-    let coordinator = CaptureTransactionCoordinator::new(Arc::clone(&store));
-    let adapter = GateAdapter::default();
+    let adapter = Arc::new(GateAdapter::default());
+    let runtime = CaptureRuntimeOwner::new(Arc::clone(&store), adapter.clone());
 
-    run_one_cycle(&coordinator, &adapter, 1).await?;
+    run_one_cycle(&runtime, 1).await?;
     let mut sampler = ProcessSampler::new()?;
     sampler.sample()?;
-    let samples = run_start_stop_cycles(&coordinator, &adapter, START_STOP_CYCLES, 2).await?;
+    let samples = run_start_stop_cycles(&runtime, START_STOP_CYCLES, 2).await?;
     let resources = sampler.finish()?;
     let journal = store.recovery_journal()?;
     let summary = latency_summary(samples)?;
@@ -544,18 +544,13 @@ async fn run_soak_lifecycle(
     }
     let workspace = GateWorkspace::create()?;
     let store = Arc::new(SockscapStore::open(&workspace.path)?);
-    let coordinator = CaptureTransactionCoordinator::new(Arc::clone(&store));
-    let adapter = GateAdapter::default();
+    let adapter = Arc::new(GateAdapter::default());
+    let runtime = CaptureRuntimeOwner::new(Arc::clone(&store), adapter.clone());
 
-    let cycle_samples = run_start_stop_cycles(&coordinator, &adapter, START_STOP_CYCLES, 1).await?;
+    let cycle_samples = run_start_stop_cycles(&runtime, START_STOP_CYCLES, 1).await?;
     let mut active_spec = capture_spec(START_STOP_CYCLES + 1);
-    let mut handle = coordinator
-        .install(
-            &adapter,
-            active_spec.clone(),
-            &["gate-profile".into()],
-            false,
-        )
+    let mut handle = runtime
+        .install(active_spec.clone(), &["gate-profile".into()], false)
         .await
         .map_err(|error| error.to_string())?;
     active_spec.generation = handle.generation;
@@ -583,8 +578,8 @@ async fn run_soak_lifecycle(
         iterations = iterations.saturating_add(128);
 
         if last_heartbeat.elapsed() >= HEARTBEAT_INTERVAL {
-            handle = coordinator
-                .heartbeat(&adapter, &handle, &active_spec)
+            handle = runtime
+                .heartbeat(&handle, &active_spec)
                 .await
                 .map_err(|error| error.to_string())?;
             last_heartbeat = Instant::now();
@@ -604,8 +599,8 @@ async fn run_soak_lifecycle(
         tokio::time::sleep(SOAK_TICK).await;
     }
 
-    coordinator
-        .stop(&adapter, &handle)
+    runtime
+        .stop(&handle)
         .await
         .map_err(|error| error.to_string())?;
     let observed_duration = active_started.elapsed();
@@ -625,36 +620,30 @@ async fn run_soak_lifecycle(
 }
 
 async fn run_start_stop_cycles(
-    coordinator: &CaptureTransactionCoordinator,
-    adapter: &GateAdapter,
+    runtime: &CaptureRuntimeOwner,
     cycles: u64,
     first_revision: u64,
 ) -> Result<Vec<u64>, String> {
     let mut samples = Vec::with_capacity(cycles as usize);
     for cycle in 0..cycles {
         let started = Instant::now();
-        run_one_cycle(coordinator, adapter, first_revision + cycle).await?;
+        run_one_cycle(runtime, first_revision + cycle).await?;
         samples.push(nanos(started.elapsed()));
     }
     Ok(samples)
 }
 
-async fn run_one_cycle(
-    coordinator: &CaptureTransactionCoordinator,
-    adapter: &GateAdapter,
-    config_revision: u64,
-) -> Result<(), String> {
-    let handle = coordinator
+async fn run_one_cycle(runtime: &CaptureRuntimeOwner, config_revision: u64) -> Result<(), String> {
+    let handle = runtime
         .install(
-            adapter,
             capture_spec(config_revision),
             &["gate-profile".into()],
             false,
         )
         .await
         .map_err(|error| error.to_string())?;
-    let journal = coordinator
-        .stop(adapter, &handle)
+    let journal = runtime
+        .stop(&handle)
         .await
         .map_err(|error| error.to_string())?;
     if journal.cleanup_required || journal.phase != RecoveryPhase::Clean {

@@ -28,6 +28,8 @@ use super::helper_protocol::{
 
 pub const INSTALLED_HELPER_POLICY: &str = "/etc/taomni/sockscap-helper-policy.json";
 pub const HELPER_RUNTIME_DIR: &str = "/run/taomni";
+pub const HELPER_LIFECYCLE_LOCK: &str = "/run/taomni/sockscap-lifecycle.lock";
+pub const PACKAGE_OPERATION_SENTINEL: &str = "/run/taomni/sockscap-package-operation";
 pub const HELPER_POLICY_SCHEMA_VERSION: u32 = 1;
 const HELPER_POLICY_MAX_BYTES: u64 = 64 * 1024;
 const MAX_PINNED_BINARIES: usize = 16;
@@ -460,6 +462,10 @@ pub fn helper_socket_path(authorized_uid: u32, generation: u64) -> PathBuf {
 pub struct BoundHelperSocket {
     pub listener: UnixListener,
     guard: SocketPathGuard,
+    // The package pre-install/pre-remove hooks take this same advisory lock
+    // exclusively. Retaining the shared lock for the listener lifetime keeps
+    // package mutation from crossing an active helper session.
+    _lifecycle_lock: File,
 }
 
 impl BoundHelperSocket {
@@ -476,6 +482,7 @@ pub fn bind_helper_socket(
     generation: u64,
 ) -> Result<BoundHelperSocket, ProtocolError> {
     ensure_runtime_directory()?;
+    let lifecycle_lock = acquire_helper_lifecycle_lock()?;
     let path = helper_socket_path(authorized_uid, generation);
     if path.exists() {
         return Err(ProtocolError::Transport(format!(
@@ -503,6 +510,7 @@ pub fn bind_helper_socket(
         .map_err(|error| ProtocolError::Transport(format!("inspect helper socket: {error}")))?;
     Ok(BoundHelperSocket {
         listener,
+        _lifecycle_lock: lifecycle_lock,
         guard: SocketPathGuard {
             path,
             device: metadata.dev(),
@@ -527,17 +535,99 @@ fn ensure_runtime_directory() -> Result<(), ProtocolError> {
     let metadata = std::fs::symlink_metadata(path).map_err(|error| {
         ProtocolError::Transport(format!("inspect helper runtime directory: {error}"))
     })?;
-    if !metadata.is_dir() || metadata.file_type().is_symlink() || metadata.uid() != 0 {
+    if !metadata.is_dir()
+        || metadata.file_type().is_symlink()
+        || metadata.uid() != 0
+        || metadata.gid() != 0
+        || metadata.mode() & 0o7777 != 0o755
+    {
         return Err(ProtocolError::Authentication(
-            "helper runtime directory must be a root-owned real directory".into(),
-        ));
-    }
-    if metadata.mode() & 0o022 != 0 {
-        return Err(ProtocolError::Authentication(
-            "helper runtime directory must not be group/world writable".into(),
+            "helper runtime directory must be root:root with exact mode 0755".into(),
         ));
     }
     Ok(())
+}
+
+fn acquire_helper_lifecycle_lock() -> Result<File, ProtocolError> {
+    let lock_path = Path::new(HELPER_LIFECYCLE_LOCK);
+    let open_existing = || {
+        OpenOptions::new()
+            .read(true)
+            .write(true)
+            .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
+            .open(lock_path)
+    };
+    let lock = match OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
+        .open(lock_path)
+    {
+        Ok(file) => {
+            file.set_permissions(std::fs::Permissions::from_mode(0o600))
+                .map_err(|error| {
+                    ProtocolError::Transport(format!("protect helper lifecycle lock: {error}"))
+                })?;
+            file
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => open_existing()
+            .map_err(|error| {
+                ProtocolError::Authentication(format!(
+                    "open existing helper lifecycle lock without following links: {error}"
+                ))
+            })?,
+        Err(error) => {
+            return Err(ProtocolError::Transport(format!(
+                "create helper lifecycle lock: {error}"
+            )));
+        }
+    };
+    let metadata = lock.metadata().map_err(|error| {
+        ProtocolError::Authentication(format!("inspect helper lifecycle lock: {error}"))
+    })?;
+    let path_metadata = std::fs::symlink_metadata(lock_path).map_err(|error| {
+        ProtocolError::Authentication(format!("inspect helper lifecycle lock path: {error}"))
+    })?;
+    if !metadata.is_file()
+        || metadata.file_type().is_symlink()
+        || metadata.uid() != 0
+        || metadata.gid() != 0
+        || metadata.mode() & 0o7777 != 0o600
+        || metadata.nlink() != 1
+        || metadata.dev() != path_metadata.dev()
+        || metadata.ino() != path_metadata.ino()
+    {
+        return Err(ProtocolError::Authentication(
+            "helper lifecycle lock must be a root:root 0600 single-link regular file".into(),
+        ));
+    }
+
+    // SAFETY: `flock` only reads the valid descriptor and has no pointer
+    // arguments. LOCK_NB makes helper startup fail closed rather than wait in
+    // the privileged process while a package transaction is mutating files.
+    let result = unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_SH | libc::LOCK_NB) };
+    if result != 0 {
+        return Err(ProtocolError::Authentication(format!(
+            "package operation owns the helper lifecycle lock: {}",
+            std::io::Error::last_os_error()
+        )));
+    }
+    match std::fs::symlink_metadata(PACKAGE_OPERATION_SENTINEL) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(ProtocolError::Authentication(format!(
+                "cannot audit package-operation sentinel: {error}"
+            )));
+        }
+        Ok(_) => {
+            return Err(ProtocolError::Authentication(
+                "an incomplete package operation blocks helper startup".into(),
+            ));
+        }
+    }
+    Ok(lock)
 }
 
 struct SocketPathGuard {

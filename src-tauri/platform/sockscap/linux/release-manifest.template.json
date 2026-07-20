@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "captureReleaseEnabled": false,
+  "gitCommit": "",
+  "buildId": "",
+  "platform": "linux",
+  "architecture": "x86_64",
+  "captureProvider": "cgroup_v2_nft_tun",
+  "package": {
+    "kind": "deb",
+    "path": "staged/taomni.deb",
+    "sha256": "",
+    "signature": {
+      "scheme": "detached_openpgp",
+      "path": "staged/taomni.deb.asc",
+      "sha256": "",
+      "publicKeyPath": "staged/linux-release-signing-key.asc",
+      "publicKeySha256": ""
+    }
+  },
+  "installedArtifacts": {
+    "application": "/usr/bin/taomni",
+    "helper": "/usr/libexec/taomni/sockscap-helper",
+    "helperPolicy": "/etc/taomni/sockscap-helper-policy.json",
+    "polkitAction": "/usr/share/polkit-1/actions/com.taomni.sockscap.policy"
+  },
+  "packageManifestOutput": "evidence/linux-package-manifest.json"
+}

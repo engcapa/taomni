@@ -387,6 +387,51 @@ impl PacketStackError {
 
 type DriverResult = Result<PacketStackExit, PacketStackError>;
 
+/// Startup error with explicit ownership when a spawned driver has not yet
+/// proved termination.  Production callers must retain and retry this owner;
+/// the emergency Drop reaper is containment only.
+#[derive(Debug, thiserror::Error)]
+#[error("packet stack startup failed: {error}")]
+pub(in crate::sockscap::flow) struct PacketStackStartupError {
+    #[source]
+    error: PacketStackError,
+    recovery_owner: Option<StartingPacketStack>,
+}
+
+impl PacketStackStartupError {
+    fn with_owner(error: PacketStackError, recovery_owner: StartingPacketStack) -> Self {
+        Self {
+            error,
+            recovery_owner: Some(recovery_owner),
+        }
+    }
+
+    pub(in crate::sockscap::flow) fn code(&self) -> &'static str {
+        self.error.code()
+    }
+
+    pub(in crate::sockscap::flow) fn take_recovery_owner(&mut self) -> Option<StartingPacketStack> {
+        self.recovery_owner.take()
+    }
+
+    pub(in crate::sockscap::flow) fn into_unowned_error(self) -> PacketStackError {
+        assert!(
+            self.recovery_owner.is_none(),
+            "a packet-stack startup owner must not be discarded"
+        );
+        self.error
+    }
+}
+
+impl From<PacketStackError> for PacketStackStartupError {
+    fn from(error: PacketStackError) -> Self {
+        Self {
+            error,
+            recovery_owner: None,
+        }
+    }
+}
+
 const FIRST_EVENT_PENDING: u8 = 0;
 const FIRST_EVENT_CANCEL_REQUESTED: u8 = 1;
 const FIRST_EVENT_DRIVER_TERMINATED: u8 = 2;
@@ -503,7 +548,7 @@ enum StartupOutcome {
 
 /// Single-use owner of a provider factory and its validated release-neutral
 /// contract. No constructor in this module supplies a product provider.
-pub struct PacketStackSupervisor {
+pub(in crate::sockscap::flow) struct PacketStackSupervisor {
     config: PacketStackSupervisorConfig,
     stack_config: IpStackConfig,
     descriptor: PacketStackDescriptor,
@@ -512,7 +557,7 @@ pub struct PacketStackSupervisor {
 }
 
 impl PacketStackSupervisor {
-    pub fn new(
+    pub(in crate::sockscap::flow) fn new(
         config: PacketStackSupervisorConfig,
         stack_config: IpStackConfig,
         provider: Arc<dyn PacketStackProvider>,
@@ -561,14 +606,6 @@ impl PacketStackSupervisor {
         })
     }
 
-    pub fn config(&self) -> &PacketStackSupervisorConfig {
-        &self.config
-    }
-
-    pub fn descriptor(&self) -> &PacketStackDescriptor {
-        &self.descriptor
-    }
-
     /// Build and start a provider, then wait for its one-shot readiness proof.
     ///
     /// The startup timeout is one absolute budget shared by provider build and
@@ -576,13 +613,29 @@ impl PacketStackSupervisor {
     /// [`StartingDriverGuard`] cancels it and transfers its join handle to a
     /// bounded emergency reaper; driver termination also drops its sole
     /// decoded-flow producer.
-    pub async fn start(&self, io: PacketStackIo) -> Result<ReadyPacketStack, PacketStackError> {
+    #[cfg(test)]
+    pub(in crate::sockscap::flow) async fn start(
+        &self,
+        io: PacketStackIo,
+    ) -> Result<ReadyPacketStack, PacketStackStartupError> {
+        self.start_until(io, Instant::now() + self.config.startup_timeout)
+            .await
+    }
+
+    /// Start under one absolute caller deadline. Once a driver task has been
+    /// spawned, every ordinary error returns its join handle as an explicit
+    /// retryable owner rather than silently relying on the emergency reaper.
+    pub(in crate::sockscap::flow) async fn start_until(
+        &self,
+        io: PacketStackIo,
+        caller_deadline: Instant,
+    ) -> Result<ReadyPacketStack, PacketStackStartupError> {
         if self
             .started
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .is_err()
         {
-            return Err(PacketStackError::AlreadyStarted);
+            return Err(PacketStackError::AlreadyStarted.into());
         }
         let io_identity = io.identity();
         if io_identity.generation != self.config.identity.generation
@@ -591,25 +644,29 @@ impl PacketStackSupervisor {
             return Err(PacketStackError::invalid(
                 "PACKET_STACK_IO_IDENTITY_MISMATCH",
                 "packet queues do not belong to the configured generation and platform",
-            ));
+            )
+            .into());
         }
         let runtime = tokio::runtime::Handle::try_current()
             .map_err(|_| PacketStackError::AsyncRuntimeUnavailable)?;
-        let deadline = Instant::now() + self.config.startup_timeout;
+        let deadline = caller_deadline.min(Instant::now() + self.config.startup_timeout);
+        if Instant::now() >= deadline {
+            return Err(PacketStackError::StartTimeout.into());
+        }
         let build = AssertUnwindSafe(self.provider.build(self.stack_config.clone())).catch_unwind();
         let driver = match tokio::time::timeout_at(deadline, build).await {
             Ok(Ok(Ok(driver))) => driver,
-            Ok(Ok(Err(error))) => return Err(error),
-            Ok(Err(_)) => return Err(PacketStackError::ProviderBuildPanicked),
-            Err(_) => return Err(PacketStackError::StartTimeout),
+            Ok(Ok(Err(error))) => return Err(error.into()),
+            Ok(Err(_)) => return Err(PacketStackError::ProviderBuildPanicked.into()),
+            Err(_) => return Err(PacketStackError::StartTimeout.into()),
         };
         let driver_identity = std::panic::catch_unwind(AssertUnwindSafe(|| driver.identity()))
             .map_err(|_| PacketStackError::DriverIdentityPanicked)?;
         if driver_identity != self.config.identity {
-            return Err(PacketStackError::DriverIdentityMismatch);
+            return Err(PacketStackError::DriverIdentityMismatch.into());
         }
         if Instant::now() >= deadline {
-            return Err(PacketStackError::StartTimeout);
+            return Err(PacketStackError::StartTimeout.into());
         }
 
         let (tcp_sender, tcp_ingress) =
@@ -648,34 +705,57 @@ impl PacketStackSupervisor {
         let readiness = match startup {
             StartupOutcome::Driver(result) => {
                 guard.release_completed();
-                return Err(classify_before_ready(result));
+                return Err(classify_before_ready(result).into());
             }
-            StartupOutcome::Ready(result) => {
-                result.map_err(|_| PacketStackError::ReadyChannelClosed)?
+            StartupOutcome::Ready(Ok(readiness)) => readiness,
+            StartupOutcome::Ready(Err(_)) => {
+                let owner = guard.into_recovery();
+                return Err(PacketStackStartupError::with_owner(
+                    PacketStackError::ReadyChannelClosed,
+                    owner,
+                ));
             }
-            StartupOutcome::TimedOut => return Err(PacketStackError::StartTimeout),
+            StartupOutcome::TimedOut => {
+                let owner = guard.into_recovery();
+                return Err(PacketStackStartupError::with_owner(
+                    PacketStackError::StartTimeout,
+                    owner,
+                ));
+            }
         };
         if readiness.identity != self.config.identity {
-            return Err(PacketStackError::ReadyIdentityMismatch);
+            let owner = guard.into_recovery();
+            return Err(PacketStackStartupError::with_owner(
+                PacketStackError::ReadyIdentityMismatch,
+                owner,
+            ));
         }
         if readiness.capabilities != self.descriptor.capabilities
             || !readiness
                 .capabilities
                 .supports(self.config.required_capabilities)
         {
-            return Err(PacketStackError::ReadyCapabilitiesMismatch);
+            let owner = guard.into_recovery();
+            return Err(PacketStackStartupError::with_owner(
+                PacketStackError::ReadyCapabilitiesMismatch,
+                owner,
+            ));
         }
 
         // Give an immediately-returning driver a chance to become observable;
         // readiness followed by a synchronous exit must not authorize capture.
         tokio::task::yield_now().await;
         if Instant::now() >= deadline {
-            return Err(PacketStackError::StartTimeout);
+            let owner = guard.into_recovery();
+            return Err(PacketStackStartupError::with_owner(
+                PacketStackError::StartTimeout,
+                owner,
+            ));
         }
         if guard.is_finished() {
             let result = guard.task_mut().await;
             guard.release_completed();
-            return Err(classify_before_ready(result));
+            return Err(classify_before_ready(result).into());
         }
 
         let task = guard.disarm();
@@ -707,7 +787,7 @@ impl fmt::Debug for PacketStackSupervisor {
 /// This is only the packet-stack part of data-plane readiness. The caller must
 /// start `FlowRuntime` with [`Self::take_flow_ingress`] and combine its health
 /// with native packet-pump health before activating privileged capture state.
-pub struct ReadyPacketStack {
+pub(in crate::sockscap::flow) struct ReadyPacketStack {
     identity: PacketStackIdentity,
     capabilities: PacketStackCapabilities,
     flow_ingress: Option<Arc<BoundedFlowIngress>>,
@@ -718,10 +798,12 @@ pub struct ReadyPacketStack {
 }
 
 impl ReadyPacketStack {
+    #[cfg(test)]
     pub fn identity(&self) -> &PacketStackIdentity {
         &self.identity
     }
 
+    #[cfg(test)]
     pub fn capabilities(&self) -> PacketStackCapabilities {
         self.capabilities
     }
@@ -735,6 +817,7 @@ impl ReadyPacketStack {
             .ok_or(PacketStackError::FlowIngressAlreadyTaken)
     }
 
+    #[cfg(test)]
     pub fn cancellation_token(&self) -> PacketStackCancellation {
         PacketStackCancellation {
             cancellation: self.cancellation.clone(),
@@ -766,6 +849,7 @@ impl ReadyPacketStack {
         }
     }
 
+    #[cfg(test)]
     pub async fn shutdown(&mut self) -> Result<PacketStackExit, PacketStackError> {
         let deadline = Instant::now() + self.shutdown_timeout;
         self.shutdown_until(deadline).await
@@ -828,6 +912,63 @@ impl fmt::Debug for ReadyPacketStack {
     }
 }
 
+/// Explicit owner for a driver that was spawned but never reached accepted
+/// readiness. Cleanup can be retried under successive absolute deadlines.
+pub(in crate::sockscap::flow) struct StartingPacketStack {
+    cancellation: CancellationToken,
+    task: Option<JoinHandle<DriverResult>>,
+    shutdown_timeout: Duration,
+}
+
+impl StartingPacketStack {
+    pub fn request_stop(&self) {
+        self.cancellation.cancel();
+    }
+
+    pub async fn shutdown_until(
+        &mut self,
+        caller_deadline: Instant,
+    ) -> Result<(), PacketStackError> {
+        let Some(task) = self.task.as_mut() else {
+            return Ok(());
+        };
+        self.cancellation.cancel();
+        let deadline = caller_deadline.min(Instant::now() + self.shutdown_timeout);
+        let result = match tokio::time::timeout_at(deadline, &mut *task).await {
+            Ok(result) => result,
+            Err(_) => return Err(PacketStackError::ShutdownTimeout),
+        };
+        self.task.take();
+        match result {
+            Ok(Ok(_)) => Ok(()),
+            Ok(Err(error)) => Err(PacketStackError::DriverFailedBeforeReady {
+                provider_code: error.code(),
+            }),
+            Err(error) if error.is_panic() => Err(PacketStackError::DriverPanickedBeforeReady),
+            Err(_) => Err(PacketStackError::DriverAbortedBeforeReady),
+        }
+    }
+}
+
+impl fmt::Debug for StartingPacketStack {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("StartingPacketStack")
+            .field("cancelled", &self.cancellation.is_cancelled())
+            .field("task_owned", &self.task.is_some())
+            .finish()
+    }
+}
+
+impl Drop for StartingPacketStack {
+    fn drop(&mut self) {
+        self.cancellation.cancel();
+        if let Some(task) = self.task.take() {
+            spawn_emergency_reaper(task, self.shutdown_timeout);
+        }
+    }
+}
+
 /// RAII fence for cancellation of the public `start` future.  Once armed, no
 /// return path or caller cancellation can leave an uncancelled driver behind.
 struct StartingDriverGuard {
@@ -867,6 +1008,16 @@ impl StartingDriverGuard {
     fn disarm(mut self) -> JoinHandle<DriverResult> {
         self.armed = false;
         self.task.take().expect("starting driver task is owned")
+    }
+
+    fn into_recovery(mut self) -> StartingPacketStack {
+        self.cancellation.cancel();
+        self.armed = false;
+        StartingPacketStack {
+            cancellation: self.cancellation.clone(),
+            task: self.task.take(),
+            shutdown_timeout: self.reaper_timeout,
+        }
     }
 }
 
@@ -1022,6 +1173,7 @@ mod tests {
     enum RunBehavior {
         ReadyAndWait,
         NeverReady,
+        NeverReadyUntilRelease(Arc<tokio::sync::Notify>),
         EarlyExit,
         EarlyError,
         Panic,
@@ -1083,6 +1235,10 @@ mod tests {
                     Ok(PacketStackExit::Cancelled)
                 }
                 RunBehavior::NeverReady => pending().await,
+                RunBehavior::NeverReadyUntilRelease(release) => {
+                    release.notified().await;
+                    Ok(PacketStackExit::Cancelled)
+                }
                 RunBehavior::EarlyExit => Ok(PacketStackExit::Cancelled),
                 RunBehavior::EarlyError => Err(PacketStackError::provider(
                     "FAKE_DRIVER_FAILED",
@@ -1303,15 +1459,33 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn readiness_timeout_cancels_and_drops_driver() {
+    async fn readiness_timeout_returns_retryable_pre_ready_owner() {
         let (mut config, stack) = (supervisor_config(), stack_config());
         config.startup_timeout = Duration::from_millis(20);
-        let (provider, observation) = provider(RunBehavior::NeverReady);
+        config.shutdown_timeout = Duration::from_millis(20);
+        let release = Arc::new(tokio::sync::Notify::new());
+        let (provider, observation) =
+            provider(RunBehavior::NeverReadyUntilRelease(Arc::clone(&release)));
         let supervisor = PacketStackSupervisor::new(config, stack, provider).unwrap();
+        let mut error = supervisor.start(packet_io()).await.unwrap_err();
+        assert_eq!(error.code(), "PACKET_STACK_START_TIMEOUT");
+        let mut owner = error
+            .take_recovery_owner()
+            .expect("a spawned pre-ready driver must remain explicitly owned");
         assert_eq!(
-            supervisor.start(packet_io()).await.unwrap_err().code(),
-            "PACKET_STACK_START_TIMEOUT"
+            owner
+                .shutdown_until(Instant::now() + Duration::from_millis(20))
+                .await
+                .unwrap_err()
+                .code(),
+            "PACKET_STACK_SHUTDOWN_TIMEOUT"
         );
+        assert!(!observation.dropped.load(Ordering::Acquire));
+        release.notify_one();
+        owner
+            .shutdown_until(Instant::now() + Duration::from_secs(1))
+            .await
+            .unwrap();
         wait_for(|| observation.dropped.load(Ordering::Acquire)).await;
         assert!(
             observation

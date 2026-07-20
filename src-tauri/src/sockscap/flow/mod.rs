@@ -9,6 +9,7 @@
 
 pub mod attribution;
 pub mod bypass;
+pub mod composition;
 pub mod connectors;
 pub mod engine;
 pub mod ingress;

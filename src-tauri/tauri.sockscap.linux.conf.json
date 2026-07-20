@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": {
+    "beforeBundleCommand": "bash scripts/bundle-krb5-macos.sh fixbin && bash scripts/sockscap/stage-linux-package.sh"
+  },
+  "bundle": {
+    "icon": [
+      "platform/sockscap/linux/staged/icons/32x32.png",
+      "platform/sockscap/linux/staged/icons/128x128.png",
+      "platform/sockscap/linux/staged/icons/128x128@2x.png"
+    ],
+    "targets": [
+      "deb",
+      "rpm"
+    ],
+    "createUpdaterArtifacts": false,
+    "linux": {
+      "deb": {
+        "depends": [
+          "iproute2",
+          "nftables",
+          "policykit-1"
+        ],
+        "files": {
+          "/usr/libexec/taomni/sockscap-helper": "platform/sockscap/linux/staged/sockscap-helper",
+          "/etc/taomni/sockscap-helper-policy.json": "platform/sockscap/linux/staged/sockscap-helper-policy.json",
+          "/usr/share/polkit-1/actions/com.taomni.sockscap.policy": "platform/sockscap/linux/staged/com.taomni.sockscap.policy"
+        },
+        "preInstallScript": "platform/sockscap/linux/packaging/require-clean-state.sh",
+        "postInstallScript": "platform/sockscap/linux/packaging/post-install.sh",
+        "preRemoveScript": "platform/sockscap/linux/packaging/require-clean-state.sh",
+        "postRemoveScript": "platform/sockscap/linux/packaging/post-remove.sh"
+      },
+      "rpm": {
+        "depends": [
+          "iproute",
+          "nftables",
+          "polkit"
+        ],
+        "files": {
+          "/usr/libexec/taomni/sockscap-helper": "platform/sockscap/linux/staged/sockscap-helper",
+          "/etc/taomni/sockscap-helper-policy.json": "platform/sockscap/linux/staged/sockscap-helper-policy.json",
+          "/usr/share/polkit-1/actions/com.taomni.sockscap.policy": "platform/sockscap/linux/staged/com.taomni.sockscap.policy"
+        },
+        "preInstallScript": "platform/sockscap/linux/packaging/require-clean-state.sh",
+        "postInstallScript": "platform/sockscap/linux/packaging/post-install.sh",
+        "preRemoveScript": "platform/sockscap/linux/packaging/require-clean-state.sh",
+        "postRemoveScript": "platform/sockscap/linux/packaging/post-remove.sh"
+      }
+    }
+  }
+}

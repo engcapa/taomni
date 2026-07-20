@@ -32,6 +32,11 @@
       "passed": false,
       "path": "",
       "sha256": ""
+    },
+    "linuxInstallProvenance": {
+      "passed": false,
+      "path": "",
+      "sha256": ""
     }
   },
   "captureMatrix": {

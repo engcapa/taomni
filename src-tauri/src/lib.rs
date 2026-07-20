@@ -59,7 +59,19 @@ fn should_reap_ai_process(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        // Keep this first for second-launch activation UX. It is not the
+        // journal safety boundary: SockscapStore::open independently acquires
+        // a fail-closed OS owner lock before opening sockscap.db.
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.unminimize();
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }));
+    builder
         // Auto-update: unconditional (unlike the debug-only log plugin below).
         // `process` provides relaunch() so the user can restart into the new
         // version after install.
@@ -117,6 +129,8 @@ pub fn run() {
 
             // Sockscap owns a standalone WAL database so frequent aggregate
             // writes and recovery markers cannot block the main session DB.
+            // Its OS-held owner lock is the durable single-writer boundary;
+            // the Tauri single-instance plugin above is activation UX only.
             let sockscap_store = Arc::new(
                 sockscap::storage::SockscapStore::open(&app_data)
                     .expect("failed to open sockscap database"),

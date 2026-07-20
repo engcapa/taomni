@@ -1,4 +1,7 @@
-name: Sockscap Platform Gates
+name: Sockscap Source and Quick Gates (Non-Release)
+
+# This workflow emits source-contract and synthetic quick evidence only. It
+# never authorizes a Sockscap production capability or release promotion.
 
 on:
   pull_request:
@@ -6,26 +9,57 @@ on:
       - "scripts/sockscap/**"
       - "src-tauri/platform/sockscap/**"
       - "src-tauri/src/bin/sockscap_gate.rs"
+      - "src-tauri/src/bin/sockscap_helper.rs"
       - "src-tauri/src/sockscap/**"
+      - "src-tauri/src/lib.rs"
+      - "src-tauri/src/state.rs"
+      - "src-tauri/build.rs"
       - "src-tauri/Cargo.toml"
       - "src-tauri/Cargo.lock"
+      - "src-tauri/capabilities/**"
+      - "src-tauri/icons/**"
+      - "src-tauri/tauri.conf.json"
       - "src/components/sockscap/**"
+      - "src/lib/sockscap*"
+      - "src/stubs/sockscap*"
       - "src/stores/sockscapStore.ts"
+      - "qa-ui-auto-tests/cases/**/*SOCKSCAP*.testcase.yaml"
       - "src-tauri/tauri.sockscap.macos.conf.json"
+      - "src-tauri/tauri.sockscap.linux.conf.json"
+      - "scripts/bundle-krb5-macos.sh"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/release.yml"
       - ".github/workflows/sockscap-platform-gates.yml"
   push:
     branches:
+      - "main"
       - "feat/sockscap-*"
     paths:
       - "scripts/sockscap/**"
       - "src-tauri/platform/sockscap/**"
       - "src-tauri/src/bin/sockscap_gate.rs"
+      - "src-tauri/src/bin/sockscap_helper.rs"
       - "src-tauri/src/sockscap/**"
+      - "src-tauri/src/lib.rs"
+      - "src-tauri/src/state.rs"
+      - "src-tauri/build.rs"
       - "src-tauri/Cargo.toml"
       - "src-tauri/Cargo.lock"
+      - "src-tauri/capabilities/**"
+      - "src-tauri/icons/**"
+      - "src-tauri/tauri.conf.json"
       - "src/components/sockscap/**"
+      - "src/lib/sockscap*"
+      - "src/stubs/sockscap*"
       - "src/stores/sockscapStore.ts"
+      - "qa-ui-auto-tests/cases/**/*SOCKSCAP*.testcase.yaml"
       - "src-tauri/tauri.sockscap.macos.conf.json"
+      - "src-tauri/tauri.sockscap.linux.conf.json"
+      - "scripts/bundle-krb5-macos.sh"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/release.yml"
       - ".github/workflows/sockscap-platform-gates.yml"
   workflow_dispatch:
 
@@ -34,17 +68,32 @@ permissions:
 
 jobs:
   source-gates:
-    name: Gate source contracts (Linux)
+    name: Source contracts (Linux, non-release)
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Validate shell and JSON contracts
         shell: bash
         run: |
           bash -n scripts/sockscap/verify-macos-release.sh
+          bash -n scripts/sockscap/build-linux-capture-candidates.sh
+          bash -n scripts/sockscap/stage-linux-package.sh
+          bash -n src-tauri/platform/sockscap/linux/packaging/*.sh
           jq -e . src-tauri/tauri.sockscap.macos.conf.json >/dev/null
+          jq -e . src-tauri/tauri.sockscap.linux.conf.json >/dev/null
           jq -e . src-tauri/platform/sockscap/windows/release-manifest.template.json >/dev/null
+          jq -e . src-tauri/platform/sockscap/linux/release-policy.json >/dev/null
+          jq -e . src-tauri/platform/sockscap/linux/release-manifest.template.json >/dev/null
           jq -e . src-tauri/platform/sockscap/performance-release-manifest.template.json >/dev/null
+          python3 -m py_compile scripts/sockscap/generate-linux-helper-policy.py
+          python3 scripts/sockscap/test_generate_linux_helper_policy.py
+          bash scripts/sockscap/build-linux-capture-candidates.sh --lint
+          bash scripts/sockscap/stage-linux-package.sh --lint
+          python3 scripts/sockscap/test_linux_package_contract.py
+          python3 -m py_compile scripts/sockscap/verify-linux-release.py
+          python3 scripts/sockscap/test_verify_linux_release.py
+          python3 scripts/sockscap/verify-linux-release.py --lint \
+            src-tauri/platform/sockscap/linux/release-manifest.template.json
           python3 -m py_compile scripts/sockscap/verify-performance-gate.py
           python3 scripts/sockscap/test_verify_performance_gate.py
           python3 scripts/sockscap/verify-performance-gate.py platform \
@@ -54,19 +103,32 @@ jobs:
             src-tauri/platform/sockscap/macos/release-manifest.template.json
 
   core-performance:
-    name: Gate core performance and lifecycle (optimized Linux build)
+    name: Synthetic core quick and frontend (Linux, non-release)
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Install Protoc
-        uses: arduino/setup-protoc@v3
+        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3.0.0
         with:
+          version: "29.3"
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: "10"
+          run_install: false
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: pnpm
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable action snapshot
+        with:
+          toolchain: 1.95.0
       - name: Cache Rust build
-        uses: swatinem/rust-cache@v2
+        uses: swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: src-tauri -> target
       - name: Install Linux build dependencies
@@ -74,10 +136,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev libkrb5-dev
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run frontend build and focused Sockscap unit tests
+        run: |
+          pnpm build
+          pnpm exec vitest run \
+            src/components/sockscap \
+            src/lib/sockscap*.test.ts \
+            src/stores/sockscapStore.test.ts \
+            src/stubs/sockscap.test.ts
       - name: Run optimized core gate
         env:
           SOCKSCAP_GATE_GIT_COMMIT: ${{ github.sha }}
         run: |
+          cargo test --locked --manifest-path src-tauri/Cargo.toml \
+            --lib sockscap --quiet
+          cargo build --locked --manifest-path src-tauri/Cargo.toml --release \
+            --bin sockscap-helper
           cargo run --locked --manifest-path src-tauri/Cargo.toml --release \
             --bin sockscap-gate -- quick \
             --output "$RUNNER_TEMP/sockscap-core-quick.json"
@@ -86,31 +162,77 @@ jobs:
             --expected-commit "${{ github.sha }}"
       - name: Upload core gate receipt
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: sockscap-core-quick-${{ github.sha }}
           path: ${{ runner.temp }}/sockscap-core-quick.json
           if-no-files-found: error
 
   windows-contract:
-    name: Gate source contracts (Windows)
+    name: Source compile and process contract (Windows, non-release)
     runs-on: windows-latest
+    timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Install Protoc
+        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3.0.0
+        with:
+          version: "29.3"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable action snapshot
+        with:
+          toolchain: 1.95.0
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: src-tauri -> target
       - name: Parse disabled Windows release template
         shell: pwsh
         run: |
           ./scripts/sockscap/verify-windows-release.ps1 `
             -ManifestPath ./src-tauri/platform/sockscap/windows/release-manifest.template.json `
             -LintOnly
+      - name: Compile Windows source and run process contract
+        shell: pwsh
+        run: |
+          cargo check --locked --manifest-path src-tauri/Cargo.toml --lib --bins
+          cargo test --locked --manifest-path src-tauri/Cargo.toml --lib sockscap::processes
 
   macos-contract:
-    name: Gate source contracts (macOS)
+    name: Source compile and process contract (macOS, non-release)
     runs-on: macos-latest
+    timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Install Protoc
+        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # v3.0.0
+        with:
+          version: "29.3"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable action snapshot
+        with:
+          toolchain: 1.95.0
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: src-tauri -> target
+      - name: Install native macOS build dependencies
+        shell: bash
+        run: |
+          brew install krb5
+          krb5_prefix="$(brew --prefix krb5)"
+          echo "LIBGSSAPI_IMPL=mit" >> "$GITHUB_ENV"
+          echo "LIBGSSAPI_PREFIX=$krb5_prefix" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$krb5_prefix/lib/pkgconfig" >> "$GITHUB_ENV"
       - name: Parse release entitlements and disabled template
         shell: bash
         run: |
           bash scripts/sockscap/verify-macos-release.sh --lint \
             src-tauri/platform/sockscap/macos/release-manifest.template.json
+      - name: Compile macOS source and run process contract
+        shell: bash
+        run: |
+          cargo check --locked --manifest-path src-tauri/Cargo.toml --lib --bins
+          cargo test --locked --manifest-path src-tauri/Cargo.toml --lib sockscap::processes

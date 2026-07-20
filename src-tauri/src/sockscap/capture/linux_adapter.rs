@@ -111,6 +111,37 @@ impl LinuxPacketChannelIdentity {
 }
 
 impl LinuxPacketRuntimeChannels {
+    /// Join the exact stack-facing ends produced by one bounded native packet
+    /// device.  Keeping this constructor at the capture boundary lets product
+    /// data-plane adapters consume the pair without fabricating the private
+    /// source identity carried by the queues.
+    pub(super) fn from_packet_queues(
+        ingress: PacketIngressReceiver,
+        egress: PacketEgressSender,
+    ) -> Result<Self, LinuxDataPlaneError> {
+        let ingress_identity = ingress.identity();
+        let egress_identity = egress.identity();
+        if ingress_identity != egress_identity
+            || ingress_identity.generation == 0
+            || ingress_identity.platform != CapturePlatform::Linux
+            || ingress_identity.source_id() == 0
+        {
+            return Err(LinuxDataPlaneError::invalid(
+                "LINUX_PACKET_CHANNEL_IDENTITY_INVALID",
+                "packet channels do not belong to one Linux native packet device",
+            ));
+        }
+        Ok(Self {
+            ingress,
+            egress,
+            identity: LinuxPacketChannelIdentity {
+                generation: ingress_identity.generation,
+                platform: ingress_identity.platform,
+                packet_queue: ingress_identity,
+            },
+        })
+    }
+
     fn validate_for(&self, spec: &CaptureInstallSpec) -> Result<(), LinuxDataPlaneError> {
         let ingress_identity = self.ingress.identity();
         let egress_identity = self.egress.identity();
@@ -263,7 +294,13 @@ impl LinuxTunPacketRuntime {
         let (native, stack) =
             bounded_packet_device_queues(queue_bytes, generation, CapturePlatform::Linux)
                 .map_err(LinuxPacketRuntimeError::Packet)?;
-        let packet_queue = stack.ingress.identity();
+        let channels = LinuxPacketRuntimeChannels::from_packet_queues(stack.ingress, stack.egress)
+            .map_err(|_| {
+                LinuxPacketRuntimeError::invalid(
+                    "LINUX_PACKET_CHANNEL_IDENTITY_INVALID",
+                    "bounded native packet queues returned an inconsistent Linux identity",
+                )
+            })?;
         Ok((
             Self {
                 reader: Arc::new(reader),
@@ -277,15 +314,7 @@ impl LinuxTunPacketRuntime {
                 pump_started: AtomicBool::new(false),
                 closed: AtomicBool::new(false),
             },
-            LinuxPacketRuntimeChannels {
-                ingress: stack.ingress,
-                egress: stack.egress,
-                identity: LinuxPacketChannelIdentity {
-                    generation,
-                    platform: CapturePlatform::Linux,
-                    packet_queue,
-                },
-            },
+            channels,
         ))
     }
 
@@ -926,6 +955,17 @@ pub trait LinuxDataPlaneFactory: Send + Sync {
         channels: LinuxPacketRuntimeChannels,
         deadline: Instant,
     ) -> Result<Box<dyn LinuxDataPlaneRuntime>, LinuxDataPlaneError>;
+
+    /// Discharge any startup owner retained before a runtime handle could be
+    /// inserted into the lifecycle record. Stateless factories have nothing
+    /// to do; cancellation-safe product factories override this method.
+    async fn recover_generation_until(
+        &self,
+        _generation: u64,
+        _deadline: Instant,
+    ) -> Result<(), LinuxDataPlaneError> {
+        Ok(())
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -2177,18 +2217,40 @@ impl LinuxCaptureLifecycle {
     /// if the caller cancels the public operation, the lock is released but
     /// each joinable owner remains in the record for a recovery retry.
     async fn cleanup_local_resources_until(&self, deadline: Instant, failures: &mut Vec<String>) {
-        let mut record = self.record.lock().await;
-        if let Some(data_plane) = record.data_plane.as_mut() {
-            match data_plane.stop_until(deadline).await {
-                Ok(()) => record.data_plane = None,
-                Err(error) => failures.push(error.to_string()),
+        let generation = {
+            let mut record = self.record.lock().await;
+            let generation = match record.state {
+                LinuxCaptureState::Idle => None,
+                LinuxCaptureState::Preparing { generation }
+                | LinuxCaptureState::RuntimeReady { generation, .. }
+                | LinuxCaptureState::DataPlaneStarting { generation, .. }
+                | LinuxCaptureState::DataPlaneReady { generation, .. }
+                | LinuxCaptureState::Activating { generation, .. }
+                | LinuxCaptureState::Active { generation, .. }
+                | LinuxCaptureState::Stopping { generation }
+                | LinuxCaptureState::RecoveryRequired { generation } => Some(generation),
+            };
+            if let Some(data_plane) = record.data_plane.as_mut() {
+                match data_plane.stop_until(deadline).await {
+                    Ok(()) => record.data_plane = None,
+                    Err(error) => failures.push(error.to_string()),
+                }
             }
-        }
-        if let Some(runtime) = record.runtime.as_mut() {
-            match runtime.runtime.close_until(deadline).await {
-                Ok(()) => record.runtime = None,
-                Err(error) => failures.push(error.to_string()),
+            if let Some(runtime) = record.runtime.as_mut() {
+                match runtime.runtime.close_until(deadline).await {
+                    Ok(()) => record.runtime = None,
+                    Err(error) => failures.push(error.to_string()),
+                }
             }
+            generation
+        };
+        if let Some(generation) = generation
+            && let Err(error) = self
+                .data_plane_factory
+                .recover_generation_until(generation, deadline)
+                .await
+        {
+            failures.push(error.to_string());
         }
     }
 

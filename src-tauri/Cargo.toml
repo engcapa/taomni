@@ -5,7 +5,7 @@ description = "AI-native remote workspace for developers"
 authors = ["engcapa"]
 license = "MIT"
 edition = "2024"
-rust-version = "1.94"
+rust-version = "1.95"
 # Required once [[bin]] acp-fake-agent exists: otherwise `cargo run` /
 # `cargo tauri dev` cannot pick between taomni and acp-fake-agent.
 default-run = "taomni"
@@ -55,6 +55,7 @@ log = "0.4"
 portable-pty = "0.9"
 base64 = "0.22"
 rusqlite = { version = "0.40", features = ["bundled"] }
+fs2 = "=0.4.3"
 chrono = "0.4"
 russh = { version = "0.61", features = ["async-trait"] }
 russh-sftp = "2.3"
@@ -225,6 +226,9 @@ hbase-kerberos = ["dep:cross-krb5"]
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["fileapi", "commdlg", "shellapi", "winbase", "winuser"] }
 winreg = "0.55"
+
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = "=2.4.3"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # RDP server X11 screen capture (XShm / MIT-SHM via libxcb) plus the DAMAGE

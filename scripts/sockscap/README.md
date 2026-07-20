@@ -103,6 +103,66 @@ Neither verifier obtains certificates, Apple managed capabilities, Microsoft
 driver signatures, or lab evidence. Those are external release inputs, and the
 gate remains red until the real artifacts are supplied.
 
+## Linux
+
+Capture-capable Linux delivery is deliberately limited to installed DEB/RPM
+packages. Ordinary AppImage and updater builds do not install the fixed root
+helper, helper policy, or polkit action and therefore must keep every capture
+capability disabled. The sole candidate-build entry is:
+
+```bash
+bash scripts/sockscap/build-linux-capture-candidates.sh
+```
+
+It invokes Tauri with `src-tauri/tauri.sockscap.linux.conf.json` and only the
+`deb,rpm` bundle set. It rejects test staging overrides and refuses to build
+until the committed policy contains a reviewed architecture, a complete
+per-distro package dependency contract, and complete DEB/RPM signer
+fingerprints. Both policy states are intentionally `unconfigured` today, so
+`--lint` is the only passing source-only mode:
+
+```bash
+bash scripts/sockscap/build-linux-capture-candidates.sh --lint
+bash scripts/sockscap/stage-linux-package.sh --lint
+python3 scripts/sockscap/verify-linux-release.py --lint \
+  src-tauri/platform/sockscap/linux/release-manifest.template.json
+```
+
+The release-only Tauri hook builds the fixed `sockscap-helper`, hashes the
+final application and helper into an exact-installed-only helper policy, and
+stages that policy with the fixed polkit action. Package hooks install the
+files as root with fixed modes and refuse upgrade/removal while cgroup, nft,
+TUN, policy-route, unsafe runtime, or unknown tombstone state remains. They do
+not delete recovery evidence, and the old package's post-remove hook preserves
+the new runtime directory during upgrade.
+
+After the final DEB/RPM is signed and installed on the verification host, copy
+the disabled Linux manifest to an evidence directory, fill every hash/path and
+run:
+
+```bash
+python3 scripts/sockscap/verify-linux-release.py \
+  path/to/linux-release-manifest.json \
+  > path/to/evidence/artifact-gate.json
+```
+
+The verifier pins the fixed policy, package type, full OpenPGP signer
+fingerprint, package payload and maintainer scripts, installed paths,
+root ownership/modes, absence of helper file capabilities, helper policy, and
+polkit defaults. It emits a hash-bound package manifest. This is same-host
+artifact evidence, not proof that clean install, dirty-state blocking,
+upgrade, rollback, uninstall, and final-residue checks ran under a real package
+manager; the aggregate platform Gate requires that separate typed lab receipt.
+
+The current aggregate verifier deliberately keeps Linux lab-runner attestation
+unconfigured. It validates the typed lifecycle receipt and all five classes of
+hash-pinned raw evidence, then fails with
+`LINUX_INSTALL_PROVENANCE_ATTESTATION_UNCONFIGURED`; self-reported `PASS` fields
+cannot produce a Linux release `PASS`. Before enabling this path, implement a
+protected package-manager lab runner and commit its reviewed identity/public
+key plus a fixed signature and verification protocol. This is an intentional
+external release blocker, not a source-lint failure.
+
 ## Core performance and lifecycle soak
 
 The headless core gate uses the production policy matcher, bounded live-flow
@@ -146,13 +206,13 @@ python3 scripts/sockscap/verify-performance-gate.py platform \
 ```
 
 `evidence.artifactGate` must point to the final JSON receipt emitted by the
-same-host Windows/macOS verifier, never its lint output. A Linux packaging
-pipeline must emit an equivalent PASS receipt containing the exact
-architecture/provider, installed app/helper/policy paths, and true package
-signature, root-helper ownership, and helper-policy checks. The aggregate Gate
-re-hashes each absolute receipt-listed app/helper/provider/package path on the
+same-host Windows/macOS/Linux verifier, never its lint output. The aggregate
+Gate binds each receipt to the committed platform policy and re-hashes every
+receipt-listed app/helper/provider/package/policy/manifest path on the
 verification host; copying only a PASS JSON without its exact candidate files
-is rejected.
+is rejected. Linux additionally requires `evidence.linuxInstallProvenance`, a
+typed real-package-manager receipt for install/upgrade/rollback/uninstall and
+dirty-state/final-residue checks.
 
 `evidence.nativeSmoke` must point to schema v1
 `sockscap_native_capture_smoke` evidence with

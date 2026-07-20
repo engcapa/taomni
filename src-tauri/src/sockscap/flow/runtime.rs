@@ -109,6 +109,12 @@ pub trait FlowRuntimeOwner: Send + Sync {
     /// Stable non-secret saved egress id this owner keeps alive.
     fn binding_id(&self) -> &str;
 
+    /// Complete shutdown of the live resource represented by this owner.
+    ///
+    /// The runtime never calls this method again after it returns `Ok(())`.
+    /// A future cancelled by a bounded deadline, a panic, or an error remains
+    /// pending and can be called again, so inconclusive attempts must be
+    /// cancellation-safe and retryable.
     async fn shutdown(&self) -> Result<(), FlowRuntimeOwnerError>;
 }
 
@@ -156,6 +162,10 @@ impl ProfileRuntime {
             owner: Some(owner),
         }
     }
+
+    pub(in crate::sockscap::flow) fn owner(&self) -> Option<Arc<dyn FlowRuntimeOwner>> {
+        self.owner.clone()
+    }
 }
 
 impl std::fmt::Debug for ProfileRuntime {
@@ -197,6 +207,28 @@ pub enum FlowRuntimeError {
     #[error("FLOW_RUNTIME_INGRESS_FAILED: {code}")]
     Ingress { code: &'static str },
 }
+
+/// Lock-free lifecycle fence for product composition health checks.
+///
+/// A join handle only says whether the supervisor has completely returned.
+/// Cleanup can remain in progress after packet ingress has already reached
+/// EOF, so callers must revoke readiness as soon as the admission loop exits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlowRuntimeLifecycle {
+    NotStarted,
+    Starting,
+    Running,
+    Stopping,
+    Stopped,
+    Failed,
+}
+
+const RUNTIME_NOT_STARTED: u8 = 0;
+const RUNTIME_STARTING: u8 = 1;
+const RUNTIME_RUNNING: u8 = 2;
+const RUNTIME_STOPPING: u8 = 3;
+const RUNTIME_STOPPED: u8 = 4;
+const RUNTIME_FAILED: u8 = 5;
 
 /// Privacy-bounded counters; no tuple, hostname, application identity, or
 /// payload-derived value enters this structure.
@@ -345,11 +377,27 @@ pub struct FlowRuntime {
     config: FlowRuntimeConfig,
     selector: ProfileSelector,
     engines: HashMap<String, Arc<FlowEngine>>,
-    owners: Vec<Arc<dyn FlowRuntimeOwner>>,
+    owner_count: usize,
+    /// Only owners whose shutdown has not returned success remain here.
+    pending_owners: tokio::sync::Mutex<Vec<Arc<dyn FlowRuntimeOwner>>>,
     admission: Arc<Semaphore>,
     cancellation: CancellationToken,
     metrics: Arc<FlowRuntimeMetrics>,
+    /// Join/control owners that outlived the supervisor's first bounded
+    /// cleanup attempt. The product recovery owner retries this state; it is
+    /// never dropped merely to report a clean stop.
+    cleanup_state: tokio::sync::Mutex<Option<RuntimeState>>,
+    /// Set when the supervisor unwound outside its guarded admission-loop
+    /// error path. In that case local JoinSet ownership was dropped without an
+    /// observable join proof, so no later retry may report a clean runtime.
+    cleanup_uncertain: AtomicBool,
+    /// Independent from the primary terminal error. It is cleared only after
+    /// the internal supervisor is terminal and every local/profile owner has
+    /// produced cleanup proof.
+    cleanup_pending: AtomicBool,
+    supervisor_terminal: tokio::sync::Notify,
     started: AtomicBool,
+    lifecycle: AtomicU8,
 }
 
 impl FlowRuntime {
@@ -414,16 +462,50 @@ impl FlowRuntime {
             config,
             selector,
             engines,
-            owners,
+            owner_count: owners.len(),
+            pending_owners: tokio::sync::Mutex::new(owners),
             admission: Arc::new(Semaphore::new(config.max_active_flows())),
             cancellation: CancellationToken::new(),
             metrics: Arc::new(FlowRuntimeMetrics::default()),
+            cleanup_state: tokio::sync::Mutex::new(None),
+            cleanup_uncertain: AtomicBool::new(false),
+            cleanup_pending: AtomicBool::new(false),
+            supervisor_terminal: tokio::sync::Notify::new(),
             started: AtomicBool::new(false),
+            lifecycle: AtomicU8::new(RUNTIME_NOT_STARTED),
         })
     }
 
     pub fn cancel(&self) {
         self.cancellation.cancel();
+    }
+
+    /// Retry shutdown of live profile owners after the supervisor exhausted
+    /// its original cleanup deadline or its join outcome was uncertain. The
+    /// owners remain strongly held by `FlowRuntime`, so a timed-out attempt is
+    /// never treated as cleanup proof.
+    pub async fn retry_cleanup_until(&self, deadline: Instant) -> Result<(), FlowRuntimeError> {
+        if !self.wait_for_supervisor_terminal_until(deadline).await {
+            self.cleanup_pending.store(true, Ordering::Release);
+            return Err(FlowRuntimeError::OwnerShutdownFailed);
+        }
+        let local_clean = self.retry_local_cleanup_until(deadline).await;
+        let failures = self.shutdown_owners_until(deadline).await;
+        self.metrics.owner_shutdown_failures(failures);
+        let clean = local_clean && failures == 0 && !self.cleanup_uncertain.load(Ordering::Acquire);
+        self.cleanup_pending.store(!clean, Ordering::Release);
+        if clean {
+            Ok(())
+        } else {
+            Err(FlowRuntimeError::OwnerShutdownFailed)
+        }
+    }
+
+    /// Whether supervisor completion or child/control/profile-owner cleanup
+    /// proof is still outstanding. This does not hide the primary terminal
+    /// runtime error returned by the supervisor.
+    pub fn has_pending_cleanup(&self) -> bool {
+        self.cleanup_pending.load(Ordering::Acquire)
     }
 
     pub fn cancellation_token(&self) -> CancellationToken {
@@ -432,6 +514,17 @@ impl FlowRuntime {
 
     pub fn snapshot(&self) -> FlowRuntimeSnapshot {
         self.metrics.snapshot()
+    }
+
+    pub fn lifecycle(&self) -> FlowRuntimeLifecycle {
+        match self.lifecycle.load(Ordering::Acquire) {
+            RUNTIME_NOT_STARTED => FlowRuntimeLifecycle::NotStarted,
+            RUNTIME_STARTING => FlowRuntimeLifecycle::Starting,
+            RUNTIME_RUNNING => FlowRuntimeLifecycle::Running,
+            RUNTIME_STOPPING => FlowRuntimeLifecycle::Stopping,
+            RUNTIME_STOPPED => FlowRuntimeLifecycle::Stopped,
+            _ => FlowRuntimeLifecycle::Failed,
+        }
     }
 
     /// Start an owned supervisor. Dropping the returned handle requests a
@@ -449,9 +542,26 @@ impl FlowRuntime {
         {
             return Err(FlowRuntimeError::AlreadyStarted);
         }
+        self.lifecycle.store(RUNTIME_STARTING, Ordering::Release);
+        self.cleanup_pending.store(true, Ordering::Release);
 
         let runtime = Arc::clone(self);
-        let supervisor = async_runtime.spawn(async move { runtime.supervise(ingress).await });
+        let supervisor = async_runtime.spawn(async move {
+            let outcome = AssertUnwindSafe(Arc::clone(&runtime).supervise(ingress))
+                .catch_unwind()
+                .await;
+            let result = match outcome {
+                Ok(result) => result,
+                Err(_) => {
+                    runtime.cleanup_uncertain.store(true, Ordering::Release);
+                    runtime.cleanup_pending.store(true, Ordering::Release);
+                    runtime.lifecycle.store(RUNTIME_FAILED, Ordering::Release);
+                    Err(FlowRuntimeError::SupervisorFailed)
+                }
+            };
+            runtime.supervisor_terminal.notify_waiters();
+            result
+        });
         Ok(FlowRuntimeHandle {
             cancellation: self.cancellation.clone(),
             supervisor: Some(supervisor),
@@ -462,6 +572,7 @@ impl FlowRuntime {
         self: Arc<Self>,
         ingress: Arc<dyn FlowIngress>,
     ) -> Result<FlowRuntimeSnapshot, FlowRuntimeError> {
+        self.lifecycle.store(RUNTIME_RUNNING, Ordering::Release);
         let mut state = RuntimeState::new(self.config.max_active_flows());
         let stop_reason = match AssertUnwindSafe(self.admission_loop(&ingress, &mut state))
             .catch_unwind()
@@ -471,14 +582,60 @@ impl FlowRuntime {
             Err(_) => StopReason::SupervisorPanic,
         };
 
+        // Revoke product readiness before any potentially slow flow/owner
+        // cleanup.  A live wrapper JoinHandle is not proof of admission health.
+        self.lifecycle.store(RUNTIME_STOPPING, Ordering::Release);
         let owner_failures = self.cleanup(&mut state, stop_reason).await;
-        if owner_failures > 0 && matches!(stop_reason, StopReason::Eof | StopReason::Cancelled) {
-            return Err(FlowRuntimeError::OwnerShutdownFailed);
-        }
-        match stop_reason {
-            StopReason::Ingress(error) => Err(error),
-            StopReason::SupervisorPanic => Err(FlowRuntimeError::SupervisorFailed),
-            StopReason::Eof | StopReason::Cancelled => Ok(self.metrics.snapshot()),
+        let result = if owner_failures > 0
+            && matches!(stop_reason, StopReason::Eof | StopReason::Cancelled)
+        {
+            Err(FlowRuntimeError::OwnerShutdownFailed)
+        } else {
+            match stop_reason {
+                StopReason::Ingress(error) => Err(error),
+                StopReason::SupervisorPanic => Err(FlowRuntimeError::SupervisorFailed),
+                StopReason::Eof | StopReason::Cancelled => Ok(self.metrics.snapshot()),
+            }
+        };
+        let clean_controlled_stop = result.is_ok() && stop_reason == StopReason::Cancelled;
+        self.lifecycle.store(
+            if clean_controlled_stop {
+                RUNTIME_STOPPED
+            } else {
+                RUNTIME_FAILED
+            },
+            Ordering::Release,
+        );
+        result
+    }
+
+    async fn wait_for_supervisor_terminal_until(&self, deadline: Instant) -> bool {
+        loop {
+            match self.lifecycle() {
+                FlowRuntimeLifecycle::NotStarted
+                | FlowRuntimeLifecycle::Stopped
+                | FlowRuntimeLifecycle::Failed => return true,
+                FlowRuntimeLifecycle::Starting
+                | FlowRuntimeLifecycle::Running
+                | FlowRuntimeLifecycle::Stopping => {}
+            }
+            if Instant::now() >= deadline {
+                return false;
+            }
+            let notified = self.supervisor_terminal.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            if matches!(
+                self.lifecycle(),
+                FlowRuntimeLifecycle::NotStarted
+                    | FlowRuntimeLifecycle::Stopped
+                    | FlowRuntimeLifecycle::Failed
+            ) {
+                continue;
+            }
+            if tokio::time::timeout_at(deadline, notified).await.is_err() {
+                return false;
+            }
         }
     }
 
@@ -743,16 +900,18 @@ impl FlowRuntime {
             }
         }
 
-        // Any task that could not be joined still has an owned active record.
-        // Its task is aborted by JoinSet drop; finalization below is at-most-once
-        // and consumes only the remaining shared deadline.
-        for (_, active) in state.active_by_task.drain() {
-            state.active_flow_ids.remove(&active.flow_id);
-            state.pending_finalization.push(PendingFinalization {
-                active,
-                disposition: TcpCloseDisposition::Cancelled,
-                panicked: false,
-            });
+        // Never detach metadata from a task whose abort completion has not
+        // been observed. A retryable cleanup owner retains both JoinSet and
+        // active record beyond this first deadline.
+        if state.flow_tasks.is_empty() {
+            for (_, active) in state.active_by_task.drain() {
+                state.active_flow_ids.remove(&active.flow_id);
+                state.pending_finalization.push(PendingFinalization {
+                    active,
+                    disposition: TcpCloseDisposition::Cancelled,
+                    panicked: false,
+                });
+            }
         }
         self.finalize_pending_until(state, close_deadline).await;
         self.drain_rejected_closes_until(state, close_deadline)
@@ -761,11 +920,19 @@ impl FlowRuntime {
 
         let owner_failures = self.shutdown_owners_until(total_deadline).await;
         self.metrics.owner_shutdown_failures(owner_failures);
-        if !state.active_flow_ids.is_empty() {
-            self.metrics.invariant_violation();
-            state.active_flow_ids.clear();
+        let local_incomplete = !state.flow_tasks.is_empty()
+            || !state.close_tasks.is_empty()
+            || !state.pending_finalization.is_empty()
+            || !state.active_by_task.is_empty()
+            || !state.active_flow_ids.is_empty();
+        if local_incomplete {
+            let max_close_tasks = state.max_close_tasks;
+            let retained = std::mem::replace(state, RuntimeState::empty(max_close_tasks));
+            *self.cleanup_state.lock().await = Some(retained);
         }
-        owner_failures
+        self.cleanup_pending
+            .store(owner_failures > 0 || local_incomplete, Ordering::Release);
+        owner_failures + usize::from(local_incomplete)
     }
 
     async fn drain_flow_tasks_until(&self, state: &mut RuntimeState, deadline: Instant) {
@@ -787,53 +954,28 @@ impl FlowRuntime {
     }
 
     async fn finalize_pending_until(&self, state: &mut RuntimeState, deadline: Instant) {
-        let mut next_id = 0_u64;
-        let mut metadata = HashMap::new();
-        let mut futures: FuturesUnordered<BoxFuture<'static, (u64, TaskCompletion)>> =
-            FuturesUnordered::new();
-        for pending in state.pending_finalization.drain(..) {
-            let id = next_id;
-            next_id += 1;
-            metadata.insert(id, (pending.disposition, pending.panicked));
-            futures.push(
-                async move {
-                    let outcome = pending.active.close.close(pending.disposition).await;
-                    (
-                        id,
-                        task_completion_from_close(
-                            pending.disposition,
-                            0,
-                            0,
-                            pending.panicked,
-                            outcome,
-                        ),
-                    )
+        while let Some(pending) = state.pending_finalization.last() {
+            if Instant::now() >= deadline {
+                break;
+            }
+            let close = Arc::clone(&pending.active.close);
+            let disposition = pending.disposition;
+            let panicked = pending.panicked;
+            let outcome = tokio::time::timeout_at(deadline, close.close(disposition)).await;
+            match outcome {
+                Ok(outcome) => {
+                    state.pending_finalization.pop();
+                    self.metrics.completed(&task_completion_from_close(
+                        disposition,
+                        0,
+                        0,
+                        panicked,
+                        outcome,
+                    ));
                 }
-                .boxed(),
-            );
-        }
-
-        while !futures.is_empty() && Instant::now() < deadline {
-            match tokio::time::timeout_at(deadline, futures.next()).await {
-                Ok(Some((id, completion))) => {
-                    metadata.remove(&id);
-                    self.metrics.completed(&completion);
-                }
-                Ok(None) | Err(_) => break,
+                Err(_) => break,
             }
         }
-        drop(futures);
-        let forced = metadata.len();
-        for (_, (disposition, panicked)) in metadata {
-            self.metrics.completed(&TaskCompletion {
-                disposition,
-                bytes_to_egress: 0,
-                bytes_to_ingress: 0,
-                close_failed: true,
-                panicked,
-            });
-        }
-        self.metrics.forced_drops(forced);
     }
 
     async fn drain_rejected_closes_until(&self, state: &mut RuntimeState, deadline: Instant) {
@@ -850,42 +992,84 @@ impl FlowRuntime {
         if forced > 0 {
             state.close_tasks.abort_all();
             self.metrics.forced_drops(forced);
-            for _ in 0..forced {
-                self.metrics.rejected_close(CloseOutcome {
-                    failed: true,
-                    panicked: false,
-                });
-            }
         }
     }
 
+    async fn retry_local_cleanup_until(&self, deadline: Instant) -> bool {
+        let mut retained = self.cleanup_state.lock().await;
+        let Some(state) = retained.as_mut() else {
+            return true;
+        };
+
+        state.flow_tasks.abort_all();
+        while !state.flow_tasks.is_empty() && Instant::now() < deadline {
+            match tokio::time::timeout_at(deadline, state.flow_tasks.join_next_with_id()).await {
+                Ok(Some(result)) => self.finish_flow_join(result, state),
+                Ok(None) | Err(_) => break,
+            }
+        }
+        if state.flow_tasks.is_empty() {
+            for (_, active) in state.active_by_task.drain() {
+                state.active_flow_ids.remove(&active.flow_id);
+                state.pending_finalization.push(PendingFinalization {
+                    active,
+                    disposition: TcpCloseDisposition::Cancelled,
+                    panicked: false,
+                });
+            }
+            self.finalize_pending_until(state, deadline).await;
+        }
+
+        state.close_tasks.abort_all();
+        while !state.close_tasks.is_empty() && Instant::now() < deadline {
+            match tokio::time::timeout_at(deadline, state.close_tasks.join_next()).await {
+                Ok(Some(result)) => self.finish_close_join(result),
+                Ok(None) | Err(_) => break,
+            }
+        }
+
+        let clean = state.flow_tasks.is_empty()
+            && state.close_tasks.is_empty()
+            && state.pending_finalization.is_empty()
+            && state.active_by_task.is_empty()
+            && state.active_flow_ids.is_empty();
+        if clean {
+            retained.take();
+        }
+        clean
+    }
+
     async fn shutdown_owners_until(&self, deadline: Instant) -> usize {
-        if self.owners.is_empty() {
+        let mut pending = self.pending_owners.lock().await;
+        if pending.is_empty() {
             return 0;
         }
-        let mut shutdowns: FuturesUnordered<BoxFuture<'static, bool>> = FuturesUnordered::new();
-        for owner in &self.owners {
+        let mut shutdowns: FuturesUnordered<BoxFuture<'static, (Arc<dyn FlowRuntimeOwner>, bool)>> =
+            FuturesUnordered::new();
+        for owner in pending.iter() {
             let owner = owner.clone();
             shutdowns.push(
                 async move {
-                    AssertUnwindSafe(owner.shutdown())
+                    let succeeded = AssertUnwindSafe(owner.shutdown())
                         .catch_unwind()
                         .await
-                        .is_ok_and(|result| result.is_ok())
+                        .is_ok_and(|result| result.is_ok());
+                    (owner, succeeded)
                 }
                 .boxed(),
             );
         }
-        let mut failures = 0;
         while !shutdowns.is_empty() && Instant::now() < deadline {
             match tokio::time::timeout_at(deadline, shutdowns.next()).await {
-                Ok(Some(true)) => {}
-                Ok(Some(false)) => failures += 1,
+                Ok(Some((owner, true))) => {
+                    pending.retain(|candidate| !Arc::ptr_eq(candidate, &owner));
+                }
+                Ok(Some((_owner, false))) => {}
                 Ok(None) => break,
                 Err(_) => break,
             }
         }
-        failures + shutdowns.len()
+        pending.len()
     }
 }
 
@@ -980,6 +1164,17 @@ impl RuntimeState {
                 .clamp(MIN_CONTROL_CLOSE_CONCURRENCY, MAX_CONTROL_CLOSE_CONCURRENCY),
         }
     }
+
+    fn empty(max_close_tasks: usize) -> Self {
+        Self {
+            flow_tasks: JoinSet::new(),
+            active_by_task: HashMap::new(),
+            active_flow_ids: HashSet::new(),
+            pending_finalization: Vec::new(),
+            close_tasks: JoinSet::new(),
+            max_close_tasks,
+        }
+    }
 }
 
 struct ActiveRecord {
@@ -999,8 +1194,10 @@ impl std::fmt::Debug for FlowRuntime {
             .debug_struct("FlowRuntime")
             .field("config", &self.config)
             .field("profile_count", &self.engines.len())
-            .field("owner_count", &self.owners.len())
+            .field("owner_count", &self.owner_count)
+            .field("cleanup_pending", &self.has_pending_cleanup())
             .field("cancelled", &self.cancellation.is_cancelled())
+            .field("lifecycle", &self.lifecycle())
             .field("snapshot", &self.snapshot())
             .finish()
     }
@@ -1242,6 +1439,11 @@ mod tests {
         shutdowns: AtomicUsize,
     }
 
+    struct BlockingRetryOwner {
+        attempts: AtomicUsize,
+        release: tokio::sync::Notify,
+    }
+
     #[async_trait]
     impl FlowRuntimeOwner for RecordingOwner {
         fn binding_id(&self) -> &str {
@@ -1250,6 +1452,19 @@ mod tests {
 
         async fn shutdown(&self) -> Result<(), FlowRuntimeOwnerError> {
             self.shutdowns.fetch_add(1, AtomicOrdering::SeqCst);
+            Ok(())
+        }
+    }
+
+    #[async_trait]
+    impl FlowRuntimeOwner for BlockingRetryOwner {
+        fn binding_id(&self) -> &str {
+            "blocking-retry-owner"
+        }
+
+        async fn shutdown(&self) -> Result<(), FlowRuntimeOwnerError> {
+            self.attempts.fetch_add(1, AtomicOrdering::SeqCst);
+            self.release.notified().await;
             Ok(())
         }
     }
@@ -1667,7 +1882,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rejected_hanging_closes_share_the_absolute_shutdown_deadline() {
+    async fn rejected_hanging_closes_require_observed_abort_retry() {
         let runtime = runtime(RouteAction::Direct, None, 2);
         let (sender, ingress) = bounded_flow_ingress(8).unwrap();
         let mut controls = Vec::new();
@@ -1684,13 +1899,21 @@ mod tests {
         drop(sender);
 
         let started = Instant::now();
-        let snapshot = runtime
+        let error = runtime
             .start(Arc::new(ingress))
             .unwrap()
             .wait()
             .await
-            .unwrap();
+            .unwrap_err();
+        assert_eq!(error, FlowRuntimeError::OwnerShutdownFailed);
         assert!(started.elapsed() < Duration::from_millis(600));
+        assert!(runtime.has_pending_cleanup());
+        runtime
+            .retry_cleanup_until(Instant::now() + Duration::from_secs(1))
+            .await
+            .unwrap();
+        assert!(!runtime.has_pending_cleanup());
+        let snapshot = runtime.snapshot();
         assert_eq!(snapshot.rejected_stale, 8);
         assert_eq!(snapshot.forced_drops, 8);
         assert_eq!(snapshot.control_close_failures, 8);
@@ -1752,6 +1975,62 @@ mod tests {
         .unwrap();
         assert_eq!(control.dispositions(), vec![TcpCloseDisposition::Cancelled]);
         assert_terminal_invariant(&runtime.snapshot());
+    }
+
+    #[tokio::test]
+    async fn cancelled_owner_cleanup_retry_keeps_owner_for_next_attempt() {
+        let owner = Arc::new(BlockingRetryOwner {
+            attempts: AtomicUsize::new(0),
+            release: tokio::sync::Notify::new(),
+        });
+        let runtime = Arc::new(
+            FlowRuntime::new(
+                FlowRuntimeConfig::new(CapturePlatform::Linux, 7, 3, 1, Duration::from_millis(100))
+                    .unwrap(),
+                vec![ProfileRuntime::with_owner(
+                    profile(RouteAction::Block),
+                    engine(RouteAction::Block, None),
+                    owner.clone(),
+                )],
+            )
+            .unwrap(),
+        );
+        let (sender, ingress) = bounded_flow_ingress(1).unwrap();
+        drop(sender);
+        let error = runtime
+            .start(Arc::new(ingress))
+            .unwrap()
+            .wait()
+            .await
+            .unwrap_err();
+        assert_eq!(error, FlowRuntimeError::OwnerShutdownFailed);
+        assert!(runtime.has_pending_cleanup());
+        assert_eq!(owner.attempts.load(AtomicOrdering::SeqCst), 1);
+
+        let retry_runtime = Arc::clone(&runtime);
+        let retry = tokio::spawn(async move {
+            retry_runtime
+                .retry_cleanup_until(Instant::now() + Duration::from_secs(1))
+                .await
+        });
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while owner.attempts.load(AtomicOrdering::SeqCst) < 2 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        retry.abort();
+        assert!(retry.await.unwrap_err().is_cancelled());
+        assert!(runtime.has_pending_cleanup());
+
+        owner.release.notify_one();
+        runtime
+            .retry_cleanup_until(Instant::now() + Duration::from_secs(1))
+            .await
+            .unwrap();
+        assert_eq!(owner.attempts.load(AtomicOrdering::SeqCst), 3);
+        assert!(!runtime.has_pending_cleanup());
     }
 
     #[tokio::test]

@@ -5,10 +5,12 @@
 //! `taomni.db`; credentials and host-key trust remain in Vault/known-hosts.
 
 use std::collections::{HashMap, HashSet};
+use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use fs2::FileExt;
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -23,6 +25,8 @@ use super::types::{
 };
 
 pub const SOCKSCAP_DB_FILE: &str = "sockscap.db";
+pub const SOCKSCAP_OWNER_LOCK_FILE: &str = "sockscap.owner.lock";
+pub const SOCKSCAP_STORE_ALREADY_OPEN: &str = "SOCKSCAP_STORE_ALREADY_OPEN";
 pub const SOCKSCAP_SCHEMA_VERSION: i64 = 1;
 const RESTORE_ON_SYSTEM_LOGIN_SETTING: &str = "restore_on_system_login";
 const MAX_RECOVERY_ARTIFACT_BYTES: usize = 64 * 1024;
@@ -33,21 +37,44 @@ const DEFAULT_HOURLY_RETENTION_DAYS: i64 = 90;
 pub struct SockscapStore {
     conn: Mutex<Connection>,
     path: Option<PathBuf>,
+    // Declared after `conn` so the database closes before the process-wide
+    // ownership lock is released during normal field drop.
+    _owner_lock: Option<File>,
+    // Keep the canonical application-data directory open while SQLite and the
+    // owner lock are live. Platform validation below detects path replacement;
+    // a future handle-relative SQLite VFS is still required to eliminate the
+    // remaining same-user TOCTOU window completely.
+    _app_data_dir_guard: Option<File>,
+    capture_operation: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl SockscapStore {
     pub fn open(app_data_dir: &Path) -> Result<Self, String> {
         std::fs::create_dir_all(app_data_dir)
             .map_err(|error| format!("create app data directory: {error}"))?;
+        let app_data_dir = std::fs::canonicalize(app_data_dir)
+            .map_err(|error| format!("canonicalize Sockscap app data directory: {error}"))?;
+        let app_data_dir_guard = open_app_data_dir_guard(&app_data_dir)?;
+        validate_app_data_dir_binding(app_data_dir_guard.as_ref(), &app_data_dir)?;
+
+        let owner_lock = acquire_owner_lock(&app_data_dir)?;
+        validate_app_data_dir_binding(app_data_dir_guard.as_ref(), &app_data_dir)?;
         let path = app_data_dir.join(SOCKSCAP_DB_FILE);
+        validate_database_path(&path)?;
         let conn =
             Connection::open(&path).map_err(|error| format!("open {}: {error}", path.display()))?;
         configure_connection(&conn, true)?;
         migrate(&conn)?;
         harden_database_file(&path)?;
+        validate_database_path(&path)?;
+        validate_owner_lock_binding(&owner_lock, &app_data_dir.join(SOCKSCAP_OWNER_LOCK_FILE))?;
+        validate_app_data_dir_binding(app_data_dir_guard.as_ref(), &app_data_dir)?;
         Ok(Self {
             conn: Mutex::new(conn),
             path: Some(path),
+            _owner_lock: Some(owner_lock),
+            _app_data_dir_guard: app_data_dir_guard,
+            capture_operation: Arc::new(tokio::sync::Mutex::new(())),
         })
     }
 
@@ -59,7 +86,14 @@ impl SockscapStore {
         Ok(Self {
             conn: Mutex::new(conn),
             path: None,
+            _owner_lock: None,
+            _app_data_dir_guard: None,
+            capture_operation: Arc::new(tokio::sync::Mutex::new(())),
         })
+    }
+
+    pub(crate) fn capture_operation(&self) -> Arc<tokio::sync::Mutex<()>> {
+        Arc::clone(&self.capture_operation)
     }
 
     pub fn database_path(&self) -> Option<&Path> {
@@ -562,7 +596,9 @@ impl SockscapStore {
         config_revision: u64,
         platform: CapturePlatform,
         restore_after_recovery: bool,
+        adapter_id: &str,
     ) -> Result<RecoveryJournal, String> {
+        validate_safe_id("recovery adapter id", adapter_id)?;
         if active_profile_ids.is_empty() || active_profile_ids.len() > 1024 {
             return Err("recovery marker requires 1-1024 active profile ids".into());
         }
@@ -587,15 +623,22 @@ impl SockscapStore {
             ));
         }
         let generation = current.generation.saturating_add(1);
+        let adapter_binding = serde_json::to_string(&serde_json::json!({
+            "bindingSchemaVersion": 1,
+            "bindingState": "adapter_selected",
+            "adapter": adapter_id,
+            "generation": generation,
+        }))
+        .map_err(|error| format!("serialize recovery adapter binding: {error}"))?;
         let now = unix_now();
         tx.execute(
             "UPDATE engine_recovery_journal SET
                generation = ?1, phase = 'preparing', cleanup_required = 1,
                restore_after_recovery = ?2, config_revision = ?3,
                platform = ?4, active_profile_ids_json = ?5,
-               artifact_state_json = '{}', helper_pid = NULL,
+               artifact_state_json = ?6, helper_pid = NULL,
                last_heartbeat_at = NULL, last_error_code = NULL,
-               created_at = ?6, updated_at = ?6
+               created_at = ?7, updated_at = ?7
              WHERE singleton_id = 1",
             params![
                 to_sql_counter(generation, "recovery generation")?,
@@ -603,6 +646,7 @@ impl SockscapStore {
                 to_sql_counter(config_revision, "recovery config revision")?,
                 enum_name(&platform)?,
                 profile_ids_json,
+                adapter_binding,
                 now,
             ],
         )
@@ -1807,6 +1851,470 @@ fn delete_profile_stats(tx: &Transaction<'_>, profile_id: &str) -> Result<u64, S
     Ok(removed)
 }
 
+#[cfg(unix)]
+fn open_app_data_dir_guard(path: &Path) -> Result<Option<File>, String> {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let mut options = OpenOptions::new();
+    options
+        .read(true)
+        .custom_flags(libc::O_CLOEXEC | libc::O_DIRECTORY | libc::O_NOFOLLOW);
+    options.open(path).map(Some).map_err(|error| {
+        format!(
+            "open Sockscap app data directory {}: {error}",
+            path.display()
+        )
+    })
+}
+
+#[cfg(windows)]
+fn open_app_data_dir_guard(path: &Path) -> Result<Option<File>, String> {
+    use std::os::windows::fs::OpenOptionsExt;
+
+    const FILE_SHARE_READ: u32 = 0x0000_0001;
+    const FILE_SHARE_WRITE: u32 = 0x0000_0002;
+    const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+    const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+
+    let mut options = OpenOptions::new();
+    options
+        .read(true)
+        // Deliberately omit FILE_SHARE_DELETE so the canonical directory
+        // cannot be renamed or deleted while this process owns the store.
+        .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT);
+    options.open(path).map(Some).map_err(|error| {
+        format!(
+            "open Sockscap app data directory {}: {error}",
+            path.display()
+        )
+    })
+}
+
+#[cfg(not(any(unix, windows)))]
+fn open_app_data_dir_guard(path: &Path) -> Result<Option<File>, String> {
+    let metadata = std::fs::symlink_metadata(path).map_err(|error| {
+        format!(
+            "inspect Sockscap app data directory {}: {error}",
+            path.display()
+        )
+    })?;
+    if !metadata.file_type().is_dir() {
+        return Err(format!(
+            "Sockscap app data path {} is not a directory",
+            path.display()
+        ));
+    }
+    Ok(None)
+}
+
+#[cfg(unix)]
+fn validate_app_data_dir_binding(guard: Option<&File>, path: &Path) -> Result<(), String> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    let guard = guard.ok_or_else(|| "Sockscap app data directory guard is missing".to_string())?;
+    let mut opened = guard.metadata().map_err(|error| {
+        format!(
+            "inspect open Sockscap app data directory {}: {error}",
+            path.display()
+        )
+    })?;
+    let current = std::fs::symlink_metadata(path).map_err(|error| {
+        format!(
+            "reinspect Sockscap app data directory {}: {error}",
+            path.display()
+        )
+    })?;
+    if !opened.file_type().is_dir()
+        || !current.file_type().is_dir()
+        || opened.dev() != current.dev()
+        || opened.ino() != current.ino()
+    {
+        return Err(format!(
+            "Sockscap app data directory {} changed identity during store open",
+            path.display()
+        ));
+    }
+
+    let effective_uid = unsafe { libc::geteuid() };
+    if opened.uid() != effective_uid {
+        return Err(format!(
+            "Sockscap app data directory {} is not owned by the current user",
+            path.display()
+        ));
+    }
+    if opened.mode() & 0o077 != 0 {
+        guard
+            .set_permissions(std::fs::Permissions::from_mode(0o700))
+            .map_err(|error| {
+                format!(
+                    "harden Sockscap app data directory {} permissions: {error}",
+                    path.display()
+                )
+            })?;
+        opened = guard.metadata().map_err(|error| {
+            format!(
+                "reinspect hardened Sockscap app data directory {}: {error}",
+                path.display()
+            )
+        })?;
+        if opened.uid() != effective_uid || opened.mode() & 0o077 != 0 {
+            return Err(format!(
+                "Sockscap app data directory {} permissions could not be hardened to 0700",
+                path.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn validate_app_data_dir_binding(guard: Option<&File>, path: &Path) -> Result<(), String> {
+    use std::os::windows::fs::MetadataExt;
+
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0000_0400;
+
+    let guard = guard.ok_or_else(|| "Sockscap app data directory guard is missing".to_string())?;
+    let opened = guard.metadata().map_err(|error| {
+        format!(
+            "inspect open Sockscap app data directory {}: {error}",
+            path.display()
+        )
+    })?;
+    let current = std::fs::symlink_metadata(path).map_err(|error| {
+        format!(
+            "reinspect Sockscap app data directory {}: {error}",
+            path.display()
+        )
+    })?;
+    let current_guard = open_app_data_dir_guard(path)?
+        .ok_or_else(|| "Sockscap app data directory guard is missing".to_string())?;
+    if !opened.file_type().is_dir()
+        || !current.file_type().is_dir()
+        || opened.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+        || current.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+        || windows_file_identity(guard, path)? != windows_file_identity(&current_guard, path)?
+    {
+        return Err(format!(
+            "Sockscap app data directory {} is a reparse point or changed identity during store open",
+            path.display()
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(not(any(unix, windows)))]
+fn validate_app_data_dir_binding(_guard: Option<&File>, path: &Path) -> Result<(), String> {
+    let metadata = std::fs::symlink_metadata(path).map_err(|error| {
+        format!(
+            "inspect Sockscap app data directory {}: {error}",
+            path.display()
+        )
+    })?;
+    if metadata.file_type().is_dir() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Sockscap app data path {} is not a directory",
+            path.display()
+        ))
+    }
+}
+
+fn acquire_owner_lock(app_data_dir: &Path) -> Result<File, String> {
+    let path = app_data_dir.join(SOCKSCAP_OWNER_LOCK_FILE);
+    let (file, created) = open_owner_lock_file(&path)?;
+    let metadata = file
+        .metadata()
+        .map_err(|error| format!("inspect Sockscap owner lock {}: {error}", path.display()))?;
+    if !metadata.file_type().is_file() {
+        return Err(format!(
+            "Sockscap owner lock {} is not a regular file",
+            path.display()
+        ));
+    }
+
+    #[cfg(unix)]
+    harden_and_validate_unix_owner_lock(&file, &path, &metadata, created)?;
+
+    #[cfg(not(unix))]
+    let _ = created;
+
+    validate_owner_lock_binding(&file, &path)?;
+
+    file.try_lock_exclusive().map_err(|error| {
+        let contended = fs2::lock_contended_error();
+        if error.kind() == std::io::ErrorKind::WouldBlock
+            || error.raw_os_error() == contended.raw_os_error()
+        {
+            format!(
+                "{SOCKSCAP_STORE_ALREADY_OPEN}: another process owns {}",
+                path.display()
+            )
+        } else {
+            format!("acquire Sockscap owner lock {}: {error}", path.display())
+        }
+    })?;
+    validate_owner_lock_binding(&file, &path)?;
+    Ok(file)
+}
+
+#[cfg(unix)]
+fn owner_lock_open_options() -> OpenOptions {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let mut options = OpenOptions::new();
+    options
+        .read(true)
+        .write(true)
+        .mode(0o600)
+        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
+    options
+}
+
+#[cfg(windows)]
+fn owner_lock_open_options() -> OpenOptions {
+    use std::os::windows::fs::OpenOptionsExt;
+
+    const FILE_SHARE_READ: u32 = 0x0000_0001;
+    const FILE_SHARE_WRITE: u32 = 0x0000_0002;
+    const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+
+    let mut options = OpenOptions::new();
+    options
+        .read(true)
+        .write(true)
+        // A contender may open and lock the file, but it cannot replace the
+        // path while the current owner handle is alive.
+        .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
+    options
+}
+
+#[cfg(not(any(unix, windows)))]
+fn owner_lock_open_options() -> OpenOptions {
+    let mut options = OpenOptions::new();
+    options.read(true).write(true);
+    options
+}
+
+fn open_owner_lock_file(path: &Path) -> Result<(File, bool), String> {
+    let mut create_options = owner_lock_open_options();
+    match create_options.create_new(true).open(path) {
+        Ok(file) => Ok((file, true)),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            owner_lock_open_options()
+                .open(path)
+                .map(|file| (file, false))
+                .map_err(|error| {
+                    format!(
+                        "open existing Sockscap owner lock {}: {error}",
+                        path.display()
+                    )
+                })
+        }
+        Err(error) => Err(format!(
+            "create Sockscap owner lock {}: {error}",
+            path.display()
+        )),
+    }
+}
+
+#[cfg(unix)]
+fn harden_and_validate_unix_owner_lock(
+    file: &File,
+    path: &Path,
+    initial: &std::fs::Metadata,
+    created: bool,
+) -> Result<(), String> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    let effective_uid = unsafe { libc::geteuid() };
+    if initial.nlink() != 1 {
+        return Err(format!(
+            "Sockscap owner lock {} must have exactly one hard link",
+            path.display()
+        ));
+    }
+    if initial.uid() != effective_uid {
+        return Err(format!(
+            "Sockscap owner lock {} is not owned by the current user",
+            path.display()
+        ));
+    }
+    if created {
+        file.set_permissions(std::fs::Permissions::from_mode(0o600))
+            .map_err(|error| {
+                format!(
+                    "set Sockscap owner lock {} permissions: {error}",
+                    path.display()
+                )
+            })?;
+    }
+
+    let metadata = file
+        .metadata()
+        .map_err(|error| format!("reinspect Sockscap owner lock {}: {error}", path.display()))?;
+    if !metadata.file_type().is_file() || metadata.nlink() != 1 || metadata.uid() != effective_uid {
+        return Err(format!(
+            "Sockscap owner lock {} changed identity during validation",
+            path.display()
+        ));
+    }
+    if metadata.mode() & 0o7777 != 0o600 {
+        return Err(format!(
+            "Sockscap owner lock {} permissions must be 0600",
+            path.display()
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn validate_owner_lock_binding(file: &File, path: &Path) -> Result<(), String> {
+    use std::os::unix::fs::MetadataExt;
+
+    let opened = file
+        .metadata()
+        .map_err(|error| format!("inspect Sockscap owner lock {}: {error}", path.display()))?;
+    let current = std::fs::symlink_metadata(path)
+        .map_err(|error| format!("reinspect Sockscap owner lock {}: {error}", path.display()))?;
+    if !current.file_type().is_file()
+        || opened.dev() != current.dev()
+        || opened.ino() != current.ino()
+        || opened.nlink() != 1
+        || current.nlink() != 1
+    {
+        return Err(format!(
+            "Sockscap owner lock {} changed identity during store open",
+            path.display()
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn validate_owner_lock_binding(file: &File, path: &Path) -> Result<(), String> {
+    use std::os::windows::fs::MetadataExt;
+
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0000_0400;
+
+    let opened = file
+        .metadata()
+        .map_err(|error| format!("inspect Sockscap owner lock {}: {error}", path.display()))?;
+    let current = std::fs::symlink_metadata(path)
+        .map_err(|error| format!("reinspect Sockscap owner lock {}: {error}", path.display()))?;
+    let current_file = owner_lock_open_options()
+        .open(path)
+        .map_err(|error| format!("reopen Sockscap owner lock {}: {error}", path.display()))?;
+    if !opened.file_type().is_file()
+        || !current.file_type().is_file()
+        || opened.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+        || current.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+        || windows_file_identity(file, path)? != windows_file_identity(&current_file, path)?
+    {
+        return Err(format!(
+            "Sockscap owner lock {} is a reparse point or changed identity during store open",
+            path.display()
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct WindowsFileIdentity {
+    volume_serial_number: u32,
+    file_index: u64,
+}
+
+#[cfg(windows)]
+fn windows_file_identity(file: &File, path: &Path) -> Result<WindowsFileIdentity, String> {
+    use std::os::windows::io::AsRawHandle;
+    use winapi::um::fileapi::{BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle};
+
+    let mut information = unsafe { std::mem::zeroed::<BY_HANDLE_FILE_INFORMATION>() };
+    let succeeded = unsafe { GetFileInformationByHandle(file.as_raw_handle(), &mut information) };
+    if succeeded == 0 {
+        return Err(format!(
+            "read Windows file identity for {}: {}",
+            path.display(),
+            std::io::Error::last_os_error()
+        ));
+    }
+    Ok(WindowsFileIdentity {
+        volume_serial_number: information.dwVolumeSerialNumber,
+        file_index: (u64::from(information.nFileIndexHigh) << 32)
+            | u64::from(information.nFileIndexLow),
+    })
+}
+
+#[cfg(not(any(unix, windows)))]
+fn validate_owner_lock_binding(file: &File, path: &Path) -> Result<(), String> {
+    let metadata = file
+        .metadata()
+        .map_err(|error| format!("inspect Sockscap owner lock {}: {error}", path.display()))?;
+    if metadata.file_type().is_file() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Sockscap owner lock {} is not a regular file",
+            path.display()
+        ))
+    }
+}
+
+fn validate_database_path(path: &Path) -> Result<(), String> {
+    let metadata = match std::fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(format!(
+                "inspect Sockscap database path {}: {error}",
+                path.display()
+            ));
+        }
+    };
+    if !metadata.file_type().is_file() {
+        return Err(format!(
+            "Sockscap database path {} is not a regular file",
+            path.display()
+        ));
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+
+        if metadata.uid() != unsafe { libc::geteuid() } {
+            return Err(format!(
+                "Sockscap database {} is not owned by the current user",
+                path.display()
+            ));
+        }
+        if metadata.nlink() != 1 {
+            return Err(format!(
+                "Sockscap database {} must have exactly one hard link",
+                path.display()
+            ));
+        }
+    }
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0000_0400;
+        if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            return Err(format!(
+                "Sockscap database {} must not be a reparse point",
+                path.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn configure_connection(conn: &Connection, disk: bool) -> Result<(), String> {
     conn.busy_timeout(Duration::from_secs(5))
         .map_err(|error| format!("configure Sockscap busy timeout: {error}"))?;
@@ -1828,7 +2336,7 @@ fn configure_connection(conn: &Connection, disk: bool) -> Result<(), String> {
             return Err(format!("Sockscap database refused WAL mode: {mode}"));
         }
     }
-    conn.pragma_update(None, "synchronous", "NORMAL")
+    conn.pragma_update(None, "synchronous", if disk { "FULL" } else { "NORMAL" })
         .map_err(|error| format!("configure Sockscap synchronous mode: {error}"))?;
     Ok(())
 }
@@ -1854,15 +2362,54 @@ fn migrate(conn: &Connection) -> Result<(), String> {
 }
 
 fn harden_database_file(path: &Path) -> Result<(), String> {
+    validate_database_path(path)?;
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        let mut permissions = std::fs::metadata(path)
-            .map_err(|error| format!("read {} permissions: {error}", path.display()))?
-            .permissions();
-        permissions.set_mode(0o600);
-        std::fs::set_permissions(path, permissions)
-            .map_err(|error| format!("harden {} permissions: {error}", path.display()))?;
+        harden_unix_sqlite_file(path)?;
+    }
+    for suffix in ["-wal", "-shm"] {
+        let sidecar = sqlite_sidecar_path(path, suffix);
+        match std::fs::symlink_metadata(&sidecar) {
+            Ok(_) => {
+                validate_database_path(&sidecar)?;
+                #[cfg(unix)]
+                harden_unix_sqlite_file(&sidecar)?;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(format!(
+                    "inspect Sockscap SQLite sidecar {}: {error}",
+                    sidecar.display()
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn sqlite_sidecar_path(path: &Path, suffix: &str) -> PathBuf {
+    let mut sidecar = path.as_os_str().to_os_string();
+    sidecar.push(suffix);
+    PathBuf::from(sidecar)
+}
+
+#[cfg(unix)]
+fn harden_unix_sqlite_file(path: &Path) -> Result<(), String> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+        .map_err(|error| format!("harden {} permissions: {error}", path.display()))?;
+    let metadata = std::fs::symlink_metadata(path)
+        .map_err(|error| format!("reinspect hardened {}: {error}", path.display()))?;
+    if !metadata.file_type().is_file()
+        || metadata.uid() != unsafe { libc::geteuid() }
+        || metadata.nlink() != 1
+        || metadata.mode() & 0o777 != 0o600
+    {
+        return Err(format!(
+            "Sockscap SQLite file {} failed owner, link, or 0600 validation",
+            path.display()
+        ));
     }
     Ok(())
 }
@@ -2619,12 +3166,29 @@ mod tests {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
+            let directory_mode = std::fs::metadata(directory.path())
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777;
+            assert_eq!(directory_mode, 0o700);
             let mode = std::fs::metadata(store.database_path().unwrap())
                 .unwrap()
                 .permissions()
                 .mode()
                 & 0o777;
             assert_eq!(mode, 0o600);
+            let lock_mode = std::fs::metadata(directory.path().join(SOCKSCAP_OWNER_LOCK_FILE))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777;
+            assert_eq!(lock_mode, 0o600);
+            for suffix in ["-wal", "-shm"] {
+                let sidecar = sqlite_sidecar_path(store.database_path().unwrap(), suffix);
+                let sidecar_mode = std::fs::metadata(sidecar).unwrap().permissions().mode() & 0o777;
+                assert_eq!(sidecar_mode, 0o600);
+            }
         }
         let tables: i64 = store
             .lock_conn()
@@ -2645,6 +3209,97 @@ mod tests {
             )
             .unwrap();
         assert_eq!(tables, 12);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn disk_store_binds_to_the_canonical_private_app_data_directory() {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+
+        let parent = tempfile::tempdir().unwrap();
+        let app_data = parent.path().join("app-data");
+        std::fs::create_dir(&app_data).unwrap();
+        std::fs::set_permissions(&app_data, std::fs::Permissions::from_mode(0o777)).unwrap();
+        let alias = parent.path().join("app-data-alias");
+        symlink(&app_data, &alias).unwrap();
+
+        let store = SockscapStore::open(&alias).unwrap();
+        let expected = app_data.canonicalize().unwrap().join(SOCKSCAP_DB_FILE);
+        assert_eq!(store.database_path(), Some(expected.as_path()));
+        let directory_mode = std::fs::metadata(&app_data).unwrap().permissions().mode() & 0o777;
+        assert_eq!(directory_mode, 0o700);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn disk_store_rejects_symlink_database_and_owner_lock_paths() {
+        use std::os::unix::fs::symlink;
+
+        let database_directory = tempfile::tempdir().unwrap();
+        let foreign_database = database_directory.path().join("foreign.db");
+        std::fs::write(&foreign_database, b"not a Sockscap database").unwrap();
+        symlink(
+            &foreign_database,
+            database_directory.path().join(SOCKSCAP_DB_FILE),
+        )
+        .unwrap();
+        let database_error = SockscapStore::open(database_directory.path())
+            .err()
+            .expect("a database symlink must be rejected");
+        assert!(database_error.contains("database path"));
+        assert!(database_error.contains("not a regular file"));
+
+        let lock_directory = tempfile::tempdir().unwrap();
+        let foreign_lock = lock_directory.path().join("foreign.lock");
+        std::fs::write(&foreign_lock, b"").unwrap();
+        symlink(
+            &foreign_lock,
+            lock_directory.path().join(SOCKSCAP_OWNER_LOCK_FILE),
+        )
+        .unwrap();
+        let lock_error = SockscapStore::open(lock_directory.path())
+            .err()
+            .expect("an owner-lock symlink must be rejected");
+        assert!(lock_error.contains("owner lock"));
+    }
+
+    #[test]
+    fn synchronous_mode_is_full_on_disk_and_normal_in_memory() {
+        let directory = tempfile::tempdir().unwrap();
+        let disk = SockscapStore::open(directory.path()).unwrap();
+        let disk_synchronous: i64 = disk
+            .lock_conn()
+            .unwrap()
+            .query_row("PRAGMA synchronous", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(disk_synchronous, 2);
+
+        let memory = store();
+        let memory_synchronous: i64 = memory
+            .lock_conn()
+            .unwrap()
+            .query_row("PRAGMA synchronous", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(memory_synchronous, 1);
+    }
+
+    #[test]
+    fn disk_store_owner_lock_is_exclusive_and_released_on_drop() {
+        let directory = tempfile::tempdir().unwrap();
+        let first = SockscapStore::open(directory.path()).unwrap();
+
+        let error = SockscapStore::open(directory.path())
+            .err()
+            .expect("a second disk store must not open the same database");
+        assert!(
+            error.starts_with(SOCKSCAP_STORE_ALREADY_OPEN),
+            "unexpected owner-lock error: {error}"
+        );
+
+        drop(first);
+        let reopened = SockscapStore::open(directory.path())
+            .expect("dropping the first store must release its owner lock");
+        assert_eq!(reopened.schema_version().unwrap(), SOCKSCAP_SCHEMA_VERSION);
     }
 
     #[test]
@@ -2782,6 +3437,7 @@ mod tests {
                 disposable.revision,
                 CapturePlatform::Linux,
                 false,
+                "linux_nft",
             )
             .unwrap();
         assert!(
@@ -2882,13 +3538,29 @@ mod tests {
         assert!(!clean.cleanup_required);
 
         let preparing = store
-            .begin_prepare(&["global".into()], 7, CapturePlatform::Linux, true)
+            .begin_prepare(
+                &["global".into()],
+                7,
+                CapturePlatform::Linux,
+                true,
+                "linux_nft",
+            )
             .unwrap();
         assert_eq!(preparing.generation, 1);
         assert!(preparing.cleanup_required);
+        assert_eq!(preparing.artifact_state["bindingSchemaVersion"], 1);
+        assert_eq!(preparing.artifact_state["bindingState"], "adapter_selected");
+        assert_eq!(preparing.artifact_state["adapter"], "linux_nft");
+        assert_eq!(preparing.artifact_state["generation"], 1);
         assert!(
             store
-                .begin_prepare(&["global".into()], 8, CapturePlatform::Linux, false)
+                .begin_prepare(
+                    &["global".into()],
+                    8,
+                    CapturePlatform::Linux,
+                    false,
+                    "linux_nft",
+                )
                 .is_err()
         );
         assert!(store.commit_active(preparing.generation).is_err());
@@ -2940,12 +3612,36 @@ mod tests {
     }
 
     #[test]
+    fn recovery_journal_rejects_an_unsafe_adapter_binding() {
+        let store = store();
+        let error = store
+            .begin_prepare(
+                &["global".into()],
+                7,
+                CapturePlatform::Linux,
+                false,
+                "linux adapter/../../foreign",
+            )
+            .unwrap_err();
+        assert!(error.contains("recovery adapter id"));
+        let journal = store.recovery_journal().unwrap();
+        assert_eq!(journal.phase, RecoveryPhase::Clean);
+        assert!(!journal.cleanup_required);
+    }
+
+    #[test]
     fn recovery_artifact_rejects_secrets_and_survives_reopen() {
         let directory = tempfile::tempdir().unwrap();
         let generation = {
             let store = SockscapStore::open(directory.path()).unwrap();
             let marker = store
-                .begin_prepare(&["p1".into()], 1, CapturePlatform::Linux, false)
+                .begin_prepare(
+                    &["p1".into()],
+                    1,
+                    CapturePlatform::Linux,
+                    false,
+                    "linux_nft",
+                )
                 .unwrap();
             let error = store
                 .record_capture_installed(
