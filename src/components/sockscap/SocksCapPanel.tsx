@@ -46,7 +46,12 @@ import {
   type UpstreamKind,
   type UserRule,
 } from "../../lib/sockscap";
-import { listSessions } from "../../lib/ipc";
+import {
+  listSessions,
+  vaultPut,
+  vaultStatus,
+  VAULT_LOCKED_EVENT,
+} from "../../lib/ipc";
 import { useT } from "../../lib/i18n";
 import { isTauriRuntime } from "../../lib/runtime";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -126,6 +131,8 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
   });
   const [showProcPicker, setShowProcPicker] = useState(false);
   const [helper, setHelper] = useState<HelperStatus | null>(null);
+  const [password, setPassword] = useState("");
+  const [storingPass, setStoringPass] = useState(false);
 
   const report = useCallback(
     (text: string, ok = true) => {
@@ -295,6 +302,44 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     }
   };
 
+  const storePassword = async () => {
+    if (!cfg || !password) return;
+    setStoringPass(true);
+    try {
+      const status = await vaultStatus().catch(() => null);
+      if (!status || status.state !== "unlocked") {
+        window.dispatchEvent(
+          new CustomEvent(VAULT_LOCKED_EVENT, {
+            detail: { reason: t("sockscap.vaultLocked") },
+          }),
+        );
+        report(t("sockscap.vaultLocked"), false);
+        return;
+      }
+      const res = await vaultPut(
+        "sockscap_upstream_password",
+        "SocksCap Upstream Password",
+        password,
+      );
+      await patch({
+        upstream: { ...cfg.upstream, passwordRef: res.reference },
+      });
+      setPassword("");
+      report(t("sockscap.passwordSaved"));
+    } catch (e) {
+      report(String(e), false);
+    } finally {
+      setStoringPass(false);
+    }
+  };
+
+  const clearPassword = async () => {
+    if (!cfg) return;
+    setPassword("");
+    await patch({ upstream: { ...cfg.upstream, passwordRef: "" } });
+    report(t("sockscap.passwordCleared"));
+  };
+
   const onTestUpstream = async () => {
     if (!cfg) return;
     setBusy(true);
@@ -305,6 +350,7 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
         host: u.host || "127.0.0.1",
         port: u.port || 1080,
         username: u.username,
+        password: password || u.passwordRef || undefined,
         testHost: "www.google.com",
         testPort: 443,
       });
@@ -586,6 +632,42 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
                     }
                     onBlur={() => void persist(cfg)}
                   />
+                </Field>
+                <Field label={t("sockscap.password")}>
+                  <div className="flex gap-1">
+                    <input
+                      type="password"
+                      className="flex-1 text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+                      placeholder={
+                        cfg.upstream.passwordRef
+                          ? t("sockscap.passwordStored")
+                          : t("sockscap.passwordPh")
+                      }
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete="off"
+                    />
+                    <button
+                      type="button"
+                      className="px-2 py-1 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50"
+                      disabled={!password || storingPass}
+                      onClick={() => void storePassword()}
+                    >
+                      {storingPass ? "…" : t("sockscap.passwordStore")}
+                    </button>
+                    {cfg.upstream.passwordRef ? (
+                      <button
+                        type="button"
+                        className="px-2 py-1 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
+                        onClick={() => void clearPassword()}
+                      >
+                        {t("sockscap.passwordClear")}
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="text-[10px] text-[var(--taomni-text-muted)] mt-1">
+                    {t("sockscap.passwordVaultHint")}
+                  </div>
                 </Field>
               </>
             )}

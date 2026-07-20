@@ -11,6 +11,8 @@
 #[cfg(windows)]
 mod capture;
 #[cfg(windows)]
+mod proc_info;
+#[cfg(windows)]
 mod windivert;
 
 fn main() {

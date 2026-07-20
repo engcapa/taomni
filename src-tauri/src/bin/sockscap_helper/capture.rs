@@ -10,6 +10,9 @@ use std::thread::JoinHandle;
 use serde_json::json;
 use winapi::um::winnt::HANDLE;
 
+use crate::proc_info::{
+    path_matches_selector, tcp_owner_pid, SharedTree,
+};
 use crate::windivert::{
     addr_event, addr_is_outbound, addr_layer, addr_set_loopback, flow_endpoints_ip,
     flow_process_id, WinDivertApi, ADDR_LEN, LAYER_FLOW, LAYER_NETWORK,
@@ -149,6 +152,7 @@ impl CaptureEngine {
         let net_handle = net_h as usize;
         let seen = Arc::clone(&self.packets_seen);
         let redirected = Arc::clone(&self.packets_redirected);
+        let tree = Arc::new(SharedTree::new());
         self.threads.push(std::thread::spawn(move || {
             network_loop(
                 api_net,
@@ -159,6 +163,7 @@ impl CaptureEngine {
                 seen,
                 redirected,
                 stop,
+                tree,
             );
         }));
 
@@ -314,6 +319,7 @@ fn network_loop(
     seen: Arc<AtomicU64>,
     redirected: Arc<AtomicU64>,
     stop: Arc<AtomicBool>,
+    tree: Arc<SharedTree>,
 ) {
     let mut packet = vec![0u8; 0xFFFF];
     let mut addr = vec![0u8; ADDR_LEN];
@@ -361,11 +367,14 @@ fn network_loop(
                     }
                 }
             } else {
-                let Some(f) = flows.lock().ok().and_then(|m| m.get(&key).cloned()) else {
+                // Resolve flow info: FLOW table, short retry, then TCP table PID fallback.
+                let f = resolve_flow(&flows, &tree, &key, src, sport);
+                let Some(f) = f else {
+                    // Unknown owner — pass through (fail-open).
                     let _ = api.send(handle, pkt, &addr);
                     continue;
                 };
-                if !process_in_scope(&plan, f.pid, &f.path) {
+                if !process_in_scope(&plan, f.pid, &f.path, &tree) {
                     let _ = api.send(handle, pkt, &addr);
                     continue;
                 }
@@ -450,36 +459,73 @@ fn should_bypass(
     false
 }
 
-fn process_in_scope(plan: &CapturePlan, pid: u32, path: &str) -> bool {
+/// FLOW table miss → brief spin → GetExtendedTcpTable owner PID + process tree path.
+fn resolve_flow(
+    flows: &Arc<Mutex<HashMap<String, FlowInfo>>>,
+    tree: &SharedTree,
+    key: &str,
+    src: IpAddr,
+    sport: u16,
+) -> Option<FlowInfo> {
+    if let Some(f) = flows.lock().ok().and_then(|m| m.get(key).cloned()) {
+        return Some(f);
+    }
+    // Race: NETWORK packet can arrive before FLOW event is processed.
+    for _ in 0..3 {
+        std::thread::sleep(std::time::Duration::from_millis(1));
+        if let Some(f) = flows.lock().ok().and_then(|m| m.get(key).cloned()) {
+            return Some(f);
+        }
+    }
+    let pid = tcp_owner_pid(src, sport)?;
+    let path = tree
+        .with(|t| {
+            t.path_of(pid)
+                .map(|s| s.to_string())
+                .or_else(|| process_path(pid))
+        })
+        .flatten()
+        .unwrap_or_else(|| process_path(pid).unwrap_or_default());
+    let info = FlowInfo {
+        pid,
+        path,
+        remote: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+        remote_port: 0,
+    };
+    if let Ok(mut m) = flows.lock() {
+        m.insert(key.to_string(), info.clone());
+    }
+    Some(info)
+}
+
+fn process_in_scope(plan: &CapturePlan, pid: u32, path: &str, tree: &SharedTree) -> bool {
     if plan.bypass_pids.contains(&pid) {
         return false;
     }
     if !plan.mode_apps {
         return true;
     }
-    if path.is_empty() {
+    // Match this process path or any ancestor's path (child process of selected app).
+    let mut candidates: Vec<String> = Vec::new();
+    if !path.is_empty() {
+        candidates.push(path.to_string());
+    }
+    if let Some(anc) = tree.with(|t| t.ancestor_paths(pid)) {
+        candidates.extend(anc);
+    }
+    if candidates.is_empty() {
         return false;
     }
-    let p = normalize_path(path);
-    plan.app_paths.iter().any(|a| {
-        let a = normalize_path(a);
-        p == a || p.ends_with(&a) || p.ends_with(a.trim_start_matches('\\'))
+    plan.app_paths.iter().any(|sel| {
+        candidates
+            .iter()
+            .any(|p| path_matches_selector(p, sel))
     })
-}
-
-fn normalize_path(p: &str) -> String {
-    let mut s = p.trim().replace('/', "\\").to_ascii_lowercase();
-    while s.ends_with('\\') {
-        s.pop();
-    }
-    if let Some(rest) = s.strip_prefix(r"\\?\") {
-        s = rest.to_string();
-    }
-    s
 }
 
 fn process_path(pid: u32) -> Option<String> {
     use std::os::windows::ffi::OsStringExt;
+    use winapi::shared::minwindef::{DWORD, FALSE, MAX_PATH};
     use winapi::um::handleapi::CloseHandle;
     use winapi::um::processthreadsapi::OpenProcess;
     use winapi::um::winnt::PROCESS_QUERY_LIMITED_INFORMATION;
@@ -488,19 +534,19 @@ fn process_path(pid: u32) -> Option<String> {
         return None;
     }
     unsafe {
-        let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
         if h.is_null() {
             return None;
         }
-        let mut buf = vec![0u16; 1024];
-        let mut size = buf.len() as u32;
+        let mut buf = vec![0u16; MAX_PATH as usize * 4];
+        let mut size = buf.len() as DWORD;
         #[link(name = "kernel32")]
         unsafe extern "system" {
             fn QueryFullProcessImageNameW(
                 h: HANDLE,
-                flags: u32,
+                flags: DWORD,
                 buf: *mut u16,
-                size: *mut u32,
+                size: *mut DWORD,
             ) -> i32;
         }
         let ok = QueryFullProcessImageNameW(h, 0, buf.as_mut_ptr(), &mut size);

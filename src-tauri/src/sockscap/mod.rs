@@ -410,6 +410,21 @@ pub async fn sockscap_start(
 
     match &status {
         Ok(st) => {
+            let helper_port = state
+                .sockscap
+                .helper
+                .inner
+                .lock()
+                .ok()
+                .and_then(|g| g.as_ref().map(|s| s.port));
+            let relay_port = state
+                .sockscap
+                .orch
+                .read()
+                .await
+                .relay
+                .as_ref()
+                .map(|r| r.port);
             recovery::write_journal(
                 &journal_path,
                 &recovery::RecoveryJournal {
@@ -418,6 +433,8 @@ pub async fn sockscap_start(
                     config_hash: cfg.content_hash(),
                     pid: std::process::id(),
                     clean: false,
+                    relay_port,
+                    helper_port,
                 },
             )?;
         }
@@ -619,35 +636,23 @@ pub async fn sockscap_stop(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<SocksCapStatus, String> {
-    // Stop helper capture first (if any).
-    {
-        let guard = state.sockscap.helper.inner.lock().ok();
-        if let Some(guard) = guard {
-            if let Some(sess) = guard.as_ref() {
-                let _ = helper::capture_stop(sess);
-            }
-        }
-    }
-
-    let mut orch = state.sockscap.orch.write().await;
-    orch.stop().await?;
-    let journal_path = data_dir(&app)?.join("recovery.json");
-    let _ = recovery::clear_journal(&journal_path);
+    full_teardown(&app, &state).await;
+    let orch = state.sockscap.orch.read().await;
     Ok(orch.status())
 }
 
 #[tauri::command]
 pub async fn sockscap_recover(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
-    let journal_path = data_dir(&app)?.join("recovery.json");
-    // Platform-specific recovery will live in capture::*; for now clear journal
-    // and reset orchestrator to Idle.
-    // Best-effort: stop capture + relay.
-    {
-        let guard = state.sockscap.helper.inner.lock().ok();
-        if let Some(guard) = guard {
-            if let Some(sess) = guard.as_ref() {
-                let _ = helper::capture_stop(sess);
-            }
+    full_teardown(&app, &state).await;
+    capture::recover_system().await?;
+    Ok(())
+}
+
+/// Stop capture, relay; mark recovery journal clean.
+async fn full_teardown(app: &AppHandle, state: &State<'_, AppState>) {
+    if let Ok(guard) = state.sockscap.helper.inner.lock() {
+        if let Some(sess) = guard.as_ref() {
+            let _ = helper::capture_stop(sess);
         }
     }
     {
@@ -655,9 +660,9 @@ pub async fn sockscap_recover(app: AppHandle, state: State<'_, AppState>) -> Res
         let _ = orch.stop().await;
         orch.force_idle();
     }
-    let _ = recovery::clear_journal(&journal_path);
-    capture::recover_system().await?;
-    Ok(())
+    if let Ok(dir) = data_dir(app) {
+        let _ = recovery::mark_clean_and_clear(&recovery::journal_path(&dir));
+    }
 }
 
 #[tauri::command]
@@ -684,11 +689,16 @@ pub async fn sockscap_test_upstream(
     test_host: Option<String>,
     test_port: Option<u16>,
 ) -> Result<String, String> {
-    let _ = state; // vault/session resolution lands with full upstream wiring
     let target_host = test_host.unwrap_or_else(|| "www.google.com".into());
     let target_port = test_port.unwrap_or(443);
     let user = username.unwrap_or_default();
-    let pass = password.unwrap_or_default();
+    let mut pass = password.unwrap_or_default();
+    // Resolve vault:<id> if the UI passed a password_ref.
+    if pass.starts_with("vault:") {
+        if let Ok(Some(p)) = state.vault.resolve(&pass) {
+            pass = (*p).clone();
+        }
+    }
 
     match kind.as_str() {
         "http" => {
@@ -733,12 +743,25 @@ pub async fn boot_repair(app: &AppHandle) {
     let Ok(dir) = data_dir(app) else {
         return;
     };
-    let journal_path = dir.join("recovery.json");
-    if recovery::needs_repair(&journal_path) {
-        tracing::warn!("sockscap: dirty recovery journal — attempting system recover");
-        if let Err(e) = capture::recover_system().await {
-            tracing::warn!("sockscap: boot recover failed: {e}");
-        }
-        let _ = recovery::clear_journal(&journal_path);
+    let journal_path = recovery::journal_path(&dir);
+    if !recovery::needs_repair(&journal_path) {
+        return;
     }
+    tracing::warn!("sockscap: dirty recovery journal — repairing network state");
+    if let Some(j) = recovery::read_journal(&journal_path) {
+        tracing::warn!(
+            "sockscap: dirty journal pid={} backend={} relay={:?} helper={:?}",
+            j.pid,
+            j.capture_backend,
+            j.relay_port,
+            j.helper_port
+        );
+    }
+    // Previous helper cannot be contacted without its token; platform recover
+    // + clear journal so the next Start opens a fresh elevated helper.
+    if let Err(e) = capture::recover_system().await {
+        tracing::warn!("sockscap: boot recover failed: {e}");
+    }
+    let _ = recovery::mark_clean_and_clear(&journal_path);
+    tracing::info!("sockscap: recovery complete");
 }
