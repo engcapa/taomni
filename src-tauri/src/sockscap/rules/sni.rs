@@ -1,4 +1,57 @@
-//! Read-only TLS ClientHello SNI extraction (no MITM).
+//! Read-only hostname attribution from TLS SNI / HTTP Host (no MITM).
+
+/// Best-effort hostname from the first application bytes of a TCP stream.
+pub fn extract_hostname_from_prefix(data: &[u8]) -> Option<String> {
+    extract_sni(data).or_else(|| extract_http_host(data))
+}
+
+/// Extract `Host` from a plaintext HTTP/1.x request prefix.
+pub fn extract_http_host(data: &[u8]) -> Option<String> {
+    // Need enough bytes for a request line + Host header.
+    if data.len() < 16 {
+        return None;
+    }
+    // Reject binary (TLS starts with 0x16).
+    if data[0] == 0x16 {
+        return None;
+    }
+    let text = std::str::from_utf8(data).ok()?;
+    if !(text.starts_with("GET ")
+        || text.starts_with("POST ")
+        || text.starts_with("HEAD ")
+        || text.starts_with("PUT ")
+        || text.starts_with("OPTIONS ")
+        || text.starts_with("DELETE ")
+        || text.starts_with("CONNECT ")
+        || text.starts_with("PATCH "))
+    {
+        // Still scan for Host: if it looks like HTTP-ish ASCII.
+        if !text.contains("HTTP/") {
+            return None;
+        }
+    }
+    for line in text.split(['\r', '\n']) {
+        let line = line.trim();
+        if line.len() >= 5 && line[..5].eq_ignore_ascii_case("host:") {
+            let val = line[5..].trim();
+            // Strip optional port; leave bare IPv6 alone if bracketed.
+            let host = if let Some(inner) = val.strip_prefix('[').and_then(|s| s.split(']').next())
+            {
+                inner
+            } else {
+                val.rsplit_once(':')
+                    .filter(|(_, p)| p.chars().all(|c| c.is_ascii_digit()))
+                    .map(|(h, _)| h)
+                    .unwrap_or(val)
+            };
+            let host = host.trim().trim_end_matches('.').to_ascii_lowercase();
+            if !host.is_empty() {
+                return Some(host);
+            }
+        }
+    }
+    None
+}
 
 /// Extract SNI hostname from a TLS record that begins with a ClientHello.
 ///
@@ -154,5 +207,24 @@ mod tests {
     fn rejects_garbage() {
         assert!(extract_sni(b"hello").is_none());
         assert!(extract_sni(&[0x16, 0x03, 0x01, 0, 1, 0]).is_none());
+    }
+
+    #[test]
+    fn http_host_header() {
+        let req = b"GET / HTTP/1.1\r\nHost: www.Example.com\r\nUser-Agent: x\r\n\r\n";
+        assert_eq!(
+            extract_http_host(req).as_deref(),
+            Some("www.example.com")
+        );
+        assert_eq!(
+            extract_hostname_from_prefix(req).as_deref(),
+            Some("www.example.com")
+        );
+    }
+
+    #[test]
+    fn http_host_with_port() {
+        let req = b"GET / HTTP/1.1\r\nHost: api.foo.org:8080\r\n\r\n";
+        assert_eq!(extract_http_host(req).as_deref(), Some("api.foo.org"));
     }
 }

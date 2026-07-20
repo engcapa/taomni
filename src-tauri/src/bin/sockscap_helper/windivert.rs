@@ -252,19 +252,33 @@ pub fn flow_process_id(addr: &[u8]) -> u32 {
     u32::from_le_bytes(addr[base..base + 4].try_into().unwrap_or([0; 4]))
 }
 
-pub fn flow_endpoints(addr: &[u8]) -> Option<(std::net::Ipv4Addr, u16, std::net::Ipv4Addr, u16, u8)> {
+/// Parse FLOW local/remote as IpAddr (IPv4 or IPv6).
+pub fn flow_endpoints_ip(
+    addr: &[u8],
+) -> Option<(std::net::IpAddr, u16, std::net::IpAddr, u16, u8)> {
     if addr.len() < 16 + 8 + 8 + 4 + 16 + 16 + 2 + 2 + 1 {
         return None;
     }
     let mut o = 16 + 16 + 4; // after endpoints + pid
-    // IPv4 is first UINT32 of LocalAddr[4] / RemoteAddr[4] in network byte order.
-    let local = std::net::Ipv4Addr::new(addr[o], addr[o + 1], addr[o + 2], addr[o + 3]);
+    let local = decode_addr128(&addr[o..o + 16]);
     o += 16;
-    let remote = std::net::Ipv4Addr::new(addr[o], addr[o + 1], addr[o + 2], addr[o + 3]);
+    let remote = decode_addr128(&addr[o..o + 16]);
     o += 16;
-    // Docs: LocalPort / RemotePort are host byte order.
     let local_port = u16::from_le_bytes([addr[o], addr[o + 1]]);
     let remote_port = u16::from_le_bytes([addr[o + 2], addr[o + 3]]);
     let protocol = addr[o + 4];
     Some((local, local_port, remote, remote_port, protocol))
+}
+
+fn decode_addr128(bytes: &[u8]) -> std::net::IpAddr {
+    // IPv4: only first 4 bytes non-zero and rest zero → treat as v4 in network order.
+    if bytes[4..16].iter().all(|&b| b == 0) {
+        std::net::IpAddr::V4(std::net::Ipv4Addr::new(
+            bytes[0], bytes[1], bytes[2], bytes[3],
+        ))
+    } else {
+        let mut a = [0u8; 16];
+        a.copy_from_slice(&bytes[..16]);
+        std::net::IpAddr::V6(std::net::Ipv6Addr::from(a))
+    }
 }

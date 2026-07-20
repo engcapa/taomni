@@ -1,10 +1,10 @@
 //! Rule compilation and matching (GFWList / AutoProxy + user helpers).
 
 mod autopxy;
-mod dns_map;
+pub mod dns_map;
 mod gfwlist;
 pub mod source;
-mod sni;
+pub mod sni;
 
 #[allow(unused_imports)]
 pub use dns_map::DnsMap;

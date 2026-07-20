@@ -595,15 +595,10 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
               type="button"
               className="text-[11px] px-2 py-1 rounded border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
               onClick={() => void onTestUpstream()}
-              disabled={busy || cfg.upstream.kind === "ssh"}
+              disabled={busy}
             >
               {t("sockscap.testUpstream")}
             </button>
-            {cfg.upstream.kind === "ssh" && (
-              <span className="ml-2 text-[10px] text-[var(--taomni-text-muted)]">
-                {t("sockscap.sshTestLater")}
-              </span>
-            )}
           </div>
         </Section>
 

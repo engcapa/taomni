@@ -293,7 +293,7 @@ mod windows_main {
                         .as_deref()
                         .unwrap_or("127.0.0.1")
                         .parse()
-                        .unwrap_or_else(|_| std::net::Ipv4Addr::new(127, 0, 0, 1)),
+                        .unwrap_or(std::net::Ipv4Addr::new(127, 0, 0, 1)),
                     relay_port: req.relay_port.unwrap_or(0),
                 };
                 if plan.relay_port == 0 {
@@ -346,21 +346,29 @@ mod windows_main {
             },
             "lookup_orig" => {
                 let src_port = req.src_port.unwrap_or(0);
+                let src_ip = req.src_ip.as_deref().unwrap_or("");
                 match engine.lock() {
-                    Ok(eng) => match eng.lookup_orig(src_port) {
-                        Some(v) => Response {
-                            id: req.id,
-                            ok: true,
-                            result: Some(v),
-                            error: None,
-                        },
-                        None => Response {
-                            id: req.id,
-                            ok: false,
-                            result: None,
-                            error: Some("no mapping".into()),
-                        },
-                    },
+                    Ok(eng) => {
+                        let found = if src_ip.is_empty() {
+                            eng.lookup_orig(src_port)
+                        } else {
+                            eng.lookup_orig_ip_port(src_ip, src_port)
+                        };
+                        match found {
+                            Some(v) => Response {
+                                id: req.id,
+                                ok: true,
+                                result: Some(v),
+                                error: None,
+                            },
+                            None => Response {
+                                id: req.id,
+                                ok: false,
+                                result: None,
+                                error: Some("no mapping".into()),
+                            },
+                        }
+                    }
                     Err(e) => Response {
                         id: req.id,
                         ok: false,

@@ -395,8 +395,55 @@ async fn start_windows_capture(
         return Err(helper_st.message);
     }
 
-    // 2) Local relay for NAT'd TCP.
-    let (up_host, up_port, up_user, up_pass) = relay::upstream_from_config(cfg);
+    // 2) Resolve upstream credentials (manual fields; vault password_ref).
+    let (mut up_host, mut up_port, mut up_user, mut up_pass) =
+        relay::upstream_from_config(cfg);
+    if !cfg.upstream.password_ref.is_empty() {
+        if let Ok(Some(p)) = state.vault.resolve(&cfg.upstream.password_ref) {
+            up_pass = (*p).clone();
+        }
+    }
+    // Session-backed upstream: load host/port/user from sessions DB when set.
+    if !cfg.upstream.session_id.is_empty() {
+        if let Ok(db) = state.db.lock() {
+            if let Ok(sess) = crate::session::db::get_session(&db, &cfg.upstream.session_id) {
+                up_host = sess.host;
+                up_port = sess.port;
+                if let Some(u) = sess.username {
+                    if !u.is_empty() {
+                        up_user = u;
+                    }
+                }
+            }
+        }
+    }
+
+    // Optional SSH pool for capture-path PROXY via direct-tcpip.
+    let ssh_pool = if matches!(cfg.upstream.kind, crate::sockscap::config::UpstreamKind::Ssh)
+    {
+        use crate::sockscap::egress::ssh_pool::SshPool;
+        use crate::terminal::ssh::SshAuth;
+        let auth = if !up_pass.is_empty() {
+            SshAuth::Password(up_pass.clone())
+        } else if !cfg.upstream.password_ref.is_empty()
+            && cfg.upstream.password_ref.starts_with("key:")
+        {
+            // Convention unused; private key path stored in password_ref rare.
+            SshAuth::PrivateKey(cfg.upstream.password_ref.clone())
+        } else {
+            // Prefer agent when no password.
+            SshAuth::Agent
+        };
+        match SshPool::connect(&up_host, up_port, &up_user, auth).await {
+            Ok(p) => Some(Arc::new(p)),
+            Err(e) => {
+                return Err(format!("SSH upstream connect failed: {e}"));
+            }
+        }
+    } else {
+        None
+    };
+
     let stats = {
         let orch = state.sockscap.orch.read().await;
         Arc::clone(&orch.stats)
@@ -410,11 +457,15 @@ async fn start_windows_capture(
         rules,
         helper: Arc::clone(&state.sockscap.helper),
         stats,
-        upstream_host: up_host,
+        upstream_host: up_host.clone(),
         upstream_port: up_port,
         upstream_user: up_user,
         upstream_pass: up_pass,
         self_pid: std::process::id(),
+        ssh_pool,
+        dns_map: Arc::new(std::sync::Mutex::new(
+            crate::sockscap::rules::dns_map::DnsMap::new(8192, std::time::Duration::from_secs(300)),
+        )),
     }));
     let relay_handle = relay::start_relay(Arc::clone(&ctx)).await?;
 
@@ -424,11 +475,12 @@ async fn start_windows_capture(
         bypass_pids.push(pid);
     }
     let mut bypass_endpoints = Vec::new();
-    if !cfg.upstream.host.is_empty() && cfg.upstream.port > 0 {
-        bypass_endpoints.push((cfg.upstream.host.clone(), cfg.upstream.port));
+    if !up_host.is_empty() && up_port > 0 {
+        bypass_endpoints.push((up_host, up_port));
     }
-    // Always bypass loopback relay itself.
+    // Always bypass loopback relay itself (v4 + v6).
     bypass_endpoints.push(("127.0.0.1".into(), relay_handle.port));
+    bypass_endpoints.push(("::1".into(), relay_handle.port));
 
     let args = CaptureStartArgs {
         mode_apps: matches!(cfg.mode, ScopeMode::Apps),
@@ -570,10 +622,24 @@ pub async fn sockscap_test_upstream(
                 host, port, target_host, target_port
             ))
         }
-        "ssh" => Err(
-            "SSH upstream test requires a saved session id; full pool lands with capture wiring"
-                .into(),
-        ),
+        "ssh" => {
+            use crate::sockscap::egress::ssh_pool::SshPool;
+            use crate::terminal::ssh::SshAuth;
+            let auth = if pass.is_empty() {
+                SshAuth::Agent
+            } else {
+                SshAuth::Password(pass)
+            };
+            let pool = SshPool::connect(&host, port, &user, auth).await?;
+            let stream = pool
+                .dial(&target_host, target_port, "127.0.0.1", 0)
+                .await?;
+            // Drop after successful open.
+            drop(stream);
+            Ok(format!(
+                "SSH direct-tcpip via {host}:{port} to {target_host}:{target_port} ok"
+            ))
+        }
         other => Err(format!("unknown upstream kind: {other}")),
     }
 }

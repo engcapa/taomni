@@ -1,7 +1,7 @@
-//! FLOW (PID map) + NETWORK (IPv4 TCP NAT → loopback relay) capture engine.
+//! FLOW (PID map) + NETWORK (IPv4/IPv6 TCP NAT → loopback relay) capture engine.
 
 use std::collections::HashMap;
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -11,13 +11,13 @@ use serde_json::json;
 use winapi::um::winnt::HANDLE;
 
 use crate::windivert::{
-    self, addr_event, addr_is_outbound, addr_layer, addr_set_loopback, flow_endpoints,
+    addr_event, addr_is_outbound, addr_layer, addr_set_loopback, flow_endpoints_ip,
     flow_process_id, WinDivertApi, ADDR_LEN, LAYER_FLOW, LAYER_NETWORK,
 };
 
 #[derive(Debug, Clone)]
 pub struct Endpoint {
-    pub ip: Ipv4Addr,
+    pub ip: IpAddr,
     pub port: u16,
 }
 
@@ -36,16 +36,20 @@ pub struct CapturePlan {
 struct FlowInfo {
     pid: u32,
     path: String,
-    remote: Ipv4Addr,
+    remote: IpAddr,
     remote_port: u16,
 }
 
 #[derive(Debug, Clone)]
 struct RedirectMapping {
-    orig_dst: Ipv4Addr,
+    orig_dst: IpAddr,
     orig_port: u16,
     pid: u32,
     path: String,
+}
+
+fn flow_key(ip: IpAddr, port: u16) -> String {
+    format!("{ip}:{port}")
 }
 
 pub struct CaptureEngine {
@@ -53,19 +57,17 @@ pub struct CaptureEngine {
     api: Option<Arc<WinDivertApi>>,
     stop: Arc<AtomicBool>,
     threads: Vec<JoinHandle<()>>,
-    /// Stored as usize so CaptureEngine is Send (HANDLE is a raw pointer).
     flow_handle: Option<usize>,
     net_handle: Option<usize>,
-    /// local_port → flow info (IPv4 TCP)
-    flows: Arc<Mutex<HashMap<u16, FlowInfo>>>,
-    /// After redirect: client source port → original destination
-    redirects: Arc<Mutex<HashMap<u16, RedirectMapping>>>,
+    /// "local_ip:local_port" → flow info
+    flows: Arc<Mutex<HashMap<String, FlowInfo>>>,
+    /// "src_ip:src_port" after redirect → original destination
+    redirects: Arc<Mutex<HashMap<String, RedirectMapping>>>,
     plan: Option<CapturePlan>,
     packets_seen: Arc<AtomicU64>,
     packets_redirected: Arc<AtomicU64>,
     active: bool,
 }
-
 
 impl CaptureEngine {
     pub fn new(windivert_dir: Option<PathBuf>) -> Self {
@@ -93,6 +95,7 @@ impl CaptureEngine {
             "flowEntries": self.flows.lock().map(|m| m.len()).unwrap_or(0),
             "redirectEntries": self.redirects.lock().map(|m| m.len()).unwrap_or(0),
             "relayPort": self.plan.as_ref().map(|p| p.relay_port),
+            "ipv6": true,
         })
     }
 
@@ -115,11 +118,11 @@ impl CaptureEngine {
         self.packets_seen.store(0, Ordering::Relaxed);
         self.packets_redirected.store(0, Ordering::Relaxed);
 
-        // FLOW: all TCP for PID mapping
         let flow_h = api.open("tcp", LAYER_FLOW, 1000, 0)?;
-        // NETWORK: IPv4 TCP outbound + return path from relay
+        // IPv4 + IPv6 TCP; return path from v4/v6 loopback relay.
         let filter = format!(
-            "ip and tcp and (outbound or (inbound and ip.SrcAddr == {rip} and tcp.SrcPort == {rp}))",
+            "tcp and (outbound or (inbound and tcp.SrcPort == {rp} and \
+             (ip.SrcAddr == {rip} or ipv6.SrcAddr == ::1)))",
             rip = plan.relay_ip,
             rp = plan.relay_port
         );
@@ -164,6 +167,7 @@ impl CaptureEngine {
             "filter": filter,
             "relay": relay_desc,
             "modeApps": mode_apps,
+            "ipv6": true,
         }))
     }
 
@@ -191,8 +195,35 @@ impl CaptureEngine {
     }
 
     pub fn lookup_orig(&self, src_port: u16) -> Option<serde_json::Value> {
+        // Prefer exact key match ending with :port (first hit).
         let map = self.redirects.lock().ok()?;
-        let m = map.get(&src_port)?;
+        let suffix = format!(":{src_port}");
+        let m = map
+            .iter()
+            .find(|(k, _)| k.ends_with(&suffix))
+            .map(|(_, v)| v.clone())?;
+        Some(json!({
+            "dstIp": m.orig_dst.to_string(),
+            "dstPort": m.orig_port,
+            "pid": m.pid,
+            "path": m.path,
+        }))
+    }
+
+    pub fn lookup_orig_ip_port(&self, src_ip: &str, src_port: u16) -> Option<serde_json::Value> {
+        let key = if src_ip.is_empty() {
+            return self.lookup_orig(src_port);
+        } else {
+            format!("{src_ip}:{src_port}")
+        };
+        let map = self.redirects.lock().ok()?;
+        let m = map.get(&key).cloned().or_else(|| {
+            // Fallback: any entry with this port.
+            let suffix = format!(":{src_port}");
+            map.iter()
+                .find(|(k, _)| k.ends_with(&suffix))
+                .map(|(_, v)| v.clone())
+        })?;
         Some(json!({
             "dstIp": m.orig_dst.to_string(),
             "dstPort": m.orig_port,
@@ -220,10 +251,10 @@ impl Drop for CaptureEngine {
 fn flow_loop(
     api: Arc<WinDivertApi>,
     handle: HANDLE,
-    flows: Arc<Mutex<HashMap<u16, FlowInfo>>>,
+    flows: Arc<Mutex<HashMap<String, FlowInfo>>>,
     stop: Arc<AtomicBool>,
 ) {
-    let mut packet = vec![0u8; 1]; // FLOW layer may deliver empty packet body
+    let mut packet = vec![0u8; 1];
     let mut addr = vec![0u8; ADDR_LEN];
     while !stop.load(Ordering::SeqCst) {
         match api.recv(handle, &mut packet, &mut addr) {
@@ -231,20 +262,20 @@ fn flow_loop(
                 if addr_layer(&addr) != LAYER_FLOW as u8 {
                     continue;
                 }
-                // Event 0 = established, 1 = deleted
                 let event = addr_event(&addr);
                 let pid = flow_process_id(&addr);
-                let Some((local, local_port, remote, remote_port, proto)) = flow_endpoints(&addr)
+                let Some((local, local_port, remote, remote_port, proto)) =
+                    flow_endpoints_ip(&addr)
                 else {
                     continue;
                 };
                 if proto != 6 {
-                    continue; // TCP
+                    continue;
                 }
-                let _ = local;
+                let key = flow_key(local, local_port);
                 if event == 1 {
                     if let Ok(mut m) = flows.lock() {
-                        m.remove(&local_port);
+                        m.remove(&key);
                     }
                     continue;
                 }
@@ -254,7 +285,7 @@ fn flow_loop(
                 let path = process_path(pid).unwrap_or_default();
                 if let Ok(mut m) = flows.lock() {
                     m.insert(
-                        local_port,
+                        key,
                         FlowInfo {
                             pid,
                             path,
@@ -277,8 +308,8 @@ fn flow_loop(
 fn network_loop(
     api: Arc<WinDivertApi>,
     handle: HANDLE,
-    flows: Arc<Mutex<HashMap<u16, FlowInfo>>>,
-    redirects: Arc<Mutex<HashMap<u16, RedirectMapping>>>,
+    flows: Arc<Mutex<HashMap<String, FlowInfo>>>,
+    redirects: Arc<Mutex<HashMap<String, RedirectMapping>>>,
     plan: CapturePlan,
     seen: Arc<AtomicU64>,
     redirected: Arc<AtomicU64>,
@@ -287,6 +318,8 @@ fn network_loop(
     let mut packet = vec![0u8; 0xFFFF];
     let mut addr = vec![0u8; ADDR_LEN];
     let bypass_nets = parse_cidrs(&plan.bypass_cidrs);
+    let relay_v4 = IpAddr::V4(plan.relay_ip);
+    let relay_v6 = IpAddr::V6(Ipv6Addr::LOCALHOST);
 
     while !stop.load(Ordering::SeqCst) {
         let len = match api.recv(handle, &mut packet, &mut addr) {
@@ -300,105 +333,105 @@ fn network_loop(
         };
         seen.fetch_add(1, Ordering::Relaxed);
         let pkt = &mut packet[..len];
-
         let outbound = addr_is_outbound(&addr);
 
+        let Some((src, sport, dst, dport, is_v6)) = parse_ip_tcp(pkt) else {
+            let _ = api.send(handle, pkt, &addr);
+            continue;
+        };
+
         if outbound {
-            if let Some((_src, sport, dst, dport)) = parse_ipv4_tcp(pkt) {
-                // Already rewritten return path or our own traffic?
-                if should_bypass(&plan, &bypass_nets, sport, dst, dport, &flows) {
-                    let _ = api.send(handle, pkt, &addr);
-                    continue;
-                }
-
-                // Return path from app? Handle mapping already exists → keep rewriting dst to relay
-                let is_known_redirect = redirects
-                    .lock()
-                    .map(|m| m.contains_key(&sport))
-                    .unwrap_or(false);
-
-                let flow = flows.lock().ok().and_then(|m| m.get(&sport).cloned());
-                let (pid, path, orig_dst, orig_port) = if is_known_redirect {
-                    let m = redirects.lock().ok().and_then(|m| m.get(&sport).cloned());
-                    match m {
-                        Some(r) => (r.pid, r.path, r.orig_dst, r.orig_port),
-                        None => {
-                            let _ = api.send(handle, pkt, &addr);
-                            continue;
-                        }
-                    }
-                } else {
-                    // New flow: require process match
-                    let Some(f) = flow else {
-                        // Unknown process — pass through (or drop if we want fail-closed global)
-                        let _ = api.send(handle, pkt, &addr);
-                        continue;
-                    };
-                    if !process_in_scope(&plan, f.pid, &f.path) {
-                        let _ = api.send(handle, pkt, &addr);
-                        continue;
-                    }
-                    // Destination from packet (authoritative for this SYN/data)
-                    (f.pid, f.path.clone(), dst, dport)
-                };
-
-                // Don't redirect traffic already aimed at the relay.
-                if dst == plan.relay_ip && dport == plan.relay_port {
-                    let _ = api.send(handle, pkt, &addr);
-                    continue;
-                }
-
-                if let Ok(mut m) = redirects.lock() {
-                    m.insert(
-                        sport,
-                        RedirectMapping {
-                            orig_dst,
-                            orig_port,
-                            pid,
-                            path,
-                        },
-                    );
-                }
-
-                if rewrite_ipv4_tcp_dst(pkt, plan.relay_ip, plan.relay_port) {
-                    addr_set_loopback(&mut addr, true);
-                    api.calc_checksums(pkt, &mut addr);
-                    if api.send(handle, pkt, &addr).is_ok() {
-                        redirected.fetch_add(1, Ordering::Relaxed);
-                    }
-                }
+            let key = flow_key(src, sport);
+            if should_bypass(&plan, &bypass_nets, &key, dst, dport, &flows) {
+                let _ = api.send(handle, pkt, &addr);
                 continue;
             }
-        } else {
-            // Inbound from relay → restore original source so the app TCP stack matches.
-            if let Some((src, sport, dst, dport)) = parse_ipv4_tcp(pkt) {
-                let _ = (src, sport);
-                if let Some(mapping) = redirects.lock().ok().and_then(|m| m.get(&dport).cloned()) {
-                    if rewrite_ipv4_tcp_src(pkt, mapping.orig_dst, mapping.orig_port) {
-                        addr_set_loopback(&mut addr, false);
-                        api.calc_checksums(pkt, &mut addr);
+
+            let is_known = redirects
+                .lock()
+                .map(|m| m.contains_key(&key))
+                .unwrap_or(false);
+
+            let (pid, path, orig_dst, orig_port) = if is_known {
+                match redirects.lock().ok().and_then(|m| m.get(&key).cloned()) {
+                    Some(r) => (r.pid, r.path, r.orig_dst, r.orig_port),
+                    None => {
                         let _ = api.send(handle, pkt, &addr);
                         continue;
                     }
                 }
-            }
-        }
+            } else {
+                let Some(f) = flows.lock().ok().and_then(|m| m.get(&key).cloned()) else {
+                    let _ = api.send(handle, pkt, &addr);
+                    continue;
+                };
+                if !process_in_scope(&plan, f.pid, &f.path) {
+                    let _ = api.send(handle, pkt, &addr);
+                    continue;
+                }
+                (f.pid, f.path.clone(), dst, dport)
+            };
 
-        // Default: reinject unmodified
-        let _ = api.send(handle, pkt, &addr);
+            // Already aimed at relay?
+            if (dst == relay_v4 || dst == relay_v6) && dport == plan.relay_port {
+                let _ = api.send(handle, pkt, &addr);
+                continue;
+            }
+
+            if let Ok(mut m) = redirects.lock() {
+                m.insert(
+                    key,
+                    RedirectMapping {
+                        orig_dst,
+                        orig_port,
+                        pid,
+                        path,
+                    },
+                );
+            }
+
+            let ok = if is_v6 {
+                rewrite_ipv6_tcp_dst(pkt, Ipv6Addr::LOCALHOST, plan.relay_port)
+            } else {
+                rewrite_ipv4_tcp_dst(pkt, plan.relay_ip, plan.relay_port)
+            };
+            if ok {
+                addr_set_loopback(&mut addr, true);
+                api.calc_checksums(pkt, &mut addr);
+                if api.send(handle, pkt, &addr).is_ok() {
+                    redirected.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+        } else {
+            // Inbound from relay → restore original source.
+            let key = flow_key(dst, dport); // client is destination of return path
+            if let Some(mapping) = redirects.lock().ok().and_then(|m| m.get(&key).cloned()) {
+                let ok = match mapping.orig_dst {
+                    IpAddr::V4(v4) => rewrite_ipv4_tcp_src(pkt, v4, mapping.orig_port),
+                    IpAddr::V6(v6) => rewrite_ipv6_tcp_src(pkt, v6, mapping.orig_port),
+                };
+                if ok {
+                    addr_set_loopback(&mut addr, false);
+                    api.calc_checksums(pkt, &mut addr);
+                    let _ = api.send(handle, pkt, &addr);
+                    continue;
+                }
+            }
+            let _ = api.send(handle, pkt, &addr);
+        }
     }
 }
 
 fn should_bypass(
     plan: &CapturePlan,
-    bypass_nets: &[(Ipv4Addr, u8)],
-    sport: u16,
-    dst: Ipv4Addr,
+    bypass_nets: &[(IpAddr, u8)],
+    flow_key: &str,
+    dst: IpAddr,
     dport: u16,
-    flows: &Arc<Mutex<HashMap<u16, FlowInfo>>>,
+    flows: &Arc<Mutex<HashMap<String, FlowInfo>>>,
 ) -> bool {
     if let Ok(m) = flows.lock() {
-        if let Some(f) = m.get(&sport) {
+        if let Some(f) = m.get(flow_key) {
             if plan.bypass_pids.contains(&f.pid) {
                 return true;
             }
@@ -410,7 +443,7 @@ fn should_bypass(
         }
     }
     for (net, prefix) in bypass_nets {
-        if ipv4_in_cidr(dst, *net, *prefix) {
+        if ip_in_cidr(dst, *net, *prefix) {
             return true;
         }
     }
@@ -428,9 +461,7 @@ fn process_in_scope(plan: &CapturePlan, pid: u32, path: &str) -> bool {
         return false;
     }
     let p = path.replace('/', "\\").to_ascii_lowercase();
-    plan.app_paths.iter().any(|a| {
-        p == *a || p.ends_with(a) || p.ends_with(&a.trim_start_matches('\\').to_string())
-    })
+    plan.app_paths.iter().any(|a| p == *a || p.ends_with(a))
 }
 
 fn process_path(pid: u32) -> Option<String> {
@@ -449,7 +480,6 @@ fn process_path(pid: u32) -> Option<String> {
         }
         let mut buf = vec![0u16; 1024];
         let mut size = buf.len() as u32;
-        // QueryFullProcessImageNameW
         #[link(name = "kernel32")]
         unsafe extern "system" {
             fn QueryFullProcessImageNameW(
@@ -469,46 +499,88 @@ fn process_path(pid: u32) -> Option<String> {
     }
 }
 
-fn parse_cidrs(list: &[String]) -> Vec<(Ipv4Addr, u8)> {
+fn parse_cidrs(list: &[String]) -> Vec<(IpAddr, u8)> {
     let mut out = Vec::new();
     for s in list {
         let s = s.trim();
         if let Some((a, p)) = s.split_once('/') {
-            if let (Ok(ip), Ok(pref)) = (a.parse::<Ipv4Addr>(), p.parse::<u8>()) {
-                out.push((ip, pref.min(32)));
+            if let (Ok(ip), Ok(pref)) = (a.parse::<IpAddr>(), p.parse::<u8>()) {
+                let max = match ip {
+                    IpAddr::V4(_) => 32,
+                    IpAddr::V6(_) => 128,
+                };
+                out.push((ip, pref.min(max)));
             }
-        } else if let Ok(ip) = s.parse::<Ipv4Addr>() {
-            out.push((ip, 32));
+        } else if let Ok(ip) = s.parse::<IpAddr>() {
+            let pref = match ip {
+                IpAddr::V4(_) => 32,
+                IpAddr::V6(_) => 128,
+            };
+            out.push((ip, pref));
         }
     }
     out
 }
 
-fn ipv4_in_cidr(ip: Ipv4Addr, net: Ipv4Addr, prefix: u8) -> bool {
-    let shift = 32u32.saturating_sub(prefix as u32);
-    let mask = if shift >= 32 { 0 } else { u32::MAX << shift };
-    (u32::from(ip) & mask) == (u32::from(net) & mask)
+fn ip_in_cidr(ip: IpAddr, net: IpAddr, prefix: u8) -> bool {
+    match (ip, net) {
+        (IpAddr::V4(a), IpAddr::V4(n)) => {
+            let shift = 32u32.saturating_sub(prefix as u32);
+            let mask = if shift >= 32 { 0 } else { u32::MAX << shift };
+            (u32::from(a) & mask) == (u32::from(n) & mask)
+        }
+        (IpAddr::V6(a), IpAddr::V6(n)) => {
+            let shift = 128u32.saturating_sub(prefix as u32);
+            let mask = if shift >= 128 {
+                0u128
+            } else {
+                u128::MAX << shift
+            };
+            (u128::from(a) & mask) == (u128::from(n) & mask)
+        }
+        _ => false,
+    }
 }
 
-fn parse_ipv4_tcp(pkt: &[u8]) -> Option<(Ipv4Addr, u16, Ipv4Addr, u16)> {
-    if pkt.len() < 40 {
+/// Returns (src, sport, dst, dport, is_v6)
+fn parse_ip_tcp(pkt: &[u8]) -> Option<(IpAddr, u16, IpAddr, u16, bool)> {
+    if pkt.is_empty() {
         return None;
     }
-    if pkt[0] >> 4 != 4 {
-        return None;
+    let ver = pkt[0] >> 4;
+    if ver == 4 {
+        if pkt.len() < 40 {
+            return None;
+        }
+        let ihl = (pkt[0] & 0x0f) as usize * 4;
+        if ihl < 20 || pkt.len() < ihl + 20 || pkt[9] != 6 {
+            return None;
+        }
+        let src = IpAddr::V4(Ipv4Addr::new(pkt[12], pkt[13], pkt[14], pkt[15]));
+        let dst = IpAddr::V4(Ipv4Addr::new(pkt[16], pkt[17], pkt[18], pkt[19]));
+        let sport = u16::from_be_bytes([pkt[ihl], pkt[ihl + 1]]);
+        let dport = u16::from_be_bytes([pkt[ihl + 2], pkt[ihl + 3]]);
+        Some((src, sport, dst, dport, false))
+    } else if ver == 6 {
+        // Fixed header only (no extension headers).
+        if pkt.len() < 40 + 20 {
+            return None;
+        }
+        if pkt[6] != 6 {
+            return None; // next header must be TCP
+        }
+        let mut s = [0u8; 16];
+        let mut d = [0u8; 16];
+        s.copy_from_slice(&pkt[8..24]);
+        d.copy_from_slice(&pkt[24..40]);
+        let src = IpAddr::V6(Ipv6Addr::from(s));
+        let dst = IpAddr::V6(Ipv6Addr::from(d));
+        let sport = u16::from_be_bytes([pkt[40], pkt[41]]);
+        let dport = u16::from_be_bytes([pkt[42], pkt[43]]);
+        Some((src, sport, dst, dport, true))
+    } else {
+        None
     }
-    let ihl = (pkt[0] & 0x0f) as usize * 4;
-    if ihl < 20 || pkt.len() < ihl + 20 {
-        return None;
-    }
-    if pkt[9] != 6 {
-        return None; // TCP
-    }
-    let src = Ipv4Addr::new(pkt[12], pkt[13], pkt[14], pkt[15]);
-    let dst = Ipv4Addr::new(pkt[16], pkt[17], pkt[18], pkt[19]);
-    let sport = u16::from_be_bytes([pkt[ihl], pkt[ihl + 1]]);
-    let dport = u16::from_be_bytes([pkt[ihl + 2], pkt[ihl + 3]]);
-    Some((src, sport, dst, dport))
 }
 
 fn rewrite_ipv4_tcp_dst(pkt: &mut [u8], dst: Ipv4Addr, dport: u16) -> bool {
@@ -520,14 +592,10 @@ fn rewrite_ipv4_tcp_dst(pkt: &mut [u8], dst: Ipv4Addr, dport: u16) -> bool {
         return false;
     }
     let o = dst.octets();
-    pkt[16] = o[0];
-    pkt[17] = o[1];
-    pkt[18] = o[2];
-    pkt[19] = o[3];
+    pkt[16..20].copy_from_slice(&o);
     let pb = dport.to_be_bytes();
     pkt[ihl + 2] = pb[0];
     pkt[ihl + 3] = pb[1];
-    // Zero checksums; WinDivertHelperCalcChecksums will fill.
     pkt[10] = 0;
     pkt[11] = 0;
     pkt[ihl + 16] = 0;
@@ -544,10 +612,7 @@ fn rewrite_ipv4_tcp_src(pkt: &mut [u8], src: Ipv4Addr, sport: u16) -> bool {
         return false;
     }
     let o = src.octets();
-    pkt[12] = o[0];
-    pkt[13] = o[1];
-    pkt[14] = o[2];
-    pkt[15] = o[3];
+    pkt[12..16].copy_from_slice(&o);
     let pb = sport.to_be_bytes();
     pkt[ihl] = pb[0];
     pkt[ihl + 1] = pb[1];
@@ -558,3 +623,28 @@ fn rewrite_ipv4_tcp_src(pkt: &mut [u8], src: Ipv4Addr, sport: u16) -> bool {
     true
 }
 
+fn rewrite_ipv6_tcp_dst(pkt: &mut [u8], dst: Ipv6Addr, dport: u16) -> bool {
+    if pkt.len() < 60 || pkt[0] >> 4 != 6 || pkt[6] != 6 {
+        return false;
+    }
+    pkt[24..40].copy_from_slice(&dst.octets());
+    let pb = dport.to_be_bytes();
+    pkt[42] = pb[0];
+    pkt[43] = pb[1];
+    pkt[40 + 16] = 0; // TCP checksum
+    pkt[40 + 17] = 0;
+    true
+}
+
+fn rewrite_ipv6_tcp_src(pkt: &mut [u8], src: Ipv6Addr, sport: u16) -> bool {
+    if pkt.len() < 60 || pkt[0] >> 4 != 6 || pkt[6] != 6 {
+        return false;
+    }
+    pkt[8..24].copy_from_slice(&src.octets());
+    let pb = sport.to_be_bytes();
+    pkt[40] = pb[0];
+    pkt[41] = pb[1];
+    pkt[40 + 16] = 0;
+    pkt[40 + 17] = 0;
+    true
+}

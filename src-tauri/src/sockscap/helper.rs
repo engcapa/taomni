@@ -488,13 +488,22 @@ pub fn capture_stop(sess: &HelperSession) -> Result<(), String> {
 }
 
 pub fn lookup_orig(sess: &HelperSession, src_port: u16) -> Result<OrigMapping, String> {
-    let result = expect_ok(send_json(
-        sess,
-        json!({
-            "cmd": "lookup_orig",
-            "srcPort": src_port,
-        }),
-    )?)?;
+    lookup_orig_key(sess, "", src_port)
+}
+
+pub fn lookup_orig_key(
+    sess: &HelperSession,
+    src_ip: &str,
+    src_port: u16,
+) -> Result<OrigMapping, String> {
+    let mut body = json!({
+        "cmd": "lookup_orig",
+        "srcPort": src_port,
+    });
+    if !src_ip.is_empty() {
+        body["srcIp"] = json!(src_ip);
+    }
+    let result = expect_ok(send_json(sess, body)?)?;
     Ok(OrigMapping {
         dst_ip: result
             .get("dstIp")
