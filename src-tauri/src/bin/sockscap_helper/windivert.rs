@@ -78,9 +78,17 @@ impl WinDivertApi {
         let c = std::ffi::CString::new(filter).map_err(|e| e.to_string())?;
         let h = unsafe { (self.open)(c.as_ptr(), layer, priority, flags) };
         if h.is_null() || h == (-1isize as HANDLE) {
+            let err = std::io::Error::last_os_error();
+            let layer_name = match layer {
+                0 => "NETWORK",
+                1 => "NETWORK_FORWARD",
+                2 => "FLOW",
+                3 => "SOCKET",
+                4 => "REFLECT",
+                _ => "?",
+            };
             return Err(format!(
-                "WinDivertOpen(layer={layer}) failed: {}",
-                std::io::Error::last_os_error()
+                "WinDivertOpen(layer={layer}/{layer_name}, filter={filter:?}, prio={priority}) failed: {err}"
             ));
         }
         Ok(h)

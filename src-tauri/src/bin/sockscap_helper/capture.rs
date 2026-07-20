@@ -121,29 +121,78 @@ impl CaptureEngine {
         self.packets_seen.store(0, Ordering::Relaxed);
         self.packets_redirected.store(0, Ordering::Relaxed);
 
-        let flow_h = api.open("tcp", LAYER_FLOW, 1000, 0)?;
-        // IPv4 + IPv6 TCP; return path from v4/v6 loopback relay.
-        let filter = format!(
-            "tcp and (outbound or (inbound and tcp.SrcPort == {rp} and \
-             (ip.SrcAddr == {rip} or ipv6.SrcAddr == ::1)))",
-            rip = plan.relay_ip,
-            rp = plan.relay_port
-        );
-        let net_h = api.open(&filter, LAYER_NETWORK, 0, 0)?;
+        // FLOW layer: do NOT use packet-layer aliases like "tcp" / "ip" — those
+        // are invalid at layer=FLOW and yield ERROR_INVALID_PARAMETER (87).
+        // Use "true" or "protocol == 6". Priority must stay within [-1000,1000];
+        // keep modest values to avoid edge issues on some WinDivert builds.
+        let mut flow_note = String::new();
+        let flow_h = match api.open("true", LAYER_FLOW, 0, 0) {
+            Ok(h) => Some(h),
+            Err(e1) => match api.open("protocol == 6", LAYER_FLOW, 0, 0) {
+                Ok(h) => {
+                    flow_note = format!("flow filter fallback protocol==6 (first: {e1})");
+                    Some(h)
+                }
+                Err(e2) => {
+                    // Capture can still run via GetExtendedTcpTable PID fallback.
+                    flow_note = format!(
+                        "FLOW layer unavailable ({e2}); using TCP-table PID only"
+                    );
+                    tracing::warn!("sockscap-helper: {flow_note}");
+                    None
+                }
+            },
+        };
+
+        // NETWORK layer: IPv4 + IPv6 TCP; return path from v4/v6 loopback relay.
+        // Prefer a simple filter first — complex ipv6.SrcAddr forms can also 87.
+        let filter_candidates = [
+            format!(
+                "tcp and (outbound or (inbound and tcp.SrcPort == {}))",
+                plan.relay_port
+            ),
+            format!(
+                "(ip or ipv6) and tcp and (outbound or (inbound and tcp.SrcPort == {}))",
+                plan.relay_port
+            ),
+            "tcp".to_string(),
+        ];
+        let mut net_h = None;
+        let mut filter_used = String::new();
+        let mut last_net_err = String::new();
+        for f in &filter_candidates {
+            match api.open(f, LAYER_NETWORK, 0, 0) {
+                Ok(h) => {
+                    net_h = Some(h);
+                    filter_used = f.clone();
+                    break;
+                }
+                Err(e) => last_net_err = e,
+            }
+        }
+        let net_h = net_h.ok_or_else(|| {
+            format!(
+                "WinDivert NETWORK open failed: {last_net_err}. \
+                 Ensure WinDivert.dll/sys match (x64) and helper is elevated."
+            )
+        })?;
+
         let relay_desc = format!("{}:{}", plan.relay_ip, plan.relay_port);
         let mode_apps = plan.mode_apps;
 
-        self.flow_handle = Some(flow_h as usize);
+        self.flow_handle = flow_h.map(|h| h as usize);
         self.net_handle = Some(net_h as usize);
         self.active = true;
 
-        let stop = Arc::clone(&self.stop);
-        let flows = Arc::clone(&self.flows);
-        let api_flow = Arc::clone(&api);
-        let flow_handle = flow_h as usize;
-        self.threads.push(std::thread::spawn(move || {
-            flow_loop(api_flow, flow_handle as HANDLE, flows, stop);
-        }));
+        if let Some(flow_h) = flow_h {
+            let stop = Arc::clone(&self.stop);
+            let flows = Arc::clone(&self.flows);
+            let api_flow = Arc::clone(&api);
+            let flow_handle = flow_h as usize;
+            self.threads.push(std::thread::spawn(move || {
+                flow_loop(api_flow, flow_handle as HANDLE, flows, stop);
+            }));
+        }
 
         let stop = Arc::clone(&self.stop);
         let flows = Arc::clone(&self.flows);
@@ -169,10 +218,12 @@ impl CaptureEngine {
 
         Ok(json!({
             "started": true,
-            "filter": filter,
+            "filter": filter_used,
             "relay": relay_desc,
             "modeApps": mode_apps,
             "ipv6": true,
+            "flowNote": flow_note,
+            "flowLayer": self.flow_handle.is_some(),
         }))
     }
 
