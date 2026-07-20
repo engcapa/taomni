@@ -77,7 +77,19 @@ jobs:
           # openh264's x86 asm, libasound2-dev is cpal's ALSA backend, libv4l-dev
           # is nokhwa's camera backend. X11 screen capture uses libxcb (already
           # present on the runner).
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libkrb5-dev nasm libasound2-dev libv4l-dev
+          # libpipewire-0.3-dev: always required on Linux because target cfg deps
+          # pull in xcap for RDP Wayland ScreenCast, and xcap → pipewire →
+          # libspa-sys needs libpipewire-0.3.pc at build time.
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libkrb5-dev \
+            nasm \
+            libasound2-dev \
+            libv4l-dev \
+            libpipewire-0.3-dev
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
