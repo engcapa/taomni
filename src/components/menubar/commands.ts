@@ -22,6 +22,7 @@ export type AppCommand =
   | "settings"
   | "help"
   | "toggle-xserver"
+  | "sockscap"
   | "exit"
   | "close-active"
   | "reload-sessions"

@@ -55,6 +55,10 @@ const NOTE_PREFS_STORAGE_KEY = "taomni.stub.notePrefs.v1";
 const NOTE_ALERT_ACK_STORAGE_KEY = "taomni.stub.noteAlertAcks.v1";
 const MAIL_DRAFTS_STORAGE_KEY = "taomni.stub.mailDrafts.v1";
 const SDK_REGISTRY_STORAGE_KEY = "taomni.stub.sdkRegistry.v1";
+const SOCKSCAP_PROFILES_KEY = "taomni.stub.sockscap.profiles.v1";
+const SOCKSCAP_RULES_KEY = "taomni.stub.sockscap.customRules.v1";
+const SOCKSCAP_SOURCES_KEY = "taomni.stub.sockscap.ruleSources.v1";
+const SOCKSCAP_ENGINE_KEY = "taomni.stub.sockscap.engineState.v1";
 
 interface StubSdkRegistry {
   schemaVersion: number;
@@ -1023,6 +1027,47 @@ function stubSaveMailDraft(accountId: string, draft: Record<string, unknown>): S
   ]);
   return saved;
 }
+
+
+// ── Sockscap stub helpers ────────────────────────────────────────────────
+function jsonLoad<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function jsonSave(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* quota — ignore in preview */
+  }
+}
+
+function sockscapEngineState(): { state: string; detail?: string } {
+  return jsonLoad(SOCKSCAP_ENGINE_KEY, { state: "disabled" });
+}
+
+function sockscapCapabilities() {
+  // Local SOCKS is Supported; transparent scopes still need setup — matches
+  // the desktop capability report after Phases 5–7 scaffolding.
+  return {
+    platform: "browser-preview",
+    globalCapture: "supported",
+    appCapture: "requires-setup",
+    pidCapture: "degraded",
+    childFollow: true,
+    trayLeftClickToggle: false,
+    requiresPrivilege: false,
+    notes: [
+      "Browser preview: local SOCKS front-end is simulated; transparent capture needs the desktop app",
+    ],
+  };
+}
+
 
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
   switch (cmd) {
@@ -2724,6 +2769,198 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       }
       return undefined as T;
     }
+    // ── Sockscap (browser-preview; real WinDivert capture needs desktop) ──
+    case "sockscap_open_window": {
+      // No Tauri window API in preview — open the route in a plain window.
+      const u = new URL(location.href);
+      u.searchParams.set("sockscap", "1");
+      u.hash = "";
+      window.open(u.toString(), "sockscap", "width=1100,height=760");
+      return undefined as T;
+    }
+    case "sockscap_capabilities":
+      return sockscapCapabilities() as T;
+    case "sockscap_status":
+      return ({
+        state: sockscapEngineState(),
+        capabilities: sockscapCapabilities(),
+        captureMode: "local-socks",
+        capturePort: 1080,
+      } as unknown) as T;
+    case "sockscap_list_profiles":
+      return (jsonLoad(SOCKSCAP_PROFILES_KEY, []) as unknown) as T;
+    case "sockscap_upsert_profile": {
+      const profile = args?.profile;
+      const list = jsonLoad<any[]>(SOCKSCAP_PROFILES_KEY, []);
+      // Mirror the Rust conflict check: at most one enabled global.
+      const globals = list.filter(
+        (p) => p.enabled && p.scope === "global" && p.id !== profile?.id,
+      );
+      if (profile?.enabled && profile?.scope === "global" && globals.length > 0) {
+        throw new Error("profile conflict: only one enabled global profile is allowed");
+      }
+      const next = list.filter((p) => p.id !== profile?.id);
+      next.push(profile);
+      jsonSave(SOCKSCAP_PROFILES_KEY, next);
+      return undefined as T;
+    }
+    case "sockscap_delete_profile": {
+      const list = jsonLoad<any[]>(SOCKSCAP_PROFILES_KEY, []).filter((p) => p.id !== args?.id);
+      jsonSave(SOCKSCAP_PROFILES_KEY, list);
+      return undefined as T;
+    }
+    case "sockscap_get_custom_rules": {
+      const all = jsonLoad<Record<string, any[]>>(SOCKSCAP_RULES_KEY, {});
+      return ((all[args?.profileId] ?? []) as unknown) as T;
+    }
+    case "sockscap_set_custom_rules": {
+      const all = jsonLoad<Record<string, any[]>>(SOCKSCAP_RULES_KEY, {});
+      all[args?.profileId] = args?.rules ?? [];
+      jsonSave(SOCKSCAP_RULES_KEY, all);
+      return undefined as T;
+    }
+    case "sockscap_list_rule_sources":
+      return (jsonLoad(SOCKSCAP_SOURCES_KEY, [
+        {
+          id: "gfwlist-official",
+          name: "GFWList (official)",
+          kind: "gfwlist-official",
+          urls: [],
+          localPath: null,
+          enabled: true,
+          minRefreshSecs: 21600,
+        },
+      ]) as unknown) as T;
+    case "sockscap_upsert_rule_source": {
+      const list = jsonLoad<any[]>(SOCKSCAP_SOURCES_KEY, []).filter((s) => s.id !== args?.source?.id);
+      list.push(args?.source);
+      jsonSave(SOCKSCAP_SOURCES_KEY, list);
+      return undefined as T;
+    }
+    case "sockscap_delete_rule_source": {
+      jsonSave(
+        SOCKSCAP_SOURCES_KEY,
+        jsonLoad<any[]>(SOCKSCAP_SOURCES_KEY, []).filter((s) => s.id !== args?.id),
+      );
+      return undefined as T;
+    }
+    case "sockscap_refresh_rule_source":
+    case "sockscap_import_rule_source":
+      return ({
+        stats: { totalLines: 7600, domainRules: 3623, exceptionRules: 123, ipRules: 12, unsupported: 40 },
+        sha256: "stub-preview-hash",
+        mirrorUrl: "https://gitlab.com/gfwlist/gfwlist/raw/master/gfwlist.txt",
+        lastGoodAt: Math.floor(Date.now() / 1000),
+        lastError: null,
+        unsupportedExamples: ["/ads?/ (regex rule (no unambiguous host))"],
+      } as unknown) as T;
+    case "sockscap_test_target": {
+      const host: string = args?.input?.host ?? "";
+      const proxied = /(^|\.)(google|youtube|twitter|facebook)\.(com|net)$/.test(host);
+      return ({
+        profileId: jsonLoad<any[]>(SOCKSCAP_PROFILES_KEY, [])[0]?.id ?? null,
+        action: proxied ? "proxy" : "direct",
+        reason: proxied ? "subscription-proxy" : "default-action",
+        hostnameSource: host ? "platform-remote" : args?.input?.ip ? "ip-rule" : "unknown",
+        matchedSourceId: proxied ? "gfwlist-official" : null,
+        matchedPattern: proxied ? `||${host}` : null,
+        note: null,
+      } as unknown) as T;
+    }
+    case "sockscap_start": {
+      // Browser preview can't install real capture; simulate Active so the UI
+      // is explorable. The desktop app returns "backend not available".
+      localStorage.setItem(SOCKSCAP_ENGINE_KEY, JSON.stringify({ state: "active" }));
+      return ({ state: "active" } as unknown) as T;
+    }
+    case "sockscap_stop":
+    case "sockscap_recover": {
+      localStorage.setItem(SOCKSCAP_ENGINE_KEY, JSON.stringify({ state: "disabled" }));
+      return ({ state: "disabled" } as unknown) as T;
+    }
+    case "sockscap_stats_snapshot":
+    case "sockscap_live_stats":
+      return ({
+        bytesUp: 1_240_000,
+        bytesDown: 8_930_000,
+        connections: 142,
+        errors: 3,
+        direct: 88,
+        proxy: 51,
+        block: 3,
+        unknownHost: 7,
+      } as unknown) as T;
+    case "sockscap_top_apps":
+      return ([
+        { app: "chrome.exe", connections: 40 },
+        { app: "node.exe", connections: 12 },
+      ] as unknown) as T;
+    case "sockscap_egress_health":
+      return ({
+        sshProfiles: 1,
+        proxyProfiles: 1,
+        knownHosts: 2,
+        hostKeyChanges: 0,
+        note: "SSH jump profiles use known_hosts verification [browser stub]",
+      } as unknown) as T;
+    case "sockscap_stats_series": {
+      const nowMin = Math.floor(Date.now() / 1000 / 60) * 60;
+      const n = Math.min(Number(args?.minutes) || 30, 60);
+      const points = [];
+      for (let i = n - 1; i >= 0; i -= 1) {
+        points.push({
+          minuteTs: nowMin - i * 60,
+          bytesUp: 10_000 + i * 100,
+          bytesDown: 40_000 + i * 200,
+          connections: 2 + (i % 5),
+          direct: 1,
+          proxy: 1,
+          block: 0,
+          errors: 0,
+        });
+      }
+      return points as T;
+    }
+    case "sockscap_top_domains":
+      return ([
+        { domain: "example.com", bytes: 120_000, connections: 12 },
+        { domain: "cdn.example.net", bytes: 80_000, connections: 5 },
+      ] as unknown) as T;
+    case "sockscap_hide_window":
+      return undefined as T;
+    case "sockscap_test_egress":
+      return ({
+        ok: true,
+        sessionId: args?.sessionId ?? "proxy-demo",
+        kind: "proxy",
+        endpoint: "127.0.0.1:1080",
+        latencyMs: 12,
+        message: "TCP connect ok (proxy) [browser stub]",
+      } as unknown) as T;
+    case "sockscap_clear_stats":
+      return undefined as T;
+    case "sockscap_list_processes":
+      return ([
+        {
+          pid: 4242,
+          name: "chrome.exe",
+          path: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+          processStartTime: "2026-07-01T12:00:00",
+        },
+        {
+          pid: 1337,
+          name: "node.exe",
+          path: "C:\\Program Files\\nodejs\\node.exe",
+          processStartTime: "2026-07-01T12:05:00",
+        },
+        { pid: 900, name: "curl.exe", path: null, processStartTime: "listed:900:curl.exe" },
+      ] as unknown) as T;
+    case "sockscap_list_egress_sessions":
+      return ([
+        { id: "proxy-demo", name: "Office SOCKS5", kind: "proxy" },
+        { id: "ssh-demo", name: "Bastion (jump)", kind: "ssh" },
+      ] as unknown) as T;
+
     default:
       console.warn(`[tauri-stub] Unknown invoke command: ${cmd}`, args);
       if (cmd === "history_match_prefix" || cmd === "history_list_recent") {

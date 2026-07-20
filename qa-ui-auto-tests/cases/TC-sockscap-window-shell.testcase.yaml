@@ -1,0 +1,45 @@
+id: TC-sockscap-window-shell
+title: Sockscap standalone window shell renders dashboard profiles and rules
+description: |
+  Browser-mode smoke for the Sockscap hash route (plan Phase 4 / §11). Opens
+  the app with ?sockscap=1 so App mounts SockscapWindow instead of MainLayout.
+  Verifies master status chrome, tab navigation across Dashboard / Profiles /
+  Rules, dashboard KPIs and hide-to-tray control, and rules surfaces (custom
+  rules + test target). Real capture start remains requires-setup on desktop;
+  browser stub simulates Active when Start is clicked.
+covers: [F-SOCKSCAP-1]
+tags: [smoke, p1, sockscap]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 60
+steps:
+  - open: ${cfg.app.base_url}?sockscap=1
+  - wait_for: '[data-testid="sockscap-header"]'
+  - assert_visible: '[data-testid="sockscap-state"]'
+  - assert_visible: '[data-testid="sockscap-tabs"]'
+  - assert_visible: '[data-testid="sockscap-tab-dashboard"]'
+  - assert_visible: '[data-testid="sockscap-dashboard"]'
+  - assert_visible: '[data-testid="sockscap-capture-mode"]'
+  - assert_visible: '[data-testid="sockscap-bandwidth-chart"]'
+  - assert_visible: '[data-testid="sockscap-profile-status"]'
+  - assert_visible: '[data-testid="sockscap-top-apps"]'
+  - assert_visible: '[data-testid="sockscap-ssh-card"]'
+  - assert_visible: '[data-testid="sockscap-hide-to-tray"]'
+  - assert_visible: '[data-testid="sockscap-clear-stats"]'
+  - click: '[data-testid="sockscap-tab-profiles"]'
+  - assert_text:
+      selector: body
+      contains: New profile
+  - click: '[data-testid="sockscap-tab-rules"]'
+  - wait_for: '[data-testid="sockscap-rules"]'
+  - assert_visible: '[data-testid="sockscap-custom-rules"]'
+  - assert_visible: '[data-testid="sockscap-test-target"]'
+  - assert_visible: '[data-testid="sockscap-egress-test"]'
+  - click: '[data-testid="sockscap-tab-dashboard"]'
+  - assert_visible: '[data-testid="sockscap-start"]'
+  - click: '[data-testid="sockscap-start"]'
+  - wait_for: '[data-testid="sockscap-stop"]'
+  - assert_text:
+      selector: '[data-testid="sockscap-state"]'
+      contains: Active
+  - screenshot: sockscap-window-shell.png

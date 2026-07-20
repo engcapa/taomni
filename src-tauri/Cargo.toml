@@ -20,12 +20,18 @@ path = "tests/support/acp_fake_agent.rs"
 test = false
 bench = false
 
+[[bin]]
+name = "sockscap-helper"
+path = "src/bin/sockscap_helper.rs"
+test = false
+bench = false
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 prost-build = "0.14"
 
 [dependencies]
-tauri = { version = "2", features = ["protocol-asset"] }
+tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
 tauri-plugin-log = "2"
 # In-app auto-update: pull signed bundles from GitHub Releases (see
 # claudedocs/auto-update-plan.md). `process` provides relaunch() after install.
@@ -77,6 +83,10 @@ jaq-json = "2.0.1"
 rig-core = { version = "=0.38.1", default-features = false, features = ["derive"] }
 urlencoding = "2"
 url = "2"
+# Sockscap rule engine (sockscap/autoproxy.rs): IDNA/punycode normalization so
+# GFWList IDN domains compile into the reverse-label matcher trie the same way a
+# browser would resolve them.
+idna = "1"
 which = "8"
 shellexpand = "3"
 libc = "0.2"
@@ -202,12 +212,30 @@ screen-capture = ["dep:xcap"]
 # claudedocs/lanchat-linux-native-av-transport.md.
 native-av = ["dep:cpal", "dep:audiopus", "dep:openh264", "dep:nokhwa"]
 asr-sherpa-onnx = []
+# Empty feature kept for CI/docs compatibility. On Windows the WinDivert path is
+# always compiled under cfg(windows) and loads WinDivert.dll dynamically.
+sockscap-windivert = []
 vulkan-detect = ["dep:ash"]
 local-llm-fim = ["dep:llama-cpp-2"]
 hbase-kerberos = ["dep:cross-krb5"]
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["fileapi", "commdlg", "shellapi", "winbase", "winuser"] }
+winapi = { version = "0.3", features = [
+  "fileapi",
+  "commdlg",
+  "shellapi",
+  "winbase",
+  "winuser",
+  "processthreadsapi",
+  "securitybaseapi",
+  "handleapi",
+  "errhandlingapi",
+  "libloaderapi",
+  "iphlpapi",
+  "tcpmib",
+  "iptypes",
+  "namedpipeapi",
+] }
 winreg = "0.55"
 
 [target.'cfg(target_os = "macos")'.dependencies]

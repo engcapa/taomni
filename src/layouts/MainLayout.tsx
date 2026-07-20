@@ -2990,6 +2990,12 @@ export function MainLayout() {
       case "tools":
         openPlaceholderTab(t("tabs.networkTools"), t("status.commandUnavailable"));
         break;
+      case "sockscap":
+        void invoke("sockscap_open_window").catch((err) => {
+          console.error("sockscap_open_window failed", err);
+          setStatusMessage(String(err));
+        });
+        break;
       case "git":
         void openGitRepository();
         break;

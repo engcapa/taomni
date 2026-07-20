@@ -22,11 +22,25 @@ pub struct SshSession {
     pub handle: client::Handle<SshHandler>,
 }
 
+/// Host-key verification hook. Sockscap SSH-jump egress injects one to enforce
+/// its known_hosts store; the terminal and tunnel paths pass `None` and keep
+/// their existing behavior. Kept in this module so `terminal` never depends on
+/// `sockscap`.
+pub trait HostKeyCheck: Send + Sync {
+    /// Return `true` to accept the offered server key.
+    fn check(&self, key: &PublicKey) -> bool;
+}
+
+pub type HostKeyVerifier = Arc<dyn HostKeyCheck>;
+
 pub struct SshHandler {
     pub output_tx: Arc<Mutex<Option<tokio::sync::mpsc::UnboundedSender<Vec<u8>>>>>,
     /// X11 forwarding config for this session, if enabled. When set, inbound
     /// `x11` channels opened by the server are bridged to the local X server.
     pub x11: Option<Arc<XForward>>,
+    /// Optional host-key verifier. `None` = accept any key (legacy terminal /
+    /// tunnel behavior); `Some` = enforce verification and reject on mismatch.
+    pub host_key_verifier: Option<HostKeyVerifier>,
 }
 
 impl client::Handler for SshHandler {
@@ -34,12 +48,13 @@ impl client::Handler for SshHandler {
 
     fn check_server_key(
         &mut self,
-        _server_public_key: &PublicKey,
+        server_public_key: &PublicKey,
     ) -> impl Future<Output = Result<bool, Self::Error>> + Send {
-        async {
-            // TODO: proper host key verification
-            Ok(true)
-        }
+        let decision = match &self.host_key_verifier {
+            Some(v) => v.check(server_public_key),
+            None => true,
+        };
+        async move { Ok(decision) }
     }
 
     fn data(
@@ -624,6 +639,7 @@ pub async fn connect_ssh(
     let handler = SshHandler {
         output_tx: Arc::new(Mutex::new(None)),
         x11: x11.clone(),
+        host_key_verifier: None,
     };
 
     let stream = build_ssh_transport(host, port, network).await?;
@@ -755,6 +771,7 @@ pub async fn connect_ssh_authenticated_with_prompter(
     let handler = SshHandler {
         output_tx: Arc::new(Mutex::new(None)),
         x11: None,
+        host_key_verifier: None,
     };
 
     let stream = build_ssh_transport(host, port, network).await?;
@@ -762,6 +779,32 @@ pub async fn connect_ssh_authenticated_with_prompter(
         .await
         .map_err(|e| format!("SSH handshake failed: {}", e))?;
 
+    authenticate(&mut handle, username, auth, prompter).await?;
+    Ok(handle)
+}
+
+/// Connect an SSH control connection for Sockscap SSH-jump egress, reusing the
+/// app's transport/config/auth stack while enforcing host-key verification via
+/// the injected `verifier`. Opens no PTY — callers open `direct-tcpip` channels.
+pub(crate) async fn connect_ssh_egress(
+    host: &str,
+    port: u16,
+    username: &str,
+    auth: SshAuth,
+    network: Option<&NetworkSettings>,
+    verifier: Option<HostKeyVerifier>,
+    prompter: Option<&KbdInteractivePrompter>,
+) -> Result<client::Handle<SshHandler>, String> {
+    let config = build_client_config(network);
+    let handler = SshHandler {
+        output_tx: Arc::new(Mutex::new(None)),
+        x11: None,
+        host_key_verifier: verifier,
+    };
+    let stream = build_ssh_transport(host, port, network).await?;
+    let mut handle = client::connect_stream(config, stream, handler)
+        .await
+        .map_err(|e| format!("SSH handshake failed: {}", e))?;
     authenticate(&mut handle, username, auth, prompter).await?;
     Ok(handle)
 }

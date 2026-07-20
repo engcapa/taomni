@@ -25,6 +25,7 @@ mod serial;
 mod servers;
 mod session;
 mod sdk;
+pub mod sockscap;
 mod state;
 mod tab;
 mod terminal;
@@ -127,6 +128,28 @@ pub fn run() {
             let local_history = local_history::init_local_history(app.handle())
                 .expect("failed to init local history store");
             app.manage(local_history);
+
+            // Sockscap traffic-routing module. Uses its own SQLite (sockscap.db)
+            // so high-frequency stats writes don't lock taomni.db. No secrets —
+            // egress sessions/credentials stay in taomni.db + Vault. Windows
+            // capture uses WinDivert via elevated sockscap-helper.
+            match sockscap::runtime::SockscapState::new(
+                app_data.join("sockscap.db"),
+                app_data.join("sockscap").join("known_hosts"),
+                app_data.join("sockscap").join("rules"),
+            ) {
+                Ok(sockscap_state) => {
+                    if let Ok(res) = app.path().resource_dir() {
+                        sockscap_state.set_resource_dir(res);
+                    }
+                    app.manage(sockscap_state);
+                }
+                // eprintln: log plugin is installed later, so warn! would be dropped.
+                Err(e) => eprintln!("sockscap: init failed, module disabled: {e}"),
+            }
+            if let Err(e) = sockscap::tray::install(app.handle()) {
+                eprintln!("sockscap: tray install failed: {e}");
+            }
 
             let handle_for_reaper = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -786,6 +809,34 @@ pub fn run() {
             notes::commands::notes_set_prefs,
             notes::commands::notes_list_alerts,
             notes::commands::notes_ack_alert,
+            sockscap::commands::sockscap_open_window,
+            sockscap::commands::sockscap_capabilities,
+            sockscap::commands::sockscap_status,
+            sockscap::commands::sockscap_list_profiles,
+            sockscap::commands::sockscap_upsert_profile,
+            sockscap::commands::sockscap_delete_profile,
+            sockscap::commands::sockscap_get_custom_rules,
+            sockscap::commands::sockscap_set_custom_rules,
+            sockscap::commands::sockscap_list_rule_sources,
+            sockscap::commands::sockscap_upsert_rule_source,
+            sockscap::commands::sockscap_delete_rule_source,
+            sockscap::commands::sockscap_refresh_rule_source,
+            sockscap::commands::sockscap_import_rule_source,
+            sockscap::commands::sockscap_test_target,
+            sockscap::commands::sockscap_start,
+            sockscap::commands::sockscap_stop,
+            sockscap::commands::sockscap_recover,
+            sockscap::commands::sockscap_stats_snapshot,
+            sockscap::commands::sockscap_stats_series,
+            sockscap::commands::sockscap_top_domains,
+            sockscap::commands::sockscap_top_apps,
+            sockscap::commands::sockscap_egress_health,
+            sockscap::commands::sockscap_live_stats,
+            sockscap::commands::sockscap_clear_stats,
+            sockscap::commands::sockscap_hide_window,
+            sockscap::commands::sockscap_test_egress,
+            sockscap::commands::sockscap_list_processes,
+            sockscap::commands::sockscap_list_egress_sessions,
             exit_app,
         ])
         .run(tauri::generate_context!())

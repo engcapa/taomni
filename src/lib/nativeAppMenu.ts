@@ -188,6 +188,7 @@ export function buildAppMenuSpec(params: BuildAppMenuParams): AppMenuSpec {
     { type: "item", id: "code-workspace", label: t("menu.codeWorkspace"), action: "code-workspace" },
     { type: "item", id: "lan-chat", label: t("tabs.lanChat"), action: "lan-chat" },
     { type: "item", id: "network-tools", label: t("menu.networkTools"), action: "tools" },
+    { type: "item", id: "sockscap", label: "Sockscap", action: "sockscap" },
     { type: "separator" },
     { type: "item", id: "settings", label: t("menu.settings"), action: "settings", accelerator: "CmdOrCtrl+," },
   ];

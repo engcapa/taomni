@@ -10240,6 +10240,7 @@ dependencies = [
  "heck 0.5.0",
  "hex",
  "hmac 0.13.0",
+ "idna",
  "if-addrs",
  "ignore",
  "image",
