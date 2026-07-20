@@ -7,7 +7,7 @@
 //! stack.
 
 use std::fmt;
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -53,8 +53,9 @@ impl PacketQueueIdentity {
 }
 
 /// Parsed envelope facts needed by the stack without exposing packet payloads
-/// in logs or metrics.  Transport headers and extension chains remain the
-/// stack's responsibility.
+/// in logs or metrics. This boundary validates the IP header and audited IPv6
+/// extension chain; the stack validates the final TCP/UDP header at the
+/// trusted `transport_offset`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IpVersion {
@@ -62,13 +63,35 @@ pub enum IpVersion {
     V6,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IpPacketInfo {
     pub version: IpVersion,
     pub total_len: usize,
     pub transport_protocol: u8,
     pub fragmented: bool,
+    pub source: IpAddr,
+    pub destination: IpAddr,
+    /// Offset of the final transport header after a fully validated IP and
+    /// IPv6-extension envelope. Fragments deliberately never expose an
+    /// offset: their tuple is not authoritative until bounded reassembly has
+    /// completed.
+    pub transport_offset: Option<usize>,
+}
+
+impl fmt::Debug for IpPacketInfo {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("IpPacketInfo")
+            .field("version", &self.version)
+            .field("total_len", &self.total_len)
+            .field("transport_protocol", &self.transport_protocol)
+            .field("fragmented", &self.fragmented)
+            .field("has_source", &true)
+            .field("has_destination", &true)
+            .field("transport_offset", &self.transport_offset)
+            .finish()
+    }
 }
 
 /// Capture-time identity attached by the native adapter or its authenticated
@@ -490,11 +513,31 @@ fn parse_ipv4(payload: &[u8]) -> Result<IpPacketInfo, PacketDeviceError> {
         ));
     }
     let flags_fragment = u16::from_be_bytes([payload[6], payload[7]]);
+    if flags_fragment & 0x8000 != 0 {
+        return Err(PacketDeviceError::invalid(
+            "PACKET_IPV4_FLAGS_INVALID",
+            "IPv4 reserved flag must be zero",
+        ));
+    }
+    let fragmented = flags_fragment & 0x3fff != 0;
     Ok(IpPacketInfo {
         version: IpVersion::V4,
         total_len,
         transport_protocol: payload[9],
-        fragmented: flags_fragment & 0x3fff != 0,
+        fragmented,
+        source: IpAddr::V4(Ipv4Addr::new(
+            payload[12],
+            payload[13],
+            payload[14],
+            payload[15],
+        )),
+        destination: IpAddr::V4(Ipv4Addr::new(
+            payload[16],
+            payload[17],
+            payload[18],
+            payload[19],
+        )),
+        transport_offset: (!fragmented).then_some(header_len),
     })
 }
 
@@ -512,7 +555,14 @@ fn parse_ipv6(payload: &[u8]) -> Result<IpPacketInfo, PacketDeviceError> {
             "IPv6 jumbograms are not accepted by the bounded device contract",
         ));
     }
-    let total_len = IPV6_FIXED_HEADER_BYTES + payload_len;
+    let total_len = IPV6_FIXED_HEADER_BYTES
+        .checked_add(payload_len)
+        .ok_or_else(|| {
+            PacketDeviceError::invalid(
+                "PACKET_IPV6_LENGTH_INVALID",
+                "IPv6 payload length overflows the L3 frame length",
+            )
+        })?;
     if total_len != payload.len() {
         return Err(PacketDeviceError::invalid(
             "PACKET_IPV6_LENGTH_INVALID",
@@ -577,11 +627,35 @@ fn parse_ipv6(payload: &[u8]) -> Result<IpPacketInfo, PacketDeviceError> {
         }
     }
 
+    let source = payload
+        .get(8..24)
+        .and_then(|bytes| <[u8; 16]>::try_from(bytes).ok())
+        .map(Ipv6Addr::from)
+        .ok_or_else(|| {
+            PacketDeviceError::invalid(
+                "PACKET_IPV6_HEADER_TRUNCATED",
+                "IPv6 source address is truncated",
+            )
+        })?;
+    let destination = payload
+        .get(24..40)
+        .and_then(|bytes| <[u8; 16]>::try_from(bytes).ok())
+        .map(Ipv6Addr::from)
+        .ok_or_else(|| {
+            PacketDeviceError::invalid(
+                "PACKET_IPV6_HEADER_TRUNCATED",
+                "IPv6 destination address is truncated",
+            )
+        })?;
+
     Ok(IpPacketInfo {
         version: IpVersion::V6,
         total_len,
         transport_protocol: next_header,
         fragmented,
+        source: IpAddr::V6(source),
+        destination: IpAddr::V6(destination),
+        transport_offset: (!fragmented).then_some(cursor),
     })
 }
 
@@ -1298,6 +1372,8 @@ mod tests {
         packet[4..6].copy_from_slice(&(body.len() as u16).to_be_bytes());
         packet[6] = next_header;
         packet[7] = 64;
+        packet[8..24].copy_from_slice(&Ipv6Addr::LOCALHOST.octets());
+        packet[24..40].copy_from_slice(&Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 8).octets());
         packet.extend_from_slice(&body);
         packet.into()
     }
@@ -1321,6 +1397,24 @@ mod tests {
             .expect("valid IPv4 packet");
         assert_eq!(info.version, IpVersion::V4);
         assert_eq!(info.transport_protocol, 6);
+        assert_eq!(info.source, IpAddr::V4(Ipv4Addr::LOCALHOST));
+        assert_eq!(info.destination, IpAddr::V4(Ipv4Addr::new(198, 51, 100, 8)));
+        assert_eq!(info.transport_offset, Some(20));
+        let debug = format!("{info:?}");
+        assert!(!debug.contains("127.0.0.1"));
+        assert!(!debug.contains("198.51.100.8"));
+
+        let mut reserved_flag = packet.clone();
+        let mut payload = reserved_flag.payload.to_vec();
+        payload[6] |= 0x80;
+        reserved_flag.payload = payload.into();
+        assert_eq!(
+            reserved_flag
+                .validate_for(7, CapturePlatform::Linux)
+                .unwrap_err()
+                .code(),
+            "PACKET_IPV4_FLAGS_INVALID"
+        );
 
         let mut bad = packet.clone();
         bad.payload = Bytes::from_static(&[0x45, 0, 0, 20]);
@@ -1368,6 +1462,30 @@ mod tests {
         assert_eq!(info.version, IpVersion::V6);
         assert_eq!(info.transport_protocol, 17);
         assert!(info.fragmented);
+        assert_eq!(info.transport_offset, None);
+    }
+
+    #[test]
+    fn ipv6_extension_chain_exposes_only_a_validated_transport_offset() {
+        let mut body = Vec::new();
+        body.extend_from_slice(&[60, 0, 0, 0, 0, 0, 0, 0]); // Hop-by-Hop
+        body.extend_from_slice(&[17, 0, 0, 0, 0, 0, 0, 0]); // Destination
+        body.extend_from_slice(&[0; 8]); // UDP header belongs to the stack
+        let packet = PacketFrame {
+            identity: identity(7, 17),
+            payload: ipv6_packet(0, body),
+        };
+
+        let info = packet
+            .validate_for(7, CapturePlatform::Linux)
+            .expect("valid ordered IPv6 extension chain");
+        assert_eq!(info.transport_protocol, 17);
+        assert_eq!(info.transport_offset, Some(56));
+        assert_eq!(info.source, IpAddr::V6(Ipv6Addr::LOCALHOST));
+        assert_eq!(
+            info.destination,
+            IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 8))
+        );
     }
 
     #[test]

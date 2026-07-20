@@ -1,15 +1,17 @@
 //! Owned supervisor contract for a replaceable packet-stack provider.
 //!
 //! This module deliberately does not register or implement a production TCP,
-//! UDP, fragment-reassembly, or virtual-DNS stack.  It only defines the
+//! UDP, or fragment-reassembly stack.  It only defines the
 //! fail-closed boundary a future pinned provider must satisfy: exact snapshot
 //! identity, explicit capabilities, single-owner packet queues, bounded
 //! startup/shutdown, cancellation, and a readiness handshake before a native
 //! capture adapter is allowed to redirect traffic.
 //!
-//! [`ReadyPacketStack::take_flow_ingress`] transfers the bounded decoded-TCP
-//! ingress receiver exactly once.  A composition layer must start `FlowRuntime`
-//! with that receiver and re-check [`ReadyPacketStack::health`] before
+//! [`ReadyPacketStack::take_flow_ingress`] and
+//! [`ReadyPacketStack::take_udp_flow_ingress`] transfer the independently
+//! bounded decoded TCP and UDP receivers exactly once. A composition layer
+//! must start `FlowRuntime` with both receivers and re-check
+//! [`ReadyPacketStack::health`] before
 //! activating a privileged capture helper.  Readiness from this supervisor
 //! alone is not permission to unlock a platform capability.
 
@@ -21,13 +23,15 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use futures::FutureExt;
-use tokio::sync::oneshot;
+use tokio::sync::{Notify, oneshot};
 use tokio::task::{JoinError, JoinHandle};
 use tokio::time::Instant;
 use tokio_util::sync::CancellationToken;
 
 use super::ingress::{
-    BoundedFlowIngress, BoundedFlowIngressSender, MAX_INGRESS_QUEUE_CAPACITY, bounded_flow_ingress,
+    BoundedFlowIngress, BoundedFlowIngressSender, BoundedUdpFlowIngress,
+    BoundedUdpFlowIngressSender, MAX_INGRESS_QUEUE_CAPACITY, MAX_UDP_INGRESS_QUEUE_CAPACITY,
+    bounded_flow_ingress, bounded_udp_flow_ingress,
 };
 use super::ip_stack::{IpStackConfig, IpStackError, IpStackProviderPin};
 use crate::sockscap::capture::packet_device::{
@@ -78,7 +82,6 @@ pub struct PacketStackCapabilities {
     pub tcp: bool,
     pub udp: bool,
     pub fragment_reassembly: bool,
-    pub virtual_dns: bool,
 }
 
 impl PacketStackCapabilities {
@@ -88,7 +91,6 @@ impl PacketStackCapabilities {
             && (!required.tcp || self.tcp)
             && (!required.udp || self.udp)
             && (!required.fragment_reassembly || self.fragment_reassembly)
-            && (!required.virtual_dns || self.virtual_dns)
     }
 }
 
@@ -245,9 +247,116 @@ pub trait PacketStackDriver: Send {
         self: Box<Self>,
         context: PacketStackRunContext,
         readiness: oneshot::Sender<PacketStackReady>,
-        cancellation: CancellationToken,
+        control: PacketStackDriverControl,
         tcp_ingress: BoundedFlowIngressSender,
+        udp_ingress: BoundedUdpFlowIngressSender,
     ) -> Result<PacketStackExit, PacketStackError>;
+}
+
+const ADMISSION_OPEN: u8 = 0;
+const ADMISSION_QUIESCE_REQUESTED: u8 = 1;
+const ADMISSION_QUIESCED: u8 = 2;
+
+/// Shared one-way admission fence.  Acknowledgement is valid only after the
+/// provider has stopped polling and dropped the native packet ingress, closed
+/// both decoded-flow senders, and completed every in-flight admission send.
+/// The provider's control actor must remain alive until final termination.
+struct DriverQuiesceState {
+    phase: AtomicU8,
+    acknowledged: Notify,
+}
+
+impl DriverQuiesceState {
+    fn new() -> Self {
+        Self {
+            phase: AtomicU8::new(ADMISSION_OPEN),
+            acknowledged: Notify::new(),
+        }
+    }
+
+    fn request(&self, quiesce: &CancellationToken) {
+        let _ = self.phase.compare_exchange(
+            ADMISSION_OPEN,
+            ADMISSION_QUIESCE_REQUESTED,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        );
+        quiesce.cancel();
+    }
+
+    fn acknowledge(&self, quiesce: &CancellationToken) -> Result<(), PacketStackError> {
+        if !quiesce.is_cancelled() {
+            return Err(PacketStackError::QuiesceAcknowledgedBeforeRequest);
+        }
+        match self.phase.compare_exchange(
+            ADMISSION_QUIESCE_REQUESTED,
+            ADMISSION_QUIESCED,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        ) {
+            Ok(_) => self.acknowledged.notify_waiters(),
+            Err(ADMISSION_QUIESCED) => {}
+            Err(_) => return Err(PacketStackError::QuiesceAcknowledgedBeforeRequest),
+        }
+        Ok(())
+    }
+
+    fn is_requested(&self) -> bool {
+        self.phase.load(Ordering::Acquire) != ADMISSION_OPEN
+    }
+
+    fn is_quiesced(&self) -> bool {
+        self.phase.load(Ordering::Acquire) == ADMISSION_QUIESCED
+    }
+}
+
+/// Non-cloneable lifecycle control owned by exactly one packet-stack driver.
+///
+/// `quiesce_requested` and `termination_requested` are deliberately separate:
+/// a ready driver must acknowledge the former while its provider control actor
+/// is still serving existing TCP/UDP close requests, then keep running until
+/// the latter is observed. Before accepted readiness, the supervisor may issue
+/// final termination directly and no quiesce acknowledgement is required.
+pub struct PacketStackDriverControl {
+    quiesce: CancellationToken,
+    termination: CancellationToken,
+    quiesce_state: Arc<DriverQuiesceState>,
+}
+
+impl PacketStackDriverControl {
+    pub async fn quiesce_requested(&self) {
+        self.quiesce.cancelled().await;
+    }
+
+    pub fn is_quiesce_requested(&self) -> bool {
+        self.quiesce.is_cancelled()
+    }
+
+    /// Acknowledge the admission fence. The provider must call this only after
+    /// dropping native packet ingress and both decoded TCP/UDP senders, with no
+    /// admission send still in flight, while retaining its live control actor.
+    /// Repeating the acknowledgement after that proof is idempotent.
+    pub fn acknowledge_quiesced(&self) -> Result<(), PacketStackError> {
+        self.quiesce_state.acknowledge(&self.quiesce)
+    }
+
+    pub async fn termination_requested(&self) {
+        self.termination.cancelled().await;
+    }
+
+    pub fn is_termination_requested(&self) -> bool {
+        self.termination.is_cancelled()
+    }
+}
+
+impl fmt::Debug for PacketStackDriverControl {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PacketStackDriverControl")
+            .field("quiesce_requested", &self.is_quiesce_requested())
+            .field("termination_requested", &self.is_termination_requested())
+            .finish_non_exhaustive()
+    }
 }
 
 /// Validated supervisor limits and exact runtime identity.
@@ -256,6 +365,7 @@ pub struct PacketStackSupervisorConfig {
     pub identity: PacketStackIdentity,
     pub required_capabilities: PacketStackCapabilities,
     pub decoded_tcp_queue_capacity: usize,
+    pub decoded_udp_queue_capacity: usize,
     pub startup_timeout: Duration,
     pub shutdown_timeout: Duration,
 }
@@ -269,6 +379,14 @@ impl PacketStackSupervisorConfig {
             return Err(PacketStackError::invalid(
                 "PACKET_STACK_FLOW_QUEUE_INVALID",
                 "decoded TCP queue capacity is outside the bounded ingress range",
+            ));
+        }
+        if self.decoded_udp_queue_capacity == 0
+            || self.decoded_udp_queue_capacity > MAX_UDP_INGRESS_QUEUE_CAPACITY
+        {
+            return Err(PacketStackError::invalid(
+                "PACKET_STACK_UDP_QUEUE_INVALID",
+                "decoded UDP queue capacity is outside the bounded ingress range",
             ));
         }
         for timeout in [self.startup_timeout, self.shutdown_timeout] {
@@ -286,12 +404,14 @@ impl PacketStackSupervisorConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PacketStackHealth {
     Ready,
+    Quiescing,
+    Quiesced,
     Stopping,
     Failed,
     Stopped,
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum PacketStackError {
     #[error("{code}: {message}")]
     Invalid {
@@ -327,6 +447,8 @@ pub enum PacketStackError {
     ReadyCapabilitiesMismatch,
     #[error("PACKET_STACK_FLOW_INGRESS_ALREADY_TAKEN: decoded TCP ingress was already transferred")]
     FlowIngressAlreadyTaken,
+    #[error("PACKET_STACK_UDP_INGRESS_ALREADY_TAKEN: decoded UDP ingress was already transferred")]
+    UdpIngressAlreadyTaken,
     #[error("PACKET_STACK_DRIVER_EXITED_BEFORE_READY: driver exited before readiness")]
     DriverExitedBeforeReady,
     #[error("PACKET_STACK_DRIVER_FAILED_BEFORE_READY: {provider_code}")]
@@ -343,6 +465,16 @@ pub enum PacketStackError {
     DriverPanicked,
     #[error("PACKET_STACK_DRIVER_ABORTED: ready driver was aborted")]
     DriverAborted,
+    #[error(
+        "PACKET_STACK_QUIESCE_ACK_BEFORE_REQUEST: driver acknowledged admission quiesce before it was requested"
+    )]
+    QuiesceAcknowledgedBeforeRequest,
+    #[error("PACKET_STACK_QUIESCE_TIMEOUT: driver did not quiesce admission before the deadline")]
+    QuiesceTimeout,
+    #[error(
+        "PACKET_STACK_SHUTDOWN_BEFORE_QUIESCE: final termination requires acknowledged admission quiesce"
+    )]
+    ShutdownBeforeQuiesce,
     #[error("PACKET_STACK_SHUTDOWN_TIMEOUT: driver did not stop before the deadline")]
     ShutdownTimeout,
 }
@@ -372,6 +504,7 @@ impl PacketStackError {
             Self::ReadyIdentityMismatch => "PACKET_STACK_READY_IDENTITY_MISMATCH",
             Self::ReadyCapabilitiesMismatch => "PACKET_STACK_READY_CAPABILITIES_MISMATCH",
             Self::FlowIngressAlreadyTaken => "PACKET_STACK_FLOW_INGRESS_ALREADY_TAKEN",
+            Self::UdpIngressAlreadyTaken => "PACKET_STACK_UDP_INGRESS_ALREADY_TAKEN",
             Self::DriverExitedBeforeReady => "PACKET_STACK_DRIVER_EXITED_BEFORE_READY",
             Self::DriverFailedBeforeReady { .. } => "PACKET_STACK_DRIVER_FAILED_BEFORE_READY",
             Self::DriverPanickedBeforeReady => "PACKET_STACK_DRIVER_PANICKED_BEFORE_READY",
@@ -380,6 +513,9 @@ impl PacketStackError {
             Self::DriverFailed { .. } => "PACKET_STACK_DRIVER_FAILED",
             Self::DriverPanicked => "PACKET_STACK_DRIVER_PANICKED",
             Self::DriverAborted => "PACKET_STACK_DRIVER_ABORTED",
+            Self::QuiesceAcknowledgedBeforeRequest => "PACKET_STACK_QUIESCE_ACK_BEFORE_REQUEST",
+            Self::QuiesceTimeout => "PACKET_STACK_QUIESCE_TIMEOUT",
+            Self::ShutdownBeforeQuiesce => "PACKET_STACK_SHUTDOWN_BEFORE_QUIESCE",
             Self::ShutdownTimeout => "PACKET_STACK_SHUTDOWN_TIMEOUT",
         }
     }
@@ -597,6 +733,12 @@ impl PacketStackSupervisor {
                 "decoded TCP queue exceeds the configured TCP flow bound",
             ));
         }
+        if config.decoded_udp_queue_capacity > stack_config.max_udp_associations {
+            return Err(PacketStackError::invalid(
+                "PACKET_STACK_UDP_QUEUE_INVALID",
+                "decoded UDP queue exceeds the configured UDP association bound",
+            ));
+        }
         Ok(Self {
             config,
             stack_config,
@@ -677,21 +819,41 @@ impl PacketStackSupervisor {
                 )
             })?;
         let tcp_ingress = Arc::new(tcp_ingress);
+        let (udp_sender, udp_ingress) =
+            bounded_udp_flow_ingress(self.config.decoded_udp_queue_capacity).map_err(|_| {
+                PacketStackError::invalid(
+                    "PACKET_STACK_UDP_QUEUE_INVALID",
+                    "could not create the validated decoded UDP queue",
+                )
+            })?;
+        let udp_ingress = Arc::new(udp_ingress);
         let (ready_sender, mut ready_receiver) = oneshot::channel();
-        let cancellation = CancellationToken::new();
+        let quiesce = CancellationToken::new();
+        let termination = CancellationToken::new();
+        let quiesce_state = Arc::new(DriverQuiesceState::new());
         let first_event = Arc::new(DriverFirstEvent::default());
         let context =
             PacketStackRunContext::new(self.config.identity.clone(), self.stack_config.clone(), io);
-        let driver_cancellation = cancellation.clone();
+        let driver_control = PacketStackDriverControl {
+            quiesce: quiesce.clone(),
+            termination: termination.clone(),
+            quiesce_state: Arc::clone(&quiesce_state),
+        };
         let driver_first_event = Arc::clone(&first_event);
         let task = runtime.spawn(async move {
             let _termination_guard = DriverTerminationGuard(driver_first_event);
             driver
-                .run(context, ready_sender, driver_cancellation, tcp_sender)
+                .run(
+                    context,
+                    ready_sender,
+                    driver_control,
+                    tcp_sender,
+                    udp_sender,
+                )
                 .await
         });
         let mut guard =
-            StartingDriverGuard::new(cancellation.clone(), task, self.config.shutdown_timeout);
+            StartingDriverGuard::new(termination.clone(), task, self.config.shutdown_timeout);
 
         let startup = {
             let task = guard.task_mut();
@@ -763,9 +925,13 @@ impl PacketStackSupervisor {
             identity: self.config.identity.clone(),
             capabilities: self.descriptor.capabilities,
             flow_ingress: Some(tcp_ingress),
-            cancellation,
+            udp_flow_ingress: Some(udp_ingress),
+            quiesce,
+            quiesce_state,
+            termination,
             first_event,
             driver: Some(task),
+            terminal_fault: None,
             shutdown_timeout: self.config.shutdown_timeout,
         })
     }
@@ -791,9 +957,13 @@ pub(in crate::sockscap::flow) struct ReadyPacketStack {
     identity: PacketStackIdentity,
     capabilities: PacketStackCapabilities,
     flow_ingress: Option<Arc<BoundedFlowIngress>>,
-    cancellation: CancellationToken,
+    udp_flow_ingress: Option<Arc<BoundedUdpFlowIngress>>,
+    quiesce: CancellationToken,
+    quiesce_state: Arc<DriverQuiesceState>,
+    termination: CancellationToken,
     first_event: Arc<DriverFirstEvent>,
     driver: Option<JoinHandle<DriverResult>>,
+    terminal_fault: Option<PacketStackError>,
     shutdown_timeout: Duration,
 }
 
@@ -817,26 +987,42 @@ impl ReadyPacketStack {
             .ok_or(PacketStackError::FlowIngressAlreadyTaken)
     }
 
+    /// Transfer the sole supervisor-owned decoded UDP receiver. TCP and UDP
+    /// use independent queues so a datagram flood cannot consume TCP admission
+    /// capacity or hide UDP shutdown from the runtime.
+    pub fn take_udp_flow_ingress(
+        &mut self,
+    ) -> Result<Arc<BoundedUdpFlowIngress>, PacketStackError> {
+        self.udp_flow_ingress
+            .take()
+            .ok_or(PacketStackError::UdpIngressAlreadyTaken)
+    }
+
     #[cfg(test)]
     pub fn cancellation_token(&self) -> PacketStackCancellation {
         PacketStackCancellation {
-            cancellation: self.cancellation.clone(),
+            cancellation: self.termination.clone(),
             first_event: Arc::clone(&self.first_event),
         }
     }
 
-    pub fn cancel(&self) {
-        self.first_event.request_cancellation(&self.cancellation);
+    /// Synchronously fence new native/decoded-flow admission. Repeated calls
+    /// are idempotent and never request final provider termination.
+    pub fn request_quiesce(&self) {
+        self.quiesce_state.request(&self.quiesce);
     }
 
     pub fn health(&self) -> PacketStackHealth {
         let Some(task) = self.driver.as_ref() else {
-            return PacketStackHealth::Stopped;
+            return if self.terminal_fault.is_some() {
+                PacketStackHealth::Failed
+            } else {
+                PacketStackHealth::Stopped
+            };
         };
         if task.is_finished() {
             self.first_event.record_driver_terminated();
-        } else if self.cancellation.is_cancelled()
-            && self.first_event.event() == FIRST_EVENT_PENDING
+        } else if self.termination.is_cancelled() && self.first_event.event() == FIRST_EVENT_PENDING
         {
             self.first_event.record_untracked_cancellation();
         }
@@ -845,6 +1031,8 @@ impl ReadyPacketStack {
                 PacketStackHealth::Failed
             }
             FIRST_EVENT_CANCEL_REQUESTED => PacketStackHealth::Stopping,
+            _ if self.quiesce_state.is_quiesced() => PacketStackHealth::Quiesced,
+            _ if self.quiesce_state.is_requested() => PacketStackHealth::Quiescing,
             _ => PacketStackHealth::Ready,
         }
     }
@@ -852,12 +1040,106 @@ impl ReadyPacketStack {
     #[cfg(test)]
     pub async fn shutdown(&mut self) -> Result<PacketStackExit, PacketStackError> {
         let deadline = Instant::now() + self.shutdown_timeout;
+        if !self.quiesce_state.is_quiesced() {
+            self.request_quiesce();
+            self.quiesce_until(deadline).await?;
+        }
         self.shutdown_until(deadline).await
     }
 
-    /// Request cancellation and retain the join handle when the absolute
-    /// deadline expires.  A caller can retry recovery; timeout is never
-    /// reported as a clean stop.
+    /// Wait for the provider's explicit admission-fence acknowledgement while
+    /// retaining the exact driver owner on timeout. Driver termination before
+    /// acknowledgement is cached as the root cause and is never reclassified
+    /// by a later final-shutdown request.
+    pub async fn quiesce_until(
+        &mut self,
+        caller_deadline: Instant,
+    ) -> Result<(), PacketStackError> {
+        self.request_quiesce();
+        let deadline = caller_deadline.min(Instant::now() + self.shutdown_timeout);
+        loop {
+            if self.quiesce_state.is_quiesced() {
+                tokio::task::yield_now().await;
+                if self.driver.as_ref().is_some_and(JoinHandle::is_finished) {
+                    let result = self
+                        .driver
+                        .as_mut()
+                        .expect("finished packet-stack driver remains owned")
+                        .await;
+                    self.driver.take();
+                    let error = classify_after_ready(result);
+                    self.terminal_fault = Some(error.clone());
+                    return Err(error);
+                }
+                if self.driver.is_some() {
+                    return Ok(());
+                }
+                return Err(self
+                    .terminal_fault
+                    .clone()
+                    .unwrap_or(PacketStackError::DriverExitedUnexpectedly));
+            }
+            if self.driver.is_none() {
+                return Err(self
+                    .terminal_fault
+                    .clone()
+                    .unwrap_or(PacketStackError::DriverExitedUnexpectedly));
+            }
+            if self.driver.as_ref().is_some_and(JoinHandle::is_finished) {
+                let result = self
+                    .driver
+                    .as_mut()
+                    .expect("finished packet-stack driver remains owned")
+                    .await;
+                self.driver.take();
+                let error = classify_after_ready(result);
+                self.terminal_fault = Some(error.clone());
+                return Err(error);
+            }
+            if Instant::now() >= deadline {
+                return Err(PacketStackError::QuiesceTimeout);
+            }
+
+            let quiesce_state = Arc::clone(&self.quiesce_state);
+            let acknowledgement = quiesce_state.acknowledged.notified();
+            tokio::pin!(acknowledgement);
+            if quiesce_state.is_quiesced() {
+                continue;
+            }
+
+            enum QuiesceWait {
+                Acknowledged,
+                Driver(Result<DriverResult, JoinError>),
+                TimedOut,
+            }
+            let outcome = {
+                let driver = self
+                    .driver
+                    .as_mut()
+                    .expect("packet-stack driver checked before quiesce wait");
+                tokio::select! {
+                    biased;
+                    result = driver => QuiesceWait::Driver(result),
+                    _ = &mut acknowledgement => QuiesceWait::Acknowledged,
+                    _ = tokio::time::sleep_until(deadline) => QuiesceWait::TimedOut,
+                }
+            };
+            match outcome {
+                QuiesceWait::Acknowledged => {}
+                QuiesceWait::Driver(result) => {
+                    self.driver.take();
+                    let error = classify_after_ready(result);
+                    self.terminal_fault = Some(error.clone());
+                    return Err(error);
+                }
+                QuiesceWait::TimedOut => return Err(PacketStackError::QuiesceTimeout),
+            }
+        }
+    }
+
+    /// Request final provider termination after admission quiesce has been
+    /// acknowledged. The exact join handle is retained when the absolute
+    /// deadline expires so composition can retry without losing ownership.
     pub async fn shutdown_until(
         &mut self,
         caller_deadline: Instant,
@@ -868,7 +1150,10 @@ impl ReadyPacketStack {
         if task.is_finished() {
             self.first_event.record_driver_terminated();
         }
-        self.first_event.request_cancellation(&self.cancellation);
+        if !self.quiesce_state.is_quiesced() && !task.is_finished() {
+            return Err(PacketStackError::ShutdownBeforeQuiesce);
+        }
+        self.first_event.request_cancellation(&self.termination);
         let local_deadline = Instant::now() + self.shutdown_timeout;
         let deadline = caller_deadline.min(local_deadline);
         match tokio::time::timeout_at(deadline, &mut *task).await {
@@ -878,9 +1163,15 @@ impl ReadyPacketStack {
                     .first_event
                     .driver_terminated_without_controlled_cancel()
                 {
-                    return Err(classify_after_ready(result));
+                    let error = classify_after_ready(result);
+                    self.terminal_fault = Some(error.clone());
+                    return Err(error);
                 }
-                classify_shutdown(result)
+                let result = classify_shutdown(result);
+                if let Err(error) = &result {
+                    self.terminal_fault = Some(error.clone());
+                }
+                result
             }
             Err(_) => Err(PacketStackError::ShutdownTimeout),
         }
@@ -890,10 +1181,12 @@ impl ReadyPacketStack {
 impl Drop for ReadyPacketStack {
     fn drop(&mut self) {
         // Emergency containment only: dropping a live handle cannot report
-        // whether provider cleanup ran. Product lifecycles must use
-        // `shutdown_until`, retain this handle on timeout, and treat any live
-        // handle reaching Drop as state-uncertain recovery work.
-        self.first_event.request_cancellation(&self.cancellation);
+        // whether admission quiesce/control cleanup ran. This direct final
+        // termination and detached bounded reaper remain a production blocker;
+        // explicit product lifecycles must use `quiesce_until`, then runtime
+        // cleanup, then `shutdown_until`, retaining this owner on timeout.
+        self.quiesce_state.request(&self.quiesce);
+        self.first_event.request_cancellation(&self.termination);
         if let Some(task) = self.driver.take() {
             spawn_emergency_reaper(task, self.shutdown_timeout);
         }
@@ -1092,16 +1385,19 @@ fn classify_shutdown(
 
 #[cfg(test)]
 mod tests {
-    use std::future::pending;
-    use std::sync::Mutex;
     use std::sync::atomic::{AtomicBool, Ordering};
 
     use super::*;
     use crate::sockscap::capture::packet_device::{
         MIN_PACKET_QUEUE_BYTES, bounded_packet_device_queues,
     };
-    use crate::sockscap::flow::ingress::FlowIngress;
-
+    use crate::sockscap::flow::ingress::{FlowIngress, UdpFlowIngress};
+    use crate::sockscap::flow::ip_stack::{
+        ChecksumPolicy, FragmentationPolicy, IcmpBehavior, IpStackProviderCapabilities,
+        IpStackProviderResources, Ipv6ExtensionHeaderPolicy, TcpBridgeBudget,
+        TcpLifecycleDeadlines, UdpAssociationQueueBudgets, UdpQueueBudget,
+        UdpWildcardBindingBudgets,
+    };
     const GENERATION: u64 = 7;
     const REVISION: u64 = 3;
 
@@ -1120,7 +1416,6 @@ mod tests {
             tcp: true,
             udp: true,
             fragment_reassembly: true,
-            virtual_dns: false,
         }
     }
 
@@ -1134,14 +1429,60 @@ mod tests {
     }
 
     fn stack_config() -> IpStackConfig {
+        let udp_queue = UdpQueueBudget {
+            datagrams: 2,
+            payload_bytes: 2_400,
+            metadata_bytes: 128,
+        };
         IpStackConfig {
             generation: GENERATION,
             platform: CapturePlatform::Linux,
             provider: provider_pin(),
             max_tcp_flows: 8,
             max_udp_associations: 8,
-            max_reassembly_bytes: 1 << 20,
+            max_reassembly_bytes: 0,
             max_packet_bytes: 1500,
+            mtu_bytes: 1500,
+            tcp_rx_bytes_per_flow: 8 * 1024,
+            tcp_tx_bytes_per_flow: 8 * 1024,
+            total_socket_bytes: 512 * 1024,
+            udp_datagram_bytes: 1200,
+            provider_resources: IpStackProviderResources {
+                tcp_lifecycle: TcpLifecycleDeadlines {
+                    handshake_ms: 30_000,
+                    graceful_close_ms: 10_000,
+                    reset_ms: 1_000,
+                },
+                tcp_bridge: TcpBridgeBudget {
+                    rx_bytes_per_flow: 4 * 1024,
+                    tx_bytes_per_flow: 4 * 1024,
+                },
+                udp_association_queues: UdpAssociationQueueBudgets {
+                    stack_to_egress: udp_queue,
+                    egress_to_stack: udp_queue,
+                },
+                udp_wildcard_bindings: UdpWildcardBindingBudgets {
+                    max_bindings: 8,
+                    rx: udp_queue,
+                    tx: udp_queue,
+                },
+                capabilities: IpStackProviderCapabilities {
+                    bounded_fragment_reassembly: false,
+                    validated_ipv6_extension_headers: false,
+                },
+                fragmentation_policy: FragmentationPolicy::RejectAll,
+                ipv6_extension_header_policy: Ipv6ExtensionHeaderPolicy::RejectAll,
+            },
+            udp_idle_timeout_ms: 30_000,
+            max_fragments: 0,
+            fragment_timeout_ms: 0,
+            packet_work_per_wake: 64,
+            socket_work_per_wake: 64,
+            tx_staging_packets: 8,
+            tx_staging_bytes: 12_000,
+            tx_backpressure_deadline_ms: 100,
+            checksum_policy: ChecksumPolicy::VerifyInboundAndComputeOutbound,
+            icmp_behavior: IcmpBehavior::ErrorsOnly,
         }
     }
 
@@ -1154,6 +1495,7 @@ mod tests {
                 ..PacketStackCapabilities::default()
             },
             decoded_tcp_queue_capacity: 8,
+            decoded_udp_queue_capacity: 8,
             startup_timeout: Duration::from_millis(100),
             shutdown_timeout: Duration::from_millis(100),
         }
@@ -1183,13 +1525,17 @@ mod tests {
         ReadyThenError(Arc<tokio::sync::Notify>),
         ReadyThenPanic(Arc<tokio::sync::Notify>),
         ReadyAfterBlockingDelay(Duration),
+        QuiesceUntilRelease(Arc<tokio::sync::Notify>),
+        QuiesceThenIgnoreTermination(Arc<tokio::sync::Notify>),
     }
 
     #[derive(Default)]
     struct DriverObservation {
         entered: AtomicBool,
         dropped: AtomicBool,
-        cancellation: Mutex<Option<CancellationToken>>,
+        quiesce_requested: AtomicBool,
+        quiesced: AtomicBool,
+        termination_requested: AtomicBool,
     }
 
     struct DriverDropGuard(Arc<DriverObservation>);
@@ -1207,6 +1553,37 @@ mod tests {
         observation: Arc<DriverObservation>,
     }
 
+    async fn serve_ready_driver(
+        context: PacketStackRunContext,
+        control: PacketStackDriverControl,
+        tcp_ingress: BoundedFlowIngressSender,
+        udp_ingress: BoundedUdpFlowIngressSender,
+        observation: &DriverObservation,
+        quiesce_release: Option<Arc<tokio::sync::Notify>>,
+        termination_release: Option<Arc<tokio::sync::Notify>>,
+    ) -> Result<PacketStackExit, PacketStackError> {
+        control.quiesce_requested().await;
+        observation.quiesce_requested.store(true, Ordering::Release);
+        if let Some(release) = quiesce_release {
+            release.notified().await;
+        }
+        let (native_ingress, native_egress) = context.into_io().into_parts();
+        drop(native_ingress);
+        drop(tcp_ingress);
+        drop(udp_ingress);
+        control.acknowledge_quiesced()?;
+        observation.quiesced.store(true, Ordering::Release);
+        control.termination_requested().await;
+        observation
+            .termination_requested
+            .store(true, Ordering::Release);
+        if let Some(release) = termination_release {
+            release.notified().await;
+        }
+        drop(native_egress);
+        Ok(PacketStackExit::Cancelled)
+    }
+
     #[async_trait]
     impl PacketStackDriver for FakeDriver {
         fn identity(&self) -> PacketStackIdentity {
@@ -1217,13 +1594,13 @@ mod tests {
             self: Box<Self>,
             context: PacketStackRunContext,
             readiness: oneshot::Sender<PacketStackReady>,
-            cancellation: CancellationToken,
-            _tcp_ingress: BoundedFlowIngressSender,
+            control: PacketStackDriverControl,
+            tcp_ingress: BoundedFlowIngressSender,
+            udp_ingress: BoundedUdpFlowIngressSender,
         ) -> Result<PacketStackExit, PacketStackError> {
             assert_eq!(context.identity(), &self.identity);
             assert_eq!(context.config().generation, GENERATION);
             let _drop_guard = DriverDropGuard(Arc::clone(&self.observation));
-            *self.observation.cancellation.lock().unwrap() = Some(cancellation.clone());
             self.observation.entered.store(true, Ordering::Release);
             match self.behavior {
                 RunBehavior::ReadyAndWait => {
@@ -1231,12 +1608,29 @@ mod tests {
                         identity: self.identity,
                         capabilities: self.ready_capabilities,
                     });
-                    cancellation.cancelled().await;
+                    serve_ready_driver(
+                        context,
+                        control,
+                        tcp_ingress,
+                        udp_ingress,
+                        &self.observation,
+                        None,
+                        None,
+                    )
+                    .await
+                }
+                RunBehavior::NeverReady => {
+                    control.termination_requested().await;
+                    self.observation
+                        .termination_requested
+                        .store(true, Ordering::Release);
                     Ok(PacketStackExit::Cancelled)
                 }
-                RunBehavior::NeverReady => pending().await,
                 RunBehavior::NeverReadyUntilRelease(release) => {
                     release.notified().await;
+                    self.observation
+                        .termination_requested
+                        .store(control.is_termination_requested(), Ordering::Release);
                     Ok(PacketStackExit::Cancelled)
                 }
                 RunBehavior::EarlyExit => Ok(PacketStackExit::Cancelled),
@@ -1250,7 +1644,10 @@ mod tests {
                         identity: ready_identity,
                         capabilities: self.ready_capabilities,
                     });
-                    cancellation.cancelled().await;
+                    control.termination_requested().await;
+                    self.observation
+                        .termination_requested
+                        .store(true, Ordering::Release);
                     Ok(PacketStackExit::Cancelled)
                 }
                 RunBehavior::ReadyCapabilities(ready_capabilities) => {
@@ -1258,7 +1655,10 @@ mod tests {
                         identity: self.identity,
                         capabilities: ready_capabilities,
                     });
-                    cancellation.cancelled().await;
+                    control.termination_requested().await;
+                    self.observation
+                        .termination_requested
+                        .store(true, Ordering::Release);
                     Ok(PacketStackExit::Cancelled)
                 }
                 RunBehavior::ReadyThenRelease(release) => {
@@ -1294,8 +1694,48 @@ mod tests {
                         capabilities: self.ready_capabilities,
                     });
                     std::thread::sleep(delay);
-                    cancellation.cancelled().await;
-                    Ok(PacketStackExit::Cancelled)
+                    serve_ready_driver(
+                        context,
+                        control,
+                        tcp_ingress,
+                        udp_ingress,
+                        &self.observation,
+                        None,
+                        None,
+                    )
+                    .await
+                }
+                RunBehavior::QuiesceUntilRelease(release) => {
+                    let _ = readiness.send(PacketStackReady {
+                        identity: self.identity,
+                        capabilities: self.ready_capabilities,
+                    });
+                    serve_ready_driver(
+                        context,
+                        control,
+                        tcp_ingress,
+                        udp_ingress,
+                        &self.observation,
+                        Some(release),
+                        None,
+                    )
+                    .await
+                }
+                RunBehavior::QuiesceThenIgnoreTermination(release) => {
+                    let _ = readiness.send(PacketStackReady {
+                        identity: self.identity,
+                        capabilities: self.ready_capabilities,
+                    });
+                    serve_ready_driver(
+                        context,
+                        control,
+                        tcp_ingress,
+                        udp_ingress,
+                        &self.observation,
+                        None,
+                        Some(release),
+                    )
+                    .await
                 }
             }
         }
@@ -1383,10 +1823,18 @@ mod tests {
             "PACKET_STACK_TIMEOUT_INVALID"
         );
 
-        let mut config = supervisor_config();
-        config.required_capabilities.virtual_dns = true;
+        let missing_provider: Arc<dyn PacketStackProvider> = Arc::new(FakeProvider {
+            descriptor: PacketStackDescriptor {
+                provider: provider_pin(),
+                capabilities: PacketStackCapabilities::default(),
+            },
+            driver_identity: identity(),
+            behavior: RunBehavior::ReadyAndWait,
+            observation: Arc::new(DriverObservation::default()),
+        });
+        let config = supervisor_config();
         assert_eq!(
-            PacketStackSupervisor::new(config, stack_config(), Arc::clone(&provider))
+            PacketStackSupervisor::new(config, stack_config(), missing_provider)
                 .unwrap_err()
                 .code(),
             "PACKET_STACK_CAPABILITY_MISSING"
@@ -1410,9 +1858,14 @@ mod tests {
         assert_eq!(ready.capabilities(), capabilities());
         assert_eq!(ready.health(), PacketStackHealth::Ready);
         let ingress = ready.take_flow_ingress().unwrap();
+        let udp_ingress = ready.take_udp_flow_ingress().unwrap();
         assert_eq!(
             ready.take_flow_ingress().unwrap_err().code(),
             "PACKET_STACK_FLOW_INGRESS_ALREADY_TAKEN"
+        );
+        assert_eq!(
+            ready.take_udp_flow_ingress().unwrap_err().code(),
+            "PACKET_STACK_UDP_INGRESS_ALREADY_TAKEN"
         );
 
         assert_eq!(
@@ -1423,6 +1876,7 @@ mod tests {
         assert_eq!(ready.health(), PacketStackHealth::Stopped);
         assert!(observation.dropped.load(Ordering::Acquire));
         assert!(ingress.accept_tcp().await.unwrap().is_none());
+        assert!(udp_ingress.accept_udp().await.unwrap().is_none());
     }
 
     #[tokio::test]
@@ -1487,15 +1941,7 @@ mod tests {
             .await
             .unwrap();
         wait_for(|| observation.dropped.load(Ordering::Acquire)).await;
-        assert!(
-            observation
-                .cancellation
-                .lock()
-                .unwrap()
-                .as_ref()
-                .unwrap()
-                .is_cancelled()
-        );
+        assert!(observation.termination_requested.load(Ordering::Acquire));
     }
 
     #[tokio::test]
@@ -1596,6 +2042,55 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn driver_failure_during_quiesce_is_cached_as_the_terminal_root_cause() {
+        for (behavior, release, expected) in {
+            let error_release = Arc::new(tokio::sync::Notify::new());
+            let panic_release = Arc::new(tokio::sync::Notify::new());
+            [
+                (
+                    RunBehavior::ReadyThenError(Arc::clone(&error_release)),
+                    error_release,
+                    "PACKET_STACK_DRIVER_FAILED",
+                ),
+                (
+                    RunBehavior::ReadyThenPanic(Arc::clone(&panic_release)),
+                    panic_release,
+                    "PACKET_STACK_DRIVER_PANICKED",
+                ),
+            ]
+        } {
+            let (supervisor, _) = make_supervisor(behavior);
+            let mut ready = supervisor.start(packet_io()).await.unwrap();
+            ready.request_quiesce();
+            release.notify_one();
+            assert_eq!(
+                ready
+                    .quiesce_until(Instant::now() + Duration::from_secs(1))
+                    .await
+                    .unwrap_err()
+                    .code(),
+                expected
+            );
+            assert_eq!(ready.health(), PacketStackHealth::Failed);
+            assert_eq!(
+                ready
+                    .terminal_fault
+                    .as_ref()
+                    .expect("terminal driver fault is retained")
+                    .code(),
+                expected
+            );
+            assert_eq!(
+                ready
+                    .shutdown_until(Instant::now() + Duration::from_secs(1))
+                    .await
+                    .unwrap(),
+                PacketStackExit::Cancelled
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn completed_driver_cannot_be_reclassified_by_later_cancel() {
         let release = Arc::new(tokio::sync::Notify::new());
         let (supervisor, _) = make_supervisor(RunBehavior::ReadyThenRelease(Arc::clone(&release)));
@@ -1603,7 +2098,7 @@ mod tests {
         release.notify_one();
         wait_for(|| ready.driver.as_ref().unwrap().is_finished()).await;
 
-        ready.cancel();
+        ready.request_quiesce();
         assert_eq!(ready.health(), PacketStackHealth::Failed);
         assert_eq!(
             ready.shutdown().await.unwrap_err().code(),
@@ -1615,65 +2110,59 @@ mod tests {
     async fn controlled_cancel_handle_latches_before_cooperative_exit() {
         let (supervisor, observation) = make_supervisor(RunBehavior::ReadyAndWait);
         let mut ready = supervisor.start(packet_io()).await.unwrap();
+        ready.request_quiesce();
+        ready
+            .quiesce_until(Instant::now() + Duration::from_secs(1))
+            .await
+            .unwrap();
         let cancellation = ready.cancellation_token();
 
         cancellation.cancel();
         cancellation.cancelled().await;
         assert!(cancellation.is_cancelled());
         assert_eq!(ready.health(), PacketStackHealth::Stopping);
-        assert_eq!(ready.shutdown().await.unwrap(), PacketStackExit::Cancelled);
+        assert_eq!(
+            ready
+                .shutdown_until(Instant::now() + Duration::from_secs(1))
+                .await
+                .unwrap(),
+            PacketStackExit::Cancelled
+        );
         assert!(observation.dropped.load(Ordering::Acquire));
     }
 
-    #[tokio::test]
-    async fn provider_cannot_self_cancel_and_report_a_clean_shutdown() {
-        let (supervisor, observation) = make_supervisor(RunBehavior::ReadyAndWait);
-        let mut ready = supervisor.start(packet_io()).await.unwrap();
-        let provider_token = observation
-            .cancellation
-            .lock()
-            .unwrap()
-            .as_ref()
-            .unwrap()
-            .clone();
-
-        provider_token.cancel();
-        wait_for(|| ready.driver.as_ref().unwrap().is_finished()).await;
-        assert_eq!(ready.health(), PacketStackHealth::Failed);
+    #[test]
+    fn driver_cannot_acknowledge_quiesce_before_request() {
+        let quiesce = CancellationToken::new();
+        let quiesce_state = Arc::new(DriverQuiesceState::new());
+        let control = PacketStackDriverControl {
+            quiesce,
+            termination: CancellationToken::new(),
+            quiesce_state,
+        };
         assert_eq!(
-            ready.shutdown().await.unwrap_err().code(),
-            "PACKET_STACK_DRIVER_EXITED_UNEXPECTEDLY"
+            control.acknowledge_quiesced().unwrap_err().code(),
+            "PACKET_STACK_QUIESCE_ACK_BEFORE_REQUEST"
         );
     }
 
     #[tokio::test]
-    async fn controlled_cancel_does_not_hide_failure_panic_or_abort() {
-        let release = Arc::new(tokio::sync::Notify::new());
-        let (supervisor, _) = make_supervisor(RunBehavior::ReadyThenError(Arc::clone(&release)));
-        let mut ready = supervisor.start(packet_io()).await.unwrap();
-        ready.cancel();
-        release.notify_one();
-        assert_eq!(
-            ready.shutdown().await.unwrap_err().code(),
-            "PACKET_STACK_DRIVER_FAILED"
-        );
-
-        let release = Arc::new(tokio::sync::Notify::new());
-        let (supervisor, _) = make_supervisor(RunBehavior::ReadyThenPanic(Arc::clone(&release)));
-        let mut ready = supervisor.start(packet_io()).await.unwrap();
-        ready.cancel();
-        release.notify_one();
-        assert_eq!(
-            ready.shutdown().await.unwrap_err().code(),
-            "PACKET_STACK_DRIVER_PANICKED"
-        );
-
+    async fn controlled_final_termination_does_not_hide_abort() {
         let (supervisor, _) = make_supervisor(RunBehavior::ReadyAndWait);
         let mut ready = supervisor.start(packet_io()).await.unwrap();
-        ready.cancel();
+        ready.request_quiesce();
+        ready
+            .quiesce_until(Instant::now() + Duration::from_secs(1))
+            .await
+            .unwrap();
+        ready.cancellation_token().cancel();
         ready.driver.as_ref().unwrap().abort();
         assert_eq!(
-            ready.shutdown().await.unwrap_err().code(),
+            ready
+                .shutdown_until(Instant::now() + Duration::from_secs(1))
+                .await
+                .unwrap_err()
+                .code(),
             "PACKET_STACK_DRIVER_ABORTED"
         );
     }
@@ -1690,15 +2179,80 @@ mod tests {
         start_task.abort();
         let _ = start_task.await;
         wait_for(|| observation.dropped.load(Ordering::Acquire)).await;
-        assert!(
-            observation
-                .cancellation
-                .lock()
-                .unwrap()
-                .as_ref()
-                .unwrap()
-                .is_cancelled()
+        assert!(observation.termination_requested.load(Ordering::Acquire));
+    }
+
+    #[tokio::test]
+    async fn quiesce_ack_closes_native_and_both_decoded_ingresses_before_final_stop() {
+        let (supervisor, observation) = make_supervisor(RunBehavior::ReadyAndWait);
+        let (native, stack) = bounded_packet_device_queues(
+            MIN_PACKET_QUEUE_BYTES,
+            GENERATION,
+            CapturePlatform::Linux,
+        )
+        .unwrap();
+        let mut ready = supervisor
+            .start(PacketStackIo::new(stack.ingress, stack.egress).unwrap())
+            .await
+            .unwrap();
+        let tcp_ingress = ready.take_flow_ingress().unwrap();
+        let udp_ingress = ready.take_udp_flow_ingress().unwrap();
+
+        ready.request_quiesce();
+        assert_eq!(ready.health(), PacketStackHealth::Quiescing);
+        ready
+            .quiesce_until(Instant::now() + Duration::from_secs(1))
+            .await
+            .unwrap();
+        assert_eq!(ready.health(), PacketStackHealth::Quiesced);
+        assert!(native.capture.is_closed());
+        assert!(tcp_ingress.accept_tcp().await.unwrap().is_none());
+        assert!(udp_ingress.accept_udp().await.unwrap().is_none());
+        assert!(observation.quiesced.load(Ordering::Acquire));
+        assert!(!observation.termination_requested.load(Ordering::Acquire));
+        assert!(!observation.dropped.load(Ordering::Acquire));
+
+        ready
+            .shutdown_until(Instant::now() + Duration::from_secs(1))
+            .await
+            .unwrap();
+        assert!(observation.termination_requested.load(Ordering::Acquire));
+        assert!(observation.dropped.load(Ordering::Acquire));
+    }
+
+    #[tokio::test]
+    async fn quiesce_timeout_retains_live_actor_and_retries_same_owner() {
+        let mut config = supervisor_config();
+        config.shutdown_timeout = Duration::from_millis(20);
+        let release = Arc::new(tokio::sync::Notify::new());
+        let (provider, observation) =
+            provider(RunBehavior::QuiesceUntilRelease(Arc::clone(&release)));
+        let supervisor = PacketStackSupervisor::new(config, stack_config(), provider).unwrap();
+        let mut ready = supervisor.start(packet_io()).await.unwrap();
+
+        ready.request_quiesce();
+        assert_eq!(
+            ready
+                .quiesce_until(Instant::now() + Duration::from_millis(20))
+                .await
+                .unwrap_err()
+                .code(),
+            "PACKET_STACK_QUIESCE_TIMEOUT"
         );
+        assert_eq!(ready.health(), PacketStackHealth::Quiescing);
+        assert!(!observation.termination_requested.load(Ordering::Acquire));
+        assert!(!observation.dropped.load(Ordering::Acquire));
+
+        release.notify_one();
+        ready
+            .quiesce_until(Instant::now() + Duration::from_secs(1))
+            .await
+            .unwrap();
+        assert_eq!(ready.health(), PacketStackHealth::Quiesced);
+        ready
+            .shutdown_until(Instant::now() + Duration::from_secs(1))
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -1706,7 +2260,9 @@ mod tests {
         let mut config = supervisor_config();
         config.shutdown_timeout = Duration::from_millis(20);
         let release = Arc::new(tokio::sync::Notify::new());
-        let (provider, observation) = provider(RunBehavior::ReadyThenRelease(Arc::clone(&release)));
+        let (provider, observation) = provider(RunBehavior::QuiesceThenIgnoreTermination(
+            Arc::clone(&release),
+        ));
         let supervisor = PacketStackSupervisor::new(config, stack_config(), provider).unwrap();
         let mut ready = supervisor.start(packet_io()).await.unwrap();
         let started = Instant::now();

@@ -10,7 +10,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::panic::AssertUnwindSafe;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -22,7 +22,10 @@ use tokio::sync::oneshot;
 use tokio::task::{JoinError, JoinHandle};
 use tokio::time::Instant;
 
-use super::ingress::{BoundedFlowIngress, FlowIngress, IngressError, IngressTcpFlow};
+use super::ingress::{
+    BoundedFlowIngress, BoundedUdpFlowIngress, FlowIngress, IngressError, IngressTcpFlow,
+    IngressUdpAssociation, UdpFlowIngress,
+};
 use super::ip_stack::{IpStackConfig, IpStackError, IpStackProviderPin};
 use super::packet_stack::{
     PacketStackError, PacketStackExit, PacketStackHealth, PacketStackIo, PacketStackProvider,
@@ -42,6 +45,7 @@ const PRODUCT_DATA_PLANE_RUNTIME_EXIT_CODE: &str = "PRODUCT_DATA_PLANE_RUNTIME_E
 const PRODUCT_DATA_PLANE_RUNTIME_JOIN_CODE: &str = "PRODUCT_DATA_PLANE_RUNTIME_JOIN_FAILED";
 const PRODUCT_DATA_PLANE_RUNTIME_SHUTDOWN_TIMEOUT_CODE: &str =
     "PRODUCT_DATA_PLANE_RUNTIME_SHUTDOWN_TIMEOUT";
+const PACKET_STACK_QUIESCE_TIMEOUT_CODE: &str = "PACKET_STACK_QUIESCE_TIMEOUT";
 const PACKET_STACK_SHUTDOWN_TIMEOUT_CODE: &str = "PACKET_STACK_SHUTDOWN_TIMEOUT";
 const PRODUCT_DATA_PLANE_STACK_UNHEALTHY_CODE: &str = "PRODUCT_DATA_PLANE_PACKET_STACK_UNHEALTHY";
 const PRODUCT_DATA_PLANE_NATIVE_FAILED_CODE: &str = "PRODUCT_DATA_PLANE_NATIVE_FAILED";
@@ -85,16 +89,67 @@ impl ProductDataPlaneConfig {
                 "packet stack, IP stack, and flow runtime use different snapshots",
             ));
         }
+        if !self.packet_stack.required_capabilities.ipv4
+            && !self.packet_stack.required_capabilities.ipv6
+        {
+            return Err(ProductDataPlaneError::invalid(
+                "PRODUCT_DATA_PLANE_IP_CAPABILITY_REQUIRED",
+                "product composition must explicitly require at least one IP family",
+            ));
+        }
         if !self.packet_stack.required_capabilities.tcp {
             return Err(ProductDataPlaneError::invalid(
                 "PRODUCT_DATA_PLANE_TCP_CAPABILITY_REQUIRED",
                 "decoded-flow composition requires an explicitly required TCP provider",
             ));
         }
+        if !self.packet_stack.required_capabilities.udp {
+            return Err(ProductDataPlaneError::invalid(
+                "PRODUCT_DATA_PLANE_UDP_CAPABILITY_REQUIRED",
+                "dual-transport composition requires an explicitly required UDP provider",
+            ));
+        }
         if self.flow_runtime.max_active_flows() > self.ip_stack.max_tcp_flows {
             return Err(ProductDataPlaneError::invalid(
                 "PRODUCT_DATA_PLANE_FLOW_LIMIT_MISMATCH",
                 "FlowRuntime cannot admit more TCP flows than the packet stack",
+            ));
+        }
+        if self.flow_runtime.max_active_udp_associations() > self.ip_stack.max_udp_associations {
+            return Err(ProductDataPlaneError::invalid(
+                "PRODUCT_DATA_PLANE_UDP_LIMIT_MISMATCH",
+                "FlowRuntime cannot admit more UDP associations than the packet stack",
+            ));
+        }
+        if self.packet_stack.decoded_tcp_queue_capacity > self.flow_runtime.max_active_flows() {
+            return Err(ProductDataPlaneError::invalid(
+                "PRODUCT_DATA_PLANE_TCP_QUEUE_RUNTIME_MISMATCH",
+                "decoded TCP flow queue cannot exceed the runtime flow budget",
+            ));
+        }
+        if self.packet_stack.decoded_udp_queue_capacity
+            > self.flow_runtime.max_active_udp_associations()
+        {
+            return Err(ProductDataPlaneError::invalid(
+                "PRODUCT_DATA_PLANE_UDP_QUEUE_RUNTIME_MISMATCH",
+                "decoded UDP association queue cannot exceed the runtime association budget",
+            ));
+        }
+
+        let runtime_udp_idle_timeout = self.flow_runtime.udp_idle_timeout();
+        let runtime_udp_idle_timeout_ms = u64::try_from(runtime_udp_idle_timeout.as_millis())
+            .map_err(|_| {
+                ProductDataPlaneError::invalid(
+                    "PRODUCT_DATA_PLANE_UDP_IDLE_TIMEOUT_MISMATCH",
+                    "FlowRuntime UDP idle timeout cannot be represented in milliseconds",
+                )
+            })?;
+        if Duration::from_millis(runtime_udp_idle_timeout_ms) != runtime_udp_idle_timeout
+            || runtime_udp_idle_timeout_ms != self.ip_stack.udp_idle_timeout_ms
+        {
+            return Err(ProductDataPlaneError::invalid(
+                "PRODUCT_DATA_PLANE_UDP_IDLE_TIMEOUT_MISMATCH",
+                "FlowRuntime and IP-stack UDP idle timeouts must match exactly",
             ));
         }
         Ok(())
@@ -782,7 +837,6 @@ impl ProductDataPlaneFactory {
             Err(mut error) => {
                 let primary = error.code();
                 let starting_stack = error.take_recovery_owner();
-                let had_stack_owner = starting_stack.is_some();
                 let owner = ProductDataPlaneRecoveryOwner::starting(
                     starting_stack,
                     Arc::clone(&self.flow_runtime),
@@ -790,16 +844,14 @@ impl ProductDataPlaneFactory {
                 );
                 let failure =
                     rollback_recovery_owner_failure(owner, primary, cleanup_timeout).await;
-                if !had_stack_owner
-                    && matches!(
-                        &failure,
-                        ProductDataPlaneError::StartupFailed {
-                            cleanup,
-                            recovery_owner: None,
-                            ..
-                        } if cleanup.is_empty()
-                    )
-                {
+                if matches!(
+                    &failure,
+                    ProductDataPlaneError::StartupFailed {
+                        cleanup,
+                        recovery_owner: None,
+                        ..
+                    } if cleanup.is_empty()
+                ) {
                     return Err(ProductDataPlaneError::PacketStack(
                         error.into_unowned_error(),
                     ));
@@ -842,15 +894,34 @@ impl ProductDataPlaneFactory {
                 .await);
             }
         };
+        let udp_flow_ingress = match ready_stack.take_udp_flow_ingress() {
+            Ok(ingress) => ingress,
+            Err(error) => {
+                let primary = error.code();
+                return Err(startup_failure(
+                    identity,
+                    ready_stack,
+                    Arc::clone(&self.flow_runtime),
+                    None,
+                    primary,
+                    cleanup_timeout,
+                )
+                .await);
+            }
+        };
         let (runtime_ready_sender, mut runtime_ready_receiver) = oneshot::channel();
-        let runtime_ingress: Arc<dyn FlowIngress> = Arc::new(RuntimeReadyIngress {
-            inner: flow_ingress,
+        let runtime_ingress = Arc::new(RuntimeReadyIngress {
+            tcp: flow_ingress,
+            udp: udp_flow_ingress,
             ready: Mutex::new(Some(runtime_ready_sender)),
+            polled: AtomicU8::new(0),
         });
-        let runtime_handle = match self.flow_runtime.start(runtime_ingress) {
+        let tcp_ingress: Arc<dyn FlowIngress> = runtime_ingress.clone();
+        let udp_ingress: Arc<dyn UdpFlowIngress> = runtime_ingress;
+        let runtime_handle = match self.flow_runtime.start_with_udp(tcp_ingress, udp_ingress) {
             Ok(handle) => handle,
             Err(error) => {
-                let primary = flow_runtime_error_code(&error);
+                let primary = flow_runtime_error_code(&error.error());
                 return Err(startup_failure(
                     identity,
                     ready_stack,
@@ -869,6 +940,7 @@ impl ProductDataPlaneFactory {
             flow_runtime: Arc::clone(&self.flow_runtime),
             runtime_task: Some(runtime_task),
             stopping: AtomicBool::new(false),
+            stop_phase: AtomicU8::new(PRODUCT_STOP_RUNNING),
             stopped: false,
             faults: ProductDataPlaneFaults::default(),
             cleanup_faults: ProductDataPlaneFaults::default(),
@@ -941,6 +1013,13 @@ impl fmt::Debug for ProductDataPlaneFactory {
 
 type RuntimeTaskResult = Result<FlowRuntimeSnapshot, FlowRuntimeError>;
 
+const PRODUCT_STOP_RUNNING: u8 = 0;
+const PRODUCT_STOP_QUIESCING: u8 = 1;
+const PRODUCT_STOP_RUNTIME_DRAINING: u8 = 2;
+const PRODUCT_STOP_RUNTIME_CLEANUP: u8 = 3;
+const PRODUCT_STOP_STACK_STOPPING: u8 = 4;
+const PRODUCT_STOP_STOPPED: u8 = 5;
+
 /// Owned, retryable product data plane. Explicit `stop_until` is required for
 /// cleanup proof; Drop only provides bounded emergency containment.
 pub struct ReadyProductDataPlane {
@@ -949,6 +1028,10 @@ pub struct ReadyProductDataPlane {
     flow_runtime: Arc<FlowRuntime>,
     runtime_task: Option<JoinHandle<RuntimeTaskResult>>,
     stopping: AtomicBool,
+    /// Monotonic explicit-stop phase. A timeout leaves this exact phase and all
+    /// owners in place so the next `stop_until` resumes rather than restarting
+    /// or prematurely terminating the provider control actor.
+    stop_phase: AtomicU8,
     stopped: bool,
     /// First runtime/root-cause faults survive successful cleanup for
     /// diagnostics. They never substitute for the current ownership proof.
@@ -976,17 +1059,21 @@ impl ReadyProductDataPlane {
         self.faults
     }
 
-    /// Synchronously revoke readiness and request cancellation of every
-    /// shared-plane owner.  Product handoff guards use this before scheduling
-    /// asynchronous cleanup, so dropping a pending platform startup future
-    /// cannot leave the provider accepting traffic until a cleanup task gets
-    /// its first poll.
+    /// Synchronously revoke product readiness and fence packet admission.
+    /// FlowRuntime and final provider termination are deliberately deferred
+    /// until the asynchronous quiesce acknowledgement proves the control actor
+    /// is still alive and no new TCP/UDP admission can arrive.
     pub fn request_stop(&self) {
         self.stopping.store(true, Ordering::Release);
+        let _ = self.stop_phase.compare_exchange(
+            PRODUCT_STOP_RUNNING,
+            PRODUCT_STOP_QUIESCING,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        );
         if let Some(stack) = self.packet_stack.as_ref() {
-            stack.cancel();
+            stack.request_quiesce();
         }
-        self.flow_runtime.cancel();
     }
 
     pub fn health(&self, native: NativePacketPlaneHealth) -> ProductDataPlaneHealth {
@@ -999,7 +1086,11 @@ impl ReadyProductDataPlane {
             Some(PacketStackHealth::Failed) => {
                 faults.packet_stack = Some(PRODUCT_DATA_PLANE_STACK_UNHEALTHY_CODE);
             }
-            Some(PacketStackHealth::Stopping) if !stopping => {
+            Some(
+                PacketStackHealth::Quiescing
+                | PacketStackHealth::Quiesced
+                | PacketStackHealth::Stopping,
+            ) if !stopping => {
                 faults.packet_stack = Some(PRODUCT_DATA_PLANE_STACK_UNHEALTHY_CODE);
             }
             Some(PacketStackHealth::Stopped) if !stopping => {
@@ -1063,58 +1154,116 @@ impl ReadyProductDataPlane {
         &mut self,
         deadline: Instant,
     ) -> Result<FlowRuntimeSnapshot, ProductDataPlaneError> {
-        self.request_stop();
-
-        let packet_stack = &mut self.packet_stack;
-        let runtime_task = &mut self.runtime_task;
-        let retry_owner_cleanup = self.owner_cleanup_pending;
-        let flow_runtime = Arc::clone(&self.flow_runtime);
-        let (stack_result, runtime_result, owner_retry_result) = tokio::join!(
-            stop_packet_stack(packet_stack, deadline),
-            stop_flow_runtime(runtime_task, deadline),
-            retry_flow_runtime_owners(flow_runtime, retry_owner_cleanup, deadline),
-        );
-
-        let stack_error = stack_result.err();
-        self.faults.packet_stack = merge_terminal_fault(
-            self.faults.packet_stack,
-            stack_error,
-            PACKET_STACK_SHUTDOWN_TIMEOUT_CODE,
-        );
-        self.cleanup_faults.packet_stack = stack_error;
-        let (snapshot, mut runtime_error) = match runtime_result {
-            Ok(Some(snapshot)) => (snapshot, None),
-            Ok(None) => (self.flow_runtime.snapshot(), None),
-            Err(code) => (self.flow_runtime.snapshot(), Some(code)),
-        };
-        if self.flow_runtime.has_pending_cleanup()
-            || runtime_error == Some(PRODUCT_DATA_PLANE_RUNTIME_JOIN_CODE)
-        {
-            self.owner_cleanup_pending = true;
+        if self.stopped {
+            return Ok(self.flow_runtime.snapshot());
         }
-        if retry_owner_cleanup {
-            match owner_retry_result {
-                Ok(()) => self.owner_cleanup_pending = false,
-                Err(code) => runtime_error = Some(code),
+        self.request_stop();
+        self.cleanup_faults = ProductDataPlaneFaults::default();
+        let mut snapshot = self.flow_runtime.snapshot();
+
+        if self.stop_phase.load(Ordering::Acquire) <= PRODUCT_STOP_QUIESCING {
+            match quiesce_packet_stack(&mut self.packet_stack, deadline).await {
+                Ok(()) => {
+                    self.stop_phase
+                        .store(PRODUCT_STOP_RUNTIME_DRAINING, Ordering::Release);
+                }
+                Err(code) => {
+                    self.cleanup_faults.packet_stack = Some(code);
+                    self.faults.packet_stack = merge_terminal_fault(
+                        self.faults.packet_stack,
+                        Some(code),
+                        PACKET_STACK_QUIESCE_TIMEOUT_CODE,
+                    );
+                    if code == PACKET_STACK_QUIESCE_TIMEOUT_CODE {
+                        return Err(ProductDataPlaneError::StopFailed {
+                            faults: self.cleanup_faults,
+                        });
+                    }
+                    // A terminal driver failure has already ended its actor and
+                    // closed ingress. Continue runtime cleanup while retaining
+                    // the first stack root cause; there is no live final token
+                    // to send in this branch.
+                    self.stop_phase
+                        .store(PRODUCT_STOP_RUNTIME_DRAINING, Ordering::Release);
+                }
             }
         }
-        if self.owner_cleanup_pending && runtime_error.is_none() {
-            runtime_error = Some(FLOW_RUNTIME_OWNER_SHUTDOWN_FAILED_CODE);
+
+        if self.stop_phase.load(Ordering::Acquire) == PRODUCT_STOP_RUNTIME_DRAINING {
+            let runtime_error = match stop_flow_runtime(&mut self.runtime_task, deadline).await {
+                Ok(Some(completed)) => {
+                    snapshot = completed;
+                    None
+                }
+                Ok(None) => None,
+                Err(code) => Some(code),
+            };
+            if runtime_error == Some(PRODUCT_DATA_PLANE_RUNTIME_SHUTDOWN_TIMEOUT_CODE) {
+                self.cleanup_faults.flow_runtime = runtime_error;
+                return Err(ProductDataPlaneError::StopFailed {
+                    faults: self.cleanup_faults,
+                });
+            }
+            if self.flow_runtime.has_pending_cleanup()
+                || runtime_error == Some(PRODUCT_DATA_PLANE_RUNTIME_JOIN_CODE)
+            {
+                self.owner_cleanup_pending = true;
+            }
+            self.faults.flow_runtime = match runtime_error {
+                Some(FLOW_RUNTIME_OWNER_SHUTDOWN_FAILED_CODE) => self.faults.flow_runtime,
+                Some(code) => Some(code),
+                None => self.faults.flow_runtime,
+            };
+            self.cleanup_faults.flow_runtime = runtime_error;
+            self.stop_phase
+                .store(PRODUCT_STOP_RUNTIME_CLEANUP, Ordering::Release);
         }
-        self.faults.flow_runtime = match runtime_error {
-            Some(FLOW_RUNTIME_OWNER_SHUTDOWN_FAILED_CODE)
-            | Some(PRODUCT_DATA_PLANE_RUNTIME_SHUTDOWN_TIMEOUT_CODE) => self.faults.flow_runtime,
-            Some(code) => Some(code),
-            None => self.faults.flow_runtime,
-        };
-        self.cleanup_faults.flow_runtime = runtime_error;
-        self.cleanup_faults.native = None;
+
+        if self.stop_phase.load(Ordering::Acquire) == PRODUCT_STOP_RUNTIME_CLEANUP {
+            let cleanup_required =
+                self.owner_cleanup_pending || self.flow_runtime.has_pending_cleanup();
+            if cleanup_required {
+                match retry_flow_runtime_owners(Arc::clone(&self.flow_runtime), true, deadline)
+                    .await
+                {
+                    Ok(()) => self.owner_cleanup_pending = false,
+                    Err(code) => {
+                        self.owner_cleanup_pending = true;
+                        self.cleanup_faults.flow_runtime = Some(code);
+                        return Err(ProductDataPlaneError::StopFailed {
+                            faults: self.cleanup_faults,
+                        });
+                    }
+                }
+            } else {
+                self.owner_cleanup_pending = false;
+            }
+            self.stop_phase
+                .store(PRODUCT_STOP_STACK_STOPPING, Ordering::Release);
+        }
+
+        if self.stop_phase.load(Ordering::Acquire) == PRODUCT_STOP_STACK_STOPPING {
+            let stack_error = stop_packet_stack(&mut self.packet_stack, deadline)
+                .await
+                .err();
+            self.faults.packet_stack = merge_terminal_fault(
+                self.faults.packet_stack,
+                stack_error,
+                PACKET_STACK_SHUTDOWN_TIMEOUT_CODE,
+            );
+            if let Some(code) = stack_error {
+                self.cleanup_faults.packet_stack = Some(code);
+            }
+        }
+
         if !self.cleanup_faults.is_empty() {
             return Err(ProductDataPlaneError::StopFailed {
                 faults: self.cleanup_faults,
             });
         }
         self.stopped = true;
+        self.stop_phase
+            .store(PRODUCT_STOP_STOPPED, Ordering::Release);
         Ok(snapshot)
     }
 
@@ -1151,11 +1300,12 @@ impl Drop for ReadyProductDataPlane {
         {
             return;
         }
-        self.stopping.store(true, Ordering::Release);
+        self.request_stop();
+        // Emergency containment cannot provide the ordered ownership proof of
+        // explicit `stop_until`: this direct runtime cancellation and the
+        // detached bounded task below remain a production blocker. The normal
+        // path never reaches final stack termination before runtime cleanup.
         self.flow_runtime.cancel();
-        if let Some(stack) = self.packet_stack.as_ref() {
-            stack.cancel();
-        }
         spawn_emergency_cleanup(
             self.packet_stack.take(),
             self.runtime_task.take(),
@@ -1369,10 +1519,9 @@ impl StartingProductDataPlane {
         if let Some(stack) = self.packet_stack.as_ref() {
             stack.request_stop();
         }
-        self.flow_runtime.cancel();
         let (stack_result, owner_result) = tokio::join!(
             stop_starting_packet_stack(&mut self.packet_stack, deadline),
-            self.flow_runtime.retry_cleanup_until(deadline),
+            self.flow_runtime.cancel_unstarted_until(deadline),
         );
         let stack_error = stack_result.err();
         self.cleanup_faults.packet_stack = stack_error;
@@ -1417,17 +1566,22 @@ impl Drop for StartingProductDataPlane {
     }
 }
 
-/// Readiness is sent from inside `accept_tcp`, so successful composition start
-/// proves the FlowRuntime admission loop actually polled its sole ingress. The
-/// wrapper and receiver are never exposed from the factory.
+/// Readiness is sent only after the runtime polls both transport admissions, so
+/// successful composition start proves neither independently bounded queue is
+/// orphaned. The wrapper and receivers are never exposed from the factory.
 struct RuntimeReadyIngress {
-    inner: Arc<BoundedFlowIngress>,
+    tcp: Arc<BoundedFlowIngress>,
+    udp: Arc<BoundedUdpFlowIngress>,
     ready: Mutex<Option<oneshot::Sender<()>>>,
+    polled: AtomicU8,
 }
 
-#[async_trait]
-impl FlowIngress for RuntimeReadyIngress {
-    async fn accept_tcp(&self) -> Result<Option<IngressTcpFlow>, IngressError> {
+impl RuntimeReadyIngress {
+    fn mark_polled(&self, bit: u8) {
+        let previous = self.polled.fetch_or(bit, Ordering::AcqRel);
+        if previous | bit != 0b11 {
+            return;
+        }
         if let Some(ready) = self
             .ready
             .lock()
@@ -1436,7 +1590,38 @@ impl FlowIngress for RuntimeReadyIngress {
         {
             let _ = ready.send(());
         }
-        self.inner.accept_tcp().await
+    }
+}
+
+#[async_trait]
+impl FlowIngress for RuntimeReadyIngress {
+    fn max_buffered_tcp(&self) -> usize {
+        self.tcp.max_buffered_tcp()
+    }
+
+    async fn close_tcp_admission(&self) -> Result<(), IngressError> {
+        self.tcp.close_tcp_admission().await
+    }
+
+    async fn accept_tcp(&self) -> Result<Option<IngressTcpFlow>, IngressError> {
+        self.mark_polled(0b01);
+        self.tcp.accept_tcp().await
+    }
+}
+
+#[async_trait]
+impl UdpFlowIngress for RuntimeReadyIngress {
+    fn max_buffered_udp(&self) -> usize {
+        self.udp.max_buffered_udp()
+    }
+
+    async fn close_udp_admission(&self) -> Result<(), IngressError> {
+        self.udp.close_udp_admission().await
+    }
+
+    async fn accept_udp(&self) -> Result<Option<IngressUdpAssociation>, IngressError> {
+        self.mark_polled(0b10);
+        self.udp.accept_udp().await
     }
 }
 
@@ -1454,6 +1639,7 @@ async fn startup_failure(
         flow_runtime: runtime,
         runtime_task,
         stopping: AtomicBool::new(false),
+        stop_phase: AtomicU8::new(PRODUCT_STOP_RUNNING),
         stopped: false,
         faults: ProductDataPlaneFaults::default(),
         cleanup_faults: ProductDataPlaneFaults::default(),
@@ -1554,6 +1740,20 @@ fn merge_terminal_fault(
     }
 }
 
+async fn quiesce_packet_stack(
+    stack: &mut Option<ReadyPacketStack>,
+    deadline: Instant,
+) -> Result<(), &'static str> {
+    let Some(owner) = stack.as_mut() else {
+        return Ok(());
+    };
+    owner.request_quiesce();
+    owner
+        .quiesce_until(deadline)
+        .await
+        .map_err(|error| error.code())
+}
+
 async fn stop_packet_stack(
     stack: &mut Option<ReadyPacketStack>,
     deadline: Instant,
@@ -1566,7 +1766,19 @@ async fn stop_packet_stack(
             stack.take();
             Ok(())
         }
-        Err(error) => Err(error.code()),
+        Err(error) => {
+            let code = error.code();
+            if !matches!(
+                error,
+                PacketStackError::ShutdownTimeout | PacketStackError::ShutdownBeforeQuiesce
+            ) {
+                // A non-timeout final result consumed the driver's JoinHandle.
+                // Drop only the now-terminal type-state owner; its root cause
+                // is copied into the product terminal-fault record by caller.
+                stack.take();
+            }
+            Err(code)
+        }
     }
 }
 
@@ -1635,15 +1847,24 @@ fn spawn_emergency_cleanup(
     };
     runtime.spawn(async move {
         let deadline = Instant::now() + timeout;
-        let _ = tokio::join!(
-            stop_packet_stack(&mut stack, deadline),
-            stop_flow_runtime(&mut runtime_task, deadline),
-            retry_flow_runtime_owners(flow_runtime, retry_runtime_cleanup, deadline),
-        );
+        let quiesced = quiesce_packet_stack(&mut stack, deadline).await.is_ok();
+        let _ = stop_flow_runtime(&mut runtime_task, deadline).await;
+        let cleanup_required = retry_runtime_cleanup || flow_runtime.has_pending_cleanup();
+        let runtime_clean =
+            retry_flow_runtime_owners(Arc::clone(&flow_runtime), cleanup_required, deadline)
+                .await
+                .is_ok();
+        if quiesced && runtime_task.is_none() && runtime_clean {
+            let _ = stop_packet_stack(&mut stack, deadline).await;
+        }
         if let Some(task) = runtime_task {
             task.abort();
             let _ = task.await;
         }
+        // If the absolute emergency budget expired, dropping a live stack
+        // invokes its direct final-termination reaper. That task is detached
+        // containment, not production cleanup proof; explicit stop/recovery
+        // must retain the owner instead.
         drop(stack);
     });
 }
@@ -1708,7 +1929,7 @@ fn spawn_starting_emergency_cleanup(
         let deadline = Instant::now() + timeout;
         let _ = tokio::join!(
             stop_starting_packet_stack(&mut stack, deadline),
-            flow_runtime.retry_cleanup_until(deadline),
+            flow_runtime.cancel_unstarted_until(deadline),
         );
         drop(stack);
     });
@@ -1745,9 +1966,9 @@ fn flow_runtime_error_code(error: &FlowRuntimeError) -> &'static str {
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 
     use tokio::sync::Notify;
-    use tokio_util::sync::CancellationToken;
 
     use super::*;
     use crate::sockscap::capture::packet_device::{
@@ -1756,9 +1977,15 @@ mod tests {
     use crate::sockscap::flow::attribution::FakeIpMap;
     use crate::sockscap::flow::bypass::HardBypassSet;
     use crate::sockscap::flow::engine::{EgressProvider, FlowEngine, FlowEngineSnapshot};
+    use crate::sockscap::flow::ip_stack::{
+        ChecksumPolicy, FragmentationPolicy, IcmpBehavior, IpStackProviderCapabilities,
+        IpStackProviderResources, Ipv6ExtensionHeaderPolicy, TcpBridgeBudget,
+        TcpLifecycleDeadlines, UdpAssociationQueueBudgets, UdpQueueBudget,
+        UdpWildcardBindingBudgets,
+    };
     use crate::sockscap::flow::packet_stack::{
-        PacketStackCapabilities, PacketStackDescriptor, PacketStackDriver, PacketStackIdentity,
-        PacketStackReady, PacketStackRunContext,
+        PacketStackCapabilities, PacketStackDescriptor, PacketStackDriver,
+        PacketStackDriverControl, PacketStackIdentity, PacketStackReady, PacketStackRunContext,
     };
     use crate::sockscap::flow::runtime::{FlowRuntimeOwner, FlowRuntimeOwnerError};
     use crate::sockscap::policy::matcher::ProfileMatcher;
@@ -1773,6 +2000,11 @@ mod tests {
     #[derive(Clone)]
     enum DriverBehavior {
         Wait,
+        ObservedWait(Arc<CompositionDriverObservation>),
+        DelayQuiesce {
+            release: Arc<Notify>,
+            observation: Arc<CompositionDriverObservation>,
+        },
         FailOnCancel,
         FailAfter(Arc<Notify>),
         DropIngressThenWait,
@@ -1795,6 +2027,22 @@ mod tests {
 
     struct GatedDriver {
         stopped: Arc<Notify>,
+    }
+
+    #[derive(Default)]
+    struct CompositionDriverObservation {
+        quiesce_requested: AtomicBool,
+        quiesced: AtomicBool,
+        termination_requested: AtomicBool,
+        dropped: AtomicBool,
+    }
+
+    struct CompositionDriverDropGuard(Arc<CompositionDriverObservation>);
+
+    impl Drop for CompositionDriverDropGuard {
+        fn drop(&mut self) {
+            self.0.dropped.store(true, AtomicOrdering::Release);
+        }
     }
 
     #[async_trait]
@@ -1837,6 +2085,44 @@ mod tests {
         }
     }
 
+    async fn quiesce_and_terminate_driver(
+        context: PacketStackRunContext,
+        control: PacketStackDriverControl,
+        tcp_ingress: super::super::ingress::BoundedFlowIngressSender,
+        udp_ingress: super::super::ingress::BoundedUdpFlowIngressSender,
+        quiesce_release: Option<Arc<Notify>>,
+        observation: Option<Arc<CompositionDriverObservation>>,
+    ) -> Result<(), PacketStackError> {
+        let _drop_guard = observation
+            .as_ref()
+            .map(|observation| CompositionDriverDropGuard(Arc::clone(observation)));
+        control.quiesce_requested().await;
+        if let Some(observation) = &observation {
+            observation
+                .quiesce_requested
+                .store(true, AtomicOrdering::Release);
+        }
+        if let Some(release) = quiesce_release {
+            release.notified().await;
+        }
+        let (native_ingress, native_egress) = context.into_io().into_parts();
+        drop(native_ingress);
+        drop(tcp_ingress);
+        drop(udp_ingress);
+        control.acknowledge_quiesced()?;
+        if let Some(observation) = &observation {
+            observation.quiesced.store(true, AtomicOrdering::Release);
+        }
+        control.termination_requested().await;
+        if let Some(observation) = &observation {
+            observation
+                .termination_requested
+                .store(true, AtomicOrdering::Release);
+        }
+        drop(native_egress);
+        Ok(())
+    }
+
     #[async_trait]
     impl PacketStackDriver for TestDriver {
         fn identity(&self) -> PacketStackIdentity {
@@ -1845,10 +2131,11 @@ mod tests {
 
         async fn run(
             self: Box<Self>,
-            _context: PacketStackRunContext,
+            context: PacketStackRunContext,
             readiness: oneshot::Sender<PacketStackReady>,
-            cancellation: CancellationToken,
+            control: PacketStackDriverControl,
             tcp_ingress: super::super::ingress::BoundedFlowIngressSender,
+            udp_ingress: super::super::ingress::BoundedUdpFlowIngressSender,
         ) -> Result<PacketStackExit, PacketStackError> {
             let _ = readiness.send(PacketStackReady {
                 identity: stack_identity(),
@@ -1856,13 +2143,54 @@ mod tests {
             });
             match self.behavior {
                 DriverBehavior::Wait => {
-                    cancellation.cancelled().await;
-                    drop(tcp_ingress);
+                    quiesce_and_terminate_driver(
+                        context,
+                        control,
+                        tcp_ingress,
+                        udp_ingress,
+                        None,
+                        None,
+                    )
+                    .await?;
+                    Ok(PacketStackExit::Cancelled)
+                }
+                DriverBehavior::ObservedWait(observation) => {
+                    quiesce_and_terminate_driver(
+                        context,
+                        control,
+                        tcp_ingress,
+                        udp_ingress,
+                        None,
+                        Some(observation),
+                    )
+                    .await?;
+                    Ok(PacketStackExit::Cancelled)
+                }
+                DriverBehavior::DelayQuiesce {
+                    release,
+                    observation,
+                } => {
+                    quiesce_and_terminate_driver(
+                        context,
+                        control,
+                        tcp_ingress,
+                        udp_ingress,
+                        Some(release),
+                        Some(observation),
+                    )
+                    .await?;
                     Ok(PacketStackExit::Cancelled)
                 }
                 DriverBehavior::FailOnCancel => {
-                    cancellation.cancelled().await;
-                    drop(tcp_ingress);
+                    quiesce_and_terminate_driver(
+                        context,
+                        control,
+                        tcp_ingress,
+                        udp_ingress,
+                        None,
+                        None,
+                    )
+                    .await?;
                     Err(PacketStackError::provider(
                         "TEST_PACKET_STACK_FAILED",
                         "test failure",
@@ -1871,6 +2199,7 @@ mod tests {
                 DriverBehavior::FailAfter(release) => {
                     release.notified().await;
                     drop(tcp_ingress);
+                    drop(udp_ingress);
                     Err(PacketStackError::provider(
                         "TEST_PACKET_STACK_FAILED",
                         "test failure",
@@ -1878,12 +2207,25 @@ mod tests {
                 }
                 DriverBehavior::DropIngressThenWait => {
                     drop(tcp_ingress);
-                    cancellation.cancelled().await;
+                    drop(udp_ingress);
+                    control.quiesce_requested().await;
+                    let (native_ingress, native_egress) = context.into_io().into_parts();
+                    drop(native_ingress);
+                    control.acknowledge_quiesced()?;
+                    control.termination_requested().await;
+                    drop(native_egress);
                     Ok(PacketStackExit::Cancelled)
                 }
                 DriverBehavior::DropIngressAndIgnoreCancel(release) => {
                     drop(tcp_ingress);
+                    drop(udp_ingress);
+                    control.quiesce_requested().await;
                     release.notified().await;
+                    let (native_ingress, native_egress) = context.into_io().into_parts();
+                    drop(native_ingress);
+                    control.acknowledge_quiesced()?;
+                    control.termination_requested().await;
+                    drop(native_egress);
                     Ok(PacketStackExit::Cancelled)
                 }
             }
@@ -1898,17 +2240,18 @@ mod tests {
 
         async fn run(
             self: Box<Self>,
-            _context: PacketStackRunContext,
+            context: PacketStackRunContext,
             readiness: oneshot::Sender<PacketStackReady>,
-            cancellation: CancellationToken,
+            control: PacketStackDriverControl,
             tcp_ingress: super::super::ingress::BoundedFlowIngressSender,
+            udp_ingress: super::super::ingress::BoundedUdpFlowIngressSender,
         ) -> Result<PacketStackExit, PacketStackError> {
             let _ = readiness.send(PacketStackReady {
                 identity: stack_identity(),
                 capabilities: capabilities(),
             });
-            cancellation.cancelled().await;
-            drop(tcp_ingress);
+            quiesce_and_terminate_driver(context, control, tcp_ingress, udp_ingress, None, None)
+                .await?;
             self.stopped.notify_one();
             Ok(PacketStackExit::Cancelled)
         }
@@ -1962,7 +2305,6 @@ mod tests {
             tcp: true,
             udp: true,
             fragment_reassembly: true,
-            virtual_dns: true,
         }
     }
 
@@ -1976,15 +2318,22 @@ mod tests {
     }
 
     fn product_config() -> ProductDataPlaneConfig {
+        let udp_queue = UdpQueueBudget {
+            datagrams: 2,
+            payload_bytes: 2_400,
+            metadata_bytes: 128,
+        };
         ProductDataPlaneConfig {
             packet_stack: PacketStackSupervisorConfig {
                 identity: stack_identity(),
                 required_capabilities: PacketStackCapabilities {
                     ipv4: true,
                     tcp: true,
+                    udp: true,
                     ..PacketStackCapabilities::default()
                 },
                 decoded_tcp_queue_capacity: 8,
+                decoded_udp_queue_capacity: 8,
                 startup_timeout: Duration::from_millis(100),
                 shutdown_timeout: Duration::from_millis(100),
             },
@@ -1994,8 +2343,49 @@ mod tests {
                 provider: provider_pin(),
                 max_tcp_flows: 8,
                 max_udp_associations: 8,
-                max_reassembly_bytes: 1 << 20,
+                max_reassembly_bytes: 0,
                 max_packet_bytes: 1500,
+                mtu_bytes: 1500,
+                tcp_rx_bytes_per_flow: 8 * 1024,
+                tcp_tx_bytes_per_flow: 8 * 1024,
+                total_socket_bytes: 512 * 1024,
+                udp_datagram_bytes: 1200,
+                provider_resources: IpStackProviderResources {
+                    tcp_lifecycle: TcpLifecycleDeadlines {
+                        handshake_ms: 30_000,
+                        graceful_close_ms: 10_000,
+                        reset_ms: 1_000,
+                    },
+                    tcp_bridge: TcpBridgeBudget {
+                        rx_bytes_per_flow: 4 * 1024,
+                        tx_bytes_per_flow: 4 * 1024,
+                    },
+                    udp_association_queues: UdpAssociationQueueBudgets {
+                        stack_to_egress: udp_queue,
+                        egress_to_stack: udp_queue,
+                    },
+                    udp_wildcard_bindings: UdpWildcardBindingBudgets {
+                        max_bindings: 8,
+                        rx: udp_queue,
+                        tx: udp_queue,
+                    },
+                    capabilities: IpStackProviderCapabilities {
+                        bounded_fragment_reassembly: false,
+                        validated_ipv6_extension_headers: false,
+                    },
+                    fragmentation_policy: FragmentationPolicy::RejectAll,
+                    ipv6_extension_header_policy: Ipv6ExtensionHeaderPolicy::RejectAll,
+                },
+                udp_idle_timeout_ms: 30_000,
+                max_fragments: 0,
+                fragment_timeout_ms: 0,
+                packet_work_per_wake: 64,
+                socket_work_per_wake: 64,
+                tx_staging_packets: 8,
+                tx_staging_bytes: 12_000,
+                tx_backpressure_deadline_ms: 100,
+                checksum_policy: ChecksumPolicy::VerifyInboundAndComputeOutbound,
+                icmp_behavior: IcmpBehavior::ErrorsOnly,
             },
             flow_runtime: FlowRuntimeConfig::new(
                 CapturePlatform::Linux,
@@ -2139,6 +2529,112 @@ mod tests {
         assert_eq!(error.code(), "PRODUCT_DATA_PLANE_IDENTITY_MISMATCH");
     }
 
+    #[test]
+    fn product_config_requires_an_ip_family_and_both_transports() {
+        assert!(product_config().validate().is_ok());
+
+        let mut no_ip_family = product_config();
+        no_ip_family.packet_stack.required_capabilities.ipv4 = false;
+        no_ip_family.packet_stack.required_capabilities.ipv6 = false;
+        assert_eq!(
+            no_ip_family.validate().unwrap_err().code(),
+            "PRODUCT_DATA_PLANE_IP_CAPABILITY_REQUIRED"
+        );
+
+        let mut ipv6_only = product_config();
+        ipv6_only.packet_stack.required_capabilities.ipv4 = false;
+        ipv6_only.packet_stack.required_capabilities.ipv6 = true;
+        assert!(ipv6_only.validate().is_ok());
+
+        let mut no_udp = product_config();
+        no_udp.packet_stack.required_capabilities.udp = false;
+        assert_eq!(
+            no_udp.validate().unwrap_err().code(),
+            "PRODUCT_DATA_PLANE_UDP_CAPABILITY_REQUIRED"
+        );
+    }
+
+    #[test]
+    fn product_config_bounds_runtime_and_decoded_queues() {
+        let mut tcp_queue_at_limit = product_config();
+        tcp_queue_at_limit.packet_stack.decoded_tcp_queue_capacity =
+            tcp_queue_at_limit.flow_runtime.max_active_flows();
+        assert!(tcp_queue_at_limit.validate().is_ok());
+
+        let mut excessive_tcp_queue = product_config();
+        excessive_tcp_queue.ip_stack.max_tcp_flows = 16;
+        excessive_tcp_queue.packet_stack.decoded_tcp_queue_capacity = 9;
+        assert_eq!(
+            excessive_tcp_queue.validate().unwrap_err().code(),
+            "PRODUCT_DATA_PLANE_TCP_QUEUE_RUNTIME_MISMATCH"
+        );
+
+        let mut excessive_runtime = product_config();
+        excessive_runtime.flow_runtime = FlowRuntimeConfig::new_with_transport_limits(
+            CapturePlatform::Linux,
+            GENERATION,
+            REVISION,
+            8,
+            9,
+            Duration::from_millis(100),
+            Duration::from_secs(30),
+        )
+        .unwrap();
+        assert_eq!(
+            excessive_runtime.validate().unwrap_err().code(),
+            "PRODUCT_DATA_PLANE_UDP_LIMIT_MISMATCH"
+        );
+
+        let mut udp_queue_at_limit = product_config();
+        udp_queue_at_limit.packet_stack.decoded_udp_queue_capacity = udp_queue_at_limit
+            .flow_runtime
+            .max_active_udp_associations();
+        assert!(udp_queue_at_limit.validate().is_ok());
+
+        let mut excessive_queue = product_config();
+        excessive_queue.ip_stack.max_udp_associations = 16;
+        excessive_queue.packet_stack.decoded_udp_queue_capacity = 9;
+        assert_eq!(
+            excessive_queue.validate().unwrap_err().code(),
+            "PRODUCT_DATA_PLANE_UDP_QUEUE_RUNTIME_MISMATCH"
+        );
+    }
+
+    #[test]
+    fn product_config_requires_exact_millisecond_udp_idle_timeout() {
+        let mut mismatch = product_config();
+        mismatch.flow_runtime = FlowRuntimeConfig::new_with_transport_limits(
+            CapturePlatform::Linux,
+            GENERATION,
+            REVISION,
+            8,
+            8,
+            Duration::from_millis(100),
+            Duration::from_secs(31),
+        )
+        .unwrap();
+        assert_eq!(
+            mismatch.validate().unwrap_err().code(),
+            "PRODUCT_DATA_PLANE_UDP_IDLE_TIMEOUT_MISMATCH"
+        );
+
+        let mut sub_millisecond = product_config();
+        sub_millisecond.flow_runtime = FlowRuntimeConfig::new_with_transport_limits(
+            CapturePlatform::Linux,
+            GENERATION,
+            REVISION,
+            8,
+            8,
+            Duration::from_millis(100),
+            Duration::from_secs(30) + Duration::from_nanos(1),
+        )
+        .unwrap();
+        assert_eq!(
+            sub_millisecond.validate().unwrap_err().code(),
+            "PRODUCT_DATA_PLANE_UDP_IDLE_TIMEOUT_MISMATCH"
+        );
+    }
+
     #[tokio::test]
     async fn start_binds_queue_and_runtime_then_stops_both() {
         let (mut plane, _native) = start_plane(DriverBehavior::Wait).await;
@@ -2158,6 +2654,110 @@ mod tests {
             plane.health(NativePacketPlaneHealth::Stopped),
             ProductDataPlaneHealth::Stopped
         );
+    }
+
+    #[tokio::test]
+    async fn quiesce_timeout_keeps_runtime_and_control_actor_owned_for_retry() {
+        let release = Arc::new(Notify::new());
+        let observation = Arc::new(CompositionDriverObservation::default());
+        let factory = ProductDataPlaneFactory::new(
+            product_config(),
+            profiles(),
+            Arc::new(TestProvider {
+                behavior: DriverBehavior::DelayQuiesce {
+                    release: Arc::clone(&release),
+                    observation: Arc::clone(&observation),
+                },
+            }),
+        )
+        .unwrap();
+        let (native, io) = packet_io();
+        let mut plane = factory
+            .start_until(io, Instant::now() + Duration::from_secs(1))
+            .await
+            .unwrap();
+
+        let error = plane
+            .stop_until(Instant::now() + Duration::from_millis(20))
+            .await
+            .unwrap_err();
+        let ProductDataPlaneError::StopFailed { faults } = error else {
+            panic!("quiesce timeout must retain the product owner");
+        };
+        assert_eq!(faults.packet_stack, Some(PACKET_STACK_QUIESCE_TIMEOUT_CODE));
+        assert!(observation.quiesce_requested.load(AtomicOrdering::Acquire));
+        assert!(!observation.quiesced.load(AtomicOrdering::Acquire));
+        assert!(
+            !observation
+                .termination_requested
+                .load(AtomicOrdering::Acquire)
+        );
+        assert!(!observation.dropped.load(AtomicOrdering::Acquire));
+        assert!(!native.capture.is_closed());
+
+        release.notify_one();
+        plane
+            .stop_until(Instant::now() + Duration::from_secs(1))
+            .await
+            .unwrap();
+        assert!(observation.quiesced.load(AtomicOrdering::Acquire));
+        assert!(
+            observation
+                .termination_requested
+                .load(AtomicOrdering::Acquire)
+        );
+        assert!(observation.dropped.load(AtomicOrdering::Acquire));
+        assert!(native.capture.is_closed());
+    }
+
+    #[tokio::test]
+    async fn runtime_drain_timeout_keeps_quiesced_control_actor_alive() {
+        let owner_release = Arc::new(Notify::new());
+        let observation = Arc::new(CompositionDriverObservation::default());
+        let factory = ProductDataPlaneFactory::new(
+            product_config(),
+            profiles_with_blocking_owner(Arc::clone(&owner_release)),
+            Arc::new(TestProvider {
+                behavior: DriverBehavior::ObservedWait(Arc::clone(&observation)),
+            }),
+        )
+        .unwrap();
+        let (_native, io) = packet_io();
+        let mut plane = factory
+            .start_until(io, Instant::now() + Duration::from_secs(1))
+            .await
+            .unwrap();
+
+        let error = plane
+            .stop_until(Instant::now() + Duration::from_millis(20))
+            .await
+            .unwrap_err();
+        let ProductDataPlaneError::StopFailed { faults } = error else {
+            panic!("runtime drain timeout must retain every owner");
+        };
+        assert_eq!(
+            faults.flow_runtime,
+            Some(PRODUCT_DATA_PLANE_RUNTIME_SHUTDOWN_TIMEOUT_CODE)
+        );
+        assert!(observation.quiesced.load(AtomicOrdering::Acquire));
+        assert!(
+            !observation
+                .termination_requested
+                .load(AtomicOrdering::Acquire)
+        );
+        assert!(!observation.dropped.load(AtomicOrdering::Acquire));
+
+        owner_release.notify_one();
+        plane
+            .stop_until(Instant::now() + Duration::from_secs(1))
+            .await
+            .unwrap();
+        assert!(
+            observation
+                .termination_requested
+                .load(AtomicOrdering::Acquire)
+        );
+        assert!(observation.dropped.load(AtomicOrdering::Acquire));
     }
 
     #[tokio::test]
@@ -2197,6 +2797,18 @@ mod tests {
             .await
             .unwrap_err();
         assert_eq!(error.code(), "PRODUCT_DATA_PLANE_STOP_FAILED");
+        assert_eq!(
+            plane.terminal_faults().packet_stack,
+            Some("PACKET_STACK_DRIVER_FAILED")
+        );
+        plane
+            .stop_until(Instant::now() + Duration::from_millis(500))
+            .await
+            .unwrap();
+        assert_eq!(
+            plane.terminal_faults().packet_stack,
+            Some("PACKET_STACK_DRIVER_FAILED")
+        );
     }
 
     #[tokio::test]
@@ -2302,7 +2914,7 @@ mod tests {
         };
         assert_eq!(
             cleanup.packet_stack,
-            Some(PACKET_STACK_SHUTDOWN_TIMEOUT_CODE)
+            Some(PACKET_STACK_QUIESCE_TIMEOUT_CODE)
         );
         let mut recovery = error
             .take_recovery_owner()

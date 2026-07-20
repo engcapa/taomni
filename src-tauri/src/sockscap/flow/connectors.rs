@@ -5,13 +5,14 @@
 //! FlowEngine can later carry either a `TcpStream` or an SSH `direct-tcpip`
 //! channel without knowing the concrete transport type.
 
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
 use zeroize::{Zeroize, Zeroizing};
 
@@ -52,6 +53,43 @@ impl<T> AsyncEgressStream for T where T: AsyncRead + AsyncWrite + Unpin + Send {
 
 pub type BoxedEgressStream = Box<dyn AsyncEgressStream>;
 
+/// Largest UDP payloads representable by each IP family. Callers must retain
+/// datagram boundaries and reject larger payloads before reaching the socket.
+pub const MAX_IPV4_UDP_DATAGRAM_BYTES: usize = 65_507;
+pub const MAX_IPV6_UDP_DATAGRAM_BYTES: usize = 65_527;
+const UDP_RECEIVE_BUFFER_BYTES: usize = u16::MAX as usize;
+const DEFAULT_DIRECT_UDP_RECEIVE_BUDGET_BYTES: usize = 16 * 1024 * 1024;
+const MAX_DIRECT_UDP_RECEIVE_BUDGET_BYTES: usize = 256 * 1024 * 1024;
+
+/// Object-safe, asynchronous I/O for one connected UDP association.
+///
+/// Each `send` and `receive` represents exactly one datagram. Implementations
+/// must never split, merge, or silently truncate payloads. Both futures must be
+/// cancellation-safe and must not detach work: dropping `receive` must not
+/// consume a datagram, while dropping `send` must either leave the datagram
+/// uncommitted or have completed its one atomic send. A cancelled future must
+/// never deliver a datagram later. Returned receive allocations must be
+/// bounded to a non-jumbo UDP datagram and must not hide attacker-controlled
+/// spare capacity.
+#[async_trait]
+pub trait AsyncUdpAssociation: Send + Sync {
+    async fn send(&self, datagram: Vec<u8>) -> Result<(), EgressError>;
+
+    async fn receive(&self) -> Result<Vec<u8>, EgressError>;
+
+    /// Idempotently close this association and interrupt pending I/O.
+    ///
+    /// This is a synchronous task-cancellation hook: it must complete in O(1),
+    /// must never block on network, filesystem, thread, or actor progress, and
+    /// must not start detached cleanup. Implementations should only close an
+    /// owned local handle or signal an already-owned supervised actor.
+    fn close(&self);
+
+    fn is_closed(&self) -> bool;
+}
+
+pub type BoxedUdpAssociation = Box<dyn AsyncUdpAssociation>;
+
 /// Result of a successful egress connect.
 pub struct EgressStream {
     pub stream: BoxedEgressStream,
@@ -64,6 +102,22 @@ impl std::fmt::Debug for EgressStream {
             .debug_struct("EgressStream")
             .field("meta", &self.meta)
             .field("stream", &"bidirectional stream")
+            .finish()
+    }
+}
+
+/// Result of a successful UDP association setup.
+pub struct EgressUdpAssociation {
+    pub association: BoxedUdpAssociation,
+    pub meta: EgressMetadata,
+}
+
+impl std::fmt::Debug for EgressUdpAssociation {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("EgressUdpAssociation")
+            .field("meta", &self.meta)
+            .field("association", &"connected datagram association")
             .finish()
     }
 }
@@ -123,7 +177,27 @@ pub trait EgressConnector: Send + Sync {
         None
     }
 
+    /// Open a byte-stream transport. The future must be cancellation-safe and
+    /// own no detached setup work: dropping it must synchronously drop every
+    /// partially-created socket/session or leave cleanup with an already-owned
+    /// supervised runtime owner.
     async fn connect(&self, target: &EgressTarget) -> Result<EgressStream, EgressError>;
+
+    /// Open a datagram-preserving association. TCP-only connectors fail closed
+    /// until they provide and probe a real UDP forwarding implementation. The
+    /// future must be cancellation-safe and own no detached setup work:
+    /// dropping it must synchronously drop every partially-created
+    /// socket/session or leave cleanup with an already-owned supervised runtime
+    /// owner.
+    async fn connect_udp(
+        &self,
+        _target: &EgressTarget,
+    ) -> Result<EgressUdpAssociation, EgressError> {
+        Err(EgressError::Unavailable(format!(
+            "{} UDP egress is unsupported",
+            self.name()
+        )))
+    }
 }
 
 /// Deadline and cancellation boundary for one connect attempt.
@@ -165,14 +239,86 @@ pub async fn connect_controlled(
     }
 }
 
+/// Run UDP association setup under the same owned cancellation and deadline
+/// contract as TCP connects. The losing future is dropped immediately.
+pub async fn connect_udp_controlled(
+    connector: &dyn EgressConnector,
+    target: &EgressTarget,
+    control: &ConnectControl,
+) -> Result<EgressUdpAssociation, EgressError> {
+    let name = connector.name().to_string();
+    tokio::select! {
+        biased;
+        _ = control.cancellation.cancelled() => Err(EgressError::Cancelled { connector: name }),
+        result = tokio::time::timeout(control.timeout, connector.connect_udp(target)) => {
+            match result {
+                Ok(result) => result,
+                Err(_) => Err(EgressError::Timeout {
+                    connector: name,
+                    timeout_ms: control.timeout.as_millis().min(u64::MAX as u128) as u64,
+                }),
+            }
+        }
+    }
+}
+
 /// Direct TCP to the original destination from the physical network.
-#[derive(Debug, Default)]
-pub struct DirectConnector;
+#[derive(Clone)]
+pub struct DirectConnector {
+    udp_receive_budget: Arc<Semaphore>,
+    udp_receive_budget_bytes: usize,
+}
+
+impl DirectConnector {
+    /// Build a DIRECT connector whose concurrently waiting UDP receive buffers
+    /// have one shared hard byte ceiling. Each active receive reserves the
+    /// full non-jumbo buffer before allocation; associations beyond the budget
+    /// wait without allocating an untracked 64 KiB buffer.
+    pub fn with_udp_receive_budget(max_bytes: usize) -> Result<Self, EgressError> {
+        if max_bytes < UDP_RECEIVE_BUFFER_BYTES || max_bytes > MAX_DIRECT_UDP_RECEIVE_BUDGET_BYTES {
+            return Err(EgressError::Unavailable(
+                "direct UDP receive memory budget is outside the controlled range".into(),
+            ));
+        }
+        Ok(Self {
+            udp_receive_budget: Arc::new(Semaphore::new(max_bytes)),
+            udp_receive_budget_bytes: max_bytes,
+        })
+    }
+
+    pub fn udp_receive_budget_bytes(&self) -> usize {
+        self.udp_receive_budget_bytes
+    }
+}
+
+impl Default for DirectConnector {
+    fn default() -> Self {
+        Self::with_udp_receive_budget(DEFAULT_DIRECT_UDP_RECEIVE_BUDGET_BYTES)
+            .expect("fixed direct UDP receive budget is valid")
+    }
+}
+
+impl std::fmt::Debug for DirectConnector {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("DirectConnector")
+            .field("udp_receive_budget_bytes", &self.udp_receive_budget_bytes)
+            .field(
+                "udp_receive_budget_available",
+                &self.udp_receive_budget.available_permits(),
+            )
+            .finish()
+    }
+}
 
 #[async_trait]
 impl EgressConnector for DirectConnector {
     fn name(&self) -> &'static str {
         "direct"
+    }
+
+    fn udp_capability(&self) -> UdpEgressCapability {
+        UdpEgressCapability::Supported
     }
 
     async fn connect(&self, target: &EgressTarget) -> Result<EgressStream, EgressError> {
@@ -198,6 +344,129 @@ impl EgressConnector for DirectConnector {
                 detail: "direct TCP connection established".into(),
             },
         })
+    }
+
+    async fn connect_udp(
+        &self,
+        target: &EgressTarget,
+    ) -> Result<EgressUdpAssociation, EgressError> {
+        let destination = original_udp_destination(target)?;
+        let bind_address = udp_bind_address(destination.ip());
+        let socket = tokio::net::UdpSocket::bind(bind_address)
+            .await
+            .map_err(|error| udp_io_error("bind", error))?;
+        socket
+            .connect(destination)
+            .await
+            .map_err(|error| udp_io_error("connect", error))?;
+
+        Ok(EgressUdpAssociation {
+            association: Box::new(DirectUdpAssociation {
+                socket,
+                max_datagram_bytes: max_udp_datagram_bytes(destination.ip()),
+                closed: CancellationToken::new(),
+                receive_budget: Arc::clone(&self.udp_receive_budget),
+            }),
+            meta: EgressMetadata {
+                connector: "direct".into(),
+                remote_dns: false,
+                tcp_only: false,
+                detail: "direct UDP association established".into(),
+            },
+        })
+    }
+}
+
+struct DirectUdpAssociation {
+    socket: tokio::net::UdpSocket,
+    max_datagram_bytes: usize,
+    closed: CancellationToken,
+    receive_budget: Arc<Semaphore>,
+}
+
+impl std::fmt::Debug for DirectUdpAssociation {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("DirectUdpAssociation")
+            .field("max_datagram_bytes", &self.max_datagram_bytes)
+            .field("closed", &self.closed.is_cancelled())
+            .finish()
+    }
+}
+
+#[async_trait]
+impl AsyncUdpAssociation for DirectUdpAssociation {
+    async fn send(&self, datagram: Vec<u8>) -> Result<(), EgressError> {
+        if self.closed.is_cancelled() {
+            return Err(closed_udp_association_error());
+        }
+        if datagram.len() > self.max_datagram_bytes {
+            return Err(EgressError::InvalidTarget(format!(
+                "UDP datagram is {} bytes; maximum is {} bytes",
+                datagram.len(),
+                self.max_datagram_bytes
+            )));
+        }
+
+        let sent = tokio::select! {
+            biased;
+            _ = self.closed.cancelled() => return Err(closed_udp_association_error()),
+            result = self.socket.send(&datagram) => {
+                result.map_err(|error| udp_io_error("send", error))?
+            }
+        };
+        if sent != datagram.len() {
+            return Err(EgressError::Connect(format!(
+                "UDP send was incomplete: accepted {sent} of {} bytes",
+                datagram.len()
+            )));
+        }
+        Ok(())
+    }
+
+    async fn receive(&self) -> Result<Vec<u8>, EgressError> {
+        if self.closed.is_cancelled() {
+            return Err(closed_udp_association_error());
+        }
+
+        let receive_permit = tokio::select! {
+            biased;
+            _ = self.closed.cancelled() => return Err(closed_udp_association_error()),
+            permit = Arc::clone(&self.receive_budget)
+                .acquire_many_owned(UDP_RECEIVE_BUFFER_BYTES as u32) => {
+                permit.map_err(|_| EgressError::Unavailable(
+                    "direct UDP receive memory budget is closed".into()
+                ))?
+            }
+        };
+        // This exceeds the largest legal non-jumbo UDP payload for either
+        // family, so a successful receive cannot have been truncated by our
+        // buffer. Copy the used prefix into a tightly-sized return value before
+        // releasing the global permit; small DNS packets must not retain a
+        // hidden 64 KiB Vec capacity in downstream queues.
+        let mut datagram = vec![0; UDP_RECEIVE_BUFFER_BYTES];
+        let received = tokio::select! {
+            biased;
+            _ = self.closed.cancelled() => return Err(closed_udp_association_error()),
+            result = self.socket.recv(&mut datagram) => {
+                result.map_err(|error| udp_io_error("receive", error))?
+            }
+        };
+        // The boxed-slice round trip makes the returned Vec's allocation match
+        // the datagram length. `shrink_to_fit` alone is only a best-effort hint
+        // and would not be a sufficient queue-memory invariant here.
+        let result = datagram[..received].to_vec().into_boxed_slice().into_vec();
+        drop(datagram);
+        drop(receive_permit);
+        Ok(result)
+    }
+
+    fn close(&self) {
+        self.closed.cancel();
+    }
+
+    fn is_closed(&self) -> bool {
+        self.closed.is_cancelled()
     }
 }
 
@@ -285,11 +554,6 @@ pub struct Socks5Connector {
 impl EgressConnector for Socks5Connector {
     fn name(&self) -> &'static str {
         "socks5"
-    }
-
-    fn udp_capability(&self) -> UdpEgressCapability {
-        // UDP ASSOCIATE needs an explicit server probe and forwarding data path.
-        UdpEgressCapability::ProbeRequired
     }
 
     fn upstream_endpoint(&self) -> Option<BypassEndpoint> {
@@ -526,6 +790,46 @@ fn validate_target(target: &EgressTarget) -> Result<ValidatedTarget, EgressError
     })
 }
 
+fn original_udp_destination(target: &EgressTarget) -> Result<SocketAddr, EgressError> {
+    if target.port == 0 {
+        return Err(EgressError::InvalidTarget(
+            "destination port must be non-zero".into(),
+        ));
+    }
+    let ip = target
+        .ip
+        .as_deref()
+        .and_then(|value| value.trim().parse::<IpAddr>().ok())
+        .ok_or_else(|| {
+            EgressError::InvalidTarget(
+                "DIRECT UDP requires a numeric original destination IP".into(),
+            )
+        })?;
+    Ok(SocketAddr::new(ip, target.port))
+}
+
+fn udp_bind_address(destination: IpAddr) -> SocketAddr {
+    match destination {
+        IpAddr::V4(_) => SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0),
+        IpAddr::V6(_) => SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0),
+    }
+}
+
+fn max_udp_datagram_bytes(destination: IpAddr) -> usize {
+    match destination {
+        IpAddr::V4(_) => MAX_IPV4_UDP_DATAGRAM_BYTES,
+        IpAddr::V6(_) => MAX_IPV6_UDP_DATAGRAM_BYTES,
+    }
+}
+
+fn closed_udp_association_error() -> EgressError {
+    EgressError::Unavailable("UDP association is closed".into())
+}
+
+fn udp_io_error(operation: &str, error: std::io::Error) -> EgressError {
+    EgressError::Connect(format!("UDP {operation} failed ({:?})", error.kind()))
+}
+
 fn canonical_network_host(input: &str) -> Option<String> {
     let input = input.trim();
     let unbracketed = input
@@ -546,7 +850,7 @@ mod tests {
 
     use base64::Engine as _;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio::net::TcpListener;
+    use tokio::net::{TcpListener, UdpSocket};
 
     use super::*;
 
@@ -559,6 +863,18 @@ mod tests {
                 if let Ok(size) = socket.read(&mut buffer).await {
                     let _ = socket.write_all(&buffer[..size]).await;
                 }
+            }
+        });
+        ("127.0.0.1".into(), port)
+    }
+
+    async fn spawn_udp_echo() -> (String, u16) {
+        let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let port = socket.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let mut datagram = vec![0; UDP_RECEIVE_BUFFER_BYTES];
+            if let Ok((received, peer)) = socket.recv_from(&mut datagram).await {
+                socket.send_to(&datagram[..received], peer).await.unwrap();
             }
         });
         ("127.0.0.1".into(), port)
@@ -657,7 +973,7 @@ mod tests {
     #[tokio::test]
     async fn direct_connector_returns_a_polymorphic_echo_stream() {
         let (host, port) = spawn_echo().await;
-        let connector = DirectConnector;
+        let connector = DirectConnector::default();
         let mut egress = connector
             .connect(&EgressTarget {
                 host,
@@ -676,7 +992,7 @@ mod tests {
     #[tokio::test]
     async fn direct_connector_prefers_the_original_destination_ip() {
         let (_host, port) = spawn_echo().await;
-        let connector = DirectConnector;
+        let connector = DirectConnector::default();
         let egress = connector
             .connect(&EgressTarget {
                 host: "must-not-resolve.invalid".into(),
@@ -686,6 +1002,175 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(egress.meta.connector, "direct");
+    }
+
+    #[tokio::test]
+    async fn direct_udp_preserves_datagrams_and_returns_safe_metadata() {
+        let (ip, port) = spawn_udp_echo().await;
+        let connector = DirectConnector::default();
+        assert_eq!(connector.udp_capability(), UdpEgressCapability::Supported);
+
+        let egress = connector
+            .connect_udp(&EgressTarget {
+                host: "must-not-resolve.invalid".into(),
+                port,
+                ip: Some(ip),
+            })
+            .await
+            .unwrap();
+        assert_eq!(
+            egress.meta,
+            EgressMetadata {
+                connector: "direct".into(),
+                remote_dns: false,
+                tcp_only: false,
+                detail: "direct UDP association established".into(),
+            }
+        );
+        let debug = format!("{egress:?}");
+        assert!(!debug.contains("127.0.0.1"));
+        assert!(!debug.contains("datagram-payload"));
+
+        egress
+            .association
+            .send(b"datagram-payload".to_vec())
+            .await
+            .unwrap();
+        let received = egress.association.receive().await.unwrap();
+        assert_eq!(received, b"datagram-payload");
+        assert_eq!(received.capacity(), received.len());
+        assert_eq!(
+            connector.udp_receive_budget.available_permits(),
+            connector.udp_receive_budget_bytes()
+        );
+    }
+
+    #[test]
+    fn direct_udp_receive_budget_has_fail_closed_bounds() {
+        assert!(matches!(
+            DirectConnector::with_udp_receive_budget(UDP_RECEIVE_BUFFER_BYTES - 1),
+            Err(EgressError::Unavailable(_))
+        ));
+        assert!(matches!(
+            DirectConnector::with_udp_receive_budget(MAX_DIRECT_UDP_RECEIVE_BUDGET_BYTES + 1),
+            Err(EgressError::Unavailable(_))
+        ));
+
+        let connector = DirectConnector::with_udp_receive_budget(UDP_RECEIVE_BUFFER_BYTES).unwrap();
+        assert_eq!(
+            connector.udp_receive_budget_bytes(),
+            UDP_RECEIVE_BUFFER_BYTES
+        );
+        assert_eq!(
+            connector.udp_receive_budget.available_permits(),
+            UDP_RECEIVE_BUFFER_BYTES
+        );
+    }
+
+    #[tokio::test]
+    async fn direct_udp_receive_waits_for_the_shared_memory_budget() {
+        let (ip, port) = spawn_udp_echo().await;
+        let connector = DirectConnector::with_udp_receive_budget(UDP_RECEIVE_BUFFER_BYTES).unwrap();
+        let egress = connector
+            .connect_udp(&EgressTarget {
+                host: String::new(),
+                port,
+                ip: Some(ip),
+            })
+            .await
+            .unwrap();
+        egress.association.send(b"budgeted".to_vec()).await.unwrap();
+
+        let held_budget = Arc::clone(&connector.udp_receive_budget)
+            .acquire_many_owned(UDP_RECEIVE_BUFFER_BYTES as u32)
+            .await
+            .unwrap();
+        assert!(
+            tokio::time::timeout(Duration::from_millis(25), egress.association.receive())
+                .await
+                .is_err()
+        );
+        drop(held_budget);
+
+        let received = tokio::time::timeout(Duration::from_secs(1), egress.association.receive())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(received, b"budgeted");
+        assert_eq!(received.capacity(), received.len());
+        assert_eq!(
+            connector.udp_receive_budget.available_permits(),
+            UDP_RECEIVE_BUFFER_BYTES
+        );
+    }
+
+    #[tokio::test]
+    async fn direct_udp_rejects_missing_or_non_numeric_original_ip() {
+        let connector = DirectConnector::default();
+        for ip in [None, Some("target.example".into())] {
+            let error = connector
+                .connect_udp(&EgressTarget {
+                    host: "127.0.0.1".into(),
+                    port: 53,
+                    ip,
+                })
+                .await
+                .unwrap_err();
+            assert!(matches!(error, EgressError::InvalidTarget(_)));
+            assert_eq!(error.code(), "invalid_target");
+        }
+    }
+
+    #[tokio::test]
+    async fn direct_udp_rejects_oversized_datagrams_and_closed_io() {
+        let (ip, port) = spawn_udp_echo().await;
+        let connector = DirectConnector::default();
+        let egress = connector
+            .connect_udp(&EgressTarget {
+                host: String::new(),
+                port,
+                ip: Some(ip),
+            })
+            .await
+            .unwrap();
+
+        let oversized = egress
+            .association
+            .send(vec![0; MAX_IPV4_UDP_DATAGRAM_BYTES + 1])
+            .await
+            .unwrap_err();
+        assert!(matches!(oversized, EgressError::InvalidTarget(_)));
+
+        egress.association.close();
+        assert!(egress.association.is_closed());
+        assert!(matches!(
+            egress.association.send(Vec::new()).await.unwrap_err(),
+            EgressError::Unavailable(_)
+        ));
+        assert!(matches!(
+            egress.association.receive().await.unwrap_err(),
+            EgressError::Unavailable(_)
+        ));
+    }
+
+    #[test]
+    fn direct_udp_uses_an_unspecified_bind_address_for_each_ip_family() {
+        assert_eq!(
+            udp_bind_address("127.0.0.1".parse().unwrap()),
+            "0.0.0.0:0".parse().unwrap()
+        );
+        assert_eq!(
+            udp_bind_address("::1".parse().unwrap()),
+            "[::]:0".parse().unwrap()
+        );
+        assert_eq!(
+            max_udp_datagram_bytes("127.0.0.1".parse().unwrap()),
+            MAX_IPV4_UDP_DATAGRAM_BYTES
+        );
+        assert_eq!(
+            max_udp_datagram_bytes("::1".parse().unwrap()),
+            MAX_IPV6_UDP_DATAGRAM_BYTES
+        );
     }
 
     #[tokio::test]
@@ -795,6 +1280,26 @@ mod tests {
         }
     }
 
+    struct PendingUdpConnector;
+
+    #[async_trait]
+    impl EgressConnector for PendingUdpConnector {
+        fn name(&self) -> &'static str {
+            "pending_udp"
+        }
+
+        async fn connect(&self, _target: &EgressTarget) -> Result<EgressStream, EgressError> {
+            pending().await
+        }
+
+        async fn connect_udp(
+            &self,
+            _target: &EgressTarget,
+        ) -> Result<EgressUdpAssociation, EgressError> {
+            pending().await
+        }
+    }
+
     fn inert_target() -> EgressTarget {
         EgressTarget {
             host: "example.test".into(),
@@ -827,6 +1332,53 @@ mod tests {
         .await
         .unwrap_err();
         assert!(matches!(error, EgressError::Cancelled { .. }));
+    }
+
+    #[tokio::test]
+    async fn udp_connect_deadline_and_cancellation_are_enforced() {
+        let timeout = connect_udp_controlled(
+            &PendingUdpConnector,
+            &inert_target(),
+            &ConnectControl::new(Duration::from_millis(5), CancellationToken::new()),
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(timeout, EgressError::Timeout { .. }));
+
+        let cancellation = CancellationToken::new();
+        cancellation.cancel();
+        let cancelled = connect_udp_controlled(
+            &PendingUdpConnector,
+            &inert_target(),
+            &ConnectControl::new(Duration::from_secs(1), cancellation),
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(cancelled, EgressError::Cancelled { .. }));
+    }
+
+    #[tokio::test]
+    async fn tcp_only_connectors_fail_closed_for_udp() {
+        assert_eq!(
+            PendingConnector.udp_capability(),
+            UdpEgressCapability::Unsupported
+        );
+        let error = PendingConnector
+            .connect_udp(&inert_target())
+            .await
+            .unwrap_err();
+        assert!(matches!(error, EgressError::Unavailable(_)));
+
+        for connector in [
+            proxy_connector(proxy("socks5", 1080)).unwrap(),
+            proxy_connector(proxy("http", 8080)).unwrap(),
+        ] {
+            assert_eq!(connector.udp_capability(), UdpEgressCapability::Unsupported);
+            assert!(matches!(
+                connector.connect_udp(&inert_target()).await.unwrap_err(),
+                EgressError::Unavailable(_)
+            ));
+        }
     }
 
     #[derive(Default)]
@@ -896,6 +1448,8 @@ mod tests {
         let key = SshPoolKey::new("session:ssh-1", "SSH.EXAMPLE.", 22, "private-user").unwrap();
         let connector =
             SshJumpConnector::from_pool(pool, key, factory.clone(), CancellationToken::new());
+
+        assert_eq!(connector.udp_capability(), UdpEgressCapability::Unsupported);
 
         connector.warm_up().await.unwrap();
         let egress = connector

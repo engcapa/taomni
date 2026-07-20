@@ -5,7 +5,7 @@
 - Date: 2026-07-18
 - Last updated: 2026-07-20
 - Branch: `feat/sockscap-gpt-sol-max`
-- Related: `claudedocs/sockscap-cross-platform-design-plan.md` (Revision 8)
+- Related: `claudedocs/sockscap-cross-platform-design-plan.md` (Revision 9)
 
 ## Context
 
@@ -26,7 +26,7 @@ gates that remain **open** until real platform evidence exists.
 | Fail policy | Global default fail-open; per-profile fail-closed allowed | Frozen |
 | Unknown hostname | Default DIRECT; strict PROXY/BLOCK optional; expose unknown metrics | Frozen |
 | TCP-only egress UDP | HTTP CONNECT + SSH Jump default BLOCK for UDP/QUIC | Frozen |
-| Production data plane | Taomni-owned `FlowRuntime`; PacketIngress uses a pinned/audited IP-stack adapter; tun2proxy is reference/test-oracle only | Frozen; bounded ingress/L3 admission, in-memory TCP relay and cancellation-safe public `ProductDataPlaneSupervisor` generation ownership have landed. Root-cause diagnostics are separate from retryable cleanup proof. No concrete controlled TCP/UDP/reassembly/Virtual-DNS provider or native/performance evidence exists |
+| Production data plane | Taomni-owned `FlowRuntime`; PacketIngress uses the exactly pinned smoltcp 0.13.1 state machine behind a Taomni-controlled adapter; tun2proxy is reference/test-oracle only | Frozen; authoritative packet-derived TCP/UDP admission, bounded TCP/UDP runtime/Direct UDP relay, independent transport limits, runtime-wide UDP in-flight byte budget, a bounded `Medium::Ip` staging device and explicit quiesce → runtime drain → final termination contract have landed. The executable AnyIP/TCP/UDP compatibility spike, complete socket actor/bridge, reassembly/Virtual-DNS, final builder and native/performance evidence remain open |
 | Windows capture | Global: Wintun/TUN; app/PID: WinDivert SOCKET/FLOW/NETWORK using an unmodified, hash-pinned official package containing the production-signed kernel driver | Frozen architecture; license, DLL provenance/architecture/hash, driver signer/hash, identity-race, EDR/VPN, performance and recovery evidence remain release gates |
 | Windows first production scope | Sockscap Beta is `x86_64` only. Under the current official WinDivert/no-custom-driver route, Windows ARM64 Sockscap is not released and app/PID remains unavailable | Frozen for the first production Beta; ARM64 probes/manifests must fail closed rather than imply support |
 | Windows user-mode signing | Taomni app/helper/service/installer require trusted, timestamped Authenticode with controlled key custody; this plan does not require EV and does not authorize a custom kernel driver | Fixed first-party policy is deliberately `unconfigured`; publisher/certificate review, route/vendor/account, CI identity, rotation, revocation and clean-host evidence remain external release gates |
@@ -35,13 +35,14 @@ gates that remain **open** until real platform evidence exists.
 | Remaining support matrices | Freeze minimum macOS version/Apple Silicon/Intel scope and Linux distro/kernel/systemd/cgroup/nft/iproute2/resolver/NetworkManager scope only after real lab evidence and a maintenance owner exist | Open; macOS overlay `11.0` is only a provisional build floor, not a frozen production support claim |
 | Production release operations | Updater key custody/rotation/revocation; signed rollback compatibility across component pin/ABI, protocol/schema, journal/tombstone and ready handshake; Active capture clean stop; staged rollout/stop-rollout; continuous SBOM/CVE, threat model, support bounds | Open and blocking. Source/Quick Non-Release workflow Actions are commit-SHA pinned and Rust/MSRV is fixed to 1.95.0 after real 1.94 compilation exposed incompatible current dependencies. Windows/macOS source compile/process jobs are configured, but require matching CI runner results before they can be called PASS; formal `release.yml` does not depend on this workflow. Protected build/sign/publish provenance, runner image and update-audit process are not closed |
 | SSH host key | App-owned known-hosts store with exact `TRUST` / `REPLACE` fingerprint confirmation; background reconnect fails closed | Frozen; security gate closed |
-| Phase 0 code in tree | Types, capability probe, preflight, orchestrator, commands, authenticated Linux helper WAL/PID/client/TUN/lifecycle/fault-monitor contracts, generation product adapter/recovery boundary, Linux DEB/RPM package Gate, signed-release source gates, bounded decoded-stream + L3 packet ingress/profile selection/IP-stack admission/packet-stack supervisor/product composition/FlowRuntime relay, native window smoke, performance/soak gates | Landed contracts/memory slices only; complete packet→TCP/UDP provider, default product/async IPC wiring and real release evidence remain open |
+| Phase 0 code in tree | Types, capability probe, preflight, orchestrator, commands, authenticated Linux helper WAL/PID/client/TUN/lifecycle/fault-monitor contracts, generation product adapter/recovery boundary, Linux DEB/RPM package Gate, signed-release source gates, bounded decoded TCP/UDP + L3 ingress/profile selection/authoritative packet admission/packet-stack supervisor/product composition/FlowRuntime relay, pinned smoltcp staging foundation, native window smoke, performance/soak gates | Landed contracts and bounded foundations only; complete transparent smoltcp provider/socket bridge, Virtual DNS/reassembly decision, default product/async IPC wiring and real release evidence remain open |
 
 ## License and third-party inventory (Phase 0)
 
 | Component | License (as of design review) | Use intent | Gate |
 |---|---|---|---|
 | tun2proxy | MIT | Behavior reference and differential test oracle only; not a production runtime dependency | Do not add/fork it as the product data plane without a new ADR |
+| smoltcp 0.13.1 (`=0.13.1`; crates.io archive SHA-256 `5f73d40463bba65efc9adc6370b56df76d563cc46e2482bba58351b4afb7535e`) | 0BSD | Accepted fixed lower-stack state machine behind Taomni-owned identity, policy, queues, socket actor/bridge, memory ledger and lifecycle; current features are `std`, `medium-ip`, IPv4/IPv6 and TCP/UDP sockets | Exact pin/checksum and bounded staging device do not make a provider complete. Fragmentation features stay disabled. Before product wiring, executable probes must prove arbitrary-destination IPv4/IPv6 TCP and shared-port UDP demultiplexing; config must count stack + bridge + UDP-binding memory and reject MTU/deadline/parser-differential gaps; fuzz/native/performance/24h gates remain mandatory |
 | ipstack 1.0.1 candidate (`v.1.0.1`, commit `a343ea8c696e761acce8dbcd6687c862ecd8aacd`) | Apache-2.0 | Isolated lower-stack spike only; it has **not** been accepted into production dependencies | Source inspection found multiple `mpsc::unbounded_channel` paths. Do not add it to production `Cargo.toml` until an isolated spike establishes a bounded fork/upstream patch or another controlled adapter and closes UDP, cancellation, lifecycle, fuzz, IPv4/IPv6/DNS, performance and 24-hour resource gates |
 | WinDivert 2.2.2-A baseline | LGPLv3 / GPLv2 dual; commercial license is an alternative | Frozen Windows app/PID provider; use only an unmodified official package. The audited x64 `WinDivert.dll` has no PE Authenticode certificate table, while `WinDivert64.sys` is signed; do not treat both files as having the same signer contract | Pin exact package/variant and per-file SHA-256; DLL: verify official-package provenance, PE architecture and hash, with no invented upstream signer requirement. Driver: verify expected signer, hash and kernel policy (`signtool /kp`) on target Windows. Complete LICENSE/NOTICE or commercial-license review, PID-race, packaging, EDR/VPN and uninstall gates |
 | Wintun 0.14.1 | WireGuard project redistribution terms | Windows global TUN, using the unmodified official x64 DLL from the pinned ZIP | Preserve the bundled license and permitted-API constraints; verify official package/file hashes, x86_64 PE architecture and signer on the target Windows package |
@@ -83,12 +84,14 @@ requires the pinned signer and a successful target-Windows `signtool /kp` run.
 
 Phase 0 probes in `sockscap::capabilities` report host readiness but keep
 `capture_implemented = false` and `can_start_* = false`. Linux helper/client and
-TUN/pump/lifecycle source primitives plus the landed product adapter/public
-supervisor are not equivalent to an installed product path: a concrete
-controlled TCP/UDP/reassembly/Virtual-DNS provider, final snapshot/profile
-builder, trusted tuple side channel, default async AppState/IPC/tray injection,
-complete distro dependency/signing policy, and privileged end-to-end
-fault/capture smoke must all exist before the UI may claim routing works.
+TUN/pump/lifecycle source primitives, the product adapter/public supervisor,
+dual-transport runtime, exact smoltcp pin and bounded staging device are not
+equivalent to an installed product path: the executable compatibility spike
+and complete transparent TCP/UDP provider, final memory/profile/config builder,
+Virtual DNS/reassembly policy, trusted tuple side channel, default async
+AppState/IPC/tray injection, complete distro dependency/signing policy, and
+privileged end-to-end fault/capture smoke must all exist before the UI may
+claim routing works.
 
 ## Reference baseline
 
@@ -149,32 +152,45 @@ fault/capture smoke must all exist before the UI may claim routing works.
    this ADR; macOS host and Bash 3.2 syntax/lint pass, and PowerShell 7.2.24 AST
    plus disabled-template lint pass. None is a real platform non-lint artifact
    run.
-9. The first owned shared-runtime slice is implemented and lifecycle-hardened:
-   bounded/cancellation-safe decoded `FlowIngress`; capture intent that prevents
+9. The owned shared-runtime slice now covers TCP flows and UDP associations:
+   bounded/cancellation-safe decoded ingress; capture intent that prevents
    missing app/PID evidence from silently reaching global policy; trusted,
    revisioned child-profile queues; immutable selector limits; revision plus
    full-profile-fingerprint `FlowEngine` binding; and supervisor-owned
-   `FlowRuntime` admission, relay, exactly-once close attempts, retryable owner
-   cleanup and absolute shutdown deadline. Runtime root-cause diagnostics are
+   `FlowRuntime` admission, TCP byte relay and UDP datagram relay, independent
+   TCP/UDP admission, a checked combined transport ceiling, runtime-wide
+   bidirectional UDP in-flight byte reservation, isolated bounded reject-close
+   pools, exactly-once close attempts, retryable owner cleanup and absolute
+   shutdown deadline. Runtime root-cause diagnostics are
    independent from current cleanup proof: a provider fault may remain visible
    after every owner joins, while any unobserved task/profile/egress/stack join
-   keeps cleanup pending. Revision 8 focused and full-suite evidence is recorded
+   keeps cleanup pending. Revision 9 focused and full-suite evidence is recorded
    in the design plan §14.6 after each final run rather than frozen here as a
    stale count. Product Linux adapter/composition source exists, but no concrete
    stack or default async product injection does; no capability is unlocked.
-10. `ipstack` 1.0.1 remains an isolated candidate, not a production dependency.
-    Its unbounded internal channels conflict with the frozen bounded-queue Gate;
-    the next decision is an audited bounded fork/upstream patch versus another
-    controlled adapter after an isolated spike, not silent acceptance.
+10. `ipstack` 1.0.1 remains rejected as a production dependency because its
+    internal unbounded channels conflict with the frozen queue Gate. The chosen
+    foundation is exactly pinned smoltcp 0.13.1 (0BSD) with fragmentation
+    features disabled and a Taomni-owned bounded `Medium::Ip` staging device.
+    This is not yet a runnable provider. Product implementation stops if the
+    executable compatibility spike cannot prove arbitrary-destination IPv4/IPv6
+    TCP exact-listener semantics and correct shared-port UDP metadata demux; it
+    must not compensate for a failed probe with guessed behavior or silent
+    packet loss.
 11. The replaceable packet-stack boundary is explicit but remains release-neutral
     source code. `PacketStackSupervisor` checks exact provider/capability/
     generation/revision/platform/queue identity and preserves first-terminal
     cause. The only public start boundary is `ProductDataPlaneSupervisor`: its
     detached generation worker and registry retain startup/recovery ownership
     even if the caller future is cancelled. Linux delegates to this registry;
-    Windows/macOS must reuse it. Stack/runtime/profile/task shutdown timeout
-    retains retry state, and a bounded emergency reaper is never accepted as
-    clean-shutdown, helper rollback, or release recovery proof.
+    Windows/macOS must reuse it. Ready shutdown is now explicitly two-phase:
+    the driver first drops native packet ingress and both decoded senders,
+    completes every in-flight admission and acknowledges quiesce while keeping
+    its control actor alive; only after FlowRuntime tasks and profile owners
+    are cleaned may final provider termination occur. Every phase timeout
+    retains the same retryable owner. The Drop-time detached emergency reaper
+    remains containment only and is never accepted as clean-shutdown, helper
+    rollback, or release recovery proof.
 12. The Linux source lifecycle now starts native capture and reinject pumps and
     proves both ready before helper activation; it rechecks the combined native
     pump/data-plane identity and health before and after activation, serializes
@@ -201,16 +217,23 @@ fault/capture smoke must all exist before the UI may claim routing works.
     The numeric PID accepted by `cgroup.procs` cannot
     make identity validation and the write one atomic kernel operation; a real
     PID-reuse stress lab and pidfd/kernel-interface assessment remain mandatory.
-13. `PacketFlowRegistry` now maintains explicit active TCP and UDP counts, so
-    transport-limit admission no longer scans the complete flow table. This is
-    not a claim that every `HashMap` operation has strict worst-case O(1), and it
-    does not close the performance or long-stability Gate.
+13. `PacketFlowRegistry` now derives the authoritative TCP/UDP tuple directly
+    from each packet instead of accepting a caller-supplied independent key. It
+    validates IP/TCP/UDP lengths, ports and checksums; new TCP tuples require a
+    pure initial SYN, while later packets are accepted only for an existing
+    tuple. Explicit active TCP and UDP counts avoid a full-table transport scan.
+    This is not a claim that every `HashMap` operation has strict worst-case
+    O(1), and it does not close the performance or long-stability Gate.
 14. Packet admission now parses IPv6 extension chains with bounded head/byte
     budgets and strict ordering/length/TLV/reserved-field checks, derives the
     final transport protocol, and marks fragments before tuple parsing.
     Truncated, malformed, repeated/out-of-order or over-budget chains fail
-    closed. Fragment reconstruction is still assigned to the missing bounded
-    reassembly provider; this parser is not evidence that reassembly exists.
+    closed. IPv4 reserved flags, invalid source/destination scope and unscoped
+    IPv6 link-local are also rejected. Fragment reconstruction is still
+    disabled in the pinned provider and assigned to a future bounded design;
+    this parser is not evidence that reassembly exists. Phase 1 must additionally
+    reject IPv6 extension layouts not proven equivalent in smoltcp before any
+    native capability can be enabled.
 15. Linux package source security is fail-closed: `/run/taomni` must be exact
     root:root 0755; helper sessions hold a shared lifecycle lock while package
     transactions require the exclusive lock and a crash-persistent sentinel.
@@ -283,21 +306,23 @@ fault/capture smoke must all exist before the UI may claim routing works.
 5. **Linux support matrix**: freeze the distro/kernel/systemd/cgroup/nft/
    iproute2/resolver/NetworkManager matrix and maintenance owner before a Linux
    release claim.
-6. **Production IP-stack adapter**: the owned decoded-stream boundary,
+6. **Production IP-stack adapter**: the owned decoded TCP/UDP boundary,
    `FlowDescriptor`, `ProfileSelector`, bounded L3 PacketIngress queues,
-   provider pin/limits, tuple admission, replaceable supervisor and in-memory
-   TCP relay have landed. Queue `source_id` prevents cross-device pairing;
+   provider pin/limits, packet-derived tuple/checksum admission, replaceable
+   supervisor, TCP/UDP relay and two-phase shutdown contract have landed. Queue
+   `source_id` prevents cross-device pairing;
    provider readiness is bound to an absolute deadline and the decoded-flow
    ingress has a one-shot handoff. The public generation registry is the sole
    product start/recovery boundary and retains ownership across caller cancel.
-   Strict IPv6 extension parsing rejects malformed chains and routes fragments
-   to the still-missing reassembly boundary. These are source contracts, not a
-   stack.
-   `ipstack` 1.0.1 is not accepted because its unbounded channels violate the
-   Gate. Run it only as an isolated spike, decide a bounded fork/upstream patch
-   or another controlled adapter, then implement the full packet→TCP/UDP bridge
-   and demonstrate UDP, Virtual DNS, IPv4/IPv6, cancellation/half-close/RST,
-   fuzzing, statistics, performance and 24-hour/7-day resource gates.
+   Strict IPv6 extension parsing rejects malformed chains; fragments and
+   unscoped link-local remain rejected. smoltcp 0.13.1 is exact-pinned and its
+   bounded IP-device foundation exists, while ipstack 1.0.1 remains excluded.
+   These are source contracts, not a runnable stack. First pass the smoltcp
+   AnyIP TCP/shared-port UDP executable STOP/GO spike, then implement the full
+   socket actor/bridge, explicit memory ledger, queue/close quarantine and
+   demonstrate UDP, Virtual DNS/reassembly policy, IPv4/IPv6, MTU,
+   cancellation/half-close/RST, fuzzing, statistics, performance and
+   24-hour/7-day resource gates.
 7. **Installed recovery path**: the coordinator journal, authenticated helper
    heartbeat, mutation-before-WAL root receipts, rollback transaction,
    generation-only recovery API and cleaned-generation tombstone contract have
@@ -430,14 +455,15 @@ Commands registered in `lib.rs`:
 - Phase 2: FlowEngine + egress connectors + SshChannelPool extraction (core landed;
   production profile/session orchestration remains in Phase 3)
 - Phase 3: sockscap.db + recovery journal + browser stubs
-- Shared runtime work: retain the completed bounded decoded-stream ingress,
-  identity selector, strict IPv6 admission, memory TCP relay and packet-stack
-  supervisor/public generation registry; keep
-  ipstack 1.0.1 out of production dependencies while an isolated spike decides
-  a bounded fork/upstream patch or another controlled adapter; then implement
-  the complete packet→TCP/UDP/reassembly/Virtual-DNS provider, final
-  profile/config builder, default async product injection/fault reconciliation, fuzzing and
-  differential behavior tests against tun2proxy/reference fixtures
+- Shared runtime work: retain the completed bounded decoded TCP/UDP ingress,
+  identity selector, authoritative checksum/tuple admission, Direct UDP,
+  runtime resource bounds and two-phase supervisor/public generation registry;
+  keep ipstack 1.0.1 excluded and finish the exact smoltcp 0.13.1 AnyIP
+  TCP/shared-port UDP executable spike. Then implement the bounded socket
+  actor/bridge, queue/close quarantine, complete Virtual-DNS/reassembly policy,
+  final profile/config builder, default async product injection/fault
+  reconciliation, fuzzing and differential behavior tests against
+  tun2proxy/reference fixtures
 - Windows product work: Wintun global plus the unmodified official WinDivert
   package/app/PID path on x86_64; validate DLL provenance/architecture/hash and
   signed-driver signer/hash separately; no Windows ARM64 release and no

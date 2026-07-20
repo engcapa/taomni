@@ -17,9 +17,10 @@ use super::attribution::{AttributedHost, AttributionHints, FakeIpMap, attribute_
 use super::bypass::HardBypassSet;
 use super::connectors::{
     ConnectControl, DirectConnector, EgressConnector, EgressError, EgressMetadata, EgressStream,
-    EgressTarget, UdpEgressCapability, connect_controlled, proxy_connector,
+    EgressTarget, EgressUdpAssociation, UdpEgressCapability, connect_controlled,
+    connect_udp_controlled, proxy_connector,
 };
-use super::ingress::{FlowDescriptor, IngressError};
+use super::ingress::{FlowDescriptor, FlowTransport, IngressError};
 use super::stats::{FlowOutcomeKind, FlowStatsEvent, FlowStatsSink, NoopFlowStatsSink};
 use crate::proxy::ResolvedProxy;
 use crate::sockscap::policy::matcher::{FlowMatchInput, PolicyDecision, ProfileMatcher};
@@ -179,7 +180,10 @@ impl TryFrom<&FlowDescriptor> for FlowContext {
             process_start_time: descriptor.process_start_time,
             app_selector_kind: descriptor.app_kind,
             app_identity: descriptor.app_identity.clone(),
-            protocol: "tcp".into(),
+            protocol: match descriptor.transport {
+                FlowTransport::Tcp => "tcp".into(),
+                FlowTransport::Udp => "udp".into(),
+            },
             source_ip: Some(descriptor.source.ip().to_string()),
             source_port: Some(descriptor.source.port()),
             dest_host: None,
@@ -433,6 +437,15 @@ pub struct UdpFlowOutcome {
     pub reason: Option<String>,
 }
 
+/// UDP policy result plus the live datagram-preserving egress, when allowed.
+#[derive(Debug)]
+pub struct OpenedUdpFlow {
+    pub result: FlowHandleResult,
+    pub egress_capability: UdpEgressCapability,
+    pub reason: Option<String>,
+    pub association: Option<EgressUdpAssociation>,
+}
+
 /// Per-profile immutable policy and egress runtime.
 pub struct FlowEngine {
     snapshot: FlowEngineSnapshot,
@@ -470,7 +483,7 @@ impl FlowEngine {
             bypass,
             fake_ip,
             egress,
-            direct: Arc::new(DirectConnector),
+            direct: Arc::new(DirectConnector::default()),
             udp_policy,
             egress_failure_action,
             local_network_policy,
@@ -822,6 +835,201 @@ impl FlowEngine {
         })
     }
 
+    /// Decide and establish a UDP association with a fresh cancellation token.
+    pub async fn open_udp(&self, context: &FlowContext) -> Result<OpenedUdpFlow, EgressError> {
+        self.open_udp_with_cancel(context, &CancellationToken::new())
+            .await
+    }
+
+    /// Decide and establish a datagram-preserving UDP association.
+    ///
+    /// A policy block is a successful fail-closed outcome with no live
+    /// association. Proxy failures follow the same explicit fail-closed versus
+    /// direct-fallback policy as TCP. DIRECT always uses the original numeric
+    /// destination enforced by the connector.
+    pub async fn open_udp_with_cancel(
+        &self,
+        context: &FlowContext,
+        cancellation: &CancellationToken,
+    ) -> Result<OpenedUdpFlow, EgressError> {
+        let started = Instant::now();
+        let outcome = self.decide_udp(context)?;
+        if outcome.effective_action == RouteAction::Block {
+            self.emit(
+                context,
+                &outcome.decision,
+                RouteAction::Block,
+                FlowOutcomeKind::Blocked,
+                None,
+                None,
+                started,
+            );
+            return Ok(OpenedUdpFlow {
+                result: FlowHandleResult {
+                    decision: outcome.decision,
+                    effective_action: RouteAction::Block,
+                    egress: None,
+                    error_code: outcome.reason.clone(),
+                    error: None,
+                },
+                egress_capability: outcome.egress_capability,
+                reason: outcome.reason,
+                association: None,
+            });
+        }
+
+        let target = self.target_for(context);
+        let connector = match outcome.effective_action {
+            RouteAction::Direct => Ok(Arc::clone(&self.direct)),
+            RouteAction::Proxy => self.egress.connector(),
+            RouteAction::Block => unreachable!("handled above"),
+        };
+        let opened = match connector {
+            Ok(connector) => {
+                self.connect_udp(connector.as_ref(), &target, cancellation)
+                    .await
+            }
+            Err(error) => Err(error),
+        };
+
+        match opened {
+            Ok(association) => {
+                let metadata = association.meta.clone();
+                self.emit(
+                    context,
+                    &outcome.decision,
+                    outcome.effective_action,
+                    FlowOutcomeKind::Established,
+                    Some(&metadata),
+                    None,
+                    started,
+                );
+                Ok(OpenedUdpFlow {
+                    result: FlowHandleResult {
+                        decision: outcome.decision,
+                        effective_action: outcome.effective_action,
+                        egress: Some(metadata),
+                        error_code: None,
+                        error: None,
+                    },
+                    egress_capability: outcome.egress_capability,
+                    reason: outcome.reason,
+                    association: Some(association),
+                })
+            }
+            Err(error) if matches!(error, EgressError::Cancelled { .. }) => {
+                self.emit(
+                    context,
+                    &outcome.decision,
+                    RouteAction::Block,
+                    FlowOutcomeKind::Failed,
+                    None,
+                    Some(&error),
+                    started,
+                );
+                Err(error)
+            }
+            Err(proxy_error)
+                if outcome.effective_action == RouteAction::Proxy
+                    && self.egress_failure_action != EgressFailureAction::FailClosed =>
+            {
+                match self
+                    .connect_udp(self.direct.as_ref(), &target, cancellation)
+                    .await
+                {
+                    Ok(association) => {
+                        let metadata = association.meta.clone();
+                        self.emit(
+                            context,
+                            &outcome.decision,
+                            RouteAction::Direct,
+                            FlowOutcomeKind::FallbackDirect,
+                            Some(&metadata),
+                            Some(&proxy_error),
+                            started,
+                        );
+                        Ok(OpenedUdpFlow {
+                            result: FlowHandleResult {
+                                decision: outcome.decision,
+                                effective_action: RouteAction::Direct,
+                                egress: Some(metadata),
+                                error_code: Some(proxy_error.code().into()),
+                                error: Some(proxy_error.to_string()),
+                            },
+                            egress_capability: outcome.egress_capability,
+                            reason: outcome.reason,
+                            association: Some(association),
+                        })
+                    }
+                    Err(direct_error) if matches!(direct_error, EgressError::Cancelled { .. }) => {
+                        self.emit(
+                            context,
+                            &outcome.decision,
+                            RouteAction::Block,
+                            FlowOutcomeKind::Failed,
+                            None,
+                            Some(&direct_error),
+                            started,
+                        );
+                        Err(direct_error)
+                    }
+                    Err(direct_error) => {
+                        let combined = EgressError::Connect(format!(
+                            "UDP proxy attempt failed ({}); direct fallback failed ({})",
+                            proxy_error.code(),
+                            direct_error.code()
+                        ));
+                        self.emit(
+                            context,
+                            &outcome.decision,
+                            RouteAction::Block,
+                            FlowOutcomeKind::Failed,
+                            None,
+                            Some(&combined),
+                            started,
+                        );
+                        Err(combined)
+                    }
+                }
+            }
+            Err(error) if outcome.effective_action == RouteAction::Proxy => {
+                self.emit(
+                    context,
+                    &outcome.decision,
+                    RouteAction::Block,
+                    FlowOutcomeKind::Blocked,
+                    None,
+                    Some(&error),
+                    started,
+                );
+                Ok(OpenedUdpFlow {
+                    result: FlowHandleResult {
+                        decision: outcome.decision,
+                        effective_action: RouteAction::Block,
+                        egress: None,
+                        error_code: Some(error.code().into()),
+                        error: Some(error.to_string()),
+                    },
+                    egress_capability: outcome.egress_capability,
+                    reason: outcome.reason,
+                    association: None,
+                })
+            }
+            Err(error) => {
+                self.emit(
+                    context,
+                    &outcome.decision,
+                    RouteAction::Direct,
+                    FlowOutcomeKind::Failed,
+                    None,
+                    Some(&error),
+                    started,
+                );
+                Err(error)
+            }
+        }
+    }
+
     async fn connect(
         &self,
         connector: &dyn EgressConnector,
@@ -829,6 +1037,20 @@ impl FlowEngine {
         cancellation: &CancellationToken,
     ) -> Result<EgressStream, EgressError> {
         connect_controlled(
+            connector,
+            target,
+            &ConnectControl::new(self.connect_timeout, cancellation.clone()),
+        )
+        .await
+    }
+
+    async fn connect_udp(
+        &self,
+        connector: &dyn EgressConnector,
+        target: &EgressTarget,
+        cancellation: &CancellationToken,
+    ) -> Result<EgressUdpAssociation, EgressError> {
+        connect_udp_controlled(
             connector,
             target,
             &ConnectControl::new(self.connect_timeout, cancellation.clone()),
@@ -929,13 +1151,17 @@ fn is_local_network_ip(ip: IpAddr) -> bool {
 #[cfg(test)]
 mod tests {
     use std::future::pending;
+    use std::net::{Ipv4Addr, SocketAddr};
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
     use async_trait::async_trait;
     use futures::task::AtomicWaker;
     use tokio::io::{AsyncReadExt, AsyncWriteExt, duplex};
+    use tokio::net::UdpSocket;
 
     use super::*;
+    use crate::sockscap::flow::connectors::AsyncUdpAssociation;
+    use crate::sockscap::flow::ingress::{CaptureIntent, ProfileBinding};
     use crate::sockscap::flow::stats::InMemoryFlowStats;
     use crate::sockscap::policy::rules::parse_rule_document;
 
@@ -999,6 +1225,17 @@ mod tests {
         }
     }
 
+    async fn spawn_udp_echo() -> (SocketAddr, tokio::task::JoinHandle<()>) {
+        let socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let address = socket.local_addr().unwrap();
+        let task = tokio::spawn(async move {
+            let mut datagram = vec![0; u16::MAX as usize];
+            let (received, peer) = socket.recv_from(&mut datagram).await.unwrap();
+            socket.send_to(&datagram[..received], peer).await.unwrap();
+        });
+        (address, task)
+    }
+
     struct MemoryConnector {
         name: &'static str,
         fail: Option<EgressError>,
@@ -1050,6 +1287,100 @@ mod tests {
         )
     }
 
+    #[derive(Default)]
+    struct TestUdpAssociation {
+        closed: AtomicBool,
+    }
+
+    #[async_trait]
+    impl AsyncUdpAssociation for TestUdpAssociation {
+        async fn send(&self, _datagram: Vec<u8>) -> Result<(), EgressError> {
+            if self.is_closed() {
+                return Err(EgressError::Unavailable(
+                    "test UDP association is closed".into(),
+                ));
+            }
+            Ok(())
+        }
+
+        async fn receive(&self) -> Result<Vec<u8>, EgressError> {
+            if self.is_closed() {
+                return Err(EgressError::Unavailable(
+                    "test UDP association is closed".into(),
+                ));
+            }
+            Ok(Vec::new())
+        }
+
+        fn close(&self) {
+            self.closed.store(true, Ordering::SeqCst);
+        }
+
+        fn is_closed(&self) -> bool {
+            self.closed.load(Ordering::SeqCst)
+        }
+    }
+
+    struct UdpMemoryConnector {
+        name: &'static str,
+        capability: UdpEgressCapability,
+        fail: Option<EgressError>,
+        calls: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl EgressConnector for UdpMemoryConnector {
+        fn name(&self) -> &'static str {
+            self.name
+        }
+
+        fn udp_capability(&self) -> UdpEgressCapability {
+            self.capability
+        }
+
+        async fn connect(&self, _target: &EgressTarget) -> Result<EgressStream, EgressError> {
+            Err(EgressError::Unavailable(
+                "test connector has no TCP transport".into(),
+            ))
+        }
+
+        async fn connect_udp(
+            &self,
+            _target: &EgressTarget,
+        ) -> Result<EgressUdpAssociation, EgressError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if let Some(error) = &self.fail {
+                return Err(error.clone());
+            }
+            Ok(EgressUdpAssociation {
+                association: Box::new(TestUdpAssociation::default()),
+                meta: EgressMetadata {
+                    connector: self.name.into(),
+                    remote_dns: self.name != "direct",
+                    tcp_only: false,
+                    detail: "test UDP association".into(),
+                },
+            })
+        }
+    }
+
+    fn udp_memory_connector(
+        name: &'static str,
+        capability: UdpEgressCapability,
+        fail: Option<EgressError>,
+    ) -> (Arc<dyn EgressConnector>, Arc<AtomicUsize>) {
+        let calls = Arc::new(AtomicUsize::new(0));
+        (
+            Arc::new(UdpMemoryConnector {
+                name,
+                capability,
+                fail,
+                calls: calls.clone(),
+            }),
+            calls,
+        )
+    }
+
     #[test]
     fn flow_context_serializes_complete_capture_identity() {
         let value = serde_json::to_value(context("example.com", "tcp")).unwrap();
@@ -1057,6 +1388,45 @@ mod tests {
         assert_eq!(value["processStartTime"], 456);
         assert_eq!(value["appSelectorKind"], "executable_path");
         assert_eq!(value["sourcePort"], 50_000);
+    }
+
+    #[test]
+    fn flow_descriptor_projects_typed_tcp_and_udp_transports() {
+        let mut descriptor = FlowDescriptor {
+            generation: 7,
+            flow_id: 11,
+            platform: CapturePlatform::Linux,
+            transport: FlowTransport::Tcp,
+            source: SocketAddr::from((Ipv4Addr::new(192, 0, 2, 10), 50_000)),
+            destination: SocketAddr::from((Ipv4Addr::new(203, 0, 113, 8), 443)),
+            attribution: AttributionHints {
+                tls_sni: Some("api.example.com".into()),
+                destination_ip: Some("198.51.100.99".into()),
+                ..AttributionHints::default()
+            },
+            pid: Some(1234),
+            process_start_time: Some(9988),
+            app_kind: Some(AppSelectorKind::ExecutablePath),
+            app_identity: Some("/usr/bin/curl".into()),
+            capture_intent: CaptureIntent::RequireAnySpecific,
+            profile_binding: ProfileBinding::AutoSelect,
+        };
+
+        for (transport, protocol) in [(FlowTransport::Tcp, "tcp"), (FlowTransport::Udp, "udp")] {
+            descriptor.transport = transport;
+            let projected = FlowContext::try_from(&descriptor).unwrap();
+            assert_eq!(projected.protocol, protocol);
+            assert_eq!(projected.source_ip.as_deref(), Some("192.0.2.10"));
+            assert_eq!(projected.source_port, Some(50_000));
+            assert_eq!(projected.dest_ip.as_deref(), Some("203.0.113.8"));
+            assert_eq!(projected.dest_port, 443);
+            assert_eq!(
+                projected.attribution.destination_ip.as_deref(),
+                Some("203.0.113.8")
+            );
+            assert_eq!(projected.pid, Some(1234));
+            assert_eq!(projected.app_identity.as_deref(), Some("/usr/bin/curl"));
+        }
     }
 
     #[test]
@@ -1254,7 +1624,18 @@ mod tests {
             "pending"
         }
 
+        fn udp_capability(&self) -> UdpEgressCapability {
+            UdpEgressCapability::Supported
+        }
+
         async fn connect(&self, _target: &EgressTarget) -> Result<EgressStream, EgressError> {
+            pending().await
+        }
+
+        async fn connect_udp(
+            &self,
+            _target: &EgressTarget,
+        ) -> Result<EgressUdpAssociation, EgressError> {
             pending().await
         }
     }
@@ -1396,6 +1777,206 @@ mod tests {
             .unwrap();
         assert_eq!(outcome.result.effective_action, RouteAction::Block);
         assert_eq!(outcome.result.error_code.as_deref(), Some("timeout"));
+    }
+
+    #[tokio::test]
+    async fn direct_udp_opens_a_real_datagram_association() {
+        let (endpoint, server) = spawn_udp_echo().await;
+        let engine = engine("", EgressProvider::unavailable("unused"));
+        let mut flow = context("must-not-resolve.invalid", "udp");
+        flow.dest_ip = Some(endpoint.ip().to_string());
+        flow.dest_port = endpoint.port();
+
+        let opened = engine.open_udp(&flow).await.unwrap();
+        assert_eq!(opened.result.decision.action, RouteAction::Direct);
+        assert_eq!(opened.result.effective_action, RouteAction::Direct);
+        assert_eq!(
+            opened
+                .result
+                .egress
+                .as_ref()
+                .map(|metadata| metadata.connector.as_str()),
+            Some("direct")
+        );
+        let association = opened.association.unwrap();
+        association
+            .association
+            .send(b"engine-udp-echo".to_vec())
+            .await
+            .unwrap();
+        let echoed =
+            tokio::time::timeout(Duration::from_secs(1), association.association.receive())
+                .await
+                .unwrap()
+                .unwrap();
+        assert_eq!(echoed, b"engine-udp-echo");
+        server.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn route_block_never_opens_a_udp_association() {
+        let (proxy, proxy_calls) =
+            udp_memory_connector("proxy", UdpEgressCapability::Supported, None);
+        let (direct, direct_calls) =
+            udp_memory_connector("direct", UdpEgressCapability::Supported, None);
+        let engine = FlowEngine::new(
+            snapshot(),
+            Arc::new(ProfileMatcher::from_parts(
+                "profile-1",
+                RouteAction::Block,
+                RouteAction::Block,
+                vec![],
+                &[],
+                &[],
+            )),
+            HardBypassSet::new(),
+            FakeIpMap::new(),
+            EgressProvider::from_connector(proxy),
+            UdpPolicy::Direct,
+            EgressFailureAction::FailOpen,
+            LocalNetworkPolicy {
+                lan_action: LocalNetworkAction::Rules,
+            },
+        )
+        .with_direct_connector(direct);
+
+        let opened = engine
+            .open_udp(&context("blocked.example", "udp"))
+            .await
+            .unwrap();
+        assert_eq!(opened.result.decision.action, RouteAction::Block);
+        assert_eq!(opened.result.effective_action, RouteAction::Block);
+        assert!(opened.association.is_none());
+        assert_eq!(proxy_calls.load(Ordering::SeqCst), 0);
+        assert_eq!(direct_calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn proxy_if_supported_fails_closed_before_opening_an_unsupported_udp_egress() {
+        let (proxy, proxy_calls) =
+            udp_memory_connector("proxy", UdpEgressCapability::Unsupported, None);
+        let (direct, direct_calls) =
+            udp_memory_connector("direct", UdpEgressCapability::Supported, None);
+        let mut engine = engine("||proxy.example\n", EgressProvider::from_connector(proxy))
+            .with_direct_connector(direct);
+        engine.udp_policy = UdpPolicy::ProxyIfSupported;
+
+        let opened = engine
+            .open_udp(&context("proxy.example", "udp"))
+            .await
+            .unwrap();
+        assert_eq!(opened.result.decision.action, RouteAction::Proxy);
+        assert_eq!(opened.result.effective_action, RouteAction::Block);
+        assert_eq!(
+            opened.reason.as_deref(),
+            Some("udp_proxy_capability_not_ready")
+        );
+        assert!(opened.association.is_none());
+        assert_eq!(proxy_calls.load(Ordering::SeqCst), 0);
+        assert_eq!(direct_calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn udp_policy_direct_uses_direct_without_touching_the_proxy() {
+        let (proxy, proxy_calls) =
+            udp_memory_connector("proxy", UdpEgressCapability::Supported, None);
+        let (direct, direct_calls) =
+            udp_memory_connector("direct", UdpEgressCapability::Supported, None);
+        let mut engine = engine("||proxy.example\n", EgressProvider::from_connector(proxy))
+            .with_direct_connector(direct);
+        engine.udp_policy = UdpPolicy::Direct;
+
+        let opened = engine
+            .open_udp(&context("proxy.example", "udp"))
+            .await
+            .unwrap();
+        assert_eq!(opened.result.decision.action, RouteAction::Proxy);
+        assert_eq!(opened.result.effective_action, RouteAction::Direct);
+        assert_eq!(
+            opened.reason.as_deref(),
+            Some("udp_policy_direct_potential_leak")
+        );
+        assert_eq!(
+            opened.result.egress.unwrap().connector,
+            "direct".to_string()
+        );
+        assert!(opened.association.is_some());
+        assert_eq!(proxy_calls.load(Ordering::SeqCst), 0);
+        assert_eq!(direct_calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn cancelled_udp_proxy_never_falls_back_to_direct() {
+        let (direct, direct_calls) =
+            udp_memory_connector("direct", UdpEgressCapability::Supported, None);
+        let mut engine = engine(
+            "||proxy.example\n",
+            EgressProvider::from_connector(Arc::new(PendingConnector)),
+        )
+        .with_direct_connector(direct);
+        engine.udp_policy = UdpPolicy::ProxyIfSupported;
+        let cancellation = CancellationToken::new();
+        cancellation.cancel();
+
+        let error = engine
+            .open_udp_with_cancel(&context("proxy.example", "udp"), &cancellation)
+            .await
+            .unwrap_err();
+        assert!(matches!(error, EgressError::Cancelled { .. }));
+        assert_eq!(direct_calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn udp_proxy_failure_honors_fail_closed() {
+        let (proxy, proxy_calls) = udp_memory_connector(
+            "proxy",
+            UdpEgressCapability::Supported,
+            Some(EgressError::Connect("UDP proxy unavailable".into())),
+        );
+        let (direct, direct_calls) =
+            udp_memory_connector("direct", UdpEgressCapability::Supported, None);
+        let mut engine = engine("||proxy.example\n", EgressProvider::from_connector(proxy))
+            .with_direct_connector(direct);
+        engine.udp_policy = UdpPolicy::ProxyIfSupported;
+        engine.egress_failure_action = EgressFailureAction::FailClosed;
+
+        let opened = engine
+            .open_udp(&context("proxy.example", "udp"))
+            .await
+            .unwrap();
+        assert_eq!(opened.result.decision.action, RouteAction::Proxy);
+        assert_eq!(opened.result.effective_action, RouteAction::Block);
+        assert_eq!(opened.result.error_code.as_deref(), Some("connect_failed"));
+        assert!(opened.association.is_none());
+        assert_eq!(proxy_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(direct_calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn udp_proxy_failure_can_fall_back_to_direct() {
+        let (proxy, proxy_calls) = udp_memory_connector(
+            "proxy",
+            UdpEgressCapability::Supported,
+            Some(EgressError::Connect("UDP proxy unavailable".into())),
+        );
+        let (direct, direct_calls) =
+            udp_memory_connector("direct", UdpEgressCapability::Supported, None);
+        let mut engine = engine("||proxy.example\n", EgressProvider::from_connector(proxy))
+            .with_direct_connector(direct);
+        engine.udp_policy = UdpPolicy::ProxyIfSupported;
+        engine.egress_failure_action = EgressFailureAction::FailOpen;
+
+        let opened = engine
+            .open_udp(&context("proxy.example", "udp"))
+            .await
+            .unwrap();
+        assert_eq!(opened.result.decision.action, RouteAction::Proxy);
+        assert_eq!(opened.result.effective_action, RouteAction::Direct);
+        assert_eq!(opened.result.error_code.as_deref(), Some("connect_failed"));
+        assert_eq!(opened.result.egress.unwrap().connector, "direct");
+        assert!(opened.association.is_some());
+        assert_eq!(proxy_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(direct_calls.load(Ordering::SeqCst), 1);
     }
 
     #[test]

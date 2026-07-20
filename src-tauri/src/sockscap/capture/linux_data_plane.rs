@@ -386,7 +386,6 @@ mod tests {
     use std::time::Duration;
 
     use tokio::sync::{Notify, oneshot};
-    use tokio_util::sync::CancellationToken;
 
     use super::*;
     use crate::sockscap::capture::linux::LINUX_ADAPTER_ID;
@@ -403,10 +402,16 @@ mod tests {
     use crate::sockscap::flow::attribution::FakeIpMap;
     use crate::sockscap::flow::bypass::HardBypassSet;
     use crate::sockscap::flow::engine::{EgressProvider, FlowEngine, FlowEngineSnapshot};
-    use crate::sockscap::flow::ip_stack::IpStackConfig;
+    use crate::sockscap::flow::ip_stack::{
+        ChecksumPolicy, FragmentationPolicy, IcmpBehavior, IpStackConfig,
+        IpStackProviderCapabilities, IpStackProviderResources, Ipv6ExtensionHeaderPolicy,
+        TcpBridgeBudget, TcpLifecycleDeadlines, UdpAssociationQueueBudgets, UdpQueueBudget,
+        UdpWildcardBindingBudgets,
+    };
     use crate::sockscap::flow::packet_stack::{
-        PacketStackCapabilities, PacketStackDescriptor, PacketStackDriver, PacketStackExit,
-        PacketStackIdentity, PacketStackReady, PacketStackRunContext, PacketStackSupervisorConfig,
+        PacketStackCapabilities, PacketStackDescriptor, PacketStackDriver,
+        PacketStackDriverControl, PacketStackExit, PacketStackIdentity, PacketStackReady,
+        PacketStackRunContext, PacketStackSupervisorConfig,
     };
     use crate::sockscap::flow::runtime::FlowRuntimeConfig;
     use crate::sockscap::policy::matcher::ProfileMatcher;
@@ -476,10 +481,11 @@ mod tests {
 
         async fn run(
             self: Box<Self>,
-            _context: PacketStackRunContext,
+            context: PacketStackRunContext,
             readiness: oneshot::Sender<PacketStackReady>,
-            cancellation: CancellationToken,
+            control: PacketStackDriverControl,
             tcp_ingress: crate::sockscap::flow::ingress::BoundedFlowIngressSender,
+            udp_ingress: crate::sockscap::flow::ingress::BoundedUdpFlowIngressSender,
         ) -> Result<PacketStackExit, crate::sockscap::flow::packet_stack::PacketStackError>
         {
             let _ = readiness.send(PacketStackReady {
@@ -488,8 +494,14 @@ mod tests {
             });
             match self.behavior {
                 DriverBehavior::Wait { stopped } => {
-                    cancellation.cancelled().await;
+                    control.quiesce_requested().await;
+                    let (native_ingress, native_egress) = context.into_io().into_parts();
+                    drop(native_ingress);
                     drop(tcp_ingress);
+                    drop(udp_ingress);
+                    control.acknowledge_quiesced()?;
+                    control.termination_requested().await;
+                    drop(native_egress);
                     stopped.notify_one();
                     Ok(PacketStackExit::Cancelled)
                 }
@@ -497,15 +509,28 @@ mod tests {
                     cancellation_seen,
                     release,
                 } => {
-                    cancellation.cancelled().await;
+                    control.quiesce_requested().await;
+                    let (native_ingress, native_egress) = context.into_io().into_parts();
+                    drop(native_ingress);
+                    drop(tcp_ingress);
+                    drop(udp_ingress);
+                    control.acknowledge_quiesced()?;
+                    control.termination_requested().await;
                     cancellation_seen.notify_one();
                     release.notified().await;
-                    drop(tcp_ingress);
+                    drop(native_egress);
                     Ok(PacketStackExit::Cancelled)
                 }
                 DriverBehavior::DropIngressAndIgnoreCancellation { release } => {
                     drop(tcp_ingress);
+                    drop(udp_ingress);
+                    control.quiesce_requested().await;
                     release.notified().await;
+                    let (native_ingress, native_egress) = context.into_io().into_parts();
+                    drop(native_ingress);
+                    control.acknowledge_quiesced()?;
+                    control.termination_requested().await;
+                    drop(native_egress);
                     Ok(PacketStackExit::Cancelled)
                 }
             }
@@ -658,7 +683,6 @@ mod tests {
             tcp: true,
             udp: true,
             fragment_reassembly: true,
-            virtual_dns: true,
         }
     }
 
@@ -672,15 +696,22 @@ mod tests {
     }
 
     fn product_config(revision: u64) -> ProductDataPlaneConfig {
+        let udp_queue = UdpQueueBudget {
+            datagrams: 2,
+            payload_bytes: 2_400,
+            metadata_bytes: 128,
+        };
         ProductDataPlaneConfig {
             packet_stack: PacketStackSupervisorConfig {
                 identity: stack_identity(revision),
                 required_capabilities: PacketStackCapabilities {
                     ipv4: true,
                     tcp: true,
+                    udp: true,
                     ..PacketStackCapabilities::default()
                 },
                 decoded_tcp_queue_capacity: 8,
+                decoded_udp_queue_capacity: 8,
                 startup_timeout: Duration::from_millis(250),
                 shutdown_timeout: Duration::from_millis(20),
             },
@@ -690,8 +721,49 @@ mod tests {
                 provider: provider_pin(),
                 max_tcp_flows: 8,
                 max_udp_associations: 8,
-                max_reassembly_bytes: 1 << 20,
+                max_reassembly_bytes: 0,
                 max_packet_bytes: 1500,
+                mtu_bytes: 1500,
+                tcp_rx_bytes_per_flow: 8 * 1024,
+                tcp_tx_bytes_per_flow: 8 * 1024,
+                total_socket_bytes: 512 * 1024,
+                udp_datagram_bytes: 1200,
+                provider_resources: IpStackProviderResources {
+                    tcp_lifecycle: TcpLifecycleDeadlines {
+                        handshake_ms: 30_000,
+                        graceful_close_ms: 10_000,
+                        reset_ms: 1_000,
+                    },
+                    tcp_bridge: TcpBridgeBudget {
+                        rx_bytes_per_flow: 4 * 1024,
+                        tx_bytes_per_flow: 4 * 1024,
+                    },
+                    udp_association_queues: UdpAssociationQueueBudgets {
+                        stack_to_egress: udp_queue,
+                        egress_to_stack: udp_queue,
+                    },
+                    udp_wildcard_bindings: UdpWildcardBindingBudgets {
+                        max_bindings: 8,
+                        rx: udp_queue,
+                        tx: udp_queue,
+                    },
+                    capabilities: IpStackProviderCapabilities {
+                        bounded_fragment_reassembly: false,
+                        validated_ipv6_extension_headers: false,
+                    },
+                    fragmentation_policy: FragmentationPolicy::RejectAll,
+                    ipv6_extension_header_policy: Ipv6ExtensionHeaderPolicy::RejectAll,
+                },
+                udp_idle_timeout_ms: 30_000,
+                max_fragments: 0,
+                fragment_timeout_ms: 0,
+                packet_work_per_wake: 64,
+                socket_work_per_wake: 64,
+                tx_staging_packets: 8,
+                tx_staging_bytes: 12_000,
+                tx_backpressure_deadline_ms: 100,
+                checksum_policy: ChecksumPolicy::VerifyInboundAndComputeOutbound,
+                icmp_behavior: IcmpBehavior::ErrorsOnly,
             },
             flow_runtime: FlowRuntimeConfig::new(
                 CapturePlatform::Linux,
@@ -825,7 +897,7 @@ mod tests {
             build_entered: None,
             build_release: None,
         });
-        let (_native, channels) = packet_channels(GENERATION);
+        let (native, channels) = packet_channels(GENERATION);
         let mut runtime = factory
             .start_until(
                 &spec(),
@@ -846,6 +918,7 @@ mod tests {
             .await
             .unwrap();
         stopped.notified().await;
+        assert!(native.capture.is_closed());
         assert!(factory.recovery_status(GENERATION).is_none());
     }
 

@@ -2,7 +2,7 @@
 
 - Snapshot: 2026-07-20
 - Branch: `feat/sockscap-gpt-sol-max`
-- Design baseline: [sockscap-cross-platform-design-plan.md](./sockscap-cross-platform-design-plan.md) (Revision 8)
+- Design baseline: [sockscap-cross-platform-design-plan.md](./sockscap-cross-platform-design-plan.md) (Revision 9)
 - Capture ADR: [sockscap-phase0-adr.md](./sockscap-phase0-adr.md)
 - Gate commands: [`scripts/sockscap/README.md`](../scripts/sockscap/README.md)
 
@@ -13,15 +13,24 @@
 
 The branch now contains the policy/egress/persistence core, authenticated Linux
 root-helper and cgroup-v2+nft+fwmark/TUN transactions, recovery receipts,
-cross-platform source release Gates, and bounded ingress/`FlowRuntime` code. A
-release-neutral `PacketStackSupervisor` is now owned by the only public
+cross-platform source release Gates, and bounded dual-transport
+ingress/`FlowRuntime` code. Packet admission derives its authoritative TCP/UDP
+tuple from validated packet bytes, verifies IPv4/TCP/UDP checksums and accepts a
+new TCP tuple only on a pure initial SYN. Direct UDP relay has independent
+association admission plus a runtime-wide bidirectional in-flight byte budget.
+The exact smoltcp 0.13.1 crate is pinned by archive checksum and wrapped in a
+bounded `Medium::Ip` staging device, with fragmentation features disabled. A
+release-neutral `PacketStackSupervisor` is owned by the only public
 `ProductDataPlaneSupervisor`. Its detached generation registry retains startup
 and recovery owners across caller cancellation; Linux delegates to it rather
 than maintaining a second registry. `FlowRuntime` keeps root-cause diagnostics
 separate from current cleanup proof, and cannot report clean until stack,
-runtime, profile, egress and task owners are observed joined. This is still
-source/memory evidence: no concrete production TCP/UDP/reassembly/Virtual-DNS
-`PacketStackProvider` exists.
+runtime, profile, egress and task owners are observed joined. Ready shutdown
+now fences native/TCP/UDP admission and waits for an explicit provider quiesce
+acknowledgement before runtime drain and final stack termination; every phase
+retains its owner on timeout. This is still source/memory evidence: the smoltcp
+AnyIP/TCP/UDP executable compatibility spike and complete socket actor/bridge,
+Virtual DNS/reassembly policy and final `PacketStackProvider` do not exist yet.
 
 It still intentionally reports `capture_implemented = false` and
 `can_start_global`, `can_start_app_group`, and `can_attach_pid` as false. Linux now
@@ -72,7 +81,7 @@ receipt cannot bypass that blocker. There is no signed Windows implementation
 and no entitled/notarized macOS provider. The result remains a **preview-only
 foundation with release gates**, not end-to-end host capture.
 
-Revision 8 retains the frozen Taomni-owned data plane and first Windows Beta
+Revision 9 retains the frozen Taomni-owned data plane and first Windows Beta
 `x86_64` + Wintun/WinDivert decisions. The Sockscap workflow is explicitly a
 Source/Quick Non-Release workflow and pins every third-party Action to a full
 commit SHA and Rust/MSRV to 1.95.0. Windows and macOS source compile/process jobs
@@ -165,14 +174,14 @@ accounts, signed packages, labs, or operational exercises exist.
 
 | Phase | Status | Evidence present | Missing exit evidence |
 |---|---|---|---|
-| Phase 0 — capability/license gate | BLOCKED | Fail-fast probes; accepted ADR; WinDivert-only/x86_64 pins; bounded ingress/public generation supervisor; store-global detached capture transactions, expected-generation guard, durable adapter binding/handle lineage; disk WAL `synchronous=FULL`; canonical directory/lock/path validation; Linux helper/TUN/lifecycle and hardened DEB/RPM Gate. The Store owner lock is the intended source-level journal boundary; desktop single-instance is activation UX only. | Concrete controlled TCP/UDP/reassembly/Virtual-DNS provider/SBOM; handle-relative DB/lock binding and Windows SID/DACL; three-platform cross-process/crash/multi-session owner-lock native evidence; configured signing and complete Linux dependency policies; frozen macOS/Linux matrices; three real vertical slices; package/native/stop/kill/leak/compatibility evidence. |
+| Phase 0 — capability/license gate | BLOCKED | Fail-fast probes; accepted ADR; WinDivert-only/x86_64 pins; smoltcp 0.13.1/0BSD exact archive pin and bounded IP-device foundation; authoritative TCP/UDP packet admission; bounded dual-transport runtime and two-phase provider shutdown contract; store-global detached capture transactions, expected-generation guard, durable adapter binding/handle lineage; disk WAL `synchronous=FULL`; canonical directory/lock/path validation; Linux helper/TUN/lifecycle and hardened DEB/RPM Gate. The Store owner lock is the intended source-level journal boundary; desktop single-instance is activation UX only. | Executable smoltcp compatibility spike, complete controlled socket actor/bridge, final builder, Virtual-DNS/reassembly policy and SBOM; handle-relative DB/lock binding and Windows SID/DACL; three-platform cross-process/crash/multi-session owner-lock native evidence; configured signing and complete Linux dependency policies; frozen macOS/Linux matrices; three real vertical slices; package/native/stop/kill/leak/compatibility evidence. |
 | Phase 1 — policy/rule core | PASS for software scope | Profile model, overlap rejection, GFWList projection, exceptions, immutable matcher snapshots, target explanations, and last-good behavior. | Live mirror availability remains an operational gate. |
-| Phase 2 — FlowEngine/egress core | PARTIAL | DIRECT, SOCKS5 TCP, HTTP CONNECT, shared SSH `direct-tcpip`, bypass/cancellation/stats, strict host-key, bounded relay/IPv6 admission and public product supervisor plus Linux injection seam. | Concrete controlled TCP/UDP/reassembly/Virtual-DNS provider, final profile/config builder, default async wiring and product fault propagation; repeatable real SOCKS/HTTP/SSH matrix including stable SOCKS5 UDP ASSOCIATE. |
+| Phase 2 — FlowEngine/egress core | PARTIAL | DIRECT TCP/UDP, SOCKS5 TCP, HTTP CONNECT, shared SSH `direct-tcpip`, UDP policy/fail-open/fail-closed routing, bypass/cancellation/stats, strict host-key, bounded relay/IPv6 admission, independent TCP/UDP quotas, shared UDP in-flight bytes and public product supervisor plus Linux injection seam. | Complete transparent smoltcp TCP/UDP provider, SOCKS5 UDP ASSOCIATE connector, Virtual DNS/reassembly policy, final profile/config builder, default async wiring and product fault propagation; repeatable real SOCKS/HTTP/SSH matrix. |
 | Phase 3 — persistence/IPC/Stub | PASS for existing software scope | SQLite/WAL with disk `synchronous=FULL`, recovery journal, bounded stats, IPC/Stub, helper receipts, store-scoped operation serialization, OS owner lock/path checks, Linux generation adapter and cancellation-safe, durable-context-bound coordinator seam. | `AppState` still uses `with_store`; commands/tray still call synchronous fail-closed recovery. Default adapter/async start-update-heartbeat-stop injection, handle-relative SQLite/lock binding, Windows SID/DACL, native crash/power-loss/fault evidence, durable tombstone GC and real host recovery remain. |
 | Phase 4 — independent UI | PARTIAL | Independent route/window shell, complete UI, 67 focused tests, cataloged YAML coverage, and a real Linux WebDriver hide/reopen smoke. | Native tray click/exit smoke on all platforms, accessibility/keyboard review, and permission/recovery system smoke. |
 | Phase 5 — Windows vertical | BLOCKED | Provider is frozen to Wintun/global plus WinDivert app/PID and first Beta is x86_64 only; source capability/fixed policy/template/verifiers reject other providers/architectures and pin official artifacts. First-party WFP is out of scope. | Replace `unconfigured` publisher/certificate policy through review; implement adapters/service/orchestrator; provision user-mode Authenticode; run Windows non-lint `/kp`; complete license, install/update/uninstall, identity-race, EDR/VPN and recovery labs. |
 | Phase 6 — macOS vertical | BLOCKED | Release-only Tauri overlay, provider plist/entitlement/profile-certificate/full-app-digest contract, and signed-app/provider/notarization verifier. | Replace `unconfigured` Team/certificate/architecture policy through review; Apple-approved capability; real Swift target/Rust bridge; Developer ID provisioning/signing/notarization; final DMG/PKG provenance; permission, upgrade, uninstall and frozen architecture labs. |
-| Phase 7 — Linux vertical | PARTIAL | Helper/TUN/pump/fault/tombstone, public supervisor, generation adapter/coordinator, canonical directory/lock/DB checks and OS-held Store owner lock; desktop single-instance is activation UX only; fixed policy/polkit and DEB/RPM-only lifecycle lock/sentinel/snapshot/hermetic metadata Gate. | Handle-relative SQLite/VFS binding and hostile same-user path tests; three-platform cross-process/crash/multi-session Store-lock native evidence; concrete provider/final builder/tuple side channel/default async IPC; configured signer/architecture/complete distro dependencies, signed apt/RPM repository or mandatory verified installer, trusted lab attestation; package-manager/PID/root/native matrix. |
+| Phase 7 — Linux vertical | PARTIAL | Helper/TUN/pump/fault/tombstone, public supervisor, generation adapter/coordinator, authoritative packet admission, dual-transport runtime, explicit quiesce/drain/terminate ownership, pinned smoltcp staging foundation, canonical directory/lock/DB checks and OS-held Store owner lock; desktop single-instance is activation UX only; fixed policy/polkit and DEB/RPM-only lifecycle lock/sentinel/snapshot/hermetic metadata Gate. | Handle-relative SQLite/VFS binding and hostile same-user path tests; three-platform cross-process/crash/multi-session Store-lock native evidence; executable provider spike, complete provider/final builder/tuple side channel/default async IPC; configured signer/architecture/complete distro dependencies, signed apt/RPM repository or mandatory verified installer, trusted lab attestation; package-manager/PID/root/native matrix. |
 | Phase 8 — tray/reliability/release | PARTIAL | Native Linux window smoke; guarded exit; recovery UI; fixed performance thresholds; 100 synthetic lifecycle cycles; fail-closed quick/24h/platform receipt verifier. | Allowlisted second-launch/autostart activation-intent queue with window-ready delivery; actual adapter 100-cycle cleanup; native tray/system recovery; 24h core/real-capture soak and 7-day staged long-stability run; throughput/latency/leak gates; signed packages and install/update/uninstall matrices; updater key/rollout/rollback exercise; continuous SBOM/CVE; threat model; redacted support bundle/symbol/log policy; clean global QA gate. |
 
 ## Definition of Done audit
@@ -191,13 +200,13 @@ accounts, signed packages, labs, or operational exercises exist.
 | Rust, Vitest, qa-ui-auto, native smoke, performance, and long-run gates all pass | BLOCKED | Focused software and Linux window gates pass; global QA, real platform capture, signed packages, 24h evidence, and the stable 7-day staged actual-capture receipt/verifier remain red. |
 | Production release can be staged, stopped, rolled back and supported securely | BLOCKED | The functional updater foundation exists, but key-lifecycle, staged rollout/stop-rollout/signed rollback, compatibility, continuous SBOM/CVE, threat-model and redacted-support exercises have not passed. |
 
-## Revision 8 production-readiness gates
+## Revision 9 production-readiness gates
 
 | Work package | Status | Required evidence |
 |---|---|---|
 | `S0-CONTRACT-ALIGN` | PARTIAL — source complete, platform evidence open | Capability text, schema/templates, fixed release policies, artifact verifier and performance receipt contract accept only WinDivert/x86_64 on Windows and fail closed for obsolete provider/architecture choices. Exact WinDivert 2.2.2-A and Wintun 0.14.1 package/file hashes are pinned. Windows publisher/certificate and macOS Team/certificate/architecture policies are intentionally `unconfigured`, so non-lint release cannot pass until separately reviewed identities are committed. Closure also requires real same-host Windows `/kp`, macOS signing/profile/notary plus stable full-`.app` digest, and protected provenance binding the shipped DMG/PKG/updater artifact to that candidate. |
-| `S1-STREAM-RUNTIME` | PARTIAL — bounded stream/packet admission slice complete | `FlowDescriptor`, `ProfileSelector`, bounded decoded `FlowIngress`, bounded L3 `PacketIngress`, pinned `IpStackConfig`/`PacketFlowRegistry`, snapshot-bound `FlowEngine`, and supervisor-owned `FlowRuntime` relay are implemented. App/PID capture intent is fail-closed, child inheritance requires a trusted revisioned queue, stale engines/ownerless live egress are rejected, and queue/flow state is bounded. Explicit TCP/UDP counters remove the registry's admission-time transport scan without claiming strict worst-case `HashMap` O(1). Strict bounded IPv6 extension parsing rejects malformed, repeated/out-of-order and over-budget chains; fragments still require the missing controlled reassembly provider. Linux has a product adapter/coordinator source seam but no default/native proof; Windows/macOS adapters remain absent. Complete transport reconstruction, native smoke, performance and 24h/7d evidence remain open. |
-| `S1-PACKET-IPSTACK` | PARTIAL — public supervisor contract landed, provider open | Bounded native queues/exact `source_id`, provider limits and first-terminal attribution. `ProductDataPlaneSupervisor` is the sole public start path; detached generation ownership survives caller cancel. Runtime root cause and cleanup proof are independent, and timeout retains per-owner retry state. `ipstack` 1.0.1 remains excluded. Concrete TCP/UDP/reassembly/Virtual-DNS provider/final builder plus fuzz/native/performance/long-stability evidence remain required. |
+| `S1-STREAM-RUNTIME` | PARTIAL — bounded TCP/UDP runtime slice complete | `FlowDescriptor`, `ProfileSelector`, independent bounded decoded TCP/UDP ingress, bounded L3 `PacketIngress`, pinned `IpStackConfig`/`PacketFlowRegistry`, snapshot-bound `FlowEngine`, Direct UDP and supervisor-owned `FlowRuntime` relays are implemented. App/PID capture intent is fail-closed, child inheritance requires a trusted revisioned queue, stale engines/ownerless live egress are rejected, combined active transports are checked, and both UDP relay directions share a worst-case-datagram byte semaphore. TCP/UDP reject-close/finalization pools are separated and bounded; foreign close panic is contained. Queued-but-unaccepted association quarantine/explicit drain remains a release blocker, as do native smoke, performance and 24h/7d evidence. |
+| `S1-PACKET-IPSTACK` | PARTIAL — pinned bounded foundation, runnable provider open | Bounded native queues/exact `source_id`, packet-derived authoritative tuples, IPv4/TCP/UDP checksum validation, pure-SYN new TCP admission, strict bounded IPv6 parsing, explicit provider limits/first-terminal attribution and a bounded smoltcp `Medium::Ip` staging device. `ProductDataPlaneSupervisor` is the sole public start path; detached generation ownership survives caller cancel. Normal stop requires provider quiesce acknowledgement, runtime/owner cleanup, then final actor termination; timeouts retain the exact owner. `ipstack` 1.0.1 remains excluded and smoltcp is pinned exactly to 0.13.1/0BSD with fragmentation disabled. Executable AnyIP/TCP/UDP probes, complete socket actor/bridge, MTU/parser-differential closure, final builder, Virtual DNS/reassembly decision plus fuzz/native/performance/long-stability evidence remain required. Drop-time detached reapers are containment only. |
 | `S1-LINUX-LIFECYCLE` | PARTIAL — product/source contract, real evidence open | Helper WAL/PID/pump/withdrawal/tombstone, product adapter/public supervisor, Store-global detached transaction ownership, expected-generation guard, durable adapter binding, helper PID lineage and generation-only rollback for untrusted receipts exist. Disk Store uses WAL + `synchronous=FULL`; canonical directory/lock/DB checks and the retained OS owner lock form the intended source-level journal boundary; desktop single-instance is activation UX only. Same-process double-open/drop-release and Unix path tests exist. Package hooks add exact runtime dir, lifecycle lock/sentinel, strict stage, snapshots/hermetic tools and semantic metadata/mode rejection. Still required: handle-relative SQLite/VFS binding, Windows SID/DACL, three-platform cross-process/crash/multi-session lock evidence, WAL/disk-full/I/O/corruption/power-loss faults, provider/default injection, complete dependency/signing/repository policy, pidfd/PID-race/tombstone GC and signed package-manager/root evidence. |
 | `W0-SUPPORT-MATRIX` | PARTIAL | Windows Beta is frozen to x86_64 and Windows ARM64 must remain unsupported under the current official WinDivert/no-custom-driver route. `minimumSystemVersion=11.0` in the macOS Tauri overlay is only a provisional build floor, not a production support claim. Exact Windows versions, macOS minimum/architecture scope and Linux distro/kernel/userspace-network matrix still require owned lab evidence. |
 | `W0-SIGNING-ACCOUNT` | BLOCKED | Commit a reviewed non-placeholder Windows publisher subject and leaf-certificate SHA-256, then prove trusted timestamped Authenticode for Taomni app/helper/service/installer, controlled/non-exported CI use, clean-host chain verification, renewal/rotation/revocation owner and exercise. EV and a custom kernel-driver signing path are not required or authorized. |
@@ -252,8 +261,9 @@ capture/UI jitter) without weakening durability to make a benchmark pass.
 - Freeze the explicit distro/kernel/systemd/cgroup/nft/iproute2/resolver/
   NetworkManager support matrix and maintenance owner before issuing a release
   claim; do not substitute an undefined “mainstream Linux” label.
-- Implement the missing concrete controlled stack provider and final Linux
-  profile/config builder, then wire the landed public composition and product
+- Finish the smoltcp executable compatibility Gate, then implement the bounded
+  socket actor/bridge, ingress/close quarantine and final checked Linux
+  profile/config builder. Wire that provider and the landed public composition/
   generation adapter into the default async product path. Keep capability
   start flags false until installed probe, self-test and native evidence pass.
 - Replace the intentionally `unconfigured` Linux signer/architecture policy,
@@ -308,10 +318,14 @@ cross-platform stable label.
 
 ## Next executable verification steps
 
-1. Implement and audit the pinned controlled TCP/UDP/reassembly/Virtual-DNS
-   provider and final snapshot/profile builder behind the landed single product
-   composition. Complete fuzz, conformance and optimized memory/performance
-   checks before any platform capability can use it.
+1. Run and freeze the smoltcp 0.13.1 P0 executable STOP/GO suite for arbitrary
+   IPv4/IPv6 TCP exact-listener/SYN-ACK, shared-port UDP metadata demux/reply and
+   MTU rejection. Then implement the bounded sharded socket actor, TCP/UDP
+   bridge, tuple leases, ingress close/drain plus close-failure quarantine,
+   complete checked stack/bridge/association/binding memory builder, Virtual
+   DNS/reassembly policy and final snapshot/profile builder. Complete fuzz,
+   conformance and optimized memory/performance checks before any platform
+   capability can use it.
 2. Finish Linux first as the nearest vertical slice: wire that provider into
    the landed generation adapter/default async runtime, configure reviewed
    architecture/OpenPGP policy, build/sign the fixed DEB/RPM candidates, and

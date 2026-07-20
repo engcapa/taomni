@@ -193,6 +193,14 @@ socket2 = { version = "0.6", features = ["all"] }
 # Sockscap process picker: request only the cross-platform process/system
 # surface, not disks, networks, components, users, command lines, or env vars.
 sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
+# Sockscap controlled userspace IP state machine. Taomni owns packet identity,
+# admission, bounded queues/memory, policy, egress, cancellation, and lifecycle;
+# smoltcp is pinned exactly and is never treated as a product capability by
+# itself. The crates.io archive SHA-256 is
+# 5f73d40463bba65efc9adc6370b56df76d563cc46e2482bba58351b4afb7535e.
+# Fragmentation stays disabled until the runtime budget is bound to smoltcp's
+# compile-time reassembly constants and the overlap/fuzz gates are present.
+smoltcp = { version = "=0.13.1", default-features = false, features = ["std", "medium-ip", "proto-ipv4", "proto-ipv6", "socket-tcp", "socket-udp"] }
 tauri-plugin-notification = "2.3.3"
 xcap = { version = "0.9.6", optional = true }
 image = { version = "0.25", default-features = false, features = ["png"] }
