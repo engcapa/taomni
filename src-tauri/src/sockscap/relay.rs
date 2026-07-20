@@ -127,24 +127,8 @@ async fn handle_client(
     let peer_port = peer.port();
     let peer_ip = peer.ip().to_string();
 
-    // Peek first bytes for SNI / HTTP Host before policy (may block briefly).
-    let mut prefix = vec![0u8; 0];
-    {
-        let mut buf = vec![0u8; 4096];
-        // Short timeout so non-TLS/non-HTTP still proceeds.
-        match tokio::time::timeout(
-            std::time::Duration::from_millis(400),
-            client.read(&mut buf),
-        )
-        .await
-        {
-            Ok(Ok(n)) if n > 0 => {
-                prefix = buf[..n].to_vec();
-            }
-            _ => {}
-        }
-    }
-    let hostname = extract_hostname_from_prefix(&prefix);
+    // Multi-read peek for SNI / HTTP Host (ClientHello may span packets).
+    let (prefix, hostname) = peek_for_hostname(&mut client).await;
 
     let snap = {
         let g = ctx.read().await;
@@ -304,6 +288,58 @@ async fn handle_client(
         }
     }
     Ok(())
+}
+
+/// Read until we extract a hostname, TLS record is complete, or budget exhausted.
+async fn peek_for_hostname(client: &mut TcpStream) -> (Vec<u8>, Option<String>) {
+    use std::time::{Duration, Instant};
+    let deadline = Instant::now() + Duration::from_millis(900);
+    let mut prefix: Vec<u8> = Vec::new();
+    while Instant::now() < deadline && prefix.len() < 16 * 1024 {
+        if let Some(h) = extract_hostname_from_prefix(&prefix) {
+            return (prefix, Some(h));
+        }
+        // TLS: wait for full record if we can see the length.
+        if prefix.len() >= 5 && prefix[0] == 0x16 {
+            let rec_len = u16::from_be_bytes([prefix[3], prefix[4]]) as usize;
+            if prefix.len() >= 5 + rec_len {
+                break;
+            }
+        } else if prefix.len() >= 32 {
+            // Not TLS and no Host yet — stop waiting.
+            if extract_hostname_from_prefix(&prefix).is_none()
+                && !looks_like_incomplete_http(&prefix)
+            {
+                break;
+            }
+        }
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        let mut buf = vec![0u8; 2048];
+        match tokio::time::timeout(remaining, client.read(&mut buf)).await {
+            Ok(Ok(n)) if n > 0 => prefix.extend_from_slice(&buf[..n]),
+            _ => break,
+        }
+    }
+    let host = extract_hostname_from_prefix(&prefix);
+    (prefix, host)
+}
+
+fn looks_like_incomplete_http(data: &[u8]) -> bool {
+    if data.is_empty() || data[0] == 0x16 {
+        return false;
+    }
+    let Ok(s) = std::str::from_utf8(data) else {
+        return false;
+    };
+    let upper = s.to_ascii_uppercase();
+    (upper.starts_with("GET ")
+        || upper.starts_with("POST ")
+        || upper.starts_with("HEAD ")
+        || upper.starts_with("CONNECT "))
+        && !s.contains("\r\n\r\n")
 }
 
 async fn bridge_tcp(a: &mut TcpStream, b: &mut TcpStream) -> Result<(), String> {

@@ -37,6 +37,8 @@ pub struct Orchestrator {
     capture_backend: String,
     /// Active local relay (if capture is running).
     pub relay: Option<RelayHandle>,
+    /// Shared with the relay task so config/rules can hot-reload while Active.
+    pub relay_ctx: Option<std::sync::Arc<tokio::sync::RwLock<crate::sockscap::relay::RelayContext>>>,
 }
 
 impl Orchestrator {
@@ -49,6 +51,7 @@ impl Orchestrator {
             stats: Arc::new(StatsCounters::default()),
             capture_backend: "none".into(),
             relay: None,
+            relay_ctx: None,
         }
     }
 
@@ -140,6 +143,7 @@ impl Orchestrator {
         if let Some(relay) = self.relay.take() {
             relay.stop().await;
         }
+        self.relay_ctx = None;
         self.message = "stopped".into();
         self.phase = EnginePhase::Idle;
         self.capture_backend = "none".into();
@@ -150,6 +154,22 @@ impl Orchestrator {
         self.phase = EnginePhase::Idle;
         self.message = "recovered".into();
         self.capture_backend = "none".into();
+        self.relay_ctx = None;
+    }
+
+    /// Hot-update policy surface used by the running relay.
+    pub async fn hot_reload_policy(
+        &self,
+        cfg: SocksCapConfig,
+        rules: Option<crate::sockscap::rules::CompiledRules>,
+    ) {
+        if let Some(ctx) = &self.relay_ctx {
+            let mut g = ctx.write().await;
+            g.config = cfg;
+            if let Some(r) = rules {
+                g.rules = Some(r);
+            }
+        }
     }
 
     pub fn is_running(&self) -> bool {

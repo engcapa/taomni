@@ -11,6 +11,9 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager, State};
 
+use crate::sockscap::paths::{
+    resolve_helper_exe, resolve_windivert_dir, windivert_missing_hint,
+};
 use crate::state::AppState;
 
 static REQ_ID: AtomicU64 = AtomicU64::new(1);
@@ -72,71 +75,7 @@ impl Default for HelperRegistry {
     }
 }
 
-fn helper_exe_candidates(app: &AppHandle) -> Vec<PathBuf> {
-    let mut out = Vec::new();
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            out.push(dir.join("sockscap-helper.exe"));
-            out.push(dir.join("sockscap-helper"));
-            // cargo target/debug layout when running `tauri dev`
-            out.push(dir.join("sockscap-helper.exe"));
-        }
-    }
-    // Common cargo output next to lib during dev.
-    out.push(PathBuf::from("target/debug/sockscap-helper.exe"));
-    out.push(PathBuf::from("target/release/sockscap-helper.exe"));
-    out.push(PathBuf::from("src-tauri/target/debug/sockscap-helper.exe"));
-    out.push(PathBuf::from("src-tauri/target/release/sockscap-helper.exe"));
-    if let Ok(dir) = app.path().resource_dir() {
-        out.push(dir.join("sockscap-helper.exe"));
-        out.push(dir.join("bin").join("sockscap-helper.exe"));
-    }
-    out
-}
 
-fn resolve_helper_exe(app: &AppHandle) -> Result<PathBuf, String> {
-    for c in helper_exe_candidates(app) {
-        if c.is_file() {
-            return Ok(c);
-        }
-    }
-    Err(
-        "sockscap-helper binary not found. Build it with: cargo build --bin sockscap-helper"
-            .into(),
-    )
-}
-
-fn windivert_dir_candidates(app: &AppHandle) -> Option<PathBuf> {
-    if let Ok(d) = std::env::var("SOCKSCAP_WINDIVERT_DIR") {
-        let p = PathBuf::from(d);
-        if p.is_dir() {
-            return Some(p);
-        }
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let p = dir.join("sockscap").join("windows");
-            if p.is_dir() {
-                return Some(p);
-            }
-            if dir.join("WinDivert.dll").is_file() {
-                return Some(dir.to_path_buf());
-            }
-        }
-    }
-    if let Ok(res) = app.path().resource_dir() {
-        let p = res.join("sockscap").join("windows");
-        if p.is_dir() {
-            return Some(p);
-        }
-    }
-    // Repo layout for developers.
-    let dev = PathBuf::from("src-tauri/resources/sockscap/windows");
-    if dev.is_dir() {
-        return Some(dev);
-    }
-    None
-}
 
 fn pick_free_port() -> Result<u16, String> {
     let listener = std::net::TcpListener::bind("127.0.0.1:0")
@@ -159,15 +98,47 @@ pub async fn sockscap_helper_start(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<HelperStatus, String> {
-    // Already running?
+    // Already running and elevated?
     if let Ok(guard) = state.sockscap.helper.inner.lock() {
         if let Some(sess) = guard.as_ref() {
-            if let Ok(st) = request_status(sess) {
+            if let Ok(mut st) = request_status(sess) {
                 if st.running {
-                    return Ok(st);
+                    if !st.elevated {
+                        let _ = send_cmd(sess, "shutdown", None);
+                    } else {
+                        // Re-probe WinDivert so a stale helper without driver is rejected.
+                        match send_cmd(sess, "windivert_probe", Some("false".into())) {
+                            Ok(resp)
+                                if resp.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) =>
+                            {
+                                st.windivert = resp.get("result").cloned();
+                                st.message = "helper elevated; WinDivert OK".into();
+                                return Ok(st);
+                            }
+                            Ok(resp) => {
+                                let err = resp
+                                    .get("error")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("probe failed");
+                                let _ = send_cmd(sess, "shutdown", None);
+                                return Err(format!(
+                                    "Existing helper cannot open WinDivert: {err}. {}",
+                                    windivert_missing_hint(&app)
+                                ));
+                            }
+                            Err(e) => {
+                                let _ = send_cmd(sess, "shutdown", None);
+                                return Err(format!("Helper probe failed: {e}"));
+                            }
+                        }
+                    }
                 }
             }
         }
+    }
+    // Clear dead session slot.
+    if let Ok(mut guard) = state.sockscap.helper.inner.lock() {
+        *guard = None;
     }
 
     #[cfg(not(windows))]
@@ -198,7 +169,10 @@ pub async fn sockscap_helper_start(
             "--ready-file".into(),
             ready_file.display().to_string(),
         ];
-        if let Some(wd) = windivert_dir_candidates(&app) {
+        if resolve_windivert_dir(&app).is_none() {
+            return Err(windivert_missing_hint(&app));
+        }
+        if let Some(wd) = resolve_windivert_dir(&app) {
             args.push("--windivert-dir".into());
             args.push(wd.display().to_string());
         }
@@ -207,7 +181,7 @@ pub async fn sockscap_helper_start(
         elevate_and_spawn(&helper, &args)?;
 
         // Wait for ready file or TCP accept.
-        let deadline = Instant::now() + Duration::from_secs(30);
+        let deadline = Instant::now() + Duration::from_secs(45);
         let mut elevated = false;
         let mut pid = None;
         while Instant::now() < deadline {
@@ -221,9 +195,8 @@ pub async fn sockscap_helper_start(
                         pid = v.get("pid").and_then(|x| x.as_u64()).map(|n| n as u32);
                     }
                 }
-                // Probe TCP
                 if TcpStream::connect_timeout(
-                    &format!("127.0.0.1:{port}").parse().unwrap(),
+                    &std::net::SocketAddr::from(([127, 0, 0, 1], port)),
                     Duration::from_millis(200),
                 )
                 .is_ok()
@@ -234,15 +207,15 @@ pub async fn sockscap_helper_start(
             std::thread::sleep(Duration::from_millis(150));
         }
 
-        // Final connect check
         if TcpStream::connect_timeout(
-            &format!("127.0.0.1:{port}").parse().unwrap(),
+            &std::net::SocketAddr::from(([127, 0, 0, 1], port)),
             Duration::from_millis(500),
         )
         .is_err()
         {
             return Err(
-                "Helper did not become ready (UAC cancelled, or helper failed to start)".into(),
+                "Helper did not become ready. If you cancelled the UAC prompt, try again and click Yes."
+                    .into(),
             );
         }
 
@@ -252,7 +225,7 @@ pub async fn sockscap_helper_start(
             pid,
             ready_file,
         };
-        let st = request_status(&sess).unwrap_or(HelperStatus {
+        let mut st = request_status(&sess).unwrap_or(HelperStatus {
             running: true,
             elevated,
             endpoint: Some(format!("127.0.0.1:{port}")),
@@ -260,6 +233,41 @@ pub async fn sockscap_helper_start(
             windivert: None,
             pid,
         });
+        // Prefer live status elevated flag.
+        elevated = st.elevated || elevated;
+        st.elevated = elevated;
+
+        if !st.elevated {
+            let _ = send_cmd(&sess, "shutdown", None);
+            let _ = std::fs::remove_file(&sess.ready_file);
+            return Err(
+                "SocksCap helper is not elevated. Capture requires Administrator. Re-start and accept the UAC prompt."
+                    .into(),
+            );
+        }
+
+        // Verify WinDivert can open under the elevated helper.
+        match send_cmd(&sess, "windivert_probe", Some("false".into())) {
+            Ok(resp) if resp.get("ok").and_then(|v| v.as_bool()).unwrap_or(false) => {
+                st.windivert = resp.get("result").cloned();
+                st.message = "helper elevated; WinDivert OK".into();
+            }
+            Ok(resp) => {
+                let err = resp
+                    .get("error")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("WinDivert probe failed");
+                let _ = send_cmd(&sess, "shutdown", None);
+                return Err(format!(
+                    "Elevated helper started but WinDivert failed: {err}. {}",
+                    windivert_missing_hint(&app)
+                ));
+            }
+            Err(e) => {
+                let _ = send_cmd(&sess, "shutdown", None);
+                return Err(format!("WinDivert probe error: {e}"));
+            }
+        }
 
         if let Ok(mut guard) = state.sockscap.helper.inner.lock() {
             *guard = Some(sess);

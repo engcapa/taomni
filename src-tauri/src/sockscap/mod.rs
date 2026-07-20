@@ -7,10 +7,12 @@
 
 mod capture;
 mod config;
+mod dns_win;
 mod egress;
 mod flow;
 pub mod helper;
 mod orchestrator;
+mod paths;
 mod policy;
 mod process;
 mod recovery;
@@ -111,7 +113,10 @@ pub async fn sockscap_set_config(
     let path = config_path(&app)?;
     config.save(&path)?;
     let mut orch = state.sockscap.orch.write().await;
-    orch.apply_config(config);
+    orch.apply_config(config.clone());
+    // Hot-reload into running relay without restarting capture.
+    let rules = orch.rules().map(|r| r.clone());
+    orch.hot_reload_policy(config, rules).await;
     Ok(())
 }
 
@@ -188,8 +193,9 @@ pub async fn sockscap_refresh_gfwlist(
             let meta = compiled.meta.clone();
             cfg.save(&cfg_path)?;
             let mut orch = state.sockscap.orch.write().await;
-            orch.apply_config(cfg);
-            orch.set_rules(compiled);
+            orch.apply_config(cfg.clone());
+            orch.set_rules(compiled.clone());
+            orch.hot_reload_policy(cfg, Some(compiled)).await;
             Ok(GfwListStatus {
                 loaded: true,
                 rule_count: meta.rule_count,
@@ -199,14 +205,29 @@ pub async fn sockscap_refresh_gfwlist(
                 error: None,
             })
         }
-        Err(e) => Ok(GfwListStatus {
-            loaded: false,
-            rule_count: 0,
-            skipped: 0,
-            last_refresh: None,
-            source: fetch_url,
-            error: Some(e),
-        }),
+        Err(e) => {
+            // Keep previous rules if any; surface error for UI.
+            let orch = state.sockscap.orch.read().await;
+            if let Some(meta) = orch.gfwlist_meta() {
+                Ok(GfwListStatus {
+                    loaded: true,
+                    rule_count: meta.rule_count,
+                    skipped: meta.skipped,
+                    last_refresh: meta.last_refresh.clone(),
+                    source: meta.source.clone(),
+                    error: Some(format!("refresh failed (kept cache): {e}")),
+                })
+            } else {
+                Ok(GfwListStatus {
+                    loaded: false,
+                    rule_count: 0,
+                    skipped: 0,
+                    last_refresh: None,
+                    source: fetch_url,
+                    error: Some(e),
+                })
+            }
+        }
     }
 }
 
@@ -220,7 +241,10 @@ pub async fn sockscap_import_rules(
     let compiled = rules::source::import_from_path(std::path::Path::new(&path), &dir)?;
     let meta = compiled.meta.clone();
     let mut orch = state.sockscap.orch.write().await;
-    orch.set_rules(compiled);
+    orch.set_rules(compiled.clone());
+    if let Some(cfg) = orch.config().cloned() {
+        orch.hot_reload_policy(cfg, Some(compiled)).await;
+    }
     Ok(GfwListStatus {
         loaded: true,
         rule_count: meta.rule_count,
@@ -319,25 +343,55 @@ pub async fn sockscap_start(
         orch.set_preparing("starting");
     }
 
-    // Load cached GFWList when needed; optionally fetch if cache missing.
-    {
+    // GFWList mode: require rules (cache or fresh fetch) before capture.
+    let mut gfw_start_note = String::new();
+    if matches!(cfg.rule_mode, RuleMode::GfwList) {
         let mut orch = state.sockscap.orch.write().await;
-        if matches!(cfg.rule_mode, RuleMode::GfwList) && orch.rules().is_none() {
+        if orch.rules().is_none() {
             if let Some(c) = rules::source::load_cached(&dir) {
+                gfw_start_note = format!(
+                    "using cached GFWList ({} rules)",
+                    c.meta.rule_count
+                );
                 orch.set_rules(c);
             } else if !cfg.gfwlist.url.trim().is_empty() {
                 let url = cfg.gfwlist.url.clone();
                 drop(orch);
                 match rules::source::refresh_from_url(&url, &dir).await {
                     Ok(compiled) => {
+                        gfw_start_note = format!(
+                            "downloaded GFWList ({} rules)",
+                            compiled.meta.rule_count
+                        );
                         state.sockscap.orch.write().await.set_rules(compiled);
                     }
                     Err(e) => {
-                        tracing::warn!("sockscap: gfwlist fetch on start failed: {e}");
+                        let mut orch = state.sockscap.orch.write().await;
+                        orch.set_degraded(
+                            "none",
+                            format!("GFWList required but not loaded: {e}"),
+                        );
+                        return Err(format!(
+                            "GFWList mode needs a ruleset. Refresh GFWList or import a file first. ({e})"
+                        ));
                     }
                 }
+            } else {
+                orch.set_degraded(
+                    "none",
+                    "GFWList URL empty and no cache".to_string(),
+                );
+                return Err(
+                    "GFWList mode needs a ruleset. Set a URL and refresh, or import a local file."
+                        .to_string(),
+                );
             }
+        } else if let Some(m) = orch.gfwlist_meta() {
+            gfw_start_note = format!("GFWList ready ({} rules)", m.rule_count);
         }
+    }
+    if !gfw_start_note.is_empty() {
+        tracing::info!("sockscap: {gfw_start_note}");
     }
 
     let caps = capture::capabilities();
@@ -452,6 +506,12 @@ async fn start_windows_capture(
         let orch = state.sockscap.orch.read().await;
         orch.rules().map(|r| r.clone())
     };
+    let dns_map = Arc::new(std::sync::Mutex::new(
+        crate::sockscap::rules::dns_map::DnsMap::new(8192, std::time::Duration::from_secs(300)),
+    ));
+    // Seed from Windows DNS client cache (no admin).
+    crate::sockscap::dns_win::refresh_dns_client_cache(&dns_map);
+
     let ctx = Arc::new(RwLock::new(RelayContext {
         config: cfg.clone(),
         rules,
@@ -463,11 +523,17 @@ async fn start_windows_capture(
         upstream_pass: up_pass,
         self_pid: std::process::id(),
         ssh_pool,
-        dns_map: Arc::new(std::sync::Mutex::new(
-            crate::sockscap::rules::dns_map::DnsMap::new(8192, std::time::Duration::from_secs(300)),
-        )),
+        dns_map: Arc::clone(&dns_map),
     }));
     let relay_handle = relay::start_relay(Arc::clone(&ctx)).await?;
+
+    // Periodic DNS cache refresh while capture runs.
+    let dns_stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let _dns_task = crate::sockscap::dns_win::spawn_dns_cache_refresher(
+        dns_map,
+        Arc::clone(&dns_stop),
+        std::time::Duration::from_secs(60),
+    );
 
     // 3) Tell helper to start FLOW+NETWORK capture → NAT to relay.
     let mut bypass_pids = vec![std::process::id()];
@@ -484,13 +550,24 @@ async fn start_windows_capture(
 
     let args = CaptureStartArgs {
         mode_apps: matches!(cfg.mode, ScopeMode::Apps),
-        app_paths: cfg.apps.iter().map(|a| a.path.clone()).collect(),
+        app_paths: cfg
+            .apps
+            .iter()
+            .map(|a| paths::normalize_exe_path(&a.path))
+            .filter(|p| !p.is_empty())
+            .collect(),
         bypass_cidrs: cfg.bypass_cidrs.clone(),
         bypass_pids,
         bypass_endpoints,
         relay_ip: "127.0.0.1".into(),
         relay_port: relay_handle.port,
     };
+
+    if args.mode_apps && args.app_paths.is_empty() {
+        dns_stop.store(true, std::sync::atomic::Ordering::SeqCst);
+        relay_handle.stop().await;
+        return Err("App mode requires at least one application path".into());
+    }
 
     let capture_result = {
         let guard = state
@@ -509,22 +586,28 @@ async fn start_windows_capture(
         Ok(info) => {
             let mut orch = state.sockscap.orch.write().await;
             orch.relay = Some(relay_handle);
+            orch.relay_ctx = Some(ctx);
+            let gfw_note = orch
+                .gfwlist_meta()
+                .map(|m| format!(", gfw={}", m.rule_count))
+                .unwrap_or_default();
             orch.set_active(
                 &caps.capture_backend,
                 format!(
-                    "capture active (relay :{}, helper elevated={})",
-                    args.relay_port, helper_st.elevated
+                    "capture active (relay :{}, elevated=true{gfw_note})",
+                    args.relay_port
                 ),
             );
             tracing::info!("sockscap capture started: {info}");
             Ok(orch.status())
         }
         Err(e) => {
+            dns_stop.store(true, std::sync::atomic::Ordering::SeqCst);
             relay_handle.stop().await;
             let mut orch = state.sockscap.orch.write().await;
             orch.set_degraded(
                 &caps.capture_backend,
-                format!("helper/capture failed: {e} (is WinDivert.dll installed?)"),
+                format!("helper/capture failed: {e}"),
             );
             Err(e)
         }

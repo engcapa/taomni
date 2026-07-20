@@ -460,8 +460,22 @@ fn process_in_scope(plan: &CapturePlan, pid: u32, path: &str) -> bool {
     if path.is_empty() {
         return false;
     }
-    let p = path.replace('/', "\\").to_ascii_lowercase();
-    plan.app_paths.iter().any(|a| p == *a || p.ends_with(a))
+    let p = normalize_path(path);
+    plan.app_paths.iter().any(|a| {
+        let a = normalize_path(a);
+        p == a || p.ends_with(&a) || p.ends_with(a.trim_start_matches('\\'))
+    })
+}
+
+fn normalize_path(p: &str) -> String {
+    let mut s = p.trim().replace('/', "\\").to_ascii_lowercase();
+    while s.ends_with('\\') {
+        s.pop();
+    }
+    if let Some(rest) = s.strip_prefix(r"\\?\") {
+        s = rest.to_string();
+    }
+    s
 }
 
 fn process_path(pid: u32) -> Option<String> {

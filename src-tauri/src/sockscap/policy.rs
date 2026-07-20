@@ -3,9 +3,9 @@
 use crate::sockscap::config::{
     Decision, RuleMode, ScopeMode, SocksCapConfig, UserRule, UserRuleAction,
 };
+use crate::sockscap::paths::{normalize_exe_path, paths_match_exe};
 use crate::sockscap::rules::{CompiledRules, RuleMatch};
 use std::net::IpAddr;
-use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub struct PolicyInput {
@@ -93,7 +93,7 @@ impl PolicyEngine {
         let apps = cfg
             .apps
             .iter()
-            .map(|a| a.path.to_ascii_lowercase())
+            .map(|a| normalize_exe_path(&a.path))
             .filter(|p| !p.is_empty())
             .collect();
         Self {
@@ -259,12 +259,11 @@ fn user_rule_matches(r: &UserRule, host: Option<&str>, ip: Option<IpAddr>) -> bo
 }
 
 fn normalize_path(p: &str) -> String {
-    p.replace('\\', "/").to_ascii_lowercase()
+    normalize_exe_path(p)
 }
 
 fn paths_match(process: &str, selector: &str) -> bool {
-    let s = normalize_path(selector);
-    process == s || process.ends_with(&s) || Path::new(process).ends_with(Path::new(&s))
+    paths_match_exe(process, selector)
 }
 
 #[cfg(test)]

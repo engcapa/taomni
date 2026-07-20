@@ -218,7 +218,7 @@ hbase-kerberos = ["dep:cross-krb5"]
 winapi = { version = "0.3", features = [
   "fileapi", "commdlg", "shellapi", "winbase", "winuser",
   "libloaderapi", "errhandlingapi", "processthreadsapi",
-  "handleapi", "minwindef", "synchapi",
+  "handleapi", "minwindef", "synchapi", "tlhelp32",
 ] }
 winreg = "0.55"
 

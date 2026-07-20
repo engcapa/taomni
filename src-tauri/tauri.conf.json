@@ -47,6 +47,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": [
+      "resources/sockscap/**/*"
+    ],
     "macOS": {
       "entitlements": "Entitlements.plist",
       "frameworks": [

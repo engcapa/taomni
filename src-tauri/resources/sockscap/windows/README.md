@@ -25,12 +25,16 @@ Taomni relay  ──► Policy (GFWList) ──► DIRECT | HTTP | SOCKS5 ──
 
 ## Dev workflow
 
-```bat
-cargo build --bin sockscap-helper
-:: copy WinDivert.dll next to target\debug\sockscap-helper.exe (or into this folder)
+```powershell
+# From repo root — builds helper and copies WinDivert next to target/debug
+pwsh scripts/stage-sockscap-windows.ps1
+
 pnpm tauri dev
-:: SocksCap UI → Start (UAC once for helper) → traffic from scoped apps hits relay
+# SocksCap UI → Start (accept UAC) → Active means elevated helper + WinDivert OK
 ```
+
+`tauri.conf.json` bundles `resources/sockscap/**/*` into the app resource dir.
+Place `WinDivert.dll` + `WinDivert64.sys` here before packaging a Windows installer.
 
 ## Hard bypass
 
