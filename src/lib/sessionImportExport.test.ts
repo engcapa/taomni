@@ -239,6 +239,7 @@ describe("Taomni session import/export", () => {
         dbDatabase: "sales",
         dbSsl: true,
         dbTimeout: "30",
+        dbPrestoDialect: "trino",
         passwordRef: "vault:db-presto",
       }),
     });
@@ -259,6 +260,7 @@ describe("Taomni session import/export", () => {
       dbDatabase: "sales",
       dbSsl: true,
       dbTimeout: "30",
+      dbPrestoDialect: "trino",
       passwordRef: "vault:db-presto",
     });
   });
@@ -459,6 +461,14 @@ describe("DBeaver session import", () => {
             user: "analyst",
           },
         },
+        presto: {
+          driver: "presto",
+          name: "Legacy Presto",
+          configuration: {
+            url: "jdbc:presto://presto.example.com:8080/hive/default",
+            user: "presto_user",
+          },
+        },
         redis: {
           driver: "redis",
           name: "Cache",
@@ -493,6 +503,7 @@ describe("DBeaver session import", () => {
       "StarRocks",
       "PostgreSQL",
       "ClickHouse",
+      "Presto",
       "Presto",
       "Redis",
       "PanWeiDB",
@@ -558,29 +569,37 @@ describe("DBeaver session import", () => {
       dbCatalog: "hive",
       dbDatabase: "sales",
       dbSsl: true,
+      // jdbc:trino:// + driver "trino" must default to the Trino header dialect.
+      dbPrestoDialect: "trino",
     });
     expect(JSON.parse(result.sessions[6].options_json)).toMatchObject({
+      dbCatalog: "hive",
+      dbDatabase: "default",
+      // jdbc:presto:// stays on the Presto header dialect.
+      dbPrestoDialect: "presto",
+    });
+    expect(JSON.parse(result.sessions[7].options_json)).toMatchObject({
       dbRedisIndex: "2",
     });
-    expect(result.sessions[7]).toMatchObject({
+    expect(result.sessions[8]).toMatchObject({
       name: "PanWei Warehouse",
       session_type: "PanWeiDB",
       host: "pw.example.com",
       port: 5432,
       username: "pwuser",
     });
-    expect(JSON.parse(result.sessions[7].options_json)).toMatchObject({
+    expect(JSON.parse(result.sessions[8].options_json)).toMatchObject({
       dbDatabase: "pwdb",
       dbSsl: false,
     });
-    expect(result.sessions[8]).toMatchObject({
+    expect(result.sessions[9]).toMatchObject({
       name: "Billing Oracle",
       session_type: "Oracle",
       host: "oracle.example.com",
       port: 1522,
       username: "billing",
     });
-    expect(JSON.parse(result.sessions[8].options_json)).toMatchObject({
+    expect(JSON.parse(result.sessions[9].options_json)).toMatchObject({
       dbDatabase: "ORCLPDB1",
       dbSsl: false,
     });

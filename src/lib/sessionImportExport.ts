@@ -861,6 +861,7 @@ function navicatConnectionToSession(
   const ssl = navicatTruthy(firstXmlAttr(attrs, ["ssl", "useSsl", "useSSL", "encrypt", "useEncryption", "sslMode"]));
   const importedFolder = combineImportFolder("Navicat", normalizeGroupPath(input.folderPath));
 
+  const navicatDriverKey = firstXmlAttr(attrs, ["dbtype", "dbType", "connType", "type", "protocol", "driver"]) || "";
   const session = importedSession({
     name: label,
     sessionType,
@@ -877,12 +878,21 @@ function navicatConnectionToSession(
       dbTimeout: "15",
       dbHttpPort: sessionType === "ClickHouse" ? String(sanitizePort(firstXmlAttr(attrs, ["httpPort", "http_port"]), 8123)) : "",
       dbChProtocol: sessionType === "ClickHouse" ? "HTTP" : "",
+      dbPrestoDialect:
+        sessionType === "Presto"
+          ? (isTrinoDriverKey(navicatDriverKey) ? "trino" : "presto")
+          : "",
       dbRedisIndex: sessionType === "Redis" ? redisDbIndex || database || "0" : "",
     },
     now,
     warnings,
   });
   return session ? { session } : null;
+}
+
+/** True when the driver/URL key clearly identifies Trino (not PrestoDB). */
+function isTrinoDriverKey(value: string): boolean {
+  return /\btrino\b/i.test(value);
 }
 
 function navicatSessionType(value: string): string | null {
@@ -1140,6 +1150,11 @@ function dbeaverConnectionToSession(
     dbTimeout: "15",
     dbHttpPort: httpPort,
     dbChProtocol: sessionType === "ClickHouse" ? "HTTP" : "",
+    // jdbc:trino:// (and Trino drivers) need X-Trino-* headers; Presto stays presto.
+    dbPrestoDialect:
+      sessionType === "Presto"
+        ? (isTrinoDriverKey(driverKey) || urlInfo.driverKey?.toLowerCase() === "trino" ? "trino" : "presto")
+        : "",
     dbRedisIndex: sessionType === "Redis" ? redisDbIndex || database || "0" : "",
   }));
 
@@ -3434,6 +3449,8 @@ function sanitizeOptions(input: unknown): Record<string, unknown> {
   copyString(source, output, "dbTimeout", 16);
   copyString(source, output, "dbHttpPort", 16);
   copyString(source, output, "dbChProtocol", 16);
+  // "presto" | "trino" — selects X-Presto-* vs X-Trino-* HTTP headers.
+  copyString(source, output, "dbPrestoDialect", 16);
   copyString(source, output, "dbRedisIndex", 16);
   copyString(source, output, "hbaseNamespace", MAX_NAME_LENGTH);
   copyString(source, output, "hbaseRestPath", MAX_PATH_LENGTH);
