@@ -1,6 +1,9 @@
-//! Presto backend over the HTTP statement API. The client follows the
-//! `/v1/statement` response `nextUri` chain and translates Presto JSON rows
-//! into the same string/null grid shape used by the other SQL engines.
+//! Presto/Trino backend over the HTTP statement API. The client follows the
+//! `/v1/statement` response `nextUri` chain and translates JSON rows into the
+//! same string/null grid shape used by the other SQL engines.
+//!
+//! Header dialect is selected per connection: Presto uses `X-Presto-*` while
+//! Trino uses `X-Trino-*` (see `DbConfig.presto_dialect`).
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -18,6 +21,59 @@ use super::{
 const DEFAULT_TIMEOUT_SECS: u64 = 15;
 const STREAM_BATCH_ROWS: usize = 100;
 const DEFAULT_PRESTO_USER: &str = "taomni";
+const HEADER_PREFIX_PRESTO: &str = "X-Presto";
+const HEADER_PREFIX_TRINO: &str = "X-Trino";
+
+/// Precomputed protocol header names for either the Presto or Trino dialect.
+#[derive(Clone, Copy)]
+struct ProtocolHeaders {
+    /// Display / User-Agent label: "Presto" or "Trino".
+    engine_label: &'static str,
+    user: &'static str,
+    source: &'static str,
+    catalog: &'static str,
+    schema: &'static str,
+    set_catalog: &'static str,
+    set_schema: &'static str,
+}
+
+const PRESTO_HEADERS: ProtocolHeaders = ProtocolHeaders {
+    engine_label: "Presto",
+    user: "X-Presto-User",
+    source: "X-Presto-Source",
+    catalog: "X-Presto-Catalog",
+    schema: "X-Presto-Schema",
+    set_catalog: "X-Presto-Set-Catalog",
+    set_schema: "X-Presto-Set-Schema",
+};
+
+const TRINO_HEADERS: ProtocolHeaders = ProtocolHeaders {
+    engine_label: "Trino",
+    user: "X-Trino-User",
+    source: "X-Trino-Source",
+    catalog: "X-Trino-Catalog",
+    schema: "X-Trino-Schema",
+    set_catalog: "X-Trino-Set-Catalog",
+    set_schema: "X-Trino-Set-Schema",
+};
+
+/// Resolve protocol headers from connect config.
+/// Missing / unknown values default to Presto for backward compatibility.
+fn protocol_headers_from_dialect(dialect: Option<&str>) -> ProtocolHeaders {
+    match dialect.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(value) if value.eq_ignore_ascii_case("trino") => TRINO_HEADERS,
+        _ => PRESTO_HEADERS,
+    }
+}
+
+/// Resolve the HTTP header prefix from connect config (test/helpers).
+fn header_prefix_from_dialect(dialect: Option<&str>) -> &'static str {
+    if protocol_headers_from_dialect(dialect).engine_label == "Trino" {
+        HEADER_PREFIX_TRINO
+    } else {
+        HEADER_PREFIX_PRESTO
+    }
+}
 
 #[derive(Clone)]
 pub struct PrestoClient {
@@ -25,6 +81,8 @@ pub struct PrestoClient {
     base_url: String,
     user: String,
     password: Option<String>,
+    /// Presto (`X-Presto-*`) or Trino (`X-Trino-*`) protocol header set.
+    headers: ProtocolHeaders,
     catalog: Arc<AsyncMutex<Option<String>>>,
     schema: Arc<AsyncMutex<Option<String>>>,
     current_next_uri: Arc<AsyncMutex<Option<String>>>,
@@ -181,6 +239,7 @@ pub async fn connect(config: &DbConfig, password: Option<&str>) -> Result<DbHand
             .filter(|u| !u.is_empty())
             .unwrap_or_else(|| DEFAULT_PRESTO_USER.to_string()),
         password: password.map(|value| value.to_string()),
+        headers: protocol_headers_from_dialect(config.presto_dialect.as_deref()),
         catalog: Arc::new(AsyncMutex::new(
             config.catalog.clone().filter(|value| !value.is_empty()),
         )),
@@ -222,15 +281,16 @@ fn add_presto_headers(
     catalog: Option<&str>,
     schema: Option<&str>,
 ) -> reqwest::RequestBuilder {
+    let h = client.headers;
     req = req
-        .header("X-Presto-User", client.user.as_str())
-        .header("X-Presto-Source", "taomni")
-        .header("User-Agent", "Taomni Presto Client");
+        .header(h.user, client.user.as_str())
+        .header(h.source, "taomni")
+        .header("User-Agent", format!("Taomni {} Client", h.engine_label));
     if let Some(catalog) = catalog.filter(|value| !value.is_empty()) {
-        req = req.header("X-Presto-Catalog", catalog);
+        req = req.header(h.catalog, catalog);
     }
     if let Some(schema) = schema.filter(|value| !value.is_empty()) {
-        req = req.header("X-Presto-Schema", schema);
+        req = req.header(h.schema, schema);
     }
     if let Some(password) = &client.password {
         req = req.basic_auth(client.user.as_str(), Some(password));
@@ -239,10 +299,11 @@ fn add_presto_headers(
 }
 
 async fn apply_session_headers(client: &PrestoClient, headers: &HeaderMap) {
-    if let Some(catalog) = header_string(headers, "X-Presto-Set-Catalog") {
+    let h = client.headers;
+    if let Some(catalog) = header_string(headers, h.set_catalog) {
         *client.catalog.lock().await = Some(catalog);
     }
-    if let Some(schema) = header_string(headers, "X-Presto-Set-Schema") {
+    if let Some(schema) = header_string(headers, h.set_schema) {
         *client.schema.lock().await = Some(schema);
     }
 }
@@ -1126,6 +1187,8 @@ mod tests {
         body_contains: Option<&'static str>,
         body_equals: Option<&'static str>,
         headers: Vec<(&'static str, &'static str)>,
+        /// Optional response headers (e.g. X-Trino-Set-Catalog) returned before the body.
+        response_headers: Vec<(&'static str, &'static str)>,
         response_body: String,
     }
 
@@ -1203,24 +1266,34 @@ mod tests {
             if let Some(body) = expected.body_equals {
                 assert_eq!(request_body(&request), body);
             }
-            let response = format!(
-                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            let mut response = String::from("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n");
+            for (key, value) in &expected.response_headers {
+                response.push_str(&format!("{key}: {value}\r\n"));
+            }
+            response.push_str(&format!(
+                "Content-Length: {}\r\nConnection: close\r\n\r\n{}",
                 expected.response_body.len(),
                 expected.response_body
-            );
+            ));
             stream.write_all(response.as_bytes()).await.unwrap();
         }
     }
 
     fn test_client(base_url: String) -> PrestoClient {
+        test_client_with_headers(base_url, PRESTO_HEADERS)
+    }
+
+    fn test_client_with_headers(base_url: String, headers: ProtocolHeaders) -> PrestoClient {
         PrestoClient {
             client: reqwest::Client::builder()
-                .timeout(Duration::from_secs(2))
+                .timeout(Duration::from_secs(5))
+                .no_proxy()
                 .build()
                 .unwrap(),
             base_url,
             user: "analyst".to_string(),
             password: None,
+            headers,
             catalog: Arc::new(AsyncMutex::new(Some("hive".to_string()))),
             schema: Arc::new(AsyncMutex::new(Some("sales".to_string()))),
             current_next_uri: Arc::new(AsyncMutex::new(None)),
@@ -1324,6 +1397,7 @@ mod tests {
                         ("X-Presto-Catalog", "hive"),
                         ("X-Presto-Schema", "sales"),
                     ],
+                    response_headers: Vec::new(),
                     response_body: format!(
                         r#"{{"id":"query-1","columns":[{{"name":"id","type":"bigint"}}],"data":[[1]],"nextUri":"{next_uri}"}}"#
                     ),
@@ -1338,6 +1412,7 @@ mod tests {
                         ("X-Presto-Catalog", "hive"),
                         ("X-Presto-Schema", "sales"),
                     ],
+                    response_headers: Vec::new(),
                     response_body: r#"{"id":"query-1","data":[[2]]}"#.to_string(),
                 },
             ],
@@ -1374,6 +1449,7 @@ mod tests {
                     ("X-Presto-Catalog", "hive"),
                     ("X-Presto-Schema", "sales"),
                 ],
+                response_headers: Vec::new(),
                 response_body:
                     r#"{"id":"query-1","columns":[{"name":"_col0","type":"integer"}],"data":[[1]]}"#
                         .to_string(),
@@ -1410,6 +1486,7 @@ mod tests {
                         ("X-Presto-Catalog", "hive"),
                         ("X-Presto-Schema", "sales"),
                     ],
+                    response_headers: Vec::new(),
                     response_body: r#"{"id":"catalogs","data":[["hive"],["iceberg"]]}"#
                         .to_string(),
                 },
@@ -1423,6 +1500,7 @@ mod tests {
                         ("X-Presto-Catalog", "hive"),
                         ("X-Presto-Schema", "sales"),
                     ],
+                    response_headers: Vec::new(),
                     response_body: r#"{"id":"schemas","data":[["marketing"],["sales"]]}"#
                         .to_string(),
                 },
@@ -1436,6 +1514,7 @@ mod tests {
                         ("X-Presto-Catalog", "hive"),
                         ("X-Presto-Schema", "sales"),
                     ],
+                    response_headers: Vec::new(),
                     response_body: r#"{"id":"tables","data":[["orders","BASE TABLE"],["orders_v","VIEW"]]}"#
                         .to_string(),
                 },
@@ -1449,6 +1528,7 @@ mod tests {
                         ("X-Presto-Catalog", "hive"),
                         ("X-Presto-Schema", "sales"),
                     ],
+                    response_headers: Vec::new(),
                     response_body: r#"{"id":"columns","data":[["id","bigint","NO",null],["note","varchar","YES","'new'"]]}"#
                         .to_string(),
                 },
@@ -1462,6 +1542,7 @@ mod tests {
                         ("X-Presto-Catalog", "iceberg"),
                         ("X-Presto-Schema", "sales"),
                     ],
+                    response_headers: Vec::new(),
                     response_body: r#"{"id":"iceberg-schemas","data":[["lake"]]}"#
                         .to_string(),
                 },
@@ -1505,5 +1586,187 @@ mod tests {
         assert!(columns[1].nullable);
         assert_eq!(columns[1].default.as_deref(), Some("'new'"));
         assert_eq!(iceberg_schemas[0].name, "lake");
+    }
+
+    #[test]
+    fn header_prefix_from_dialect_defaults_to_presto() {
+        assert_eq!(header_prefix_from_dialect(None), HEADER_PREFIX_PRESTO);
+        assert_eq!(header_prefix_from_dialect(Some("")), HEADER_PREFIX_PRESTO);
+        assert_eq!(header_prefix_from_dialect(Some("presto")), HEADER_PREFIX_PRESTO);
+        assert_eq!(header_prefix_from_dialect(Some("Presto")), HEADER_PREFIX_PRESTO);
+        assert_eq!(header_prefix_from_dialect(Some("unknown")), HEADER_PREFIX_PRESTO);
+        assert_eq!(header_prefix_from_dialect(Some("trino")), HEADER_PREFIX_TRINO);
+        assert_eq!(header_prefix_from_dialect(Some("TRINO")), HEADER_PREFIX_TRINO);
+        assert_eq!(header_prefix_from_dialect(Some("  trino  ")), HEADER_PREFIX_TRINO);
+    }
+
+    #[tokio::test]
+    async fn trino_dialect_sends_x_trino_headers_on_post_and_poll() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base_url = format!("http://{}", listener.local_addr().unwrap());
+        let next_path = "/v1/statement/query-trino/1";
+        let next_uri = format!("{base_url}{next_path}");
+        let server = tokio::spawn(serve_expected_requests(
+            listener,
+            vec![
+                ExpectedRequest {
+                    method: "POST",
+                    path: "/v1/statement".to_string(),
+                    body_contains: Some("SELECT * FROM orders"),
+                    body_equals: None,
+                    headers: vec![
+                        ("X-Trino-User", "analyst"),
+                        ("X-Trino-Catalog", "hive"),
+                        ("X-Trino-Schema", "sales"),
+                        ("X-Trino-Source", "taomni"),
+                    ],
+                    response_headers: Vec::new(),
+                    response_body: format!(
+                        r#"{{"id":"query-trino","columns":[{{"name":"id","type":"bigint"}}],"data":[[10]],"nextUri":"{next_uri}"}}"#
+                    ),
+                },
+                ExpectedRequest {
+                    method: "GET",
+                    path: next_path.to_string(),
+                    body_contains: None,
+                    body_equals: None,
+                    headers: vec![
+                        ("X-Trino-User", "analyst"),
+                        ("X-Trino-Catalog", "hive"),
+                        ("X-Trino-Schema", "sales"),
+                    ],
+                    response_headers: Vec::new(),
+                    response_body: r#"{"id":"query-trino","data":[[11]]}"#.to_string(),
+                },
+            ],
+        ));
+        let token = CancellationToken::new();
+        let client = test_client_with_headers(base_url, TRINO_HEADERS);
+
+        let result = execute(&client, "SELECT * FROM orders", &token)
+            .await
+            .unwrap();
+        server.await.unwrap();
+
+        assert_eq!(
+            result.rows,
+            vec![vec![Some("10".to_string())], vec![Some("11".to_string())]]
+        );
+        assert_eq!(client.headers.engine_label, "Trino");
+        assert_eq!(client.headers.user, "X-Trino-User");
+    }
+
+    #[tokio::test]
+    async fn trino_set_catalog_and_schema_response_headers_update_client() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base_url = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(serve_expected_requests(
+            listener,
+            vec![
+                ExpectedRequest {
+                    method: "POST",
+                    path: "/v1/statement".to_string(),
+                    body_contains: None,
+                    body_equals: Some("SELECT 1"),
+                    headers: vec![
+                        ("X-Trino-User", "analyst"),
+                        ("X-Trino-Catalog", "hive"),
+                        ("X-Trino-Schema", "sales"),
+                    ],
+                    response_headers: vec![
+                        ("X-Trino-Set-Catalog", "iceberg"),
+                        ("X-Trino-Set-Schema", "analytics"),
+                    ],
+                    response_body:
+                        r#"{"id":"q1","columns":[{"name":"_col0","type":"integer"}],"data":[[1]]}"#
+                            .to_string(),
+                },
+                ExpectedRequest {
+                    method: "POST",
+                    path: "/v1/statement".to_string(),
+                    body_contains: None,
+                    body_equals: Some("SELECT 2"),
+                    headers: vec![
+                        ("X-Trino-User", "analyst"),
+                        ("X-Trino-Catalog", "iceberg"),
+                        ("X-Trino-Schema", "analytics"),
+                    ],
+                    response_headers: Vec::new(),
+                    response_body:
+                        r#"{"id":"q2","columns":[{"name":"_col0","type":"integer"}],"data":[[2]]}"#
+                            .to_string(),
+                },
+            ],
+        ));
+        let token = CancellationToken::new();
+        let client = test_client_with_headers(base_url, TRINO_HEADERS);
+
+        execute(&client, "SELECT 1", &token).await.unwrap();
+        assert_eq!(
+            client.catalog.lock().await.as_deref(),
+            Some("iceberg")
+        );
+        assert_eq!(
+            client.schema.lock().await.as_deref(),
+            Some("analytics")
+        );
+
+        let result = execute(&client, "SELECT 2", &token).await.unwrap();
+        server.await.unwrap();
+        assert_eq!(result.rows, vec![vec![Some("2".to_string())]]);
+    }
+
+    #[tokio::test]
+    async fn presto_set_catalog_and_schema_response_headers_still_apply() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base_url = format!("http://{}", listener.local_addr().unwrap());
+        let server = tokio::spawn(serve_expected_requests(
+            listener,
+            vec![
+                ExpectedRequest {
+                    method: "POST",
+                    path: "/v1/statement".to_string(),
+                    body_contains: None,
+                    body_equals: Some("SELECT 1"),
+                    headers: vec![
+                        ("X-Presto-User", "analyst"),
+                        ("X-Presto-Catalog", "hive"),
+                        ("X-Presto-Schema", "sales"),
+                    ],
+                    response_headers: vec![
+                        ("X-Presto-Set-Catalog", "memory"),
+                        ("X-Presto-Set-Schema", "default"),
+                    ],
+                    response_body:
+                        r#"{"id":"q1","columns":[{"name":"_col0","type":"integer"}],"data":[[1]]}"#
+                            .to_string(),
+                },
+                ExpectedRequest {
+                    method: "POST",
+                    path: "/v1/statement".to_string(),
+                    body_contains: None,
+                    body_equals: Some("SELECT 2"),
+                    headers: vec![
+                        ("X-Presto-User", "analyst"),
+                        ("X-Presto-Catalog", "memory"),
+                        ("X-Presto-Schema", "default"),
+                    ],
+                    response_headers: Vec::new(),
+                    response_body:
+                        r#"{"id":"q2","columns":[{"name":"_col0","type":"integer"}],"data":[[2]]}"#
+                            .to_string(),
+                },
+            ],
+        ));
+        let token = CancellationToken::new();
+        let client = test_client(base_url);
+
+        execute(&client, "SELECT 1", &token).await.unwrap();
+        assert_eq!(client.catalog.lock().await.as_deref(), Some("memory"));
+        assert_eq!(client.schema.lock().await.as_deref(), Some("default"));
+
+        let result = execute(&client, "SELECT 2", &token).await.unwrap();
+        server.await.unwrap();
+        assert_eq!(result.rows, vec![vec![Some("2".to_string())]]);
     }
 }

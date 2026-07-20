@@ -1003,6 +1003,7 @@ mod tests {
             timeout_secs: None,
             http_port: None,
             protocol: None,
+            presto_dialect: None,
             db_index: None,
             network_settings: None,
         };
@@ -1026,6 +1027,7 @@ mod tests {
             timeout_secs: None,
             http_port: None,
             protocol: None,
+            presto_dialect: None,
             db_index: None,
             network_settings: None,
         };

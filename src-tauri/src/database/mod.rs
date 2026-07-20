@@ -79,6 +79,10 @@ pub struct DbConfig {
     /// ClickHouse protocol: "http" (default) or "native".
     #[serde(default)]
     pub protocol: Option<String>,
+    /// Presto/Trino HTTP header dialect: "presto" (default) or "trino".
+    /// Controls `X-Presto-*` vs `X-Trino-*` request/response headers.
+    #[serde(default)]
+    pub presto_dialect: Option<String>,
     /// Redis logical DB index (0-15).
     #[serde(default)]
     pub db_index: Option<i64>,
@@ -1242,6 +1246,7 @@ mod live_tests {
             timeout_secs: Some(30),
             http_port: None,
             protocol: None,
+            presto_dialect: None,
             db_index: None,
             network_settings: None,
         };
