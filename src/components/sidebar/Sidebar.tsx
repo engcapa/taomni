@@ -11,6 +11,7 @@ import {
   GitBranch,
   Server,
   Network,
+  Shield,
   FileText,
   MessageSquare,
 } from "lucide-react";
@@ -251,6 +252,12 @@ function ToolsPanel({ onCommand }: { onCommand?: (command: AppCommand) => void }
       label: t("menu.tunneling"),
       icon: <Network className="w-4 h-4 shrink-0" />,
       testId: "sidebar-tool-tunneling",
+    },
+    {
+      id: "sockscap",
+      label: t("menu.sockscap"),
+      icon: <Shield className="w-4 h-4 shrink-0" />,
+      testId: "sidebar-tool-sockscap",
     },
     {
       id: "git",

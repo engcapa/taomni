@@ -1,0 +1,408 @@
+//! SocksCap privileged helper (Windows).
+//!
+//! Elevated (UAC) process that owns WinDivert handles:
+//! - FLOW layer → PID association for TCP 5-tuples
+//! - NETWORK layer → IPv4 TCP redirect/NAT toward a loopback relay
+//!
+//! Control plane: newline JSON on 127.0.0.1 with shared token.
+
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
+#[cfg(windows)]
+mod capture;
+#[cfg(windows)]
+mod windivert;
+
+fn main() {
+    #[cfg(windows)]
+    {
+        windows_main::run();
+    }
+    #[cfg(not(windows))]
+    {
+        eprintln!("sockscap-helper is only supported on Windows");
+        std::process::exit(1);
+    }
+}
+
+#[cfg(windows)]
+mod windows_main {
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::{TcpListener, TcpStream};
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Mutex};
+
+    use serde::{Deserialize, Serialize};
+    use serde_json::json;
+
+    use crate::capture::{CaptureEngine, CapturePlan, Endpoint};
+
+    #[derive(Debug, Deserialize)]
+    struct Request {
+        id: u64,
+        token: String,
+        cmd: String,
+        #[serde(default)]
+        filter: Option<String>,
+        #[serde(default)]
+        mode: Option<String>,
+        #[serde(default, rename = "appPaths")]
+        app_paths: Option<Vec<String>>,
+        #[serde(default, rename = "bypassCidrs")]
+        bypass_cidrs: Option<Vec<String>>,
+        #[serde(default, rename = "bypassPids")]
+        bypass_pids: Option<Vec<u32>>,
+        #[serde(default, rename = "bypassEndpoints")]
+        bypass_endpoints: Option<Vec<EndpointDto>>,
+        #[serde(default, rename = "relayIp")]
+        relay_ip: Option<String>,
+        #[serde(default, rename = "relayPort")]
+        relay_port: Option<u16>,
+        #[serde(default, rename = "srcIp")]
+        src_ip: Option<String>,
+        #[serde(default, rename = "srcPort")]
+        src_port: Option<u16>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct EndpointDto {
+        ip: String,
+        port: u16,
+    }
+
+    #[derive(Debug, Serialize)]
+    struct Response {
+        id: u64,
+        ok: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        result: Option<serde_json::Value>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    }
+
+    pub fn run() {
+        let args: Vec<String> = std::env::args().skip(1).collect();
+        let mut token = String::new();
+        let mut port: u16 = 0;
+        let mut ready_file: Option<PathBuf> = None;
+        let mut windivert_dir: Option<PathBuf> = None;
+
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_str() {
+                "--token" => {
+                    i += 1;
+                    token = args.get(i).cloned().unwrap_or_default();
+                }
+                "--port" => {
+                    i += 1;
+                    port = args.get(i).and_then(|s| s.parse().ok()).unwrap_or(0);
+                }
+                "--ready-file" => {
+                    i += 1;
+                    ready_file = args.get(i).map(PathBuf::from);
+                }
+                "--windivert-dir" => {
+                    i += 1;
+                    windivert_dir = args.get(i).map(PathBuf::from);
+                }
+                other => eprintln!("unknown arg: {other}"),
+            }
+            i += 1;
+        }
+
+        if token.is_empty() || port == 0 {
+            eprintln!("sockscap-helper: --token and --port are required");
+            std::process::exit(2);
+        }
+
+        let listener = match TcpListener::bind(("127.0.0.1", port)) {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("bind 127.0.0.1:{port}: {e}");
+                std::process::exit(1);
+            }
+        };
+
+        if let Some(path) = &ready_file {
+            let body = json!({
+                "pid": std::process::id(),
+                "port": port,
+                "elevated": is_elevated(),
+            });
+            let _ = std::fs::write(path, body.to_string());
+        }
+
+        let running = Arc::new(AtomicBool::new(true));
+        let token = Arc::new(token);
+        let engine = Arc::new(Mutex::new(CaptureEngine::new(windivert_dir)));
+
+        while running.load(Ordering::SeqCst) {
+            let (stream, _) = match listener.accept() {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            let running = Arc::clone(&running);
+            let token = Arc::clone(&token);
+            let engine = Arc::clone(&engine);
+            std::thread::spawn(move || handle_client(stream, &token, &engine, &running));
+        }
+
+        if let Ok(mut eng) = engine.lock() {
+            eng.stop();
+        }
+    }
+
+    fn handle_client(
+        stream: TcpStream,
+        token: &str,
+        engine: &Mutex<CaptureEngine>,
+        running: &AtomicBool,
+    ) {
+        let reader_stream = match stream.try_clone() {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        let mut reader = BufReader::new(reader_stream);
+        let mut writer = stream;
+        let mut line = String::new();
+
+        loop {
+            line.clear();
+            match reader.read_line(&mut line) {
+                Ok(0) => break,
+                Ok(_) => {}
+                Err(_) => break,
+            }
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let req: Request = match serde_json::from_str(trimmed) {
+                Ok(r) => r,
+                Err(e) => {
+                    let _ = write_resp(
+                        &mut writer,
+                        Response {
+                            id: 0,
+                            ok: false,
+                            result: None,
+                            error: Some(format!("bad json: {e}")),
+                        },
+                    );
+                    continue;
+                }
+            };
+            if req.token != token {
+                let _ = write_resp(
+                    &mut writer,
+                    Response {
+                        id: req.id,
+                        ok: false,
+                        result: None,
+                        error: Some("unauthorized".into()),
+                    },
+                );
+                continue;
+            }
+
+            let resp = dispatch(&req, engine, running);
+            let _ = write_resp(&mut writer, resp);
+            if !running.load(Ordering::SeqCst) {
+                break;
+            }
+        }
+    }
+
+    fn dispatch(req: &Request, engine: &Mutex<CaptureEngine>, running: &AtomicBool) -> Response {
+        match req.cmd.as_str() {
+            "ping" | "status" => {
+                let capt = engine
+                    .lock()
+                    .ok()
+                    .map(|e| e.status_json())
+                    .unwrap_or(json!({}));
+                Response {
+                    id: req.id,
+                    ok: true,
+                    result: Some(json!({
+                        "pong": true,
+                        "pid": std::process::id(),
+                        "elevated": is_elevated(),
+                        "platform": "windows",
+                        "capture": capt,
+                    })),
+                    error: None,
+                }
+            }
+            "windivert_probe" => match engine.lock() {
+                Ok(mut eng) => match eng.probe(req.filter.as_deref().unwrap_or("false")) {
+                    Ok(v) => Response {
+                        id: req.id,
+                        ok: true,
+                        result: Some(v),
+                        error: None,
+                    },
+                    Err(e) => Response {
+                        id: req.id,
+                        ok: false,
+                        result: None,
+                        error: Some(e),
+                    },
+                },
+                Err(e) => Response {
+                    id: req.id,
+                    ok: false,
+                    result: None,
+                    error: Some(e.to_string()),
+                },
+            },
+            "capture_start" => {
+                let plan = CapturePlan {
+                    mode_apps: req.mode.as_deref() == Some("apps"),
+                    app_paths: req
+                        .app_paths
+                        .clone()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|p| p.replace('/', "\\").to_ascii_lowercase())
+                        .collect(),
+                    bypass_cidrs: req.bypass_cidrs.clone().unwrap_or_default(),
+                    bypass_pids: {
+                        let mut p = req.bypass_pids.clone().unwrap_or_default();
+                        p.push(std::process::id());
+                        p
+                    },
+                    bypass_endpoints: req
+                        .bypass_endpoints
+                        .as_ref()
+                        .map(|v| {
+                            v.iter()
+                                .filter_map(|e| {
+                                    Some(Endpoint {
+                                        ip: e.ip.parse().ok()?,
+                                        port: e.port,
+                                    })
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                    relay_ip: req
+                        .relay_ip
+                        .as_deref()
+                        .unwrap_or("127.0.0.1")
+                        .parse()
+                        .unwrap_or_else(|_| std::net::Ipv4Addr::new(127, 0, 0, 1)),
+                    relay_port: req.relay_port.unwrap_or(0),
+                };
+                if plan.relay_port == 0 {
+                    return Response {
+                        id: req.id,
+                        ok: false,
+                        result: None,
+                        error: Some("relayPort required".into()),
+                    };
+                }
+                match engine.lock() {
+                    Ok(mut eng) => match eng.start(plan) {
+                        Ok(v) => Response {
+                            id: req.id,
+                            ok: true,
+                            result: Some(v),
+                            error: None,
+                        },
+                        Err(e) => Response {
+                            id: req.id,
+                            ok: false,
+                            result: None,
+                            error: Some(e),
+                        },
+                    },
+                    Err(e) => Response {
+                        id: req.id,
+                        ok: false,
+                        result: None,
+                        error: Some(e.to_string()),
+                    },
+                }
+            }
+            "capture_stop" => match engine.lock() {
+                Ok(mut eng) => {
+                    eng.stop();
+                    Response {
+                        id: req.id,
+                        ok: true,
+                        result: Some(json!({ "stopped": true })),
+                        error: None,
+                    }
+                }
+                Err(e) => Response {
+                    id: req.id,
+                    ok: false,
+                    result: None,
+                    error: Some(e.to_string()),
+                },
+            },
+            "lookup_orig" => {
+                let src_port = req.src_port.unwrap_or(0);
+                match engine.lock() {
+                    Ok(eng) => match eng.lookup_orig(src_port) {
+                        Some(v) => Response {
+                            id: req.id,
+                            ok: true,
+                            result: Some(v),
+                            error: None,
+                        },
+                        None => Response {
+                            id: req.id,
+                            ok: false,
+                            result: None,
+                            error: Some("no mapping".into()),
+                        },
+                    },
+                    Err(e) => Response {
+                        id: req.id,
+                        ok: false,
+                        result: None,
+                        error: Some(e.to_string()),
+                    },
+                }
+            }
+            "shutdown" => {
+                if let Ok(mut eng) = engine.lock() {
+                    eng.stop();
+                }
+                running.store(false, Ordering::SeqCst);
+                Response {
+                    id: req.id,
+                    ok: true,
+                    result: Some(json!({ "shuttingDown": true })),
+                    error: None,
+                }
+            }
+            other => Response {
+                id: req.id,
+                ok: false,
+                result: None,
+                error: Some(format!("unknown cmd: {other}")),
+            },
+        }
+    }
+
+    fn write_resp(w: &mut TcpStream, resp: Response) -> std::io::Result<()> {
+        let mut line = serde_json::to_string(&resp)
+            .unwrap_or_else(|_| r#"{"id":0,"ok":false,"error":"ser"}"#.into());
+        line.push('\n');
+        w.write_all(line.as_bytes())?;
+        w.flush()
+    }
+
+    fn is_elevated() -> bool {
+        #[link(name = "shell32")]
+        unsafe extern "system" {
+            fn IsUserAnAdmin() -> i32;
+        }
+        unsafe { IsUserAnAdmin() != 0 }
+    }
+}

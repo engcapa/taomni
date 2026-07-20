@@ -2001,6 +2001,131 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         "Opening files with the OS shell is not available in browser preview. Use 'Download to local' to save the file.",
       );
     }
+    // ---------- SocksCap (browser preview: config/rules dry-run only) ----------
+    case "sockscap_capabilities": {
+      return {
+        platform: "browser",
+        globalTcp: false,
+        appFilter: false,
+        captureBackend: "none",
+        notes: ["Browser preview — rules engine stub only; no OS capture."],
+        privilegedRequired: false,
+      } as T;
+    }
+    case "sockscap_get_config": {
+      try {
+        const raw = localStorage.getItem("taomni.sockscap.config.v1");
+        if (raw) return JSON.parse(raw) as T;
+      } catch {
+        /* fallthrough */
+      }
+      return {
+        enabled: false,
+        mode: "global",
+        apps: [],
+        upstream: { kind: "socks5", sessionId: "", host: "127.0.0.1", port: 1080, username: "", passwordRef: "" },
+        ruleMode: "gfwList",
+        gfwlist: {
+          enabled: true,
+          url: "https://cdn.jsdelivr.net/gh/gfwlist/gfwlist/gfwlist.txt",
+          autoRefreshHours: 24,
+        },
+        userRules: [],
+        bypassCidrs: ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"],
+        defaultAction: "direct",
+        restoreOnLogin: false,
+      } as T;
+    }
+    case "sockscap_set_config": {
+      localStorage.setItem("taomni.sockscap.config.v1", JSON.stringify(args?.config ?? {}));
+      return undefined as T;
+    }
+    case "sockscap_gfwlist_status": {
+      return {
+        loaded: false,
+        ruleCount: 0,
+        skipped: 0,
+        lastRefresh: null,
+        source: "",
+        error: null,
+      } as T;
+    }
+    case "sockscap_refresh_gfwlist":
+    case "sockscap_import_rules": {
+      return {
+        loaded: true,
+        ruleCount: 0,
+        skipped: 0,
+        lastRefresh: new Date().toISOString(),
+        source: "browser-stub",
+        error: "GFWList fetch/import requires the desktop build.",
+      } as T;
+    }
+    case "sockscap_test_target": {
+      const host = String(args?.host ?? "");
+      const hit = /google|github|twitter|facebook|youtube/i.test(host);
+      return {
+        host,
+        port: Number(args?.port ?? 443),
+        decision: hit ? "proxy" : "direct",
+        reason: hit ? "browser stub heuristic" : "browser stub default",
+        matchedRule: hit ? "||stub" : null,
+      } as T;
+    }
+    case "sockscap_status": {
+      return {
+        phase: "idle",
+        message: "browser preview",
+        ruleCount: 0,
+        captureBackend: "none",
+      } as T;
+    }
+    case "sockscap_start": {
+      return {
+        phase: "degraded",
+        message: "Browser preview — capture unavailable; use desktop build for SocksCap.",
+        ruleCount: 0,
+        captureBackend: "none",
+      } as T;
+    }
+    case "sockscap_stop": {
+      return {
+        phase: "idle",
+        message: "stopped",
+        ruleCount: 0,
+        captureBackend: "none",
+      } as T;
+    }
+    case "sockscap_recover":
+      return undefined as T;
+    case "sockscap_stats_snapshot": {
+      return {
+        flowsTotal: 0,
+        flowsProxy: 0,
+        flowsDirect: 0,
+        flowsBlock: 0,
+        bytesUp: 0,
+        bytesDown: 0,
+      } as T;
+    }
+    case "sockscap_list_processes":
+      return [] as T;
+    case "sockscap_test_upstream":
+      throw new Error("Upstream test is only available in the desktop build.");
+    case "sockscap_helper_status":
+      return {
+        running: false,
+        elevated: false,
+        endpoint: null,
+        message: "Helper not available in browser preview.",
+        windivert: null,
+      } as T;
+    case "sockscap_helper_start":
+      throw new Error("Elevated helper requires the desktop Windows build.");
+    case "sockscap_helper_stop":
+      return undefined as T;
+    case "sockscap_helper_probe_windivert":
+      throw new Error("WinDivert probe requires the desktop Windows build.");
     case "list_tunnels": {
       return loadTunnels() as T;
     }

@@ -20,6 +20,7 @@ mod notes;
 mod objectstorage;
 pub mod perf;
 mod proxy;
+mod sockscap;
 mod rdp;
 mod serial;
 mod servers;
@@ -229,6 +230,12 @@ pub fn run() {
             let app_for_autostart = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 tunnel::autostart_tunnels(app_for_autostart).await;
+            });
+
+            // SocksCap: repair residual OS capture state from a previous unclean exit.
+            let app_for_sockscap = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                sockscap::boot_repair(&app_for_sockscap).await;
             });
 
             // Auto-start any local servers with startOnLaunch=true.
@@ -534,6 +541,24 @@ pub fn run() {
             tunnel::test_tunnel,
             tunnel::get_tunnel_status,
             tunnel::list_tunnel_statuses,
+            sockscap::sockscap_capabilities,
+            sockscap::sockscap_get_config,
+            sockscap::sockscap_set_config,
+            sockscap::sockscap_gfwlist_status,
+            sockscap::sockscap_refresh_gfwlist,
+            sockscap::sockscap_import_rules,
+            sockscap::sockscap_test_target,
+            sockscap::sockscap_status,
+            sockscap::sockscap_start,
+            sockscap::sockscap_stop,
+            sockscap::sockscap_recover,
+            sockscap::sockscap_stats_snapshot,
+            sockscap::sockscap_list_processes,
+            sockscap::sockscap_test_upstream,
+            sockscap::helper::sockscap_helper_start,
+            sockscap::helper::sockscap_helper_stop,
+            sockscap::helper::sockscap_helper_status,
+            sockscap::helper::sockscap_helper_probe_windivert,
             servers::start_local_server,
             servers::stop_local_server,
             servers::get_server_status,
