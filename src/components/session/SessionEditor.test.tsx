@@ -909,6 +909,8 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
     await waitFor(() => expect(screen.getByTestId("session-database-section")).toBeInTheDocument());
     await user.type(screen.getByLabelText("Remote host"), "presto.example.com");
     await user.type(screen.getByLabelText("Database username"), "analyst");
+    // New Presto sessions default to Trino; switch to Presto for the legacy path.
+    await user.selectOptions(screen.getByLabelText("Presto/Trino engine"), "Presto");
     await user.type(screen.getByLabelText("Presto catalog"), "hive");
     await user.type(screen.getByLabelText("Presto schema"), "sales");
 
@@ -927,8 +929,66 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
       dbCatalog: "hive",
       dbDatabase: "sales",
       dbTimeout: "15",
+      dbPrestoDialect: "presto",
     });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists Trino dialect and includes it on database test-connection payload", async () => {
+    const user = userEvent.setup();
+    renderEditor(undefined, { initialProto: "Presto" });
+
+    await waitFor(() => expect(screen.getByTestId("session-database-section")).toBeInTheDocument());
+    await user.type(screen.getByLabelText("Remote host"), "trino.example.com");
+    await user.type(screen.getByLabelText("Database username"), "analyst");
+    // New sessions already default to Trino; keep it and require catalog for test.
+    await user.selectOptions(screen.getByLabelText("Presto/Trino engine"), "Trino");
+    await user.type(screen.getByLabelText("Presto catalog"), "hive");
+    await user.type(screen.getByLabelText("Presto schema"), "sales");
+
+    await user.click(screen.getByTestId("db-test-connection"));
+
+    await waitFor(() => expect(ipcMocks.dbTestConnection).toHaveBeenCalledTimes(1));
+    expect(ipcMocks.dbTestConnection.mock.calls[0][0]).toMatchObject({
+      engine: "Presto",
+      host: "trino.example.com",
+      catalog: "hive",
+      database: "sales",
+      prestoDialect: "trino",
+    });
+
+    await user.click(screen.getByRole("button", { name: "OK" }));
+    const savedOptions = JSON.parse(ipcMocks.saveSession.mock.calls[0][0].options_json);
+    expect(savedOptions).toMatchObject({
+      dbCatalog: "hive",
+      dbDatabase: "sales",
+      dbPrestoDialect: "trino",
+    });
+  });
+
+  it("hydrates a saved Presto session without dialect as Presto engine", async () => {
+    renderEditor({
+      id: "old-presto",
+      name: "Legacy Presto",
+      session_type: "Presto",
+      group_path: null,
+      host: "presto.example.com",
+      port: 8080,
+      username: "analyst",
+      auth_method: "None",
+      options_json: JSON.stringify({
+        dbCatalog: "hive",
+        dbDatabase: "sales",
+      }),
+      created_at: 1,
+      updated_at: 1,
+      last_connected_at: null,
+      sort_order: 0,
+    });
+
+    await waitFor(() => expect(screen.getByTestId("session-database-section")).toBeInTheDocument());
+    expect(screen.getByLabelText("Presto/Trino engine")).toHaveValue("Presto");
+    expect(screen.getByLabelText("Presto catalog")).toHaveValue("hive");
   });
 
   it("persists SQL Server database settings with the default port", async () => {

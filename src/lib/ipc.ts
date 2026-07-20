@@ -960,6 +960,8 @@ function toDbConfigPayload(info: DbConnectInfo): Record<string, unknown> {
     timeoutSecs: info.timeoutSecs ?? null,
     httpPort: info.httpPort ?? null,
     protocol: info.protocol ?? null,
+    // Presto/Trino header dialect (X-Presto-* vs X-Trino-*). Must reach Rust.
+    prestoDialect: info.prestoDialect ?? null,
     dbIndex: info.dbIndex ?? null,
     networkSettings: info.networkSettings ?? null,
   };

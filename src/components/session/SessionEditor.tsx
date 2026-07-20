@@ -1836,6 +1836,7 @@ function DatabaseSettings({
   timeoutSecs, setTimeoutSecs,
   httpPort, setHttpPort,
   chProtocol, setChProtocol,
+  prestoDialect, setPrestoDialect,
   redisDbIndex, setRedisDbIndex,
 }: {
   proto: Proto;
@@ -1850,6 +1851,8 @@ function DatabaseSettings({
   timeoutSecs: string; setTimeoutSecs: (v: string) => void;
   httpPort: string; setHttpPort: (v: string) => void;
   chProtocol: string; setChProtocol: (v: string) => void;
+  /** "Presto" | "Trino" — controls X-Presto-* vs X-Trino-* headers. */
+  prestoDialect: string; setPrestoDialect: (v: string) => void;
   redisDbIndex: string; setRedisDbIndex: (v: string) => void;
 }) {
   const isRedis = proto === "Redis";
@@ -1897,6 +1900,21 @@ function DatabaseSettings({
           <Shield className="w-3 h-3" /> Encrypted
         </span>
       </Field>
+
+      {isPresto && (
+        <Field label="Engine">
+          <Select
+            value={prestoDialect}
+            className="w-40"
+            options={["Presto", "Trino"]}
+            onChange={setPrestoDialect}
+            ariaLabel="Presto/Trino engine"
+          />
+          <span className="ml-2 text-[var(--taomni-text-muted)]">
+            Trino uses X-Trino-* headers
+          </span>
+        </Field>
+      )}
 
       {isPresto && (
         <Field label="Catalog">
@@ -2488,6 +2506,14 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [dbTimeout, setDbTimeout] = useState(() => optionString(initialOptions, "dbTimeout", "15"));
   const [dbHttpPort, setDbHttpPort] = useState(() => optionString(initialOptions, "dbHttpPort", "8123"));
   const [dbChProtocol, setDbChProtocol] = useState(() => optionString(initialOptions, "dbChProtocol", "HTTP"));
+  // New sessions default to Trino (modern default); saved sessions without the
+  // key hydrate as "Presto" so legacy options_json keeps X-Presto-* behavior.
+  const [dbPrestoDialect, setDbPrestoDialect] = useState(() => {
+    const stored = optionString(initialOptions, "dbPrestoDialect", "");
+    if (stored.toLowerCase() === "trino") return "Trino";
+    if (stored.toLowerCase() === "presto") return "Presto";
+    return session ? "Presto" : "Trino";
+  });
   const [dbRedisIndex, setDbRedisIndex] = useState(() => optionString(initialOptions, "dbRedisIndex", "0"));
   const [hbaseNamespace, setHBaseNamespace] = useState(() => optionString(initialOptions, "hbaseNamespace", ""));
   const [hbaseRestPath, setHBaseRestPath] = useState(() => optionString(initialOptions, "hbaseRestPath", ""));
@@ -2823,6 +2849,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           dbTimeout,
           dbHttpPort,
           dbChProtocol,
+          dbPrestoDialect: dbPrestoDialect.toLowerCase(),
           dbRedisIndex,
         }
       : {};
@@ -3349,6 +3376,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setDbTimeout(optionString(nextOptions, "dbTimeout", "15"));
     setDbHttpPort(optionString(nextOptions, "dbHttpPort", "8123"));
     setDbChProtocol(optionString(nextOptions, "dbChProtocol", "HTTP"));
+    {
+      const dialect = optionString(nextOptions, "dbPrestoDialect", "presto").toLowerCase();
+      setDbPrestoDialect(dialect === "trino" ? "Trino" : "Presto");
+    }
     setDbRedisIndex(optionString(nextOptions, "dbRedisIndex", "0"));
     setHBaseNamespace(optionString(nextOptions, "hbaseNamespace", ""));
     setHBaseRestPath(optionString(nextOptions, "hbaseRestPath", ""));
@@ -3686,6 +3717,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     timeoutSecs: parseInt(dbTimeout) || null,
     httpPort: proto === "ClickHouse" ? parseInt(dbHttpPort) || 8123 : null,
     protocol: proto === "ClickHouse" ? dbChProtocol.toLowerCase() : null,
+    prestoDialect:
+      proto === "Presto"
+        ? (dbPrestoDialect.toLowerCase() === "trino" ? "trino" : "presto")
+        : null,
     dbIndex: proto === "Redis" ? parseInt(dbRedisIndex) || 0 : null,
     // Route the test probe through the same proxy / SSH jump host the saved
     // connection uses. Only attach when a proxy/jump is actually selected so a
@@ -4504,6 +4539,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 timeoutSecs={dbTimeout} setTimeoutSecs={setDbTimeout}
                 httpPort={dbHttpPort} setHttpPort={setDbHttpPort}
                 chProtocol={dbChProtocol} setChProtocol={setDbChProtocol}
+                prestoDialect={dbPrestoDialect} setPrestoDialect={setDbPrestoDialect}
                 redisDbIndex={dbRedisIndex} setRedisDbIndex={setDbRedisIndex}
               />
             </div>

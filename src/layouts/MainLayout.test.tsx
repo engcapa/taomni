@@ -1500,6 +1500,8 @@ describe("MainLayout attached SFTP sidebar", () => {
           database: "sales",
           ssl: true,
           timeoutSecs: 30,
+          // Legacy sessions without dbPrestoDialect default to presto headers.
+          prestoDialect: "presto",
         },
       });
     });
@@ -1508,6 +1510,48 @@ describe("MainLayout attached SFTP sidebar", () => {
     });
     expect(screen.getByTestId("db-client-tab")).toHaveAttribute("data-catalog", "hive");
     expect(screen.getByTestId("db-client-tab")).toHaveAttribute("data-database", "sales");
+  });
+
+  it("opens Trino-dialect Presto sessions with prestoDialect=trino on the tab", async () => {
+    const trinoSession: SessionConfig = {
+      id: "trino-1",
+      name: "Trino Analytics",
+      session_type: "Presto",
+      group_path: null,
+      host: "trino.example.test",
+      port: 8080,
+      username: "analyst",
+      auth_method: "None",
+      options_json: JSON.stringify({
+        dbCatalog: "hive",
+        dbDatabase: "sales",
+        dbPrestoDialect: "trino",
+      }),
+      created_at: 10,
+      updated_at: 10,
+      last_connected_at: null,
+      sort_order: 0,
+    };
+
+    render(<MainLayout />);
+
+    act(() => {
+      latestSidebarProps().onConnectSession?.(trinoSession);
+    });
+
+    await waitFor(() => {
+      const tab = useAppStore.getState().tabs.find((candidate) => candidate.sessionId === "trino-1");
+      expect(tab).toMatchObject({
+        type: "database",
+        db: {
+          engine: "Presto",
+          host: "trino.example.test",
+          catalog: "hive",
+          database: "sales",
+          prestoDialect: "trino",
+        },
+      });
+    });
   });
 
   it("opens saved HBaseShell sessions as independent HBase shell tabs", async () => {
