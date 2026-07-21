@@ -96,6 +96,8 @@ impl Orchestrator {
         self.phase = EnginePhase::Preparing;
         self.capture_backend = backend.to_string();
         self.message = "preparing capture".into();
+        // Fresh session counters for the dashboard.
+        self.stats.reset();
     }
 
     pub fn set_active(&mut self, backend: &str, message: impl Into<String>) {

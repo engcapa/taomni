@@ -35,6 +35,15 @@ impl StatsCounters {
             self.flows_direct.fetch_add(1, Ordering::Relaxed);
         }
     }
+
+    pub fn reset(&self) {
+        self.flows_total.store(0, Ordering::Relaxed);
+        self.flows_proxy.store(0, Ordering::Relaxed);
+        self.flows_direct.store(0, Ordering::Relaxed);
+        self.flows_block.store(0, Ordering::Relaxed);
+        self.bytes_up.store(0, Ordering::Relaxed);
+        self.bytes_down.store(0, Ordering::Relaxed);
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

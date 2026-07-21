@@ -1156,6 +1156,10 @@ const dict = {
     start: "Start",
     stop: "Stop",
     recover: "Recover network",
+    recoverHint:
+      "Stop capture and clear residual SocksCap state (does not kill the elevated helper process).",
+    refreshStatus: "Refresh status & traffic counters",
+    statusRefreshed: "Status refreshed",
     saved: "Configuration saved",
     started: "SocksCap started",
     stopped: "SocksCap stopped",

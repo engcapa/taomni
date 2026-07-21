@@ -142,6 +142,7 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     [onStatusMessage],
   );
 
+  /** Full panel reload (config + caps + status + stats + helper). */
   const refresh = useCallback(async () => {
     try {
       const [c, cap, st, gf, sn, hp] = await Promise.all([
@@ -163,6 +164,22 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     }
   }, [report]);
 
+  /** Lightweight poll while capture is running (stats + phase + helper only). */
+  const refreshLive = useCallback(async () => {
+    try {
+      const [st, sn, hp] = await Promise.all([
+        sockscapStatus().catch(() => null),
+        sockscapStatsSnapshot().catch(() => null),
+        sockscapHelperStatus().catch(() => null),
+      ]);
+      if (st) setStatus(st);
+      if (sn) setStats(sn);
+      if (hp) setHelper(hp);
+    } catch {
+      /* ignore transient poll errors */
+    }
+  }, []);
+
   useEffect(() => {
     void refresh();
     listSessions()
@@ -180,6 +197,21 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
       .catch(() => {});
   }, [refresh]);
 
+  const running = useMemo(
+    () => status && ["active", "degraded", "preparing"].includes(status.phase),
+    [status],
+  );
+
+  // Poll dashboard counters while capture is active (previously never updated after mount).
+  useEffect(() => {
+    if (!running) return;
+    void refreshLive();
+    const id = window.setInterval(() => {
+      void refreshLive();
+    }, 1500);
+    return () => window.clearInterval(id);
+  }, [running, refreshLive]);
+
   const persist = async (next: SocksCapConfig) => {
     setCfg(next);
     try {
@@ -195,10 +227,17 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     await persist({ ...cfg, ...partial });
   };
 
-  const running = useMemo(
-    () => status && ["active", "degraded", "preparing"].includes(status.phase),
-    [status],
-  );
+  const onRefreshStatus = async () => {
+    setBusy(true);
+    try {
+      await refresh();
+      report(t("sockscap.statusRefreshed"));
+    } catch (e) {
+      report(String(e), false);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const onStart = async () => {
     if (!cfg) return;
@@ -208,8 +247,14 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
       const st = await sockscapStart();
       setStatus(st);
       report(st.message || t("sockscap.started"), st.phase !== "idle");
-      const gf = await sockscapGfwlistStatus().catch(() => null);
+      const [gf, sn, hp] = await Promise.all([
+        sockscapGfwlistStatus().catch(() => null),
+        sockscapStatsSnapshot().catch(() => null),
+        sockscapHelperStatus().catch(() => null),
+      ]);
       setGfw(gf);
+      if (sn) setStats(sn);
+      if (hp) setHelper(hp);
     } catch (e) {
       report(String(e), false);
     } finally {
@@ -222,6 +267,12 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     try {
       const st = await sockscapStop();
       setStatus(st);
+      const [sn, hp] = await Promise.all([
+        sockscapStatsSnapshot().catch(() => null),
+        sockscapHelperStatus().catch(() => null),
+      ]);
+      if (sn) setStats(sn);
+      if (hp) setHelper(hp);
       report(t("sockscap.stopped"));
     } catch (e) {
       report(String(e), false);
@@ -230,6 +281,7 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     }
   };
 
+  /** Explicit network recovery — tears down capture (not a status refresh). */
   const onRecover = async () => {
     setBusy(true);
     try {
@@ -442,12 +494,23 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
         )}
         <button
           type="button"
+          data-testid="sockscap-refresh-status"
           className="inline-flex items-center gap-1 px-2 py-1.5 rounded text-[12px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
+          onClick={() => void onRefreshStatus()}
+          disabled={busy}
+          title={t("sockscap.refreshStatus")}
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${busy ? "animate-spin" : ""}`} />
+        </button>
+        <button
+          type="button"
+          data-testid="sockscap-recover"
+          className="inline-flex items-center gap-1 px-2 py-1.5 rounded text-[12px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"
           onClick={() => void onRecover()}
           disabled={busy}
-          title={t("sockscap.recover")}
+          title={t("sockscap.recoverHint")}
         >
-          <RefreshCw className="w-3.5 h-3.5" />
+          {t("sockscap.recover")}
         </button>
         {onClose && (
           <button

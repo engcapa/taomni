@@ -29,7 +29,7 @@ pub struct HelperStatus {
     pub pid: Option<u32>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HelperSession {
     pub token: String,
     pub port: u16,

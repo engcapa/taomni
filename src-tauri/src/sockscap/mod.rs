@@ -652,11 +652,20 @@ pub async fn sockscap_recover(app: AppHandle, state: State<'_, AppState>) -> Res
 }
 
 /// Stop capture, relay; mark recovery journal clean.
+/// Does **not** kill the elevated helper process (UAC) — only stops NETWORK capture
+/// on it and tears down the in-app relay. Use helper stop separately if needed.
 async fn full_teardown(app: &AppHandle, state: &State<'_, AppState>) {
-    if let Ok(guard) = state.sockscap.helper.inner.lock() {
-        if let Some(sess) = guard.as_ref() {
-            let _ = helper::capture_stop(sess);
-        }
+    // Best-effort capture_stop; never hold the helper mutex across slow RPC if we can
+    // clone the session handle first. Timeouts are inside send_json (≈15s read max).
+    let sess = state
+        .sockscap
+        .helper
+        .inner
+        .lock()
+        .ok()
+        .and_then(|g| g.as_ref().cloned());
+    if let Some(sess) = sess {
+        let _ = helper::capture_stop(&sess);
     }
     {
         let mut orch = state.sockscap.orch.write().await;
