@@ -4,6 +4,7 @@ import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SessionEditor } from "./SessionEditor";
 import { setLocale } from "../../lib/i18n";
+import { AppDialogProvider } from "../../lib/appDialogs";
 
 const ipcMocks = vi.hoisted(() => ({
   testSshConnection: vi.fn(),
@@ -69,7 +70,11 @@ function renderEditor(
   props: Partial<Omit<ComponentProps<typeof SessionEditor>, "session" | "onClose">> = {},
 ) {
   const onClose = vi.fn();
-  render(<SessionEditor session={session} onClose={onClose} {...props} />);
+  render(
+    <AppDialogProvider>
+      <SessionEditor session={session} onClose={onClose} {...props} />
+    </AppDialogProvider>,
+  );
   return { onClose };
 }
 
@@ -478,6 +483,47 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
       jumpUser: "ops",
       jumpPort: 22,
     });
+    // Full success text is shown in a modal (footer is truncated summary only).
+    await waitFor(() => expect(screen.getByTestId("alert-dialog")).toBeInTheDocument());
+    expect(screen.getByTestId("alert-dialog")).toHaveAttribute("data-tone", "success");
+    expect(screen.getByTestId("alert-dialog-message")).toHaveTextContent("Database connection OK");
+    await user.click(screen.getByTestId("alert-dialog-ok"));
+  });
+
+  it("shows the full database test failure in a modal, including empty-body 502 detail", async () => {
+    const user = userEvent.setup();
+    ipcMocks.dbTestConnection.mockRejectedValueOnce(
+      new Error("Presto error (502 Bad Gateway): "),
+    );
+    const prestoSession = {
+      id: "presto-1",
+      name: "trino",
+      session_type: "Presto",
+      group_path: null,
+      host: "trino.example.com",
+      port: 8080,
+      username: "analyst",
+      auth_method: "Password" as const,
+      options_json: JSON.stringify({
+        dbCatalog: "hive",
+        dbPrestoDialect: "trino",
+      }),
+      created_at: 1,
+      updated_at: 1,
+      last_connected_at: null,
+      sort_order: 0,
+    };
+    renderEditor(prestoSession);
+
+    await user.click(screen.getByTestId("db-test-connection"));
+
+    await waitFor(() => expect(screen.getByTestId("alert-dialog")).toBeInTheDocument());
+    expect(screen.getByTestId("alert-dialog")).toHaveAttribute("data-tone", "error");
+    expect(screen.getByText("Connection test failed")).toBeInTheDocument();
+    const message = screen.getByTestId("alert-dialog-message");
+    expect(message).toHaveTextContent("Presto error (502 Bad Gateway):");
+    expect(message).toHaveTextContent("No additional detail was returned by the server.");
+    await user.click(screen.getByTestId("alert-dialog-ok"));
   });
 
   it.each(["SSH", "SFTP"] as const)("uses saved vault password ref when testing a %s session", async (sessionType) => {
@@ -956,6 +1002,8 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
       database: "sales",
       prestoDialect: "trino",
     });
+    await waitFor(() => expect(screen.getByTestId("alert-dialog")).toBeInTheDocument());
+    await user.click(screen.getByTestId("alert-dialog-ok"));
 
     await user.click(screen.getByRole("button", { name: "OK" }));
     const savedOptions = JSON.parse(ipcMocks.saveSession.mock.calls[0][0].options_json);

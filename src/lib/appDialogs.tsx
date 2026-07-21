@@ -26,6 +26,8 @@ export interface AppAlertDialogOptions {
   title?: string;
   message: string;
   okLabel?: string;
+  /** Visual cue for success / error notices (e.g. session Test connection). */
+  tone?: "default" | "success" | "error";
 }
 
 type DialogValue = boolean | string | ChoiceDialogValue | undefined;
@@ -78,6 +80,37 @@ export function choiceAppDialog(options: AppChoiceDialogOptions): Promise<Choice
 
 export async function alertAppDialog(options: AppAlertDialogOptions): Promise<void> {
   await enqueueDialog<undefined>({ kind: "alert", ...options });
+}
+
+/**
+ * Best-effort stringify for invoke / thrown errors so Test-connection dialogs
+ * surface the full payload instead of a clipped footer line or `[object Object]`.
+ */
+export function formatUnknownError(err: unknown): string {
+  if (err == null) return "";
+  if (typeof err === "string") return err;
+  if (err instanceof Error) {
+    const parts: string[] = [];
+    if (err.message) parts.push(err.message);
+    else if (err.name) parts.push(err.name);
+    if (err.cause !== undefined && err.cause !== null) {
+      const causeText = formatUnknownError(err.cause);
+      if (causeText) parts.push(`Cause: ${causeText}`);
+    }
+    return parts.join("\n") || String(err);
+  }
+  if (typeof err === "object") {
+    const record = err as Record<string, unknown>;
+    if (typeof record.message === "string" && record.message.trim()) {
+      return record.message;
+    }
+    try {
+      return JSON.stringify(err, null, 2);
+    } catch {
+      return String(err);
+    }
+  }
+  return String(err);
 }
 
 const AppDialogsContext = createContext<AppDialogsApi>({
@@ -173,6 +206,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
           title={active.title}
           message={active.message}
           okLabel={active.okLabel}
+          tone={active.tone}
           onClose={() => resolveDialog(active, undefined)}
         />
       )}

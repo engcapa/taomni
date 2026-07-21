@@ -418,18 +418,32 @@ export function TextInputDialog({
   );
 }
 
+export type AlertDialogTone = "default" | "success" | "error";
+
 export interface AlertDialogProps {
   title?: string;
   message: string;
   okLabel?: string;
+  /** Visual cue for connection test outcomes and similar notices. */
+  tone?: AlertDialogTone;
   onClose: () => void;
 }
 
-export function AlertDialog({ title, message, okLabel, onClose }: AlertDialogProps) {
+export function AlertDialog({
+  title,
+  message,
+  okLabel,
+  tone = "default",
+  onClose,
+}: AlertDialogProps) {
   const t = useT();
   const okRef = useRef<HTMLButtonElement>(null);
   const resolvedTitle = title ?? t("common.message");
   const resolvedOk = okLabel ?? t("common.ok");
+  const titleColor =
+    tone === "success" ? "#2f8a3e" : tone === "error" ? "#b22222" : "var(--taomni-text)";
+  const accent =
+    tone === "success" ? "#2f8a3e" : tone === "error" ? "#b22222" : "var(--taomni-accent)";
 
   useEffect(() => {
     okRef.current?.focus();
@@ -444,36 +458,46 @@ export function AlertDialog({ title, message, okLabel, onClose }: AlertDialogPro
   };
 
   return (
+    // True modal: backdrop dims the app but does NOT dismiss on outside click.
+    // Users often need to select/copy long error text; accidental outside clicks
+    // must not discard the message. Close only via OK or Escape (or Enter).
     <div
-      className="fixed inset-0 z-[950] flex items-center justify-center"
+      className="fixed inset-0 z-[950] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.4)" }}
-      onClick={onClose}
       onKeyDown={handleKeyDown}
+      role="presentation"
     >
       <div
         role="alertdialog"
         aria-label={resolvedTitle}
         aria-modal="true"
         data-testid="alert-dialog"
-        className="w-[420px] rounded shadow-lg p-4"
+        data-tone={tone}
+        className="w-[520px] max-w-[min(520px,92vw)] max-h-[min(80vh,720px)] flex flex-col rounded shadow-lg p-4"
         style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
-        onClick={(event) => event.stopPropagation()}
       >
-        <div className="text-sm font-semibold mb-3">{resolvedTitle}</div>
+        <div className="text-sm font-semibold mb-3 shrink-0" style={{ color: titleColor }}>
+          {resolvedTitle}
+        </div>
         <div
           data-testid="alert-dialog-message"
-          className="text-[12px] mb-4 whitespace-pre-line"
-          style={{ color: "var(--taomni-text)" }}
+          className="text-[12px] mb-4 min-h-0 overflow-auto whitespace-pre-wrap break-words taomni-mono select-text"
+          style={{
+            color: "var(--taomni-text)",
+            maxHeight: "min(50vh, 420px)",
+            lineHeight: 1.45,
+            userSelect: "text",
+          }}
         >
           {message}
         </div>
-        <div className="flex gap-2 justify-end">
+        <div className="flex gap-2 justify-end shrink-0">
           <button
             ref={okRef}
             type="button"
             data-testid="alert-dialog-ok"
             className="px-3 py-1 text-[12px] rounded text-white"
-            style={{ background: "var(--taomni-accent)" }}
+            style={{ background: accent }}
             onClick={onClose}
           >
             {resolvedOk}
