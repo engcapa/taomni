@@ -14,8 +14,9 @@ use crate::proc_info::{
     path_matches_selector, tcp_owner_pid, SharedTree,
 };
 use crate::windivert::{
-    addr_event, addr_is_outbound, addr_layer, addr_set_loopback, flow_endpoints_ip,
-    flow_process_id, WinDivertApi, ADDR_LEN, LAYER_FLOW, LAYER_NETWORK,
+    addr_event, addr_for_local_redirect, addr_for_return_to_app, addr_is_outbound, addr_layer,
+    flow_endpoints_ip, flow_process_id, WinDivertApi, ADDR_LEN, LAYER_FLOW, LAYER_NETWORK,
+    LAYER_SOCKET,
 };
 
 #[derive(Debug, Clone)]
@@ -121,22 +122,22 @@ impl CaptureEngine {
         self.packets_seen.store(0, Ordering::Relaxed);
         self.packets_redirected.store(0, Ordering::Relaxed);
 
-        // FLOW layer: do NOT use packet-layer aliases like "tcp" / "ip" — those
-        // are invalid at layer=FLOW and yield ERROR_INVALID_PARAMETER (87).
-        // Use "true" or "protocol == 6". Priority must stay within [-1000,1000];
-        // keep modest values to avoid edge issues on some WinDivert builds.
+        // FLOW/SOCKET layers: never use packet aliases like "tcp" (ERROR 87).
+        // WinDivert 1.x has no FLOW/SOCKET — open will fail; we fall back to
+        // GetExtendedTcpTable owner-PID matching for App mode.
         let mut flow_note = String::new();
         let flow_h = match api.open("true", LAYER_FLOW, 0, 0) {
             Ok(h) => Some(h),
-            Err(e1) => match api.open("protocol == 6", LAYER_FLOW, 0, 0) {
+            Err(e_flow) => match api.open("true", LAYER_SOCKET, 0, 0) {
                 Ok(h) => {
-                    flow_note = format!("flow filter fallback protocol==6 (first: {e1})");
+                    flow_note = format!(
+                        "FLOW unavailable ({e_flow}); using SOCKET layer for process events"
+                    );
                     Some(h)
                 }
-                Err(e2) => {
-                    // Capture can still run via GetExtendedTcpTable PID fallback.
+                Err(e_sock) => {
                     flow_note = format!(
-                        "FLOW layer unavailable ({e2}); using TCP-table PID only"
+                        "FLOW/SOCKET unavailable (flow={e_flow}; socket={e_sock}); TCP-table PID only"
                     );
                     tracing::warn!("sockscap-helper: {flow_note}");
                     None
@@ -315,27 +316,38 @@ fn flow_loop(
     while !stop.load(Ordering::SeqCst) {
         match api.recv(handle, &mut packet, &mut addr) {
             Ok(_) => {
-                if addr_layer(&addr) != LAYER_FLOW as u8 {
+                let layer = addr_layer(&addr);
+                // Accept FLOW (2) or SOCKET (3) events.
+                if layer != LAYER_FLOW as u8 && layer != LAYER_SOCKET as u8 {
                     continue;
                 }
                 let event = addr_event(&addr);
+                // FLOW: 0=established, 1=deleted
+                // SOCKET: 0=bind, 1=connect, 2=listen, 3=accept, 4=close...
+                let is_delete = event == 1 && layer == LAYER_FLOW as u8
+                    || event == 4 && layer == LAYER_SOCKET as u8;
                 let pid = flow_process_id(&addr);
                 let Some((local, local_port, remote, remote_port, proto)) =
                     flow_endpoints_ip(&addr)
                 else {
                     continue;
                 };
-                if proto != 6 {
+                // SOCKET layer may report proto 0; still track by ports.
+                if proto != 0 && proto != 6 {
                     continue;
                 }
                 let key = flow_key(local, local_port);
-                if event == 1 {
+                if is_delete {
                     if let Ok(mut m) = flows.lock() {
                         m.remove(&key);
                     }
                     continue;
                 }
-                if !addr_is_outbound(&addr) {
+                // SOCKET connect = 1; FLOW established = 0; also accept SOCKET bind/connect/accept
+                if layer == LAYER_SOCKET as u8 && event > 3 {
+                    continue;
+                }
+                if layer == LAYER_FLOW as u8 && !addr_is_outbound(&addr) {
                     continue;
                 }
                 let path = process_path(pid).unwrap_or_default();
@@ -456,14 +468,23 @@ fn network_loop(
                 rewrite_ipv4_tcp_dst(pkt, plan.relay_ip, plan.relay_port)
             };
             if ok {
-                addr_set_loopback(&mut addr, true);
+                // Critical: outbound→local must clear Outbound and set Loopback,
+                // or Windows will not deliver the packet to the local relay.
+                addr_for_local_redirect(&mut addr);
                 api.calc_checksums(pkt, &mut addr);
                 if api.send(handle, pkt, &addr).is_ok() {
                     redirected.fetch_add(1, Ordering::Relaxed);
+                } else {
+                    // Fail-open: try original? packet already rewritten — drop
+                    // is worse; still attempt send of rewritten form only once.
+                    tracing::debug!("sockscap-helper: send after redirect failed");
                 }
+            } else {
+                // Rewrite failed — reinject unmodified so we never blackhole.
+                let _ = api.send(handle, pkt, &addr);
             }
         } else {
-            // Inbound from relay → restore original source.
+            // Inbound from relay → restore original source so app TCB matches.
             let key = flow_key(dst, dport); // client is destination of return path
             if let Some(mapping) = redirects.lock().ok().and_then(|m| m.get(&key).cloned()) {
                 let ok = match mapping.orig_dst {
@@ -471,7 +492,7 @@ fn network_loop(
                     IpAddr::V6(v6) => rewrite_ipv6_tcp_src(pkt, v6, mapping.orig_port),
                 };
                 if ok {
-                    addr_set_loopback(&mut addr, false);
+                    addr_for_return_to_app(&mut addr);
                     api.calc_checksums(pkt, &mut addr);
                     let _ = api.send(handle, pkt, &addr);
                     continue;
@@ -521,14 +542,19 @@ fn resolve_flow(
     if let Some(f) = flows.lock().ok().and_then(|m| m.get(key).cloned()) {
         return Some(f);
     }
-    // Race: NETWORK packet can arrive before FLOW event is processed.
-    for _ in 0..3 {
-        std::thread::sleep(std::time::Duration::from_millis(1));
+    // Race: NETWORK packet can arrive before FLOW/SOCKET event is processed.
+    for _ in 0..10 {
+        std::thread::sleep(std::time::Duration::from_millis(2));
         if let Some(f) = flows.lock().ok().and_then(|m| m.get(key).cloned()) {
             return Some(f);
         }
     }
-    let pid = tcp_owner_pid(src, sport)?;
+    // TCP table (includes SYN_SENT when using OWNER_PID_ALL).
+    let pid = tcp_owner_pid(src, sport).or_else(|| {
+        // One more brief wait — table can lag the diverted SYN slightly.
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        tcp_owner_pid(src, sport)
+    })?;
     let path = tree
         .with(|t| {
             t.path_of(pid)

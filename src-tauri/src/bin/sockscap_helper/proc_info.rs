@@ -33,8 +33,9 @@ unsafe extern "system" {
 
 const AF_INET: u32 = 2;
 const AF_INET6: u32 = 23;
-// TCP_TABLE_OWNER_PID_CONNECTIONS
-const TCP_TABLE_OWNER_PID_CONNECTIONS: u32 = 5;
+// TCP_TABLE_CLASS (iphlpapi.h)
+// 4 = OWNER_PID_CONNECTIONS, 5 = OWNER_PID_ALL (includes SYN_SENT etc.)
+const TCP_TABLE_OWNER_PID_ALL: u32 = 5;
 const NO_ERROR: u32 = 0;
 const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
 
@@ -158,7 +159,7 @@ pub fn tcp_owner_pid_v4(local: Ipv4Addr, local_port: u16) -> Option<u32> {
             &mut size,
             1,
             AF_INET,
-            TCP_TABLE_OWNER_PID_CONNECTIONS,
+            TCP_TABLE_OWNER_PID_ALL,
             0,
         );
         if r != ERROR_INSUFFICIENT_BUFFER || size == 0 {
@@ -170,7 +171,7 @@ pub fn tcp_owner_pid_v4(local: Ipv4Addr, local_port: u16) -> Option<u32> {
             &mut size,
             1,
             AF_INET,
-            TCP_TABLE_OWNER_PID_CONNECTIONS,
+            TCP_TABLE_OWNER_PID_ALL,
             0,
         );
         if r != NO_ERROR || buf.len() < 4 {
@@ -208,7 +209,7 @@ pub fn tcp_owner_pid_v6(local: Ipv6Addr, local_port: u16) -> Option<u32> {
             &mut size,
             1,
             AF_INET6,
-            TCP_TABLE_OWNER_PID_CONNECTIONS,
+            TCP_TABLE_OWNER_PID_ALL,
             0,
         );
         if r != ERROR_INSUFFICIENT_BUFFER || size == 0 {
@@ -220,7 +221,7 @@ pub fn tcp_owner_pid_v6(local: Ipv6Addr, local_port: u16) -> Option<u32> {
             &mut size,
             1,
             AF_INET6,
-            TCP_TABLE_OWNER_PID_CONNECTIONS,
+            TCP_TABLE_OWNER_PID_ALL,
             0,
         );
         if r != NO_ERROR || buf.len() < 4 {

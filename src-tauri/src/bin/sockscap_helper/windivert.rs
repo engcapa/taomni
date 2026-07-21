@@ -11,6 +11,7 @@ use winapi::um::winnt::HANDLE;
 
 pub const LAYER_NETWORK: i32 = 0;
 pub const LAYER_FLOW: i32 = 2;
+pub const LAYER_SOCKET: i32 = 3;
 
 pub const WINDIVERT_HELPER_NO_IP_CHECKSUM: u64 = 1;
 pub const WINDIVERT_HELPER_NO_TCP_CHECKSUM: u64 = 2;
@@ -228,13 +229,30 @@ pub fn addr_event(addr: &[u8]) -> u8 {
     addr[9]
 }
 
+/// Flag bits in the UINT32 after Timestamp (offset 8), packed by MSVC as:
+/// Layer:8, Event:8, Sniffed:1, Outbound:1, Loopback:1, Impostor:1, IPv6:1, ...
+/// So byte at offset 10 holds: Sniffed(0x01) Outbound(0x02) Loopback(0x04) Impostor(0x08) IPv6(0x10)...
+const FLAG_SNIFFED: u8 = 0x01;
+const FLAG_OUTBOUND: u8 = 0x02;
+const FLAG_LOOPBACK: u8 = 0x04;
+const FLAG_IMPOSTOR: u8 = 0x08;
+
 pub fn addr_is_outbound(addr: &[u8]) -> bool {
     if addr.len() < 11 {
         return false;
     }
-    // Flags packed after Layer/Event — bit 1 of the next bits is Outbound.
-    // Layout: byte10 holds Sniffed(1) Outbound(1) Loopback(1) Impostor(1) IPv6(1) ...
-    (addr[10] & 0x02) != 0
+    (addr[10] & FLAG_OUTBOUND) != 0
+}
+
+pub fn addr_set_outbound(addr: &mut [u8], on: bool) {
+    if addr.len() < 11 {
+        return;
+    }
+    if on {
+        addr[10] |= FLAG_OUTBOUND;
+    } else {
+        addr[10] &= !FLAG_OUTBOUND;
+    }
 }
 
 pub fn addr_set_loopback(addr: &mut [u8], on: bool) {
@@ -242,10 +260,36 @@ pub fn addr_set_loopback(addr: &mut [u8], on: bool) {
         return;
     }
     if on {
-        addr[10] |= 0x04;
+        addr[10] |= FLAG_LOOPBACK;
     } else {
-        addr[10] &= !0x04;
+        addr[10] &= !FLAG_LOOPBACK;
     }
+}
+
+pub fn addr_set_impostor(addr: &mut [u8], on: bool) {
+    if addr.len() < 11 {
+        return;
+    }
+    if on {
+        addr[10] |= FLAG_IMPOSTOR;
+    } else {
+        addr[10] &= !FLAG_IMPOSTOR;
+    }
+}
+
+/// Prepare address for reinjecting a packet we rewrote toward the local relay.
+pub fn addr_for_local_redirect(addr: &mut [u8]) {
+    addr_set_outbound(addr, false);
+    addr_set_loopback(addr, true);
+    addr_set_impostor(addr, true);
+    let _ = FLAG_SNIFFED;
+}
+
+/// Prepare address for reinjecting a return packet (relay → app) with forged source.
+pub fn addr_for_return_to_app(addr: &mut [u8]) {
+    addr_set_outbound(addr, false);
+    addr_set_loopback(addr, false);
+    addr_set_impostor(addr, true);
 }
 
 /// FLOW data starts at offset 16 in ADDRESS (after Timestamp+flags header).
