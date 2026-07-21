@@ -41,8 +41,8 @@ const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
 
 /// Snapshot of pid → (parent_pid, path) refreshed on a short interval.
 pub struct ProcessTree {
-    parent: HashMap<u32, u32>,
-    path: HashMap<u32, String>,
+    pub parent: HashMap<u32, u32>,
+    pub path: HashMap<u32, String>,
     refreshed_at: Instant,
 }
 
@@ -150,15 +150,22 @@ unsafe fn query_path(pid: u32) -> Option<String> {
     Some(os.to_string_lossy().to_string())
 }
 
-/// Look up owning PID for a local IPv4 TCP endpoint (host order port).
-pub fn tcp_owner_pid_v4(local: Ipv4Addr, local_port: u16) -> Option<u32> {
+/// One TCP endpoint ownership row.
+#[derive(Debug, Clone)]
+pub struct TcpOwnerRow {
+    pub local: IpAddr,
+    pub local_port: u16,
+    pub pid: u32,
+}
+
+fn read_tcp_table(af: u32) -> Option<Vec<u8>> {
     unsafe {
         let mut size: DWORD = 0;
         let r = GetExtendedTcpTable(
             std::ptr::null_mut(),
             &mut size,
             1,
-            AF_INET,
+            af,
             TCP_TABLE_OWNER_PID_ALL,
             0,
         );
@@ -170,92 +177,111 @@ pub fn tcp_owner_pid_v4(local: Ipv4Addr, local_port: u16) -> Option<u32> {
             buf.as_mut_ptr(),
             &mut size,
             1,
-            AF_INET,
+            af,
             TCP_TABLE_OWNER_PID_ALL,
             0,
         );
         if r != NO_ERROR || buf.len() < 4 {
             return None;
         }
+        Some(buf)
+    }
+}
+
+/// Enumerate all IPv4/IPv6 TCP endpoints with owning PID (includes SYN_SENT).
+pub fn list_tcp_owner_rows() -> Vec<TcpOwnerRow> {
+    let mut out = Vec::new();
+    if let Some(buf) = read_tcp_table(AF_INET) {
         let n = u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]) as usize;
-        // MIB_TCPROW_OWNER_PID: 6×DWORD (state, localAddr, localPort, remoteAddr, remotePort, pid)
         let row_size = 24usize;
-        let want_addr = u32::from(local);
         for i in 0..n {
             let off = 4 + i * row_size;
             if off + row_size > buf.len() {
                 break;
             }
-            let local_addr_ne =
-                u32::from_be(u32::from_le_bytes(buf[off + 4..off + 8].try_into().ok()?));
-            // Port is first 16 bits in network byte order.
+            // IP octets stored in network order consecutively.
+            let ip = Ipv4Addr::new(buf[off + 4], buf[off + 5], buf[off + 6], buf[off + 7]);
             let port = u16::from_be_bytes([buf[off + 8], buf[off + 9]]);
-            let pid = u32::from_le_bytes(buf[off + 20..off + 24].try_into().ok()?);
-            if port == local_port && pid != 0 && (local_addr_ne == 0 || local_addr_ne == want_addr)
-            {
-                return Some(pid);
+            let pid = u32::from_le_bytes([
+                buf[off + 20],
+                buf[off + 21],
+                buf[off + 22],
+                buf[off + 23],
+            ]);
+            if pid != 0 && port != 0 {
+                out.push(TcpOwnerRow {
+                    local: IpAddr::V4(ip),
+                    local_port: port,
+                    pid,
+                });
             }
         }
-        None
     }
-}
-
-/// IPv6 owner PID (MIB_TCP6ROW_OWNER_PID is larger).
-pub fn tcp_owner_pid_v6(local: Ipv6Addr, local_port: u16) -> Option<u32> {
-    unsafe {
-        let mut size: DWORD = 0;
-        let r = GetExtendedTcpTable(
-            std::ptr::null_mut(),
-            &mut size,
-            1,
-            AF_INET6,
-            TCP_TABLE_OWNER_PID_ALL,
-            0,
-        );
-        if r != ERROR_INSUFFICIENT_BUFFER || size == 0 {
-            return None;
-        }
-        let mut buf = vec![0u8; size as usize];
-        let r = GetExtendedTcpTable(
-            buf.as_mut_ptr(),
-            &mut size,
-            1,
-            AF_INET6,
-            TCP_TABLE_OWNER_PID_ALL,
-            0,
-        );
-        if r != NO_ERROR || buf.len() < 4 {
-            return None;
-        }
+    if let Some(buf) = read_tcp_table(AF_INET6) {
         let n = u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]) as usize;
-        // MIB_TCP6ROW_OWNER_PID: localAddr[16], dwLocalScopeId, dwLocalPort, remoteAddr[16],
-        // dwRemoteScopeId, dwRemotePort, dwState, dwOwningPid ≈ 56 bytes
+        // localAddr[16] + scopeId + localPort + remote[16] + rscope + rport + state + pid
         let row_size = 56usize;
         for i in 0..n {
             let off = 4 + i * row_size;
             if off + row_size > buf.len() {
                 break;
             }
-            let addr_bytes: [u8; 16] = buf[off..off + 16].try_into().ok()?;
-            let row_ip = Ipv6Addr::from(addr_bytes);
-            // dwLocalPort at offset 20
+            let mut a = [0u8; 16];
+            a.copy_from_slice(&buf[off..off + 16]);
+            let ip = Ipv6Addr::from(a);
             let port = u16::from_be_bytes([buf[off + 20], buf[off + 21]]);
-            if (row_ip == local || row_ip.is_unspecified()) && port == local_port {
-                let pid = u32::from_le_bytes(buf[off + 52..off + 56].try_into().ok()?);
-                if pid != 0 {
-                    return Some(pid);
-                }
+            let pid = u32::from_le_bytes([
+                buf[off + 52],
+                buf[off + 53],
+                buf[off + 54],
+                buf[off + 55],
+            ]);
+            if pid != 0 && port != 0 {
+                out.push(TcpOwnerRow {
+                    local: IpAddr::V6(ip),
+                    local_port: port,
+                    pid,
+                });
             }
         }
-        None
     }
+    out
 }
 
 pub fn tcp_owner_pid(local: IpAddr, local_port: u16) -> Option<u32> {
-    match local {
-        IpAddr::V4(v4) => tcp_owner_pid_v4(v4, local_port),
-        IpAddr::V6(v6) => tcp_owner_pid_v6(v6, local_port),
+    for row in list_tcp_owner_rows() {
+        if row.local_port != local_port || row.pid == 0 {
+            continue;
+        }
+        // Match exact IP, or unspecified/any, or IPv4-mapped quirks: compare port-first.
+        if row.local == local
+            || row.local.is_unspecified()
+            || matches!((row.local, local), (IpAddr::V4(a), IpAddr::V4(b)) if a.is_unspecified() || a == b)
+        {
+            return Some(row.pid);
+        }
     }
+    // Port-only fallback (local ports are unique on a host for a given family).
+    list_tcp_owner_rows()
+        .into_iter()
+        .find(|r| r.local_port == local_port && r.pid != 0)
+        .map(|r| r.pid)
+}
+
+/// Build set of "ip:port" keys owned by any of `pids`.
+pub fn port_keys_for_pids(pids: &std::collections::HashSet<u32>) -> std::collections::HashSet<String> {
+    let mut keys = std::collections::HashSet::new();
+    if pids.is_empty() {
+        return keys;
+    }
+    for row in list_tcp_owner_rows() {
+        if pids.contains(&row.pid) {
+            keys.insert(format!("{}:{}", row.local, row.local_port));
+            // Also index by port alone for matching when packet src is more specific.
+            keys.insert(format!("*:{}", row.local_port));
+        }
+    }
+    keys
 }
 
 pub fn normalize_path(p: &str) -> String {

@@ -1,17 +1,18 @@
 //! FLOW (PID map) + NETWORK (IPv4/IPv6 TCP NAT → loopback relay) capture engine.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
 
 use serde_json::json;
 use winapi::um::winnt::HANDLE;
 
 use crate::proc_info::{
-    path_matches_selector, tcp_owner_pid, SharedTree,
+    path_matches_selector, port_keys_for_pids, tcp_owner_pid, ProcessTree, SharedTree,
 };
 use crate::windivert::{
     addr_event, addr_for_local_redirect, addr_for_return_to_app, addr_is_outbound, addr_layer,
@@ -390,7 +391,55 @@ fn network_loop(
     let relay_v4 = IpAddr::V4(plan.relay_ip);
     let relay_v6 = IpAddr::V6(Ipv6Addr::LOCALHOST);
 
+    // App mode: inverted index — ports owned by matching PIDs (works without FLOW).
+    let mut app_port_keys: HashSet<String> = HashSet::new();
+    let mut app_ports_refreshed = Instant::now() - Duration::from_secs(10);
+    let mut matched_pids: HashSet<u32> = HashSet::new();
+
+    let refresh_app_index = |tree: &SharedTree,
+                             plan: &CapturePlan,
+                             keys: &mut HashSet<String>,
+                             pids: &mut HashSet<u32>| {
+        tree.with(|t| {
+            t.refresh();
+            pids.clear();
+            // Collect PIDs whose path (or ancestor) matches app list.
+            for (&pid, path) in t.path.iter() {
+                if plan.bypass_pids.contains(&pid) {
+                    continue;
+                }
+                if process_in_scope_tree(plan, pid, path, t) {
+                    pids.insert(pid);
+                }
+            }
+            // Also include children of matched pids (path may differ).
+            let parents = t.parent.clone();
+            for _ in 0..8 {
+                let mut changed = false;
+                for (&pid, &pp) in &parents {
+                    if pids.contains(&pp)
+                        && !pids.contains(&pid)
+                        && !plan.bypass_pids.contains(&pid)
+                    {
+                        pids.insert(pid);
+                        changed = true;
+                    }
+                }
+                if !changed {
+                    break;
+                }
+            }
+        });
+        *keys = port_keys_for_pids(pids);
+    };
+
     while !stop.load(Ordering::SeqCst) {
+        // Keep App port index warm (every 100ms).
+        if plan.mode_apps && app_ports_refreshed.elapsed() >= Duration::from_millis(100) {
+            refresh_app_index(&tree, &plan, &mut app_port_keys, &mut matched_pids);
+            app_ports_refreshed = Instant::now();
+        }
+
         let len = match api.recv(handle, &mut packet, &mut addr) {
             Ok(n) => n,
             Err(_) => {
@@ -429,19 +478,64 @@ fn network_loop(
                         continue;
                     }
                 }
+            } else if plan.mode_apps {
+                // Primary: port owned by a matching app PID?
+                let port_hit = app_port_keys.contains(&key)
+                    || app_port_keys.contains(&format!("*:{sport}"));
+                if !port_hit {
+                    // Refresh once on miss then recheck (new SYN may not be indexed yet).
+                    refresh_app_index(&tree, &plan, &mut app_port_keys, &mut matched_pids);
+                    app_ports_refreshed = Instant::now();
+                    let port_hit = app_port_keys.contains(&key)
+                        || app_port_keys.contains(&format!("*:{sport}"));
+                    if !port_hit {
+                        // Fall through to resolve_flow; if still miss, pass-through.
+                        let f = resolve_flow(&flows, &tree, &key, src, sport);
+                        let Some(f) = f else {
+                            let _ = api.send(handle, pkt, &addr);
+                            continue;
+                        };
+                        if !matched_pids.contains(&f.pid)
+                            && !process_in_scope(&plan, f.pid, &f.path, &tree)
+                        {
+                            let _ = api.send(handle, pkt, &addr);
+                            continue;
+                        }
+                        (f.pid, f.path.clone(), dst, dport)
+                    } else {
+                        let pid = matched_pids.iter().copied().next().unwrap_or(0);
+                        let path = tree
+                            .with(|t| t.path_of(pid).map(|s| s.to_string()))
+                            .flatten()
+                            .unwrap_or_default();
+                        // Prefer exact PID for this port.
+                        let pid = tcp_owner_pid(src, sport).unwrap_or(pid);
+                        let path = tree
+                            .with(|t| t.path_of(pid).map(|s| s.to_string()))
+                            .flatten()
+                            .unwrap_or(path);
+                        (pid, path, dst, dport)
+                    }
+                } else {
+                    let pid = tcp_owner_pid(src, sport).unwrap_or(0);
+                    let path = tree
+                        .with(|t| t.path_of(pid).map(|s| s.to_string()))
+                        .flatten()
+                        .unwrap_or_default();
+                    (pid, path, dst, dport)
+                }
             } else {
-                // Resolve flow info: FLOW table, short retry, then TCP table PID fallback.
+                // Global: redirect everything that is not bypassed.
                 let f = resolve_flow(&flows, &tree, &key, src, sport);
-                let Some(f) = f else {
-                    // Unknown owner — pass through (fail-open).
-                    let _ = api.send(handle, pkt, &addr);
-                    continue;
+                let (pid, path) = match f {
+                    Some(f) => (f.pid, f.path),
+                    None => (0, String::new()),
                 };
-                if !process_in_scope(&plan, f.pid, &f.path, &tree) {
+                if plan.bypass_pids.contains(&pid) {
                     let _ = api.send(handle, pkt, &addr);
                     continue;
                 }
-                (f.pid, f.path.clone(), dst, dport)
+                (pid, path, dst, dport)
             };
 
             // Already aimed at relay?
@@ -576,28 +670,28 @@ fn resolve_flow(
 }
 
 fn process_in_scope(plan: &CapturePlan, pid: u32, path: &str, tree: &SharedTree) -> bool {
+    tree.with(|t| process_in_scope_tree(plan, pid, path, t))
+        .unwrap_or(false)
+}
+
+fn process_in_scope_tree(plan: &CapturePlan, pid: u32, path: &str, tree: &ProcessTree) -> bool {
     if plan.bypass_pids.contains(&pid) {
         return false;
     }
     if !plan.mode_apps {
         return true;
     }
-    // Match this process path or any ancestor's path (child process of selected app).
     let mut candidates: Vec<String> = Vec::new();
     if !path.is_empty() {
         candidates.push(path.to_string());
     }
-    if let Some(anc) = tree.with(|t| t.ancestor_paths(pid)) {
-        candidates.extend(anc);
-    }
+    candidates.extend(tree.ancestor_paths(pid));
     if candidates.is_empty() {
         return false;
     }
-    plan.app_paths.iter().any(|sel| {
-        candidates
-            .iter()
-            .any(|p| path_matches_selector(p, sel))
-    })
+    plan.app_paths
+        .iter()
+        .any(|sel| candidates.iter().any(|p| path_matches_selector(p, sel)))
 }
 
 fn process_path(pid: u32) -> Option<String> {
