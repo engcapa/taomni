@@ -458,11 +458,14 @@ export function AlertDialog({
   };
 
   return (
+    // True modal: backdrop dims the app but does NOT dismiss on outside click.
+    // Users often need to select/copy long error text; accidental outside clicks
+    // must not discard the message. Close only via OK or Escape (or Enter).
     <div
       className="fixed inset-0 z-[950] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.4)" }}
-      onClick={onClose}
       onKeyDown={handleKeyDown}
+      role="presentation"
     >
       <div
         role="alertdialog"
@@ -472,18 +475,18 @@ export function AlertDialog({
         data-tone={tone}
         className="w-[520px] max-w-[min(520px,92vw)] max-h-[min(80vh,720px)] flex flex-col rounded shadow-lg p-4"
         style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
-        onClick={(event) => event.stopPropagation()}
       >
         <div className="text-sm font-semibold mb-3 shrink-0" style={{ color: titleColor }}>
           {resolvedTitle}
         </div>
         <div
           data-testid="alert-dialog-message"
-          className="text-[12px] mb-4 min-h-0 overflow-auto whitespace-pre-wrap break-words taomni-mono"
+          className="text-[12px] mb-4 min-h-0 overflow-auto whitespace-pre-wrap break-words taomni-mono select-text"
           style={{
             color: "var(--taomni-text)",
             maxHeight: "min(50vh, 420px)",
             lineHeight: 1.45,
+            userSelect: "text",
           }}
         >
           {message}

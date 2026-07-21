@@ -149,6 +149,30 @@ describe("appDialogs", () => {
     );
   });
 
+  it("keeps alert modal open when clicking the backdrop (must dismiss via OK)", async () => {
+    render(
+      <AppDialogProvider>
+        <button
+          type="button"
+          onClick={() => {
+            void alertAppDialog({ title: "Keep open", message: "Do not dismiss on outside click" });
+          }}
+        >
+          Open
+        </button>
+      </AppDialogProvider>,
+    );
+
+    fireEvent.click(screen.getByText("Open"));
+    const dialog = screen.getByTestId("alert-dialog");
+    // Click the dimmed overlay (parent of the alertdialog panel).
+    fireEvent.click(dialog.parentElement!);
+    expect(screen.getByTestId("alert-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("alert-dialog-message")).toHaveTextContent(
+      "Do not dismiss on outside click",
+    );
+  });
+
   it("formatUnknownError surfaces nested Error messages and plain strings", () => {
     expect(formatUnknownError("plain")).toBe("plain");
     expect(formatUnknownError(new Error("boom"))).toBe("boom");
