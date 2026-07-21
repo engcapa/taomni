@@ -1,4 +1,8 @@
 //! Dynamic WinDivert FFI (load DLL at runtime — LGPLv3/GPLv2 isolation).
+//!
+//! Requires **WinDivert 2.x** (Recv/Send parameter order and ADDRESS layout).
+//! WinDivert 1.x is detected and rejected with a clear error (FLOW layers
+//! return ERROR_INVALID_PARAMETER on 1.x).
 
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
@@ -17,7 +21,9 @@ pub const WINDIVERT_HELPER_NO_IP_CHECKSUM: u64 = 1;
 pub const WINDIVERT_HELPER_NO_TCP_CHECKSUM: u64 = 2;
 
 type OpenFn = unsafe extern "C" fn(*const i8, i32, i16, u64) -> HANDLE;
+// WinDivert 2.x: Recv(handle, packet, packetLen, *recvLen, *addr)
 type RecvFn = unsafe extern "C" fn(HANDLE, *mut u8, u32, *mut u32, *mut u8) -> i32;
+// WinDivert 2.x: Send(handle, packet, packetLen, *sendLen, *addr)
 type SendFn = unsafe extern "C" fn(HANDLE, *const u8, u32, *mut u32, *const u8) -> i32;
 type CloseFn = unsafe extern "C" fn(HANDLE) -> i32;
 type CalcChecksumsFn = unsafe extern "C" fn(*mut u8, u32, *mut u8, u64) -> i32;
@@ -25,6 +31,7 @@ type ShutdownFn = unsafe extern "C" fn(HANDLE, i32) -> i32;
 
 pub struct WinDivertApi {
     module: HMODULE,
+    pub dll_path: PathBuf,
     open: OpenFn,
     recv: RecvFn,
     send: SendFn,
@@ -40,6 +47,15 @@ unsafe impl Sync for WinDivertApi {}
 impl WinDivertApi {
     pub fn load(dir: Option<&Path>) -> Result<Self, String> {
         let dll = resolve_dll(dir)?;
+        // Must be absolute — elevated helper cwd is often C:\Windows\System32.
+        let dll = std::fs::canonicalize(&dll).unwrap_or(dll);
+        if !dll.is_file() {
+            return Err(format!(
+                "WinDivert.dll not found at {} (use absolute --windivert-dir with 2.2+ x64 build)",
+                dll.display()
+            ));
+        }
+
         let wide: Vec<u16> = OsStr::new(&dll)
             .encode_wide()
             .chain(std::iter::once(0))
@@ -52,26 +68,54 @@ impl WinDivertApi {
                 std::io::Error::last_os_error()
             ));
         }
+
         unsafe {
+            // WinDivert 2.0+ exports WinDivertShutdown; 1.x does not.
+            let shutdown_ptr =
+                GetProcAddress(module, b"WinDivertShutdown\0".as_ptr() as *const i8);
+            if shutdown_ptr.is_null() {
+                FreeLibrary(module);
+                return Err(format!(
+                    "WinDivert at {} looks like 1.x (missing WinDivertShutdown). \
+                     SocksCap requires WinDivert 2.2+ x64. Replace WinDivert.dll and \
+                     WinDivert64.sys next to the helper (see resources/sockscap/windows/README.md).",
+                    dll.display()
+                ));
+            }
+
             let open = load_sym(module, b"WinDivertOpen\0")?;
             let recv = load_sym(module, b"WinDivertRecv\0")?;
             let send = load_sym(module, b"WinDivertSend\0")?;
             let close = load_sym(module, b"WinDivertClose\0")?;
             let calc = load_sym(module, b"WinDivertHelperCalcChecksums\0")?;
-            let shutdown = GetProcAddress(module, b"WinDivertShutdown\0".as_ptr() as *const i8);
-            Ok(Self {
+
+            let api = Self {
                 module,
+                dll_path: dll.clone(),
                 open: std::mem::transmute::<FARPROC, OpenFn>(open),
                 recv: std::mem::transmute::<FARPROC, RecvFn>(recv),
                 send: std::mem::transmute::<FARPROC, SendFn>(send),
                 close: std::mem::transmute::<FARPROC, CloseFn>(close),
                 calc_checksums: std::mem::transmute::<FARPROC, CalcChecksumsFn>(calc),
-                shutdown: if shutdown.is_null() {
-                    None
-                } else {
-                    Some(std::mem::transmute::<FARPROC, ShutdownFn>(shutdown))
-                },
-            })
+                shutdown: Some(std::mem::transmute::<FARPROC, ShutdownFn>(shutdown_ptr)),
+            };
+
+            // Sanity: NETWORK open must work with 2.x ABI.
+            match api.open("false", LAYER_NETWORK, 0, 0) {
+                Ok(h) => {
+                    api.close_handle(h);
+                }
+                Err(e) => {
+                    drop(api);
+                    return Err(format!(
+                        "WinDivert 2.x probe open failed for {}: {e}. \
+                         Ensure the matching WinDivert64.sys is beside the DLL and helper is elevated.",
+                        dll.display()
+                    ));
+                }
+            }
+
+            Ok(api)
         }
     }
 
@@ -89,7 +133,8 @@ impl WinDivertApi {
                 _ => "?",
             };
             return Err(format!(
-                "WinDivertOpen(layer={layer}/{layer_name}, filter={filter:?}, prio={priority}) failed: {err}"
+                "WinDivertOpen(layer={layer}/{layer_name}, filter={filter:?}, prio={priority}, dll={}) failed: {err}",
+                self.dll_path.display()
             ));
         }
         Ok(h)
@@ -185,8 +230,15 @@ unsafe fn load_sym(module: HMODULE, name: &[u8]) -> Result<FARPROC, String> {
 }
 
 fn resolve_dll(dir: Option<&Path>) -> Result<PathBuf, String> {
-    let mut candidates = Vec::new();
+    let mut candidates: Vec<PathBuf> = Vec::new();
     if let Some(d) = dir {
+        let d = if d.is_absolute() {
+            d.to_path_buf()
+        } else {
+            std::env::current_dir()
+                .map(|c| c.join(d))
+                .unwrap_or_else(|_| d.to_path_buf())
+        };
         candidates.push(d.join("WinDivert.dll"));
         candidates.push(d.join("x64").join("WinDivert.dll"));
     }
@@ -199,20 +251,28 @@ fn resolve_dll(dir: Option<&Path>) -> Result<PathBuf, String> {
     if let Ok(d) = std::env::var("SOCKSCAP_WINDIVERT_DIR") {
         candidates.push(PathBuf::from(d).join("WinDivert.dll"));
     }
+
     for c in &candidates {
         if c.is_file() {
             return Ok(c.clone());
         }
     }
-    // Let the loader search PATH / SxS.
-    Ok(PathBuf::from("WinDivert.dll"))
+
+    Err(format!(
+        "WinDivert.dll not found. Tried:\n  {}",
+        candidates
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect::<Vec<_>>()
+            .join("\n  ")
+    ))
 }
 
-/// WinDivert ADDRESS is a packed bitfield struct; we treat it as opaque bytes.
-/// Layout (WinDivert 2.2, MSVC x64) — first 16 bytes:
-///   Timestamp: i64
-///   Layer: u8, Event: u8, Flags: u16 (bitfields packed), Reserved2: u32
-/// Then union (~64 bytes). Total we allocate 128.
+/// WinDivert 2.x ADDRESS layout (MSVC x64):
+///   Timestamp: i64 @0
+///   Layer:8 Event:8 Sniffed:1 Outbound:1 Loopback:1 Impostor:1 ... @8
+///   Reserved2 @12
+///   union (Network/Flow/Socket) @16
 pub const ADDR_LEN: usize = 128;
 
 pub fn addr_layer(addr: &[u8]) -> u8 {
@@ -229,9 +289,6 @@ pub fn addr_event(addr: &[u8]) -> u8 {
     addr[9]
 }
 
-/// Flag bits in the UINT32 after Timestamp (offset 8), packed by MSVC as:
-/// Layer:8, Event:8, Sniffed:1, Outbound:1, Loopback:1, Impostor:1, IPv6:1, ...
-/// So byte at offset 10 holds: Sniffed(0x01) Outbound(0x02) Loopback(0x04) Impostor(0x08) IPv6(0x10)...
 const FLAG_SNIFFED: u8 = 0x01;
 const FLAG_OUTBOUND: u8 = 0x02;
 const FLAG_LOOPBACK: u8 = 0x04;
@@ -277,41 +334,42 @@ pub fn addr_set_impostor(addr: &mut [u8], on: bool) {
     }
 }
 
-/// Prepare address for reinjecting a packet we rewrote toward the local relay.
-pub fn addr_for_local_redirect(addr: &mut [u8]) {
+/// Streamdump-style reflect: reinject as inbound (only flip Outbound).
+/// Official sample does NOT force Loopback/Impostor/IfIdx — those break
+/// delivery when reflecting onto the host's LAN address.
+pub fn addr_for_reflect_inbound(addr: &mut [u8]) {
     addr_set_outbound(addr, false);
-    addr_set_loopback(addr, true);
-    addr_set_impostor(addr, true);
     let _ = FLAG_SNIFFED;
+    let _ = FLAG_LOOPBACK;
+    let _ = FLAG_IMPOSTOR;
 }
 
-/// Prepare address for reinjecting a return packet (relay → app) with forged source.
+// Keep old names as aliases so any residual call sites compile.
+pub fn addr_for_local_redirect(addr: &mut [u8]) {
+    addr_for_reflect_inbound(addr);
+}
+
 pub fn addr_for_return_to_app(addr: &mut [u8]) {
-    addr_set_outbound(addr, false);
-    addr_set_loopback(addr, false);
-    addr_set_impostor(addr, true);
+    addr_for_reflect_inbound(addr);
 }
 
-/// FLOW data starts at offset 16 in ADDRESS (after Timestamp+flags header).
-/// WINDIVERT_DATA_FLOW:
-///   EndpointId u64, ParentEndpointId u64, ProcessId u32,
-///   LocalAddr[4] u32, RemoteAddr[4] u32, LocalPort u16, RemotePort u16, Protocol u8
+/// FLOW/SOCKET process id lives in the layer-specific union at offset 16.
+/// FLOW: EndpointId u64, ParentEndpointId u64, ProcessId u32 → pid at 16+16=32
 pub fn flow_process_id(addr: &[u8]) -> u32 {
     if addr.len() < 16 + 8 + 8 + 4 {
         return 0;
     }
-    let base = 16 + 16; // skip two u64 endpoint ids
+    let base = 16 + 16;
     u32::from_le_bytes(addr[base..base + 4].try_into().unwrap_or([0; 4]))
 }
 
-/// Parse FLOW local/remote as IpAddr (IPv4 or IPv6).
 pub fn flow_endpoints_ip(
     addr: &[u8],
 ) -> Option<(std::net::IpAddr, u16, std::net::IpAddr, u16, u8)> {
     if addr.len() < 16 + 8 + 8 + 4 + 16 + 16 + 2 + 2 + 1 {
         return None;
     }
-    let mut o = 16 + 16 + 4; // after endpoints + pid
+    let mut o = 16 + 16 + 4;
     let local = decode_addr128(&addr[o..o + 16]);
     o += 16;
     let remote = decode_addr128(&addr[o..o + 16]);
@@ -323,7 +381,6 @@ pub fn flow_endpoints_ip(
 }
 
 fn decode_addr128(bytes: &[u8]) -> std::net::IpAddr {
-    // IPv4: only first 4 bytes non-zero and rest zero → treat as v4 in network order.
     if bytes[4..16].iter().all(|&b| b == 0) {
         std::net::IpAddr::V4(std::net::Ipv4Addr::new(
             bytes[0], bytes[1], bytes[2], bytes[3],

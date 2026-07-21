@@ -49,7 +49,16 @@ pub fn resolve_helper_exe(app: &AppHandle) -> Result<PathBuf, String> {
     let candidates = helper_exe_candidates(app);
     for c in &candidates {
         if c.is_file() {
-            return Ok(c.clone());
+            // Absolute path is required: elevated helper cwd is often System32.
+            return Ok(std::fs::canonicalize(c).unwrap_or_else(|_| {
+                if c.is_absolute() {
+                    c.clone()
+                } else {
+                    std::env::current_dir()
+                        .map(|cwd| cwd.join(c))
+                        .unwrap_or_else(|_| c.clone())
+                }
+            }));
         }
     }
     let listed = candidates
@@ -98,15 +107,27 @@ pub fn windivert_dir_candidates(app: &AppHandle) -> Vec<PathBuf> {
     out
 }
 
-/// First directory that actually contains WinDivert.dll.
+fn to_absolute_dir(d: PathBuf) -> PathBuf {
+    std::fs::canonicalize(&d).unwrap_or_else(|_| {
+        if d.is_absolute() {
+            d
+        } else {
+            std::env::current_dir()
+                .map(|cwd| cwd.join(&d))
+                .unwrap_or(d)
+        }
+    })
+}
+
+/// First directory that actually contains WinDivert.dll (always absolute).
 pub fn resolve_windivert_dir(app: &AppHandle) -> Option<PathBuf> {
     for d in windivert_dir_candidates(app) {
         if d.join("WinDivert.dll").is_file() {
-            return Some(d);
+            return Some(to_absolute_dir(d));
         }
         // Also accept nested x64/
         if d.join("x64").join("WinDivert.dll").is_file() {
-            return Some(d.join("x64"));
+            return Some(to_absolute_dir(d.join("x64")));
         }
     }
     None

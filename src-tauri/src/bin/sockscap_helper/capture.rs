@@ -1,4 +1,12 @@
-//! FLOW (PID map) + NETWORK (IPv4/IPv6 TCP NAT → loopback relay) capture engine.
+//! FLOW (PID map) + NETWORK capture engine.
+//!
+//! TCP redirect uses the official WinDivert **streamdump reflection** pattern
+//! (not NAT-to-127.0.0.1, which fails to deliver to loopback-only listeners):
+//!
+//! - Client C:sp → Remote R:dp  becomes  R:sp → C:relay  (inbound)
+//! - Proxy reply C:relay → R:sp becomes  R:dp → C:sp     (inbound)
+//!
+//! Relay must listen on 0.0.0.0 (all interfaces), not only 127.0.0.1.
 
 use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -15,9 +23,8 @@ use crate::proc_info::{
     path_matches_selector, port_keys_for_pids, tcp_owner_pid, ProcessTree, SharedTree,
 };
 use crate::windivert::{
-    addr_event, addr_for_local_redirect, addr_for_return_to_app, addr_is_outbound, addr_layer,
-    flow_endpoints_ip, flow_process_id, WinDivertApi, ADDR_LEN, LAYER_FLOW, LAYER_NETWORK,
-    LAYER_SOCKET,
+    addr_event, addr_for_reflect_inbound, addr_is_outbound, addr_layer, flow_endpoints_ip,
+    flow_process_id, WinDivertApi, ADDR_LEN, LAYER_FLOW, LAYER_NETWORK, LAYER_SOCKET,
 };
 
 #[derive(Debug, Clone)]
@@ -47,6 +54,10 @@ struct FlowInfo {
 
 #[derive(Debug, Clone)]
 struct RedirectMapping {
+    /// Client local address (original TCP source).
+    orig_src: IpAddr,
+    orig_sport: u16,
+    /// Original remote destination.
     orig_dst: IpAddr,
     orig_port: u16,
     pid: u32,
@@ -112,6 +123,7 @@ impl CaptureEngine {
             "message": "WinDivert open/close probe succeeded",
             "elevated": true,
             "filter": filter,
+            "dll": api.dll_path.display().to_string(),
         }))
     }
 
@@ -146,17 +158,11 @@ impl CaptureEngine {
             },
         };
 
-        // NETWORK layer: IPv4 + IPv6 TCP; return path from v4/v6 loopback relay.
-        // Prefer a simple filter first — complex ipv6.SrcAddr forms can also 87.
+        // NETWORK: outbound TCP only (streamdump). Reflected packets are
+        // reinjected as inbound and are not recaptured by the same handle
+        // (Impostor left clear, matching the official sample).
         let filter_candidates = [
-            format!(
-                "tcp and (outbound or (inbound and tcp.SrcPort == {}))",
-                plan.relay_port
-            ),
-            format!(
-                "(ip or ipv6) and tcp and (outbound or (inbound and tcp.SrcPort == {}))",
-                plan.relay_port
-            ),
+            "tcp and outbound".to_string(),
             "tcp".to_string(),
         ];
         let mut net_h = None;
@@ -179,7 +185,8 @@ impl CaptureEngine {
             )
         })?;
 
-        let relay_desc = format!("{}:{}", plan.relay_ip, plan.relay_port);
+        // streamdump reflection delivers to client_lan:relay, not necessarily 127.0.0.1
+        let relay_desc = format!("*:{}", plan.relay_port);
         let mode_apps = plan.mode_apps;
 
         self.flow_handle = flow_h.map(|h| h as usize);
@@ -226,6 +233,7 @@ impl CaptureEngine {
             "ipv6": true,
             "flowNote": flow_note,
             "flowLayer": self.flow_handle.is_some(),
+            "dll": api.dll_path.display().to_string(),
         }))
     }
 
@@ -453,147 +461,267 @@ fn network_loop(
         let pkt = &mut packet[..len];
         let outbound = addr_is_outbound(&addr);
 
-        let Some((src, sport, dst, dport, is_v6)) = parse_ip_tcp(pkt) else {
+        let Some((src, sport, dst, dport, _is_v6)) = parse_ip_tcp(pkt) else {
             let _ = api.send(handle, pkt, &addr);
             continue;
         };
 
-        if outbound {
-            let key = flow_key(src, sport);
-            if should_bypass(&plan, &bypass_nets, &key, dst, dport, &flows) {
-                let _ = api.send(handle, pkt, &addr);
-                continue;
-            }
-
-            let is_known = redirects
-                .lock()
-                .map(|m| m.contains_key(&key))
-                .unwrap_or(false);
-
-            let (pid, path, orig_dst, orig_port) = if is_known {
-                match redirects.lock().ok().and_then(|m| m.get(&key).cloned()) {
-                    Some(r) => (r.pid, r.path, r.orig_dst, r.orig_port),
-                    None => {
-                        let _ = api.send(handle, pkt, &addr);
-                        continue;
-                    }
+        // ------------------------------------------------------------------
+        // Streamdump PROXY→PORT: outbound from local relay/proxy.
+        // Packet is C:relay → R:client_sport; reflect to R:orig_port → C:client_sport.
+        // ------------------------------------------------------------------
+        if outbound && sport == plan.relay_port {
+            // Prefer reverse key R:client_sport; also try by client port alone.
+            let rev_key = flow_key(dst, dport);
+            let mapping = redirects.lock().ok().and_then(|m| {
+                m.get(&rev_key)
+                    .cloned()
+                    .or_else(|| {
+                        let suffix = format!(":{dport}");
+                        m.iter()
+                            .find(|(k, v)| {
+                                k.ends_with(&suffix) && v.orig_sport == dport
+                            })
+                            .map(|(_, v)| v.clone())
+                    })
+            });
+            if let Some(mapping) = mapping {
+                if reflect_from_proxy(pkt, mapping.orig_port) {
+                    addr_for_reflect_inbound(&mut addr);
+                    api.calc_checksums(pkt, &mut addr);
+                    let _ = api.send(handle, pkt, &addr);
+                } else {
+                    let _ = api.send(handle, pkt, &addr);
                 }
-            } else if plan.mode_apps {
-                // Primary: port owned by a matching app PID?
+            } else {
+                // No mapping (control / unknown) — pass through.
+                let _ = api.send(handle, pkt, &addr);
+            }
+            continue;
+        }
+
+        // Never re-process traffic already destined to the relay port.
+        if dport == plan.relay_port {
+            let _ = api.send(handle, pkt, &addr);
+            continue;
+        }
+
+        if !outbound {
+            let _ = api.send(handle, pkt, &addr);
+            continue;
+        }
+
+        // ------------------------------------------------------------------
+        // Outbound client → remote: streamdump PORT→PROXY reflection.
+        // ------------------------------------------------------------------
+        let key = flow_key(src, sport);
+
+        if let Some(_existing) = redirects.lock().ok().and_then(|m| m.get(&key).cloned()) {
+            if reflect_towards_proxy(pkt, plan.relay_port) {
+                addr_for_reflect_inbound(&mut addr);
+                api.calc_checksums(pkt, &mut addr);
+                if api.send(handle, pkt, &addr).is_ok() {
+                    redirected.fetch_add(1, Ordering::Relaxed);
+                }
+            } else {
+                let _ = api.send(handle, pkt, &addr);
+            }
+            continue;
+        }
+
+        if should_bypass(&plan, &bypass_nets, &key, dst, dport, &flows) {
+            let _ = api.send(handle, pkt, &addr);
+            continue;
+        }
+
+        // Skip pure loopback destinations (local services).
+        if is_loopback_ip(dst) {
+            let _ = api.send(handle, pkt, &addr);
+            continue;
+        }
+
+        // Skip packets already reflecting (src looks like remote, rare).
+        let _ = (relay_v4, relay_v6);
+
+        let (pid, path) = if plan.mode_apps {
+            let port_hit = app_port_keys.contains(&key)
+                || app_port_keys.contains(&format!("*:{sport}"));
+            if !port_hit {
+                refresh_app_index(&tree, &plan, &mut app_port_keys, &mut matched_pids);
+                app_ports_refreshed = Instant::now();
                 let port_hit = app_port_keys.contains(&key)
                     || app_port_keys.contains(&format!("*:{sport}"));
                 if !port_hit {
-                    // Refresh once on miss then recheck (new SYN may not be indexed yet).
-                    refresh_app_index(&tree, &plan, &mut app_port_keys, &mut matched_pids);
-                    app_ports_refreshed = Instant::now();
-                    let port_hit = app_port_keys.contains(&key)
-                        || app_port_keys.contains(&format!("*:{sport}"));
-                    if !port_hit {
-                        // Fall through to resolve_flow; if still miss, pass-through.
-                        let f = resolve_flow(&flows, &tree, &key, src, sport);
-                        let Some(f) = f else {
-                            let _ = api.send(handle, pkt, &addr);
-                            continue;
-                        };
-                        if !matched_pids.contains(&f.pid)
-                            && !process_in_scope(&plan, f.pid, &f.path, &tree)
-                        {
-                            let _ = api.send(handle, pkt, &addr);
-                            continue;
-                        }
-                        (f.pid, f.path.clone(), dst, dport)
-                    } else {
-                        let pid = matched_pids.iter().copied().next().unwrap_or(0);
-                        let path = tree
-                            .with(|t| t.path_of(pid).map(|s| s.to_string()))
-                            .flatten()
-                            .unwrap_or_default();
-                        // Prefer exact PID for this port.
-                        let pid = tcp_owner_pid(src, sport).unwrap_or(pid);
-                        let path = tree
-                            .with(|t| t.path_of(pid).map(|s| s.to_string()))
-                            .flatten()
-                            .unwrap_or(path);
-                        (pid, path, dst, dport)
+                    let f = resolve_flow(&flows, &tree, &key, src, sport);
+                    let Some(f) = f else {
+                        let _ = api.send(handle, pkt, &addr);
+                        continue;
+                    };
+                    if !matched_pids.contains(&f.pid)
+                        && !process_in_scope(&plan, f.pid, &f.path, &tree)
+                    {
+                        let _ = api.send(handle, pkt, &addr);
+                        continue;
                     }
+                    (f.pid, f.path.clone())
                 } else {
-                    let pid = tcp_owner_pid(src, sport).unwrap_or(0);
+                    let pid = tcp_owner_pid(src, sport)
+                        .or_else(|| matched_pids.iter().copied().next())
+                        .unwrap_or(0);
                     let path = tree
                         .with(|t| t.path_of(pid).map(|s| s.to_string()))
                         .flatten()
                         .unwrap_or_default();
-                    (pid, path, dst, dport)
+                    (pid, path)
                 }
             } else {
-                // Global: redirect everything that is not bypassed.
-                let f = resolve_flow(&flows, &tree, &key, src, sport);
-                let (pid, path) = match f {
-                    Some(f) => (f.pid, f.path),
-                    None => (0, String::new()),
-                };
-                if plan.bypass_pids.contains(&pid) {
-                    let _ = api.send(handle, pkt, &addr);
-                    continue;
-                }
-                (pid, path, dst, dport)
+                let pid = tcp_owner_pid(src, sport).unwrap_or(0);
+                let path = tree
+                    .with(|t| t.path_of(pid).map(|s| s.to_string()))
+                    .flatten()
+                    .unwrap_or_default();
+                (pid, path)
+            }
+        } else {
+            // Global: avoid long PID spins — only resolve when bypass_pids set.
+            let f = resolve_flow(&flows, &tree, &key, src, sport);
+            let (pid, path) = match f {
+                Some(f) => (f.pid, f.path),
+                None => (0, String::new()),
             };
-
-            // Already aimed at relay?
-            if (dst == relay_v4 || dst == relay_v6) && dport == plan.relay_port {
+            if pid != 0 && plan.bypass_pids.contains(&pid) {
                 let _ = api.send(handle, pkt, &addr);
                 continue;
             }
+            (pid, path)
+        };
 
-            if let Ok(mut m) = redirects.lock() {
-                m.insert(
-                    key,
-                    RedirectMapping {
-                        orig_dst,
-                        orig_port,
-                        pid,
-                        path,
-                    },
-                );
-            }
+        let mapping = RedirectMapping {
+            orig_src: src,
+            orig_sport: sport,
+            orig_dst: dst,
+            orig_port: dport,
+            pid,
+            path,
+        };
+        // Client key (continuations) + reverse key (proxy peer = R:client_sport).
+        if let Ok(mut m) = redirects.lock() {
+            m.insert(key.clone(), mapping.clone());
+            m.insert(flow_key(dst, sport), mapping);
+        }
 
-            let ok = if is_v6 {
-                rewrite_ipv6_tcp_dst(pkt, Ipv6Addr::LOCALHOST, plan.relay_port)
-            } else {
-                rewrite_ipv4_tcp_dst(pkt, plan.relay_ip, plan.relay_port)
-            };
-            if ok {
-                // Critical: outbound→local must clear Outbound and set Loopback,
-                // or Windows will not deliver the packet to the local relay.
-                addr_for_local_redirect(&mut addr);
-                api.calc_checksums(pkt, &mut addr);
-                if api.send(handle, pkt, &addr).is_ok() {
-                    redirected.fetch_add(1, Ordering::Relaxed);
-                } else {
-                    // Fail-open: try original? packet already rewritten — drop
-                    // is worse; still attempt send of rewritten form only once.
-                    tracing::debug!("sockscap-helper: send after redirect failed");
-                }
-            } else {
-                // Rewrite failed — reinject unmodified so we never blackhole.
-                let _ = api.send(handle, pkt, &addr);
+        if reflect_towards_proxy(pkt, plan.relay_port) {
+            addr_for_reflect_inbound(&mut addr);
+            api.calc_checksums(pkt, &mut addr);
+            if api.send(handle, pkt, &addr).is_ok() {
+                redirected.fetch_add(1, Ordering::Relaxed);
             }
         } else {
-            // Inbound from relay → restore original source so app TCB matches.
-            let key = flow_key(dst, dport); // client is destination of return path
-            if let Some(mapping) = redirects.lock().ok().and_then(|m| m.get(&key).cloned()) {
-                let ok = match mapping.orig_dst {
-                    IpAddr::V4(v4) => rewrite_ipv4_tcp_src(pkt, v4, mapping.orig_port),
-                    IpAddr::V6(v6) => rewrite_ipv6_tcp_src(pkt, v6, mapping.orig_port),
-                };
-                if ok {
-                    addr_for_return_to_app(&mut addr);
-                    api.calc_checksums(pkt, &mut addr);
-                    let _ = api.send(handle, pkt, &addr);
-                    continue;
-                }
-            }
             let _ = api.send(handle, pkt, &addr);
         }
+    }
+}
+
+fn is_loopback_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v) => v.is_loopback(),
+        IpAddr::V6(v) => v.is_loopback(),
+    }
+}
+
+/// Streamdump PORT→PROXY:
+/// `C:sp → R:dp`  ⇒  `R:sp → C:relay` (caller sets Outbound=false).
+fn reflect_towards_proxy(pkt: &mut [u8], relay_port: u16) -> bool {
+    let ver = pkt.first().map(|b| b >> 4).unwrap_or(0);
+    if ver == 4 {
+        if pkt.len() < 40 {
+            return false;
+        }
+        let ihl = (pkt[0] & 0x0f) as usize * 4;
+        if ihl < 20 || pkt.len() < ihl + 20 || pkt[9] != 6 {
+            return false;
+        }
+        let mut src = [0u8; 4];
+        let mut dst = [0u8; 4];
+        src.copy_from_slice(&pkt[12..16]);
+        dst.copy_from_slice(&pkt[16..20]);
+        pkt[12..16].copy_from_slice(&dst); // src = old dst (remote)
+        pkt[16..20].copy_from_slice(&src); // dst = old src (client)
+        let pb = relay_port.to_be_bytes();
+        pkt[ihl + 2] = pb[0];
+        pkt[ihl + 3] = pb[1];
+        // sport unchanged (client ephemeral)
+        pkt[10] = 0;
+        pkt[11] = 0;
+        pkt[ihl + 16] = 0;
+        pkt[ihl + 17] = 0;
+        true
+    } else if ver == 6 {
+        if pkt.len() < 60 || pkt[6] != 6 {
+            return false;
+        }
+        let mut src = [0u8; 16];
+        let mut dst = [0u8; 16];
+        src.copy_from_slice(&pkt[8..24]);
+        dst.copy_from_slice(&pkt[24..40]);
+        pkt[8..24].copy_from_slice(&dst);
+        pkt[24..40].copy_from_slice(&src);
+        let pb = relay_port.to_be_bytes();
+        pkt[42] = pb[0];
+        pkt[43] = pb[1];
+        pkt[40 + 16] = 0;
+        pkt[40 + 17] = 0;
+        true
+    } else {
+        false
+    }
+}
+
+/// Streamdump PROXY→PORT:
+/// `C:relay → R:sp`  ⇒  `R:orig_port → C:sp`.
+fn reflect_from_proxy(pkt: &mut [u8], orig_port: u16) -> bool {
+    let ver = pkt.first().map(|b| b >> 4).unwrap_or(0);
+    if ver == 4 {
+        if pkt.len() < 40 {
+            return false;
+        }
+        let ihl = (pkt[0] & 0x0f) as usize * 4;
+        if ihl < 20 || pkt.len() < ihl + 20 || pkt[9] != 6 {
+            return false;
+        }
+        let mut src = [0u8; 4];
+        let mut dst = [0u8; 4];
+        src.copy_from_slice(&pkt[12..16]);
+        dst.copy_from_slice(&pkt[16..20]);
+        pkt[12..16].copy_from_slice(&dst); // src = old dst (remote)
+        pkt[16..20].copy_from_slice(&src); // dst = old src (client)
+        let pb = orig_port.to_be_bytes();
+        pkt[ihl] = pb[0];
+        pkt[ihl + 1] = pb[1];
+        // dport stays client ephemeral
+        pkt[10] = 0;
+        pkt[11] = 0;
+        pkt[ihl + 16] = 0;
+        pkt[ihl + 17] = 0;
+        true
+    } else if ver == 6 {
+        if pkt.len() < 60 || pkt[6] != 6 {
+            return false;
+        }
+        let mut src = [0u8; 16];
+        let mut dst = [0u8; 16];
+        src.copy_from_slice(&pkt[8..24]);
+        dst.copy_from_slice(&pkt[24..40]);
+        pkt[8..24].copy_from_slice(&dst);
+        pkt[24..40].copy_from_slice(&src);
+        let pb = orig_port.to_be_bytes();
+        pkt[40] = pb[0];
+        pkt[41] = pb[1];
+        pkt[40 + 16] = 0;
+        pkt[40 + 17] = 0;
+        true
+    } else {
+        false
     }
 }
 
@@ -625,7 +753,10 @@ fn should_bypass(
     false
 }
 
-/// FLOW table miss → brief spin → GetExtendedTcpTable owner PID + process tree path.
+/// FLOW table miss → GetExtendedTcpTable owner PID + process tree path.
+///
+/// When FLOW/SOCKET is unavailable, keep the wait short: long spins on every
+/// SYN stall the divert thread and cause app timeouts.
 fn resolve_flow(
     flows: &Arc<Mutex<HashMap<String, FlowInfo>>>,
     tree: &SharedTree,
@@ -636,17 +767,15 @@ fn resolve_flow(
     if let Some(f) = flows.lock().ok().and_then(|m| m.get(key).cloned()) {
         return Some(f);
     }
-    // Race: NETWORK packet can arrive before FLOW/SOCKET event is processed.
-    for _ in 0..10 {
-        std::thread::sleep(std::time::Duration::from_millis(2));
-        if let Some(f) = flows.lock().ok().and_then(|m| m.get(key).cloned()) {
-            return Some(f);
-        }
+    // One brief yield for FLOW race; then TCP table (OWNER_PID_ALL includes SYN_SENT).
+    if flows.lock().ok().and_then(|m| m.get(key).cloned()).is_none() {
+        std::thread::sleep(std::time::Duration::from_millis(1));
     }
-    // TCP table (includes SYN_SENT when using OWNER_PID_ALL).
+    if let Some(f) = flows.lock().ok().and_then(|m| m.get(key).cloned()) {
+        return Some(f);
+    }
     let pid = tcp_owner_pid(src, sport).or_else(|| {
-        // One more brief wait — table can lag the diverted SYN slightly.
-        std::thread::sleep(std::time::Duration::from_millis(5));
+        std::thread::sleep(std::time::Duration::from_millis(2));
         tcp_owner_pid(src, sport)
     })?;
     let path = tree
@@ -814,68 +943,4 @@ fn parse_ip_tcp(pkt: &[u8]) -> Option<(IpAddr, u16, IpAddr, u16, bool)> {
     }
 }
 
-fn rewrite_ipv4_tcp_dst(pkt: &mut [u8], dst: Ipv4Addr, dport: u16) -> bool {
-    if pkt.len() < 40 || pkt[0] >> 4 != 4 {
-        return false;
-    }
-    let ihl = (pkt[0] & 0x0f) as usize * 4;
-    if pkt.len() < ihl + 20 {
-        return false;
-    }
-    let o = dst.octets();
-    pkt[16..20].copy_from_slice(&o);
-    let pb = dport.to_be_bytes();
-    pkt[ihl + 2] = pb[0];
-    pkt[ihl + 3] = pb[1];
-    pkt[10] = 0;
-    pkt[11] = 0;
-    pkt[ihl + 16] = 0;
-    pkt[ihl + 17] = 0;
-    true
-}
 
-fn rewrite_ipv4_tcp_src(pkt: &mut [u8], src: Ipv4Addr, sport: u16) -> bool {
-    if pkt.len() < 40 || pkt[0] >> 4 != 4 {
-        return false;
-    }
-    let ihl = (pkt[0] & 0x0f) as usize * 4;
-    if pkt.len() < ihl + 20 {
-        return false;
-    }
-    let o = src.octets();
-    pkt[12..16].copy_from_slice(&o);
-    let pb = sport.to_be_bytes();
-    pkt[ihl] = pb[0];
-    pkt[ihl + 1] = pb[1];
-    pkt[10] = 0;
-    pkt[11] = 0;
-    pkt[ihl + 16] = 0;
-    pkt[ihl + 17] = 0;
-    true
-}
-
-fn rewrite_ipv6_tcp_dst(pkt: &mut [u8], dst: Ipv6Addr, dport: u16) -> bool {
-    if pkt.len() < 60 || pkt[0] >> 4 != 6 || pkt[6] != 6 {
-        return false;
-    }
-    pkt[24..40].copy_from_slice(&dst.octets());
-    let pb = dport.to_be_bytes();
-    pkt[42] = pb[0];
-    pkt[43] = pb[1];
-    pkt[40 + 16] = 0; // TCP checksum
-    pkt[40 + 17] = 0;
-    true
-}
-
-fn rewrite_ipv6_tcp_src(pkt: &mut [u8], src: Ipv6Addr, sport: u16) -> bool {
-    if pkt.len() < 60 || pkt[0] >> 4 != 6 || pkt[6] != 6 {
-        return false;
-    }
-    pkt[8..24].copy_from_slice(&src.octets());
-    let pb = sport.to_be_bytes();
-    pkt[40] = pb[0];
-    pkt[41] = pb[1];
-    pkt[40 + 16] = 0;
-    pkt[40 + 17] = 0;
-    true
-}

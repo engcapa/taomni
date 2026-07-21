@@ -561,9 +561,11 @@ async fn start_windows_capture(
     if !up_host.is_empty() && up_port > 0 {
         bypass_endpoints.push((up_host, up_port));
     }
-    // Always bypass loopback relay itself (v4 + v6).
+    // Relay listens on 0.0.0.0 / :: (streamdump reflection). Bypass those endpoints
+    // so we never re-capture the proxy's own accept path as a new flow.
     bypass_endpoints.push(("127.0.0.1".into(), relay_handle.port));
     bypass_endpoints.push(("::1".into(), relay_handle.port));
+    bypass_endpoints.push(("0.0.0.0".into(), relay_handle.port));
 
     let args = CaptureStartArgs {
         mode_apps: matches!(cfg.mode, ScopeMode::Apps),
@@ -576,7 +578,8 @@ async fn start_windows_capture(
         bypass_cidrs: cfg.bypass_cidrs.clone(),
         bypass_pids,
         bypass_endpoints,
-        relay_ip: "127.0.0.1".into(),
+        // Unused for streamdump reflection dest (kept for helper JSON compat).
+        relay_ip: "0.0.0.0".into(),
         relay_port: relay_handle.port,
     };
 

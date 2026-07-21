@@ -159,6 +159,9 @@ pub async fn sockscap_helper_start(
             .join("sockscap");
         std::fs::create_dir_all(&ready_dir).map_err(|e| e.to_string())?;
         let ready_file = ready_dir.join(format!("helper-ready-{port}.json"));
+        let ready_file = std::fs::canonicalize(&ready_dir)
+            .map(|d| d.join(format!("helper-ready-{port}.json")))
+            .unwrap_or(ready_file);
         let _ = std::fs::remove_file(&ready_file);
 
         let mut args = vec![
@@ -169,13 +172,17 @@ pub async fn sockscap_helper_start(
             "--ready-file".into(),
             ready_file.display().to_string(),
         ];
-        if resolve_windivert_dir(&app).is_none() {
+        let Some(wd) = resolve_windivert_dir(&app) else {
             return Err(windivert_missing_hint(&app));
-        }
-        if let Some(wd) = resolve_windivert_dir(&app) {
-            args.push("--windivert-dir".into());
-            args.push(wd.display().to_string());
-        }
+        };
+        // Absolute path required: elevated process cwd is typically System32.
+        args.push("--windivert-dir".into());
+        args.push(wd.display().to_string());
+        tracing::info!(
+            "sockscap: launching helper={} windivert-dir={}",
+            helper.display(),
+            wd.display()
+        );
 
         // UAC elevation: PowerShell Start-Process -Verb RunAs
         elevate_and_spawn(&helper, &args)?;

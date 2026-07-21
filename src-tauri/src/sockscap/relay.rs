@@ -50,10 +50,12 @@ pub struct RelayContext {
     pub dns_map: Arc<Mutex<DnsMap>>,
 }
 
-/// Bind 127.0.0.1:0 and serve redirected flows (IPv4 NAT target).
-/// IPv6 redirected flows use the same port on ::1 via a second listener when possible.
+/// Bind **0.0.0.0:0** (all interfaces) — required for WinDivert streamdump-style
+/// reflection, which delivers connections as `remote → client_lan_ip:relay`
+/// rather than to 127.0.0.1. Unknown peers without a redirect mapping are dropped.
+/// IPv6: also listen on `[::]:port` when available.
 pub async fn start_relay(ctx: Arc<RwLock<RelayContext>>) -> Result<RelayHandle, String> {
-    let listener = TcpListener::bind(("127.0.0.1", 0))
+    let listener = TcpListener::bind(("0.0.0.0", 0))
         .await
         .map_err(|e| format!("relay bind: {e}"))?;
     let port = listener
@@ -61,8 +63,8 @@ pub async fn start_relay(ctx: Arc<RwLock<RelayContext>>) -> Result<RelayHandle, 
         .map_err(|e| e.to_string())?
         .port();
 
-    // Best-effort dual-stack: also accept IPv6 loopback on the same port.
-    let listener_v6 = TcpListener::bind((std::net::Ipv6Addr::LOCALHOST, port))
+    // Best-effort dual-stack IPv6 any.
+    let listener_v6 = TcpListener::bind((std::net::Ipv6Addr::UNSPECIFIED, port))
         .await
         .ok();
 
@@ -113,7 +115,8 @@ async fn accept_loop(
         let ctx = Arc::clone(&ctx);
         tokio::spawn(async move {
             if let Err(e) = handle_client(sock, peer, ctx).await {
-                tracing::debug!("sockscap relay client: {e}");
+                // Mapping miss / upstream fail are the usual "proxy does nothing" causes.
+                tracing::warn!("sockscap relay client {peer}: {e}");
             }
         });
     }
@@ -137,9 +140,9 @@ async fn handle_client(
             let sess = guard
                 .as_ref()
                 .ok_or_else(|| "helper session missing".to_string())?;
-            // Prefer lookup by port; helper may also key on ip:port.
-            helper::lookup_orig(sess, peer_port)
-                .or_else(|_| helper::lookup_orig_key(sess, &peer_ip, peer_port))?
+            // Streamdump peer is orig_remote:client_sport — prefer exact ip:port key.
+            helper::lookup_orig_key(sess, &peer_ip, peer_port)
+                .or_else(|_| helper::lookup_orig(sess, peer_port))?
         };
 
         let dst_ip: IpAddr = mapping
