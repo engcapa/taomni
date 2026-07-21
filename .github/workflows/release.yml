@@ -31,7 +31,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: ubuntu-22.04
+          # Ubuntu 24.04 (not 22.04): xcap → pipewire → libspa 0.9.x expects
+          # spa_video_info_raw.flags and u64 modifier. Jammy's PipeWire ~0.3.48
+          # headers lack those fields and fail to compile libspa.
+          - platform: ubuntu-24.04
             args: "--features native-av"
             rust-targets: ""
           - platform: windows-latest
@@ -70,7 +73,7 @@ jobs:
           workspaces: src-tauri -> target
 
       - name: Install Linux bundle dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.platform == 'ubuntu-24.04'
         run: |
           sudo apt-get update
           # Base bundle deps + LanChat native A/V (native-av feature): nasm builds
@@ -79,7 +82,8 @@ jobs:
           # present on the runner).
           # libpipewire-0.3-dev: always required on Linux because target cfg deps
           # pull in xcap for RDP Wayland ScreenCast, and xcap → pipewire →
-          # libspa-sys needs libpipewire-0.3.pc at build time.
+          # libspa-sys needs libpipewire-0.3.pc at build time. Headers must be
+          # new enough for libspa 0.9.x (Ubuntu 24.04 ships PipeWire 1.x).
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
@@ -409,7 +413,7 @@ jobs:
   finalize-updater-manifest:
     name: Compose latest.json
     needs: [build, build-macos]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: github.event_name == 'release' || github.ref_type == 'tag' || inputs.tag != ''
     steps:
       - name: Resolve release tag
