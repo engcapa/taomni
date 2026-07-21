@@ -247,8 +247,20 @@ impl CaptureEngine {
                 api.close_handle(h as HANDLE);
             }
         }
+        // Join divert threads with a short timeout so capture_stop RPC cannot
+        // block the control plane indefinitely if WinDivertRecv never unblocks.
         for t in self.threads.drain(..) {
-            let _ = t.join();
+            let (tx, rx) = std::sync::mpsc::channel();
+            std::thread::spawn(move || {
+                let _ = t.join();
+                let _ = tx.send(());
+            });
+            if rx
+                .recv_timeout(std::time::Duration::from_millis(750))
+                .is_err()
+            {
+                tracing::warn!("sockscap-helper: capture thread join timed out; detaching");
+            }
         }
         if let Ok(mut m) = self.flows.lock() {
             m.clear();

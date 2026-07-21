@@ -6,6 +6,7 @@ use crate::sockscap::relay::RelayHandle;
 use crate::sockscap::rules::{CompiledRules, GfwListMeta};
 use crate::sockscap::stats::{StatsCounters, StatsSnapshot};
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -39,6 +40,8 @@ pub struct Orchestrator {
     pub relay: Option<RelayHandle>,
     /// Shared with the relay task so config/rules can hot-reload while Active.
     pub relay_ctx: Option<std::sync::Arc<tokio::sync::RwLock<crate::sockscap::relay::RelayContext>>>,
+    /// Signal DNS cache refresher to exit when capture stops.
+    pub dns_stop: Option<Arc<AtomicBool>>,
 }
 
 impl Orchestrator {
@@ -52,6 +55,7 @@ impl Orchestrator {
             capture_backend: "none".into(),
             relay: None,
             relay_ctx: None,
+            dns_stop: None,
         }
     }
 
@@ -137,26 +141,49 @@ impl Orchestrator {
         Ok(())
     }
 
+    /// Take the running relay out so the caller can stop it without holding
+    /// the orchestrator write lock (avoids deadlocking status/stats polls).
+    pub fn take_relay_for_stop(&mut self) -> Option<RelayHandle> {
+        if !matches!(self.phase, EnginePhase::Idle) {
+            self.phase = EnginePhase::Stopping;
+            self.message = "stopping".into();
+        }
+        self.relay.take()
+    }
+
     pub async fn stop(&mut self) -> Result<(), String> {
-        if matches!(self.phase, EnginePhase::Idle) {
+        if matches!(self.phase, EnginePhase::Idle) && self.relay.is_none() {
             return Ok(());
         }
         self.phase = EnginePhase::Stopping;
         if let Some(relay) = self.relay.take() {
             relay.stop().await;
         }
-        self.relay_ctx = None;
-        self.message = "stopped".into();
-        self.phase = EnginePhase::Idle;
-        self.capture_backend = "none".into();
+        self.finish_stop();
         Ok(())
     }
 
+    /// Clear runtime handles after relay has been stopped (or abandoned).
+    pub fn finish_stop(&mut self) {
+        if let Some(flag) = self.dns_stop.take() {
+            flag.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+        self.relay_ctx = None;
+        self.relay = None;
+        self.message = "stopped".into();
+        self.phase = EnginePhase::Idle;
+        self.capture_backend = "none".into();
+    }
+
     pub fn force_idle(&mut self) {
+        if let Some(flag) = self.dns_stop.take() {
+            flag.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
         self.phase = EnginePhase::Idle;
         self.message = "recovered".into();
         self.capture_backend = "none".into();
         self.relay_ctx = None;
+        self.relay = None;
     }
 
     /// Hot-update policy surface used by the running relay.

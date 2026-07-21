@@ -1,9 +1,10 @@
 //! Local loopback relay: accept NAT'd connections from WinDivert helper,
 //! attribute hostname (SNI / HTTP Host), apply policy, dial egress, bridge.
 
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -27,10 +28,30 @@ pub struct RelayHandle {
 }
 
 impl RelayHandle {
+    /// Stop accept loops promptly.
+    ///
+    /// Must wake **both** IPv4 and IPv6 listeners (we bind 0.0.0.0 and optionally ::).
+    /// A previous bug only connected to 127.0.0.1, leaving the IPv6 accept task
+    /// blocked forever so `Stop` never returned.
     pub async fn stop(self) {
         self.stop.store(true, Ordering::SeqCst);
-        let _ = TcpStream::connect(("127.0.0.1", self.port)).await;
-        let _ = self.task.await;
+        let port = self.port;
+        // Best-effort wake of both stacks (ignore connect errors).
+        let wake_v4 = TcpStream::connect(("127.0.0.1", port));
+        let wake_v6 = TcpStream::connect((Ipv6Addr::LOCALHOST, port));
+        let _ = tokio::join!(wake_v4, wake_v6);
+
+        let mut task = self.task;
+        tokio::select! {
+            _ = &mut task => {}
+            _ = tokio::time::sleep(Duration::from_millis(800)) => {
+                tracing::warn!(
+                    "sockscap relay accept loops did not exit within 800ms; aborting task"
+                );
+                task.abort();
+                let _ = task.await;
+            }
+        }
     }
 }
 

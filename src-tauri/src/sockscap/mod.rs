@@ -544,7 +544,7 @@ async fn start_windows_capture(
     }));
     let relay_handle = relay::start_relay(Arc::clone(&ctx)).await?;
 
-    // Periodic DNS cache refresh while capture runs.
+    // Periodic DNS cache refresh while capture runs (stopped via orch.dns_stop).
     let dns_stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let _dns_task = crate::sockscap::dns_win::spawn_dns_cache_refresher(
         dns_map,
@@ -607,6 +607,7 @@ async fn start_windows_capture(
             let mut orch = state.sockscap.orch.write().await;
             orch.relay = Some(relay_handle);
             orch.relay_ctx = Some(ctx);
+            orch.dns_stop = Some(dns_stop);
             let gfw_note = orch
                 .gfwlist_meta()
                 .map(|m| format!(", gfw={}", m.rule_count))
@@ -651,12 +652,16 @@ pub async fn sockscap_recover(app: AppHandle, state: State<'_, AppState>) -> Res
     Ok(())
 }
 
-/// Stop capture, relay; mark recovery journal clean.
-/// Does **not** kill the elevated helper process (UAC) — only stops NETWORK capture
-/// on it and tears down the in-app relay. Use helper stop separately if needed.
+/// Thorough capture teardown:
+/// 1) Stop WinDivert NETWORK capture in the elevated helper (with timeout)
+/// 2) Stop local relay accept loops (IPv4+IPv6 wake + abort fallback)
+/// 3) Stop DNS refresher, clear relay ctx, mark recovery journal clean
+///
+/// Does **not** kill the elevated helper process (avoids another UAC on next Start).
 async fn full_teardown(app: &AppHandle, state: &State<'_, AppState>) {
-    // Best-effort capture_stop; never hold the helper mutex across slow RPC if we can
-    // clone the session handle first. Timeouts are inside send_json (≈15s read max).
+    use std::time::Duration;
+
+    // --- 1) Helper capture_stop (blocking RPC) off the async runtime ----------
     let sess = state
         .sockscap
         .helper
@@ -665,16 +670,44 @@ async fn full_teardown(app: &AppHandle, state: &State<'_, AppState>) {
         .ok()
         .and_then(|g| g.as_ref().cloned());
     if let Some(sess) = sess {
-        let _ = helper::capture_stop(&sess);
+        let stop_rpc = tokio::task::spawn_blocking(move || helper::capture_stop(&sess));
+        match tokio::time::timeout(Duration::from_secs(4), stop_rpc).await {
+            Ok(Ok(Ok(()))) => {
+                tracing::info!("sockscap: helper capture_stop ok");
+            }
+            Ok(Ok(Err(e))) => {
+                tracing::warn!("sockscap: helper capture_stop error: {e}");
+            }
+            Ok(Err(e)) => {
+                tracing::warn!("sockscap: helper capture_stop join error: {e}");
+            }
+            Err(_) => {
+                tracing::warn!(
+                    "sockscap: helper capture_stop timed out after 4s (WinDivert threads may still be exiting)"
+                );
+            }
+        }
     }
+
+    // --- 2) Take relay without holding write lock during await ---------------
+    let relay = {
+        let mut orch = state.sockscap.orch.write().await;
+        orch.take_relay_for_stop()
+    };
+    if let Some(relay) = relay {
+        // Internal: dual-stack wake + 800ms abort fallback.
+        relay.stop().await;
+    }
+
+    // --- 3) Finish engine state + DNS + journal ------------------------------
     {
         let mut orch = state.sockscap.orch.write().await;
-        let _ = orch.stop().await;
-        orch.force_idle();
+        orch.finish_stop();
     }
     if let Ok(dir) = data_dir(app) {
         let _ = recovery::mark_clean_and_clear(&recovery::journal_path(&dir));
     }
+    tracing::info!("sockscap: teardown complete");
 }
 
 #[tauri::command]

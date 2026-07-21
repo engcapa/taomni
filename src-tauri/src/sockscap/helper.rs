@@ -434,7 +434,16 @@ fn send_cmd(
 }
 
 /// Low-level helper RPC with a free-form JSON body (`cmd` required).
-pub fn send_json(sess: &HelperSession, mut body: serde_json::Value) -> Result<serde_json::Value, String> {
+pub fn send_json(sess: &HelperSession, body: serde_json::Value) -> Result<serde_json::Value, String> {
+    send_json_timeout(sess, body, Duration::from_secs(15))
+}
+
+/// Same as [`send_json`] with an explicit read timeout (used by capture_stop).
+pub fn send_json_timeout(
+    sess: &HelperSession,
+    mut body: serde_json::Value,
+    read_timeout: Duration,
+) -> Result<serde_json::Value, String> {
     let id = REQ_ID.fetch_add(1, Ordering::Relaxed);
     if let Some(obj) = body.as_object_mut() {
         obj.insert("id".into(), json!(id));
@@ -445,9 +454,7 @@ pub fn send_json(sess: &HelperSession, mut body: serde_json::Value) -> Result<se
         Duration::from_secs(2),
     )
     .map_err(|e| format!("connect helper: {e}"))?;
-    stream
-        .set_read_timeout(Some(Duration::from_secs(15)))
-        .ok();
+    stream.set_read_timeout(Some(read_timeout)).ok();
     stream
         .set_write_timeout(Some(Duration::from_secs(5)))
         .ok();
@@ -498,7 +505,13 @@ pub fn capture_start(sess: &HelperSession, args: &CaptureStartArgs) -> Result<se
 }
 
 pub fn capture_stop(sess: &HelperSession) -> Result<(), String> {
-    let _ = expect_ok(send_json(sess, json!({ "cmd": "capture_stop" }))?)?;
+    // Helper joins divert threads after WinDivertClose; keep client wait short
+    // so Stop never hangs the UI for the full 15s RPC default.
+    let _ = expect_ok(send_json_timeout(
+        sess,
+        json!({ "cmd": "capture_stop" }),
+        Duration::from_secs(3),
+    )?)?;
     Ok(())
 }
 
