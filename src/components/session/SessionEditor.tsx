@@ -65,7 +65,12 @@ import {
   normalizeGroupPath,
   toStoredGroupPath,
 } from "../../lib/sessionPaths";
-import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
+import {
+  alertAppDialog,
+  confirmAppDialog,
+  formatUnknownError,
+  promptAppDialog,
+} from "../../lib/appDialogs";
 import type { SessionConfig, AuthMethod } from "../../lib/ipc";
 import {
   DEFAULT_MAIL_TERMINAL_PROFILE,
@@ -2689,6 +2694,24 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [testing, setTesting] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  /** Footer short status + modal with the full success / error text (errors often overflow the footer). */
+  const presentTestOutcome = (ok: boolean, rawMessage: string) => {
+    let message = rawMessage.trimEnd();
+    if (!message) {
+      message = ok ? t("sessionEditor2.testConnection") : t("sessionEditor2.testFailedTitle");
+    } else if (!ok && /:\s*$/.test(message)) {
+      // e.g. "Presto error (502 Bad Gateway): " with an empty HTTP body
+      message = `${message}\n\n${t("sessionEditor2.testEmptyDetail")}`;
+    }
+    setTestResult({ ok, msg: message });
+    void alertAppDialog({
+      title: ok ? t("sessionEditor2.testSuccessTitle") : t("sessionEditor2.testFailedTitle"),
+      message,
+      okLabel: t("sessionEditor2.ok"),
+      tone: ok ? "success" : "error",
+    });
+  };
+
   /* --- derived --- */
   const needsHost = !["Serial", "File", "Shell", "WSL", "HBaseShell", "S3"].includes(proto);
   const isSSH = ["SSH", "SFTP"].includes(proto);
@@ -3670,12 +3693,12 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
   const handleTestConnection = async () => {
     if (!host || !username) {
-      setTestResult({ ok: false, msg: t("sessionEditor2.testHostUserRequired") });
+      presentTestOutcome(false, t("sessionEditor2.testHostUserRequired"));
       return;
     }
     const passwordAuthData = password || passwordRef;
     if (authMethod === "Password" && !passwordAuthData) {
-      setTestResult({ ok: false, msg: t("sessionEditor2.testEnterPassword") });
+      presentTestOutcome(false, t("sessionEditor2.testEnterPassword"));
       return;
     }
     setTesting(true);
@@ -3693,9 +3716,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         authData,
         JSON.stringify(toNetworkSettingsPayload(networkSettings)),
       );
-      setTestResult({ ok: true, msg });
+      presentTestOutcome(true, msg);
     } catch (err) {
-      setTestResult({ ok: false, msg: String(err) });
+      presentTestOutcome(false, formatUnknownError(err));
     } finally {
       setTesting(false);
     }
@@ -3761,20 +3784,20 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
   const handleTestDbConnection = async () => {
     if (!host) {
-      setTestResult({ ok: false, msg: t("sessionEditor2.errHostRequired") });
+      presentTestOutcome(false, t("sessionEditor2.errHostRequired"));
       return;
     }
     if (proto === "Presto" && !dbCatalog.trim()) {
-      setTestResult({ ok: false, msg: "Presto catalog is required." });
+      presentTestOutcome(false, "Presto catalog is required.");
       return;
     }
     setTesting(true);
     setTestResult(null);
     try {
       const msg = await dbTestConnection(buildDbConnectInfo());
-      setTestResult({ ok: true, msg });
+      presentTestOutcome(true, msg);
     } catch (err) {
-      setTestResult({ ok: false, msg: String(err) });
+      presentTestOutcome(false, formatUnknownError(err));
     } finally {
       setTesting(false);
     }
@@ -3784,12 +3807,12 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     // Mirror the save-path validation: REST/Thrift need a host; native needs a
     // ZK quorum, an hbase-site.xml, or a host (host/port hidden in native mode).
     if ((hbaseConnectionMode === "rest" || hbaseConnectionMode === "thrift") && !host.trim()) {
-      setTestResult({
-        ok: false,
-        msg: hbaseConnectionMode === "thrift"
+      presentTestOutcome(
+        false,
+        hbaseConnectionMode === "thrift"
           ? "HBase Thrift host is required."
           : "HBase REST host is required.",
-      });
+      );
       return;
     }
     if (
@@ -3798,19 +3821,19 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       !hbaseZkQuorum.trim() &&
       !host.trim()
     ) {
-      setTestResult({
-        ok: false,
-        msg: "HBase ZooKeeper quorum, HBase-site.xml, or Remote host is required.",
-      });
+      presentTestOutcome(
+        false,
+        "HBase ZooKeeper quorum, HBase-site.xml, or Remote host is required.",
+      );
       return;
     }
     setTesting(true);
     setTestResult(null);
     try {
       const msg = await hbaseTestConnection(buildHBaseConnectInfo());
-      setTestResult({ ok: true, msg });
+      presentTestOutcome(true, msg);
     } catch (err) {
-      setTestResult({ ok: false, msg: String(err) });
+      presentTestOutcome(false, formatUnknownError(err));
     } finally {
       setTesting(false);
     }
@@ -3818,7 +3841,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
 
   const handleTestProxyConnection = async () => {
     if (!host) {
-      setTestResult({ ok: false, msg: t("sessionEditor2.proxyHostRequired") });
+      presentTestOutcome(false, t("sessionEditor2.proxyHostRequired"));
       return;
     }
     setTesting(true);
@@ -3835,9 +3858,9 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
         testHost,
         testPort,
       );
-      setTestResult({ ok: true, msg });
+      presentTestOutcome(true, msg);
     } catch (err) {
-      setTestResult({ ok: false, msg: String(err) });
+      presentTestOutcome(false, formatUnknownError(err));
     } finally {
       setTesting(false);
     }
@@ -4711,8 +4734,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           
           {(testResult || saveError) && (
             <span
-              className="text-[11px]"
+              className="text-[11px] min-w-0 max-w-[280px] truncate"
+              title={saveError ?? testResult?.msg}
               style={{ color: testResult?.ok && !saveError ? "#2f8a3e" : "#b22222" }}
+              data-testid="session-test-result-summary"
             >
               {saveError ?? testResult?.msg}
             </span>

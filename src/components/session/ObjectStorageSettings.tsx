@@ -10,7 +10,9 @@ import {
   type AzureAuthSource,
 } from "../../types/objectStorage";
 import { storageTestConnection } from "../../lib/objectStorage";
+import { alertAppDialog, formatUnknownError } from "../../lib/appDialogs";
 import { parseSessionOptions } from "../../lib/terminalProfile";
+import { useT } from "../../lib/i18n";
 
 /** Editor-local form state for an object-storage connection. Secrets are kept
  * as plaintext while editing; the save path swaps them for `vault:` refs. */
@@ -144,20 +146,37 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 export function ObjectStorageSettings({ value, onChange, saveInVault, setSaveInVault }: ObjectStorageSettingsProps) {
+  const t = useT();
   const [test, setTest] = useState<{ ok: boolean; msg: string } | null>(null);
   const [testing, setTesting] = useState(false);
   const engine = engineForProvider(value.provider);
   const preset = presetFor(value.provider);
   const patch = (p: Partial<OssFormState>) => onChange({ ...value, ...p });
 
+  const presentTestOutcome = (ok: boolean, rawMessage: string) => {
+    let message = rawMessage.trimEnd();
+    if (!message) {
+      message = ok ? t("sessionEditor2.testSuccessTitle") : t("sessionEditor2.testFailedTitle");
+    } else if (!ok && /:\s*$/.test(message)) {
+      message = `${message}\n\n${t("sessionEditor2.testEmptyDetail")}`;
+    }
+    setTest({ ok, msg: message });
+    void alertAppDialog({
+      title: ok ? t("sessionEditor2.testSuccessTitle") : t("sessionEditor2.testFailedTitle"),
+      message,
+      okLabel: t("sessionEditor2.ok"),
+      tone: ok ? "success" : "error",
+    });
+  };
+
   const runTest = async () => {
     setTesting(true);
     setTest(null);
     try {
       await storageTestConnection(ossFormToConfig(value));
-      setTest({ ok: true, msg: "Connection succeeded." });
+      presentTestOutcome(true, "Connection succeeded.");
     } catch (err) {
-      setTest({ ok: false, msg: err instanceof Error ? err.message : String(err) });
+      presentTestOutcome(false, formatUnknownError(err));
     } finally {
       setTesting(false);
     }
@@ -309,11 +328,22 @@ export function ObjectStorageSettings({ value, onChange, saveInVault, setSaveInV
       </label>
 
       <div className="col-span-2 flex items-center gap-3">
-        <button type="button" className="taomni-btn" disabled={testing} onClick={() => void runTest()}>
-          {testing ? "Testing…" : "Test connection"}
+        <button
+          type="button"
+          className="taomni-btn"
+          data-testid="oss-test-connection"
+          disabled={testing}
+          onClick={() => void runTest()}
+        >
+          {testing ? t("sessionEditor2.testing") : t("sessionEditor2.testConnection")}
         </button>
         {test && (
-          <span className="text-[11px]" style={{ color: test.ok ? "var(--taomni-accent)" : "#d33" }}>
+          <span
+            className="text-[11px] min-w-0 max-w-[280px] truncate"
+            title={test.msg}
+            data-testid="oss-test-result-summary"
+            style={{ color: test.ok ? "#2f8a3e" : "#b22222" }}
+          >
             {test.msg}
           </span>
         )}

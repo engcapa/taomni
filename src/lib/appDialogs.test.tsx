@@ -5,6 +5,7 @@ import {
   alertAppDialog,
   choiceAppDialog,
   confirmAppDialog,
+  formatUnknownError,
   promptAppDialog,
 } from "./appDialogs";
 
@@ -121,5 +122,36 @@ describe("appDialogs", () => {
     fireEvent.click(screen.getByTestId("alert-dialog-ok"));
     await waitFor(() => expect(closed).toBe(true));
     expect(screen.queryByTestId("alert-dialog")).not.toBeInTheDocument();
+  });
+
+  it("passes alert tone through to the dialog for connection test styling", async () => {
+    render(
+      <AppDialogProvider>
+        <button
+          type="button"
+          onClick={() => {
+            void alertAppDialog({
+              title: "Connection test failed",
+              message: "Presto error (502 Bad Gateway): ",
+              tone: "error",
+            });
+          }}
+        >
+          Fail
+        </button>
+      </AppDialogProvider>,
+    );
+
+    fireEvent.click(screen.getByText("Fail"));
+    expect(screen.getByTestId("alert-dialog")).toHaveAttribute("data-tone", "error");
+    expect(screen.getByTestId("alert-dialog-message")).toHaveTextContent(
+      "Presto error (502 Bad Gateway):",
+    );
+  });
+
+  it("formatUnknownError surfaces nested Error messages and plain strings", () => {
+    expect(formatUnknownError("plain")).toBe("plain");
+    expect(formatUnknownError(new Error("boom"))).toBe("boom");
+    expect(formatUnknownError({ message: "from object" })).toBe("from object");
   });
 });
