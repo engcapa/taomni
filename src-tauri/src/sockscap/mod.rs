@@ -5,20 +5,20 @@
 //!   FLOW (PID) + NETWORK (IPv4 TCP NAT → local relay → policy → upstream)
 //! - Linux / macOS capture: not yet (capabilities report unavailable)
 
-mod capture;
-mod config;
-mod dns_win;
-mod egress;
-mod flow;
+pub mod capture;
+pub mod config;
+pub mod dns_win;
+pub mod egress;
+pub mod flow;
 pub mod helper;
-mod orchestrator;
-mod paths;
-mod policy;
-mod process;
-mod recovery;
+pub mod orchestrator;
+pub mod paths;
+pub mod policy;
+pub mod process;
+pub mod recovery;
 pub mod relay;
-mod rules;
-mod stats;
+pub mod rules;
+pub mod stats;
 
 pub use config::{Decision, RuleMode, SocksCapConfig};
 pub use orchestrator::{Orchestrator, SocksCapStatus};
