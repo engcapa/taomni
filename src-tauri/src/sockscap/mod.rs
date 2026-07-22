@@ -398,15 +398,17 @@ pub async fn sockscap_start(
     let caps = capture::capabilities();
     let journal_path = data_dir(&app)?.join("recovery.json");
 
-    #[cfg(windows)]
-    let status = start_windows_capture(&app, &state, &cfg, &caps).await;
+    let status: Result<SocksCapStatus, String> = {
+        #[cfg(windows)]
+        start_windows_capture(&app, &state, &cfg, &caps).await
 
-    #[cfg(not(windows))]
-    let status = {
-        let mut orch = state.sockscap.orch.write().await;
-        orch.apply_config(cfg.clone());
-        let _ = orch.start_stub(&caps);
-        Ok(orch.status())
+        #[cfg(not(windows))]
+        {
+            let mut orch = state.sockscap.orch.write().await;
+            orch.apply_config(cfg.clone());
+            let _ = orch.start_stub(&caps);
+            Ok(orch.status())
+        }
     };
 
     match &status {
