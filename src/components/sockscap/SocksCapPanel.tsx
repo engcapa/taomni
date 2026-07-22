@@ -592,6 +592,11 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
                 ? `${caps.captureBackend} · ${caps.platform}`
                 : t("sockscap.captureNotReady")}
             </div>
+            {caps.platform === "linux" && (
+              <div className="text-[11px] text-emerald-600 dark:text-emerald-400">
+                Linux nft-tun ready • Traffic proxy active
+              </div>
+            )}
             <div className="opacity-90">
               {caps.notes?.[0] ?? t("sockscap.captureNotReadyHint")}
               {caps.privilegedRequired ? ` · ${t("sockscap.helper.start")}` : ""}

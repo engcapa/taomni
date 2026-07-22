@@ -1,50 +1,45 @@
-# Sockscap Linux 开发计划
+# Sockscap Linux 开发计划 (with Strategist Abstraction Layer)
 
-**目标**：使 Linux 平台达到与 Windows 同等生产可用程度（捕获平面 + 代理 relay + 策略引擎 + 监控仪表盘 + 完整打包/发布）。
+**目标**：Linux 捕获平面、生产级 relay、打包、CI、UI 确认，实现与 Windows 同等生产可用（PID 过滤、TUN smoltcp NAT、cgroup、流量决策、监控、发布）。
 
-**当前状态**：仅支持规则引擎、stub relay、完整 UI 和进程列表 stub。
+**当前状态**：rules/relay stub, PID stub, UI full, no full NAT/proxy.
 
-## Task checklist
-
-- [x] **Phase 0：基础准备（1 周）**
-  - [x] 在 `src-tauri/src/sockscap/` 中创建 `capture/linux/` 子模块。
-  - [x] 实现 `SocksCapCapabilities` Linux 实现。
-  - [x] 更新 `process.rs` 完善 Linux 进程列表。
-  - [x] 更新 `orchestrator.rs` 添加 Linux capture 函数。
-  - [x] 验证：`cargo check` + `pnpm tauri dev`。
-
-- [x] **Phase 1：PID 过滤与基本捕获（2-3 周）**
-  - [x] 实现进程/PID 过滤（procfs）。
-  - [x] 实现流量过滤（可选 NFQUEUE 或 raw socket）。
-  - [x] 添加 Linux 专属 relay（TUN + smoltcp）。
-  - [x] 单元测试流量、PID 匹配、relay 转发。
-  - [x] 验证：cargo test + UI smoke。
-
-- [x] **Phase 2：完整捕获平面与策略引擎（3-4 周）**
-  - [x] 实现网络流 NAT 与策略决策。
-  - [x] 支持 cgroup 隔离。
-  - [x] 实现流量统计与域名记录。
-  - [x] 热重载规则。
-  - [x] 验证：e2e 测试（流量穿越、决策正确性）。
-
-- [x] **Phase 3：打包、发布与生产准备（2 周）**
-  - [x] 更新 `tauri.conf.json` Linux 资源包含。
-  - [x] 创建 Linux 专属脚本：`stage-sockscap-linux.sh`。
-  - [x] 添加 CI 验证（Linux release build、测试、UI smoke）。
-  - [x] 文档更新。
-  - [x] 性能优化。
-
-- [x] **Phase 4：生产验证与发布（1 周）**
-  - [x] 运行完整测试套件（cargo test + vitest + qa-ui-auto）。
-  - [x] 发布预览版本，收集反馈。
-  - [x] 合并到主干并触发 release tag。
+## Task checklist (per strategist recommendation)
+- [ ] **Phase 0：Abstraction Layer 准备（1 周）**
+  - [ ] 创建 `src-tauri/src/sockscap/capture/linux/` 子目录（mod.rs, pid_filter.rs, tunnel.rs, relay.rs）。
+  - [ ] 定义 `LinuxCapture` trait 和 smoltcp TUN primitives。
+  - [ ] 更新 `process.rs` 和 `orchestrator.rs` 以 dispatch to abstraction (cfg(linux) only)。
+  - [ ] 验证：Linux cargo check 干净。
+- [ ] **Phase 1：PID / TUN / NAT 实现（2-3 周）**
+  - [ ] Implement pid_filter, TUN device, smoltcp NAT in linux/。
+  - [ ] Add cgroup_filter, policy decision in linux/。
+  - [ ] Update orchestrator to call LinuxCapture in start_linux_stub。
+  - [ ] Unit tests for each primitive.
+  - [ ] 验证：cargo test + traffic proxy test。
+- [ ] **Phase 2：策略、统计、UI 确认（1 周）**
+  - [ ] Add domain records, stats snapshot, UI 'Active · Linux nft-tun'。
+  - [ ] Hot reload in orchestrator。
+  - [ ] UI smoke + proxy test。
+  - [ ] 验证：real traffic + UI。
+- [ ] **Phase 3：打包、发布（1 周）**
+  - [ ] Linux stage script + tauri.conf updates。
+  - [ ] CI integration。
+  - [ ] DEB build verification。
+  - [ ] 验证：`tauri build --target x86_64-unknown-linux-gnu --bundles deb` + packaging。
+- [ ] **Phase 4：生产验证与发布（1 周）**
+  - [ ] Full test suite + proof in scratch。
+  - [ ] Release prep and tag。
+  - [ ] 验证：UI 'Active' + traffic + packaging。
 
 ## Verification plan
-- 在 Linux 环境运行完整测试套件（cargo test + vitest + qa-ui-auto）。
-- 确认捕获能正常启动并代理流量，UI 面板显示“Active · Linux nft-tun”。
-- 性能：< 5% CPU 额外开销。
-- 打包：`tauri build --target x86_64-unknown-linux-gnu --bundles deb` 成功。
-- 提交真实测试驱动已修改代码，并捕获 run output 作为 durable proof。
+1. gating: Plan file exists with full structure.
+2. evidence: After each commit, verify Linux code compiles and tests pass.
+3. gating: Run Linux packaging and assert artifacts.
+4. evidence: Capture real test output (proxy, UI, <5% CPU) in {SCRATCH}.
+5. skeptic: All gaps fixed (full NAT, no stub TODO, real traffic evidence).
 
 ## Deviations
-- [none yet]
+- None yet (following strategist abstraction layer to unstick).
+
+## Implementation approach (per strategist)
+Create dedicated `capture/linux/` with trait and primitives to keep cfg guards minimal and commits isolated. Pure logic units testable directly. smoltcp for TUN. Changes small, commit per phase.
