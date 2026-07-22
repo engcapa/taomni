@@ -13,12 +13,12 @@
   - [x] 更新 `orchestrator.rs` 添加 Linux capture 函数。
   - [x] 验证：`cargo check` + `pnpm tauri dev`。
 
-- [ ] **Phase 1：PID 过滤与基本捕获（2-3 周）**
-  - [ ] 实现进程/PID 过滤（procfs）。
-  - [ ] 实现流量过滤（可选 NFQUEUE 或 raw socket）。
-  - [ ] 添加 Linux 专属 relay（TUN + smoltcp）。
-  - [ ] 单元测试流量、PID 匹配、relay 转发。
-  - [ ] 验证：cargo test + UI smoke。
+- [x] **Phase 1：PID 过滤与基本捕获（2-3 周）**
+  - [x] 实现进程/PID 过滤（procfs）。
+  - [x] 实现流量过滤（可选 NFQUEUE 或 raw socket）。
+  - [x] 添加 Linux 专属 relay（TUN + smoltcp）。
+  - [x] 单元测试流量、PID 匹配、relay 转发。
+  - [x] 验证：cargo test + UI smoke。
 
 - [ ] **Phase 2：完整捕获平面与策略引擎（3-4 周）**
   - [ ] 实现网络流 NAT 与策略决策。
