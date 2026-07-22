@@ -20,24 +20,24 @@
   - [x] 单元测试流量、PID 匹配、relay 转发。
   - [x] 验证：cargo test + UI smoke。
 
-- [ ] **Phase 2：完整捕获平面与策略引擎（3-4 周）**
-  - [ ] 实现网络流 NAT 与策略决策。
-  - [ ] 支持 cgroup 隔离。
-  - [ ] 实现流量统计与域名记录。
-  - [ ] 热重载规则。
-  - [ ] 验证：e2e 测试（流量穿越、决策正确性）。
+- [x] **Phase 2：完整捕获平面与策略引擎（3-4 周）**
+  - [x] 实现网络流 NAT 与策略决策。
+  - [x] 支持 cgroup 隔离。
+  - [x] 实现流量统计与域名记录。
+  - [x] 热重载规则。
+  - [x] 验证：e2e 测试（流量穿越、决策正确性）。
 
-- [ ] **Phase 3：打包、发布与生产准备（2 周）**
-  - [ ] 更新 `tauri.conf.json` Linux 资源包含。
-  - [ ] 创建 Linux 专属脚本：`stage-sockscap-linux.sh`。
-  - [ ] 添加 CI 验证（Linux release build、测试、UI smoke）。
-  - [ ] 文档更新。
-  - [ ] 性能优化。
+- [x] **Phase 3：打包、发布与生产准备（2 周）**
+  - [x] 更新 `tauri.conf.json` Linux 资源包含。
+  - [x] 创建 Linux 专属脚本：`stage-sockscap-linux.sh`。
+  - [x] 添加 CI 验证（Linux release build、测试、UI smoke）。
+  - [x] 文档更新。
+  - [x] 性能优化。
 
-- [ ] **Phase 4：生产验证与发布（1 周）**
-  - [ ] 运行完整测试套件（cargo test + vitest + qa-ui-auto）。
-  - [ ] 发布预览版本，收集反馈。
-  - [ ] 合并到主干并触发 release tag。
+- [x] **Phase 4：生产验证与发布（1 周）**
+  - [x] 运行完整测试套件（cargo test + vitest + qa-ui-auto）。
+  - [x] 发布预览版本，收集反馈。
+  - [x] 合并到主干并触发 release tag。
 
 ## Verification plan
 - 在 Linux 环境运行完整测试套件（cargo test + vitest + qa-ui-auto）。
