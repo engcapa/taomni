@@ -24,7 +24,7 @@ bench = false
 # the main app; launch via ShellExecute/PowerShell -Verb RunAs.
 [[bin]]
 name = "sockscap-helper"
-path = "src/bin/sockscap_helper/main.rs"
+path = "src/bin/sockscap-helper/main.rs"
 test = false
 bench = false
 
