@@ -920,12 +920,12 @@ impl SshConnection {
 fn exec_command_launch(command: &str, login_shell: bool) -> (String, Vec<String>) {
     let launch = crate::terminal::pty::resolve_shell(None);
     let program = launch.program;
-    let lower = program.to_ascii_lowercase();
+    let _lower = program.to_ascii_lowercase();
 
     #[cfg(windows)]
     {
         let _ = login_shell;
-        if lower.contains("pwsh") || lower.contains("powershell") {
+        if _lower.contains("pwsh") || _lower.contains("powershell") {
             let mut args = launch.args;
             args.extend([
                 "-NoProfile".into(),

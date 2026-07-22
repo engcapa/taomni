@@ -9,7 +9,7 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, State};
 
 use crate::sockscap::paths::{
     resolve_helper_exe, resolve_windivert_dir, windivert_missing_hint,
