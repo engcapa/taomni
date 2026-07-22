@@ -148,6 +148,7 @@ describe("buildAppMenuSpec", () => {
     const toolActions = actions(tools.items);
     expect(toolActions).toContain("servers");
     expect(toolActions).toContain("tunneling");
+    expect(toolActions).toContain("sockscap");
     expect(toolActions).toContain("git");
     expect(toolActions).toContain("code-workspace");
     expect(toolActions).toContain("lan-chat");

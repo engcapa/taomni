@@ -21,6 +21,7 @@ use crate::rdp::ws::RdpSession;
 use crate::sdk::SdkManager;
 use crate::servers::ServerRegistry;
 use crate::terminal::{ActiveTerminal, TerminalOutputChannel};
+use crate::sockscap::SocksCapRuntime;
 use crate::tunnel::TunnelRegistry;
 use crate::vault::Vault;
 use crate::vnc::ws::VncSession;
@@ -77,6 +78,8 @@ pub struct AppState {
     pub sftp_sessions: Arc<RwLock<HashMap<String, Arc<ActiveSftp>>>>,
     pub transfers: Arc<RwLock<HashMap<String, Arc<TransferHandle>>>>,
     pub tunnels: Arc<TunnelRegistry>,
+    /// OS-level SocksCap engine (rules/egress now; capture in later phases).
+    pub sockscap: Arc<SocksCapRuntime>,
     pub servers: Arc<ServerRegistry>,
     pub vnc_sessions: Arc<RwLock<HashMap<String, VncSession>>>,
     pub rdp_sessions: Arc<RwLock<HashMap<String, RdpSession>>>,
@@ -197,6 +200,7 @@ impl AppState {
             sftp_sessions: Arc::new(RwLock::new(HashMap::new())),
             transfers: Arc::new(RwLock::new(HashMap::new())),
             tunnels: Arc::new(TunnelRegistry::new()),
+            sockscap: Arc::new(SocksCapRuntime::new()),
             servers: Arc::new(ServerRegistry::new()),
             vnc_sessions: Arc::new(RwLock::new(HashMap::new())),
             rdp_sessions: Arc::new(RwLock::new(HashMap::new())),

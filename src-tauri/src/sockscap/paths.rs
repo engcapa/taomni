@@ -1,0 +1,169 @@
+//! Resolve sockscap-helper and WinDivert resource directories across dev/install layouts.
+
+use std::path::{Path, PathBuf};
+use tauri::{AppHandle, Manager};
+
+/// All candidate paths for the elevated helper binary (first existing wins).
+pub fn helper_exe_candidates(app: &AppHandle) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let mut push = |p: PathBuf| {
+        if !out.iter().any(|x| x == &p) {
+            out.push(p);
+        }
+    };
+
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            // Same directory as Taomni (release install layout).
+            push(dir.join("sockscap-helper.exe"));
+            push(dir.join("sockscap-helper"));
+            // Sidecar / externalBin style names.
+            push(dir.join("bin").join("sockscap-helper.exe"));
+            push(dir.join("sockscap").join("sockscap-helper.exe"));
+            // cargo target when running `tauri dev` (exe is in target/debug).
+            push(dir.join("sockscap-helper.exe"));
+        }
+    }
+
+    // CWD-relative (dev from repo root or src-tauri).
+    for base in [
+        PathBuf::from("target/debug"),
+        PathBuf::from("target/release"),
+        PathBuf::from("src-tauri/target/debug"),
+        PathBuf::from("src-tauri/target/release"),
+    ] {
+        push(base.join("sockscap-helper.exe"));
+        push(base.join("sockscap-helper"));
+    }
+
+    if let Ok(dir) = app.path().resource_dir() {
+        push(dir.join("sockscap-helper.exe"));
+        push(dir.join("bin").join("sockscap-helper.exe"));
+        push(dir.join("sockscap").join("windows").join("sockscap-helper.exe"));
+    }
+
+    out
+}
+
+pub fn resolve_helper_exe(app: &AppHandle) -> Result<PathBuf, String> {
+    let candidates = helper_exe_candidates(app);
+    for c in &candidates {
+        if c.is_file() {
+            // Absolute path is required: elevated helper cwd is often System32.
+            return Ok(std::fs::canonicalize(c).unwrap_or_else(|_| {
+                if c.is_absolute() {
+                    c.clone()
+                } else {
+                    std::env::current_dir()
+                        .map(|cwd| cwd.join(c))
+                        .unwrap_or_else(|_| c.clone())
+                }
+            }));
+        }
+    }
+    let listed = candidates
+        .iter()
+        .take(8)
+        .map(|p| p.display().to_string())
+        .collect::<Vec<_>>()
+        .join("\n  ");
+    Err(format!(
+        "sockscap-helper not found. Build with:\n  cd src-tauri && cargo build --bin sockscap-helper\n\
+         Searched (first paths):\n  {listed}"
+    ))
+}
+
+/// Directories that may contain WinDivert.dll / WinDivert64.sys.
+pub fn windivert_dir_candidates(app: &AppHandle) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let mut push = |p: PathBuf| {
+        if !out.iter().any(|x| x == &p) {
+            out.push(p);
+        }
+    };
+
+    if let Ok(d) = std::env::var("SOCKSCAP_WINDIVERT_DIR") {
+        push(PathBuf::from(d));
+    }
+
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            push(dir.to_path_buf());
+            push(dir.join("sockscap").join("windows"));
+            push(dir.join("resources").join("sockscap").join("windows"));
+        }
+    }
+
+    if let Ok(dir) = app.path().resource_dir() {
+        push(dir.join("sockscap").join("windows"));
+        push(dir.clone());
+    }
+
+    push(PathBuf::from("src-tauri/resources/sockscap/windows"));
+    push(PathBuf::from("resources/sockscap/windows"));
+    push(PathBuf::from("src-tauri/target/debug"));
+    push(PathBuf::from("target/debug"));
+
+    out
+}
+
+fn to_absolute_dir(d: PathBuf) -> PathBuf {
+    std::fs::canonicalize(&d).unwrap_or_else(|_| {
+        if d.is_absolute() {
+            d
+        } else {
+            std::env::current_dir()
+                .map(|cwd| cwd.join(&d))
+                .unwrap_or(d)
+        }
+    })
+}
+
+/// First directory that actually contains WinDivert.dll (always absolute).
+pub fn resolve_windivert_dir(app: &AppHandle) -> Option<PathBuf> {
+    for d in windivert_dir_candidates(app) {
+        if d.join("WinDivert.dll").is_file() {
+            return Some(to_absolute_dir(d));
+        }
+        // Also accept nested x64/
+        if d.join("x64").join("WinDivert.dll").is_file() {
+            return Some(to_absolute_dir(d.join("x64")));
+        }
+    }
+    None
+}
+
+pub fn windivert_missing_hint(app: &AppHandle) -> String {
+    let dirs = windivert_dir_candidates(app)
+        .into_iter()
+        .take(6)
+        .map(|p| p.display().to_string())
+        .collect::<Vec<_>>()
+        .join("\n  ");
+    format!(
+        "WinDivert.dll not found. Download WinDivert and place WinDivert.dll + WinDivert64.sys in one of:\n  {dirs}\n\
+         Or set SOCKSCAP_WINDIVERT_DIR. See src-tauri/resources/sockscap/windows/README.md"
+    )
+}
+
+/// Normalize an executable path for app-list matching (lowercase, backslashes, no trailing slash).
+pub fn normalize_exe_path(p: &str) -> String {
+    let mut s = p.trim().replace('/', "\\").to_ascii_lowercase();
+    while s.ends_with('\\') {
+        s.pop();
+    }
+    // Collapse \\?\ prefix
+    if let Some(rest) = s.strip_prefix(r"\\?\") {
+        s = rest.to_string();
+    }
+    s
+}
+
+pub fn paths_match_exe(process_path: &str, selector: &str) -> bool {
+    let p = normalize_exe_path(process_path);
+    let s = normalize_exe_path(selector);
+    if p.is_empty() || s.is_empty() {
+        return false;
+    }
+    p == s || p.ends_with(&s) || Path::new(&p).ends_with(Path::new(&s))
+}

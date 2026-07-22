@@ -43,7 +43,9 @@ import { SettingsPanel } from "../components/settings/SettingsPanel";
 import { LanChatGate } from "../components/lanchat/LanChatGate";
 import { EdgeDrawer } from "../components/lanchat/EdgeDrawer";
 import { CallOverlay } from "../components/lanchat/CallOverlay";
-import { WhiteboardOverlay } from "../components/lanchat/whiteboard/WhiteboardOverlay";import { TunnelManager } from "../components/tunnel/TunnelManager";
+import { WhiteboardOverlay } from "../components/lanchat/whiteboard/WhiteboardOverlay";
+import { TunnelManager } from "../components/tunnel/TunnelManager";
+import { SocksCapPanel } from "../components/sockscap/SocksCapPanel";
 import { FileBrowser, type SftpPendingUploadRequest } from "../components/filebrowser/FileBrowser";
 import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowserPanel";
 import { ObjectStorageBrowser } from "../components/objectstorage/ObjectStorageBrowser";
@@ -2987,6 +2989,20 @@ export function MainLayout() {
         }
         break;
       }
+      case "sockscap": {
+        const existing = tabsRef.current.find((tab) => tab.type === "sockscap");
+        if (existing) {
+          setActiveTab(existing.id);
+        } else {
+          addTab({
+            id: "sockscap-main",
+            type: "sockscap",
+            title: t("sockscap.title"),
+            closable: true,
+          });
+        }
+        break;
+      }
       case "tools":
         openPlaceholderTab(t("tabs.networkTools"), t("status.commandUnavailable"));
         break;
@@ -4036,6 +4052,13 @@ export function MainLayout() {
                   />
                 )}
 
+                {activeTab?.type === "sockscap" && (
+                  <SocksCapPanel
+                    onStatusMessage={setStatusMessage}
+                    onClose={() => removeTab(activeTab.id)}
+                  />
+                )}
+
                 {activeTab?.type === "proxy-test" && activeTab.proxyTest && (
                   <Suspense fallback={null}>
                     <ProxyTestTab info={activeTab.proxyTest} />
@@ -4057,6 +4080,7 @@ export function MainLayout() {
                   activeTab.type !== "settings" &&
                   activeTab.type !== "git" &&
                   activeTab.type !== "nettools" &&
+                  activeTab.type !== "sockscap" &&
                   activeTab.type !== "lan-chat" &&
                   activeTab.type !== "proxy-test" && (
                   <UnavailablePanel title={activeTab.title} message={activeTab.message} />

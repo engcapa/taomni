@@ -1,0 +1,5 @@
+# WinDivert redistributables (download from official releases; LGPLv3/GPLv2)
+*.dll
+*.sys
+*.lib
+!README.md

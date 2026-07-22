@@ -4,7 +4,7 @@ import type { NetworkSettingsPayload } from "../lib/networkSettings";
 import type { RdpOptions } from "./rdp";
 import type { ObjectStorageConfig } from "./objectStorage";
 
-export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "lan-chat" | "git" | "mail" | "code-workspace";
+export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "sockscap" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "lan-chat" | "git" | "mail" | "code-workspace";
 
 /** Presence state of a LAN peer (mirrors the Rust `PresenceStatus`). */
 export type LanPresence = "online" | "away" | "busy" | "offline";

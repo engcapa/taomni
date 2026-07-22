@@ -700,6 +700,8 @@ export function TabIcon({ tab }: { tab: Tab }) {
       return <Monitor className="w-3 h-3" style={{ color: "#a04b9c" }} />;
     case "nettools":
       return <NetworkIcon className="w-3 h-3" style={{ color: "#236a98" }} />;
+    case "sockscap":
+      return <NetworkIcon className="w-3 h-3" style={{ color: "#0d9488" }} />;
     case "proxy-test":
       return <NetworkIcon className="w-3 h-3" style={{ color: "#6b7280" }} />;
     case "git":

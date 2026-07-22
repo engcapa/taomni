@@ -17,6 +17,7 @@ import {
   Search,
   Server,
   Settings,
+  Shield,
   SplitSquareVertical,
   Terminal as TerminalIcon,
   Upload,
@@ -186,6 +187,7 @@ export function ControlBar({
         children: [
           { label: t("servers.dialogTitle"), testId: "context-menu-item-servers", icon: <Server className="w-3 h-3" />, onClick: () => onCommand("servers") },
           { label: t("menu.tunneling"), icon: <Network className="w-3 h-3" />, onClick: () => onCommand("tunneling") },
+          { label: t("menu.sockscap"), icon: <Shield className="w-3 h-3" />, onClick: () => onCommand("sockscap") },
           { label: t("menu.gitRepository"), icon: <GitBranch className="w-3 h-3" />, onClick: () => onCommand("git") },
           { label: t("menu.codeWorkspace"), icon: <FileText className="w-3 h-3" />, onClick: () => onCommand("code-workspace") },
           ...(workspaceCommands.length > 0 ? [{

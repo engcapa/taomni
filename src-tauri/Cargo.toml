@@ -20,6 +20,14 @@ path = "tests/support/acp_fake_agent.rs"
 test = false
 bench = false
 
+# Elevated SocksCap helper (Windows UAC + WinDivert probe). Built alongside
+# the main app; launch via ShellExecute/PowerShell -Verb RunAs.
+[[bin]]
+name = "sockscap-helper"
+path = "src/bin/sockscap_helper/main.rs"
+test = false
+bench = false
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 prost-build = "0.14"
@@ -207,7 +215,11 @@ local-llm-fim = ["dep:llama-cpp-2"]
 hbase-kerberos = ["dep:cross-krb5"]
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = ["fileapi", "commdlg", "shellapi", "winbase", "winuser"] }
+winapi = { version = "0.3", features = [
+  "fileapi", "commdlg", "shellapi", "winbase", "winuser",
+  "libloaderapi", "errhandlingapi", "processthreadsapi",
+  "handleapi", "minwindef", "synchapi", "tlhelp32",
+] }
 winreg = "0.55"
 
 [target.'cfg(target_os = "macos")'.dependencies]
