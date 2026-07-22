@@ -24,6 +24,7 @@ pub use config::{Decision, RuleMode, SocksCapConfig};
 pub use orchestrator::{Orchestrator, SocksCapStatus};
 pub use policy::{PolicyEngine, PolicyInput};
 pub use rules::GfwListMeta;
+pub use stats::DomainRecord;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -515,9 +516,9 @@ async fn start_windows_capture(
         None
     };
 
-    let stats = {
+    let (stats, domains) = {
         let orch = state.sockscap.orch.read().await;
-        Arc::clone(&orch.stats)
+        (Arc::clone(&orch.stats), Arc::clone(&orch.domains))
     };
     let rules = {
         let orch = state.sockscap.orch.read().await;
@@ -541,6 +542,7 @@ async fn start_windows_capture(
         self_pid: std::process::id(),
         ssh_pool,
         dns_map: Arc::clone(&dns_map),
+        domains,
     }));
     let relay_handle = relay::start_relay(Arc::clone(&ctx)).await?;
 
@@ -809,4 +811,23 @@ pub async fn boot_repair(app: &AppHandle) {
     }
     let _ = recovery::mark_clean_and_clear(&journal_path);
     tracing::info!("sockscap: recovery complete");
+}
+
+#[tauri::command]
+pub async fn sockscap_get_domain_records(
+    state: State<'_, AppState>,
+) -> Result<Vec<DomainRecord>, String> {
+    let orch = state.sockscap.orch.read().await;
+    let guard = orch.domains.lock().map_err(|e| e.to_string())?;
+    Ok(guard.snapshot())
+}
+
+#[tauri::command]
+pub async fn sockscap_clear_domain_records(
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let orch = state.sockscap.orch.read().await;
+    let mut guard = orch.domains.lock().map_err(|e| e.to_string())?;
+    guard.clear();
+    Ok(())
 }

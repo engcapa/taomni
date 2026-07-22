@@ -36,6 +36,15 @@ impl StatsCounters {
         }
     }
 
+    pub fn add_bytes(&self, up: u64, down: u64) {
+        if up > 0 {
+            self.bytes_up.fetch_add(up, Ordering::Relaxed);
+        }
+        if down > 0 {
+            self.bytes_down.fetch_add(down, Ordering::Relaxed);
+        }
+    }
+
     pub fn reset(&self) {
         self.flows_total.store(0, Ordering::Relaxed);
         self.flows_proxy.store(0, Ordering::Relaxed);
@@ -56,3 +65,123 @@ pub struct StatsSnapshot {
     pub bytes_up: u64,
     pub bytes_down: u64,
 }
+
+use crate::sockscap::config::Decision;
+use std::collections::HashMap;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DomainRecord {
+    pub key: String,
+    pub domain_or_ip: String,
+    pub decision: Decision,
+    pub matched_rule: Option<String>,
+    pub process_name: Option<String>,
+    pub pid: Option<u32>,
+    pub hit_count: u64,
+    pub bytes_up: u64,
+    pub bytes_down: u64,
+    pub last_seen_unix: u64,
+}
+
+#[derive(Debug)]
+pub struct DomainTracker {
+    records: HashMap<String, DomainRecord>,
+    max_capacity: usize,
+}
+
+impl DomainTracker {
+    pub fn new(max_capacity: usize) -> Self {
+        Self {
+            records: HashMap::new(),
+            max_capacity,
+        }
+    }
+
+    pub fn record(
+        &mut self,
+        domain_or_ip: String,
+        decision: Decision,
+        matched_rule: Option<String>,
+        process_path: Option<String>,
+        pid: Option<u32>,
+        bytes_up: u64,
+        bytes_down: u64,
+    ) {
+        let key = format!("{domain_or_ip}:{:?}", decision);
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        let process_name = process_path.as_ref().and_then(|p| {
+            std::path::Path::new(p)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|s| s.to_string())
+        });
+
+        if let Some(entry) = self.records.get_mut(&key) {
+            entry.hit_count += 1;
+            entry.bytes_up += bytes_up;
+            entry.bytes_down += bytes_down;
+            entry.last_seen_unix = now;
+            if matched_rule.is_some() {
+                entry.matched_rule = matched_rule;
+            }
+            if process_name.is_some() {
+                entry.process_name = process_name;
+            }
+            if pid.is_some() {
+                entry.pid = pid;
+            }
+        } else {
+            if self.records.len() >= self.max_capacity {
+                if let Some(oldest_key) = self
+                    .records
+                    .iter()
+                    .min_by_key(|(_, v)| v.last_seen_unix)
+                    .map(|(k, _)| k.clone())
+                {
+                    self.records.remove(&oldest_key);
+                }
+            }
+
+            self.records.insert(
+                key.clone(),
+                DomainRecord {
+                    key,
+                    domain_or_ip,
+                    decision,
+                    matched_rule,
+                    process_name,
+                    pid,
+                    hit_count: 1,
+                    bytes_up,
+                    bytes_down,
+                    last_seen_unix: now,
+                },
+            );
+        }
+    }
+
+    pub fn add_traffic(&mut self, domain_or_ip: &str, decision: Decision, bytes_up: u64, bytes_down: u64) {
+        let key = format!("{domain_or_ip}:{:?}", decision);
+        if let Some(entry) = self.records.get_mut(&key) {
+            entry.bytes_up += bytes_up;
+            entry.bytes_down += bytes_down;
+        }
+    }
+
+    pub fn snapshot(&self) -> Vec<DomainRecord> {
+        let mut list: Vec<_> = self.records.values().cloned().collect();
+        list.sort_by(|a, b| b.last_seen_unix.cmp(&a.last_seen_unix));
+        list
+    }
+
+    pub fn clear(&mut self) {
+        self.records.clear();
+    }
+}
+

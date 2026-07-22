@@ -2108,6 +2108,10 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
         bytesDown: 0,
       } as T;
     }
+    case "sockscap_get_domain_records":
+      return [] as T;
+    case "sockscap_clear_domain_records":
+      return undefined as T;
     case "sockscap_list_processes":
       return [] as T;
     case "sockscap_test_upstream":

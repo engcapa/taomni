@@ -553,6 +553,8 @@ pub fn run() {
             sockscap::sockscap_stop,
             sockscap::sockscap_recover,
             sockscap::sockscap_stats_snapshot,
+            sockscap::sockscap_get_domain_records,
+            sockscap::sockscap_clear_domain_records,
             sockscap::sockscap_list_processes,
             sockscap::sockscap_test_upstream,
             sockscap::helper::sockscap_helper_start,

@@ -35,6 +35,7 @@ pub struct Orchestrator {
     config: Option<SocksCapConfig>,
     rules: Option<Arc<CompiledRules>>,
     pub stats: Arc<StatsCounters>,
+    pub domains: Arc<std::sync::Mutex<crate::sockscap::stats::DomainTracker>>,
     capture_backend: String,
     /// Active local relay (if capture is running).
     pub relay: Option<RelayHandle>,
@@ -52,6 +53,7 @@ impl Orchestrator {
             config: None,
             rules: None,
             stats: Arc::new(StatsCounters::default()),
+            domains: Arc::new(std::sync::Mutex::new(crate::sockscap::stats::DomainTracker::new(200))),
             capture_backend: "none".into(),
             relay: None,
             relay_ctx: None,

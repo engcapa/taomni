@@ -204,3 +204,24 @@ export function sockscapHelperStatus(): Promise<HelperStatus> {
 export function sockscapHelperProbeWindivert(filter?: string): Promise<unknown> {
   return invoke("sockscap_helper_probe_windivert", { filter: filter ?? null });
 }
+
+export interface DomainRecord {
+  key: string;
+  domainOrIp: string;
+  decision: Decision;
+  matchedRule: string | null;
+  processName: string | null;
+  pid: number | null;
+  hitCount: number;
+  bytesUp: number;
+  bytesDown: number;
+  lastSeenUnix: number;
+}
+
+export function sockscapGetDomainRecords(): Promise<DomainRecord[]> {
+  return invoke("sockscap_get_domain_records");
+}
+
+export function sockscapClearDomainRecords(): Promise<void> {
+  return invoke("sockscap_clear_domain_records");
+}

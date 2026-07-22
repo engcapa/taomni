@@ -1,13 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   AlertCircle,
+  ArrowDownLeft,
+  ArrowUpRight,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Loader2,
   Network,
   Play,
   Plus,
   RefreshCw,
+  Search,
   Shield,
   Square,
   Trash2,
@@ -26,6 +31,8 @@ import {
   sockscapStatsSnapshot,
   sockscapStatus,
   sockscapStop,
+  sockscapGetDomainRecords,
+  sockscapClearDomainRecords,
   sockscapHelperProbeWindivert,
   sockscapHelperStart,
   sockscapHelperStatus,
@@ -33,6 +40,7 @@ import {
   sockscapTestTarget,
   sockscapTestUpstream,
   type Decision,
+  type DomainRecord,
   type HelperStatus,
   type GfwListStatus,
   type ProcessInfo,
@@ -134,6 +142,16 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
   const [password, setPassword] = useState("");
   const [storingPass, setStoringPass] = useState(false);
 
+  // Traffic rates and domain tracking state
+  const [domainRecords, setDomainRecords] = useState<DomainRecord[]>([]);
+  const [domainsExpanded, setDomainsExpanded] = useState(true);
+  const [domainFilter, setDomainFilter] = useState("");
+  const [decisionFilter, setDecisionFilter] = useState<"all" | "proxy" | "direct" | "block">("all");
+  const [topNLimit, setTopNLimit] = useState(50);
+  const [upSpeed, setUpSpeed] = useState(0);
+  const [downSpeed, setDownSpeed] = useState(0);
+  const lastBytesRef = useRef<{ up: number; down: number; ts: number } | null>(null);
+
   const report = useCallback(
     (text: string, ok = true) => {
       setMsg({ ok, text });
@@ -142,16 +160,17 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     [onStatusMessage],
   );
 
-  /** Full panel reload (config + caps + status + stats + helper). */
+  /** Full panel reload (config + caps + status + stats + helper + domains). */
   const refresh = useCallback(async () => {
     try {
-      const [c, cap, st, gf, sn, hp] = await Promise.all([
+      const [c, cap, st, gf, sn, hp, doms] = await Promise.all([
         sockscapGetConfig().catch(() => DEFAULT_CFG),
         sockscapCapabilities().catch(() => null),
         sockscapStatus().catch(() => null),
         sockscapGfwlistStatus().catch(() => null),
         sockscapStatsSnapshot().catch(() => null),
         sockscapHelperStatus().catch(() => null),
+        sockscapGetDomainRecords().catch(() => null),
       ]);
       setCfg({ ...DEFAULT_CFG, ...c, upstream: { ...DEFAULT_CFG.upstream, ...c.upstream } });
       setCaps(cap);
@@ -159,26 +178,59 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
       setGfw(gf);
       setStats(sn);
       setHelper(hp);
+      if (doms) setDomainRecords(doms);
     } catch (e) {
       report(String(e), false);
     }
   }, [report]);
 
-  /** Lightweight poll while capture is running (stats + phase + helper only). */
+  /** Lightweight poll while capture is running (stats + rates + helper + domains). */
   const refreshLive = useCallback(async () => {
     try {
-      const [st, sn, hp] = await Promise.all([
+      const [st, sn, hp, doms] = await Promise.all([
         sockscapStatus().catch(() => null),
         sockscapStatsSnapshot().catch(() => null),
         sockscapHelperStatus().catch(() => null),
+        sockscapGetDomainRecords().catch(() => null),
       ]);
       if (st) setStatus(st);
-      if (sn) setStats(sn);
       if (hp) setHelper(hp);
+      if (doms) setDomainRecords(doms);
+      if (sn) {
+        const now = Date.now();
+        if (lastBytesRef.current) {
+          const dt = (now - lastBytesRef.current.ts) / 1000;
+          if (dt > 0) {
+            const upD = Math.max(0, sn.bytesUp - lastBytesRef.current.up);
+            const downD = Math.max(0, sn.bytesDown - lastBytesRef.current.down);
+            setUpSpeed(upD / dt);
+            setDownSpeed(downD / dt);
+          }
+        }
+        lastBytesRef.current = { up: sn.bytesUp, down: sn.bytesDown, ts: now };
+        setStats(sn);
+      }
     } catch {
       /* ignore transient poll errors */
     }
   }, []);
+
+  const filteredDomainRecords = useMemo(() => {
+    let list = domainRecords;
+    if (decisionFilter !== "all") {
+      list = list.filter((r) => r.decision === decisionFilter);
+    }
+    if (domainFilter.trim()) {
+      const q = domainFilter.trim().toLowerCase();
+      list = list.filter(
+        (r) =>
+          r.domainOrIp.toLowerCase().includes(q) ||
+          (r.processName && r.processName.toLowerCase().includes(q)) ||
+          (r.matchedRule && r.matchedRule.toLowerCase().includes(q)),
+      );
+    }
+    return list;
+  }, [domainRecords, decisionFilter, domainFilter]);
 
   useEffect(() => {
     void refresh();
@@ -995,17 +1047,227 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
           </div>
         </Section>
 
-        {/* Stats / status message */}
+        {/* Stats, Rates & Domain Monitor Panel (Option B) */}
         <Section title={t("sockscap.section.status")}>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
-            <Stat
-              icon={<Activity className="w-3.5 h-3.5" />}
-              label={t("sockscap.stats.flows")}
-              value={String(stats?.flowsTotal ?? 0)}
-            />
-            <Stat label={t("sockscap.stats.proxy")} value={String(stats?.flowsProxy ?? 0)} />
-            <Stat label={t("sockscap.stats.direct")} value={String(stats?.flowsDirect ?? 0)} />
-            <Stat label={t("sockscap.stats.block")} value={String(stats?.flowsBlock ?? 0)} />
+          {/* Top 4 Metric Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] mb-3">
+            <div className="rounded border border-[var(--taomni-divider)] px-2.5 py-2 bg-[var(--taomni-bg)] flex flex-col justify-between">
+              <div className="text-[var(--taomni-text-muted)] flex items-center justify-between text-[10px]">
+                <span className="flex items-center gap-1 font-medium"><ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" /> Upload Speed</span>
+                <span className="text-[10px] text-[var(--taomni-text-muted)]">Total: {formatBytes(stats?.bytesUp ?? 0)}</span>
+              </div>
+              <div className="text-[15px] font-bold text-emerald-600 dark:text-emerald-400 tabular-nums mt-1">
+                {formatSpeed(upSpeed)}
+              </div>
+            </div>
+
+            <div className="rounded border border-[var(--taomni-divider)] px-2.5 py-2 bg-[var(--taomni-bg)] flex flex-col justify-between">
+              <div className="text-[var(--taomni-text-muted)] flex items-center justify-between text-[10px]">
+                <span className="flex items-center gap-1 font-medium"><ArrowDownLeft className="w-3.5 h-3.5 text-blue-500" /> Download Speed</span>
+                <span className="text-[10px] text-[var(--taomni-text-muted)]">Total: {formatBytes(stats?.bytesDown ?? 0)}</span>
+              </div>
+              <div className="text-[15px] font-bold text-blue-600 dark:text-blue-400 tabular-nums mt-1">
+                {formatSpeed(downSpeed)}
+              </div>
+            </div>
+
+            <div className="rounded border border-[var(--taomni-divider)] px-2.5 py-2 bg-[var(--taomni-bg)] flex flex-col justify-between">
+              <div className="text-[var(--taomni-text-muted)] flex items-center justify-between text-[10px]">
+                <span className="flex items-center gap-1 font-medium"><Activity className="w-3.5 h-3.5 text-indigo-500" /> Active Flows</span>
+                <span className="text-[10px] text-[var(--taomni-text-muted)]">Proxy: {stats?.flowsProxy ?? 0}</span>
+              </div>
+              <div className="text-[15px] font-bold tabular-nums mt-1">
+                {stats?.flowsTotal ?? 0}
+              </div>
+            </div>
+
+            <div className="rounded border border-[var(--taomni-divider)] px-2.5 py-2 bg-[var(--taomni-bg)] flex flex-col justify-between">
+              <div className="text-[var(--taomni-text-muted)] flex items-center justify-between text-[10px]">
+                <span className="flex items-center gap-1 font-medium"><Shield className="w-3.5 h-3.5 text-amber-500" /> Direct & Block</span>
+                <span className="text-[10px] text-[var(--taomni-text-muted)]">Block: {stats?.flowsBlock ?? 0}</span>
+              </div>
+              <div className="text-[15px] font-bold tabular-nums mt-1 flex items-center gap-2">
+                <span className="text-slate-700 dark:text-slate-300">{stats?.flowsDirect ?? 0}</span>
+                <span className="text-[10px] font-normal text-slate-400">Direct</span>
+              </div>
+            </div>
+          </div>
+
+          {status?.message && (
+            <div className="mb-3 text-[11px] text-[var(--taomni-text-muted)] flex gap-1 items-start">
+              <Network className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              {status.message}
+            </div>
+          )}
+
+          {/* Captured Domains Collapsible Panel */}
+          <div className="rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] overflow-hidden">
+            <button
+              type="button"
+              className="w-full px-3 py-2 text-left text-[11px] font-semibold flex items-center justify-between hover:bg-[var(--taomni-hover)] transition-colors"
+              onClick={() => setDomainsExpanded(!domainsExpanded)}
+            >
+              <div className="flex items-center gap-2">
+                {domainsExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                <span>Captured Domains & Flow History</span>
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-[var(--taomni-hover)] font-normal text-[var(--taomni-text-muted)]">
+                  {domainRecords.length} entries
+                </span>
+              </div>
+              <span className="text-[10px] font-normal text-[var(--taomni-text-muted)]">
+                {domainsExpanded ? "Click to collapse" : "Click to expand"}
+              </span>
+            </button>
+
+            {domainsExpanded && (
+              <div className="p-3 border-t border-[var(--taomni-divider)] space-y-3">
+                {/* Controls Bar */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-[220px]">
+                    <div className="relative flex-1">
+                      <Search className="w-3.5 h-3.5 absolute left-2 top-2 text-[var(--taomni-text-muted)]" />
+                      <input
+                        className="w-full text-[11px] pl-7 pr-2 py-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel)]"
+                        placeholder="Search domain, IP or process..."
+                        value={domainFilter}
+                        onChange={(e) => setDomainFilter(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* Decision Filter Pills */}
+                    <div className="flex rounded border border-[var(--taomni-divider)] p-0.5 text-[10px]">
+                      {(["all", "proxy", "direct", "block"] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          className={`px-2 py-0.5 rounded capitalize transition-colors ${
+                            decisionFilter === mode
+                              ? "bg-[var(--taomni-accent)] text-white font-medium"
+                              : "hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"
+                          }`}
+                          onClick={() => setDecisionFilter(mode)}
+                        >
+                          {mode}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Top N Limit Dropdown */}
+                    <select
+                      className="text-[10px] px-2 py-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel)]"
+                      value={topNLimit}
+                      onChange={(e) => setTopNLimit(Number(e.target.value))}
+                    >
+                      <option value={50}>Top 50</option>
+                      <option value={100}>Top 100</option>
+                      <option value={200}>All (max 200)</option>
+                    </select>
+
+                    {/* Clear Button */}
+                    <button
+                      type="button"
+                      className="px-2 py-1 rounded text-[10px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] flex items-center gap-1 text-[var(--taomni-text-muted)]"
+                      onClick={() => {
+                        void sockscapClearDomainRecords();
+                        setDomainRecords([]);
+                      }}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                {/* Table */}
+                <div className="max-h-[280px] overflow-auto rounded border border-[var(--taomni-divider)]">
+                  <table className="w-full text-[11px] text-left border-collapse">
+                    <thead className="sticky top-0 bg-[var(--taomni-panel)] border-b border-[var(--taomni-divider)] text-[10px] text-[var(--taomni-text-muted)] uppercase">
+                      <tr>
+                        <th className="py-1.5 px-2">Domain / IP</th>
+                        <th className="py-1.5 px-2">Decision</th>
+                        <th className="py-1.5 px-2">Matched Rule</th>
+                        <th className="py-1.5 px-2">Process (PID)</th>
+                        <th className="py-1.5 px-2 text-right">Hits</th>
+                        <th className="py-1.5 px-2 text-right">Data Transferred</th>
+                        <th className="py-1.5 px-2 text-right">Last Seen</th>
+                        <th className="py-1.5 px-2 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--taomni-divider)]">
+                      {filteredDomainRecords.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="py-4 text-center text-[10px] text-[var(--taomni-text-muted)]">
+                            No domain records captured yet. Start SocksCap and browse network to inspect live domain traffic.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredDomainRecords.slice(0, topNLimit).map((rec) => (
+                          <tr key={rec.key} className="hover:bg-[var(--taomni-hover)] transition-colors">
+                            <td className="py-1.5 px-2 font-mono font-medium truncate max-w-[180px]" title={rec.domainOrIp}>
+                              {rec.domainOrIp}
+                            </td>
+                            <td className="py-1.5 px-2">
+                              {rec.decision === "proxy" && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                                  PROXY
+                                </span>
+                              )}
+                              {rec.decision === "direct" && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20">
+                                  DIRECT
+                                </span>
+                              )}
+                              {rec.decision === "block" && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+                                  BLOCK
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-1.5 px-2 text-[var(--taomni-text-muted)] truncate max-w-[140px]" title={rec.matchedRule || "-"}>
+                              {rec.matchedRule || "-"}
+                            </td>
+                            <td className="py-1.5 px-2 text-[var(--taomni-text-muted)]">
+                              {rec.processName ? (
+                                <span>{rec.processName} {rec.pid ? `(${rec.pid})` : ""}</span>
+                              ) : (
+                                "-"
+                              )}
+                            </td>
+                            <td className="py-1.5 px-2 text-right tabular-nums font-mono">{rec.hitCount}</td>
+                            <td className="py-1.5 px-2 text-right tabular-nums font-mono">
+                              {formatBytes(rec.bytesUp + rec.bytesDown)}
+                            </td>
+                            <td className="py-1.5 px-2 text-right tabular-nums font-mono text-[var(--taomni-text-muted)]">
+                              {formatTime(rec.lastSeenUnix)}
+                            </td>
+                            <td className="py-1.5 px-2 text-right">
+                              <button
+                                type="button"
+                                className="px-1.5 py-0.5 rounded text-[9px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] transition-colors"
+                                onClick={() => {
+                                  if (!cfg) return;
+                                  const pattern = rec.domainOrIp;
+                                  if (cfg.userRules.some((r) => r.pattern === pattern)) return;
+                                  const updatedRules = [
+                                    { pattern, action: rec.decision === "proxy" ? ("proxy" as const) : ("direct" as const) },
+                                    ...cfg.userRules,
+                                  ];
+                                  void patch({ userRules: updatedRules });
+                                }}
+                              >
+                                + User Rule
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
           {status?.message && (
             <div className="mt-2 text-[11px] text-[var(--taomni-text-muted)] flex gap-1 items-start">
@@ -1086,26 +1348,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Stat({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <div className="rounded border border-[var(--taomni-divider)] px-2 py-1.5 bg-[var(--taomni-bg)]">
-      <div className="text-[var(--taomni-text-muted)] flex items-center gap-1">
-        {icon}
-        {label}
-      </div>
-      <div className="text-[14px] font-semibold tabular-nums">{value}</div>
-    </div>
-  );
-}
-
 function ManualAppAdd({ onAdd }: { onAdd: (path: string) => void }) {
   const t = useT();
   const [path, setPath] = useState("");
@@ -1131,4 +1373,24 @@ function ManualAppAdd({ onAdd }: { onAdd: (path: string) => void }) {
       </button>
     </div>
   );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+function formatSpeed(bytesPerSec: number): string {
+  return `${formatBytes(bytesPerSec)}/s`;
+}
+
+function formatTime(unixSec: number): string {
+  if (!unixSec) return "-";
+  const date = new Date(unixSec * 1000);
+  const h = String(date.getHours()).padStart(2, "0");
+  const m = String(date.getMinutes()).padStart(2, "0");
+  const s = String(date.getSeconds()).padStart(2, "0");
+  return `${h}:${m}:${s}`;
 }

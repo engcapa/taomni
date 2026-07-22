@@ -69,6 +69,8 @@ pub struct RelayContext {
     pub ssh_pool: Option<Arc<SshPool>>,
     /// IP → hostname learned from SNI / HTTP Host.
     pub dns_map: Arc<Mutex<DnsMap>>,
+    /// Domain & flow traffic tracker
+    pub domains: Arc<Mutex<crate::sockscap::stats::DomainTracker>>,
 }
 
 /// Bind **0.0.0.0:0** (all interfaces) — required for WinDivert streamdump-style
@@ -212,6 +214,7 @@ async fn handle_client(
             g.upstream_pass.clone(),
             Arc::clone(&g.stats),
             g.ssh_pool.clone(),
+            Arc::clone(&g.domains),
         )
     };
 
@@ -226,6 +229,7 @@ async fn handle_client(
         up_pass,
         stats,
         ssh_pool,
+        domains,
     ) = snap;
 
     // Prefer hostname for dial when known (proxy-side DNS).
@@ -234,9 +238,20 @@ async fn handle_client(
         .unwrap_or_else(|| mapping.dst_ip.clone());
     let dest_port = mapping.dst_port;
 
-    match trace.decision {
+    let res = match trace.decision {
         Decision::Block => {
             stats.record_decision(false, true);
+            if let Ok(mut doms) = domains.lock() {
+                doms.record(
+                    dial_host.clone(),
+                    trace.decision,
+                    trace.matched_rule.clone(),
+                    if mapping.path.is_empty() { None } else { Some(mapping.path.clone()) },
+                    Some(mapping.pid),
+                    0,
+                    0,
+                );
+            }
             return Err(format!(
                 "blocked {dial_host}:{dest_port} ({})",
                 trace.reason
@@ -253,7 +268,7 @@ async fn handle_client(
                     .await
                     .map_err(|e| format!("prefix write: {e}"))?;
             }
-            bridge_tcp(&mut client, &mut remote).await?;
+            bridge_tcp(&mut client, &mut remote).await
         }
         Decision::Proxy => {
             stats.record_decision(true, false);
@@ -274,7 +289,7 @@ async fn handle_client(
                             .await
                             .map_err(|e| format!("prefix write: {e}"))?;
                     }
-                    bridge_tcp(&mut client, &mut remote).await?;
+                    bridge_tcp(&mut client, &mut remote).await
                 }
                 UpstreamKind::Socks5 => {
                     let mut remote = egress::socks5::dial(
@@ -292,7 +307,7 @@ async fn handle_client(
                             .await
                             .map_err(|e| format!("prefix write: {e}"))?;
                     }
-                    bridge_tcp(&mut client, &mut remote).await?;
+                    bridge_tcp(&mut client, &mut remote).await
                 }
                 UpstreamKind::Ssh => {
                     let pool = ssh_pool.ok_or_else(|| "SSH pool not initialized".to_string())?;
@@ -306,11 +321,32 @@ async fn handle_client(
                             .await
                             .map_err(|e| format!("prefix write: {e}"))?;
                     }
-                    bridge_any(&mut client, &mut remote).await?;
+                    bridge_any(&mut client, &mut remote).await
                 }
             }
         }
+    };
+
+    match res {
+        Ok((bytes_a, bytes_b)) => {
+            let up = bytes_a + prefix.len() as u64;
+            let down = bytes_b;
+            stats.add_bytes(up, down);
+            if let Ok(mut doms) = domains.lock() {
+                doms.record(
+                    dial_host,
+                    trace.decision,
+                    trace.matched_rule,
+                    if mapping.path.is_empty() { None } else { Some(mapping.path) },
+                    Some(mapping.pid),
+                    up,
+                    down,
+                );
+            }
+        }
+        Err(e) => return Err(e),
     }
+
     Ok(())
 }
 
@@ -366,19 +402,18 @@ fn looks_like_incomplete_http(data: &[u8]) -> bool {
         && !s.contains("\r\n\r\n")
 }
 
-async fn bridge_tcp(a: &mut TcpStream, b: &mut TcpStream) -> Result<(), String> {
+async fn bridge_tcp(a: &mut TcpStream, b: &mut TcpStream) -> Result<(u64, u64), String> {
     bridge_any(a, b).await
 }
 
-async fn bridge_any<A, B>(a: &mut A, b: &mut B) -> Result<(), String>
+async fn bridge_any<A, B>(a: &mut A, b: &mut B) -> Result<(u64, u64), String>
 where
     A: AsyncRead + AsyncWrite + Unpin,
     B: AsyncRead + AsyncWrite + Unpin,
 {
     tokio::io::copy_bidirectional(a, b)
         .await
-        .map_err(|e| format!("bridge: {e}"))?;
-    Ok(())
+        .map_err(|e| format!("bridge: {e}"))
 }
 
 /// Resolve manual upstream fields from config.
