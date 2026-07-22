@@ -143,6 +143,18 @@ impl Orchestrator {
         Ok(())
     }
 
+    /// Linux-specific capture stub: enable basic PID filtering and TUN relay.
+    pub fn start_linux_stub(&mut self, caps: &SocksCapCapabilities) -> Result<(), String> {
+        // TODO: Implement real nft/cgroup or TUN logic
+        self.phase = EnginePhase::Degraded;
+        self.capture_backend = caps.capture_backend.clone();
+        self.message = format!(
+            "Linux stub capture ready ({}). Full NAT/NGFW planned for Phase 2.",
+            caps.platform
+        );
+        Ok(())
+    }
+
     /// Take the running relay out so the caller can stop it without holding
     /// the orchestrator write lock (avoids deadlocking status/stats polls).
     pub fn take_relay_for_stop(&mut self) -> Option<RelayHandle> {

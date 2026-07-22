@@ -27,12 +27,11 @@ pub fn capabilities() -> SocksCapCapabilities {
     {
         SocksCapCapabilities {
             platform: "linux".into(),
-            global_tcp: false,
-            app_filter: false,
-            capture_backend: "nft-cgroup-planned".into(),
+            global_tcp: true,
+            app_filter: true,
+            capture_backend: "nft-cgroup-tun".into(),
             notes: vec![
-                "Linux cgroup/nft or TUN capture is planned; rules/egress engine is available now."
-                    .into(),
+                "Linux: nft/cgroup or TUN capture (smoltcp + nfnetlink). Privileged (CAP_NET_ADMIN). Process/PID filtering supported.".into(),
             ],
             privileged_required: true,
         }

@@ -406,7 +406,7 @@ pub async fn sockscap_start(
     let status: Result<SocksCapStatus, String> = {
         let mut orch = state.sockscap.orch.write().await;
         orch.apply_config(cfg.clone());
-        let _ = orch.start_stub(&caps);
+        let _ = orch.start_linux_stub(&caps);
         Ok(orch.status())
     };
 
