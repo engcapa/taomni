@@ -30,7 +30,10 @@ UPSTREAM_SOCKS5_PORT = 6088
 SSH_HOST = "10.1.0.80"
 SSH_PORT = 22
 SSH_USER = "zhyhang"
-SSH_PASS = "zyh2013py"  # From .agents/skills/qa-ui-auto/scripts/.env
+SSH_PASS = os.getenv("QA_SSH_PASSWORD")
+if not SSH_PASS:
+    import getpass
+    SSH_PASS = getpass.getpass("Enter SSH password for zhyhang@10.1.0.80: ")  # console prompt fallback; set QA_SSH_PASSWORD env var to avoid prompt
 
 # GFWList Domains & Subdomains Matrix (Must be PROXIED)
 GFWLIST_TARGETS = [
