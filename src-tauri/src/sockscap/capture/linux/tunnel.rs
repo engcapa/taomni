@@ -9,6 +9,7 @@
 use std::net::IpAddr;
 use std::path::Path;
 
+use crate::sockscap::capture::linux::cgroup::CgroupV2Match;
 use crate::sockscap::capture::linux::exec::run_command_elevated;
 use crate::sockscap::config::ScopeMode;
 
@@ -70,8 +71,8 @@ pub struct RedirectPlan {
     pub relay_port: u16,
     pub redirect_ipv6: bool,
     pub bypass_cidrs: Vec<ValidatedCidr>,
-    pub bypass_cgroup_id: Option<u64>,
-    pub capture_cgroup_ids: Vec<u64>,
+    pub bypass_cgroup: Option<CgroupV2Match>,
+    pub capture_cgroups: Vec<CgroupV2Match>,
 }
 
 impl RedirectPlan {
@@ -80,8 +81,8 @@ impl RedirectPlan {
         relay_port: u16,
         redirect_ipv6: bool,
         bypass_cidrs: &[String],
-        bypass_cgroup_id: Option<u64>,
-        capture_cgroup_ids: &[u64],
+        bypass_cgroup: Option<CgroupV2Match>,
+        capture_cgroups: &[CgroupV2Match],
     ) -> Result<Self, String> {
         if relay_port == 0 {
             return Err("Linux relay port must be non-zero".into());
@@ -95,8 +96,8 @@ impl RedirectPlan {
             relay_port,
             redirect_ipv6,
             bypass_cidrs,
-            bypass_cgroup_id,
-            capture_cgroup_ids: capture_cgroup_ids.to_vec(),
+            bypass_cgroup,
+            capture_cgroups: capture_cgroups.to_vec(),
         };
         plan.validate()?;
         Ok(plan)
@@ -104,11 +105,11 @@ impl RedirectPlan {
 
     fn validate(&self) -> Result<(), String> {
         match self.mode {
-            ScopeMode::Global if self.bypass_cgroup_id.is_none() => Err(
+            ScopeMode::Global if self.bypass_cgroup.is_none() => Err(
                 "global Linux capture requires a relay bypass cgroup; refusing to install a redirect loop"
                     .into(),
             ),
-            ScopeMode::Apps if self.capture_cgroup_ids.is_empty() => {
+            ScopeMode::Apps if self.capture_cgroups.is_empty() => {
                 Err("app-mode Linux capture requires at least one capture cgroup".into())
             }
             _ => Ok(()),
@@ -128,15 +129,19 @@ impl RedirectPlan {
 
         match self.mode {
             ScopeMode::Global => {
-                script.push_str(&format!(
-                    "    meta cgroup {} return\n",
-                    self.bypass_cgroup_id.expect("validated global cgroup")
-                ));
+                let cgroup = self
+                    .bypass_cgroup
+                    .as_ref()
+                    .expect("validated global cgroup");
+                script.push_str(&format!("    {} return\n", cgroup.nft_expression()));
                 self.render_redirect_rule(&mut script, "");
             }
             ScopeMode::Apps => {
-                for cgroup_id in &self.capture_cgroup_ids {
-                    self.render_redirect_rule(&mut script, &format!("meta cgroup {cgroup_id} "));
+                for cgroup in &self.capture_cgroups {
+                    self.render_redirect_rule(
+                        &mut script,
+                        &format!("{} ", cgroup.nft_expression()),
+                    );
                 }
             }
         }
@@ -330,22 +335,24 @@ mod tests {
 
     #[test]
     fn renders_global_bypass_before_redirect() {
+        let bypass = CgroupV2Match::from_relative_path("taomni-sockscap-42/bypass").unwrap();
         let plan = RedirectPlan::new(
             ScopeMode::Global,
             18443,
             true,
             &["10.0.0.0/8".into(), "fd00::/8".into()],
-            Some(42),
+            Some(bypass),
             &[],
         )
         .unwrap();
         let script = plan.render_nft_script();
-        assert!(script.contains("meta cgroup 42 return"));
+        let bypass_rule = "socket cgroupv2 level 2 \"taomni-sockscap-42/bypass\" return";
+        assert!(script.contains(bypass_rule));
+        assert!(!script.contains("meta cgroup"));
         assert!(script.contains("meta l4proto tcp redirect to :18443"));
         assert!(script.contains(OWNERSHIP_MARKER));
         assert!(
-            script.find("meta cgroup 42 return").unwrap()
-                < script.find("meta l4proto tcp redirect").unwrap()
+            script.find(bypass_rule).unwrap() < script.find("meta l4proto tcp redirect").unwrap()
         );
         assert!(script.contains("ip daddr 10.0.0.0/8 return"));
         assert!(script.contains("ip6 daddr fd00::/8 return"));
@@ -353,10 +360,19 @@ mod tests {
 
     #[test]
     fn app_mode_only_redirects_selected_cgroups() {
-        let plan = RedirectPlan::new(ScopeMode::Apps, 15000, true, &[], None, &[11, 22]).unwrap();
+        let captures = [
+            CgroupV2Match::from_relative_path("taomni-sockscap-42/capture-11").unwrap(),
+            CgroupV2Match::from_relative_path("taomni-sockscap-42/capture-22").unwrap(),
+        ];
+        let plan = RedirectPlan::new(ScopeMode::Apps, 15000, true, &[], None, &captures).unwrap();
         let script = plan.render_nft_script();
-        assert!(script.contains("meta cgroup 11 meta l4proto tcp redirect to :15000"));
-        assert!(script.contains("meta cgroup 22 meta l4proto tcp redirect to :15000"));
+        assert!(script.contains(
+            "socket cgroupv2 level 2 \"taomni-sockscap-42/capture-11\" meta l4proto tcp redirect to :15000"
+        ));
+        assert!(script.contains(
+            "socket cgroupv2 level 2 \"taomni-sockscap-42/capture-22\" meta l4proto tcp redirect to :15000"
+        ));
+        assert!(!script.contains("meta cgroup"));
         assert!(!script.contains("\n    meta l4proto tcp redirect to :15000\n"));
     }
 
@@ -370,10 +386,14 @@ mod tests {
 
     #[test]
     fn avoids_ipv6_redirect_when_the_loopback_listener_is_unavailable() {
-        let plan = RedirectPlan::new(ScopeMode::Apps, 15000, false, &[], None, &[11]).unwrap();
+        let captures =
+            [CgroupV2Match::from_relative_path("taomni-sockscap-42/capture-11").unwrap()];
+        let plan = RedirectPlan::new(ScopeMode::Apps, 15000, false, &[], None, &captures).unwrap();
         assert!(
             plan.render_nft_script()
-                .contains("meta cgroup 11 ip protocol tcp redirect to :15000")
+                .contains(
+                    "socket cgroupv2 level 2 \"taomni-sockscap-42/capture-11\" ip protocol tcp redirect to :15000"
+                )
         );
     }
 }

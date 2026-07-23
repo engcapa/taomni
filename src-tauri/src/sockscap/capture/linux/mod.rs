@@ -114,8 +114,8 @@ impl LinuxCapture for LinuxCaptureImpl {
             relay_port,
             relay.ipv6_ready,
             &config.bypass_cidrs,
-            cgroups.bypass_id(),
-            cgroups.capture_ids(),
+            cgroups.bypass_match(),
+            cgroups.capture_matches(),
         ) {
             Ok(plan) => plan,
             Err(error) => {

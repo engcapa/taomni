@@ -1,12 +1,12 @@
 //! cgroup v2 ownership for the Linux transparent-capture rules.
 //!
-//! nftables can match a cgroup id, which gives us a stable process filter without
-//! relying on a race-prone `/proc` lookup for every packet. The session records
-//! every move so teardown can put processes back where they started.
+//! nftables can match a socket's cgroup v2 path, which gives us a stable process
+//! filter without relying on a race-prone `/proc` lookup for every packet. The
+//! session records every move so teardown can put processes back where they
+//! started.
 
 use std::collections::BTreeSet;
 use std::fs;
-use std::os::unix::fs::MetadataExt;
 use std::path::{Component, Path, PathBuf};
 
 use crate::sockscap::capture::linux::exec::{is_effective_root, run_command_elevated};
@@ -21,6 +21,65 @@ struct CgroupMove {
     managed_dir: PathBuf,
 }
 
+/// A cgroup v2 socket match suitable for nftables'
+/// `socket cgroupv2 level N "path"` expression.
+///
+/// `meta cgroup` must not be used here: it reads the cgroup v1
+/// `net_cls.classid`, which is zero on a unified cgroup v2 host. Supplying a
+/// cgroup v2 directory inode to that expression silently disables the match
+/// and, in global mode, recursively redirects the relay's own connections.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CgroupV2Match {
+    relative_path: String,
+    level: u32,
+}
+
+impl CgroupV2Match {
+    pub(crate) fn from_relative_path(relative_path: &str) -> Result<Self, String> {
+        let relative_path = relative_path.trim_matches('/');
+        if relative_path.is_empty() {
+            return Err("cgroup v2 match path must not be empty".into());
+        }
+        if !relative_path
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'-' | b'_' | b'.'))
+        {
+            return Err(format!(
+                "cgroup v2 match path contains unsupported characters: {relative_path:?}"
+            ));
+        }
+        let path = Path::new(relative_path);
+        if path
+            .components()
+            .any(|component| !matches!(component, Component::Normal(_)))
+        {
+            return Err(format!("invalid cgroup v2 match path: {relative_path:?}"));
+        }
+        let level = u32::try_from(path.components().count())
+            .map_err(|_| "cgroup v2 path is too deep".to_string())?;
+        Ok(Self {
+            relative_path: relative_path.to_string(),
+            level,
+        })
+    }
+
+    fn from_managed_dir(path: &Path) -> Result<Self, String> {
+        let relative = path
+            .strip_prefix(CGROUP_ROOT)
+            .map_err(|_| format!("{} is outside {CGROUP_ROOT}", path.display()))?
+            .to_str()
+            .ok_or_else(|| format!("cgroup path is not valid UTF-8: {}", path.display()))?;
+        Self::from_relative_path(relative)
+    }
+
+    pub(crate) fn nft_expression(&self) -> String {
+        format!(
+            "socket cgroupv2 level {} \"{}\"",
+            self.level, self.relative_path
+        )
+    }
+}
+
 /// The cgroups created for one running SocksCap session.
 ///
 /// In global mode, Taomni itself is moved to a bypass cgroup while all other
@@ -31,8 +90,8 @@ struct CgroupMove {
 pub struct CgroupSession {
     root: PathBuf,
     moves: Vec<CgroupMove>,
-    bypass_id: Option<u64>,
-    capture_ids: Vec<u64>,
+    bypass_match: Option<CgroupV2Match>,
+    capture_matches: Vec<CgroupV2Match>,
 }
 
 impl CgroupSession {
@@ -86,14 +145,14 @@ impl CgroupSession {
         let mut session = Self {
             root,
             moves: Vec::new(),
-            bypass_id: None,
-            capture_ids: Vec::new(),
+            bypass_match: None,
+            capture_matches: Vec::new(),
         };
 
         let setup = match mode {
             ScopeMode::Global => session
                 .move_pid(self_pid, "bypass", sudo_password)
-                .map(|id| session.bypass_id = Some(id)),
+                .map(|cgroup_match| session.bypass_match = Some(cgroup_match)),
             ScopeMode::Apps => {
                 if target_pids.is_empty() {
                     Err("App mode needs at least one running selected process".into())
@@ -104,9 +163,9 @@ impl CgroupSession {
                     )
                 } else {
                     for pid in target_pids {
-                        let id =
+                        let cgroup_match =
                             session.move_pid(*pid, &format!("capture-{pid}"), sudo_password)?;
-                        session.capture_ids.push(id);
+                        session.capture_matches.push(cgroup_match);
                     }
                     Ok(())
                 }
@@ -124,12 +183,12 @@ impl CgroupSession {
         Ok(session)
     }
 
-    pub fn bypass_id(&self) -> Option<u64> {
-        self.bypass_id
+    pub fn bypass_match(&self) -> Option<CgroupV2Match> {
+        self.bypass_match.clone()
     }
 
-    pub fn capture_ids(&self) -> &[u64] {
-        &self.capture_ids
+    pub fn capture_matches(&self) -> &[CgroupV2Match] {
+        &self.capture_matches
     }
 
     /// Restore moved processes and remove the session's empty cgroup tree.
@@ -180,8 +239,8 @@ impl CgroupSession {
         }
 
         self.moves.clear();
-        self.capture_ids.clear();
-        self.bypass_id = None;
+        self.capture_matches.clear();
+        self.bypass_match = None;
 
         if errors.is_empty() {
             Ok(())
@@ -195,7 +254,7 @@ impl CgroupSession {
         pid: u32,
         name: &str,
         sudo_password: Option<&str>,
-    ) -> Result<u64, String> {
+    ) -> Result<CgroupV2Match, String> {
         let original_dir = cgroup_dir_for_pid(pid)?;
         let managed_dir = self.root.join(name);
         if let Err(e) = fs::create_dir(&managed_dir) {
@@ -205,11 +264,11 @@ impl CgroupSession {
                 return Err(format!("create {mdir_str}: {e}"));
             }
         }
-        // Read the inode before moving the process. If that read fails, the
-        // new cgroup is still empty and the session-level rollback can remove
+        // Build the nftables cgroup v2 path before moving the process. If this
+        // fails, the new cgroup is still empty and session rollback can remove
         // it without leaving a PID stranded in an untracked cgroup.
-        let id = match cgroup_id(&managed_dir) {
-            Ok(id) => id,
+        let cgroup_match = match CgroupV2Match::from_managed_dir(&managed_dir) {
+            Ok(cgroup_match) => cgroup_match,
             Err(error) => {
                 let cleanup_error = fs::remove_dir(&managed_dir).err();
                 return Err(match cleanup_error {
@@ -224,7 +283,7 @@ impl CgroupSession {
         let managed_display = managed_dir.display().to_string();
         self.moves.push(CgroupMove {
             original_dir,
-            managed_dir,
+            managed_dir: managed_dir.clone(),
         });
 
         // Write the PID with elevation when the desktop process does not have
@@ -241,7 +300,16 @@ impl CgroupSession {
             ));
         }
 
-        Ok(id)
+        let actual_dir = cgroup_dir_for_pid(pid)?;
+        if actual_dir != managed_dir {
+            return Err(format!(
+                "move PID {pid} verification failed: expected {}, found {}",
+                managed_dir.display(),
+                actual_dir.display()
+            ));
+        }
+
+        Ok(cgroup_match)
     }
 }
 
@@ -359,12 +427,6 @@ fn cgroup_dir_for_pid(pid: u32) -> Result<PathBuf, String> {
     cgroup_dir_from_relative(relative)
 }
 
-fn cgroup_id(path: &Path) -> Result<u64, String> {
-    path.metadata()
-        .map(|metadata| metadata.ino())
-        .map_err(|e| format!("stat {}: {e}", path.display()))
-}
-
 pub(crate) fn parse_cgroup_v2_path(contents: &str) -> Option<&str> {
     contents.lines().find_map(|line| line.strip_prefix("0::"))
 }
@@ -397,6 +459,22 @@ mod tests {
     #[test]
     fn rejects_parent_components() {
         assert!(cgroup_dir_from_relative("/../outside").is_err());
+    }
+
+    #[test]
+    fn renders_real_cgroup_v2_socket_expression() {
+        let cgroup_match = CgroupV2Match::from_relative_path("taomni-sockscap-42/bypass").unwrap();
+        assert_eq!(
+            cgroup_match.nft_expression(),
+            "socket cgroupv2 level 2 \"taomni-sockscap-42/bypass\""
+        );
+    }
+
+    #[test]
+    fn rejects_unsafe_cgroup_match_paths() {
+        assert!(CgroupV2Match::from_relative_path("../outside").is_err());
+        assert!(CgroupV2Match::from_relative_path("safe/with space").is_err());
+        assert!(CgroupV2Match::from_relative_path("").is_err());
     }
 
     #[test]

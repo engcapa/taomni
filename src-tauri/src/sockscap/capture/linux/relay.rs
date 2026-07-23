@@ -8,9 +8,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, Semaphore};
+use tokio::task::JoinSet;
 
-use crate::sockscap::relay::{CapturedFlow, RelayContext, RelayHandle};
+use crate::sockscap::relay::{
+    ACCEPT_BACKOFF_INITIAL, ACCEPT_BACKOFF_MAX, CapturedFlow, RelayContext, RelayHandle,
+    acquire_relay_flow_permit, new_relay_flow_limiter,
+};
 
 const SO_ORIGINAL_DST: libc::c_int = 80;
 
@@ -45,17 +49,19 @@ pub async fn start_linux_relay(ctx: Arc<RwLock<RelayContext>>) -> Result<LinuxRe
 
     let stop = Arc::new(AtomicBool::new(false));
     let stop_for_task = Arc::clone(&stop);
+    let limiter = new_relay_flow_limiter();
     let task = tokio::spawn(async move {
-        let v4 = tokio::spawn(accept_loop(
+        let v4 = accept_loop(
             listener_v4,
             Arc::clone(&ctx),
             Arc::clone(&stop_for_task),
-        ));
+            Arc::clone(&limiter),
+        );
         if let Some(listener_v6) = listener_v6 {
-            let v6 = tokio::spawn(accept_loop(listener_v6, ctx, Arc::clone(&stop_for_task)));
+            let v6 = accept_loop(listener_v6, ctx, Arc::clone(&stop_for_task), limiter);
             let _ = tokio::join!(v4, v6);
         } else {
-            let _ = v4.await;
+            v4.await;
         }
     });
 
@@ -84,17 +90,37 @@ fn bind_loopback_v6(port: u16) -> Result<TcpListener, String> {
     TcpListener::from_std(socket.into()).map_err(|error| format!("adopt IPv6 Linux relay: {error}"))
 }
 
-async fn accept_loop(listener: TcpListener, ctx: Arc<RwLock<RelayContext>>, stop: Arc<AtomicBool>) {
+async fn accept_loop(
+    listener: TcpListener,
+    ctx: Arc<RwLock<RelayContext>>,
+    stop: Arc<AtomicBool>,
+    limiter: Arc<Semaphore>,
+) {
+    let mut clients = JoinSet::new();
+    let mut accept_backoff = ACCEPT_BACKOFF_INITIAL;
     loop {
+        while clients.try_join_next().is_some() {}
         if stop.load(Ordering::SeqCst) {
             break;
         }
+        let Some(permit) = acquire_relay_flow_permit(&limiter, &stop).await else {
+            break;
+        };
         let (socket, peer) = match listener.accept().await {
-            Ok(connection) => connection,
+            Ok(connection) => {
+                accept_backoff = ACCEPT_BACKOFF_INITIAL;
+                connection
+            }
             Err(error) => {
                 if !stop.load(Ordering::SeqCst) {
-                    tracing::warn!("Linux SocksCap relay accept failed: {error}");
+                    tracing::warn!(
+                        "Linux SocksCap relay accept failed: {error}; retrying in {}ms",
+                        accept_backoff.as_millis()
+                    );
                 }
+                tokio::time::sleep(accept_backoff).await;
+                accept_backoff =
+                    std::cmp::min(accept_backoff.saturating_mul(2), ACCEPT_BACKOFF_MAX);
                 continue;
             }
         };
@@ -112,7 +138,8 @@ async fn accept_loop(listener: TcpListener, ctx: Arc<RwLock<RelayContext>>, stop
             }
         };
         let ctx = Arc::clone(&ctx);
-        tokio::spawn(async move {
+        clients.spawn(async move {
+            let _permit = permit;
             let flow = CapturedFlow {
                 destination,
                 process_path: None,
@@ -126,6 +153,7 @@ async fn accept_loop(listener: TcpListener, ctx: Arc<RwLock<RelayContext>>, stop
             }
         });
     }
+    clients.shutdown().await;
 }
 
 /// Read the pre-NAT destination saved by the nftables REDIRECT hook.
