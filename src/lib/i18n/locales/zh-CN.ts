@@ -1165,6 +1165,8 @@ export const zhCN: DeepPartial<typeof en> = {
     captureNotReady: "系统捕获尚未就绪",
     captureNotReadyHint:
       "规则引擎与上游拨号已可用。WinDivert / 平台捕获仍在接入中。",
+    linuxCaptureReady: "Linux nftables 透明捕获已就绪；启动时需要 cgroup 和网络管理权限。",
+    linuxCaptureActive: "已激活 · Linux nftables 透明捕获",
     section: {
       scope: "范围",
       upstream: "上游",

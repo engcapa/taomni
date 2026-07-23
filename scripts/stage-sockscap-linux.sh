@@ -1,21 +1,30 @@
-#!/bin/bash
-# Stage sockscap-helper + Linux resources for Tauri DEB/RPM release.
+#!/usr/bin/env bash
+# Linux SocksCap bundle preflight.
+#
+# Tauri copies `resources/sockscap/**/*` itself. Do not copy files directly
+# into target/bundle here: Tauri can recreate that directory later in the same
+# build. This script verifies the Linux runtime material and package metadata
+# before Tauri produces DEB/RPM/AppImage artifacts.
 
-set -e
+set -euo pipefail
 
-TAURI_DIR="src-tauri"
-CONFIG="release"
-TARGET="x86_64-unknown-linux-gnu"
-BUNDLE="deb"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-echo "Staging sockscap for Linux ($CONFIG, $TARGET, $BUNDLE)..."
+if [[ "$(uname -s)" != "Linux" ]]; then
+  echo "Skipping Linux SocksCap bundle preflight on $(uname -s)."
+  exit 0
+fi
 
-# Build helper if needed (optional for Linux, no elevated helper yet)
-cargo build --bin sockscap-helper --target $TARGET --release
+if [[ "${1:-}" != "--check" && $# -ne 0 ]]; then
+  echo "Usage: $0 [--check]" >&2
+  exit 2
+fi
 
-# Copy resources
-mkdir -p $TAURI_DIR/target/release/bundle/$BUNDLE/resources/sockscap/linux
-cp -r src-tauri/resources/sockscap/* $TAURI_DIR/target/release/bundle/$BUNDLE/resources/sockscap/ || true
+config="$repo_root/src-tauri/tauri.conf.json"
+runtime_doc="$repo_root/src-tauri/resources/sockscap/linux/README.md"
 
-# For Linux, copy any additional files (cgroup scripts, etc.)
-echo "Linux sockscap staged successfully."
+test -f "$runtime_doc"
+grep -Fq 'resources/sockscap/**/*' "$config"
+grep -Fq '"nftables"' "$config"
+
+echo "Linux SocksCap bundle preflight passed: nftables dependency and runtime documentation are staged by Tauri resources."

@@ -169,6 +169,12 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify Linux SocksCap transparent-capture backend
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          cargo test --manifest-path src-tauri/Cargo.toml --lib sockscap::capture::linux
+          bash scripts/stage-sockscap-linux.sh --check
+
       - name: Resolve release version
         id: version
         shell: bash

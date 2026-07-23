@@ -253,6 +253,7 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     () => status && ["active", "degraded", "preparing"].includes(status.phase),
     [status],
   );
+  const recoveryRequired = status?.phase === "recoveryRequired";
 
   // Poll dashboard counters while capture is active (previously never updated after mount).
   useEffect(() => {
@@ -538,7 +539,7 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
             data-testid="sockscap-start"
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-[12px] bg-[var(--taomni-accent)] text-white hover:opacity-90"
             onClick={() => void onStart()}
-            disabled={busy}
+            disabled={busy || recoveryRequired}
           >
             <Play className="w-3.5 h-3.5" />
             {t("sockscap.start")}
@@ -593,8 +594,17 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
                 : t("sockscap.captureNotReady")}
             </div>
             {caps.platform === "linux" && (
-              <div className="text-[11px] text-emerald-600 dark:text-emerald-400">
-                Linux nft-tun ready • Traffic proxy active
+              <div
+                className={`text-[11px] ${
+                  status?.phase === "active"
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-[var(--taomni-text-muted)]"
+                }`}
+                data-testid="sockscap-linux-capture-state"
+              >
+                {status?.phase === "active"
+                  ? t("sockscap.linuxCaptureActive")
+                  : t("sockscap.linuxCaptureReady")}
               </div>
             )}
             <div className="opacity-90">

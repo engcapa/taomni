@@ -8,7 +8,7 @@
     "devUrl": "http://localhost:1980",
     "beforeDevCommand": "bash scripts/bundle-krb5-macos.sh stage && pnpm dev",
     "beforeBuildCommand": "pnpm build && bash scripts/bundle-krb5-macos.sh stage",
-    "beforeBundleCommand": "bash scripts/bundle-krb5-macos.sh fixbin"
+    "beforeBundleCommand": "bash scripts/bundle-krb5-macos.sh fixbin && bash scripts/stage-sockscap-linux.sh --check"
   },
   "app": {
     "withGlobalTauri": true,
@@ -50,6 +50,18 @@
     "resources": [
       "resources/sockscap/**/*"
     ],
+    "linux": {
+      "deb": {
+        "depends": [
+          "nftables"
+        ]
+      },
+      "rpm": {
+        "depends": [
+          "nftables"
+        ]
+      }
+    },
     "macOS": {
       "entitlements": "Entitlements.plist",
       "frameworks": [

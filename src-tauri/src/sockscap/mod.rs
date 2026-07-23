@@ -3,7 +3,8 @@
 //! - Rules / policy / GFWList / egress dialers (all platforms)
 //! - Windows capture: elevated `sockscap-helper` + WinDivert
 //!   FLOW (PID) + NETWORK (IPv4 TCP NAT → local relay → policy → upstream)
-//! - Linux / macOS capture: not yet (capabilities report unavailable)
+//! - Linux capture: nftables OUTPUT redirect + cgroup v2 + loopback relay
+//! - macOS capture: not yet (capabilities report unavailable)
 
 pub mod capture;
 pub mod config;
@@ -337,6 +338,12 @@ pub async fn sockscap_start(
     let dir = rules_dir(&app)?;
     {
         let mut orch = state.sockscap.orch.write().await;
+        if matches!(
+            orch.status().phase,
+            orchestrator::EnginePhase::RecoveryRequired
+        ) {
+            return Err("sockscap recovery is required before starting again".into());
+        }
         if orch.is_running() {
             return Err("sockscap already running".into());
         }
@@ -402,15 +409,18 @@ pub async fn sockscap_start(
     let status: Result<SocksCapStatus, String> =
         start_windows_capture(&app, &state, &cfg, &caps).await;
 
-    #[cfg(not(windows))]
+    #[cfg(target_os = "linux")]
+    let status: Result<SocksCapStatus, String> = start_linux_capture(&state, &cfg, &caps).await;
+
+    #[cfg(all(not(windows), not(target_os = "linux")))]
     let status: Result<SocksCapStatus, String> = {
         let mut orch = state.sockscap.orch.write().await;
         orch.apply_config(cfg.clone());
-        let _ = orch.start_linux_stub(&caps);
+        let _ = orch.start_stub(&caps);
         Ok(orch.status())
     };
 
-    match &status {
+    let journal_result = match &status {
         Ok(st) => {
             let helper_port = state
                 .sockscap
@@ -419,14 +429,7 @@ pub async fn sockscap_start(
                 .lock()
                 .ok()
                 .and_then(|g| g.as_ref().map(|s| s.port));
-            let relay_port = state
-                .sockscap
-                .orch
-                .read()
-                .await
-                .relay
-                .as_ref()
-                .map(|r| r.port);
+            let relay_port = state.sockscap.orch.read().await.relay_port();
             recovery::write_journal(
                 &journal_path,
                 &recovery::RecoveryJournal {
@@ -438,15 +441,141 @@ pub async fn sockscap_start(
                     relay_port,
                     helper_port,
                 },
-            )?;
+            )
         }
         Err(e) => {
             let mut orch = state.sockscap.orch.write().await;
             orch.set_degraded(&caps.capture_backend, e.clone());
+            Ok(())
         }
+    };
+
+    if let Err(journal_error) = journal_result {
+        // A live capture without a dirty journal cannot be recovered after a
+        // crash. Tear it down before reporting the failed Start; preserve a
+        // RecoveryRequired phase if that teardown itself cannot complete.
+        let teardown_error = full_teardown(&app, &state, false).await.err();
+        let teardown_failed = teardown_error.is_some();
+        let message = match teardown_error {
+            Some(teardown_error) => format!(
+                "write SocksCap recovery journal failed: {journal_error}; teardown also failed: {teardown_error}"
+            ),
+            None => format!(
+                "write SocksCap recovery journal failed; capture was stopped: {journal_error}"
+            ),
+        };
+        if !teardown_failed {
+            state
+                .sockscap
+                .orch
+                .write()
+                .await
+                .set_degraded(&caps.capture_backend, message.clone());
+        }
+        return Err(message);
     }
 
     status
+}
+
+#[cfg(target_os = "linux")]
+async fn build_linux_relay_context(
+    state: &State<'_, AppState>,
+    cfg: &SocksCapConfig,
+) -> Result<Arc<RwLock<relay::RelayContext>>, String> {
+    let (mut upstream_host, mut upstream_port, mut upstream_user, mut upstream_pass) =
+        relay::upstream_from_config(cfg);
+    if !cfg.upstream.password_ref.is_empty() {
+        if let Ok(Some(password)) = state.vault.resolve(&cfg.upstream.password_ref) {
+            upstream_pass = (*password).clone();
+        }
+    }
+    if !cfg.upstream.session_id.is_empty() {
+        if let Ok(db) = state.db.lock() {
+            if let Ok(session) = crate::session::db::get_session(&db, &cfg.upstream.session_id) {
+                upstream_host = session.host;
+                upstream_port = session.port;
+                if let Some(username) = session.username.filter(|username| !username.is_empty()) {
+                    upstream_user = username;
+                }
+            }
+        }
+    }
+
+    let ssh_pool = if matches!(cfg.upstream.kind, config::UpstreamKind::Ssh) {
+        use crate::sockscap::egress::ssh_pool::SshPool;
+        use crate::terminal::ssh::SshAuth;
+
+        let auth = if !upstream_pass.is_empty() {
+            SshAuth::Password(upstream_pass.clone())
+        } else if cfg.upstream.password_ref.starts_with("key:") {
+            SshAuth::PrivateKey(cfg.upstream.password_ref.clone())
+        } else {
+            SshAuth::Agent
+        };
+        Some(Arc::new(
+            SshPool::connect(&upstream_host, upstream_port, &upstream_user, auth)
+                .await
+                .map_err(|error| format!("SSH upstream connect failed: {error}"))?,
+        ))
+    } else {
+        None
+    };
+
+    let (stats, domains, rules) = {
+        let orch = state.sockscap.orch.read().await;
+        (
+            Arc::clone(&orch.stats),
+            Arc::clone(&orch.domains),
+            orch.rules().cloned(),
+        )
+    };
+    let dns_map = Arc::new(std::sync::Mutex::new(rules::dns_map::DnsMap::new(
+        8192,
+        std::time::Duration::from_secs(300),
+    )));
+
+    Ok(Arc::new(RwLock::new(relay::RelayContext {
+        config: cfg.clone(),
+        rules,
+        helper: Arc::clone(&state.sockscap.helper),
+        stats,
+        upstream_host,
+        upstream_port,
+        upstream_user,
+        upstream_pass,
+        self_pid: std::process::id(),
+        ssh_pool,
+        dns_map,
+        domains,
+    })))
+}
+
+#[cfg(target_os = "linux")]
+async fn start_linux_capture(
+    state: &State<'_, AppState>,
+    cfg: &SocksCapConfig,
+    caps: &capture::SocksCapCapabilities,
+) -> Result<SocksCapStatus, String> {
+    use crate::sockscap::capture::linux::{LinuxCapture, LinuxCaptureImpl};
+
+    let ctx = build_linux_relay_context(state, cfg).await?;
+    let backend = LinuxCaptureImpl;
+    let capture = backend.start(cfg, Arc::clone(&ctx)).await?;
+    let relay_port = capture.relay_port();
+
+    let mut orch = state.sockscap.orch.write().await;
+    let gfw_note = orch
+        .gfwlist_meta()
+        .map(|meta| format!(", gfw={}", meta.rule_count))
+        .unwrap_or_default();
+    orch.relay_ctx = Some(ctx);
+    orch.set_linux_capture(capture);
+    orch.set_active(
+        &caps.capture_backend,
+        format!("capture active (Linux nft+cgroup relay :{relay_port}{gfw_note})"),
+    );
+    Ok(orch.status())
 }
 
 #[cfg(windows)]
@@ -643,26 +772,64 @@ pub async fn sockscap_stop(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<SocksCapStatus, String> {
-    full_teardown(&app, &state).await;
+    full_teardown(&app, &state, true).await?;
     let orch = state.sockscap.orch.read().await;
     Ok(orch.status())
 }
 
 #[tauri::command]
 pub async fn sockscap_recover(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
-    full_teardown(&app, &state).await;
-    capture::recover_system().await?;
-    Ok(())
+    // Even if stopping the active session was incomplete, recovery gets one
+    // more independent chance to remove the platform-owned state.
+    let teardown_error = full_teardown(&app, &state, false).await.err();
+    match capture::recover_system().await {
+        Ok(()) => {
+            state.sockscap.orch.write().await.force_idle();
+            if let Ok(dir) = data_dir(&app) {
+                let _ = recovery::mark_clean_and_clear(&recovery::journal_path(&dir));
+            }
+            if let Some(error) = teardown_error {
+                tracing::info!("sockscap: Recover repaired incomplete teardown: {error}");
+            }
+            Ok(())
+        }
+        Err(recovery_error) => {
+            let message = match teardown_error {
+                Some(teardown_error) => {
+                    format!("teardown failed: {teardown_error}; recovery failed: {recovery_error}")
+                }
+                None => format!("recovery failed: {recovery_error}"),
+            };
+            let backend = capture::capabilities().capture_backend;
+            state
+                .sockscap
+                .orch
+                .write()
+                .await
+                .set_recovery_required(&backend, message.clone());
+            Err(message)
+        }
+    }
 }
 
 /// Thorough capture teardown:
 /// 1) Stop WinDivert NETWORK capture in the elevated helper (with timeout)
 /// 2) Stop local relay accept loops (IPv4+IPv6 wake + abort fallback)
-/// 3) Stop DNS refresher, clear relay ctx, mark recovery journal clean
+/// 3) Stop DNS refresher and clear relay context. The caller decides whether
+///    it is safe to clear the recovery journal.
 ///
 /// Does **not** kill the elevated helper process (avoids another UAC on next Start).
-async fn full_teardown(app: &AppHandle, state: &State<'_, AppState>) {
+async fn full_teardown(
+    app: &AppHandle,
+    state: &State<'_, AppState>,
+    clear_journal: bool,
+) -> Result<(), String> {
     use std::time::Duration;
+
+    #[cfg(target_os = "linux")]
+    let mut errors = Vec::new();
+    #[cfg(not(target_os = "linux"))]
+    let errors: Vec<String> = Vec::new();
 
     // --- 1) Helper capture_stop (blocking RPC) off the async runtime ----------
     let sess = state
@@ -692,7 +859,22 @@ async fn full_teardown(app: &AppHandle, state: &State<'_, AppState>) {
         }
     }
 
-    // --- 2) Take relay without holding write lock during await ---------------
+    // --- 2) Linux removes nft rules + restores cgroups before its relay stops -
+    #[cfg(target_os = "linux")]
+    {
+        let linux_capture = {
+            let mut orch = state.sockscap.orch.write().await;
+            orch.take_linux_capture_for_stop()
+        };
+        if let Some(capture) = linux_capture {
+            if let Err(error) = capture.stop().await {
+                tracing::warn!("sockscap: Linux capture teardown error: {error}");
+                errors.push(format!("Linux capture teardown failed: {error}"));
+            }
+        }
+    }
+
+    // --- 3) Take any platform relay without holding write lock during await --
     let relay = {
         let mut orch = state.sockscap.orch.write().await;
         orch.take_relay_for_stop()
@@ -702,15 +884,27 @@ async fn full_teardown(app: &AppHandle, state: &State<'_, AppState>) {
         relay.stop().await;
     }
 
-    // --- 3) Finish engine state + DNS + journal ------------------------------
+    // --- 4) Finish engine state + DNS + journal ------------------------------
     {
         let mut orch = state.sockscap.orch.write().await;
         orch.finish_stop();
+        if !errors.is_empty() {
+            orch.set_recovery_required("nft-cgroup-redirect", errors.join("; "));
+        }
     }
-    if let Ok(dir) = data_dir(app) {
-        let _ = recovery::mark_clean_and_clear(&recovery::journal_path(&dir));
+    if errors.is_empty() {
+        if clear_journal {
+            if let Ok(dir) = data_dir(app) {
+                let _ = recovery::mark_clean_and_clear(&recovery::journal_path(&dir));
+            }
+        }
+        tracing::info!("sockscap: teardown complete");
+        Ok(())
+    } else {
+        let error = errors.join("; ");
+        tracing::warn!("sockscap: teardown incomplete; Recover is required: {error}");
+        Err(error)
     }
-    tracing::info!("sockscap: teardown complete");
 }
 
 #[tauri::command]
@@ -808,7 +1002,10 @@ pub async fn boot_repair(app: &AppHandle) {
     // Previous helper cannot be contacted without its token; platform recover
     // + clear journal so the next Start opens a fresh elevated helper.
     if let Err(e) = capture::recover_system().await {
-        tracing::warn!("sockscap: boot recover failed: {e}");
+        // Leave the journal dirty so a later boot retries instead of falsely
+        // declaring potentially-live nftables/cgroup state recovered.
+        tracing::warn!("sockscap: boot recover failed; leaving journal dirty: {e}");
+        return;
     }
     let _ = recovery::mark_clean_and_clear(&journal_path);
     tracing::info!("sockscap: recovery complete");

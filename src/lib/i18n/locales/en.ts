@@ -1167,6 +1167,9 @@ const dict = {
     captureNotReady: "OS capture not active yet",
     captureNotReadyHint:
       "Rules engine and upstream dialers work now. WinDivert / platform capture is still being integrated.",
+    linuxCaptureReady:
+      "Linux nftables transparent capture is ready when started with cgroup and network-admin privileges.",
+    linuxCaptureActive: "Active · Linux nftables transparent capture",
     section: {
       scope: "Scope",
       upstream: "Upstream",

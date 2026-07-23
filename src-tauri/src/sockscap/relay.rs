@@ -28,6 +28,10 @@ pub struct RelayHandle {
 }
 
 impl RelayHandle {
+    pub(crate) fn new(port: u16, stop: Arc<AtomicBool>, task: JoinHandle<()>) -> Self {
+        Self { port, stop, task }
+    }
+
     /// Stop accept loops promptly.
     ///
     /// Must wake **both** IPv4 and IPv6 listeners (we bind 0.0.0.0 and optionally ::).
@@ -73,6 +77,17 @@ pub struct RelayContext {
     pub domains: Arc<Mutex<crate::sockscap::stats::DomainTracker>>,
 }
 
+/// Metadata recovered by an OS capture backend before a redirected connection
+/// enters the shared policy relay. Windows obtains it from the WinDivert helper;
+/// Linux reads `SO_ORIGINAL_DST` from the nftables-redirected socket.
+#[derive(Debug, Clone)]
+pub(crate) struct CapturedFlow {
+    pub destination: SocketAddr,
+    pub process_path: Option<String>,
+    pub pid: Option<u32>,
+    pub origin: SocketAddr,
+}
+
 /// Bind **0.0.0.0:0** (all interfaces) — required for WinDivert streamdump-style
 /// reflection, which delivers connections as `remote → client_lan_ip:relay`
 /// rather than to 127.0.0.1. Unknown peers without a redirect mapping are dropped.
@@ -111,7 +126,7 @@ pub async fn start_relay(ctx: Arc<RwLock<RelayContext>>) -> Result<RelayHandle, 
             let _ = v4.await;
         }
     });
-    Ok(RelayHandle { port, stop, task })
+    Ok(RelayHandle::new(port, stop, task))
 }
 
 async fn accept_loop(
@@ -146,39 +161,57 @@ async fn accept_loop(
 }
 
 async fn handle_client(
-    mut client: TcpStream,
+    client: TcpStream,
     peer: SocketAddr,
     ctx: Arc<RwLock<RelayContext>>,
 ) -> Result<(), String> {
     let peer_port = peer.port();
     let peer_ip = peer.ip().to_string();
 
+    let mapping = {
+        let g = ctx.read().await;
+        let guard = g.helper.inner.lock().map_err(|e| e.to_string())?;
+        let sess = guard
+            .as_ref()
+            .ok_or_else(|| "helper session missing".to_string())?;
+        // Streamdump peer is orig_remote:client_sport — prefer exact ip:port key.
+        helper::lookup_orig_key(sess, &peer_ip, peer_port)
+            .or_else(|_| helper::lookup_orig(sess, peer_port))?
+    };
+    let dst_ip: IpAddr = mapping
+        .dst_ip
+        .parse()
+        .map_err(|e| format!("bad dst ip: {e}"))?;
+    let flow = CapturedFlow {
+        destination: SocketAddr::new(dst_ip, mapping.dst_port),
+        process_path: (!mapping.path.is_empty()).then_some(mapping.path),
+        pid: (mapping.pid != 0).then_some(mapping.pid),
+        origin: peer,
+    };
+    handle_captured_client(client, flow, ctx).await
+}
+
+/// Apply shared hostname/policy/egress processing to a flow whose original
+/// destination was recovered by a platform capture backend.
+pub(crate) async fn handle_captured_client(
+    mut client: TcpStream,
+    flow: CapturedFlow,
+    ctx: Arc<RwLock<RelayContext>>,
+) -> Result<(), String> {
+    let destination = flow.destination;
+    let process_path = flow.process_path;
+    let pid = flow.pid;
+    let origin = flow.origin;
+
     // Multi-read peek for SNI / HTTP Host (ClientHello may span packets).
     let (prefix, hostname) = peek_for_hostname(&mut client).await;
 
     let snap = {
         let g = ctx.read().await;
-        let mapping = {
-            let guard = g.helper.inner.lock().map_err(|e| e.to_string())?;
-            let sess = guard
-                .as_ref()
-                .ok_or_else(|| "helper session missing".to_string())?;
-            // Streamdump peer is orig_remote:client_sport — prefer exact ip:port key.
-            helper::lookup_orig_key(sess, &peer_ip, peer_port)
-                .or_else(|_| helper::lookup_orig(sess, peer_port))?
-        };
-
-        let dst_ip: IpAddr = mapping
-            .dst_ip
-            .parse()
-            .map_err(|e| format!("bad dst ip: {e}"))?;
-
         // Learn IP→host from this flow for later pure-IP connections.
         if let Some(host) = hostname.as_ref() {
-            if let Ok(ip) = mapping.dst_ip.parse::<IpAddr>() {
-                if let Ok(mut map) = g.dns_map.lock() {
-                    map.insert(ip, host.clone(), None);
-                }
+            if let Ok(mut map) = g.dns_map.lock() {
+                map.insert(destination.ip(), host.clone(), None);
             }
         }
 
@@ -187,24 +220,19 @@ async fn handle_client(
             g.dns_map
                 .lock()
                 .ok()
-                .and_then(|mut m| m.lookup(dst_ip))
+                .and_then(|mut m| m.lookup(destination.ip()))
         });
 
         let engine = PolicyEngine::from_config(&g.config, g.rules.as_ref());
         let input = PolicyInput {
             host: host_for_policy,
-            ip: Some(dst_ip),
-            port: mapping.dst_port,
-            process_path: if mapping.path.is_empty() {
-                None
-            } else {
-                Some(mapping.path.clone())
-            },
-            pid: Some(mapping.pid),
+            ip: Some(destination.ip()),
+            port: destination.port(),
+            process_path: process_path.clone(),
+            pid,
         };
         let trace = engine.decide(&input);
         (
-            mapping,
             hostname,
             trace,
             g.config.upstream.kind,
@@ -218,25 +246,12 @@ async fn handle_client(
         )
     };
 
-    let (
-        mapping,
-        hostname,
-        trace,
-        kind,
-        up_host,
-        up_port,
-        up_user,
-        up_pass,
-        stats,
-        ssh_pool,
-        domains,
-    ) = snap;
+    let (hostname, trace, kind, up_host, up_port, up_user, up_pass, stats, ssh_pool, domains) =
+        snap;
 
     // Prefer hostname for dial when known (proxy-side DNS).
-    let dial_host = hostname
-        .clone()
-        .unwrap_or_else(|| mapping.dst_ip.clone());
-    let dest_port = mapping.dst_port;
+    let dial_host = hostname.unwrap_or_else(|| destination.ip().to_string());
+    let dest_port = destination.port();
 
     let res = match trace.decision {
         Decision::Block => {
@@ -246,8 +261,8 @@ async fn handle_client(
                     dial_host.clone(),
                     trace.decision,
                     trace.matched_rule.clone(),
-                    if mapping.path.is_empty() { None } else { Some(mapping.path.clone()) },
-                    Some(mapping.pid),
+                    process_path.clone(),
+                    pid,
                     0,
                     0,
                 );
@@ -311,9 +326,9 @@ async fn handle_client(
                 }
                 UpstreamKind::Ssh => {
                     let pool = ssh_pool.ok_or_else(|| "SSH pool not initialized".to_string())?;
-                    let origin = peer.ip().to_string();
+                    let origin_ip = origin.ip().to_string();
                     let mut remote = pool
-                        .dial(&dial_host, dest_port, &origin, peer.port())
+                        .dial(&dial_host, dest_port, &origin_ip, origin.port())
                         .await?;
                     if !prefix.is_empty() {
                         remote
@@ -337,8 +352,8 @@ async fn handle_client(
                     dial_host,
                     trace.decision,
                     trace.matched_rule,
-                    if mapping.path.is_empty() { None } else { Some(mapping.path) },
-                    Some(mapping.pid),
+                    process_path,
+                    pid,
                     up,
                     down,
                 );

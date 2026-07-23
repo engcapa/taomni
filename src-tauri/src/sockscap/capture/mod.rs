@@ -1,12 +1,17 @@
 //! Platform capture plane.
 //!
-//! Phase 1: capability reporting + recover stub only.
-//! Phase 2+: WinDivert (Windows), cgroup/nft or TUN (Linux), NE/utun (macOS).
+//! OS capture adapters.
+//!
+//! Windows uses the elevated WinDivert helper. Linux uses nftables + cgroup v2
+//! transparent TCP redirect. macOS currently exposes the rules engine only.
 
 use serde::{Deserialize, Serialize};
 
 // Re-export for orchestrator without circular path noise.
 pub use super::SocksCapCapabilities;
+
+#[cfg(target_os = "linux")]
+pub mod linux;
 
 /// Describe what this build/OS can do today.
 pub fn capabilities() -> SocksCapCapabilities {
@@ -29,9 +34,9 @@ pub fn capabilities() -> SocksCapCapabilities {
             platform: "linux".into(),
             global_tcp: true,
             app_filter: true,
-            capture_backend: "nft-cgroup-tun".into(),
+            capture_backend: "nft-cgroup-redirect".into(),
             notes: vec![
-                "Linux: nft/cgroup or TUN capture (smoltcp + nfnetlink). Privileged (CAP_NET_ADMIN). Process/PID filtering supported.".into(),
+                "Linux: nftables transparent TCP redirect with cgroup v2 process filtering. Requires root or delegated CAP_NET_ADMIN/cgroup permissions.".into(),
             ],
             privileged_required: true,
         }
@@ -63,8 +68,13 @@ pub fn capabilities() -> SocksCapCapabilities {
     }
 }
 
-/// Undo any residual OS capture state (no-op until capture is implemented).
+/// Undo any residual OS capture state left by an unclean shutdown.
 pub async fn recover_system() -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    {
+        return linux::recover_system();
+    }
+    #[cfg(not(target_os = "linux"))]
     Ok(())
 }
 

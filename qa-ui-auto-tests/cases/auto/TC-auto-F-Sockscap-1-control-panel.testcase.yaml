@@ -1,0 +1,33 @@
+id: TC-auto-F-Sockscap-1
+title: SocksCap panel opens and browser-preview controls transition safely
+description: |
+  F-Sockscap-1 browser smoke coverage. The browser runtime deliberately has no
+  OS packet capture, so Start must enter its degraded preview state rather than
+  claim Linux capture is active. This case verifies the panel entry point,
+  status refresh, rule dry-run, Start → Stop transition, and recovery action.
+  Privileged nftables/cgroup capture is verified separately by Rust tests and
+  native/manual validation on a Linux host with the required permissions.
+covers: [F-Sockscap-1]
+tags: [auto-generated, smoke, needs-review, network, sockscap]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 45
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="sidebar"]'
+  - click: '[data-testid="sidebar-tool-sockscap"]'
+  - wait_for: '[data-testid="sockscap-panel"]'
+  - assert_visible: '[data-testid="sockscap-start"]'
+  - assert_visible: '[data-testid="sockscap-refresh-status"]'
+  - assert_visible: '[data-testid="sockscap-recover"]'
+  - click: '[data-testid="sockscap-refresh-status"]'
+  - fill:
+      selector: '[data-testid="sockscap-test-host"]'
+      value: www.google.com
+  - click: '[data-testid="sockscap-test-target"]'
+  - click: '[data-testid="sockscap-start"]'
+  - wait_for: '[data-testid="sockscap-stop"]'
+  - click: '[data-testid="sockscap-stop"]'
+  - wait_for: '[data-testid="sockscap-start"]'
+  - click: '[data-testid="sockscap-recover"]'
+  - screenshot: sockscap-control-panel.png

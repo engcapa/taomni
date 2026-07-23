@@ -1,6 +1,8 @@
 //! SocksCap engine state machine.
 
 use crate::sockscap::capture::SocksCapCapabilities;
+#[cfg(target_os = "linux")]
+use crate::sockscap::capture::linux::LinuxCaptureHandle;
 use crate::sockscap::config::SocksCapConfig;
 use crate::sockscap::relay::RelayHandle;
 use crate::sockscap::rules::{CompiledRules, GfwListMeta};
@@ -39,6 +41,10 @@ pub struct Orchestrator {
     capture_backend: String,
     /// Active local relay (if capture is running).
     pub relay: Option<RelayHandle>,
+    /// Linux owns both the nftables rules and its loopback relay as one
+    /// lifecycle unit, so the two can be removed in the safe order.
+    #[cfg(target_os = "linux")]
+    linux_capture: Option<LinuxCaptureHandle>,
     /// Shared with the relay task so config/rules can hot-reload while Active.
     pub relay_ctx: Option<std::sync::Arc<tokio::sync::RwLock<crate::sockscap::relay::RelayContext>>>,
     /// Signal DNS cache refresher to exit when capture stops.
@@ -56,6 +62,8 @@ impl Orchestrator {
             domains: Arc::new(std::sync::Mutex::new(crate::sockscap::stats::DomainTracker::new(200))),
             capture_backend: "none".into(),
             relay: None,
+            #[cfg(target_os = "linux")]
+            linux_capture: None,
             relay_ctx: None,
             dns_stop: None,
         }
@@ -118,6 +126,15 @@ impl Orchestrator {
         self.message = message.into();
     }
 
+    /// Capture teardown was incomplete. Keep this distinct from `Idle` so the
+    /// UI can direct the user to Recover instead of claiming the host's
+    /// networking state is clean.
+    pub fn set_recovery_required(&mut self, backend: &str, message: impl Into<String>) {
+        self.phase = EnginePhase::RecoveryRequired;
+        self.capture_backend = backend.to_string();
+        self.message = message.into();
+    }
+
     /// Phase-1 fallback when OS capture is unavailable.
     pub fn start_stub(&mut self, caps: &SocksCapCapabilities) -> Result<(), String> {
         if matches!(
@@ -143,16 +160,32 @@ impl Orchestrator {
         Ok(())
     }
 
-    /// Linux-specific capture stub: enable basic PID filtering and TUN relay.
-    pub fn start_linux_stub(&mut self, caps: &SocksCapCapabilities) -> Result<(), String> {
-        // TODO: Implement real nft/cgroup or TUN logic
-        self.phase = EnginePhase::Degraded;
-        self.capture_backend = caps.capture_backend.clone();
-        self.message = format!(
-            "Linux stub capture ready ({}). Full NAT/NGFW planned for Phase 2.",
-            caps.platform
-        );
-        Ok(())
+    #[cfg(target_os = "linux")]
+    pub fn set_linux_capture(&mut self, capture: LinuxCaptureHandle) {
+        self.linux_capture = Some(capture);
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn take_linux_capture_for_stop(&mut self) -> Option<LinuxCaptureHandle> {
+        if !matches!(self.phase, EnginePhase::Idle) {
+            self.phase = EnginePhase::Stopping;
+            self.message = "stopping".into();
+        }
+        self.linux_capture.take()
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn relay_port(&self) -> Option<u16> {
+        self.relay.as_ref().map(|relay| relay.port).or_else(|| {
+            self.linux_capture
+                .as_ref()
+                .map(LinuxCaptureHandle::relay_port)
+        })
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    pub fn relay_port(&self) -> Option<u16> {
+        self.relay.as_ref().map(|relay| relay.port)
     }
 
     /// Take the running relay out so the caller can stop it without holding
@@ -166,15 +199,37 @@ impl Orchestrator {
     }
 
     pub async fn stop(&mut self) -> Result<(), String> {
-        if matches!(self.phase, EnginePhase::Idle) && self.relay.is_none() {
+        #[cfg(target_os = "linux")]
+        let no_platform_capture = self.linux_capture.is_none();
+        #[cfg(not(target_os = "linux"))]
+        let no_platform_capture = true;
+
+        if matches!(self.phase, EnginePhase::Idle) && self.relay.is_none() && no_platform_capture {
             return Ok(());
         }
         self.phase = EnginePhase::Stopping;
+        let capture_backend = self.capture_backend.clone();
+        #[cfg(target_os = "linux")]
+        let mut errors = Vec::new();
+        #[cfg(not(target_os = "linux"))]
+        let errors: Vec<String> = Vec::new();
+        #[cfg(target_os = "linux")]
+        if let Some(capture) = self.linux_capture.take() {
+            if let Err(error) = capture.stop().await {
+                errors.push(error);
+            }
+        }
         if let Some(relay) = self.relay.take() {
             relay.stop().await;
         }
         self.finish_stop();
-        Ok(())
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            let error = errors.join("; ");
+            self.set_recovery_required(&capture_backend, error.clone());
+            Err(error)
+        }
     }
 
     /// Clear runtime handles after relay has been stopped (or abandoned).
@@ -184,6 +239,10 @@ impl Orchestrator {
         }
         self.relay_ctx = None;
         self.relay = None;
+        #[cfg(target_os = "linux")]
+        {
+            self.linux_capture = None;
+        }
         self.message = "stopped".into();
         self.phase = EnginePhase::Idle;
         self.capture_backend = "none".into();
@@ -198,6 +257,10 @@ impl Orchestrator {
         self.capture_backend = "none".into();
         self.relay_ctx = None;
         self.relay = None;
+        #[cfg(target_os = "linux")]
+        {
+            self.linux_capture = None;
+        }
     }
 
     /// Hot-update policy surface used by the running relay.

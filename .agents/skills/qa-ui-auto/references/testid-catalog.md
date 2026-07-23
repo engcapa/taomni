@@ -340,6 +340,21 @@
 - `[data-testid="compact-sidebar-drawer-toggle"]` — interactive — F1.4.sidebar-drawer-toggle
   ↳ `[aria-label="Show sessions drawer"]` — alias
 
+## network/sockscap (F-Sockscap-1)
+
+- `[data-testid="sidebar-tool-sockscap"]` — interactive — F-Sockscap-1.sidebar-entry
+- `[data-testid="sockscap-panel"]` — display — F-Sockscap-1.panel
+- `[data-testid="sockscap-start"]` — interactive — F-Sockscap-1.start
+- `[data-testid="sockscap-stop"]` — interactive [optional] — F-Sockscap-1.stop
+- `[data-testid="sockscap-refresh-status"]` — interactive — F-Sockscap-1.refresh-status
+- `[data-testid="sockscap-recover"]` — interactive — F-Sockscap-1.recover
+- `[data-testid="sockscap-linux-capture-state"]` — display [optional] — F-Sockscap-1.linux-capture-state
+- `[data-testid="sockscap-refresh-gfw"]` — interactive [optional] — F-Sockscap-1.refresh-gfw
+- `[data-testid="sockscap-test-host"]` — interactive — F-Sockscap-1.test-host
+- `[data-testid="sockscap-test-target"]` — interactive — F-Sockscap-1.test-target
+- `[data-testid="sockscap-helper-start"]` — interactive [optional] — F-Sockscap-1.helper-start
+- `[data-testid="sockscap-windivert-probe"]` — interactive [optional] — F-Sockscap-1.windivert-probe
+
 ## notes (F-TAO-1)
 
 - `[data-testid="tao-hub-tab-chat"]` — interactive [optional] — F-TAO-1.tao-hub-tab-chat
@@ -387,7 +402,6 @@
 ## servers (F-Servers-1)
 
 - `[data-testid="servers-dialog"]` — display [optional] — F-Servers-1.dialog
-- `[data-testid="servers-dialog-close"]` — interactive [optional] — F-Servers-1.dialog-close
 - `[data-testid="servers-dialog-cancel"]` — interactive [optional] — F-Servers-1.dialog-cancel
 - `[data-testid="servers-dialog-apply"]` — interactive [optional] — F-Servers-1.dialog-apply
 - `[data-testid="server-list"]` — display [optional] — F-Servers-1.server-list
