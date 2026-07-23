@@ -14,6 +14,15 @@ pub struct SshPool {
     pub port: u16,
 }
 
+impl std::fmt::Debug for SshPool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SshPool")
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .finish()
+    }
+}
+
 impl SshPool {
     pub async fn connect(
         host: &str,

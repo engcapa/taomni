@@ -59,6 +59,16 @@ impl RelayHandle {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct ResolvedUpstream {
+    pub kind: UpstreamKind,
+    pub host: String,
+    pub port: u16,
+    pub user: String,
+    pub pass: String,
+    pub ssh_pool: Option<Arc<SshPool>>,
+}
+
 pub struct RelayContext {
     pub config: SocksCapConfig,
     pub rules: Option<CompiledRules>,
@@ -71,6 +81,7 @@ pub struct RelayContext {
     pub self_pid: u32,
     /// Shared SSH session when upstream kind is SSH.
     pub ssh_pool: Option<Arc<SshPool>>,
+    pub profile_upstreams: std::collections::HashMap<String, ResolvedUpstream>,
     /// IP → hostname learned from SNI / HTTP Host.
     pub dns_map: Arc<Mutex<DnsMap>>,
     /// Domain & flow traffic tracker
@@ -232,16 +243,32 @@ pub(crate) async fn handle_captured_client(
             pid,
         };
         let trace = engine.decide(&input);
+
+        let (kind, up_host, up_port, up_user, up_pass, ssh_pool) = match trace.profile_id.as_deref() {
+            Some(pid) if g.profile_upstreams.contains_key(pid) => {
+                let up = &g.profile_upstreams[pid];
+                (up.kind, up.host.clone(), up.port, up.user.clone(), up.pass.clone(), up.ssh_pool.clone())
+            }
+            _ => (
+                g.config.upstream.kind,
+                g.upstream_host.clone(),
+                g.upstream_port,
+                g.upstream_user.clone(),
+                g.upstream_pass.clone(),
+                g.ssh_pool.clone(),
+            ),
+        };
+
         (
             hostname,
             trace,
-            g.config.upstream.kind,
-            g.upstream_host.clone(),
-            g.upstream_port,
-            g.upstream_user.clone(),
-            g.upstream_pass.clone(),
+            kind,
+            up_host,
+            up_port,
+            up_user,
+            up_pass,
             Arc::clone(&g.stats),
-            g.ssh_pool.clone(),
+            ssh_pool,
             Arc::clone(&g.domains),
         )
     };
@@ -261,6 +288,7 @@ pub(crate) async fn handle_captured_client(
                     dial_host.clone(),
                     trace.decision,
                     trace.matched_rule.clone(),
+                    trace.profile_name.clone(),
                     process_path.clone(),
                     pid,
                     0,
@@ -352,6 +380,7 @@ pub(crate) async fn handle_captured_client(
                     dial_host,
                     trace.decision,
                     trace.matched_rule,
+                    trace.profile_name,
                     process_path,
                     pid,
                     up,
@@ -437,6 +466,15 @@ pub fn upstream_from_config(cfg: &SocksCapConfig) -> (String, u16, String, Strin
         cfg.upstream.host.clone(),
         cfg.upstream.port,
         cfg.upstream.username.clone(),
+        String::new(),
+    )
+}
+
+pub fn upstream_from_config_ref(up: &crate::sockscap::config::UpstreamRef) -> (String, u16, String, String) {
+    (
+        up.host.clone(),
+        up.port,
+        up.username.clone(),
         String::new(),
     )
 }

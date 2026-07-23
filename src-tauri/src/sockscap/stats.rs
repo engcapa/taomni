@@ -77,6 +77,8 @@ pub struct DomainRecord {
     pub domain_or_ip: String,
     pub decision: Decision,
     pub matched_rule: Option<String>,
+    #[serde(default)]
+    pub profile_name: Option<String>,
     pub process_name: Option<String>,
     pub pid: Option<u32>,
     pub hit_count: u64,
@@ -104,6 +106,7 @@ impl DomainTracker {
         domain_or_ip: String,
         decision: Decision,
         matched_rule: Option<String>,
+        profile_name: Option<String>,
         process_path: Option<String>,
         pid: Option<u32>,
         bytes_up: u64,
@@ -130,6 +133,9 @@ impl DomainTracker {
             if matched_rule.is_some() {
                 entry.matched_rule = matched_rule;
             }
+            if profile_name.is_some() {
+                entry.profile_name = profile_name;
+            }
             if process_name.is_some() {
                 entry.process_name = process_name;
             }
@@ -155,6 +161,7 @@ impl DomainTracker {
                     domain_or_ip,
                     decision,
                     matched_rule,
+                    profile_name,
                     process_name,
                     pid,
                     hit_count: 1,

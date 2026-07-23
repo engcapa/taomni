@@ -546,6 +546,7 @@ async fn build_linux_relay_context(
         upstream_pass,
         self_pid: std::process::id(),
         ssh_pool,
+        profile_upstreams: std::collections::HashMap::new(),
         dns_map,
         domains,
     })))
@@ -621,6 +622,69 @@ async fn start_windows_capture(
         }
     }
 
+    let active_profs = cfg.active_profiles();
+    let mut profile_upstreams = std::collections::HashMap::new();
+    for p in &active_profs {
+        let (mut phost, mut pport, mut puser, mut ppass) =
+            relay::upstream_from_config_ref(&p.upstream);
+        if phost.is_empty() {
+            phost = up_host.clone();
+            pport = up_port;
+            puser = up_user.clone();
+            ppass = up_pass.clone();
+        } else {
+            if !p.upstream.password_ref.is_empty() {
+                if let Ok(Some(pass)) = state.vault.resolve(&p.upstream.password_ref) {
+                    ppass = (*pass).clone();
+                }
+            }
+            if !p.upstream.session_id.is_empty() {
+                if let Ok(db) = state.db.lock() {
+                    if let Ok(sess) = crate::session::db::get_session(&db, &p.upstream.session_id) {
+                        phost = sess.host;
+                        pport = sess.port;
+                        if let Some(u) = sess.username.filter(|u| !u.is_empty()) {
+                            puser = u;
+                        }
+                    }
+                }
+            }
+        }
+
+        let p_ssh_pool = if matches!(p.upstream.kind, crate::sockscap::config::UpstreamKind::Ssh) {
+            use crate::sockscap::egress::ssh_pool::SshPool;
+            use crate::terminal::ssh::SshAuth;
+            let auth = if !ppass.is_empty() {
+                SshAuth::Password(ppass.clone())
+            } else if !p.upstream.password_ref.is_empty() && p.upstream.password_ref.starts_with("key:") {
+                SshAuth::PrivateKey(p.upstream.password_ref.clone())
+            } else {
+                SshAuth::Agent
+            };
+            match SshPool::connect(&phost, pport, &puser, auth).await {
+                Ok(pool) => Some(Arc::new(pool)),
+                Err(e) => {
+                    tracing::warn!("Profile '{}' SSH upstream connect failed: {e}", p.name);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        profile_upstreams.insert(
+            p.id.clone(),
+            relay::ResolvedUpstream {
+                kind: p.upstream.kind,
+                host: phost,
+                port: pport,
+                user: puser,
+                pass: ppass,
+                ssh_pool: p_ssh_pool,
+            },
+        );
+    }
+
     // Optional SSH pool for capture-path PROXY via direct-tcpip.
     let ssh_pool = if matches!(cfg.upstream.kind, crate::sockscap::config::UpstreamKind::Ssh)
     {
@@ -672,6 +736,7 @@ async fn start_windows_capture(
         upstream_pass: up_pass,
         self_pid: std::process::id(),
         ssh_pool,
+        profile_upstreams,
         dns_map: Arc::clone(&dns_map),
         domains,
     }));
@@ -686,6 +751,23 @@ async fn start_windows_capture(
     );
 
     // 3) Tell helper to start FLOW+NETWORK capture → NAT to relay.
+    let mode_apps = !active_profs.is_empty()
+        && active_profs
+            .iter()
+            .all(|p| matches!(p.mode, ScopeMode::Apps));
+
+    let mut app_paths: Vec<String> = Vec::new();
+    for p in &active_profs {
+        if matches!(p.mode, ScopeMode::Apps) {
+            for a in &p.apps {
+                let norm = paths::normalize_exe_path(&a.path);
+                if !norm.is_empty() && !app_paths.contains(&norm) {
+                    app_paths.push(norm);
+                }
+            }
+        }
+    }
+
     let mut bypass_pids = vec![std::process::id()];
     if let Some(pid) = helper_st.pid {
         bypass_pids.push(pid);
@@ -701,13 +783,8 @@ async fn start_windows_capture(
     bypass_endpoints.push(("0.0.0.0".into(), relay_handle.port));
 
     let args = CaptureStartArgs {
-        mode_apps: matches!(cfg.mode, ScopeMode::Apps),
-        app_paths: cfg
-            .apps
-            .iter()
-            .map(|a| paths::normalize_exe_path(&a.path))
-            .filter(|p| !p.is_empty())
-            .collect(),
+        mode_apps,
+        app_paths,
         bypass_cidrs: cfg.bypass_cidrs.clone(),
         bypass_pids,
         bypass_endpoints,
