@@ -4330,6 +4330,7 @@ area: network/sockscap
 components: [SocksCapPanel]
 files:
   - src/components/sockscap/SocksCapPanel.tsx
+  - src/components/sockscap/SocksCapRootPrompt.tsx
   - src/lib/sockscap.ts
   - src/stubs/tauri-core.ts
 controls:
@@ -4356,6 +4357,26 @@ controls:
     selector: '[data-testid="sockscap-linux-capture-state"]'
     kind: display
     optional: true       # only when the desktop backend reports Linux
+  - id: root-prompt-dialog
+    selector: '[data-testid="sockscap-root-prompt-dialog"]'
+    kind: display
+    optional: true       # only after Linux capture requests authorization
+  - id: root-password-input
+    selector: '[data-testid="sockscap-root-password-input"]'
+    kind: interactive
+    optional: true       # only after Linux capture requests authorization
+  - id: root-prompt-submit
+    selector: '[data-testid="sockscap-root-prompt-submit"]'
+    kind: interactive
+    optional: true       # only after Linux capture requests authorization
+  - id: root-prompt-cancel
+    selector: '[data-testid="sockscap-root-prompt-cancel"]'
+    kind: interactive
+    optional: true       # only after Linux capture requests authorization
+  - id: root-prompt-close
+    selector: '[data-testid="sockscap-root-prompt-close"]'
+    kind: interactive
+    optional: true       # only after Linux capture requests authorization
   - id: refresh-gfw
     selector: '[data-testid="sockscap-refresh-gfw"]'
     kind: interactive

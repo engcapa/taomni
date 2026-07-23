@@ -8,8 +8,8 @@ use crate::sockscap::relay::RelayHandle;
 use crate::sockscap::rules::{CompiledRules, GfwListMeta};
 use crate::sockscap::stats::{StatsCounters, StatsSnapshot};
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -46,7 +46,8 @@ pub struct Orchestrator {
     #[cfg(target_os = "linux")]
     linux_capture: Option<LinuxCaptureHandle>,
     /// Shared with the relay task so config/rules can hot-reload while Active.
-    pub relay_ctx: Option<std::sync::Arc<tokio::sync::RwLock<crate::sockscap::relay::RelayContext>>>,
+    pub relay_ctx:
+        Option<std::sync::Arc<tokio::sync::RwLock<crate::sockscap::relay::RelayContext>>>,
     /// Signal DNS cache refresher to exit when capture stops.
     pub dns_stop: Option<Arc<AtomicBool>>,
 }
@@ -59,7 +60,9 @@ impl Orchestrator {
             config: None,
             rules: None,
             stats: Arc::new(StatsCounters::default()),
-            domains: Arc::new(std::sync::Mutex::new(crate::sockscap::stats::DomainTracker::new(200))),
+            domains: Arc::new(std::sync::Mutex::new(
+                crate::sockscap::stats::DomainTracker::new(200),
+            )),
             capture_backend: "none".into(),
             relay: None,
             #[cfg(target_os = "linux")]
@@ -123,6 +126,18 @@ impl Orchestrator {
     pub fn set_degraded(&mut self, backend: &str, message: impl Into<String>) {
         self.phase = EnginePhase::Degraded;
         self.capture_backend = backend.to_string();
+        self.message = message.into();
+    }
+
+    /// A Start attempt failed before it installed an active capture handle.
+    ///
+    /// This is intentionally distinct from [`Self::set_degraded`]: degraded
+    /// represents a running fallback/partially operational session and must
+    /// remain stoppable, while a failed preflight must be immediately
+    /// retryable (for example after the user supplies sudo credentials).
+    pub fn set_start_failed(&mut self, message: impl Into<String>) {
+        self.phase = EnginePhase::Idle;
+        self.capture_backend = "none".into();
         self.message = message.into();
     }
 
@@ -289,5 +304,24 @@ impl Orchestrator {
 impl Default for Orchestrator {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn failed_start_returns_to_a_retryable_idle_state() {
+        let mut orchestrator = Orchestrator::new();
+        orchestrator.set_preparing("nft-cgroup-redirect");
+
+        orchestrator.set_start_failed("authorization required");
+
+        let status = orchestrator.status();
+        assert_eq!(status.phase, EnginePhase::Idle);
+        assert_eq!(status.capture_backend, "none");
+        assert_eq!(status.message, "authorization required");
+        assert!(!orchestrator.is_running());
     }
 }

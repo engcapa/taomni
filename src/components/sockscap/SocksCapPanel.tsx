@@ -54,6 +54,7 @@ import {
   type UpstreamKind,
   type UserRule,
 } from "../../lib/sockscap";
+import { SocksCapRootPrompt } from "./SocksCapRootPrompt";
 import {
   listSessions,
   vaultPut,
@@ -292,12 +293,42 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     }
   };
 
-  const onStart = async () => {
+  const [showRootPrompt, setShowRootPrompt] = useState(false);
+  const [rootPromptError, setRootPromptError] = useState<string | null>(null);
+  const [rootPromptBusy, setRootPromptBusy] = useState(false);
+
+  const isLinuxRootRequiredError = (msg: string) => {
+    const lower = msg.toLowerCase();
+    return (
+      lower.includes("cap_net_admin") ||
+      lower.includes("linux capture requires") ||
+      lower.includes("linux capture needs root") ||
+      lower.includes("permission to manage cgroup v2")
+    );
+  };
+
+  const isSudoAuthenticationError = (msg: string) => {
+    const lower = msg.toLowerCase();
+    return (
+      lower.includes("incorrect password") ||
+      lower.includes("authentication failure") ||
+      lower.includes("sudo authentication failed") ||
+      lower.includes("sorry, try again") ||
+      lower.includes("a password is required")
+    );
+  };
+
+  const onStart = async (sudoPassword?: string) => {
     if (!cfg) return;
-    setBusy(true);
+    if (sudoPassword) {
+      setRootPromptBusy(true);
+      setRootPromptError(null);
+    } else {
+      setBusy(true);
+    }
     try {
       await sockscapSetConfig(cfg);
-      const st = await sockscapStart();
+      const st = await sockscapStart(sudoPassword);
       setStatus(st);
       report(st.message || t("sockscap.started"), st.phase !== "idle");
       const [gf, sn, hp] = await Promise.all([
@@ -308,10 +339,23 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
       setGfw(gf);
       if (sn) setStats(sn);
       if (hp) setHelper(hp);
+      setShowRootPrompt(false);
+      setRootPromptError(null);
     } catch (e) {
-      report(String(e), false);
+      const errStr = String(e);
+      if (!sudoPassword && isLinuxRootRequiredError(errStr)) {
+        setShowRootPrompt(true);
+        setRootPromptError(null);
+      } else if (sudoPassword && isSudoAuthenticationError(errStr)) {
+        setShowRootPrompt(true);
+        setRootPromptError(t("sockscap.rootPromptIncorrectPassword"));
+      } else {
+        if (sudoPassword) setShowRootPrompt(false);
+        report(errStr, false);
+      }
     } finally {
       setBusy(false);
+      setRootPromptBusy(false);
     }
   };
 
@@ -1340,6 +1384,18 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {showRootPrompt && (
+        <SocksCapRootPrompt
+          onSubmit={(password) => void onStart(password)}
+          onCancel={() => {
+            setShowRootPrompt(false);
+            setRootPromptError(null);
+          }}
+          error={rootPromptError}
+          busy={rootPromptBusy}
+        />
       )}
     </div>
   );

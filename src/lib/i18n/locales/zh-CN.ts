@@ -1167,6 +1167,13 @@ export const zhCN: DeepPartial<typeof en> = {
       "规则引擎与上游拨号已可用。WinDivert / 平台捕获仍在接入中。",
     linuxCaptureReady: "Linux nftables 透明捕获已就绪；启动时需要 cgroup 和网络管理权限。",
     linuxCaptureActive: "已激活 · Linux nftables 透明捕获",
+    rootPromptTitle: "Root 权限验证",
+    rootPromptSubtitle:
+      "Linux nftables 与 cgroup v2 透明捕获需要 Root (CAP_NET_ADMIN) 权限。请输入 sudo 密码以继续。",
+    rootPasswordLabel: "Sudo 密码",
+    rootPasswordPlaceholder: "请输入 root / sudo 密码",
+    rootPromptIncorrectPassword: "Sudo 密码错误或验证失败，请重试。",
+    authenticating: "验证中...",
     section: {
       scope: "范围",
       upstream: "上游",

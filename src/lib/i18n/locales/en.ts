@@ -1170,6 +1170,14 @@ const dict = {
     linuxCaptureReady:
       "Linux nftables transparent capture is ready when started with cgroup and network-admin privileges.",
     linuxCaptureActive: "Active · Linux nftables transparent capture",
+    rootPromptTitle: "Root Authorization Required",
+    rootPromptSubtitle:
+      "Linux nftables & cgroup v2 transparent capture requires Root (CAP_NET_ADMIN) privileges. Please enter your sudo password to proceed.",
+    rootPasswordLabel: "Sudo Password",
+    rootPasswordPlaceholder: "Enter root / sudo password",
+    rootPromptIncorrectPassword:
+      "Sudo password incorrect or authentication failed. Please try again.",
+    authenticating: "Authenticating...",
     section: {
       scope: "Scope",
       upstream: "Upstream",

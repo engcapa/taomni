@@ -9,6 +9,7 @@ use std::fs;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Component, Path, PathBuf};
 
+use crate::sockscap::capture::linux::exec::{is_effective_root, run_command_elevated};
 use crate::sockscap::config::ScopeMode;
 
 const CGROUP_ROOT: &str = "/sys/fs/cgroup";
@@ -49,6 +50,7 @@ impl CgroupSession {
         mode: ScopeMode,
         target_pids: &BTreeSet<u32>,
         self_pid: u32,
+        sudo_password: Option<&str>,
     ) -> Result<Self, String> {
         Self::preflight()?;
 
@@ -59,12 +61,27 @@ impl CgroupSession {
                 root.display()
             ));
         }
-        fs::create_dir(&root).map_err(|e| {
-            format!(
-                "create {}: {e}. Linux capture must run with permission to manage cgroup v2",
-                root.display()
-            )
-        })?;
+
+        if let Err(e) = fs::create_dir(&root) {
+            if !is_effective_root() && sudo_password.is_some() {
+                let root_str = root.display().to_string();
+                // Keep cgroup ownership with root. Each required mutation is
+                // elevated individually instead of making control files
+                // persistently writable by the desktop process.
+                let mk_res =
+                    run_command_elevated("mkdir", &["-p", &root_str], None, sudo_password)?;
+                if !mk_res.status.success() {
+                    return Err(format!(
+                        "create {root_str}: {e}. Linux capture must run with permission to manage cgroup v2"
+                    ));
+                }
+            } else {
+                return Err(format!(
+                    "create {}: {e}. Linux capture must run with permission to manage cgroup v2",
+                    root.display()
+                ));
+            }
+        }
 
         let mut session = Self {
             root,
@@ -75,7 +92,7 @@ impl CgroupSession {
 
         let setup = match mode {
             ScopeMode::Global => session
-                .move_pid(self_pid, "bypass")
+                .move_pid(self_pid, "bypass", sudo_password)
                 .map(|id| session.bypass_id = Some(id)),
             ScopeMode::Apps => {
                 if target_pids.is_empty() {
@@ -87,7 +104,8 @@ impl CgroupSession {
                     )
                 } else {
                     for pid in target_pids {
-                        let id = session.move_pid(*pid, &format!("capture-{pid}"))?;
+                        let id =
+                            session.move_pid(*pid, &format!("capture-{pid}"), sudo_password)?;
                         session.capture_ids.push(id);
                     }
                     Ok(())
@@ -96,7 +114,7 @@ impl CgroupSession {
         };
 
         if let Err(error) = setup {
-            let cleanup_error = session.cleanup().err();
+            let cleanup_error = session.cleanup(sudo_password).err();
             return Err(match cleanup_error {
                 Some(cleanup_error) => format!("{error}; cleanup also failed: {cleanup_error}"),
                 None => error,
@@ -115,11 +133,11 @@ impl CgroupSession {
     }
 
     /// Restore moved processes and remove the session's empty cgroup tree.
-    pub fn cleanup(&mut self) -> Result<(), String> {
+    pub fn cleanup(&mut self, sudo_password: Option<&str>) -> Result<(), String> {
         let mut errors = Vec::new();
 
         for moved in self.moves.iter().rev() {
-            if let Err(error) = restore_managed_processes(moved) {
+            if let Err(error) = restore_managed_processes(moved, sudo_password) {
                 errors.push(error);
             }
         }
@@ -127,13 +145,37 @@ impl CgroupSession {
         for moved in self.moves.iter().rev() {
             if let Err(error) = fs::remove_dir(&moved.managed_dir) {
                 if error.kind() != std::io::ErrorKind::NotFound {
-                    errors.push(format!("remove {}: {error}", moved.managed_dir.display()));
+                    let mdir_str = moved.managed_dir.display().to_string();
+                    match run_command_elevated("rmdir", &[&mdir_str], None, sudo_password) {
+                        Ok(output) if output.status.success() => {}
+                        Ok(output) => errors.push(format!(
+                            "remove {}: {error}; elevated rmdir failed: {}",
+                            moved.managed_dir.display(),
+                            command_error(&output)
+                        )),
+                        Err(elevated_error) => errors.push(format!(
+                            "remove {}: {error}; elevated rmdir failed: {elevated_error}",
+                            moved.managed_dir.display()
+                        )),
+                    }
                 }
             }
         }
         if let Err(error) = fs::remove_dir(&self.root) {
             if error.kind() != std::io::ErrorKind::NotFound {
-                errors.push(format!("remove {}: {error}", self.root.display()));
+                let root_str = self.root.display().to_string();
+                match run_command_elevated("rmdir", &[&root_str], None, sudo_password) {
+                    Ok(output) if output.status.success() => {}
+                    Ok(output) => errors.push(format!(
+                        "remove {}: {error}; elevated rmdir failed: {}",
+                        self.root.display(),
+                        command_error(&output)
+                    )),
+                    Err(elevated_error) => errors.push(format!(
+                        "remove {}: {error}; elevated rmdir failed: {elevated_error}",
+                        self.root.display()
+                    )),
+                }
             }
         }
 
@@ -148,11 +190,21 @@ impl CgroupSession {
         }
     }
 
-    fn move_pid(&mut self, pid: u32, name: &str) -> Result<u64, String> {
+    fn move_pid(
+        &mut self,
+        pid: u32,
+        name: &str,
+        sudo_password: Option<&str>,
+    ) -> Result<u64, String> {
         let original_dir = cgroup_dir_for_pid(pid)?;
         let managed_dir = self.root.join(name);
-        fs::create_dir(&managed_dir)
-            .map_err(|e| format!("create {}: {e}", managed_dir.display()))?;
+        if let Err(e) = fs::create_dir(&managed_dir) {
+            let mdir_str = managed_dir.display().to_string();
+            let mk_res = run_command_elevated("mkdir", &["-p", &mdir_str], None, sudo_password)?;
+            if !mk_res.status.success() {
+                return Err(format!("create {mdir_str}: {e}"));
+            }
+        }
         // Read the inode before moving the process. If that read fails, the
         // new cgroup is still empty and the session-level rollback can remove
         // it without leaving a PID stranded in an untracked cgroup.
@@ -174,12 +226,21 @@ impl CgroupSession {
             original_dir,
             managed_dir,
         });
-        fs::write(cgroup_procs, pid.to_string()).map_err(|e| {
-            format!(
-                "move PID {pid} into {}: {e}. Linux capture needs root or delegated cgroup permissions",
-                managed_display
-            )
-        })?;
+
+        // Write the PID with elevation when the desktop process does not have
+        // delegated cgroup permissions. `run_command_elevated` authenticates
+        // sudo separately, so tee receives only this PID and can never echo a
+        // password into the application status.
+        let contents = format!("{pid}\n");
+        let proc_str = cgroup_procs.display().to_string();
+        let res = run_command_elevated("tee", &[&proc_str], Some(&contents), sudo_password)?;
+        if !res.status.success() {
+            return Err(format!(
+                "move PID {pid} into {managed_display}: {}. Linux capture needs root or delegated cgroup permissions",
+                command_error(&res)
+            ));
+        }
+
         Ok(id)
     }
 }
@@ -208,20 +269,47 @@ fn parse_cgroup_processes(contents: &str, path: &Path) -> Result<Vec<u32>, Strin
         .collect()
 }
 
-fn restore_managed_processes(moved: &CgroupMove) -> Result<(), String> {
+fn restore_managed_processes(
+    moved: &CgroupMove,
+    sudo_password: Option<&str>,
+) -> Result<(), String> {
     for pid in cgroup_processes(&moved.managed_dir)? {
         if !Path::new(&format!("/proc/{pid}")).exists() {
             continue;
         }
-        fs::write(moved.original_dir.join("cgroup.procs"), pid.to_string()).map_err(|error| {
-            format!(
-                "restore PID {pid} from {} to {}: {error}",
-                moved.managed_dir.display(),
-                moved.original_dir.display()
-            )
-        })?;
+        let target = moved.original_dir.join("cgroup.procs");
+        if let Err(error) = fs::write(&target, pid.to_string()) {
+            if !is_effective_root() && sudo_password.is_some() {
+                let target_str = target.display().to_string();
+                let contents = format!("{pid}\n");
+                let res =
+                    run_command_elevated("tee", &[&target_str], Some(&contents), sudo_password)?;
+                if !res.status.success() {
+                    return Err(format!(
+                        "restore PID {pid} from {} to {}: {error}",
+                        moved.managed_dir.display(),
+                        moved.original_dir.display()
+                    ));
+                }
+            } else {
+                return Err(format!(
+                    "restore PID {pid} from {} to {}: {error}",
+                    moved.managed_dir.display(),
+                    moved.original_dir.display()
+                ));
+            }
+        }
     }
     Ok(())
+}
+
+fn command_error(output: &std::process::Output) -> String {
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if stderr.is_empty() {
+        format!("exit status {}", output.status)
+    } else {
+        stderr
+    }
 }
 
 /// Best-effort cleanup used by Recover / boot repair. It intentionally removes

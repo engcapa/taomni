@@ -140,8 +140,8 @@ export function sockscapStatus(): Promise<SocksCapStatus> {
   return invoke("sockscap_status");
 }
 
-export function sockscapStart(): Promise<SocksCapStatus> {
-  return invoke("sockscap_start");
+export function sockscapStart(sudoPassword?: string): Promise<SocksCapStatus> {
+  return invoke("sockscap_start", { sudoPassword });
 }
 
 export function sockscapStop(): Promise<SocksCapStatus> {

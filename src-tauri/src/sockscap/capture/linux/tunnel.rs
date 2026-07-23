@@ -8,8 +8,8 @@
 
 use std::net::IpAddr;
 use std::path::Path;
-use std::process::{Command, Stdio};
 
+use crate::sockscap::capture::linux::exec::run_command_elevated;
 use crate::sockscap::config::ScopeMode;
 
 const TABLE_NAME: &str = "taomni_sockscap";
@@ -165,18 +165,12 @@ pub struct NftRedirect {
 }
 
 impl NftRedirect {
-    pub fn preflight() -> Result<(), String> {
-        let output = Command::new(nft_binary()?)
-            .arg("--version")
-            .output()
-            .map_err(|e| format!("run nft --version: {e}"))?;
+    pub fn preflight(sudo_password: Option<&str>) -> Result<(), String> {
+        let output = run_command_elevated(nft_binary()?, &["--version"], None, sudo_password)?;
         if !output.status.success() {
             return Err(format!("nft --version failed: {}", command_error(&output)));
         }
-        let output = Command::new(nft_binary()?)
-            .args(["list", "tables"])
-            .output()
-            .map_err(|e| format!("query nftables permissions: {e}"))?;
+        let output = run_command_elevated(nft_binary()?, &["list", "tables"], None, sudo_password)?;
         if output.status.success() {
             Ok(())
         } else {
@@ -187,10 +181,10 @@ impl NftRedirect {
         }
     }
 
-    pub fn install(plan: &RedirectPlan) -> Result<Self, String> {
+    pub fn install(plan: &RedirectPlan, sudo_password: Option<&str>) -> Result<Self, String> {
         plan.validate()?;
-        Self::preflight()?;
-        match table_state()? {
+        Self::preflight(sudo_password)?;
+        match table_state(sudo_password)? {
             TableState::Absent => {}
             TableState::Managed => {
                 return Err(
@@ -205,25 +199,25 @@ impl NftRedirect {
                 );
             }
         }
-        run_nft_script(&plan.render_nft_script())?;
+        run_nft_script(&plan.render_nft_script(), sudo_password)?;
         Ok(Self { installed: true })
     }
 
-    pub fn remove(&mut self) -> Result<(), String> {
+    pub fn remove(&mut self, sudo_password: Option<&str>) -> Result<(), String> {
         if !self.installed {
             return Ok(());
         }
-        delete_managed_table()?;
+        delete_managed_table(sudo_password)?;
         self.installed = false;
         Ok(())
     }
 }
 
 /// Remove residual capture rules after an unclean shutdown.
-pub fn recover_rules() -> Result<(), String> {
-    match table_state()? {
+pub fn recover_rules(sudo_password: Option<&str>) -> Result<(), String> {
+    match table_state(sudo_password)? {
         TableState::Absent => Ok(()),
-        TableState::Managed => delete_table(),
+        TableState::Managed => delete_table(sudo_password),
         TableState::Unmanaged => Err(
             "an nftables table named taomni_sockscap is not recognized as SocksCap-owned; refusing to delete it"
                 .into(),
@@ -246,11 +240,13 @@ enum TableState {
     Unmanaged,
 }
 
-fn table_state() -> Result<TableState, String> {
-    let output = Command::new(nft_binary()?)
-        .args(["list", "table", "inet", TABLE_NAME])
-        .output()
-        .map_err(|e| format!("query nftables table: {e}"))?;
+fn table_state(sudo_password: Option<&str>) -> Result<TableState, String> {
+    let output = run_command_elevated(
+        nft_binary()?,
+        &["list", "table", "inet", TABLE_NAME],
+        None,
+        sudo_password,
+    )?;
     if output.status.success() {
         return Ok(if managed_table_output(&output.stdout) {
             TableState::Managed
@@ -272,10 +268,10 @@ fn managed_table_output(stdout: &[u8]) -> bool {
     String::from_utf8_lossy(stdout).contains(OWNERSHIP_MARKER)
 }
 
-fn delete_managed_table() -> Result<(), String> {
-    match table_state()? {
+fn delete_managed_table(sudo_password: Option<&str>) -> Result<(), String> {
+    match table_state(sudo_password)? {
         TableState::Absent => Ok(()),
-        TableState::Managed => delete_table(),
+        TableState::Managed => delete_table(sudo_password),
         TableState::Unmanaged => Err(
             "an nftables table named taomni_sockscap is not recognized as SocksCap-owned; refusing to delete it"
                 .into(),
@@ -283,11 +279,13 @@ fn delete_managed_table() -> Result<(), String> {
     }
 }
 
-fn delete_table() -> Result<(), String> {
-    let output = Command::new(nft_binary()?)
-        .args(["delete", "table", "inet", TABLE_NAME])
-        .output()
-        .map_err(|e| format!("delete nftables table: {e}"))?;
+fn delete_table(sudo_password: Option<&str>) -> Result<(), String> {
+    let output = run_command_elevated(
+        nft_binary()?,
+        &["delete", "table", "inet", TABLE_NAME],
+        None,
+        sudo_password,
+    )?;
     if output.status.success() {
         return Ok(());
     }
@@ -299,25 +297,8 @@ fn delete_table() -> Result<(), String> {
     }
 }
 
-fn run_nft_script(script: &str) -> Result<(), String> {
-    use std::io::Write;
-
-    let mut child = Command::new(nft_binary()?)
-        .args(["-f", "-"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("start nft: {e}"))?;
-    child
-        .stdin
-        .as_mut()
-        .ok_or_else(|| "nft stdin unavailable".to_string())?
-        .write_all(script.as_bytes())
-        .map_err(|e| format!("write nft rules: {e}"))?;
-    let output = child
-        .wait_with_output()
-        .map_err(|e| format!("wait for nft: {e}"))?;
+fn run_nft_script(script: &str, sudo_password: Option<&str>) -> Result<(), String> {
+    let output = run_command_elevated(nft_binary()?, &["-f", "-"], Some(script), sudo_password)?;
     if output.status.success() {
         Ok(())
     } else {

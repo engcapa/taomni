@@ -72,7 +72,7 @@ pub fn capabilities() -> SocksCapCapabilities {
 pub async fn recover_system() -> Result<(), String> {
     #[cfg(target_os = "linux")]
     {
-        return linux::recover_system();
+        return linux::recover_system(None);
     }
     #[cfg(not(target_os = "linux"))]
     Ok(())

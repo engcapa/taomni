@@ -6,6 +6,7 @@
 //! with `SO_ORIGINAL_DST` and reuses SocksCap's shared policy/egress engine.
 
 pub mod cgroup;
+pub mod exec;
 pub mod pid_filter;
 pub mod relay;
 pub mod tunnel;
@@ -15,6 +16,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use tokio::sync::RwLock;
+use zeroize::Zeroizing;
 
 use crate::sockscap::config::{ScopeMode, SocksCapConfig};
 use crate::sockscap::relay::RelayContext;
@@ -26,6 +28,7 @@ pub struct LinuxCaptureHandle {
     relay: Option<crate::sockscap::relay::RelayHandle>,
     redirect: tunnel::NftRedirect,
     cgroups: cgroup::CgroupSession,
+    sudo_password: Option<Zeroizing<String>>,
 }
 
 impl LinuxCaptureHandle {
@@ -37,14 +40,15 @@ impl LinuxCaptureHandle {
     /// assignments. This ordering prevents new intercepted connections from
     /// reaching a relay that is already shutting down.
     pub async fn stop(mut self) -> Result<(), String> {
+        let sudo_pw = self.sudo_password.as_deref().map(String::as_str);
         let mut errors = Vec::new();
-        if let Err(error) = self.redirect.remove() {
+        if let Err(error) = self.redirect.remove(sudo_pw) {
             errors.push(error);
         }
         if let Some(relay) = self.relay.take() {
             relay.stop().await;
         }
-        if let Err(error) = self.cgroups.cleanup() {
+        if let Err(error) = self.cgroups.cleanup(sudo_pw) {
             errors.push(error);
         }
         if errors.is_empty() {
@@ -57,12 +61,13 @@ impl LinuxCaptureHandle {
 
 #[async_trait]
 pub trait LinuxCapture: Send + Sync {
-    fn preflight(&self) -> Result<(), String>;
+    fn preflight(&self, sudo_password: Option<&str>) -> Result<(), String>;
 
     async fn start(
         &self,
         config: &SocksCapConfig,
         ctx: Arc<RwLock<RelayContext>>,
+        sudo_password: Option<String>,
     ) -> Result<LinuxCaptureHandle, String>;
 }
 
@@ -71,9 +76,9 @@ pub struct LinuxCaptureImpl;
 
 #[async_trait]
 impl LinuxCapture for LinuxCaptureImpl {
-    fn preflight(&self) -> Result<(), String> {
+    fn preflight(&self, sudo_password: Option<&str>) -> Result<(), String> {
         cgroup::CgroupSession::preflight()?;
-        tunnel::NftRedirect::preflight()?;
+        tunnel::NftRedirect::preflight(sudo_password)?;
         Ok(())
     }
 
@@ -81,21 +86,28 @@ impl LinuxCapture for LinuxCaptureImpl {
         &self,
         config: &SocksCapConfig,
         ctx: Arc<RwLock<RelayContext>>,
+        sudo_password: Option<String>,
     ) -> Result<LinuxCaptureHandle, String> {
-        self.preflight()?;
+        let sudo_password = sudo_password.map(Zeroizing::new);
+        let sudo_pw = sudo_password.as_deref().map(String::as_str);
+        self.preflight(sudo_pw)?;
 
         let target_pids = target_pids_for_config(config)?;
         let relay = relay::start_linux_relay(ctx).await?;
         let relay_port = relay.handle.port;
 
-        let mut cgroups =
-            match cgroup::CgroupSession::prepare(config.mode, &target_pids, std::process::id()) {
-                Ok(cgroups) => cgroups,
-                Err(error) => {
-                    relay.handle.stop().await;
-                    return Err(error);
-                }
-            };
+        let mut cgroups = match cgroup::CgroupSession::prepare(
+            config.mode,
+            &target_pids,
+            std::process::id(),
+            sudo_pw,
+        ) {
+            Ok(cgroups) => cgroups,
+            Err(error) => {
+                relay.handle.stop().await;
+                return Err(error);
+            }
+        };
 
         let plan = match tunnel::RedirectPlan::new(
             config.mode,
@@ -107,16 +119,16 @@ impl LinuxCapture for LinuxCaptureImpl {
         ) {
             Ok(plan) => plan,
             Err(error) => {
-                let _ = cgroups.cleanup();
+                let _ = cgroups.cleanup(sudo_pw);
                 relay.handle.stop().await;
                 return Err(error);
             }
         };
 
-        let redirect = match tunnel::NftRedirect::install(&plan) {
+        let redirect = match tunnel::NftRedirect::install(&plan, sudo_pw) {
             Ok(redirect) => redirect,
             Err(error) => {
-                let _ = cgroups.cleanup();
+                let _ = cgroups.cleanup(sudo_pw);
                 relay.handle.stop().await;
                 return Err(error);
             }
@@ -133,12 +145,13 @@ impl LinuxCapture for LinuxCaptureImpl {
             relay: Some(relay.handle),
             redirect,
             cgroups,
+            sudo_password,
         })
     }
 }
 
-pub fn recover_system() -> Result<(), String> {
-    tunnel::recover_rules()?;
+pub fn recover_system(sudo_password: Option<&str>) -> Result<(), String> {
+    tunnel::recover_rules(sudo_password)?;
     match cgroup::cleanup_empty_sessions() {
         Ok(()) => Ok(()),
         // The nft table is already removed. A live cgroup cannot be safely

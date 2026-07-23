@@ -330,7 +330,11 @@ pub async fn sockscap_status(state: State<'_, AppState>) -> Result<SocksCapStatu
 pub async fn sockscap_start(
     app: AppHandle,
     state: State<'_, AppState>,
+    sudo_password: Option<String>,
 ) -> Result<SocksCapStatus, String> {
+    #[cfg(not(target_os = "linux"))]
+    let _ = sudo_password;
+
     let cfg_path = config_path(&app)?;
     let cfg = SocksCapConfig::load(&cfg_path);
     cfg.validate()?;
@@ -375,20 +379,14 @@ pub async fn sockscap_start(
                     }
                     Err(e) => {
                         let mut orch = state.sockscap.orch.write().await;
-                        orch.set_degraded(
-                            "none",
-                            format!("GFWList required but not loaded: {e}"),
-                        );
+                        orch.set_start_failed(format!("GFWList required but not loaded: {e}"));
                         return Err(format!(
                             "GFWList mode needs a ruleset. Refresh GFWList or import a file first. ({e})"
                         ));
                     }
                 }
             } else {
-                orch.set_degraded(
-                    "none",
-                    "GFWList URL empty and no cache".to_string(),
-                );
+                orch.set_start_failed("GFWList URL empty and no cache");
                 return Err(
                     "GFWList mode needs a ruleset. Set a URL and refresh, or import a local file."
                         .to_string(),
@@ -398,6 +396,7 @@ pub async fn sockscap_start(
             gfw_start_note = format!("GFWList ready ({} rules)", m.rule_count);
         }
     }
+
     if !gfw_start_note.is_empty() {
         tracing::info!("sockscap: {gfw_start_note}");
     }
@@ -410,7 +409,8 @@ pub async fn sockscap_start(
         start_windows_capture(&app, &state, &cfg, &caps).await;
 
     #[cfg(target_os = "linux")]
-    let status: Result<SocksCapStatus, String> = start_linux_capture(&state, &cfg, &caps).await;
+    let status: Result<SocksCapStatus, String> =
+        start_linux_capture(&state, &cfg, &caps, sudo_password).await;
 
     #[cfg(all(not(windows), not(target_os = "linux")))]
     let status: Result<SocksCapStatus, String> = {
@@ -445,7 +445,7 @@ pub async fn sockscap_start(
         }
         Err(e) => {
             let mut orch = state.sockscap.orch.write().await;
-            orch.set_degraded(&caps.capture_backend, e.clone());
+            orch.set_start_failed(e.clone());
             Ok(())
         }
     };
@@ -470,7 +470,7 @@ pub async fn sockscap_start(
                 .orch
                 .write()
                 .await
-                .set_degraded(&caps.capture_backend, message.clone());
+                .set_start_failed(message.clone());
         }
         return Err(message);
     }
@@ -556,12 +556,13 @@ async fn start_linux_capture(
     state: &State<'_, AppState>,
     cfg: &SocksCapConfig,
     caps: &capture::SocksCapCapabilities,
+    sudo_password: Option<String>,
 ) -> Result<SocksCapStatus, String> {
     use crate::sockscap::capture::linux::{LinuxCapture, LinuxCaptureImpl};
 
     let ctx = build_linux_relay_context(state, cfg).await?;
     let backend = LinuxCaptureImpl;
-    let capture = backend.start(cfg, Arc::clone(&ctx)).await?;
+    let capture = backend.start(cfg, Arc::clone(&ctx), sudo_password).await?;
     let relay_port = capture.relay_port();
 
     let mut orch = state.sockscap.orch.write().await;
@@ -758,10 +759,7 @@ async fn start_windows_capture(
             dns_stop.store(true, std::sync::atomic::Ordering::SeqCst);
             relay_handle.stop().await;
             let mut orch = state.sockscap.orch.write().await;
-            orch.set_degraded(
-                &caps.capture_backend,
-                format!("helper/capture failed: {e}"),
-            );
+            orch.set_start_failed(format!("helper/capture failed: {e}"));
             Err(e)
         }
     }

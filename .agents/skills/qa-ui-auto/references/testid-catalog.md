@@ -349,6 +349,11 @@
 - `[data-testid="sockscap-refresh-status"]` — interactive — F-Sockscap-1.refresh-status
 - `[data-testid="sockscap-recover"]` — interactive — F-Sockscap-1.recover
 - `[data-testid="sockscap-linux-capture-state"]` — display [optional] — F-Sockscap-1.linux-capture-state
+- `[data-testid="sockscap-root-prompt-dialog"]` — display [optional] — F-Sockscap-1.root-prompt-dialog
+- `[data-testid="sockscap-root-password-input"]` — interactive [optional] — F-Sockscap-1.root-password-input
+- `[data-testid="sockscap-root-prompt-submit"]` — interactive [optional] — F-Sockscap-1.root-prompt-submit
+- `[data-testid="sockscap-root-prompt-cancel"]` — interactive [optional] — F-Sockscap-1.root-prompt-cancel
+- `[data-testid="sockscap-root-prompt-close"]` — interactive [optional] — F-Sockscap-1.root-prompt-close
 - `[data-testid="sockscap-refresh-gfw"]` — interactive [optional] — F-Sockscap-1.refresh-gfw
 - `[data-testid="sockscap-test-host"]` — interactive — F-Sockscap-1.test-host
 - `[data-testid="sockscap-test-target"]` — interactive — F-Sockscap-1.test-target
