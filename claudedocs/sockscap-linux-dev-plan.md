@@ -13,7 +13,7 @@
   - [x] 验证：Linux `cargo check --lib` 通过。
 
 - [x] **Phase 1：PID / 内核重定向 / relay**
-  - [x] 根据已配置的可执行文件解析运行中 PID；App 模式只把目标 PID 移入 capture cgroup。
+  - [x] 根据已配置的可执行文件解析 PID；App 模式预建按方案隔离的 capture cgroup，并持续发现、接管在 SocksCap Start 之后启动的目标进程。
   - [x] Global 模式将 Taomni/relay 放入 bypass cgroup，防止上游连接被自己再次捕获。
   - [x] 用受验证的 CIDR 生成专属 `inet taomni_sockscap` nftables OUTPUT NAT 表，并只将 TCP 重定向到 loopback relay。
   - [x] 在 relay 上通过 `SO_ORIGINAL_DST` 恢复原始 IPv4/IPv6 目标，复用现有策略、统计和 HTTP/SOCKS/SSH egress。

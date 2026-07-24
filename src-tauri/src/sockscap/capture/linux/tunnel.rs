@@ -73,6 +73,7 @@ pub struct RedirectPlan {
     pub bypass_cidrs: Vec<ValidatedCidr>,
     pub bypass_cgroup: Option<CgroupV2Match>,
     pub capture_cgroups: Vec<CgroupV2Match>,
+    capture_relay_ports: Vec<u16>,
 }
 
 impl RedirectPlan {
@@ -98,12 +99,49 @@ impl RedirectPlan {
             bypass_cidrs,
             bypass_cgroup,
             capture_cgroups: capture_cgroups.to_vec(),
+            capture_relay_ports: vec![relay_port; capture_cgroups.len()],
+        };
+        plan.validate()?;
+        Ok(plan)
+    }
+
+    pub fn new_app_routes(
+        redirect_ipv6: bool,
+        bypass_cidrs: &[String],
+        routes: &[(CgroupV2Match, u16)],
+    ) -> Result<Self, String> {
+        let relay_port = routes
+            .first()
+            .map(|(_, relay_port)| *relay_port)
+            .ok_or_else(|| {
+                "app-mode Linux capture requires at least one capture route".to_string()
+            })?;
+        let capture_cgroups = routes.iter().map(|(cgroup, _)| cgroup.clone()).collect();
+        let capture_relay_ports = routes.iter().map(|(_, relay_port)| *relay_port).collect();
+        let bypass_cidrs = bypass_cidrs
+            .iter()
+            .map(|cidr| ValidatedCidr::parse(cidr))
+            .collect::<Result<Vec<_>, _>>()?;
+        let plan = Self {
+            mode: ScopeMode::Apps,
+            relay_port,
+            redirect_ipv6,
+            bypass_cidrs,
+            bypass_cgroup: None,
+            capture_cgroups,
+            capture_relay_ports,
         };
         plan.validate()?;
         Ok(plan)
     }
 
     fn validate(&self) -> Result<(), String> {
+        if self.capture_cgroups.len() != self.capture_relay_ports.len() {
+            return Err("Linux app capture cgroup/relay route count mismatch".into());
+        }
+        if self.capture_relay_ports.contains(&0) {
+            return Err("Linux relay port must be non-zero".into());
+        }
         match self.mode {
             ScopeMode::Global if self.bypass_cgroup.is_none() => Err(
                 "global Linux capture requires a relay bypass cgroup; refusing to install a redirect loop"
@@ -134,13 +172,16 @@ impl RedirectPlan {
                     .as_ref()
                     .expect("validated global cgroup");
                 script.push_str(&format!("    {} return\n", cgroup.nft_expression()));
-                self.render_redirect_rule(&mut script, "");
+                self.render_redirect_rule(&mut script, "", self.relay_port);
             }
             ScopeMode::Apps => {
-                for cgroup in &self.capture_cgroups {
+                for (cgroup, relay_port) in
+                    self.capture_cgroups.iter().zip(&self.capture_relay_ports)
+                {
                     self.render_redirect_rule(
                         &mut script,
                         &format!("{} ", cgroup.nft_expression()),
+                        *relay_port,
                     );
                 }
             }
@@ -150,7 +191,7 @@ impl RedirectPlan {
         script
     }
 
-    fn render_redirect_rule(&self, script: &mut String, prefix: &str) {
+    fn render_redirect_rule(&self, script: &mut String, prefix: &str, relay_port: u16) {
         let protocol = if self.redirect_ipv6 {
             "meta l4proto tcp"
         } else {
@@ -158,7 +199,7 @@ impl RedirectPlan {
         };
         script.push_str(&format!(
             "    {prefix}{protocol} redirect to :{} comment \"{OWNERSHIP_MARKER}\"\n",
-            self.relay_port
+            relay_port
         ));
     }
 }
@@ -374,6 +415,28 @@ mod tests {
         ));
         assert!(!script.contains("meta cgroup"));
         assert!(!script.contains("\n    meta l4proto tcp redirect to :15000\n"));
+    }
+
+    #[test]
+    fn app_profiles_can_route_to_distinct_relays() {
+        let routes = [
+            (
+                CgroupV2Match::from_relative_path("taomni-sockscap-42/capture-profile-0").unwrap(),
+                15000,
+            ),
+            (
+                CgroupV2Match::from_relative_path("taomni-sockscap-42/capture-profile-1").unwrap(),
+                16000,
+            ),
+        ];
+        let plan = RedirectPlan::new_app_routes(true, &[], &routes).unwrap();
+        let script = plan.render_nft_script();
+        assert!(script.contains(
+            "socket cgroupv2 level 2 \"taomni-sockscap-42/capture-profile-0\" meta l4proto tcp redirect to :15000"
+        ));
+        assert!(script.contains(
+            "socket cgroupv2 level 2 \"taomni-sockscap-42/capture-profile-1\" meta l4proto tcp redirect to :16000"
+        ));
     }
 
     #[test]
