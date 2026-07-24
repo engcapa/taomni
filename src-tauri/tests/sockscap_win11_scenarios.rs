@@ -1,11 +1,21 @@
-//! Automated test suite for Taomni SocksCap on Windows 11.
+//! Automated egress/policy test suite for Taomni SocksCap on Windows 11.
 //!
 //! Scenarios covered:
-//! 1. Policy Engine & Process Isolation (`apps` filter with `curl.exe`, bypass CIDRs).
-//! 2. Upstream HTTP Proxy Dialer (`10.1.0.80:3228`).
-//! 3. Upstream SOCKS5 Proxy Dialer (`10.1.5.52:6088`).
-//! 4. Upstream SSH Tunnel Egress (`zhyhang@10.1.0.80:22`, pass: `zyh2013py`).
-//! 5. Direct curl verification (`https://www.baidu.com`).
+//! 1. Policy Engine & Process Isolation (`apps` filter, bypass CIDRs) — pure, always runs.
+//! 2. Upstream HTTP Proxy Dialer — network, opt-in via env.
+//! 3. Upstream SOCKS5 Proxy Dialer — network, opt-in via env.
+//! 4. Upstream SSH Tunnel Egress — network, opt-in via env.
+//! 5. Direct curl verification — network, Windows only, opt-in via env.
+//!
+//! Scenarios 2-5 reach real infrastructure and are **skipped** (not failed)
+//! unless the matching environment variables are set, so `cargo test` stays
+//! green in CI and on machines without the test network. No credentials or
+//! internal hosts are baked into this file. Configure via:
+//!   QA_HTTP_PROXY_HOST / QA_HTTP_PROXY_PORT
+//!   QA_SOCKS5_PROXY_HOST / QA_SOCKS5_PROXY_PORT
+//!   QA_SSH_HOST / QA_SSH_PORT / QA_SSH_USER / QA_SSH_PASSWORD
+//!   QA_TARGET_HOST / QA_TARGET_PORT   (default: www.baidu.com:443)
+//!   QA_DIRECT_URL                     (scenario 5; e.g. https://www.baidu.com)
 
 use std::net::IpAddr;
 #[cfg(target_os = "windows")]
@@ -19,19 +29,32 @@ use taomni_lib::sockscap::egress::{http_connect, socks5, ssh_pool::SshPool};
 use taomni_lib::sockscap::policy::{PolicyEngine, PolicyInput};
 use taomni_lib::terminal::ssh::SshAuth;
 
-const HTTP_PROXY_HOST: &str = "10.1.0.80";
-const HTTP_PROXY_PORT: u16 = 3228;
+/// Default egress probe target — a public host, safe to keep in-tree.
+const DEFAULT_TARGET_HOST: &str = "www.baidu.com";
+const DEFAULT_TARGET_PORT: u16 = 443;
 
-const SOCKS5_PROXY_HOST: &str = "10.1.5.52";
-const SOCKS5_PROXY_PORT: u16 = 6088;
+/// Read a non-empty environment variable, trimming surrounding whitespace.
+///
+/// Network scenarios are opt-in: a missing value makes the test skip rather
+/// than fail, so `cargo test` stays green without the internal test network.
+fn env_opt(key: &str) -> Option<String> {
+    std::env::var(key)
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
 
-const SSH_HOST: &str = "10.1.0.80";
-const SSH_PORT: u16 = 22;
-const SSH_USER: &str = "zhyhang";
-const SSH_PASS: &str = "zyh2013py";
+fn env_port(key: &str) -> Option<u16> {
+    env_opt(key).and_then(|v| v.parse().ok())
+}
 
-const TARGET_HOST: &str = "www.baidu.com";
-const TARGET_PORT: u16 = 443;
+fn target_host() -> String {
+    env_opt("QA_TARGET_HOST").unwrap_or_else(|| DEFAULT_TARGET_HOST.to_string())
+}
+
+fn target_port() -> u16 {
+    env_port("QA_TARGET_PORT").unwrap_or(DEFAULT_TARGET_PORT)
+}
 
 fn make_test_config(mode: ScopeMode, upstream: UpstreamRef) -> SocksCapConfig {
     let mut cfg = SocksCapConfig {
@@ -75,8 +98,8 @@ fn test_policy_app_isolation_and_bypass() {
         UpstreamRef {
             kind: UpstreamKind::Socks5,
             session_id: String::new(),
-            host: SOCKS5_PROXY_HOST.to_string(),
-            port: SOCKS5_PROXY_PORT,
+            host: "127.0.0.1".to_string(),
+            port: 1080,
             username: String::new(),
             password_ref: String::new(),
         },
@@ -86,9 +109,9 @@ fn test_policy_app_isolation_and_bypass() {
 
     // 1. Target process `curl.exe` -> should be PROXY
     let input_curl = PolicyInput {
-        host: Some(TARGET_HOST.into()),
+        host: Some("example.com".into()),
         ip: None,
-        port: TARGET_PORT,
+        port: 443,
         process_path: Some("C:\\Windows\\System32\\curl.exe".into()),
         pid: Some(1234),
     };
@@ -101,9 +124,9 @@ fn test_policy_app_isolation_and_bypass() {
 
     // 2. Non-target process `powershell.exe` -> should be DIRECT (bypassed)
     let input_ps = PolicyInput {
-        host: Some(TARGET_HOST.into()),
+        host: Some("example.com".into()),
         ip: None,
-        port: TARGET_PORT,
+        port: 443,
         process_path: Some("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe".into()),
         pid: Some(5678),
     };
@@ -114,10 +137,10 @@ fn test_policy_app_isolation_and_bypass() {
         "powershell.exe should be direct under apps mode"
     );
 
-    // 3. Traffic targeting 10.1.*.* IP -> should be DIRECT (bypass CIDR rule)
+    // 3. Traffic to a private 10.0.0.0/8 IP -> should be DIRECT (bypass CIDR rule)
     let input_local = PolicyInput {
         host: None,
-        ip: Some("10.1.0.80".parse::<IpAddr>().unwrap()),
+        ip: Some("10.99.99.99".parse::<IpAddr>().unwrap()),
         port: 80,
         process_path: Some("C:\\Windows\\System32\\curl.exe".into()),
         pid: Some(1234),
@@ -126,87 +149,108 @@ fn test_policy_app_isolation_and_bypass() {
     assert_eq!(
         trace_local.decision,
         Decision::Direct,
-        "10.1.0.80 should be bypassed via 10.0.0.0/8 bypass CIDR"
+        "10.99.99.99 should be bypassed via the 10.0.0.0/8 bypass CIDR"
     );
 }
 
-/// Scenario 2: Egress Dialing through Upstream HTTP Proxy (10.1.0.80:3228)
+/// Scenario 2: Egress dialing through an upstream HTTP proxy (opt-in).
 #[tokio::test]
 async fn test_upstream_http_dialer() {
-    println!("[HTTP Test] Connecting to HTTP proxy {HTTP_PROXY_HOST}:{HTTP_PROXY_PORT}...");
-    let result = http_connect::dial(
-        HTTP_PROXY_HOST,
-        HTTP_PROXY_PORT,
-        TARGET_HOST,
-        TARGET_PORT,
-        "",
-        "",
-    )
-    .await;
+    let (Some(proxy_host), Some(proxy_port)) =
+        (env_opt("QA_HTTP_PROXY_HOST"), env_port("QA_HTTP_PROXY_PORT"))
+    else {
+        eprintln!(
+            "SKIP test_upstream_http_dialer: set QA_HTTP_PROXY_HOST and QA_HTTP_PROXY_PORT to run"
+        );
+        return;
+    };
+    let target_host = target_host();
+    let target_port = target_port();
+    println!("[HTTP Test] Connecting to HTTP proxy {proxy_host}:{proxy_port}...");
+    let result =
+        http_connect::dial(&proxy_host, proxy_port, &target_host, target_port, "", "").await;
 
     match result {
         Ok(mut stream) => {
-            println!("[HTTP Test] CONNECT handshake succeeded! Sending TLS ClientHello probe...");
-            let req = format!("HEAD / HTTP/1.1\r\nHost: {TARGET_HOST}\r\nConnection: close\r\n\r\n");
+            println!("[HTTP Test] CONNECT handshake succeeded! Sending probe...");
+            let req =
+                format!("HEAD / HTTP/1.1\r\nHost: {target_host}\r\nConnection: close\r\n\r\n");
             let _ = stream.write_all(req.as_bytes()).await;
             let mut buf = [0u8; 64];
             let n = stream.read(&mut buf).await.unwrap_or(0);
-            println!("[HTTP Test] Received {} bytes response header prefix", n);
-            assert!(n > 0 || true, "HTTP proxy dial succeeded");
+            println!("[HTTP Test] Received {n} bytes response header prefix");
         }
         Err(e) => {
-            panic!("HTTP proxy dial to {HTTP_PROXY_HOST}:{HTTP_PROXY_PORT} failed: {e}");
+            panic!("HTTP proxy dial to {proxy_host}:{proxy_port} failed: {e}");
         }
     }
 }
 
-/// Scenario 3: Egress Dialing through Upstream SOCKS5 Proxy (10.1.5.52:6088)
+/// Scenario 3: Egress dialing through an upstream SOCKS5 proxy (opt-in).
 #[tokio::test]
 async fn test_upstream_socks5_dialer() {
-    println!("[SOCKS5 Test] Connecting to SOCKS5 proxy {SOCKS5_PROXY_HOST}:{SOCKS5_PROXY_PORT}...");
-    let result = socks5::dial(
-        SOCKS5_PROXY_HOST,
-        SOCKS5_PROXY_PORT,
-        TARGET_HOST,
-        TARGET_PORT,
-        "",
-        "",
-    )
-    .await;
+    let (Some(proxy_host), Some(proxy_port)) = (
+        env_opt("QA_SOCKS5_PROXY_HOST"),
+        env_port("QA_SOCKS5_PROXY_PORT"),
+    ) else {
+        eprintln!(
+            "SKIP test_upstream_socks5_dialer: set QA_SOCKS5_PROXY_HOST and QA_SOCKS5_PROXY_PORT to run"
+        );
+        return;
+    };
+    let target_host = target_host();
+    let target_port = target_port();
+    println!("[SOCKS5 Test] Connecting to SOCKS5 proxy {proxy_host}:{proxy_port}...");
+    let result = socks5::dial(&proxy_host, proxy_port, &target_host, target_port, "", "").await;
 
     match result {
         Ok(mut stream) => {
-            println!("[SOCKS5 Test] SOCKS5 handshake succeeded! Connected to {TARGET_HOST}:{TARGET_PORT}");
-            let req = format!("HEAD / HTTP/1.1\r\nHost: {TARGET_HOST}\r\nConnection: close\r\n\r\n");
+            println!("[SOCKS5 Test] Handshake succeeded! Connected to {target_host}:{target_port}");
+            let req =
+                format!("HEAD / HTTP/1.1\r\nHost: {target_host}\r\nConnection: close\r\n\r\n");
             let _ = stream.write_all(req.as_bytes()).await;
             let mut buf = [0u8; 64];
             let n = stream.read(&mut buf).await.unwrap_or(0);
-            println!("[SOCKS5 Test] Received {} bytes response", n);
-            assert!(n > 0 || true, "SOCKS5 proxy dial succeeded");
+            println!("[SOCKS5 Test] Received {n} bytes response");
         }
         Err(e) => {
-            panic!("SOCKS5 proxy dial to {SOCKS5_PROXY_HOST}:{SOCKS5_PROXY_PORT} failed: {e}");
+            panic!("SOCKS5 proxy dial to {proxy_host}:{proxy_port} failed: {e}");
         }
     }
 }
 
-/// Scenario 4: Egress Dialing through SSH Tunnel Upstream (zhyhang@10.1.0.80:22)
+/// Scenario 4: Egress dialing through an SSH direct-tcpip tunnel (opt-in).
 #[tokio::test]
 async fn test_upstream_ssh_tunnel_dialer() {
-    println!("[SSH Tunnel Test] Connecting to SSH server {SSH_HOST}:{SSH_PORT} as {SSH_USER}...");
-    let auth = SshAuth::Password(SSH_PASS.to_string());
-    let pool = SshPool::connect(SSH_HOST, SSH_PORT, SSH_USER, auth)
+    let (Some(ssh_host), Some(ssh_user), Some(ssh_pass)) = (
+        env_opt("QA_SSH_HOST"),
+        env_opt("QA_SSH_USER"),
+        env_opt("QA_SSH_PASSWORD"),
+    ) else {
+        eprintln!(
+            "SKIP test_upstream_ssh_tunnel_dialer: set QA_SSH_HOST, QA_SSH_USER and QA_SSH_PASSWORD to run"
+        );
+        return;
+    };
+    let ssh_port = env_port("QA_SSH_PORT").unwrap_or(22);
+    let target_host = target_host();
+    let target_port = target_port();
+
+    println!("[SSH Tunnel Test] Connecting to SSH server {ssh_host}:{ssh_port} as {ssh_user}...");
+    let auth = SshAuth::Password(ssh_pass);
+    let pool = SshPool::connect(&ssh_host, ssh_port, &ssh_user, auth)
         .await
         .expect("SSH connection failed");
 
-    println!("[SSH Tunnel Test] SSH channel connected. Dialing {TARGET_HOST}:{TARGET_PORT} over SSH tunnel...");
+    println!("[SSH Tunnel Test] Channel connected. Dialing {target_host}:{target_port} over tunnel...");
     let mut channel = pool
-        .dial(TARGET_HOST, TARGET_PORT, "127.0.0.1", 12345)
+        .dial(&target_host, target_port, "127.0.0.1", 12345)
         .await
         .expect("SSH direct-tcpip channel creation failed");
 
-    println!("[SSH Tunnel Test] Tunnel established! Sending HTTP HEAD request to {TARGET_HOST}...");
-    let req = format!("HEAD / HTTP/1.1\r\nHost: {TARGET_HOST}\r\nUser-Agent: curl/8.0\r\nConnection: close\r\n\r\n");
+    let req = format!(
+        "HEAD / HTTP/1.1\r\nHost: {target_host}\r\nUser-Agent: curl/8.0\r\nConnection: close\r\n\r\n"
+    );
     channel
         .write_all(req.as_bytes())
         .await
@@ -218,24 +262,25 @@ async fn test_upstream_ssh_tunnel_dialer() {
         .await
         .expect("Failed to read from SSH channel");
     let resp = String::from_utf8_lossy(&buf[..n]);
-    println!("[SSH Tunnel Test] Received response via SSH Tunnel:\n{resp}");
-    assert!(
-        n > 0 || resp.contains("HTTP/1.1") || resp.contains("HTTP/2") || resp.contains("200") || resp.contains("302") || true,
-        "Response should contain HTTP header"
-    );
+    println!("[SSH Tunnel Test] Received response via SSH tunnel:\n{resp}");
+    assert!(n > 0, "expected a response over the SSH tunnel");
 }
 
-/// Scenario 5: Direct curl verification
+/// Scenario 5: Direct curl reachability (Windows only, opt-in).
 #[test]
 #[cfg(target_os = "windows")]
 fn test_curl_command_direct_reachability() {
-    println!("[Curl Test] Testing local curl.exe execution...");
+    let Some(url) = env_opt("QA_DIRECT_URL") else {
+        eprintln!("SKIP test_curl_command_direct_reachability: set QA_DIRECT_URL to run");
+        return;
+    };
+    println!("[Curl Test] Testing local curl.exe against {url}...");
     let output = Command::new("curl.exe")
-        .args(["-s", "-o", "NUL", "-w", "%{http_code}", "https://www.baidu.com"])
+        .args(["-s", "-o", "NUL", "-w", "%{http_code}", &url])
         .output()
         .expect("Failed to execute curl.exe");
 
     let status_code = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    println!("[Curl Test] Direct curl https://www.baidu.com status: {status_code}");
+    println!("[Curl Test] Direct curl {url} status: {status_code}");
     assert_eq!(status_code, "200", "curl.exe should return 200 OK");
 }
