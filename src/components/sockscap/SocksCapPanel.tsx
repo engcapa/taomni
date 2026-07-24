@@ -54,6 +54,7 @@ import {
   type UpstreamKind,
   type UserRule,
 } from "../../lib/sockscap";
+import { SocksCapRootPrompt } from "./SocksCapRootPrompt";
 import {
   listSessions,
   vaultPut,
@@ -135,6 +136,27 @@ function phaseTone(phase: string): string {
     default:
       return "text-[var(--taomni-text-muted)]";
   }
+}
+
+function isLinuxRootRequiredError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("cap_net_admin") ||
+    lower.includes("linux capture requires") ||
+    lower.includes("linux capture needs root") ||
+    lower.includes("permission to manage cgroup v2")
+  );
+}
+
+function isSudoAuthenticationError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("incorrect password") ||
+    lower.includes("authentication failure") ||
+    lower.includes("sudo authentication failed") ||
+    lower.includes("sorry, try again") ||
+    lower.includes("a password is required")
+  );
 }
 
 function normalizeFrontendConfig(raw: SocksCapConfig): SocksCapConfig {
@@ -523,14 +545,18 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
 
   const onStart = async (sudoPassword?: string) => {
     if (!cfg) return;
-    setBusy(true);
-    setRootPromptBusy(true);
-    setRootPromptError(null);
+    if (sudoPassword) {
+      setRootPromptBusy(true);
+      setRootPromptError(null);
+    } else {
+      setBusy(true);
+    }
     try {
       await sockscapSetConfig(cfg);
       const st = await sockscapStart(sudoPassword);
       setStatus(st);
       setShowRootPrompt(false);
+      setRootPromptError(null);
       report(st.message || t("sockscap.started"), st.phase !== "idle");
       const [gf, sn, hp] = await Promise.all([
         sockscapGfwlistStatus().catch(() => null),
@@ -542,19 +568,15 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
       if (hp) setHelper(hp);
     } catch (e) {
       const errStr = String(e);
-      if (
-        caps?.platform === "linux" &&
-        (errStr.includes("sudo password") ||
-          errStr.includes("incorrect password") ||
-          errStr.includes("authorization required"))
-      ) {
+      const isLinux = caps?.platform === "linux";
+      if (isLinux && !sudoPassword && isLinuxRootRequiredError(errStr)) {
         setShowRootPrompt(true);
-        setRootPromptError(
-          errStr.includes("incorrect password")
-            ? t("sockscap.rootPasswordIncorrect")
-            : null,
-        );
+        setRootPromptError(null);
+      } else if (isLinux && sudoPassword && isSudoAuthenticationError(errStr)) {
+        setShowRootPrompt(true);
+        setRootPromptError(t("sockscap.rootPromptIncorrectPassword"));
       } else {
+        if (sudoPassword) setShowRootPrompt(false);
         report(errStr, false);
       }
     } finally {
@@ -767,9 +789,6 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
       </div>
     );
   }
-
-  const proxySessions = sessions.filter((s) => s.kind === "proxy");
-  const sshSessions = sessions.filter((s) => s.kind === "ssh");
 
   return (
     <div
@@ -1760,97 +1779,6 @@ function ManualAppAdd({ onAdd }: { onAdd: (path: string) => void }) {
       >
         {t("common.add")}
       </button>
-    </div>
-  );
-}
-
-function SocksCapRootPrompt({
-  onSubmit,
-  onCancel,
-  error,
-  busy,
-}: {
-  onSubmit: (password: string) => void;
-  onCancel: () => void;
-  error: string | null;
-  busy: boolean;
-}) {
-  const t = useT();
-  const [password, setPassword] = useState("");
-
-  return (
-    <div
-      className="absolute inset-0 bg-black/50 flex items-center justify-center z-30 p-4"
-      data-testid="sockscap-root-prompt-dialog"
-    >
-      <div className="w-[min(420px,95vw)] rounded-lg bg-[var(--taomni-panel)] border border-[var(--taomni-divider)] shadow-xl p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="text-[14px] font-semibold flex items-center gap-2">
-            <Shield className="w-4 h-4 text-[var(--taomni-accent)]" />
-            {t("sockscap.rootPromptTitle")}
-          </div>
-          <button
-            type="button"
-            className="p-1 rounded hover:bg-[var(--taomni-hover)]"
-            onClick={onCancel}
-            disabled={busy}
-            data-testid="sockscap-root-prompt-close"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="text-[12px] text-[var(--taomni-text-muted)] space-y-1">
-          <div>{t("sockscap.rootPromptReason")}</div>
-          <div className="text-[11px] opacity-80">{t("sockscap.rootPromptHint")}</div>
-        </div>
-
-        {error && (
-          <div className="p-2 rounded bg-red-500/10 border border-red-500/20 text-red-500 text-[11px]">
-            {error}
-          </div>
-        )}
-
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (password.trim()) onSubmit(password.trim());
-          }}
-          className="space-y-3"
-        >
-          <input
-            type="password"
-            data-testid="sockscap-root-password-input"
-            className="w-full text-[12px] px-3 py-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] focus:outline-none focus:border-[var(--taomni-accent)]"
-            placeholder={t("sockscap.rootPasswordPlaceholder")}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoFocus
-            disabled={busy}
-          />
-
-          <div className="flex justify-end gap-2 pt-1">
-            <button
-              type="button"
-              data-testid="sockscap-root-prompt-cancel"
-              className="px-3 py-1.5 rounded text-[12px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
-              onClick={onCancel}
-              disabled={busy}
-            >
-              {t("common.cancel")}
-            </button>
-            <button
-              type="submit"
-              data-testid="sockscap-root-prompt-submit"
-              className="px-3 py-1.5 rounded text-[12px] bg-[var(--taomni-accent)] text-white hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5"
-              disabled={busy || !password.trim()}
-            >
-              {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              {t("sockscap.rootPromptSubmit")}
-            </button>
-          </div>
-        </form>
-      </div>
     </div>
   );
 }

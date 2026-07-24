@@ -145,6 +145,18 @@ impl PolicyEngine {
     }
 
     pub fn decide(&self, input: &PolicyInput) -> MatchTrace {
+        self.decide_with_profile_hint(input, None)
+    }
+
+    /// Evaluate a flow already scoped by an OS capture backend to one app
+    /// profile. Linux uses a dedicated cgroup + relay port per profile, so it
+    /// can preserve profile identity without an expensive per-flow `/proc`
+    /// socket-owner lookup.
+    pub(crate) fn decide_with_profile_hint(
+        &self,
+        input: &PolicyInput,
+        profile_id_hint: Option<&str>,
+    ) -> MatchTrace {
         let host = input
             .host
             .as_deref()
@@ -169,13 +181,15 @@ impl PolicyEngine {
         // Iterate active profiles in priority order
         for prof in &self.profiles {
             if matches!(prof.mode, ScopeMode::Apps) {
-                let in_scope = match input.process_path.as_deref() {
-                    Some(p) => {
-                        let norm = normalize_path(p);
-                        prof.apps.iter().any(|a| paths_match(&norm, a))
-                    }
-                    None => false,
-                };
+                let in_scope = profile_id_hint
+                    .map(|profile_id| profile_id == prof.id)
+                    .unwrap_or_else(|| match input.process_path.as_deref() {
+                        Some(p) => {
+                            let norm = normalize_path(p);
+                            prof.apps.iter().any(|a| paths_match(&norm, a))
+                        }
+                        None => false,
+                    });
                 if !in_scope {
                     continue;
                 }
@@ -450,5 +464,29 @@ mod tests {
         assert!(matches!(t3.decision, Decision::Direct));
         assert_eq!(t3.profile_name, None);
     }
-}
 
+    #[test]
+    fn linux_profile_hint_scopes_app_flow_without_process_path() {
+        let mut config = SocksCapConfig::default();
+        config.profiles[0].mode = ScopeMode::Apps;
+        config.profiles[0].apps = vec![AppSelector {
+            path: "/opt/example/example".into(),
+            bundle_id: String::new(),
+            name: "Example".into(),
+        }];
+        config.profiles[0].rule_mode = RuleMode::ProxyAll;
+        let engine = PolicyEngine::from_config(&config, None);
+        let trace = engine.decide_with_profile_hint(
+            &PolicyInput {
+                host: Some("example.com".into()),
+                ip: None,
+                port: 443,
+                process_path: None,
+                pid: None,
+            },
+            Some("default"),
+        );
+        assert_eq!(trace.decision, Decision::Proxy);
+        assert_eq!(trace.profile_id.as_deref(), Some("default"));
+    }
+}

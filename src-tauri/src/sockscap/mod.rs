@@ -522,6 +522,74 @@ async fn build_linux_relay_context(
         None
     };
 
+    let mut profile_upstreams = std::collections::HashMap::new();
+    for profile in cfg.active_profiles() {
+        let (mut host, mut port, mut user, mut password) =
+            relay::upstream_from_config_ref(&profile.upstream);
+        if host.is_empty() {
+            host = upstream_host.clone();
+            port = upstream_port;
+            user = upstream_user.clone();
+            password = upstream_pass.clone();
+        } else {
+            if !profile.upstream.password_ref.is_empty() {
+                if let Ok(Some(resolved)) = state.vault.resolve(&profile.upstream.password_ref) {
+                    password = (*resolved).clone();
+                }
+            }
+            if !profile.upstream.session_id.is_empty() {
+                if let Ok(db) = state.db.lock() {
+                    if let Ok(session) =
+                        crate::session::db::get_session(&db, &profile.upstream.session_id)
+                    {
+                        host = session.host;
+                        port = session.port;
+                        if let Some(username) =
+                            session.username.filter(|username| !username.is_empty())
+                        {
+                            user = username;
+                        }
+                    }
+                }
+            }
+        }
+        let profile_ssh_pool = if matches!(profile.upstream.kind, config::UpstreamKind::Ssh) {
+            use crate::sockscap::egress::ssh_pool::SshPool;
+            use crate::terminal::ssh::SshAuth;
+
+            let auth = if !password.is_empty() {
+                SshAuth::Password(password.clone())
+            } else if profile.upstream.password_ref.starts_with("key:") {
+                SshAuth::PrivateKey(profile.upstream.password_ref.clone())
+            } else {
+                SshAuth::Agent
+            };
+            Some(Arc::new(
+                SshPool::connect(&host, port, &user, auth)
+                    .await
+                    .map_err(|error| {
+                        format!(
+                            "Profile '{}' SSH upstream connect failed: {error}",
+                            profile.name
+                        )
+                    })?,
+            ))
+        } else {
+            None
+        };
+        profile_upstreams.insert(
+            profile.id.clone(),
+            relay::ResolvedUpstream {
+                kind: profile.upstream.kind,
+                host,
+                port,
+                user,
+                pass: password,
+                ssh_pool: profile_ssh_pool,
+            },
+        );
+    }
+
     let (stats, domains, rules) = {
         let orch = state.sockscap.orch.read().await;
         (
@@ -546,7 +614,7 @@ async fn build_linux_relay_context(
         upstream_pass,
         self_pid: std::process::id(),
         ssh_pool,
-        profile_upstreams: std::collections::HashMap::new(),
+        profile_upstreams,
         dns_map,
         domains,
     })))
@@ -571,11 +639,24 @@ async fn start_linux_capture(
         .gfwlist_meta()
         .map(|meta| format!(", gfw={}", meta.rule_count))
         .unwrap_or_default();
+    let active_profiles = cfg.active_profiles();
+    let app_watch_note = if active_profiles
+        .iter()
+        .all(|profile| matches!(profile.mode, config::ScopeMode::Apps))
+    {
+        let application_count = active_profiles
+            .iter()
+            .map(|profile| profile.apps.len())
+            .sum::<usize>();
+        format!(", watching {application_count} application selector(s)")
+    } else {
+        String::new()
+    };
     orch.relay_ctx = Some(ctx);
     orch.set_linux_capture(capture);
     orch.set_active(
         &caps.capture_backend,
-        format!("capture active (Linux nft+cgroup relay :{relay_port}{gfw_note})"),
+        format!("capture active (Linux nft+cgroup relay :{relay_port}{gfw_note}{app_watch_note})"),
     );
     Ok(orch.status())
 }

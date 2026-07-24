@@ -173,9 +173,6 @@ fn list_processes_linux() -> Result<Vec<ProcessInfo>, String> {
             name: cmdline.trim().to_string(),
             path: exe,
         });
-        if out.len() >= 500 {
-            break;
-        }
     }
     out.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(out)

@@ -134,6 +134,7 @@ pub(crate) struct CapturedFlow {
     pub process_path: Option<String>,
     pub pid: Option<u32>,
     pub origin: SocketAddr,
+    pub profile_id_hint: Option<String>,
 }
 
 /// Bind **0.0.0.0:0** (all interfaces) — required for WinDivert streamdump-style
@@ -250,6 +251,7 @@ async fn handle_client(
         process_path: (!mapping.path.is_empty()).then_some(mapping.path),
         pid: (mapping.pid != 0).then_some(mapping.pid),
         origin: peer,
+        profile_id_hint: None,
     };
     handle_captured_client(client, flow, ctx).await
 }
@@ -265,6 +267,7 @@ pub(crate) async fn handle_captured_client(
     let process_path = flow.process_path;
     let pid = flow.pid;
     let origin = flow.origin;
+    let profile_id_hint = flow.profile_id_hint;
 
     // Multi-read peek for SNI / HTTP Host (ClientHello may span packets).
     let (prefix, hostname) = peek_for_hostname(&mut client).await;
@@ -294,7 +297,7 @@ pub(crate) async fn handle_captured_client(
             process_path: process_path.clone(),
             pid,
         };
-        let trace = engine.decide(&input);
+        let trace = engine.decide_with_profile_hint(&input, profile_id_hint.as_deref());
 
         let (kind, up_host, up_port, up_user, up_pass, ssh_pool) = match trace.profile_id.as_deref()
         {

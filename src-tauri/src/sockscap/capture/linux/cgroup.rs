@@ -10,7 +10,6 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 
 use crate::sockscap::capture::linux::exec::{is_effective_root, run_command_elevated};
-use crate::sockscap::config::ScopeMode;
 
 const CGROUP_ROOT: &str = "/sys/fs/cgroup";
 const SESSION_PREFIX: &str = "taomni-sockscap-";
@@ -89,9 +88,12 @@ impl CgroupV2Match {
 #[derive(Debug)]
 pub struct CgroupSession {
     root: PathBuf,
+    self_pid: u32,
     moves: Vec<CgroupMove>,
     bypass_match: Option<CgroupV2Match>,
     capture_matches: Vec<CgroupV2Match>,
+    app_group_dirs: Vec<PathBuf>,
+    next_move_id: u64,
 }
 
 impl CgroupSession {
@@ -105,14 +107,29 @@ impl CgroupSession {
         Ok(())
     }
 
-    pub fn prepare(
-        mode: ScopeMode,
-        target_pids: &BTreeSet<u32>,
+    pub fn prepare_global(self_pid: u32, sudo_password: Option<&str>) -> Result<Self, String> {
+        let mut session = Self::create(self_pid, sudo_password)?;
+        let setup = session
+            .move_pid(self_pid, session.root.join("bypass"), sudo_password)
+            .map(|cgroup_match| session.bypass_match = Some(cgroup_match));
+        session.finish_setup(setup, sudo_password)
+    }
+
+    pub fn prepare_apps(
+        target_pid_groups: &[BTreeSet<u32>],
         self_pid: u32,
         sudo_password: Option<&str>,
     ) -> Result<Self, String> {
-        Self::preflight()?;
+        if target_pid_groups.is_empty() {
+            return Err("App mode requires at least one active application profile".into());
+        }
+        let mut session = Self::create(self_pid, sudo_password)?;
+        let setup = session.setup_app_groups(target_pid_groups, sudo_password);
+        session.finish_setup(setup, sudo_password)
+    }
 
+    fn create(self_pid: u32, sudo_password: Option<&str>) -> Result<Self, String> {
+        Self::preflight()?;
         let root = Path::new(CGROUP_ROOT).join(format!("{SESSION_PREFIX}{self_pid}"));
         if root.exists() {
             return Err(format!(
@@ -121,66 +138,52 @@ impl CgroupSession {
             ));
         }
 
-        if let Err(e) = fs::create_dir(&root) {
-            if !is_effective_root() && sudo_password.is_some() {
-                let root_str = root.display().to_string();
-                // Keep cgroup ownership with root. Each required mutation is
-                // elevated individually instead of making control files
-                // persistently writable by the desktop process.
-                let mk_res =
-                    run_command_elevated("mkdir", &["-p", &root_str], None, sudo_password)?;
-                if !mk_res.status.success() {
-                    return Err(format!(
-                        "create {root_str}: {e}. Linux capture must run with permission to manage cgroup v2"
-                    ));
-                }
-            } else {
-                return Err(format!(
-                    "create {}: {e}. Linux capture must run with permission to manage cgroup v2",
-                    root.display()
-                ));
-            }
-        }
-
-        let mut session = Self {
+        create_cgroup_dir(&root, sudo_password)?;
+        Ok(Self {
             root,
+            self_pid,
             moves: Vec::new(),
             bypass_match: None,
             capture_matches: Vec::new(),
-        };
+            app_group_dirs: Vec::new(),
+            next_move_id: 0,
+        })
+    }
 
-        let setup = match mode {
-            ScopeMode::Global => session
-                .move_pid(self_pid, "bypass", sudo_password)
-                .map(|cgroup_match| session.bypass_match = Some(cgroup_match)),
-            ScopeMode::Apps => {
-                if target_pids.is_empty() {
-                    Err("App mode needs at least one running selected process".into())
-                } else if target_pids.contains(&self_pid) {
-                    Err(
-                        "Taomni itself cannot be selected for Linux app capture; it must remain outside the redirect cgroup"
-                            .into(),
-                    )
-                } else {
-                    for pid in target_pids {
-                        let cgroup_match =
-                            session.move_pid(*pid, &format!("capture-{pid}"), sudo_password)?;
-                        session.capture_matches.push(cgroup_match);
-                    }
-                    Ok(())
-                }
+    fn setup_app_groups(
+        &mut self,
+        target_pid_groups: &[BTreeSet<u32>],
+        sudo_password: Option<&str>,
+    ) -> Result<(), String> {
+        for (index, _) in target_pid_groups.iter().enumerate() {
+            let group_dir = self.root.join(format!("capture-profile-{index}"));
+            create_cgroup_dir(&group_dir, sudo_password)?;
+            self.capture_matches
+                .push(CgroupV2Match::from_managed_dir(&group_dir)?);
+            self.app_group_dirs.push(group_dir);
+        }
+        for (index, pids) in target_pid_groups.iter().enumerate() {
+            for pid in pids {
+                self.move_app_pid(index, *pid, sudo_password)?;
             }
-        };
+        }
+        Ok(())
+    }
 
+    fn finish_setup(
+        mut self,
+        setup: Result<(), String>,
+        sudo_password: Option<&str>,
+    ) -> Result<Self, String> {
         if let Err(error) = setup {
-            let cleanup_error = session.cleanup(sudo_password).err();
-            return Err(match cleanup_error {
+            let cleanup_error = self.cleanup(sudo_password).err();
+            Err(match cleanup_error {
                 Some(cleanup_error) => format!("{error}; cleanup also failed: {cleanup_error}"),
                 None => error,
-            });
+            })
+        } else {
+            Ok(self)
         }
-
-        Ok(session)
     }
 
     pub fn bypass_match(&self) -> Option<CgroupV2Match> {
@@ -189,6 +192,35 @@ impl CgroupSession {
 
     pub fn capture_matches(&self) -> &[CgroupV2Match] {
         &self.capture_matches
+    }
+
+    /// Move a newly-discovered app PID into its profile's stable capture
+    /// subtree. nftables matches the parent profile cgroup, so descendants
+    /// created after Start are covered without rewriting live rules.
+    pub fn move_app_pid(
+        &mut self,
+        profile_index: usize,
+        pid: u32,
+        sudo_password: Option<&str>,
+    ) -> Result<bool, String> {
+        let group_dir = self
+            .app_group_dirs
+            .get(profile_index)
+            .cloned()
+            .ok_or_else(|| format!("unknown Linux app capture profile index {profile_index}"))?;
+        if pid == self.self_pid {
+            return Err(
+                "Taomni itself cannot be selected for Linux app capture; it must remain outside the redirect cgroup"
+                    .into(),
+            );
+        }
+        if cgroup_dir_for_pid(pid)?.starts_with(&group_dir) {
+            return Ok(false);
+        }
+        self.next_move_id += 1;
+        let managed_dir = group_dir.join(format!("process-{}-{pid}", self.next_move_id));
+        self.move_pid(pid, managed_dir, sudo_password)?;
+        Ok(true)
     }
 
     /// Restore moved processes and remove the session's empty cgroup tree.
@@ -220,6 +252,11 @@ impl CgroupSession {
                 }
             }
         }
+        for group_dir in self.app_group_dirs.iter().rev() {
+            if let Err(error) = remove_cgroup_dir(group_dir, sudo_password) {
+                errors.push(error);
+            }
+        }
         if let Err(error) = fs::remove_dir(&self.root) {
             if error.kind() != std::io::ErrorKind::NotFound {
                 let root_str = self.root.display().to_string();
@@ -240,6 +277,7 @@ impl CgroupSession {
 
         self.moves.clear();
         self.capture_matches.clear();
+        self.app_group_dirs.clear();
         self.bypass_match = None;
 
         if errors.is_empty() {
@@ -252,18 +290,11 @@ impl CgroupSession {
     fn move_pid(
         &mut self,
         pid: u32,
-        name: &str,
+        managed_dir: PathBuf,
         sudo_password: Option<&str>,
     ) -> Result<CgroupV2Match, String> {
         let original_dir = cgroup_dir_for_pid(pid)?;
-        let managed_dir = self.root.join(name);
-        if let Err(e) = fs::create_dir(&managed_dir) {
-            let mdir_str = managed_dir.display().to_string();
-            let mk_res = run_command_elevated("mkdir", &["-p", &mdir_str], None, sudo_password)?;
-            if !mk_res.status.success() {
-                return Err(format!("create {mdir_str}: {e}"));
-            }
-        }
+        create_cgroup_dir(&managed_dir, sudo_password)?;
         // Build the nftables cgroup v2 path before moving the process. If this
         // fails, the new cgroup is still empty and session rollback can remove
         // it without leaving a PID stranded in an untracked cgroup.
@@ -310,6 +341,50 @@ impl CgroupSession {
         }
 
         Ok(cgroup_match)
+    }
+}
+
+fn create_cgroup_dir(path: &Path, sudo_password: Option<&str>) -> Result<(), String> {
+    if let Err(error) = fs::create_dir(path) {
+        if !is_effective_root() && sudo_password.is_none() {
+            return Err(format!(
+                "create {}: {error}. Linux capture must run with permission to manage cgroup v2",
+                path.display()
+            ));
+        }
+        let path_string = path.display().to_string();
+        // Keep cgroup ownership with root. Each mutation is elevated instead
+        // of making kernel control files writable by the desktop process.
+        let output = run_command_elevated("mkdir", &["-p", &path_string], None, sudo_password)?;
+        if !output.status.success() {
+            return Err(format!(
+                "create {path_string}: {error}; elevated mkdir failed: {}",
+                command_error(&output)
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn remove_cgroup_dir(path: &Path, sudo_password: Option<&str>) -> Result<(), String> {
+    match fs::remove_dir(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => {
+            let path_string = path.display().to_string();
+            match run_command_elevated("rmdir", &[&path_string], None, sudo_password) {
+                Ok(output) if output.status.success() => Ok(()),
+                Ok(output) => Err(format!(
+                    "remove {}: {error}; elevated rmdir failed: {}",
+                    path.display(),
+                    command_error(&output)
+                )),
+                Err(elevated_error) => Err(format!(
+                    "remove {}: {error}; elevated rmdir failed: {elevated_error}",
+                    path.display()
+                )),
+            }
+        }
     }
 }
 

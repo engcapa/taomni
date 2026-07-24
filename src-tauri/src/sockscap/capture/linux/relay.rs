@@ -26,7 +26,10 @@ pub struct LinuxRelay {
 /// Start a loopback-only listener. nftables redirects locally-originated TCP
 /// connections here, so accepting on all interfaces would only broaden attack
 /// surface without helping capture.
-pub async fn start_linux_relay(ctx: Arc<RwLock<RelayContext>>) -> Result<LinuxRelay, String> {
+pub async fn start_linux_relay(
+    ctx: Arc<RwLock<RelayContext>>,
+    profile_id_hint: Option<String>,
+) -> Result<LinuxRelay, String> {
     let listener_v4 = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
         .await
         .map_err(|error| format!("bind Linux relay: {error}"))?;
@@ -49,6 +52,7 @@ pub async fn start_linux_relay(ctx: Arc<RwLock<RelayContext>>) -> Result<LinuxRe
 
     let stop = Arc::new(AtomicBool::new(false));
     let stop_for_task = Arc::clone(&stop);
+    let profile_id_hint = profile_id_hint.map(Arc::<str>::from);
     let limiter = new_relay_flow_limiter();
     let task = tokio::spawn(async move {
         let v4 = accept_loop(
@@ -56,9 +60,16 @@ pub async fn start_linux_relay(ctx: Arc<RwLock<RelayContext>>) -> Result<LinuxRe
             Arc::clone(&ctx),
             Arc::clone(&stop_for_task),
             Arc::clone(&limiter),
+            profile_id_hint.clone(),
         );
         if let Some(listener_v6) = listener_v6 {
-            let v6 = accept_loop(listener_v6, ctx, Arc::clone(&stop_for_task), limiter);
+            let v6 = accept_loop(
+                listener_v6,
+                ctx,
+                Arc::clone(&stop_for_task),
+                limiter,
+                profile_id_hint,
+            );
             let _ = tokio::join!(v4, v6);
         } else {
             v4.await;
@@ -95,6 +106,7 @@ async fn accept_loop(
     ctx: Arc<RwLock<RelayContext>>,
     stop: Arc<AtomicBool>,
     limiter: Arc<Semaphore>,
+    profile_id_hint: Option<Arc<str>>,
 ) {
     let mut clients = JoinSet::new();
     let mut accept_backoff = ACCEPT_BACKOFF_INITIAL;
@@ -138,6 +150,7 @@ async fn accept_loop(
             }
         };
         let ctx = Arc::clone(&ctx);
+        let profile_id_hint = profile_id_hint.clone();
         clients.spawn(async move {
             let _permit = permit;
             let flow = CapturedFlow {
@@ -145,6 +158,7 @@ async fn accept_loop(
                 process_path: None,
                 pid: None,
                 origin: peer,
+                profile_id_hint: profile_id_hint.as_deref().map(str::to_owned),
             };
             if let Err(error) =
                 crate::sockscap::relay::handle_captured_client(socket, flow, ctx).await

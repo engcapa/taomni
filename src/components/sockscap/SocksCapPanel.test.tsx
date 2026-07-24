@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SocksCapPanel } from "./SocksCapPanel";
-import type { SocksCapConfig } from "../../lib/sockscap";
+import { sockscapStart, type SocksCapConfig } from "../../lib/sockscap";
 
 const defaultTestCfg: SocksCapConfig = {
   enabled: false,
@@ -35,6 +35,7 @@ const defaultTestCfg: SocksCapConfig = {
 };
 
 let currentCfg = { ...defaultTestCfg };
+let currentPlatform = "windows";
 
 vi.mock("../../lib/sockscap", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../lib/sockscap")>();
@@ -45,12 +46,18 @@ vi.mock("../../lib/sockscap", async (importOriginal) => {
       currentCfg = JSON.parse(JSON.stringify(cfg));
     }),
     sockscapCapabilities: vi.fn(async () => ({
-      platform: "windows",
+      platform: currentPlatform,
       globalTcp: true,
       appFilter: true,
       captureBackend: "WinDivert",
       notes: [],
       privilegedRequired: true,
+    })),
+    sockscapStart: vi.fn(async () => ({
+      phase: "active",
+      message: "active",
+      ruleCount: 0,
+      captureBackend: "test",
     })),
     sockscapStatus: vi.fn(async () => ({
       phase: "idle",
@@ -89,6 +96,14 @@ vi.mock("../../lib/sockscap", async (importOriginal) => {
 describe("SocksCapPanel Multi-Profile UI", () => {
   beforeEach(() => {
     currentCfg = JSON.parse(JSON.stringify(defaultTestCfg));
+    currentPlatform = "windows";
+    vi.mocked(sockscapStart).mockReset();
+    vi.mocked(sockscapStart).mockResolvedValue({
+      phase: "active",
+      message: "active",
+      ruleCount: 0,
+      captureBackend: "test",
+    });
   });
 
   afterEach(() => {
@@ -119,5 +134,19 @@ describe("SocksCapPanel Multi-Profile UI", () => {
       expect(currentCfg.profiles.length).toBe(2);
       expect(currentCfg.profiles[1].name).toBe("方案 2");
     });
+  });
+
+  it("prompts for sudo when Linux nftables reports missing CAP_NET_ADMIN", async () => {
+    currentPlatform = "linux";
+    vi.mocked(sockscapStart).mockRejectedValueOnce(
+      "nftables is present but unavailable: Operation not permitted "
+        + "(you must be root). Linux capture requires CAP_NET_ADMIN",
+    );
+    render(<SocksCapPanel />);
+
+    const startButton = await screen.findByTestId("sockscap-start");
+    fireEvent.click(startButton);
+
+    expect(await screen.findByTestId("sockscap-root-prompt-dialog")).toBeInTheDocument();
   });
 });
