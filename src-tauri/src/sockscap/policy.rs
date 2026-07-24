@@ -1,11 +1,10 @@
-//! Policy engine: hard-bypass → user rules → bypass CIDR → GFWList → default.
+use std::net::IpAddr;
+use serde::Serialize;
 
-use crate::sockscap::config::{
-    Decision, RuleMode, ScopeMode, SocksCapConfig, UserRule, UserRuleAction,
-};
+use crate::sockscap::config::{RuleMode, ScopeMode, SocksCapConfig, SocksCapProfile, UserRule, UserRuleAction};
 use crate::sockscap::paths::{normalize_exe_path, paths_match_exe};
 use crate::sockscap::rules::{CompiledRules, RuleMatch};
-use std::net::IpAddr;
+use crate::sockscap::Decision;
 
 #[derive(Debug, Clone)]
 pub struct PolicyInput {
@@ -16,20 +15,30 @@ pub struct PolicyInput {
     pub pid: Option<u32>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MatchTrace {
     pub decision: Decision,
     pub reason: String,
     pub matched_rule: Option<String>,
+    pub profile_id: Option<String>,
+    pub profile_name: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ActiveProfileEngine {
+    pub id: String,
+    pub name: String,
+    pub mode: ScopeMode,
+    pub apps: Vec<String>,
+    pub rule_mode: RuleMode,
+    pub user_rules: Vec<UserRule>,
+    pub default_action: Decision,
 }
 
 pub struct PolicyEngine {
-    mode: ScopeMode,
-    apps: Vec<String>,
-    rule_mode: RuleMode,
-    user_rules: Vec<UserRule>,
+    profiles: Vec<ActiveProfileEngine>,
     bypass_cidrs: Vec<IpNetwork>,
-    default_action: Decision,
     rules: Option<CompiledRules>,
 }
 
@@ -90,49 +99,52 @@ impl PolicyEngine {
             .iter()
             .filter_map(|s| IpNetwork::parse(s))
             .collect();
-        let apps = cfg
-            .apps
-            .iter()
-            .map(|a| normalize_exe_path(&a.path))
-            .filter(|p| !p.is_empty())
+        let profiles = cfg
+            .active_profiles()
+            .into_iter()
+            .map(|p| {
+                let apps = p
+                    .apps
+                    .iter()
+                    .map(|a| normalize_exe_path(&a.path))
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                ActiveProfileEngine {
+                    id: p.id.clone(),
+                    name: p.name.clone(),
+                    mode: p.mode,
+                    apps,
+                    rule_mode: p.rule_mode,
+                    user_rules: p.user_rules.clone(),
+                    default_action: p.default_action,
+                }
+            })
             .collect();
         Self {
-            mode: cfg.mode,
-            apps,
-            rule_mode: cfg.rule_mode,
-            user_rules: cfg.user_rules.clone(),
+            profiles,
             bypass_cidrs,
-            default_action: cfg.default_action,
             rules: rules.cloned(),
         }
     }
 
-    /// Whether this process is in scope for capture (App mode).
+    /// Whether this process is in scope for capture across any active profile.
     pub fn process_in_scope(&self, process_path: Option<&str>) -> bool {
-        match self.mode {
-            ScopeMode::Global => true,
-            ScopeMode::Apps => {
-                let Some(p) = process_path else {
-                    return false;
-                };
-                let p = normalize_path(p);
-                self.apps.iter().any(|a| paths_match(&p, a))
-            }
+        if self.profiles.is_empty() {
+            return false;
         }
+        if self.profiles.iter().any(|p| matches!(p.mode, ScopeMode::Global)) {
+            return true;
+        }
+        let Some(p) = process_path else {
+            return false;
+        };
+        let norm = normalize_path(p);
+        self.profiles
+            .iter()
+            .any(|prof| prof.apps.iter().any(|a| paths_match(&norm, a)))
     }
 
     pub fn decide(&self, input: &PolicyInput) -> MatchTrace {
-        // App scope is enforced at capture; still guard here for dry-run.
-        if matches!(self.mode, ScopeMode::Apps)
-            && !self.process_in_scope(input.process_path.as_deref())
-        {
-            return MatchTrace {
-                decision: Decision::Direct,
-                reason: "process not in app list".into(),
-                matched_rule: None,
-            };
-        }
-
         let host = input
             .host
             .as_deref()
@@ -147,74 +159,124 @@ impl PolicyEngine {
                         decision: Decision::Direct,
                         reason: format!("bypass CIDR ({ip})"),
                         matched_rule: Some(format!("{}/{}", net.addr, net.prefix)),
+                        profile_id: None,
+                        profile_name: None,
                     };
                 }
             }
         }
 
-        // User rules — Block > Proxy > Direct by scanning in that action order
-        // while preserving list order within the same action.
-        if let Some(t) = self.match_user_rules(host.as_deref(), input.ip, UserRuleAction::Block) {
-            return t;
-        }
-        if let Some(t) = self.match_user_rules(host.as_deref(), input.ip, UserRuleAction::Proxy) {
-            return t;
-        }
-        if let Some(t) = self.match_user_rules(host.as_deref(), input.ip, UserRuleAction::Direct) {
-            return t;
-        }
-
-        match self.rule_mode {
-            RuleMode::Off => MatchTrace {
-                decision: Decision::Direct,
-                reason: "rule_mode=off".into(),
-                matched_rule: None,
-            },
-            RuleMode::ProxyAll => MatchTrace {
-                decision: Decision::Proxy,
-                reason: "rule_mode=proxyAll".into(),
-                matched_rule: None,
-            },
-            RuleMode::GfwList => {
-                let Some(host) = host else {
-                    return MatchTrace {
-                        decision: self.default_action,
-                        reason: "no hostname for gfwlist; default_action".into(),
-                        matched_rule: None,
-                    };
+        // Iterate active profiles in priority order
+        for prof in &self.profiles {
+            if matches!(prof.mode, ScopeMode::Apps) {
+                let in_scope = match input.process_path.as_deref() {
+                    Some(p) => {
+                        let norm = normalize_path(p);
+                        prof.apps.iter().any(|a| paths_match(&norm, a))
+                    }
+                    None => false,
                 };
-                match self.rules.as_ref().map(|r| r.match_host(&host)) {
-                    Some(RuleMatch::Proxy { rule }) => MatchTrace {
-                        decision: Decision::Proxy,
-                        reason: "gfwlist proxy".into(),
-                        matched_rule: Some(rule),
-                    },
-                    Some(RuleMatch::Direct { rule }) => MatchTrace {
-                        decision: Decision::Direct,
-                        reason: "gfwlist whitelist".into(),
-                        matched_rule: Some(rule),
-                    },
-                    Some(RuleMatch::Miss) | None => MatchTrace {
-                        decision: self.default_action,
-                        reason: if self.rules.is_none() {
-                            "gfwlist not loaded; default_action".into()
-                        } else {
-                            "gfwlist miss; default_action".into()
-                        },
-                        matched_rule: None,
-                    },
+                if !in_scope {
+                    continue;
                 }
             }
+
+            // User rules in this profile — Block > Proxy > Direct
+            if let Some(mut t) = self.match_user_rules(prof, host.as_deref(), input.ip, UserRuleAction::Block) {
+                t.profile_id = Some(prof.id.clone());
+                t.profile_name = Some(prof.name.clone());
+                return t;
+            }
+            if let Some(mut t) = self.match_user_rules(prof, host.as_deref(), input.ip, UserRuleAction::Proxy) {
+                t.profile_id = Some(prof.id.clone());
+                t.profile_name = Some(prof.name.clone());
+                return t;
+            }
+            if let Some(mut t) = self.match_user_rules(prof, host.as_deref(), input.ip, UserRuleAction::Direct) {
+                t.profile_id = Some(prof.id.clone());
+                t.profile_name = Some(prof.name.clone());
+                return t;
+            }
+
+            match prof.rule_mode {
+                RuleMode::Off => {
+                    return MatchTrace {
+                        decision: Decision::Direct,
+                        reason: format!("profile '{}' rule_mode=off", prof.name),
+                        matched_rule: None,
+                        profile_id: Some(prof.id.clone()),
+                        profile_name: Some(prof.name.clone()),
+                    };
+                }
+                RuleMode::ProxyAll => {
+                    return MatchTrace {
+                        decision: Decision::Proxy,
+                        reason: format!("profile '{}' rule_mode=proxyAll", prof.name),
+                        matched_rule: None,
+                        profile_id: Some(prof.id.clone()),
+                        profile_name: Some(prof.name.clone()),
+                    };
+                }
+                RuleMode::GfwList => {
+                    let Some(h) = host.as_deref() else {
+                        return MatchTrace {
+                            decision: prof.default_action,
+                            reason: format!("profile '{}' no hostname; default_action", prof.name),
+                            matched_rule: None,
+                            profile_id: Some(prof.id.clone()),
+                            profile_name: Some(prof.name.clone()),
+                        };
+                    };
+                    match self.rules.as_ref().map(|r| r.match_host(h)) {
+                        Some(RuleMatch::Proxy { rule }) => {
+                            return MatchTrace {
+                                decision: Decision::Proxy,
+                                reason: format!("profile '{}' gfwlist proxy", prof.name),
+                                matched_rule: Some(rule),
+                                profile_id: Some(prof.id.clone()),
+                                profile_name: Some(prof.name.clone()),
+                            };
+                        }
+                        Some(RuleMatch::Direct { rule }) => {
+                            return MatchTrace {
+                                decision: Decision::Direct,
+                                reason: format!("profile '{}' gfwlist whitelist", prof.name),
+                                matched_rule: Some(rule),
+                                profile_id: Some(prof.id.clone()),
+                                profile_name: Some(prof.name.clone()),
+                            };
+                        }
+                        Some(RuleMatch::Miss) | None => {
+                            return MatchTrace {
+                                decision: prof.default_action,
+                                reason: format!("profile '{}' gfwlist miss; default_action", prof.name),
+                                matched_rule: None,
+                                profile_id: Some(prof.id.clone()),
+                                profile_name: Some(prof.name.clone()),
+                            };
+                        }
+                    }
+                }
+            }
+        }
+
+        MatchTrace {
+            decision: Decision::Direct,
+            reason: "no matching active profile".into(),
+            matched_rule: None,
+            profile_id: None,
+            profile_name: None,
         }
     }
 
     fn match_user_rules(
         &self,
+        prof: &ActiveProfileEngine,
         host: Option<&str>,
         ip: Option<IpAddr>,
         action: UserRuleAction,
     ) -> Option<MatchTrace> {
-        for r in &self.user_rules {
+        for r in &prof.user_rules {
             if r.action != action {
                 continue;
             }
@@ -226,8 +288,10 @@ impl PolicyEngine {
                 };
                 return Some(MatchTrace {
                     decision,
-                    reason: format!("user rule ({:?})", r.action),
+                    reason: format!("profile '{}' user rule ({:?})", prof.name, r.action),
                     matched_rule: Some(r.pattern.clone()),
+                    profile_id: Some(prof.id.clone()),
+                    profile_name: Some(prof.name.clone()),
                 });
             }
         }
@@ -269,12 +333,14 @@ fn paths_match(process: &str, selector: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sockscap::config::{AppSelector, RuleMode, ScopeMode, SocksCapConfig, SocksCapProfile, UserRule};
     use crate::sockscap::rules::CompiledRules;
+    use crate::sockscap::Decision;
 
     fn cfg_gfw() -> SocksCapConfig {
         let mut c = SocksCapConfig::default();
-        c.upstream.host = "127.0.0.1".into();
-        c.upstream.port = 1080;
+        c.profiles[0].upstream.host = "127.0.0.1".into();
+        c.profiles[0].upstream.port = 1080;
         c
     }
 
@@ -304,6 +370,7 @@ mod tests {
             pid: None,
         });
         assert!(matches!(hit.decision, Decision::Proxy));
+        assert_eq!(hit.profile_id.as_deref(), Some("default"));
         let miss = eng.decide(&PolicyInput {
             host: Some("example.cn".into()),
             ip: None,
@@ -315,22 +382,73 @@ mod tests {
     }
 
     #[test]
-    fn user_block_overrides_gfw() {
-        let mut c = cfg_gfw();
-        c.user_rules.push(UserRule {
-            pattern: "google.com".into(),
-            action: UserRuleAction::Block,
-            comment: String::new(),
-        });
-        let rules = CompiledRules::compile("||google.com\n", "t").unwrap();
-        let eng = PolicyEngine::from_config(&c, Some(&rules));
-        let t = eng.decide(&PolicyInput {
-            host: Some("google.com".into()),
+    fn multi_profile_priority() {
+        let mut c = SocksCapConfig::default();
+        let p1 = SocksCapProfile {
+            id: "game".into(),
+            name: "Game".into(),
+            icon: None,
+            color: None,
+            enabled: true,
+            priority: 0,
+            mode: ScopeMode::Apps,
+            apps: vec![AppSelector { path: "C:\\Apex.exe".into(), bundle_id: "".into(), name: "Apex".into() }],
+            upstream: Default::default(),
+            rule_mode: RuleMode::ProxyAll,
+            user_rules: vec![],
+            default_action: Decision::Proxy,
+        };
+        let p2 = SocksCapProfile {
+            id: "dev".into(),
+            name: "Dev".into(),
+            icon: None,
+            color: None,
+            enabled: true,
+            priority: 1,
+            mode: ScopeMode::Apps,
+            apps: vec![AppSelector { path: "C:\\VSCode.exe".into(), bundle_id: "".into(), name: "VSCode".into() }],
+            upstream: Default::default(),
+            rule_mode: RuleMode::Off,
+            user_rules: vec![],
+            default_action: Decision::Direct,
+        };
+        c.profiles = vec![p1, p2];
+        c.active_profile_ids = vec!["game".into(), "dev".into()];
+
+        let eng = PolicyEngine::from_config(&c, None);
+
+        // Apex.exe should match Game profile
+        let t1 = eng.decide(&PolicyInput {
+            host: Some("apex.com".into()),
             ip: None,
             port: 443,
-            process_path: None,
+            process_path: Some("C:\\Apex.exe".into()),
             pid: None,
         });
-        assert!(matches!(t.decision, Decision::Block));
+        assert!(matches!(t1.decision, Decision::Proxy));
+        assert_eq!(t1.profile_name.as_deref(), Some("Game"));
+
+        // VSCode.exe should match Dev profile
+        let t2 = eng.decide(&PolicyInput {
+            host: Some("github.com".into()),
+            ip: None,
+            port: 443,
+            process_path: Some("C:\\VSCode.exe".into()),
+            pid: None,
+        });
+        assert!(matches!(t2.decision, Decision::Direct));
+        assert_eq!(t2.profile_name.as_deref(), Some("Dev"));
+
+        // Unmatched process should be Direct
+        let t3 = eng.decide(&PolicyInput {
+            host: Some("baidu.com".into()),
+            ip: None,
+            port: 443,
+            process_path: Some("C:\\Notepad.exe".into()),
+            pid: None,
+        });
+        assert!(matches!(t3.decision, Decision::Direct));
+        assert_eq!(t3.profile_name, None);
     }
 }
+

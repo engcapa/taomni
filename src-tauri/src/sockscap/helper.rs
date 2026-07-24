@@ -517,6 +517,12 @@ pub fn capture_stop(sess: &HelperSession) -> Result<(), String> {
     Ok(())
 }
 
+/// Hot-swap the relay port on the running capture session.
+/// Does not restart WinDivert — takes effect on the next intercepted packet.
+pub fn capture_update_relay(sess: &HelperSession, relay_port: u16) -> Result<serde_json::Value, String> {
+    expect_ok(send_json(sess, json!({ "cmd": "capture_update", "relayPort": relay_port }))?)
+}
+
 pub fn lookup_orig(sess: &HelperSession, src_port: u16) -> Result<OrigMapping, String> {
     lookup_orig_key(sess, "", src_port)
 }

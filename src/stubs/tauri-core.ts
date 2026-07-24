@@ -2013,28 +2013,74 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       } as T;
     }
     case "sockscap_get_config": {
+      let cfg: Record<string, unknown> | null = null;
       try {
         const raw = localStorage.getItem("taomni.sockscap.config.v1");
-        if (raw) return JSON.parse(raw) as T;
+        if (raw) cfg = JSON.parse(raw) as Record<string, unknown>;
       } catch {
         /* fallthrough */
       }
-      return {
-        enabled: false,
-        mode: "global",
-        apps: [],
-        upstream: { kind: "socks5", sessionId: "", host: "127.0.0.1", port: 1080, username: "", passwordRef: "" },
-        ruleMode: "gfwList",
-        gfwlist: {
-          enabled: true,
-          url: "https://cdn.jsdelivr.net/gh/gfwlist/gfwlist/gfwlist.txt",
-          autoRefreshHours: 24,
-        },
-        userRules: [],
-        bypassCidrs: ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"],
-        defaultAction: "direct",
-        restoreOnLogin: false,
-      } as T;
+      if (!cfg) {
+        cfg = {
+          enabled: false,
+          activeProfileIds: ["default"],
+          selectedProfileId: "default",
+          profiles: [
+            {
+              id: "default",
+              name: "默认方案",
+              icon: "🎮",
+              enabled: true,
+              priority: 0,
+              mode: "global",
+              apps: [],
+              upstream: { kind: "socks5", sessionId: "", host: "127.0.0.1", port: 1080, username: "", passwordRef: "" },
+              ruleMode: "gfwList",
+              userRules: [],
+              defaultAction: "direct",
+            },
+          ],
+          mode: "global",
+          apps: [],
+          upstream: { kind: "socks5", sessionId: "", host: "127.0.0.1", port: 1080, username: "", passwordRef: "" },
+          ruleMode: "gfwList",
+          gfwlist: {
+            enabled: true,
+            url: "https://cdn.jsdelivr.net/gh/gfwlist/gfwlist/gfwlist.txt",
+            autoRefreshHours: 24,
+          },
+          userRules: [],
+          bypassCidrs: ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"],
+          defaultAction: "direct",
+          restoreOnLogin: false,
+        };
+      }
+      if (!Array.isArray(cfg.profiles) || cfg.profiles.length === 0) {
+        cfg.profiles = [
+          {
+            id: "default",
+            name: "默认方案",
+            icon: "🎮",
+            enabled: true,
+            priority: 0,
+            mode: cfg.mode ?? "global",
+            apps: cfg.apps ?? [],
+            upstream: cfg.upstream ?? { kind: "socks5", sessionId: "", host: "127.0.0.1", port: 1080 },
+            ruleMode: cfg.ruleMode ?? "gfwList",
+            userRules: cfg.userRules ?? [],
+            defaultAction: cfg.defaultAction ?? "direct",
+          },
+        ];
+      }
+      if (!Array.isArray(cfg.activeProfileIds) || cfg.activeProfileIds.length === 0) {
+        const profList = cfg.profiles as Array<Record<string, unknown>>;
+        cfg.activeProfileIds = [String(profList[0]?.id ?? "default")];
+      }
+      if (!cfg.selectedProfileId) {
+        const profList = cfg.profiles as Array<Record<string, unknown>>;
+        cfg.selectedProfileId = String(profList[0]?.id ?? "default");
+      }
+      return cfg as T;
     }
     case "sockscap_set_config": {
       localStorage.setItem("taomni.sockscap.config.v1", JSON.stringify(args?.config ?? {}));

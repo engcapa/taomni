@@ -4319,6 +4319,90 @@ controls:
 
 ---
 
+## 14. SocksCap 网络流量路由
+
+### 14.1 SocksCap 控制面板 🟡
+
+<!-- feature
+id: F-Sockscap-1
+status: partial
+area: network/sockscap
+components: [SocksCapPanel]
+files:
+  - src/components/sockscap/SocksCapPanel.tsx
+  - src/components/sockscap/SocksCapRootPrompt.tsx
+  - src/lib/sockscap.ts
+  - src/stubs/tauri-core.ts
+controls:
+  - id: sidebar-entry
+    selector: '[data-testid="sidebar-tool-sockscap"]'
+    kind: interactive
+  - id: panel
+    selector: '[data-testid="sockscap-panel"]'
+    kind: display
+  - id: start
+    selector: '[data-testid="sockscap-start"]'
+    kind: interactive
+  - id: stop
+    selector: '[data-testid="sockscap-stop"]'
+    kind: interactive
+    optional: true       # shown after a running/degraded start result
+  - id: refresh-status
+    selector: '[data-testid="sockscap-refresh-status"]'
+    kind: interactive
+  - id: recover
+    selector: '[data-testid="sockscap-recover"]'
+    kind: interactive
+  - id: linux-capture-state
+    selector: '[data-testid="sockscap-linux-capture-state"]'
+    kind: display
+    optional: true       # only when the desktop backend reports Linux
+  - id: root-prompt-dialog
+    selector: '[data-testid="sockscap-root-prompt-dialog"]'
+    kind: display
+    optional: true       # only after Linux capture requests authorization
+  - id: root-password-input
+    selector: '[data-testid="sockscap-root-password-input"]'
+    kind: interactive
+    optional: true       # only after Linux capture requests authorization
+  - id: root-prompt-submit
+    selector: '[data-testid="sockscap-root-prompt-submit"]'
+    kind: interactive
+    optional: true       # only after Linux capture requests authorization
+  - id: root-prompt-cancel
+    selector: '[data-testid="sockscap-root-prompt-cancel"]'
+    kind: interactive
+    optional: true       # only after Linux capture requests authorization
+  - id: root-prompt-close
+    selector: '[data-testid="sockscap-root-prompt-close"]'
+    kind: interactive
+    optional: true       # only after Linux capture requests authorization
+  - id: refresh-gfw
+    selector: '[data-testid="sockscap-refresh-gfw"]'
+    kind: interactive
+    optional: true       # shown only while the GFWList rule mode is selected
+  - id: test-host
+    selector: '[data-testid="sockscap-test-host"]'
+    kind: interactive
+  - id: test-target
+    selector: '[data-testid="sockscap-test-target"]'
+    kind: interactive
+  - id: helper-start
+    selector: '[data-testid="sockscap-helper-start"]'
+    kind: interactive
+    optional: true       # privileged desktop helper; unavailable in browser preview
+  - id: windivert-probe
+    selector: '[data-testid="sockscap-windivert-probe"]'
+    kind: interactive
+    optional: true       # Windows-only helper diagnostic
+-->
+
+- 提供全局/按应用 TCP 路由、上游代理、GFWList、规则 dry-run、状态与流量统计的控制面板。
+- Linux 后端通过 nftables + cgroup v2 做透明 TCP 重定向；实际启用需要受管理员策略授权的网络与 cgroup 权限，因此该特性保持部分完成状态直到真实特权环境验证完成。
+- 浏览器预览覆盖控制面板状态流转；内核捕获和原始目标恢复由 Rust 单元/集成验证覆盖。
+
+---
+
 
 > 下述入口已经在 UI 中可见但点击会显示 "not active in this phase" 占位面板，对应能力**尚未实装**，本清单不视为完成项，仅在此说明以解释 UI 为何存在：
 >

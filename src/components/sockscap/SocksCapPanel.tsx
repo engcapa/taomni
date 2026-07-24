@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity,
   AlertCircle,
   ArrowDownLeft,
   ArrowUpRight,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Copy,
+  Layers,
   Loader2,
-  Network,
+  PanelLeftClose,
+  PanelLeftOpen,
   Play,
   Plus,
   RefreshCw,
@@ -33,21 +35,19 @@ import {
   sockscapStop,
   sockscapGetDomainRecords,
   sockscapClearDomainRecords,
-  sockscapHelperProbeWindivert,
-  sockscapHelperStart,
   sockscapHelperStatus,
-  sockscapHelperStop,
   sockscapTestTarget,
   sockscapTestUpstream,
   type Decision,
   type DomainRecord,
-  type HelperStatus,
   type GfwListStatus,
+  type HelperStatus,
   type ProcessInfo,
   type RuleMode,
   type ScopeMode,
   type SocksCapCapabilities,
   type SocksCapConfig,
+  type SocksCapProfile,
   type SocksCapStatus,
   type StatsSnapshot,
   type TargetTestResult,
@@ -69,8 +69,13 @@ interface Props {
   onClose?: () => void;
 }
 
-const DEFAULT_CFG: SocksCapConfig = {
-  enabled: false,
+const DEFAULT_PROFILE: SocksCapProfile = {
+  id: "default",
+  name: "Default Profile",
+  icon: "🎮",
+  color: null,
+  enabled: true,
+  priority: 0,
   mode: "global",
   apps: [],
   upstream: {
@@ -81,6 +86,19 @@ const DEFAULT_CFG: SocksCapConfig = {
     username: "",
     passwordRef: "",
   },
+  ruleMode: "gfwList",
+  userRules: [],
+  defaultAction: "direct",
+};
+
+const DEFAULT_CFG: SocksCapConfig = {
+  enabled: false,
+  activeProfileIds: ["default"],
+  selectedProfileId: "default",
+  profiles: [DEFAULT_PROFILE],
+  mode: "global",
+  apps: [],
+  upstream: DEFAULT_PROFILE.upstream,
   ruleMode: "gfwList",
   gfwlist: {
     enabled: true,
@@ -119,6 +137,46 @@ function phaseTone(phase: string): string {
   }
 }
 
+function normalizeFrontendConfig(raw: SocksCapConfig): SocksCapConfig {
+  const defaultProf: SocksCapProfile = {
+    id: "default",
+    name: "Default Profile",
+    icon: "🎮",
+    color: null,
+    enabled: true,
+    priority: 0,
+    mode: raw.mode || "global",
+    apps: raw.apps || [],
+    upstream: raw.upstream || { kind: "socks5", sessionId: "", host: "127.0.0.1", port: 1080 },
+    ruleMode: raw.ruleMode || "gfwList",
+    userRules: raw.userRules || [],
+    defaultAction: raw.defaultAction || "direct",
+  };
+  const profiles = raw.profiles && raw.profiles.length > 0 ? raw.profiles : [defaultProf];
+  const activeProfileIds =
+    raw.activeProfileIds && raw.activeProfileIds.length > 0
+      ? raw.activeProfileIds
+      : [profiles[0].id];
+  const selectedProfileId =
+    raw.selectedProfileId && profiles.some((p) => p.id === raw.selectedProfileId)
+      ? raw.selectedProfileId
+      : profiles[0].id;
+  const selectedProf = profiles.find((p) => p.id === selectedProfileId) || profiles[0];
+
+  return {
+    ...raw,
+    profiles,
+    activeProfileIds,
+    selectedProfileId,
+    mode: selectedProf.mode,
+    apps: selectedProf.apps,
+    upstream: selectedProf.upstream,
+    ruleMode: selectedProf.ruleMode,
+    userRules: selectedProf.userRules,
+    defaultAction: selectedProf.defaultAction,
+  };
+}
+
 export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
   const t = useT();
   const [cfg, setCfg] = useState<SocksCapConfig | null>(null);
@@ -126,6 +184,7 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
   const [status, setStatus] = useState<SocksCapStatus | null>(null);
   const [gfw, setGfw] = useState<GfwListStatus | null>(null);
   const [stats, setStats] = useState<StatsSnapshot | null>(null);
+  const [helper, setHelper] = useState<HelperStatus | null>(null);
   const [sessions, setSessions] = useState<SessionOpt[]>([]);
   const [processes, setProcesses] = useState<ProcessInfo[]>([]);
   const [busy, setBusy] = useState(false);
@@ -138,9 +197,13 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     comment: "",
   });
   const [showProcPicker, setShowProcPicker] = useState(false);
-  const [helper, setHelper] = useState<HelperStatus | null>(null);
   const [password, setPassword] = useState("");
   const [storingPass, setStoringPass] = useState(false);
+
+  // Linux sudo prompt modal state
+  const [showRootPrompt, setShowRootPrompt] = useState(false);
+  const [rootPromptError, setRootPromptError] = useState<string | null>(null);
+  const [rootPromptBusy, setRootPromptBusy] = useState(false);
 
   // Traffic rates and domain tracking state
   const [domainRecords, setDomainRecords] = useState<DomainRecord[]>([]);
@@ -152,6 +215,39 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
   const [downSpeed, setDownSpeed] = useState(0);
   const lastBytesRef = useRef<{ up: number; down: number; ts: number } | null>(null);
 
+  // Resizable profile sidebar & ribbon collapse state
+  const [sidebarWidth, setSidebarWidth] = useState(230);
+  const [isRibbon, setIsRibbon] = useState(false);
+  const isDraggingRef = useRef(false);
+
+  const handleMouseDownSplitter = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    const startX = e.clientX;
+    const startW = sidebarWidth;
+
+    const onMouseMove = (moveEv: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      const delta = moveEv.clientX - startX;
+      const nextW = startW + delta;
+      if (nextW < 110) {
+        setIsRibbon(true);
+      } else {
+        setIsRibbon(false);
+        setSidebarWidth(Math.max(160, Math.min(420, nextW)));
+      }
+    };
+
+    const onMouseUp = () => {
+      isDraggingRef.current = false;
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  }, [sidebarWidth]);
+
   const report = useCallback(
     (text: string, ok = true) => {
       setMsg({ ok, text });
@@ -160,11 +256,10 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     [onStatusMessage],
   );
 
-  /** Full panel reload (config + caps + status + stats + helper + domains). */
   const refresh = useCallback(async () => {
     try {
-      const [c, cap, st, gf, sn, hp, doms] = await Promise.all([
-        sockscapGetConfig().catch(() => DEFAULT_CFG),
+      const [c, cp, st, gf, sn, hp, drs] = await Promise.all([
+        sockscapGetConfig().then(normalizeFrontendConfig).catch(() => DEFAULT_CFG),
         sockscapCapabilities().catch(() => null),
         sockscapStatus().catch(() => null),
         sockscapGfwlistStatus().catch(() => null),
@@ -172,99 +267,85 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
         sockscapHelperStatus().catch(() => null),
         sockscapGetDomainRecords().catch(() => null),
       ]);
-      setCfg({ ...DEFAULT_CFG, ...c, upstream: { ...DEFAULT_CFG.upstream, ...c.upstream } });
-      setCaps(cap);
+      setCfg(c);
+      setCaps(cp);
       setStatus(st);
       setGfw(gf);
-      setStats(sn);
-      setHelper(hp);
-      if (doms) setDomainRecords(doms);
+      if (sn) setStats(sn);
+      if (hp) setHelper(hp);
+      if (drs) setDomainRecords(drs);
     } catch (e) {
       report(String(e), false);
     }
   }, [report]);
 
-  /** Lightweight poll while capture is running (stats + rates + helper + domains). */
-  const refreshLive = useCallback(async () => {
-    try {
-      const [st, sn, hp, doms] = await Promise.all([
-        sockscapStatus().catch(() => null),
-        sockscapStatsSnapshot().catch(() => null),
-        sockscapHelperStatus().catch(() => null),
-        sockscapGetDomainRecords().catch(() => null),
-      ]);
-      if (st) setStatus(st);
-      if (hp) setHelper(hp);
-      if (doms) setDomainRecords(doms);
-      if (sn) {
-        const now = Date.now();
-        if (lastBytesRef.current) {
-          const dt = (now - lastBytesRef.current.ts) / 1000;
-          if (dt > 0) {
-            const upD = Math.max(0, sn.bytesUp - lastBytesRef.current.up);
-            const downD = Math.max(0, sn.bytesDown - lastBytesRef.current.down);
-            setUpSpeed(upD / dt);
-            setDownSpeed(downD / dt);
-          }
-        }
-        lastBytesRef.current = { up: sn.bytesUp, down: sn.bytesDown, ts: now };
-        setStats(sn);
-      }
-    } catch {
-      /* ignore transient poll errors */
-    }
-  }, []);
-
-  const filteredDomainRecords = useMemo(() => {
-    let list = domainRecords;
-    if (decisionFilter !== "all") {
-      list = list.filter((r) => r.decision === decisionFilter);
-    }
-    if (domainFilter.trim()) {
-      const q = domainFilter.trim().toLowerCase();
-      list = list.filter(
-        (r) =>
-          r.domainOrIp.toLowerCase().includes(q) ||
-          (r.processName && r.processName.toLowerCase().includes(q)) ||
-          (r.matchedRule && r.matchedRule.toLowerCase().includes(q)),
-      );
-    }
-    return list;
-  }, [domainRecords, decisionFilter, domainFilter]);
-
   useEffect(() => {
     void refresh();
     listSessions()
-      .then((all) => {
-        const opts: SessionOpt[] = [];
-        for (const s of all) {
-          if (s.session_type === "Proxy") {
-            opts.push({ id: s.id, name: s.name, host: s.host, port: s.port, kind: "proxy" });
-          } else if (s.session_type === "SSH") {
-            opts.push({ id: s.id, name: s.name, host: s.host, port: s.port, kind: "ssh" });
-          }
-        }
-        setSessions(opts);
+      .then((arr) => {
+        const mapped: SessionOpt[] = arr.map((s) => {
+          const kind = (s.session_type === "ssh" ? "ssh" : "proxy") as "proxy" | "ssh";
+          return { id: s.id, name: s.name, host: s.host, port: s.port, kind };
+        });
+        setSessions(mapped);
       })
-      .catch(() => {});
+      .catch(() => setSessions([]));
   }, [refresh]);
 
-  const running = useMemo(
-    () => status && ["active", "degraded", "preparing"].includes(status.phase),
-    [status],
-  );
-
-  // Poll dashboard counters while capture is active (previously never updated after mount).
   useEffect(() => {
-    if (!running) return;
-    void refreshLive();
-    const id = window.setInterval(() => {
-      void refreshLive();
+    if (!status || status.phase === "idle") {
+      lastBytesRef.current = null;
+      setUpSpeed(0);
+      setDownSpeed(0);
+      return;
+    }
+    const timer = setInterval(() => {
+      Promise.all([
+        sockscapStatsSnapshot().catch(() => null),
+        sockscapStatus().catch(() => null),
+        sockscapHelperStatus().catch(() => null),
+        sockscapGetDomainRecords().catch(() => null),
+      ])
+        .then(([sn, st, hp, drs]) => {
+          if (st) setStatus(st);
+          if (hp) setHelper(hp);
+          if (drs) setDomainRecords(drs);
+          if (sn) {
+            const now = Date.now();
+            if (lastBytesRef.current) {
+              const dt = (now - lastBytesRef.current.ts) / 1000;
+              if (dt > 0.3) {
+                const dup = Math.max(0, sn.bytesUp - lastBytesRef.current.up);
+                const ddown = Math.max(0, sn.bytesDown - lastBytesRef.current.down);
+                setUpSpeed(dup / dt);
+                setDownSpeed(ddown / dt);
+              }
+            }
+            lastBytesRef.current = { up: sn.bytesUp, down: sn.bytesDown, ts: now };
+            setStats(sn);
+          }
+        })
+        .catch(() => {});
     }, 1500);
-    return () => window.clearInterval(id);
-  }, [running, refreshLive]);
+    return () => clearInterval(timer);
+  }, [status]);
 
-  const persist = async (next: SocksCapConfig) => {
+  const running =
+    status?.phase === "active" ||
+    status?.phase === "degraded" ||
+    status?.phase === "preparing";
+
+  const selectedProf = useMemo(() => {
+    if (!cfg) return DEFAULT_PROFILE;
+    return cfg.profiles.find((p) => p.id === cfg.selectedProfileId) || cfg.profiles[0] || DEFAULT_PROFILE;
+  }, [cfg]);
+
+  const activeProfiles = useMemo(() => {
+    if (!cfg) return [DEFAULT_PROFILE];
+    return cfg.profiles.filter((p) => p.enabled && cfg.activeProfileIds.includes(p.id));
+  }, [cfg]);
+
+  const persistConfig = async (next: SocksCapConfig) => {
     setCfg(next);
     try {
       await sockscapSetConfig(next);
@@ -274,30 +355,182 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     }
   };
 
-  const patch = async (partial: Partial<SocksCapConfig>) => {
+  const patchSelectedProfile = async (partial: Partial<SocksCapProfile>) => {
     if (!cfg) return;
-    await persist({ ...cfg, ...partial });
+    const profiles = cfg.profiles.map((p) => {
+      if (p.id === cfg.selectedProfileId) {
+        return { ...p, ...partial };
+      }
+      return p;
+    });
+    const updatedSelected = profiles.find((p) => p.id === cfg.selectedProfileId) || profiles[0];
+    const nextCfg: SocksCapConfig = {
+      ...cfg,
+      profiles,
+      mode: updatedSelected.mode,
+      apps: updatedSelected.apps,
+      upstream: updatedSelected.upstream,
+      ruleMode: updatedSelected.ruleMode,
+      userRules: updatedSelected.userRules,
+      defaultAction: updatedSelected.defaultAction,
+    };
+    await persistConfig(nextCfg);
+  };
+
+  const toggleProfileActive = async (id: string) => {
+    if (!cfg) return;
+    let activeProfileIds: string[];
+    if (cfg.activeProfileIds.includes(id)) {
+      if (cfg.activeProfileIds.length === 1) {
+        report(t("sockscap.atLeastOneActive"), false);
+        return;
+      }
+      activeProfileIds = cfg.activeProfileIds.filter((x) => x !== id);
+    } else {
+      activeProfileIds = [...cfg.activeProfileIds, id];
+    }
+    const nextCfg = { ...cfg, activeProfileIds };
+    await persistConfig(nextCfg);
+  };
+
+  const selectProfile = (id: string) => {
+    if (!cfg) return;
+    const prof = cfg.profiles.find((p) => p.id === id);
+    if (!prof) return;
+    const nextCfg: SocksCapConfig = {
+      ...cfg,
+      selectedProfileId: id,
+      mode: prof.mode,
+      apps: prof.apps,
+      upstream: prof.upstream,
+      ruleMode: prof.ruleMode,
+      userRules: prof.userRules,
+      defaultAction: prof.defaultAction,
+    };
+    setCfg(nextCfg);
+  };
+
+  const addProfile = async () => {
+    if (!cfg) return;
+    const newId = "prof-" + Date.now().toString(36);
+    const newProf: SocksCapProfile = {
+      id: newId,
+      name: `方案 ${cfg.profiles.length + 1}`,
+      icon: "🎮",
+      color: null,
+      enabled: true,
+      priority: cfg.profiles.length,
+      mode: "global",
+      apps: [],
+      upstream: { kind: "socks5", sessionId: "", host: "127.0.0.1", port: 1080, username: "", passwordRef: "" },
+      ruleMode: "gfwList",
+      userRules: [],
+      defaultAction: "direct",
+    };
+    const profiles = [...cfg.profiles, newProf];
+    const activeProfileIds = [...cfg.activeProfileIds, newId];
+    const nextCfg: SocksCapConfig = {
+      ...cfg,
+      profiles,
+      activeProfileIds,
+      selectedProfileId: newId,
+      mode: newProf.mode,
+      apps: newProf.apps,
+      upstream: newProf.upstream,
+      ruleMode: newProf.ruleMode,
+      userRules: newProf.userRules,
+      defaultAction: newProf.defaultAction,
+    };
+    await persistConfig(nextCfg);
+    report(t("sockscap.profileCreated", { name: newProf.name }));
+  };
+
+  const duplicateProfile = async (prof: SocksCapProfile) => {
+    if (!cfg) return;
+    const newId = "prof-" + Date.now().toString(36);
+    const newProf: SocksCapProfile = {
+      ...prof,
+      id: newId,
+      name: `${prof.name} (副本)`,
+      priority: cfg.profiles.length,
+    };
+    const profiles = [...cfg.profiles, newProf];
+    const activeProfileIds = [...cfg.activeProfileIds, newId];
+    const nextCfg: SocksCapConfig = {
+      ...cfg,
+      profiles,
+      activeProfileIds,
+      selectedProfileId: newId,
+      mode: newProf.mode,
+      apps: newProf.apps,
+      upstream: newProf.upstream,
+      ruleMode: newProf.ruleMode,
+      userRules: newProf.userRules,
+      defaultAction: newProf.defaultAction,
+    };
+    await persistConfig(nextCfg);
+    report(t("sockscap.profileDuplicated", { name: newProf.name }));
+  };
+
+  const deleteProfile = async (id: string) => {
+    if (!cfg || cfg.profiles.length <= 1) {
+      report(t("sockscap.atLeastOneProfile"), false);
+      return;
+    }
+    const profiles = cfg.profiles.filter((p) => p.id !== id);
+    const activeProfileIds = cfg.activeProfileIds.filter((x) => x !== id);
+    if (activeProfileIds.length === 0 && profiles.length > 0) {
+      activeProfileIds.push(profiles[0].id);
+    }
+    const selectedProfileId = cfg.selectedProfileId === id ? profiles[0].id : cfg.selectedProfileId;
+    const selectedProf = profiles.find((p) => p.id === selectedProfileId) || profiles[0];
+    const nextCfg: SocksCapConfig = {
+      ...cfg,
+      profiles,
+      activeProfileIds,
+      selectedProfileId,
+      mode: selectedProf.mode,
+      apps: selectedProf.apps,
+      upstream: selectedProf.upstream,
+      ruleMode: selectedProf.ruleMode,
+      userRules: selectedProf.userRules,
+      defaultAction: selectedProf.defaultAction,
+    };
+    await persistConfig(nextCfg);
+    report("方案已删除");
   };
 
   const onRefreshStatus = async () => {
     setBusy(true);
     try {
-      await refresh();
+      const [st, sn, hp, gf, drs] = await Promise.all([
+        sockscapStatus().catch(() => null),
+        sockscapStatsSnapshot().catch(() => null),
+        sockscapHelperStatus().catch(() => null),
+        sockscapGfwlistStatus().catch(() => null),
+        sockscapGetDomainRecords().catch(() => null),
+      ]);
+      if (st) setStatus(st);
+      if (sn) setStats(sn);
+      if (hp) setHelper(hp);
+      if (gf) setGfw(gf);
+      if (drs) setDomainRecords(drs);
       report(t("sockscap.statusRefreshed"));
-    } catch (e) {
-      report(String(e), false);
     } finally {
       setBusy(false);
     }
   };
 
-  const onStart = async () => {
+  const onStart = async (sudoPassword?: string) => {
     if (!cfg) return;
     setBusy(true);
+    setRootPromptBusy(true);
+    setRootPromptError(null);
     try {
       await sockscapSetConfig(cfg);
-      const st = await sockscapStart();
+      const st = await sockscapStart(sudoPassword);
       setStatus(st);
+      setShowRootPrompt(false);
       report(st.message || t("sockscap.started"), st.phase !== "idle");
       const [gf, sn, hp] = await Promise.all([
         sockscapGfwlistStatus().catch(() => null),
@@ -308,9 +541,25 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
       if (sn) setStats(sn);
       if (hp) setHelper(hp);
     } catch (e) {
-      report(String(e), false);
+      const errStr = String(e);
+      if (
+        caps?.platform === "linux" &&
+        (errStr.includes("sudo password") ||
+          errStr.includes("incorrect password") ||
+          errStr.includes("authorization required"))
+      ) {
+        setShowRootPrompt(true);
+        setRootPromptError(
+          errStr.includes("incorrect password")
+            ? t("sockscap.rootPasswordIncorrect")
+            : null,
+        );
+      } else {
+        report(errStr, false);
+      }
     } finally {
       setBusy(false);
+      setRootPromptBusy(false);
     }
   };
 
@@ -333,7 +582,6 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     }
   };
 
-  /** Explicit network recovery — tears down capture (not a status refresh). */
   const onRecover = async () => {
     setBusy(true);
     try {
@@ -425,8 +673,8 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
         "SocksCap Upstream Password",
         password,
       );
-      await patch({
-        upstream: { ...cfg.upstream, passwordRef: res.reference },
+      await patchSelectedProfile({
+        upstream: { ...selectedProf.upstream, passwordRef: res.reference },
       });
       setPassword("");
       report(t("sockscap.passwordSaved"));
@@ -440,7 +688,7 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
   const clearPassword = async () => {
     if (!cfg) return;
     setPassword("");
-    await patch({ upstream: { ...cfg.upstream, passwordRef: "" } });
+    await patchSelectedProfile({ upstream: { ...selectedProf.upstream, passwordRef: "" } });
     report(t("sockscap.passwordCleared"));
   };
 
@@ -448,7 +696,7 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     if (!cfg) return;
     setBusy(true);
     try {
-      const u = cfg.upstream;
+      const u = selectedProf.upstream;
       const text = await sockscapTestUpstream({
         kind: u.kind,
         host: u.host || "127.0.0.1",
@@ -478,19 +726,38 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
 
   const addAppPath = async (path: string, name?: string) => {
     if (!cfg || !path.trim()) return;
-    const apps = [...cfg.apps];
+    const apps = [...selectedProf.apps];
     if (apps.some((a) => a.path.toLowerCase() === path.toLowerCase())) return;
     apps.push({ path, name: name || path.split(/[/\\]/).pop() || path });
-    await patch({ apps });
+    await patchSelectedProfile({ apps });
   };
 
   const addUserRule = async () => {
     if (!cfg || !newRule.pattern.trim()) return;
-    await patch({
-      userRules: [...cfg.userRules, { ...newRule, pattern: newRule.pattern.trim() }],
+    await patchSelectedProfile({
+      userRules: [...selectedProf.userRules, { ...newRule, pattern: newRule.pattern.trim() }],
     });
     setNewRule({ pattern: "", action: "direct", comment: "" });
   };
+
+  const filteredDomainRecords = useMemo(() => {
+    let list = domainRecords;
+    if (decisionFilter !== "all") {
+      list = list.filter((r) => r.decision === decisionFilter);
+    }
+    if (domainFilter.trim()) {
+      const q = domainFilter.trim().toLowerCase();
+      list = list.filter(
+        (r) =>
+          r.domainOrIp.toLowerCase().includes(q) ||
+          r.matchedRule?.toLowerCase().includes(q) ||
+          r.profileName?.toLowerCase().includes(q) ||
+          r.processName?.toLowerCase().includes(q) ||
+          String(r.pid).includes(q),
+      );
+    }
+    return list;
+  }, [domainRecords, decisionFilter, domainFilter]);
 
   if (!cfg) {
     return (
@@ -576,80 +843,567 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
         )}
       </div>
 
-      {/* Banner */}
-      {caps && (
-        <div
-          className={`px-4 py-2 text-[11px] border-b border-[var(--taomni-divider)] flex gap-2 items-start ${
-            caps.globalTcp
-              ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"
-              : "bg-amber-500/10 text-amber-700 dark:text-amber-300"
-          }`}
-        >
-          <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-          <div>
-            <div className="font-medium">
-              {caps.globalTcp
-                ? `${caps.captureBackend} · ${caps.platform}`
-                : t("sockscap.captureNotReady")}
-            </div>
-            <div className="opacity-90">
-              {caps.notes?.[0] ?? t("sockscap.captureNotReadyHint")}
-              {caps.privilegedRequired ? ` · ${t("sockscap.helper.start")}` : ""}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="flex-1 overflow-auto p-4 space-y-4">
-        {/* Scope */}
-        <Section title={t("sockscap.section.scope")}>
-          <div className="flex gap-2">
-            {(["global", "apps"] as ScopeMode[]).map((m) => (
-              <button
-                key={m}
-                type="button"
-                data-testid={`sockscap-mode-${m}`}
-                className={`px-3 py-1.5 rounded text-[12px] border ${
-                  cfg.mode === m
-                    ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)]"
-                    : "border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
-                }`}
-                onClick={() => void patch({ mode: m })}
+      {/* Profile Active Summary Banner */}
+      <div className="px-4 py-2 bg-[var(--taomni-bg)] border-b border-[var(--taomni-divider)] text-[11px] flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold flex items-center gap-1">
+            <Layers className="w-3.5 h-3.5 text-[var(--taomni-accent)]" />
+            {t("sockscap.activeProfilesBanner", { count: activeProfiles.length })}
+          </span>
+          <div className="flex flex-wrap gap-1">
+            {activeProfiles.map((p) => (
+              <span
+                key={p.id}
+                className="px-2 py-0.5 rounded text-[10px] font-medium bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)] border border-[var(--taomni-accent)]/30 flex items-center gap-1"
               >
-                {t(`sockscap.mode.${m}`)}
-              </button>
+                <span>{p.icon || "🛡️"}</span>
+                <span>{p.name}</span>
+                <span className="opacity-75">
+                  ({p.mode === "global" ? t("sockscap.badgeGlobal") : t("sockscap.badgeApps", { count: p.apps.length })})
+                </span>
+              </span>
             ))}
           </div>
-          {cfg.mode === "apps" && (
-            <div className="mt-3 space-y-2">
-              <div className="flex gap-2">
+        </div>
+        <div className="flex items-center gap-3">
+          {stats && (
+            <div className="hidden sm:flex items-center gap-2 text-[10px] text-[var(--taomni-text-muted)]">
+              <span>
+                {t("sockscap.statsFlows", {
+                  total: stats.flowsTotal,
+                  proxy: stats.flowsProxy,
+                  direct: stats.flowsDirect,
+                })}
+              </span>
+            </div>
+          )}
+          {helper?.running && (
+            <span className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-mono border border-emerald-500/20">
+              Helper PID: {helper.pid}
+            </span>
+          )}
+          {running && (
+            <div className="flex items-center gap-3 font-mono text-[10px] text-[var(--taomni-text-muted)]">
+              <span className="flex items-center gap-1 text-emerald-500">
+                <ArrowUpRight className="w-3 h-3" />
+                {formatSpeed(upSpeed)}
+              </span>
+              <span className="flex items-center gap-1 text-sky-500">
+                <ArrowDownLeft className="w-3 h-3" />
+                {formatSpeed(downSpeed)}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Main Dual-Column Content Area */}
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        {/* Left Column: Profile Manager Sidebar */}
+        {isRibbon ? (
+          <div
+            className="w-[52px] shrink-0 flex flex-col items-center bg-[var(--taomni-panel)] py-3 px-1 space-y-3 border-r border-[var(--taomni-divider)] select-none"
+            data-testid="sockscap-profile-list"
+          >
+            <div className="flex flex-col items-center gap-1 shrink-0 pb-2 border-b border-[var(--taomni-divider)] w-full">
+              <button
+                type="button"
+                className="p-1.5 rounded text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)] transition-colors"
+                onClick={() => setIsRibbon(false)}
+                title={t("sockscap.expandProfiles")}
+                aria-label={t("sockscap.expandProfiles")}
+              >
+                <PanelLeftOpen className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                data-testid="sockscap-add-profile"
+                className="p-1.5 rounded text-[var(--taomni-text-muted)] hover:text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)] transition-colors"
+                onClick={() => void addProfile()}
+                title={t("sockscap.newProfileTooltip")}
+                aria-label={t("sockscap.newProfileTooltip")}
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2 flex-1 overflow-y-auto w-full flex flex-col items-center">
+              {cfg.profiles.map((p) => {
+                const isSelected = p.id === cfg.selectedProfileId;
+                const isActive = p.enabled && cfg.activeProfileIds.includes(p.id);
+                return (
+                  <div
+                    key={p.id}
+                    data-testid={`sockscap-profile-item-${p.id}`}
+                    className={`w-9 h-9 rounded-lg border flex items-center justify-center relative cursor-pointer transition-all ${
+                      isSelected
+                        ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/20 shadow-sm"
+                        : "border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] bg-[var(--taomni-bg)]"
+                    }`}
+                    onClick={() => selectProfile(p.id)}
+                    onDoubleClick={() => setIsRibbon(false)}
+                    title={`${p.name} - ${p.mode === "global" ? t("sockscap.scopeGlobal") : t("sockscap.appsBound", { count: p.apps.length })} (${isActive ? t("sockscap.activeTooltipActive") : t("sockscap.activeTooltipInactive")})`}
+                  >
+                    <span className="text-base select-none">{p.icon || "🛡️"}</span>
+                    {isActive && (
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 absolute -top-0.5 -right-0.5 ring-2 ring-[var(--taomni-panel)]" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div
+            style={{ width: sidebarWidth }}
+            className="shrink-0 flex flex-col bg-[var(--taomni-panel)] p-3 space-y-3 overflow-y-auto border-r border-[var(--taomni-divider)] select-none relative"
+            data-testid="sockscap-profile-list"
+          >
+            <div className="flex items-center justify-between gap-1">
+              <span className="text-[12px] font-bold text-[var(--taomni-text)] truncate">
+                {t("sockscap.profilesTitle")}
+              </span>
+              <div className="flex items-center gap-1 shrink-0">
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
-                  onClick={() => void loadProcesses()}
+                  data-testid="sockscap-add-profile"
+                  className="p-1 rounded text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)] transition-colors flex items-center justify-center"
+                  onClick={() => void addProfile()}
+                  title={t("sockscap.newProfileTooltip")}
+                  aria-label={t("sockscap.newProfileTooltip")}
                 >
-                  <Plus className="w-3 h-3" />
-                  {t("sockscap.pickProcess")}
+                  <Plus className="w-4 h-4" />
                 </button>
-                <ManualAppAdd onAdd={(path) => void addAppPath(path)} />
+                <button
+                  type="button"
+                  className="p-1 rounded text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)] transition-colors flex items-center justify-center"
+                  onClick={() => setIsRibbon(true)}
+                  title={t("sockscap.collapseProfiles")}
+                  aria-label={t("sockscap.collapseProfiles")}
+                >
+                  <PanelLeftClose className="w-4 h-4" />
+                </button>
               </div>
-              {cfg.apps.length === 0 ? (
-                <div className="text-[11px] text-[var(--taomni-text-muted)]">{t("sockscap.appsEmpty")}</div>
+            </div>
+
+            <div className="space-y-1.5 flex-1 overflow-y-auto">
+              {cfg.profiles.map((p) => {
+                const isSelected = p.id === cfg.selectedProfileId;
+                const isActive = p.enabled && cfg.activeProfileIds.includes(p.id);
+                return (
+                  <div
+                    key={p.id}
+                    data-testid={`sockscap-profile-item-${p.id}`}
+                    className={`p-2 rounded-lg border text-[11px] transition-all cursor-pointer ${
+                      isSelected
+                        ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/10 shadow-sm"
+                        : "border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] bg-[var(--taomni-bg)]"
+                    }`}
+                    onClick={() => selectProfile(p.id)}
+                  >
+                    <div className="flex items-center justify-between gap-1.5 mb-1">
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <input
+                          type="checkbox"
+                          data-testid={`sockscap-profile-checkbox-${p.id}`}
+                          checked={isActive}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            void toggleProfileActive(p.id);
+                          }}
+                          className="rounded border-[var(--taomni-divider)] text-[var(--taomni-accent)] focus:ring-0 cursor-pointer"
+                          title={isActive ? t("sockscap.activeTooltipActive") : t("sockscap.activeTooltipInactive")}
+                        />
+                        <span className="text-[13px]">{p.icon || "🛡️"}</span>
+                        <span className="font-semibold truncate">{p.name}</span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          className="p-1 text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] rounded"
+                          title={t("sockscap.duplicateProfileTooltip")}
+                          onClick={() => void duplicateProfile(p)}
+                        >
+                          <Copy className="w-3 h-3" />
+                        </button>
+                        {cfg.profiles.length > 1 && (
+                          <button
+                            type="button"
+                            data-testid={`sockscap-delete-profile-${p.id}`}
+                            className="p-1 text-[var(--taomni-text-muted)] hover:text-red-500 rounded"
+                            title={t("sockscap.deleteProfileTooltip")}
+                            onClick={() => void deleteProfile(p.id)}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-[var(--taomni-text-muted)]">
+                      <span>
+                        {p.mode === "global"
+                          ? t("sockscap.scopeGlobal")
+                          : t("sockscap.appsBound", { count: p.apps.length })}
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded bg-[var(--taomni-hover)] font-mono">
+                        {p.ruleMode}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Resizable Handle / Splitter */}
+        {!isRibbon && (
+          <div
+            className="w-1 cursor-col-resize bg-transparent hover:bg-[var(--taomni-accent)]/40 active:bg-[var(--taomni-accent)] transition-colors shrink-0 z-10 self-stretch"
+            onMouseDown={handleMouseDownSplitter}
+            title="Drag to resize panel"
+          />
+        )}
+
+        {/* Right Column: Selected Profile Detail & Inspector */}
+        <div className="flex-1 overflow-auto p-4 space-y-4">
+          {/* Profile Basic info header */}
+          <Section title={t("sockscap.editProfileTitle", { name: selectedProf.name })}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Field label={t("sockscap.profileNameLabel")}>
+                <input
+                  className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+                  value={selectedProf.name}
+                  onChange={(e) => void patchSelectedProfile({ name: e.target.value })}
+                />
+              </Field>
+              <Field label={t("sockscap.profileIconLabel")}>
+                <div className="flex gap-1.5">
+                  {["🎮", "💻", "🎬", "🌐", "⚡", "🛡️"].map((ic) => (
+                    <button
+                      key={ic}
+                      type="button"
+                      className={`px-2 py-1 rounded text-[13px] border ${
+                        selectedProf.icon === ic
+                          ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/20"
+                          : "border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
+                      }`}
+                      onClick={() => void patchSelectedProfile({ icon: ic })}
+                    >
+                      {ic}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            </div>
+          </Section>
+
+          {/* Scope Mode */}
+          <Section title={t("sockscap.section.scope")}>
+            <div className="flex gap-2">
+              {(["global", "apps"] as ScopeMode[]).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  data-testid={`sockscap-mode-${m}`}
+                  className={`px-3 py-1.5 rounded text-[12px] border ${
+                    selectedProf.mode === m
+                      ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)] font-medium"
+                      : "border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
+                  }`}
+                  onClick={() => void patchSelectedProfile({ mode: m })}
+                >
+                  {t(`sockscap.mode.${m}`)}
+                </button>
+              ))}
+            </div>
+            {selectedProf.mode === "apps" && (
+              <div className="mt-3 space-y-2">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
+                    onClick={() => void loadProcesses()}
+                  >
+                    <Plus className="w-3 h-3" />
+                    {t("sockscap.pickProcess")}
+                  </button>
+                  <ManualAppAdd onAdd={(path) => void addAppPath(path)} />
+                </div>
+                {selectedProf.apps.length === 0 ? (
+                  <div className="text-[11px] text-[var(--taomni-text-muted)]">{t("sockscap.appsEmpty")}</div>
+                ) : (
+                  <ul className="space-y-1">
+                    {selectedProf.apps.map((a) => (
+                      <li
+                        key={a.path}
+                        className="flex items-center gap-2 text-[12px] px-2 py-1 rounded bg-[var(--taomni-bg)] border border-[var(--taomni-divider)]"
+                      >
+                        <span className="flex-1 truncate" title={a.path}>
+                          {a.name || a.path}
+                        </span>
+                        <button
+                          type="button"
+                          className="p-1 hover:text-red-500"
+                          onClick={() =>
+                            void patchSelectedProfile({
+                              apps: selectedProf.apps.filter((x) => x.path !== a.path),
+                            })
+                          }
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </Section>
+
+          {/* Upstream */}
+          <Section title={t("sockscap.section.upstream")}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Field label={t("sockscap.upstreamKind")}>
+                <select
+                  className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+                  value={selectedProf.upstream.kind}
+                  onChange={(e) =>
+                    void patchSelectedProfile({
+                      upstream: {
+                        ...selectedProf.upstream,
+                        kind: e.target.value as UpstreamKind,
+                      },
+                    })
+                  }
+                >
+                  <option value="socks5">SOCKS5</option>
+                  <option value="http">HTTP / HTTPS</option>
+                  <option value="ssh">SSH Tunnel (Dynamic SOCKS)</option>
+                </select>
+              </Field>
+
+              {selectedProf.upstream.kind === "ssh" ? (
+                <Field label={t("sockscap.upstreamSession")}>
+                  <select
+                    className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+                    value={selectedProf.upstream.sessionId}
+                    onChange={(e) =>
+                      void patchSelectedProfile({
+                        upstream: { ...selectedProf.upstream, sessionId: e.target.value },
+                      })
+                    }
+                  >
+                    <option value="">{t("sockscap.manualUpstream")}</option>
+                    {sessions
+                      .filter((s) => s.kind === "ssh")
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.host}:{s.port})
+                        </option>
+                      ))}
+                  </select>
+                </Field>
               ) : (
-                <ul className="space-y-1">
-                  {cfg.apps.map((a) => (
+                <Field label={t("sockscap.upstreamSession")}>
+                  <select
+                    className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+                    value={selectedProf.upstream.sessionId}
+                    onChange={(e) => {
+                      const sid = e.target.value;
+                      const match = sessions.find((x) => x.id === sid);
+                      if (match) {
+                        void patchSelectedProfile({
+                          upstream: {
+                            ...selectedProf.upstream,
+                            sessionId: sid,
+                            host: match.host,
+                            port: match.port,
+                          },
+                        });
+                      } else {
+                        void patchSelectedProfile({
+                          upstream: { ...selectedProf.upstream, sessionId: "" },
+                        });
+                      }
+                    }}
+                  >
+                    <option value="">{t("sockscap.manualUpstream")}</option>
+                    {sessions.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.host}:{s.port})
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+
+              <Field label={t("sockscap.host")}>
+                <input
+                  className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+                  value={selectedProf.upstream.host}
+                  onChange={(e) =>
+                    void patchSelectedProfile({
+                      upstream: { ...selectedProf.upstream, host: e.target.value },
+                    })
+                  }
+                />
+              </Field>
+              <Field label={t("sockscap.port")}>
+                <input
+                  type="number"
+                  className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+                  value={selectedProf.upstream.port}
+                  onChange={(e) =>
+                    void patchSelectedProfile({
+                      upstream: {
+                        ...selectedProf.upstream,
+                        port: parseInt(e.target.value, 10) || 1080,
+                      },
+                    })
+                  }
+                />
+              </Field>
+              <Field label={t("sockscap.username")}>
+                <input
+                  className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+                  value={selectedProf.upstream.username || ""}
+                  onChange={(e) =>
+                    void patchSelectedProfile({
+                      upstream: { ...selectedProf.upstream, username: e.target.value },
+                    })
+                  }
+                />
+              </Field>
+              <Field label={t("sockscap.password")}>
+                <div className="flex gap-1.5">
+                  <input
+                    type="password"
+                    className="flex-1 text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+                    placeholder={
+                      selectedProf.upstream.passwordRef
+                        ? t("sockscap.passwordStored")
+                        : t("sockscap.passwordPh")
+                    }
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="px-2 py-1.5 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] shrink-0"
+                    onClick={() => void storePassword()}
+                    disabled={storingPass || !password}
+                  >
+                    {t("sockscap.passwordStore")}
+                  </button>
+                  {selectedProf.upstream.passwordRef && (
+                    <button
+                      type="button"
+                      className="px-2 py-1.5 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] text-red-500 shrink-0"
+                      onClick={() => void clearPassword()}
+                    >
+                      {t("common.clear")}
+                    </button>
+                  )}
+                </div>
+              </Field>
+            </div>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                className="px-3 py-1.5 rounded text-[12px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
+                onClick={() => void onTestUpstream()}
+                disabled={busy}
+              >
+                {t("sockscap.testUpstream")}
+              </button>
+            </div>
+          </Section>
+
+          {/* Rules Strategy */}
+          <Section title={t("sockscap.section.rules")}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+              <Field label={t("sockscap.ruleMode")}>
+                <select
+                  className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+                  value={selectedProf.ruleMode}
+                  onChange={(e) =>
+                    void patchSelectedProfile({ ruleMode: e.target.value as RuleMode })
+                  }
+                >
+                  <option value="gfwList">{t("sockscap.ruleMode.gfwList")}</option>
+                  <option value="proxyAll">{t("sockscap.ruleMode.proxyAll")}</option>
+                  <option value="off">{t("sockscap.ruleMode.off")}</option>
+                </select>
+              </Field>
+              <Field label={t("sockscap.defaultAction")}>
+                <select
+                  className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+                  value={selectedProf.defaultAction}
+                  onChange={(e) =>
+                    void patchSelectedProfile({ defaultAction: e.target.value as Decision })
+                  }
+                >
+                  <option value="direct">{t("sockscap.action.direct")}</option>
+                  <option value="proxy">{t("sockscap.action.proxy")}</option>
+                  <option value="block">{t("sockscap.action.block")}</option>
+                </select>
+              </Field>
+            </div>
+
+            {/* User rules table for selected profile */}
+            <div className="space-y-2">
+              <div className="text-[11px] font-medium text-[var(--taomni-text-muted)]">
+                {t("sockscap.userRulesTitle")}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 text-[12px] px-2 py-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+                  placeholder={t("sockscap.patternPh")}
+                  value={newRule.pattern}
+                  onChange={(e) => setNewRule({ ...newRule, pattern: e.target.value })}
+                />
+                <select
+                  className="text-[12px] px-2 py-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+                  value={newRule.action}
+                  onChange={(e) =>
+                    setNewRule({ ...newRule, action: e.target.value as Decision })
+                  }
+                >
+                  <option value="direct">{t("sockscap.action.direct")}</option>
+                  <option value="proxy">{t("sockscap.action.proxy")}</option>
+                  <option value="block">{t("sockscap.action.block")}</option>
+                </select>
+                <button
+                  type="button"
+                  className="px-3 py-1 rounded text-[12px] bg-[var(--taomni-accent)] text-white hover:opacity-90"
+                  onClick={() => void addUserRule()}
+                >
+                  {t("common.add")}
+                </button>
+              </div>
+
+              {selectedProf.userRules.length === 0 ? (
+                <div className="text-[11px] text-[var(--taomni-text-muted)]">{t("sockscap.userRulesEmpty")}</div>
+              ) : (
+                <ul className="space-y-1 max-h-36 overflow-auto">
+                  {selectedProf.userRules.map((r, idx) => (
                     <li
-                      key={a.path}
+                      key={`${r.pattern}-${idx}`}
                       className="flex items-center gap-2 text-[12px] px-2 py-1 rounded bg-[var(--taomni-bg)] border border-[var(--taomni-divider)]"
                     >
-                      <span className="flex-1 truncate" title={a.path}>
-                        {a.name || a.path}
+                      <span className="font-mono flex-1">{r.pattern}</span>
+                      <span className="text-[11px] text-[var(--taomni-text-muted)] uppercase">
+                        {r.action}
                       </span>
                       <button
                         type="button"
                         className="p-1 hover:text-red-500"
                         onClick={() =>
-                          void patch({ apps: cfg.apps.filter((x) => x.path !== a.path) })
+                          void patchSelectedProfile({
+                            userRules: selectedProf.userRules.filter((_, i) => i !== idx),
+                          })
                         }
                       >
                         <Trash2 className="w-3 h-3" />
@@ -659,449 +1413,76 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
                 </ul>
               )}
             </div>
-          )}
-        </Section>
+          </Section>
 
-        {/* Upstream */}
-        <Section title={t("sockscap.section.upstream")}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <Field label={t("sockscap.upstreamKind")}>
-              <select
-                className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
-                value={cfg.upstream.kind}
-                onChange={(e) =>
-                  void patch({
-                    upstream: {
-                      ...cfg.upstream,
-                      kind: e.target.value as UpstreamKind,
-                      sessionId: "",
-                    },
-                  })
-                }
-              >
-                <option value="http">HTTP CONNECT</option>
-                <option value="socks5">SOCKS5</option>
-                <option value="ssh">SSH (single hop)</option>
-              </select>
-            </Field>
-            <Field label={t("sockscap.upstreamSession")}>
-              <select
-                className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
-                value={cfg.upstream.sessionId || ""}
-                onChange={(e) => {
-                  const id = e.target.value;
-                  const s = sessions.find((x) => x.id === id);
-                  void patch({
-                    upstream: {
-                      ...cfg.upstream,
-                      sessionId: id,
-                      host: s?.host ?? cfg.upstream.host,
-                      port: s?.port ?? cfg.upstream.port,
-                    },
-                  });
-                }}
-              >
-                <option value="">{t("sockscap.manualUpstream")}</option>
-                {(cfg.upstream.kind === "ssh" ? sshSessions : proxySessions).map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.host}:{s.port})
-                  </option>
-                ))}
-              </select>
-            </Field>
-            {!cfg.upstream.sessionId && (
-              <>
-                <Field label={t("sockscap.host")}>
-                  <input
-                    className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
-                    value={cfg.upstream.host || ""}
-                    onChange={(e) =>
-                      setCfg({ ...cfg, upstream: { ...cfg.upstream, host: e.target.value } })
-                    }
-                    onBlur={() => void persist(cfg)}
-                  />
-                </Field>
-                <Field label={t("sockscap.port")}>
-                  <input
-                    type="number"
-                    className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
-                    value={cfg.upstream.port || 0}
-                    onChange={(e) =>
-                      setCfg({
-                        ...cfg,
-                        upstream: { ...cfg.upstream, port: Number(e.target.value) || 0 },
-                      })
-                    }
-                    onBlur={() => void persist(cfg)}
-                  />
-                </Field>
-                <Field label={t("sockscap.username")}>
-                  <input
-                    className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
-                    value={cfg.upstream.username || ""}
-                    onChange={(e) =>
-                      setCfg({
-                        ...cfg,
-                        upstream: { ...cfg.upstream, username: e.target.value },
-                      })
-                    }
-                    onBlur={() => void persist(cfg)}
-                  />
-                </Field>
-                <Field label={t("sockscap.password")}>
-                  <div className="flex gap-1">
-                    <input
-                      type="password"
-                      className="flex-1 text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
-                      placeholder={
-                        cfg.upstream.passwordRef
-                          ? t("sockscap.passwordStored")
-                          : t("sockscap.passwordPh")
-                      }
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      autoComplete="off"
-                    />
-                    <button
-                      type="button"
-                      className="px-2 py-1 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50"
-                      disabled={!password || storingPass}
-                      onClick={() => void storePassword()}
-                    >
-                      {storingPass ? "…" : t("sockscap.passwordStore")}
-                    </button>
-                    {cfg.upstream.passwordRef ? (
-                      <button
-                        type="button"
-                        className="px-2 py-1 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
-                        onClick={() => void clearPassword()}
-                      >
-                        {t("sockscap.passwordClear")}
-                      </button>
-                    ) : null}
-                  </div>
-                  <div className="text-[10px] text-[var(--taomni-text-muted)] mt-1">
-                    {t("sockscap.passwordVaultHint")}
-                  </div>
-                </Field>
-              </>
-            )}
-          </div>
-          <div className="mt-2">
-            <button
-              type="button"
-              className="text-[11px] px-2 py-1 rounded border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
-              onClick={() => void onTestUpstream()}
-              disabled={busy}
-            >
-              {t("sockscap.testUpstream")}
-            </button>
-          </div>
-        </Section>
-
-        {/* Rules */}
-        <Section title={t("sockscap.section.rules")}>
-          <div className="flex flex-wrap gap-2 mb-3">
-            {(["gfwList", "proxyAll", "off"] as RuleMode[]).map((m) => (
+          {/* Test Target Dry-run */}
+          <Section title={t("sockscap.section.test")}>
+            <div className="flex gap-2 items-center">
+              <input
+                data-testid="sockscap-test-host"
+                className="flex-1 text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
+                value={testHost}
+                onChange={(e) => setTestHost(e.target.value)}
+              />
               <button
-                key={m}
                 type="button"
-                data-testid={`sockscap-rule-mode-${m}`}
-                className={`px-3 py-1.5 rounded text-[12px] border ${
-                  cfg.ruleMode === m
-                    ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)]"
-                    : "border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
-                }`}
-                onClick={() => void patch({ ruleMode: m })}
+                data-testid="sockscap-test-target"
+                className="px-3 py-1.5 rounded text-[12px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
+                onClick={() => void onTestTarget()}
+                disabled={busy}
               >
-                {t(`sockscap.ruleMode.${m}`)}
+                {t("sockscap.testTarget")}
               </button>
-            ))}
-          </div>
+            </div>
+            {testResult && (
+              <div className="mt-2 p-2 rounded bg-[var(--taomni-bg)] border border-[var(--taomni-divider)] text-[11px]">
+                <span className="font-semibold">{testResult.host}: </span>
+                <span className="uppercase font-medium text-[var(--taomni-accent)]">
+                  {testResult.decision}
+                </span>{" "}
+                · {testResult.reason}
+              </div>
+            )}
+          </Section>
 
-          {cfg.ruleMode === "gfwList" && (
-            <div className="space-y-2 mb-3 p-3 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]">
-              <Field label={t("sockscap.gfwUrl")}>
-                <input
-                  className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel)]"
-                  value={cfg.gfwlist.url}
-                  onChange={(e) =>
-                    setCfg({
-                      ...cfg,
-                      gfwlist: { ...cfg.gfwlist, url: e.target.value },
+          {/* Global GFWList & Shared Controls */}
+          <Section title={t("sockscap.gfwListTitle")}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-[11px] text-[var(--taomni-text-muted)]">
+                {gfw?.loaded
+                  ? t("sockscap.gfwStatus", {
+                      count: String(gfw.ruleCount),
+                      skipped: String(gfw.skipped),
+                      when: gfw.lastRefresh
+                        ? new Date(gfw.lastRefresh).toLocaleString()
+                        : t("common.justNow"),
                     })
-                  }
-                  onBlur={() => void persist(cfg)}
-                />
-              </Field>
-              <div className="flex flex-wrap gap-2 items-center text-[11px]">
+                  : t("sockscap.gfwNotLoaded")}
+              </div>
+              <div className="flex gap-2">
                 <button
                   type="button"
-                  data-testid="sockscap-refresh-gfw"
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
                   onClick={() => void onRefreshGfw()}
                   disabled={busy}
                 >
-                  <RefreshCw className="w-3 h-3" />
+                  <RefreshCw className={`w-3 h-3 ${busy ? "animate-spin" : ""}`} />
                   {t("sockscap.refreshGfw")}
                 </button>
                 <button
                   type="button"
-                  className="px-2 py-1 rounded border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
                   onClick={() => void onImportGfw()}
                   disabled={busy}
                 >
                   {t("sockscap.importGfw")}
                 </button>
-                <span className="text-[var(--taomni-text-muted)]">
-                  {gfw?.loaded
-                    ? t("sockscap.gfwStatus", {
-                        count: String(gfw.ruleCount),
-                        skipped: String(gfw.skipped),
-                        when: gfw.lastRefresh || "—",
-                      })
-                    : t("sockscap.gfwNotLoaded")}
-                </span>
-              </div>
-              <Field label={t("sockscap.defaultAction")}>
-                <select
-                  className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel)]"
-                  value={cfg.defaultAction}
-                  onChange={(e) => void patch({ defaultAction: e.target.value as Decision })}
-                >
-                  <option value="direct">{t("sockscap.decision.direct")}</option>
-                  <option value="proxy">{t("sockscap.decision.proxy")}</option>
-                  <option value="block">{t("sockscap.decision.block")}</option>
-                </select>
-              </Field>
-            </div>
-          )}
-
-          <div className="text-[12px] font-medium mb-1">{t("sockscap.userRules")}</div>
-          <div className="flex flex-wrap gap-2 mb-2">
-            <input
-              className="flex-1 min-w-[140px] text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
-              placeholder={t("sockscap.rulePatternPh")}
-              value={newRule.pattern}
-              onChange={(e) => setNewRule({ ...newRule, pattern: e.target.value })}
-            />
-            <select
-              className="text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
-              value={newRule.action}
-              onChange={(e) =>
-                setNewRule({
-                  ...newRule,
-                  action: e.target.value as UserRule["action"],
-                })
-              }
-            >
-              <option value="direct">{t("sockscap.decision.direct")}</option>
-              <option value="proxy">{t("sockscap.decision.proxy")}</option>
-              <option value="block">{t("sockscap.decision.block")}</option>
-            </select>
-            <button
-              type="button"
-              className="px-2 py-1 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
-              onClick={() => void addUserRule()}
-            >
-              {t("sockscap.addRule")}
-            </button>
-          </div>
-          {cfg.userRules.length > 0 && (
-            <ul className="space-y-1 mb-3">
-              {cfg.userRules.map((r, i) => (
-                <li
-                  key={`${r.pattern}-${i}`}
-                  className="flex items-center gap-2 text-[11px] px-2 py-1 rounded border border-[var(--taomni-divider)]"
-                >
-                  <span className="font-mono flex-1 truncate">{r.pattern}</span>
-                  <span className="text-[var(--taomni-text-muted)]">{r.action}</span>
-                  <button
-                    type="button"
-                    className="p-1 hover:text-red-500"
-                    onClick={() =>
-                      void patch({
-                        userRules: cfg.userRules.filter((_, j) => j !== i),
-                      })
-                    }
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="flex flex-wrap gap-2 items-end">
-            <Field label={t("sockscap.testTarget")}>
-              <input
-                data-testid="sockscap-test-host"
-                className="w-full min-w-[180px] text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
-                value={testHost}
-                onChange={(e) => setTestHost(e.target.value)}
-              />
-            </Field>
-            <button
-              type="button"
-              data-testid="sockscap-test-target"
-              className="px-3 py-1.5 rounded text-[12px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
-              onClick={() => void onTestTarget()}
-              disabled={busy}
-            >
-              {t("sockscap.runTest")}
-            </button>
-            {testResult && (
-              <div className="text-[11px] text-[var(--taomni-text-muted)]">
-                → <span className="font-medium text-[var(--taomni-text)]">{testResult.decision}</span>
-                {" · "}
-                {testResult.reason}
-                {testResult.matchedRule ? ` (${testResult.matchedRule})` : ""}
-              </div>
-            )}
-          </div>
-        </Section>
-
-        {/* Elevated helper / WinDivert spike */}
-        <Section title={t("sockscap.helper.title")}>
-          <div className="flex flex-wrap gap-2 items-center text-[11px] mb-2">
-            <span className="text-[var(--taomni-text-muted)]">
-              {helper?.running
-                ? `${helper.endpoint ?? "…"} · ${
-                    helper.elevated ? t("sockscap.helper.elevated") : t("sockscap.helper.notElevated")
-                  }${helper.pid ? ` · pid ${helper.pid}` : ""}`
-                : t("sockscap.helper.notRunning")}
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              data-testid="sockscap-helper-start"
-              className="px-2 py-1 rounded border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
-              disabled={busy}
-              onClick={() => {
-                void (async () => {
-                  setBusy(true);
-                  try {
-                    const st = await sockscapHelperStart();
-                    setHelper(st);
-                    report(
-                      st.elevated
-                        ? t("sockscap.helper.elevated")
-                        : st.message || t("sockscap.helper.status"),
-                    );
-                  } catch (e) {
-                    report(String(e), false);
-                  } finally {
-                    setBusy(false);
-                  }
-                })();
-              }}
-            >
-              {t("sockscap.helper.start")}
-            </button>
-            <button
-              type="button"
-              className="px-2 py-1 rounded border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
-              disabled={busy || !helper?.running}
-              onClick={() => {
-                void (async () => {
-                  setBusy(true);
-                  try {
-                    await sockscapHelperStop();
-                    setHelper(await sockscapHelperStatus());
-                    report(t("sockscap.helper.notRunning"));
-                  } catch (e) {
-                    report(String(e), false);
-                  } finally {
-                    setBusy(false);
-                  }
-                })();
-              }}
-            >
-              {t("sockscap.stop")}
-            </button>
-            <button
-              type="button"
-              data-testid="sockscap-windivert-probe"
-              className="px-2 py-1 rounded border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
-              disabled={busy || !helper?.running}
-              onClick={() => {
-                void (async () => {
-                  setBusy(true);
-                  try {
-                    const res = await sockscapHelperProbeWindivert("false");
-                    report(`${t("sockscap.helper.windivertOk")}: ${JSON.stringify(res)}`);
-                  } catch (e) {
-                    report(`${t("sockscap.helper.windivertFail")}: ${String(e)}`, false);
-                  } finally {
-                    setBusy(false);
-                  }
-                })();
-              }}
-            >
-              {t("sockscap.helper.windivertProbe")}
-            </button>
-          </div>
-          <div className="mt-2 text-[10px] text-[var(--taomni-text-muted)]">
-            Place WinDivert.dll / .sys under src-tauri/resources/sockscap/windows/ (see README there).
-          </div>
-        </Section>
-
-        {/* Stats, Rates & Domain Monitor Panel (Option B) */}
-        <Section title={t("sockscap.section.status")}>
-          {/* Top 4 Metric Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] mb-3">
-            <div className="rounded border border-[var(--taomni-divider)] px-2.5 py-2 bg-[var(--taomni-bg)] flex flex-col justify-between">
-              <div className="text-[var(--taomni-text-muted)] flex items-center justify-between text-[10px]">
-                <span className="flex items-center gap-1 font-medium"><ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" /> Upload Speed</span>
-                <span className="text-[10px] text-[var(--taomni-text-muted)]">Total: {formatBytes(stats?.bytesUp ?? 0)}</span>
-              </div>
-              <div className="text-[15px] font-bold text-emerald-600 dark:text-emerald-400 tabular-nums mt-1">
-                {formatSpeed(upSpeed)}
               </div>
             </div>
+          </Section>
 
-            <div className="rounded border border-[var(--taomni-divider)] px-2.5 py-2 bg-[var(--taomni-bg)] flex flex-col justify-between">
-              <div className="text-[var(--taomni-text-muted)] flex items-center justify-between text-[10px]">
-                <span className="flex items-center gap-1 font-medium"><ArrowDownLeft className="w-3.5 h-3.5 text-blue-500" /> Download Speed</span>
-                <span className="text-[10px] text-[var(--taomni-text-muted)]">Total: {formatBytes(stats?.bytesDown ?? 0)}</span>
-              </div>
-              <div className="text-[15px] font-bold text-blue-600 dark:text-blue-400 tabular-nums mt-1">
-                {formatSpeed(downSpeed)}
-              </div>
-            </div>
-
-            <div className="rounded border border-[var(--taomni-divider)] px-2.5 py-2 bg-[var(--taomni-bg)] flex flex-col justify-between">
-              <div className="text-[var(--taomni-text-muted)] flex items-center justify-between text-[10px]">
-                <span className="flex items-center gap-1 font-medium"><Activity className="w-3.5 h-3.5 text-indigo-500" /> Active Flows</span>
-                <span className="text-[10px] text-[var(--taomni-text-muted)]">Proxy: {stats?.flowsProxy ?? 0}</span>
-              </div>
-              <div className="text-[15px] font-bold tabular-nums mt-1">
-                {stats?.flowsTotal ?? 0}
-              </div>
-            </div>
-
-            <div className="rounded border border-[var(--taomni-divider)] px-2.5 py-2 bg-[var(--taomni-bg)] flex flex-col justify-between">
-              <div className="text-[var(--taomni-text-muted)] flex items-center justify-between text-[10px]">
-                <span className="flex items-center gap-1 font-medium"><Shield className="w-3.5 h-3.5 text-amber-500" /> Direct & Block</span>
-                <span className="text-[10px] text-[var(--taomni-text-muted)]">Block: {stats?.flowsBlock ?? 0}</span>
-              </div>
-              <div className="text-[15px] font-bold tabular-nums mt-1 flex items-center gap-2">
-                <span className="text-slate-700 dark:text-slate-300">{stats?.flowsDirect ?? 0}</span>
-                <span className="text-[10px] font-normal text-slate-400">Direct</span>
-              </div>
-            </div>
-          </div>
-
-          {status?.message && (
-            <div className="mb-3 text-[11px] text-[var(--taomni-text-muted)] flex gap-1 items-start">
-              <Network className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              {status.message}
-            </div>
-          )}
-
-          {/* Captured Domains Collapsible Panel */}
-          <div className="rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] overflow-hidden">
+          {/* Captured Domains & Traffic Table */}
+          <div className="rounded-lg border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] overflow-hidden">
             <button
               type="button"
               className="w-full px-3 py-2 text-left text-[11px] font-semibold flex items-center justify-between hover:bg-[var(--taomni-hover)] transition-colors"
@@ -1128,7 +1509,7 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
                       <Search className="w-3.5 h-3.5 absolute left-2 top-2 text-[var(--taomni-text-muted)]" />
                       <input
                         className="w-full text-[11px] pl-7 pr-2 py-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel)]"
-                        placeholder="Search domain, IP or process..."
+                        placeholder="Search domain, IP, profile or process..."
                         value={domainFilter}
                         onChange={(e) => setDomainFilter(e.target.value)}
                       />
@@ -1136,7 +1517,6 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {/* Decision Filter Pills */}
                     <div className="flex rounded border border-[var(--taomni-divider)] p-0.5 text-[10px]">
                       {(["all", "proxy", "direct", "block"] as const).map((mode) => (
                         <button
@@ -1154,7 +1534,6 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
                       ))}
                     </div>
 
-                    {/* Top N Limit Dropdown */}
                     <select
                       className="text-[10px] px-2 py-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel)]"
                       value={topNLimit}
@@ -1165,7 +1544,6 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
                       <option value={200}>All (max 200)</option>
                     </select>
 
-                    {/* Clear Button */}
                     <button
                       type="button"
                       className="px-2 py-1 rounded text-[10px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] flex items-center gap-1 text-[var(--taomni-text-muted)]"
@@ -1187,6 +1565,7 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
                       <tr>
                         <th className="py-1.5 px-2">Domain / IP</th>
                         <th className="py-1.5 px-2">Decision</th>
+                        <th className="py-1.5 px-2">Profile</th>
                         <th className="py-1.5 px-2">Matched Rule</th>
                         <th className="py-1.5 px-2">Process (PID)</th>
                         <th className="py-1.5 px-2 text-right">Hits</th>
@@ -1198,7 +1577,7 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
                     <tbody className="divide-y divide-[var(--taomni-divider)]">
                       {filteredDomainRecords.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="py-4 text-center text-[10px] text-[var(--taomni-text-muted)]">
+                          <td colSpan={9} className="py-4 text-center text-[10px] text-[var(--taomni-text-muted)]">
                             No domain records captured yet. Start SocksCap and browse network to inspect live domain traffic.
                           </td>
                         </tr>
@@ -1225,6 +1604,9 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
                                 </span>
                               )}
                             </td>
+                            <td className="py-1.5 px-2 font-medium text-[var(--taomni-accent)] truncate max-w-[100px]" title={rec.profileName || "-"}>
+                              {rec.profileName || "-"}
+                            </td>
                             <td className="py-1.5 px-2 text-[var(--taomni-text-muted)] truncate max-w-[140px]" title={rec.matchedRule || "-"}>
                               {rec.matchedRule || "-"}
                             </td>
@@ -1249,12 +1631,12 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
                                 onClick={() => {
                                   if (!cfg) return;
                                   const pattern = rec.domainOrIp;
-                                  if (cfg.userRules.some((r) => r.pattern === pattern)) return;
+                                  if (selectedProf.userRules.some((r) => r.pattern === pattern)) return;
                                   const updatedRules = [
                                     { pattern, action: rec.decision === "proxy" ? ("proxy" as const) : ("direct" as const) },
-                                    ...cfg.userRules,
+                                    ...selectedProf.userRules,
                                   ];
-                                  void patch({ userRules: updatedRules });
+                                  void patchSelectedProfile({ userRules: updatedRules });
                                 }}
                               >
                                 + User Rule
@@ -1269,12 +1651,7 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
               </div>
             )}
           </div>
-          {status?.message && (
-            <div className="mt-2 text-[11px] text-[var(--taomni-text-muted)] flex gap-1 items-start">
-              <Network className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              {status.message}
-            </div>
-          )}
+
           {msg && (
             <div
               className={`mt-2 text-[11px] flex gap-1 items-start ${
@@ -1289,7 +1666,7 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
               {msg.text}
             </div>
           )}
-        </Section>
+        </div>
       </div>
 
       {showProcPicker && (
@@ -1325,6 +1702,18 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {showRootPrompt && (
+        <SocksCapRootPrompt
+          onSubmit={(password) => void onStart(password)}
+          onCancel={() => {
+            setShowRootPrompt(false);
+            setRootPromptError(null);
+          }}
+          error={rootPromptError}
+          busy={rootPromptBusy}
+        />
       )}
     </div>
   );
@@ -1371,6 +1760,97 @@ function ManualAppAdd({ onAdd }: { onAdd: (path: string) => void }) {
       >
         {t("common.add")}
       </button>
+    </div>
+  );
+}
+
+function SocksCapRootPrompt({
+  onSubmit,
+  onCancel,
+  error,
+  busy,
+}: {
+  onSubmit: (password: string) => void;
+  onCancel: () => void;
+  error: string | null;
+  busy: boolean;
+}) {
+  const t = useT();
+  const [password, setPassword] = useState("");
+
+  return (
+    <div
+      className="absolute inset-0 bg-black/50 flex items-center justify-center z-30 p-4"
+      data-testid="sockscap-root-prompt-dialog"
+    >
+      <div className="w-[min(420px,95vw)] rounded-lg bg-[var(--taomni-panel)] border border-[var(--taomni-divider)] shadow-xl p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="text-[14px] font-semibold flex items-center gap-2">
+            <Shield className="w-4 h-4 text-[var(--taomni-accent)]" />
+            {t("sockscap.rootPromptTitle")}
+          </div>
+          <button
+            type="button"
+            className="p-1 rounded hover:bg-[var(--taomni-hover)]"
+            onClick={onCancel}
+            disabled={busy}
+            data-testid="sockscap-root-prompt-close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="text-[12px] text-[var(--taomni-text-muted)] space-y-1">
+          <div>{t("sockscap.rootPromptReason")}</div>
+          <div className="text-[11px] opacity-80">{t("sockscap.rootPromptHint")}</div>
+        </div>
+
+        {error && (
+          <div className="p-2 rounded bg-red-500/10 border border-red-500/20 text-red-500 text-[11px]">
+            {error}
+          </div>
+        )}
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (password.trim()) onSubmit(password.trim());
+          }}
+          className="space-y-3"
+        >
+          <input
+            type="password"
+            data-testid="sockscap-root-password-input"
+            className="w-full text-[12px] px-3 py-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] focus:outline-none focus:border-[var(--taomni-accent)]"
+            placeholder={t("sockscap.rootPasswordPlaceholder")}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoFocus
+            disabled={busy}
+          />
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              data-testid="sockscap-root-prompt-cancel"
+              className="px-3 py-1.5 rounded text-[12px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
+              onClick={onCancel}
+              disabled={busy}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              type="submit"
+              data-testid="sockscap-root-prompt-submit"
+              className="px-3 py-1.5 rounded text-[12px] bg-[var(--taomni-accent)] text-white hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5"
+              disabled={busy || !password.trim()}
+            >
+              {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {t("sockscap.rootPromptSubmit")}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

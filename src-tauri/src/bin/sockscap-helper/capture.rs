@@ -11,7 +11,7 @@
 use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
@@ -83,6 +83,8 @@ pub struct CaptureEngine {
     packets_seen: Arc<AtomicU64>,
     packets_redirected: Arc<AtomicU64>,
     active: bool,
+    /// Hot-swappable relay port shared with the running network thread.
+    relay_port_live: Arc<AtomicU16>,
 }
 
 impl CaptureEngine {
@@ -100,7 +102,21 @@ impl CaptureEngine {
             packets_seen: Arc::new(AtomicU64::new(0)),
             packets_redirected: Arc::new(AtomicU64::new(0)),
             active: false,
+            relay_port_live: Arc::new(AtomicU16::new(0)),
         }
+    }
+
+    /// Hot-swap the relay port while capture is running.
+    /// Returns an error if capture is not currently active.
+    pub fn update_relay_port(&mut self, port: u16) -> Result<serde_json::Value, String> {
+        if !self.active {
+            return Err("capture not active".into());
+        }
+        self.relay_port_live.store(port, Ordering::SeqCst);
+        if let Some(ref mut plan) = self.plan {
+            plan.relay_port = port;
+        }
+        Ok(serde_json::json!({ "relayPort": port }))
     }
 
     pub fn status_json(&self) -> serde_json::Value {
@@ -131,6 +147,7 @@ impl CaptureEngine {
         self.stop();
         let api = self.ensure_api()?;
         self.stop = Arc::new(AtomicBool::new(false));
+        self.relay_port_live = Arc::new(AtomicU16::new(plan.relay_port));
         self.plan = Some(plan.clone());
         self.packets_seen.store(0, Ordering::Relaxed);
         self.packets_redirected.store(0, Ordering::Relaxed);
@@ -210,6 +227,7 @@ impl CaptureEngine {
         let net_handle = net_h as usize;
         let seen = Arc::clone(&self.packets_seen);
         let redirected = Arc::clone(&self.packets_redirected);
+        let relay_port_live = Arc::clone(&self.relay_port_live);
         let tree = Arc::new(SharedTree::new());
         self.threads.push(std::thread::spawn(move || {
             network_loop(
@@ -218,6 +236,7 @@ impl CaptureEngine {
                 flows,
                 redirects,
                 plan,
+                relay_port_live,
                 seen,
                 redirected,
                 stop,
@@ -400,6 +419,7 @@ fn network_loop(
     flows: Arc<Mutex<HashMap<String, FlowInfo>>>,
     redirects: Arc<Mutex<HashMap<String, RedirectMapping>>>,
     plan: CapturePlan,
+    relay_port_live: Arc<AtomicU16>,
     seen: Arc<AtomicU64>,
     redirected: Arc<AtomicU64>,
     stop: Arc<AtomicBool>,
@@ -482,7 +502,8 @@ fn network_loop(
         // Streamdump PROXY→PORT: outbound from local relay/proxy.
         // Packet is C:relay → R:client_sport; reflect to R:orig_port → C:client_sport.
         // ------------------------------------------------------------------
-        if outbound && sport == plan.relay_port {
+        let relay_port = relay_port_live.load(Ordering::Relaxed);
+        if outbound && sport == relay_port {
             // Prefer reverse key R:client_sport; also try by client port alone.
             let rev_key = flow_key(dst, dport);
             let mapping = redirects.lock().ok().and_then(|m| {
@@ -513,7 +534,7 @@ fn network_loop(
         }
 
         // Never re-process traffic already destined to the relay port.
-        if dport == plan.relay_port {
+        if dport == relay_port {
             let _ = api.send(handle, pkt, &addr);
             continue;
         }
@@ -529,7 +550,7 @@ fn network_loop(
         let key = flow_key(src, sport);
 
         if let Some(_existing) = redirects.lock().ok().and_then(|m| m.get(&key).cloned()) {
-            if reflect_towards_proxy(pkt, plan.relay_port) {
+            if reflect_towards_proxy(pkt, relay_port) {
                 addr_for_reflect_inbound(&mut addr);
                 api.calc_checksums(pkt, &mut addr);
                 if api.send(handle, pkt, &addr).is_ok() {
@@ -622,7 +643,7 @@ fn network_loop(
             m.insert(flow_key(dst, sport), mapping);
         }
 
-        if reflect_towards_proxy(pkt, plan.relay_port) {
+        if reflect_towards_proxy(pkt, relay_port) {
             addr_for_reflect_inbound(&mut addr);
             api.calc_checksums(pkt, &mut addr);
             if api.send(handle, pkt, &addr).is_ok() {
@@ -954,5 +975,4 @@ fn parse_ip_tcp(pkt: &[u8]) -> Option<(IpAddr, u16, IpAddr, u16, bool)> {
         None
     }
 }
-
 

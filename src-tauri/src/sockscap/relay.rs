@@ -8,18 +8,27 @@ use std::time::Duration;
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::RwLock;
-use tokio::task::JoinHandle;
+use tokio::sync::{OwnedSemaphorePermit, RwLock, Semaphore};
+use tokio::task::{JoinHandle, JoinSet};
 
 use crate::sockscap::config::{Decision, SocksCapConfig, UpstreamKind};
 use crate::sockscap::egress;
 use crate::sockscap::egress::ssh_pool::SshPool;
 use crate::sockscap::helper::{self, HelperRegistry};
 use crate::sockscap::policy::{PolicyEngine, PolicyInput};
+use crate::sockscap::rules::CompiledRules;
 use crate::sockscap::rules::dns_map::DnsMap;
 use crate::sockscap::rules::sni::extract_hostname_from_prefix;
-use crate::sockscap::rules::CompiledRules;
 use crate::sockscap::stats::StatsCounters;
+
+/// Each TCP relay consumes an accepted socket and normally one egress socket.
+/// Keep enough headroom below the common Linux soft RLIMIT_NOFILE of 1024 for
+/// the rest of the desktop application.
+pub(crate) const MAX_ACTIVE_RELAY_FLOWS: usize = 256;
+pub(crate) const ACCEPT_BACKOFF_INITIAL: Duration = Duration::from_millis(50);
+pub(crate) const ACCEPT_BACKOFF_MAX: Duration = Duration::from_secs(1);
+const RELAY_DIAL_TIMEOUT: Duration = Duration::from_secs(15);
+const RELAY_PREFIX_WRITE_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub struct RelayHandle {
     pub port: u16,
@@ -28,6 +37,10 @@ pub struct RelayHandle {
 }
 
 impl RelayHandle {
+    pub(crate) fn new(port: u16, stop: Arc<AtomicBool>, task: JoinHandle<()>) -> Self {
+        Self { port, stop, task }
+    }
+
     /// Stop accept loops promptly.
     ///
     /// Must wake **both** IPv4 and IPv6 listeners (we bind 0.0.0.0 and optionally ::).
@@ -55,6 +68,44 @@ impl RelayHandle {
     }
 }
 
+pub(crate) fn new_relay_flow_limiter() -> Arc<Semaphore> {
+    Arc::new(Semaphore::new(MAX_ACTIVE_RELAY_FLOWS))
+}
+
+/// Wait for relay capacity without making Stop wait indefinitely behind a full
+/// semaphore. The permit is owned by the spawned flow task and releases on
+/// every success, error, cancellation, or panic path.
+pub(crate) async fn acquire_relay_flow_permit(
+    limiter: &Arc<Semaphore>,
+    stop: &AtomicBool,
+) -> Option<OwnedSemaphorePermit> {
+    loop {
+        if stop.load(Ordering::SeqCst) {
+            return None;
+        }
+        match tokio::time::timeout(
+            Duration::from_millis(100),
+            Arc::clone(limiter).acquire_owned(),
+        )
+        .await
+        {
+            Ok(Ok(permit)) => return Some(permit),
+            Ok(Err(_)) => return None,
+            Err(_) => {}
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ResolvedUpstream {
+    pub kind: UpstreamKind,
+    pub host: String,
+    pub port: u16,
+    pub user: String,
+    pub pass: String,
+    pub ssh_pool: Option<Arc<SshPool>>,
+}
+
 pub struct RelayContext {
     pub config: SocksCapConfig,
     pub rules: Option<CompiledRules>,
@@ -67,10 +118,22 @@ pub struct RelayContext {
     pub self_pid: u32,
     /// Shared SSH session when upstream kind is SSH.
     pub ssh_pool: Option<Arc<SshPool>>,
+    pub profile_upstreams: std::collections::HashMap<String, ResolvedUpstream>,
     /// IP → hostname learned from SNI / HTTP Host.
     pub dns_map: Arc<Mutex<DnsMap>>,
     /// Domain & flow traffic tracker
     pub domains: Arc<Mutex<crate::sockscap::stats::DomainTracker>>,
+}
+
+/// Metadata recovered by an OS capture backend before a redirected connection
+/// enters the shared policy relay. Windows obtains it from the WinDivert helper;
+/// Linux reads `SO_ORIGINAL_DST` from the nftables-redirected socket.
+#[derive(Debug, Clone)]
+pub(crate) struct CapturedFlow {
+    pub destination: SocketAddr,
+    pub process_path: Option<String>,
+    pub pid: Option<u32>,
+    pub origin: SocketAddr,
 }
 
 /// Bind **0.0.0.0:0** (all interfaces) — required for WinDivert streamdump-style
@@ -81,10 +144,7 @@ pub async fn start_relay(ctx: Arc<RwLock<RelayContext>>) -> Result<RelayHandle, 
     let listener = TcpListener::bind(("0.0.0.0", 0))
         .await
         .map_err(|e| format!("relay bind: {e}"))?;
-    let port = listener
-        .local_addr()
-        .map_err(|e| e.to_string())?
-        .port();
+    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
 
     // Best-effort dual-stack IPv6 any.
     let listener_v6 = TcpListener::bind((std::net::Ipv6Addr::UNSPECIFIED, port))
@@ -93,42 +153,58 @@ pub async fn start_relay(ctx: Arc<RwLock<RelayContext>>) -> Result<RelayHandle, 
 
     let stop = Arc::new(AtomicBool::new(false));
     let stop2 = Arc::clone(&stop);
+    let limiter = new_relay_flow_limiter();
     let task = tokio::spawn(async move {
         let stop_v4 = Arc::clone(&stop2);
         let ctx_v4 = Arc::clone(&ctx);
-        let v4 = tokio::spawn(async move {
-            accept_loop(listener, ctx_v4, stop_v4).await;
-        });
+        let limiter_v4 = Arc::clone(&limiter);
+        let v4 = accept_loop(listener, ctx_v4, stop_v4, limiter_v4);
 
         if let Some(l6) = listener_v6 {
             let stop_v6 = Arc::clone(&stop2);
             let ctx_v6 = Arc::clone(&ctx);
-            let v6 = tokio::spawn(async move {
-                accept_loop(l6, ctx_v6, stop_v6).await;
-            });
+            let limiter_v6 = Arc::clone(&limiter);
+            let v6 = accept_loop(l6, ctx_v6, stop_v6, limiter_v6);
             let _ = tokio::join!(v4, v6);
         } else {
-            let _ = v4.await;
+            v4.await;
         }
     });
-    Ok(RelayHandle { port, stop, task })
+    Ok(RelayHandle::new(port, stop, task))
 }
 
 async fn accept_loop(
     listener: TcpListener,
     ctx: Arc<RwLock<RelayContext>>,
     stop: Arc<AtomicBool>,
+    limiter: Arc<Semaphore>,
 ) {
+    let mut clients = JoinSet::new();
+    let mut accept_backoff = ACCEPT_BACKOFF_INITIAL;
     loop {
+        while clients.try_join_next().is_some() {}
         if stop.load(Ordering::SeqCst) {
             break;
         }
+        let Some(permit) = acquire_relay_flow_permit(&limiter, &stop).await else {
+            break;
+        };
         let (sock, peer) = match listener.accept().await {
-            Ok(v) => v,
-            Err(_) => {
+            Ok(v) => {
+                accept_backoff = ACCEPT_BACKOFF_INITIAL;
+                v
+            }
+            Err(error) => {
                 if stop.load(Ordering::SeqCst) {
                     break;
                 }
+                tracing::warn!(
+                    "sockscap relay accept failed: {error}; retrying in {}ms",
+                    accept_backoff.as_millis()
+                );
+                tokio::time::sleep(accept_backoff).await;
+                accept_backoff =
+                    std::cmp::min(accept_backoff.saturating_mul(2), ACCEPT_BACKOFF_MAX);
                 continue;
             }
         };
@@ -136,49 +212,69 @@ async fn accept_loop(
             break;
         }
         let ctx = Arc::clone(&ctx);
-        tokio::spawn(async move {
+        clients.spawn(async move {
+            let _permit = permit;
             if let Err(e) = handle_client(sock, peer, ctx).await {
                 // Mapping miss / upstream fail are the usual "proxy does nothing" causes.
                 tracing::warn!("sockscap relay client {peer}: {e}");
             }
         });
     }
+    clients.shutdown().await;
 }
 
 async fn handle_client(
-    mut client: TcpStream,
+    client: TcpStream,
     peer: SocketAddr,
     ctx: Arc<RwLock<RelayContext>>,
 ) -> Result<(), String> {
     let peer_port = peer.port();
     let peer_ip = peer.ip().to_string();
 
+    let mapping = {
+        let g = ctx.read().await;
+        let guard = g.helper.inner.lock().map_err(|e| e.to_string())?;
+        let sess = guard
+            .as_ref()
+            .ok_or_else(|| "helper session missing".to_string())?;
+        // Streamdump peer is orig_remote:client_sport — prefer exact ip:port key.
+        helper::lookup_orig_key(sess, &peer_ip, peer_port)
+            .or_else(|_| helper::lookup_orig(sess, peer_port))?
+    };
+    let dst_ip: IpAddr = mapping
+        .dst_ip
+        .parse()
+        .map_err(|e| format!("bad dst ip: {e}"))?;
+    let flow = CapturedFlow {
+        destination: SocketAddr::new(dst_ip, mapping.dst_port),
+        process_path: (!mapping.path.is_empty()).then_some(mapping.path),
+        pid: (mapping.pid != 0).then_some(mapping.pid),
+        origin: peer,
+    };
+    handle_captured_client(client, flow, ctx).await
+}
+
+/// Apply shared hostname/policy/egress processing to a flow whose original
+/// destination was recovered by a platform capture backend.
+pub(crate) async fn handle_captured_client(
+    mut client: TcpStream,
+    flow: CapturedFlow,
+    ctx: Arc<RwLock<RelayContext>>,
+) -> Result<(), String> {
+    let destination = flow.destination;
+    let process_path = flow.process_path;
+    let pid = flow.pid;
+    let origin = flow.origin;
+
     // Multi-read peek for SNI / HTTP Host (ClientHello may span packets).
     let (prefix, hostname) = peek_for_hostname(&mut client).await;
 
     let snap = {
         let g = ctx.read().await;
-        let mapping = {
-            let guard = g.helper.inner.lock().map_err(|e| e.to_string())?;
-            let sess = guard
-                .as_ref()
-                .ok_or_else(|| "helper session missing".to_string())?;
-            // Streamdump peer is orig_remote:client_sport — prefer exact ip:port key.
-            helper::lookup_orig_key(sess, &peer_ip, peer_port)
-                .or_else(|_| helper::lookup_orig(sess, peer_port))?
-        };
-
-        let dst_ip: IpAddr = mapping
-            .dst_ip
-            .parse()
-            .map_err(|e| format!("bad dst ip: {e}"))?;
-
         // Learn IP→host from this flow for later pure-IP connections.
         if let Some(host) = hostname.as_ref() {
-            if let Ok(ip) = mapping.dst_ip.parse::<IpAddr>() {
-                if let Ok(mut map) = g.dns_map.lock() {
-                    map.insert(ip, host.clone(), None);
-                }
+            if let Ok(mut map) = g.dns_map.lock() {
+                map.insert(destination.ip(), host.clone(), None);
             }
         }
 
@@ -187,56 +283,62 @@ async fn handle_client(
             g.dns_map
                 .lock()
                 .ok()
-                .and_then(|mut m| m.lookup(dst_ip))
+                .and_then(|mut m| m.lookup(destination.ip()))
         });
 
         let engine = PolicyEngine::from_config(&g.config, g.rules.as_ref());
         let input = PolicyInput {
             host: host_for_policy,
-            ip: Some(dst_ip),
-            port: mapping.dst_port,
-            process_path: if mapping.path.is_empty() {
-                None
-            } else {
-                Some(mapping.path.clone())
-            },
-            pid: Some(mapping.pid),
+            ip: Some(destination.ip()),
+            port: destination.port(),
+            process_path: process_path.clone(),
+            pid,
         };
         let trace = engine.decide(&input);
+
+        let (kind, up_host, up_port, up_user, up_pass, ssh_pool) = match trace.profile_id.as_deref()
+        {
+            Some(pid) if g.profile_upstreams.contains_key(pid) => {
+                let up = &g.profile_upstreams[pid];
+                (
+                    up.kind,
+                    up.host.clone(),
+                    up.port,
+                    up.user.clone(),
+                    up.pass.clone(),
+                    up.ssh_pool.clone(),
+                )
+            }
+            _ => (
+                g.config.upstream.kind,
+                g.upstream_host.clone(),
+                g.upstream_port,
+                g.upstream_user.clone(),
+                g.upstream_pass.clone(),
+                g.ssh_pool.clone(),
+            ),
+        };
+
         (
-            mapping,
             hostname,
             trace,
-            g.config.upstream.kind,
-            g.upstream_host.clone(),
-            g.upstream_port,
-            g.upstream_user.clone(),
-            g.upstream_pass.clone(),
+            kind,
+            up_host,
+            up_port,
+            up_user,
+            up_pass,
             Arc::clone(&g.stats),
-            g.ssh_pool.clone(),
+            ssh_pool,
             Arc::clone(&g.domains),
         )
     };
 
-    let (
-        mapping,
-        hostname,
-        trace,
-        kind,
-        up_host,
-        up_port,
-        up_user,
-        up_pass,
-        stats,
-        ssh_pool,
-        domains,
-    ) = snap;
+    let (hostname, trace, kind, up_host, up_port, up_user, up_pass, stats, ssh_pool, domains) =
+        snap;
 
     // Prefer hostname for dial when known (proxy-side DNS).
-    let dial_host = hostname
-        .clone()
-        .unwrap_or_else(|| mapping.dst_ip.clone());
-    let dest_port = mapping.dst_port;
+    let dial_host = hostname.unwrap_or_else(|| destination.ip().to_string());
+    let dest_port = destination.port();
 
     let res = match trace.decision {
         Decision::Block => {
@@ -246,8 +348,9 @@ async fn handle_client(
                     dial_host.clone(),
                     trace.decision,
                     trace.matched_rule.clone(),
-                    if mapping.path.is_empty() { None } else { Some(mapping.path.clone()) },
-                    Some(mapping.pid),
+                    trace.profile_name.clone(),
+                    process_path.clone(),
+                    pid,
                     0,
                     0,
                 );
@@ -259,68 +362,73 @@ async fn handle_client(
         }
         Decision::Direct => {
             stats.record_decision(false, false);
-            let mut remote = TcpStream::connect((dial_host.as_str(), dest_port))
-                .await
-                .map_err(|e| format!("direct connect {dial_host}:{dest_port}: {e}"))?;
-            if !prefix.is_empty() {
-                remote
-                    .write_all(&prefix)
-                    .await
-                    .map_err(|e| format!("prefix write: {e}"))?;
-            }
+            let mut remote = tokio::time::timeout(
+                RELAY_DIAL_TIMEOUT,
+                TcpStream::connect((dial_host.as_str(), dest_port)),
+            )
+            .await
+            .map_err(|_| {
+                format!(
+                    "direct connect {dial_host}:{dest_port}: timed out after {}s",
+                    RELAY_DIAL_TIMEOUT.as_secs()
+                )
+            })?
+            .map_err(|e| format!("direct connect {dial_host}:{dest_port}: {e}"))?;
+            write_prefix(&mut remote, &prefix).await?;
             bridge_tcp(&mut client, &mut remote).await
         }
         Decision::Proxy => {
             stats.record_decision(true, false);
             match kind {
                 UpstreamKind::Http => {
-                    let mut remote = egress::http_connect::dial(
-                        &up_host,
-                        up_port,
-                        &dial_host,
-                        dest_port,
-                        &up_user,
-                        &up_pass,
+                    let mut remote = tokio::time::timeout(
+                        RELAY_DIAL_TIMEOUT,
+                        egress::http_connect::dial(
+                            &up_host, up_port, &dial_host, dest_port, &up_user, &up_pass,
+                        ),
                     )
-                    .await?;
-                    if !prefix.is_empty() {
-                        remote
-                            .write_all(&prefix)
-                            .await
-                            .map_err(|e| format!("prefix write: {e}"))?;
-                    }
+                    .await
+                    .map_err(|_| {
+                        format!(
+                            "HTTP proxy {up_host}:{up_port} connect to {dial_host}:{dest_port}: timed out after {}s",
+                            RELAY_DIAL_TIMEOUT.as_secs()
+                        )
+                    })??;
+                    write_prefix(&mut remote, &prefix).await?;
                     bridge_tcp(&mut client, &mut remote).await
                 }
                 UpstreamKind::Socks5 => {
-                    let mut remote = egress::socks5::dial(
-                        &up_host,
-                        up_port,
-                        &dial_host,
-                        dest_port,
-                        &up_user,
-                        &up_pass,
+                    let mut remote = tokio::time::timeout(
+                        RELAY_DIAL_TIMEOUT,
+                        egress::socks5::dial(
+                            &up_host, up_port, &dial_host, dest_port, &up_user, &up_pass,
+                        ),
                     )
-                    .await?;
-                    if !prefix.is_empty() {
-                        remote
-                            .write_all(&prefix)
-                            .await
-                            .map_err(|e| format!("prefix write: {e}"))?;
-                    }
+                    .await
+                    .map_err(|_| {
+                        format!(
+                            "SOCKS5 proxy {up_host}:{up_port} connect to {dial_host}:{dest_port}: timed out after {}s",
+                            RELAY_DIAL_TIMEOUT.as_secs()
+                        )
+                    })??;
+                    write_prefix(&mut remote, &prefix).await?;
                     bridge_tcp(&mut client, &mut remote).await
                 }
                 UpstreamKind::Ssh => {
                     let pool = ssh_pool.ok_or_else(|| "SSH pool not initialized".to_string())?;
-                    let origin = peer.ip().to_string();
-                    let mut remote = pool
-                        .dial(&dial_host, dest_port, &origin, peer.port())
-                        .await?;
-                    if !prefix.is_empty() {
-                        remote
-                            .write_all(&prefix)
-                            .await
-                            .map_err(|e| format!("prefix write: {e}"))?;
-                    }
+                    let origin_ip = origin.ip().to_string();
+                    let mut remote = tokio::time::timeout(
+                        RELAY_DIAL_TIMEOUT,
+                        pool.dial(&dial_host, dest_port, &origin_ip, origin.port()),
+                    )
+                    .await
+                    .map_err(|_| {
+                        format!(
+                            "SSH connect to {dial_host}:{dest_port}: timed out after {}s",
+                            RELAY_DIAL_TIMEOUT.as_secs()
+                        )
+                    })??;
+                    write_prefix(&mut remote, &prefix).await?;
                     bridge_any(&mut client, &mut remote).await
                 }
             }
@@ -337,8 +445,9 @@ async fn handle_client(
                     dial_host,
                     trace.decision,
                     trace.matched_rule,
-                    if mapping.path.is_empty() { None } else { Some(mapping.path) },
-                    Some(mapping.pid),
+                    trace.profile_name,
+                    process_path,
+                    pid,
                     up,
                     down,
                 );
@@ -387,6 +496,24 @@ async fn peek_for_hostname(client: &mut TcpStream) -> (Vec<u8>, Option<String>) 
     (prefix, host)
 }
 
+async fn write_prefix<W>(remote: &mut W, prefix: &[u8]) -> Result<(), String>
+where
+    W: AsyncWrite + Unpin,
+{
+    if prefix.is_empty() {
+        return Ok(());
+    }
+    tokio::time::timeout(RELAY_PREFIX_WRITE_TIMEOUT, remote.write_all(prefix))
+        .await
+        .map_err(|_| {
+            format!(
+                "prefix write timed out after {}s",
+                RELAY_PREFIX_WRITE_TIMEOUT.as_secs()
+            )
+        })?
+        .map_err(|e| format!("prefix write: {e}"))
+}
+
 fn looks_like_incomplete_http(data: &[u8]) -> bool {
     if data.is_empty() || data[0] == 0x16 {
         return false;
@@ -426,6 +553,52 @@ pub fn upstream_from_config(cfg: &SocksCapConfig) -> (String, u16, String, Strin
     )
 }
 
+pub fn upstream_from_config_ref(
+    up: &crate::sockscap::config::UpstreamRef,
+) -> (String, u16, String, String) {
+    (up.host.clone(), up.port, up.username.clone(), String::new())
+}
+
 pub fn relay_loopback_ip() -> Ipv4Addr {
     Ipv4Addr::new(127, 0, 0, 1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn relay_flow_limiter_reserves_fd_headroom() {
+        let limiter = new_relay_flow_limiter();
+        assert_eq!(limiter.available_permits(), MAX_ACTIVE_RELAY_FLOWS);
+    }
+
+    #[tokio::test]
+    async fn relay_flow_permit_is_released_when_flow_finishes() {
+        let limiter = Arc::new(Semaphore::new(1));
+        let stop = AtomicBool::new(false);
+
+        let permit = acquire_relay_flow_permit(&limiter, &stop)
+            .await
+            .expect("capacity should be available");
+        assert_eq!(limiter.available_permits(), 0);
+
+        drop(permit);
+        assert_eq!(limiter.available_permits(), 1);
+    }
+
+    #[tokio::test]
+    async fn stopped_relay_does_not_wait_for_capacity() {
+        let limiter = Arc::new(Semaphore::new(0));
+        let stop = AtomicBool::new(true);
+
+        let result = tokio::time::timeout(
+            Duration::from_millis(50),
+            acquire_relay_flow_permit(&limiter, &stop),
+        )
+        .await
+        .expect("stop should be observed promptly");
+
+        assert!(result.is_none());
+    }
 }

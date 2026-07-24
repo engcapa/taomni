@@ -1,8 +1,13 @@
 //! HTTP CONNECT dialer (shared pattern with `terminal::network`).
 
-use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+use std::time::Duration;
+
+use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+
+const PROXY_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const PROXY_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Connect to `proxy_host:proxy_port` and CONNECT to `dest_host:dest_port`.
 /// Returns the tunnelled stream on success.
@@ -14,14 +19,51 @@ pub async fn dial(
     user: &str,
     pass: &str,
 ) -> Result<TcpStream, String> {
-    let mut s = TcpStream::connect((proxy_host, proxy_port))
-        .await
-        .map_err(|e| format!("connect proxy {proxy_host}:{proxy_port}: {e}"))?;
+    let mut s = tokio::time::timeout(
+        PROXY_CONNECT_TIMEOUT,
+        TcpStream::connect((proxy_host, proxy_port)),
+    )
+    .await
+    .map_err(|_| {
+        format!(
+            "connect proxy {proxy_host}:{proxy_port}: timed out after {}s",
+            PROXY_CONNECT_TIMEOUT.as_secs()
+        )
+    })?
+    .map_err(|e| format!("connect proxy {proxy_host}:{proxy_port}: {e}"))?;
     handshake(&mut s, dest_host, dest_port, user, pass).await?;
     Ok(s)
 }
 
 pub async fn handshake(
+    s: &mut TcpStream,
+    host: &str,
+    port: u16,
+    user: &str,
+    pass: &str,
+) -> Result<(), String> {
+    handshake_with_timeout(s, host, port, user, pass, PROXY_HANDSHAKE_TIMEOUT).await
+}
+
+async fn handshake_with_timeout(
+    s: &mut TcpStream,
+    host: &str,
+    port: u16,
+    user: &str,
+    pass: &str,
+    timeout: Duration,
+) -> Result<(), String> {
+    tokio::time::timeout(timeout, handshake_inner(s, host, port, user, pass))
+        .await
+        .map_err(|_| {
+            format!(
+                "HTTP proxy CONNECT {host}:{port}: timed out after {}s",
+                timeout.as_secs_f64()
+            )
+        })?
+}
+
+async fn handshake_inner(
     s: &mut TcpStream,
     host: &str,
     port: u16,
@@ -65,4 +107,35 @@ pub async fn handshake(
         return Err(format!("HTTP proxy rejected CONNECT: {status}"));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::net::TcpListener;
+
+    #[tokio::test]
+    async fn connect_handshake_times_out_when_proxy_never_replies() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (_socket, _) = listener.accept().await.unwrap();
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        });
+        let mut client = TcpStream::connect(address).await.unwrap();
+
+        let error = handshake_with_timeout(
+            &mut client,
+            "example.com",
+            443,
+            "",
+            "",
+            Duration::from_millis(30),
+        )
+        .await
+        .unwrap_err();
+
+        assert!(error.contains("timed out"));
+        server.abort();
+    }
 }

@@ -346,6 +346,40 @@ mod windows_main {
                     error: Some(e.to_string()),
                 },
             },
+            "capture_update" => {
+                let port = req.relay_port.unwrap_or(0);
+                if port == 0 {
+                    Response {
+                        id: req.id,
+                        ok: false,
+                        result: None,
+                        error: Some("relayPort required".into()),
+                    }
+                } else {
+                    match engine.lock() {
+                        Ok(mut eng) => match eng.update_relay_port(port) {
+                            Ok(v) => Response {
+                                id: req.id,
+                                ok: true,
+                                result: Some(v),
+                                error: None,
+                            },
+                            Err(e) => Response {
+                                id: req.id,
+                                ok: false,
+                                result: None,
+                                error: Some(e),
+                            },
+                        },
+                        Err(e) => Response {
+                            id: req.id,
+                            ok: false,
+                            result: None,
+                            error: Some(e.to_string()),
+                        },
+                    }
+                }
+            }
             "lookup_orig" => {
                 let src_port = req.src_port.unwrap_or(0);
                 let src_ip = req.src_ip.as_deref().unwrap_or("");

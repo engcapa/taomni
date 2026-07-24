@@ -23,6 +23,21 @@ export interface AppSelector {
   name?: string;
 }
 
+export interface SocksCapProfile {
+  id: string;
+  name: string;
+  icon?: string | null;
+  color?: string | null;
+  enabled: boolean;
+  priority: number;
+  mode: ScopeMode;
+  apps: AppSelector[];
+  upstream: UpstreamRef;
+  ruleMode: RuleMode;
+  userRules: UserRule[];
+  defaultAction: Decision;
+}
+
 export interface UpstreamRef {
   kind: UpstreamKind;
   sessionId?: string;
@@ -46,6 +61,9 @@ export interface GfwListSource {
 
 export interface SocksCapConfig {
   enabled: boolean;
+  activeProfileIds: string[];
+  selectedProfileId: string;
+  profiles: SocksCapProfile[];
   mode: ScopeMode;
   apps: AppSelector[];
   upstream: UpstreamRef;
@@ -140,8 +158,8 @@ export function sockscapStatus(): Promise<SocksCapStatus> {
   return invoke("sockscap_status");
 }
 
-export function sockscapStart(): Promise<SocksCapStatus> {
-  return invoke("sockscap_start");
+export function sockscapStart(sudoPassword?: string): Promise<SocksCapStatus> {
+  return invoke("sockscap_start", { sudoPassword });
 }
 
 export function sockscapStop(): Promise<SocksCapStatus> {
@@ -210,6 +228,7 @@ export interface DomainRecord {
   domainOrIp: string;
   decision: Decision;
   matchedRule: string | null;
+  profileName?: string | null;
   processName: string | null;
   pid: number | null;
   hitCount: number;

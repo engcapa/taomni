@@ -685,26 +685,26 @@ fn scan_termius_exports(files: &mut Vec<LocalSessionFile>) {
     }
 }
 
-fn scan_mremote(files: &mut Vec<LocalSessionFile>) {
+fn scan_mremote(_files: &mut Vec<LocalSessionFile>) {
     #[cfg(windows)]
     if let Some(appdata) = std::env::var_os("APPDATA").map(PathBuf::from) {
         push_file(
             "mremote",
             &appdata.join("mRemoteNG").join("confCons.xml"),
             "confCons.xml",
-            files,
+            _files,
         );
     }
 }
 
-fn scan_securecrt(files: &mut Vec<LocalSessionFile>) {
+fn scan_securecrt(_files: &mut Vec<LocalSessionFile>) {
     #[cfg(windows)]
     if let Some(appdata) = std::env::var_os("APPDATA").map(PathBuf::from) {
         scan_dir_for_ext(
             "securecrt",
             &appdata.join("VanDyke").join("Config").join("Sessions"),
             "ini",
-            files,
+            _files,
         );
     }
     #[cfg(target_os = "macos")]
