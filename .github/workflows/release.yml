@@ -175,6 +175,13 @@ jobs:
           cargo test --manifest-path src-tauri/Cargo.toml --lib sockscap::capture::linux
           bash scripts/stage-sockscap-linux.sh --check
 
+      - name: Verify Windows SocksCap helper and preflight
+        if: matrix.platform == 'windows-latest'
+        run: |
+          pwsh scripts/stage-sockscap-windows.ps1
+          cargo test --manifest-path src-tauri/Cargo.toml --lib sockscap::policy sockscap::config
+          pwsh scripts/stage-sockscap-windows.ps1 --check
+
       - name: Resolve release version
         id: version
         shell: bash
