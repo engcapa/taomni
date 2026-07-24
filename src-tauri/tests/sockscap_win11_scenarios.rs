@@ -35,6 +35,9 @@ const TARGET_PORT: u16 = 443;
 fn make_test_config(mode: ScopeMode, upstream: UpstreamRef) -> SocksCapConfig {
     SocksCapConfig {
         enabled: true,
+        active_profile_ids: vec![],
+        selected_profile_id: String::new(),
+        profiles: vec![],
         mode,
         apps: vec![AppSelector {
             path: "C:\\Windows\\System32\\curl.exe".to_string(),
