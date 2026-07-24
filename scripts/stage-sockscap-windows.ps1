@@ -11,11 +11,31 @@ param(
   [string]$Configuration = "debug"
 )
 
+if (-not $IsWindows) {
+  Write-Host "Skipping Windows SocksCap preflight on non-Windows host."
+  exit 0
+}
+
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $tauri = Join-Path $root "src-tauri"
 $target = Join-Path $tauri "target\$Configuration"
 $resWin = Join-Path $tauri "resources\sockscap\windows"
+
+if ($args -contains "--check") {
+  # Preflight only - no build, no copy
+  if (-not (Test-Path $resWin)) {
+    Write-Host "WinDivert resources missing at $resWin"
+    exit 1
+  }
+  $dll = Join-Path $resWin "WinDivert.dll"
+  if (-not (Test-Path $dll)) {
+    Write-Host "WinDivert.dll missing."
+    exit 1
+  }
+  Write-Host "Windows SocksCap bundle preflight passed (WinDivert present)."
+  exit 0
+}
 
 function Stop-SockscapHelper {
   $procs = Get-Process -Name "sockscap-helper" -ErrorAction SilentlyContinue
@@ -124,6 +144,11 @@ $helperSrc = Join-Path $target "sockscap-helper.exe"
 if (-not (Test-Path $helperSrc)) {
   throw "helper not found at $helperSrc"
 }
+
+# Stage helper into resources/sockscap/windows/ so it is bundled with the app (via resources wildcard + paths.rs support).
+$helperDest = Join-Path $resWin "sockscap-helper.exe"
+Copy-Item -Path $helperSrc -Destination $helperDest -Force
+Write-Host "Helper staged to resources for bundling: $helperDest"
 
 # Prefer resources/sockscap/windows for WinDivert; copy into target for runtime discovery.
 $dll = Join-Path $resWin "WinDivert.dll"
