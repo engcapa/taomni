@@ -8,6 +8,7 @@
 //! 5. Direct curl verification (`https://www.baidu.com`).
 
 use std::net::IpAddr;
+#[cfg(target_os = "windows")]
 use std::process::Command;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
