@@ -725,6 +725,7 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
         port: u.port || 1080,
         username: u.username,
         password: password || u.passwordRef || undefined,
+        sessionId: u.sessionId || undefined,
         testHost: "www.google.com",
         testPort: 443,
       });
