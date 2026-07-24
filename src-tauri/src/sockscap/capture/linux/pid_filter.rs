@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 
 use crate::sockscap::config::AppSelector;
-use crate::sockscap::paths::paths_match_exe;
+use crate::sockscap::paths::{paths_match_exe, normalize_exe_path};
 use crate::sockscap::process::{self, ProcessInfo};
 
 /// Whether a packet/process PID belongs to a resolved app-mode target set.
@@ -66,16 +66,26 @@ fn match_processes_to_groups(
 /// Match both the existing cross-platform normalized spelling and canonical
 /// filesystem paths so app-mode does not silently omit the selected process.
 fn selector_matches_process_path(process_path: &str, selector: &str) -> bool {
+    let process_norm = normalize_exe_path(process_path);
+    let selector_norm = normalize_exe_path(selector);
+    if process_norm.is_empty() || selector_norm.is_empty() {
+        return false;
+    }
     if paths_match_exe(process_path, selector) {
         return true;
     }
-    match (
-        std::fs::canonicalize(process_path),
-        std::fs::canonicalize(selector),
-    ) {
-        (Ok(process_path), Ok(selector)) => process_path == selector,
-        _ => false,
+    // For symlink / absolute selectors (including launcher links like "grok"), try canonical path match.
+    // This fixes cases where the configured "source" is a symlink but /proc/<pid>/exe resolves to the target.
+    if selector.contains('/') || selector.contains('\\') || selector.starts_with('.') {
+        match (
+            std::fs::canonicalize(process_path),
+            std::fs::canonicalize(selector),
+        ) {
+            (Ok(p), Ok(s)) => return p == s,
+            _ => {}
+        }
     }
+    false
 }
 
 #[cfg(test)]
@@ -96,6 +106,21 @@ mod tests {
             executable.to_str().unwrap(),
             "/proc/self/exe"
         ));
+    }
+
+    #[test]
+    fn handles_symlink_selectors_correctly() {
+        let target = std::env::current_exe().unwrap();
+        let symlink = target.with_file_name("grok-symlink");
+        // Simulate symlink selector
+        std::fs::copy(&target, &symlink).unwrap();
+        // On Linux, we can make it a symlink
+        std::os::unix::fs::symlink(&target, &symlink).unwrap();
+        assert!(selector_matches_process_path(
+            target.to_str().unwrap(),
+            symlink.to_str().unwrap()
+        ));
+        let _ = std::fs::remove_file(&symlink); // cleanup
     }
 
     #[test]
