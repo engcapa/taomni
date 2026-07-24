@@ -478,6 +478,68 @@ pub async fn sockscap_start(
     status
 }
 
+/// Extract the `passwordRef` a saved Proxy / SSH session keeps in its
+/// `options_json`. `SessionConfig` has no password column of its own — the
+/// secret is stored as a `vault:<id>` reference under `options_json.passwordRef`
+/// (see `terminal::resolve_proxy_session`). Returns `None` when absent/blank.
+fn session_password_ref(options_json: &str) -> Option<String> {
+    serde_json::from_str::<serde_json::Value>(options_json)
+        .ok()
+        .and_then(|v| {
+            v.get("passwordRef")
+                .and_then(|r| r.as_str())
+                .map(str::to_string)
+        })
+        .filter(|s| !s.trim().is_empty())
+}
+
+/// Resolve a saved session's stored proxy/SSH password to plaintext.
+///
+/// Mirrors `NetworkSettings::resolve_proxy_pass`: a `vault:<id>` reference is
+/// decrypted through the vault; a non-reference value is treated as a literal
+/// password (backwards compat). Returns `None` when the session carries no
+/// `passwordRef` — callers then keep any password already resolved from the
+/// upstream's own `password_ref`. Vault errors (e.g. locked) are swallowed to
+/// match the sibling `password_ref` resolution and the UI's unlock gate.
+fn session_proxy_password(
+    vault: &crate::vault::Vault,
+    session: &crate::session::models::SessionConfig,
+) -> Option<String> {
+    let pass_ref = session_password_ref(&session.options_json)?;
+    match vault.resolve(&pass_ref) {
+        Ok(Some(plain)) => Some((*plain).clone()),
+        Ok(None) => Some(pass_ref),
+        Err(_) => None,
+    }
+}
+
+/// Resolve the SSH auth to use for a saved SSH session bound as an upstream.
+///
+/// PrivateKey sessions store a key **file path** in `auth_method` (a DB column),
+/// while Password sessions keep the secret as a `vault:<id>` reference in
+/// `options_json.passwordRef`. Mirrors `terminal::create_ssh_terminal` /
+/// `terminal::resolve_jump_credentials`; without this a key-based SSH upstream
+/// would silently fall through to the agent. Falls back to the SSH agent when
+/// neither a key path nor a password is available.
+fn session_ssh_auth(
+    vault: &crate::vault::Vault,
+    session: &crate::session::models::SessionConfig,
+) -> crate::terminal::ssh::SshAuth {
+    use crate::session::models::AuthMethod;
+    use crate::terminal::ssh::SshAuth;
+    match &session.auth_method {
+        AuthMethod::PrivateKey { key_path } if !key_path.trim().is_empty() => {
+            SshAuth::PrivateKey(key_path.clone())
+        }
+        AuthMethod::Agent => SshAuth::Agent,
+        // Password / None / keyless PrivateKey: use the stored password if any.
+        _ => match session_proxy_password(vault, session) {
+            Some(pass) if !pass.is_empty() => SshAuth::Password(pass),
+            _ => SshAuth::Agent,
+        },
+    }
+}
+
 #[cfg(target_os = "linux")]
 async fn build_linux_relay_context(
     state: &State<'_, AppState>,
@@ -490,15 +552,27 @@ async fn build_linux_relay_context(
             upstream_pass = (*password).clone();
         }
     }
+    let mut upstream_session: Option<crate::session::models::SessionConfig> = None;
     if !cfg.upstream.session_id.is_empty() {
-        if let Ok(db) = state.db.lock() {
-            if let Ok(session) = crate::session::db::get_session(&db, &cfg.upstream.session_id) {
-                upstream_host = session.host;
-                upstream_port = session.port;
-                if let Some(username) = session.username.filter(|username| !username.is_empty()) {
-                    upstream_user = username;
-                }
+        let session = {
+            let db = state.db.lock().ok();
+            db.and_then(|db| {
+                crate::session::db::get_session(&db, &cfg.upstream.session_id).ok()
+            })
+        };
+        if let Some(session) = session {
+            upstream_host = session.host.clone();
+            upstream_port = session.port;
+            if let Some(username) = session.username.clone().filter(|u| !u.is_empty()) {
+                upstream_user = username;
             }
+            // Session credentials live in the vault, not the upstream's own
+            // `password_ref`; without this a session-backed SOCKS5/HTTP proxy
+            // that needs auth would dial with an empty password.
+            if let Some(pass) = session_proxy_password(&state.vault, &session) {
+                upstream_pass = pass;
+            }
+            upstream_session = Some(session);
         }
     }
 
@@ -506,7 +580,11 @@ async fn build_linux_relay_context(
         use crate::sockscap::egress::ssh_pool::SshPool;
         use crate::terminal::ssh::SshAuth;
 
-        let auth = if !upstream_pass.is_empty() {
+        // A bound SSH session carries its own auth (key path in `auth_method`,
+        // or a vault password); manual upstreams fall back to the old rules.
+        let auth = if let Some(sess) = &upstream_session {
+            session_ssh_auth(&state.vault, sess)
+        } else if !upstream_pass.is_empty() {
             SshAuth::Password(upstream_pass.clone())
         } else if cfg.upstream.password_ref.starts_with("key:") {
             SshAuth::PrivateKey(cfg.upstream.password_ref.clone())
@@ -526,11 +604,14 @@ async fn build_linux_relay_context(
     for profile in cfg.active_profiles() {
         let (mut host, mut port, mut user, mut password) =
             relay::upstream_from_config_ref(&profile.upstream);
+        let mut profile_session: Option<crate::session::models::SessionConfig> = None;
         if host.is_empty() {
             host = upstream_host.clone();
             port = upstream_port;
             user = upstream_user.clone();
             password = upstream_pass.clone();
+            // Inherit the global upstream's SSH auth (e.g. key-based session).
+            profile_session = upstream_session.clone();
         } else {
             if !profile.upstream.password_ref.is_empty() {
                 if let Ok(Some(resolved)) = state.vault.resolve(&profile.upstream.password_ref) {
@@ -538,18 +619,24 @@ async fn build_linux_relay_context(
                 }
             }
             if !profile.upstream.session_id.is_empty() {
-                if let Ok(db) = state.db.lock() {
-                    if let Ok(session) =
-                        crate::session::db::get_session(&db, &profile.upstream.session_id)
+                let session = {
+                    let db = state.db.lock().ok();
+                    db.and_then(|db| {
+                        crate::session::db::get_session(&db, &profile.upstream.session_id).ok()
+                    })
+                };
+                if let Some(session) = session {
+                    host = session.host.clone();
+                    port = session.port;
+                    if let Some(username) =
+                        session.username.clone().filter(|u| !u.is_empty())
                     {
-                        host = session.host;
-                        port = session.port;
-                        if let Some(username) =
-                            session.username.filter(|username| !username.is_empty())
-                        {
-                            user = username;
-                        }
+                        user = username;
                     }
+                    if let Some(pass) = session_proxy_password(&state.vault, &session) {
+                        password = pass;
+                    }
+                    profile_session = Some(session);
                 }
             }
         }
@@ -557,7 +644,9 @@ async fn build_linux_relay_context(
             use crate::sockscap::egress::ssh_pool::SshPool;
             use crate::terminal::ssh::SshAuth;
 
-            let auth = if !password.is_empty() {
+            let auth = if let Some(sess) = &profile_session {
+                session_ssh_auth(&state.vault, sess)
+            } else if !password.is_empty() {
                 SshAuth::Password(password.clone())
             } else if profile.upstream.password_ref.starts_with("key:") {
                 SshAuth::PrivateKey(profile.upstream.password_ref.clone())
@@ -688,18 +777,27 @@ async fn start_windows_capture(
             up_pass = (*p).clone();
         }
     }
-    // Session-backed upstream: load host/port/user from sessions DB when set.
+    // Session-backed upstream: load host/port/user/password from the sessions
+    // DB + vault when set. The password comes from the session's vault ref, not
+    // the upstream's own `password_ref`.
+    let mut up_session: Option<crate::session::models::SessionConfig> = None;
     if !cfg.upstream.session_id.is_empty() {
-        if let Ok(db) = state.db.lock() {
-            if let Ok(sess) = crate::session::db::get_session(&db, &cfg.upstream.session_id) {
-                up_host = sess.host;
-                up_port = sess.port;
-                if let Some(u) = sess.username {
-                    if !u.is_empty() {
-                        up_user = u;
-                    }
-                }
+        let sess = {
+            let db = state.db.lock().ok();
+            db.and_then(|db| {
+                crate::session::db::get_session(&db, &cfg.upstream.session_id).ok()
+            })
+        };
+        if let Some(sess) = sess {
+            up_host = sess.host.clone();
+            up_port = sess.port;
+            if let Some(u) = sess.username.clone().filter(|u| !u.is_empty()) {
+                up_user = u;
             }
+            if let Some(pass) = session_proxy_password(&state.vault, &sess) {
+                up_pass = pass;
+            }
+            up_session = Some(sess);
         }
     }
 
@@ -708,11 +806,14 @@ async fn start_windows_capture(
     for p in &active_profs {
         let (mut phost, mut pport, mut puser, mut ppass) =
             relay::upstream_from_config_ref(&p.upstream);
+        let mut p_session: Option<crate::session::models::SessionConfig> = None;
         if phost.is_empty() {
             phost = up_host.clone();
             pport = up_port;
             puser = up_user.clone();
             ppass = up_pass.clone();
+            // Inherit the global upstream's SSH auth (e.g. key-based session).
+            p_session = up_session.clone();
         } else {
             if !p.upstream.password_ref.is_empty() {
                 if let Ok(Some(pass)) = state.vault.resolve(&p.upstream.password_ref) {
@@ -720,14 +821,22 @@ async fn start_windows_capture(
                 }
             }
             if !p.upstream.session_id.is_empty() {
-                if let Ok(db) = state.db.lock() {
-                    if let Ok(sess) = crate::session::db::get_session(&db, &p.upstream.session_id) {
-                        phost = sess.host;
-                        pport = sess.port;
-                        if let Some(u) = sess.username.filter(|u| !u.is_empty()) {
-                            puser = u;
-                        }
+                let sess = {
+                    let db = state.db.lock().ok();
+                    db.and_then(|db| {
+                        crate::session::db::get_session(&db, &p.upstream.session_id).ok()
+                    })
+                };
+                if let Some(sess) = sess {
+                    phost = sess.host.clone();
+                    pport = sess.port;
+                    if let Some(u) = sess.username.clone().filter(|u| !u.is_empty()) {
+                        puser = u;
                     }
+                    if let Some(pass) = session_proxy_password(&state.vault, &sess) {
+                        ppass = pass;
+                    }
+                    p_session = Some(sess);
                 }
             }
         }
@@ -735,7 +844,9 @@ async fn start_windows_capture(
         let p_ssh_pool = if matches!(p.upstream.kind, crate::sockscap::config::UpstreamKind::Ssh) {
             use crate::sockscap::egress::ssh_pool::SshPool;
             use crate::terminal::ssh::SshAuth;
-            let auth = if !ppass.is_empty() {
+            let auth = if let Some(sess) = &p_session {
+                session_ssh_auth(&state.vault, sess)
+            } else if !ppass.is_empty() {
                 SshAuth::Password(ppass.clone())
             } else if !p.upstream.password_ref.is_empty() && p.upstream.password_ref.starts_with("key:") {
                 SshAuth::PrivateKey(p.upstream.password_ref.clone())
@@ -771,7 +882,9 @@ async fn start_windows_capture(
     {
         use crate::sockscap::egress::ssh_pool::SshPool;
         use crate::terminal::ssh::SshAuth;
-        let auth = if !up_pass.is_empty() {
+        let auth = if let Some(sess) = &up_session {
+            session_ssh_auth(&state.vault, sess)
+        } else if !up_pass.is_empty() {
             SshAuth::Password(up_pass.clone())
         } else if !cfg.upstream.password_ref.is_empty()
             && cfg.upstream.password_ref.starts_with("key:")
@@ -1084,17 +1197,43 @@ pub async fn sockscap_test_upstream(
     port: u16,
     username: Option<String>,
     password: Option<String>,
+    session_id: Option<String>,
     test_host: Option<String>,
     test_port: Option<u16>,
 ) -> Result<String, String> {
     let target_host = test_host.unwrap_or_else(|| "www.google.com".into());
     let target_port = test_port.unwrap_or(443);
-    let user = username.unwrap_or_default();
+    let mut host = host;
+    let mut port = port;
+    let mut user = username.unwrap_or_default();
     let mut pass = password.unwrap_or_default();
     // Resolve vault:<id> if the UI passed a password_ref.
     if pass.starts_with("vault:") {
         if let Ok(Some(p)) = state.vault.resolve(&pass) {
             pass = (*p).clone();
+        }
+    }
+    // Session-backed upstream: pull host/port/user/password from the saved
+    // session so the Test button matches what a real capture start would dial.
+    // The session's own vault ref overrides any manually supplied credentials.
+    let mut test_session: Option<crate::session::models::SessionConfig> = None;
+    if let Some(sid) = session_id.filter(|s| !s.trim().is_empty()) {
+        let session = {
+            let db = state.db.lock().ok();
+            db.and_then(|db| crate::session::db::get_session(&db, &sid).ok())
+        };
+        if let Some(session) = session {
+            host = session.host.clone();
+            port = session.port;
+            if let Some(u) = session.username.clone().filter(|u| !u.is_empty()) {
+                user = u;
+            }
+            if let Some(p) = session_proxy_password(&state.vault, &session) {
+                pass = p;
+            }
+            test_session = Some(session);
+        } else {
+            return Err(format!("upstream session '{sid}' not found"));
         }
     }
 
@@ -1116,7 +1255,11 @@ pub async fn sockscap_test_upstream(
         "ssh" => {
             use crate::sockscap::egress::ssh_pool::SshPool;
             use crate::terminal::ssh::SshAuth;
-            let auth = if pass.is_empty() {
+            // A bound SSH session carries its own auth (key path or vault
+            // password); manual entry only has the typed password.
+            let auth = if let Some(sess) = &test_session {
+                session_ssh_auth(&state.vault, sess)
+            } else if pass.is_empty() {
                 SshAuth::Agent
             } else {
                 SshAuth::Password(pass)
@@ -1184,4 +1327,175 @@ pub async fn sockscap_clear_domain_records(
     let mut guard = orch.domains.lock().map_err(|e| e.to_string())?;
     guard.clear();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{session_password_ref, session_proxy_password, session_ssh_auth};
+    use crate::session::models::{AuthMethod, SessionConfig, SessionType};
+    use crate::terminal::ssh::SshAuth;
+    use crate::vault::Vault;
+
+    fn proxy_session(options_json: &str) -> SessionConfig {
+        SessionConfig {
+            id: "proxy-1".into(),
+            name: "SOCKS5 upstream".into(),
+            session_type: SessionType::Proxy,
+            group_path: None,
+            host: "10.0.0.9".into(),
+            port: 1080,
+            username: Some("alice".into()),
+            auth_method: AuthMethod::Password,
+            options_json: options_json.into(),
+            created_at: 0,
+            updated_at: 0,
+            last_connected_at: None,
+            sort_order: 0,
+        }
+    }
+
+    fn fresh_vault() -> (tempfile::TempDir, Vault) {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let vault = Vault::open(&dir.path().join("vault.db")).expect("open vault");
+        vault.init("correct-horse-battery-staple").expect("init vault");
+        (dir, vault)
+    }
+
+    #[test]
+    fn password_ref_extracted_from_options_json() {
+        assert_eq!(
+            session_password_ref(r#"{"proxyKind":"socks5","passwordRef":"vault:abc"}"#),
+            Some("vault:abc".to_string())
+        );
+    }
+
+    #[test]
+    fn password_ref_absent_or_blank_is_none() {
+        assert_eq!(session_password_ref(r#"{"proxyKind":"socks5"}"#), None);
+        assert_eq!(session_password_ref(r#"{"passwordRef":"   "}"#), None);
+        assert_eq!(session_password_ref("not json"), None);
+    }
+
+    #[test]
+    fn session_password_resolves_vault_reference() {
+        let (_dir, vault) = fresh_vault();
+        let reference = vault
+            .put("sockscap-upstream", "alice@proxy", "s3cret")
+            .expect("put")
+            .reference;
+        let options = format!(r#"{{"proxyKind":"socks5","passwordRef":"{reference}"}}"#);
+        assert_eq!(
+            session_proxy_password(&vault, &proxy_session(&options)),
+            Some("s3cret".to_string())
+        );
+    }
+
+    #[test]
+    fn session_without_password_ref_returns_none() {
+        let (_dir, vault) = fresh_vault();
+        assert_eq!(
+            session_proxy_password(&vault, &proxy_session(r#"{"proxyKind":"socks5"}"#)),
+            None
+        );
+    }
+
+    #[test]
+    fn non_reference_password_treated_as_literal() {
+        // Backwards-compat: a plaintext value in passwordRef is used as-is.
+        let (_dir, vault) = fresh_vault();
+        assert_eq!(
+            session_proxy_password(&vault, &proxy_session(r#"{"passwordRef":"plain-pass"}"#)),
+            Some("plain-pass".to_string())
+        );
+    }
+
+    #[test]
+    fn locked_vault_swallows_error_and_returns_none() {
+        let (_dir, vault) = fresh_vault();
+        let reference = vault
+            .put("sockscap-upstream", "alice@proxy", "s3cret")
+            .expect("put")
+            .reference;
+        vault.lock().expect("lock");
+        let options = format!(r#"{{"passwordRef":"{reference}"}}"#);
+        assert_eq!(session_proxy_password(&vault, &proxy_session(&options)), None);
+    }
+
+    fn ssh_session(auth_method: AuthMethod, options_json: &str) -> SessionConfig {
+        SessionConfig {
+            id: "ssh-1".into(),
+            name: "SSH upstream".into(),
+            session_type: SessionType::SSH,
+            group_path: None,
+            host: "bastion.example".into(),
+            port: 22,
+            username: Some("bob".into()),
+            auth_method,
+            options_json: options_json.into(),
+            created_at: 0,
+            updated_at: 0,
+            last_connected_at: None,
+            sort_order: 0,
+        }
+    }
+
+    #[test]
+    fn ssh_private_key_session_uses_key_path() {
+        let (_dir, vault) = fresh_vault();
+        let session = ssh_session(
+            AuthMethod::PrivateKey {
+                key_path: "~/.ssh/id_ed25519".into(),
+            },
+            "{}",
+        );
+        match session_ssh_auth(&vault, &session) {
+            SshAuth::PrivateKey(path) => assert_eq!(path, "~/.ssh/id_ed25519"),
+            other => panic!("expected PrivateKey, got {}", auth_label(&other)),
+        }
+    }
+
+    #[test]
+    fn ssh_password_session_resolves_vault_password() {
+        let (_dir, vault) = fresh_vault();
+        let reference = vault
+            .put("ssh-password", "bob@bastion", "hunter2")
+            .expect("put")
+            .reference;
+        let options = format!(r#"{{"passwordRef":"{reference}"}}"#);
+        let session = ssh_session(AuthMethod::Password, &options);
+        match session_ssh_auth(&vault, &session) {
+            SshAuth::Password(p) => assert_eq!(p, "hunter2"),
+            other => panic!("expected Password, got {}", auth_label(&other)),
+        }
+    }
+
+    #[test]
+    fn ssh_agent_and_passwordless_sessions_fall_back_to_agent() {
+        let (_dir, vault) = fresh_vault();
+        assert!(matches!(
+            session_ssh_auth(&vault, &ssh_session(AuthMethod::Agent, "{}")),
+            SshAuth::Agent
+        ));
+        // Password auth but no stored secret → agent, not an empty password.
+        assert!(matches!(
+            session_ssh_auth(&vault, &ssh_session(AuthMethod::Password, "{}")),
+            SshAuth::Agent
+        ));
+        // Keyless PrivateKey (blank path) → agent rather than an empty key path.
+        assert!(matches!(
+            session_ssh_auth(
+                &vault,
+                &ssh_session(AuthMethod::PrivateKey { key_path: "  ".into() }, "{}")
+            ),
+            SshAuth::Agent
+        ));
+    }
+
+    fn auth_label(auth: &SshAuth) -> &'static str {
+        match auth {
+            SshAuth::Password(_) => "Password",
+            SshAuth::PrivateKey(_) => "PrivateKey",
+            SshAuth::Agent => "Agent",
+        }
+    }
 }

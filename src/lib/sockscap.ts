@@ -184,6 +184,7 @@ export function sockscapTestUpstream(args: {
   port: number;
   username?: string;
   password?: string;
+  sessionId?: string;
   testHost?: string;
   testPort?: number;
 }): Promise<string> {
@@ -193,6 +194,7 @@ export function sockscapTestUpstream(args: {
     port: args.port,
     username: args.username ?? null,
     password: args.password ?? null,
+    sessionId: args.sessionId ?? null,
     testHost: args.testHost ?? null,
     testPort: args.testPort ?? null,
   });
