@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "fixtureId": "maven-single",
-  "generatedAt": "2026-09-04T00:02:08.228Z",
+  "generatedAt": "2026-09-07T16:28:57.150Z",
   "sanitized": true,
   "toolchain": {
     "java": {
-      "path": "/data/dev/jdk-21/bin/java",
+      "path": "C:\\Program Files\\Java\\jdk-21\\bin\\java.exe",
       "version": "21.0.4",
       "info": {
         "line": "openjdk version \"21.0.4\" 2024-07-16 LTS",
@@ -14,16 +14,16 @@
       }
     },
     "jdtls": {
-      "home": "~/.local/share/jdtls",
-      "version": "1.61.0.202607102111.jar"
+      "home": "~\\AppData\\Local\\jdtls",
+      "version": "1.61.0.202607142124.jar"
     },
     "gradle": {
-      "version": "9.5.1",
-      "home": "~/.gradle/wrapper/dists/gradle-9.5.1-bin/bvvv0hnjcinfezlom7fy9dbyi/gradle-9.5.1"
+      "version": "8.7",
+      "home": "~\\.gradle\\wrapper\\dists\\gradle-8.7-bin\\bhs2wmbdwecv87pi65oeuq5iu\\gradle-8.7"
     },
-    "mavenCliDetected": "Apache Maven 3.9.9 (8e8579a9e76f7d015ee5ec7bfcdc97d260186937)"
+    "mavenCliDetected": null
   },
-  "buildModelFingerprint": "1f5457909013590296f1710d954eba6b51b61e0ab610a319e711614c1cd3465e",
+  "buildModelFingerprint": "890f3944e6ed154a663fad8964eedb837b9c3fb6ee622f2cc5687df098e7a6c5",
   "scenarios": [
     {
       "caseId": "jdk-type",
@@ -37,7 +37,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 2224,
+          "msTotal": 6371,
           "itemCount": 50,
           "isIncomplete": true,
           "satisfied": true,
@@ -61,7 +61,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 392,
+          "msTotal": 1033,
           "itemCount": 58,
           "isIncomplete": true,
           "satisfied": true,
@@ -85,7 +85,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 60,
+          "msTotal": 75,
           "itemCount": 14,
           "isIncomplete": false,
           "satisfied": true,
@@ -167,7 +167,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 133,
+          "msTotal": 157,
           "itemCount": 2,
           "isIncomplete": false,
           "satisfied": true,
@@ -176,16 +176,16 @@
         }
       ],
       "resolve": {
-        "ms": 645,
+        "ms": 841,
         "additionalEditCount": 1,
         "additionalEditTexts": [
-          "\n\nimport org.apache.commons.lang3.StringUtils;"
+          "\r\n\r\nimport org.apache.commons.lang3.StringUtils;"
         ]
       },
       "acceptance": {
-        "originalSha256": "d1a95976fce19b5ab5c4719fccbc59875db10f684e5177eef08323a8fc554d59",
-        "appliedSha256": "eeb6e0ed331b0512f0b284654482d6981a403cd957f3ba62c946df6ef1d44e30",
-        "revertedSha256": "d1a95976fce19b5ab5c4719fccbc59875db10f684e5177eef08323a8fc554d59",
+        "originalSha256": "387ae2d99c39a0c5d7070ea0a47031474415fb54c887d51a079740ee7bed024b",
+        "appliedSha256": "92db6161806bae7b71aa301eee71c1413315be9ab97505e376f49e58aa0353e6",
+        "revertedSha256": "387ae2d99c39a0c5d7070ea0a47031474415fb54c887d51a079740ee7bed024b",
         "revertRestoresOriginalHash": true
       },
       "notes": null
@@ -202,7 +202,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 171,
+          "msTotal": 237,
           "itemCount": 50,
           "isIncomplete": true,
           "satisfied": true,
@@ -225,7 +225,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 123,
+        "msTotal": 185,
         "signaturesCount": 13,
         "labels": [
           "append(double d) : StringBuilder",
@@ -261,7 +261,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 74,
+        "msTotal": 142,
         "signaturesCount": 13,
         "labels": [
           "append(double d) : StringBuilder",
@@ -297,7 +297,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 91,
+        "msTotal": 252,
         "signaturesCount": 3,
         "labels": [
           "parseInt(String s) : int",
@@ -323,7 +323,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 65,
+        "msTotal": 109,
         "signaturesCount": 9,
         "labels": [
           "valueOf(double d) : String",
@@ -355,7 +355,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 162,
+        "msTotal": 275,
         "signaturesCount": 1,
         "labels": [
           "singletonList(T o) : List<T>"
@@ -381,9 +381,9 @@
       "supersede": {
         "firstOutcome": "rejected:-32800",
         "firstCancelled": true,
-        "msFirst": 59,
+        "msFirst": 101,
         "secondSatisfied": true,
-        "msSecond": 53
+        "msSecond": 94
       },
       "notes": "$/cancelRequest on the in-flight request mirrors the production cancel bridge; second request must satisfy"
     },
@@ -397,7 +397,7 @@
       },
       "scopeRequested": "default",
       "hover": {
-        "msFirst": 54,
+        "msFirst": 111,
         "attempts": 1,
         "contentsPresent": true,
         "contentsKind": "markup-array",
@@ -418,7 +418,7 @@
       },
       "scopeRequested": "default",
       "hover": {
-        "msFirst": 123,
+        "msFirst": 208,
         "attempts": 1,
         "contentsPresent": true,
         "contentsKind": "markup-array",
@@ -439,7 +439,7 @@
       },
       "scopeRequested": "default",
       "hover": {
-        "msFirst": 43,
+        "msFirst": 77,
         "attempts": 1,
         "contentsPresent": true,
         "contentsKind": "markup-array",
@@ -510,10 +510,10 @@
     "resolved": true,
     "resolveFailure": null,
     "importInsertText": "import org.apache.commons.lang3.StringUtils;",
-    "appliedSha256": "a1a321c4326cdfef25e6aec6ccce42ec1f06395f10ba44154a0f424b5105dec2",
-    "originalSha256": "f2de5c8ab98b58cf18ff998ebc47d19c127bb6f4290550d2827a40a37552e70a",
+    "appliedSha256": "ac694b9072804031b676cace1194cccd226ecb2f16eef13060a82ffb3d646f7a",
+    "originalSha256": "fa85c034632f35aa03d738d0acc975938918814283cc184ff97118b0d40b54b7",
     "revertedRestoresOriginalHash": true,
-    "msTotal": 730,
+    "msTotal": 1379,
     "satisfied": true,
     "reason": null,
     "resolvedShape": {
@@ -530,13 +530,13 @@
         "changes"
       ],
       "changeUris": [
-        "file://${project}/src/main/java/com/example/single/QuickFixTarget.java"
+        "${project}/src/main/java/com/example/single/QuickFixTarget.java"
       ],
       "changeEditCounts": [
         1
       ],
       "documentChanges": [],
-      "requestedUri": "file://${project}/src/main/java/com/example/single/QuickFixTarget.java",
+      "requestedUri": "${project}/src/main/java/com/example/single/QuickFixTarget.java",
       "exactUriMatch": true,
       "encodedUriMatch": true,
       "targetEditShapes": [
@@ -550,7 +550,7 @@
             "start"
           ],
           "newTextType": "string",
-          "newTextLength": 75,
+          "newTextLength": 79,
           "containsImport": true
         }
       ]
@@ -570,22 +570,22 @@
     "probeReason": "command-not-registered:java.project.list",
     "buildFiles": [
       {
-        "path": "${project}/pom.xml",
-        "sha256": "c2ccbbe9c9ed21fc1e12c1a03a964d0f91cec3bbc6706922a22654a88d3b045f"
+        "path": "${project}\\pom.xml",
+        "sha256": "6c0f4334cc03d2dfd2da9596739f232b4ebe0366ccf52cc748410371a545bc8a"
       }
     ],
     "importProgress": {
-      "events": 42,
-      "beginTokens": 13,
+      "events": 56,
+      "beginTokens": 15,
       "titles": [
-        "Synchronizing projects",
         "Building",
+        "Synchronizing projects",
         "Initialize Workspace",
-        "Detect installed JVMs",
         "LookupJDKToolchainsJob",
+        "Detect installed JVMs",
         "Reporting encoding changes.",
-        "Searching...",
-        "Validate documents"
+        "Validate documents",
+        "Searching..."
       ],
       "anyWithPercentage": true
     },
@@ -600,16 +600,16 @@
     }
   },
   "analysisTiming": {
-    "firstCompletionSatisfiedMs": 8642,
+    "firstCompletionSatisfiedMs": 19750,
     "offlineCacheHint": {
-      "coldSessionFirstSatisfiedMs": 8642,
-      "restartedSessionFirstSatisfiedMs": 5976,
+      "coldSessionFirstSatisfiedMs": 19750,
+      "restartedSessionFirstSatisfiedMs": 14785,
       "fasterThanCold": true
     }
   },
   "restart": {
     "performed": true,
-    "msToReadyAfterRestart": 6083,
+    "msToReadyAfterRestart": 14895,
     "completionOkAfterRestart": true,
     "signatureHelpOkAfterRestart": true,
     "reason": null,

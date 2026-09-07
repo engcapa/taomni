@@ -158,6 +158,7 @@ describe("§8.19.4 real jdtls trace contract", () => {
       expect(raw, fixtureId).not.toContain("/home/zhyhang");
       // The runner's throwaway -data workspaces never survive sanitization.
       expect(raw, fixtureId).not.toMatch(/taomni-r3-/);
+      expect(raw, fixtureId).not.toMatch(/file:\/\/\/[A-Za-z]:\//);
     }
   });
 

@@ -16,13 +16,17 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { LspClient, sha256 } from "./lsp-client.mjs";
 
 const RUNNER_DIR = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_ROOT = resolve(RUNNER_DIR, "..");
 const PROJECTS_DIR = join(FIXTURE_ROOT, "projects");
 const TRACES_DIR = join(FIXTURE_ROOT, "traces");
+
+function fileUri(path) {
+  return pathToFileURL(path).href;
+}
 
 // ---------------------------------------------------------------------------
 // Toolchain resolution (pinned versions recorded into every trace)
@@ -565,7 +569,7 @@ async function startSession(jdtls, fixtureId, options = {}) {
   const progressEvents = [];
   const rawDiagnosticsByUri = new Map();
   const client = new LspClient(options.javaPath, launchArgs(jdtls, dataDir), {
-    workspaceFolders: [{ uri: `file://${projectDir}`, name: fixtureId }],
+    workspaceFolders: [{ uri: fileUri(projectDir), name: fixtureId }],
     onDiagnostics: (params) => {
       for (const diagnostic of params?.diagnostics ?? []) {
         diagnosticsLog.push({
@@ -611,8 +615,8 @@ async function startSession(jdtls, fixtureId, options = {}) {
   const startedAt = Date.now();
   const initializeResult = await client.request("initialize", {
     processId: null,
-    rootUri: `file://${projectDir}`,
-    workspaceFolders: [{ uri: `file://${projectDir}`, name: fixtureId }],
+    rootUri: fileUri(projectDir),
+    workspaceFolders: [{ uri: fileUri(projectDir), name: fixtureId }],
     initializationOptions: initializationSettings(options.gradleHome ?? null),
     capabilities: clientCapabilities(),
   }, 180_000);
@@ -773,7 +777,7 @@ async function runQuickFixScenario(session, spec) {
   };
   const startedAt = Date.now();
   const abs = join(session.projectDir, spec.file);
-  const uri = `file://${abs}`;
+  const uri = fileUri(abs);
   const text = openFile(session.client, session.projectDir, spec.file);
   // Precise caret range for the simple name (pushed publishDiagnostics carry
   // no range in this runner's reduced log; the fixture line is fixed).
@@ -959,7 +963,7 @@ function openFile(client, projectDir, relPath) {
   const text = readFileSync(abs, "utf8");
   client.notify("textDocument/didOpen", {
     textDocument: {
-      uri: `file://${abs}`,
+      uri: fileUri(abs),
       languageId: "java",
       version: 1,
       text,
@@ -1184,14 +1188,19 @@ function evaluateExpect(expect, items) {
 // Sanitization
 // ---------------------------------------------------------------------------
 
+function pathVariants(path) {
+  return [...new Set([path, path.replaceAll("\\\\", "/"), fileUri(path)])];
+}
+
 function makeSanitizer(projectDir) {
-  const homes = [homedir(), tmpdir()];
+  const replacements = [
+    ...pathVariants(projectDir).map((path) => [path, "${project}"]),
+    ...pathVariants(FIXTURE_ROOT).map((path) => [path, "${fixtures}"]),
+    ...[homedir(), tmpdir()].flatMap((path) => pathVariants(path).map((variant) => [variant, "~"])),
+  ];
   return (value) => {
     if (typeof value === "string") {
-      let out = value.replaceAll(projectDir, "${project}");
-      out = out.replaceAll(FIXTURE_ROOT, "${fixtures}");
-      for (const home of homes) out = out.replaceAll(home, "~");
-      return out;
+      return replacements.reduce((out, [path, replacement]) => out.replaceAll(path, replacement), value);
     }
     if (Array.isArray(value)) return value.map(makeSanitizer(projectDir));
     if (value && typeof value === "object") {
@@ -1238,7 +1247,7 @@ async function runFixture(fixtureId, toolchain, jdtls, gradleHome) {
 
     for (const fileSpec of spec.filesToOpen) {
       const text = openFile(session.client, session.projectDir, fileSpec.path);
-      openedUris.set(fileSpec.path, { uri: `file://${join(session.projectDir, fileSpec.path)}`, text });
+      openedUris.set(fileSpec.path, { uri: fileUri(join(session.projectDir, fileSpec.path)), text });
     }
 
     // Give the importer a moment to publish progress; cases poll anyway.
@@ -1502,7 +1511,7 @@ async function runFixture(fixtureId, toolchain, jdtls, gradleHome) {
       const eventsBefore = session.progressEvents.length;
       writeFileSync(absPath, `${original}\n<!-- w2-generation-bump-probe -->\n`);
       session.client.notify("workspace/didChangeWatchedFiles", {
-        changes: [{ uri: `file://${absPath}`, type: 2 }],
+        changes: [{ uri: fileUri(absPath), type: 2 }],
       });
       let reimportObserved = false;
       const deadline = Date.now() + 120_000;
@@ -1516,7 +1525,7 @@ async function runFixture(fixtureId, toolchain, jdtls, gradleHome) {
       }
       writeFileSync(absPath, original);
       session.client.notify("workspace/didChangeWatchedFiles", {
-        changes: [{ uri: `file://${absPath}`, type: 2 }],
+        changes: [{ uri: fileUri(absPath), type: 2 }],
       });
       // Give the importer time to chew on the revert before the probe.
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 5_000));
@@ -1563,7 +1572,7 @@ async function runFixture(fixtureId, toolchain, jdtls, gradleHome) {
         const text = openFile(second.client, second.projectDir, reopenSpec.file);
         const wait = await waitForCase(
           second.client,
-          `file://${join(second.projectDir, reopenSpec.file)}`,
+          fileUri(join(second.projectDir, reopenSpec.file)),
           locateTokenEnd(text, reopenSpec.token),
           null,
           (items) => evaluateExpect(reopenSpec.expect, items),
@@ -1577,7 +1586,7 @@ async function runFixture(fixtureId, toolchain, jdtls, gradleHome) {
           const sigText = openFile(second.client, second.projectDir, APP_MAIN);
           const sigWait = await waitForSignature(
             second.client,
-            `file://${join(second.projectDir, APP_MAIN)}`,
+            fileUri(join(second.projectDir, APP_MAIN)),
             locateAfterPrefix(sigText, SIG_OVERLOAD_LINE, "sb.append("),
             (result) => evaluateSignatureExpect({ minSignatures: 1 }, result),
             240_000,
