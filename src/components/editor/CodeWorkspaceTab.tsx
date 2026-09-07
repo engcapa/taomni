@@ -637,6 +637,7 @@ import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
 import {
   replaceMatchAbsolutePath,
   searchMatchesToReplaceInputs,
+  summarizeReplaceCommitReport,
   validateReplacePreconditions,
   verifyReplaceMatchFreshness,
   type FileRevisionGuard,
@@ -8729,8 +8730,20 @@ export function CodeWorkspaceTab({
       },
       applyToOpenBuffer: (key, nextText) => updateFileText(key, nextText),
       // §5.2.9 open-clean: apply then save so the buffer is not left dirty.
+      // ED-AUDIT-003: the shared committer reports a failed or cancelled disk
+      // write as a typed result (null here), not a rejection. The applier
+      // contract is Promise<void>, so the only truthful failure signal is a
+      // throw — otherwise a readonly or conflicted save would be recorded as
+      // a phantom "applied-open" and the workspace-edit report would claim a
+      // completion the disk never reached. The buffer keeps the applied text,
+      // its dirty flag and the committer's error message for in-editor
+      // recovery.
       saveOpenBuffer: async (key, nextText) => {
-        await saveOpenBufferText(key, nextText);
+        const saved = await saveOpenBufferText(key, nextText);
+        if (!saved) {
+          const error = openFilesRef.current[key]?.error;
+          throw new Error(error || `save did not commit for open buffer ${key}`);
+        }
       },
       readDisk: async (absolutePath) => {
         // Prefer workspace APIs via root-relative path when possible.
@@ -18112,13 +18125,20 @@ export function CodeWorkspaceTab({
                     setStatusMessage(message);
                     return { ok: false, message };
                   }
-                  await applyLspWorkspaceEdit(edit);
-                  const fileCount = byFile.size;
-                  const appliedCount = matches.length;
-                  setStatusMessage(
-                    `Replaced ${appliedCount} occurrence${appliedCount === 1 ? "" : "s"} in ${fileCount} file${fileCount === 1 ? "" : "s"} — Ctrl+Z to undo`,
-                  );
-                  return { ok: true, appliedCount, fileCount };
+                  // ED-AUDIT-003: the applier's per-operation ledger is the
+                  // only truth for what actually changed. A failed or skipped
+                  // document (readonly file, disk write failure, declined
+                  // retry) must surface the real applied set — never a
+                  // planned-count "all complete" report.
+                  const outcomes = await applyLspWorkspaceEdit(edit);
+                  const report = summarizeReplaceCommitReport(outcomes, modelMatches);
+                  setStatusMessage(report.message);
+                  return {
+                    ok: report.ok,
+                    appliedCount: report.appliedCount,
+                    fileCount: report.fileCount,
+                    ...(report.ok ? {} : { message: report.message }),
+                  };
                 }}
               />
             ),

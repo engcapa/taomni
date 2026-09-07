@@ -561,4 +561,37 @@ describe("ED-FIND-004: replace preview commit flow in FindInFilesPanel", () => {
     expect(screen.queryByTestId("code-workspace-replace-preview")).not.toBeInTheDocument();
     expect(onReplaceMatches).not.toHaveBeenCalled();
   });
+
+  // ED-AUDIT-003: a superseded search invalidates the frozen preview so a
+  // stale plan can never commit after the result set moved underneath it.
+  it("closes the frozen replace preview when a new search supersedes it (A2 stale)", async () => {
+    const onReplaceMatches = vi.fn();
+    await openPreview(onReplaceMatches);
+    expect(screen.getByTestId("code-workspace-replace-preview")).toBeInTheDocument();
+
+    await runSearch("second");
+    await waitFor(() =>
+      expect(screen.queryByTestId("code-workspace-replace-preview")).not.toBeInTheDocument());
+    expect(onReplaceMatches).not.toHaveBeenCalled();
+  });
+
+  // ED-AUDIT-003: an invalid regex surfaces as a search error before any
+  // replace entry point can open; the Replace All gate stays disabled.
+  it("shows an invalid regex error before preview and keeps Replace All disabled (A2)", async () => {
+    render(
+      <FindInFilesPanel roots={roots} onOpenMatch={vi.fn()} onReplaceMatches={vi.fn()} />,
+    );
+    const unlisten = vi.fn();
+    searchMocks.subscribeWorkspaceSearch.mockResolvedValue(unlisten);
+    searchMocks.workspaceSearchStart.mockRejectedValue(
+      new Error("Invalid search pattern: unclosed group"),
+    );
+    fireEvent.change(screen.getByLabelText("Search query"), { target: { value: "foo(bar" } });
+    // Enable the Regular expression toggle, then run the search.
+    fireEvent.click(screen.getByRole("button", { name: "Regular expression" }));
+    fireEvent.keyDown(screen.getByLabelText("Search query"), { key: "Enter" });
+    await waitFor(() => expect(screen.getByTestId("code-workspace-find-error")).toBeInTheDocument());
+    expect(screen.getByTestId("code-workspace-find-error")).toHaveTextContent("Invalid search pattern");
+    expect(screen.getByRole("button", { name: "Preview replace all matches" })).toBeDisabled();
+  });
 });

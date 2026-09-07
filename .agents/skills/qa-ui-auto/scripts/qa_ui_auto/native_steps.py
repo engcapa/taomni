@@ -12,6 +12,9 @@ Native-only verbs:
 * assert_file_receipt   - independent byte hash/encoding/receipt reconciliation.
 * assert_file_sha256    - exact host-byte postcondition without reading source text.
 * native_set_writable   - report-root-scoped Linux permission fault injection.
+* host_write_file       - report-root-scoped external file mutation (real
+                          bytes written by the host, not the app) to prove
+                          stale-state/conflict reactions against real disk.
 * native_clipboard_owner - external X11 CLIPBOARD selection owner: grant a real
                           OS payload, deny text conversion, or suspend the owner
                           so any client's selection read genuinely fails (the
@@ -548,6 +551,55 @@ def _native_set_writable(ctx: NativeStepContext, args: Any) -> str:
     })
     artifact.write_text(json.dumps(observations, indent=2, sort_keys=True), encoding="utf-8")
     return f"owner writable={writable} for {target} ({before:04o}->{observed:04o})"
+
+
+def _host_write_file(ctx: NativeStepContext, args: Any) -> str:
+    """Host-side external file mutation, scoped to the retained report root.
+
+    Simulates a real external editor/process changing a workspace file while
+    the app holds stale state (e.g. between a replace-in-files preview and
+    its commit). The write is unconditional bytes-in/bytes-out: the case
+    proves the app's reaction with the file-assertion verbs, never with this
+    verb's return value.
+    """
+    if not isinstance(args, dict) or not {"path", "text"} <= set(args):
+        raise StepError("host_write_file: expected {path, text}")
+    requested = Path(str(args["path"])).expanduser()
+    try:
+        target = requested.resolve(strict=True)
+    except OSError as exc:
+        raise StepError(f"host_write_file: cannot resolve {requested}: {exc}") from exc
+    report_root = ctx.case_dir.parent.resolve()
+    if not target.is_relative_to(report_root):
+        raise StepError(
+            f"host_write_file: target must stay inside report root {report_root}"
+        )
+    text = str(args["text"])
+    before = hashlib.sha256(target.read_bytes()).hexdigest() if target.exists() else None
+    # Preserve declared LF bytes regardless of host newline translation.
+    payload = text.encode("utf-8")
+    target.write_bytes(payload)
+    after = hashlib.sha256(target.read_bytes()).hexdigest()
+
+    artifact = ctx.case_dir / "native-host-write-observations.json"
+    observations: list[dict[str, Any]] = []
+    if artifact.exists():
+        try:
+            loaded = json.loads(artifact.read_text(encoding="utf-8"))
+            if isinstance(loaded, list):
+                observations = loaded
+        except (OSError, json.JSONDecodeError):
+            observations = []
+    observations.append({
+        "platform": platform.system().lower(),
+        "path": str(target),
+        "byteLength": len(payload),
+        "sha256Before": before,
+        "sha256After": after,
+        "verifiedAtUnixMs": int(time.time() * 1000),
+    })
+    artifact.write_text(json.dumps(observations, indent=2, sort_keys=True), encoding="utf-8")
+    return f"host wrote {target} ({len(payload)} bytes, sha256 {after[:12]})"
 
 
 def _command_output(command: list[str]) -> str:
@@ -1267,6 +1319,11 @@ def _do_assert_file_sha256(ctx: NativeStepContext, args: Any) -> str:
 @_verb("native_set_writable")
 def _do_native_set_writable(ctx: NativeStepContext, args: Any) -> str:
     return _native_set_writable(ctx, args)
+
+
+@_verb("host_write_file")
+def _do_host_write_file(ctx: NativeStepContext, args: Any) -> str:
+    return _host_write_file(ctx, args)
 
 
 @_verb("native_keys")

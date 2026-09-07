@@ -176,6 +176,9 @@
     "native_set_writable": {
      "$ref": "#/$defs/native_set_writable_arg"
     },
+    "host_write_file": {
+     "$ref": "#/$defs/host_write_file_arg"
+    },
     "native_clipboard_owner": {
      "$ref": "#/$defs/native_clipboard_owner_arg"
     },
@@ -817,6 +820,23 @@
     },
     "writable": {
      "type": "boolean"
+    }
+   }
+  },
+  "host_write_file_arg": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "path",
+    "text"
+   ],
+   "properties": {
+    "path": {
+     "type": "string",
+     "minLength": 1
+    },
+    "text": {
+     "type": "string"
     }
    }
   },

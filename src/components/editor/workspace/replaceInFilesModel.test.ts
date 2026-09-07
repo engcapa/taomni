@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildReplaceInFilesWorkspaceEdit,
   createReplaceInFilesPlan,
+  summarizeReplaceCommitReport,
   validateReplacePreconditions,
   verifyReplaceMatchFreshness,
   type ReplaceInFilesMatch,
@@ -113,5 +114,69 @@ describe("ED-FIND-004: replace match freshness against disk", () => {
     expect(conflicts[0].path).toBe("/ws/a.ts");
     expect(conflicts[0].reason).toContain("changed since search");
     expect(conflicts[1].path).toBe("/ws/gone.ts");
+  });
+});
+
+describe("ED-AUDIT-003: replace commit report from the applier ledger", () => {
+  const matches: ReplaceInFilesMatch[] = [
+    { filePath: "/ws/a.ts", startLine: 0, startCharacter: 0, endLine: 0, endCharacter: 6, matchedText: "needle" },
+    { filePath: "/ws/a.ts", startLine: 1, startCharacter: 0, endLine: 1, endCharacter: 6, matchedText: "needle" },
+    { filePath: "/ws/b.ts", startLine: 0, startCharacter: 0, endLine: 0, endCharacter: 6, matchedText: "needle" },
+  ];
+
+  it("reports full success only when every document applied", () => {
+    const report = summarizeReplaceCommitReport([
+      { path: "/ws/a.ts", status: "applied-disk" },
+      { path: "/ws/b.ts", status: "applied-open", reason: undefined },
+    ], matches);
+    expect(report.ok).toBe(true);
+    expect(report.appliedCount).toBe(3);
+    expect(report.fileCount).toBe(2);
+    expect(report.blockers).toEqual([]);
+    expect(report.message).toContain("Replaced 3 occurrences in 2 files");
+  });
+
+  it("reports the real applied set when one document fails (readonly/disk)", () => {
+    const report = summarizeReplaceCommitReport([
+      { path: "/ws/a.ts", status: "applied-disk" },
+      { path: "/ws/b.ts", status: "failed", reason: "Permission denied (os error 13)" },
+    ], matches);
+    expect(report.ok).toBe(false);
+    expect(report.appliedCount).toBe(2);
+    expect(report.fileCount).toBe(1);
+    expect(report.blockers).toEqual(["/ws/b.ts: Permission denied (os error 13)"]);
+    expect(report.message).toContain("partially applied: 2 of 3 occurrences in 1 of 2 files");
+    expect(report.message).toContain("/ws/b.ts: Permission denied");
+  });
+
+  it("reports zero effect when the first document fails before any write", () => {
+    const report = summarizeReplaceCommitReport([
+      { path: "/ws/a.ts", status: "failed", reason: "write cancelled before write: denied" },
+    ], matches);
+    expect(report.ok).toBe(false);
+    expect(report.appliedCount).toBe(0);
+    expect(report.fileCount).toBe(0);
+    expect(report.message).toContain("nothing applied");
+  });
+
+  it("treats a skipped preview-decline as a blocker, not success", () => {
+    const report = summarizeReplaceCommitReport([
+      { path: "WorkspaceEdit", status: "skipped", reason: "WorkspaceEdit preview was declined" },
+    ], matches);
+    expect(report.ok).toBe(false);
+    expect(report.appliedCount).toBe(0);
+    expect(report.blockers[0]).toContain("preview was declined");
+  });
+
+  it("compares Windows paths case-insensitively across outcome and match", () => {
+    const windowsMatches: ReplaceInFilesMatch[] = [
+      { filePath: "C:/Repo/App/src/a.ts", startLine: 0, startCharacter: 0, endLine: 0, endCharacter: 6, matchedText: "needle" },
+    ];
+    const report = summarizeReplaceCommitReport([
+      { path: "c:/repo/app/src/a.ts", status: "applied-disk" },
+    ], windowsMatches);
+    expect(report.ok).toBe(true);
+    expect(report.appliedCount).toBe(1);
+    expect(report.fileCount).toBe(1);
   });
 });

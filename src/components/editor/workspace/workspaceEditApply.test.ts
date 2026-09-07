@@ -101,6 +101,35 @@ describe("applyWorkspaceEdit", () => {
     expect(outcomes[0]).toMatchObject({ status: "applied-open", dirty: false });
   });
 
+  // ED-AUDIT-003: a failed open-clean save must surface as a failed outcome,
+  // never a phantom "applied-open" — the buffer changed but the disk did not.
+  it("reports a failed outcome when the open-clean save rejects (readonly disk)", async () => {
+    const applyToOpenBuffer = vi.fn();
+    const saveOpenBuffer = vi.fn(async () => {
+      throw new Error("Permission denied (os error 13)");
+    });
+    const writeDisk = vi.fn();
+    const outcomes = await applyWorkspaceEdit(
+      edit("file:///repo/ro.ts", "/repo/ro.ts", "Z"),
+      {
+        resolvePath: (file) => file.path,
+        getOpenBuffer: () => ({ text: "x = 1", dirty: false, key: "ro-key" }),
+        applyToOpenBuffer,
+        saveOpenBuffer,
+        readDisk: async () => null,
+        writeDisk,
+      },
+    );
+    expect(applyToOpenBuffer).toHaveBeenCalledWith("ro-key", "Z = 1");
+    expect(saveOpenBuffer).toHaveBeenCalledWith("ro-key", "Z = 1");
+    expect(writeDisk).not.toHaveBeenCalled();
+    expect(outcomes[0]).toMatchObject({
+      status: "failed",
+      path: "/repo/ro.ts",
+      reason: "Permission denied (os error 13)",
+    });
+  });
+
   it("writes unopened files via disk hooks with hash", async () => {
     const writeDisk = vi.fn(async () => committedDisk());
     const saveOpenBuffer = vi.fn(async () => {});
