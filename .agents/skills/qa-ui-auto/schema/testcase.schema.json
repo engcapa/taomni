@@ -68,6 +68,7 @@
      "workspace_root",
      "java_sample_projects",
      "java25_projects",
+     "editor_performance",
      "git_diff_repo",
      "welcome_recents"
     ]
@@ -713,7 +714,16 @@
      "minItems": 5,
      "items": {"type": "string", "minLength": 1, "maxLength": 1}
     },
-    "max_p95_ms": {"type": "number", "exclusiveMinimum": 0}
+    "max_p95_ms": {"type": "number", "exclusiveMinimum": 0},
+    "repeat_keys": {"type": "integer", "minimum": 1},
+    "warmup_keys": {
+     "type": "array",
+     "items": {"type": "string", "minLength": 1, "maxLength": 1}
+    },
+    "group_id": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._-]+$"},
+    "fixture_path": {"type": "string", "minLength": 1},
+    "fixture_label": {"type": "string", "minLength": 1},
+    "artifact_name": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._-]+\\.json$"}
    }
   },
   "native_click_arg": {

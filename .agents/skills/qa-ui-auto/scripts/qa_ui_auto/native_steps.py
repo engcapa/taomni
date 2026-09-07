@@ -28,6 +28,7 @@ from __future__ import annotations
 import ctypes
 import hashlib
 import json
+import math
 import os
 import platform
 import re
@@ -761,15 +762,52 @@ def _assert_native_process_delta(ctx: NativeStepContext, args: Any) -> str:
 
 
 def _native_editor_performance(ctx: NativeStepContext, args: Any) -> str:
+    """Collect compact, real keydown-to-DOM samples from a mounted editor.
+
+    ``max_p95_ms`` is retained as a collection guard for legacy cases. It is
+    not a product budget claim; ED-AUDIT-005 compares repeated raw samples.
+    """
     if not isinstance(args, dict) or not {"selector", "keys", "max_p95_ms"} <= set(args):
         raise StepError("native_editor_performance: expected {selector, keys, max_p95_ms}")
     selector = str(args["selector"])
-    keys = args["keys"]
+    key_pattern = args["keys"]
+    repeat_keys = int(args.get("repeat_keys", 1))
+    if repeat_keys < 1:
+        raise StepError("native_editor_performance: repeat_keys must be positive")
+    keys = key_pattern * repeat_keys
+    warmup_keys = args.get("warmup_keys", [])
     max_p95_ms = float(args["max_p95_ms"])
     if not isinstance(keys, list) or len(keys) < 5 or not all(
         isinstance(key, str) and len(key) == 1 and key.isascii() for key in keys
     ):
         raise StepError("native_editor_performance: keys must contain at least five ASCII characters")
+    if not isinstance(warmup_keys, list) or not all(
+        isinstance(key, str) and len(key) == 1 and key.isascii() for key in warmup_keys
+    ):
+        raise StepError("native_editor_performance: warmup_keys must contain ASCII characters")
+    if warmup_keys and len(warmup_keys) < 20:
+        raise StepError("native_editor_performance: warmup_keys must contain at least twenty characters")
+    if warmup_keys and len(keys) < 200:
+        raise StepError("native_editor_performance: measured keys must contain at least 200 characters")
+    group_id = str(args.get("group_id", "default"))
+    artifact_name = str(args.get("artifact_name", "native-editor-performance.json"))
+    if Path(artifact_name).name != artifact_name or not artifact_name.endswith(".json"):
+        raise StepError("native_editor_performance: artifact_name must be a file name ending in .json")
+    fixture_path = args.get("fixture_path")
+    fixture_label = str(args.get("fixture_label", group_id))
+    fixture_observation: dict[str, Any] | None = None
+    if fixture_path is not None:
+        fixture = Path(str(fixture_path)).expanduser()
+        if not fixture.is_file():
+            raise StepError(f"native_editor_performance: fixture does not exist: {fixture}")
+        fixture_bytes = fixture.read_bytes()
+        fixture_observation = {
+            "label": fixture_label,
+            "path": fixture.as_posix(),
+            "byteLength": len(fixture_bytes),
+            "sha256": hashlib.sha256(fixture_bytes).hexdigest(),
+        }
+
     focused = ctx.session.execute(
         f"const el = document.querySelector({json.dumps(selector)});"
         "return !!el && (document.activeElement === el || el.contains(document.activeElement));"
@@ -780,111 +818,194 @@ def _native_editor_performance(ctx: NativeStepContext, args: Any) -> str:
     installed = ctx.session.execute(
         f"const el = document.querySelector({json.dumps(selector)});"
         "if (!(el instanceof HTMLElement)) return false;"
-        "const view=el.cmTile?.root?.view ?? null;"
-        "const editorText=()=>view?.state?.doc?.toString?.() ?? null;"
-        "const state={pending:[],samples:[],keys:[],inputs:[],lastText:el.textContent ?? '',editorTextAtInstall:editorText()};"
+        "const state={pending:[],samples:[],keys:[],inputs:[],"
+        "editorTextAtInstallLength:(el.textContent ?? '').length,"
+        "domTextAtInstallLength:(el.textContent ?? '').length};"
         "const keydown=(event)=>{"
         " if(event.key.length===1&&!event.ctrlKey&&!event.metaKey&&!event.altKey){"
         "   const pending={key:event.key,started:performance.now()}; state.pending.push(pending);"
-        "   state.keys.push({key:event.key,started:pending.started,text:el.textContent ?? '',editorText:editorText(),defaultPrevented:event.defaultPrevented});"
+        "   state.keys.push({key:event.key,started:pending.started,"
+        "defaultPrevented:event.defaultPrevented});"
         " }"
         "};"
-        "const input=(event)=>state.inputs.push({type:event.type,data:event.data ?? null,inputType:event.inputType ?? null,text:el.textContent ?? '',editorText:editorText()});"
-        "const observer=new MutationObserver(()=>{"
-        " const text=el.textContent ?? ''; if(text===state.lastText)return; state.lastText=text;"
+        "const input=(event)=>state.inputs.push({type:event.type,data:event.data ?? null,"
+        "inputType:event.inputType ?? null});"
+        "const observer=new MutationObserver((records)=>{"
+        " if(!records.some((record)=>record.type==='characterData'||record.addedNodes.length||record.removedNodes.length))return;"
         " const pending=state.pending.shift(); if(!pending)return;"
         " const mutationLatencyMs=performance.now()-pending.started;"
-        " const sample={key:pending.key,text,editorText:editorText(),mutationLatencyMs,nextFrameLatencyMs:null};"
+        " const sample={key:pending.key,mutationLatencyMs,nextFrameLatencyMs:null,"
+        "};"
         " state.samples.push(sample);"
         " requestAnimationFrame(()=>{sample.nextFrameLatencyMs=performance.now()-pending.started;});"
         "});"
         "el.addEventListener('keydown',keydown,true); el.addEventListener('beforeinput',input,true); el.addEventListener('input',input,true);"
         "observer.observe(el,{subtree:true,childList:true,characterData:true});"
-        "window.__QA_NATIVE_EDITOR_PERF__={state,cleanup:()=>{observer.disconnect();el.removeEventListener('keydown',keydown,true);el.removeEventListener('beforeinput',input,true);el.removeEventListener('input',input,true);}};"
+        "window.__QA_NATIVE_EDITOR_PERF__={state,resetMeasured:()=>{state.pending=[];state.samples=[];state.keys=[];state.inputs=[];},cleanup:()=>{observer.disconnect();el.removeEventListener('keydown',keydown,true);el.removeEventListener('beforeinput',input,true);el.removeEventListener('input',input,true);}};"
         "return true;"
     )
     if not installed:
         raise StepError(f"native_editor_performance: selector not found: {selector}")
+
+    def wait_for_samples(expected: int, label: str) -> None:
+        deadline = time.time() + max(10, min(60, expected / 10))
+        while time.time() < deadline:
+            captured = int(ctx.session.execute(
+                "return window.__QA_NATIVE_EDITOR_PERF__?.state.samples.length ?? 0;"
+            ))
+            if captured >= expected:
+                return
+            time.sleep(0.01)
+        captured = int(ctx.session.execute(
+            "return window.__QA_NATIVE_EDITOR_PERF__?.state.samples.length ?? 0;"
+        ))
+        raise StepError(
+            f"native_editor_performance: captured {captured} {label} samples for {expected} physical keys"
+        )
+
     # WebDriver key actions are delivered by the packaged native webview's
     # input source. XTest events are intentionally not used here: WebKitGTK
     # marks synthetic X11 modifier events untrusted and drops them before DOM
     # dispatch, which would measure the desktop harness rather than the editor.
+    if warmup_keys:
+        ctx.session.type_text("".join(warmup_keys))
+        wait_for_samples(len(warmup_keys), "warmup")
+        time.sleep(0.1)
+        warmup_state = ctx.session.execute(
+            "const state=window.__QA_NATIVE_EDITOR_PERF__?.state; return state ? {"
+            "samples:state.samples,keys:state.keys,inputs:state.inputs} : null;"
+        )
+        ctx.session.execute("window.__QA_NATIVE_EDITOR_PERF__?.resetMeasured?.(); return true;")
+    else:
+        warmup_state = {"samples": [], "keys": [], "inputs": []}
+
     ctx.session.type_text("".join(keys))
-    deadline = time.time() + 5
-    while time.time() < deadline:
-        captured = int(ctx.session.execute(
-            "return window.__QA_NATIVE_EDITOR_PERF__?.state.samples.length ?? 0;"
-        ))
-        if captured >= len(keys):
-            break
-        time.sleep(0.01)
+    wait_for_samples(len(keys), "measured")
     time.sleep(0.35)
     performance_state = ctx.session.execute(
         "const harness=window.__QA_NATIVE_EDITOR_PERF__;"
         "if(!harness)return null;"
-        "const el=harness.state; const target=document.querySelector(" + json.dumps(selector) + ");"
-        "const view=target?.cmTile?.root?.view ?? null;"
-        "el.domTextAfterSettle=target?.textContent ?? null;"
-        "el.editorTextAfterSettle=view?.state?.doc?.toString?.() ?? null;"
-        "harness.cleanup(); return el;"
+        "const state=harness.state; const target=document.querySelector(" + json.dumps(selector) + ");"
+        "state.domTextAfterSettleLength=(target?.textContent ?? '').length;"
+        "state.editorTextAfterSettle=target?.taomniDocumentSnapshot ?? null;"
+        "const selection=window.getSelection();"
+        "state.domSelectionAfterSettle=selection ? {anchorOffset:selection.anchorOffset,focusOffset:selection.focusOffset,isCollapsed:selection.isCollapsed} : null;"
+        "harness.cleanup(); return state;"
     )
     samples = performance_state.get("samples") if isinstance(performance_state, dict) else None
-    if not isinstance(samples, list) or len(samples) < len(keys) - 1:
+    if not isinstance(samples, list) or len(samples) != len(keys):
         raise StepError(
             f"native_editor_performance: captured {len(samples) if isinstance(samples, list) else 0} "
-            f"paint samples for {len(keys)} physical keys"
+            f"measured samples for {len(keys)} physical keys"
         )
-    latencies = sorted(
-        float(sample["mutationLatencyMs"])
-        for sample in samples
-        if "mutationLatencyMs" in sample
-    )
+
+    def sample_values(entries: Any) -> list[float]:
+        if not isinstance(entries, list):
+            return []
+        return [float(sample["mutationLatencyMs"]) for sample in entries if isinstance(sample, dict) and "mutationLatencyMs" in sample]
+
+    def summary(entries: Any) -> dict[str, Any]:
+        raw = sample_values(entries)
+        if not raw:
+            return {"sampleCount": 0, "rawSamplesMs": [], "p50Ms": None, "p95Ms": None, "p99Ms": None, "maxMs": None}
+        ordered = sorted(raw)
+
+        def nearest_rank(quantile: float) -> float:
+            rank = max(1, min(len(ordered), math.ceil(len(ordered) * quantile)))
+            return ordered[rank - 1]
+
+        return {
+            "sampleCount": len(raw),
+            "rawSamplesMs": raw,
+            "p50Ms": nearest_rank(0.50),
+            "p95Ms": nearest_rank(0.95),
+            "p99Ms": nearest_rank(0.99),
+            "maxMs": ordered[-1],
+        }
+
+    measured_summary = summary(samples)
+    warmup_summary = summary(warmup_state.get("samples") if isinstance(warmup_state, dict) else [])
     next_frame_latencies = sorted(
         float(sample["nextFrameLatencyMs"])
         for sample in samples
-        if isinstance(sample.get("nextFrameLatencyMs"), (int, float))
+        if isinstance(sample, dict) and isinstance(sample.get("nextFrameLatencyMs"), (int, float))
     )
-    p95_index = max(0, min(len(latencies) - 1, int((len(latencies) * 0.95) + 0.9999) - 1))
-    p95 = latencies[p95_index]
+    post_text = performance_state.get("editorTextAfterSettle")
+    if not isinstance(post_text, str):
+        raise StepError("native_editor_performance: editor text was unavailable after settle")
+    post_hash = hashlib.sha256(post_text.encode("utf-8")).hexdigest()
+    build_identity: dict[str, Any] = {}
+    binary_value = (ctx.cfg.get("app") or {}).get("native_binary")
+    if binary_value:
+        binary = Path(str(binary_value))
+        identity_path = binary.with_name(binary.name + ".qa-identity.json")
+        with suppress(OSError, json.JSONDecodeError):
+            loaded = json.loads(identity_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                build_identity = {
+                    "profile": loaded.get("profile"),
+                    "sourceSha256": loaded.get("source_sha256"),
+                    "binarySha256": loaded.get("binary_sha256"),
+                }
     artifact = {
-        "sampleCount": len(latencies),
+        "schemaVersion": 2,
+        "groupId": group_id,
+        "fixture": fixture_observation,
+        "environment": {
+            "platform": platform.platform(),
+            "os": platform.system(),
+            "python": sys.version.split()[0],
+            "webviewUserAgent": ctx.session.execute("return navigator.userAgent")
+        },
+        "build": build_identity,
+        "warmup": {
+            "keys": warmup_state.get("keys", []) if isinstance(warmup_state, dict) else [],
+            "inputs": warmup_state.get("inputs", []) if isinstance(warmup_state, dict) else [],
+            **warmup_summary,
+        },
+        "measured": {
+            "keys": performance_state.get("keys", []),
+            "keyPattern": key_pattern,
+            "repeatKeys": repeat_keys,
+            "inputs": performance_state.get("inputs", []),
+            **measured_summary,
+        },
+        "sampleCount": measured_summary["sampleCount"],
         "keydownCount": len(performance_state.get("keys", [])),
         "pendingKeyCount": len(performance_state.get("pending", [])),
-        "editorTextAtInstall": performance_state.get("editorTextAtInstall"),
-        "domTextAfterSettle": performance_state.get("domTextAfterSettle"),
-        "editorTextAfterSettle": performance_state.get("editorTextAfterSettle"),
-        "keys": performance_state.get("keys", []),
-        "inputs": performance_state.get("inputs", []),
+        "editorTextAtInstallLength": performance_state.get("editorTextAtInstallLength"),
+        "domTextAtInstallLength": performance_state.get("domTextAtInstallLength"),
+        "domTextAfterSettleLength": performance_state.get("domTextAfterSettleLength"),
+        "editorTextAfterSettleLength": len(post_text),
+        "editorTextAfterSettleSha256": post_hash,
+        "domSelectionAfterSettle": performance_state.get("domSelectionAfterSettle"),
         "samples": samples,
-        "latencyMs": latencies,
-        "p50Ms": latencies[len(latencies) // 2],
-        "p95Ms": p95,
-        "maxMs": latencies[-1],
         "nextFrameLatencyMs": next_frame_latencies,
         "nextFrameP95Ms": (
-            next_frame_latencies[p95_index]
-            if len(next_frame_latencies) == len(latencies)
-            else None
+            next_frame_latencies[max(0, min(len(next_frame_latencies), math.ceil(len(next_frame_latencies) * 0.95)) - 1)]
+            if next_frame_latencies else None
         ),
-        "thresholdP95Ms": max_p95_ms,
+        "collectionGuardP95Ms": max_p95_ms,
+        "absoluteBudgetClaim": False,
         "measurement": "native WebDriver keydown to CodeMirror DOM mutation",
         "nextFrameMeasurement": (
             "diagnostic only: requestAnimationFrame registered by MutationObserver; "
             "when CodeMirror mutates during its own animation frame this is the following frame, "
             "not the paint containing the mutation"
         ),
-        "transport": "W3C WebDriver key actions -> GTK/WebKitGTK packaged app",
+        "transport": "W3C WebDriver key actions -> packaged native webview",
     }
-    (ctx.case_dir / "native-editor-performance.json").write_text(
+    (ctx.case_dir / artifact_name).write_text(
         json.dumps(artifact, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
-    if p95 > max_p95_ms:
+    p95 = measured_summary["p95Ms"]
+    if isinstance(p95, (int, float)) and p95 > max_p95_ms:
         raise StepError(
-            f"native editor input p95 {p95:.2f} ms exceeds {max_p95_ms:.2f} ms "
-            f"({len(latencies)} samples)"
+            f"native editor input group {group_id!r} p95 {p95:.2f} ms exceeds collection guard "
+            f"{max_p95_ms:.2f} ms ({len(samples)} samples)"
         )
-    return f"native editor input p95={p95:.2f}ms ({len(latencies)} physical keys)"
+    return f"native editor input group={group_id} p95={p95:.2f}ms ({len(samples)} measured keys)"
 
 
 # --------------------------------------------------------------------------

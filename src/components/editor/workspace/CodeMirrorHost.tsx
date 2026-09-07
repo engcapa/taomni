@@ -1679,6 +1679,49 @@ function documentReplacementChange(currentText: string, nextText: string): Docum
   };
 }
 
+interface IncrementalDocumentUpdate {
+  text: string;
+  deltas: DocumentChangeDelta[];
+}
+
+/**
+ * Rebuild the controlled string from the last known snapshot and a CodeMirror
+ * change set. The editor state identity check at the call site makes this
+ * valid for character-level input while preserving a full-text fallback for
+ * external or otherwise untracked state transitions.
+ */
+function applyChangeSetToDocumentText(
+  previousText: string,
+  changes: ChangeSet,
+  expectedPreviousLength: number,
+): IncrementalDocumentUpdate | null {
+  if (previousText.length !== expectedPreviousLength) return null;
+
+  const chunks: string[] = [];
+  const deltas: DocumentChangeDelta[] = [];
+  let cursor = 0;
+  let valid = true;
+  changes.iterChanges((fromA, toA, _fromB, _toB, insertedText) => {
+    if (!valid || fromA < cursor || toA < fromA || toA > previousText.length) {
+      valid = false;
+      return;
+    }
+    const deleted = previousText.slice(fromA, toA);
+    const insert = insertedText.toString();
+    chunks.push(previousText.slice(cursor, fromA), insert);
+    deltas.push({
+      from: fromA,
+      to: toA,
+      insert,
+      ...(deleted ? { deleted } : {}),
+    });
+    cursor = toA;
+  });
+  if (!valid) return null;
+  chunks.push(previousText.slice(cursor));
+  return { text: chunks.join(""), deltas };
+}
+
 function applySharedTransactionToView(view: EditorView, transaction: DocumentTransaction): boolean {
   if (transaction.changes.length === 0) return false;
   const changes = transaction.changes.map(({ from, to, insert }) => ({ from, to, insert }));
@@ -1887,6 +1930,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const applyingExternalDocRef = useRef(false);
   /** Mirrors the last full text sent through onChange or applied from props. */
   const lastDocumentTextRef = useRef(doc);
+  /** Keeps the incremental input path anchored to the immediately previous state. */
+  const lastEditorStateRef = useRef<EditorState | null>(null);
   /** Last controlled prop snapshot; distinguishes stale lag from a real reload. */
   const lastPropDocumentTextRef = useRef(doc);
   /** Local snapshots awaiting a controlled-prop echo, oldest first. */
@@ -2500,25 +2545,37 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
           },
         }),
         EditorView.updateListener.of((update) => {
+          const previousState = lastEditorStateRef.current;
+          lastEditorStateRef.current = update.state;
           if (update.docChanged) {
             const isRemote = update.transactions.some((tr) => tr.annotation(remoteTransactionAnnotation));
             if (!applyingExternalDocRef.current && !isRemote) {
-              // onChange currently carries a full string, so one conversion is
-              // unavoidable. Remember it to avoid a second full conversion in
-              // the controlled-doc effect after React reflects the change.
-              const nextDoc = update.state.doc.toString();
+              // onChange carries a full string, but character-level input can
+              // reuse the last controlled snapshot instead of traversing the
+              // entire CodeMirror rope on every keypress.
+              const incremental = previousState === update.startState
+                ? applyChangeSetToDocumentText(
+                  lastDocumentTextRef.current,
+                  update.changes,
+                  update.startState.doc.length,
+                )
+                : null;
+              const nextDoc = incremental?.text ?? update.state.doc.toString();
               lastDocumentTextRef.current = nextDoc;
               if (transactionOwnerRef.current && fileKeyRef.current && viewIdRef.current) {
-                const deltas: DocumentChangeDelta[] = [];
-                update.changes.iterChanges((fromA, toA, _fromB, _toB, insertedText) => {
-                  const deleted = update.startState.doc.sliceString(fromA, toA);
-                  deltas.push({
-                    from: fromA,
-                    to: toA,
-                    insert: insertedText.toString(),
-                    ...(deleted ? { deleted } : {}),
+                const deltas = incremental?.deltas ?? (() => {
+                  const fallbackDeltas: DocumentChangeDelta[] = [];
+                  update.changes.iterChanges((fromA, toA, _fromB, _toB, insertedText) => {
+                    const deleted = update.startState.doc.sliceString(fromA, toA);
+                    fallbackDeltas.push({
+                      from: fromA,
+                      to: toA,
+                      insert: insertedText.toString(),
+                      ...(deleted ? { deleted } : {}),
+                    });
                   });
-                });
+                  return fallbackDeltas;
+                })();
                 if (deltas.length > 0) {
                   const sharedTransaction = transactionOwnerRef.current.dispatchTransaction(
                     fileKeyRef.current,
@@ -2537,14 +2594,14 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
                         currentView !== rejectedView
                         || !currentOwner
                         || !currentFileKey
-                        || currentView.state.doc.toString() !== rejectedText
+                        || lastDocumentTextRef.current !== rejectedText
                       ) return;
                       const canonical = currentOwner.getDocument(currentFileKey);
                       if (canonical === null || canonical === rejectedText) return;
                       applyingExternalDocRef.current = true;
                       try {
                         applyDocumentSnapshotToView(currentView, canonical);
-                        lastDocumentTextRef.current = currentView.state.doc.toString();
+                        lastDocumentTextRef.current = canonical;
                       } finally {
                         applyingExternalDocRef.current = false;
                       }
@@ -2596,6 +2653,12 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     const view = new EditorView({ state, parent: hostRef.current });
     editorLanguageByView.set(view, liveTemplateLanguageForPath(pathRef.current));
     viewRef.current = view;
+    Object.defineProperty(view.contentDOM, "taomniDocumentSnapshot", {
+      configurable: true,
+      enumerable: false,
+      get: () => view.state.doc.toString(),
+    });
+    lastEditorStateRef.current = view.state;
     const compositionNavigationGuard = (event: KeyboardEvent) => {
       if (
         (!view.composing && event.isComposing !== true)
@@ -2703,6 +2766,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       view.contentDOM.removeEventListener("keydown", compositionNavigationGuard, true);
       view.destroy();
       viewRef.current = null;
+      lastEditorStateRef.current = null;
       if (owner && sharedFileKey) owner.releaseView(sharedFileKey, sharedViewId);
     };
   }, []);
@@ -3084,7 +3148,6 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       // advanced again before React delivers this prop. Replacing the live
       // document here can corrupt an in-flight CodeMirror change set; a later
       // non-echo snapshot remains responsible for canonical reconciliation.
-      lastDocumentTextRef.current = view.state.doc.toString();
       return;
     }
     while (
@@ -3098,12 +3161,13 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     if (owner && fileKeyRef.current) {
       const canonical = owner.getDocument(fileKeyRef.current);
       if (canonical !== null) {
-        const currentText = view.state.doc.toString();
         if (doc === canonical) {
           // The controlled snapshot caught up with the shared owner. If a
           // remote transaction raced this effect, repair only the changed
-          // range and preserve the view's selection.
-          if (currentText !== canonical) {
+          // range and preserve the view's selection. The tracked snapshot is
+          // kept in lockstep by the update listener, so this branch avoids a
+          // second full conversion for the ordinary local echo.
+          if (lastDocumentTextRef.current !== canonical) {
             applyingExternalDocRef.current = true;
             try {
               applyDocumentSnapshotToView(view, canonical);
@@ -3111,7 +3175,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
               applyingExternalDocRef.current = false;
             }
           }
-          lastDocumentTextRef.current = view.state.doc.toString();
+          lastDocumentTextRef.current = canonical;
           return;
         }
         if (previousPropDocument !== doc) {
@@ -3125,13 +3189,12 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             "external-disk",
           );
           if (transaction) applySharedTransactionToView(view, transaction);
-          lastDocumentTextRef.current = view.state.doc.toString();
+          lastDocumentTextRef.current = transaction ? doc : lastDocumentTextRef.current;
           return;
         }
-        if (currentText === canonical || lastDocumentTextRef.current === canonical) {
+        if (lastDocumentTextRef.current === canonical) {
           // React may still expose the previous store value while a live
           // editor edit is buffered. The shared owner is authoritative.
-          lastDocumentTextRef.current = currentText;
           return;
         }
       }
@@ -3140,8 +3203,11 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     if (lastDocumentTextRef.current === doc) return;
     applyingExternalDocRef.current = true;
     try {
-      applyDocumentSnapshotToView(view, doc);
-      lastDocumentTextRef.current = view.state.doc.toString();
+      if (applyDocumentSnapshotToView(view, doc)) {
+        lastDocumentTextRef.current = doc;
+      } else {
+        lastDocumentTextRef.current = view.state.doc.toString();
+      }
     } finally {
       applyingExternalDocRef.current = false;
     }

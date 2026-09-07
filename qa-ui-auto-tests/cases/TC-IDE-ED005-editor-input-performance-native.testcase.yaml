@@ -1,0 +1,149 @@
+id: TC-IDE-ED005-editor-input-performance-native
+title: "ED-AUDIT-005 mounted editor input performance and recovery"
+description: |
+  Measures the packaged native Code Workspace editor through the real WebDriver
+  input path on a deterministic small document, a 1 MiB Java-like document,
+  and a 5 MiB stress document. Every measured group retains 20 warmup and 200+
+  raw input samples plus document postconditions. The small document also
+  exercises selection replacement, undo recovery, and a real save readback.
+  The native collector's high p95 value is only a collection guard because
+  this card has no approved absolute product budget.
+covers: [F25.5]
+tags: [code-workspace, performance, native-gate, p1]
+modes: [native]
+native_platforms: [Linux, Windows]
+fixtures: [reset_db, editor_performance]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-ed005-editor-performance-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-ed005","name":"editor-performance","roots":[{"id":"ed005-root","name":"editor-performance","path":"${fixture.editor_performance_root}","kind":"folder"}],"looseFiles":[],"lastOpenedAt":1756100000000,"isGitRepo":false,"lastActiveFile":{"kind":"root","rootId":"ed005-root","path":"small.java"}}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.editor_performance_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="small.java"]'
+  - click: '[data-testid="code-workspace-tree-file"][data-path="small.java"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "public final class EditorPerformanceFixture"
+      timeout_sec: 30
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - native_editor_performance:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      warmup_keys: [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t]
+      keys: [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z]
+      repeat_keys: 8
+      group_id: small
+      fixture_label: small-document
+      fixture_path: "${fixture.editor_performance_small}"
+      artifact_name: native-editor-performance-small.json
+      max_p95_ms: 1000
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: abcdefghijklmnopqrst
+      timeout_sec: 30
+
+  # Selection is observable before the edit; one undo must restore the exact
+  # first character without disturbing the measured suffix.
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [Control+Home, Shift+ArrowRight]
+  - eval_readonly:
+      expression: 'window.getSelection()?.isCollapsed === false'
+      expect_truthy: true
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [x]
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: xackage perf
+      timeout_sec: 30
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [Control+z]
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: package perf
+      timeout_sec: 30
+  - press: Control+s
+  - wait: 1
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-save-observation"]'
+      name: data-state
+      equals: saved
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-save-observation"]'
+      name: data-dirty
+      equals: "false"
+  - assert_file_contains:
+      path: "${fixture.editor_performance_small}"
+      contains: abcdefghijklmnopqrst
+      timeout_sec: 30
+
+  - click: '[data-testid="code-workspace-tree-file"][data-path="one-mib.java"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "public final class EditorPerformanceFixture"
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - native_editor_performance:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      warmup_keys: [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t]
+      keys: [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z]
+      repeat_keys: 8
+      group_id: one-mib
+      fixture_label: one-mib-java-like
+      fixture_path: "${fixture.editor_performance_one_mib}"
+      artifact_name: native-editor-performance-one-mib.json
+      max_p95_ms: 1000
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: abcdefghijklmnopqrst
+      timeout_sec: 60
+  - press: Control+s
+  - wait: 1
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-save-observation"]'
+      name: data-state
+      equals: saved
+  - assert_file_contains:
+      path: "${fixture.editor_performance_one_mib}"
+      contains: abcdefghijklmnopqrst
+      timeout_sec: 60
+
+  - click: '[data-testid="code-workspace-tree-file"][data-path="five-mib.java"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 120
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "public final class EditorPerformanceFixture"
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - native_editor_performance:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      warmup_keys: [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t]
+      keys: [a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z]
+      repeat_keys: 8
+      group_id: five-mib
+      fixture_label: five-mib-java-like-stress
+      fixture_path: "${fixture.editor_performance_five_mib}"
+      artifact_name: native-editor-performance-five-mib.json
+      max_p95_ms: 1000
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: abcdefghijklmnopqrst
+      timeout_sec: 60

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   invokeWithPerformanceObservation,
+  summarizePerformanceSamples,
   type PerformanceIpcEvent,
 } from "./performanceInstrumentation";
 
@@ -11,6 +12,17 @@ afterEach(() => {
 });
 
 describe("performanceInstrumentation", () => {
+  it("uses nearest-rank percentiles and retains raw sample order", () => {
+    expect(summarizePerformanceSamples([9, 1, 7, 3, 5])).toEqual({
+      rawSamplesMs: [9, 1, 7, 3, 5],
+      p50Ms: 5,
+      p95Ms: 9,
+      p99Ms: 9,
+      maxMs: 9,
+    });
+    expect(() => summarizePerformanceSamples([])).toThrow(RangeError);
+  });
+
   it("records real operation start and completion without changing its result", async () => {
     const events: PerformanceIpcEvent[] = [];
     (globalThis as typeof globalThis & {

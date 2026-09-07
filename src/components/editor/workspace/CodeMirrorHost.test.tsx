@@ -950,6 +950,61 @@ describe("§8.26 ED-MULTIVIEW-002 shared document host wiring", () => {
     unsubscribe();
   });
 
+  it("reuses the previous document snapshot for input and keeps delayed echoes behind the owner", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const actionHost = new WorkspaceActionHost({ workspaceId: "ws-incremental-input" });
+    const initial = `${"const value = 1;\n".repeat(2_000)}tail`;
+    const onChange = vi.fn();
+    const rendered = render(
+      <CodeMirrorHost {...sharedProps(owner, "primary", initial, onChange, actionHost)} />,
+    );
+    const view = EditorView.findFromDOM(rendered.container.querySelector<HTMLElement>(".cm-editor")!);
+    expect(view).not.toBeNull();
+
+    const previousDocument = view!.state.doc;
+    const previousDocumentToString = vi.spyOn(previousDocument, "toString");
+    const firstText = `${initial}!`;
+    view!.dispatch({
+      changes: { from: initial.length, to: initial.length, insert: "!" },
+      selection: { anchor: firstText.length },
+      userEvent: "input.type",
+    });
+
+    expect(previousDocumentToString).not.toHaveBeenCalled();
+    expect(view!.state.doc.toString()).toBe(firstText);
+    expect(owner.getDocument("shared.ts")).toBe(firstText);
+    expect(onChange).toHaveBeenLastCalledWith(firstText, expect.anything(), firstText.length);
+    expect(view!.state.selection.main.head).toBe(firstText.length);
+
+    // A second native change can reach the owner before React renders the
+    // controlled echo for the first change. That echo must acknowledge only.
+    const secondText = `${firstText}?`;
+    view!.dispatch({
+      changes: { from: firstText.length, to: firstText.length, insert: "?" },
+      selection: { anchor: secondText.length },
+      userEvent: "input.type",
+    });
+    rendered.rerender(
+      <CodeMirrorHost
+        {...sharedProps(owner, "primary", firstText, onChange, actionHost)}
+        documentRevision={1}
+      />,
+    );
+    expect(view!.state.doc.toString()).toBe(secondText);
+    expect(owner.getDocument("shared.ts")).toBe(secondText);
+
+    await act(async () => {
+      const result = await actionHost.execute("workspace.undo", { focus: "editor", hasActiveFile: true });
+      expect(result.kind).toBe("applied");
+    });
+    expect(view!.state.doc.toString()).toBe(firstText);
+    expect(owner.getDocument("shared.ts")).toBe(firstText);
+    expect(owner.getHistoryState("shared.ts")).toMatchObject({ canUndo: true, canRedo: true });
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+    expect((content as HTMLElement & { taomniDocumentSnapshot?: string }).taomniDocumentSnapshot)
+      .toBe(firstText);
+  });
+
   it("routes undo and redo through the shared owner for both mounted views", async () => {
     const owner = new WorkspaceDocumentTransactionOwner();
     const actionHost = new WorkspaceActionHost({ workspaceId: "ws-shared-history" });

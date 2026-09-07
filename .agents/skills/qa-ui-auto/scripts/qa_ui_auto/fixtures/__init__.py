@@ -12,6 +12,7 @@ Fixtures are referenced from a testcase's `fixtures: [...]` list. Builtin set:
 * java_sample_projects - expose in-repo sample Maven/Gradle project roots as
                     ${fixture.maven_single_root} / ${fixture.gradle_single_root}
 * java25_projects - create and compile isolated Maven + Gradle Java 25 projects
+* editor_performance - create deterministic small, 1 MiB and 5 MiB Java-like files
 * git_diff_repo    - native-only reproducible Git history and worktree state
 
 Custom fixtures should live in this package and register via `register(name, fn)`.
@@ -22,7 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Protocol
 
-from . import git_diff_repo, java25_projects, java_sample_projects, jdtls_required, linux_x11_required, reset_db, sftp_required, ssh_required, welcome_recents, workspace_root
+from . import editor_performance, git_diff_repo, java25_projects, java_sample_projects, jdtls_required, linux_x11_required, reset_db, sftp_required, ssh_required, welcome_recents, workspace_root
 
 
 class FixtureContext(Protocol):
@@ -48,6 +49,7 @@ REGISTRY: dict[str, Fixture] = {
     "workspace_root": Fixture("workspace_root", workspace_root.setup, workspace_root.teardown),
     "java_sample_projects": Fixture("java_sample_projects", java_sample_projects.setup),
     "java25_projects": Fixture("java25_projects", java25_projects.setup),
+    "editor_performance": Fixture("editor_performance", editor_performance.setup),
     "git_diff_repo": Fixture("git_diff_repo", git_diff_repo.setup, git_diff_repo.teardown),
     "welcome_recents": Fixture("welcome_recents", welcome_recents.setup, welcome_recents.teardown),
 }

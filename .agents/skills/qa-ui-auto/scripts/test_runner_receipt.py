@@ -16,6 +16,7 @@ from pathlib import Path
 import tempfile
 import unittest
 import sys
+from unittest.mock import patch
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(SCRIPTS_DIR) not in sys.path:
@@ -226,6 +227,28 @@ class TestRunnerReceipt(unittest.TestCase):
             verif = verify_runner_receipt(content, now_iso="2026-08-29T12:00:00Z")
             self.assertTrue(verif["valid"])
             self.assertEqual(verif["key"]["keyId"], "key-browser-runner-01")
+
+    def test_artifact_collection_tolerates_file_removed_during_walk(self):
+        """Native teardown may remove an isolated file after discovery."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            report_dir = Path(tmpdir) / "run-race"
+            report_dir.mkdir(parents=True)
+            stable = report_dir / "summary.json"
+            stable.write_text("{}")
+            vanishing = report_dir / "vanishing.bin"
+            vanishing.write_bytes(b"cache")
+
+            original_read_bytes = Path.read_bytes
+
+            def read_bytes(path: Path) -> bytes:
+                if path.name == "vanishing.bin":
+                    raise FileNotFoundError(path)
+                return original_read_bytes(path)
+
+            with patch.object(Path, "read_bytes", new=read_bytes):
+                artifacts = collect_report_artifacts(report_dir)
+
+            self.assertEqual([item["path"] for item in artifacts], ["summary.json"])
 
 
 if __name__ == "__main__":

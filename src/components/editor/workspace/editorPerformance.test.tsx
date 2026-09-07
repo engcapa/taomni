@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createFixtureCompletionSource, MAX_COMPLETION_OPTIONS } from "./lspCompletion";
 import { CodeMirrorHost } from "./CodeMirrorHost";
 import type { LspCompletionResult, LspDiagnostic, LspDocumentStatus } from "../../../lib/editor/lsp";
+import { summarizePerformanceSamples } from "../../../lib/performanceInstrumentation";
 
 const TYPING_FIXTURE = Array.from({ length: 400 }, (_, line) =>
   `const value${line} = ${line}; // stable editor benchmark fixture`,
@@ -332,5 +333,10 @@ describe("Editor typing and completion performance verification", () => {
 
     expect(samplesMs).toHaveLength(TYPING_MEASURED_SAMPLES);
     expect(view!.state.doc.length).toBe(TYPING_FIXTURE.length + TYPING_WARMUP_SAMPLES + TYPING_MEASURED_SAMPLES);
+    const summary = summarizePerformanceSamples(samplesMs);
+    expect(summary.rawSamplesMs).toHaveLength(TYPING_MEASURED_SAMPLES);
+    expect(summary.p50Ms).toBeGreaterThanOrEqual(0);
+    expect(summary.p95Ms).toBeGreaterThanOrEqual(summary.p50Ms);
+    expect(summary.p99Ms).toBeGreaterThanOrEqual(summary.p95Ms);
   });
 });

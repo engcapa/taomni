@@ -241,20 +241,40 @@ def collect_report_artifacts(report_root: Path) -> list[dict[str, Any]]:
     if not report_root.is_dir():
         return artifacts
 
-    for p in sorted(report_root.rglob("*")):
-        if set(p.relative_to(report_root).parts).intersection({
-            "_workdirs", "native-appdata", "native-appconfig", "native-appcache",
-        }):
-            continue
-        if p.is_file() and p.name != "runner_receipt.json":
+    excluded_directories = {
+        "_workdirs", "native-appdata", "native-appconfig", "native-appcache",
+    }
+    report_files: list[Path] = []
+
+    def ignore_walk_error(_error: OSError) -> None:
+        # Native teardown may remove a directory between scandir calls.
+        return
+
+    for directory, directories, files in os.walk(
+        report_root,
+        topdown=True,
+        onerror=ignore_walk_error,
+    ):
+        directories[:] = sorted(name for name in directories if name not in excluded_directories)
+        report_files.extend(Path(directory) / name for name in sorted(files))
+
+    for p in sorted(report_files):
+        try:
+            if not p.is_file() or p.name == "runner_receipt.json":
+                continue
             rel = str(p.relative_to(report_root))
             raw = p.read_bytes()
-            sha256 = f"sha256:{hashlib.sha256(raw).hexdigest()}"
-            artifacts.append({
-                "path": rel,
-                "sha256": sha256,
-                "bytes": len(raw),
-            })
+        except (FileNotFoundError, NotADirectoryError):
+            # Native teardown can remove an isolated cache entry while the
+            # report tree is being walked. It is not a report artifact and
+            # must not prevent the runner from emitting its own receipt.
+            continue
+        sha256 = f"sha256:{hashlib.sha256(raw).hexdigest()}"
+        artifacts.append({
+            "path": rel,
+            "sha256": sha256,
+            "bytes": len(raw),
+        })
     return artifacts
 
 
