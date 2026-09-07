@@ -77,9 +77,13 @@ evidence. Missing baselines/measurements are unverified; establish a baseline
 before claiming no regression.
 
 `native_editor_performance` records keydown-to-CodeMirror-DOM-mutation samples
-and gates a supplied p95 budget. This renderer metric is not full OS-to-screen
-latency. Compare `native-editor-performance.json` before/after as well as checking
-the absolute budget. `assert_native_process_delta` detects Linux process leaks.
+and gates a supplied p95 guardrail. This renderer metric is not full OS-to-screen
+latency. `keys` accepts a single-char array or a plain string; `capture_text:
+false` skips the per-key textContent probe for multi-megabyte documents, and
+`label` writes per-invocation `native-editor-performance-<label>.json` artifacts
+so repeated measurement groups accumulate. Compare the labeled artifacts
+before/after as well as checking the guardrail. `assert_native_process_delta`
+detects Linux process leaks.
 
 `scripts/perf_baseline.py --base-url URL` remains a Chromium editor diagnostic.
 It retains all measured samples, records explicit warmup separately and fails

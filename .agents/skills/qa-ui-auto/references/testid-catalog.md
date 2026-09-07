@@ -273,6 +273,24 @@
 - `[data-testid="code-workspace-local-history-dialog"]` — display [optional] — F25.5.local-history-dialog
 - `[data-testid="code-workspace-local-history-compare"]` — interactive [optional] — F25.5.local-history-compare
 - `[data-testid="code-workspace-local-history-restore"]` — interactive [optional] — F25.5.local-history-restore
+- `[data-testid="auto-import-settings-dialog"]` — display [optional] — F25.5.auto-import-settings-dialog
+- `[data-testid="auto-import-close-button"]` — interactive [optional] — F25.5.auto-import-close-button
+- `[data-testid="auto-import-on-the-fly-checkbox"]` — interactive [optional] — F25.5.auto-import-on-the-fly-checkbox
+- `[data-testid="auto-import-optimize-on-the-fly-checkbox"]` — interactive [optional] — F25.5.auto-import-optimize-on-the-fly-checkbox
+- `[data-testid="auto-import-paste-mode-select"]` — interactive [optional] — F25.5.auto-import-paste-mode-select
+- `[data-testid="auto-import-save-button"]` — interactive [optional] — F25.5.auto-import-save-button
+- `[data-testid="auto-import-reset-button"]` — interactive [optional] — F25.5.auto-import-reset-button
+- `[data-testid="auto-import-candidate-dialog"]` — display [optional] — F25.5.auto-import-candidate-dialog
+- `[data-testid="file-template-settings-dialog"]` — display [optional] — F25.5.file-template-settings-dialog
+- `[data-testid="file-template-close-button"]` — interactive [optional] — F25.5.file-template-close-button
+- `[data-testid="file-template-editor-textarea"]` — interactive [optional] — F25.5.file-template-editor-textarea
+- `[data-testid="file-template-save-button"]` — interactive [optional] — F25.5.file-template-save-button
+- `[data-testid="file-template-reset-button"]` — interactive [optional] — F25.5.file-template-reset-button
+- `[data-testid="new-java-class-dialog"]` — display [optional] — F25.5.new-java-class-dialog
+- `[data-testid="new-java-class-name-input"]` — interactive [optional] — F25.5.new-java-class-name-input
+- `[data-testid="new-java-class-kind-select"]` — interactive [optional] — F25.5.new-java-class-kind-select
+- `[data-testid="new-java-class-confirm"]` — interactive [optional] — F25.5.new-java-class-confirm
+- `[data-testid="new-java-class-cancel"]` — interactive [optional] — F25.5.new-java-class-cancel
 
 ## code-workspace/execution (F25.1)
 
@@ -717,6 +735,8 @@
 - `[data-testid="status-bar-message"]` — display [optional] — F1.7.status-message
 - `[data-testid="status-bar-workspace-encoding"]` — interactive [optional] — F1.7.workspace-encoding
 - `[data-testid="status-bar-workspace-eol"]` — interactive [optional] — F1.7.workspace-eol
+- `[data-testid="status-bar-workspace-cursor"]` — display [optional] — F1.7.workspace-cursor
+- `[data-testid="status-bar-workspace-large-file"]` — display [optional] — F1.7.workspace-large-file
 
 ## main/tabs (F1.5)
 

@@ -1,0 +1,218 @@
+id: TC-IDE-C0-03
+title: "Continuous typing latency on 1 MiB text, degraded 5 MiB mode, small-doc no-regression"
+description: |
+  ED-AUDIT-005 native measurement slice. Three deterministic plain-text
+  fixtures (exactly 1 MiB, exactly 5 MiB, and a small document, all Java-like
+  multi-line) are provisioned in a fresh host directory and opened in the
+  packaged editor. Plain .txt keeps every language server out of the
+  measurement, so the recorded keydown-to-DOM latency is the production
+  editor chain itself: CodeMirror transaction -> CodeMirrorHost update
+  listener -> shared-document owner -> queueEditorTextUpdate -> debounced
+  store flush. The 1 MiB file stays under both large-file thresholds and is
+  measured in full editing mode: 24-key warmup, then two repeated 200-key
+  groups (N=400 measured keys). The 5 MiB file crosses the large-file
+  downgrade thresholds; the case asserts the degraded-mode indicator and
+  measures it separately (24-key warmup plus four 100-key groups) so the two
+  modes are never mixed. The small document proves ordinary edits do not
+  regress with the full per-key DOM capture enabled. After typing, the caret
+  position, the saved disk bytes (SHA-256 of base content plus the typed
+  suffix), and undo (the shared-document owner pops one entry per keystroke,
+  so four undos remove exactly the last four typed chars and the next save
+  lands exactly those bytes) prove semantics and history are unharmed. The
+  per-group max_p95_ms values are
+  responsiveness guardrails, not budgets: the measured p50/p95/max raw
+  samples per group are the evidence, and no absolute budget is claimed.
+  Highest claim on green: L1 native performance measurement of the real
+  input chain.
+covers: [F25.5]
+tags: [code-workspace, ide-c0, performance, typing-latency, native-gate, p1]
+modes: [native]
+fixtures: [reset_db, editor_typing_fixtures]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  # Fresh isolated app-data => empty vault => first-run master-password gate.
+  - vault_first_run: "qa-native-perf-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+
+  # Enter the workspace through persisted recents; lastActiveFile auto-opens
+  # the 1 MiB document into the active leaf.
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-editor-perf","name":"editor-perf","roots":[{"id":"editor-perf","name":"editor-perf","path":"${fixture.editor_perf_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"editor-perf","path":"Large1MiB.txt"},"lastOpenedAt":1788537600000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.editor_perf_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for: '[data-testid="code-workspace-editor-pane"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "SyntheticFixture"
+      timeout_sec: 60
+
+  # ---- 1 MiB document: full editing mode ----
+  # Under both large-file thresholds (1,500,000 chars / 20,000 lines), so the
+  # per-edit semantic storm stays on and the mode is full editing.
+  - assert_not_visible: '[data-testid="status-bar-workspace-large-file"]'
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["Control+End"]
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "${fixture.editor_perf_Large1MiB_cursor_at_end}"
+      timeout_sec: 10
+  # Warmup: 24 keys, loose guardrail; primes lazy per-edit paths on the
+  # large document so the measured groups see steady-state cost.
+  - native_editor_performance:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: "${fixture.editor_perf_warmup_keys}"
+      capture_text: false
+      max_p95_ms: 1000
+      label: large1mib-warmup
+  - native_editor_performance:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: "${fixture.editor_perf_group1_keys}"
+      capture_text: false
+      max_p95_ms: 150
+      label: large1mib-group1
+  - native_editor_performance:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: "${fixture.editor_perf_group2_keys}"
+      capture_text: false
+      max_p95_ms: 150
+      label: large1mib-group2
+  # Selection sync: the debounced status-bar caret must show the appended
+  # position (same line as Ctrl+End, col advanced by all 424 typed chars).
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "${fixture.editor_perf_Large1MiB_cursor_after_append}"
+      timeout_sec: 10
+  # Semantics: the buffer's exact bytes land on disk (base + typed suffix).
+  - press: Control+s
+  - assert_file_sha256:
+      path: "${fixture.editor_perf_root}/Large1MiB.txt"
+      equals: "${fixture.editor_perf_Large1MiB_after_sha256}"
+      timeout_sec: 30
+  # History: the workspace editor undoes through the shared-document owner
+  # (CodeMirror history() is not installed in owner mode), which records one
+  # undo entry per keystroke transaction without typed-run grouping, so four
+  # undos remove exactly the last four typed chars. The next save must land
+  # exactly those undone bytes - proof that undo is deterministic and the
+  # saved bytes are never corrupted by the measured input burst.
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["Control+z", "Control+z", "Control+z", "Control+z"]
+  - wait: 0.5
+  - press: Control+s
+  - assert_file_sha256:
+      path: "${fixture.editor_perf_root}/Large1MiB.txt"
+      equals: "${fixture.editor_perf_Large1MiB_after_undo4_sha256}"
+      timeout_sec: 30
+
+  # ---- 5 MiB document: degraded (large-file) mode, reported separately ----
+  - click: '[data-testid="code-workspace-tree-file"][data-path="Stress5MiB.txt"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "SyntheticFixture"
+      timeout_sec: 60
+  # Above both thresholds: the degraded-mode indicator must be on, and this
+  # group's samples are never mixed with the 1 MiB full-editing group.
+  - assert_visible: '[data-testid="status-bar-workspace-large-file"]'
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["Control+End"]
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "${fixture.editor_perf_Stress5MiB_cursor_at_end}"
+      timeout_sec: 10
+  - native_editor_performance:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: "${fixture.editor_perf_warmup_keys}"
+      capture_text: false
+      max_p95_ms: 2000
+      label: stress5mib-warmup
+  - native_editor_performance:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: "${fixture.editor_perf_stress_chunk1_keys}"
+      capture_text: false
+      max_p95_ms: 500
+      label: stress5mib-group1
+  - native_editor_performance:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: "${fixture.editor_perf_stress_chunk2_keys}"
+      capture_text: false
+      max_p95_ms: 500
+      label: stress5mib-group2
+  - native_editor_performance:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: "${fixture.editor_perf_stress_chunk3_keys}"
+      capture_text: false
+      max_p95_ms: 500
+      label: stress5mib-group3
+  - native_editor_performance:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: "${fixture.editor_perf_stress_chunk4_keys}"
+      capture_text: false
+      max_p95_ms: 500
+      label: stress5mib-group4
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "${fixture.editor_perf_Stress5MiB_cursor_after_append}"
+      timeout_sec: 10
+  - press: Control+s
+  - assert_file_sha256:
+      path: "${fixture.editor_perf_root}/Stress5MiB.txt"
+      equals: "${fixture.editor_perf_Stress5MiB_after_sha256}"
+      timeout_sec: 60
+
+  # ---- Small document: ordinary edits do not regress ----
+  - click: '[data-testid="code-workspace-tree-file"][data-path="Small.txt"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "SyntheticFixture"
+      timeout_sec: 30
+  - assert_not_visible: '[data-testid="status-bar-workspace-large-file"]'
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["Control+End"]
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "${fixture.editor_perf_Small_cursor_at_end}"
+      timeout_sec: 10
+  # Full per-key DOM capture on the small document: every sample carries the
+  # rendered text so the input chain's content progression is inspectable.
+  - native_editor_performance:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: "${fixture.editor_perf_warmup_keys}"
+      capture_text: true
+      max_p95_ms: 1000
+      label: small-warmup
+  - native_editor_performance:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: "${fixture.editor_perf_group1_keys}"
+      capture_text: true
+      max_p95_ms: 50
+      label: small-group1
+  - native_editor_performance:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: "${fixture.editor_perf_group2_keys}"
+      capture_text: true
+      max_p95_ms: 50
+      label: small-group2
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "${fixture.editor_perf_Small_cursor_after_append}"
+      timeout_sec: 10
+  - press: Control+s
+  - assert_file_sha256:
+      path: "${fixture.editor_perf_root}/Small.txt"
+      equals: "${fixture.editor_perf_Small_after_sha256}"
+      timeout_sec: 30
+  - screenshot: tc-ide-c0-03-typing-latency.png

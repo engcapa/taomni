@@ -817,7 +817,17 @@ def _native_editor_performance(ctx: NativeStepContext, args: Any) -> str:
         raise StepError("native_editor_performance: expected {selector, keys, max_p95_ms}")
     selector = str(args["selector"])
     keys = args["keys"]
+    if isinstance(keys, str):
+        # A plain string is typed character-by-character, same as a list of
+        # single-char entries; this keeps long measurement groups readable.
+        keys = list(keys)
     max_p95_ms = float(args["max_p95_ms"])
+    label = args.get("label")
+    capture_text = args.get("capture_text", True)
+    if label is not None and not isinstance(label, str):
+        raise StepError("native_editor_performance: label must be a string")
+    if not isinstance(capture_text, bool):
+        raise StepError("native_editor_performance: capture_text must be a boolean")
     if not isinstance(keys, list) or len(keys) < 5 or not all(
         isinstance(key, str) and len(key) == 1 and key.isascii() for key in keys
     ):
@@ -832,21 +842,28 @@ def _native_editor_performance(ctx: NativeStepContext, args: Any) -> str:
     installed = ctx.session.execute(
         f"const el = document.querySelector({json.dumps(selector)});"
         "if (!(el instanceof HTMLElement)) return false;"
+        "const capture=" + ("true" if capture_text else "false") + ";"
         "const view=el.cmTile?.root?.view ?? null;"
         "const editorText=()=>view?.state?.doc?.toString?.() ?? null;"
-        "const state={pending:[],samples:[],keys:[],inputs:[],lastText:el.textContent ?? '',editorTextAtInstall:editorText()};"
+        "const state={captureText:capture,pending:[],samples:[],keys:[],inputs:[],lastText:capture?(el.textContent ?? ''):'',editorTextAtInstall:editorText()};"
         "const keydown=(event)=>{"
         " if(event.key.length===1&&!event.ctrlKey&&!event.metaKey&&!event.altKey){"
         "   const pending={key:event.key,started:performance.now()}; state.pending.push(pending);"
-        "   state.keys.push({key:event.key,started:pending.started,text:el.textContent ?? '',editorText:editorText(),defaultPrevented:event.defaultPrevented});"
+        "   state.keys.push(capture"
+        f"     ? {{key:event.key,started:pending.started,text:el.textContent ?? '',editorText:editorText(),defaultPrevented:event.defaultPrevented}}"
+        "     : {key:event.key,started:pending.started,defaultPrevented:event.defaultPrevented});"
         " }"
         "};"
-        "const input=(event)=>state.inputs.push({type:event.type,data:event.data ?? null,inputType:event.inputType ?? null,text:el.textContent ?? '',editorText:editorText()});"
+        "const input=(event)=>state.inputs.push(capture"
+        " ? {type:event.type,data:event.data ?? null,inputType:event.inputType ?? null,text:el.textContent ?? '',editorText:editorText()}"
+        " : {type:event.type,inputType:event.inputType ?? null});"
         "const observer=new MutationObserver(()=>{"
-        " const text=el.textContent ?? ''; if(text===state.lastText)return; state.lastText=text;"
+        " let text=null; if(capture){text=el.textContent ?? ''; if(text===state.lastText)return; state.lastText=text;}"
         " const pending=state.pending.shift(); if(!pending)return;"
         " const mutationLatencyMs=performance.now()-pending.started;"
-        " const sample={key:pending.key,text,editorText:editorText(),mutationLatencyMs,nextFrameLatencyMs:null};"
+        " const sample=capture"
+        "   ? {key:pending.key,text,editorText:editorText(),mutationLatencyMs,nextFrameLatencyMs:null}"
+        "   : {key:pending.key,mutationLatencyMs,nextFrameLatencyMs:null};"
         " state.samples.push(sample);"
         " requestAnimationFrame(()=>{sample.nextFrameLatencyMs=performance.now()-pending.started;});"
         "});"
@@ -871,12 +888,16 @@ def _native_editor_performance(ctx: NativeStepContext, args: Any) -> str:
             break
         time.sleep(0.01)
     time.sleep(0.35)
+    # The settle snapshot reads the rendered DOM text only in capture mode:
+    # for multi-megabyte documents serializing textContent through the
+    # WebDriver execute channel would dominate the very latency being
+    # measured, and the disk-hash steps prove content instead.
     performance_state = ctx.session.execute(
         "const harness=window.__QA_NATIVE_EDITOR_PERF__;"
         "if(!harness)return null;"
         "const el=harness.state; const target=document.querySelector(" + json.dumps(selector) + ");"
         "const view=target?.cmTile?.root?.view ?? null;"
-        "el.domTextAfterSettle=target?.textContent ?? null;"
+        "if(el.captureText!==false){el.domTextAfterSettle=target?.textContent ?? null;}"
         "el.editorTextAfterSettle=view?.state?.doc?.toString?.() ?? null;"
         "harness.cleanup(); return el;"
     )
@@ -899,6 +920,8 @@ def _native_editor_performance(ctx: NativeStepContext, args: Any) -> str:
     p95_index = max(0, min(len(latencies) - 1, int((len(latencies) * 0.95) + 0.9999) - 1))
     p95 = latencies[p95_index]
     artifact = {
+        "label": label,
+        "captureText": capture_text,
         "sampleCount": len(latencies),
         "keydownCount": len(performance_state.get("keys", [])),
         "pendingKeyCount": len(performance_state.get("pending", [])),
@@ -927,7 +950,14 @@ def _native_editor_performance(ctx: NativeStepContext, args: Any) -> str:
         ),
         "transport": "W3C WebDriver key actions -> GTK/WebKitGTK packaged app",
     }
-    (ctx.case_dir / "native-editor-performance.json").write_text(
+    # A labeled invocation writes its own artifact so repeated measurement
+    # groups (warmup / group1 / group2 ...) accumulate instead of clobbering
+    # the previous group's raw samples.
+    artifact_name = "native-editor-performance.json"
+    if label:
+        slug = "".join(ch if ch.isalnum() else "-" for ch in label).strip("-").lower()
+        artifact_name = f"native-editor-performance-{slug}.json"
+    (ctx.case_dir / artifact_name).write_text(
         json.dumps(artifact, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )

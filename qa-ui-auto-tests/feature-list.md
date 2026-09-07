@@ -410,6 +410,14 @@ controls:
     selector: '[data-testid="status-bar-workspace-eol"]'
     kind: interactive
     optional: true       # active Code Workspace file only
+  - id: workspace-cursor
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    kind: display
+    optional: true       # active Code Workspace file only (debounced caret)
+  - id: workspace-large-file
+    selector: '[data-testid="status-bar-workspace-large-file"]'
+    kind: display
+    optional: true       # only when the open file exceeds large-file thresholds
 -->
 
 - 显示活跃连接数
