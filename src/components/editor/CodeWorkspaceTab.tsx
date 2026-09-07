@@ -443,6 +443,7 @@ import {
   snapshotCodeActionContext,
   type CodeActionContextIdentity,
   type CodeActionProviderClient,
+  type CodeActionProviderResultV4,
   type CodeActionTransactionSnapshot,
   type ProviderActionV4,
 } from "./workspace/codeActionProviderAdapter";
@@ -696,6 +697,35 @@ function semanticLocationsFromResult(result: {
   if (result.status.error) throw new Error(result.status.error);
   if (!result.status.available || !result.status.active) return null;
   return result.locations;
+}
+
+function codeActionProviderStatusMessage(
+  result: CodeActionProviderResultV4,
+  sectionLabel: string,
+): string {
+  const label = sectionLabel.length > 0
+    ? `${sectionLabel.slice(0, 1).toUpperCase()}${sectionLabel.slice(1)}`
+    : "Code actions";
+  switch (result.state) {
+    case "unsupported":
+      return `${label} unsupported: ${result.reason}`;
+    case "unavailable":
+      return `${label} unavailable: ${result.reason}`;
+    case "empty":
+      return `${label} provider returned a null response`;
+    case "malformed":
+      return `${label} malformed: ${result.message}`;
+    case "timeout":
+      return `${label} request timed out; retry the request`;
+    case "cancelled":
+      return `${label} request cancelled`;
+    case "failed":
+      return `${label} failed: ${result.message}`;
+    case "ready":
+      return result.actions.length === 0
+        ? `No ${sectionLabel} returned by the language server`
+        : "";
+  }
 }
 
 function breadcrumbSegmentsForFile(
@@ -1116,6 +1146,7 @@ import {
 import {
   changedWorkspaceSemanticBufferPaths,
   workspaceSemanticIndexBuildIsCurrent,
+  workspaceSemanticIndexQueryIsCurrent,
   type WorkspaceSemanticIndexBuildToken,
 } from "./workspace/workspaceSemanticIndex";
 import { useWorkspaceSemanticIndex } from "./workspace/useWorkspaceSemanticIndex";
@@ -5870,7 +5901,7 @@ export function CodeWorkspaceTab({
                     [],
                     params.context.only ? [...params.context.only] : undefined,
                   );
-                  return result.actions;
+                  return { actions: result.actions, status: result.status };
                 },
                 resolveCodeAction: async (act) => {
                   if (!act.raw) return null;
@@ -9903,20 +9934,41 @@ export function CodeWorkspaceTab({
     providerActions: readonly ProviderActionV4[];
     context: CodeActionContextIdentity | null;
     semanticToken: WorkspaceSemanticIndexBuildToken | null;
+    providerResult: CodeActionProviderResultV4 | null;
   }> => {
     const caps = lspFilesRef.current[file.key]?.status?.capabilities;
     if (caps && !caps.codeAction) {
-      return { actions: [], providerActions: [], context: null, semanticToken: null };
+      return {
+        actions: [],
+        providerActions: [],
+        context: null,
+        semanticToken: null,
+        providerResult: null,
+      };
     }
     const semanticQuery = only.some((kind) => kind === "refactor" || kind.startsWith("refactor."));
     const expectedRevision = semanticIndex.current().revision;
     const live = await ensureWorkspaceSemanticDocumentsSynced(file.key, expectedRevision);
     if (!live) {
       setStatusMessage(`${semanticQuery ? "Refactor" : "Code actions"} require the language server to finish synchronizing current editor buffers`);
-      return { actions: [], providerActions: [], context: null, semanticToken: null };
+      return {
+        actions: [],
+        providerActions: [],
+        context: null,
+        semanticToken: null,
+        providerResult: null,
+      };
     }
     const descriptor = lspDescriptorForFile(live);
-    if (!descriptor) return { actions: [], providerActions: [], context: null, semanticToken: null };
+    if (!descriptor) {
+      return {
+        actions: [],
+        providerActions: [],
+        context: null,
+        semanticToken: null,
+        providerResult: null,
+      };
+    }
     const buildToken = semanticIndex.beginBuild("language-server");
     try {
       const context = snapshotCodeActionContext({
@@ -9956,7 +10008,7 @@ export function CodeWorkspaceTab({
             params.context.only ? [...params.context.only] : undefined,
           );
           updateLspStatusForFile(live, result.status);
-          return result.actions;
+          return { actions: result.actions, status: result.status };
         },
       };
 
@@ -9973,11 +10025,29 @@ export function CodeWorkspaceTab({
         resultCount: rawActions.length,
       });
       return completion.accepted
-        ? { actions: rawActions, providerActions, context, semanticToken: buildToken }
-        : { actions: [], providerActions: [], context: null, semanticToken: null };
+        ? {
+          actions: rawActions,
+          providerActions,
+          context,
+          semanticToken: buildToken,
+          providerResult: serviceRes,
+        }
+        : {
+          actions: [],
+          providerActions: [],
+          context: null,
+          semanticToken: null,
+          providerResult: serviceRes,
+        };
     } catch (error) {
       semanticIndex.failBuild(buildToken, errorMessage(error));
-      return { actions: [], providerActions: [], context: null, semanticToken: null };
+      return {
+        actions: [],
+        providerActions: [],
+        context: null,
+        semanticToken: null,
+        providerResult: null,
+      };
     }
   }, [
     ensureWorkspaceSemanticDocumentsSynced,
@@ -10032,7 +10102,7 @@ export function CodeWorkspaceTab({
       const assertSemanticCurrent = () => {
         if (
           semanticToken
-          && !workspaceSemanticIndexBuildIsCurrent(semanticIndex.current(), semanticToken)
+          && !workspaceSemanticIndexQueryIsCurrent(semanticIndex.current(), semanticToken)
         ) {
           throw new Error("Refactor result became stale because the workspace changed; request it again");
         }
@@ -10225,7 +10295,7 @@ export function CodeWorkspaceTab({
           }
           if (
             semanticToken
-            && !workspaceSemanticIndexBuildIsCurrent(semanticIndex.current(), semanticToken)
+            && !workspaceSemanticIndexQueryIsCurrent(semanticIndex.current(), semanticToken)
           ) {
             return { valid: false, status: "stale", reason: "The workspace semantic index changed" };
           }
@@ -10242,6 +10312,11 @@ export function CodeWorkspaceTab({
             semanticRevision: semanticToken?.revision,
             plan: refactorPlan,
             recordHistory: false,
+            // A direct provider response remains valid while a separate
+            // provider-progress notification keeps the full index non-ready.
+            // Document/provider identity is still checked by the transaction
+            // hooks above and by this revision-only preflight.
+            semanticRequireReady: false,
             preflightMutation: transactionOptions?.onBeforeCommit,
             onActiveEditResolved: (nextEdit) => {
               appliedEdit = nextEdit;
@@ -10544,11 +10619,18 @@ export function CodeWorkspaceTab({
     );
     if (requestAbort.signal.aborted || intentionRequestAbortRef.current !== requestAbort) return;
 
-    if (requested.semanticToken && !workspaceSemanticIndexBuildIsCurrent(
+    if (requested.semanticToken && !workspaceSemanticIndexQueryIsCurrent(
       semanticIndex.current(),
       requested.semanticToken,
     )) {
       setStatusMessage("Refactor actions became stale because the workspace changed; request them again");
+      return;
+    }
+    const providerMessage = requested.providerResult
+      ? codeActionProviderStatusMessage(requested.providerResult, sectionLabel)
+      : "";
+    if (providerMessage) {
+      setStatusMessage(providerMessage);
       return;
     }
     if (!requested.context) {
@@ -13811,6 +13893,8 @@ export function CodeWorkspaceTab({
       editorComposing: editorState?.composing ?? false,
       editorCaretCount: editorState?.caretCount ?? 0,
       editorOccurrenceSessionActive: editorState?.occurrenceSessionActive ?? false,
+      workspaceEditCanUndo: workspaceEditHistoryState.canUndo,
+      workspaceEditCanRedo: workspaceEditHistoryState.canRedo,
     };
   }, [
     activeEditorCommandState,
@@ -13818,6 +13902,8 @@ export function CodeWorkspaceTab({
     activeFile?.path,
     activeKey,
     editorCommandContextRevision,
+    workspaceEditHistoryState.canRedo,
+    workspaceEditHistoryState.canUndo,
   ]);
 
   const actionsController = useWorkspaceActionsController({

@@ -11,6 +11,7 @@ import {
   setWorkspaceSemanticIndexActiveProviders,
   workspaceSemanticIndexBuildIsCurrent,
   workspaceSemanticIndexIsCurrent,
+  workspaceSemanticIndexQueryIsCurrent,
 } from "./workspaceSemanticIndex";
 
 describe("workspaceSemanticIndex", () => {
@@ -121,6 +122,25 @@ describe("workspaceSemanticIndex", () => {
       },
     });
     expect(workspaceSemanticIndexIsCurrent(snapshot)).toBe(false);
+  });
+
+  it("keeps a direct provider query usable while background provider progress is reported", () => {
+    const build = beginWorkspaceSemanticIndexBuild(
+      createWorkspaceSemanticIndexSnapshot(),
+      "language-server",
+    );
+    const inProgress = setWorkspaceSemanticIndexActiveProviders(
+      build.snapshot,
+      ["jdtls:/repo"],
+    );
+    const querySnapshot = completeWorkspaceSemanticIndexBuild(inProgress, build.token);
+
+    expect(querySnapshot.status).toBe("building");
+    expect(workspaceSemanticIndexBuildIsCurrent(querySnapshot, build.token)).toBe(false);
+    expect(workspaceSemanticIndexQueryIsCurrent(querySnapshot, build.token)).toBe(true);
+
+    const changed = invalidateWorkspaceSemanticIndex(querySnapshot, "document-edited", ["src/App.java"]);
+    expect(workspaceSemanticIndexQueryIsCurrent(changed, build.token)).toBe(false);
   });
 
   it("detects only text replacements in already-open semantic buffers", () => {

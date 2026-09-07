@@ -108,6 +108,8 @@ export function createLspHyperlinkExtension(hooks: LspHyperlinkHooks): Extension
       private lastPos: number | null = null;
       private probeToken = 0;
       private probeTimer: number | null = null;
+      private refreshQueued = false;
+      private disposed = false;
       private readonly onKeyDown = (event: KeyboardEvent) => {
         if (!isGotoModifier(event)) return;
         if (this.modHeld) return;
@@ -132,7 +134,8 @@ export function createLspHyperlinkExtension(hooks: LspHyperlinkHooks): Extension
 
       update(update: ViewUpdate) {
         if (update.docChanged && this.lastPos !== null) {
-          this.refreshAt(this.lastPos, false);
+          this.lastPos = update.changes.mapPos(this.lastPos, 1);
+          this.scheduleRefresh();
         }
         const held = update.state.field(modHeldField);
         const hasLink = update.state.field(hyperlinkField).size > 0;
@@ -140,6 +143,7 @@ export function createLspHyperlinkExtension(hooks: LspHyperlinkHooks): Extension
       }
 
       destroy() {
+        this.disposed = true;
         window.removeEventListener("keydown", this.onKeyDown, true);
         window.removeEventListener("keyup", this.onKeyUp, true);
         window.removeEventListener("blur", this.onWindowBlur);
@@ -165,6 +169,21 @@ export function createLspHyperlinkExtension(hooks: LspHyperlinkHooks): Extension
         if (this.view.state.field(hyperlinkField).size === 0) return;
         this.view.dispatch({ effects: setHyperlinkEffect.of(null) });
         this.view.dom.classList.remove("cm-lsp-hyperlink-cursor");
+      }
+
+      /**
+       * ViewPlugin.update runs inside EditorView.update; refreshAt may dispatch
+       * a decoration transaction, so defer that follow-up until the update has
+       * fully unwound. Coalesce bursts of document changes to one refresh.
+       */
+      private scheduleRefresh() {
+        if (this.refreshQueued || this.disposed) return;
+        this.refreshQueued = true;
+        queueMicrotask(() => {
+          this.refreshQueued = false;
+          if (this.disposed || this.lastPos === null) return;
+          this.refreshAt(this.lastPos, false);
+        });
       }
 
       handleMouseMove(event: MouseEvent) {

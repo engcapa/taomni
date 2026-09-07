@@ -1,0 +1,82 @@
+id: TC-IDE-C8-08
+title: "Code action intention apply and undo over real JDT LS"
+description: |
+  ED-AUDIT-008 native gate. Opens the isolated Maven fixture at the unresolved
+  StringUtils reference, uses the real JDT LS diagnostic and Import quick fix,
+  and verifies both the gutter lightbulb and Alt+Enter entries apply the import
+  and restore the exact editor text with one workspace undo each. Browser
+  stubs cannot establish this provider or packaged-runtime boundary.
+  Highest claim on green: L2 provider-backed native Windows behavior.
+covers: [F25.5]
+tags: [code-workspace, ide-c8, intention, quick-fix, provider-fixture, native-gate, p1]
+modes: [native]
+fixtures: [reset_db, java_sample_projects, jdtls_required]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-gate-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-c8-08","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/QuickFixTarget.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 90
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "StringUtils"
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: "Java"
+      timeout_sec: 60
+  - wait_for:
+      selector: '[data-testid="code-workspace-lightbulb"]'
+      timeout_sec: 120
+  - click: '[data-testid="code-workspace-lightbulb"]'
+  - wait_for:
+      selector: '[data-testid^="code-workspace-intention-"]'
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="context-menu"]'
+      contains: "org.apache.commons.lang3"
+      timeout_sec: 30
+  - click: '[data-testid="code-workspace-intention-intention.provider.4df1ac6fd1001c47"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "import org.apache.commons.lang3.StringUtils;"
+      timeout_sec: 60
+  - press:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      key: Control+z
+  - eval_readonly:
+      expression: '!document.querySelector(".cm-content")?.textContent?.includes("import org.apache.commons.lang3.StringUtils;")'
+      expect_truthy: true
+  - click: '[data-testid="code-workspace-editor"] .cm-line:nth-child(13)'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["Alt+Enter"]
+  - wait_for:
+      selector: '[data-testid^="code-workspace-intention-"]'
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="context-menu"]'
+      contains: "org.apache.commons.lang3"
+      timeout_sec: 30
+  - click: '[data-testid="code-workspace-intention-intention.provider.4df1ac6fd1001c47"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "import org.apache.commons.lang3.StringUtils;"
+      timeout_sec: 60
+  - press:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      key: Control+z
+  - eval_readonly:
+      expression: '!document.querySelector(".cm-content")?.textContent?.includes("import org.apache.commons.lang3.StringUtils;")'
+      expect_truthy: true
+  - screenshot: tc-ide-c8-08-intention-after-undo.png

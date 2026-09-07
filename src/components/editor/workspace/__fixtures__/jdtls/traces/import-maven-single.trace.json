@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "fixtureId": "import-maven-single",
-  "generatedAt": "2026-09-05T05:25:51.571Z",
+  "generatedAt": "2026-09-07T22:25:22.652Z",
   "sanitized": true,
   "toolchain": {
     "java": {
-      "path": "/data/dev/jdk-21/bin/java",
+      "path": "C:\\Program Files\\Java\\jdk-21\\bin\\java.exe",
       "version": "21.0.4",
       "info": {
         "line": "openjdk version \"21.0.4\" 2024-07-16 LTS",
@@ -14,8 +14,8 @@
       }
     },
     "jdtls": {
-      "home": "/home/zhyhang/.local/share/jdtls",
-      "version": "1.61.0.202607102111.jar"
+      "home": "C:\\Users\\yuhan\\AppData\\Local\\jdtls",
+      "version": "1.61.0.202607142124.jar"
     }
   },
   "capabilities": {
@@ -28,7 +28,13 @@
       "refactor.rewrite",
       "source",
       "source.organizeImports"
-    ]
+    ],
+    "registeredMethods": [
+      "textDocument/codeAction",
+      "textDocument/completion",
+      "textDocument/signatureHelp"
+    ],
+    "diagnosticsSeen": 14
   },
   "codeActionQuery": {
     "file": "src/main/java/com/example/single/QuickFixTarget.java",
@@ -38,8 +44,47 @@
       "Import 'StringUtils' (com.sun.tools.javac.util)",
       "Import 'StringUtils' (org.apache.commons.lang3)",
       "Add all missing imports",
-      "Create class 'StringUtils'"
-    ]
+      "Create class 'StringUtils'",
+      "Create enum 'StringUtils'",
+      "Create interface 'StringUtils'",
+      "Create record 'StringUtils'",
+      "Create constant 'StringUtils'",
+      "Create local variable 'StringUtils'",
+      "Change to 'String' (com.sun.org.apache.xpath.internal.operations)",
+      "Change to 'String' (java.lang)",
+      "Change to 'StringDV' (com.sun.org.apache.xerces.internal.impl.dv.xs)",
+      "Change to 'StringEscapeUtils' (org.apache.commons.lang3)",
+      "Change to 'Strings' (jdk.internal.joptsimple.internal)",
+      "Create field 'StringUtils'",
+      "Create parameter 'StringUtils'",
+      "Add Javadoc comment",
+      "Add final modifier for 'blank'",
+      "Organize imports",
+      "Generate toString()",
+      "Change modifiers to final where possible"
+    ],
+    "diagnostic": {
+      "range": {
+        "start": {
+          "line": 12,
+          "character": 28
+        },
+        "end": {
+          "line": 12,
+          "character": 39
+        }
+      },
+      "message": "StringUtils cannot be resolved",
+      "severity": 1,
+      "source": "Java",
+      "code": "570425394"
+    },
+    "responseCount": 21,
+    "selectedTitle": "Import 'StringUtils' (org.apache.commons.lang3)",
+    "resolveAttempted": true,
+    "resolved": true,
+    "resolveFailure": null,
+    "resolvedImportEdit": "import org.apache.commons.lang3.StringUtils;"
   },
   "parsedCandidates": [
     {
@@ -90,10 +135,14 @@
     }
   },
   "transactionEvidence": {
-    "originalSha256": "f2de5c8ab98b58cf18ff998ebc47d19c127bb6f4290550d2827a40a37552e70a",
-    "appliedSha256": "465ecbe1b5c71a64cca491844476ec9d841d7892add247ecff4de3ad6507c368",
-    "revertedSha256": "f2de5c8ab98b58cf18ff998ebc47d19c127bb6f4290550d2827a40a37552e70a",
-    "revertedRestoresOriginalHash": true
+    "originalSha256": "fa85c034632f35aa03d738d0acc975938918814283cc184ff97118b0d40b54b7",
+    "appliedSha256": "ac694b9072804031b676cace1194cccd226ecb2f16eef13060a82ffb3d646f7a",
+    "revertedSha256": "fa85c034632f35aa03d738d0acc975938918814283cc184ff97118b0d40b54b7",
+    "revertedRestoresOriginalHash": true,
+    "editCount": 1,
+    "providerCancel": {
+      "outcome": "rejected:-32800"
+    }
   },
   "failures": []
 }

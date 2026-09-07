@@ -220,4 +220,18 @@ describe("§8.26 / ED-MULTIVIEW-002: WorkspaceDocumentTransactionOwner", () => {
     expect(owner.getDocument("main.ts")).toBe("hello");
     expect(owner.getHistoryState("main.ts")).toMatchObject({ canUndo: false, canRedo: false });
   });
+
+  it("accepts an external insertion snapshot and keeps its delta undoable", () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    owner.acquireView("main.ts", "primary", "x=1");
+
+    const transaction = owner.replaceDocument("main.ts", "primary", "x =1", "external-disk");
+
+    expect(transaction?.changes).toEqual([{ from: 1, to: 1, insert: " " }]);
+    expect(owner.getDocument("main.ts")).toBe("x =1");
+    expect(owner.undo("main.ts", "primary")?.changes).toEqual([
+      { from: 1, to: 2, insert: "", deleted: " " },
+    ]);
+    expect(owner.getDocument("main.ts")).toBe("x=1");
+  });
 });

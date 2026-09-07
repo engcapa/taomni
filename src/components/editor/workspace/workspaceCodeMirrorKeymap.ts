@@ -201,6 +201,8 @@ function editorAction(input: {
   secondary?: readonly string[];
   keywords?: readonly string[];
   requiresEditor: boolean;
+  /** Suppress character history while a workspace transaction is available. */
+  blockedByWorkspaceHistory?: "undo" | "redo";
   getState?: (context: WorkspaceActionContext) => ActionState;
   run: (context: WorkspaceActionContext) => Promise<ActionResult>;
 }) {
@@ -214,7 +216,13 @@ function editorAction(input: {
     provenance: "local" as const,
     ...(input.getState ? { getState: input.getState } : {}),
     when: input.requiresEditor
-      ? (context: WorkspaceActionContext) => context.focus === "editor" && !!context.hasActiveFile
+      ? (context: WorkspaceActionContext) => context.focus === "editor"
+        && !!context.hasActiveFile
+        && (input.blockedByWorkspaceHistory === "undo"
+          ? context.workspaceEditCanUndo !== true
+          : input.blockedByWorkspaceHistory === "redo"
+            ? context.workspaceEditCanRedo !== true
+            : true)
       : undefined,
     run: input.run,
   };
@@ -452,6 +460,7 @@ export function buildEditorHostActions(handlers: EditorHostActionHandlers) {
       secondary: ["Meta+z"],
       keywords: ["history", "undo"],
       requiresEditor: true,
+      blockedByWorkspaceHistory: "undo",
       run: async () => runSharedHistoryOrLocal(handlers, handlers.undo, undo),
     }),
     editorAction({
@@ -462,6 +471,7 @@ export function buildEditorHostActions(handlers: EditorHostActionHandlers) {
       secondary: ["Meta+Shift+z"],
       keywords: ["history", "redo"],
       requiresEditor: true,
+      blockedByWorkspaceHistory: "redo",
       run: async () => runSharedHistoryOrLocal(handlers, handlers.redo, redo),
     }),
     editorAction({

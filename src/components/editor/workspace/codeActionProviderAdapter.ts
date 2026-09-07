@@ -39,6 +39,7 @@ export type CodeActionProviderResultV4 =
     evidence: CapabilityEvidenceV3;
   }
   | { state: "unsupported"; reason: string; evidence: CapabilityEvidenceV3 }
+  | { state: "unavailable"; reason: string; evidence: CapabilityEvidenceV3 }
   | { state: "timeout"; requestId: string; cancelled: boolean; providerStillHealthy: boolean; retryAfter: "manual" | "restart" }
   | { state: "cancelled"; requestId: string; reason: "aborted"; providerStillHealthy: boolean }
   | { state: "failed"; message: string; providerStillHealthy: boolean };
@@ -133,6 +134,7 @@ export function evaluateCodeActionResult(
     | { kind: "empty"; reason: "null-response" }
     | { kind: "malformed"; malformedCount: number; message: string }
     | { kind: "unsupported"; reason: string }
+    | { kind: "unavailable"; reason: string }
     | { kind: "timeout"; requestId: string; cancelled: boolean; providerStillHealthy: boolean; retryAfter: "manual" | "restart" }
     | { kind: "cancelled"; requestId: string; reason: "aborted"; providerStillHealthy: boolean }
     | { kind: "failed"; message: string; providerStillHealthy: boolean },
@@ -185,6 +187,19 @@ export function evaluateCodeActionResult(
     });
     return {
       state: "unsupported",
+      reason: outcome.reason,
+      evidence,
+    };
+  }
+  if (outcome.kind === "unavailable") {
+    const evidence = buildCapabilityEvidence({
+      ...evidenceInput,
+      capabilityId: "codeAction.intention",
+      complete: false,
+      reason: outcome.reason,
+    });
+    return {
+      state: "unavailable",
       reason: outcome.reason,
       evidence,
     };
@@ -247,6 +262,20 @@ export interface CodeActionCandidate {
   evidence?: CapabilityEvidenceV3 | null;
 }
 
+/** Provider health returned alongside native code-action payloads. */
+export interface CodeActionProviderStatus {
+  available: boolean;
+  active: boolean;
+  error?: string | null;
+  installHint?: string | null;
+}
+
+/** Native clients may return provider status without changing legacy clients. */
+export interface CodeActionProviderResponse {
+  actions: readonly LspCodeAction[] | null;
+  status?: CodeActionProviderStatus | null;
+}
+
 export interface ImmutableCodeActionPlan {
   actionId: string;
   title: string;
@@ -294,9 +323,47 @@ export interface CodeActionProviderClient {
   requestCodeActions: (
     params: ReturnType<typeof buildCodeActionParams>,
     signal?: AbortSignal,
-  ) => Promise<readonly LspCodeAction[] | null>;
+  ) => Promise<readonly LspCodeAction[] | null | CodeActionProviderResponse>;
   resolveCodeAction?: (action: LspCodeAction, signal?: AbortSignal) => Promise<LspCodeAction | null>;
   checkCapability?: () => { supported: boolean; reason?: string };
+}
+
+function isCodeActionProviderResponse(value: unknown): value is CodeActionProviderResponse {
+  return value !== null
+    && typeof value === "object"
+    && "actions" in value
+    && (Array.isArray(value.actions) || value.actions === null);
+}
+
+function isWorkspaceEditShape(value: unknown): value is LspWorkspaceEdit {
+  if (value === null || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  if (!Array.isArray(record.documentEdits)) return false;
+  if (record.operations !== undefined && !Array.isArray(record.operations)) return false;
+  return record.documentEdits.every((documentEdit) => {
+    if (documentEdit === null || typeof documentEdit !== "object") return false;
+    const documentRecord = documentEdit as Record<string, unknown>;
+    return typeof documentRecord.uri === "string" && Array.isArray(documentRecord.edits);
+  });
+}
+
+function isResolvedCodeAction(value: unknown): value is LspCodeAction {
+  if (value === null || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  if (typeof record.title !== "string" || record.title.trim().length === 0) return false;
+  if (record.edit !== null && record.edit !== undefined && !isWorkspaceEditShape(record.edit)) return false;
+  if (record.command !== null && record.command !== undefined && typeof record.command !== "string") return false;
+  if (typeof record.command === "string" && record.command.trim().length === 0) return false;
+  return true;
+}
+
+function hasExecutableCodeActionEffect(
+  edit: LspWorkspaceEdit | null,
+  command: { command: string; arguments?: unknown[] } | null,
+): boolean {
+  const hasTextEdits = Boolean(edit?.documentEdits.some((documentEdit) => documentEdit.edits.length > 0));
+  const hasResourceOperations = Boolean(edit?.operations && edit.operations.length > 0);
+  return hasTextEdits || hasResourceOperations || command !== null;
 }
 
 function cloneAndDeepFreeze<T>(value: T): T {
@@ -395,11 +462,44 @@ export class CanonicalCodeActionService {
           requestAbort.abort();
         }, timeoutMs);
       });
-      const rawActions = await Promise.race([
+      const providerResponse = await Promise.race([
         resultPromise,
         timeoutPromise,
         cancellationPromise,
       ]);
+
+      const response = isCodeActionProviderResponse(providerResponse)
+        ? providerResponse
+        : { actions: providerResponse };
+      const providerStatus = response.status;
+      if (providerStatus) {
+        const errorReason = providerStatus.error?.trim() || null;
+        if (!providerStatus.available) {
+          return evaluateCodeActionResult({
+            kind: "unavailable",
+            reason: errorReason
+              ?? providerStatus.installHint?.trim()
+              ?? "Language server is not available for this document",
+          }, evidenceInput);
+        }
+        if (!providerStatus.active) {
+          return evaluateCodeActionResult({
+            kind: "unavailable",
+            reason: errorReason
+              ?? providerStatus.installHint?.trim()
+              ?? "Language server is not active for this document",
+          }, evidenceInput);
+        }
+        if (errorReason) {
+          return evaluateCodeActionResult({
+            kind: "failed",
+            message: errorReason,
+            providerStillHealthy: false,
+          }, evidenceInput);
+        }
+      }
+
+      const rawActions = response.actions;
 
       if (!rawActions) {
         return evaluateCodeActionResult({ kind: "empty", reason: "null-response" }, evidenceInput);
@@ -528,6 +628,10 @@ export class CanonicalCodeActionService {
       }
     }
 
+    if (!isResolvedCodeAction(resolvedAction)) {
+      return { state: "rejected", reason: "malformed" };
+    }
+
     // Extract edit & command
     let effectiveEdit = resolvedAction.edit ?? null;
     let effectiveCommand: { command: string; arguments?: unknown[] } | null = null;
@@ -558,6 +662,10 @@ export class CanonicalCodeActionService {
     // If there is a command remaining, validate against command allowlist
     if (effectiveCommand && !isCommandAllowed(effectiveCommand.command, options.allowedCommands)) {
       return { state: "rejected", reason: "command-disallowed" };
+    }
+
+    if (!hasExecutableCodeActionEffect(effectiveEdit, effectiveCommand)) {
+      return { state: "rejected", reason: "malformed" };
     }
 
     const plan = cloneAndDeepFreeze<ImmutableCodeActionPlan>({
@@ -596,6 +704,7 @@ export class CanonicalCodeActionService {
       let reason: string;
       if (reqRes.state === "unsupported") reason = reqRes.reason;
       else if (reqRes.state === "failed" || reqRes.state === "malformed") reason = reqRes.message;
+      else if (reqRes.state === "unavailable") reason = reqRes.reason;
       else if (reqRes.state === "empty") reason = "Provider returned a null code-action response";
       else if (reqRes.state === "timeout") reason = "Code-action request timed out";
       else if (reqRes.state === "cancelled") reason = "Code-action request was cancelled";

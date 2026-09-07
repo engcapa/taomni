@@ -75,6 +75,10 @@ export interface WorkspaceActionContext {
   isDirty?: boolean;
   canUndo?: boolean;
   canRedo?: boolean;
+  /** True when the workspace-level transaction history owns Ctrl/Cmd+Z. */
+  workspaceEditCanUndo?: boolean;
+  /** True when the workspace-level transaction history owns Ctrl/Cmd+Shift+Z. */
+  workspaceEditCanRedo?: boolean;
   splitActive?: boolean;
   debugActive?: boolean;
   modalOpen?: boolean;

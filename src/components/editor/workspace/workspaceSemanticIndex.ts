@@ -259,6 +259,22 @@ export function workspaceSemanticIndexBuildIsCurrent(
 }
 
 /**
+ * Direct provider queries (for example code actions) carry their own result
+ * for the captured workspace revision. Background provider progress can keep
+ * the broader semantic index non-ready without invalidating that response.
+ * Callers still verify their document/provider identity before applying it.
+ */
+export function workspaceSemanticIndexQueryIsCurrent(
+  snapshot: WorkspaceSemanticIndexSnapshot,
+  token: WorkspaceSemanticIndexBuildToken,
+): boolean {
+  return snapshot.status !== "error"
+    && snapshot.provider === "language-server"
+    && snapshot.revision === token.revision
+    && snapshot.error === null;
+}
+
+/**
  * §8.20.3 W2 copy rule: this ledger is PROVIDER FRESHNESS metadata. It must
  * never read as an IntelliJ-style index ("Ready"/"Building" alone would
  * overclaim), so every label names the provider relationship explicitly.

@@ -2464,6 +2464,49 @@ describe("CodeWorkspaceTab", () => {
     ).openFiles["root:app:src/main.ts"]?.text).toBe("x =1"));
   });
 
+  it("shows the native provider failure instead of a generic empty-actions message", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-actions-provider-failure",
+      workspaceInstanceId: "instance-actions-provider-failure",
+      name: "Actions provider failure",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    const activeStatus = documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({ codeAction: true }),
+    });
+    const failureStatus = documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      available: false,
+      active: false,
+      error: "JDT LS is unavailable",
+      capabilities: defaultCapabilities({ codeAction: true }),
+    });
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "x=1"));
+    lspMocks.lspOpenDocument.mockResolvedValue(activeStatus);
+    lspMocks.lspCodeActions.mockResolvedValue({ status: failureStatus, actions: [] });
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+    fireEvent.keyDown(window, { key: "Enter", altKey: true });
+
+    await waitFor(() => expect(lspMocks.lspCodeActions).toHaveBeenCalled());
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toBe(
+      "Code actions unavailable: JDT LS is unavailable",
+    ));
+    expect(screen.queryByRole("button", { name: /code action/i })).not.toBeInTheDocument();
+  });
+
   it("applies a mounted provider rename, verifies disk, and supports one workspace undo", async () => {
     const { workspace, disk } = setupMountedRenameFixture("instance-mounted-rename");
     const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
@@ -2785,6 +2828,143 @@ describe("CodeWorkspaceTab", () => {
     fireEvent.mouseDown(bulb!);
     const gutterCandidate = await screen.findByRole("button", { name: "Use shared candidate" });
     expect(gutterCandidate.getAttribute("data-testid")).toBe(keyboardCandidateId);
+    expect(lspMocks.lspCodeActions).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses one canonical commit and one undo for both Alt+Enter and the gutter entry", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-action-entry-commit",
+      workspaceInstanceId: "instance-action-entry-commit",
+      name: "Action entry commit",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    const disk = new Map([["src/main.ts", "x=1"]]);
+    const status = documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({ codeAction: true }),
+    });
+    const diagnostic = {
+      range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+      severity: 2,
+      code: "entry-commit",
+      source: "typescript",
+      message: "Entry commit diagnostic",
+    };
+    const action = {
+      title: "Insert shared space",
+      kind: "quickfix",
+      isPreferred: true,
+      edit: {
+        documentEdits: [{
+          uri: "file:///repo/app/src/main.ts",
+          path: "/repo/app/src/main.ts",
+          edits: [{
+            range: {
+              start: { line: 0, character: 1 },
+              end: { line: 0, character: 1 },
+            },
+            newText: " ",
+          }],
+        }],
+      },
+      command: null,
+      commandArguments: null,
+      raw: { title: "Insert shared space", kind: "quickfix" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => (
+      file(path, disk.get(path) ?? "x=1", { hash: `hash-${disk.get(path) ?? "x=1"}` })
+    ));
+    workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+      _rootPath: string,
+      path: string,
+      text: string,
+    ) => {
+      disk.set(path, text);
+      return writeAck(file(path, text, { hash: `hash-${text}` }));
+    });
+    lspMocks.lspOpenDocument.mockResolvedValue(status);
+    lspMocks.lspChangeDocument.mockResolvedValue(status);
+    lspMocks.lspSaveDocument.mockResolvedValue(status);
+    lspMocks.lspGetDiagnostics.mockResolvedValue({ status, diagnostics: [diagnostic] });
+    lspMocks.lspCodeActions.mockResolvedValue({ status, actions: [action] });
+
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+    const rendered = renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(lspMocks.lspGetDiagnostics).toHaveBeenCalled());
+    await waitFor(() => expect(rendered.container.querySelector(
+      '[data-testid="code-workspace-lightbulb"]',
+    )).toBeTruthy());
+
+    const bulb = rendered.container.querySelector('[data-testid="code-workspace-lightbulb"]');
+    expect(bulb).not.toBeNull();
+    fireEvent.mouseDown(bulb!);
+    const gutterCandidate = await screen.findByRole("button", { name: "Insert shared space" });
+    const candidateId = gutterCandidate.getAttribute("data-testid");
+    fireEvent.click(gutterCandidate);
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-action-entry-commit",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("x =1"));
+    await waitFor(() => expect(disk.get("src/main.ts")).toBe("x =1"));
+    await waitFor(() => expect(rendered.container.querySelector(".cm-content")?.textContent).toContain("x =1"));
+    await waitFor(() => expect(
+      registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled,
+    ).toBe(true));
+
+    const pressWorkspaceUndo = async () => {
+      const editorContent = rendered.container.querySelector<HTMLElement>(".cm-content");
+      expect(editorContent).not.toBeNull();
+      fireEvent.keyDown(editorContent!, { key: "z", code: "KeyZ", ctrlKey: true });
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Undid"));
+    };
+    await pressWorkspaceUndo();
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-action-entry-commit",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("x=1"));
+    await waitFor(() => expect(disk.get("src/main.ts")).toBe("x=1"));
+    await waitFor(() => expect(rendered.container.querySelector(".cm-content")?.textContent).toContain("x=1"));
+    await waitFor(() => expect(
+      registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled,
+    ).toBe(false));
+
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+    expect(content).not.toBeNull();
+    fireEvent.keyDown(content!, { key: "Enter", altKey: true });
+    const keyboardCandidate = await screen.findByRole("button", { name: "Insert shared space" });
+    expect(keyboardCandidate.getAttribute("data-testid")).toBe(candidateId);
+    fireEvent.click(keyboardCandidate);
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-action-entry-commit",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("x =1"));
+    await waitFor(() => expect(disk.get("src/main.ts")).toBe("x =1"));
+    await waitFor(() => expect(rendered.container.querySelector(".cm-content")?.textContent).toContain("x =1"));
+    await waitFor(() => expect(
+      registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled,
+    ).toBe(true));
+
+    await pressWorkspaceUndo();
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-action-entry-commit",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("x=1"));
+    await waitFor(() => expect(disk.get("src/main.ts")).toBe("x=1"));
+    await waitFor(() => expect(rendered.container.querySelector(".cm-content")?.textContent).toContain("x=1"));
+    await waitFor(() => expect(
+      registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled,
+    ).toBe(false));
     expect(lspMocks.lspCodeActions).toHaveBeenCalledTimes(2);
   });
 

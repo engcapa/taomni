@@ -3985,6 +3985,15 @@ impl LspSession {
                 .write()
                 .await
                 .insert(uri.to_string(), diagnostics);
+            // Push diagnostics arrive after didOpen/didChange has returned. Notify
+            // the renderer so an early pull does not leave open-file diagnostics
+            // (and their intention lightbulb) stale until another user action.
+            self.client_bridge
+                .emit_diagnostics_refresh(LspDiagnosticsRefreshEvent {
+                    workspace_id: self.key.workspace_id.clone(),
+                    preset_id: self.key.preset_id.clone(),
+                    root_uri: self.root_uri.clone(),
+                });
         }
     }
 

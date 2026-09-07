@@ -5679,6 +5679,16 @@ controls:
     selector: '.cm-tooltip-autocomplete'
     kind: display
     optional: true       # CodeMirror-owned completion list while suggestions are active
+  # ED-AUDIT-008: provider intention entry and its frozen candidate menu.
+  - id: intention-lightbulb
+    selector: '[data-testid="code-workspace-lightbulb"]'
+    kind: interactive
+    optional: true       # only when the active provider publishes a diagnostic
+  - id: intention-candidate
+    selector: '[data-testid^="code-workspace-intention-"]'
+    aliases: ['[data-testid="code-workspace-intention-intention.provider.4df1ac6fd1001c47"]']
+    kind: interactive
+    optional: true       # only while a provider code-action menu is open
   - id: file-status
     selector: '[data-testid="code-workspace-file-status"]'
     kind: display

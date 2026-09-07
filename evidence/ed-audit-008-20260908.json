@@ -1,0 +1,132 @@
+{
+  "verified_at": "2026-09-07T23:20:20Z",
+  "head": "7718c30118cd5edf515b8e64f98a0cb8bfebd4b1",
+  "checks": [
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-08 --report-dir qa-ui-auto-report/ed-audit-008-native-final-20260908 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "Windows packaged attempt run-20260908-024916-345493600 reached the real QA app but could not find the provider intention menu within 30 seconds; the failure artifacts are retained.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-08 --report-dir qa-ui-auto-report/ed-audit-008-native-final-20260908 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "Windows packaged attempt run-20260908-032442-472537600 applied the action path but the editor assertion did not observe the import text; the failure artifacts are retained.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-08 --report-dir qa-ui-auto-report/ed-audit-008-native-status-wait-20260908 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "Windows packaged attempt run-20260908-043206-801969200 completed the edit but the status-bar Undid assertion raced with the provider Searching status; no success was claimed from it.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-08 --report-dir qa-ui-auto-report/ed-audit-008-native-final-20260908 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "Windows packaged attempt run-20260908-050426-596258300 did not expose the provider intention candidate after the real diagnostic; the failure artifacts are retained.",
+      "acceptance": []
+    },
+    {
+      "kind": "provider",
+      "command": "$env:TAOMNI_FIXTURE_JAVA='C:\\Program Files\\Java\\jdk-21\\bin\\java.exe'; $env:JDTLS_HOME='C:\\Users\\yuhan\\AppData\\Local\\jdtls'; node src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-import-fixture.mjs",
+      "result": "passed",
+      "summary": "The isolated real JDT LS import fixture recorded JDK 21.0.4 and JDT LS 1.61.0.202607142124.jar, a provider-published StringUtils diagnostic, 21 returned actions, resolved import org.apache.commons.lang3.StringUtils, an applied hash different from the original, exact hash restoration, and provider cancellation rejected:-32800. Trace: src/components/editor/workspace/__fixtures__/jdtls/traces/import-maven-single.trace.json (SHA-256 28db3eb57f94f87bad7269b29a102d80f1e0bb97800be7c1ac4d98d0d269dff6).",
+      "acceptance": ["ED-AUDIT-008-A1", "ED-AUDIT-008-A3"]
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-08 --report-dir qa-ui-auto-report/ed-audit-008-native-final-20260908 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "Windows packaged attempt run-20260908-064025-537412900 again timed out waiting for the provider intention menu; the failure artifacts are retained.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-08 --report-dir qa-ui-auto-report/ed-audit-008-native-keys-20260908 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "Windows packaged attempt run-20260908-064935-320719200 did not find the candidate menu after the key-path preparation; the failure artifacts are retained.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-08 --report-dir qa-ui-auto-report/ed-audit-008-native-final-20260908 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "Windows packaged attempt run-20260908-065809-476544700 applied and attempted undo, but the Undid status assertion observed the provider's transient Searching status.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-08 --report-dir qa-ui-auto-report/ed-audit-008-native-final-20260908 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "Windows packaged attempt run-20260908-070019-770333900 opened the provider menu but its context-menu text assertion did not include the expected org.apache.commons.lang3 candidate.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-08 --report-dir qa-ui-auto-report/ed-audit-008-native-final-20260908 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Current Windows packaged com.taomni.app.qa run run-20260908-070211-771688000 selected 1 and passed 1 with 28/28 steps, 0 failures and 0 skips. Source identity 8923cb8a1011505f7d8a3cb0bb4392051e5971f690b5e46a68cfd70dc8f36120 was stable; QA binary SHA-256 was 4193bd07ec8e65f2d75f909bff46632c33d8ea92253968b6aac841d009284570. summary.json SHA-256 is 49943416c21e189621caa9fadbccfa8d52ff658574eb8b11f265ceb013915d1d and runner_receipt.json SHA-256 is c36c89463b5cb75ae73756441b7f76e67c2700ce44c25a9f2df3ca4b0ef438af. The case asserted real provider menu, import text after apply, post-undo text, the second Alt+Enter path, and a second undo. native-key-observation.json records Windows Edge/WebDriver NumpadEnter, altKey=true and defaultPrevented=true.",
+      "acceptance": ["ED-AUDIT-008-A1", "ED-AUDIT-008-A3"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/CodeWorkspaceTab.test.tsx src/components/editor/workspace/codeActionProviderAdapter.test.ts src/components/editor/workspace/intentionSession.test.ts src/components/editor/workspace/codeActionExecution.test.ts src/components/editor/workspace/workspaceEditApply.test.ts src/components/editor/workspace/workspaceEditHistory.test.ts src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts src/components/editor/workspace/workspaceSemanticIndex.test.ts src/components/editor/workspace/workspaceActionHostKeymap.test.ts src/components/editor/workspace/lspHyperlink.test.ts src/components/editor/workspace/semanticWorkspaceEdit.test.ts",
+      "result": "passed",
+      "summary": "11 test files passed; 218/218 tests passed. Coverage includes canonical candidate/resolve/apply/recovery, malformed/null/failure/cancel/stale outcomes, one workspace history entry and undo, mounted CodeWorkspace entry routing, NumpadEnter shortcut matching, and the CodeMirror update regression.",
+      "acceptance": ["ED-AUDIT-008-A1", "ED-AUDIT-008-A2", "ED-AUDIT-008-A3"]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/CodeWorkspaceTab.tsx --path src/components/editor/CodeWorkspaceTab.test.tsx --path src/components/editor/workspace/CodeMirrorHost.tsx --path src/components/editor/workspace/codeActionProviderAdapter.ts --path src/components/editor/workspace/codeActionProviderAdapter.test.ts --path src/components/editor/workspace/lspHyperlink.ts --path src/components/editor/workspace/lspHyperlink.test.ts --path src/components/editor/workspace/workspaceActionHost.ts --path src/components/editor/workspace/workspaceActionHost.test.ts --path src/components/editor/workspace/workspaceActionHostKeymap.test.ts --path src/components/editor/workspace/workspaceActionRegistry.ts --path src/components/editor/workspace/workspaceCodeMirrorKeymap.ts --path src/components/editor/workspace/workspaceDocumentTransactionOwner.ts --path src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts --path src/components/editor/workspace/workspaceSemanticIndex.ts --path src/components/editor/workspace/workspaceSemanticIndex.test.ts --json",
+      "result": "passed",
+      "summary": "All 16 owned TypeScript paths were checked; scoped_errors=0 and external_errors=0 across 0 files.",
+      "acceptance": ["ED-AUDIT-008-A3"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/__fixtures__/jdtls/jdtlsTraceContract.test.ts",
+      "result": "passed",
+      "summary": "44/44 current trace contract tests passed against the regenerated Windows-sanitized real-provider trace.",
+      "acceptance": ["ED-AUDIT-008-A3"]
+    },
+    {
+      "kind": "rust",
+      "command": "cargo test --lib lsp::tests::",
+      "result": "passed",
+      "summary": "96 passed; 0 failed; 0 ignored; 1191 filtered out. The focused Rust LSP suite covers code-action payload parsing, resolve, cancellation, workspace apply bridge and provider startup contracts.",
+      "acceptance": []
+    },
+    {
+      "kind": "qa-lint",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto audit --gate",
+      "result": "failed",
+      "summary": "The static QA gate parsed 188 cases and 81 features with 0 schema errors and a current catalog, but retained baseline regressions: shallow controls 44->51, orphans 0->11, and F25.5 shallow 1->8. The 11 orphan selectors and 18 missing required controls are outside this card's production outcome; the gate baseline was not changed.",
+      "acceptance": []
+    },
+    {
+      "kind": "code-audit",
+      "command": "Inspection: CodeWorkspaceTab requestCodeActions/showCodeActionsMenu/runCodeAction -> lspCodeActions and lspCodeActionResolve -> CanonicalCodeActionService request/resolve/preview/apply -> applyLspWorkspaceEdit and WorkspaceEditHistory -> native text/hash observations",
+      "result": "passed",
+      "summary": "Alt+Enter, the gutter lightbulb and the Problems/context action path use the same CodeWorkspaceTab request and run owner. Provider status is preserved as unsupported/unavailable/empty/malformed/timeout/cancelled/failed, candidates are frozen in IntentionSession, and resolve builds an immutable plan. applyPlan captures preimages, revalidates document/provider/project identity before commit, applies the real workspace edit, verifies the postimage, registers one history entry, and restores through the same snapshot ledger on edit or command failure. Cancellation and stale paths return without history; partial effects are reported with recovery state rather than zero-effect text.",
+      "acceptance": ["ED-AUDIT-008-A1", "ED-AUDIT-008-A2", "ED-AUDIT-008-A3"]
+    }
+  ],
+  "unrun": [
+    "browser: no browser case provides this card's provider-backed intention apply plus undo boundary; browser stubs are not substituted for the packaged/provider run.",
+    "idea-comparison: no IntelliJ IDEA 2026.2.x runtime/build and no identical fixture/action observation were available.",
+    "native Linux: no qualifying Linux Tauri/WebKitGTK desktop was available for this Windows run.",
+    "native macOS: no qualifying macOS QA bundle, WKWebView automation or manual QA-app run was available.",
+    "provider Linux/macOS: the real JDT LS provider trace was collected on Windows only; cross-platform provider behavior is not claimed."
+  ],
+  "notes": [
+    "Verification used the working tree rooted at baseline HEAD 7718c30118cd5edf515b8e64f98a0cb8bfebd4b1; native source and case identities bind the packaged run to the current uncommitted task tree.",
+    "The native failures are retained in chronological order before the passing run. The final run used the independently built com.taomni.app.qa application and matching receipt, not a renamed production binary.",
+    "The provider trace is real JDT LS stdio evidence and includes request/result/cancel facts plus apply/undo hashes; it does not prove the Taomni Tauri IPC/WebView path by itself.",
+    "The implementation reaches the Windows packaged/provider L2 slice. The terminal state remains implemented because the required browser and IDEA comparison layers are missing, and Linux/macOS native layers were not run.",
+    "The QA audit failure is a pre-existing/global catalog baseline issue surfaced after the required F25.5 catalog update; no coverage baseline ratchet or unrelated control repair was made."
+  ]
+}

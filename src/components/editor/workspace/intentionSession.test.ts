@@ -349,7 +349,16 @@ describe("IntentionSession §8.20.4 frozen candidates", () => {
           if (fail) throw new Error("Resolve connection timed out");
           return {
             ...act,
-            edit: { documentEdits: [] },
+            edit: {
+              documentEdits: [{
+                uri: context.document.uri,
+                path: "/workspace/src/App.java",
+                edits: [{
+                  range: context.range,
+                  newText: "// extracted\n",
+                }],
+              }],
+            },
           };
         },
       };

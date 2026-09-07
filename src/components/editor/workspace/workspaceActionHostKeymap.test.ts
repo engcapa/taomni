@@ -61,6 +61,39 @@ describe("§8.18.2 scheme-aware binding resolution", () => {
     expect(dispatched?.result.kind).toBe("applied");
   });
 
+  it("matches Enter shortcuts when Windows WebDriver reports NumpadEnter", async () => {
+    const run = vi.fn(async () => ({ kind: "applied" as const }));
+    const host = makeHost([{
+      id: "workspace.codeActions",
+      title: "Show Code Actions",
+      category: "Refactor",
+      keybinding: "Alt+Enter",
+      provenance: "provider",
+      run,
+    }]);
+    const event = {
+      key: "Enter",
+      code: "NumpadEnter",
+      ctrlKey: false,
+      altKey: true,
+      shiftKey: false,
+      metaKey: false,
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+    };
+
+    const resolved = host.prepareBinding(event);
+    expect(resolved.resolution).toBe("single");
+    const dispatched = await host.dispatchKeydownV2({
+      event,
+      workspaceId: "ws-km",
+      targetViewId: null,
+    });
+    expect(dispatched).toMatchObject({ kind: "executed", actionId: "workspace.codeActions" });
+    expect(run).toHaveBeenCalledOnce();
+    expect(event.preventDefault).toHaveBeenCalled();
+  });
+
   it("lets a user scheme override defaults and reports source=user", async () => {
     const host = makeHost([saveAction]);
     host.setKeymapScheme(userScheme((scheme) => setActionBindings(scheme, "editor.save", [

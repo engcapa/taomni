@@ -611,6 +611,40 @@ describe("§8.21.4 V3 Intention session recovery and preconditions", () => {
         expect(disallowedOutcome.reason).toBe("command-disallowed");
       }
     });
+
+    it("rejects a resolved action that has no executable edit or command", async () => {
+      const action: LspCodeAction = {
+        title: "Malformed quick fix",
+        kind: "quickfix",
+        isPreferred: true,
+        edit: null,
+        command: null,
+        commandArguments: null,
+        raw: { data: { resolveId: "malformed" } },
+      };
+      const candidate: CodeActionCandidate = {
+        id: "codeAction.jdtls.malformed",
+        title: action.title,
+        kind: action.kind ?? "",
+        isPreferred: true,
+        disabledReason: null,
+        resolveRequired: true,
+        rawAction: action,
+      };
+
+      const outcome = await service.resolvePlan(
+        candidate,
+        sampleContext,
+        {
+          requestCodeActions: vi.fn(),
+          resolveCodeAction: vi.fn().mockResolvedValue(action),
+        },
+        sampleContext.document.revision,
+        sampleContext.provider.generation,
+      );
+
+      expect(outcome).toEqual({ state: "rejected", reason: "malformed" });
+    });
   });
 
   describe("§ED-ACTION-003: Problems, Context Menu, and Save Plan-Only", () => {

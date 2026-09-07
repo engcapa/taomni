@@ -151,7 +151,9 @@ function singleReplacement(text: string, nextText: string): DocumentChangeDelta 
     from: prefix,
     to: text.length - suffix,
     insert: nextText.slice(prefix, nextText.length - suffix),
-    deleted: text.slice(prefix, text.length - suffix),
+    ...(text.slice(prefix, text.length - suffix)
+      ? { deleted: text.slice(prefix, text.length - suffix) }
+      : {}),
   };
 }
 

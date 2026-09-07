@@ -124,7 +124,11 @@ export interface WorkspaceActionHostOptions {
  * ("f4"/"F4"/"End"-style inputs converge on one identity).
  */
 function normalize(stroke: ShortcutStroke): ShortcutStroke {
-  return { ...stroke, key: undefined, code: logicalKeyToCode(stroke.code) ?? stroke.code };
+  const code = logicalKeyToCode(stroke.code) ?? stroke.code;
+  // Edge WebDriver reports the W3C Enter key as NumpadEnter on Windows.
+  // Treat that transport alias as the same Enter stroke so native shortcuts
+  // such as Alt+Enter keep their physical action identity.
+  return { ...stroke, key: undefined, code: code === "NumpadEnter" ? "Enter" : code };
 }
 
 function actionKeybindings(action: WorkspaceActionDefinition): string[] {

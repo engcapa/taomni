@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { identifierRangeAt } from "./lspHyperlink";
+import { EditorState } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
+import { describe, expect, it, vi } from "vitest";
+import { createLspHyperlinkExtension, identifierRangeAt } from "./lspHyperlink";
 
 describe("identifierRangeAt", () => {
   it("finds a simple identifier under the caret", () => {
@@ -16,5 +18,40 @@ describe("identifierRangeAt", () => {
   it("returns null on punctuation or pure numbers", () => {
     expect(identifierRangeAt("a + b", 2)).toBeNull();
     expect(identifierRangeAt("x = 42;", 5)).toBeNull();
+  });
+
+  it("does not dispatch while CodeMirror is applying a document update", () => {
+    const parent = document.createElement("div");
+    document.body.appendChild(parent);
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: "foo();",
+        extensions: [
+          createLspHyperlinkExtension({
+            onDefinition: vi.fn(),
+          }),
+        ],
+      }),
+      parent,
+    });
+    vi.spyOn(view, "posAtCoords").mockReturnValue(1);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    view.contentDOM.dispatchEvent(new MouseEvent("mousemove", {
+      bubbles: true,
+      ctrlKey: true,
+      clientX: 1,
+      clientY: 1,
+    }));
+    view.dispatch({ changes: { from: 0, insert: "x" } });
+
+    expect(consoleError).not.toHaveBeenCalledWith(
+      expect.stringContaining("CodeMirror plugin crashed:"),
+      expect.anything(),
+    );
+
+    view.destroy();
+    consoleError.mockRestore();
+    parent.remove();
   });
 });
