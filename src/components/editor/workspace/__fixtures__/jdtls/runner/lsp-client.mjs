@@ -138,7 +138,10 @@ export class LspClient {
       this.pending.delete(message.id);
       clearTimeout(entry.timer);
       if (message.error) {
-        const error = new Error(message.error.message ?? JSON.stringify(message.error));
+        const error = new Error(
+          `${message.error.message ?? JSON.stringify(message.error)} for ${entry.method}`
+            + `${this.stderrTail ? `\n${this.stderrTail}` : ""}`,
+        );
         // LSP error codes ride along so scenarios can distinguish
         // RequestCancelled (-32800) from real failures.
         error.code = typeof message.error.code === "number" ? message.error.code : null;

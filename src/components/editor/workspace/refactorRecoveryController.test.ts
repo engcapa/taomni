@@ -79,6 +79,50 @@ describe("RefactorRecoveryController", () => {
     if (result.status === "pending") expect(result.reason).toContain("quota exceeded");
   });
 
+  it("does not begin recovery after the workspace owner is disposed", async () => {
+    const writes: string[] = [];
+    const controller = new RefactorRecoveryController({
+      workspaceId: "ws",
+      workspaceRoot: "/repo",
+      storage: storageWithMap(),
+    });
+    controller.dispose();
+
+    const result = await controller.recover(entry(), {
+      readText: async () => ({ text: "class Renamed {}", hash: "post-hash", dirty: false }),
+      applyText: async () => { writes.push("write"); },
+    });
+
+    expect(result.status).toBe("pending");
+    if (result.status === "pending") {
+      expect(result.reason).toContain("owner is closed");
+    }
+    expect(writes).toEqual([]);
+  });
+
+  it("stops before a recovery write when the owner closes during preflight", async () => {
+    const writes: string[] = [];
+    const controller = new RefactorRecoveryController({
+      workspaceId: "ws",
+      workspaceRoot: "/repo",
+      storage: storageWithMap(),
+    });
+    let reads = 0;
+
+    const result = await controller.recover(entry(), {
+      readText: async () => {
+        reads += 1;
+        if (reads === 1) controller.dispose();
+        return { text: "class Renamed {}", hash: "post-hash", dirty: false };
+      },
+      applyText: async () => { writes.push("write"); },
+    });
+
+    expect(result.status).toBe("pending");
+    expect(result.preHashesRestored).toBe(false);
+    expect(writes).toEqual([]);
+  });
+
   it("reads all files before rejecting a third-party conflict", async () => {
     const writes: string[] = [];
     const controller = new RefactorRecoveryController({

@@ -1633,6 +1633,8 @@ export function CodeWorkspaceTab({
    * silently aborted the Java debug launch right after main-class resolution.
    */
   const mountedRef = useMountedRef();
+  const workspaceInstanceIdRef = useRef(workspaceInstanceId);
+  workspaceInstanceIdRef.current = workspaceInstanceId;
   const [workspaceResourceOperationLocked, setWorkspaceResourceOperationLocked] = useState(false);
   const workspaceEditQueueRef = useRef<Promise<void>>(Promise.resolve());
   const providerCommandSemanticGuardRef = useRef<{
@@ -2000,6 +2002,10 @@ export function CodeWorkspaceTab({
     }),
     [roots, workspaceInstanceId],
   );
+  useEffect(() => {
+    refactorRecoveryController.activate();
+    return () => refactorRecoveryController.dispose();
+  }, [refactorRecoveryController]);
   const {
     directories,
     compactChains,
@@ -2572,8 +2578,6 @@ export function CodeWorkspaceTab({
       publishWorkspaceObservation((bridge) => bridge.observeProviderCancel(kind));
     },
   }));
-  const workspaceInstanceIdRef = useRef(workspaceInstanceId);
-  workspaceInstanceIdRef.current = workspaceInstanceId;
   const semanticQuerySequenceRef = useRef(0);
   const semanticQueryLatestRequestRef = useRef<Record<string, string>>({});
 
@@ -8741,12 +8745,23 @@ export function CodeWorkspaceTab({
     const refactorRecoveryEntryState = { current: null as RefactorRecoveryJournalEntry | null };
     const effectiveRefactorPlanState = { current: null as RefactorPlanV3 | null };
     let refactorRecoveryFailure: string | null = null;
+    const isWorkspaceEditOwnerActive = () => (
+      mountedRef.current
+      && workspaceInstanceIdRef.current === workspaceInstanceId
+      && refactorRecoveryController.isActive()
+    );
+    const assertWorkspaceEditOwner = () => {
+      if (!isWorkspaceEditOwnerActive()) {
+        throw new Error("Workspace edit owner is closed; changes were not applied");
+      }
+    };
     const isTextOnlyRefactor = (candidate: LspWorkspaceEdit): boolean => (
       options.plan !== undefined
       && workspaceEditOperations(candidate).length > 0
       && workspaceEditOperations(candidate).every((operation) => operation.kind === "text")
     );
     const prepareRefactorRecovery = async () => {
+      assertWorkspaceEditOwner();
       if (!options.plan || !isTextOnlyRefactor(resolvedEdit) || refactorRecoveryEntryState.current) return;
       if (!beforeSnapshots) {
         throw new Error("Refactor recovery could not capture the preimage before mutation");
@@ -8819,9 +8834,13 @@ export function CodeWorkspaceTab({
         }
         return null;
       },
-      applyToOpenBuffer: (key, nextText) => updateFileText(key, nextText),
+      applyToOpenBuffer: (key, nextText) => {
+        assertWorkspaceEditOwner();
+        updateFileText(key, nextText);
+      },
       // §5.2.9 open-clean: apply then save so the buffer is not left dirty.
       saveOpenBuffer: async (key, nextText) => {
+        assertWorkspaceEditOwner();
         await saveOpenBufferText(key, nextText);
       },
       readDisk: async (absolutePath) => {
@@ -8865,6 +8884,7 @@ export function CodeWorkspaceTab({
         bom = false,
         eol?: "lf" | "crlf" | "cr",
       ) => {
+        assertWorkspaceEditOwner();
         const replayMetadata = replayWorkspaceEncodingRef.current?.get(fsPathComparisonKey(absolutePath));
         // Replay metadata is the authoritative prior state for undo; it wins
         // over applier defaults but both flow through the single policy
@@ -8936,7 +8956,9 @@ export function CodeWorkspaceTab({
         || (options.semanticGeneration != null && options.semanticRevision != null)
         || options.plan !== undefined
         ? async () => {
+          assertWorkspaceEditOwner();
           await options.preflightMutation?.();
+          assertWorkspaceEditOwner();
           if (options.semanticGeneration != null && options.semanticRevision != null) {
             const current = semanticIndex.current();
             const semanticToken = {
@@ -8951,6 +8973,7 @@ export function CodeWorkspaceTab({
             }
           }
           await prepareRefactorRecovery();
+          assertWorkspaceEditOwner();
         }
         : undefined,
       validateOperationPaths: options.semanticWorkspaceOnly || (options.semanticGeneration != null && options.semanticRevision != null)
@@ -8959,9 +8982,18 @@ export function CodeWorkspaceTab({
           rootsRef.current.map((root) => root.path),
         )
         : undefined,
-      createFile: (operation) => applyLspResourceOperation(operation),
-      renameFile: (operation) => applyLspResourceOperation(operation),
-      deleteFile: (operation) => applyLspResourceOperation(operation),
+      createFile: async (operation) => {
+        assertWorkspaceEditOwner();
+        await applyLspResourceOperation(operation);
+      },
+      renameFile: async (operation) => {
+        assertWorkspaceEditOwner();
+        await applyLspResourceOperation(operation);
+      },
+      deleteFile: async (operation) => {
+        assertWorkspaceEditOwner();
+        await applyLspResourceOperation(operation);
+      },
       onActiveEditResolved: (activeEdit) => {
         resolvedEdit = activeEdit;
         if (allowPreview) selectedEdit = activeEdit;
@@ -8981,6 +9013,7 @@ export function CodeWorkspaceTab({
         void refactorRecoveryController.persist(entry);
       },
     });
+    assertWorkspaceEditOwner();
     let outcomes = await applyWorkspaceEdit(edit, buildHooks(true));
     let allOutcomes = [...outcomes];
     // §8.19.1: per-operation effect ledger with an explicit resume boundary.
@@ -9026,7 +9059,7 @@ export function CodeWorkspaceTab({
         }
       }
     }
-    if (allOutcomes.some((outcome) => (
+    if (isWorkspaceEditOwnerActive() && allOutcomes.some((outcome) => (
       outcome.status === "applied-create"
       || outcome.status === "applied-rename"
       || outcome.status === "applied-delete"
@@ -9034,7 +9067,7 @@ export function CodeWorkspaceTab({
       refreshTree();
     }
     const mutated = allOutcomes.some((outcome) => outcome.status.startsWith("applied"));
-    if (mutated) {
+    if (mutated && isWorkspaceEditOwnerActive()) {
       semanticIndex.invalidate(
         "workspace-edit",
         allOutcomes.flatMap((outcome) => outcome.status.startsWith("applied") ? [outcome.path] : []),
@@ -9190,15 +9223,21 @@ export function CodeWorkspaceTab({
       };
       outcomes = [...outcomes, recoveryOutcome];
       allOutcomes = [...allOutcomes, recoveryOutcome];
-      setRefactorRecoveryEntries(refactorRecoveryController.listPending());
-      setWorkspaceRecoveryOpen(true);
+      if (isWorkspaceEditOwnerActive()) {
+        setRefactorRecoveryEntries(refactorRecoveryController.listPending());
+        setWorkspaceRecoveryOpen(true);
+      }
     } else if (refactorRecoveryEntry) {
-      setRefactorRecoveryEntries(refactorRecoveryController.listPending());
+      if (isWorkspaceEditOwnerActive()) {
+        setRefactorRecoveryEntries(refactorRecoveryController.listPending());
+      }
     }
-    setStatusMessage([
-      summarizeWorkspaceEditOutcomes(outcomes),
-      historyUnavailable ? "Undo unavailable: workspace resource snapshot is incomplete" : null,
-    ].filter(Boolean).join("; "));
+    if (isWorkspaceEditOwnerActive()) {
+      setStatusMessage([
+        summarizeWorkspaceEditOutcomes(outcomes),
+        historyUnavailable ? "Undo unavailable: workspace resource snapshot is incomplete" : null,
+      ].filter(Boolean).join("; "));
+    }
     return outcomes;
   }, [
     absolutePathForOpenFile,
@@ -9575,6 +9614,7 @@ export function CodeWorkspaceTab({
         }
       },
     });
+    if (!mountedRef.current || workspaceInstanceIdRef.current !== workspaceInstanceId) return;
     const remaining = refreshRefactorRecoveryEntries();
     if (result.status === "rolled-back") {
       setStatusMessage(`Recovered refactor ${entry.actionId}; ${result.restoredUris.length} file(s) verified`);

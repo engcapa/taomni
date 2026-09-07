@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "fixtureId": "refactor-maven-single",
-  "generatedAt": "2026-09-05T04:44:32.829Z",
+  "generatedAt": "2026-09-07T11:53:22.890Z",
   "sanitized": true,
   "toolchain": {
     "java": {
-      "path": "/data/dev/jdk-21/bin/java",
+      "path": "C:\\Program Files\\Java\\jdk-21\\bin\\java.exe",
       "version": "21.0.4",
       "info": {
         "line": "openjdk version \"21.0.4\" 2024-07-16 LTS",
@@ -14,8 +14,8 @@
       }
     },
     "jdtls": {
-      "home": "~/.local/share/jdtls",
-      "version": "1.61.0.202607102111.jar"
+      "home": "~\\AppData\\Local\\jdtls",
+      "version": "1.61.0.202607142124.jar"
     }
   },
   "renameCapability": {
@@ -38,20 +38,20 @@
         "character": 25
       }
     },
-    "latencyMs": 228
+    "latencyMs": 499
   },
   "rename": {
     "targetSymbol": "signatureTargets",
     "newName": "executeWorkflow",
-    "latencyMs": 1433,
+    "latencyMs": 4450,
     "affectedFilesCount": 2,
     "files": [
       {
         "path": "src/main/java/com/example/single/App.java",
         "isDeclaration": true,
         "editCount": 1,
-        "preSha256": "c1d3ce8ee8ae91dd8e0b339059f1582781a4af6445fd0c2483f64b6d7ee92b6f",
-        "postSha256": "94bc04d9c7de82c190dde77dfe9007528746b99b7b66bf0d10364f11c3f23f13",
+        "preSha256": "0340c73ab6bf482cb7a48e1fabb08049a931cfcb8f0ac820a521aca4a395d598",
+        "postSha256": "35357d3bd63cddc7aad540692e8608d501d80cd6c10257abf455454b163d12d1",
         "edits": [
           {
             "range": {
@@ -64,7 +64,7 @@
                 "character": 38
               }
             },
-            "newText": "executeWorkflow() {\n        if (false) {\n            StringBuilder sb = new StringBuilder();\n            sb.append(\"alpha\");\n            sb.append(\"ab\", 0, 1);\n            String nested = String.valueOf(Integer.parseInt(\"42\"));\n            java.util.Collections.singletonList(\"x\");\n            new App().executeWorkflow"
+            "newText": "executeWorkflow() {\r\n        if (false) {\r\n            StringBuilder sb = new StringBuilder();\r\n            sb.append(\"alpha\");\r\n            sb.append(\"ab\", 0, 1);\r\n            String nested = String.valueOf(Integer.parseInt(\"42\"));\r\n            java.util.Collections.singletonList(\"x\");\r\n            new App().executeWorkflow"
           }
         ]
       },
@@ -72,8 +72,8 @@
         "path": "src/test/java/com/example/single/AppTest.java",
         "isDeclaration": false,
         "editCount": 1,
-        "preSha256": "8d338b5f49eb69fafccb52559d22f4d9dd03819ae5542898d6005ba0ee8fac57",
-        "postSha256": "265437d02d1aa0b0636742bba49ecda0bd079cad8fb1c03062d1d1fcb9ad673a",
+        "preSha256": "690b984586aea81eb0d0491e36fc331bd2677b3ced76a449b0ae25bf7a28862e",
+        "postSha256": "82c4ef59f8478505104c05a395c1e13ccf68a917fe74850004d03da89469fe9b",
         "edits": [
           {
             "range": {

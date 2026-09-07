@@ -25,6 +25,7 @@ export class RefactorRecoveryController {
   private readonly workspaceId: string;
   private readonly workspaceRoot: string;
   private readonly storage: Storage | undefined;
+  private active = true;
 
   constructor(options: RefactorRecoveryControllerOptions) {
     this.workspaceId = options.workspaceId;
@@ -32,11 +33,28 @@ export class RefactorRecoveryController {
     this.storage = options.storage;
   }
 
+  /** Re-arm the owner after a StrictMode effect replay or workspace mount. */
+  activate(): void {
+    this.active = true;
+  }
+
+  /** Stop pending recovery work when the owning workspace is unmounted. */
+  dispose(): void {
+    this.active = false;
+  }
+
+  isActive(): boolean {
+    return this.active;
+  }
+
   listPending(): RefactorRecoveryJournalRecord[] {
     return listPendingRefactorRecoveryJournals(this.workspaceRoot, this.storage);
   }
 
   persist(entry: RefactorRecoveryJournalEntry): { ok: true } | { ok: false; reason: string } {
+    if (!this.active) {
+      return { ok: false, reason: "Refactor recovery workspace owner is closed" };
+    }
     if (entry.workspaceId !== this.workspaceId || normalizeFsPath(entry.workspaceRoot) !== this.workspaceRoot) {
       return { ok: false, reason: "Refactor recovery journal belongs to another workspace" };
     }
@@ -54,6 +72,9 @@ export class RefactorRecoveryController {
     entry: RefactorRecoveryJournalRecord,
     handlers: RefactorRecoveryReplayHandlers,
   ): Promise<RefactorRecoveryReplayResult> {
+    if (!this.active) {
+      return this.pending([], [], "Refactor recovery workspace owner is closed");
+    }
     if (entry.schemaVersion !== 2) {
       return replayRefactorRecoveryJournal(entry, handlers);
     }
@@ -74,8 +95,17 @@ export class RefactorRecoveryController {
 
     const result = await replayRefactorRecoveryJournal(applying, {
       ...handlers,
+      readText: async (path, document) => {
+        if (!this.active) throw new Error("Refactor recovery workspace owner is closed");
+        return handlers.readText(path, document);
+      },
+      applyText: async (path, text, document, expectedDocumentRevision) => {
+        if (!this.active) throw new Error("Refactor recovery workspace owner is closed");
+        return handlers.applyText(path, text, document, expectedDocumentRevision);
+      },
       onDocumentApplied: async (path, document) => {
         await handlers.onDocumentApplied?.(path, document);
+        if (!this.active) throw new Error("Refactor recovery workspace owner is closed");
         const documentIndex = applying.documents.indexOf(document);
         if (documentIndex < 0) {
           throw new Error(`Recovery settled an unknown document: ${path}`);

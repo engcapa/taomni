@@ -21,13 +21,17 @@ import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { LspClient, sha256 } from "./lsp-client.mjs";
 
 const RUNNER_DIR = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_ROOT = resolve(RUNNER_DIR, "..");
 const PROJECTS_DIR = join(FIXTURE_ROOT, "projects");
 const TRACES_DIR = join(FIXTURE_ROOT, "traces");
+
+function fileUri(path) {
+  return pathToFileURL(path).href;
+}
 
 function resolveJava() {
   const candidate = process.env.TAOMNI_FIXTURE_JAVA
@@ -123,15 +127,15 @@ async function main() {
 
   // Clean completion syntax stubs to provide clean compilation units for refactoring
   const cleanAppText = readFileSync(appFile, "utf8")
-    .replace(/\n\s*Stri\n/, "\n            // Stri\n")
-    .replace(/\n\s*Arrays\.\n/, "\n            // Arrays.\n")
-    .replace(/\n\s*new StringBuilder\(\)\.appen\n/, "\n            // appen\n")
-    .replace(/\n\s*StringUti\n/, "\n            // StringUti\n");
+    .replace(/\r?\n\s*Stri\r?\n/, "\n            // Stri\n")
+    .replace(/\r?\n\s*Arrays\.\r?\n/, "\n            // Arrays.\n")
+    .replace(/\r?\n\s*new StringBuilder\(\)\.appen\r?\n/, "\n            // appen\n")
+    .replace(/\r?\n\s*StringUti\r?\n/, "\n            // StringUti\n");
   writeFileSync(appFile, cleanAppText, "utf8");
 
   // Wire cross-file invocation in test to ensure multi-file rename effect
   const cleanTestText = readFileSync(testFile, "utf8")
-    .replace(/\n\s*Asser\n/, "\n            // Asser\n")
+    .replace(/\r?\n\s*Asser\r?\n/, "\n            // Asser\n")
     .replace("Assert.assertTrue", "new App().signatureTargets();\n        Assert.assertTrue");
   writeFileSync(testFile, cleanTestText, "utf8");
 
@@ -143,7 +147,7 @@ async function main() {
   const registeredCapabilities = [];
   const client = new LspClient(javaPath, launchArgs(jdtls, dataDir), {
     cwd: tempProjectDir,
-    workspaceFolders: [{ uri: `file://${tempProjectDir}`, name: "maven-single" }],
+    workspaceFolders: [{ uri: fileUri(tempProjectDir), name: "maven-single" }],
     onWorkDoneProgress: (params) => {
       const title = params.value?.title;
       if (title && !importProgressTitles.includes(title)) importProgressTitles.push(title);
@@ -156,8 +160,8 @@ async function main() {
   try {
     const initResponse = await client.request("initialize", {
       processId: null,
-      rootUri: `file://${tempProjectDir}`,
-      workspaceFolders: [{ uri: `file://${tempProjectDir}`, name: "maven-single" }],
+      rootUri: fileUri(tempProjectDir),
+      workspaceFolders: [{ uri: fileUri(tempProjectDir), name: "maven-single" }],
       capabilities: {
         textDocument: {
           synchronization: { dynamicRegistration: false, didSave: true },
@@ -177,7 +181,7 @@ async function main() {
     // Open both documents
     client.notify("textDocument/didOpen", {
       textDocument: {
-        uri: `file://${appFile}`,
+        uri: fileUri(appFile),
         languageId: "java",
         version: 1,
         text: cleanAppText,
@@ -185,7 +189,7 @@ async function main() {
     });
     client.notify("textDocument/didOpen", {
       textDocument: {
-        uri: `file://${testFile}`,
+        uri: fileUri(testFile),
         languageId: "java",
         version: 1,
         text: cleanTestText,
@@ -203,7 +207,7 @@ async function main() {
     // 1. prepareRename probe
     const prepareStart = Date.now();
     const prepareResult = await client.request("textDocument/prepareRename", {
-      textDocument: { uri: `file://${appFile}` },
+      textDocument: { uri: fileUri(appFile) },
       position: { line: methodLine, character: methodChar },
     }, 30_000);
     const prepareMs = Date.now() - prepareStart;
@@ -216,7 +220,7 @@ async function main() {
     const newName = "executeWorkflow";
     const renameStart = Date.now();
     const renameResult = await client.request("textDocument/rename", {
-      textDocument: { uri: `file://${appFile}` },
+      textDocument: { uri: fileUri(appFile) },
       position: { line: methodLine, character: methodChar },
       newName,
     }, 60_000);
@@ -330,7 +334,10 @@ async function main() {
       process.exitCode = 1;
     }
   } finally {
-    client.kill();
+    // Windows keeps the temporary project locked until the JDT LS child has
+    // actually exited. Await teardown before removing either fixture tree so
+    // a valid provider trace is not downgraded by cleanup-time EPERM.
+    await client.shutdown();
     rmSync(tempProjectDir, { recursive: true, force: true });
     rmSync(dataDir, { recursive: true, force: true });
   }
