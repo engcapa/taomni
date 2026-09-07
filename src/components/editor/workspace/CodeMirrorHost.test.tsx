@@ -6,7 +6,12 @@ import { undoDepth } from "@codemirror/commands";
 import { startCompletion } from "@codemirror/autocomplete";
 import { EditorView } from "@codemirror/view";
 import { CodeMirrorHost } from "./CodeMirrorHost";
-import { virtualSpaceOverflowField } from "./workspaceVirtualSpace";
+import {
+  setVirtualOverflow,
+  virtualOverflowAt,
+  virtualSpaceOverflowField,
+  virtualSpaceTypingHandler,
+} from "./workspaceVirtualSpace";
 import { WorkspaceActionHost } from "./workspaceActionHost";
 import { WorkspaceDocumentTransactionOwner } from "./workspaceDocumentTransactionOwner";
 import type { GitLineChange } from "./gitEditorChrome";
@@ -983,6 +988,61 @@ describe("§8.26 ED-MULTIVIEW-002 shared document host wiring", () => {
     expect(primary.state.doc.toString()).toBe("hello!");
     expect(secondary.state.doc.toString()).toBe("hello!");
     expect(owner.getHistoryState("shared.ts")).toMatchObject({ canUndo: true, canRedo: false });
+  });
+
+  it("ED-AUDIT-002: one undo through the shared owner restores the virtual caret with the text", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const actionHost = new WorkspaceActionHost({ workspaceId: "ws-vspace-undo" });
+    const initial = "first line\nsecond";
+    const rendered = render(
+      <CodeMirrorHost
+        {...sharedProps(owner, "primary", initial, vi.fn(), actionHost)}
+        appearance={{
+          fontFamily: "monospace",
+          fontSizePx: 14,
+          lineHeight: 1.5,
+          ligatures: false,
+          colorSchemeId: "default",
+          highContrast: false,
+          virtualSpace: { afterLineEnd: true, atFileBottom: true },
+        }}
+      />,
+    );
+    const view = EditorView.findFromDOM(rendered.container.querySelector<HTMLElement>(".cm-editor")!);
+    expect(view).not.toBeNull();
+
+    // Park a virtual caret past the end of line 0 (offset 10) with 3 columns.
+    view!.dispatch({
+      selection: EditorSelection.cursor(10),
+      effects: setVirtualOverflow.of(new Map([[10, 3]])),
+    });
+    expect(virtualOverflowAt(view!.state, 10)).toBe(3);
+
+    // Typing consumes the overflow: padding + text in one transaction that
+    // reaches the shared owner through the host's update listener.
+    expect((virtualSpaceTypingHandler as any).value(view!, 10, 10, "X")).toBe(true);
+    expect(view!.state.doc.toString()).toBe("first line   X\nsecond");
+    expect(owner.getDocument("shared.ts")).toBe("first line   X\nsecond");
+
+    // The production undo action routes through the shared owner.
+    await act(async () => {
+      const result = await actionHost.execute("workspace.undo", { focus: "editor", hasActiveFile: true });
+      expect(result.kind).toBe("applied");
+    });
+    expect(view!.state.doc.toString()).toBe(initial);
+    expect(view!.state.selection.main.head).toBe(10);
+    expect(virtualOverflowAt(view!.state, 10)).toBe(3);
+    expect(owner.getDocument("shared.ts")).toBe(initial);
+
+    // The restored caret is live: the next insertion re-manufactures padding.
+    expect((virtualSpaceTypingHandler as any).value(view!, 10, 10, "Z")).toBe(true);
+    expect(view!.state.doc.toString()).toBe("first line   Z\nsecond");
+    await act(async () => {
+      const result = await actionHost.execute("workspace.undo", { focus: "editor", hasActiveFile: true });
+      expect(result.kind).toBe("applied");
+    });
+    expect(view!.state.doc.toString()).toBe(initial);
+    expect(virtualOverflowAt(view!.state, 10)).toBe(3);
   });
 
   it("keeps a native replacement burst ahead of delayed controlled document echoes after undo", async () => {

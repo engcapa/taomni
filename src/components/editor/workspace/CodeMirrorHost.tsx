@@ -191,6 +191,7 @@ import { observeSyntaxFacts, treeRevisionField } from "./workspaceSyntaxFacts";
 import {
   desiredVisualColumnField,
   isEditorGeometryReady,
+  virtualOverflowRestoreField,
   virtualSpaceClickHandler,
   virtualSpaceOverflowField,
   virtualSpaceTypingHandler,
@@ -1696,6 +1697,12 @@ function applySharedTransactionToView(view: EditorView, transaction: DocumentTra
       remoteTransactionAnnotation.of(true),
       Transaction.addToHistory.of(false),
     ],
+    // ED-AUDIT-002: replayed undo/redo transactions carry the matching
+    // userEvent so the virtual-space overflow field can restore the virtual
+    // caret on undo and drop it on redo.
+    ...(transaction.origin === "undo" || transaction.origin === "redo"
+      ? { userEvent: transaction.origin }
+      : {}),
   });
   return true;
 }
@@ -2252,7 +2259,9 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         // §8.19.8 treeRevision source for semantic-edit evidence envelopes.
         treeRevisionField,
         // §8.19.5 / §8.21.3 Virtual Space: overflow tracking, typing materialization,
-        // vertical desired column preservation, and click-past-EOL.
+        // vertical desired column preservation, and click-past-EOL. The restore
+        // field must precede the overflow field (ED-AUDIT-002 undo restore).
+        virtualOverflowRestoreField,
         virtualSpaceOverflowField,
         desiredVisualColumnField,
         virtualSpaceTypingHandler,

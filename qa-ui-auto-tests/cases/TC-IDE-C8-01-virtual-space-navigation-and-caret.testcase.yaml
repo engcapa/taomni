@@ -109,6 +109,38 @@ steps:
       expression: 'document.querySelectorAll(".cm-line")[2]?.textContent === "longprefixX"'
       expect_truthy: true
 
+  # ED-AUDIT-002: one undo restores the virtual caret together with the text.
+  # Escape clears the flow-restored overflow; Control+Home+End parks a real
+  # caret at the line-0 end, Shift+ArrowLeft+Alt+j re-creates the three
+  # X-occurrence carets, and ArrowRight+End parks every caret one visual
+  # column past its own line end. Typing W materializes exactly one padding
+  # space per caret, one undo restores the text, and typing V again
+  # re-manufactures the same padding through the RESTORED virtual caret.
+  - press: Escape
+  - press: Control+Home
+  - press: End
+  - press: Shift+ArrowLeft
+  - press: Alt+j
+  - press: Alt+j
+  - press: ArrowRight
+  - press: End
+  - type: W
+  - eval_readonly:
+      expression: 'JSON.stringify([document.querySelectorAll(".cm-line")[0]?.textContent, document.querySelectorAll(".cm-line")[1]?.textContent, document.querySelectorAll(".cm-line")[2]?.textContent])'
+      contains: '["prefixX W","X W","longprefixX W"]'
+  - press: Control+z
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-line")[0]?.textContent === "prefixX" && document.querySelectorAll(".cm-line")[1]?.textContent === "X" && document.querySelectorAll(".cm-line")[2]?.textContent === "longprefixX"'
+      expect_truthy: true
+  - type: V
+  - eval_readonly:
+      expression: 'JSON.stringify([document.querySelectorAll(".cm-line")[0]?.textContent, document.querySelectorAll(".cm-line")[1]?.textContent, document.querySelectorAll(".cm-line")[2]?.textContent])'
+      contains: '["prefixX V","X V","longprefixX V"]'
+  - press: Control+z
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-line")[0]?.textContent === "prefixX"'
+      expect_truthy: true
+
   # Reverse a Shift selection through its line-2 anchor, then move back to the
   # anchor. With a stable anchor, typing Q inserts at line 2; swapping anchor
   # and head would replace the first two lines instead.

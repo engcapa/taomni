@@ -11,6 +11,7 @@ import {
   editorVirtualSpacePolicy,
   paddingForOverflow,
   setVirtualOverflow,
+  setVirtualOverflowRestore,
   virtualSpaceOverflowField,
   type VirtualOverflowMap,
 } from "./workspaceVirtualSpace";
@@ -201,7 +202,14 @@ export function pasteEditorClipboardPayload(
     changes,
     selection: plan.selection,
     ...(overflow && overflow.size > 0
-      ? { effects: setVirtualOverflow.of(new Map()) }
+      ? {
+          effects: [
+            setVirtualOverflow.of(new Map()),
+            // ED-AUDIT-002: record the consumed overflow so one undo restores
+            // the pasted text and the virtual caret together.
+            setVirtualOverflowRestore.of(overflow),
+          ],
+        }
       : {}),
     userEvent: "input.paste",
     scrollIntoView: true,
