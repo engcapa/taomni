@@ -3,6 +3,7 @@ import {
   WorkspaceEditHistory,
   buildWorkspacePathSnapshotEdit,
   buildWorkspaceTextSnapshotEdit,
+  workspaceEditUndoPrecondition,
 } from "./workspaceEditHistory";
 
 describe("WorkspaceEditHistory", () => {
@@ -97,5 +98,48 @@ describe("buildWorkspaceTextSnapshotEdit", () => {
     expect(edit.operations).toHaveLength(2);
     expect(edit.documentEdits[0]?.edits[0]?.range.end).toEqual({ line: 2, character: 0 });
     expect(edit.documentEdits[1]?.edits[0]?.range.end).toEqual({ line: 0, character: 6 });
+  });
+});
+
+describe("workspaceEditUndoPrecondition (ED-AUDIT-014)", () => {
+  const recorded = [
+    { path: "/repo/a.ts", exists: true, text: "after refactor" },
+    { path: "/repo/b.ts", exists: true, text: "after refactor b" },
+  ];
+
+  it("allows undo when every recorded text still matches the current content", () => {
+    const result = workspaceEditUndoPrecondition(recorded, {
+      "/repo/a.ts": "after refactor",
+      "/repo/b.ts": "after refactor b",
+    });
+    expect(result.blocked).toBe(false);
+    expect(result.reasons).toEqual([]);
+  });
+
+  it("blocks undo when a later edit changed a recorded file", () => {
+    const result = workspaceEditUndoPrecondition(recorded, {
+      "/repo/a.ts": "user typed after the refactor",
+      "/repo/b.ts": "after refactor b",
+    });
+    expect(result.blocked).toBe(true);
+    expect(result.reasons[0]).toContain("/repo/a.ts");
+    expect(result.reasons[0]).toContain("changed after the recorded state");
+  });
+
+  it("blocks undo when a recorded file is unreadable or missing", () => {
+    const result = workspaceEditUndoPrecondition(recorded, {
+      "/repo/a.ts": "after refactor",
+    });
+    expect(result.blocked).toBe(true);
+    expect(result.reasons[0]).toContain("unreadable");
+  });
+
+  it("skips recorded non-existence when checking preconditions", () => {
+    // A file recorded as absent (text: null) has no recorded text to protect.
+    const result = workspaceEditUndoPrecondition(
+      [{ path: "/repo/removed.ts", exists: false, text: null }],
+      {},
+    );
+    expect(result.blocked).toBe(false);
   });
 });
