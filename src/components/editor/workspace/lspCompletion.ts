@@ -1,6 +1,5 @@
 import {
   completeAnyWord,
-  snippet,
   type Completion,
   type CompletionContext,
   type CompletionResult,
@@ -1143,52 +1142,6 @@ export function boostFromTypedPrefix(
   return (fromSort ?? 0) + quality;
 }
 
-/**
- * Convert an LSP snippet (`$1`, `${1:default}`, `${1|a,b|}`) to CodeMirror's
- * snippet syntax (`${}` / `${default}`). Tabstop order follows appearance,
- * which matches the numbering of snippets real servers emit.
- */
-export function lspSnippetToCmSnippet(text: string): string {
-  let out = "";
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i];
-    if (char === "\\" && i + 1 < text.length) {
-      // LSP escape: keep the escaped character literal; re-escape `${` so
-      // CodeMirror does not read it as a field.
-      const next = text[i + 1];
-      out += next === "$" && text[i + 2] === "{" ? "\\$" : next;
-      i += 1;
-      continue;
-    }
-    if (char !== "$") {
-      out += char;
-      continue;
-    }
-    const rest = text.slice(i);
-    const choice = rest.match(/^\$\{(\d+)\|([^|,}]*)[^|}]*\|\}/);
-    if (choice) {
-      out += `\${${choice[1]}:${choice[2]}}`;
-      i += choice[0].length - 1;
-      continue;
-    }
-    const placeholder = rest.match(/^\$\{(\d+):([^{}]*)\}/);
-    if (placeholder) {
-      out += `\${${placeholder[1]}:${placeholder[2]}}`;
-      i += placeholder[0].length - 1;
-      continue;
-    }
-    const tabstop = rest.match(/^\$\{(\d+)\}/) ?? rest.match(/^\$(\d+)/);
-    if (tabstop) {
-      out += `\${${tabstop[1]}}`;
-      i += tabstop[0].length - 1;
-      continue;
-    }
-    // Literal dollar; escape it when `${` would otherwise start a field.
-    out += text[i + 1] === "{" ? "\\$" : "$";
-  }
-  return out;
-}
-
 /** One committed placeholder span; `choices` present for ${n|a,b,c|} stops. */
 export interface ParsedSnippetPlaceholder {
   start: number;
@@ -1354,8 +1307,18 @@ export function advanceLspSnippetTabstop(view: EditorView): boolean {
   }
   const nextIndex = session.index + 1;
   if (nextIndex >= session.spans.length) {
+    // IDEA parity (§8.20 ED-AUDIT-007): the final Tab leaves the template
+    // with a caret-only move instead of falling through to indent, which
+    // would add a second undoable change after the acceptance and break the
+    // one-undo contract.
+    const span = session.spans[session.index];
     lspSnippetSessions.delete(view);
-    return false;
+    if (!span) return false;
+    view.dispatch({
+      selection: { anchor: Math.min(span.to, view.state.doc.length) },
+      scrollIntoView: true,
+    });
+    return true;
   }
   session.index = nextIndex;
   const span = session.spans[nextIndex];
@@ -1371,6 +1334,31 @@ export function advanceLspSnippetTabstop(view: EditorView): boolean {
 /** Clear the active tabstop session (Escape semantics). */
 export function cancelLspSnippetSession(view: EditorView): boolean {
   return lspSnippetSessions.delete(view);
+}
+
+/**
+ * Shift-Tab counterpart of `advanceLspSnippetTabstop`: move back to the
+ * previous placeholder span (selection-only, no history entry). While a
+ * session is live the template owns Tab/Shift-Tab, so the first stop
+ * re-selects itself instead of letting indentLess fire inside the template.
+ */
+export function retreatLspSnippetTabstop(view: EditorView): boolean {
+  const session = lspSnippetSessions.get(view);
+  if (!session || view.state.doc.length !== session.docLength) return false;
+  session.index = Math.max(0, session.index - 1);
+  const span = session.spans[session.index];
+  if (!span) {
+    lspSnippetSessions.delete(view);
+    return false;
+  }
+  view.dispatch({
+    selection: {
+      anchor: Math.min(span.from, view.state.doc.length),
+      head: Math.min(span.to, view.state.doc.length),
+    },
+    scrollIntoView: true,
+  });
+  return true;
 }
 
 /**
@@ -1553,11 +1541,6 @@ export function commitLspCompletion(
   const rawInsert = item.textEdit?.newText ?? item.insertText ?? item.label;
   const additionalEdits = item.additionalTextEdits ?? [];
   const isSnippet = item.insertTextFormat === 2;
-  if (isSnippet && additionalEdits.length === 0) {
-    snippet(lspSnippetToCmSnippet(rawInsert))(view, null, replaceFrom, replaceTo);
-    recordCompletionTelemetry(token, "applied");
-    return true;
-  }
 
   const parsed = isSnippet ? parseLspSnippet(rawInsert) : null;
   const insert = parsed ? parsed.text : rawInsert;
@@ -1849,13 +1832,20 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
       ? context.state.sliceDoc(context.pos - 1, context.pos)
       : "";
     const triggers = hooks.triggerCharacters();
+    const preWordChar = word && word.from > 0
+      ? context.state.sliceDoc(word.from - 1, word.from)
+      : "";
     // Trigger-only: just typed `.` / `:` with no identifier yet.
     const triggerOnly = !word && !!charBefore && triggers.includes(charBefore);
     // Also treat typing right after a trigger (e.g. `obj.t`) as a triggered
-    // completion so the server gets triggerKind=2 for member lists.
+    // completion so the server gets triggerKind=2 for member lists. Whitespace
+    // never counts as the trigger: jdtls registers ` ` in its trigger set but
+    // answers a space-triggered word request with an empty list, and a space
+    // before an identifier did not trigger the request anyway.
     const afterTrigger = !!word
       && word.from > 0
-      && triggers.includes(context.state.sliceDoc(word.from - 1, word.from));
+      && preWordChar.trim().length > 0
+      && triggers.includes(preWordChar);
     if (!context.explicit && !word && !triggerOnly) return null;
     // Suppress word-based LSP autocompletion inside string literals or comments
     // unless user explicitly invoked completion (Ctrl+Space) or typed a trigger character.
@@ -1906,10 +1896,16 @@ export function createLspCompletionSource(hooks: LspCompletionHooks): Completion
       }
     }
 
-    const triggerCharacter = triggerOnly
+    // LSP trigger semantics: an explicit invocation (Ctrl+Space) is always
+    // `Invoked` (triggerKind 1). Claiming a trigger character describes a
+    // different activation cause — and jdtls answers a space-triggered
+    // request with an empty list, which silenced every completion at a
+    // space-prefixed identifier. Typing keeps triggerKind 2 only for a real
+    // member-access trigger (`obj.t`); plain identifier typing stays Invoked.
+    const triggerCharacter = !context.explicit && triggerOnly
       ? charBefore
-      : afterTrigger
-        ? context.state.sliceDoc(word!.from - 1, word!.from)
+      : !context.explicit && afterTrigger
+        ? preWordChar
         : null;
     // §8.19.4 invocation evidence: explicit repeated calls at one caret carry
     // requestedScope:"expanded" into the provider adapter; typing/trigger

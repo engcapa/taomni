@@ -112,6 +112,7 @@ import {
   advanceLspSnippetTabstop,
   cancelLspSnippetSession,
   cycleLspSnippetChoice,
+  retreatLspSnippetTabstop,
   createLspCompletionSource,
   LspCompletionController,
   lspSnippetSessionInvalidator,
@@ -2374,9 +2375,11 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         // 2) Else expand an exact live/postfix template under the caret
         //    even when the popup is closed (sout + Tab without waiting).
         // 3) Else cycle a choice placeholder's options (§8.18.3 interactive
-        //    choice session), else plain LSP snippet tabstops (combined
-        //    snippet+import acceptance committed in one transaction).
-        // 4) Else fall through to CM snippet tabstops / indentWithTab.
+        //    choice session), else plain LSP snippet tabstops (all snippet
+        //    acceptances commit in one transaction and own their session).
+        // 4) Else fall through to indentWithTab. The final tabstop exits
+        //    with a caret-only move (never an undoable indent), and
+        //    Shift-Tab walks back through the stops while the session lives.
         Prec.high(keymap.of([
           {
             key: "Tab",
@@ -2389,6 +2392,10 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
               if (activeLspSnippetChoices(view)) return cycleLspSnippetChoice(view);
               return advanceLspSnippetTabstop(view);
             },
+          },
+          {
+            key: "Shift-Tab",
+            run: (view) => retreatLspSnippetTabstop(view),
           },
         ])),
         keymap.of([

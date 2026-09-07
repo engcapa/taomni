@@ -1,14 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { EditorState } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
-import {
-  CompletionContext,
-  hasNextSnippetField,
-  nextSnippetField,
-} from "@codemirror/autocomplete";
+import { CompletionContext } from "@codemirror/autocomplete";
 import { history, undo } from "@codemirror/commands";
 import type { LspCompletionResult, LspDocumentStatus } from "../../../lib/editor/lsp";
 import {
+  activeLspSnippetSession,
   advanceLspSnippetTabstop,
   cancelLspSnippetSession,
   lspSnippetSessionInvalidator,
@@ -24,7 +21,6 @@ import {
   compareCandidatePairs,
   compareCompletionCandidates,
   matchCompletionQuery,
-  lspSnippetToCmSnippet,
   LspCompletionController,
   WorkspaceCompletionPolicyController,
   matchesCaseRule,
@@ -77,24 +73,6 @@ function contextAt(docText: string, pos: number, explicit = false): CompletionCo
   const state = EditorState.create({ doc: docText });
   return new CompletionContext(state, pos, explicit);
 }
-
-describe("lspSnippetToCmSnippet", () => {
-  it("converts tabstops, placeholders, and choices", () => {
-    expect(lspSnippetToCmSnippet("openFile($1)$0")).toBe("openFile(${1})${0}");
-    expect(lspSnippetToCmSnippet("for (const ${1:item} of ${2:items}) {}"))
-      .toBe("for (const ${1:item} of ${2:items}) {}");
-    expect(lspSnippetToCmSnippet("align: ${1|left,right,center|}")).toBe("align: ${1:left}");
-    expect(lspSnippetToCmSnippet("${1}")).toBe("${1}");
-  });
-
-  it("keeps escaped dollars literal and protects would-be fields", () => {
-    // Unescaped $<digit> is a tabstop per the LSP spec; literals need \$.
-    expect(lspSnippetToCmSnippet("price: \\$5")).toBe("price: $5");
-    expect(lspSnippetToCmSnippet("\\$1 stays")).toBe("$1 stays");
-    expect(lspSnippetToCmSnippet("template \\${literal}")).toBe("template \\${literal}");
-    expect(lspSnippetToCmSnippet("plain $ dollar")).toBe("plain $ dollar");
-  });
-});
 
 describe("completionKindToType", () => {
   it("maps LSP kinds to CodeMirror types", () => {
@@ -219,6 +197,35 @@ describe("createLspCompletionSource", () => {
 
     expect(fetch).toHaveBeenCalledWith({ line: 0, character: 8 }, ".");
   });
+
+  it("sends no trigger character for an explicit invocation at a space-prefixed identifier", async () => {
+    // jdtls registers ` ` in its trigger-character set but answers a
+    // space-triggered word request with an empty list, so an explicit
+    // Ctrl+Space at `StringUti` must go out as triggerKind 1 (no trigger
+    // character) or the popup shows only templates.
+    const fetch = vi.fn(async () =>
+      completionResult(["StringUtils - org.apache.commons.lang3"]));
+    const source = createFixtureCompletionSource({
+      fetch,
+      triggerCharacters: () => [" ", ".", "@", "#", "*"],
+    });
+
+    await source(contextAt("            StringUti", 21, true));
+
+    expect(fetch).toHaveBeenCalledWith({ line: 0, character: 21 }, null);
+  });
+
+  it("treats typing an identifier after whitespace as Invoked, not space-triggered", async () => {
+    const fetch = vi.fn(async () => completionResult(["StringBuilder"]));
+    const source = createFixtureCompletionSource({
+      fetch,
+      triggerCharacters: () => [" ", "."],
+    });
+
+    await source(contextAt("    Stri", 8));
+
+    expect(fetch).toHaveBeenCalledWith({ line: 0, character: 8 }, null);
+  }, 2000);
 
   it("caps very large completion lists for popup performance", async () => {
     const labels = Array.from({ length: MAX_COMPLETION_OPTIONS + 50 }, (_, i) => `item${i}`);
@@ -762,12 +769,20 @@ describe("createLspCompletionSource", () => {
         view.state.selection.main.from,
         view.state.selection.main.to,
       )).toBe("first");
-      expect(hasNextSnippetField(view.state)).toBe(true);
-      expect(nextSnippetField(view)).toBe(true);
+      expect(activeLspSnippetSession(view)).toBe(true);
+      // Tab advances to the second placeholder with zero document edits.
+      expect(advanceLspSnippetTabstop(view)).toBe(true);
+      expect(view.state.doc.toString()).toBe("call(first, second)");
       expect(view.state.sliceDoc(
         view.state.selection.main.from,
         view.state.selection.main.to,
       )).toBe("second");
+      // The bare $0 stop follows, then the final Tab exits caret-only.
+      expect(advanceLspSnippetTabstop(view)).toBe(true);
+      expect(view.state.selection.main.head).toBe(view.state.doc.length);
+      expect(advanceLspSnippetTabstop(view)).toBe(true);
+      expect(view.state.doc.toString()).toBe("call(first, second)");
+      expect(activeLspSnippetSession(view)).toBe(false);
       view.destroy();
     });
 
@@ -892,8 +907,11 @@ describe("P0-J1 remainder: parseLspSnippet spans & tabstop session", () => {
     expect(view.state.selection.main.from).toBe(importPrefix + 1 + "loadUser(".length);
     expect(view.state.selection.main.to).toBe(importPrefix + 1 + "loadUser(user".length);
 
-    // Exhausting the single-placeholder session returns false (falls through).
-    expect(advanceLspSnippetTabstop(view)).toBe(false);
+    // The final Tab exits caret-only (no undoable indent, session ends).
+    expect(advanceLspSnippetTabstop(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe(docAfterAccept);
+    expect(view.state.selection.main.head).toBe(importPrefix + 1 + "loadUser(user".length);
+    expect(activeLspSnippetSession(view)).toBe(false);
 
     // Multi-placeholder session: Tab moves between spans with zero doc change.
     const fetchMulti = vi.fn(async (): Promise<LspCompletionResult> => ({
@@ -939,8 +957,11 @@ describe("P0-J1 remainder: parseLspSnippet spans & tabstop session", () => {
     expect(viewMulti.state.doc.toString()).toBe(docMulti);
     expect(viewMulti.state.selection.main.from).toBe(pairPrefix + "pair(a, ".length);
     expect(viewMulti.state.selection.main.to).toBe(pairPrefix + "pair(a, b".length);
-    // Exhausted.
-    expect(advanceLspSnippetTabstop(viewMulti)).toBe(false);
+    // Exhausted: caret-only exit at the last span's end, session closed.
+    expect(advanceLspSnippetTabstop(viewMulti)).toBe(true);
+    expect(viewMulti.state.doc.toString()).toBe(docMulti);
+    expect(viewMulti.state.selection.main.head).toBe(pairPrefix + "pair(a, b".length);
+    expect(activeLspSnippetSession(viewMulti)).toBe(false);
     viewMulti.destroy();
 
     cancelLspSnippetSession(view);

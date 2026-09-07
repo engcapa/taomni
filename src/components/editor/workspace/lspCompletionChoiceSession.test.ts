@@ -3,6 +3,7 @@ import { EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import {
   activeLspSnippetChoices,
+  activeLspSnippetSession,
   advanceLspSnippetTabstop,
   cycleLspSnippetChoice,
   lspSnippetSessionInvalidator,
@@ -47,8 +48,12 @@ describe("§8.18.3 interactive choice session", () => {
     seedLspSnippetSessionForTest(view, "A${1|a,bbbb|}B;");
     expect(cycleLspSnippetChoice(view)).toBe(true);
     expect(view.state.doc.toString()).toBe("AbbbbB;");
-    // Only one placeholder exists; after cycling there is no next stop.
-    expect(advanceLspSnippetTabstop(view)).toBe(false);
+    // Only one placeholder exists; the next Tab exits caret-only (no
+    // undoable indent after the acceptance).
+    expect(advanceLspSnippetTabstop(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe("AbbbbB;");
+    expect(view.state.selection.main.head).toBe(5);
+    expect(activeLspSnippetSession(view)).toBe(false);
     view.destroy();
   });
 
@@ -57,9 +62,13 @@ describe("§8.18.3 interactive choice session", () => {
     seedLspSnippetSessionForTest(view, "${1:name};$2");
     expect(activeLspSnippetChoices(view)).toBeNull();
     expect(cycleLspSnippetChoice(view)).toBe(false);
-    // Plain stops still advance normally (to the bare $2), then exhaust.
+    // Plain stops still advance normally (to the bare $2), then the final
+    // Tab exits caret-only instead of falling through to indent.
     expect(advanceLspSnippetTabstop(view)).toBe(true);
-    expect(advanceLspSnippetTabstop(view)).toBe(false);
+    expect(advanceLspSnippetTabstop(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe("name;;");
+    expect(view.state.selection.main.head).toBe(5);
+    expect(activeLspSnippetSession(view)).toBe(false);
     view.destroy();
   });
 });

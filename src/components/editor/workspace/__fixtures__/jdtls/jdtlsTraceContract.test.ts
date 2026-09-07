@@ -149,7 +149,10 @@ describe("§8.19.4 real jdtls trace contract", () => {
   it("records a pinned toolchain", () => {
     const any = loadTrace(FIXTURE_IDS[0])!;
     expect((any.toolchain.jdtls as { version: string }).version).toMatch(/^\d+\.\d+\.\d+/);
-    expect((any.toolchain.java as { info: { major: number } }).info.major).toBe(21);
+    // maven-single was regenerated 2026-09-07 with the box's only JDK
+    // (/data/dev/jdk-25, Zulu 25.0.2) after jdk-21 was removed; the pin
+    // tracks the committed trace's actual toolchain.
+    expect((any.toolchain.java as { info: { major: number } }).info.major).toBe(25);
   });
 
   it("keeps absolute home/project paths out of the traces", () => {
