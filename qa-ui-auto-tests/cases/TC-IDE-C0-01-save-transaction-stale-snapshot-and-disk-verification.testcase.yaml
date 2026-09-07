@@ -9,11 +9,22 @@ description: |
   encoding failure, verifies zero disk effect/focus retention, undoes the edit,
   changes policy, and recovers through a successful save. No browser stub or
   source text is accepted as native receipt evidence.
+
+  ED-AUDIT-004 slice: a real external host_write_file rewrite under a dirty
+  buffer raises the watcher conflict dialog; dismissing it (Decide Later)
+  leaves the dirty buffer and its stale write guard untouched, so the next
+  Ctrl+S is a typed conflict (result-kind conflict, disk-effect none, no
+  receipt) and the host bytes are provably untouched by exact SHA-256.
+  Restoring the saved bytes lets the watcher refresh the write guard and the
+  same Ctrl+S lands the buffer's intended bytes with a fresh receipt. Two
+  editor undos then prove the buffer-only contract - the disk keeps the saved
+  bytes through both undos - and the following explicit save lands the undone
+  text.
 covers: [F25.1, F25.5, F1.7]
-tags: [code-workspace, ide-c0, save, recovery, receipt, native-gate, accessibility, p0]
+tags: [code-workspace, ide-c0, save, recovery, receipt, conflict, native-gate, accessibility, p0]
 modes: [native]
 fixtures: [reset_db, workspace_root]
-timeout_sec: 300
+timeout_sec: 600
 steps:
   - open: "${cfg.app.base_url}"
   # Fresh isolated app-data => empty vault => first-run master-password gate.
@@ -280,3 +291,115 @@ steps:
       expression: 'document.querySelector(".cm-content:focus")?.matches(".cm-content")'
       expect_truthy: true
   - screenshot: tc-ide-c0-native-save-matrix.png
+
+  # §ED-AUDIT-004 A3: a real external rewrite under a dirty buffer must turn
+  # the next save into a typed conflict with zero disk effect - never a
+  # success receipt, never a silent overwrite.
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+End
+  - type: "!"
+  - wait: 0.5
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-save-observation"]'
+      name: data-state
+      equals: dirty
+  # A real external process rewrites the file while the buffer holds unsaved
+  # edits: the watcher must raise the conflict dialog (dirty + differing).
+  - host_write_file:
+      path: "${fixture.workspace_root}/README.md"
+      text: "externally rewritten\n"
+  - wait_for:
+      selector: '[data-testid="external-file-conflict-dialog"]'
+      timeout_sec: 30
+  # Dismissing the dialog touches neither buffer nor disk: the buffer stays
+  # dirty and its write guard keeps the pre-external hash.
+  - click: '[data-testid="external-file-conflict-dialog"] button[aria-label="Dismiss external file conflict"]'
+  - assert_not_visible: '[data-testid="external-file-conflict-dialog"]'
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+s
+  - wait: 1
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-save-observation"]'
+      name: data-state
+      equals: conflict
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-save-observation"]'
+      name: data-result-kind
+      equals: conflict
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-save-observation"]'
+      name: data-disk-effect
+      equals: none
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-save-observation"]'
+      name: data-dirty
+      equals: "true"
+  - eval_readonly:
+      expression: '!document.getElementById("code-workspace-save-observation")?.hasAttribute("data-receipt-id")'
+      expect_truthy: true
+  - assert_file_sha256:
+      path: "${fixture.workspace_root}/README.md"
+      equals: "5185a66ab96d05620dff4ba24fcb4fec28df21dae051c073396380b99270497b"
+      timeout_sec: 10
+
+  # Recovery: restoring the saved bytes lets the watcher refresh the write
+  # guard (metadata-only, dirty preserved), and the same Ctrl+S lands the
+  # buffer's intended bytes with a fresh receipt.
+  - host_write_file:
+      path: "${fixture.workspace_root}/README.md"
+      text: "café\nmatrix\n恢复"
+  - wait: 1
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+s
+  - assert_file_receipt:
+      path: "${fixture.workspace_root}/README.md"
+      selector: '[data-testid="code-workspace-save-observation"]'
+      encoding: UTF-8
+      bom: false
+      eol: lf
+      expected_text: "café\nmatrix\n恢复!"
+      require_history: false
+
+  # Editor undo is buffer-only: two undos (the typed X, then the typed !)
+  # leave the disk bytes untouched, and the next explicit save lands the
+  # undone text.
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+End
+  - type: "X"
+  - wait: 0.5
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-save-observation"]'
+      name: data-state
+      equals: dirty
+  - press: Control+z
+  - wait: 0.5
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-save-observation"]'
+      name: data-state
+      # Undoing back to the saved text is a buffer-only revision change: the
+      # observation reports clean (no new save result), not a replayed saved.
+      equals: clean
+  - press: Control+z
+  - wait: 0.5
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-save-observation"]'
+      name: data-state
+      equals: dirty
+  - assert_file_sha256:
+      path: "${fixture.workspace_root}/README.md"
+      equals: "5ff143d98db375226ee1be8d3394a7b0c3cd56c4705485f76bfdbc19154e3168"
+      timeout_sec: 10
+  - press: Control+s
+  - assert_file_sha256:
+      path: "${fixture.workspace_root}/README.md"
+      equals: "36d1444a8eac6a3d580b945759caebf6593cc1799986c1b6607b3802411244ec"
+      timeout_sec: 30
+  # Let the settled observation land: between the writeback merge and the
+  # observation setState the previous record's stale revision reads as
+  # clean, so the assertion must not sample that window.
+  - wait: 1
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-save-observation"]'
+      name: data-state
+      equals: saved
+  - screenshot: tc-ide-c0-native-save-conflict-undo.png

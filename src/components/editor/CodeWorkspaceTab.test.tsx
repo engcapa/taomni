@@ -7255,6 +7255,221 @@ end_of_record
       );
     });
 
+    it("surfaces a real hash-mismatch save as conflict with zero disk effect and no blocking row", async () => {
+      const path = "src/main.ts";
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: "ws-save-external-conflict",
+        workspaceInstanceId: "instance-save-external-conflict",
+        name: "Save External Conflict",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path },
+      };
+      workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+      workspaceMocks.workspaceReadFile.mockResolvedValue(file(path, "disk_v1\n"));
+      // Native precondition failure (§ED-AUDIT-004 A3): the disk changed under
+      // the dirty buffer (external rewrite between load and save). The native
+      // writer proves zero bytes landed via effect=none and never fabricates a
+      // success receipt.
+      workspaceMocks.workspaceWriteFileEncoded.mockRejectedValue(Object.assign(
+        new Error("disk hash changed since load"),
+        {
+          kind: "hash-mismatch",
+          expectedHash: `hash-${path}`,
+          actualHash: "hash-external-rewrite",
+          effect: "none",
+        },
+      ));
+
+      const rendered = renderWorkspace(workspace);
+      await screen.findByTitle(`app / ${path}`);
+      const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+      expect(content).not.toBeNull();
+      fireEvent.keyDown(content!, { key: "d", code: "KeyD", ctrlKey: true });
+      await waitFor(() => expect(selectCodeWorkspaceUi(
+        useCodeWorkspaceStore.getState(),
+        "instance-save-external-conflict",
+      ).openFiles[`root:app:${path}`]?.dirty).toBe(true));
+
+      fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Save conflict"));
+      expect(workspaceMocks.workspaceWriteFileEncoded).toHaveBeenCalledTimes(1);
+
+      const conflictObservation = screen.getByTestId("code-workspace-save-observation");
+      expect(conflictObservation).toHaveAttribute("data-state", "conflict");
+      expect(conflictObservation).toHaveAttribute("data-result-kind", "conflict");
+      expect(conflictObservation).toHaveAttribute("data-disk-effect", "none");
+      expect(conflictObservation).toHaveAttribute("data-dirty", "true");
+      expect(conflictObservation).not.toHaveAttribute("data-receipt-id");
+      expect(conflictObservation).not.toHaveAttribute("data-recovery-id");
+
+      // The buffer keeps the user's edits dirty; no ledger row blocks a later
+      // save because a conflict provably wrote nothing.
+      const fileState = selectCodeWorkspaceUi(
+        useCodeWorkspaceStore.getState(),
+        "instance-save-external-conflict",
+      ).openFiles[`root:app:${path}`];
+      expect(fileState?.dirty).toBe(true);
+      expect(fileState?.text).toBe("disk_v1\ndisk_v1\n");
+      expect(hasBlockingDiskEffectResolution(
+        "instance-save-external-conflict",
+        `/repo/app/${path}`,
+      )).toBe(false);
+
+      // A conflict never blocks the retry: the next Ctrl+S invokes the
+      // writer again against the refreshed expectation.
+      fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+      await waitFor(() => expect(workspaceMocks.workspaceWriteFileEncoded).toHaveBeenCalledTimes(2));
+    });
+
+    it("continues a lost-acknowledge save as committed when the read-back proves the intended bytes landed", async () => {
+      const path = "src/main.ts";
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: "ws-save-unknown-committed",
+        workspaceInstanceId: "instance-save-unknown-committed",
+        name: "Save Unknown Committed",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path },
+      };
+      workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+      workspaceMocks.workspaceReadFile.mockResolvedValue(file(path, "initial\n"));
+      // Native unknown-effect contract: the atomic replace acknowledgement was
+      // lost, so the error carries the intent hash and old hash but no proof.
+      workspaceMocks.workspaceWriteFileEncoded.mockRejectedValue(Object.assign(
+        new Error("atomic replace acknowledgement was lost"),
+        {
+          kind: "io",
+          effect: "unknown",
+          intentHash: "intended-new-hash",
+          intentByteLength: 16,
+          oldHash: `hash-${path}`,
+        },
+      ));
+      // The frontend read-back proves the intended bytes are on disk.
+      workspaceMocks.workspaceReadFileWithEncoding.mockResolvedValue(file(path, "initial\ninitial\n", {
+        hash: "intended-new-hash",
+      }));
+
+      const rendered = renderWorkspace(workspace);
+      await screen.findByTitle(`app / ${path}`);
+      const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+      expect(content).not.toBeNull();
+      fireEvent.keyDown(content!, { key: "d", code: "KeyD", ctrlKey: true });
+      await waitFor(() => expect(selectCodeWorkspaceUi(
+        useCodeWorkspaceStore.getState(),
+        "instance-save-unknown-committed",
+      ).openFiles[`root:app:${path}`]?.dirty).toBe(true));
+
+      fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Saved"));
+      // Exactly one write attempt and one real read-back verification.
+      expect(workspaceMocks.workspaceWriteFileEncoded).toHaveBeenCalledTimes(1);
+      expect(workspaceMocks.workspaceReadFileWithEncoding).toHaveBeenCalledWith(
+        "/repo/app",
+        path,
+        "UTF-8",
+      );
+
+      const savedObservation = screen.getByTestId("code-workspace-save-observation");
+      expect(savedObservation).toHaveAttribute("data-state", "saved");
+      expect(savedObservation).toHaveAttribute("data-result-kind", "saved-current");
+      expect(savedObservation).toHaveAttribute("data-disk-effect", "committed");
+      expect(savedObservation).toHaveAttribute("data-dirty", "false");
+      expect(savedObservation).toHaveAttribute("data-receipt-id", expect.stringMatching(/^receipt-tx-save-/));
+      expect(savedObservation).toHaveAttribute("data-encoded-bytes-sha256", "intended-new-hash");
+      expect(savedObservation).toHaveAttribute("data-disk-pre-sha256", `hash-${path}`);
+      expect(savedObservation).toHaveAttribute("data-disk-post-sha256", "intended-new-hash");
+      expect(savedObservation).toHaveAttribute("data-write-count", "1");
+      expect(savedObservation).not.toHaveAttribute("data-recovery-id");
+
+      // The verified-committed path never leaves a blocking ledger row.
+      expect(hasBlockingDiskEffectResolution(
+        "instance-save-unknown-committed",
+        `/repo/app/${path}`,
+      )).toBe(false);
+
+      // The provider is synced with the proven on-disk text.
+      await waitFor(() => expect(lspMocks.lspSaveDocument).toHaveBeenCalledWith(
+        expect.anything(),
+        "initial\ninitial\n",
+        expect.anything(),
+      ));
+    });
+
+    it("reports a verified zero-effect unknown failure and unblocks the retry after read-back", async () => {
+      const path = "src/main.ts";
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: "ws-save-unknown-none",
+        workspaceInstanceId: "instance-save-unknown-none",
+        name: "Save Unknown None",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path },
+      };
+      workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+      workspaceMocks.workspaceReadFile.mockResolvedValue(file(path, "initial\n"));
+      workspaceMocks.workspaceWriteFileEncoded.mockRejectedValue(Object.assign(
+        new Error("atomic replace acknowledgement was lost"),
+        {
+          kind: "io",
+          effect: "unknown",
+          intentHash: "intended-new-hash",
+          intentByteLength: 16,
+          oldHash: `hash-${path}`,
+        },
+      ));
+      // The read-back proves the old bytes are still on disk: nothing landed.
+      workspaceMocks.workspaceReadFileWithEncoding.mockResolvedValue(file(path, "initial\n"));
+
+      const rendered = renderWorkspace(workspace);
+      await screen.findByTitle(`app / ${path}`);
+      const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+      expect(content).not.toBeNull();
+      fireEvent.keyDown(content!, { key: "d", code: "KeyD", ctrlKey: true });
+      await waitFor(() => expect(selectCodeWorkspaceUi(
+        useCodeWorkspaceStore.getState(),
+        "instance-save-unknown-none",
+      ).openFiles[`root:app:${path}`]?.dirty).toBe(true));
+
+      fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Save failed"));
+      expect(workspaceMocks.workspaceWriteFileEncoded).toHaveBeenCalledTimes(1);
+      expect(workspaceMocks.workspaceReadFileWithEncoding).toHaveBeenCalledWith(
+        "/repo/app",
+        path,
+        "UTF-8",
+      );
+
+      const errorObservation = screen.getByTestId("code-workspace-save-observation");
+      expect(errorObservation).toHaveAttribute("data-state", "error");
+      expect(errorObservation).toHaveAttribute("data-result-kind", "failed");
+      expect(errorObservation).toHaveAttribute("data-disk-effect", "none");
+      expect(errorObservation).toHaveAttribute("data-dirty", "true");
+      expect(errorObservation).not.toHaveAttribute("data-receipt-id");
+      expect(errorObservation).not.toHaveAttribute("data-recovery-id");
+
+      // Verified zero effect: no blocking ledger row, and the buffer keeps
+      // the user's edits dirty for an ordinary retry.
+      const fileState = selectCodeWorkspaceUi(
+        useCodeWorkspaceStore.getState(),
+        "instance-save-unknown-none",
+      ).openFiles[`root:app:${path}`];
+      expect(fileState?.dirty).toBe(true);
+      expect(fileState?.text).toBe("initial\ninitial\n");
+      expect(hasBlockingDiskEffectResolution(
+        "instance-save-unknown-none",
+        `/repo/app/${path}`,
+      )).toBe(false);
+
+      // The retry is unblocked: the next Ctrl+S invokes the writer again.
+      fireEvent.keyDown(window, { key: "s", code: "KeyS", ctrlKey: true });
+      await waitFor(() => expect(workspaceMocks.workspaceWriteFileEncoded).toHaveBeenCalledTimes(2));
+    });
+
     it("§8.27.2 BB1 passes root clipboard handle via WorkspaceClipboardSessionContext to CodeMirror split instances", async () => {
       const workspace: CodeWorkspaceTabInfo = {
         repoRoot: "/repo/app",
