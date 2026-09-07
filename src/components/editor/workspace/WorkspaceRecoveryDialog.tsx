@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, FileWarning, HardDrive, RotateCcw, ShieldCheck, Trash2, X } from "lucide-react";
 import type { WorkspaceDiskEffectLedgerEntryV4, WorkspaceRecoveryEntry } from "./workspaceRecovery";
+import type { RefactorRecoveryJournalRecord } from "./refactorPlan";
 
 export interface WorkspaceRecoveryDialogProps {
   entries: WorkspaceRecoveryEntry[];
@@ -17,6 +18,10 @@ export interface WorkspaceRecoveryDialogProps {
   ledgerEntries?: readonly WorkspaceDiskEffectLedgerEntryV4[];
   onAcknowledgeLedgerEntry?: (entry: WorkspaceDiskEffectLedgerEntryV4) => void;
   onReopenLedgerEntry?: (entry: WorkspaceDiskEffectLedgerEntryV4) => void;
+  /** Text-only refactor journals waiting for verified recovery. */
+  refactorEntries?: readonly RefactorRecoveryJournalRecord[];
+  onRecoverRefactor?: (entry: RefactorRecoveryJournalRecord) => void | Promise<void>;
+  onDiscardRefactor?: (entry: RefactorRecoveryJournalRecord) => void;
 }
 
 function lineCount(text: string): number {
@@ -60,6 +65,12 @@ function resolutionBadgeTone(entry: WorkspaceDiskEffectLedgerEntryV4): "blocked"
     : "info";
 }
 
+function refactorEntryPath(entry: RefactorRecoveryJournalRecord): string {
+  return entry.documents
+    .map((document) => document.canonicalPath || document.uri)
+    .join(", ");
+}
+
 /** Lists unsaved buffers and unresolved disk effects left by a previous lifetime. */
 export function WorkspaceRecoveryDialog({
   entries,
@@ -71,24 +82,59 @@ export function WorkspaceRecoveryDialog({
   ledgerEntries = [],
   onAcknowledgeLedgerEntry,
   onReopenLedgerEntry,
+  refactorEntries = [],
+  onRecoverRefactor,
+  onDiscardRefactor,
 }: WorkspaceRecoveryDialogProps) {
-  const [tab, setTab] = useState<"buffers" | "disk">(
-    entries.length > 0 ? "buffers" : ledgerEntries.length > 0 ? "disk" : "buffers",
+  const [tab, setTab] = useState<"buffers" | "refactors" | "disk">(
+    entries.length > 0
+      ? "buffers"
+      : refactorEntries.length > 0
+        ? "refactors"
+        : ledgerEntries.length > 0
+          ? "disk"
+          : "buffers",
   );
   const [selectedKey, setSelectedKey] = useState(entries[0]?.key ?? null);
+  const [selectedRefactorId, setSelectedRefactorId] = useState(refactorEntries[0]?.recoveryId ?? null);
   const [busy, setBusy] = useState(false);
   const primaryRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const tabHasEntries = tab === "buffers"
+      ? entries.length > 0
+      : tab === "refactors"
+        ? refactorEntries.length > 0
+        : ledgerEntries.length > 0;
+    if (tabHasEntries) return;
+    setTab(
+      entries.length > 0
+        ? "buffers"
+        : refactorEntries.length > 0
+          ? "refactors"
+          : ledgerEntries.length > 0
+            ? "disk"
+            : "buffers",
+    );
+  }, [entries.length, ledgerEntries.length, refactorEntries.length, tab]);
 
   useEffect(() => {
     if (!entries.some((entry) => entry.key === selectedKey)) {
       setSelectedKey(entries[0]?.key ?? null);
     }
+    if (!refactorEntries.some((entry) => entry.recoveryId === selectedRefactorId)) {
+      setSelectedRefactorId(refactorEntries[0]?.recoveryId ?? null);
+    }
     window.setTimeout(() => primaryRef.current?.focus(), 0);
-  }, [entries, selectedKey]);
+  }, [entries, refactorEntries, selectedKey, selectedRefactorId]);
 
   const selected = useMemo(
     () => entries.find((entry) => entry.key === selectedKey) ?? entries[0] ?? null,
     [entries, selectedKey],
+  );
+  const selectedRefactor = useMemo(
+    () => refactorEntries.find((entry) => entry.recoveryId === selectedRefactorId) ?? refactorEntries[0] ?? null,
+    [refactorEntries, selectedRefactorId],
   );
 
   // Group ledger rows by path so multi-attempt history on one file reads as
@@ -153,7 +199,7 @@ export function WorkspaceRecoveryDialog({
           </button>
         </header>
 
-        {(entries.length > 0 || ledgerEntries.length > 0) && (
+        {(entries.length > 0 || refactorEntries.length > 0 || ledgerEntries.length > 0) && (
           <div className="flex shrink-0 items-center gap-1 border-b border-[var(--taomni-code-border)] px-3 py-1.5">
             <button
               type="button"
@@ -164,6 +210,17 @@ export function WorkspaceRecoveryDialog({
               disabled={entries.length === 0}
             >
               Unsaved buffers ({entries.length})
+            </button>
+            <button
+              type="button"
+              data-testid="workspace-recovery-refactors-tab"
+              className={`inline-flex h-7 items-center gap-1.5 rounded px-2.5 text-[11px] ${
+                tab === "refactors" ? "bg-[var(--taomni-code-selection-match-bg)] text-[var(--taomni-code-text)]" : "text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+              }`}
+              onClick={() => setTab("refactors")}
+              disabled={refactorEntries.length === 0}
+            >
+              Refactor recovery ({refactorEntries.length})
             </button>
             <button
               type="button"
@@ -179,7 +236,108 @@ export function WorkspaceRecoveryDialog({
           </div>
         )}
 
-        {tab === "disk" ? (
+        {tab === "refactors" ? (
+          <section className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-[280px_1fr]" data-testid="workspace-recovery-refactors">
+            <aside className="min-h-0 overflow-auto border-b border-[var(--taomni-code-border)] md:border-b-0 md:border-r">
+              <div className="border-b border-[var(--taomni-code-border)] px-3 py-2 text-[10px] text-[var(--taomni-code-muted)]">
+                {refactorEntries.length} pending refactor {refactorEntries.length === 1 ? "transaction" : "transactions"}
+              </div>
+              <ul className="py-1">
+                {refactorEntries.map((entry) => (
+                  <li key={entry.recoveryId}>
+                    <div
+                      className="flex items-start gap-1 px-2 py-1 hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-selection-match-bg)]"
+                      data-selected={entry.recoveryId === selectedRefactor?.recoveryId || undefined}
+                    >
+                      <button
+                        type="button"
+                        className="min-w-0 flex-1 truncate px-1 py-1 text-left"
+                        onClick={() => setSelectedRefactorId(entry.recoveryId)}
+                      >
+                        <span className="block truncate text-[11px] text-[var(--taomni-code-text)]" title={refactorEntryPath(entry)}>
+                          {entry.actionId}
+                        </span>
+                        <span className="block truncate text-[10px] text-[var(--taomni-code-muted)]">
+                          {entry.schemaVersion === 2 ? entry.status : "unverified legacy v1"} · {entry.documents.length} files
+                        </span>
+                      </button>
+                      {onDiscardRefactor && (
+                        <button
+                          type="button"
+                          aria-label={`Discard refactor recovery for ${entry.actionId}`}
+                          title="Discard"
+                          className="mt-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--taomni-code-muted)] hover:bg-red-500/15 hover:text-red-400"
+                          onClick={() => onDiscardRefactor(entry)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </aside>
+            <section className="flex min-h-0 flex-col">
+              {selectedRefactor ? (
+                <>
+                  <div className="shrink-0 border-b border-[var(--taomni-code-border)] px-3 py-2">
+                    <div className="truncate text-[11px] font-semibold text-[var(--taomni-code-text)]" title={refactorEntryPath(selectedRefactor)}>
+                      {selectedRefactor.actionId}
+                    </div>
+                    <div className="mt-0.5 text-[10px] text-[var(--taomni-code-muted)]">
+                      {selectedRefactor.schemaVersion === 2
+                        ? `Status: ${selectedRefactor.status} · ${selectedRefactor.appliedOperationIndex + 1} of ${selectedRefactor.operationCount} operations settled`
+                        : "Legacy v1 journal is unverified and cannot be replayed automatically"}
+                    </div>
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-auto p-3">
+                    <ul className="flex flex-col gap-2">
+                      {selectedRefactor.documents.map((document) => (
+                        <li
+                          key={document.uri}
+                          className="rounded border border-[var(--taomni-code-border)] px-3 py-2"
+                          data-testid="workspace-recovery-refactor-file"
+                        >
+                          <div className="truncate text-[11px] text-[var(--taomni-code-text)]" title={document.canonicalPath || document.uri}>
+                            {document.canonicalPath || document.uri}
+                          </div>
+                          <div className="mt-1 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 font-mono text-[10px] text-[var(--taomni-code-muted)]">
+                            <span>before</span><span className="break-all">{hashDigest(document.preHash)}</span>
+                            <span>after</span><span className="break-all">{hashDigest(document.postHash)}</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-[var(--taomni-code-border)] px-3 py-2">
+                    {selectedRefactor.schemaVersion === 2 && onRecoverRefactor && (
+                      <button
+                        ref={primaryRef}
+                        type="button"
+                        disabled={busy}
+                        className="inline-flex h-8 items-center gap-1.5 rounded bg-[var(--taomni-accent)] px-3 text-[11px] font-medium text-white hover:brightness-110 disabled:opacity-50"
+                        onClick={() => {
+                          setBusy(true);
+                          void Promise.resolve(onRecoverRefactor(selectedRefactor)).finally(() => setBusy(false));
+                        }}
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Recover refactor
+                      </button>
+                    )}
+                    {selectedRefactor.schemaVersion === 1 && (
+                      <span className="text-[10px] text-amber-400">Manual inspection only</span>
+                    )}
+                  </footer>
+                </>
+              ) : (
+                <div className="flex flex-1 items-center justify-center p-6 text-[11px] text-[var(--taomni-code-muted)]">
+                  No refactor recovery entries remain.
+                </div>
+              )}
+            </section>
+          </section>
+        ) : tab === "disk" ? (
           <section className="min-h-0 flex-1 overflow-auto p-3" data-testid="workspace-recovery-disk-results">
             {ledgerByPath.length === 0 ? (
               <div className="flex h-full items-center justify-center text-[11px] text-[var(--taomni-code-muted)]">

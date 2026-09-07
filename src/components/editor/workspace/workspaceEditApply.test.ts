@@ -350,6 +350,27 @@ describe("applyWorkspaceEdit", () => {
     expect(outcomes[0]).toMatchObject({ status: "failed", reason: "disk full" });
   });
 
+  it("marks open-clean apply as failed when the shared save reports no disk commit", async () => {
+    const applyToOpenBuffer = vi.fn();
+    const saveOpenBuffer = vi.fn(async () => null);
+    const outcomes = await applyWorkspaceEdit(
+      edit("file:///repo/c.ts", "/repo/c.ts", "Z"),
+      {
+        resolvePath: (file) => file.path,
+        getOpenBuffer: () => ({ text: "x", dirty: false, key: "c" }),
+        applyToOpenBuffer,
+        saveOpenBuffer,
+        readDisk: async () => null,
+        writeDisk: async () => committedDisk(),
+      },
+    );
+
+    expect(outcomes[0]).toMatchObject({
+      status: "failed",
+      reason: "open buffer save did not establish a committed disk effect",
+    });
+  });
+
   it("rejects a stale versioned TextDocumentEdit before changing the buffer", async () => {
     const applyToOpenBuffer = vi.fn();
     const workspaceEdit = edit("file:///repo/versioned.ts", "/repo/versioned.ts", "Z");

@@ -3,7 +3,7 @@ import type {
   LspWorkspaceEdit,
   LspWorkspaceEditOperation,
 } from "../../../lib/editor/lsp";
-import { normalizeFsPath, relativePathWithinRoot } from "./codeWorkspaceModel";
+import { fsPathEquals, normalizeFsPath, relativePathWithinRoot } from "./codeWorkspaceModel";
 import type { CapabilityEvidenceV3 } from "./capabilityEvidence";
 import { workspaceEditOperations } from "./workspaceEditPreview";
 import { useProjectFactsStore } from "../../../stores/projectFactsStore";
@@ -438,9 +438,9 @@ export function buildRefactorPlan(input: BuildRefactorPlanInput): RefactorPlanV4
     }
 
     // ED-REF-001-A3: calculate expectedPostHash and preTextSha256
-    const sourceText = matched?.text
-      ?? input.currentTexts?.[info.uri]
+    const sourceText = input.currentTexts?.[info.uri]
       ?? (info.path ? input.currentTexts?.[info.path] : undefined)
+      ?? matched?.text
       ?? null;
 
     let preTextSha256: string | null = null;
@@ -579,15 +579,20 @@ export function verifyRefactorPostHashes(
 ): {
   allMatched: boolean;
   mismatches: Array<{ uri: string; expectedPostHash: string; actualPostHash: string }>;
+  missingUris: string[];
   verifiedDocuments: number;
 } {
   const mismatches: Array<{ uri: string; expectedPostHash: string; actualPostHash: string }> = [];
+  const missingUris: string[] = [];
   let verifiedDocuments = 0;
 
   for (const doc of plan.documents) {
     if (!doc.expectedPostHash) continue;
     const actualText = actualPostTexts[doc.uri] ?? (doc.canonicalPath ? actualPostTexts[doc.canonicalPath] : undefined);
-    if (actualText === undefined) continue;
+    if (actualText === undefined) {
+      missingUris.push(doc.uri || doc.canonicalPath || "unknown");
+      continue;
+    }
     verifiedDocuments += 1;
     const actualHash = sha256Hex(actualText);
     if (actualHash !== doc.expectedPostHash) {
@@ -600,16 +605,30 @@ export function verifyRefactorPostHashes(
   }
 
   return {
-    allMatched: mismatches.length === 0,
+    allMatched: mismatches.length === 0 && missingUris.length === 0,
     mismatches,
+    missingUris,
     verifiedDocuments,
   };
 }
 
 /**
- * ED-REF-001-A4: Recovery journal entry holding before/after preimages and
- * hashes so that restart recovery can replay or restore consistently.
+ * ED-AUDIT-014: v2 recovery journal entry holding before/after preimages and
+ * hashes so restart recovery can verify every file before and after writing.
  */
+export type RefactorRecoveryJournalStatus =
+  | "prepared"
+  | "applying"
+  | "recovery-required"
+  | "committed"
+  | "rolled-back";
+
+export interface RefactorRecoveryDocumentMetadata {
+  encoding?: string;
+  bom?: boolean;
+  eol?: "lf" | "crlf" | "cr";
+}
+
 export interface RefactorRecoveryDocumentSnapshot {
   uri: string;
   canonicalPath: string | null;
@@ -617,29 +636,95 @@ export interface RefactorRecoveryDocumentSnapshot {
   preHash: string;
   postText: string;
   postHash: string;
+  encoding: string;
+  bom: boolean;
+  eol: "lf" | "crlf" | "cr";
+  preDocumentRevision: number | null;
 }
 
 export interface RefactorRecoveryJournalEntry {
+  schemaVersion: 2;
+  workspaceId: string;
+  recoveryId: string;
+  transactionId: string;
+  actionId: string;
+  kind: RefactorKind;
+  workspaceRoot: string;
+  createdAt: number;
+  updatedAt: number;
+  status: RefactorRecoveryJournalStatus;
+  /** Highest operation index known to have settled in the applying run. */
+  appliedOperationIndex: number;
+  operationCount: number;
+  documents: readonly RefactorRecoveryDocumentSnapshot[];
+}
+
+/** Legacy v1 rows remain readable for user inspection, never automatic replay. */
+export interface RefactorRecoveryJournalEntryV1 {
+  schemaVersion: 1;
+  verified: false;
   recoveryId: string;
   actionId: string;
   kind: RefactorKind;
   workspaceRoot: string;
   createdAt: number;
   status: "prepared" | "committed" | "rolled-back";
-  documents: readonly RefactorRecoveryDocumentSnapshot[];
+  documents: ReadonlyArray<{
+    uri: string;
+    canonicalPath: string | null;
+    preText: string;
+    preHash: string;
+    postText: string;
+    postHash: string;
+  }>;
+}
+
+export type RefactorRecoveryJournalRecord =
+  | RefactorRecoveryJournalEntry
+  | RefactorRecoveryJournalEntryV1;
+
+export interface BuildRefactorRecoveryJournalOptions {
+  workspaceId?: string;
+  transactionId?: string;
+  edit?: LspWorkspaceEdit;
+  documentMetadata?: Record<string, RefactorRecoveryDocumentMetadata>;
+}
+
+function metadataForDocument(
+  options: BuildRefactorRecoveryJournalOptions,
+  doc: RefactorDocumentPreconditionV4,
+): RefactorRecoveryDocumentMetadata {
+  return options.documentMetadata?.[doc.uri]
+    ?? (doc.canonicalPath ? options.documentMetadata?.[doc.canonicalPath] : undefined)
+    ?? {};
 }
 
 export function buildRefactorRecoveryJournalEntry(
   plan: RefactorPlanV4,
   preTexts: Record<string, string>,
   workspaceRoot: string,
+  options: BuildRefactorRecoveryJournalOptions = {},
 ): RefactorRecoveryJournalEntry | null {
+  const activeOperations = options.edit ? workspaceEditOperations(options.edit) : plan.operations;
+  if (activeOperations.length === 0 || activeOperations.some((operation) => operation.kind !== "text")) {
+    return null;
+  }
+  const activeDocuments = plan.documents.filter((doc) => activeOperations.some((operation) => (
+    operation.kind === "text"
+      && ((operation.document.uri || "") === doc.uri
+        || (doc.canonicalPath !== null && (operation.document.path || "") === doc.canonicalPath))
+  )));
+  if (activeDocuments.length === 0) return null;
+
+  const createdAt = Date.now();
+  const transactionId = options.transactionId ?? `refactor:${plan.actionId}:${createdAt}`;
+  const workspaceId = options.workspaceId ?? workspaceRoot;
   const documents: RefactorRecoveryDocumentSnapshot[] = [];
-  for (const doc of plan.documents) {
+  for (const doc of activeDocuments) {
     const text = preTexts[doc.uri] ?? (doc.canonicalPath ? preTexts[doc.canonicalPath] : undefined);
     if (text === undefined) return null;
     const preHash = sha256Hex(text);
-    const docEdits = plan.operations.flatMap((op) => {
+    const docEdits = activeOperations.flatMap((op) => {
       if (op.kind === "text") {
         const opUri = op.document.uri || "";
         const opPath = op.document.path || "";
@@ -649,8 +734,14 @@ export function buildRefactorRecoveryJournalEntry(
       }
       return [];
     });
-    const postText = docEdits.length > 0 ? applyLspTextEditsToString(text, docEdits) : text;
+    let postText: string;
+    try {
+      postText = docEdits.length > 0 ? applyLspTextEditsToString(text, docEdits) : text;
+    } catch {
+      return null;
+    }
     const postHash = sha256Hex(postText);
+    const metadata = metadataForDocument(options, doc);
     documents.push({
       uri: doc.uri,
       canonicalPath: doc.canonicalPath,
@@ -658,39 +749,181 @@ export function buildRefactorRecoveryJournalEntry(
       preHash,
       postText,
       postHash,
+      encoding: metadata.encoding ?? "UTF-8",
+      bom: metadata.bom ?? false,
+      eol: metadata.eol ?? "lf",
+      preDocumentRevision: doc.expectedDocumentRevision,
     });
   }
   return {
-    recoveryId: `ref-rec-${sha256Hex(`${plan.actionId}:${Date.now()}`).slice(0, 16)}`,
+    schemaVersion: 2,
+    workspaceId,
+    recoveryId: `ref-rec-${sha256Hex(`${workspaceId}:${transactionId}:${plan.actionId}`).slice(0, 16)}`,
+    transactionId,
     actionId: plan.actionId,
     kind: plan.kind,
     workspaceRoot,
-    createdAt: Date.now(),
+    createdAt,
+    updatedAt: createdAt,
     status: "prepared",
+    appliedOperationIndex: -1,
+    operationCount: activeOperations.length,
     documents: Object.freeze(documents),
   };
 }
 
-const RECOVERY_STORAGE_PREFIX = "taomni.refactor.recovery.v1:";
+const RECOVERY_STORAGE_PREFIX_V1 = "taomni.refactor.recovery.v1:";
+const RECOVERY_STORAGE_PREFIX_V2 = "taomni.refactor.recovery.v2:";
+
+function recoveryStorageKey(prefix: string, recoveryId: string): string {
+  return `${prefix}${recoveryId}`;
+}
+
+function parseRefactorRecoveryRecord(value: unknown): RefactorRecoveryJournalRecord | null {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Record<string, unknown>;
+  if (source.schemaVersion === 2) {
+    if (
+      typeof source.workspaceId !== "string"
+      || typeof source.recoveryId !== "string"
+      || typeof source.transactionId !== "string"
+      || typeof source.actionId !== "string"
+      || typeof source.workspaceRoot !== "string"
+      || typeof source.createdAt !== "number"
+      || typeof source.updatedAt !== "number"
+      || typeof source.appliedOperationIndex !== "number"
+      || typeof source.operationCount !== "number"
+      || !["prepared", "applying", "recovery-required", "committed", "rolled-back"].includes(String(source.status))
+      || !Array.isArray(source.documents)
+    ) return null;
+    const documents = source.documents.map((document) => {
+      if (!document || typeof document !== "object") return null;
+      const item = document as Record<string, unknown>;
+      if (
+        typeof item.uri !== "string"
+        || (item.canonicalPath !== null && typeof item.canonicalPath !== "string")
+        || typeof item.preText !== "string"
+        || typeof item.preHash !== "string"
+        || typeof item.postText !== "string"
+        || typeof item.postHash !== "string"
+        || typeof item.encoding !== "string"
+        || typeof item.bom !== "boolean"
+        || !["lf", "crlf", "cr"].includes(String(item.eol))
+        || (item.preDocumentRevision !== null && typeof item.preDocumentRevision !== "number")
+      ) return null;
+      return {
+        uri: item.uri,
+        canonicalPath: item.canonicalPath as string | null,
+        preText: item.preText,
+        preHash: item.preHash,
+        postText: item.postText,
+        postHash: item.postHash,
+        encoding: item.encoding,
+        bom: item.bom,
+        eol: item.eol as "lf" | "crlf" | "cr",
+        preDocumentRevision: item.preDocumentRevision as number | null,
+      } satisfies RefactorRecoveryDocumentSnapshot;
+    });
+    if (documents.some((document) => document === null)) return null;
+    return {
+      schemaVersion: 2,
+      workspaceId: source.workspaceId,
+      recoveryId: source.recoveryId,
+      transactionId: source.transactionId,
+      actionId: source.actionId,
+      kind: source.kind as RefactorKind,
+      workspaceRoot: source.workspaceRoot,
+      createdAt: source.createdAt,
+      updatedAt: source.updatedAt,
+      status: source.status as RefactorRecoveryJournalStatus,
+      appliedOperationIndex: source.appliedOperationIndex,
+      operationCount: source.operationCount,
+      documents: Object.freeze(documents as RefactorRecoveryDocumentSnapshot[]),
+    };
+  }
+
+  // Rows written by the old implementation had no schema marker. They are
+  // intentionally exposed as unverified inspection records only.
+  const schemaVersion = source.schemaVersion === undefined ? 1 : source.schemaVersion;
+  if (
+    schemaVersion !== 1
+    || typeof source.recoveryId !== "string"
+    || typeof source.actionId !== "string"
+    || typeof source.workspaceRoot !== "string"
+    || typeof source.createdAt !== "number"
+    || !Array.isArray(source.documents)
+  ) return null;
+  const documents = source.documents.map((document) => {
+    if (!document || typeof document !== "object") return null;
+    const item = document as Record<string, unknown>;
+    if (
+      typeof item.uri !== "string"
+      || (item.canonicalPath !== null && typeof item.canonicalPath !== "string")
+      || typeof item.preText !== "string"
+      || typeof item.preHash !== "string"
+      || typeof item.postText !== "string"
+      || typeof item.postHash !== "string"
+    ) return null;
+    return {
+      uri: item.uri,
+      canonicalPath: item.canonicalPath as string | null,
+      preText: item.preText,
+      preHash: item.preHash,
+      postText: item.postText,
+      postHash: item.postHash,
+    };
+  });
+  if (documents.some((document) => document === null)) return null;
+  return {
+    schemaVersion: 1,
+    verified: false,
+    recoveryId: source.recoveryId,
+    actionId: source.actionId,
+    kind: source.kind as RefactorKind,
+    workspaceRoot: source.workspaceRoot,
+    createdAt: source.createdAt,
+    status: source.status === "committed" || source.status === "rolled-back" ? source.status : "prepared",
+    documents: documents as RefactorRecoveryJournalEntryV1["documents"],
+  };
+}
+
+function validRecoveryRecordForWorkspace(
+  value: RefactorRecoveryJournalRecord,
+  workspaceRoot?: string,
+): boolean {
+  return !workspaceRoot || fsPathEquals(value.workspaceRoot, workspaceRoot);
+}
 
 export function recordRefactorRecoveryJournal(
   entry: RefactorRecoveryJournalEntry,
   storage: Storage = typeof window !== "undefined" ? window.localStorage : ({} as Storage),
-): void {
+): { ok: true; entry: RefactorRecoveryJournalEntry } | { ok: false; entry: RefactorRecoveryJournalEntry; reason: string } {
   try {
-    storage.setItem?.(`${RECOVERY_STORAGE_PREFIX}${entry.recoveryId}`, JSON.stringify(entry));
-  } catch {
-    // Non-blocking quota failure
+    if (typeof storage.setItem !== "function") {
+      return { ok: false, entry, reason: "Refactor recovery storage is unavailable" };
+    }
+    const next = { ...entry, updatedAt: Date.now() };
+    storage.setItem(recoveryStorageKey(RECOVERY_STORAGE_PREFIX_V2, entry.recoveryId), JSON.stringify(next));
+    Object.assign(entry, next);
+    return { ok: true, entry };
+  } catch (error) {
+    return {
+      ok: false,
+      entry,
+      reason: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
 export function getRefactorRecoveryJournal(
   recoveryId: string,
   storage: Storage = typeof window !== "undefined" ? window.localStorage : ({} as Storage),
-): RefactorRecoveryJournalEntry | null {
+): RefactorRecoveryJournalRecord | null {
   try {
-    const raw = storage.getItem?.(`${RECOVERY_STORAGE_PREFIX}${recoveryId}`);
-    return raw ? (JSON.parse(raw) as RefactorRecoveryJournalEntry) : null;
+    const v2 = storage.getItem?.(recoveryStorageKey(RECOVERY_STORAGE_PREFIX_V2, recoveryId));
+    if (v2) return parseRefactorRecoveryRecord(JSON.parse(v2));
+    const v1 = storage.getItem?.(recoveryStorageKey(RECOVERY_STORAGE_PREFIX_V1, recoveryId));
+    return v1 ? parseRefactorRecoveryRecord(JSON.parse(v1)) : null;
   } catch {
     return null;
   }
@@ -699,26 +932,36 @@ export function getRefactorRecoveryJournal(
 export function listRefactorRecoveryJournals(
   workspaceRoot?: string,
   storage: Storage = typeof window !== "undefined" ? window.localStorage : ({} as Storage),
-): RefactorRecoveryJournalEntry[] {
-  const entries: RefactorRecoveryJournalEntry[] = [];
+): RefactorRecoveryJournalRecord[] {
+  const entries: RefactorRecoveryJournalRecord[] = [];
   try {
     const len = storage.length ?? 0;
     for (let i = 0; i < len; i += 1) {
       const key = storage.key?.(i);
-      if (key?.startsWith(RECOVERY_STORAGE_PREFIX)) {
+      if (!key || (!key.startsWith(RECOVERY_STORAGE_PREFIX_V1) && !key.startsWith(RECOVERY_STORAGE_PREFIX_V2))) continue;
+      try {
         const raw = storage.getItem?.(key);
-        if (raw) {
-          const parsed = JSON.parse(raw) as RefactorRecoveryJournalEntry;
-          if (!workspaceRoot || parsed.workspaceRoot === workspaceRoot) {
-            entries.push(parsed);
-          }
-        }
+        const parsed = raw ? parseRefactorRecoveryRecord(JSON.parse(raw)) : null;
+        if (parsed && validRecoveryRecordForWorkspace(parsed, workspaceRoot)) entries.push(parsed);
+      } catch {
+        // One corrupt row must not hide other workspace recovery entries.
       }
     }
   } catch {
-    // Return available entries
+    return entries;
   }
   return entries.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export function listPendingRefactorRecoveryJournals(
+  workspaceRoot?: string,
+  storage: Storage = typeof window !== "undefined" ? window.localStorage : ({} as Storage),
+): RefactorRecoveryJournalRecord[] {
+  return listRefactorRecoveryJournals(workspaceRoot, storage).filter((entry) => (
+    entry.schemaVersion === 1
+      ? entry.status === "prepared"
+      : entry.status !== "committed" && entry.status !== "rolled-back"
+  ));
 }
 
 export function clearRefactorRecoveryJournal(
@@ -726,25 +969,196 @@ export function clearRefactorRecoveryJournal(
   storage: Storage = typeof window !== "undefined" ? window.localStorage : ({} as Storage),
 ): void {
   try {
-    storage.removeItem?.(`${RECOVERY_STORAGE_PREFIX}${recoveryId}`);
+    storage.removeItem?.(recoveryStorageKey(RECOVERY_STORAGE_PREFIX_V2, recoveryId));
+    storage.removeItem?.(recoveryStorageKey(RECOVERY_STORAGE_PREFIX_V1, recoveryId));
   } catch {
     // Ignore storage deletion errors
   }
 }
 
+export interface RefactorRecoveryReplayDocument {
+  text: string;
+  hash?: string;
+  dirty?: boolean;
+  /** Present for open buffers so recovery can detect a concurrent edit. */
+  documentRevision?: number | null;
+}
+
+export interface RefactorRecoveryReplayHandlers {
+  readText: (
+    pathOrUri: string,
+    document: RefactorRecoveryDocumentSnapshot,
+  ) => Promise<RefactorRecoveryReplayDocument | null>;
+  applyText: (
+    pathOrUri: string,
+    text: string,
+    document: RefactorRecoveryDocumentSnapshot,
+    expectedDocumentRevision?: number | null,
+  ) => Promise<void> | void;
+  /** Durable progress callback after one recovery write has settled. */
+  onDocumentApplied?: (
+    pathOrUri: string,
+    document: RefactorRecoveryDocumentSnapshot,
+  ) => Promise<void> | void;
+}
+
+export type RefactorRecoveryReplayResult =
+  | {
+    status: "rolled-back";
+    restoredUris: string[];
+    preHashesRestored: true;
+    conflicts: string[];
+  }
+  | {
+    status: "pending" | "unverified";
+    restoredUris: string[];
+    preHashesRestored: false;
+    conflicts: string[];
+    reason: string;
+  };
+
 export async function replayRefactorRecoveryJournal(
-  entry: RefactorRecoveryJournalEntry,
-  applyText: (pathOrUri: string, text: string) => Promise<void> | void,
-): Promise<{ restoredUris: string[]; preHashesRestored: boolean }> {
+  entry: RefactorRecoveryJournalRecord,
+  handlers: RefactorRecoveryReplayHandlers,
+): Promise<RefactorRecoveryReplayResult> {
+  if (entry.schemaVersion !== 2) {
+    return {
+      status: "unverified",
+      restoredUris: [],
+      preHashesRestored: false,
+      conflicts: [],
+      reason: "Legacy refactor recovery journal v1 is inspection-only and cannot be replayed automatically",
+    };
+  }
+
+  const current: Array<{ document: RefactorRecoveryDocumentSnapshot; path: string; value: RefactorRecoveryReplayDocument }> = [];
+  const conflicts: string[] = [];
+  try {
+    for (const doc of entry.documents) {
+      const path = doc.canonicalPath || doc.uri;
+      const value = await handlers.readText(path, doc);
+      if (!value) {
+        conflicts.push(`${path}: current content could not be read`);
+        continue;
+      }
+      if (value.dirty) {
+        conflicts.push(`${path}: open buffer has unsaved changes`);
+        continue;
+      }
+      current.push({ document: doc, path, value });
+      const currentHash = value.hash ?? sha256Hex(value.text);
+      if (currentHash !== doc.preHash && currentHash !== doc.postHash) {
+        conflicts.push(`${path}: current content differs from both known recovery images`);
+      }
+    }
+  } catch (error) {
+    return {
+      status: "pending",
+      restoredUris: [],
+      preHashesRestored: false,
+      conflicts,
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
+  if (conflicts.length > 0 || current.length !== entry.documents.length) {
+    return {
+      status: "pending",
+      restoredUris: [],
+      preHashesRestored: false,
+      conflicts,
+      reason: conflicts.join("; ") || "Recovery precondition could not be verified",
+    };
+  }
+
   const restoredUris: string[] = [];
-  for (const doc of entry.documents) {
-    const target = doc.canonicalPath || doc.uri;
-    await applyText(target, doc.preText);
-    restoredUris.push(doc.uri);
+  try {
+    for (const { document, path, value: initial } of current) {
+      // The initial all-files preflight prevents known conflicts before the
+      // first write. Re-read immediately before each write as well so a
+      // third-party change between files cannot be overwritten by recovery.
+      const latest = await handlers.readText(path, document);
+      if (!latest) {
+        return {
+          status: "pending",
+          restoredUris,
+          preHashesRestored: false,
+          conflicts: [`${path}: current content could not be read before restore`],
+          reason: `${path}: current content could not be read before restore`,
+        };
+      }
+      if (latest.dirty) {
+        return {
+          status: "pending",
+          restoredUris,
+          preHashesRestored: false,
+          conflicts: [`${path}: open buffer has unsaved changes`],
+          reason: `${path}: open buffer has unsaved changes`,
+        };
+      }
+      const initialRevision = initial.documentRevision ?? null;
+      const latestRevision = latest.documentRevision ?? null;
+      if (initialRevision !== latestRevision) {
+        const reason = `${path}: open buffer document revision changed during recovery`;
+        return {
+          status: "pending",
+          restoredUris,
+          preHashesRestored: false,
+          conflicts: [reason],
+          reason,
+        };
+      }
+      const currentHash = latest.hash ?? sha256Hex(latest.text);
+      if (currentHash !== document.preHash && currentHash !== document.postHash) {
+        const reason = `${path}: current content differs from both known recovery images`;
+        return {
+          status: "pending",
+          restoredUris,
+          preHashesRestored: false,
+          conflicts: [reason],
+          reason,
+        };
+      }
+      if (currentHash === document.preHash) continue;
+      await handlers.applyText(path, document.preText, document, latest.documentRevision);
+      restoredUris.push(document.uri);
+      await handlers.onDocumentApplied?.(path, document);
+    }
+  } catch (error) {
+    return {
+      status: "pending",
+      restoredUris,
+      preHashesRestored: false,
+      conflicts,
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  const postWriteConflicts: string[] = [];
+  try {
+    for (const { document, path } of current) {
+      const value = await handlers.readText(path, document);
+      const actualHash = value?.hash ?? (value ? sha256Hex(value.text) : null);
+      if (!value || value.dirty || actualHash !== document.preHash) {
+        postWriteConflicts.push(`${path}: restored content failed independent preimage verification`);
+      }
+    }
+  } catch (error) {
+    postWriteConflicts.push(error instanceof Error ? error.message : String(error));
+  }
+  if (postWriteConflicts.length > 0) {
+    return {
+      status: "pending",
+      restoredUris,
+      preHashesRestored: false,
+      conflicts: postWriteConflicts,
+      reason: postWriteConflicts.join("; "),
+    };
   }
   return {
+    status: "rolled-back",
     restoredUris,
     preHashesRestored: true,
+    conflicts: [],
   };
 }
 

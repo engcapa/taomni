@@ -380,6 +380,7 @@ import {
 } from "./workspace/intelligencePreferences";
 import { WorkspaceLspSessionManager } from "./workspace/workspaceLspSessionManager";
 import { applyLspTextEditsToString } from "./workspace/lspTextEdits";
+import { sha256Hex } from "./workspace/projectAnalysisModel";
 import { isLargeFileContent } from "./workspace/largeFile";
 import {
   applyWorkspaceEdit,
@@ -401,11 +402,14 @@ import {
   buildRefactorPlan,
   refactorApplyGate,
   evaluateDestructiveRefactorAvailability,
+  type RefactorRecoveryDocumentMetadata,
+  type RefactorRecoveryJournalEntry,
+  type RefactorRecoveryJournalRecord,
   verifyRefactorPostHashes,
   buildRefactorRecoveryJournalEntry,
-  recordRefactorRecoveryJournal,
   type RefactorPlanV3,
 } from "./workspace/refactorPlan";
+import { RefactorRecoveryController } from "./workspace/refactorRecoveryController";
 import { KeymapCheatSheetDialog } from "./workspace/KeymapCheatSheetDialog";
 import { KeymapSettingsDialog } from "./workspace/KeymapSettingsDialog";
 import {
@@ -1632,6 +1636,7 @@ export function CodeWorkspaceTab({
   const [externalFileConflicts, setExternalFileConflicts] = useState<PendingExternalFileConflict[]>([]);
   const pendingExternalFileEventsRef = useRef(new Map<string, PendingExternalFileEvent>());
   const [workspaceRecoveryEntries, setWorkspaceRecoveryEntries] = useState<WorkspaceRecoveryEntry[]>([]);
+  const [refactorRecoveryEntries, setRefactorRecoveryEntries] = useState<RefactorRecoveryJournalRecord[]>([]);
   const [workspaceRecoveryOpen, setWorkspaceRecoveryOpen] = useState(false);
   /** §8.19.1 disk-effect ledger view state; bumped whenever rows are recorded/resolved. */
   const [diskEffectLedgerRevision, setDiskEffectLedgerRevision] = useState(0);
@@ -1968,6 +1973,13 @@ export function CodeWorkspaceTab({
     ]);
   }, [projectDescriptorDiscovery.refresh, projectFacts.refresh]);
   const [looseFiles, setLooseFiles] = useState<CodeWorkspaceLooseFileInfo[]>(() => initialLooseFiles(workspace));
+  const refactorRecoveryController = useMemo(
+    () => new RefactorRecoveryController({
+      workspaceId: workspaceInstanceId,
+      workspaceRoot: roots[0]?.path ?? "",
+    }),
+    [roots, workspaceInstanceId],
+  );
   const {
     directories,
     compactChains,
@@ -2618,14 +2630,18 @@ export function CodeWorkspaceTab({
 
   useEffect(() => {
     const entries = readWorkspaceRecoveryEntries(workspaceInstanceId);
+    const refactorEntries = refactorRecoveryController.listPending();
     pendingWorkspaceRecoveryKeysRef.current = new Set(entries.map((entry) => entry.key));
     setWorkspaceRecoveryEntries(entries);
+    setRefactorRecoveryEntries(refactorEntries);
     // §8.19.1: unresolved disk-effect rows also open the recovery center so a
     // previous session's committed-discarded/unknown writes are surfaced.
     setWorkspaceRecoveryOpen(
-      entries.length > 0 || listDiskEffectLedgerEntries(workspaceInstanceId).length > 0,
+      entries.length > 0
+        || refactorEntries.length > 0
+        || listDiskEffectLedgerEntries(workspaceInstanceId).length > 0,
     );
-  }, [workspaceInstanceId]);
+  }, [refactorRecoveryController, workspaceInstanceId]);
 
   useEffect(() => {
     if (!isTauriRuntime()) return undefined;
@@ -4291,20 +4307,23 @@ export function CodeWorkspaceTab({
 
   const readWorkspaceEditPathSnapshot = useCallback(async (
     absolutePath: string,
+    options: { includeOpenBuffer?: boolean } = {},
   ): Promise<WorkspaceEditPathSnapshot | null> => {
     const normalizedPath = normalizeFsPath(absolutePath);
-    const open = Object.values(openFilesRef.current).find((file) => {
-      const path = absolutePathForOpenFile(file);
-      return path != null && fsPathEquals(path, normalizedPath);
-    });
-    if (open) return {
-      path: normalizedPath,
-      exists: true,
-      text: open.text,
-      encoding: open.encoding ?? "UTF-8",
-      bom: open.bom ?? false,
-      eol: open.eol ? (open.eol.toLowerCase() as "lf" | "crlf" | "cr") : undefined,
-    };
+    if (options.includeOpenBuffer !== false) {
+      const open = Object.values(openFilesRef.current).find((file) => {
+        const path = absolutePathForOpenFile(file);
+        return path != null && fsPathEquals(path, normalizedPath);
+      });
+      if (open) return {
+        path: normalizedPath,
+        exists: true,
+        text: open.text,
+        encoding: open.encoding ?? "UTF-8",
+        bom: open.bom ?? false,
+        eol: open.eol ? (open.eol.toLowerCase() as "lf" | "crlf" | "cr") : undefined,
+      };
+    }
     for (const root of rootsRef.current) {
       const relative = relativePathWithinRoot(root.path, normalizedPath);
       if (relative === null) continue;
@@ -4349,6 +4368,7 @@ export function CodeWorkspaceTab({
 
   const captureWorkspaceEditPathSnapshots = useCallback(async (
     edit: LspWorkspaceEdit,
+    options: { includeOpenBuffer?: boolean } = {},
   ): Promise<WorkspaceEditPathSnapshot[] | null> => {
     const paths: string[] = [];
     const seen = new Set<string>();
@@ -4371,7 +4391,9 @@ export function CodeWorkspaceTab({
         return null;
       }
     }
-    const snapshots = await Promise.all(paths.map(readWorkspaceEditPathSnapshot));
+    const snapshots = await Promise.all(paths.map((path) => (
+      readWorkspaceEditPathSnapshot(path, options)
+    )));
     return snapshots.every((snapshot): snapshot is WorkspaceEditPathSnapshot => snapshot !== null)
       ? snapshots
       : null;
@@ -8678,7 +8700,12 @@ export function CodeWorkspaceTab({
     options: WorkspaceEditApplyOptions = {},
   ) => {
     const orderedOperations = workspaceEditOperations(edit);
-    const beforeSnapshots = options.recordHistory !== false && orderedOperations.length > 0
+    const shouldRecordHistory = options.recordHistory !== false;
+    // Refactor recovery needs the same preimage even when a higher-level code
+    // action service owns the user-facing history entry.
+    const shouldCaptureSnapshots = orderedOperations.length > 0
+      && (shouldRecordHistory || options.plan !== undefined);
+    const beforeSnapshots = shouldCaptureSnapshots
       ? await captureWorkspaceEditPathSnapshots(edit)
       : null;
     const beforeBookmarks = beforeSnapshots
@@ -8690,7 +8717,70 @@ export function CodeWorkspaceTab({
     // §8.19.1: the edit actually applied after preview filtering drives any
     // resume slicing — never the pre-confirmation original.
     let resolvedEdit = edit;
-    const buildHooks = (allowPreview: boolean): WorkspaceEditApplyHooks => ({
+    let selectedEdit = edit;
+    let operationIndexOffset = 0;
+    const applyTransactionId = nextSaveTransactionId("tx-wedit");
+    const refactorRecoveryEntryState = { current: null as RefactorRecoveryJournalEntry | null };
+    const effectiveRefactorPlanState = { current: null as RefactorPlanV3 | null };
+    let refactorRecoveryFailure: string | null = null;
+    const isTextOnlyRefactor = (candidate: LspWorkspaceEdit): boolean => (
+      options.plan !== undefined
+      && workspaceEditOperations(candidate).length > 0
+      && workspaceEditOperations(candidate).every((operation) => operation.kind === "text")
+    );
+    const prepareRefactorRecovery = async () => {
+      if (!options.plan || !isTextOnlyRefactor(resolvedEdit) || refactorRecoveryEntryState.current) return;
+      if (!beforeSnapshots) {
+        throw new Error("Refactor recovery could not capture the preimage before mutation");
+      }
+      const preTexts: Record<string, string> = {};
+      const documentMetadata: Record<string, RefactorRecoveryDocumentMetadata> = {};
+      for (const snapshot of beforeSnapshots) {
+        if (snapshot.text === null) continue;
+        preTexts[snapshot.path] = snapshot.text;
+        documentMetadata[snapshot.path] = {
+          encoding: snapshot.encoding,
+          bom: snapshot.bom,
+          eol: snapshot.eol,
+        };
+      }
+      effectiveRefactorPlanState.current = buildRefactorPlan({
+        actionId: options.plan.actionId,
+        kind: options.plan.kind,
+        evidence: options.plan.evidence,
+        edit: resolvedEdit,
+        roots: rootsRef.current,
+        openFiles: openFilesRef.current,
+        currentTexts: preTexts,
+        conflicts: options.plan.conflicts,
+        completeness: options.plan.completeness,
+        projectFacts: options.plan.projectFacts,
+      });
+      const gate = refactorApplyGate(effectiveRefactorPlanState.current);
+      if (!gate.allowed) {
+        throw new Error(`Refactoring became unsafe before mutation: ${gate.reason}`);
+      }
+      const entry = buildRefactorRecoveryJournalEntry(
+        effectiveRefactorPlanState.current,
+        preTexts,
+        rootsRef.current[0]?.path ?? "",
+        {
+          workspaceId: workspaceInstanceId,
+          transactionId: applyTransactionId,
+          edit: resolvedEdit,
+          documentMetadata,
+        },
+      );
+      if (!entry) {
+        throw new Error("Refactor recovery could not build complete text preimages");
+      }
+      const persisted = refactorRecoveryController.persist(entry);
+      if (!persisted.ok) {
+        throw new Error(`Refactor recovery journal could not be prepared: ${persisted.reason}`);
+      }
+      refactorRecoveryEntryState.current = entry;
+    };
+    const buildHooks = (allowPreview: boolean, operationOffset = 0): WorkspaceEditApplyHooks => ({
       resolvePath: (file) => {
         if (file.path) return normalizeFsPath(file.path);
         return null;
@@ -8826,20 +8916,23 @@ export function CodeWorkspaceTab({
         : undefined,
       preflightMutation: options.preflightMutation
         || (options.semanticGeneration != null && options.semanticRevision != null)
+        || options.plan !== undefined
         ? async () => {
           await options.preflightMutation?.();
-          if (options.semanticGeneration == null || options.semanticRevision == null) return;
-          const current = semanticIndex.current();
-          const semanticToken = {
-            generation: options.semanticGeneration!,
-            revision: options.semanticRevision!,
-          };
-          const valid = options.semanticRequireReady === false
-            ? current.revision === semanticToken.revision
-            : workspaceSemanticIndexBuildIsCurrent(current, semanticToken);
-          if (!valid) {
-            throw new Error("Semantic result became stale before changes were applied; run the action again");
+          if (options.semanticGeneration != null && options.semanticRevision != null) {
+            const current = semanticIndex.current();
+            const semanticToken = {
+              generation: options.semanticGeneration,
+              revision: options.semanticRevision,
+            };
+            const valid = options.semanticRequireReady === false
+              ? current.revision === semanticToken.revision
+              : workspaceSemanticIndexBuildIsCurrent(current, semanticToken);
+            if (!valid) {
+              throw new Error("Semantic result became stale before changes were applied; run the action again");
+            }
           }
+          await prepareRefactorRecovery();
         }
         : undefined,
       validateOperationPaths: options.semanticWorkspaceOnly || (options.semanticGeneration != null && options.semanticRevision != null)
@@ -8853,7 +8946,21 @@ export function CodeWorkspaceTab({
       deleteFile: (operation) => applyLspResourceOperation(operation),
       onActiveEditResolved: (activeEdit) => {
         resolvedEdit = activeEdit;
+        if (allowPreview) selectedEdit = activeEdit;
         options.onActiveEditResolved?.(activeEdit);
+      },
+      onOperationSettled: (operationIndex, outcome) => {
+        const entry = refactorRecoveryEntryState.current;
+        if (!entry) return;
+        if (!outcome.status.startsWith("applied") && outcome.status !== "noop") return;
+        entry.status = "applying";
+        entry.appliedOperationIndex = Math.max(
+          entry.appliedOperationIndex,
+          operationIndex + operationOffset,
+        );
+        // A progress write failure leaves the durable prepared entry intact;
+        // recovery will re-read pre/post hashes instead of assuming progress.
+        void refactorRecoveryController.persist(entry);
       },
     });
     let outcomes = await applyWorkspaceEdit(edit, buildHooks(true));
@@ -8862,7 +8969,6 @@ export function CodeWorkspaceTab({
     // A partial run stops at the failed operation; the user may re-run the
     // unapplied suffix, and every remaining text operation re-validates its
     // disk hash / open-buffer version before writing.
-    const applyTransactionId = nextSaveTransactionId("tx-wedit");
     const historySafePaths = new Set(
       (beforeSnapshots ?? [])
         .filter((snapshot) => snapshot.exists && snapshot.text !== null)
@@ -8893,8 +8999,9 @@ export function CodeWorkspaceTab({
             confirmLabel: "Retry remaining changes",
           });
           if (!resume) break;
+          operationIndexOffset += applyResult.nextOperationIndex;
           resolvedEdit = sliceWorkspaceEditForResume(resolvedEdit, applyResult.nextOperationIndex);
-          outcomes = await applyWorkspaceEdit(resolvedEdit, buildHooks(false));
+          outcomes = await applyWorkspaceEdit(resolvedEdit, buildHooks(false, operationIndexOffset));
           allOutcomes = [...allOutcomes, ...outcomes];
           applyResult = buildApplyResult(outcomes);
           if (applyResult.disposition !== "partial" || applyResult.nextOperationIndex === null) break;
@@ -8920,69 +9027,155 @@ export function CodeWorkspaceTab({
       && beforeSnapshots === null
       && mutated;
     if (beforeSnapshots && mutated) {
-      const afterSnapshots = await captureWorkspaceEditPathSnapshots(edit);
-      if (!afterSnapshots) historyUnavailable = true;
+      const afterSnapshots = await captureWorkspaceEditPathSnapshots(selectedEdit);
+      const refactorRecoveryEntry = refactorRecoveryEntryState.current;
+      const effectiveRefactorPlan = effectiveRefactorPlanState.current;
+      // An open buffer can mask a bad disk acknowledgement. Refactor
+      // postconditions therefore use an independent disk readback, while
+      // ordinary workspace history continues to capture the live buffers.
+      const postconditionSnapshots = refactorRecoveryEntry && effectiveRefactorPlan
+        ? await captureWorkspaceEditPathSnapshots(selectedEdit, { includeOpenBuffer: false })
+        : afterSnapshots;
+      const activePathKeys = new Set(
+        workspaceEditOperations(selectedEdit).flatMap((operation) => {
+          if (operation.kind === "text") return operation.document.path ? [operation.document.path] : [];
+          if (operation.kind === "rename") return [operation.oldPath, operation.newPath];
+          return operation.path ? [operation.path] : [];
+        }).filter((path): path is string => path !== null).map(fsPathComparisonKey),
+      );
+      const historyBeforeSnapshots = beforeSnapshots.filter((snapshot) => (
+        activePathKeys.has(fsPathComparisonKey(snapshot.path))
+      ));
       const afterBookmarks = afterSnapshots
         ? captureWorkspaceEditBookmarkSnapshot(afterSnapshots.map((snapshot) => snapshot.path))
         : null;
-      const changed = afterSnapshots?.some((snapshot, index) => (
-        snapshot.path !== beforeSnapshots[index]?.path
-        || snapshot.exists !== beforeSnapshots[index]?.exists
-        || snapshot.text !== beforeSnapshots[index]?.text
-        || snapshot.encoding !== beforeSnapshots[index]?.encoding
-        || snapshot.bom !== beforeSnapshots[index]?.bom
-      ));
-      if (afterSnapshots && changed) {
-        if (options.plan) {
+      if (!afterSnapshots) {
+        historyUnavailable = true;
+        const entry = refactorRecoveryEntryState.current;
+        const plan = effectiveRefactorPlanState.current;
+        if (entry && plan) {
+          refactorRecoveryFailure = "Refactor postcondition could not be read back; recovery is required for all affected files";
+          entry.status = "recovery-required";
+          const persisted = refactorRecoveryController.persist(entry);
+          if (!persisted.ok) refactorRecoveryFailure += `; ${persisted.reason}`;
+        }
+      } else {
+        const beforeByPath = new Map(historyBeforeSnapshots.map((snapshot) => [
+          fsPathComparisonKey(snapshot.path),
+          snapshot,
+        ]));
+        const changed = afterSnapshots.some((snapshot) => {
+          const before = beforeByPath.get(fsPathComparisonKey(snapshot.path));
+          return !before
+            || snapshot.exists !== before.exists
+            || snapshot.text !== before.text
+            || snapshot.encoding !== before.encoding
+            || snapshot.bom !== before.bom;
+        });
+        const entry = refactorRecoveryEntry;
+        const plan = effectiveRefactorPlan;
+        if (entry && plan && !postconditionSnapshots) {
+          refactorRecoveryFailure = "Refactor postcondition could not be read back from disk; recovery is required for all affected files";
+          entry.status = "recovery-required";
+          const persisted = refactorRecoveryController.persist(entry);
+          if (!persisted.ok) refactorRecoveryFailure += `; ${persisted.reason}`;
+        } else if (entry && plan && postconditionSnapshots) {
           const actualPostTexts: Record<string, string> = {};
-          for (const s of afterSnapshots) {
-            if (s.text !== null) actualPostTexts[s.path] = s.text;
+          for (const snapshot of postconditionSnapshots) {
+            if (snapshot.text !== null) actualPostTexts[snapshot.path] = snapshot.text;
           }
-          const postHashCheck = verifyRefactorPostHashes(options.plan, actualPostTexts);
+          const postHashCheck = verifyRefactorPostHashes(plan, actualPostTexts);
           if (!postHashCheck.allMatched) {
-            console.warn("[refactor] Post-refactor hash mismatch detected:", postHashCheck.mismatches);
-          }
-          const preTexts: Record<string, string> = {};
-          for (const s of beforeSnapshots) {
-            if (s.text !== null) preTexts[s.path] = s.text;
-          }
-          const recoveryEntry = buildRefactorRecoveryJournalEntry(
-            options.plan,
-            preTexts,
-            rootsRef.current[0]?.path ?? "",
-          );
-          if (recoveryEntry) {
-            recoveryEntry.status = "committed";
-            recordRefactorRecoveryJournal(recoveryEntry);
+            const affectedPaths = plan.documents.map((document) => (
+              document.canonicalPath || document.uri
+            ));
+            const mismatchPaths = [
+              ...postHashCheck.mismatches.map((mismatch) => mismatch.uri),
+              ...postHashCheck.missingUris,
+            ];
+            refactorRecoveryFailure = `Refactor postcondition mismatch; recovery required for ${mismatchPaths.join(", ") || affectedPaths.join(", ")}`;
+            entry.status = "recovery-required";
+            const persisted = refactorRecoveryController.persist(entry);
+            if (!persisted.ok) refactorRecoveryFailure += `; ${persisted.reason}`;
+          } else {
+            entry.status = "committed";
+            entry.appliedOperationIndex = Math.max(
+              entry.appliedOperationIndex,
+              entry.operationCount - 1,
+            );
+            const persisted = refactorRecoveryController.persist(entry);
+            if (!persisted.ok) {
+              entry.status = "recovery-required";
+              refactorRecoveryFailure = `Refactor completed but its recovery journal could not be settled: ${persisted.reason}`;
+            }
           }
         }
-        const affectedBookmarkIds = Array.from(new Set([
-          ...(beforeBookmarks ?? []).map((bookmark) => bookmark.id),
-          ...(afterBookmarks ?? []).map((bookmark) => bookmark.id),
-        ]));
-        const afterTabs = captureWorkspaceEditTabSnapshot(
-          afterSnapshots.map((snapshot) => snapshot.path),
-        );
-        workspaceEditHistorySequenceRef.current += 1;
-        const label = options.label?.trim() || "Workspace edit";
-        const entry: WorkspaceEditHistoryEntry = {
-          id: `${workspaceInstanceId}:${workspaceEditHistorySequenceRef.current}`,
-          label,
-          affectedPaths: beforeSnapshots.map((snapshot) => snapshot.path),
-          undo: async () => {
-            await replayWorkspacePathSnapshotsRef.current(beforeSnapshots);
-            restoreWorkspaceBookmarkSnapshot(beforeBookmarks ?? [], affectedBookmarkIds);
-            if (beforeTabs) await restoreWorkspaceEditTabs(beforeTabs);
-          },
-          redo: async () => {
-            await replayWorkspacePathSnapshotsRef.current(afterSnapshots);
-            restoreWorkspaceBookmarkSnapshot(afterBookmarks ?? [], affectedBookmarkIds);
-            await restoreWorkspaceEditTabs(afterTabs);
-          },
-        };
-        workspaceEditHistory.push(entry);
-        setWorkspaceEditHistoryRevision((revision) => revision + 1);
+        if (changed && shouldRecordHistory && !refactorRecoveryFailure) {
+          const affectedBookmarkIds = Array.from(new Set([
+            ...(beforeBookmarks ?? []).map((bookmark) => bookmark.id),
+            ...(afterBookmarks ?? []).map((bookmark) => bookmark.id),
+          ]));
+          const afterTabs = captureWorkspaceEditTabSnapshot(
+            afterSnapshots.map((snapshot) => snapshot.path),
+          );
+          workspaceEditHistorySequenceRef.current += 1;
+          const label = options.label?.trim() || "Workspace edit";
+          const entry: WorkspaceEditHistoryEntry = {
+            id: `${workspaceInstanceId}:${workspaceEditHistorySequenceRef.current}`,
+            label,
+            affectedPaths: historyBeforeSnapshots.map((snapshot) => snapshot.path),
+            undo: async () => {
+              await replayWorkspacePathSnapshotsRef.current(historyBeforeSnapshots);
+              restoreWorkspaceBookmarkSnapshot(beforeBookmarks ?? [], affectedBookmarkIds);
+              if (beforeTabs) await restoreWorkspaceEditTabs(beforeTabs);
+            },
+            redo: async () => {
+              await replayWorkspacePathSnapshotsRef.current(afterSnapshots);
+              restoreWorkspaceBookmarkSnapshot(afterBookmarks ?? [], affectedBookmarkIds);
+              await restoreWorkspaceEditTabs(afterTabs);
+            },
+          };
+          workspaceEditHistory.push(entry);
+          setWorkspaceEditHistoryRevision((revision) => revision + 1);
+        }
       }
+    }
+    const refactorRecoveryEntry = refactorRecoveryEntryState.current;
+    const effectiveRefactorPlan = effectiveRefactorPlanState.current;
+    const hasFailedOperation = allOutcomes.some((outcome) => outcome.status === "failed");
+    if (
+      refactorRecoveryEntry
+      && !refactorRecoveryFailure
+      && refactorRecoveryEntry.status !== "committed"
+      && hasFailedOperation
+    ) {
+      refactorRecoveryFailure = "Refactor application failed after its recovery journal was prepared; recovery is required for affected files";
+      refactorRecoveryEntry.status = "recovery-required";
+      const persisted = refactorRecoveryController.persist(refactorRecoveryEntry);
+      if (!persisted.ok) refactorRecoveryFailure += `; ${persisted.reason}`;
+    }
+    if (!mutated && refactorRecoveryEntry && !refactorRecoveryFailure) {
+      refactorRecoveryEntry.status = "rolled-back";
+      void refactorRecoveryController.persist(refactorRecoveryEntry);
+    }
+    if (refactorRecoveryFailure) {
+      const affectedPaths = effectiveRefactorPlan?.documents.map((document) => (
+        document.canonicalPath || document.uri
+      )) ?? [];
+      const recoveryOutcome: WorkspaceEditApplyOutcome = {
+        operationIndex: null,
+        path: "Refactor",
+        status: "recovery-required",
+        reason: refactorRecoveryFailure,
+        affectedPaths,
+        recoveryId: refactorRecoveryEntry?.recoveryId ?? null,
+      };
+      outcomes = [...outcomes, recoveryOutcome];
+      allOutcomes = [...allOutcomes, recoveryOutcome];
+      setRefactorRecoveryEntries(refactorRecoveryController.listPending());
+      setWorkspaceRecoveryOpen(true);
+    } else if (refactorRecoveryEntry) {
+      setRefactorRecoveryEntries(refactorRecoveryController.listPending());
     }
     setStatusMessage([
       summarizeWorkspaceEditOutcomes(outcomes),
@@ -9000,6 +9193,8 @@ export function CodeWorkspaceTab({
     isLspDocumentSynced,
     lspDocumentVersion,
     refreshTree,
+    refactorRecoveryController,
+    readWorkspaceEditPathSnapshot,
     saveOpenBufferText,
     setStatusMessage,
     restoreWorkspaceEditTabs,
@@ -9054,6 +9249,122 @@ export function CodeWorkspaceTab({
     workspaceEditQueueRef.current = pending.then(() => undefined, () => undefined);
     return pending;
   }, [applyLspWorkspaceEditNow]);
+
+  const refreshRefactorRecoveryEntries = useCallback(() => {
+    const entries = refactorRecoveryController.listPending();
+    setRefactorRecoveryEntries(entries);
+    return entries;
+  }, [refactorRecoveryController]);
+
+  const recoverRefactorRecoveryEntry = useCallback(async (
+    entry: RefactorRecoveryJournalRecord,
+  ) => {
+    const result = await refactorRecoveryController.recover(entry, {
+      readText: async (path) => {
+        const normalized = normalizeFsPath(path);
+        const open = Object.values(openFilesRef.current).find((file) => {
+          const openPath = absolutePathForOpenFile(file);
+          return openPath !== null && fsPathEquals(openPath, normalized);
+        });
+        if (open) {
+          return {
+            text: open.text,
+            hash: sha256Hex(open.text),
+            dirty: open.dirty,
+            documentRevision: open.documentRevision ?? 0,
+          };
+        }
+        const snapshot = await readWorkspaceEditPathSnapshot(normalized);
+        if (!snapshot || !snapshot.exists || snapshot.text === null) return null;
+        return {
+          text: snapshot.text,
+          hash: sha256Hex(snapshot.text),
+          dirty: false,
+          documentRevision: null,
+        };
+      },
+      applyText: async (path, text, document, expectedDocumentRevision) => {
+        const normalized = normalizeFsPath(path);
+        const open = Object.values(openFilesRef.current).find((file) => {
+          const openPath = absolutePathForOpenFile(file);
+          return openPath !== null && fsPathEquals(openPath, normalized);
+        });
+        if (open) {
+          if (open.dirty) throw new Error(`${normalized}: open buffer changed during recovery`);
+          if (
+            expectedDocumentRevision != null
+            && (open.documentRevision ?? 0) !== expectedDocumentRevision
+          ) {
+            throw new Error(`${normalized}: open buffer document revision changed during recovery`);
+          }
+          updateFileText(open.key, text);
+          await saveOpenBufferText(open.key, text);
+          return;
+        }
+        const current = await readWorkspaceEditPathSnapshot(normalized);
+        if (!current || !current.exists || current.text === null) {
+          throw new Error(`${normalized}: file is no longer available for recovery`);
+        }
+        replayWorkspaceEncodingRef.current = new Map([[fsPathComparisonKey(normalized), {
+          encoding: document.encoding,
+          bom: document.bom,
+          eol: document.eol,
+        }]]);
+        try {
+          const outcomes = await applyLspWorkspaceEditNow(
+            buildWorkspacePathSnapshotEdit(
+              [current],
+              [{ ...current, text }],
+            ),
+            { recordHistory: false },
+          );
+          const response = workspaceEditApplyResponse(outcomes);
+          if (!response.applied) {
+            throw new Error(response.failureReason ?? `${normalized}: recovery write failed`);
+          }
+        } finally {
+          replayWorkspaceEncodingRef.current = null;
+        }
+      },
+    });
+    const remaining = refreshRefactorRecoveryEntries();
+    if (result.status === "rolled-back") {
+      setStatusMessage(`Recovered refactor ${entry.actionId}; ${result.restoredUris.length} file(s) verified`);
+      const buffersRemain = readWorkspaceRecoveryEntries(workspaceInstanceId).length > 0;
+      const diskRemain = listDiskEffectLedgerEntries(workspaceInstanceId).length > 0;
+      setWorkspaceRecoveryOpen(buffersRemain || diskRemain || remaining.length > 0);
+    } else if (result.status === "unverified") {
+      setStatusMessage(result.reason);
+      setWorkspaceRecoveryOpen(true);
+    } else {
+      setStatusMessage(`Refactor recovery remains pending: ${result.reason}`);
+      setWorkspaceRecoveryOpen(true);
+    }
+  }, [
+    absolutePathForOpenFile,
+    applyLspWorkspaceEditNow,
+    refreshRefactorRecoveryEntries,
+    refactorRecoveryController,
+    readWorkspaceEditPathSnapshot,
+    saveOpenBufferText,
+    setStatusMessage,
+    updateFileText,
+    workspaceInstanceId,
+  ]);
+
+  const discardRefactorRecoveryEntry = useCallback((entry: RefactorRecoveryJournalRecord) => {
+    refactorRecoveryController.discard(entry);
+    const remaining = refreshRefactorRecoveryEntries();
+    setStatusMessage(`Discarded refactor recovery journal for ${entry.actionId}`);
+    const buffersRemain = readWorkspaceRecoveryEntries(workspaceInstanceId).length > 0;
+    const diskRemain = listDiskEffectLedgerEntries(workspaceInstanceId).length > 0;
+    setWorkspaceRecoveryOpen(buffersRemain || diskRemain || remaining.length > 0);
+  }, [
+    refreshRefactorRecoveryEntries,
+    refactorRecoveryController,
+    setStatusMessage,
+    workspaceInstanceId,
+  ]);
 
   const workspaceEditHistoryState = useMemo(
     () => workspaceEditHistory.state(),
@@ -18228,7 +18539,7 @@ export function CodeWorkspaceTab({
           onCancel={() => dismissExternalFileConflict(externalFileConflicts[0]!.key)}
         />
       )}
-      {visible && workspaceRecoveryOpen && (workspaceRecoveryEntries.length > 0 || diskEffectLedgerEntries.length > 0) && externalFileConflicts.length === 0 && (
+      {visible && workspaceRecoveryOpen && (workspaceRecoveryEntries.length > 0 || refactorRecoveryEntries.length > 0 || diskEffectLedgerEntries.length > 0) && externalFileConflicts.length === 0 && (
         <WorkspaceRecoveryDialog
           entries={workspaceRecoveryEntries}
           onRecover={(entry) => {
@@ -18241,6 +18552,9 @@ export function CodeWorkspaceTab({
           ledgerEntries={diskEffectLedgerEntries}
           onAcknowledgeLedgerEntry={acknowledgeDiskEffectLedgerEntry}
           onReopenLedgerEntry={reopenDiskEffectLedgerFile}
+          refactorEntries={refactorRecoveryEntries}
+          onRecoverRefactor={recoverRefactorRecoveryEntry}
+          onDiscardRefactor={discardRefactorRecoveryEntry}
         />
       )}
       {visible && fileEncodingDialogOpen && activeFile && !activeFile.library && (

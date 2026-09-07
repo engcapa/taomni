@@ -580,6 +580,12 @@ describe("buildRefactorPlan & verifyExclusionSafety §8.20.6 & §8.21.2", () => 
       expect(passResult.mismatches).toHaveLength(0);
       expect(passResult.verifiedDocuments).toBe(2);
 
+      const missingResult = verifyRefactorPostHashes(plan, {
+        "/workspace/App.java": expectedPostA,
+      });
+      expect(missingResult.allMatched).toBe(false);
+      expect(missingResult.missingUris).toEqual(["file:///workspace/Client.java"]);
+
       // 2. Post-hash verification detects mismatch
       const failResult = verifyRefactorPostHashes(plan, {
         "/workspace/App.java": expectedPostA,
@@ -663,12 +669,19 @@ describe("buildRefactorPlan & verifyExclusionSafety §8.20.6 & §8.21.2", () => 
       ]);
 
       // Replay recovery to restore original pre-images
-      const replayResult = await replayRefactorRecoveryJournal(retrieved!, (target, text) => {
-        liveFiles.set(target, text);
+      const replayResult = await replayRefactorRecoveryJournal(retrieved!, {
+        readText: async (target) => {
+          const text = liveFiles.get(target);
+          return text === undefined ? null : { text, hash: sha256Hex(text), dirty: false };
+        },
+        applyText: (target, text) => {
+          liveFiles.set(target, text);
+        },
       });
 
       expect(replayResult.restoredUris).toHaveLength(2);
       expect(replayResult.preHashesRestored).toBe(true);
+      expect(replayResult.status).toBe("rolled-back");
 
       // Verify restored content matches pre-images and pre-hashes in one step
       expect(liveFiles.get("/workspace/A.java")).toBe(fileAText);

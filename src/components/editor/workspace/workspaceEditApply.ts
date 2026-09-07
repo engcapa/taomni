@@ -21,7 +21,15 @@ export type WorkspaceEditApplyOutcome =
   | { operationIndex: number; path: string; status: "applied-delete" }
   | { operationIndex: number; path: string; status: "noop" }
   | { operationIndex: number | null; path: string; status: "skipped"; reason: string }
-  | { operationIndex: number | null; path: string; status: "failed"; reason: string };
+  | { operationIndex: number | null; path: string; status: "failed"; reason: string }
+  | {
+    operationIndex: number | null;
+    path: string;
+    status: "recovery-required";
+    reason: string;
+    affectedPaths: readonly string[];
+    recoveryId: string | null;
+  };
 
 export interface WorkspaceEditApplyResponse {
   applied: boolean;
@@ -221,8 +229,11 @@ export interface WorkspaceEditApplyHooks {
   /**
    * Persist an open clean buffer after applying edits.
    * Must write `nextText` to disk and leave the open buffer clean (dirty=false).
+   * A `null` result means the shared save committer did not establish a
+   * committed disk effect; `undefined` remains valid for test/simple shells
+   * whose save hook reports success by completion.
    */
-  saveOpenBuffer: (key: string, nextText: string) => Promise<void>;
+  saveOpenBuffer: (key: string, nextText: string) => Promise<unknown>;
   /** Read disk contents for a closed file. */
   readDisk: (absolutePath: string) => Promise<{
     text: string;
@@ -271,6 +282,8 @@ export interface WorkspaceEditApplyHooks {
    * resume slicing must use this edit, never the pre-confirmation original.
    */
   onActiveEditResolved?: (edit: LspWorkspaceEdit) => void;
+  /** Records an operation boundary for a prepared recovery journal. */
+  onOperationSettled?: (operationIndex: number, outcome: WorkspaceEditApplyOutcome) => void;
 }
 
 async function applyTextDocumentEdit(
@@ -313,7 +326,15 @@ async function applyTextDocumentEdit(
       const next = applyLspTextEditsToString(open.text, file.edits);
       if (!open.dirty) {
         hooks.applyToOpenBuffer(open.key, next);
-        await hooks.saveOpenBuffer(open.key, next);
+        const saveResult = await hooks.saveOpenBuffer(open.key, next);
+        if (saveResult === null) {
+          return {
+            operationIndex,
+            path,
+            status: "failed",
+            reason: "open buffer save did not establish a committed disk effect",
+          };
+        }
         return { operationIndex, path, status: "applied-open", dirty: false };
       }
       hooks.applyToOpenBuffer(open.key, next);
@@ -499,6 +520,7 @@ export async function applyWorkspaceEdit(
     if (operation.kind === "text") {
       const outcome = await applyTextDocumentEdit(operation.document, operationIndex, hooks);
       outcomes.push(outcome);
+      hooks.onOperationSettled?.(operationIndex, outcome);
       if (outcome.status === "failed" || outcome.status === "skipped") break;
       continue;
     }
@@ -509,23 +531,31 @@ export async function applyWorkspaceEdit(
       if (operation.kind === "create") {
         if (!hooks.createFile) throw new Error("CreateFile is not supported by this workspace");
         await hooks.createFile(operation);
-        outcomes.push({ operationIndex, path, status: "applied-create" });
+        const outcome = { operationIndex, path, status: "applied-create" as const };
+        outcomes.push(outcome);
+        hooks.onOperationSettled?.(operationIndex, outcome);
       } else if (operation.kind === "rename") {
         if (!hooks.renameFile) throw new Error("RenameFile is not supported by this workspace");
         await hooks.renameFile(operation);
-        outcomes.push({ operationIndex, path, status: "applied-rename" });
+        const outcome = { operationIndex, path, status: "applied-rename" as const };
+        outcomes.push(outcome);
+        hooks.onOperationSettled?.(operationIndex, outcome);
       } else {
         if (!hooks.deleteFile) throw new Error("DeleteFile is not supported by this workspace");
         await hooks.deleteFile(operation);
-        outcomes.push({ operationIndex, path, status: "applied-delete" });
+        const outcome = { operationIndex, path, status: "applied-delete" as const };
+        outcomes.push(outcome);
+        hooks.onOperationSettled?.(operationIndex, outcome);
       }
     } catch (error) {
-      outcomes.push({
+      const outcome = {
         operationIndex,
         path,
         status: "failed",
         reason: error instanceof Error ? error.message : String(error),
-      });
+      } as const;
+      outcomes.push(outcome);
+      hooks.onOperationSettled?.(operationIndex, outcome);
       break;
     }
   }
@@ -536,7 +566,7 @@ export function workspaceEditApplyResponse(
   outcomes: WorkspaceEditApplyOutcome[],
 ): WorkspaceEditApplyResponse {
   const failure = outcomes.find((outcome) => (
-    outcome.status === "failed" || outcome.status === "skipped"
+    outcome.status === "failed" || outcome.status === "skipped" || outcome.status === "recovery-required"
   ));
   if (!failure) {
     return { applied: true, failureReason: null, failedChange: null };
@@ -553,9 +583,10 @@ export function summarizeWorkspaceEditOutcomes(outcomes: WorkspaceEditApplyOutco
   const unchanged = outcomes.filter((item) => item.status === "noop").length;
   const failed = outcomes.filter((item) => item.status === "failed").length;
   const skipped = outcomes.filter((item) => item.status === "skipped").length;
+  const recoveryRequired = outcomes.filter((item) => item.status === "recovery-required").length;
   const firstReason = outcomes.find((item) => (
-    item.status === "failed" || item.status === "skipped"
+    item.status === "failed" || item.status === "skipped" || item.status === "recovery-required"
   ));
-  const summary = `Applied ${applied}, unchanged ${unchanged}, failed ${failed}, skipped ${skipped}`;
+  const summary = `Applied ${applied}, unchanged ${unchanged}, failed ${failed}, skipped ${skipped}, recovery required ${recoveryRequired}`;
   return firstReason ? `${summary}: ${firstReason.reason}` : summary;
 }

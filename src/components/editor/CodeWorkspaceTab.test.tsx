@@ -505,6 +505,70 @@ function renderWorkspace(
   return render(options.strict ? <StrictMode>{element}</StrictMode> : element);
 }
 
+function setupMountedRenameFixture(instanceId: string) {
+  const workspace: CodeWorkspaceTabInfo = {
+    repoRoot: "/repo/app",
+    workspaceId: `ws-${instanceId}`,
+    workspaceInstanceId: instanceId,
+    name: "Mounted rename",
+    roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+    looseFiles: [],
+    initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+  };
+  const disk = new Map([["src/main.ts", "const value = 1;"]]);
+  const status = documentStatus({
+    path: "/repo/app/src/main.ts",
+    uri: "file:///repo/app/src/main.ts",
+    available: true,
+    active: true,
+    capabilities: defaultCapabilities({ rename: true }),
+  });
+  const renameRange = {
+    start: { line: 0, character: 6 },
+    end: { line: 0, character: 11 },
+  };
+
+  workspaceMocks.workspaceListDir.mockImplementation(async (_root: string, path = "") => (
+    path === "src"
+      ? [entry("main.ts", "src/main.ts")]
+      : [entry("src", "src", "dir")]
+  ));
+  workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => {
+    const text = disk.get(path);
+    if (text === undefined) throw new Error(`missing fixture ${path}`);
+    return file(path, text, { hash: `hash-${text}` });
+  });
+  workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+    _rootPath: string,
+    path: string,
+    text: string,
+  ) => {
+    disk.set(path, text);
+    return writeAck(file(path, text, { hash: `hash-${text}` }));
+  });
+  lspMocks.lspOpenDocument.mockResolvedValue(status);
+  lspMocks.lspChangeDocument.mockResolvedValue(status);
+  lspMocks.lspSaveDocument.mockResolvedValue(status);
+  lspMocks.lspPrepareRename.mockResolvedValue({
+    status,
+    allowed: true,
+    range: renameRange,
+    placeholder: "value",
+    message: null,
+  });
+  lspMocks.lspRename.mockResolvedValue({
+    status,
+    edit: {
+      documentEdits: [{
+        uri: "file:///repo/app/src/main.ts",
+        path: "/repo/app/src/main.ts",
+        edits: [{ range: renameRange, newText: "renamed" }],
+      }],
+    },
+  });
+  return { workspace, disk };
+}
+
 describe("extractContextSnippet", () => {
   it("extracts the first line and its following context at offset zero", () => {
     expect(extractContextSnippet("first\nsecond\nthird", 0, 0)).toEqual({
@@ -2398,6 +2462,105 @@ describe("CodeWorkspaceTab", () => {
       useCodeWorkspaceStore.getState(),
       "instance-actions",
     ).openFiles["root:app:src/main.ts"]?.text).toBe("x =1"));
+  });
+
+  it("applies a mounted provider rename, verifies disk, and supports one workspace undo", async () => {
+    const { workspace, disk } = setupMountedRenameFixture("instance-mounted-rename");
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+    vi.mocked(promptAppDialog).mockResolvedValueOnce("renamed");
+
+    renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(registrationRef.current).not.toBeNull());
+
+    await act(async () => {
+      await registrationRef.current!.executeAction("workspace.renameSymbol");
+    });
+    await waitFor(() => expect(disk.get("src/main.ts")).toBe("const renamed = 1;"));
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Applied 1"));
+    expect(screen.queryByTestId("workspace-recovery-dialog")).not.toBeInTheDocument();
+    expect(registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled).toBe(true);
+
+    await act(async () => {
+      await registrationRef.current!.executeAction("workspace.undoWorkspaceEdit");
+    });
+    await waitFor(() => expect(disk.get("src/main.ts")).toBe("const value = 1;"));
+    expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-mounted-rename",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("const value = 1;");
+  });
+
+  it("blocks a mounted rename on a disk postcondition mismatch and exposes recovery without history", async () => {
+    const { workspace, disk } = setupMountedRenameFixture("instance-mounted-mismatch");
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+    workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+      _rootPath: string,
+      path: string,
+      _text: string,
+    ) => {
+      const foreignText = "const changedBySomeoneElse = 1;";
+      disk.set(path, foreignText);
+      return writeAck(file(path, foreignText, { hash: `hash-${foreignText}` }));
+    });
+    vi.mocked(promptAppDialog).mockResolvedValueOnce("renamed");
+
+    renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(registrationRef.current).not.toBeNull());
+    await act(async () => {
+      await registrationRef.current!.executeAction("workspace.renameSymbol");
+    });
+
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("recovery required"));
+    const dialog = await screen.findByTestId("workspace-recovery-dialog");
+    expect(within(dialog).getByTestId("workspace-recovery-refactors")).toBeInTheDocument();
+    expect(dialog).toHaveTextContent("recovery-required");
+    expect(within(dialog).getByText("/repo/app/src/main.ts")).toBeInTheDocument();
+    expect(registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled).toBe(false);
+    expect(disk.get("src/main.ts")).toBe("const changedBySomeoneElse = 1;");
+    const journalKey = Object.keys(window.localStorage).find((key) => key.startsWith("taomni.refactor.recovery.v2:"));
+    expect(journalKey).toBeTruthy();
+    expect(JSON.parse(window.localStorage.getItem(journalKey!) ?? "null")).toMatchObject({
+      status: "recovery-required",
+    });
+  });
+
+  it("does not write a mounted rename when recovery journal preparation fails", async () => {
+    const { workspace, disk } = setupMountedRenameFixture("instance-mounted-journal-failure");
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+    vi.mocked(promptAppDialog).mockResolvedValueOnce("renamed");
+
+    renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(registrationRef.current).not.toBeNull());
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("quota exceeded");
+    });
+
+    try {
+      await act(async () => {
+        await registrationRef.current!.executeAction("workspace.renameSymbol");
+      });
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("quota exceeded"));
+      expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
+      expect(disk.get("src/main.ts")).toBe("const value = 1;");
+      expect(selectCodeWorkspaceUi(
+        useCodeWorkspaceStore.getState(),
+        "instance-mounted-journal-failure",
+      ).openFiles["root:app:src/main.ts"]?.text).toBe("const value = 1;");
+    } finally {
+      setItem.mockRestore();
+    }
   });
 
   it("cancels a multi-file code-action preview with zero edits and zero history", async () => {
