@@ -41,6 +41,36 @@ ED-AUDIT-001 负责在 `claudedocs/code-workspace-idea-specs/idea-comparison.sch
 
 `matched` 要求规定字段全部可比且无未解释差异。`different` 记录真实差距；`incomparable` 用于版本/fixture/动作/平台前提不匹配；缺一端运行是 `unverified`。validator 不凭合法 JSON 签发运行证明。
 
+### 2a. 运行手册（ED-AUDIT-001 交付）
+
+记录文件写入 `qa-ui-auto-report/idea-comparison/<task>/<run>/record.json`；`artifacts[].path` 与 `taomni.summary`/`taomni.receipt` 的 `path` 都相对 record.json 所在 run 目录。校验命令（仓库根目录，无需额外依赖）：
+
+```bash
+python .agents/skills/code-workspace-idea-task/scripts/compare_idea.py \
+  --record qa-ui-auto-report/idea-comparison/<task>/<run>/record.json
+# 可选：
+#   --require-match                 非 matched 也算失败（exit 1）
+#   --artifacts-dir <dir>           覆盖 artifact 解析目录（默认 record.json 所在目录）
+#   --fixture-root <dir>            额外核对 fixture.files 的 SHA-256
+```
+
+Exit code：`0` 记录合法（`--require-match` 下且 verdict=matched）；`1` 记录合法但 verdict 为 different/incomparable/unverified；`2` 格式或 fail-closed 语义错误（duplicate step、缺失观测、artifact 缺失/被篡改、fixture/build mismatch、版本不匹配仍声称 matched、taomni-only 全部步骤仍声称 matched、not-run 无理由等）。报告为 stdout JSON，含 computed/recorded verdict、双侧步骤、taomni-only 计数与 artifact 核对结果；taomni-only 步骤单独列出，不进入 IDEA matched 分母。行为卡只需填写记录并运行该命令；不新增 DSL，也不修改 verifier。
+
+IDEA 人工采样表（每个 step 一行，采样前先从 Help/About 记录完整 build number）：
+
+| 记录项 | 写入字段 | 采集方式 |
+|---|---|---|
+| IDEA 版本/build/edition/OS | `idea.version/buildNumber/edition/os` | Help/About 截图或文本，2026.2.x 之外记 incomparable |
+| keymap 与动作绑定 | `settings.keymap` | Settings > Keymap 查询 actionName 实际 chord |
+| 实际按键或菜单路径 | `steps[].keys` / `steps[].menuPath` | 手工执行时逐键记录，不得改写为"等价"键 |
+| 前置状态 | `steps[].preState` | caret/selection/dirty/打开视图 |
+| 逐步骤观测 | `idea.observations[]` | documents hash、caret/selection（UTF-16 offset）、focus、results 顺序、history/undo、错误与恢复；原始产物存 run 目录并登记 `artifacts` |
+| 撤销/恢复 | 同上 `history`/`recovery` | 每个正常动作至少重复一次撤销 |
+
+三端 native 步骤：Taomni 端按第 4 节平台表执行（Linux：tauri-driver + 真实桌面或 Xvfb，Xvfb 不等价 IME/compositor 需补测；Windows：同源 QA build + WebView2 driver，剪贴板先存后恢复；macOS：独立 QA bundle + OS 自动化或逐步手工，禁止浏览器报告冒充 native）。每端结果写入独立 record（`taomni.os`/`webview`/`mode` 不同），不得合并或推广单端结论。
+
+与 runner summary/receipt 的链接规则：`taomni.summary.path`/`taomni.receipt.path` 指向本次 run 的 `summary.json` 与执行 receipt（相对 run 目录），`sha256` 为文件实际哈希；手工 IDEA 数据只能进入 `idea.*` 字段，不得写入或伪装 runner summary/receipt。`taomni.head`、`sourceIdentity.sourceTreeHash/sourceDirty` 取自 qa-ui-auto verification 的当前身份；HEAD 之外还须记录未提交源码状态。记录中的 `notes` 必须保留未运行层理由；synthetic validator fixture（`test_compare_idea.py`）只测校验器，永不进入 runtime passing matrix。
+
 ## 3. 每卡执行流程
 
 1. 读本文件和所选能力章节，核对列出的 owner/caller；把每个 A ID 映射到一个完整生产路径。

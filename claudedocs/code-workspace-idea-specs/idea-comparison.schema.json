@@ -1,0 +1,435 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://taomni.local/code-workspace-idea-specs/idea-comparison.schema.json",
+  "title": "IdeaComparisonRecord",
+  "description": "IDEA 2026.2 vs Taomni comparison record (idea-2026-comparison.md section 2). Validated by compare_idea.py with a stdlib-only subset validator; the CLI rules are the authority where this schema and the manual disagree.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "taskId",
+    "acceptance",
+    "scenarioId",
+    "fixture",
+    "settings",
+    "steps",
+    "idea",
+    "taomni",
+    "observations",
+    "deltas",
+    "verdict",
+    "ceiling",
+    "artifacts"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "taskId": { "type": "string", "pattern": "^ED-[A-Z]+-\\d{3}$" },
+    "acceptance": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^ED-[A-Z]+-\\d{3}-A\\d+$"
+      }
+    },
+    "scenarioId": { "type": "string", "minLength": 1 },
+    "fixture": { "$ref": "#/$defs/fixture" },
+    "settings": { "$ref": "#/$defs/settings" },
+    "steps": { "$ref": "#/$defs/steps" },
+    "idea": { "$ref": "#/$defs/idea" },
+    "taomni": { "$ref": "#/$defs/taomni" },
+    "observations": { "$ref": "#/$defs/observations" },
+    "deltas": { "type": "array", "items": { "$ref": "#/$defs/delta" } },
+    "verdict": { "$ref": "#/$defs/verdict" },
+    "ceiling": { "$ref": "#/$defs/ceiling" },
+    "artifacts": { "$ref": "#/$defs/artifacts" },
+    "notes": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!\\\\).*$",
+      "description": "Relative path using '/' separators; the only permitted normalization is OS separator unification for pre-declared run-dir aliases."
+    },
+    "fixture": {
+      "type": "object",
+      "required": ["files", "contentSource", "rootAlias", "initialState"],
+      "additionalProperties": false,
+      "properties": {
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["path", "sha256"],
+            "additionalProperties": false,
+            "properties": {
+              "path": { "$ref": "#/$defs/relativePath" },
+              "sha256": { "$ref": "#/$defs/sha256" }
+            }
+          }
+        },
+        "contentSource": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where the identical initial content came from (repo path, generator id, or fixture tag)."
+        },
+        "rootAlias": { "type": "string", "minLength": 1 },
+        "initialState": {
+          "type": "object",
+          "required": ["dirty", "onDisk"],
+          "additionalProperties": false,
+          "properties": {
+            "dirty": { "type": "boolean" },
+            "onDisk": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "required": ["keymap", "editor", "language"],
+      "additionalProperties": false,
+      "properties": {
+        "keymap": {
+          "type": "object",
+          "required": ["name", "bindings"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "bindings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["actionName", "keys"],
+                "additionalProperties": false,
+                "properties": {
+                  "actionName": { "type": "string", "minLength": 1 },
+                  "keys": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+                }
+              }
+            }
+          }
+        },
+        "editor": {
+          "type": "object",
+          "required": [],
+          "additionalProperties": { "type": ["string", "number", "boolean"] }
+        },
+        "language": { "type": "string", "minLength": 1 },
+        "jdk": { "type": "string" },
+        "readiness": {
+          "type": "object",
+          "additionalProperties": { "type": ["string", "boolean"] },
+          "description": "Project import/indexing ready conditions that were waited on."
+        },
+        "locale": { "type": "string" },
+        "plugins": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["stepId", "actionName", "input", "preState", "observedFields"],
+        "additionalProperties": false,
+        "properties": {
+          "stepId": { "type": "string", "minLength": 1 },
+          "actionName": { "type": "string", "minLength": 1 },
+          "keys": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Actual key/chord pressed, or the menu path used; not an executable DSL."
+          },
+          "menuPath": { "type": "string", "minLength": 1 },
+          "input": { "type": ["string", "null"] },
+          "preState": { "type": "string", "minLength": 1 },
+          "observedFields": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "documents",
+                "caret",
+                "selection",
+                "focus",
+                "results",
+                "history",
+                "errors",
+                "recovery",
+                "timing"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "idea": {
+      "type": "object",
+      "required": [
+        "version",
+        "buildNumber",
+        "edition",
+        "os",
+        "sampledAt",
+        "operator",
+        "settingsSnapshot",
+        "artifacts",
+        "observations"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Free-form recorded version. Only 2026.2.x is comparable; compare_idea.py fails closed unless a non-2026.2.x record declares verdict incomparable."
+        },
+        "buildNumber": { "type": "string", "minLength": 1 },
+        "edition": { "type": "string", "minLength": 1 },
+        "os": { "type": "string", "minLength": 1 },
+        "sampledAt": { "type": "string", "minLength": 1 },
+        "operator": { "type": "string", "minLength": 1 },
+        "settingsSnapshot": {
+          "type": "object",
+          "additionalProperties": { "type": ["string", "number", "boolean"] }
+        },
+        "artifacts": { "$ref": "#/$defs/artifactList" },
+        "observations": { "$ref": "#/$defs/sideObservations" }
+      }
+    },
+    "taomni": {
+      "type": "object",
+      "required": [
+        "head",
+        "sourceIdentity",
+        "qaBuildIdentity",
+        "os",
+        "webview",
+        "provider",
+        "mode",
+        "summary",
+        "receipt",
+        "observations"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "head": { "$ref": "#/$defs/commit" },
+        "sourceIdentity": {
+          "type": "object",
+          "required": ["sourceTreeHash", "sourceDirty"],
+          "additionalProperties": false,
+          "properties": {
+            "sourceTreeHash": { "$ref": "#/$defs/sha256" },
+            "sourceDirty": { "type": "boolean" }
+          }
+        },
+        "qaBuildIdentity": { "type": "string", "minLength": 1 },
+        "os": { "type": "string", "minLength": 1 },
+        "webview": { "type": "string", "minLength": 1 },
+        "provider": {
+          "type": "object",
+          "required": ["id", "version"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "version": { "type": ["string", "null"] }
+          }
+        },
+        "mode": { "type": "string", "minLength": 1 },
+        "summary": { "$ref": "#/$defs/qaLink" },
+        "receipt": { "$ref": "#/$defs/qaLink" },
+        "observations": { "$ref": "#/$defs/sideObservations" }
+      }
+    },
+    "qaLink": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "sideObservations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["stepId", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "stepId": { "type": "string", "minLength": 1 },
+          "status": {
+            "type": "string",
+            "enum": ["observed", "failed", "cancelled", "not-run"]
+          },
+          "reason": { "type": "string" },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["path"],
+              "additionalProperties": false,
+              "properties": {
+                "path": { "$ref": "#/$defs/relativePath" },
+                "textHash": { "$ref": "#/$defs/sha256" },
+                "byteHash": { "$ref": "#/$defs/sha256" },
+                "dirty": { "type": "boolean" }
+              }
+            }
+          },
+          "caret": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "offset": { "type": "integer", "minimum": 0 },
+              "offsetEncoding": { "type": "string", "enum": ["utf16"] },
+              "visualColumn": {
+                "type": "object",
+                "additionalProperties": { "type": ["string", "number", "boolean"] }
+              }
+            }
+          },
+          "selection": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["anchor", "head"],
+              "additionalProperties": false,
+              "properties": {
+                "anchor": { "type": "integer", "minimum": 0 },
+                "head": { "type": "integer", "minimum": 0 },
+                "offsetEncoding": { "type": "string", "enum": ["utf16"] }
+              }
+            }
+          },
+          "focus": { "type": "string" },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["label"],
+              "additionalProperties": false,
+              "properties": {
+                "label": { "type": "string" },
+                "scope": { "type": "string" },
+                "order": { "type": "integer", "minimum": 0 }
+              }
+            }
+          },
+          "history": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "undoAvailable": { "type": "boolean" },
+              "redoAvailable": { "type": "boolean" },
+              "undoCount": { "type": "integer", "minimum": 0 },
+              "undoText": { "type": ["string", "null"] }
+            }
+          },
+          "errors": { "type": "array", "items": { "type": "string" } },
+          "recovery": { "type": "string" },
+          "timing": {
+            "type": "object",
+            "additionalProperties": { "type": ["string", "number", "boolean"] }
+          }
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["stepId", "idea", "taomni", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "stepId": { "type": "string", "minLength": 1 },
+          "status": {
+            "type": "string",
+            "enum": ["matched", "different", "taomni-only", "not-compared"]
+          },
+          "idea": { "type": ["string", "null"] },
+          "taomni": { "type": ["string", "null"] },
+          "linkedAcceptance": {
+            "type": "array",
+            "items": { "type": "string", "pattern": "^ED-[A-Z]+-\\d{3}-A\\d+$" }
+          }
+        }
+      }
+    },
+    "delta": {
+      "type": "object",
+      "required": ["field", "ideaValue", "taomniValue", "classification", "linkedAcceptance", "explanation", "disposition"],
+      "additionalProperties": false,
+      "properties": {
+        "field": { "type": "string", "minLength": 1 },
+        "ideaValue": { "type": ["string", "number", "boolean", "null"] },
+        "taomniValue": { "type": ["string", "number", "boolean", "null"] },
+        "classification": {
+          "type": "string",
+          "enum": ["confirmed-gap", "taomni-extension", "environment", "provider-capability", "unclassified"]
+        },
+        "linkedAcceptance": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^ED-[A-Z]+-\\d{3}-A\\d+$" }
+        },
+        "explanation": { "type": "string", "minLength": 1 },
+        "disposition": { "type": "string", "minLength": 1 }
+      }
+    },
+    "verdict": {
+      "type": "object",
+      "required": ["state", "reason"],
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": ["matched", "different", "incomparable", "unverified"]
+        },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "ceiling": {
+      "type": "object",
+      "required": ["capability", "fixture", "provider", "platform", "level"],
+      "additionalProperties": false,
+      "properties": {
+        "capability": { "type": "string", "minLength": 1 },
+        "fixture": { "type": "string", "minLength": 1 },
+        "provider": { "type": "string", "minLength": 1 },
+        "platform": { "type": "string", "minLength": 1 },
+        "level": {
+          "type": "string",
+          "enum": ["L0", "L1", "L2", "L3"]
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/artifactEntry" }
+    },
+    "artifactList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifactEntry" }
+    },
+    "artifactEntry": {
+      "type": "object",
+      "required": ["path", "sha256", "type", "acquisition"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "$ref": "#/$defs/relativePath" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "type": { "type": "string", "minLength": 1 },
+        "acquisition": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
