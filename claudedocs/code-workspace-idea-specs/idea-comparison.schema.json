@@ -1,0 +1,1108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://taomni.local/schemas/idea-comparison.schema.json",
+  "title": "Taomni IntelliJ IDEA comparison record",
+  "description": "A factual, two-sided comparison record. It is not a runner receipt and cannot certify runtime execution by itself.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "taskId",
+    "acceptance",
+    "scenarioId",
+    "pathAliases",
+    "fixture",
+    "settings",
+    "steps",
+    "idea",
+    "taomni",
+    "observations",
+    "deltas",
+    "verdict",
+    "ceiling",
+    "artifacts",
+    "unrun"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "taskId": {
+      "type": "string",
+      "pattern": "^ED-[A-Z]+-\\d{3}$"
+    },
+    "acceptance": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^ED-[A-Z]+-\\d{3}-A\\d+$"
+      }
+    },
+    "scenarioId": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "pathAliases": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9._-]*$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "fixture": {
+      "$ref": "#/$defs/fixture"
+    },
+    "settings": {
+      "$ref": "#/$defs/settings"
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/step"
+      }
+    },
+    "idea": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "build": {
+          "type": "string",
+          "minLength": 1
+        },
+        "edition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "os": {
+          "$ref": "#/$defs/platform"
+        },
+        "sampledAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "operator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "automationTool": {
+          "type": "string",
+          "minLength": 1
+        },
+        "settingsSnapshot": {
+          "$ref": "#/$defs/artifactRef"
+        },
+        "rawArtifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/artifactRef"
+          }
+        }
+      },
+      "required": [
+        "version",
+        "build",
+        "edition",
+        "os",
+        "sampledAt",
+        "operator",
+        "automationTool",
+        "settingsSnapshot",
+        "rawArtifacts"
+      ],
+      "additionalProperties": false
+    },
+    "taomni": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "head": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{40}$"
+        },
+        "sourceIdentityDigest": {
+          "$ref": "#/$defs/identityDigest"
+        },
+        "qaBuildIdentity": {
+          "$ref": "#/$defs/qaBuildIdentity"
+        },
+        "os": {
+          "$ref": "#/$defs/platform"
+        },
+        "webview": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider": {
+          "$ref": "#/$defs/provider"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "browser",
+            "native",
+            "manual"
+          ]
+        },
+        "summary": {
+          "$ref": "#/$defs/artifactRef"
+        },
+        "receipt": {
+          "$ref": "#/$defs/artifactRef"
+        },
+        "rawArtifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/artifactRef"
+          }
+        }
+      },
+      "required": [
+        "head",
+        "sourceIdentityDigest",
+        "qaBuildIdentity",
+        "os",
+        "webview",
+        "provider",
+        "mode",
+        "summary",
+        "receipt",
+        "rawArtifacts"
+      ],
+      "additionalProperties": false
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/pairedObservation"
+      }
+    },
+    "deltas": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/delta"
+      }
+    },
+    "verdict": {
+      "$ref": "#/$defs/verdict"
+    },
+    "ceiling": {
+      "$ref": "#/$defs/ceiling"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/artifactRef"
+      }
+    },
+    "unrun": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "jsonValue": {
+      "type": [
+        "null",
+        "boolean",
+        "number",
+        "string",
+        "array",
+        "object"
+      ],
+      "items": {
+        "$ref": "#/$defs/jsonValue"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/jsonValue"
+      }
+    },
+    "jsonObject": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/jsonValue"
+      }
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "identityDigest": {
+      "type": "string",
+      "pattern": "^(sha256:)?[0-9a-fA-F]{64}$"
+    },
+    "platform": {
+      "type": "string",
+      "enum": [
+        "Windows",
+        "Linux",
+        "macOS"
+      ]
+    },
+    "artifactRef": {
+      "type": "object",
+      "required": [
+        "rootAlias",
+        "path",
+        "sha256",
+        "type",
+        "acquisition"
+      ],
+      "properties": {
+        "rootAlias": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]*$"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "acquisition": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "fixture": {
+      "type": "object",
+      "required": [
+        "relativePath",
+        "sha256",
+        "initialContentSource",
+        "rootAlias",
+        "initialDirty",
+        "diskState"
+      ],
+      "properties": {
+        "relativePath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "initialContentSource": {
+          "type": "object",
+          "required": [
+            "kind",
+            "description"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "fixture-file",
+                "inline",
+                "generated",
+                "redacted"
+              ]
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sourceArtifact": {
+              "$ref": "#/$defs/artifactRef"
+            }
+          },
+          "additionalProperties": false
+        },
+        "rootAlias": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]*$"
+        },
+        "initialDirty": {
+          "type": "boolean"
+        },
+        "diskState": {
+          "type": "string",
+          "enum": [
+            "present-clean",
+            "present-dirty",
+            "missing",
+            "read-only",
+            "unknown"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "settings": {
+      "type": "object",
+      "required": [
+        "keymap",
+        "actionBindings",
+        "editor",
+        "formatter",
+        "language",
+        "jdk",
+        "project",
+        "locale",
+        "plugins"
+      ],
+      "properties": {
+        "keymap": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actionBindings": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "editor": {
+          "type": "object",
+          "required": [
+            "parameters"
+          ],
+          "properties": {
+            "parameters": {
+              "$ref": "#/$defs/jsonObject"
+            }
+          },
+          "additionalProperties": false
+        },
+        "formatter": {
+          "type": "object",
+          "required": [
+            "parameters"
+          ],
+          "properties": {
+            "parameters": {
+              "$ref": "#/$defs/jsonObject"
+            }
+          },
+          "additionalProperties": false
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jdk": {
+          "type": "object",
+          "required": [
+            "version",
+            "tooling"
+          ],
+          "properties": {
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tooling": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "project": {
+          "type": "object",
+          "required": [
+            "importState",
+            "indexingState"
+          ],
+          "properties": {
+            "importState": {
+              "type": "string",
+              "enum": [
+                "ready",
+                "not-ready",
+                "failed",
+                "not-applicable"
+              ]
+            },
+            "indexingState": {
+              "type": "string",
+              "enum": [
+                "ready",
+                "running",
+                "failed",
+                "not-applicable"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "locale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "plugins": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "version",
+              "enabled"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string",
+                "minLength": 1
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "step": {
+      "type": "object",
+      "required": [
+        "stepId",
+        "actionName",
+        "input",
+        "preconditions",
+        "observe"
+      ],
+      "properties": {
+        "stepId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        },
+        "actionName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "keyChord": {
+          "type": "string",
+          "minLength": 1
+        },
+        "menuPath": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "input": {
+          "$ref": "#/$defs/jsonValue"
+        },
+        "preconditions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "observe": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "documents",
+              "caret",
+              "selection",
+              "focus",
+              "results",
+              "history",
+              "errors",
+              "recovery"
+            ]
+          }
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "keyChord"
+          ]
+        },
+        {
+          "required": [
+            "menuPath"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
+    "qaBuildIdentity": {
+      "type": "object",
+      "required": [
+        "buildId",
+        "sourceIdentityDigest",
+        "platform",
+        "profile"
+      ],
+      "properties": {
+        "buildId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceIdentityDigest": {
+          "$ref": "#/$defs/identityDigest"
+        },
+        "platform": {
+          "$ref": "#/$defs/platform"
+        },
+        "profile": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "release"
+          ]
+        },
+        "binarySha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "additionalProperties": false
+    },
+    "provider": {
+      "type": "object",
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "documentObservation": {
+      "type": "object",
+      "required": [
+        "relativePath",
+        "textSha256",
+        "byteSha256",
+        "dirty"
+      ],
+      "properties": {
+        "relativePath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "textSha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "byteSha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "dirty": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "position": {
+      "type": "object",
+      "required": [
+        "offsetUtf16",
+        "line",
+        "columnUtf16",
+        "visualColumn",
+        "graphemeColumn",
+        "tabSize"
+      ],
+      "properties": {
+        "offsetUtf16": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "line": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "columnUtf16": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "visualColumn": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "graphemeColumn": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "tabSize": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "selection": {
+      "type": "object",
+      "required": [
+        "anchorUtf16",
+        "headUtf16",
+        "direction"
+      ],
+      "properties": {
+        "anchorUtf16": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "headUtf16": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "direction": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "forward",
+            "backward",
+            "none",
+            null
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "range": {
+      "type": "object",
+      "required": [
+        "startUtf16",
+        "endUtf16"
+      ],
+      "properties": {
+        "startUtf16": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "endUtf16": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "history": {
+      "type": "object",
+      "required": [
+        "undoAvailable",
+        "entryCount",
+        "lastAction",
+        "identity"
+      ],
+      "properties": {
+        "undoAvailable": {
+          "type": "boolean"
+        },
+        "entryCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lastAction": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "identity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "observationError": {
+      "type": "object",
+      "required": [
+        "code",
+        "state",
+        "externalEffect"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "unsupported",
+            "unavailable",
+            "cancelled",
+            "stale",
+            "conflict",
+            "failed",
+            "unknown-effect",
+            "applied"
+          ]
+        },
+        "externalEffect": {
+          "type": "string",
+          "enum": [
+            "performed",
+            "not-performed",
+            "unknown",
+            "none"
+          ]
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "recovery": {
+      "type": "object",
+      "required": [
+        "status",
+        "action",
+        "postcondition"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "none",
+            "available",
+            "performed",
+            "blocked",
+            "unavailable"
+          ]
+        },
+        "action": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "postcondition": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "observation": {
+      "type": "object",
+      "required": [
+        "stepId",
+        "status",
+        "documents",
+        "caret",
+        "selection",
+        "focusTarget",
+        "results",
+        "history",
+        "errors",
+        "recovery"
+      ],
+      "properties": {
+        "stepId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "unsupported",
+            "unavailable",
+            "cancelled",
+            "stale",
+            "conflict",
+            "failed",
+            "unknown-effect",
+            "applied"
+          ]
+        },
+        "documents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/documentObservation"
+          }
+        },
+        "caret": {
+          "$ref": "#/$defs/position"
+        },
+        "selection": {
+          "$ref": "#/$defs/selection"
+        },
+        "focusTarget": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "results": {
+          "type": "object",
+          "required": [
+            "items",
+            "range"
+          ],
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/jsonValue"
+              }
+            },
+            "range": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "properties": {
+                "startUtf16": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "endUtf16": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "startUtf16",
+                "endUtf16"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "history": {
+          "$ref": "#/$defs/history"
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/observationError"
+          }
+        },
+        "recovery": {
+          "$ref": "#/$defs/recovery"
+        }
+      },
+      "additionalProperties": false
+    },
+    "pairedObservation": {
+      "type": "object",
+      "required": [
+        "stepId",
+        "idea",
+        "taomni"
+      ],
+      "properties": {
+        "stepId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        },
+        "idea": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/observation"
+            }
+          ]
+        },
+        "taomni": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/observation"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "delta": {
+      "type": "object",
+      "required": [
+        "field",
+        "ideaValue",
+        "taomniValue",
+        "classification",
+        "linkedAcceptance",
+        "explanation",
+        "disposition"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ideaValue": {
+          "$ref": "#/$defs/jsonValue"
+        },
+        "taomniValue": {
+          "$ref": "#/$defs/jsonValue"
+        },
+        "classification": {
+          "type": "string",
+          "enum": [
+            "same",
+            "different",
+            "incomparable",
+            "unverified"
+          ]
+        },
+        "linkedAcceptance": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^ED-[A-Z]+-\\d{3}-A\\d+$"
+          }
+        },
+        "explanation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disposition": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "matched",
+        "different",
+        "incomparable",
+        "unverified"
+      ]
+    },
+    "ceiling": {
+      "type": "object",
+      "required": [
+        "capability",
+        "fixture",
+        "provider",
+        "platform",
+        "level",
+        "claim"
+      ],
+      "properties": {
+        "capability": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fixture": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "Windows",
+            "Linux",
+            "macOS",
+            "cross-platform"
+          ]
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "L0",
+            "L1",
+            "L2",
+            "L3"
+          ]
+        },
+        "claim": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

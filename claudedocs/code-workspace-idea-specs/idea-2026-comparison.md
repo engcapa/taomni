@@ -81,6 +81,41 @@ native build/run 命令与隔离详见 `.agents/skills/qa-ui-auto/references/nat
 - `audit --release-evidence`：现有 release manifest 校验。手工 IDEA/native 数据不能伪装为 runner summary。
 共同遵守 qa-ui-auto verification.md：当前身份含未提交源码和 runner/case fingerprints；只记录 HEAD 不充分。
 
+### 4.1 对比记录采样与校验手册
+
+对比记录使用 `claudedocs/code-workspace-idea-specs/idea-comparison.schema.json`。记录中的 `pathAliases` 是相对于 `--base-dir` 的显式目录映射；所有 `fixture`、settings 和 artifact 路径都必须带 `rootAlias`，路径只能使用相对路径。校验器只把 `\\` 与 `/` 视为同一 OS 分隔符，并拒绝绝对路径、`.`、`..` 和 alias 根越界；文本、BOM、EOL、字节 hash、结果顺序和耗时不做归一化。
+
+从仓库根目录运行：
+
+```bash
+python .agents/skills/code-workspace-idea-task/scripts/compare_idea.py \
+  --record qa-ui-auto-report/idea-comparison/<task>/<run>/record.json \
+  --base-dir .
+python .agents/skills/code-workspace-idea-task/scripts/compare_idea.py \
+  --record qa-ui-auto-report/idea-comparison/<task>/<run>/record.json \
+  --base-dir . --require-match
+```
+
+默认运行只报告 `matched`、`different`、`incomparable` 或 `unverified`；格式/schema 错误返回 2，`--require-match` 在非 `matched` 时返回 1。校验器会读取声明的 fixture 和 artifact 字节并核对 SHA-256，读取 summary/receipt JSON 以确认 summary 链接和 source identity 一致，但不会加载或执行记录中的代码、动作或 provider 响应。记录自身和 validator 的输出是 synthetic validator material，不能写入 runtime passing matrix。
+
+#### IDEA 人工采样表
+
+每个动作都使用真实 UI 入口，并在 IDEA Help/About 记录完整 build。表格中的 `observe` 不是可执行 DSL，而是采样者必须填写的字段清单；每个正常动作和撤销/恢复动作至少重复一次。
+
+| stepId | actionName | key/chord 或菜单路径 | 前置状态 | 必须观察 |
+|---|---|---|---|---|
+| `<stable-id>` | `<用户可见动作>` | `<Control/Meta chord>` 或 `<菜单层级>` | fixture、项目导入和索引状态 | 文档文本/字节 hash、dirty、caret/selection、focus、结果顺序、history/undo、错误/恢复 |
+
+IDEA 端填写 `version`、完整 `build`、edition、OS、采样时间、operator/tool、settings snapshot 和原始产物。没有 IDEA 2026.2.x 或动作前提不满足时，不降低版本要求，使用 `unrun` 或 `incomparable` 并保留原因。
+
+#### 三端 native 采样步骤
+
+1. 为本卡建立 disposable fixture 和独立 QA workspace；从仓库根目录运行 `python .agents/skills/qa-ui-auto/scripts/native_build.py`，只使用带 `com.taomni.app.qa` 身份记录的产物。运行前阅读 `.agents/skills/qa-ui-auto/references/native-testing.md`，不要用重命名的生产 binary。
+2. 在同一初始 bytes、settings、provider 和动作前提下运行真实打包应用，按上表记录两端每个 step 的 observation。Linux 使用 `tauri-driver`/WebKitWebDriver 和 X11 或 Xvfb；Windows 使用匹配的 WebView2/msedgedriver 并执行 Ctrl/Alt、盘符/UNC、锁定文件和剪贴板边界；macOS 使用独立 QA bundle、profile 和 OS automation 或手工记录，因为没有 Tauri WebDriver。
+3. 收集整个 run 目录中的 `summary.json`、`runner_receipt.json` 和原始产物。记录的 `taomni.summary`、`taomni.receipt` 及 top-level `artifacts` 必须带相对路径和 SHA-256；receipt 的 `artifacts` 必须包含相对于 receipt 所在目录的 `summary.json` 路径及相同 hash。通过 `status` 读取 summary/receipt 的 source、case、runner、平台和 QA build identity；不可用的平台写入 `unrun`，不能用 browser、截图或旧 receipt 补成 native pass。
+
+平台限制必须原样记录：Linux Xvfb 不证明真实物理输入、IME、compositor 或硬件延迟；Windows 运行后恢复 host clipboard；macOS 必须核对 `CFBundleIdentifier=com.taomni.app.qa`，不能把 Chromium/WebKit browser 结果当作 WKWebView native 结果。关闭应用和 provider 后保留失败原始产物，并清理或恢复 fixture、只读属性及支持的 host 状态。
+
 ## 5. IDEA 资料定位与实测场景
 
 官方主题只提供操作定位，不代表 2026.2 已实测：
