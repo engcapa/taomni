@@ -40,4 +40,14 @@ describe("buildReplaceWorkspaceEdit", () => {
     ], "x");
     expect(edit.documentEdits).toHaveLength(2);
   });
+
+  it("emits UTF-16 ranges for matches after astral characters", () => {
+    const edit = buildReplaceWorkspaceEdit([
+      match({ lineText: "🚀 foo", matchStart: 2, matchEnd: 5 }),
+    ], "bar");
+    expect(edit.documentEdits[0]?.edits[0]?.range).toEqual({
+      start: { line: 1, character: 3 },
+      end: { line: 1, character: 6 },
+    });
+  });
 });

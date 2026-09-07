@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ReplacePreviewDialog } from "./ReplacePreviewDialog";
 import {
   buildReplaceInFilesWorkspaceEdit,
+  type ReplaceInFilesFilePreimage,
   type ReplaceInFilesMatch,
 } from "../replaceInFilesModel";
 
@@ -14,12 +15,17 @@ function sampleMatches(): ReplaceInFilesMatch[] {
   ];
 }
 
-function renderDialog(onCommit = vi.fn(), onCancel = vi.fn()) {
+function renderDialog(
+  onCommit = vi.fn(),
+  onCancel = vi.fn(),
+  filePreimages: ReplaceInFilesFilePreimage[] = [],
+) {
   const edit = buildReplaceInFilesWorkspaceEdit({ matches: sampleMatches(), replacementText: "thread" });
   render(
     <ReplacePreviewDialog
       edit={edit}
       replacement="thread"
+      filePreimages={filePreimages}
       committing={false}
       commitError={null}
       onCommit={onCommit}
@@ -48,6 +54,13 @@ describe("ED-FIND-004: ReplacePreviewDialog", () => {
     expect(screen.getByTestId("code-workspace-replace-counts")).toHaveTextContent("2 of 3");
     expect(screen.getByTestId("code-workspace-replace-commit")).toHaveTextContent("Replace 2");
 
+    // Excluded rows remain in the frozen source list and can be included
+    // again without changing the original usage identity.
+    fireEvent.click(usages[0]);
+    expect(screen.getByTestId("code-workspace-replace-counts")).toHaveTextContent("3 of 3");
+    fireEvent.click(usages[0]);
+    expect(screen.getByTestId("code-workspace-replace-counts")).toHaveTextContent("2 of 3");
+
     fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
     expect(onCommit).toHaveBeenCalledTimes(1);
     const excluded = onCommit.mock.calls[0][0] as ReadonlySet<string>;
@@ -68,6 +81,35 @@ describe("ED-FIND-004: ReplacePreviewDialog", () => {
     renderDialog();
     fireEvent.click(screen.getByLabelText("Include all matches in /ws/a.ts"));
     fireEvent.click(screen.getByLabelText("Include all matches in /ws/b.ts"));
+    expect(screen.getByTestId("code-workspace-replace-commit")).toBeDisabled();
+  });
+
+  it("shows and excludes dirty, read-only, and oversize files from the frozen plan (A2)", () => {
+    renderDialog(vi.fn(), vi.fn(), [
+      {
+        path: "/ws/a.ts",
+        hash: "disk-a",
+        dirty: true,
+        readOnly: false,
+        size: 10,
+        availability: "ready",
+      },
+      {
+        path: "/ws/b.ts",
+        hash: null,
+        dirty: false,
+        readOnly: false,
+        size: null,
+        availability: "oversize",
+        reason: "File exceeds the text editor size limit",
+      },
+    ]);
+
+    expect(screen.getAllByTestId("code-workspace-replace-file-status").map((node) => node.textContent))
+      .toEqual(["dirty buffer", "too large"]);
+    expect(screen.getByTestId("code-workspace-replace-counts")).toHaveTextContent("0 of 3");
+    expect(screen.getByLabelText("Include occurrence at /ws/a.ts:1")).toBeDisabled();
+    expect(screen.getByLabelText("Include occurrence at /ws/b.ts:3")).toBeDisabled();
     expect(screen.getByTestId("code-workspace-replace-commit")).toBeDisabled();
   });
 });

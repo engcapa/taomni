@@ -38,20 +38,20 @@ steps:
       selector: '[data-testid="code-workspace-bottom-tab-search"]'
       name: aria-selected
       equals: "true"
-  - native_click:
-      selector: '[aria-label="Search query"]'
+  - click: '[aria-label="Search query"]'
   - native_keys:
       selector: '[aria-label="Search query"]'
+      transport: webdriver
       keys: ["Control+a", "s", "c", "r", "a", "t", "c", "h", "Enter"]
   - click: '[data-testid="code-workspace-find-run-search"]'
   - assert_text:
       selector: '[data-testid="code-workspace-find-in-files-panel"]'
       contains: "notes.txt"
       timeout_sec: 60
-  - native_click:
-      selector: '[aria-label="Replace text"]'
+  - click: '[aria-label="Replace text"]'
   - native_keys:
       selector: '[aria-label="Replace text"]'
+      transport: webdriver
       keys: ["Control+a", "s", "n", "a", "t", "c", "h"]
   - click: '[data-testid="code-workspace-find-replace-all"]'
   - wait_for: '[data-testid="code-workspace-replace-preview"]'
@@ -64,10 +64,10 @@ steps:
       path: "${fixture.workspace_root}/notes.txt"
       contains: "snatch notes"
       timeout_sec: 30
-  - native_click:
-      selector: '[aria-label="Search query"]'
+  - click: '[aria-label="Search query"]'
   - native_keys:
       selector: '[aria-label="Search query"]'
+      transport: webdriver
       keys: ["Control+z"]
   - assert_file_contains:
       path: "${fixture.workspace_root}/notes.txt"

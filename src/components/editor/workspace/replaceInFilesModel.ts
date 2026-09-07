@@ -4,8 +4,15 @@
  * per-occurrence exclusion, dirty/disk hash conflict protection, and single-step undo.
  */
 
-import type { LspFileTextEdits, LspTextEdit, LspWorkspaceEdit } from "../../../lib/editor/lsp";
+import type {
+  LspFileTextEdits,
+  LspRange,
+  LspTextEdit,
+  LspWorkspaceEdit,
+} from "../../../lib/editor/lsp";
 import type { WorkspaceSearchMatch } from "../../../lib/editor/workspaceSearch";
+import type { FindInFilesScopeKind } from "./findInFilesScopeModel";
+import { fsPathComparisonKey } from "./codeWorkspaceModel";
 import {
   buildWorkspaceEditPreview,
   filterWorkspaceEditByUsages,
@@ -20,6 +27,104 @@ export interface ReplaceInFilesMatch {
   endLine: number;
   endCharacter: number;
   matchedText: string;
+}
+
+export interface ReplaceInFilesScopeSnapshot {
+  kind: FindInFilesScopeKind;
+  workspaceRoots: readonly { id: string; path: string }[];
+  plannedRoots: readonly string[];
+  explicitFiles: readonly string[];
+  fileMask: string | null;
+  generation?: number;
+  query: string;
+  caseSensitive: boolean;
+  wholeWord: boolean;
+  regexp: boolean;
+  includeGlobs: readonly string[];
+  excludeGlobs: readonly string[];
+}
+
+export interface ReplaceInFilesFilePreimage {
+  path: string;
+  hash: string | null;
+  dirty: boolean;
+  readOnly: boolean;
+  size: number | null;
+  availability: "ready" | "oversize" | "unreadable";
+  reason?: string;
+}
+
+/** Immutable inputs captured before the preview can be committed. */
+export interface ReplaceInFilesPreviewSnapshot {
+  replacementText: string;
+  scope: ReplaceInFilesScopeSnapshot;
+  filePreimages: readonly ReplaceInFilesFilePreimage[];
+}
+
+export type ReplaceInFilesPreparationResult =
+  | { ok: true; snapshot: ReplaceInFilesPreviewSnapshot }
+  | { ok: false; message: string };
+
+export function classifyReplacePreimageError(error: unknown): {
+  availability: "oversize" | "unreadable";
+  reason: string;
+} {
+  const reason = error instanceof Error ? error.message : String(error);
+  return {
+    availability: /exceeds text editor limit|too large/i.test(reason) ? "oversize" : "unreadable",
+    reason,
+  };
+}
+
+export function replaceScopeConflict(
+  scope: ReplaceInFilesScopeSnapshot,
+  currentRoots: readonly { id: string; path: string }[],
+  currentFacts?: { generation: number; status: string; isStale: boolean } | null,
+): string | null {
+  const rootIdentity = (root: { id: string; path: string }) => (
+    `${root.id}:${fsPathComparisonKey(root.path)}`
+  );
+  const expectedRoots = scope.workspaceRoots.map(rootIdentity).sort().join("\u0000");
+  const actualRoots = currentRoots.map(rootIdentity).sort().join("\u0000");
+  if (expectedRoots !== actualRoots) {
+    return "Workspace roots changed after the search; run the search again";
+  }
+  if (
+    scope.generation !== undefined
+    && (
+      !currentFacts
+      || currentFacts.status !== "ready"
+      || currentFacts.isStale
+      || currentFacts.generation !== scope.generation
+    )
+  ) {
+    const liveGeneration = currentFacts?.generation ?? "unknown";
+    return `Search scope became stale (G${scope.generation} -> G${liveGeneration}); run the search again`;
+  }
+  return null;
+}
+
+/** Convert the search backend's code-point offset to an LSP UTF-16 offset. */
+export function utf16OffsetFromCodePoint(text: string, offset: number): number {
+  const codePoints = Array.from(text);
+  const normalized = Number.isFinite(offset) ? Math.trunc(offset) : 0;
+  const bounded = Math.min(codePoints.length, Math.max(0, normalized));
+  return codePoints.slice(0, bounded).join("").length;
+}
+
+/** Map one backend search match to the UTF-16 range consumed by the editor. */
+export function workspaceSearchMatchRange(match: WorkspaceSearchMatch): LspRange {
+  const line = Math.max(0, match.lineNumber - 1);
+  return {
+    start: {
+      line,
+      character: utf16OffsetFromCodePoint(match.lineText, match.matchStart),
+    },
+    end: {
+      line,
+      character: utf16OffsetFromCodePoint(match.lineText, match.matchEnd),
+    },
+  };
 }
 
 /** Absolute host path for a search match (mirrors buildReplaceEdits). */
@@ -37,14 +142,14 @@ export function replaceMatchAbsolutePath(match: WorkspaceSearchMatch): string {
 export function searchMatchesToReplaceInputs(matches: readonly WorkspaceSearchMatch[]): ReplaceInFilesMatch[] {
   return matches.map((match) => {
     const absolute = replaceMatchAbsolutePath(match);
-    const line = Math.max(0, match.lineNumber - 1);
+    const range = workspaceSearchMatchRange(match);
     return {
       filePath: absolute,
       fileUri: `file://${absolute}`,
-      startLine: line,
-      startCharacter: match.matchStart,
-      endLine: line,
-      endCharacter: match.matchEnd,
+      startLine: range.start.line,
+      startCharacter: range.start.character,
+      endLine: range.end.line,
+      endCharacter: range.end.character,
       matchedText: Array.from(match.lineText).slice(match.matchStart, match.matchEnd).join(""),
     };
   });
@@ -94,6 +199,7 @@ export interface FileRevisionGuard {
   expectedHash?: string | null;
   actualHash?: string | null;
   isDirty?: boolean;
+  isReadOnly?: boolean;
 }
 
 export interface ConflictCheckResult {
@@ -111,6 +217,13 @@ export function validateReplacePreconditions(
   const conflicts: Array<{ path: string; reason: string }> = [];
 
   for (const g of guards) {
+    if (g.isReadOnly) {
+      conflicts.push({
+        path: g.path,
+        reason: "File is read-only and cannot be replaced",
+      });
+    }
+
     if (!allowDirty && g.isDirty) {
       conflicts.push({
         path: g.path,
@@ -157,12 +270,12 @@ export function verifyReplaceMatchFreshness(
       });
       continue;
     }
-    const lines = diskText.split("\n");
+    const lines = diskText.split(/\r\n|\r|\n/);
     const line = lines[match.startLine];
     if (
       line === undefined ||
       match.startLine !== match.endLine ||
-      Array.from(line).slice(match.startCharacter, match.endCharacter).join("") !== match.matchedText
+      line.slice(match.startCharacter, match.endCharacter) !== match.matchedText
     ) {
       conflicts.push({
         path: match.filePath,
@@ -171,6 +284,27 @@ export function verifyReplaceMatchFreshness(
     }
   }
   return conflicts;
+}
+
+function replaceEditSignature(edit: LspWorkspaceEdit): string {
+  return JSON.stringify(edit.documentEdits.map((document) => ({
+    path: fsPathComparisonKey(document.path ?? document.uri),
+    edits: document.edits.map((textEdit) => ({
+      start: textEdit.range.start,
+      end: textEdit.range.end,
+      newText: textEdit.newText,
+    })),
+  })).sort((left, right) => left.path.localeCompare(right.path)));
+}
+
+/** Ensure the edit passed to the writer is exactly the selected match set. */
+export function replaceEditMatchesSelection(
+  edit: LspWorkspaceEdit,
+  matches: readonly ReplaceInFilesMatch[],
+  replacementText: string,
+): boolean {
+  const expected = buildReplaceInFilesWorkspaceEdit({ matches, replacementText });
+  return replaceEditSignature(edit) === replaceEditSignature(expected);
 }
 
 export interface ReplaceInFilesPlan {

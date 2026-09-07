@@ -8,6 +8,14 @@ import { fsPathEquals } from "./codeWorkspaceModel";
 
 export type FindInFilesScopeKind = "project" | "module" | "directory" | "recent" | "custom";
 
+function usableFactsGeneration(
+  factsEntry?: WorkspaceProjectFactsEntry | null,
+): number | undefined {
+  return factsEntry?.status === "ready" && !factsEntry.isStale
+    ? factsEntry.generation
+    : undefined;
+}
+
 export interface FindInFilesScopeRequest {
   kind: FindInFilesScopeKind;
   workspaceRoot: string;
@@ -114,7 +122,7 @@ export function planFindInFilesScope(
         kind: "project",
         roots: [request.workspaceRoot],
         fileMask,
-        generation: factsEntry?.generation,
+        generation: usableFactsGeneration(factsEntry),
       };
     }
 
@@ -125,7 +133,7 @@ export function planFindInFilesScope(
         kind: "directory",
         roots: [dir],
         fileMask,
-        generation: factsEntry?.generation,
+        generation: usableFactsGeneration(factsEntry),
       };
     }
 
@@ -137,7 +145,7 @@ export function planFindInFilesScope(
         roots: [],
         explicitFiles: recent,
         fileMask,
-        generation: factsEntry?.generation,
+        generation: usableFactsGeneration(factsEntry),
       };
     }
 
@@ -149,7 +157,7 @@ export function planFindInFilesScope(
         roots: custom.filter((p) => !p.includes(".")),
         explicitFiles: custom.filter((p) => p.includes(".")),
         fileMask,
-        generation: factsEntry?.generation,
+        generation: usableFactsGeneration(factsEntry),
       };
     }
 

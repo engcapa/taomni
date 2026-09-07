@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   buildReplaceInFilesWorkspaceEdit,
+  classifyReplacePreimageError,
   createReplaceInFilesPlan,
+  replaceEditMatchesSelection,
+  replaceScopeConflict,
+  searchMatchesToReplaceInputs,
   validateReplacePreconditions,
   verifyReplaceMatchFreshness,
   type ReplaceInFilesMatch,
@@ -88,6 +92,60 @@ describe("ED-FIND-004: replaceInFilesModel preview, exclude, conflict guard, com
     ]);
     expect(hashCheck.canCommit).toBe(false);
     expect(hashCheck.conflicts[0].reason).toContain("hash mismatch");
+
+    const readOnlyCheck = validateReplacePreconditions([
+      { path: "/ws/core/Service.java", isReadOnly: true },
+    ]);
+    expect(readOnlyCheck.canCommit).toBe(false);
+    expect(readOnlyCheck.conflicts[0].reason).toContain("read-only");
+  });
+
+  it("accepts only the exact selected edit ranges", () => {
+    const edit = buildReplaceInFilesWorkspaceEdit({
+      matches: sampleMatches,
+      replacementText: "newName",
+    });
+    expect(replaceEditMatchesSelection(edit, sampleMatches, "newName")).toBe(true);
+    expect(replaceEditMatchesSelection(edit, sampleMatches.slice(1), "newName")).toBe(false);
+  });
+});
+
+describe("ED-FIND-004: frozen scope and preimage failure classification", () => {
+  const scope = {
+    kind: "project" as const,
+    workspaceRoots: [{ id: "root", path: "C:/repo" }],
+    plannedRoots: ["C:/repo"],
+    explicitFiles: [],
+    fileMask: null,
+    generation: 7,
+    query: "needle",
+    caseSensitive: false,
+    wholeWord: false,
+    regexp: false,
+    includeGlobs: [],
+    excludeGlobs: [],
+  };
+
+  it("treats project facts generation changes as stale", () => {
+    expect(replaceScopeConflict(scope, scope.workspaceRoots, {
+      generation: 8,
+      status: "ready",
+      isStale: false,
+    })).toContain("G7 -> G8");
+    expect(replaceScopeConflict(scope, scope.workspaceRoots, {
+      generation: 7,
+      status: "ready",
+      isStale: false,
+    })).toBeNull();
+  });
+
+  it("keeps native read failures typed for the preview", () => {
+    expect(classifyReplacePreimageError(
+      new Error("File is 5242881 bytes, exceeds text editor limit of 5242880 bytes"),
+    )).toMatchObject({ availability: "oversize" });
+    expect(classifyReplacePreimageError(new Error("Access denied"))).toMatchObject({
+      availability: "unreadable",
+    });
   });
 });
 
@@ -113,5 +171,42 @@ describe("ED-FIND-004: replace match freshness against disk", () => {
     expect(conflicts[0].path).toBe("/ws/a.ts");
     expect(conflicts[0].reason).toContain("changed since search");
     expect(conflicts[1].path).toBe("/ws/gone.ts");
+  });
+
+  it("keeps search code-point offsets aligned with LSP UTF-16 ranges", () => {
+    const [input] = searchMatchesToReplaceInputs([{
+      rootId: "ws",
+      rootName: "ws",
+      rootPath: "/ws",
+      path: "emoji.ts",
+      lineNumber: 1,
+      column: 3,
+      matchStart: 2,
+      matchEnd: 8,
+      lineText: "🚀 needle",
+    }]);
+    if (!input) throw new Error("expected mapped search match");
+
+    expect(input.startCharacter).toBe(3);
+    expect(input.endCharacter).toBe(9);
+    expect(input.matchedText).toBe("needle");
+    expect(verifyReplaceMatchFreshness(
+      new Map([["/ws/emoji.ts", "🚀 needle\n"]]),
+      [input],
+    )).toEqual([]);
+  });
+
+  it("splits CR-only files when checking a frozen match", () => {
+    expect(verifyReplaceMatchFreshness(
+      new Map([["/ws/cr.txt", "first\rneedle\rlast"]]),
+      [{
+        filePath: "/ws/cr.txt",
+        startLine: 1,
+        startCharacter: 0,
+        endLine: 1,
+        endCharacter: 6,
+        matchedText: "needle",
+      }],
+    )).toEqual([]);
   });
 });

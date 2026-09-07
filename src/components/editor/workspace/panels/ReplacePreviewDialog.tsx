@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import {
   createReplaceInFilesPlan,
+  type ReplaceInFilesFilePreimage,
 } from "../replaceInFilesModel";
+import type { WorkspaceEditPreview } from "../workspaceEditPreview";
 import type { LspWorkspaceEdit } from "../../../../lib/editor/lsp";
 
 /**
@@ -19,6 +21,8 @@ export interface ReplacePreviewDialogProps {
   edit: LspWorkspaceEdit;
   /** Replacement text shown in the header. */
   replacement: string;
+  /** Frozen disk/readability facts captured before this dialog opened. */
+  filePreimages?: readonly ReplaceInFilesFilePreimage[];
   committing: boolean;
   commitError: string | null;
   onCommit: (excludedKeys: ReadonlySet<string>) => void;
@@ -29,46 +33,76 @@ export function stableUsageKey(path: string, startLine: number, startCharacter: 
   return `${path}:${startLine}:${startCharacter}:${endLine}:${endCharacter}`;
 }
 
-export function ReplacePreviewDialog({
-  edit,
-  replacement,
-  committing,
-  commitError,
-  onCommit,
-  onCancel,
-}: ReplacePreviewDialogProps) {
-  const [excluded, setExcluded] = useState<ReadonlySet<string>>(() => new Set());
-  const live = useMemo(() => {
-    const excludedUsageIds = new Set<string>();
-    for (const usage of createReplaceInFilesPlan(edit).preview.usages) {
-      const key = stableUsageKey(
-        usage.path,
-        usage.range.start.line,
-        usage.range.start.character,
-        usage.range.end.line,
-        usage.range.end.character,
-      );
-      if (excluded.has(key)) excludedUsageIds.add(usage.id);
-    }
-    return createReplaceInFilesPlan(edit, excludedUsageIds);
-  }, [edit, excluded]);
-  const byFile = useMemo(() => {
-    const groups = new Map<string, typeof live.preview.usages>();
-    for (const usage of live.preview.usages) {
-      const list = groups.get(usage.path);
-      if (list) list.push(usage);
-      else groups.set(usage.path, [usage]);
-    }
-    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [live]);
+type ReplaceUsage = WorkspaceEditPreview["usages"][number];
 
-  const keyOf = (usage: { path: string; range: { start: { line: number; character: number }; end: { line: number; character: number } } }) => stableUsageKey(
+function usageKey(usage: ReplaceUsage): string {
+  return stableUsageKey(
     usage.path,
     usage.range.start.line,
     usage.range.start.character,
     usage.range.end.line,
     usage.range.end.character,
   );
+}
+
+function preimageStatus(preimage: ReplaceInFilesFilePreimage | undefined): string | null {
+  if (!preimage) return null;
+  const statuses: string[] = [];
+  if (preimage.dirty) statuses.push("dirty buffer");
+  if (preimage.readOnly) statuses.push("read-only");
+  if (preimage.availability === "oversize") statuses.push("too large");
+  if (preimage.availability === "unreadable") statuses.push("unreadable");
+  return statuses.length > 0 ? statuses.join(" · ") : "ready";
+}
+
+export function ReplacePreviewDialog({
+  edit,
+  replacement,
+  filePreimages = [],
+  committing,
+  commitError,
+  onCommit,
+  onCancel,
+}: ReplacePreviewDialogProps) {
+  const source = useMemo(() => createReplaceInFilesPlan(edit), [edit]);
+  const preimagesByPath = useMemo(
+    () => new Map(filePreimages.map((preimage) => [preimage.path, preimage])),
+    [filePreimages],
+  );
+  const blockedPaths = useMemo(
+    () => new Set(filePreimages
+      .filter((preimage) => (
+        preimage.dirty
+        || preimage.readOnly
+        || preimage.availability !== "ready"
+        || preimage.hash === null
+      ))
+      .map((preimage) => preimage.path)),
+    [filePreimages],
+  );
+  const [excluded, setExcluded] = useState<ReadonlySet<string>>(() => new Set(
+    source.preview.usages
+      .filter((usage) => blockedPaths.has(usage.path))
+      .map(usageKey),
+  ));
+  const live = useMemo(() => {
+    const excludedUsageIds = new Set(
+      source.preview.usages
+        .filter((usage) => excluded.has(usageKey(usage)))
+        .map((usage) => usage.id),
+    );
+    return createReplaceInFilesPlan(edit, excludedUsageIds);
+  }, [edit, excluded, source]);
+  const byFile = useMemo(() => {
+    const groups = new Map<string, ReplaceUsage[]>();
+    for (const usage of source.preview.usages) {
+      const list = groups.get(usage.path);
+      if (list) list.push(usage);
+      else groups.set(usage.path, [usage]);
+    }
+    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [source]);
+
   const toggleUsageKey = (key: string) => {
     setExcluded((current) => {
       const next = new Set(current);
@@ -78,12 +112,13 @@ export function ReplacePreviewDialog({
     });
   };
   const toggleFile = (path: string, checked: boolean) => {
+    if (blockedPaths.has(path)) return;
     setExcluded((current) => {
       const next = new Set(current);
-      for (const usage of live.preview.usages) {
+      for (const usage of source.preview.usages) {
         if (usage.path !== path) continue;
-        if (checked) next.delete(keyOf(usage));
-        else next.add(keyOf(usage));
+        if (checked) next.delete(usageKey(usage));
+        else next.add(usageKey(usage));
       }
       return next;
     });
@@ -107,14 +142,18 @@ export function ReplacePreviewDialog({
       </div>
       <div className="min-h-0 flex-1 overflow-auto py-1">
         {byFile.map(([path, usages]) => {
-          const excludedCount = usages.filter((usage) => excluded.has(keyOf(usage))).length;
-          const allExcluded = excludedCount === usages.length;
+          const excludedCount = usages.filter((usage) => excluded.has(usageKey(usage))).length;
+          const includedCount = usages.length - excludedCount;
+          const status = preimageStatus(preimagesByPath.get(path));
+          const pathBlocked = blockedPaths.has(path);
+          const allExcluded = includedCount === 0;
           return (
             <section key={path}>
               <label className="flex h-6 items-center gap-2 px-3 font-medium text-[var(--taomni-code-muted)]">
                 <input
                   type="checkbox"
-                  checked={!allExcluded}
+                  checked={!allExcluded && !pathBlocked}
+                  disabled={pathBlocked}
                   aria-label={`Include all matches in ${path}`}
                   data-testid="code-workspace-replace-file-toggle"
                   data-path={path}
@@ -122,11 +161,21 @@ export function ReplacePreviewDialog({
                 />
                 <span className="min-w-0 flex-1 truncate text-left">{path}</span>
                 <span className="shrink-0 text-[10px] tabular-nums">
-                  {usages.length - excludedCount}/{usages.length}
+                  {includedCount}/{usages.length}
                 </span>
+                {status && (
+                  <span
+                    data-testid="code-workspace-replace-file-status"
+                    data-path={path}
+                    className={pathBlocked ? "shrink-0 text-[10px] text-amber-500" : "shrink-0 text-[10px] text-[var(--taomni-code-muted)]"}
+                    title={preimagesByPath.get(path)?.reason ?? undefined}
+                  >
+                    {status}
+                  </span>
+                )}
               </label>
               {usages.map((usage) => {
-                const key = keyOf(usage);
+                const key = usageKey(usage);
                 return (
                   <label
                     key={key}
@@ -134,7 +183,8 @@ export function ReplacePreviewDialog({
                   >
                     <input
                       type="checkbox"
-                      checked={!excluded.has(key)}
+                      checked={!excluded.has(key) && !pathBlocked}
+                      disabled={pathBlocked}
                       aria-label={`Include occurrence at ${usage.path}:${usage.range.start.line + 1}`}
                       data-testid="code-workspace-replace-usage"
                       data-usage-id={usage.id}
@@ -152,7 +202,7 @@ export function ReplacePreviewDialog({
             </section>
           );
         })}
-        {byFile.length === 0 && (
+        {live.preview.usages.length === 0 && (
           <div className="px-3 py-2 text-[var(--taomni-code-muted)]">
             Every occurrence is excluded — nothing will be replaced.
           </div>

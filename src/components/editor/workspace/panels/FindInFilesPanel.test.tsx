@@ -473,6 +473,29 @@ describe("ED-FIND-003: scope planning in FindInFilesPanel", () => {
     expect(await screen.findByTestId("code-workspace-find-error")).toBeInTheDocument();
     expect(screen.getByTestId("code-workspace-find-error")).toHaveTextContent(/G2 -> G3/);
   });
+
+  it("stops project-scope results when captured facts generation moves (A1/A2)", async () => {
+    await seedModuleFacts(2);
+    render(<FindInFilesPanel roots={moduleRoots} onOpenMatch={vi.fn()} />);
+    const emit = await runSearch();
+
+    const { useProjectFactsStore } = await import("../../../../stores/projectFactsStore");
+    const live = useProjectFactsStore.getState().getWorkspaceFacts("C:/repo/app");
+    useProjectFactsStore.setState({
+      workspaces: { "C:/repo/app": { ...live, generation: 3 } },
+    });
+
+    act(() => {
+      emit({
+        ...doneEvent(),
+        kind: "batch",
+        matches: [searchMatch({ lineText: "project stale needle" })],
+      });
+    });
+
+    expect(screen.queryByText(/project stale needle/)).not.toBeInTheDocument();
+    expect(await screen.findByTestId("code-workspace-find-error")).toHaveTextContent(/G2 -> G3/);
+  });
 });
 
 describe("ED-FIND-004: replace preview commit flow in FindInFilesPanel", () => {
@@ -560,5 +583,25 @@ describe("ED-FIND-004: replace preview commit flow in FindInFilesPanel", () => {
     fireEvent.click(screen.getByTestId("code-workspace-replace-cancel"));
     expect(screen.queryByTestId("code-workspace-replace-preview")).not.toBeInTheDocument();
     expect(onReplaceMatches).not.toHaveBeenCalled();
+  });
+
+  it("commits the replacement text frozen when the preview opened (A1)", async () => {
+    const onReplaceMatches = vi.fn(
+      async (
+        _matches: WorkspaceSearchMatch[],
+        _replacement: string,
+        _edit: LspWorkspaceEdit,
+      ): Promise<{ ok: boolean }> => ({ ok: true }),
+    );
+    await openPreview(onReplaceMatches);
+
+    fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "changed later" } });
+    fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+
+    await waitFor(() => expect(onReplaceMatches).toHaveBeenCalledTimes(1));
+    const call = onReplaceMatches.mock.calls[0];
+    if (!call) throw new Error("expected onReplaceMatches to have been called");
+    expect(call[1]).toBe("thread");
+    expect(call[2]?.documentEdits[0]?.edits[0]?.newText).toBe("thread");
   });
 });

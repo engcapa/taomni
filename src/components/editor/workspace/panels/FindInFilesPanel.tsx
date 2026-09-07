@@ -31,6 +31,10 @@ import {
   createReplaceInFilesPlan,
   replaceMatchAbsolutePath,
   searchMatchesToReplaceInputs,
+  workspaceSearchMatchRange,
+  type ReplaceInFilesPreparationResult,
+  type ReplaceInFilesPreviewSnapshot,
+  type ReplaceInFilesScopeSnapshot,
   type ReplaceInFilesPlan,
 } from "../replaceInFilesModel";
 import { ReplacePreviewDialog } from "./ReplacePreviewDialog";
@@ -42,11 +46,18 @@ import {
 interface FindInFilesPanelProps {
   roots: CodeWorkspaceRootInfo[];
   onOpenMatch: (match: WorkspaceSearchMatch, options: { preview: boolean }) => void;
+  /** Capture disk preimages before the replace preview becomes committable. */
+  onPrepareReplace?: (
+    matches: WorkspaceSearchMatch[],
+    edit: LspWorkspaceEdit,
+    scope: ReplaceInFilesScopeSnapshot,
+  ) => Promise<ReplaceInFilesPreparationResult>;
   /** Commit a filtered replace transaction; returns the commit report. */
   onReplaceMatches?: (
     matches: WorkspaceSearchMatch[],
     replacement: string,
     edit: LspWorkspaceEdit,
+    snapshot: ReplaceInFilesPreviewSnapshot,
   ) => Promise<{ ok: boolean; appliedCount?: number; fileCount?: number; message?: string }>;
   /** Bump to move focus into the query input (Ctrl+Shift+F). */
   focusNonce?: number;
@@ -175,8 +186,34 @@ function groupKey(match: WorkspaceSearchMatch): string {
 
 /** Join key shared by preview usages and search matches for exclusion. */
 function usageJoinKeyForMatch(match: WorkspaceSearchMatch): string {
-  const line = Math.max(0, match.lineNumber - 1);
-  return `${replaceMatchAbsolutePath(match)}:${line}:${match.matchStart}:${line}:${match.matchEnd}`;
+  const range = workspaceSearchMatchRange(match);
+  return `${replaceMatchAbsolutePath(match)}:${range.start.line}:${range.start.character}:${range.end.line}:${range.end.character}`;
+}
+
+function createReplaceScopeSnapshot(
+  plan: Extract<FindInFilesScopePlan, { status: "ready" }>,
+  roots: readonly CodeWorkspaceRootInfo[],
+  query: string,
+  caseSensitive: boolean,
+  wholeWord: boolean,
+  regexp: boolean,
+  includeGlobs: string,
+  excludeGlobs: string,
+): ReplaceInFilesScopeSnapshot {
+  return {
+    kind: plan.kind,
+    workspaceRoots: roots.map((root) => ({ id: root.id, path: root.path })),
+    plannedRoots: [...plan.roots],
+    explicitFiles: [...(plan.explicitFiles ?? [])],
+    fileMask: plan.fileMask,
+    ...(plan.generation !== undefined ? { generation: plan.generation } : {}),
+    query,
+    caseSensitive,
+    wholeWord,
+    regexp,
+    includeGlobs: splitGlobs(includeGlobs),
+    excludeGlobs: splitGlobs(excludeGlobs),
+  };
 }
 
 function groupTitle(match: WorkspaceSearchMatch): string {
@@ -185,6 +222,7 @@ function groupTitle(match: WorkspaceSearchMatch): string {
 
 export function FindInFilesPanel({
   roots,
+  onPrepareReplace,
   onOpenMatch,
   onReplaceMatches,
   focusNonce = 0,
@@ -208,9 +246,12 @@ export function FindInFilesPanel({
     edit: LspWorkspaceEdit;
     plan: ReplaceInFilesPlan;
     matches: WorkspaceSearchMatch[];
+    replacement: string;
+    snapshot: ReplaceInFilesPreviewSnapshot;
     usageToMatchKey: ReadonlyMap<string, string>;
     stableToUsageId: ReadonlyMap<string, string>;
   } | null>(null);
+  const [replacePreparing, setReplacePreparing] = useState(false);
   const [replaceCommitting, setReplaceCommitting] = useState(false);
   const [replaceCommitError, setReplaceCommitError] = useState<string | null>(null);
   /** ED-FIND-003: selected search scope. Module scope requires ready facts. */
@@ -261,6 +302,7 @@ export function FindInFilesPanel({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const searchIdRef = useRef<string | null>(null);
+  const searchScopeSnapshotRef = useRef<ReplaceInFilesScopeSnapshot | null>(null);
   const unlistenRef = useRef<(() => void) | null>(null);
   const groupsRef = useRef<Map<string, MatchGroup>>(new Map());
   const languagesRef = useRef<Record<string, Language | null>>({});
@@ -295,6 +337,7 @@ export function FindInFilesPanel({
     unlistenRef.current = null;
     const active = searchIdRef.current;
     searchIdRef.current = null;
+    searchScopeSnapshotRef.current = null;
     // ED-FIND-004: a superseded search invalidates any open replace preview
     // so a stale plan can never commit.
     setReplacePreview(null);
@@ -335,6 +378,16 @@ export function FindInFilesPanel({
       setError(plan.reason);
       return;
     }
+    searchScopeSnapshotRef.current = createReplaceScopeSnapshot(
+      plan,
+      roots,
+      trimmed,
+      caseSensitive,
+      wholeWord,
+      regexp,
+      includeGlobs,
+      excludeGlobs,
+    );
     // Project scope spans every workspace root; module/directory scopes use
     // the exact plan roots. Client-side filtering below applies to
     // facts-derived scopes only, so other roots' matches are never dropped.
@@ -353,18 +406,17 @@ export function FindInFilesPanel({
     try {
       const unlisten = await subscribeWorkspaceSearch(searchId, (event) => {
         if (searchIdRef.current !== searchId) return;
-        // ED-FIND-003 A4: facts-derived scopes stop publishing once the
-        // snapshot moves under a running search. Filesystem scopes are
-        // facts-independent and keep streaming.
-        if (filterPlan !== null && filterPlan.generation !== undefined) {
+        // ED-FIND-003/004: any scope that captured project facts stops
+        // publishing once that generation moves under a running search.
+        if (plan.generation !== undefined) {
           const liveGeneration = useProjectFactsStore
             .getState()
             .getWorkspaceFacts(workspaceRoot).generation;
-          if (liveGeneration !== filterPlan.generation) {
+          if (liveGeneration !== plan.generation) {
             teardownSearch();
             setStatus("error");
             setError(
-              `Project facts changed during search (G${filterPlan.generation} -> G${liveGeneration}); run the search again`,
+              `Project facts changed during search (G${plan.generation} -> G${liveGeneration}); run the search again`,
             );
             return;
           }
@@ -548,16 +600,24 @@ export function FindInFilesPanel({
     );
   }, [languagesByPath]);
 
-  const replaceAll = useCallback(() => {
-    if (!onReplaceMatches || allMatches.length === 0 || replacePreview) return;
+  const replaceAll = useCallback(async () => {
+    if (!onReplaceMatches || allMatches.length === 0 || replacePreview || replacePreparing) return;
+    const scope = searchScopeSnapshotRef.current;
+    if (!scope) {
+      setStatus("error");
+      setError("Search results are stale; run the search again before replacing");
+      return;
+    }
     // ED-FIND-004 A1: freeze the preimage — model matches, edit, and plan —
     // at dialog open. Commit reconfirms against live disk state (A2/A3).
-    const modelMatches = searchMatchesToReplaceInputs(allMatches);
-    const edit = buildReplaceInFilesWorkspaceEdit({ matches: modelMatches, replacementText: replacement });
+    const frozenMatches = [...allMatches];
+    const frozenReplacement = replacement;
+    const modelMatches = searchMatchesToReplaceInputs(frozenMatches);
+    const edit = buildReplaceInFilesWorkspaceEdit({ matches: modelMatches, replacementText: frozenReplacement });
     const plan = createReplaceInFilesPlan(edit);
     // Join preview usage ids back to search-match keys for exclusion.
     const remaining = new Map<string, WorkspaceSearchMatch[]>();
-    for (const match of allMatches) {
+    for (const match of frozenMatches) {
       const key = usageJoinKeyForMatch(match);
       const list = remaining.get(key);
       if (list) list.push(match);
@@ -576,8 +636,44 @@ export function FindInFilesPanel({
       if (list && list.length === 0) remaining.delete(key);
     }
     setReplaceCommitError(null);
-    setReplacePreview({ edit, plan, matches: allMatches, usageToMatchKey, stableToUsageId });
-  }, [allMatches, onReplaceMatches, replacement, replacePreview]);
+    setReplacePreparing(true);
+    try {
+      const prepared = onPrepareReplace
+        ? await onPrepareReplace(frozenMatches, edit, scope)
+        : {
+            ok: true as const,
+            snapshot: {
+              replacementText: frozenReplacement,
+              scope,
+              filePreimages: [],
+            },
+          };
+      if (searchScopeSnapshotRef.current !== scope) return;
+      if (!prepared.ok) {
+        setStatus("error");
+        setError(prepared.message);
+        return;
+      }
+      setReplacePreview({
+        edit,
+        plan,
+        matches: frozenMatches,
+        replacement: frozenReplacement,
+        snapshot: {
+          ...prepared.snapshot,
+          replacementText: frozenReplacement,
+        },
+        usageToMatchKey,
+        stableToUsageId,
+      });
+    } catch (err) {
+      if (searchScopeSnapshotRef.current !== scope) return;
+      setStatus("error");
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setReplacePreparing(false);
+    }
+  }, [allMatches, caseSensitive, excludeGlobs, includeGlobs, onPrepareReplace, onReplaceMatches, regexp, replacePreparing, replacePreview, replacement, roots, searchScopeSnapshotRef, scopeKind, scopeModuleId, wholeWord]);
 
   const commitReplacePreview = useCallback(async (excludedStableKeys: ReadonlySet<string>) => {
     if (!replacePreview || !onReplaceMatches) return;
@@ -603,7 +699,12 @@ export function FindInFilesPanel({
     setReplaceCommitting(true);
     setReplaceCommitError(null);
     try {
-      const result = await onReplaceMatches(filteredMatches, replacement, filteredEdit);
+      const result = await onReplaceMatches(
+        filteredMatches,
+        replacePreview.replacement,
+        filteredEdit,
+        replacePreview.snapshot,
+      );
       if (result.ok) {
         setReplacePreview(null);
       } else {
@@ -612,7 +713,7 @@ export function FindInFilesPanel({
     } finally {
       setReplaceCommitting(false);
     }
-  }, [onReplaceMatches, replacePreview, replacement]);
+  }, [onReplaceMatches, replacePreview]);
 
   const toggles = [
     { label: "Match case", icon: <CaseSensitive className="h-3.5 w-3.5" />, value: caseSensitive, set: setCaseSensitive },
@@ -765,11 +866,11 @@ export function FindInFilesPanel({
             type="button"
             aria-label="Preview replace all matches"
             data-testid="code-workspace-find-replace-all"
-            disabled={allMatches.length === 0 || replaceCommitting || status === "searching"}
+            disabled={allMatches.length === 0 || replaceCommitting || replacePreparing || status === "searching"}
             className="h-6 inline-flex items-center gap-1 rounded px-1.5 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-50"
             onClick={() => void replaceAll()}
           >
-            <span>Replace All</span>
+            <span>{replacePreparing ? "Preparing…" : "Replace All"}</span>
           </button>
         )}
         <span className="ml-auto flex items-center gap-1.5 text-[10px] text-[var(--taomni-code-muted)]">
@@ -884,7 +985,8 @@ export function FindInFilesPanel({
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 p-4">
           <ReplacePreviewDialog
             edit={replacePreview.edit}
-            replacement={replacement}
+            replacement={replacePreview.replacement}
+            filePreimages={replacePreview.snapshot.filePreimages}
             committing={replaceCommitting}
             commitError={replaceCommitError}
             onCommit={(excluded) => void commitReplacePreview(excluded)}

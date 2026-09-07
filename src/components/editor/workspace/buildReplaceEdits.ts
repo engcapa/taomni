@@ -1,5 +1,6 @@
 import type { LspTextEdit, LspWorkspaceEdit } from "../../../lib/editor/lsp";
 import type { WorkspaceSearchMatch } from "../../../lib/editor/workspaceSearch";
+import { workspaceSearchMatchRange } from "./replaceInFilesModel";
 
 function matchKey(match: WorkspaceSearchMatch): string {
   return `${match.rootId}:${match.path}:${match.lineNumber}:${match.matchStart}:${match.matchEnd}`;
@@ -19,12 +20,9 @@ export function buildReplaceWorkspaceEdit(
     const key = matchKey(match);
     if (selectedKeys && !selectedKeys.has(key)) continue;
     const fileKey = `${match.rootPath}::${match.path}`;
-    const line = Math.max(0, match.lineNumber - 1);
+    const range = workspaceSearchMatchRange(match);
     const edit: LspTextEdit = {
-      range: {
-        start: { line, character: match.matchStart },
-        end: { line, character: match.matchEnd },
-      },
+      range,
       newText: replacement,
     };
     const existing = byFile.get(fileKey);

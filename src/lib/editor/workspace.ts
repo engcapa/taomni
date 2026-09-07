@@ -19,6 +19,8 @@ export interface WorkspaceFile {
   encoding?: string;
   /** Whether the on-disk UTF-8 bytes begin with EF BB BF. */
   bom?: boolean;
+  /** Native filesystem read-only attribute/permission state when available. */
+  readOnly?: boolean;
   size: number;
   mtime: number;
   hash: string;

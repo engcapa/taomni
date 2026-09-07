@@ -629,10 +629,18 @@ import type { WorkspaceFocus } from "./workspace/workspaceActionRegistry";
 import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
 import {
   replaceMatchAbsolutePath,
+  replaceEditMatchesSelection,
+  replaceScopeConflict,
+  classifyReplacePreimageError,
   searchMatchesToReplaceInputs,
   validateReplacePreconditions,
   verifyReplaceMatchFreshness,
+  workspaceSearchMatchRange,
   type FileRevisionGuard,
+  type ReplaceInFilesFilePreimage,
+  type ReplaceInFilesPreparationResult,
+  type ReplaceInFilesPreviewSnapshot,
+  type ReplaceInFilesScopeSnapshot,
 } from "./workspace/replaceInFilesModel";
 import type {
   CodeWorkspaceFileRef,
@@ -648,6 +656,18 @@ interface CodeWorkspaceTabProps {
   onOpenGitManager?: (payload: CodeWorkspaceGitManagerPayload) => void;
   onSyncGitManager?: (payload: CodeWorkspaceGitManagerPayload) => void;
   onCommandsChange?: (tabId: string, registration: WorkspaceCommandRegistration | null) => void;
+}
+
+function replacePathOutsideFrozenScope(
+  scope: ReplaceInFilesScopeSnapshot,
+  absolutePath: string,
+): boolean {
+  const roots = scope.kind === "project"
+    ? scope.workspaceRoots.map((root) => root.path)
+    : scope.plannedRoots;
+  if (roots.some((root) => relativePathWithinRoot(root, absolutePath) !== null)) return false;
+  if (scope.explicitFiles.some((path) => fsPathEquals(path, absolutePath))) return false;
+  return true;
 }
 
 export interface CodeWorkspaceGitManagerPayload {
@@ -8081,10 +8101,8 @@ export function CodeWorkspaceTab({
     (match: WorkspaceSearchMatch, options: { preview: boolean }) => {
       const ref: CodeWorkspaceFileRef = { kind: "root", rootId: match.rootId, path: match.path };
       // Backend line numbers are 1-based; reveal targets follow LSP 0-based.
-      const line = Math.max(0, match.lineNumber - 1);
       revealEditorLocation(fileKey(ref), {
-        start: { line, character: match.matchStart },
-        end: { line, character: match.matchEnd },
+        ...workspaceSearchMatchRange(match),
       });
       void openFile(ref, { preview: options.preview });
     },
@@ -9249,6 +9267,236 @@ export function CodeWorkspaceTab({
     workspaceEditQueueRef.current = pending.then(() => undefined, () => undefined);
     return pending;
   }, [applyLspWorkspaceEditNow]);
+
+  const prepareReplaceMatches = useCallback(async (
+    matches: WorkspaceSearchMatch[],
+    edit: LspWorkspaceEdit,
+    scope: ReplaceInFilesScopeSnapshot,
+  ): Promise<ReplaceInFilesPreparationResult> => {
+    const facts = useProjectFactsStore.getState().getWorkspaceFacts(projectFactsRoot);
+    const scopeConflict = replaceScopeConflict(scope, rootsRef.current, facts);
+    if (scopeConflict) return { ok: false, message: `Replace blocked: ${scopeConflict}` };
+
+    const paths = new Map<string, WorkspaceSearchMatch[]>();
+    for (const match of matches) {
+      const absolute = replaceMatchAbsolutePath(match);
+      const existing = paths.get(absolute);
+      if (existing) existing.push(match);
+      else paths.set(absolute, [match]);
+    }
+    if (paths.size === 0) return { ok: false, message: "Nothing to replace" };
+
+    const filePreimages: ReplaceInFilesFilePreimage[] = [];
+    for (const absolute of paths.keys()) {
+      if (replacePathOutsideFrozenScope(scope, absolute)) {
+        return { ok: false, message: `Replace blocked: ${absolute} is outside the frozen search scope` };
+      }
+      const containing = rootsRef.current.find(
+        (root) => relativePathWithinRoot(root.path, absolute) !== null,
+      );
+      if (!containing) {
+        return { ok: false, message: `Replace refused: ${absolute} is outside the workspace` };
+      }
+      const relative = relativePathWithinRoot(containing.path, absolute);
+      if (relative === null || !relative) {
+        return { ok: false, message: `Replace refused: invalid file path ${absolute}` };
+      }
+      const open = Object.values(openFilesRef.current).find((file) => {
+        const currentPath = absolutePathForOpenFile(file);
+        return currentPath !== null && fsPathEquals(currentPath, absolute);
+      });
+      try {
+        const disk = await workspaceReadFile(containing.path, relative);
+        filePreimages.push({
+          path: absolute,
+          hash: disk.hash,
+          dirty: open?.dirty ?? false,
+          readOnly: disk.readOnly === true,
+          size: disk.size,
+          availability: "ready",
+        });
+      } catch (error) {
+        const classified = classifyReplacePreimageError(error);
+        // Keep the file in the frozen preview so the user can see exactly
+        // which occurrence set is unavailable; the dialog disables it and
+        // the commit owner rejects it again if a caller bypasses the UI.
+        filePreimages.push({
+          path: absolute,
+          hash: null,
+          dirty: open?.dirty ?? false,
+          readOnly: false,
+          size: null,
+          availability: classified.availability,
+          reason: classified.reason,
+        });
+      }
+    }
+    return {
+      ok: true,
+      snapshot: {
+        replacementText: edit.documentEdits
+          .flatMap((document) => document.edits)
+          .find(() => true)?.newText ?? "",
+        scope,
+        filePreimages,
+      },
+    };
+  }, [absolutePathForOpenFile, projectFactsRoot]);
+
+  const commitReplaceMatches = useCallback(async (
+    matches: WorkspaceSearchMatch[],
+    replacement: string,
+    edit: LspWorkspaceEdit,
+    snapshot: ReplaceInFilesPreviewSnapshot,
+  ): Promise<{ ok: boolean; appliedCount?: number; fileCount?: number; message?: string }> => {
+    const facts = useProjectFactsStore.getState().getWorkspaceFacts(projectFactsRoot);
+    const scopeConflict = replaceScopeConflict(snapshot.scope, rootsRef.current, facts);
+    if (scopeConflict) {
+      const message = `Replace blocked: ${scopeConflict}`;
+      setStatusMessage(message);
+      return { ok: false, message };
+    }
+    if (snapshot.replacementText !== replacement) {
+      const message = "Replace blocked: the replacement text changed after preview; run the search again";
+      setStatusMessage(message);
+      return { ok: false, message };
+    }
+
+    const byFile = new Map<string, WorkspaceSearchMatch[]>();
+    for (const match of matches) {
+      const absolute = replaceMatchAbsolutePath(match);
+      const list = byFile.get(absolute);
+      if (list) list.push(match);
+      else byFile.set(absolute, [match]);
+    }
+    if (byFile.size === 0) return { ok: false, message: "Nothing to replace" };
+
+    const editPaths = new Set(
+      edit.documentEdits.map((document) => fsPathComparisonKey(document.path ?? document.uri)),
+    );
+    const matchPaths = new Set([...byFile.keys()].map(fsPathComparisonKey));
+    if (
+      editPaths.size !== matchPaths.size
+      || [...editPaths].some((path) => !matchPaths.has(path))
+      || edit.documentEdits.reduce((count, document) => count + document.edits.length, 0) !== matches.length
+      || !replaceEditMatchesSelection(
+        edit,
+        searchMatchesToReplaceInputs(matches),
+        replacement,
+      )
+    ) {
+      const message = "Replace blocked: the preview edit no longer matches its selected occurrences";
+      setStatusMessage(message);
+      return { ok: false, message };
+    }
+
+    const preimages = new Map(
+      snapshot.filePreimages.map((preimage) => [fsPathComparisonKey(preimage.path), preimage]),
+    );
+    const guards: FileRevisionGuard[] = [];
+    const diskTexts = new Map<string, string>();
+    for (const absolute of byFile.keys()) {
+      if (replacePathOutsideFrozenScope(snapshot.scope, absolute)) {
+        const message = `Replace blocked: ${absolute} is outside the frozen search scope`;
+        setStatusMessage(message);
+        return { ok: false, message };
+      }
+      const preimage = preimages.get(fsPathComparisonKey(absolute));
+      if (!preimage) {
+        const message = `Replace blocked: no frozen disk preimage is available for ${absolute}`;
+        setStatusMessage(message);
+        return { ok: false, message };
+      }
+      if (preimage.availability !== "ready" || preimage.hash === null) {
+        const reason = preimage.reason ?? (
+          preimage.availability === "oversize"
+            ? "File exceeds the text editor size limit"
+            : "File is not readable"
+        );
+        const message = `Replace blocked: ${absolute}: ${reason}`;
+        setStatusMessage(message);
+        return { ok: false, message };
+      }
+      const containing = rootsRef.current.find(
+        (root) => relativePathWithinRoot(root.path, absolute) !== null,
+      );
+      if (!containing) {
+        const message = `Replace refused: ${absolute} is outside the workspace`;
+        setStatusMessage(message);
+        return { ok: false, message };
+      }
+      const relative = relativePathWithinRoot(containing.path, absolute);
+      if (relative === null || !relative) {
+        const message = `Replace refused: invalid file path ${absolute}`;
+        setStatusMessage(message);
+        return { ok: false, message };
+      }
+      const open = Object.values(openFilesRef.current).find((file) => {
+        const currentPath = absolutePathForOpenFile(file);
+        return currentPath !== null && fsPathEquals(currentPath, absolute);
+      });
+      let disk;
+      try {
+        disk = await workspaceReadFile(containing.path, relative);
+      } catch {
+        const message = `Replace refused: cannot read ${absolute}`;
+        setStatusMessage(message);
+        return { ok: false, message };
+      }
+      diskTexts.set(absolute, disk.text);
+      guards.push({
+        path: absolute,
+        expectedHash: preimage.hash,
+        actualHash: disk.hash,
+        isDirty: open?.dirty ?? false,
+        isReadOnly: preimage.readOnly || disk.readOnly === true,
+      });
+    }
+
+    const modelMatches = searchMatchesToReplaceInputs(matches);
+    const freshness = verifyReplaceMatchFreshness(diskTexts, modelMatches);
+    const precondition = validateReplacePreconditions(guards);
+    const conflicts = [
+      ...precondition.conflicts,
+      ...freshness.map((conflict) => ({ path: conflict.path, reason: conflict.reason })),
+    ];
+    if (conflicts.length > 0) {
+      const message = `Replace blocked: ${conflicts.map((conflict) => `${conflict.path}: ${conflict.reason}`).join("; ")}`;
+      setStatusMessage(message);
+      return { ok: false, message };
+    }
+
+    let outcomes;
+    try {
+      outcomes = await applyLspWorkspaceEdit(edit, { label: "Replace in Files" });
+    } catch (error) {
+      const message = `Replace failed: ${errorMessage(error)}`;
+      setStatusMessage(message);
+      return { ok: false, message };
+    }
+    const response = workspaceEditApplyResponse(outcomes);
+    const appliedOperations = outcomes.filter((outcome) => outcome.status.startsWith("applied"));
+    const appliedPathKeys = new Set(appliedOperations.map((outcome) => fsPathComparisonKey(outcome.path)));
+    const appliedCount = edit.documentEdits.reduce(
+      (count, document) => count + (appliedPathKeys.has(fsPathComparisonKey(document.path ?? document.uri)) ? document.edits.length : 0),
+      0,
+    );
+    const appliedFileCount = [...appliedPathKeys].length;
+    if (!response.applied) {
+      const summary = summarizeWorkspaceEditOutcomes(outcomes);
+      const message = appliedCount > 0
+        ? `Replace partially applied (${appliedCount} occurrence${appliedCount === 1 ? "" : "s"} in ${appliedFileCount} file${appliedFileCount === 1 ? "" : "s"}); ${summary}`
+        : `Replace blocked: ${response.failureReason ?? summary}`;
+      setStatusMessage(message);
+      return { ok: false, appliedCount, fileCount: appliedFileCount, message };
+    }
+
+    const message = appliedCount > 0
+      ? `Replaced ${appliedCount} occurrence${appliedCount === 1 ? "" : "s"} in ${byFile.size} file${byFile.size === 1 ? "" : "s"} — Ctrl+Z to undo`
+      : "Replace completed with no changes; no history entry was created";
+    setStatusMessage(message);
+    return { ok: true, appliedCount, fileCount: byFile.size };
+  }, [absolutePathForOpenFile, applyLspWorkspaceEdit, projectFactsRoot, setStatusMessage]);
 
   const refreshRefactorRecoveryEntries = useCallback(() => {
     const entries = refactorRecoveryController.listPending();
@@ -18066,71 +18314,8 @@ export function CodeWorkspaceTab({
                 includePreset={searchIncludePreset}
                 queryPreset={searchQueryPreset}
                 onOpenMatch={openSearchMatch}
-                onReplaceMatches={async (matches, replacement, edit) => {
-                  void replacement;
-                  // ED-FIND-004 A2/A3: pre-commit recheck (dirty open buffers,
-                  // unreadable disk, matches moved since search) before the
-                  // shared WorkspaceEdit path applies anything.
-                  const byFile = new Map<string, WorkspaceSearchMatch[]>();
-                  for (const match of matches) {
-                    const absolute = replaceMatchAbsolutePath(match);
-                    const list = byFile.get(absolute);
-                    if (list) list.push(match);
-                    else byFile.set(absolute, [match]);
-                  }
-                  if (byFile.size === 0) {
-                    return { ok: false, message: "Nothing to replace" };
-                  }
-                  const guards: FileRevisionGuard[] = [];
-                  const diskTexts = new Map<string, string>();
-                  for (const absolute of byFile.keys()) {
-                    const open = Object.values(openFilesRef.current).find((file) => {
-                      const currentPath = absolutePathForOpenFile(file);
-                      return currentPath !== null && fsPathEquals(currentPath, absolute);
-                    });
-                    const containing = rootsRef.current.find(
-                      (root) => relativePathWithinRoot(root.path, absolute) !== null,
-                    );
-                    if (!containing) {
-                      return { ok: false, message: `Replace refused: ${absolute} is outside the workspace` };
-                    }
-                    let diskText: string | null = null;
-                    try {
-                      const relative = relativePathWithinRoot(containing.path, absolute) ?? "";
-                      const disk = await workspaceReadFile(containing.path, relative);
-                      diskText = disk.text;
-                    } catch {
-                      diskText = null;
-                    }
-                    if (diskText === null) {
-                      return { ok: false, message: `Replace refused: cannot read ${absolute}` };
-                    }
-                    diskTexts.set(absolute, diskText);
-                    guards.push({ path: absolute, isDirty: open?.dirty ?? false });
-                  }
-                  const modelMatches = searchMatchesToReplaceInputs(matches);
-                  const freshness = verifyReplaceMatchFreshness(diskTexts, modelMatches);
-                  const precondition = validateReplacePreconditions(guards);
-                  const conflicts = [
-                    ...precondition.conflicts,
-                    ...freshness.map((conflict) => ({
-                      path: conflict.path,
-                      reason: conflict.reason,
-                    })),
-                  ];
-                  if (conflicts.length > 0) {
-                    const message = `Replace blocked: ${conflicts.map((conflict) => `${conflict.path}: ${conflict.reason}`).join("; ")}`;
-                    setStatusMessage(message);
-                    return { ok: false, message };
-                  }
-                  await applyLspWorkspaceEdit(edit);
-                  const fileCount = byFile.size;
-                  const appliedCount = matches.length;
-                  setStatusMessage(
-                    `Replaced ${appliedCount} occurrence${appliedCount === 1 ? "" : "s"} in ${fileCount} file${fileCount === 1 ? "" : "s"} — Ctrl+Z to undo`,
-                  );
-                  return { ok: true, appliedCount, fileCount };
-                }}
+                onPrepareReplace={prepareReplaceMatches}
+                onReplaceMatches={commitReplaceMatches}
               />
             ),
           },

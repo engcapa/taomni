@@ -67,6 +67,13 @@ describe("ED-FIND-003: findInFilesScopeModel scope and file-mask filtering", () 
       expect(projectPlan.status).toBe("ready");
       expect(projectPlan.roots).toEqual(["/workspace"]);
 
+      const projectWithFacts = planFindInFilesScope(
+        { kind: "project", workspaceRoot: "/workspace" },
+        readyFacts,
+      );
+      expect(projectWithFacts.status).toBe("ready");
+      expect(projectWithFacts.generation).toBe(2);
+
       const dirPlan = planFindInFilesScope({
         kind: "directory",
         workspaceRoot: "/workspace",
@@ -84,6 +91,22 @@ describe("ED-FIND-003: findInFilesScopeModel scope and file-mask filtering", () 
       // `explicitFiles` only exists on the ready variant.
       if (recentPlan.status !== "ready") throw new Error(`expected ready, got ${recentPlan.status}`);
       expect(recentPlan.explicitFiles).toContain("/workspace/core/src/main/java/Main.java");
+    });
+
+    it("does not bind filesystem scopes to failed or stale project facts", () => {
+      const failedPlan = planFindInFilesScope(
+        { kind: "project", workspaceRoot: "/workspace" },
+        { ...readyFacts, status: "failed", structure: null },
+      );
+      expect(failedPlan.status).toBe("ready");
+      expect(failedPlan.generation).toBeUndefined();
+
+      const stalePlan = planFindInFilesScope(
+        { kind: "directory", workspaceRoot: "/workspace", targetDirectory: "/workspace/core" },
+        { ...readyFacts, isStale: true },
+      );
+      expect(stalePlan.status).toBe("ready");
+      expect(stalePlan.generation).toBeUndefined();
     });
 
     it("plans module scope from ready project facts", () => {
