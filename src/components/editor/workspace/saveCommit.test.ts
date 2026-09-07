@@ -370,6 +370,32 @@ describe("§8.18.1 unknown disk-effect verification", () => {
     expect(untyped.error.kind).toBe("io");
     expect(untyped.diskEffect).toBeUndefined();
   });
+
+  it("preserves native hash-conflict effect facts when parsing the IPC payload", () => {
+    const mapped = saveCommitResultFromError("tx-hash-facts", {
+      kind: "hash-mismatch",
+      message: "hash-mismatch: File changed on disk; expected hash old, found foreign",
+      expectedHash: "old",
+      actualHash: "foreign",
+      effect: "none",
+      intentHash: "intended",
+      intentByteLength: 8,
+      oldHash: "old",
+    });
+
+    expect(mapped).toMatchObject({
+      kind: "conflict",
+      diskEffect: "none",
+      providerEffect: "not-sent",
+      error: {
+        kind: "hash-mismatch",
+        effect: "none",
+        intentHash: "intended",
+        intentByteLength: 8,
+        oldHash: "old",
+      },
+    });
+  });
 });
 
 describe("§8.19.1 resolveUnknownDiskResolution (three-hash classification)", () => {

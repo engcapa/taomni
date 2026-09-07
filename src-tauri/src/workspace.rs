@@ -2338,12 +2338,18 @@ pub fn workspace_write_file_encoded(
     encoding: String,
     bom: Option<bool>,
 ) -> Result<WorkspaceWriteAck, WorkspaceWriteError> {
-    let root = canonical_repo_root(&repo_root)
-        .map_err(|e| WorkspaceWriteError::new(WorkspaceWriteErrorKind::Io, e))?;
-    let target = resolve_writable_path(&root, &path)
-        .map_err(|e| WorkspaceWriteError::new(WorkspaceWriteErrorKind::Io, e))?;
-    reject_protected_write(&root, &target)
-        .map_err(|e| WorkspaceWriteError::new(WorkspaceWriteErrorKind::Io, e))?;
+    let root = canonical_repo_root(&repo_root).map_err(|e| {
+        WorkspaceWriteError::new(WorkspaceWriteErrorKind::Io, e)
+            .with_effect(WorkspaceWriteEffect::None, None)
+    })?;
+    let target = resolve_writable_path(&root, &path).map_err(|e| {
+        WorkspaceWriteError::new(WorkspaceWriteErrorKind::Io, e)
+            .with_effect(WorkspaceWriteEffect::None, None)
+    })?;
+    reject_protected_write(&root, &target).map_err(|e| {
+        WorkspaceWriteError::new(WorkspaceWriteErrorKind::Io, e)
+            .with_effect(WorkspaceWriteEffect::None, None)
+    })?;
     let bytes = encode_workspace_text(&contents, &encoding, bom.unwrap_or(false)).map_err(|e| {
         // Encoding happens before any filesystem mutation.
         WorkspaceWriteError::new(WorkspaceWriteErrorKind::Encoding, e)
@@ -2380,10 +2386,14 @@ pub fn workspace_write_loose_file_encoded(
     encoding: String,
     bom: Option<bool>,
 ) -> Result<WorkspaceWriteAck, WorkspaceWriteError> {
-    let target = resolve_writable_loose_file_path(&path)
-        .map_err(|e| WorkspaceWriteError::new(WorkspaceWriteErrorKind::Io, e))?;
-    reject_protected_loose_write(&target)
-        .map_err(|e| WorkspaceWriteError::new(WorkspaceWriteErrorKind::Io, e))?;
+    let target = resolve_writable_loose_file_path(&path).map_err(|e| {
+        WorkspaceWriteError::new(WorkspaceWriteErrorKind::Io, e)
+            .with_effect(WorkspaceWriteEffect::None, None)
+    })?;
+    reject_protected_loose_write(&target).map_err(|e| {
+        WorkspaceWriteError::new(WorkspaceWriteErrorKind::Io, e)
+            .with_effect(WorkspaceWriteEffect::None, None)
+    })?;
     let bytes = encode_workspace_text(&contents, &encoding, bom.unwrap_or(false)).map_err(|e| {
         // Encoding happens before any filesystem mutation.
         WorkspaceWriteError::new(WorkspaceWriteErrorKind::Encoding, e)
@@ -3279,6 +3289,18 @@ fn write_workspace_bytes(
     bytes: Vec<u8>,
     expected_hash: Option<&str>,
 ) -> Result<WrittenBytesAck, WorkspaceWriteError> {
+    let intent_hash = sha256_hex(&bytes);
+    let intent_byte_length = bytes.len() as u64;
+
+    // Once encoding has succeeded, every target-side failure must retain the
+    // same intended bytes and the pre-mutation hash when it was observable.
+    let known_zero_effect = |error: WorkspaceWriteError, old_hash: Option<String>| {
+        error
+            .with_effect(WorkspaceWriteEffect::None, None)
+            .with_intent(intent_hash.clone(), intent_byte_length)
+            .with_old_hash(old_hash)
+    };
+
     // §8.19.1: compute the pre-mutation bytes identity before touching disk.
     // This read also serves the hash precondition when one was requested; the
     // observed value is carried on every failure fact either way.
@@ -3286,8 +3308,10 @@ fn write_workspace_bytes(
         Ok(current) => Some(sha256_hex(&current)),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
         Err(error) => {
-            return Err(classify_io_error("read target", &error)
-                .with_effect(WorkspaceWriteEffect::None, None));
+            return Err(known_zero_effect(
+                classify_io_error("read target", &error),
+                None,
+            ));
         }
     };
     let expected = expected_hash
@@ -3296,11 +3320,13 @@ fn write_workspace_bytes(
     // A requested precondition against a missing target is a stale snapshot:
     // creating the file would silently violate the caller's expectation.
     if expected.is_some() && old_hash.is_none() {
-        return Err(WorkspaceWriteError::new(
-            WorkspaceWriteErrorKind::Io,
-            "read target: expected-hash precondition requires an existing target",
-        )
-        .with_effect(WorkspaceWriteEffect::None, None));
+        return Err(known_zero_effect(
+            WorkspaceWriteError::new(
+                WorkspaceWriteErrorKind::Io,
+                "read target: expected-hash precondition requires an existing target",
+            ),
+            old_hash.clone(),
+        ));
     }
     if let Some(expected) = expected {
         if let Some(current_hash) = old_hash.as_deref() {
@@ -3314,32 +3340,51 @@ fn write_workspace_bytes(
                     effect: Some(WorkspaceWriteEffect::None),
                     written_hash: None,
                     written_byte_length: None,
-                    intent_hash: Some(sha256_hex(&bytes)),
-                    intent_byte_length: Some(bytes.len() as u64),
+                    intent_hash: Some(intent_hash.clone()),
+                    intent_byte_length: Some(intent_byte_length),
                     old_hash: old_hash.clone(),
                 });
             }
         }
     }
-    let parent = target.parent().ok_or_else(|| {
-        WorkspaceWriteError::new(
-            WorkspaceWriteErrorKind::Io,
-            "Cannot resolve parent directory for target",
-        )
+    let parent = match target.parent() {
+        Some(parent) => parent,
+        None => {
+            return Err(known_zero_effect(
+                WorkspaceWriteError::new(
+                    WorkspaceWriteErrorKind::Io,
+                    "Cannot resolve parent directory for target",
+                ),
+                old_hash.clone(),
+            ));
+        }
+    };
+    fs::create_dir_all(parent).map_err(|error| {
+        known_zero_effect(classify_io_error("mkdir parent", &error), old_hash.clone())
     })?;
-    fs::create_dir_all(parent).map_err(|error| classify_io_error("mkdir parent", &error))?;
     let tmp = parent.join(format!(".taomni-write-{}", uuid::Uuid::new_v4().simple()));
-    {
+    let temp_result = {
         use std::io::Write;
-        let mut file = fs::OpenOptions::new()
+        let file = fs::OpenOptions::new()
             .write(true)
             .create_new(true)
-            .open(&tmp)
-            .map_err(|error| classify_io_error("open temp file", &error))?;
-        file.write_all(&bytes)
-            .map_err(|error| classify_io_error("write temp file", &error))?;
-        file.sync_all()
-            .map_err(|error| classify_io_error("sync temp file", &error))?;
+            .open(&tmp);
+        match file {
+            Ok(mut file) => match file.write_all(&bytes) {
+                Ok(()) => file.sync_all().map_err(|error| ("sync temp file", error)),
+                Err(error) => Err(("write temp file", error)),
+            },
+            Err(error) => Err(("open temp file", error)),
+        }
+    };
+    if let Err((operation, error)) = temp_result {
+        // The target was never replaced. Remove a partial temp file before
+        // returning so a known failure does not leave a save artifact behind.
+        let _ = fs::remove_file(&tmp);
+        return Err(known_zero_effect(
+            classify_io_error(operation, &error),
+            old_hash.clone(),
+        ));
     }
     if let Err(error) = replace_file(&tmp, target) {
         let remove_result = fs::remove_file(&tmp);
@@ -3355,13 +3400,13 @@ fn write_workspace_bytes(
         // identity so the frontend ledger can record a non-null intent hash.
         return Err(classify_io_error("rename temp file", &error)
             .with_effect(effect, None)
-            .with_intent(sha256_hex(&bytes), bytes.len() as u64)
+            .with_intent(intent_hash, intent_byte_length)
             .with_old_hash(old_hash));
     }
     Ok(WrittenBytesAck {
         old_hash,
-        written_hash: sha256_hex(&bytes),
-        written_byte_length: bytes.len() as u64,
+        written_hash: intent_hash,
+        written_byte_length: intent_byte_length,
     })
 }
 
@@ -3715,6 +3760,25 @@ mod tests {
             Some(first.written_hash.as_str()),
             "overwrite ack must report the pre-mutation bytes hash"
         );
+    }
+
+    #[test]
+    fn encoded_write_target_failure_carries_zero_effect_and_byte_facts() {
+        let dir = tempfile::tempdir().unwrap();
+        let parent_file = dir.path().join("parent-file");
+        fs::write(&parent_file, b"not a directory").unwrap();
+        let target = parent_file.join("nested.txt");
+
+        let err = write_workspace_bytes(&target, b"new bytes".to_vec(), None).unwrap_err();
+
+        assert_eq!(err.effect, Some(WorkspaceWriteEffect::None));
+        assert_eq!(
+            err.intent_hash.as_deref(),
+            Some(sha256_hex(b"new bytes").as_str())
+        );
+        assert_eq!(err.intent_byte_length, Some(9));
+        assert_eq!(err.old_hash, None);
+        assert_eq!(fs::read(&parent_file).unwrap(), b"not a directory");
     }
 
     #[test]

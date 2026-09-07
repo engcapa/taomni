@@ -683,8 +683,29 @@ export class WorkspaceHashMismatchError extends WorkspaceWriteError {
   readonly expected: string;
   readonly actual: string;
 
-  constructor(message: string, expected = "", actual = "") {
-    super("hash-mismatch", message, expected, actual);
+  constructor(
+    message: string,
+    expected = "",
+    actual = "",
+    effect?: WorkspaceWriteEffect,
+    writtenHash?: string,
+    writtenByteLength?: number,
+    intentHash?: string,
+    intentByteLength?: number,
+    oldHash?: string,
+  ) {
+    super(
+      "hash-mismatch",
+      message,
+      expected,
+      actual,
+      effect,
+      writtenHash,
+      writtenByteLength,
+      intentHash,
+      intentByteLength,
+      oldHash,
+    );
     this.name = "WorkspaceHashMismatchError";
     this.expected = expected;
     this.actual = actual;
@@ -705,12 +726,6 @@ export function parseWorkspaceWriteError(err: unknown): WorkspaceWriteError {
   const msg = err instanceof Error ? err.message : (typeof err === "object" && err !== null && "message" in err ? String((err as { message: unknown }).message) : String(err));
   const match = msg.match(/expected hash\s+([^\s,;]+)[,\s]+found\s+([^\s,;]+)/i);
   
-  if (isWorkspaceHashMismatchError(err)) {
-    if (err instanceof WorkspaceHashMismatchError) return err;
-    const exp = (err as { expectedHash?: string; expected?: string })?.expectedHash ?? (err as { expected?: string })?.expected ?? match?.[1];
-    const act = (err as { actualHash?: string; actual?: string })?.actualHash ?? (err as { actual?: string })?.actual ?? match?.[2];
-    return new WorkspaceHashMismatchError(msg, exp ?? "", act ?? "");
-  }
   if (typeof err === "object" && err !== null) {
     const raw = err as Record<string, unknown>;
     const kind = typeof raw.kind === "string" ? raw.kind : undefined;
@@ -723,7 +738,17 @@ export function parseWorkspaceWriteError(err: unknown): WorkspaceWriteError {
     const oldHash = typeof raw.oldHash === "string" ? raw.oldHash : undefined;
     if (kind === "hash-mismatch" || kind === "encoding" || kind === "permission" || kind === "io") {
       if (kind === "hash-mismatch") {
-        return new WorkspaceHashMismatchError(message, String(raw.expectedHash ?? match?.[1] ?? ""), String(raw.actualHash ?? match?.[2] ?? ""));
+        return new WorkspaceHashMismatchError(
+          message,
+          String(raw.expectedHash ?? match?.[1] ?? ""),
+          String(raw.actualHash ?? match?.[2] ?? ""),
+          effect,
+          writtenHash,
+          writtenByteLength,
+          intentHash,
+          intentByteLength,
+          oldHash,
+        );
       }
       return new WorkspaceWriteError(kind, message, undefined, undefined, effect, writtenHash, writtenByteLength, intentHash, intentByteLength, oldHash);
     }

@@ -1,0 +1,88 @@
+id: TC-IDE-C0-03
+title: "Windows packaged save byte matrix and receipt reconciliation"
+description: |
+  ED-SAVE-004 Windows-compatible native slice. It enters a real temporary
+  workspace through persisted recents, saves a deterministic UTF-8 fixture
+  through LF, CRLF, UTF-8 BOM, and UTF-16LE BOM policies, and independently
+  hashes the host bytes against the production receipt. Linux-only permission
+  injection remains in TC-IDE-C0-01; this case supplies the current Windows
+  native byte boundary without browser VFS or synthetic receipt data.
+covers: [F25.5]
+tags: [code-workspace, ide-c0, save, receipt, native-gate, p0]
+modes: [native]
+native_platforms: [Windows]
+fixtures: [reset_db, workspace_root]
+timeout_sec: 240
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-c0-windows-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-c0-windows","name":"qa-c0-windows","roots":[{"id":"r1","name":"qa-c0-windows","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+  - click: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+  - wait_for: '[data-testid="code-workspace-editor-pane"]'
+
+  - fill:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      value: "café\nmatrix"
+  - wait: 0.5
+  - press: Control+s
+  - assert_file_receipt:
+      path: "${fixture.workspace_root}/README.md"
+      selector: '[data-testid="code-workspace-save-observation"]'
+      encoding: UTF-8
+      bom: false
+      eol: lf
+      expected_text: "café\nmatrix"
+      require_history: false
+
+  - click: '[data-testid="status-bar-workspace-eol"]'
+  - press: Control+s
+  - assert_file_receipt:
+      path: "${fixture.workspace_root}/README.md"
+      selector: '[data-testid="code-workspace-save-observation"]'
+      encoding: UTF-8
+      bom: false
+      eol: crlf
+      expected_text: "café\nmatrix"
+      require_history: false
+
+  - click: '[data-testid="status-bar-workspace-encoding"]'
+  - wait_for: '[data-testid="file-encoding-dialog"]'
+  - select_option: {selector: '[data-testid="file-encoding-select"]', value: UTF-8}
+  - click: '[data-testid="file-encoding-bom"]'
+  - click: '[data-testid="file-encoding-convert"]'
+  - press: Control+s
+  - assert_file_receipt:
+      path: "${fixture.workspace_root}/README.md"
+      selector: '[data-testid="code-workspace-save-observation"]'
+      encoding: UTF-8
+      bom: true
+      eol: crlf
+      expected_text: "café\nmatrix"
+      require_history: false
+
+  # The EOL cycle is LF -> CRLF -> CR -> LF.
+  - click: '[data-testid="status-bar-workspace-eol"]'
+  - click: '[data-testid="status-bar-workspace-eol"]'
+  - press: Control+s
+  - click: '[data-testid="status-bar-workspace-encoding"]'
+  - wait_for: '[data-testid="file-encoding-dialog"]'
+  - select_option: {selector: '[data-testid="file-encoding-select"]', value: UTF-16LE}
+  - click: '[data-testid="file-encoding-convert"]'
+  - press: Control+s
+  - assert_file_receipt:
+      path: "${fixture.workspace_root}/README.md"
+      selector: '[data-testid="code-workspace-save-observation"]'
+      encoding: UTF-16LE
+      bom: true
+      eol: lf
+      expected_text: "café\nmatrix"
+      require_history: false
