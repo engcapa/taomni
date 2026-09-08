@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import platform
 from pathlib import Path
 import subprocess
 import sys
@@ -259,10 +260,12 @@ def inspect_repository_identities(
         except Exception:
             pass
 
+    host_platform = platform.system()
+    bundle_platform = "macOS" if host_platform == "Darwin" else host_platform
     bundle_identity = build_release_bundle_identity(
         bundle_id=bundle_id,
         version=version,
-        platform="linux" if mode == "native" else "cross-platform",
+        platform=bundle_platform if mode == "native" else "cross-platform",
         files=source_files,
         test_plan=test_plan,
     )

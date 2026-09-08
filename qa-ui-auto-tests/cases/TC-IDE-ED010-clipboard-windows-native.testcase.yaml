@@ -1,0 +1,137 @@
+id: TC-IDE-ED010-clipboard-windows-native
+title: "Windows native system clipboard replacement, multi-caret paste, and one undo"
+description: |
+  ED-AUDIT-010 packaged Windows slice. Opens a real workspace file through the
+  isolated host filesystem, copies deterministic text through the production
+  workspace clipboard owner, replaces the OS clipboard from the native WebView
+  clipboard API, and pastes the external payload at two carets. The observation
+  metadata must report the real system effect and caret shape, the external
+  payload must win over stale session metadata, and one undo must restore the
+  exact pre-paste document. Browser VFS and Linux/X11 clipboard cases remain
+  separate evidence layers.
+  The final copy restores the deterministic source text to the run clipboard.
+covers: [F25.5, F1.7]
+tags: [code-workspace, ide-ed010, clipboard, multicaret, native-gate, p1]
+modes: [native]
+native_platforms: [Windows]
+fixtures: [reset_db, workspace_root]
+timeout_sec: 240
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-ed010-clipboard-windows-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-ed010","name":"qa-ed010","roots":[{"id":"r1","name":"qa-ed010","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+  - click: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+  - wait_for: '[data-testid="code-workspace-editor-pane"]'
+  - assert_file_contains:
+      path: "${fixture.workspace_root}/README.md"
+      contains: "qa workspace root"
+
+  # Make the native run deterministic without replacing the host-file read
+  # boundary exercised by opening README.md above.
+  - fill:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      value: "alpha-one\nbeta-two"
+  - wait: 0.5
+
+  # Copy through the production keymap and record the session payload before
+  # the external clipboard write.
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [Control+Home, Control+a, Control+c]
+  - wait: 1
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-clipboard-observation"]'
+      name: data-operation
+      equals: copy
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-clipboard-observation"]'
+      name: data-outcome
+      equals: success
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-clipboard-observation"]'
+      name: data-system-effect
+      equals: performed
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-clipboard-observation"]'
+      name: data-workspace-fallback
+      equals: "false"
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-tab"]'
+      name: data-clipboard-revision
+      equals: "1"
+
+  # This is a controlled native clipboard write, not a browser-VFS mutation.
+  # It changes the real OS clipboard after the workspace metadata was copied.
+  - seed_clipboard: "external-os-payload"
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [Escape, Control+Home, Control+Alt+Shift+ArrowDown]
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-cursor").length >= 2'
+      expect_truthy: true
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [Control+v]
+  - wait: 2
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-clipboard-observation"]'
+      name: data-operation
+      equals: paste
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-clipboard-observation"]'
+      name: data-outcome
+      equals: success
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-clipboard-observation"]'
+      name: data-system-effect
+      equals: performed
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-clipboard-observation"]'
+      name: data-workspace-fallback
+      equals: "false"
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-clipboard-observation"]'
+      name: data-caret-count
+      equals: "2"
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-line")[0]?.textContent === "external-os-payloadalpha-one" && document.querySelectorAll(".cm-line")[1]?.textContent === "external-os-payloadbeta-two"'
+      expect_truthy: true
+  - eval_readonly:
+      expression: '!document.getElementById("code-workspace-clipboard-observation")?.outerHTML.includes("external-os-payload")'
+      expect_truthy: true
+
+  # One production undo must remove both caret insertions as one transaction.
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [Control+z]
+  - wait: 1
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-line")[0]?.textContent === "alpha-one" && document.querySelectorAll(".cm-line")[1]?.textContent === "beta-two"'
+      expect_truthy: true
+  - eval_readonly:
+      expression: '!document.querySelectorAll(".cm-content")[0]?.textContent?.includes("external-os-payload")'
+      expect_truthy: true
+
+  # Restore the deterministic source text to the run clipboard before cleanup.
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [Control+Home, Control+a, Control+c]
+  - wait: 1
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-clipboard-observation"]'
+      name: data-operation
+      equals: copy

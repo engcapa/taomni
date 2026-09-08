@@ -75,7 +75,7 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `auth` | password string **or** `{password}` | Waits for `[data-testid="auth-prompt"]` then submits. Empty password → step error. |
 | `attach_sftp` | (none / `{}`) | Toggles attached SFTP from current SSH terminal. |
 | `set_remote_path` | path string | Sets the SFTP remote path input + presses Enter. |
-| `seed_clipboard` | text string | Writes text to OS clipboard via the page (controlled write — not eval_readonly). |
+| `seed_clipboard` | text string | Writes text to OS clipboard via the page (controlled write — not eval_readonly); browser and packaged native WebView modes support it. |
 | `seed_dialog` | `{prompt: str|[str], confirm: bool}` | Pre-arms `window.prompt` and `window.confirm` responses. Used before SFTP "new file/folder/rename" flows. `prompt` may be a list to feed sequential calls. |
 | `open_session` | `{name, double_click?}` | Clicks/dblclicks `[data-testid="session-tree-item"][data-session-name="<name>"]`. |
 | `click_menu` | label string **or** `{label}` | Click context-menu item by visible text. |

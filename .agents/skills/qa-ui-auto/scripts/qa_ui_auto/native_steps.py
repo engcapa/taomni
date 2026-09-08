@@ -19,6 +19,8 @@ Native-only verbs:
 * assert_system_clipboard - independent out-of-process read of the real X11
                           CLIPBOARD selection; the only proof that the app's
                           copy actually crossed the OS boundary.
+* seed_clipboard         - controlled write through the packaged WebView
+                          Clipboard API for native Windows clipboard flows.
 * native_pointer_drag - modifier-aware pointer drag in the packaged WebKitGTK
                         session, targeted from read-only line/column geometry.
 """
@@ -2037,6 +2039,41 @@ def _do_seed_storage(ctx: NativeStepContext, args: Any) -> str:
         "return window.localStorage.getItem(" + _json.dumps(key) + ") !== null;"
     )
     return f"seeded {key}"
+
+
+@_verb("seed_clipboard")
+def _do_seed_clipboard(ctx: NativeStepContext, args: Any) -> str:
+    """Write controlled text through the packaged WebView's OS clipboard API.
+
+    Browser mode has the same verb in ``steps.app_specific``. Native mode
+    cannot call Playwright, so use the app's WebView context and wait for the
+    real asynchronous clipboard promise before allowing the case to proceed.
+    The subsequent production paste is the behavioral postcondition.
+    """
+    text = str(args)
+    status_key = "__QA_UI_AUTO_CLIPBOARD_STATUS__"
+    script = (
+        f"window.{status_key} = 'pending'; "
+        f"navigator.clipboard.writeText({json.dumps(text)}).then("
+        f"() => window.{status_key} = 'ok', "
+        f"(error) => window.{status_key} = 'error:' + String(error)); "
+        "return true;"
+    )
+    try:
+        ctx.session.execute(script)
+    except Exception as error:  # noqa: BLE001
+        raise StepError(f"seed_clipboard: native WebView write could not start ({error})") from error
+
+    deadline = time.time() + 10
+    status = None
+    while time.time() < deadline:
+        status = ctx.session.execute(f"return window.{status_key};")
+        if status == "ok":
+            return f"native WebView clipboard write completed ({len(text)} chars)"
+        if isinstance(status, str) and status.startswith("error:"):
+            raise StepError(f"seed_clipboard: native WebView write rejected ({status[6:]})")
+        time.sleep(0.1)
+    raise StepError(f"seed_clipboard: native WebView write timed out (status={status!r})")
 
 
 @_verb("reload_window")
