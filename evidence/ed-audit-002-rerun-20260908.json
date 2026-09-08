@@ -1,0 +1,74 @@
+{
+  "verified_at": "2026-09-08T15:32:21Z",
+  "head": "6b57cbc11e18a1930e7dad24b3440fefb5fa8eeb",
+  "checks": [
+    {
+      "kind": "code-audit",
+      "command": "Re-audit at claimed baseline 6b57cbc11e18a1930e7dad24b3440fefb5fa8eeb: editor appearance virtual-space policy -> CodeMirrorHost mounted extensions/action bridge -> workspaceVirtualSpace overflow and visual-column commands -> WorkspaceDocumentTransactionOwner shared dispatch/history -> mounted undo/redo",
+      "result": "passed",
+      "summary": "Current production wiring persists afterLineEnd and atFileBottom policy, mounts virtual overflow, desired visual columns, typing and click handlers, and routes movement/materialization through the mounted editor action owner. Selection-only navigation leaves document/history unchanged; typing, paste and Enter materialize padding in one transaction; read-only, composing, stale canonical revision and lost-owner paths do not insert padding; one shared transaction owns undo/redo and split-view reconciliation. The owner scope is editor virtual space; soft-wrap intermediate visual-line, full rectangular background and grammar-fold behavior remain documented gaps outside this card.",
+      "acceptance": ["ED-AUDIT-002-A1", "ED-AUDIT-002-A2", "ED-AUDIT-002-A3"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/workspaceVirtualSpace.test.ts src/components/editor/workspace/workspaceEditorCommands.test.ts src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts src/components/editor/workspace/CodeMirrorHost.test.tsx --maxWorkers=1",
+      "result": "passed",
+      "summary": "4 test files passed; 124/124 tests passed on the current task tree. Coverage includes visual columns for tabs/CJK/emoji, virtual line and page movement, multi-caret deferred padding, selection-anchor reversal, one undo/redo transaction, paste and Enter materialization, read-only behavior, stale transaction rejection, composition isolation and mounted CodeMirrorHost wiring.",
+      "acceptance": ["ED-AUDIT-002-A2"]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/workspace/workspaceVirtualSpace.ts --path src/components/editor/workspace/workspaceEditorCommands.ts --path src/components/editor/workspace/CodeMirrorHost.tsx --path src/components/editor/workspace/workspaceDocumentTransactionOwner.ts --path src/components/editor/workspace/workspaceVirtualSpace.test.ts --path src/components/editor/workspace/workspaceEditorCommands.test.ts --path src/components/editor/workspace/CodeMirrorHost.test.tsx --path src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts",
+      "result": "passed",
+      "summary": "All 8 ED-AUDIT-002-owned TypeScript paths have scoped_errors=0; out-of-scope errors are 0 across 0 files.",
+      "acceptance": ["ED-AUDIT-002-A3"]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-01-virtual-space-navigation-and-caret --report-dir qa-ui-auto-report/ed-audit-002-browser-rerun-20260908 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "The initial command used the testcase filename instead of its catalog id and matched 0 cases; no browser behavior was executed and no pass was used.",
+      "acceptance": []
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-01 --report-dir qa-ui-auto-report/ed-audit-002-browser-rerun-20260908 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows Chromium actual run run-20260908-232307-954867800 selected 1 and passed 1 with 0 failed and 0 skipped. The case asserted real editor text and selection after mixed carets and deferred padding, one undo restoration, selection-anchor reversal, browser composition isolation, keyboard focus, textbox semantics and 200% editor zoom. Source SHA-256 485bc4f780fca911746f2d5d531e575d8441ec32a4e7e527e3c1055942176a7c; runner SHA-256 9add17360fa7d0c11a7cf31f923ec3f24e5c16096e7608f077580ae15577a771; summary SHA-256 95cdf4cd231f642e4e095b85b8c4184becd26d5bb1612cca5e970d8a5df5490b; receipt source identity was stable. Browser evidence does not prove packaged native or system IME behavior.",
+      "acceptance": ["ED-AUDIT-002-A1", "ED-AUDIT-002-A2"]
+    },
+    {
+      "kind": "native",
+      "command": "python .agents/skills/qa-ui-auto/scripts/native_build.py --force",
+      "result": "passed",
+      "summary": "Rebuilt the isolated Windows QA application with identifier com.taomni.app.qa. The build recorded source SHA-256 485bc4f780fca911746f2d5d531e575d8441ec32a4e7e527e3c1055942176a7c and binary SHA-256 dd0cebb52a3a8a9af161000767f4d70a238ad1dda1cde3dc18e92777bb9fea2e.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-02 --report-dir qa-ui-auto-report/ed-audit-002-native-rerun-20260908 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "The selected C8-02 case is Linux/X11-only and the Windows runner rejected it before launch because native_keys requires Linux/X11; no native behavior receipt was produced and no acceptance result was used.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED002-virtual-space-windows-native --report-dir qa-ui-auto-report/ed-audit-002-native-rerun-20260908 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows packaged actual run run-20260908-233031-129285500 selected 1 and passed 1 with 0 failed and 0 skipped using com.taomni.app.qa, isolated APPDATA/LOCALAPPDATA and the real WebView2 boundary. The case enabled both production virtual-space policies, asserted mixed-caret padding, reversed selection-anchor insertion, exact three-line editor text and one workspace undo. Source SHA-256 485bc4f780fca911746f2d5d531e575d8441ec32a4e7e527e3c1055942176a7c; binary SHA-256 dd0cebb52a3a8a9af161000767f4d70a238ad1dda1cde3dc18e92777bb9fea2e; summary SHA-256 9288c519d898aa92c83d44a00c256ad982ea6da835dd9e654ec4f40b78f8bd24; native-key observation SHA-256 579ee89c446c424fca8420dec104c29a3caec16084fd0cf24eddd81d080fd8cd.",
+      "acceptance": ["ED-AUDIT-002-A1", "ED-AUDIT-002-A2"]
+    }
+  ],
+  "unrun": [
+    "idea-comparison: IntelliJ IDEA 2026.2.x is not installed or available; the host only has IDEA 2025.1 and 2026.1, so no identical fixture/action observation was collected.",
+    "native Linux/WebKitGTK/X11/fcitx5: no qualifying Linux desktop runtime was available on this Windows host.",
+    "native macOS/WKWebView: no qualifying macOS runtime or OS automation host is available.",
+    "native Windows system IME beyond the browser composition assertions: no separate qualifying OS IME session was collected."
+  ],
+  "notes": [
+    "Verification was re-audited from claimed baseline HEAD 6b57cbc11e18a1930e7dad24b3440fefb5fa8eeb. Production source was already complete and no production source change was needed for this attempt; the backlog transition and evidence file are task metadata only.",
+    "The browser receipt proves a current Windows Chromium renderer workflow only. The separate native receipt proves the packaged com.taomni.app.qa/WebView2 path, isolated runtime identity and user-visible editor postconditions.",
+    "The initial filename filter mismatch and Linux-only native case rejection remain before the successful reruns. They are not represented as behavioral passes.",
+    "Terminal status is implemented: current Windows unit, scoped typecheck, browser and packaged native evidence pass; the required IDEA comparison and other platform layers remain unrun."
+  ]
+}
