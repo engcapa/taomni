@@ -1,6 +1,6 @@
 {
-  "verified_at": "2026-09-08T08:11:49Z",
-  "head": "cfde0b0c583ddc34acba93ce1f97aad4f6768ce6",
+  "verified_at": "2026-09-08T12:04:36Z",
+  "head": "0797a97b9736902622f80903b35da114584a438a",
   "checks": [
     {
       "kind": "unit",
@@ -52,21 +52,83 @@
     },
     {
       "kind": "code-audit",
-      "command": "Inspection: editorAppearanceExtension policy -> CodeMirrorHost mounted virtual-space fields/input/click handlers and action registration -> workspaceVirtualSpace navigation/materialization guards -> WorkspaceDocumentTransactionOwner dispatch/undo/redo and CodeMirrorHost revision/controlled-echo reconciliation",
+      "command": "Re-audit at claimed baseline 0797a97b9736902622f80903b35da114584a438a: editorAppearanceExtension policy -> CodeMirrorHost mounted virtual-space fields/input/click handlers and action registration -> workspaceVirtualSpace navigation/materialization guards -> WorkspaceDocumentTransactionOwner dispatch/undo/redo and CodeMirrorHost revision/controlled-echo reconciliation",
       "result": "passed",
-      "summary": "The production chain is wired from the persisted afterLineEnd/atFileBottom policy into the mounted CodeMirrorHost. Selection-only navigation tracks visual columns without document/history changes; typing and virtual Enter combine padding and payload in one dispatch, now reject read-only and composing materialization, and the owner derives canonical history with stale deleted-text rejection. Shared undo/redo checks canonical text and applies one transaction; remote reconciliation maps current transactions, preserves focus/lease ownership, rejects stale echoes, and releases the final view lease.",
+      "summary": "The production chain is wired from persisted afterLineEnd/atFileBottom policy through mounted CodeMirrorHost handlers and workspaceEditorCommands into workspaceVirtualSpace and the shared document transaction owner. Selection-only navigation tracks visual columns without document/history changes; typing and virtual Enter combine padding and payload in one dispatch, reject read-only and composing materialization, preserve stale revision and remote-echo guards, and use one canonical undo/redo transaction with recovery-safe focus and lease reconciliation.",
+      "acceptance": [
+        "ED-AUDIT-002-A1",
+        "ED-AUDIT-002-A2",
+        "ED-AUDIT-002-A3"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/workspaceVirtualSpace.test.ts src/components/editor/workspace/workspaceEditorCommands.test.ts src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts src/components/editor/workspace/CodeMirrorHost.test.tsx",
+      "result": "passed",
+      "summary": "4 test files passed; 123/123 tests passed on the current task tree. Coverage includes visual columns for tabs/CJK/emoji, virtual navigation and selection, multi-caret deferred padding, one undo/redo transaction, composition, read-only behavior, stale transaction rejection, and mounted CodeMirrorHost wiring.",
+      "acceptance": [
+        "ED-AUDIT-002-A2"
+      ]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/workspace/workspaceVirtualSpace.ts --path src/components/editor/workspace/workspaceEditorCommands.ts --path src/components/editor/workspace/CodeMirrorHost.tsx --path src/components/editor/workspace/workspaceDocumentTransactionOwner.ts --path src/components/editor/workspace/workspaceVirtualSpace.test.ts --path src/components/editor/workspace/workspaceEditorCommands.test.ts --path src/components/editor/workspace/CodeMirrorHost.test.tsx --path src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts",
+      "result": "passed",
+      "summary": "All 8 owned TypeScript paths have 0 scoped errors; out-of-scope errors are 0 across 0 files on the current task tree.",
+      "acceptance": [
+        "ED-AUDIT-002-A3"
+      ]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-01 --require-pass --report-dir qa-ui-auto-report/ed-audit-002-browser-current-20260908 --keep-runs 0",
+      "result": "passed",
+      "summary": "Windows Chromium actual run run-20260908-195442-259698500 selected 1 and passed 1 with 0 failed and 0 skipped. The case asserted real editor text and selection after mixed carets and deferred padding, one undo restoration, selection-anchor reversal, composition isolation, keyboard focus, textbox semantics and 200% zoom. Source SHA-256 is 7ee66e6453aa36c4ecaac1b8fa68ac52d01e6c0c4316307b21b5f977a68066f0; runner SHA-256 is 78d2fa02a5f43bd9f1fe9245b133b159fe3c46b242d6bb57a3b24c29235415b4; summary SHA-256 is 83742363E1C539997A89A27CDAB4AA1AB9CF72D9AA2F2E58FEB0FC0678E782BA and receipt SHA-256 is FE35E320C92CF388DD9EF2DDD7B471243B8077B8FC8A2E3A13F38171E096E36A.",
+      "acceptance": [
+        "ED-AUDIT-002-A1"
+      ]
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-02 --require-pass --report-dir qa-ui-auto-report/ed-audit-002-native-fixed-20260908 --keep-runs 0",
+      "result": "failed",
+      "summary": "Earlier native runner validation rejected set_check for native mode before launch; no behavior receipt was produced.",
       "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED002-virtual-space-windows-native --require-pass --report-dir qa-ui-auto-report/ed-audit-002-native-windows-current-20260908 --keep-runs 0",
+      "result": "failed",
+      "summary": "Windows packaged attempt run-20260908-200058-320444900 reached the real runner but failed waiting for workspace-editor-appearance-settings-dialog after the action search; no acceptance result was used.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED002-virtual-space-windows-native --require-pass --report-dir qa-ui-auto-report/ed-audit-002-native-windows-current-20260908 --keep-runs 0",
+      "result": "failed",
+      "summary": "Windows packaged attempt run-20260908-200247-680481600 failed because native_keys required the editor target to already have DOM focus; no acceptance result was used.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED002-virtual-space-windows-native --require-pass --report-dir qa-ui-auto-report/ed-audit-002-native-windows-current-20260908 --keep-runs 0",
+      "result": "passed",
+      "summary": "Windows packaged actual run run-20260908-200355-349248500 selected 1 and passed 1 with 0 failed and 0 skipped using identifier com.taomni.app.qa and the real WebView2 boundary. The case asserted mixed caret virtual padding, reversed selection-anchor insertion, exact three-line editor text, and one workspace undo. Source SHA-256 is 7ee66e6453aa36c4ecaac1b8fa68ac52d01e6c0c4316307b21b5f977a68066f0; binary SHA-256 is 50d4e4f030b64f8dff27daed5f9aae325543d2e8251bf688182ac354126da645; summary SHA-256 is 0ACE659F38B9360D4B4525A50A81756B8B4DDD3C499FADBA3FFA843FBFF4EDB6; receipt SHA-256 is 879AB8E6AC9BF3CFCB731B91980A8CD2DB93E4905682945CC6097B1B8A0CD141; native isolation SHA-256 is 39DE23DBA162CEED03896613DBBEC9C5C7D1CFD9374B866E3DFFDED1C02AAF3A.",
+      "acceptance": [
+        "ED-AUDIT-002-A1",
+        "ED-AUDIT-002-A2"
+      ]
     }
   ],
   "unrun": [
-    "native Windows packaged virtual-space behavior: the only mapped TC-IDE-C8-02 is Linux/X11/fcitx5-specific and is rejected before launch; no qualifying Windows native case is available.",
+    "idea-comparison: IntelliJ IDEA 2026.2.x is not installed or available; no identical fixture/action observation was collected.",
     "native Linux/WebKitGTK/X11/fcitx5: unavailable on this Windows host.",
     "native macOS/WKWebView: no qualifying macOS runtime or OS automation host is available.",
-    "idea-comparison: IntelliJ IDEA 2026.2.x is not installed or available; no identical fixture/action observation was collected."
+    "native Windows composition/IME beyond the browser composition assertions: no separate qualifying OS IME session was collected."
   ],
   "notes": [
-    "Verification used production code rooted at HEAD cfde0b0c583ddc34acba93ce1f97aad4f6768ce6 with the task-owned read-only guard and regression test in the working tree.",
-    "The browser receipt proves a current Windows Chromium renderer workflow only; it does not prove packaged native WebKitGTK, OS IME, or IDEA behavior.",
-    "The native rejection and IDEA absence are named evidence gaps, so the truthful terminal status is implemented rather than done."
+    "Verification was re-audited from claimed baseline HEAD 0797a97b9736902622f80903b35da114584a438a; production source was already complete and no production source change was needed for this attempt.",
+    "The browser receipt proves a current Windows Chromium renderer workflow only; the separate Windows native receipt proves the packaged com.taomni.app.qa/WebView2 path and isolated runtime identity, not Linux WebKitGTK, macOS WKWebView, system IME, or IDEA behavior.",
+    "The initial set_check rejection, detached-dialog wait, and missing-editor-focus failures remain before the successful native rerun. The final status is implemented because IDEA comparison is required but unavailable; the current Windows native, browser, unit, typecheck, and code-audit layers pass."
   ]
 }
