@@ -196,6 +196,13 @@ interface EditorGroupProps {
   workspaceActionHost?: WorkspaceActionHost | null;
   /** §8.26 / ED-MULTIVIEW-002: shared document transaction owner across splits. */
   transactionOwner?: WorkspaceDocumentTransactionOwner | null;
+  /**
+   * ED-AUDIT-008: claim a Ctrl+Z / Ctrl+Shift+Z stroke for the workspace-edit
+   * journal before the document ledger acts. `true` = the journal consumed
+   * the stroke, `false` = the journal is busy and the stroke is blocked,
+   * `undefined` = the journal has nothing in this direction.
+   */
+  onWorkspaceHistoryClaim?: (action: "undo" | "redo") => boolean | undefined;
   /** Current buffer revision used to seed the shared document owner. */
   documentRevision?: number;
   onHover: (
@@ -354,6 +361,7 @@ export function EditorGroup({
   onParameterInvalidate,
   onParameterEscape,
   transactionOwner = null,
+  onWorkspaceHistoryClaim,
   documentRevision = 0,
   parameterPopup = null,
   onSelectionChange,
@@ -822,6 +830,8 @@ export function EditorGroup({
                         fileKey={activeFile.key}
                         viewId={groupId}
                         transactionOwner={transactionOwner}
+                        onWorkspaceHistoryClaim={onWorkspaceHistoryClaim}
+                        historyReplay={activeFile.historyReplay ?? false}
                         documentRevision={activeFile.documentRevision ?? documentRevision}
                         clipboardWorkspaceId={workspaceInstanceId}
                         onClipboardUnavailable={onClipboardUnavailable}
@@ -896,6 +906,8 @@ export function EditorGroup({
                       fileKey={activeFile.key}
                       viewId={groupId}
                       transactionOwner={transactionOwner}
+                      onWorkspaceHistoryClaim={onWorkspaceHistoryClaim}
+                      historyReplay={activeFile.historyReplay ?? false}
                       documentRevision={activeFile.documentRevision ?? documentRevision}
                       clipboardWorkspaceId={workspaceInstanceId}
                       onClipboardUnavailable={onClipboardUnavailable}

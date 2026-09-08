@@ -5687,6 +5687,10 @@ controls:
     selector: '.cm-tooltip-autocomplete'
     kind: display
     optional: true       # CodeMirror-owned completion list while suggestions are active
+  - id: editor-lightbulb               # gutter quick-fix button for the diagnostic line
+    selector: '[data-testid="code-workspace-lightbulb"]'
+    kind: interactive
+    optional: true       # only while the active line carries a provider diagnostic
   - id: file-status
     selector: '[data-testid="code-workspace-file-status"]'
     kind: display

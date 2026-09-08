@@ -259,6 +259,25 @@ export function workspaceSemanticIndexBuildIsCurrent(
 }
 
 /**
+ * Freshness of an already-produced provider response: the workspace revision
+ * the build token pinned is still current. Unlike
+ * workspaceSemanticIndexBuildIsCurrent this deliberately ignores background
+ * provider progress and index catch-up (activeProviders / indexedRevision /
+ * staleReasons). jdtls keeps reporting workDoneProgress while a code-action
+ * response is in flight, and that ongoing work must not stale a
+ * revision-pinned result — same-revision results stay usable while the
+ * provider works. Cross-revision responses are already rejected by finishQuery
+ * before they ever reach a caller, so revision equality is the whole contract
+ * for gating a produced result.
+ */
+export function workspaceSemanticIndexTokenRevisionCurrent(
+  snapshot: WorkspaceSemanticIndexSnapshot,
+  token: WorkspaceSemanticIndexBuildToken,
+): boolean {
+  return snapshot.revision === token.revision;
+}
+
+/**
  * §8.20.3 W2 copy rule: this ledger is PROVIDER FRESHNESS metadata. It must
  * never read as an IntelliJ-style index ("Ready"/"Building" alone would
  * overclaim), so every label names the provider relationship explicitly.

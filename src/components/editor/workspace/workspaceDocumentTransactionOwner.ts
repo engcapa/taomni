@@ -303,8 +303,15 @@ export class WorkspaceDocumentTransactionOwner {
     const applied = applyChanges(beforeText, changes);
     if (!applied) return null;
     for (const [index, change] of changes.entries()) {
+      // Callers that omit `deleted` trust the canonical preimage, which
+      // applyChanges derives itself. A declared deletion is verified against
+      // that preimage — normalized, because `singleReplacement` declares an
+      // explicit empty `deleted` for pure insertions while `applyChanges`
+      // omits the field when nothing was deleted.
       const expectedDeleted = applied.changes[index]?.deleted;
-      if (change.deleted !== undefined && change.deleted !== expectedDeleted) return null;
+      if (change.deleted !== undefined && (change.deleted ?? "") !== (expectedDeleted ?? "")) {
+        return null;
+      }
     }
 
     record.text = applied.text;

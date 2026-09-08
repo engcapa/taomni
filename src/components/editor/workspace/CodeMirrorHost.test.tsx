@@ -990,6 +990,94 @@ describe("§8.26 ED-MULTIVIEW-002 shared document host wiring", () => {
     expect(owner.getHistoryState("shared.ts")).toMatchObject({ canUndo: true, canRedo: false });
   });
 
+  // ED-AUDIT-008: the workspace-edit journal claims a stroke before the
+  // document ledger. A `true` claim consumes the stroke without touching the
+  // ledger; `undefined` hands it back; `false` blocks it while the journal is
+  // busy.
+  it("ED-AUDIT-008: lets the workspace-edit journal claim undo and redo strokes", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const actionHost = new WorkspaceActionHost({ workspaceId: "ws-journal-claim" });
+    const initial = "hello";
+    const claims: Array<{ action: "undo" | "redo"; result: boolean | undefined }> = [];
+    let nextClaim: boolean | undefined;
+    const rendered = render(
+      <CodeMirrorHost
+        {...sharedProps(owner, "primary", initial, vi.fn(), actionHost)}
+        onWorkspaceHistoryClaim={(action) => {
+          const result = nextClaim;
+          claims.push({ action, result });
+          return result;
+        }}
+      />,
+    );
+    const view = EditorView.findFromDOM(rendered.container.querySelector<HTMLElement>(".cm-editor")!);
+    expect(view).not.toBeNull();
+    view!.dispatch({ changes: { from: initial.length, to: initial.length, insert: "!" } });
+    expect(view!.state.doc.toString()).toBe("hello!");
+
+    // Journal claim: the stroke is consumed and the document ledger keeps
+    // its entry.
+    nextClaim = true;
+    await act(async () => {
+      const result = await actionHost.execute("workspace.undo", { focus: "editor", hasActiveFile: true });
+      expect(result.kind).toBe("applied");
+    });
+    expect(claims).toEqual([{ action: "undo", result: true }]);
+    expect(view!.state.doc.toString()).toBe("hello!");
+    expect(owner.getHistoryState("shared.ts")).toMatchObject({ canUndo: true, undoDepth: 1 });
+
+    // Busy journal: the stroke is blocked, the ledger still must not act.
+    nextClaim = false;
+    await act(async () => {
+      const result = await actionHost.execute("workspace.undo", { focus: "editor", hasActiveFile: true });
+      expect(result).toMatchObject({ kind: "no-op", reason: "condition-not-met" });
+    });
+    expect(view!.state.doc.toString()).toBe("hello!");
+    expect(owner.getHistoryState("shared.ts").undoDepth).toBe(1);
+
+    // No journal entry in this direction: the document ledger proceeds.
+    nextClaim = undefined;
+    await act(async () => {
+      const result = await actionHost.execute("workspace.undo", { focus: "editor", hasActiveFile: true });
+      expect(result.kind).toBe("applied");
+    });
+    expect(view!.state.doc.toString()).toBe(initial);
+    expect(owner.getHistoryState("shared.ts")).toMatchObject({ canUndo: false, canRedo: true });
+  });
+
+  // ED-AUDIT-008: a history-replay snapshot (journal undo/redo restore) is
+  // reconciled as an "undo"-origin transaction — visible to every view, but
+  // recorded as no second document-ledger entry, so a follow-up document
+  // undo cannot re-apply the change the journal just undid.
+  it("ED-AUDIT-008: reconciles a history-replay snapshot without recording a document-ledger entry", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const actionHost = new WorkspaceActionHost({ workspaceId: "ws-history-replay" });
+    const initial = "class Main {}\n";
+    const applied = "import util.Foo;\n\nclass Main {}\n";
+    const onChange = vi.fn();
+    const props = sharedProps(owner, "primary", initial, onChange, actionHost);
+    const rendered = render(<CodeMirrorHost {...props} historyReplay={false} />);
+    const view = EditorView.findFromDOM(rendered.container.querySelector<HTMLElement>(".cm-editor")!);
+    expect(view).not.toBeNull();
+
+    // The apply reaches the ledger as a normal external snapshot.
+    rendered.rerender(<CodeMirrorHost {...props} doc={applied} historyReplay={false} />);
+    await act(async () => {});
+    expect(view!.state.doc.toString()).toBe(applied);
+    expect(owner.getHistoryState("shared.ts")).toMatchObject({ canUndo: true, undoDepth: 1 });
+
+    // The journal restore replays the pre-apply snapshot with the replay
+    // marker: the view reverts, the store-facing onChange stays quiet, and
+    // the ledger keeps exactly one (now stale) entry.
+    rendered.rerender(<CodeMirrorHost {...props} doc={initial} historyReplay={true} />);
+    await act(async () => {});
+    expect(view!.state.doc.toString()).toBe(initial);
+    expect(owner.getDocument("shared.ts")).toBe(initial);
+    expect(owner.getHistoryState("shared.ts").undoDepth).toBe(1);
+    expect(owner.undo("shared.ts", "primary")).toBeNull();
+    expect(view!.state.doc.toString()).toBe(initial);
+  });
+
   it("ED-AUDIT-002: one undo through the shared owner restores the virtual caret with the text", async () => {
     const owner = new WorkspaceDocumentTransactionOwner();
     const actionHost = new WorkspaceActionHost({ workspaceId: "ws-vspace-undo" });

@@ -3235,6 +3235,17 @@ pub(crate) fn should_skip_workspace_entry_path(path: &str) -> bool {
     })
 }
 
+/// Atomic writes stage content in a sibling `.taomni-write-<uuid>` temp file
+/// before replacing the target. Those artifacts are private to the write
+/// pipeline, so watcher consumers must never observe them as workspace
+/// changes — an unmatched temp event would clobber user-facing apply
+/// confirmations with a bogus "file changed on disk" notice.
+pub(crate) fn is_workspace_write_temp_path(path: &str) -> bool {
+    path.rsplit(['/', '\\'])
+        .next()
+        .is_some_and(|basename| basename.starts_with(".taomni-write-"))
+}
+
 fn workspace_entry(root: &Path, path: &Path) -> Result<WorkspaceEntry, String> {
     let symlink_meta =
         fs::symlink_metadata(path).map_err(|e| format!("stat {}: {e}", path.display()))?;
@@ -3632,6 +3643,19 @@ pub fn hash_mismatch_error(expected: &str, found: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn workspace_write_temp_paths_are_recognized_on_every_platform() {
+        assert!(is_workspace_write_temp_path(
+            "/ws/src/.taomni-write-4f7a1b2c3d4e5f6a7b8c9d0e1f2a3b4c"
+        ));
+        assert!(is_workspace_write_temp_path(
+            "C:\\ws\\src\\.taomni-write-4f7a1b2c3d4e5f6a7b8c9d0e1f2a3b4c"
+        ));
+        assert!(is_workspace_write_temp_path(".taomni-write-abc"));
+        assert!(!is_workspace_write_temp_path("/ws/src/Main.java"));
+        assert!(!is_workspace_write_temp_path("/ws/.taomni-write-notes/keep.java"));
+    }
 
     #[test]
     fn hash_mismatch_error_format() {

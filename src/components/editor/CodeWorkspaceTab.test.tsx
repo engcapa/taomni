@@ -2382,27 +2382,468 @@ describe("CodeWorkspaceTab", () => {
     ).openFiles["root:app:src/main.ts"]?.text).toBe("x =1"));
     await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("undo transaction"));
 
+    // ED-AUDIT-008: with editor focus the journal action yields the stroke to
+    // the shared document undo (which claims the journal), so the journal
+    // action itself stays disabled in the snapshot even though the transaction
+    // is undoable; a non-editor stroke (window target) still reaches it.
     await waitFor(() => expect(
       registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled,
-    ).toBe(true));
+    ).toBe(false));
     await act(async () => {
-      await registrationRef.current!.executeAction("workspace.undoWorkspaceEdit");
+      fireEvent.keyDown(window, { key: "z", ctrlKey: true });
     });
     await waitFor(() => expect(selectCodeWorkspaceUi(
       useCodeWorkspaceStore.getState(),
       "instance-actions",
     ).openFiles["root:app:src/main.ts"]?.text).toBe("x=1"));
 
-    await waitFor(() => expect(
-      registrationRef.current?.items.find((item) => item.id === "workspace.redoWorkspaceEdit")?.enabled,
-    ).toBe(true));
     await act(async () => {
-      await registrationRef.current!.executeAction("workspace.redoWorkspaceEdit");
+      fireEvent.keyDown(window, { key: "z", ctrlKey: true, shiftKey: true });
     });
     await waitFor(() => expect(selectCodeWorkspaceUi(
       useCodeWorkspaceStore.getState(),
       "instance-actions",
     ).openFiles["root:app:src/main.ts"]?.text).toBe("x =1"));
+  });
+
+  // ED-AUDIT-008 A1/A3: after an intention apply, Ctrl+Z on the editor
+  // surface must run the journal undo — one history unit with its verified
+  // restore — instead of colliding with the document ledger, and a follow-up
+  // Ctrl+Z must not re-apply the change the journal just undid.
+  it("undoes an applied code action through the journal with Ctrl+Z on the editor surface", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-actions-undo",
+      workspaceInstanceId: "instance-actions-undo",
+      name: "Actions",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "x=1"));
+    workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+      _rootPath: string,
+      path: string,
+      text: string,
+    ) => writeAck(file(path, text, { hash: `hash-${text}` })));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      available: true,
+      active: true,
+      capabilities: {
+        completion: false,
+        signatureHelp: false,
+        hover: false,
+        definition: false,
+        typeDefinition: false,
+        implementation: false,
+        references: false,
+        documentSymbol: false,
+        workspaceSymbol: false,
+        rename: false,
+        formatting: false,
+        rangeFormatting: false,
+        codeAction: true,
+        documentHighlight: false,
+        callHierarchy: false,
+        typeHierarchy: false,
+        inlayHint: false,
+        selectionRange: false,
+        semanticTokens: false,
+        completionTriggerCharacters: [],
+        signatureTriggerCharacters: [],
+      },
+    }));
+    lspMocks.lspCodeActions.mockResolvedValue({
+      status: documentStatus({ available: true, active: true }),
+      actions: [{
+        title: "Insert space",
+        kind: "quickfix",
+        isPreferred: true,
+        edit: null,
+        command: null,
+        commandArguments: null,
+        raw: {
+          title: "Insert space",
+          kind: "quickfix",
+          data: { fixId: "space" },
+        },
+      }],
+    });
+    lspMocks.lspCodeActionResolve.mockResolvedValue({
+      status: documentStatus({ available: true, active: true }),
+      action: {
+        title: "Insert space",
+        kind: "quickfix",
+        isPreferred: true,
+        edit: {
+          documentEdits: [{
+            uri: "file:///repo/app/src/main.ts",
+            path: "/repo/app/src/main.ts",
+            edits: [{
+              range: {
+                start: { line: 0, character: 1 },
+                end: { line: 0, character: 1 },
+              },
+              newText: " ",
+            }],
+          }],
+        },
+        command: null,
+        commandArguments: null,
+        raw: { title: "Insert space", data: { fixId: "space" } },
+      },
+    });
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+    fireEvent.keyDown(window, { key: "Enter", altKey: true });
+    fireEvent.click(await screen.findByRole("button", { name: "Insert space" }));
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-actions-undo",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("x =1"));
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("undo transaction"));
+
+    const pane = screen.getAllByTestId("code-workspace-editor-pane")[0]!;
+    fireEvent.keyDown(pane, { key: "z", ctrlKey: true });
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-actions-undo",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("x=1"));
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Undid Insert space"));
+
+    // The journal owns the reverted transaction; the superseded document
+    // ledger entry is stale, so a second Ctrl+Z must be a no-op instead of
+    // re-applying the undone change.
+    fireEvent.keyDown(pane, { key: "z", ctrlKey: true });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+    expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-actions-undo",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("x=1");
+  });
+
+  // ED-AUDIT-008 A2: a provider command that fails AFTER the WorkspaceEdit
+  // landed must not be reported as a zero-effect success — the already-written
+  // text is automatically recovered and the status message names both the
+  // failure and the performed recovery, and the failed run registers no
+  // undoable history entry.
+  it("recovers the applied edit and reports an accurate failure when the provider command throws", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-actions-cmdfail",
+      workspaceInstanceId: "instance-actions-cmdfail",
+      name: "Actions",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "x=1"));
+    workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+      _rootPath: string,
+      path: string,
+      text: string,
+    ) => writeAck(file(path, text, { hash: `hash-${text}` })));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      available: true,
+      active: true,
+      capabilities: {
+        completion: false,
+        signatureHelp: false,
+        hover: false,
+        definition: false,
+        typeDefinition: false,
+        implementation: false,
+        references: false,
+        documentSymbol: false,
+        workspaceSymbol: false,
+        rename: false,
+        formatting: false,
+        rangeFormatting: false,
+        codeAction: true,
+        documentHighlight: false,
+        callHierarchy: false,
+        typeHierarchy: false,
+        inlayHint: false,
+        selectionRange: false,
+        semanticTokens: false,
+        completionTriggerCharacters: [],
+        signatureTriggerCharacters: [],
+      },
+    }));
+    lspMocks.lspCodeActions.mockResolvedValue({
+      status: documentStatus({ available: true, active: true }),
+      actions: [{
+        title: "Insert space then sync",
+        kind: "quickfix",
+        isPreferred: true,
+        edit: null,
+        command: null,
+        commandArguments: null,
+        raw: { title: "Insert space then sync", data: { fixId: "space-sync" } },
+      }],
+    });
+    lspMocks.lspCodeActionResolve.mockResolvedValue({
+      status: documentStatus({ available: true, active: true }),
+      action: {
+        title: "Insert space then sync",
+        kind: "quickfix",
+        isPreferred: true,
+        edit: {
+          documentEdits: [{
+            uri: "file:///repo/app/src/main.ts",
+            path: "/repo/app/src/main.ts",
+            edits: [{
+              range: { start: { line: 0, character: 1 }, end: { line: 0, character: 1 } },
+              newText: " ",
+            }],
+          }],
+        },
+        command: "java.project.refresh",
+        commandArguments: [],
+        raw: { title: "Insert space then sync", data: { fixId: "space-sync" } },
+      },
+    });
+    lspMocks.lspExecuteCommand.mockRejectedValue(
+      new Error("LSP command execution timed out on language server"),
+    );
+
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+    renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+    fireEvent.keyDown(window, { key: "Enter", altKey: true });
+    fireEvent.click(await screen.findByRole("button", { name: "Insert space then sync" }));
+
+    // The edit lands first...
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-actions-cmdfail",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("x =1"));
+    // ...then the command failure is recovered: the text is restored and the
+    // message names the failure plus the performed recovery (never a
+    // zero-effect wording that would mask the mutation).
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Code action failed:"));
+    expect(useAppStore.getState().statusMessage).toContain("Provider command execution failed");
+    expect(useAppStore.getState().statusMessage).toContain("recovery ca-rec-");
+    expect(useAppStore.getState().statusMessage).toContain("performed");
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-actions-cmdfail",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("x=1"));
+    await waitFor(() => expect(
+      registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled,
+    ).not.toBe(true));
+  });
+
+  // ED-AUDIT-008 A2: a resolve that returns null keeps the file untouched and
+  // shows the retryable resolve-failure result instead of a generic error.
+  it("reports a retryable resolve failure with zero effect when resolve returns null", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-actions-resolvefail",
+      workspaceInstanceId: "instance-actions-resolvefail",
+      name: "Actions",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "x=1"));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      available: true,
+      active: true,
+      capabilities: {
+        completion: false,
+        signatureHelp: false,
+        hover: false,
+        definition: false,
+        typeDefinition: false,
+        implementation: false,
+        references: false,
+        documentSymbol: false,
+        workspaceSymbol: false,
+        rename: false,
+        formatting: false,
+        rangeFormatting: false,
+        codeAction: true,
+        documentHighlight: false,
+        callHierarchy: false,
+        typeHierarchy: false,
+        inlayHint: false,
+        selectionRange: false,
+        semanticTokens: false,
+        completionTriggerCharacters: [],
+        signatureTriggerCharacters: [],
+      },
+    }));
+    lspMocks.lspCodeActions.mockResolvedValue({
+      status: documentStatus({ available: true, active: true }),
+      actions: [{
+        title: "Vanishing fix",
+        kind: "quickfix",
+        isPreferred: true,
+        edit: null,
+        command: null,
+        commandArguments: null,
+        raw: { title: "Vanishing fix", data: { fixId: "vanish" } },
+      }],
+    });
+    lspMocks.lspCodeActionResolve.mockResolvedValue({
+      status: documentStatus({ available: true, active: true }),
+      action: null,
+    });
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+    fireEvent.keyDown(window, { key: "Enter", altKey: true });
+    fireEvent.click(await screen.findByRole("button", { name: "Vanishing fix" }));
+
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Code action resolve failed:"));
+    expect(useAppStore.getState().statusMessage).toContain("Provider returned null on resolve");
+    expect(useAppStore.getState().statusMessage).toContain("you can retry");
+    // Zero effect: the buffer text is untouched by the failed resolve.
+    expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-actions-resolvefail",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("x=1");
+  });
+
+  // ED-AUDIT-008 A1 regression: jdtls keeps reporting work-done progress while
+  // the candidates are requested and applied, so the semantic snapshot is
+  // still "building" with an active provider at both gates. Background
+  // provider progress must not stale a revision-pinned response — pre-fix the
+  // strict build gate blocked the menu ("Refactor actions became stale…") or
+  // aborted the apply ("Semantic result became stale before changes were
+  // applied") on roughly half of the native runs. The workspace revision is
+  // unchanged throughout, so the menu must open and the apply must land.
+  it("opens the intention menu and applies the quick fix while provider work-done progress is active", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-actions-progress",
+      workspaceInstanceId: "instance-actions-progress",
+      name: "Actions",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "x=1"));
+    workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+      _rootPath: string,
+      path: string,
+      text: string,
+    ) => writeAck(file(path, text, { hash: `hash-${text}` })));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      available: true,
+      active: true,
+      capabilities: {
+        completion: false,
+        signatureHelp: false,
+        hover: false,
+        definition: false,
+        typeDefinition: false,
+        implementation: false,
+        references: false,
+        documentSymbol: false,
+        workspaceSymbol: false,
+        rename: false,
+        formatting: false,
+        rangeFormatting: false,
+        codeAction: true,
+        documentHighlight: false,
+        callHierarchy: false,
+        typeHierarchy: false,
+        inlayHint: false,
+        selectionRange: false,
+        semanticTokens: false,
+        completionTriggerCharacters: [],
+        signatureTriggerCharacters: [],
+      },
+    }));
+    const insertSpaceAction = {
+      title: "Insert space",
+      kind: "quickfix",
+      isPreferred: true,
+      edit: {
+        documentEdits: [{
+          uri: "file:///repo/app/src/main.ts",
+          path: "/repo/app/src/main.ts",
+          edits: [{
+            range: { start: { line: 0, character: 1 }, end: { line: 0, character: 1 } },
+            newText: " ",
+          }],
+        }],
+      },
+      command: null,
+      commandArguments: null,
+      raw: { title: "Insert space" },
+    };
+    lspMocks.lspCodeActions.mockResolvedValue({
+      status: documentStatus({ available: true, active: true }),
+      actions: [insertSpaceAction],
+    });
+    lspMocks.lspCodeActionResolve.mockResolvedValue({
+      status: documentStatus({ available: true, active: true }),
+      action: insertSpaceAction,
+    });
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+    // jdtls begins a long-running task (Maven import); after the 150ms
+    // progress flush the semantic snapshot stays "building" with an active
+    // provider for the rest of the scenario.
+    await act(async () => {
+      await emit("lsp://work-done-progress", {
+        workspaceId: "instance-actions-progress",
+        presetId: "app",
+        serverLabel: "jdt.ls",
+        rootUri: "file:///repo/app",
+        token: "qa008-progress",
+        kind: "begin",
+        title: "Building",
+        message: null,
+        percentage: null,
+        cancellable: false,
+      });
+    });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 250)));
+
+    fireEvent.keyDown(window, { key: "Enter", altKey: true });
+    fireEvent.click(await screen.findByRole("button", { name: "Insert space" }));
+
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Applied code action"));
+    expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-actions-progress",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("x =1");
+    // ED-AUDIT-008: the commit must reach the VISIBLE editor, not only the
+    // store. The import quick fix is a pure insertion; its replaceDocument
+    // delta used to be rejected by the owner's deleted-equality guard, the
+    // sync effect swallowed the store change, and the native editor kept the
+    // pre-apply text while the disk already held the import.
+    await waitFor(() => {
+      const content = document.querySelector<HTMLElement>(".cm-content");
+      expect(content?.textContent).toContain("x =1");
+    });
   });
 
   it("cancels a multi-file code-action preview with zero edits and zero history", async () => {
@@ -8071,22 +8512,22 @@ end_of_record
           .openFiles["root:app:src/main.ts"]?.text,
       ).toBe("const value = 2;\n"));
 
+      // ED-AUDIT-008: the journal action is focus-gated off the editor surface
+      // (the shared document undo claims the stroke there), so the comparison
+      // undo/redo is driven from non-editor focus (window target).
       await waitFor(() => expect(
         registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled,
-      ).toBe(true));
+      ).toBe(false));
       await act(async () => {
-        await registrationRef.current!.executeAction("workspace.undoWorkspaceEdit");
+        fireEvent.keyDown(window, { key: "z", ctrlKey: true });
       });
       await waitFor(() => expect(
         selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-compare-history")
           .openFiles["root:app:src/main.ts"]?.text,
       ).toBe("const value = 1;\n"));
 
-      await waitFor(() => expect(
-        registrationRef.current?.items.find((item) => item.id === "workspace.redoWorkspaceEdit")?.enabled,
-      ).toBe(true));
       await act(async () => {
-        await registrationRef.current!.executeAction("workspace.redoWorkspaceEdit");
+        fireEvent.keyDown(window, { key: "z", ctrlKey: true, shiftKey: true });
       });
       await waitFor(() => expect(
         selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-compare-history")
@@ -8398,18 +8839,19 @@ end_of_record
       expect(disk["src/main.ts"]).toBe(POST["src/main.ts"]);
       expect(disk["src/other.ts"]).toBe(POST["src/other.ts"]);
 
-      await waitFor(() => expect(undoItem(registrationRef)?.enabled).toBe(true));
+      // ED-AUDIT-008: the journal action is focus-gated off the editor surface;
+      // the recovery stroke is taken from non-editor focus (window target).
+      // "Applied 2" is set after the journal entry is pushed, so it is the
+      // readiness signal for an undoable transaction.
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Applied 2"));
       await act(async () => {
-        await registrationRef.current!.executeAction("workspace.undoWorkspaceEdit");
+        fireEvent.keyDown(window, { key: "z", ctrlKey: true });
       });
       await waitFor(() => expect(disk["src/main.ts"]).toBe(PRE["src/main.ts"]));
       await waitFor(() => expect(disk["src/other.ts"]).toBe(PRE["src/other.ts"]));
 
-      await waitFor(() => expect(
-        registrationRef.current?.items.find((item) => item.id === "workspace.redoWorkspaceEdit")?.enabled,
-      ).toBe(true));
       await act(async () => {
-        await registrationRef.current!.executeAction("workspace.redoWorkspaceEdit");
+        fireEvent.keyDown(window, { key: "z", ctrlKey: true, shiftKey: true });
       });
       await waitFor(() => expect(disk["src/main.ts"]).toBe(POST["src/main.ts"]));
       await waitFor(() => expect(disk["src/other.ts"]).toBe(POST["src/other.ts"]));
@@ -8426,11 +8868,15 @@ end_of_record
       await runRename(registrationRef);
       await waitFor(() => expect(disk["src/other.ts"]).toBe(POST["src/other.ts"]));
 
-      await waitFor(() => expect(undoItem(registrationRef)?.enabled).toBe(true));
+      // ED-AUDIT-008: "Applied 2" is set after the journal entry is pushed, so
+      // it is the readiness signal; the undo stroke is taken from non-editor
+      // focus (window target) because the journal action is focus-gated off
+      // the editor surface.
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Applied 2"));
       // A later edit lands on one recorded file before the user undoes.
       disk["src/other.ts"] = "later third-party edit";
       await act(async () => {
-        await registrationRef.current!.executeAction("workspace.undoWorkspaceEdit");
+        fireEvent.keyDown(window, { key: "z", ctrlKey: true });
       });
       await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
         "Cannot undo workspace edit: Undo blocked to protect later edits",

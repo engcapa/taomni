@@ -204,14 +204,14 @@ pub struct LspDocumentStatus {
     pub capabilities: Option<LspCapabilitySummary>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LspPosition {
     pub line: u32,
     pub character: u32,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LspRange {
     pub start: LspPosition,
@@ -226,7 +226,7 @@ pub struct LspDocumentContentChange {
     pub text: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LspDiagnostic {
     pub range: LspRange,
@@ -240,7 +240,7 @@ pub struct LspDiagnostic {
     pub data: Option<Value>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LspLocation {
     pub uri: String,
@@ -248,7 +248,7 @@ pub struct LspLocation {
     pub range: LspRange,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LspDiagnosticRelatedInformation {
     pub location: LspLocation,
@@ -1326,6 +1326,7 @@ impl LspManager {
                             .filter(|change| {
                                 workspace_watch_target_matches(&watch_targets, &change.path)
                                     && !crate::workspace::should_skip_workspace_entry_path(&change.path)
+                                    && !crate::workspace::is_workspace_write_temp_path(&change.path)
                             })
                             .collect::<Vec<_>>();
                         if changes.is_empty() {
@@ -3981,10 +3982,24 @@ impl LspSession {
                 .and_then(Value::as_array)
                 .map(|items| items.iter().filter_map(parse_diagnostic).collect())
                 .unwrap_or_default();
-            self.diagnostics
-                .write()
-                .await
-                .insert(uri.to_string(), diagnostics);
+            let changed = {
+                let mut stored = self.diagnostics.write().await;
+                store_diagnostics(&mut stored, uri, diagnostics)
+            };
+            if changed {
+                // Push-style servers never send `workspace/diagnostic/refresh`,
+                // and the frontend only re-pulls on that event, a document
+                // edit, or a fresh open. A publish that lands after the
+                // post-open poll (cold Maven/Gradle import, workspace sweep)
+                // would otherwise never reach the open editor's gutter or the
+                // Problems panel, so mirror the pull-refresh signal here.
+                self.client_bridge
+                    .emit_diagnostics_refresh(LspDiagnosticsRefreshEvent {
+                        workspace_id: self.key.workspace_id.clone(),
+                        preset_id: self.key.preset_id.clone(),
+                        root_uri: self.root_uri.clone(),
+                    });
+            }
         }
     }
 
@@ -9146,6 +9161,20 @@ fn parse_range(value: &Value) -> Option<LspRange> {
     })
 }
 
+/// Store a published diagnostics report and report whether the stored report
+/// for `uri` actually changed. Servers republish unchanged reports after every
+/// reconcile; the caller only signals the frontend when the report itself
+/// moved, so identical republishes stay silent.
+fn store_diagnostics(
+    stored: &mut HashMap<String, Vec<LspDiagnostic>>,
+    uri: &str,
+    diagnostics: Vec<LspDiagnostic>,
+) -> bool {
+    let changed = stored.get(uri) != Some(&diagnostics);
+    stored.insert(uri.to_string(), diagnostics);
+    changed
+}
+
 fn parse_diagnostic(value: &Value) -> Option<LspDiagnostic> {
     Some(LspDiagnostic {
         range: parse_range(value.get("range")?)?,
@@ -13230,6 +13259,56 @@ Java(TM) SE Runtime Environment (build 17.0.4+11-LTS-179)
 
         let oversized = json!({ "payload": "x".repeat(64 * 1024) });
         assert!(bounded_diagnostic_data(&oversized).is_none());
+    }
+
+    #[test]
+    fn store_diagnostics_reports_only_real_changes() {
+        let uri = "file:///repo/src/main/java/com/example/single/QuickFixTarget.java";
+        let diagnostic = LspDiagnostic {
+            range: LspRange {
+                start: LspPosition { line: 12, character: 28 },
+                end: LspPosition { line: 12, character: 39 },
+            },
+            severity: Some(1),
+            code: Some("16777218".into()),
+            source: Some("java".into()),
+            message: "StringUtils cannot be resolved".into(),
+            tags: Vec::new(),
+            related_information: Vec::new(),
+            code_description: None,
+            data: None,
+        };
+        let mut stored: HashMap<String, Vec<LspDiagnostic>> = HashMap::new();
+
+        // First publish for the document (empty -> report) must signal.
+        assert!(store_diagnostics(&mut stored, uri, vec![diagnostic.clone()]));
+
+        // Servers republish the identical report after every reconcile; the
+        // frontend must not be re-signalled for those.
+        assert!(!store_diagnostics(&mut stored, uri, vec![diagnostic.clone()]));
+
+        // A changed report (message edit) must signal again.
+        let mut edited = diagnostic.clone();
+        edited.message = "StringUtils cannot be resolved to a type".into();
+        assert!(store_diagnostics(&mut stored, uri, vec![edited.clone()]));
+
+        // Republishing the edited report is again silent.
+        assert!(!store_diagnostics(&mut stored, uri, vec![edited.clone()]));
+
+        // Clearing the report (problems fixed) must signal.
+        assert!(store_diagnostics(&mut stored, uri, Vec::new()));
+
+        // Republishing the empty report is silent.
+        assert!(!store_diagnostics(&mut stored, uri, Vec::new()));
+
+        // A different document's publish is independent.
+        assert!(store_diagnostics(
+            &mut stored,
+            "file:///repo/src/Other.java",
+            vec![diagnostic]
+        ));
+        assert_eq!(stored[uri], Vec::<LspDiagnostic>::new());
+        assert_eq!(stored["file:///repo/src/Other.java"].len(), 1);
     }
 
     #[test]

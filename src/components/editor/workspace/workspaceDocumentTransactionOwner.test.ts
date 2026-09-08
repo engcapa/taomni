@@ -220,4 +220,70 @@ describe("§8.26 / ED-MULTIVIEW-002: WorkspaceDocumentTransactionOwner", () => {
     expect(owner.getDocument("main.ts")).toBe("hello");
     expect(owner.getHistoryState("main.ts")).toMatchObject({ canUndo: false, canRedo: false });
   });
+
+  // ED-AUDIT-008 regression: replaceDocument derives its delta with
+  // singleReplacement, which declares an explicit empty `deleted` for pure
+  // insertions, while applyChanges omits the field when nothing was deleted.
+  // The deleted-equality guard compared "" against undefined and rejected the
+  // owner's own delta, so every programmatic pure insertion (the import
+  // quick fix) returned null and CodeMirrorHost swallowed the store change —
+  // the visible editor never received the applied text.
+  it("applies a pure insertion through replaceDocument and publishes it to splits", () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    owner.initializeDocument("main.ts", "package app;\n\nclass Main {}\n");
+
+    const received: DocumentTransaction[] = [];
+    owner.subscribe("main.ts", (tr) => received.push(tr));
+
+    const nextText = "package app;\n\nimport app.util.Foo;\n\nclass Main {}\n";
+    const transaction = owner.replaceDocument("main.ts", "primary", nextText, "external-disk");
+
+    expect(transaction).not.toBeNull();
+    expect(owner.getDocument("main.ts")).toBe(nextText);
+    expect(received).toHaveLength(1);
+    expect(received[0].origin).toBe("external-disk");
+    // The insertion must be replayable: one undo returns the canonical text.
+    expect(owner.getHistoryState("main.ts").canUndo).toBe(true);
+    const undo = owner.undo("main.ts", "primary");
+    expect(undo).not.toBeNull();
+    expect(owner.getDocument("main.ts")).toBe("package app;\n\nclass Main {}\n");
+  });
+
+  // ED-AUDIT-008: a workspace-history restore reconciles through origin
+  // "undo" — the journal transaction owns that history unit, so the document
+  // ledger must not record a second (mirror) entry that a follow-up Ctrl+Z
+  // could pop to re-apply the undone change.
+  it("records no document-ledger entry for an undo-origin reconciliation and stale-guards the superseded entry", () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    owner.initializeDocument("main.ts", "package app;\n\nclass Main {}\n");
+
+    const received: DocumentTransaction[] = [];
+    owner.subscribe("main.ts", (tr) => received.push(tr));
+
+    // The intention apply reaches the ledger as a normal external snapshot.
+    const applied = "package app;\n\nimport app.util.StringUtils;\n\nclass Main {}\n";
+    expect(owner.replaceDocument("main.ts", "primary", applied, "external-disk")).not.toBeNull();
+    expect(owner.getHistoryState("main.ts")).toMatchObject({ canUndo: true, undoDepth: 1 });
+
+    // The journal restore reconciles the same document back through the
+    // "undo" origin: published to every view, but never recorded.
+    expect(owner.replaceDocument("main.ts", "journal-restore", "package app;\n\nclass Main {}\n", "undo")).not.toBeNull();
+    expect(received).toHaveLength(2);
+    expect(received[1].origin).toBe("undo");
+    expect(owner.getHistoryState("main.ts").undoDepth).toBe(1);
+
+    // The superseded entry is stale: a document undo must not re-apply the
+    // change the journal just undid.
+    expect(owner.undo("main.ts", "primary")).toBeNull();
+    expect(owner.getDocument("main.ts")).toBe("package app;\n\nclass Main {}\n");
+
+    // Once the journal re-applies (redo) through the same channel, the
+    // recorded entry becomes valid again and document undo works.
+    expect(owner.replaceDocument("main.ts", "journal-restore", applied, "undo")).not.toBeNull();
+    const undo = owner.undo("main.ts", "primary");
+    expect(undo).not.toBeNull();
+    expect(owner.getDocument("main.ts")).toBe("package app;\n\nclass Main {}\n");
+    expect(owner.redo("main.ts", "primary")).not.toBeNull();
+    expect(owner.getDocument("main.ts")).toBe(applied);
+  });
 });

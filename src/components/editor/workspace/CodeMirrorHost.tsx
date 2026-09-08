@@ -221,6 +221,20 @@ interface CodeMirrorHostProps {
   viewId?: string;
   /** Shared document transaction owner (§8.26 / ED-MULTIVIEW-002). */
   transactionOwner?: WorkspaceDocumentTransactionOwner | null;
+  /**
+   * ED-AUDIT-008: claim a Ctrl+Z / Ctrl+Shift+Z stroke for the workspace-edit
+   * journal before the document ledger acts. `true` = the journal consumed
+   * the stroke, `false` = the journal is busy and the stroke is blocked,
+   * `undefined` = the journal has nothing in this direction.
+   */
+  onWorkspaceHistoryClaim?: (action: "undo" | "redo") => boolean | undefined;
+  /**
+   * ED-AUDIT-008: the controlled snapshot is a workspace-history restore
+   * (journal undo/redo or recovery). Its reconciliation runs as an
+   * "undo"-origin transaction so no second undoable document entry is
+   * recorded beside the journal transaction that owns the change.
+   */
+  historyReplay?: boolean;
   /** Store revision used when the first view creates the canonical document. */
   documentRevision?: number;
   doc: string;
@@ -1735,6 +1749,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   fileKey = path,
   viewId,
   transactionOwner = null,
+  onWorkspaceHistoryClaim,
+  historyReplay = false,
   documentRevision = 0,
   doc,
   visible,
@@ -1816,6 +1832,10 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   fileKeyRef.current = fileKey;
   const transactionOwnerRef = useRef(transactionOwner);
   transactionOwnerRef.current = transactionOwner;
+  const workspaceHistoryClaimRef = useRef(onWorkspaceHistoryClaim);
+  workspaceHistoryClaimRef.current = onWorkspaceHistoryClaim;
+  const historyReplayRef = useRef(historyReplay);
+  historyReplayRef.current = historyReplay;
   const documentRevisionRef = useRef(documentRevision);
   documentRevisionRef.current = documentRevision;
   // §8.18.2: the mount-once editor effect reads the live host through a ref so
@@ -2667,6 +2687,11 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         isEditorGeometryReady: () => isEditorGeometryReady(view),
         runEditorCommand: (command) => command(view),
         undo: () => {
+          // ED-AUDIT-008: the workspace-edit journal is the newest
+          // user-visible history owner; when it can serve this stroke the
+          // document ledger must not act on it.
+          const claimed = workspaceHistoryClaimRef.current?.("undo");
+          if (claimed !== undefined) return claimed;
           const currentOwner = transactionOwnerRef.current;
           if (!currentOwner) return undefined;
           if (view.state.readOnly || view.composing) return false;
@@ -2682,6 +2707,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
           return true;
         },
         redo: () => {
+          const claimed = workspaceHistoryClaimRef.current?.("redo");
+          if (claimed !== undefined) return claimed;
           const currentOwner = transactionOwnerRef.current;
           if (!currentOwner) return undefined;
           if (view.state.readOnly || view.composing) return false;
@@ -3133,16 +3160,25 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         if (previousPropDocument !== doc) {
           // A changed prop is an external/store snapshot. Make it one shared
           // transaction so every split sees the same replacement and history
-          // remains owned by the canonical document.
+          // remains owned by the canonical document. ED-AUDIT-008: a
+          // workspace-history restore is journaled at transaction level, so
+          // its reconciliation records no second document-ledger entry —
+          // otherwise a follow-up Ctrl+Z would re-apply the undone change.
           const transaction = owner.replaceDocument(
             fileKeyRef.current,
             viewIdRef.current,
             doc,
-            "external-disk",
+            historyReplayRef.current ? "undo" : "external-disk",
           );
-          if (transaction) applySharedTransactionToView(view, transaction);
-          lastDocumentTextRef.current = view.state.doc.toString();
-          return;
+          if (transaction) {
+            applySharedTransactionToView(view, transaction);
+            lastDocumentTextRef.current = view.state.doc.toString();
+            return;
+          }
+          // replaceDocument declined (no canonical record, or the record
+          // already holds this text). Fall through to the direct snapshot
+          // apply below so a programmatic store change still reaches this
+          // view instead of being swallowed with a stale document.
         }
         if (currentText === canonical || lastDocumentTextRef.current === canonical) {
           // React may still expose the previous store value while a live
@@ -3153,7 +3189,9 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       }
     }
 
-    if (lastDocumentTextRef.current === doc) return;
+    if (lastDocumentTextRef.current === doc) {
+      return;
+    }
     applyingExternalDocRef.current = true;
     try {
       applyDocumentSnapshotToView(view, doc);

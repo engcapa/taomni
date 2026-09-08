@@ -1104,6 +1104,7 @@ import {
 import {
   changedWorkspaceSemanticBufferPaths,
   workspaceSemanticIndexBuildIsCurrent,
+  workspaceSemanticIndexTokenRevisionCurrent,
   type WorkspaceSemanticIndexBuildToken,
 } from "./workspace/workspaceSemanticIndex";
 import { useWorkspaceSemanticIndex } from "./workspace/useWorkspaceSemanticIndex";
@@ -2203,6 +2204,12 @@ export function CodeWorkspaceTab({
     throw new Error("Workspace resource history is not ready");
   });
   const replayWorkspaceEncodingRef = useRef<Map<string, { encoding: string; bom: boolean; eol?: "lf" | "crlf" | "cr" }> | null>(null);
+  // ED-AUDIT-008: set while a workspace-history restore replays through the
+  // workspace-edit funnel. Open-buffer writes made inside that window are
+  // recorded as "history-replay" mutations so the editor hosts treat the
+  // resulting store snapshot as a journal-owned restore (origin "undo") and
+  // never mirror it as a second undoable document entry.
+  const replayWorkspaceRestoreRef = useRef(false);
   const goToDefinitionRef = useRef<(file: OpenFileState, position: LspPosition) => Promise<boolean>>(async () => false);
   const peekDefinitionRef = useRef<(file: OpenFileState, position: LspPosition) => Promise<boolean>>(async () => false);
   const goToDeclarationRef = useRef<(file: OpenFileState, position: LspPosition) => Promise<boolean>>(async () => false);
@@ -4076,6 +4083,9 @@ export function CodeWorkspaceTab({
       savedText: nextSavedText,
       dirty: calculatedDirty,
       documentRevision: nextRevision,
+      // ED-AUDIT-008: only a history replay marks the snapshot as a restore;
+      // the explicit assignment also clears a stale flag carried by `current`.
+      historyReplay: reason === "history-replay",
     };
 
     openFilesRef.current = { ...openFilesRef.current, [key]: next };
@@ -6100,7 +6110,9 @@ export function CodeWorkspaceTab({
       setStatusMessage(`File changed on disk: ${change.path}`);
       return;
     }
-    if (file.library || file.saving) return;
+    if (file.library || file.saving) {
+      return;
+    }
     if (change.type === 3) {
       if (file.dirty) {
         enqueueExternalFileConflict(file, null);
@@ -8728,7 +8740,17 @@ export function CodeWorkspaceTab({
         }
         return null;
       },
-      applyToOpenBuffer: (key, nextText) => updateFileText(key, nextText),
+      applyToOpenBuffer: (key, nextText) => {
+        // ED-AUDIT-008: a restore replaying through this funnel must not
+        // create a second undoable document entry beside the journal
+        // transaction that owns the change, so its buffer write is recorded
+        // as a history replay (see replayWorkspaceRestoreRef).
+        if (replayWorkspaceRestoreRef.current) {
+          mutateOpenBuffer(key, { text: nextText, error: null }, "history-replay");
+          return;
+        }
+        updateFileText(key, nextText);
+      },
       // §5.2.9 open-clean: apply then save so the buffer is not left dirty.
       // ED-AUDIT-003: the shared committer reports a failed or cancelled disk
       // write as a typed result (null here), not a rejection. The applier
@@ -9158,6 +9180,7 @@ export function CodeWorkspaceTab({
     formatWorkspaceEditPreview,
     isLspDocumentSynced,
     lspDocumentVersion,
+    mutateOpenBuffer,
     readWorkspaceEditPathSnapshot,
     refreshTree,
     saveOpenBufferText,
@@ -9193,13 +9216,20 @@ export function CodeWorkspaceTab({
         ]),
     );
     try {
-      const outcomes = await applyLspWorkspaceEditNow(
-        buildWorkspacePathSnapshotEdit(currentSnapshots, snapshots),
-        { recordHistory: false },
-      );
-      const response = workspaceEditApplyResponse(outcomes);
-      if (!response.applied) {
-        throw new Error(response.failureReason ?? "Workspace history replay failed");
+      // ED-AUDIT-008: open-buffer writes inside this replay are restores, not
+      // fresh edits — the journal transaction owns their history.
+      replayWorkspaceRestoreRef.current = true;
+      try {
+        const outcomes = await applyLspWorkspaceEditNow(
+          buildWorkspacePathSnapshotEdit(currentSnapshots, snapshots),
+          { recordHistory: false },
+        );
+        const response = workspaceEditApplyResponse(outcomes);
+        if (!response.applied) {
+          throw new Error(response.failureReason ?? "Workspace history replay failed");
+        }
+      } finally {
+        replayWorkspaceRestoreRef.current = false;
       }
     } finally {
       replayWorkspaceEncodingRef.current = null;
@@ -9293,20 +9323,26 @@ export function CodeWorkspaceTab({
           }],
         ]);
         try {
-          await applyLspWorkspaceEditNow(
-            buildWorkspacePathSnapshotEdit(
-              [current],
-              [{
-                path: targetPath,
-                exists: true,
-                text: doc.preText,
-                encoding: doc.encoding,
-                bom: doc.bom,
-                eol: doc.eol ?? undefined,
-              }],
-            ),
-            { recordHistory: false },
-          );
+          // ED-AUDIT-008: recovery restores are journal-owned history too.
+          replayWorkspaceRestoreRef.current = true;
+          try {
+            await applyLspWorkspaceEditNow(
+              buildWorkspacePathSnapshotEdit(
+                [current],
+                [{
+                  path: targetPath,
+                  exists: true,
+                  text: doc.preText,
+                  encoding: doc.encoding,
+                  bom: doc.bom,
+                  eol: doc.eol ?? undefined,
+                }],
+              ),
+              { recordHistory: false },
+            );
+          } finally {
+            replayWorkspaceRestoreRef.current = false;
+          }
         } finally {
           replayWorkspaceEncodingRef.current = null;
         }
@@ -9398,6 +9434,22 @@ export function CodeWorkspaceTab({
       setWorkspaceEditHistoryRevision((revision) => revision + 1);
     }
   }, [setStatusMessage, workspaceEditHistory]);
+
+  // ED-AUDIT-008: the workspace-edit journal and the per-document CodeMirror
+  // ledger are two history owners over the same Ctrl+Z stroke. The newest
+  // user-visible transaction wins: while the journal can serve the requested
+  // direction the editor's shared undo/redo routes there; `undefined` hands
+  // the stroke back to the document ledger (character-level history). A busy
+  // journal blocks the stroke entirely so a document undo can never interleave
+  // with a running multi-file restore.
+  const claimWorkspaceHistory = useCallback((action: "undo" | "redo"): boolean | undefined => {
+    const state = workspaceEditHistory.state();
+    if (state.busy) return false;
+    if (action === "undo" ? !state.canUndo : !state.canRedo) return undefined;
+    if (action === "undo") void undoWorkspaceEdit();
+    else void redoWorkspaceEdit();
+    return true;
+  }, [redoWorkspaceEdit, undoWorkspaceEdit, workspaceEditHistory]);
 
   useEffect(() => {
     let unlisten: UnlistenFn | null = null;
@@ -9617,20 +9669,34 @@ export function CodeWorkspaceTab({
     providerActions: readonly ProviderActionV4[];
     context: CodeActionContextIdentity | null;
     semanticToken: WorkspaceSemanticIndexBuildToken | null;
+    /**
+     * Why the candidates are unusable; null when the request completed
+     * normally. `message` is the accurate user-facing outcome and has already
+     * been surfaced on the status line by the time the caller sees it.
+     */
+    requestFailure: {
+      kind: "stale" | "sync-pending" | "descriptor-missing" | "failed" | "provider";
+      message: string;
+    } | null;
   }> => {
     const caps = lspFilesRef.current[file.key]?.status?.capabilities;
     if (caps && !caps.codeAction) {
-      return { actions: [], providerActions: [], context: null, semanticToken: null };
+      return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: null };
     }
     const semanticQuery = only.some((kind) => kind === "refactor" || kind.startsWith("refactor."));
     const expectedRevision = semanticIndex.current().revision;
     const live = await ensureWorkspaceSemanticDocumentsSynced(file.key, expectedRevision);
     if (!live) {
-      setStatusMessage(`${semanticQuery ? "Refactor" : "Code actions"} require the language server to finish synchronizing current editor buffers`);
-      return { actions: [], providerActions: [], context: null, semanticToken: null };
+      const message = `${semanticQuery ? "Refactor" : "Code actions"} require the language server to finish synchronizing current editor buffers`;
+      setStatusMessage(message);
+      return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: { kind: "sync-pending", message } };
     }
     const descriptor = lspDescriptorForFile(live);
-    if (!descriptor) return { actions: [], providerActions: [], context: null, semanticToken: null };
+    if (!descriptor) {
+      const message = `Cannot resolve the language server for ${semanticQuery ? "refactor" : "code"} actions`;
+      setStatusMessage(message);
+      return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: { kind: "descriptor-missing", message } };
+    }
     const buildToken = semanticIndex.beginBuild("language-server");
     try {
       const context = snapshotCodeActionContext({
@@ -9686,12 +9752,36 @@ export function CodeWorkspaceTab({
         kind: semanticQuery ? "refactor" : "code-action",
         resultCount: rawActions.length,
       });
-      return completion.accepted
-        ? { actions: rawActions, providerActions, context, semanticToken: buildToken }
-        : { actions: [], providerActions: [], context: null, semanticToken: null };
+      if (!completion.accepted) {
+        // The workspace revision moved while the provider was producing these
+        // candidates. The response is unusable; say so instead of falling
+        // through to the generic "no actions" message.
+        const message = `${semanticQuery ? "Refactor actions" : "Code actions"} became stale because the workspace changed while requesting them; request them again`;
+        setStatusMessage(message);
+        return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: { kind: "stale", message } };
+      }
+      // The provider envelope classifies non-ready outcomes (failed / timeout
+      // / malformed / unsupported / cancelled). Surface its message instead of
+      // collapsing the request into a generic "no actions" claim; a null
+      // response ("empty") genuinely means the server offered nothing.
+      if (serviceRes.state !== "ready" && serviceRes.state !== "empty") {
+        const message = serviceRes.state === "malformed" || serviceRes.state === "failed"
+          ? serviceRes.message
+          : serviceRes.state === "unsupported"
+            ? serviceRes.reason
+            : serviceRes.state === "timeout"
+              ? "Code action request timed out before the provider answered; try again"
+              : "Code action request was cancelled";
+        setStatusMessage(message);
+        return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: { kind: "provider", message } };
+      }
+      return { actions: rawActions, providerActions, context, semanticToken: buildToken, requestFailure: null };
     } catch (error) {
-      semanticIndex.failBuild(buildToken, errorMessage(error));
-      return { actions: [], providerActions: [], context: null, semanticToken: null };
+      const detail = errorMessage(error);
+      semanticIndex.failBuild(buildToken, detail);
+      const message = `Code actions request failed: ${detail}`;
+      setStatusMessage(message);
+      return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: { kind: "failed", message } };
     }
   }, [
     ensureWorkspaceSemanticDocumentsSynced,
@@ -9744,9 +9834,12 @@ export function CodeWorkspaceTab({
   ): Promise<{ ok: boolean; message: string | null; retryable: boolean }> => {
     try {
       const assertSemanticCurrent = () => {
+        // Revision-pinned freshness: background provider progress does not
+        // stale an already-produced candidate list (see
+        // workspaceSemanticIndexTokenRevisionCurrent).
         if (
           semanticToken
-          && !workspaceSemanticIndexBuildIsCurrent(semanticIndex.current(), semanticToken)
+          && !workspaceSemanticIndexTokenRevisionCurrent(semanticIndex.current(), semanticToken)
         ) {
           throw new Error("Refactor result became stale because the workspace changed; request it again");
         }
@@ -9939,9 +10032,9 @@ export function CodeWorkspaceTab({
           }
           if (
             semanticToken
-            && !workspaceSemanticIndexBuildIsCurrent(semanticIndex.current(), semanticToken)
+            && !workspaceSemanticIndexTokenRevisionCurrent(semanticIndex.current(), semanticToken)
           ) {
-            return { valid: false, status: "stale", reason: "The workspace semantic index changed" };
+            return { valid: false, status: "stale", reason: "The workspace changed after the actions were requested" };
           }
           return { valid: true };
         },
@@ -9954,6 +10047,11 @@ export function CodeWorkspaceTab({
             label: executablePlan.title,
             semanticGeneration: semanticToken?.generation,
             semanticRevision: semanticToken?.revision,
+            // Revision-pinned freshness (ED-AUDIT-008): the candidates were
+            // produced against this revision, so background provider progress
+            // (jdtls workDoneProgress) must not abort the apply. Cross-revision
+            // edits are still rejected by the revision equality check.
+            semanticRequireReady: false,
             plan: refactorPlan,
             recordHistory: false,
             preflightMutation: transactionOptions?.onBeforeCommit,
@@ -10090,12 +10188,18 @@ export function CodeWorkspaceTab({
     };
     setGenerateCode((prev) => ({ ...prev, open: true, phase: "loading", error: null }));
     const requested = await requestCodeActions(file, range, [], ["source"]);
-    if (
-      requested.semanticToken
-      && !workspaceSemanticIndexBuildIsCurrent(semanticIndex.current(), requested.semanticToken)
-    ) {
-      setGenerateCode({ open: true, phase: "error", candidates: [], error: "Generation actions became stale because the workspace changed; retry to request them again" });
+    if (requested.requestFailure) {
+      // Stale keeps its context-specific wording; every other failure kind
+      // already surfaced its accurate message on the status line.
       generateCodeContextRef.current = null;
+      setGenerateCode({
+        open: true,
+        phase: "error",
+        candidates: [],
+        error: requested.requestFailure.kind === "stale"
+          ? "Generation actions became stale because the workspace changed; retry to request them again"
+          : requested.requestFailure.message,
+      });
       return;
     }
     const filtered = filterGenerateCodeActions(requested.actions);
@@ -10120,7 +10224,7 @@ export function CodeWorkspaceTab({
       })),
       error: null,
     });
-  }, [activeFile, requestCodeActions, semanticIndex.current, setStatusMessage]);
+  }, [activeFile, requestCodeActions, setStatusMessage]);
 
   const closeGenerateDialog = useCallback(() => {
     generateCodeContextRef.current = null;
@@ -10140,7 +10244,7 @@ export function CodeWorkspaceTab({
     const outcome = await applyGenerateSelection(selection, {
       actionFor: (candidate) => context.actions[Number(candidate.id)],
       isStale: () => !!context.semanticToken
-        && !workspaceSemanticIndexBuildIsCurrent(semanticIndex.current(), context.semanticToken!),
+        && !workspaceSemanticIndexTokenRevisionCurrent(semanticIndex.current(), context.semanticToken!),
       run: (action) => runCodeAction(action, context.file, context.semanticToken),
     });
     if (outcome.failedIndex != null) {
@@ -10258,13 +10362,12 @@ export function CodeWorkspaceTab({
     );
     if (requestAbort.signal.aborted || intentionRequestAbortRef.current !== requestAbort) return;
 
-    if (requested.semanticToken && !workspaceSemanticIndexBuildIsCurrent(
-      semanticIndex.current(),
-      requested.semanticToken,
-    )) {
-      setStatusMessage("Refactor actions became stale because the workspace changed; request them again");
-      return;
-    }
+    // Request-window staleness is decided by finishQuery acceptance inside
+    // requestCodeActions: the response is revision-pinned, and background
+    // provider progress (jdtls workDoneProgress) must not stale a produced
+    // result. Every requestFailure classification already surfaced its
+    // accurate status message there.
+    if (requested.requestFailure) return;
     if (!requested.context) {
       setStatusMessage(`No ${sectionLabel} provided by the language server`);
       return;
@@ -10356,7 +10459,6 @@ export function CodeWorkspaceTab({
     openTreeContextMenuAt,
     requestCodeActions,
     runCodeAction,
-    semanticIndex.current,
     setStatusMessage,
   ]);
 
@@ -11256,17 +11358,25 @@ export function CodeWorkspaceTab({
       start: { line: 0, character: 0 },
       end: { line: file.text.split("\n").length, character: 0 },
     };
-    const { actions, semanticToken } = await requestCodeActions(
+    const requested = await requestCodeActions(
       file,
       wholeFileRange,
       [],
       ["source.organizeImports"],
     );
-    if (!actions.length) {
+    if (requested.requestFailure) {
+      // Stale keeps its context-specific wording; every other failure kind
+      // already surfaced its accurate message on the status line.
+      if (requested.requestFailure.kind === "stale") {
+        setStatusMessage("Import optimization became stale because the workspace changed; request it again");
+      }
+      return;
+    }
+    if (!requested.actions.length) {
       setStatusMessage("No import optimization available from language server");
       return;
     }
-    await runCodeAction(actions[0], file, semanticToken);
+    await runCodeAction(requested.actions[0], file, requested.semanticToken);
     setStatusMessage("Imports organized");
   }, [activeFile, requestCodeActions, runCodeAction, setStatusMessage]);
 
@@ -13012,8 +13122,13 @@ export function CodeWorkspaceTab({
       keybinding: "Ctrl+Z",
       keybindings: ["Cmd+Z"],
       keywords: ["undo", "workspace edit", "refactor"],
+      // ED-AUDIT-008: inside the editor surface the shared document undo
+      // (workspace.undo) owns Ctrl+Z and claims the journal through
+      // claimWorkspaceHistory; this action only serves non-editor focus so
+      // the two never compete for the same stroke.
       when: (context) => context.focus !== "tree"
         && context.focus !== "terminal"
+        && context.focus !== "editor"
         && workspaceEditHistoryState.canUndo
         && !workspaceEditHistoryState.busy,
       run: () => void undoWorkspaceEdit(),
@@ -13029,6 +13144,7 @@ export function CodeWorkspaceTab({
       keywords: ["redo", "workspace edit", "refactor"],
       when: (context) => context.focus !== "tree"
         && context.focus !== "terminal"
+        && context.focus !== "editor"
         && workspaceEditHistoryState.canRedo
         && !workspaceEditHistoryState.busy,
       run: () => void redoWorkspaceEdit(),
@@ -17078,6 +17194,7 @@ export function CodeWorkspaceTab({
         onDismissBanner={(key) => setDismissedBannerKeys((prev) => new Set(prev).add(key))}
         workspaceActionHost={actionsController.host}
         transactionOwner={documentTransactionOwnerRef.current}
+        onWorkspaceHistoryClaim={claimWorkspaceHistory}
         readOnly={workspaceResourceOperationLocked}
         softWrap={groupSoftWrap}
         appearance={groupAppearance}
