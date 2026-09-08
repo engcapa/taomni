@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "fixtureId": "maven-single",
-  "generatedAt": "2026-09-08T05:38:12.698Z",
+  "generatedAt": "2026-09-08T12:41:52.116Z",
   "sanitized": true,
   "toolchain": {
     "java": {
@@ -37,7 +37,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 6545,
+          "msTotal": 7534,
           "itemCount": 50,
           "isIncomplete": true,
           "satisfied": true,
@@ -61,7 +61,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 1050,
+          "msTotal": 1346,
           "itemCount": 58,
           "isIncomplete": true,
           "satisfied": true,
@@ -85,7 +85,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 86,
+          "msTotal": 95,
           "itemCount": 14,
           "isIncomplete": false,
           "satisfied": true,
@@ -167,7 +167,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 171,
+          "msTotal": 194,
           "itemCount": 2,
           "isIncomplete": false,
           "satisfied": true,
@@ -176,7 +176,7 @@
         }
       ],
       "resolve": {
-        "ms": 854,
+        "ms": 847,
         "additionalEditCount": 1,
         "additionalEditTexts": [
           "\r\n\r\nimport org.apache.commons.lang3.StringUtils;"
@@ -202,7 +202,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 339,
+          "msTotal": 365,
           "itemCount": 50,
           "isIncomplete": true,
           "satisfied": true,
@@ -225,7 +225,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 265,
+        "msTotal": 241,
         "signaturesCount": 13,
         "labels": [
           "append(double d) : StringBuilder",
@@ -261,7 +261,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 159,
+        "msTotal": 243,
         "signaturesCount": 13,
         "labels": [
           "append(double d) : StringBuilder",
@@ -297,7 +297,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 299,
+        "msTotal": 266,
         "signaturesCount": 3,
         "labels": [
           "parseInt(String s) : int",
@@ -323,7 +323,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 164,
+        "msTotal": 303,
         "signaturesCount": 9,
         "labels": [
           "valueOf(double d) : String",
@@ -355,7 +355,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 470,
+        "msTotal": 353,
         "signaturesCount": 1,
         "labels": [
           "singletonList(T o) : List<T>"
@@ -381,9 +381,9 @@
       "supersede": {
         "firstOutcome": "rejected:-32800",
         "firstCancelled": true,
-        "msFirst": 157,
+        "msFirst": 176,
         "secondSatisfied": true,
-        "msSecond": 149
+        "msSecond": 168
       },
       "notes": "$/cancelRequest on the in-flight request mirrors the production cancel bridge; second request must satisfy"
     },
@@ -397,7 +397,7 @@
       },
       "scopeRequested": "default",
       "hover": {
-        "msFirst": 163,
+        "msFirst": 187,
         "attempts": 1,
         "contentsPresent": true,
         "contentsKind": "markup-array",
@@ -418,7 +418,7 @@
       },
       "scopeRequested": "default",
       "hover": {
-        "msFirst": 304,
+        "msFirst": 277,
         "attempts": 1,
         "contentsPresent": true,
         "contentsKind": "markup-array",
@@ -439,7 +439,7 @@
       },
       "scopeRequested": "default",
       "hover": {
-        "msFirst": 154,
+        "msFirst": 134,
         "attempts": 1,
         "contentsPresent": true,
         "contentsKind": "markup-array",
@@ -513,7 +513,7 @@
     "appliedSha256": "ac694b9072804031b676cace1194cccd226ecb2f16eef13060a82ffb3d646f7a",
     "originalSha256": "fa85c034632f35aa03d738d0acc975938918814283cc184ff97118b0d40b54b7",
     "revertedRestoresOriginalHash": true,
-    "msTotal": 1800,
+    "msTotal": 1650,
     "satisfied": true,
     "reason": null,
     "resolvedShape": {
@@ -575,8 +575,8 @@
       }
     ],
     "importProgress": {
-      "events": 53,
-      "beginTokens": 14,
+      "events": 49,
+      "beginTokens": 13,
       "titles": [
         "Synchronizing projects",
         "Building",
@@ -600,16 +600,16 @@
     }
   },
   "analysisTiming": {
-    "firstCompletionSatisfiedMs": 21706,
+    "firstCompletionSatisfiedMs": 23653,
     "offlineCacheHint": {
-      "coldSessionFirstSatisfiedMs": 21706,
-      "restartedSessionFirstSatisfiedMs": 16753,
+      "coldSessionFirstSatisfiedMs": 23653,
+      "restartedSessionFirstSatisfiedMs": 17131,
       "fasterThanCold": true
     }
   },
   "restart": {
     "performed": true,
-    "msToReadyAfterRestart": 16956,
+    "msToReadyAfterRestart": 17307,
     "completionOkAfterRestart": true,
     "signatureHelpOkAfterRestart": true,
     "reason": null,
