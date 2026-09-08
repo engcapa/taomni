@@ -1,0 +1,80 @@
+{
+  "verified_at": "2026-09-08T12:30:51Z",
+  "head": "2e6cfcfe8451c7a33da25b5b0a2ed49932dccfbd",
+  "checks": [
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/findInFilesScopeModel.test.ts src/components/editor/workspace/replaceInFilesModel.test.ts src/components/editor/workspace/buildReplaceEdits.test.ts src/components/editor/workspace/panels/FindInFilesPanel.test.tsx src/components/editor/workspace/panels/ReplacePreviewDialog.test.tsx src/components/editor/CodeWorkspaceTab.test.tsx src/components/editor/workspace/workspaceEditHistory.test.ts",
+      "result": "failed",
+      "summary": "Prior ED-AUDIT-003 attempt at baseline 5a7f3db4791305c4a965da0da697361d2cb26aae was manually terminated after the combined Vitest worker grew to about 1.3 GB without producing a result; no assertion failure was used as evidence.",
+      "acceptance": []
+    },
+    {
+      "kind": "code-audit",
+      "command": "Inspection at claimed baseline 2e6cfcfe8451c7a33da25b5b0a2ed49932dccfbd: FindInFilesPanel replaceAll/commitReplacePreview -> CodeWorkspaceTab prepareReplaceMatches/commitReplaceMatches -> replaceInFilesModel scope, edit, preimage and freshness guards -> shared applyLspWorkspaceEdit/workspaceEditApply/workspaceEditHistory",
+      "result": "passed",
+      "summary": "The current production path freezes roots, file mask, query/options, project-facts generation, matches, replacement text, selected ranges and per-file disk preimages before preview. Commit revalidates workspace roots/generation, frozen scope, selected edit signature, replacement identity, disk hashes, dirty/read-only state and current match text before invoking the real workspace writer. Cancel, stale, conflict, invalid regex, unreadable/oversize, dirty and read-only paths return before mutation and history; partial applied outcomes retain the actual applied set and shared history/recovery state rather than claiming all files succeeded. The mounted panel routes one canonical Replace in Files action to the same owner and one undo transaction.",
+      "acceptance": [
+        "ED-AUDIT-003-A1",
+        "ED-AUDIT-003-A2",
+        "ED-AUDIT-003-A3"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/findInFilesScopeModel.test.ts src/components/editor/workspace/replaceInFilesModel.test.ts src/components/editor/workspace/buildReplaceEdits.test.ts src/components/editor/workspace/panels/FindInFilesPanel.test.tsx src/components/editor/workspace/panels/ReplacePreviewDialog.test.tsx src/components/editor/workspace/workspaceEditHistory.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "6 test files passed; 55/55 tests passed on the current task tree. Assertions cover scope and mask filtering, frozen preview and exclusions, invalid regex/error/cancel behavior, dirty/read-only/hash/freshness guards, exact selected ranges, mounted panel wiring, shared workspace history and undo failure recovery.",
+      "acceptance": [
+        "ED-AUDIT-003-A1",
+        "ED-AUDIT-003-A2"
+      ]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/workspace/findInFilesScopeModel.ts --path src/components/editor/workspace/replaceInFilesModel.ts --path src/components/editor/workspace/buildReplaceEdits.ts --path src/components/editor/workspace/panels/FindInFilesPanel.tsx --path src/components/editor/workspace/panels/ReplacePreviewDialog.tsx --path src/components/editor/CodeWorkspaceTab.tsx --path src/components/editor/workspace/findInFilesScopeModel.test.ts --path src/components/editor/workspace/replaceInFilesModel.test.ts --path src/components/editor/workspace/buildReplaceEdits.test.ts --path src/components/editor/workspace/panels/FindInFilesPanel.test.tsx --path src/components/editor/workspace/panels/ReplacePreviewDialog.test.tsx",
+      "result": "passed",
+      "summary": "All 11 owned TypeScript paths have 0 scoped errors; out-of-scope errors are 0 across 0 files on the current task tree.",
+      "acceptance": [
+        "ED-AUDIT-003-A3"
+      ]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-D2-01-replace-preview-exclude-cancel-browser --require-pass --report-dir qa-ui-auto-report/ed-audit-003-browser-head-20260908 --keep-runs 0",
+      "result": "passed",
+      "summary": "Windows Chromium actual run run-20260908-202359-512053600 selected 1 and passed 1 with 0 failed and 0 skipped. The case opened the real Replace in Files preview, asserted 2 of 2 matches, excluded one occurrence to obtain 1 of 2, and cancelled while the editor text remained byte-identical. identity_stable=true; source SHA-256 7ee66e6453aa36c4ecaac1b8fa68ac52d01e6c0c4316307b21b5f977a68066f0; runner SHA-256 78d2fa02a5f43bd9f1fe9245b133b159fe3c46b242d6bb57a3b24c29235415b4; case SHA-256 1e2a8580db4d8bd8d09e3dfdfdeb9a9f93a0ebac94b908a3e36b1b0516bfc639; summary SHA-256 30CED1F8B767F9D32ABD13588CE21107C41B65186A3F8255D1E763959C8ACF49; receipt SHA-256 33FA793EA79F70B26E6A71108068052465DD3AAF636F9B194CDCBCB182A1C79B; receipt exit 0.",
+      "acceptance": [
+        "ED-AUDIT-003-A1",
+        "ED-AUDIT-003-A2"
+      ]
+    },
+    {
+      "kind": "native",
+      "command": "python .agents/skills/qa-ui-auto/scripts/native_build.py --force",
+      "result": "passed",
+      "summary": "Rebuilt the isolated Windows QA application with identifier com.taomni.app.qa. Source SHA-256 is 7ee66e6453aa36c4ecaac1b8fa68ac52d01e6c0c4316307b21b5f977a68066f0 and binary SHA-256 is 77740ca1570ae29a22ce00af658033358cd94b972447df6144c4ffc6b09aa254.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-D2-02-replace-commit-undo-native --require-pass --report-dir qa-ui-auto-report/ed-audit-003-native-head-20260908 --keep-runs 0",
+      "result": "passed",
+      "summary": "Windows packaged actual run run-20260908-203020-654883800 selected 1 and passed 1 with 0 failed and 0 skipped using com.taomni.app.qa and the real WebView2/host filesystem boundary. The case replaced disposable notes.txt content from scratch to snatch, asserted the host file effect, then used one workspace Control+Z and asserted the original scratch bytes. identity_stable=true; source SHA-256 7ee66e6453aa36c4ecaac1b8fa68ac52d01e6c0c4316307b21b5f977a68066f0; runner SHA-256 78d2fa02a5f43bd9f1fe9245b133b159fe3c46b242d6bb57a3b24c29235415b4; case SHA-256 a7073a2120679bd41898d9693bd314b6844781e2c58b8a869587dc987636ab86; binary SHA-256 77740ca1570ae29a22ce00af658033358cd94b972447df6144c4ffc6b09aa254; summary SHA-256 44C5ABC0CC36B5FB49A95A01038536EF3A51697F5B44AF509B1AFA05EE002CA1; receipt SHA-256 7CF06BE6AD708A6FB2623B139A4FD382A896A059F70797A6D04F7A4779B8D967; native isolation SHA-256 5BF61C1A88CFBD9C953632271800EEE6177366988084F66A65C426CCB6431EF5; receipt exit 0.",
+      "acceptance": [
+        "ED-AUDIT-003-A2",
+        "ED-AUDIT-003-A3"
+      ]
+    }
+  ],
+  "unrun": [
+    "idea-comparison: IntelliJ IDEA 2026.2.x executable or installation was unavailable; no identical fixture/action observation was collected.",
+    "native Linux/WebKitGTK/X11: no qualifying Linux desktop runtime was available on this Windows host.",
+    "native macOS/WKWebView: no qualifying macOS runtime or OS automation host was available."
+  ],
+  "notes": [
+    "Verification was re-audited from current claimed baseline HEAD 2e6cfcfe8451c7a33da25b5b0a2ed49932dccfbd. Production source already satisfied the card and no production source change was needed in this attempt.",
+    "The browser report proves the current Windows Chromium renderer workflow; the packaged Windows report independently proves real host-file replacement and one workspace undo through com.taomni.app.qa/WebView2. Neither report proves Linux/macOS native behavior or IDEA 2026.2.x.",
+    "The prior combined-unit termination is retained before the current green focused rerun. Search hot-path implementation was unchanged, so no separate performance evidence was required. Final status is implemented because required IDEA comparison and two platform native layers remain unrun."
+  ]
+}
