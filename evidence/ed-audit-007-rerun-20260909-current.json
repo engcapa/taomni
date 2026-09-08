@@ -1,0 +1,103 @@
+{
+  "verified_at": "2026-09-08T22:31:00.410Z",
+  "head": "46032c69e37af3037af3bf9c7124d0145cff631c",
+  "checks": [
+    {
+      "kind": "code-audit",
+      "command": "Re-audit from claimed baseline 46032c69e37af3037af3bf9c7124d0145cff631c: CodeWorkspaceTab completion identity/sync callbacks -> CodeMirrorHost createLspCompletionSource/resolve gate/Tab acceptance -> lspCompletion fetch/resolve/plan/commit -> shared document transaction history",
+      "result": "passed",
+      "summary": "The current production chain freezes workspace, file, URI, language, document revision, provider generation and project-scope identity before asynchronous fetch/resolve. CodeWorkspaceTab force-syncs the live buffer and revalidates the token around provider IPC. CodeMirrorHost mounts the real LSP source and keeps completion, snippet and resolve-gate acceptance local to the editor. lspCompletion validates primary/additional ranges, combines primary edit, imports and parsed snippet text in one dispatch with one history event, and preserves selection-only snippet navigation. Timeout, failure, unavailable, cancelled, stale, policy-change and overlap outcomes remain explicit no-op or explicit-choice paths and do not silently commit old text.",
+      "acceptance": [
+        "ED-AUDIT-007-A1",
+        "ED-AUDIT-007-A2",
+        "ED-AUDIT-007-A3"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/lspCompletion.test.ts src/components/editor/workspace/lspCompletionChoice.test.ts src/components/editor/workspace/lspCompletionChoiceSession.test.ts src/components/editor/workspace/lspCompletionResolveGate.test.ts src/components/editor/workspace/CodeMirrorHost.completion.test.tsx src/components/editor/workspace/__fixtures__/jdtls/jdtlsTraceContract.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "6 files passed; 97/97 tests passed. Coverage includes primary plus additional edits in one dispatch, snippet placeholder mapping and choice cycling, one undo/revision, stale document/provider/policy guards, resolve timeout/failure/null/cancel, explicit retry or primary-only gate, overlap rejection, unavailable capability, mounted completion wiring, and the current sanitized provider trace contract.",
+      "acceptance": [
+        "ED-AUDIT-007-A1",
+        "ED-AUDIT-007-A2",
+        "ED-AUDIT-007-A3"
+      ]
+    },
+    {
+      "kind": "provider",
+      "command": "$env:TAOMNI_FIXTURE_JAVA='C:/Program Files/Java/jdk-21/bin/java.exe'; $env:JDTLS_HOME='C:/Users/yuhan/AppData/Local/jdtls'; node src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-fixture.mjs --fixture maven-single",
+      "result": "passed",
+      "summary": "Real maven-single provider fixture passed 1/1 on JDK 21.0.4, JDT LS 1.61.0.202607142124.jar and Gradle 8.7. Dependency completion returned org.apache.commons.lang3.StringUtils with one additional import edit; applying and reverting restored the original document hash exactly. A superseded request was rejected with -32800 while the replacement satisfied, and completion/signatureHelp recovered after provider restart. Current sanitized trace SHA-256: 7c5295e045364bf8f28ca65114cb476c7e1273a8e5e6b0733f78a298a14d745a.",
+      "acceptance": [
+        "ED-AUDIT-007-A1",
+        "ED-AUDIT-007-A3"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/__fixtures__/jdtls/jdtlsTraceContract.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "1 test file passed; 44/44 trace contract assertions passed against the regenerated real-provider trace, including toolchain, completion/import, cancellation, restart and Windows path-sanitization contracts.",
+      "acceptance": []
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/workspace/lspCompletion.ts --path src/components/editor/workspace/completionScopeAdapter.ts --path src/components/editor/workspace/CodeMirrorHost.tsx --path src/components/editor/CodeWorkspaceTab.tsx --path src/components/editor/workspace/lspCompletion.test.ts --path src/components/editor/workspace/lspCompletionChoice.test.ts --path src/components/editor/workspace/lspCompletionChoiceSession.test.ts --path src/components/editor/workspace/lspCompletionResolveGate.test.ts --path src/components/editor/workspace/CodeMirrorHost.completion.test.tsx --path src/components/editor/workspace/__fixtures__/jdtls/jdtlsTraceContract.test.ts --json",
+      "result": "passed",
+      "summary": "All 10 owned TypeScript paths were checked; scoped_errors=0 and external_errors=0 across 0 files.",
+      "acceptance": [
+        "ED-AUDIT-007-A3"
+      ]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C2-02-completion-scope-fallback-browser --report-dir qa-ui-auto-report/ed-audit-007-browser-current-20260909 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows Chromium actual run run-20260909-061602-521698500 selected 1 and passed 1 with 0 failures and 0 skips across 17 asserted steps. It observed the explicit completion status naming missing project scope and using document scope. identity_stable=true; source_sha256=e0a0a1eb0cf24d9f53a9023c322327c85f1c46c5585aad155dad30b9aaa56289; runner_sha256=9add17360fa7d0c11a7cf31f923ec3f24e5c16096e7608f077580ae15577a771; case_sha256=4bd3aa838e4aaea8be80b3ab1bbce6c6b4d6995e06fa88764682b8042cec9544; summary_sha256=7a6e4f90e8174ba47c56cb471b2cf1a497c3f32f5626ed2e2c918d1a5c62cd3f.",
+      "acceptance": [
+        "ED-AUDIT-007-A1",
+        "ED-AUDIT-007-A3"
+      ]
+    },
+    {
+      "kind": "native",
+      "command": "python .agents/skills/qa-ui-auto/scripts/native_build.py --force",
+      "result": "passed",
+      "summary": "Rebuilt the isolated Windows QA application as com.taomni.app.qa. The debug binary SHA-256 is 3ee4d58718efcd4b6e9afe7417f80f9c910ab2a7af2913dcce98494a1001d2a8 and the build source identity is e0a0a1eb0cf24d9f53a9023c322327c85f1c46c5585aad155dad30b9aaa56289.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C2-01,TC-IDE-C2-03-completion-choice-undo-native,TC-IDE-C2-05-java-completion-refine-accept-native --report-dir qa-ui-auto-report/ed-audit-007-native-current-20260909 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "The native runner rejected the combined selection before launch: TC-IDE-C2-03-completion-choice-undo-native uses native_keys, which requires Linux/X11. No native behavior was claimed from this preflight and no browser result was substituted.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C2-01,TC-IDE-C2-05-java-completion-refine-accept-native --report-dir qa-ui-auto-report/ed-audit-007-native-current-20260909 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows packaged WebView2 actual run run-20260909-062251-205507400 selected 2 and passed 2 with 0 failures and 0 skips. The independent com.taomni.app.qa runtime executed real JDT LS completion: C2-01 accepted the provider choice and restored both completion and import with one Ctrl+Z; C2-05 accepted refined candidates by Tab and mouse and restored the prefix with undo while checking readonly postconditions. identity_stable=true; source_sha256=e0a0a1eb0cf24d9f53a9023c322327c85f1c46c5585aad155dad30b9aaa56289; binary_sha256=3ee4d58718efcd4b6e9afe7417f80f9c910ab2a7af2913dcce98494a1001d2a8; runner_sha256=9add17360fa7d0c11a7cf31f923ec3f24e5c16096e7608f077580ae15577a771; case_sha256 values=adb4531f5912dfec668fbced313b587997d0add624931d46646624fd3b18af9f,34f5d0ec00da26e845dba9e846aa500ef9a7eab4775a3b500b861e6cb3033d4b; summary_sha256=7271f0975b399f4bb63266a336b48a5b93e66b696cfea0bc79e1054696b8b626.",
+      "acceptance": [
+        "ED-AUDIT-007-A1",
+        "ED-AUDIT-007-A2",
+        "ED-AUDIT-007-A3"
+      ]
+    }
+  ],
+  "unrun": [
+    "idea-comparison: no idea64.exe or idea.exe is on PATH and no IntelliJ IDEA 2026.2.x runtime was found; no identical fixture/action observation was collected.",
+    "native C2-03: the Windows preflight rejected native_keys because no qualifying Linux/X11 runtime is available on this host.",
+    "native Linux: no qualifying Linux Tauri/WebKitGTK desktop or X11 automation runtime was available on this Windows host.",
+    "native macOS: no qualifying macOS QA bundle, WKWebView automation or manual QA-app run was available.",
+    "provider Linux/macOS: the real JDT LS provider trace and packaged provider workflow were collected on Windows only; cross-platform provider behavior is not claimed.",
+    "IDEA ranking and Smart Completion comparison: no IDEA 2026.2.x observation exists, so ranking deltas remain unmeasured."
+  ],
+  "notes": [
+    "Verification used the claimed baseline HEAD 46032c69e37af3037af3bf9c7124d0145cff631c. Production source was re-audited and unchanged during this attempt; the regenerated sanitized provider trace, evidence file and task-board transition are task-owned changes.",
+    "The first native preflight failure is retained before the successful Windows rerun. The C2-03 case was not treated as passed after the Linux/X11 rejection.",
+    "Browser evidence is renderer/stub-boundary evidence. Provider evidence is real JDT LS stdio evidence. Native evidence is the independently built Windows Tauri/WebView2 application with isolated QA storage and the real provider workflow.",
+    "Capability ceiling: current Windows/provider L2 completion fetch, resolve, primary/import/snippet acceptance, explicit unavailable handling, stale/cancel/failure gates and one-undo behavior. This does not claim IDEA 2026.2.x parity, C2-03 Linux/X11 execution, or Linux/macOS native/provider parity."
+  ]
+}
