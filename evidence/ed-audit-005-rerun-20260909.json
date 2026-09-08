@@ -1,0 +1,94 @@
+{
+  "verified_at": "2026-09-08T16:30:35.0246895Z",
+  "head": "847f78aa87636b59cd51c4ca202f36e5ed0db475",
+  "checks": [
+    {
+      "kind": "code-audit",
+      "command": "Re-audit at claimed baseline 847f78aa87636b59cd51c4ca202f36e5ed0db475: CodeMirrorHost EditorView.updateListener/ChangeSet -> EditorGroup onChangeText -> CodeWorkspaceTab queueEditorTextUpdate -> shared document transaction owner -> LSP debounce, selection/undo, save and recovery",
+      "result": "passed",
+      "summary": "The current mounted input path reconstructs text from the tracked document snapshot and incremental ChangeSet, falling back to one full snapshot only when the start state is not the tracked state. It dispatches deltas through the shared document owner, rejects stale owner updates without replacing newer input, and preserves the same owner for selection, shared undo, save writeback and recovery. Stable semantic array comparisons and compartment guards avoid redundant reconfigure work. Live didChange is debounced and scheduled only for an already usable language-server session; measurement is passive and cannot change production results.",
+      "acceptance": [
+        "ED-AUDIT-005-A2"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/CodeMirrorHost.test.tsx src/components/editor/workspace/editorPerformance.test.tsx src/lib/performanceInstrumentation.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "3 test files passed; 51/51 tests passed. The suite covers incremental ChangeSet reconstruction, controlled-echo protection, shared owner transaction behavior, selection/undo and recovery wiring, compartment guards and raw percentile summarization.",
+      "acceptance": [
+        "ED-AUDIT-005-A2"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/editorPerformance.test.tsx src/stores/appStore.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "2 test files passed; 64/64 tests passed. Editor performance regressions and app-store/editor-owner behavior remain green on the claimed source.",
+      "acceptance": [
+        "ED-AUDIT-005-A2"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "python -m unittest discover -s .agents/skills/qa-ui-auto/scripts -p 'test_editor_performance.py'",
+      "result": "passed",
+      "summary": "1/1 deterministic fixture test passed for the small, 1 MiB and 5 MiB Java-like fixture byte sizes and hashes.",
+      "acceptance": []
+    },
+    {
+      "kind": "unit",
+      "command": "python -m unittest discover -s .agents/skills/qa-ui-auto/scripts -p 'test_runner_receipt.py'",
+      "result": "passed",
+      "summary": "11/11 runner receipt tests passed, including native report-tree teardown handling; the command exited 0 with only an internal temporary-directory git warning.",
+      "acceptance": []
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/workspace/CodeMirrorHost.tsx --path src/components/editor/workspace/CodeMirrorHost.test.tsx --path src/components/editor/workspace/editorPerformance.test.tsx --path src/components/editor/workspace/workspaceDocumentTransactionOwner.ts --path src/components/editor/CodeWorkspaceTab.tsx --path src/components/editor/CodeWorkspaceTab.test.tsx --path src/lib/performanceInstrumentation.ts --path src/lib/performanceInstrumentation.test.ts --path src/stores/appStore.test.ts",
+      "result": "passed",
+      "summary": "All 9 owned TypeScript paths have scoped errors 0; out-of-scope errors are 0 across 0 files.",
+      "acceptance": [
+        "ED-AUDIT-005-A3"
+      ]
+    },
+    {
+      "kind": "native",
+      "command": "python .agents/skills/qa-ui-auto/scripts/native_build.py --force",
+      "result": "passed",
+      "summary": "Built the isolated Windows QA application com.taomni.app.qa in debug profile. The build identity records source SHA-256 485bc4f780fca911746f2d5d531e575d8441ec32a4e7e527e3c1055942176a7c and binary SHA-256 90bc93e153315dd3673fd6199f604128c8870f03e0f06181c68c2d7f807eb912.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED005-editor-input-performance-native --report-dir qa-ui-auto-report/ed-audit-005-current-20260909 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows packaged actual run run-20260909-002605-904613100 selected 1 and passed 1 with 0 failed and 0 skipped in 107.5 seconds. Using isolated APPDATA/LOCALAPPDATA, WebView2 and the real host filesystem, it exercised mounted small/1 MiB/5 MiB editors, 20 warmup plus 208 measured keys per group, selection replacement, one undo, save state and host-file postconditions. summary source SHA-256 is 485bc4f780fca911746f2d5d531e575d8441ec32a4e7e527e3c1055942176a7c; runner SHA-256 is 9add17360fa7d0c11a7cf31f923ec3f24e5c16096e7608f077580ae15577a771; case SHA-256 is 6937c1852be60fd2261a06df7053f087300cd1ad02d41394504854749b19c8e7; identity_stable=true.",
+      "acceptance": [
+        "ED-AUDIT-005-A2",
+        "ED-AUDIT-005-A3"
+      ]
+    },
+    {
+      "kind": "performance",
+      "command": "Inspect qa-ui-auto-report/ed-audit-005-current-20260909/run-20260909-002605-904613100/TC-IDE-ED005-editor-input-performance-native/native-editor-performance-{small,one-mib,five-mib}.json",
+      "result": "passed",
+      "summary": "Each current-source native artifact retains 20 warmup and 208 measured raw keydown-to-CodeMirror-DOM-mutation samples, nearest-rank p50/p95/p99/max, fixture byte length/SHA-256, source/binary identity and final editor length/hash. p95 was small 13.6 ms, 1 MiB 47.7 ms and 5 MiB 36.1 ms; p99 was 15.9 ms, 51.6 ms and 41.7 ms respectively; maxima were 19.0 ms, 66.0 ms and 138.8 ms. The 1000 ms collection guard passed and absoluteBudgetClaim=false. This is a renderer proxy, not OS-to-screen latency; raw artifacts are retained in the run directory.",
+      "acceptance": []
+    }
+  ],
+  "unrun": [
+    "idea-comparison: the host exposes IntelliJIdea2025.1 and IntelliJIdea2026.1 only; IntelliJ IDEA 2026.2.x was unavailable, so no identical fixture/action or common endpoint observation was collected.",
+    "performance baseline/candidate decision for ED-AUDIT-005-A1: this run is a current-source observation and no pre-registered matching baseline/candidate pair is available; no matched or no-regression conclusion is claimed.",
+    "performance noise decision for ED-AUDIT-005-A2: no pre-registered statistical noise threshold or confidence procedure was approved before collection; no beyond-noise optimization claim is made.",
+    "native Linux/WebKitGTK/X11: no qualifying Linux desktop runtime was available on this Windows host.",
+    "native macOS/WKWebView: no macOS QA bundle or OS automation runtime was available."
+  ],
+  "notes": [
+    "Verification used the claimed baseline HEAD 847f78aa87636b59cd51c4ca202f36e5ed0db475. Production source was unchanged during this attempt; only task-board state was uncommitted before evidence creation.",
+    "Production effect chain: real key input -> mounted CodeMirror updateListener -> incremental ChangeSet/deltas -> shared document transaction owner -> live buffer and conditional debounced LSP sync -> controlled echo and stale-owner guards -> shared selection/undo/save/recovery state -> native observable text and host-file postconditions.",
+    "The current production path already contained the audited hot-path optimization, so no redundant rewrite was made. Unit and native behavior evidence establishes current-path correctness, but the absent matching baseline/noise decision prevents the strict beyond-noise A2 conclusion.",
+    "The native run used QA identity com.taomni.app.qa, WebView2, isolated storage roots and runner receipt source/test-plan/bundle identities. Browser stubs and runner step durations were not used as performance proof.",
+    "Terminal status is implemented: available Windows unit/typecheck/native/performance evidence passes, while required IDEA comparison, cross-platform native layers and strict baseline/noise claims remain unavailable."
+  ]
+}
