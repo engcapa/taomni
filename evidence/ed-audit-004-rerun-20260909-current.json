@@ -1,0 +1,93 @@
+{
+  "verified_at": "2026-09-08T21:40:30.8967261Z",
+  "head": "feb1c6f09bc018096cb466cc35e38043449e6434",
+  "checks": [
+    {
+      "kind": "code-audit",
+      "command": "Re-audit from claimed baseline feb1c6f09bc018096cb466cc35e38043449e6434: CodeWorkspaceTab saveFile/executeSaveTransaction/commitOpenBufferPreparedSave/commitClosedFilePreparedSave -> PreparedSave/effect axes/FinalBytesReceipt -> workspaceWriteFileEncoded -> Tauri workspace.rs encoded writer",
+      "result": "passed",
+      "summary": "The current production chain freezes document revision, style generation, expected disk hash, text and encoding/EOL/BOM policy before awaiting. The normalization pipeline is immutable and organize-imports remains plan-only; the single writer encodes once and derives its receipt from native intent, old and written byte facts. Synchronous pre-write cancellation, hash conflict, encoding/known failure, unknown effect, stale input and closed-owner writeback remain distinct. Unknown writes are read back and classified before retry, unresolved foreign bytes create a recovery ledger entry, and owner loss after a committed write reports writeback-discarded instead of resurrecting the buffer.",
+      "acceptance": [
+        "ED-AUDIT-004-A1",
+        "ED-AUDIT-004-A2",
+        "ED-AUDIT-004-A3"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/saveCommit.test.ts src/components/editor/workspace/saveNormalizationPipeline.test.ts src/components/editor/workspace/saveOrganizeImportsAdapter.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "3 files passed; 65/65 tests passed. Coverage includes policy precedence, exact EOL/encoding/BOM bytes, immutable six-stage normalization, organize-imports plan-only behavior, pre-write cancellation, typing races, closed-owner writeback, conflict, known failure, unknown effect, recovery classification and one-write receipt facts.",
+      "acceptance": [
+        "ED-AUDIT-004-A1",
+        "ED-AUDIT-004-A2"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/CodeWorkspaceTab.test.tsx --maxWorkers=1 -t \"P0-S / N1.7 Atomic Save Commit Host Race Tests\"",
+      "result": "passed",
+      "summary": "1 mounted test file passed; 9 selected tests passed and 110 unrelated tests were skipped. The mounted owner tests cover receipt wiring, pre-write typing cancellation, stale dirty writeback, closed-owner discard and unknown-effect recovery with automatic retry blocked.",
+      "acceptance": [
+        "ED-AUDIT-004-A2",
+        "ED-AUDIT-004-A3"
+      ]
+    },
+    {
+      "kind": "rust",
+      "command": "cargo test --lib encoded_write_",
+      "result": "passed",
+      "summary": "The focused Rust encoded writer suite passed 7/7 tests with 1280 tests filtered out. It covered missing target/hash precondition, encoding failure, target failure effect and byte facts, hash conflict, successful intent/old-hash acknowledgement and ISO-8859-1 round trip; exit 0 with existing warnings.",
+      "acceptance": [
+        "ED-AUDIT-004-A1",
+        "ED-AUDIT-004-A2"
+      ]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/workspace/saveCommit.ts --path src/components/editor/workspace/saveNormalizationPipeline.ts --path src/components/editor/workspace/saveOrganizeImportsAdapter.ts --path src/components/editor/CodeWorkspaceTab.tsx --path src/lib/editor/workspace.ts --path src/components/editor/workspace/saveCommit.test.ts --path src/components/editor/workspace/saveNormalizationPipeline.test.ts --path src/components/editor/workspace/saveOrganizeImportsAdapter.test.ts --path src/components/editor/CodeWorkspaceTab.test.tsx --json",
+      "result": "passed",
+      "summary": "All 9 owned TypeScript paths have scoped_errors=0; external_errors=0 across 0 files.",
+      "acceptance": [
+        "ED-AUDIT-004-A3"
+      ]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C0-02 --report-dir qa-ui-auto-report/ed-audit-004-browser-current-20260909 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows Chromium actual run run-20260909-053019-766841500 selected 1 and passed 1 with 0 failed and 0 skipped. TC-IDE-C0-02 asserted dirty/saved receipt state, encoded and final hashes, writeCount=1, visible focus, save-status live-region semantics, 200% editor size and one Undo. source_sha256=793c81e67e3e468e34d37d1d56b39149be22f35c28ff09672cd28187b084696d; runner_sha256=9add17360fa7d0c11a7cf31f923ec3f24e5c16096e7608f077580ae15577a771; identity_stable=true; case_sha256=ad3def4f299740ba5549dbdc78c443e53899115aa71b4424758e5daf35d264a9. Browser evidence is renderer/VFS-bound.",
+      "acceptance": [
+        "ED-AUDIT-004-A1"
+      ]
+    },
+    {
+      "kind": "native",
+      "command": "python .agents/skills/qa-ui-auto/scripts/native_build.py --force",
+      "result": "passed",
+      "summary": "Built the isolated Windows debug QA application com.taomni.app.qa from source_sha256=793c81e67e3e468e34d37d1d56b39149be22f35c28ff09672cd28187b084696d; binary_sha256=bed07bc417b1a0b069b6be3d87691a1ffffcbeb1093bfb328531d6a9b0979822. Build used Windows-10-10.0.26200-SP0, rustc 1.96.0 and node v24.15.0.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C0-03 --report-dir qa-ui-auto-report/ed-audit-004-native-current-20260909 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows packaged actual run run-20260909-053701-512968500 selected 1 and passed 1 with 0 failed and 0 skipped. The real com.taomni.app.qa Tauri/WebView2 runtime used isolated APPDATA/LOCALAPPDATA and host files. native-save-observations.json independently reconciled each production receipt with host bytes for UTF-8/LF (12 bytes, eeaa468182b0e8c7135b54857097d25bf00a76ff1c092477c30ff3d5eb04e63d), UTF-8/CRLF (13 bytes, 56ceb35c3dfe02fbfc25f847721413c20acddb4357c615e9da7d9b58b1c154fd), UTF-8 BOM/CRLF (16 bytes, 054939300b51321329d2b335a9ae5e6117640f91370d210e8135f1b1d00b278e) and UTF-16LE BOM/LF (24 bytes, 282b28b92e5d8136518adeb45c5ddc3f820ee2a5eaad5fc3ab90e34645ceeb65). source_sha256=793c81e67e3e468e34d37d1d56b39149be22f35c28ff09672cd28187b084696d; binary_sha256=bed07bc417b1a0b069b6be3d87691a1ffffcbeb1093bfb328531d6a9b0979822; runner_sha256=9add17360fa7d0c11a7cf31f923ec3f24e5c16096e7608f077580ae15577a771; identity_stable=true; receipt_exit=0.",
+      "acceptance": [
+        "ED-AUDIT-004-A1",
+        "ED-AUDIT-004-A3"
+      ]
+    }
+  ],
+  "unrun": [
+    "idea-comparison: no IntelliJ IDEA 2026.2.x executable or installation is available; checked JetBrains installations expose IntelliJIdea2025.1 and IntelliJIdea2026.1 only, so no identical Save/Undo, encoding/EOL/BOM, conflict or input-race observation was collected.",
+    "native Linux/WebKitGTK/X11: no qualifying Linux desktop runtime was available on this Windows host.",
+    "native macOS/WKWebView: no qualifying macOS runtime or OS automation host was available."
+  ],
+  "notes": [
+    "Production effect chain: UI Save -> immutable PreparedSave and normalization plan -> synchronous owner/revision/hash boundary -> one encoded native writer -> FinalBytesReceipt from native byte facts -> stale/closed/unknown effect classification -> provider sync, dirty preservation or recovery ledger; Undo changes the buffer/history boundary and does not silently rewrite disk.",
+    "Verification was re-audited from claimed baseline HEAD feb1c6f09bc018096cb466cc35e38043449e6434. The save implementation was already complete, so this attempt changed only task-board metadata and evidence; no production save source changed.",
+    "Browser evidence proves the current renderer/VFS workflow. Native evidence crosses the packaged Windows Tauri/WebView2 and real host-filesystem boundary; Rust evidence proves the encoded writer contract. None substitutes for IDEA 2026.2.x or other-platform native behavior.",
+    "No performance evidence is required by this card. Terminal status is implemented: all available current Windows focused, mounted, Rust, scoped typecheck, browser and packaged native evidence pass; IDEA comparison and Linux/macOS native layers remain unavailable."
+  ]
+}
