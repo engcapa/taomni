@@ -36,6 +36,36 @@ class NativeSessionTransportTest(TestCase):
             server.server_close()
             thread.join()
 
+    def test_start_forwards_webview2_user_data_folder(self):
+        session = NativeSession(
+            "http://driver.invalid",
+            Path("C:/qa/taomni.exe"),
+            webview_options={"userDataFolder": "C:/qa/profile"},
+        )
+        session.request = Mock(return_value={"sessionId": "session-1"})
+        session.install_console_hook = Mock()
+
+        session.start()
+
+        payload = session.request.call_args.args[2]
+        self.assertEqual(
+            payload["capabilities"]["alwaysMatch"]["tauri:options"],
+            {
+                "application": str(Path("C:/qa/taomni.exe").resolve()),
+                "webviewOptions": {"userDataFolder": "C:/qa/profile"},
+            },
+        )
+
+    def test_start_omits_optional_webview2_options_when_unset(self):
+        session = NativeSession("http://driver.invalid", Path("C:/qa/taomni.exe"))
+        session.request = Mock(return_value={"sessionId": "session-1"})
+        session.install_console_hook = Mock()
+
+        session.start()
+
+        options = session.request.call_args.args[2]["capabilities"]["alwaysMatch"]["tauri:options"]
+        self.assertNotIn("webviewOptions", options)
+
 
 class NativeSessionFillTest(TestCase):
     def session(self, contenteditable: bool, focus_results: list[bool] | None = None) -> NativeSession:
@@ -616,3 +646,95 @@ class NativeClipboardOwnerTest(TestCase):
                 )
             with self.assertRaises(native_steps.StepError):
                 native_steps.VERBS["assert_system_clipboard"](ctx, {})
+
+
+class NativeRestartAppVerbTest(TestCase):
+    def test_restart_closes_old_session_creates_replacement_and_records_observation(self) -> None:
+        with TemporaryDirectory() as directory:
+            case_dir = Path(directory) / "TC-NATIVE"
+            case_dir.mkdir()
+            old_session = Mock(session_id="session-old", application=Path("/qa/taomni.exe"))
+            replacement = Mock(session_id="session-new", application=Path("/qa/taomni.exe"))
+            factory = Mock(return_value=replacement)
+            ctx = native_steps.NativeStepContext(
+                old_session,
+                case_dir,
+                {},
+                session_factory=factory,
+            )
+
+            result = native_steps.VERBS["native_restart_app"](ctx, None)
+
+            self.assertIn("session-old -> session-new", result)
+            old_session.close.assert_called_once_with()
+            factory.assert_called_once_with()
+            self.assertIs(ctx.session, replacement)
+            observations = json.loads(
+                (case_dir / "native-restart-observations.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(len(observations), 1)
+            self.assertEqual(observations[0]["oldSessionId"], "session-old")
+            self.assertEqual(observations[0]["newSessionId"], "session-new")
+            self.assertTrue(observations[0]["sessionReplaced"])
+            self.assertEqual(observations[0]["application"], str(replacement.application))
+            self.assertEqual(observations[0]["sessionCreationAttempts"], 1)
+            self.assertIsInstance(observations[0]["verifiedAtUnixMs"], int)
+
+    def test_restart_retries_only_the_webview_profile_release_race(self) -> None:
+        with TemporaryDirectory() as directory:
+            case_dir = Path(directory) / "TC-NATIVE"
+            case_dir.mkdir()
+            old_session = Mock(session_id="session-old", application=Path("/qa/taomni.exe"))
+            replacement = Mock(session_id="session-new", application=Path("/qa/taomni.exe"))
+            factory = Mock(side_effect=[
+                RuntimeError(
+                    "HTTP 500: session not created: cannot parse internal JSON template: EOF"
+                ),
+                replacement,
+            ])
+            ctx = native_steps.NativeStepContext(
+                old_session,
+                case_dir,
+                {},
+                session_factory=factory,
+            )
+
+            with patch.object(native_steps.time, "sleep") as sleep:
+                native_steps.VERBS["native_restart_app"](ctx, None)
+
+            self.assertEqual(factory.call_count, 2)
+            sleep.assert_called_once_with(0.25)
+            observations = json.loads(
+                (case_dir / "native-restart-observations.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(observations[0]["sessionCreationAttempts"], 2)
+
+    def test_restart_does_not_retry_unrelated_session_creation_errors(self) -> None:
+        with TemporaryDirectory() as directory:
+            case_dir = Path(directory) / "TC-NATIVE"
+            case_dir.mkdir()
+            old_session = Mock(session_id="session-old")
+            factory = Mock(side_effect=RuntimeError("invalid capability"))
+            ctx = native_steps.NativeStepContext(
+                old_session,
+                case_dir,
+                {},
+                session_factory=factory,
+            )
+
+            with self.assertRaisesRegex(native_steps.StepError, "invalid capability"):
+                native_steps.VERBS["native_restart_app"](
+                    ctx,
+                    None,
+                )
+
+            factory.assert_called_once_with()
+
+    def test_restart_requires_a_session_factory(self) -> None:
+        with TemporaryDirectory() as directory:
+            case_dir = Path(directory) / "TC-NATIVE"
+            case_dir.mkdir()
+            ctx = native_steps.NativeStepContext(Mock(session_id="session-old"), case_dir, {})
+
+            with self.assertRaisesRegex(native_steps.StepError, "session factory is unavailable"):
+                native_steps.VERBS["native_restart_app"](ctx, None)

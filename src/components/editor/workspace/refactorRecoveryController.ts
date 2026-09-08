@@ -48,7 +48,9 @@ export class RefactorRecoveryController {
   }
 
   listPending(): RefactorRecoveryJournalRecord[] {
-    return listPendingRefactorRecoveryJournals(this.workspaceRoot, this.storage);
+    return listPendingRefactorRecoveryJournals(this.workspaceRoot, this.storage).filter((entry) => (
+      entry.schemaVersion === 1 || entry.workspaceId === this.workspaceId
+    ));
   }
 
   persist(entry: RefactorRecoveryJournalEntry): { ok: true } | { ok: false; reason: string } {

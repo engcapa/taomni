@@ -1,0 +1,80 @@
+id: TC-IDE-ED014-refactor-recovery-browser
+title: "Refactor recovery journal discovery and verified rollback in browser VFS"
+description: |
+  ED-AUDIT-014 browser slice. Creates a real browser-VFS file, saves its
+  post-image, seeds a prepared v2 refactor journal for the stable /preview
+  workspace identity, reloads and reopens the workspace, then uses the
+  production recovery dialog to restore the pre-image. This proves renderer
+  routing, journal persistence and idempotent UI state only; browser VFS is
+  not native disk/provider evidence.
+covers: [F25.5]
+tags: [code-workspace, refactor, recovery, browser-vfs, p0]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 180
+steps:
+  - open: "${cfg.app.base_url}"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="side-tab-tools"]'
+  - wait_for: '[data-testid="sidebar-tools-panel"]'
+  - click: '[data-testid="sidebar-tool-code-workspace"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - click: '[data-testid="code-workspace-tree-add-folder"]'
+  - wait_for: '[data-testid="text-input-dialog"]'
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
+
+  - click: '[data-testid="code-workspace-tree-new-file"]'
+  - wait_for: '[data-testid="text-input-dialog"]'
+  - fill:
+      selector: '[data-testid="text-input-dialog-input"]'
+      value: recovery.txt
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="recovery.txt"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+  - fill:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      value: "recovery-pre-image\n"
+  - press: Control+s
+  - wait: 0.5
+  - fill:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      value: "recovery-post-image\n"
+  - press: Control+s
+  - wait: 0.5
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: recovery-post-image
+
+  - seed_storage:
+      key: taomni.refactor.recovery.v2:ref-rec-browser-ed014
+      value: '{"schemaVersion":2,"workspaceId":"workspace-f12cn0","recoveryId":"ref-rec-browser-ed014","transactionId":"browser-ed014-transaction","actionId":"browser-refactor-recovery","kind":"rename","workspaceRoot":"/preview","createdAt":1757350000000,"updatedAt":1757350000000,"status":"recovery-required","appliedOperationIndex":0,"operationCount":1,"documents":[{"uri":"file:///preview/recovery.txt","canonicalPath":"/preview/recovery.txt","preText":"recovery-pre-image\n","preHash":"e0d59da3ca7fce20212311d33a82be2933cec76de9e5e1fed372d85ba15bd47f","postText":"recovery-post-image\n","postHash":"72c9616a22fecbc8b8ed2224bd6a9fc3f2cc5f32fcf6a00eff88465d73c25ce8","encoding":"UTF-8","bom":false,"eol":"lf","preDocumentRevision":null}]}'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"workspace-f12cn0","name":"preview","roots":[{"id":"root-preview","name":"preview","path":"/preview","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"root-preview","path":"recovery.txt"},"lastOpenedAt":1757350000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="/preview"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: recovery-post-image
+  - wait_for: '[data-testid="workspace-recovery-dialog"]'
+  - assert_text:
+      selector: '[data-testid="workspace-recovery-dialog"]'
+      contains: recovery-required
+  - assert_text:
+      selector: '[data-testid="workspace-recovery-refactor-file"]'
+      contains: recovery.txt
+  - click: '[data-testid="workspace-recovery-refactor-recover"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: recovery-pre-image
+  - assert_localstorage:
+      key: taomni.refactor.recovery.v2:ref-rec-browser-ed014
+      contains: '"status":"rolled-back"'
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: Recovered refactor
+  - assert_not_visible: '[data-testid="workspace-recovery-dialog"]'

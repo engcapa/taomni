@@ -2792,6 +2792,10 @@ controls:
     selector: '[data-testid="vault-unlock-error"]'
     kind: display
     optional: true       # only on wrong password
+  - id: startup-vault-check
+    selector: '[data-testid="startup-vault-check"]'
+    kind: display
+    optional: true       # only while startup vault state is being refreshed
 -->
 
 - AES-256-GCM 加密存储，密钥由 Argon2id 从主密码派生
@@ -5613,7 +5617,7 @@ controls:
 id: F25.5
 status: partial
 area: code-workspace/editor-shell
-components: [CodeWorkspaceTab, WorkspaceTabPolicySettingsDialog, EditorGroup, HighlightingWidget, FileTreePane, TabSwitcher, Breadcrumbs, KeymapSettingsDialog, ClipboardHistoryPopup, ProjectFactsStatusBadge, TodosBookmarksPanel, EditorCompareDialog, LocalHistoryDialog, FileEncodingDialog, AutoImportSettingsDialog, AutoImportCandidateDialog, FileTemplateSettingsDialog, NewJavaClassDialog]
+components: [CodeWorkspaceTab, WorkspaceRecoveryDialog, WorkspaceTabPolicySettingsDialog, EditorGroup, HighlightingWidget, FileTreePane, TabSwitcher, Breadcrumbs, KeymapSettingsDialog, ClipboardHistoryPopup, ProjectFactsStatusBadge, TodosBookmarksPanel, EditorCompareDialog, LocalHistoryDialog, FileEncodingDialog, AutoImportSettingsDialog, AutoImportCandidateDialog, FileTemplateSettingsDialog, NewJavaClassDialog]
 files:
   - src/components/editor/CodeWorkspaceTab.tsx
   - src/components/editor/workspace/FileEncodingDialog.tsx
@@ -5689,6 +5693,43 @@ controls:
     aliases: ['[data-testid="code-workspace-intention-intention.provider.4df1ac6fd1001c47"]']
     kind: interactive
     optional: true       # only while a provider code-action menu is open
+  # ED-AUDIT-014: persistent refactor recovery UI and disk-result tabs.
+  - id: workspace-recovery-dialog
+    selector: '[data-testid="workspace-recovery-dialog"]'
+    kind: display
+    optional: true       # only while a pending recovery entry is discovered
+  - id: workspace-recovery-refactors
+    selector: '[data-testid="workspace-recovery-refactors"]'
+    kind: display
+    optional: true       # only while the refactor recovery tab is selected
+  - id: workspace-recovery-refactors-tab
+    selector: '[data-testid="workspace-recovery-refactors-tab"]'
+    kind: interactive
+    optional: true       # disabled when no refactor journal is pending
+  - id: workspace-recovery-refactor-file
+    selector: '[data-testid="workspace-recovery-refactor-file"]'
+    kind: display
+    optional: true       # one row per affected refactor file
+  - id: workspace-recovery-refactor-recover
+    selector: '[data-testid="workspace-recovery-refactor-recover"]'
+    kind: interactive
+    optional: true       # only for a v2 journal that can be recovered
+  - id: workspace-recovery-close
+    selector: '[aria-label="Close workspace recovery"]'
+    kind: interactive
+    optional: true       # recovery can be deferred while the workspace remains open
+  - id: workspace-recovery-disk-results
+    selector: '[data-testid="workspace-recovery-disk-results"]'
+    kind: display
+    optional: true
+  - id: workspace-recovery-disk-results-tab
+    selector: '[data-testid="workspace-recovery-disk-results-tab"]'
+    kind: interactive
+    optional: true
+  - id: workspace-recovery-disk-result-row
+    selector: '[data-testid="workspace-recovery-disk-result-row"]'
+    kind: display
+    optional: true
   - id: file-status
     selector: '[data-testid="code-workspace-file-status"]'
     kind: display

@@ -162,6 +162,15 @@
 - `[data-testid="code-workspace-lightbulb"]` — interactive [optional] — F25.5.intention-lightbulb
 - `[data-testid^="code-workspace-intention-"]` — interactive [optional] — F25.5.intention-candidate
   ↳ `[data-testid="code-workspace-intention-intention.provider.4df1ac6fd1001c47"]` — alias
+- `[data-testid="workspace-recovery-dialog"]` — display [optional] — F25.5.workspace-recovery-dialog
+- `[data-testid="workspace-recovery-refactors"]` — display [optional] — F25.5.workspace-recovery-refactors
+- `[data-testid="workspace-recovery-refactors-tab"]` — interactive [optional] — F25.5.workspace-recovery-refactors-tab
+- `[data-testid="workspace-recovery-refactor-file"]` — display [optional] — F25.5.workspace-recovery-refactor-file
+- `[data-testid="workspace-recovery-refactor-recover"]` — interactive [optional] — F25.5.workspace-recovery-refactor-recover
+- `[aria-label="Close workspace recovery"]` — interactive [optional] — F25.5.workspace-recovery-close
+- `[data-testid="workspace-recovery-disk-results"]` — display [optional] — F25.5.workspace-recovery-disk-results
+- `[data-testid="workspace-recovery-disk-results-tab"]` — interactive [optional] — F25.5.workspace-recovery-disk-results-tab
+- `[data-testid="workspace-recovery-disk-result-row"]` — display [optional] — F25.5.workspace-recovery-disk-result-row
 - `[data-testid="code-workspace-file-status"]` — display [optional] — F25.5.file-status
 - `[data-testid="code-workspace-save-observation"]` — display [optional] — F25.5.save-observation
 - `[data-testid="code-workspace-clipboard-observation"]` — display [optional] — F25.5.clipboard-observation
@@ -1454,6 +1463,7 @@
 - `[data-testid="vault-unlock-cancel"]` — interactive [optional] — F12.1.unlock-cancel
 - `[data-testid="vault-unlock-confirm"]` — interactive [optional] — F12.1.unlock-confirm
 - `[data-testid="vault-unlock-error"]` — display [optional] — F12.1.unlock-error
+- `[data-testid="startup-vault-check"]` — display [optional] — F12.1.startup-vault-check
 
 ## vnc (F9.6)
 

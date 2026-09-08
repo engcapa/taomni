@@ -1223,6 +1223,7 @@ export function CodeWorkspaceTab({
     () => workspace.workspaceInstanceId ?? workspace.workspaceId ?? workspace.repoRoot?.trim() ?? tabId,
     [tabId, workspace.repoRoot, workspace.workspaceId, workspace.workspaceInstanceId],
   );
+  const recoveryWorkspaceId = workspace.workspaceId ?? workspaceInstanceId;
   const observationBridge = useMemo(
     () => new WorkspaceObservationBridge(workspaceInstanceId, import.meta.env.PROD),
     [workspaceInstanceId],
@@ -2028,10 +2029,10 @@ export function CodeWorkspaceTab({
   const [looseFiles, setLooseFiles] = useState<CodeWorkspaceLooseFileInfo[]>(() => initialLooseFiles(workspace));
   const refactorRecoveryController = useMemo(
     () => new RefactorRecoveryController({
-      workspaceId: workspaceInstanceId,
+      workspaceId: recoveryWorkspaceId,
       workspaceRoot: roots[0]?.path ?? "",
     }),
-    [roots, workspaceInstanceId],
+    [recoveryWorkspaceId, roots],
   );
   useEffect(() => {
     refactorRecoveryController.activate();
@@ -8829,7 +8830,7 @@ export function CodeWorkspaceTab({
         preTexts,
         rootsRef.current[0]?.path ?? "",
         {
-          workspaceId: workspaceInstanceId,
+          workspaceId: recoveryWorkspaceId,
           transactionId: applyTransactionId,
           edit: resolvedEdit,
           documentMetadata,
@@ -9287,6 +9288,7 @@ export function CodeWorkspaceTab({
     setStatusMessage,
     restoreWorkspaceEditTabs,
     restoreWorkspaceBookmarkSnapshot,
+    recoveryWorkspaceId,
     semanticIndex.invalidate,
     semanticIndex.current,
     updateFileText,

@@ -1,0 +1,84 @@
+id: TC-IDE-ED014-refactor-recovery-native
+title: "Refactor recovery survives native app restart and verifies disk rollback"
+description: |
+  ED-AUDIT-014 native slice. Seeds a v2 recovery-required journal for an
+  isolated real Maven workspace whose host file is at the known post-image,
+  observes the pending refactor through the packaged app, closes the app and
+  creates a replacement native session, then reopens the workspace and uses
+  the production recovery dialog. The case verifies the pre-image in the
+  editor, localStorage journal settlement, and independently hashed host
+  bytes. The native restart verb records distinct old/new WebDriver session
+  ids in the retained case artifacts.
+covers: [F25.5]
+tags: [code-workspace, refactor, recovery, native-gate, provider-fixture, p0]
+modes: [native]
+fixtures: [reset_db, java_sample_projects, jdtls_required]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-gate-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: 'taomni.refactor.recovery.v2:${fixture.maven_recovery_recovery_id}'
+      value: >-
+        {"schemaVersion":2,"workspaceId":"${fixture.maven_recovery_workspace_id}","recoveryId":"${fixture.maven_recovery_recovery_id}","transactionId":"qa-recovery-transaction","actionId":"qa-recovery-rename","kind":"rename","workspaceRoot":"${fixture.maven_recovery_root}","createdAt":1757350000000,"updatedAt":1757350000000,"status":"recovery-required","appliedOperationIndex":0,"operationCount":1,"documents":[{"uri":"file:///${fixture.maven_recovery_file}","canonicalPath":"${fixture.maven_recovery_file}","preText":"recovery-pre-image\n","preHash":"${fixture.maven_recovery_pre_sha256}","postText":"recovery-post-image\n","postHash":"${fixture.maven_recovery_post_sha256}","encoding":"UTF-8","bom":false,"eol":"lf","preDocumentRevision":null}]}
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: >-
+        [{"id":"${fixture.maven_recovery_workspace_id}","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_recovery_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/resources/recovery.txt"},"lastOpenedAt":1757350000000,"isGitRepo":false}]
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_recovery_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      timeout_sec: 90
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: recovery-post-image
+      timeout_sec: 60
+  - wait_for:
+      selector: '[data-testid="workspace-recovery-dialog"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="workspace-recovery-dialog"]'
+      contains: recovery-required
+  - assert_text:
+      selector: '[data-testid="workspace-recovery-refactor-file"]'
+      contains: recovery.txt
+  - click: '[aria-label="Close workspace recovery"]'
+  - native_restart_app: null
+  - wait_for: '[data-testid="welcome-panel"]'
+  - assert_not_visible: '[data-testid="startup-vault-check"]'
+  - wait: 1
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - wait_for: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_recovery_root}"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_recovery_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      timeout_sec: 90
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: recovery-post-image
+      timeout_sec: 60
+  - wait_for:
+      selector: '[data-testid="workspace-recovery-dialog"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="workspace-recovery-dialog"]'
+      contains: recovery-required
+  - click: '[data-testid="workspace-recovery-refactor-recover"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: recovery-pre-image
+      timeout_sec: 60
+  - assert_file_sha256:
+      path: '${fixture.maven_recovery_file}'
+      equals: '${fixture.maven_recovery_pre_sha256}'
+      timeout_sec: 30
+  - eval_readonly:
+      expression: >-
+        window.localStorage.getItem("taomni.refactor.recovery.v2:${fixture.maven_recovery_recovery_id}")?.includes('"status":"rolled-back"') === true
+      expect_truthy: true
+  - assert_not_visible: '[data-testid="workspace-recovery-dialog"]'

@@ -48,6 +48,15 @@ def native_isolation_env(report_root: Path) -> dict[str, str]:
     raise WebDriverError("Tauri WebDriver is unsupported on this OS; use an isolated QA app with OS automation/manual testing")
 
 
+def native_webview_profile(report_root: Path) -> Path:
+    """Return the run-owned WebView2 profile used by every native session."""
+    root = report_root.resolve()
+    profile = root / "native-webview-profile"
+    if profile.resolve() != profile:
+        raise WebDriverError("Native WebView profile must not be a symlink")
+    return profile
+
+
 def _tcp_ok(host: str, port: int, timeout: float = 1.0) -> bool:
     try:
         with socket.create_connection((host, int(port)), timeout=timeout):
@@ -164,9 +173,16 @@ class TauriDriverProcess:
 
 
 class NativeSession:
-    def __init__(self, driver_url: str, application: Path):
+    def __init__(
+        self,
+        driver_url: str,
+        application: Path,
+        *,
+        webview_options: dict[str, Any] | None = None,
+    ):
         self.driver_url = driver_url.rstrip("/")
         self.application = application
+        self.webview_options = dict(webview_options or {})
         self.session_id: str | None = None
         self.deadline = None
         # A local driver must remain reachable when the desktop uses a proxy.
@@ -198,12 +214,15 @@ class NativeSession:
         return value
 
     def start(self) -> None:
+        tauri_options: dict[str, Any] = {
+            "application": str(self.application.resolve())
+        }
+        if self.webview_options:
+            tauri_options["webviewOptions"] = self.webview_options
         payload = {
             "capabilities": {
                 "alwaysMatch": {
-                    "tauri:options": {
-                        "application": str(self.application.resolve())
-                    }
+                    "tauri:options": tauri_options
                 }
             }
         }
@@ -648,6 +667,7 @@ class NativeHarness:
         self.report_root = report_root
         self.application = native_binary(cfg)
         self.driver = TauriDriverProcess(cfg, report_root)
+        self.webview_profile: Path | None = None
         self._previous_env: dict[str, str | None] = {}
 
     def __enter__(self) -> "NativeHarness":
@@ -656,6 +676,8 @@ class NativeHarness:
         except ValueError as exc:
             raise WebDriverError(str(exc)) from exc
         overrides = native_isolation_env(self.report_root)
+        if platform.system() == "Windows":
+            self.webview_profile = native_webview_profile(self.report_root)
         if identity.get("source_sha256"):
             from qa_ui_auto.provenance import source_identity
             if identity["source_sha256"] != source_identity(ROOT):
@@ -664,13 +686,17 @@ class NativeHarness:
         try:
             for value in overrides.values():
                 Path(value).mkdir(parents=True, exist_ok=True)
+            if self.webview_profile is not None:
+                self.webview_profile.mkdir(parents=True, exist_ok=True)
             os.environ.update(overrides)
             self.report_root.mkdir(parents=True, exist_ok=True)
             (self.report_root / "native-isolation.json").write_text(
                 json.dumps({"identifier": QA_APP_ID, "binary": str(self.application.resolve()),
                             "binary_sha256": identity["binary_sha256"], "environment": overrides,
                             "source_sha256": identity.get("source_sha256"),
-                            "profile": identity.get("profile")}, indent=2) + "\n",
+                            "profile": identity.get("profile"),
+                            "webviewUserDataFolder": str(self.webview_profile)
+                            if self.webview_profile is not None else None}, indent=2) + "\n",
                 encoding="utf-8",
             )
             self.driver.start()
@@ -691,7 +717,14 @@ class NativeHarness:
             self._previous_env.clear()
 
     def create_session(self) -> NativeSession:
-        session = NativeSession(self.driver.url, self.application)
+        webview_options = None
+        if self.webview_profile is not None:
+            webview_options = {"userDataFolder": str(self.webview_profile)}
+        session = NativeSession(
+            self.driver.url,
+            self.application,
+            webview_options=webview_options,
+        )
         session.deadline = getattr(self, "deadline", None)
         session.start()
         return session

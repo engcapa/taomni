@@ -47,10 +47,17 @@ from .steps import StepError
 class NativeStepContext:
     """Per-case context handed to native verbs (fixture values resolved)."""
 
-    def __init__(self, session: Any, case_dir: Path, cfg: dict):
+    def __init__(
+        self,
+        session: Any,
+        case_dir: Path,
+        cfg: dict,
+        session_factory: Callable[[], Any] | None = None,
+    ):
         self.session = session
         self.case_dir = case_dir
         self.cfg = cfg
+        self.session_factory = session_factory
         self._permission_restores: dict[Path, int] = {}
         # External X11 CLIPBOARD owner started by native_clipboard_owner, plus
         # the host selection value captured before the case touched it.
@@ -229,6 +236,83 @@ def _assert_text(ctx: NativeStepContext, args: Any) -> str:
     raise StepError(
         f"assert_text failed: {selector!r} did not contain {expected!r}; last text={text[:200]!r}"
     )
+
+
+def _is_transient_profile_race(exc: BaseException) -> bool:
+    message = str(exc).lower()
+    return "session not created" in message and any(
+        marker in message
+        for marker in (
+            "cannot parse internal json template",
+            "failed to write prefs file",
+        )
+    )
+
+
+def _native_restart_app(ctx: NativeStepContext, args: Any) -> str:
+    """Replace the packaged app session while keeping the same native case."""
+    _ = args
+    if ctx.session_factory is None:
+        raise StepError("native_restart_app: session factory is unavailable")
+
+    old_session = ctx.session
+    old_session_id = getattr(old_session, "session_id", None)
+    try:
+        old_session.close()
+    except Exception as exc:  # noqa: BLE001
+        raise StepError(f"native_restart_app: could not close current session: {exc}") from exc
+
+    replacement = None
+    creation_attempts = 0
+    for attempt in range(1, 5):
+        creation_attempts = attempt
+        try:
+            replacement = ctx.session_factory()
+            break
+        except Exception as exc:  # noqa: BLE001
+            if not _is_transient_profile_race(exc) or attempt == 4:
+                raise StepError(
+                    f"native_restart_app: could not create replacement session: {exc}"
+                ) from exc
+            time.sleep(0.25 * attempt)
+
+    if replacement is None:
+        raise StepError("native_restart_app: replacement session was not created")
+
+    ctx.session = replacement
+    new_session_id = getattr(replacement, "session_id", None)
+    artifact = ctx.case_dir / "native-restart-observations.json"
+    observations: list[dict[str, Any]] = []
+    try:
+        if artifact.exists():
+            raw = json.loads(artifact.read_text(encoding="utf-8"))
+            if isinstance(raw, list):
+                observations = raw
+    except (OSError, ValueError):
+        observations = []
+    observations.append({
+        "oldSessionId": old_session_id,
+        "newSessionId": new_session_id,
+        "sessionReplaced": old_session_id != new_session_id,
+        "application": str(getattr(replacement, "application", "")),
+        "sessionCreationAttempts": creation_attempts,
+        "webviewUserDataFolder": (
+            getattr(replacement, "webview_options", {}).get("userDataFolder")
+            if isinstance(getattr(replacement, "webview_options", {}), dict)
+            else None
+        ),
+        "platform": platform.platform(),
+        "verifiedAtUnixMs": int(time.time() * 1000),
+    })
+    artifact.write_text(
+        json.dumps(observations, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    if old_session_id == new_session_id:
+        raise StepError(
+            f"native_restart_app: replacement session id was not distinct ({new_session_id!r})"
+        )
+    return f"restarted native app session {old_session_id} -> {new_session_id}"
 
 
 def _eval_readonly(ctx: NativeStepContext, args: Any) -> str:
@@ -1266,6 +1350,11 @@ def _noop_open(ctx: NativeStepContext, args: Any) -> str:
     # tauri-driver launches the binary as part of session creation; there is
     # nothing to navigate in a packaged app window.
     return "no-op (app already launched by driver)"
+
+
+@_verb("native_restart_app")
+def _do_native_restart_app(ctx: NativeStepContext, args: Any) -> str:
+    return _native_restart_app(ctx, args)
 
 
 @_verb("screenshot")

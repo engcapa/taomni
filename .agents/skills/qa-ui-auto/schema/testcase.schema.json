@@ -120,6 +120,10 @@
     "goto": {
      "$ref": "#/$defs/url_arg"
     },
+    "native_restart_app": {
+     "type": "null",
+     "description": "Native-only: close the current packaged WebDriver session and create a replacement app session in the same isolated case."
+    },
     "wait": {
      "$ref": "#/$defs/seconds_arg"
     },
@@ -376,7 +380,7 @@
       },
       "equals": {
        "type": "string",
-       "pattern": "^[a-f0-9]{64}$"
+       "pattern": "^(?:[a-f0-9]{64}|\\$\\{fixture\\.[A-Za-z0-9_.-]+\\})$"
       },
       "timeout_sec": {
        "type": "number",

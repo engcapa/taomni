@@ -450,9 +450,7 @@ export function buildRefactorPlan(input: BuildRefactorPlanInput): RefactorPlanV4
       preTextSha256 = sha256Hex(sourceText);
       const docEdits = operations.flatMap((op) => {
         if (op.kind === "text") {
-          const opUri = op.document.uri || "";
-          const opPath = op.document.path || "";
-          if (opUri === info.uri || (info.path && opPath === info.path)) {
+          if (matchesRefactorTextOperation(op, info.uri, info.path)) {
             return op.document.edits;
           }
         }
@@ -699,6 +697,17 @@ function metadataForDocument(
     ?? {};
 }
 
+function matchesRefactorTextOperation(
+  operation: Extract<LspWorkspaceEditOperation, { kind: "text" }>,
+  uri: string,
+  canonicalPath: string | null,
+): boolean {
+  const operationUri = operation.document.uri?.trim() ?? "";
+  const operationPath = operation.document.path?.trim() ?? "";
+  return (operationUri.length > 0 && uri.length > 0 && operationUri === uri)
+    || (operationPath.length > 0 && canonicalPath !== null && fsPathEquals(operationPath, canonicalPath));
+}
+
 export function buildRefactorRecoveryJournalEntry(
   plan: RefactorPlanV4,
   preTexts: Record<string, string>,
@@ -711,8 +720,7 @@ export function buildRefactorRecoveryJournalEntry(
   }
   const activeDocuments = plan.documents.filter((doc) => activeOperations.some((operation) => (
     operation.kind === "text"
-      && ((operation.document.uri || "") === doc.uri
-        || (doc.canonicalPath !== null && (operation.document.path || "") === doc.canonicalPath))
+      && matchesRefactorTextOperation(operation, doc.uri, doc.canonicalPath)
   )));
   if (activeDocuments.length === 0) return null;
 
@@ -726,9 +734,7 @@ export function buildRefactorRecoveryJournalEntry(
     const preHash = sha256Hex(text);
     const docEdits = activeOperations.flatMap((op) => {
       if (op.kind === "text") {
-        const opUri = op.document.uri || "";
-        const opPath = op.document.path || "";
-        if (opUri === doc.uri || (doc.canonicalPath && opPath === doc.canonicalPath)) {
+        if (matchesRefactorTextOperation(op, doc.uri, doc.canonicalPath)) {
           return op.document.edits;
         }
       }

@@ -280,6 +280,52 @@ describe("buildRefactorPlan & verifyExclusionSafety §8.20.6 & §8.21.2", () => 
     expect(docB?.expectedDiskHash).toBe("hash-b");
   });
 
+  it("keeps path-only multi-file postimages separate", () => {
+    const pathOnlyEdit: LspWorkspaceEdit = {
+      documentEdits: [
+        {
+          uri: "",
+          path: "/workspace/src/A.java",
+          edits: [{ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 4 } }, newText: "AAAA" }],
+        },
+        {
+          uri: "",
+          path: "/workspace/src/B.java",
+          edits: [{ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 4 } }, newText: "BBBB" }],
+        },
+      ],
+    };
+    const plan = buildRefactorPlan({
+      actionId: "plan-path-only",
+      kind: "rename",
+      evidence: dummyEvidence,
+      edit: pathOnlyEdit,
+      roots: [{ path: "/workspace" }],
+      currentTexts: {
+        "/workspace/src/A.java": "aaaa",
+        "/workspace/src/B.java": "bbbb",
+      },
+    });
+
+    const docA = plan.documents.find((document) => document.canonicalPath === "/workspace/src/A.java");
+    const docB = plan.documents.find((document) => document.canonicalPath === "/workspace/src/B.java");
+    expect(docA?.expectedPostHash).toBe(sha256Hex("AAAA"));
+    expect(docB?.expectedPostHash).toBe(sha256Hex("BBBB"));
+
+    const journal = buildRefactorRecoveryJournalEntry(
+      plan,
+      {
+        "/workspace/src/A.java": "aaaa",
+        "/workspace/src/B.java": "bbbb",
+      },
+      "/workspace",
+    );
+    expect(journal?.documents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ canonicalPath: "/workspace/src/A.java", postText: "AAAA" }),
+      expect.objectContaining({ canonicalPath: "/workspace/src/B.java", postText: "BBBB" }),
+    ]));
+  });
+
   it("flags library file modification as conflict in buildRefactorPlan", () => {
     const externalEdit: LspWorkspaceEdit = {
       documentEdits: [

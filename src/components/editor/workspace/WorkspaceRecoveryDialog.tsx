@@ -314,6 +314,7 @@ export function WorkspaceRecoveryDialog({
                       <button
                         ref={primaryRef}
                         type="button"
+                        data-testid="workspace-recovery-refactor-recover"
                         disabled={busy}
                         className="inline-flex h-8 items-center gap-1.5 rounded bg-[var(--taomni-accent)] px-3 text-[11px] font-medium text-white hover:brightness-110 disabled:opacity-50"
                         onClick={() => {

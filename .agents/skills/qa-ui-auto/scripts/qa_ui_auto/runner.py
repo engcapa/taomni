@@ -422,7 +422,12 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                     r["timings"]["session_setup_sec"] = time.monotonic() - session_started
                     nctx: NativeStepContext | None = None
                     try:
-                        nctx = NativeStepContext(session, case_dir, cfg)
+                        nctx = NativeStepContext(
+                            session,
+                            case_dir,
+                            cfg,
+                            session_factory=harness.create_session,
+                        )
                         last_step, last_verb, last_args = 0, "<setup>", None
                         for i, step in enumerate(c.steps, start=1):
                             ctx_ns.step_index = i
@@ -436,25 +441,27 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                             _timed_step(r, i, verb, lambda: run_native_step(nctx, verb, args), deadline)
                             deadline.remaining()
                     except Exception:
-                        session.deadline = Deadline(5)
+                        active_session = nctx.session if nctx is not None else session
+                        active_session.deadline = Deadline(5)
                         capture_started = time.monotonic()
-                        failure_artifacts = _capture_native_failure(session, case_dir)
+                        failure_artifacts = _capture_native_failure(active_session, case_dir)
                         r["timings"]["failure_capture_sec"] = time.monotonic() - capture_started
                         raise
                     finally:
                         cleanup_started = time.monotonic()
-                        session.deadline = Deadline(5)
                         if nctx is not None:
                             nctx.restore_host_permissions()
+                        active_session = nctx.session if nctx is not None else session
+                        active_session.deadline = Deadline(5)
                         console = []
                         with suppress(Exception):
-                            console = session.console_entries()
+                            console = active_session.console_entries()
                         (case_dir / "console.json").write_text(
                             json.dumps(console[-500:], ensure_ascii=False, indent=1),
                             encoding="utf-8",
                         )
                         with suppress(Exception):
-                            session.close()
+                            active_session.close()
                         r["timings"]["cleanup_sec"] = time.monotonic() - cleanup_started
             except WebDriverError as e:
                 r["status"] = "failed"

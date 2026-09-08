@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getRefactorRecoveryJournal,
+  recordRefactorRecoveryJournal,
   type RefactorRecoveryJournalEntry,
   type RefactorRecoveryJournalEntryV1,
 } from "./refactorPlan";
@@ -77,6 +78,46 @@ describe("RefactorRecoveryController", () => {
     expect(result.preHashesRestored).toBe(false);
     expect(writes).toEqual([]);
     if (result.status === "pending") expect(result.reason).toContain("quota exceeded");
+  });
+
+  it("lists only matching v2 entries while retaining same-root legacy inspection rows", () => {
+    const storage = storageWithMap();
+    const controller = new RefactorRecoveryController({
+      workspaceId: "ws-current",
+      workspaceRoot: "/repo",
+      storage,
+    });
+    recordRefactorRecoveryJournal(entry({
+      recoveryId: "matching-v2",
+      workspaceId: "ws-current",
+    }), storage);
+    recordRefactorRecoveryJournal(entry({
+      recoveryId: "foreign-v2",
+      workspaceId: "ws-other",
+    }), storage);
+    storage.setItem("taomni.refactor.recovery.v1:legacy-1", JSON.stringify({
+      schemaVersion: 1,
+      verified: false,
+      recoveryId: "legacy-1",
+      actionId: "legacy-rename",
+      kind: "rename",
+      workspaceRoot: "/repo",
+      createdAt: 1,
+      status: "prepared",
+      documents: [{
+        uri: "file:///repo/Example.java",
+        canonicalPath: "/repo/Example.java",
+        preText: "class Example {}",
+        preHash: "pre-hash",
+        postText: "class Renamed {}",
+        postHash: "post-hash",
+      }],
+    }));
+
+    expect(controller.listPending().map((item) => item.recoveryId)).toEqual([
+      "matching-v2",
+      "legacy-1",
+    ]);
   });
 
   it("does not begin recovery after the workspace owner is disposed", async () => {

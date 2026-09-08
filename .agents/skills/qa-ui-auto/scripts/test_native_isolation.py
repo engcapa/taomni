@@ -103,6 +103,57 @@ class NativeBuildTest(unittest.TestCase):
 
 
 class NativeIsolationTest(unittest.TestCase):
+    def test_restart_retries_webview_profile_preferences_release_race(self):
+        with TemporaryDirectory() as directory, patch.object(native_steps.time, "sleep") as sleep:
+            root = Path(directory)
+            old_session = Mock(session_id="old-session")
+            replacement = Mock(
+                session_id="new-session",
+                application="com.taomni.app.qa",
+                webview_options={"userDataFolder": str(root / "profile")},
+            )
+            factory = Mock(
+                side_effect=[
+                    RuntimeError("session not created: failed to write prefs file"),
+                    replacement,
+                ]
+            )
+            case_dir = root / "case"
+            case_dir.mkdir()
+            ctx = native_steps.NativeStepContext(
+                old_session,
+                case_dir,
+                {},
+                session_factory=factory,
+            )
+
+            result = native_steps._native_restart_app(ctx, None)
+            observations = json.loads((case_dir / "native-restart-observations.json").read_text())
+
+        self.assertEqual(result, "restarted native app session old-session -> new-session")
+        self.assertIs(ctx.session, replacement)
+        self.assertEqual(factory.call_count, 2)
+        sleep.assert_called_once_with(0.25)
+        self.assertEqual(observations[0]["sessionCreationAttempts"], 2)
+
+    def test_restart_does_not_retry_unrelated_session_creation_failure(self):
+        with TemporaryDirectory() as directory, patch.object(native_steps.time, "sleep") as sleep:
+            root = Path(directory)
+            old_session = Mock(session_id="old-session")
+            factory = Mock(side_effect=RuntimeError("session not created: bad capabilities"))
+            ctx = native_steps.NativeStepContext(
+                old_session,
+                root,
+                {},
+                session_factory=factory,
+            )
+
+            with self.assertRaises(native_steps.StepError):
+                native_steps._native_restart_app(ctx, None)
+
+        factory.assert_called_once_with()
+        sleep.assert_not_called()
+
     def test_harness_restores_environment_after_success_and_start_failure(self):
         for fails in (False, True):
             with self.subTest(fails=fails), TemporaryDirectory() as directory:
@@ -125,6 +176,29 @@ class NativeIsolationTest(unittest.TestCase):
                 harness.driver.stop.assert_called_once()
                 evidence = json.loads((root / "run" / "native-isolation.json").read_text())
                 self.assertEqual(evidence["identifier"], native_build.QA_APP_ID)
+
+    def test_windows_harness_uses_one_run_owned_webview_profile(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = recorded_binary(root)
+            harness = native.NativeHarness({"app": {"native_binary": str(binary)}}, root / "run")
+            harness.driver = Mock()
+            harness.driver.url = "http://127.0.0.1:4444"
+            with patch.object(native.platform, "system", return_value="Windows"), patch.dict(os.environ, {}, clear=False):
+                with harness:
+                    expected = root / "run" / "native-webview-profile"
+                    self.assertEqual(harness.webview_profile, expected)
+                    self.assertTrue(expected.is_dir())
+                    first = harness.create_session
+                    with patch.object(native.NativeSession, "start") as start:
+                        session = first()
+                    self.assertEqual(
+                        session.webview_options,
+                        {"userDataFolder": str(expected)},
+                    )
+                    start.assert_called_once_with()
+            evidence = json.loads((root / "run" / "native-isolation.json").read_text())
+            self.assertEqual(evidence["webviewUserDataFolder"], str(root / "run" / "native-webview-profile"))
 
     def test_unrecorded_binary_never_starts_driver(self):
         with TemporaryDirectory() as directory:

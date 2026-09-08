@@ -21,6 +21,7 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 |------|------|-------|
 | `open` | string URL **or** `{url}` | Navigates and waits for `domcontentloaded`. Auto-runs at step 0 if first step isn't `open`/`goto`. |
 | `goto` | same as `open` | Alias. |
+| `native_restart_app` | `null` | Native-only. Closes the current packaged app session and creates a replacement session through the native harness; records old/new session ids. |
 | `wait` | seconds (number or `"3s"`) | Hard sleep; use sparingly. |
 | `wait_for` | selector string **or** `{selector, timeout_sec?, state?}` | `state` ∈ `attached/detached/visible/hidden`, default `visible`. |
 | `screenshot` | filename string **or** `{path, selector?, full_page?}` | Saved under `qa-ui-auto-report/<run>/<TC-id>/`. |

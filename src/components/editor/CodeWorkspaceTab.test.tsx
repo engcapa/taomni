@@ -505,10 +505,10 @@ function renderWorkspace(
   return render(options.strict ? <StrictMode>{element}</StrictMode> : element);
 }
 
-function setupMountedRenameFixture(instanceId: string) {
+function setupMountedRenameFixture(instanceId: string, workspaceId = `ws-${instanceId}`) {
   const workspace: CodeWorkspaceTabInfo = {
     repoRoot: "/repo/app",
-    workspaceId: `ws-${instanceId}`,
+    workspaceId,
     workspaceInstanceId: instanceId,
     name: "Mounted rename",
     roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
@@ -2573,6 +2573,42 @@ describe("CodeWorkspaceTab", () => {
     expect(JSON.parse(window.localStorage.getItem(journalKey!) ?? "null")).toMatchObject({
       status: "recovery-required",
     });
+  });
+
+  it("rediscovers a pending refactor after reopening with a new workspace instance", async () => {
+    const stableWorkspaceId = "ws-mounted-restart";
+    const first = setupMountedRenameFixture("instance-mounted-restart-a", stableWorkspaceId);
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+    workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+      _rootPath: string,
+      path: string,
+      _text: string,
+    ) => {
+      const foreignText = "const changedBySomeoneElse = 1;";
+      first.disk.set(path, foreignText);
+      return writeAck(file(path, foreignText, { hash: `hash-${foreignText}` }));
+    });
+    vi.mocked(promptAppDialog).mockResolvedValueOnce("renamed");
+
+    const firstRender = renderWorkspace(first.workspace, { onCommandsChange });
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(registrationRef.current).not.toBeNull());
+    await act(async () => {
+      await registrationRef.current!.executeAction("workspace.renameSymbol");
+    });
+    await screen.findByTestId("workspace-recovery-dialog");
+    firstRender.unmount();
+
+    const reopened = setupMountedRenameFixture("instance-mounted-restart-b", stableWorkspaceId);
+    renderWorkspace(reopened.workspace);
+    await screen.findByTitle("app / src/main.ts");
+    const dialog = await screen.findByTestId("workspace-recovery-dialog");
+    expect(dialog).toHaveTextContent("recovery-required");
+    expect(within(dialog).getByTestId("workspace-recovery-refactors")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("workspace-recovery-refactor-recover")).toBeEnabled();
   });
 
   it("does not write a mounted rename when recovery journal preparation fails", async () => {
