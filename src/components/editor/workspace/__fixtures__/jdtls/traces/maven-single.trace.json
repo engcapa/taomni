@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "fixtureId": "maven-single",
-  "generatedAt": "2026-09-07T22:15:43.802Z",
+  "generatedAt": "2026-09-08T05:38:12.698Z",
   "sanitized": true,
   "toolchain": {
     "java": {
-      "path": "C:\\Program Files\\Java\\jdk-21\\bin\\java.exe",
+      "path": "C:/Program Files/Java/jdk-21/bin/java.exe",
       "version": "21.0.4",
       "info": {
         "line": "openjdk version \"21.0.4\" 2024-07-16 LTS",
@@ -14,7 +14,7 @@
       }
     },
     "jdtls": {
-      "home": "~\\AppData\\Local\\jdtls",
+      "home": "C:/Users/yuhan/AppData/Local/jdtls",
       "version": "1.61.0.202607142124.jar"
     },
     "gradle": {
@@ -37,7 +37,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 6444,
+          "msTotal": 6545,
           "itemCount": 50,
           "isIncomplete": true,
           "satisfied": true,
@@ -61,7 +61,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 1150,
+          "msTotal": 1050,
           "itemCount": 58,
           "isIncomplete": true,
           "satisfied": true,
@@ -85,7 +85,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 169,
+          "msTotal": 86,
           "itemCount": 14,
           "isIncomplete": false,
           "satisfied": true,
@@ -167,7 +167,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 162,
+          "msTotal": 171,
           "itemCount": 2,
           "isIncomplete": false,
           "satisfied": true,
@@ -176,7 +176,7 @@
         }
       ],
       "resolve": {
-        "ms": 835,
+        "ms": 854,
         "additionalEditCount": 1,
         "additionalEditTexts": [
           "\r\n\r\nimport org.apache.commons.lang3.StringUtils;"
@@ -202,7 +202,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 253,
+          "msTotal": 339,
           "itemCount": 50,
           "isIncomplete": true,
           "satisfied": true,
@@ -225,7 +225,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 238,
+        "msTotal": 265,
         "signaturesCount": 13,
         "labels": [
           "append(double d) : StringBuilder",
@@ -261,7 +261,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 167,
+        "msTotal": 159,
         "signaturesCount": 13,
         "labels": [
           "append(double d) : StringBuilder",
@@ -297,7 +297,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 318,
+        "msTotal": 299,
         "signaturesCount": 3,
         "labels": [
           "parseInt(String s) : int",
@@ -323,7 +323,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 143,
+        "msTotal": 164,
         "signaturesCount": 9,
         "labels": [
           "valueOf(double d) : String",
@@ -355,7 +355,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 329,
+        "msTotal": 470,
         "signaturesCount": 1,
         "labels": [
           "singletonList(T o) : List<T>"
@@ -381,9 +381,9 @@
       "supersede": {
         "firstOutcome": "rejected:-32800",
         "firstCancelled": true,
-        "msFirst": 104,
+        "msFirst": 157,
         "secondSatisfied": true,
-        "msSecond": 94
+        "msSecond": 149
       },
       "notes": "$/cancelRequest on the in-flight request mirrors the production cancel bridge; second request must satisfy"
     },
@@ -397,7 +397,7 @@
       },
       "scopeRequested": "default",
       "hover": {
-        "msFirst": 154,
+        "msFirst": 163,
         "attempts": 1,
         "contentsPresent": true,
         "contentsKind": "markup-array",
@@ -418,7 +418,7 @@
       },
       "scopeRequested": "default",
       "hover": {
-        "msFirst": 237,
+        "msFirst": 304,
         "attempts": 1,
         "contentsPresent": true,
         "contentsKind": "markup-array",
@@ -439,7 +439,7 @@
       },
       "scopeRequested": "default",
       "hover": {
-        "msFirst": 86,
+        "msFirst": 154,
         "attempts": 1,
         "contentsPresent": true,
         "contentsKind": "markup-array",
@@ -513,7 +513,7 @@
     "appliedSha256": "ac694b9072804031b676cace1194cccd226ecb2f16eef13060a82ffb3d646f7a",
     "originalSha256": "fa85c034632f35aa03d738d0acc975938918814283cc184ff97118b0d40b54b7",
     "revertedRestoresOriginalHash": true,
-    "msTotal": 1445,
+    "msTotal": 1800,
     "satisfied": true,
     "reason": null,
     "resolvedShape": {
@@ -585,7 +585,7 @@
         "Detect installed JVMs",
         "Reporting encoding changes.",
         "Validate documents",
-        "Searching..."
+        "Publish Diagnostics"
       ],
       "anyWithPercentage": true
     },
@@ -600,16 +600,16 @@
     }
   },
   "analysisTiming": {
-    "firstCompletionSatisfiedMs": 21166,
+    "firstCompletionSatisfiedMs": 21706,
     "offlineCacheHint": {
-      "coldSessionFirstSatisfiedMs": 21166,
-      "restartedSessionFirstSatisfiedMs": 15373,
+      "coldSessionFirstSatisfiedMs": 21706,
+      "restartedSessionFirstSatisfiedMs": 16753,
       "fasterThanCold": true
     }
   },
   "restart": {
     "performed": true,
-    "msToReadyAfterRestart": 15542,
+    "msToReadyAfterRestart": 16956,
     "completionOkAfterRestart": true,
     "signatureHelpOkAfterRestart": true,
     "reason": null,
