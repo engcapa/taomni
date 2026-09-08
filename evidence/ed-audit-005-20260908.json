@@ -1,0 +1,105 @@
+{
+  "verified_at": "2026-09-08T11:04:14.672Z",
+  "head": "15ca5f839284ed24ab5fdf57b1b5d91d9cee99d8",
+  "checks": [
+    {
+      "kind": "code-audit",
+      "command": "Inspection: CodeMirrorHost EditorView.updateListener/ChangeSet -> EditorGroup onChangeText -> CodeWorkspaceTab queueEditorTextUpdate -> WorkspaceDocumentTransactionOwner/mutateOpenBuffer -> LSP sync, shared undo, save and recovery",
+      "result": "passed",
+      "summary": "The current production path uses the mounted CodeMirror input listener and incremental ChangeSet reconstruction, then routes text through the shared document transaction owner and CodeWorkspaceTab buffer mutation/LSP synchronization. Controlled echoes acknowledge only current owner text; stale or rejected updates do not replace newer input. The same owner retains selection, shared undo, save, close-owner writeback and failure recovery semantics. The native performance collector observes keydown-to-CodeMirror DOM mutation and reads a final document postcondition without injecting state.",
+      "acceptance": []
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/CodeMirrorHost.test.tsx src/components/editor/workspace/editorPerformance.test.tsx src/lib/performanceInstrumentation.test.ts",
+      "result": "passed",
+      "summary": "3 test files passed; 50/50 tests passed. Assertions cover incremental ChangeSet reconstruction, controlled-echo protection, shared owner transaction/selection/undo behavior, save-oriented recovery, compartment guards and raw percentile summarization.",
+      "acceptance": []
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/editorPerformance.test.tsx src/stores/appStore.test.ts",
+      "result": "passed",
+      "summary": "2 test files passed; 64/64 tests passed on the claimed current source.",
+      "acceptance": []
+    },
+    {
+      "kind": "unit",
+      "command": "python -m unittest discover -s .agents/skills/qa-ui-auto/scripts -p 'test_editor_performance.py'",
+      "result": "passed",
+      "summary": "1/1 deterministic fixture test passed for the exact small, 1 MiB and 5 MiB Java-like document byte sizes and hashes.",
+      "acceptance": []
+    },
+    {
+      "kind": "unit",
+      "command": "python -m unittest discover -s .agents/skills/qa-ui-auto/scripts -p 'test_runner_receipt.py'",
+      "result": "passed",
+      "summary": "11/11 runner receipt tests passed, including the native report-tree teardown race regression.",
+      "acceptance": []
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/workspace/CodeMirrorHost.tsx --path src/components/editor/workspace/CodeMirrorHost.test.tsx --path src/components/editor/workspace/editorPerformance.test.tsx --path src/components/editor/workspace/workspaceDocumentTransactionOwner.ts --path src/components/editor/CodeWorkspaceTab.tsx --path src/components/editor/CodeWorkspaceTab.test.tsx --path src/lib/performanceInstrumentation.ts --path src/lib/performanceInstrumentation.test.ts --path src/stores/appStore.test.ts",
+      "result": "passed",
+      "summary": "All 9 owned TypeScript paths have scoped_errors=0; out-of-scope errors are 0 across 0 files.",
+      "acceptance": []
+    },
+    {
+      "kind": "qa-lint",
+      "command": "$env:PYTHONIOENCODING='utf-8'; $env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto audit --cases qa-ui-auto-tests/cases --json",
+      "result": "passed",
+      "summary": "QA case lint reports 191 files, 191 unique IDs and 0 case errors; feature lint also reports 0 errors and catalog_stale=false. The audit still reports unrelated existing orphan/missing-control gaps, which are outside this card.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "python .agents/skills/qa-ui-auto/scripts/native_build.py --force",
+      "result": "passed",
+      "summary": "The independently isolated Windows QA application identifier is com.taomni.app.qa. The build used source SHA-256 23879a1f2be71cb01f08203928f40063ba40a837beec664efd772f67f08f66d7 and binary SHA-256 8143fce463a6547bb1ebeb014b958453f335c603d15dee39de30bb15394caa25.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED005-editor-input-performance-native --report-dir qa-ui-auto-report/ed-audit-005-current-20260908-1 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "Windows packaged run selected 1 and failed 1. At step 24 the real save observation reported data-state='clean' instead of the expected 'saved' after the original 1 second wait; data-dirty=false and data-buffer-revision=230 were observed. The failure report is retained at qa-ui-auto-report/ed-audit-005-current-20260908-1/run-20260908-182920-947369200.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED005-editor-input-performance-native --report-dir qa-ui-auto-report/ed-audit-005-current-20260908-2 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows packaged com.taomni.app.qa selected 1 and passed 1 with 0 failed and 0 skipped. The run used isolated APPDATA/LOCALAPPDATA and native WebView2, and exercised small, 1 MiB and 5 MiB mounted editors, selection replacement, undo, save state and host-file postconditions. Source identity and binary identity matched the QA build; report root is qa-ui-auto-report/ed-audit-005-current-20260908-2/run-20260908-185121-611248800.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED005-editor-input-performance-native --report-dir qa-ui-auto-report/ed-audit-005-current-20260908-3 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Repeated Windows packaged com.taomni.app.qa execution selected 1 and passed 1 with 0 failed and 0 skipped. The receipt reports identity_stable=true, source SHA-256 23879a1f2be71cb01f08203928f40063ba40a837beec664efd772f67f08f66d7, runner SHA-256 78d2fa02a5f43bd9f1fe9245b133b159fe3c46b242d6bb57a3b24c29235415b4, and report root qa-ui-auto-report/ed-audit-005-current-20260908-3/run-20260908-185615-373058800.",
+      "acceptance": []
+    },
+    {
+      "kind": "performance",
+      "command": "Inspect qa-ui-auto-report/ed-audit-005-current-20260908-2/run-20260908-185121-611248800 and qa-ui-auto-report/ed-audit-005-current-20260908-3/run-20260908-185615-373058800 native-editor-performance-{small,one-mib,five-mib}.json",
+      "result": "passed",
+      "summary": "Each current-source Windows packaged run retains 20 warmup and 208 measured raw keydown-to-CodeMirror-DOM-mutation samples per group, nearest-rank p50/p95/p99/max, fixture byte length/SHA-256, build identity and final editor length/hash. Run 2 p95 values are small 10.2 ms, 1 MiB 42.0 ms and 5 MiB 30.8 ms; run 3 p95 values are small 13.4 ms, 1 MiB 43.1 ms and 5 MiB 33.7 ms. Final hashes match across repeated runs for all three fixtures. collectionGuardP95Ms is 1000 and absoluteBudgetClaim=false; this is a renderer-proxy measurement, not OS-to-screen latency.",
+      "acceptance": []
+    }
+  ],
+  "unrun": [
+    "idea-comparison: IntelliJ IDEA 2026.2.x executable or installation was not available on this Windows host, so no identical fixture/action or common endpoint observation was collected.",
+    "native Linux/WebKitGTK/X11: no Linux desktop runtime was available on this Windows host.",
+    "native macOS/WKWebView: no macOS QA bundle or OS automation runtime was available.",
+    "ED-AUDIT-005-A1 matched baseline/candidate decision: the repeated runs are current-source observations, not a pre-registered baseline/candidate pair, and the required common IDEA endpoint is unavailable; no matched/no-regression claim is made.",
+    "ED-AUDIT-005-A2 noise decision: no pre-registered statistical noise threshold or confidence procedure was approved before collection; no beyond-noise optimization claim is made.",
+    "ED-AUDIT-005-A3 full evidence: current Windows native/performance evidence passes, but required IDEA comparison and other native platforms remain unavailable."
+  ],
+  "notes": [
+    "Verification used the current production tree rooted at the claimed baseline 15ca5f839284ed24ab5fdf57b1b5d91d9cee99d8; no production source changed during this attempt.",
+    "The first native failure is intentionally preserved before the successful reruns. The testcase was then tightened to assert dirty state before save and wait three seconds for the real save receipt, without weakening the save postcondition.",
+    "The native collector uses W3C WebDriver key actions in the packaged QA application and a read-only final document postcondition; it does not inject editor state or use browser stubs.",
+    "QA report roots are ignored runtime artifacts and remain outside the task commit; this evidence records their exact paths and measured observations.",
+    "The current production implementation was already present after re-audit, so no redundant production rewrite was made. Terminal status is implemented, not done, because required comparison/platform/noise evidence is still unavailable."
+  ]
+}

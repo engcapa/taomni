@@ -49,6 +49,10 @@ steps:
       selector: '[data-testid="code-workspace-editor"]'
       contains: abcdefghijklmnopqrst
       timeout_sec: 30
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-save-observation"]'
+      name: data-dirty
+      equals: "true"
 
   # Selection is observable before the edit; one undo must restore the exact
   # first character without disturbing the measured suffix.
@@ -67,6 +71,10 @@ steps:
       selector: '[data-testid="code-workspace-editor"]'
       contains: xackage perf
       timeout_sec: 30
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-save-observation"]'
+      name: data-dirty
+      equals: "true"
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
@@ -75,8 +83,12 @@ steps:
       selector: '[data-testid="code-workspace-editor"]'
       contains: package perf
       timeout_sec: 30
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-save-observation"]'
+      name: data-dirty
+      equals: "true"
   - press: Control+s
-  - wait: 1
+  - wait: 3
   - assert_attribute:
       selector: '[data-testid="code-workspace-save-observation"]'
       name: data-state
