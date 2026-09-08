@@ -1,0 +1,72 @@
+{
+  "verified_at": "2026-09-08T08:11:49Z",
+  "head": "cfde0b0c583ddc34acba93ce1f97aad4f6768ce6",
+  "checks": [
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/workspaceVirtualSpace.test.ts -t \"does not materialize virtual padding in read-only buffers\"",
+      "result": "failed",
+      "summary": "Baseline regression before the guard: 1 test failed because virtualEnterCommand returned true for a read-only virtual caret.",
+      "acceptance": []
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/workspaceVirtualSpace.test.ts -t \"does not materialize virtual padding in read-only buffers\"",
+      "result": "passed",
+      "summary": "1 targeted regression passed; virtual Enter and input-handler typing both return false and preserve the read-only document.",
+      "acceptance": []
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/workspaceVirtualSpace.test.ts src/components/editor/workspace/workspaceEditorCommands.test.ts src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts src/components/editor/workspace/CodeMirrorHost.test.tsx",
+      "result": "passed",
+      "summary": "4 test files passed; 122/122 tests passed. Coverage includes visual columns for tabs/CJK/emoji, virtual navigation and selection, multi-caret deferred padding, one undo/redo transaction, composition, read-only behavior, stale transaction rejection, and mounted CodeMirrorHost wiring.",
+      "acceptance": [
+        "ED-AUDIT-002-A2"
+      ]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/workspace/workspaceVirtualSpace.ts --path src/components/editor/workspace/workspaceEditorCommands.ts --path src/components/editor/workspace/CodeMirrorHost.tsx --path src/components/editor/workspace/workspaceDocumentTransactionOwner.ts --path src/components/editor/workspace/workspaceVirtualSpace.test.ts --path src/components/editor/workspace/workspaceEditorCommands.test.ts --path src/components/editor/workspace/CodeMirrorHost.test.tsx --path src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts",
+      "result": "passed",
+      "summary": "All 8 owned TypeScript paths have 0 scoped errors; out-of-scope errors are 0 across 0 files.",
+      "acceptance": [
+        "ED-AUDIT-002-A3"
+      ]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-01 --require-pass --report-dir qa-ui-auto-report/ed-audit-002-browser-fixed-20260908 --keep-runs 0",
+      "result": "passed",
+      "summary": "Current Windows Chromium run run-20260908-160849-917546000 selected 1 and passed 1 with 0 failed and 0 skipped. The case asserted real editor text and selection after mixed carets and deferred padding, one undo restoration, selection-anchor reversal, composition isolation, keyboard focus, textbox semantics and 200% zoom. Source identity is 71af105c1f3fc6da8d24d9752e782525b9a4b28e6865da36bb669e08c9e0eaa5; runner identity is 78d2fa02a5f43bd9f1fe9245b133b159fe3c46b242d6bb57a3b24c29235415b4; summary SHA-256 is 4C401AE8EB337EE61E9602E8C68511A00DAC4CE4262C0E6B5018A72034CD37BE and receipt SHA-256 is 9A4AC5EB885C3CD1A700FE8080A5F7689DA7A754918E856B77E4677823126E9F.",
+      "acceptance": [
+        "ED-AUDIT-002-A1"
+      ]
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-02 --require-pass --report-dir qa-ui-auto-report/ed-audit-002-native-fixed-20260908 --keep-runs 0",
+      "result": "failed",
+      "summary": "The Windows runner rejected the selected packaged case before launch because native_keys requires Linux/X11; no native behavior receipt was produced.",
+      "acceptance": []
+    },
+    {
+      "kind": "code-audit",
+      "command": "Inspection: editorAppearanceExtension policy -> CodeMirrorHost mounted virtual-space fields/input/click handlers and action registration -> workspaceVirtualSpace navigation/materialization guards -> WorkspaceDocumentTransactionOwner dispatch/undo/redo and CodeMirrorHost revision/controlled-echo reconciliation",
+      "result": "passed",
+      "summary": "The production chain is wired from the persisted afterLineEnd/atFileBottom policy into the mounted CodeMirrorHost. Selection-only navigation tracks visual columns without document/history changes; typing and virtual Enter combine padding and payload in one dispatch, now reject read-only and composing materialization, and the owner derives canonical history with stale deleted-text rejection. Shared undo/redo checks canonical text and applies one transaction; remote reconciliation maps current transactions, preserves focus/lease ownership, rejects stale echoes, and releases the final view lease.",
+      "acceptance": []
+    }
+  ],
+  "unrun": [
+    "native Windows packaged virtual-space behavior: the only mapped TC-IDE-C8-02 is Linux/X11/fcitx5-specific and is rejected before launch; no qualifying Windows native case is available.",
+    "native Linux/WebKitGTK/X11/fcitx5: unavailable on this Windows host.",
+    "native macOS/WKWebView: no qualifying macOS runtime or OS automation host is available.",
+    "idea-comparison: IntelliJ IDEA 2026.2.x is not installed or available; no identical fixture/action observation was collected."
+  ],
+  "notes": [
+    "Verification used production code rooted at HEAD cfde0b0c583ddc34acba93ce1f97aad4f6768ce6 with the task-owned read-only guard and regression test in the working tree.",
+    "The browser receipt proves a current Windows Chromium renderer workflow only; it does not prove packaged native WebKitGTK, OS IME, or IDEA behavior.",
+    "The native rejection and IDEA absence are named evidence gaps, so the truthful terminal status is implemented rather than done."
+  ]
+}

@@ -365,6 +365,35 @@ describe("§8.19.5 virtual caret lifecycle", () => {
       expect(view.state.doc.toString()).toBe("hello    \n");
     });
 
+    it("does not materialize virtual padding in read-only buffers", () => {
+      const enterView = new EditorView({
+        state: EditorState.create({
+          doc: "hello",
+          extensions: [EditorState.readOnly.of(true), virtualSpaceOverflowField, POLICY],
+        }),
+      });
+      setVirtualHead(enterView, 5, 4, false);
+
+      expect(virtualEnterCommand(enterView)).toBe(false);
+      expect(enterView.state.doc.toString()).toBe("hello");
+
+      const typingView = new EditorView({
+        state: EditorState.create({
+          doc: "hello",
+          extensions: [
+            EditorState.readOnly.of(true),
+            virtualSpaceOverflowField,
+            virtualSpaceTypingHandler,
+            POLICY,
+          ],
+        }),
+      });
+      setVirtualHead(typingView, 5, 4, false);
+
+      expect((virtualSpaceTypingHandler as any).value(typingView, 5, 5, "X")).toBe(false);
+      expect(typingView.state.doc.toString()).toBe("hello");
+    });
+
     it("snaps to next tab stop on virtual Tab", () => {
       const view = new EditorView({
         state: EditorState.create({

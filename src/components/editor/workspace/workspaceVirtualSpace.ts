@@ -297,7 +297,7 @@ export function paddingForOverflow(overflow: number): string {
  * composing); without overflow this defers to CodeMirror's default handler.
  */
 export const virtualSpaceTypingHandler = EditorView.inputHandler.of((view, _from, _to, text) => {
-  if (view.composing || !text) return false;
+  if (view.state.readOnly || view.composing || !text) return false;
   const field = view.state.field(virtualSpaceOverflowField, false);
   if (!field || field.size === 0) return false;
   const state = view.state;
@@ -675,7 +675,7 @@ export function virtualDeleteCommand(view: EditorView): boolean {
 }
 
 export function virtualEnterCommand(view: EditorView): boolean {
-  if (view.composing) return false;
+  if (view.state.readOnly || view.composing) return false;
   const field = view.state.field(virtualSpaceOverflowField, false);
   if (!field || field.size === 0) return false;
   const state = view.state;
