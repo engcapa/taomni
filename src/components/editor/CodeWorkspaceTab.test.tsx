@@ -5790,6 +5790,81 @@ describe("CodeWorkspaceTab", () => {
     ).openFiles[fileKey]).toBeDefined();
   });
 
+  it("keeps per-leaf caret state across same-file split close and reopen", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-view-state-close-reopen",
+      workspaceInstanceId: "instance-view-state-close-reopen",
+      name: "View State Close Reopen",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    const fileKey = "root:app:src/main.ts";
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file(
+      "src/main.ts",
+      "first line\nsecond line\nthird line\n",
+    ));
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+
+    renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / src/main.ts");
+    fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+    await screen.findByTestId("code-workspace-editor-split");
+
+    const panes = screen.getAllByTestId("code-workspace-editor-pane");
+    const primaryPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") === "primary") ?? panes[0]!;
+    const secondaryPane = panes.find((pane) => pane !== primaryPane) ?? panes[1]!;
+    const secondaryGroupId = secondaryPane.getAttribute("data-editor-group-id")!;
+    const primaryView = EditorView.findFromDOM(primaryPane.querySelector<HTMLElement>(".cm-editor")!);
+    const secondaryView = EditorView.findFromDOM(secondaryPane.querySelector<HTMLElement>(".cm-editor")!);
+    expect(primaryView).not.toBeNull();
+    expect(secondaryView).not.toBeNull();
+
+    act(() => {
+      primaryView!.dispatch({ selection: EditorSelection.cursor(2) });
+      secondaryView!.dispatch({ selection: EditorSelection.cursor(24) });
+    });
+    expect(primaryView!.state.selection.main.head).toBe(2);
+    expect(secondaryView!.state.selection.main.head).toBe(24);
+
+    fireEvent.click(within(primaryPane).getByTitle("Close"));
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-view-state-close-reopen")
+        .editorGroups.primary.openOrder,
+      ).toEqual([]));
+    const remainingView = EditorView.findFromDOM(
+      screen.getAllByTestId("code-workspace-editor-pane")
+        .find((pane) => pane.getAttribute("data-editor-group-id") === secondaryGroupId)!
+        .querySelector<HTMLElement>(".cm-editor")!,
+    );
+    expect(remainingView!.state.selection.main.head).toBe(24);
+
+    fireEvent.click(within(screen.getAllByTestId("code-workspace-editor-pane").find(
+      (pane) => pane.getAttribute("data-editor-group-id") === secondaryGroupId,
+    )!).getByTitle("Close"));
+    await waitFor(() => expect(screen.getByTestId("code-workspace-tab"))
+      .toHaveAttribute("data-reopen-stack-count", "1"));
+    await act(async () => {
+      await registrationRef.current?.executeAction("workspace.reopenClosedTab");
+    });
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-view-state-close-reopen")
+        .editorGroups,
+    ).toEqual(expect.objectContaining({
+      [secondaryGroupId]: expect.objectContaining({ openOrder: [fileKey] }),
+    })));
+    const reopenedView = EditorView.findFromDOM(
+      screen.getAllByTestId("code-workspace-editor-pane")
+        .find((pane) => pane.querySelector<HTMLElement>(".cm-editor"))!
+        .querySelector<HTMLElement>(".cm-editor")!,
+    );
+    expect(reopenedView!.state.selection.main.head).toBe(24);
+  });
+
   it("opens the selected tree file in a split with Ctrl+Enter", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",

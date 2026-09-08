@@ -10,6 +10,7 @@ import { fileKey } from "./codeWorkspaceModel";
 import {
   DEFAULT_WORKSPACE_TAB_POLICY_V3,
   migrateWorkspaceTabPolicy,
+  type EditorViewSnapshot,
   type WorkspaceTabPolicyV3,
 } from "./workspaceTabPolicy";
 import {
@@ -61,6 +62,8 @@ export interface WorkspaceLayoutSnapshotV2 {
   expandedDirKeys: string[];
   layoutTreeV2: LayoutNode;
   editorGroups: Record<string, PersistedEditorGroup>;
+  /** Per-leaf view state keyed by the canonical file key. */
+  viewStateByLeafFile?: Record<string, Record<string, EditorViewSnapshot>>;
   /**
    * §8.19.6 per-workspace tab policy (schema v3). Optional on raw input;
    * normalization always materializes it: corrupt/v2 payloads migrate
@@ -136,6 +139,64 @@ function normalizeGroup(value: unknown): PersistedEditorGroup {
   };
 }
 
+function normalizeEditorViewSnapshot(value: unknown): EditorViewSnapshot | null {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Record<string, unknown>;
+  const finiteNumber = (candidate: unknown): candidate is number => (
+    typeof candidate === "number" && Number.isFinite(candidate)
+  );
+  const selection = Array.isArray(source.selection)
+    ? source.selection.flatMap((range) => {
+      if (!range || typeof range !== "object") return [];
+      const candidate = range as Record<string, unknown>;
+      if (!finiteNumber(candidate.anchor) || !finiteNumber(candidate.head)) return [];
+      return [{
+        anchor: Math.max(0, Math.floor(candidate.anchor)),
+        head: Math.max(0, Math.floor(candidate.head)),
+      }];
+    }).slice(0, 64)
+    : [];
+  if (selection.length === 0) return null;
+  const mainSelection = finiteNumber(source.mainSelection)
+    ? Math.max(0, Math.min(selection.length - 1, Math.floor(source.mainSelection)))
+    : 0;
+  const foldedRanges = Array.isArray(source.foldedRanges)
+    ? source.foldedRanges.flatMap((range) => {
+      if (!range || typeof range !== "object") return [];
+      const candidate = range as Record<string, unknown>;
+      if (!finiteNumber(candidate.from) || !finiteNumber(candidate.to)) return [];
+      const from = Math.max(0, Math.floor(candidate.from));
+      const to = Math.max(0, Math.floor(candidate.to));
+      return to > from ? [{ from, to }] : [];
+    }).slice(0, 256)
+    : [];
+  const scrollTop = finiteNumber(source.scrollTop)
+    ? Math.max(0, source.scrollTop)
+    : 0;
+  return { selection, mainSelection, scrollTop, foldedRanges };
+}
+
+function normalizeViewStateByLeafFile(
+  value: unknown,
+  layoutTreeV2: LayoutNode,
+): Record<string, Record<string, EditorViewSnapshot>> {
+  if (!value || typeof value !== "object") return {};
+  const source = value as Record<string, unknown>;
+  const normalized: Record<string, Record<string, EditorViewSnapshot>> = {};
+  for (const leaf of getAllLeafNodes(layoutTreeV2)) {
+    const rawLeaf = source[leaf.id];
+    if (!rawLeaf || typeof rawLeaf !== "object") continue;
+    const rawFiles = rawLeaf as Record<string, unknown>;
+    const files: Record<string, EditorViewSnapshot> = {};
+    for (const key of leaf.openFileKeys) {
+      const snapshot = normalizeEditorViewSnapshot(rawFiles[key]);
+      if (snapshot) files[key] = snapshot;
+    }
+    if (Object.keys(files).length > 0) normalized[leaf.id] = files;
+  }
+  return normalized;
+}
+
 export function createEmptyPersistedGroup(): PersistedEditorGroup {
   return {
     openOrder: [],
@@ -169,6 +230,7 @@ export function defaultWorkspaceLayoutSnapshot(): WorkspaceLayoutSnapshotV2 {
     expandedRootIds: [],
     expandedDirKeys: [],
     layoutTreeV2: createSingleLeafLayout("primary", [], null),
+    viewStateByLeafFile: {},
     tabPolicy: { ...DEFAULT_WORKSPACE_TAB_POLICY_V3 },
     editorGroups: {
       primary: createEmptyPersistedGroup(),
@@ -278,6 +340,7 @@ export function normalizeWorkspaceLayoutSnapshot(value: unknown): WorkspaceLayou
   // next clean live write (which sends no backup field) drops it.
   const policyMigration = migrateWorkspaceTabPolicy(source.tabPolicy);
   const policyBackup = policyMigration.backup ?? source.tabPolicyBackup ?? null;
+  const viewStateByLeafFile = normalizeViewStateByLeafFile(source.viewStateByLeafFile, layoutTreeV2);
 
   return {
     version: 2,
@@ -291,6 +354,7 @@ export function normalizeWorkspaceLayoutSnapshot(value: unknown): WorkspaceLayou
     expandedRootIds: asStringArray(source.expandedRootIds, 64),
     expandedDirKeys: asStringArray(source.expandedDirKeys, 256),
     layoutTreeV2,
+    viewStateByLeafFile,
     tabPolicy: policyMigration.policy,
     ...(policyBackup != null ? { tabPolicyBackup: policyBackup } : {}),
     editorGroups: normalizedGroups,
@@ -429,7 +493,8 @@ export function snapshotFromWorkspaceUi(input: {
   expandedRootIds: string[];
   expandedDirKeys: string[];
   editorGroups: Record<string, CodeWorkspaceEditorGroupState>;
-    layoutTreeV2: LayoutNode;
+  layoutTreeV2: LayoutNode;
+  viewStateByLeafFile?: Record<string, Record<string, EditorViewSnapshot>>;
   /** §8.19.6 per-workspace tab policy (v3); normalized on write. */
   tabPolicy?: WorkspaceTabPolicyV3;
 
@@ -468,6 +533,7 @@ export function snapshotFromWorkspaceUi(input: {
     expandedRootIds: input.expandedRootIds,
     expandedDirKeys: input.expandedDirKeys,
     layoutTreeV2: layoutTree,
+    viewStateByLeafFile: input.viewStateByLeafFile ?? {},
     tabPolicy: input.tabPolicy ?? { ...DEFAULT_WORKSPACE_TAB_POLICY_V3 },
     editorGroups: persistedGroups,
   });

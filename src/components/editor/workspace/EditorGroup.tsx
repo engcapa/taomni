@@ -43,6 +43,7 @@ import {
 } from "./CodeMirrorHost";
 import type { ClipboardObservationRecord } from "./clipboardObservationContract";
 import type { WorkspaceDocumentTransactionOwner } from "./workspaceDocumentTransactionOwner";
+import type { EditorViewSnapshot } from "./workspaceTabPolicy";
 import type { EditorAppearanceExtensionProfile } from "./editorAppearanceExtension";
 import { EditorBanner } from "./EditorBanner";
 import type { EditorBannerItem } from "./editorBannerModel";
@@ -198,6 +199,9 @@ interface EditorGroupProps {
   transactionOwner?: WorkspaceDocumentTransactionOwner | null;
   /** Current buffer revision used to seed the shared document owner. */
   documentRevision?: number;
+  /** View state is keyed by file within this leaf; it never crosses leaves. */
+  viewStatesByFileKey?: Readonly<Record<string, EditorViewSnapshot>>;
+  onViewStateChange?: (fileKey: string, snapshot: EditorViewSnapshot) => void;
   onHover: (
     file: OpenFileViewModel,
     position: LspPosition,
@@ -355,6 +359,8 @@ export function EditorGroup({
   onParameterEscape,
   transactionOwner = null,
   documentRevision = 0,
+  viewStatesByFileKey,
+  onViewStateChange,
   parameterPopup = null,
   onSelectionChange,
   onViewportChange,
@@ -823,6 +829,8 @@ export function EditorGroup({
                         viewId={groupId}
                         transactionOwner={transactionOwner}
                         documentRevision={activeFile.documentRevision ?? documentRevision}
+                        viewState={viewStatesByFileKey?.[activeFile.key] ?? null}
+                        onViewStateChange={(snapshot) => onViewStateChange?.(activeFile.key, snapshot)}
                         clipboardWorkspaceId={workspaceInstanceId}
                         onClipboardUnavailable={onClipboardUnavailable}
                         onClipboardObservation={onClipboardObservation}
@@ -897,6 +905,8 @@ export function EditorGroup({
                       viewId={groupId}
                       transactionOwner={transactionOwner}
                       documentRevision={activeFile.documentRevision ?? documentRevision}
+                      viewState={viewStatesByFileKey?.[activeFile.key] ?? null}
+                      onViewStateChange={(snapshot) => onViewStateChange?.(activeFile.key, snapshot)}
                       clipboardWorkspaceId={workspaceInstanceId}
                       onClipboardUnavailable={onClipboardUnavailable}
                       onClipboardObservation={onClipboardObservation}

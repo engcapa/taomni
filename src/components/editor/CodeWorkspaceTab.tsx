@@ -225,6 +225,7 @@ import {
   resolveReopenLocation,
   DEFAULT_WORKSPACE_TAB_POLICY_V3,
   type ClosedTabEntry,
+  type EditorViewSnapshot,
   type WorkspaceTabPolicyV3,
 } from "./workspace/workspaceTabPolicy";
 import {
@@ -1421,6 +1422,38 @@ export function CodeWorkspaceTab({
   // render when a workspace is mounted for the first time.
   const workspaceUi = useCodeWorkspaceStore((s) => selectCodeWorkspaceUi(s, workspaceInstanceId));
 
+  const [viewStateByLeafFile, setViewStateByLeafFile] = useState<
+    Record<string, Record<string, EditorViewSnapshot>>
+  >(() => readWorkspaceLayoutSnapshot(workspaceInstanceId)?.viewStateByLeafFile ?? {});
+  const viewStateByLeafFileRef = useRef(viewStateByLeafFile);
+  viewStateByLeafFileRef.current = viewStateByLeafFile;
+  const updateEditorViewState = useCallback((
+    leafId: string,
+    fileKeyValue: string,
+    snapshot: EditorViewSnapshot,
+  ) => {
+    const next = {
+      ...viewStateByLeafFileRef.current,
+      [leafId]: {
+        ...(viewStateByLeafFileRef.current[leafId] ?? {}),
+        [fileKeyValue]: snapshot,
+      },
+    };
+    viewStateByLeafFileRef.current = next;
+    setViewStateByLeafFile(next);
+  }, []);
+  const clearEditorViewState = useCallback((leafId: string, fileKeyValue: string) => {
+    const currentLeaf = viewStateByLeafFileRef.current[leafId];
+    if (!currentLeaf || !(fileKeyValue in currentLeaf)) return;
+    const nextLeaf = { ...currentLeaf };
+    delete nextLeaf[fileKeyValue];
+    const next = { ...viewStateByLeafFileRef.current };
+    if (Object.keys(nextLeaf).length > 0) next[leafId] = nextLeaf;
+    else delete next[leafId];
+    viewStateByLeafFileRef.current = next;
+    setViewStateByLeafFile(next);
+  }, []);
+
   useEffect(() => {
     ensureWorkspaceUi(workspaceInstanceId);
     replaceBookmarks(readWorkspaceBookmarks(workspaceInstanceId));
@@ -1434,6 +1467,9 @@ export function CodeWorkspaceTab({
     layoutHydratedRef.current = workspaceInstanceId;
     layoutRestoredOpenFilesRef.current = false;
     const snapshot = readWorkspaceLayoutSnapshot(workspaceInstanceId);
+    const restoredViewState = snapshot?.viewStateByLeafFile ?? {};
+    viewStateByLeafFileRef.current = restoredViewState;
+    setViewStateByLeafFile(restoredViewState);
     if (snapshot) {
       if (snapshot.layoutRecovered) {
         setStatusMessage("Recovered invalid workspace layout into a single editor leaf");
@@ -3570,6 +3606,7 @@ export function CodeWorkspaceTab({
         expandedDirKeys,
         editorGroups: persistableGroups,
         layoutTreeV2: workspaceUi.layoutTreeV2,
+        viewStateByLeafFile: viewStateByLeafFileRef.current,
         tabPolicy: tabPolicyRef.current,
       }), {
         // §8.17.4 step 3: persistence refusals surface as a recovery
@@ -3589,6 +3626,7 @@ export function CodeWorkspaceTab({
     rightPaneOpen,
     rightPaneTab,
     splitOrientation,
+    viewStateByLeafFile,
     workspaceInstanceId,
     workspaceUi.layoutTreeV2,
     tabPolicyRevision,
@@ -6303,7 +6341,9 @@ export function CodeWorkspaceTab({
         if (!confirmed) return;
       }
       const lastUsedMap = new Map(mruFileKeysRef.current.map((k, idx) => [k, 1_000_000 - idx]));
+      const closedViewState = viewStateByLeafFileRef.current[groupId]?.[key];
       closeLayoutTabInLeaf(workspaceInstanceId, groupId, key, tabPolicyRef.current, lastUsedMap);
+      clearEditorViewState(groupId, key);
       if (usedByOtherGroup) return;
 
       const coordinator = resourceRecoveryCoordinatorRef.current;
@@ -6320,6 +6360,7 @@ export function CodeWorkspaceTab({
             subtitle: file.subtitle,
             leafPath: [groupId],
             closedAt: Date.now(),
+            ...(closedViewState ? { viewState: closedViewState } : {}),
             location: {
               leafId: groupId,
               treeRoute: buildReopenTreeRoute(closedTree, groupId),
@@ -6402,7 +6443,14 @@ export function CodeWorkspaceTab({
         }
       }
     },
-    [activeEditorGroupId, closeLayoutTabInLeaf, closeLspDocumentAndWait, observeResourceCleanupOutcome, workspaceInstanceId],
+    [
+      activeEditorGroupId,
+      clearEditorViewState,
+      closeLayoutTabInLeaf,
+      closeLspDocumentAndWait,
+      observeResourceCleanupOutcome,
+      workspaceInstanceId,
+    ],
   );
   closeFileRef.current = closeFile;
 
@@ -12015,9 +12063,16 @@ export function CodeWorkspaceTab({
             : null;
           setClosedTabsStack(rest);
           if (entry && entry.ref) {
+            const targetGroupId = resolution?.leafId ?? activeEditorGroupId;
+            const reopenedKey = fileKey(entry.ref as CodeWorkspaceFileRef);
+            if (entry.viewState) {
+              // Seed before openFile mounts the editor so the first view state
+              // is restored atomically with the reopened tab.
+              updateEditorViewState(targetGroupId, reopenedKey, entry.viewState);
+            }
             const openPromise = openFile(
               entry.ref as never,
-              resolution ? { groupId: resolution.leafId } : undefined,
+              { groupId: targetGroupId },
             );
             void openPromise.then(() => {
               const opened = Object.values(openFilesRef.current).some((candidate) => (
@@ -12025,6 +12080,10 @@ export function CodeWorkspaceTab({
                 && !candidate.loading
                 && !candidate.error
               ));
+              if (!opened && entry.viewState) {
+                clearEditorViewState(targetGroupId, reopenedKey);
+                return;
+              }
               if (opened && resolution?.kind === "relocated") {
                 setStatusMessage(
                   resolution.reason === "route"
@@ -13767,6 +13826,7 @@ export function CodeWorkspaceTab({
     compareWithFile,
     compareWithLocalHistory,
     chooseMnemonicBookmarkAtCursor,
+    clearEditorViewState,
     closedTabsStack,
     columnSelectionMode,
     copyTreePath,
@@ -13843,6 +13903,7 @@ export function CodeWorkspaceTab({
     toggleTodosPane,
     jumpToMnemonicBookmark,
     undoWorkspaceEdit,
+    updateEditorViewState,
     redoWorkspaceEdit,
     unsplitAllWindows,
     workspaceEditHistoryState,
@@ -17452,6 +17513,10 @@ export function CodeWorkspaceTab({
         onDismissBanner={(key) => setDismissedBannerKeys((prev) => new Set(prev).add(key))}
         workspaceActionHost={actionsController.host}
         transactionOwner={documentTransactionOwnerRef.current}
+        viewStatesByFileKey={viewStateByLeafFile[groupId]}
+        onViewStateChange={(fileKeyValue, snapshot) => {
+          updateEditorViewState(groupId, fileKeyValue, snapshot);
+        }}
         readOnly={workspaceResourceOperationLocked}
         softWrap={groupSoftWrap}
         appearance={groupAppearance}
@@ -18978,6 +19043,10 @@ export function CodeWorkspaceTab({
                 const currentUiNow = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
                 const currentTree = currentUiNow.layoutTreeV2;
                 const activeLeaf = findLeafNode(currentTree, activeEditorGroupId);
+                const evictedLeaf = getAllLeafNodes(currentTree).find((leaf) => (
+                  leaf.openFileKeys.includes(evictedKey)
+                )) ?? activeLeaf;
+                const evictedLeafId = evictedLeaf?.id ?? activeEditorGroupId;
 
                 const cleanupHandlers: ResourceCleanupHandlers = {
                   didClose: async () => {
@@ -19023,12 +19092,15 @@ export function CodeWorkspaceTab({
                           ref: file.ref,
                           title: file.title,
                           subtitle: file.subtitle,
-                          leafPath: [activeEditorGroupId],
+                          leafPath: [evictedLeafId],
                           closedAt: Date.now(),
+                          ...(viewStateByLeafFileRef.current[evictedLeafId]?.[evictedKey]
+                            ? { viewState: viewStateByLeafFileRef.current[evictedLeafId][evictedKey] }
+                            : {}),
                           location: {
-                            leafId: activeEditorGroupId,
-                            treeRoute: buildReopenTreeRoute(currentTree, activeEditorGroupId),
-                            siblingFileKeys: (activeLeaf?.openFileKeys ?? []).filter((k) => k !== evictedKey),
+                            leafId: evictedLeafId,
+                            treeRoute: buildReopenTreeRoute(currentTree, evictedLeafId),
+                            siblingFileKeys: (evictedLeaf?.openFileKeys ?? []).filter((k) => k !== evictedKey),
                           },
                         }),
                       );
@@ -19089,6 +19161,7 @@ export function CodeWorkspaceTab({
                   expandedDirKeys,
                   editorGroups: persistableGroups,
                   layoutTreeV2: nextLayoutTreeV2,
+                  viewStateByLeafFile: viewStateByLeafFileRef.current,
                   tabPolicy: policy,
                 }), {
                   onIssue: (message) => {

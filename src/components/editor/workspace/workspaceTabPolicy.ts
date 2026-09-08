@@ -25,6 +25,17 @@ export interface WorkspaceTabPolicyV2 {
   reusePreview: boolean;
 }
 
+/**
+ * Per-leaf editor state. The document text/history stays in the shared
+ * document owner; these offsets and ranges belong to one mounted view.
+ */
+export interface EditorViewSnapshot {
+  selection: readonly { anchor: number; head: number }[];
+  mainSelection: number;
+  scrollTop: number;
+  foldedRanges: readonly { from: number; to: number }[];
+}
+
 export const DEFAULT_WORKSPACE_TAB_POLICY: WorkspaceTabPolicyV2 = {
   schemaVersion: 2,
   limitPerLeaf: 12,
@@ -274,16 +285,7 @@ export interface ClosedTabEntry {
   subtitle: string;
   leafPath: readonly string[];
   closedAt: number;
-}
-
-export interface ClosedTabEntry {
-  /** Stable identity (`root:<rootId>:<path>` / `loose:<id>:<path>`). */
-  fileIdentity: string;
-  ref: unknown;
-  title: string;
-  subtitle: string;
-  leafPath: readonly string[];
-  closedAt: number;
+  viewState?: EditorViewSnapshot;
   /**
    * §8.19.6 structured relocation evidence captured at close time; entries
    * without one fall back to plain reactivation.

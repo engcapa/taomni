@@ -1,0 +1,67 @@
+{
+  "verified_at": "2026-09-08T09:52:54Z",
+  "head": "50a4ea5c89a342733dae865a80041afff9481f2d",
+  "checks": [
+    {
+      "kind": "code-audit",
+      "command": "Inspection: CodeWorkspaceTab view-state/persistence and close/reopen handlers -> EditorGroup per-leaf routing -> CodeMirrorHost snapshot/selection/scroll/fold reporting -> shared WorkspaceDocumentTransactionOwner acquisition and undo/redo",
+      "result": "passed",
+      "summary": "The current production chain keys view state by leaf and canonical file key, hydrates and debounced-writes it through the existing layout snapshot, captures it in the session reopen entry, seeds it before reopen mounting, and filters invalid/orphan snapshots. CodeMirrorHost restores selection, folds and scroll, reports later view changes, and keeps text/history on the shared document owner. Closing a non-last leaf releases only that view; the last dirty close still exits on cancel before layout/resource cleanup, and cleanup/reopen failures remain observable with seeded state cleared after a failed open.",
+      "acceptance": ["ED-AUDIT-009-A1", "ED-AUDIT-009-A2", "ED-AUDIT-009-A3"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/workspaceLayoutPersistence.test.ts src/components/editor/workspace/workspaceTabPolicy.test.ts src/components/editor/workspace/workspaceTabPolicyV3.test.ts src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts src/components/editor/workspace/EditorGroup.test.tsx src/components/editor/CodeWorkspaceTab.test.tsx -t \"keeps per-leaf caret state across same-file split close and reopen\"",
+      "result": "passed",
+      "summary": "1 selected mounted regression passed; the command reported 6 skipped files and 212 skipped tests. The selected flow split one file into two leaves, assigned distinct carets, closed both leaves, reopened the newest entry and restored the remaining leaf caret.",
+      "acceptance": ["ED-AUDIT-009-A1", "ED-AUDIT-009-A2"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/workspaceLayoutPersistence.test.ts src/components/editor/workspace/workspaceTabPolicy.test.ts src/components/editor/workspace/workspaceTabPolicyV3.test.ts src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts src/components/editor/workspace/EditorGroup.test.tsx src/components/editor/CodeWorkspaceTab.test.tsx",
+      "result": "failed",
+      "summary": "The full seven-file attempt produced no Vitest result after more than five minutes while the CodeWorkspaceTab mounted worker continued running; it was terminated by the operator and is not treated as passing evidence.",
+      "acceptance": []
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/workspaceLayoutPersistence.test.ts src/components/editor/workspace/workspaceTabPolicy.test.ts src/components/editor/workspace/workspaceTabPolicyV3.test.ts src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts src/components/editor/workspace/EditorGroup.test.tsx src/components/editor/workspace/CodeMirrorHost.test.tsx",
+      "result": "passed",
+      "summary": "6 test files passed; 95/95 tests passed. Coverage includes old snapshot defaults and orphan filtering, tab policy/reopen invariants, shared document transaction ownership and undo/redo, mounted editor-group routing, and CodeMirrorHost behavior.",
+      "acceptance": ["ED-AUDIT-009-A1", "ED-AUDIT-009-A2", "ED-AUDIT-009-A3"]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/CodeWorkspaceTab.tsx --path src/components/editor/CodeWorkspaceTab.test.tsx --path src/components/editor/workspace/CodeMirrorHost.tsx --path src/components/editor/workspace/CodeMirrorHost.test.tsx --path src/components/editor/workspace/EditorGroup.tsx --path src/components/editor/workspace/workspaceLayoutPersistence.ts --path src/components/editor/workspace/workspaceLayoutPersistence.test.ts --path src/components/editor/workspace/workspaceTabPolicy.ts",
+      "result": "passed",
+      "summary": "All 8 ED-AUDIT-009-owned TypeScript paths have scoped_errors=0; out-of-scope errors are 0 across 0 files.",
+      "acceptance": ["ED-AUDIT-009-A3"]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C4-01 --require-pass --report-dir qa-ui-auto-report/ed-audit-009-browser-c4-01-20260908 --keep-runs 0",
+      "result": "passed",
+      "summary": "Windows Chromium selected 1 and passed 1 with 0 failed and 0 skipped. The report run-20260908-173420-203986900 recorded the current browser source identity 23879a1f2be71cb01f08203928f40063ba40a837beec664efd772f67f08f66d7, runner identity 78d2fa02a5f43bd9f1fe9245b133b159fe3c46b242d6bb57a3b24c29235415b4 and identity_stable=true for tab eviction, dirty confirmation and lifecycle assertions.",
+      "acceptance": ["ED-AUDIT-009-A2"]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C4-02 --require-pass --report-dir qa-ui-auto-report/ed-audit-009-browser-c4-02-20260908 --keep-runs 0",
+      "result": "passed",
+      "summary": "Windows Chromium selected 1 and passed 1 with 0 failed and 0 skipped. The report run-20260908-173617-999121400 recorded the same source and runner identities with identity_stable=true and asserted three-leaf split management, close and structured reopen behavior.",
+      "acceptance": ["ED-AUDIT-009-A1", "ED-AUDIT-009-A2"]
+    }
+  ],
+  "unrun": [
+    "native Windows ED009 split/restart snapshot: TC-IDE-C4-01 and TC-IDE-C4-02 are browser-only; no qualifying packaged native case currently exercises this card's split, shared history, close/reopen and restart snapshot contract, so no unrelated native case is substituted.",
+    "native Linux: no Linux desktop/WebKitGTK/X11 runtime is available on this Windows host.",
+    "native macOS: no macOS WKWebView or OS automation runtime is available.",
+    "idea-comparison: IntelliJ IDEA 2026.2.x is not installed or available; no identical split, undo, close/reopen or dirty-cancel observation was collected."
+  ],
+  "notes": [
+    "Verification used the current working tree rooted at the recorded HEAD; implementation and tests were still uncommitted during these checks.",
+    "The browser reports are current renderer/VFS evidence only and do not prove packaged native persistence or IDEA behavior.",
+    "The full seven-file unit attempt is retained before the successful six-file rerun; its termination is not counted as a pass.",
+    "Terminal status is implemented: production behavior and available focused Windows/browser evidence pass, while required native and IDEA comparison layers remain unavailable."
+  ]
+}

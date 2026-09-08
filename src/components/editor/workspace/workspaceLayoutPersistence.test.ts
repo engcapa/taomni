@@ -52,6 +52,24 @@ describe("workspaceLayoutPersistence", () => {
           pinnedKeys: [],
         },
       },
+      viewStateByLeafFile: {
+        primary: {
+          "root:app:src/main.ts": {
+            selection: [{ anchor: 4, head: 9 }],
+            mainSelection: 0,
+            scrollTop: 128,
+            foldedRanges: [{ from: 0, to: 24 }],
+          },
+        },
+        secondary: {
+          "root:app:README.md": {
+            selection: [{ anchor: 2, head: 2 }],
+            mainSelection: 0,
+            scrollTop: 32,
+            foldedRanges: [],
+          },
+        },
+      },
     };
 
     writeWorkspaceLayoutSnapshot("ws", snapshot);
@@ -68,6 +86,65 @@ describe("workspaceLayoutPersistence", () => {
       "root:app:src/lib.ts",
     ]);
     expect(restored?.editorGroups.secondary.activeKey).toBe("root:app:README.md");
+    expect(restored?.viewStateByLeafFile).toEqual(snapshot.viewStateByLeafFile);
+  });
+
+  it("defaults old snapshots and filters invalid or orphaned view state", () => {
+    const oldSnapshot = normalizeWorkspaceLayoutSnapshot({ version: 2 });
+    expect(oldSnapshot.viewStateByLeafFile).toEqual({});
+
+    const normalized = normalizeWorkspaceLayoutSnapshot({
+      version: 2,
+      layoutTreeV2: {
+        type: "leaf",
+        id: "primary",
+        openFileKeys: ["root:app:main.ts"],
+        activeKey: "root:app:main.ts",
+      },
+      editorGroups: {
+        primary: {
+          openOrder: ["root:app:main.ts"],
+          activeKey: "root:app:main.ts",
+          previewKey: null,
+          pinnedKeys: [],
+        },
+      },
+      viewStateByLeafFile: {
+        primary: {
+          "root:app:main.ts": {
+            selection: [{ anchor: 1.9, head: 6.2 }, { anchor: "bad", head: 2 }],
+            mainSelection: 9,
+            scrollTop: 16,
+            foldedRanges: [{ from: 0, to: 4 }, { from: 9, to: 9 }],
+          },
+          "root:app:orphan.ts": {
+            selection: [{ anchor: 0, head: 1 }],
+            mainSelection: 0,
+            scrollTop: 1,
+            foldedRanges: [],
+          },
+        },
+        "orphan-leaf": {
+          "root:app:main.ts": {
+            selection: [{ anchor: 0, head: 1 }],
+            mainSelection: 0,
+            scrollTop: 1,
+            foldedRanges: [],
+          },
+        },
+      },
+    });
+
+    expect(normalized.viewStateByLeafFile).toEqual({
+      primary: {
+        "root:app:main.ts": {
+          selection: [{ anchor: 1, head: 6 }],
+          mainSelection: 0,
+          scrollTop: 16,
+          foldedRanges: [{ from: 0, to: 4 }],
+        },
+      },
+    });
   });
 
   it("falls back safely for invalid payloads", () => {

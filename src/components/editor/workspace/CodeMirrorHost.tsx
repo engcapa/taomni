@@ -11,6 +11,7 @@ import {
   ChangeSet,
   Compartment,
   EditorState,
+  EditorSelection,
   Prec,
   Transaction,
   type Extension,
@@ -70,7 +71,10 @@ import {
 import {
   bracketMatching,
   foldAll,
+  foldEffect,
   foldGutter,
+  foldState,
+  foldedRanges,
   indentOnInput,
   indentUnit,
   unfoldAll,
@@ -196,6 +200,7 @@ import {
   virtualSpaceTypingHandler,
 } from "./workspaceVirtualSpace";
 import type { WorkspaceActionHost } from "./workspaceActionHost";
+import type { EditorViewSnapshot } from "./workspaceTabPolicy";
 
 export interface EditorRevealTarget {
   line: number;
@@ -221,6 +226,10 @@ interface CodeMirrorHostProps {
   transactionOwner?: WorkspaceDocumentTransactionOwner | null;
   /** Store revision used when the first view creates the canonical document. */
   documentRevision?: number;
+  /** Per-leaf/file caret, scroll, and fold state restored for this view. */
+  viewState?: EditorViewSnapshot | null;
+  /** Reports state owned by this mounted leaf/file view. */
+  onViewStateChange?: (snapshot: EditorViewSnapshot) => void;
   doc: string;
   visible: boolean;
   /**
@@ -1765,12 +1774,46 @@ function applyDocumentSnapshotToView(view: EditorView, nextText: string): boolea
   return true;
 }
 
+function clampEditorOffset(value: number, documentLength: number): number {
+  return Math.max(0, Math.min(documentLength, Math.floor(value)));
+}
+
+function selectionFromViewSnapshot(
+  snapshot: EditorViewSnapshot | null | undefined,
+  documentLength: number,
+): EditorSelection | undefined {
+  if (!snapshot || snapshot.selection.length === 0) return undefined;
+  const ranges = snapshot.selection.map(({ anchor, head }) => ({
+    anchor: clampEditorOffset(anchor, documentLength),
+    head: clampEditorOffset(head, documentLength),
+  })).map(({ anchor, head }) => EditorSelection.range(anchor, head));
+  return EditorSelection.create(
+    ranges,
+    Math.max(0, Math.min(ranges.length - 1, snapshot.mainSelection)),
+  );
+}
+
+function viewSnapshot(view: EditorView): EditorViewSnapshot {
+  const folded: Array<{ from: number; to: number }> = [];
+  foldedRanges(view.state).between(0, view.state.doc.length, (from, to) => {
+    folded.push({ from, to });
+  });
+  return {
+    selection: view.state.selection.ranges.map(({ anchor, head }) => ({ anchor, head })),
+    mainSelection: view.state.selection.mainIndex,
+    scrollTop: Math.max(0, view.scrollDOM.scrollTop),
+    foldedRanges: folded,
+  };
+}
+
 export const CodeMirrorHost = memo(function CodeMirrorHost({
   path,
   fileKey = path,
   viewId,
   transactionOwner = null,
   documentRevision = 0,
+  viewState = null,
+  onViewStateChange,
   doc,
   visible,
   diagnostics = EMPTY_DIAGNOSTICS,
@@ -1853,6 +1896,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   transactionOwnerRef.current = transactionOwner;
   const documentRevisionRef = useRef(documentRevision);
   documentRevisionRef.current = documentRevision;
+  const onViewStateChangeRef = useRef(onViewStateChange);
+  onViewStateChangeRef.current = onViewStateChange;
   // §8.18.2: the mount-once editor effect reads the live host through a ref so
   // editor.* actions register against the workspace controller's instance.
   const workspaceActionHostRef = useRef<WorkspaceActionHost | null>(workspaceActionHost);
@@ -2173,6 +2218,10 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       : doc;
     lastDocumentTextRef.current = initialDocumentText;
     const initialDoc = EditorState.create({ doc: initialDocumentText }).doc;
+    const initialSelection = selectionFromViewSnapshot(viewState, initialDocumentText.length);
+    const reportViewState = (view: EditorView) => {
+      onViewStateChangeRef.current?.(viewSnapshot(view));
+    };
     // §8.19.4 resolve gate banner: anchored to the caret at presentation time.
     // The gate request's own closures re-verify identity/doc before acting, so
     // a stale banner is inert — this only decides where it shows.
@@ -2274,6 +2323,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     };
     const state = EditorState.create({
       doc: initialDoc,
+      selection: initialSelection,
       extensions: [
         lineNumbers(),
         foldGutter(),
@@ -2647,6 +2697,16 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             scheduleSelectionEmit(update.view, update.docChanged ? 125 : 0);
           }
           if (update.viewportChanged) emitViewport(update.view);
+          const previousFolds = update.startState.field(foldState, false);
+          const currentFolds = update.state.field(foldState, false);
+          if (
+            update.selectionSet
+            || update.docChanged
+            || update.viewportChanged
+            || previousFolds !== currentFolds
+          ) {
+            reportViewState(update.view);
+          }
         }),
       ],
     });
@@ -2659,6 +2719,20 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       get: () => view.state.doc.toString(),
     });
     lastEditorStateRef.current = view.state;
+    if (viewState?.foldedRanges.length) {
+      const effects = viewState.foldedRanges.flatMap(({ from, to }) => {
+        const start = clampEditorOffset(from, view.state.doc.length);
+        const end = clampEditorOffset(to, view.state.doc.length);
+        return end > start ? [foldEffect.of({ from: start, to: end })] : [];
+      });
+      if (effects.length > 0) view.dispatch({ effects });
+    }
+    if (viewState) {
+      view.scrollDOM.scrollTop = Math.max(0, viewState.scrollTop);
+    }
+    const onScroll = () => reportViewState(view);
+    view.scrollDOM.addEventListener("scroll", onScroll, { passive: true });
+    reportViewState(view);
     const compositionNavigationGuard = (event: KeyboardEvent) => {
       if (
         (!view.composing && event.isComposing !== true)
@@ -2764,6 +2838,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       cancelActiveHoverResize(activeHoverResizeSessionRef);
       clipboardContextByView.delete(view);
       view.contentDOM.removeEventListener("keydown", compositionNavigationGuard, true);
+      view.scrollDOM.removeEventListener("scroll", onScroll);
       view.destroy();
       viewRef.current = null;
       lastEditorStateRef.current = null;

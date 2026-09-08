@@ -4,6 +4,7 @@ import type { ComponentProps } from "react";
 import { EditorSelection } from "@codemirror/state";
 import { undoDepth } from "@codemirror/commands";
 import { startCompletion } from "@codemirror/autocomplete";
+import { foldedRanges } from "@codemirror/language";
 import { EditorView } from "@codemirror/view";
 import { CodeMirrorHost } from "./CodeMirrorHost";
 import { virtualSpaceOverflowField } from "./workspaceVirtualSpace";
@@ -881,6 +882,45 @@ describe("§8.21.3 V2-C virtual space and region provenance in CodeMirrorHost", 
     await waitFor(() => {
       expect(onFoldProvenanceChange).toHaveBeenCalledWith("explicit-comment");
     });
+  });
+});
+
+describe("ED-AUDIT-009 per-leaf view snapshots", () => {
+  afterEach(() => cleanup());
+
+  it("restores selection, scroll and folds before reporting view changes", () => {
+    const onViewStateChange = vi.fn();
+    const rendered = renderEditor("function demo() {\n  return 1;\n}\n", vi.fn(), {
+      viewState: {
+        selection: [{ anchor: 9, head: 15 }],
+        mainSelection: 0,
+        scrollTop: 48,
+        foldedRanges: [{ from: 0, to: 29 }],
+      },
+      onViewStateChange,
+    });
+    const view = EditorView.findFromDOM(rendered.container.querySelector<HTMLElement>(".cm-editor")!);
+    expect(view).not.toBeNull();
+    expect(view!.state.selection.main.anchor).toBe(9);
+    expect(view!.state.selection.main.head).toBe(15);
+    expect(view!.scrollDOM.scrollTop).toBe(48);
+
+    const folds: Array<{ from: number; to: number }> = [];
+    foldedRanges(view!.state).between(0, view!.state.doc.length, (from, to) => {
+      folds.push({ from, to });
+    });
+    expect(folds).toEqual([{ from: 0, to: 29 }]);
+    expect(onViewStateChange).toHaveBeenCalledWith(expect.objectContaining({
+      selection: [{ anchor: 9, head: 15 }],
+      scrollTop: 48,
+      foldedRanges: [{ from: 0, to: 29 }],
+    }));
+
+    onViewStateChange.mockClear();
+    act(() => view!.dispatch({ selection: EditorSelection.cursor(3) }));
+    expect(onViewStateChange).toHaveBeenCalledWith(expect.objectContaining({
+      selection: [{ anchor: 3, head: 3 }],
+    }));
   });
 });
 
