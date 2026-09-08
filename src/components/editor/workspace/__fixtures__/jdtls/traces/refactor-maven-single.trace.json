@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "fixtureId": "refactor-maven-single",
-  "generatedAt": "2026-09-08T02:55:55.143Z",
+  "generatedAt": "2026-09-08T07:27:58.923Z",
   "sanitized": true,
   "toolchain": {
     "java": {
-      "path": "C:/Program Files/Java/jdk-21/bin/java.exe",
+      "path": "C:\\Program Files\\Java\\jdk-21\\bin\\java.exe",
       "version": "21.0.4",
       "info": {
         "line": "openjdk version \"21.0.4\" 2024-07-16 LTS",
@@ -14,7 +14,7 @@
       }
     },
     "jdtls": {
-      "home": "C:/Users/yuhan/AppData/Local/jdtls",
+      "home": "~\\AppData\\Local\\jdtls",
       "version": "1.61.0.202607142124.jar"
     }
   },
@@ -38,12 +38,12 @@
         "character": 25
       }
     },
-    "latencyMs": 713
+    "latencyMs": 2525
   },
   "rename": {
     "targetSymbol": "signatureTargets",
     "newName": "executeWorkflow",
-    "latencyMs": 5874,
+    "latencyMs": 9055,
     "affectedFilesCount": 2,
     "files": [
       {
