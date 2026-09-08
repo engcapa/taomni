@@ -429,7 +429,11 @@ export class WorkspaceActionHost {
   }
 
   unregisterDispatchView(viewId: string): void {
-    this.registeredViewIds.delete(viewId);
+    if (this.registeredViewIds.delete(viewId)) {
+      // A chord started by a view must not survive that view's unmount and
+      // execute against a later focus target.
+      this.cancelPendingChord("editor view unmounted");
+    }
   }
 
   isDispatchViewRegistered(viewId: string): boolean {
@@ -999,6 +1003,16 @@ export class WorkspaceActionHost {
     options?: { eventTarget?: EventTarget | null } | ActionInvocation,
   ): Promise<{ id: string; result: ActionResult } | null> {
     if (this.disposed) return null;
+    if (
+      event.isComposing === true
+      || event.key === "Process"
+      || event.key === "Unidentified"
+      || event.key === "Dead"
+      || event.getModifierState?.("AltGraph") === true
+    ) {
+      this.cancelPendingChord("composition");
+      return null;
+    }
     const resolved = this.prepareBinding(event, options);
     const enabled = resolved.candidates.find(
       (candidate) => candidate.evaluation.state.availability === "available",
@@ -1041,12 +1055,15 @@ export class WorkspaceActionHost {
       return { kind: "rejected", reason: "stale-owner" };
     }
     if (context.composing || event.isComposing === true || event.key === "Process" || event.key === "Unidentified") {
+      this.cancelPendingChord("composition");
       return { kind: "rejected", reason: "composing" };
     }
     if (event.key === "Dead" || context.deadKey) {
+      this.cancelPendingChord("dead-key");
       return { kind: "rejected", reason: "dead-key" };
     }
     if (context.altGraph || event.getModifierState?.("AltGraph") === true) {
+      this.cancelPendingChord("alt-graph");
       return { kind: "rejected", reason: "alt-graph" };
     }
 

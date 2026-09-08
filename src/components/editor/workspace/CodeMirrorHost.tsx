@@ -2733,6 +2733,13 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     const onScroll = () => reportViewState(view);
     view.scrollDOM.addEventListener("scroll", onScroll, { passive: true });
     reportViewState(view);
+    const actionHost = workspaceActionHostRef.current;
+    const cancelPendingChordOnComposition = () => {
+      actionHost?.cancelPendingChord("composition boundary");
+    };
+    const cancelPendingChordOnBlur = () => {
+      actionHost?.cancelPendingChord("editor blur");
+    };
     const compositionNavigationGuard = (event: KeyboardEvent) => {
       if (
         (!view.composing && event.isComposing !== true)
@@ -2743,6 +2750,9 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       // action from moving the caret before the composition is committed.
       event.preventDefault();
     };
+    view.contentDOM.addEventListener("compositionstart", cancelPendingChordOnComposition);
+    view.contentDOM.addEventListener("compositionend", cancelPendingChordOnComposition);
+    view.contentDOM.addEventListener("blur", cancelPendingChordOnBlur);
     view.contentDOM.addEventListener("keydown", compositionNavigationGuard, true);
     emitSelection(view);
     emitViewport(view);
@@ -2751,7 +2761,6 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     // business bindings live as explicit editor.* actions (conflict graph,
     // Search Everywhere and Keymap settings all see them). Without one
     // (isolated usage), the legacy inline bindings below stay active.
-    const actionHost = workspaceActionHostRef.current;
     let unregisterEditorActions: (() => void) | null = null;
     let bridgeRegistration: { dispose(): void } | null = null;
     let legacyBridgeRegistration: { dispose(): void } | null = null;
@@ -2836,7 +2845,11 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       clearPendingSelectionEmit();
       requestParameterInfoRef.current = null;
       cancelActiveHoverResize(activeHoverResizeSessionRef);
+      actionHost?.cancelPendingChord("editor unmount");
       clipboardContextByView.delete(view);
+      view.contentDOM.removeEventListener("compositionstart", cancelPendingChordOnComposition);
+      view.contentDOM.removeEventListener("compositionend", cancelPendingChordOnComposition);
+      view.contentDOM.removeEventListener("blur", cancelPendingChordOnBlur);
       view.contentDOM.removeEventListener("keydown", compositionNavigationGuard, true);
       view.scrollDOM.removeEventListener("scroll", onScroll);
       view.destroy();

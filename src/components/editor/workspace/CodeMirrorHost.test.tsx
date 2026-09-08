@@ -10,6 +10,7 @@ import { CodeMirrorHost } from "./CodeMirrorHost";
 import { virtualSpaceOverflowField } from "./workspaceVirtualSpace";
 import { WorkspaceActionHost } from "./workspaceActionHost";
 import { WorkspaceDocumentTransactionOwner } from "./workspaceDocumentTransactionOwner";
+import { createKeymapScheme, setActionBindings, type Shortcut } from "./workspaceKeymapScheme";
 import type { GitLineChange } from "./gitEditorChrome";
 
 function renderEditor(
@@ -820,6 +821,68 @@ describe("§8.21.3 V2-C virtual space and region provenance in CodeMirrorHost", 
 
     expect(view!.state.selection.main.head).toBe(0);
     expect(preventDefault).toHaveBeenCalledOnce();
+  });
+
+  it("clears pending workspace chords at composition, blur, and unmount boundaries", () => {
+    const actionHost = new WorkspaceActionHost({ workspaceId: "ws-ime-boundary" });
+    actionHost.registerAction({
+      id: "test.imeChord",
+      title: "IME chord",
+      category: "Edit",
+      provenance: "local",
+      run: () => ({ kind: "applied" as const }),
+    });
+    const chord: Shortcut = {
+      kind: "keyboard",
+      strokes: [
+        { code: "KeyK", ctrl: false, alt: false, shift: false, meta: false },
+        { code: "KeyS", ctrl: false, alt: false, shift: false, meta: false },
+      ],
+    };
+    actionHost.setKeymapScheme(setActionBindings(
+      createKeymapScheme({ id: "ime-boundary", name: "IME boundary", base: "idea-windows-linux" }),
+      "test.imeChord",
+      [chord],
+    ));
+    const rendered = renderEditor("中文注释", vi.fn(), {
+      workspaceActionHost: actionHost,
+      viewId: "ime-view",
+    });
+
+    const beginChord = () => {
+      const result = actionHost.dispatchKeydownV2({
+        event: {
+          key: "k",
+          code: "KeyK",
+          ctrlKey: false,
+          altKey: false,
+          shiftKey: false,
+          metaKey: false,
+          preventDefault: vi.fn(),
+          stopPropagation: vi.fn(),
+        },
+        workspaceId: "ws-ime-boundary",
+        targetViewId: null,
+      });
+      expect(result.kind).toBe("pending-chord");
+      expect(actionHost.hasPendingChord()).toBe(true);
+    };
+
+    beginChord();
+    fireEvent.compositionStart(rendered.content);
+    expect(actionHost.hasPendingChord()).toBe(false);
+
+    beginChord();
+    fireEvent.compositionEnd(rendered.content);
+    expect(actionHost.hasPendingChord()).toBe(false);
+
+    beginChord();
+    fireEvent.blur(rendered.content);
+    expect(actionHost.hasPendingChord()).toBe(false);
+
+    beginChord();
+    rendered.unmount();
+    expect(actionHost.hasPendingChord()).toBe(false);
   });
 
   it("consumes appearance.virtualSpace policy in production editor", async () => {

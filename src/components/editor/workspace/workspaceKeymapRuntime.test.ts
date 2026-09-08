@@ -230,6 +230,31 @@ describe("§8.19.2 dispatchKeydownV2 gate", () => {
     expect(event.preventDefault).not.toHaveBeenCalled();
   });
 
+  it("cancels a pending chord during composition and restores normal shortcuts afterward", async () => {
+    const first = dispatch(makeEvent({ key: "k", code: "KeyK" }));
+    expect(first.kind).toBe("pending-chord");
+    expect(host.hasPendingChord()).toBe(true);
+
+    const composing = makeEvent({ key: "Enter", code: "Enter", isComposing: true });
+    expect(dispatch(composing)).toEqual({ kind: "rejected", reason: "composing" });
+    expect(composing.preventDefault).not.toHaveBeenCalled();
+    expect(host.hasPendingChord()).toBe(false);
+
+    const normal = dispatch(makeEvent({ key: "j", code: "KeyJ", ctrlKey: true }));
+    expect(normal.kind).toBe("executed");
+    await Promise.resolve();
+    expect(executed).toContain("test.plain");
+  });
+
+  it("keeps the legacy dispatch adapter from consuming composition input", async () => {
+    expect(dispatch(makeEvent({ key: "k", code: "KeyK" })).kind).toBe("pending-chord");
+    const event = makeEvent({ key: "Enter", code: "Enter", isComposing: true });
+
+    await expect(host.dispatchKeydown(event)).resolves.toBeNull();
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(host.hasPendingChord()).toBe(false);
+  });
+
   it("rejects dead keys without triggering actions or swallowing input", () => {
     const event = makeEvent({ key: "Dead", code: "Dead", ctrlKey: true });
     const result = dispatch(event);
@@ -296,6 +321,19 @@ describe("§8.19.2 dispatchKeydownV2 gate", () => {
       targetViewId: "view-1",
     });
     expect(result).toEqual({ kind: "rejected", reason: "stale-owner" });
+  });
+
+  it("cancels a pending chord when its editor view is unmounted", () => {
+    const result = host.dispatchKeydownV2({
+      event: makeEvent({ key: "k", code: "KeyK" }),
+      workspaceId: "ws-gate",
+      targetViewId: "view-1",
+    });
+    expect(result.kind).toBe("pending-chord");
+    expect(host.hasPendingChord()).toBe(true);
+
+    host.unregisterDispatchView("view-1");
+    expect(host.hasPendingChord()).toBe(false);
   });
 
   it("completes a two-stroke chord through the typed results", async () => {
