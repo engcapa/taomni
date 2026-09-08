@@ -1,6 +1,6 @@
 {
-  "verified_at": "2026-09-08T07:42:22Z",
-  "head": "4dcc4ef7da70d85d6b6929e717a933ed3241d032",
+  "verified_at": "2026-09-08T11:33:51Z",
+  "head": "5c5a5317d13c1cffc86adf8f64ceb23b35b2e56e",
   "checks": [
     {
       "kind": "native",
@@ -106,6 +106,83 @@
       "result": "passed",
       "summary": "Windows packaged QA run run-20260908-154150-875213200 selected 1 and passed 1 with 0 failed and 0 skipped using the same com.taomni.app.qa binary. TC-IDE-C6-04 reached the real provider-backed rename preview entry; its current YAML has no apply/undo postcondition assertion, so this check is retained as entry smoke evidence only and is not mapped to an acceptance ID. Source SHA-256 cfa751e7990c992cb5331029edcf5c9c17b85a09f701cb9c85af74709efb6d3d; summary SHA-256 A4B7BCE0009AA62DE3B48D900E274A678BE8B15B605432A9275DA14C9A869021; runner receipt SHA-256 B07AF4C28454220A86469E64EFBBF2A4D97F3ADCF95CAFDF28DA1A89B962422A.",
       "acceptance": []
+    },
+    {
+      "kind": "code-audit",
+      "command": "Re-audit at claimed baseline 5c5a5317d13c1cffc86adf8f64ceb23b35b2e56e: CodeWorkspaceTab.applyLspWorkspaceEditNow -> refactorPlan v2 prepared journal -> workspace edit writer -> RefactorRecoveryController -> WorkspaceRecoveryDialog",
+      "result": "passed",
+      "summary": "Current production code persists a v2 prepared journal before mutation, verifies postimages independently, routes mismatch/read/write settlement failures to recovery-required without committed status or normal history, and restores preimages only after per-file pre/post/dirty/revision checks. Progress and verified rollback are persisted; partial failure remains pending, repeat recovery is idempotent, and v1 journals are inspection-only. The owner scope remains text-only multi-file refactor; resource create/rename/delete recovery is explicitly outside this card.",
+      "acceptance": ["ED-AUDIT-014-A1", "ED-AUDIT-014-A2", "ED-AUDIT-014-A3"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/CodeWorkspaceTab.test.tsx src/components/editor/workspace/refactorPlan.test.ts src/components/editor/workspace/refactorRecoveryController.test.ts src/components/editor/workspace/workspaceEditApply.test.ts src/components/editor/workspace/workspaceEditHistory.test.ts src/components/editor/workspace/__fixtures__/jdtls/jdtlsRefactorContract.test.ts --maxWorkers=1",
+      "result": "failed",
+      "summary": "The combined six-file rerun was manually terminated after more than two minutes with no assertion result while a Vitest Node worker grew to about 1.3 GB; it is not a passing check.",
+      "acceptance": []
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/refactorPlan.test.ts src/components/editor/workspace/refactorRecoveryController.test.ts src/components/editor/workspace/workspaceEditApply.test.ts src/components/editor/workspace/workspaceEditHistory.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "4 test files passed; 69/69 tests passed. Assertions cover prepared journal persistence failure, stale/third-party conflict guards, per-file recovery progress and verification, v1 inspection-only behavior, idempotent replay, workspace edit failure effects, and undo history boundaries.",
+      "acceptance": ["ED-AUDIT-014-A1", "ED-AUDIT-014-A2", "ED-AUDIT-014-A3"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/CodeWorkspaceTab.test.tsx --maxWorkers=1 -t \"mounted provider rename|disk postcondition mismatch|pending refactor|journal preparation fails|provider refactor\"",
+      "result": "passed",
+      "summary": "1 mounted CodeWorkspaceTab test file passed; 5 selected tests passed and 113 unrelated tests were skipped. The selected production-owner tests cover provider rename apply and one undo, postcondition mismatch recovery without history, pending recovery rediscovery, journal-preparation zero-write behavior, and stale refactor rejection.",
+      "acceptance": ["ED-AUDIT-014-A1", "ED-AUDIT-014-A2"]
+    },
+    {
+      "kind": "provider",
+      "command": "$env:TAOMNI_FIXTURE_JAVA='C:\\Program Files\\Java\\jdk-21\\bin\\java.exe'; $env:JDTLS_HOME='C:\\Users\\yuhan\\AppData\\Local\\jdtls'; node src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-refactor-fixture.mjs",
+      "result": "passed",
+      "summary": "Real JDT LS 1.61.0.202607142124.jar on JDK 21.0.4 returned rename capability, prepareRename and a two-file textDocument/rename for the maven-single fixture. The regenerated trace SHA-256 is AA8D803F798DF4CCEA6480BF592331595AD518599FA1C007326C8DD996D250BF; both independent pre/post hashes and postConditions are true, with failures empty. This provider result does not claim Taomni UI apply/undo or IDEA behavior.",
+      "acceptance": ["ED-AUDIT-014-A1", "ED-AUDIT-014-A3"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/__fixtures__/jdtls/jdtlsRefactorContract.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "1 test file passed; 4/4 tests passed for the current JDT LS trace capability, prepareRename, multi-file edit, hash and postcondition contract.",
+      "acceptance": ["ED-AUDIT-014-A1", "ED-AUDIT-014-A3"]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/CodeWorkspaceTab.test.tsx --path src/components/editor/CodeWorkspaceTab.tsx --path src/components/editor/workspace/WorkspaceRecoveryDialog.tsx --path src/components/editor/workspace/refactorPlan.test.ts --path src/components/editor/workspace/refactorPlan.ts --path src/components/editor/workspace/refactorRecoveryController.test.ts --path src/components/editor/workspace/refactorRecoveryController.ts --path src/components/editor/workspace/workspaceEditApply.test.ts --path src/components/editor/workspace/workspaceEditApply.ts --path src/components/editor/workspace/workspaceEditHistory.test.ts --path src/components/editor/workspace/workspaceEditHistory.ts --path src/components/editor/workspace/__fixtures__/jdtls/jdtlsRefactorContract.test.ts",
+      "result": "passed",
+      "summary": "All 12 ED-AUDIT-014-owned TypeScript paths have scoped_errors=0; out-of-scope errors are 0 across 0 files.",
+      "acceptance": ["ED-AUDIT-014-A3"]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED014-refactor-recovery-browser --report-dir qa-ui-auto-report/ed-audit-014-browser-current-20260908 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows Chromium actual run run-20260908-191934-045080300 selected 1 and passed 1 with 0 failed and 0 skipped. The browser recovery dialog discovered the prepared v2 journal, exposed recovery-required and its affected file, restored the editor preimage, persisted rolled-back, and closed. Source SHA-256 7ee66e6453aa36c4ecaac1b8fa68ac52d01e6c0c4316307b21b5f977a68066f0; summary SHA-256 CB5A85F7C9F18C1F41A85D4A250D89BCB5291D2CEFADFF064344411A81A36BC6; runner receipt SHA-256 301B5B34B0D870F65529C15F682841894A76FFEAD40DB1BC7CFF6E148AC770CF. Browser VFS evidence does not prove native disk behavior.",
+      "acceptance": ["ED-AUDIT-014-A2", "ED-AUDIT-014-A3"]
+    },
+    {
+      "kind": "native",
+      "command": "python .agents/skills/qa-ui-auto/scripts/native_build.py --force",
+      "result": "passed",
+      "summary": "Rebuilt the isolated Windows QA application com.taomni.app.qa from source SHA-256 7ee66e6453aa36c4ecaac1b8fa68ac52d01e6c0c4316307b21b5f977a68066f0; binary SHA-256 is 2c91aff8230c212f9f2122f4a69bc686975108332e436b74279da67e3ff6588a.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED014-refactor-recovery-native --report-dir qa-ui-auto-report/ed-audit-014-native-current-20260908 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows packaged com.taomni.app.qa actual run run-20260908-192614-633875400 selected 1 and passed 1 with 0 failed and 0 skipped. After native_restart_app, the new WebDriver session rediscovered recovery-required, restored the editor and disk preimage, persisted rolled-back, and independently verified the host file SHA-256. Source SHA-256 7ee66e6453aa36c4ecaac1b8fa68ac52d01e6c0c4316307b21b5f977a68066f0; binary SHA-256 2c91aff8230c212f9f2122f4a69bc686975108332e436b74279da67e3ff6588a; summary SHA-256 60FE273EDF91F0D563BB4436AC8BAE60EE3904B318EB88E54EAB78C7315DE794; runner receipt SHA-256 DBB67CFD241A2525CC74BF94E19D71454E402FEB28E777B8F1786A9D994C4D7C.",
+      "acceptance": ["ED-AUDIT-014-A2", "ED-AUDIT-014-A3"]
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C6-04 --report-dir qa-ui-auto-report/ed-audit-014-native-rename-current-20260908 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows packaged com.taomni.app.qa actual run run-20260908-192827-483332500 selected 1 and passed 1 with 0 failed and 0 skipped. TC-IDE-C6-04 reached the real provider-backed rename preview entry; its YAML only asserts entry smoke and a screenshot, so this check is not mapped to an acceptance ID and does not prove apply/undo postconditions. Source SHA-256 7ee66e6453aa36c4ecaac1b8fa68ac52d01e6c0c4316307b21b5f977a68066f0; binary SHA-256 2c91aff8230c212f9f2122f4a69bc686975108332e436b74279da67e3ff6588a; summary SHA-256 A93329EAB3041E1CECFF978D6775A6ED900DF99AADC2A90FC995BD129887DB9B; runner receipt SHA-256 5836A2534C99842D059939E76DE21F042AEA3B3435691B3AF854B4583B2CC4B5.",
+      "acceptance": []
     }
   ],
   "unrun": [
@@ -115,10 +192,10 @@
     "provider Linux/macOS: the real JDT LS rename provider run was collected on Windows only; cross-platform provider behavior is not claimed."
   ],
   "notes": [
-    "Verification used the current working tree based on HEAD 4dcc4ef7da70d85d6b6929e717a933ed3241d032; the regenerated refactor trace is a task-owned working-tree input bound by source identity cfa751e7990c992cb5331029edcf5c9c17b85a09f701cb9c85af74709efb6d3d.",
-    "The prior native and unit failures are retained before current successful reruns. The final native recovery run used the independently built com.taomni.app.qa application, isolated data/cache roots, matching receipt and binary identity.",
-    "Browser evidence proves renderer/VFS recovery routing only; the Windows packaged case independently proves restart, disk readback and recovery persistence across the real Tauri/WebView boundary.",
-    "The provider trace proves pinned JDT LS rename capability, request/result facts and pre/post hashes. Production code audit and focused tests cover the Taomni apply/recovery owner; the existing C6-04 case was not overclaimed because it lacks apply/undo assertions.",
-    "Terminal status is implemented: production behavior and all available Windows evidence pass, while required IDEA comparison and Linux/macOS native/provider layers remain unrun."
+    "Verification was re-audited from the claimed baseline HEAD 5c5a5317d13c1cffc86adf8f64ceb23b35b2e56e. Production source was unchanged during this attempt; the regenerated provider trace is a task-owned working-tree input bound by source identity 7ee66e6453aa36c4ecaac1b8fa68ac52d01e6c0c4316307b21b5f977a68066f0.",
+    "The earlier native and unit failures are retained before successful reruns. The latest native recovery run used the independently built com.taomni.app.qa application, isolated data/cache roots, and matching source, binary and runner identities.",
+    "Browser evidence proves renderer/VFS recovery routing only; the latest packaged Windows case independently proves process restart, disk readback and recovery persistence across the real Tauri/WebView boundary.",
+    "The current provider trace proves pinned JDT LS rename capability, request/result facts and pre/post hashes. Production audit, focused unit tests and mounted tests cover Taomni apply/recovery owners; TC-IDE-C6-04 remains entry smoke because it lacks apply/undo postconditions.",
+    "Terminal status is implemented: production behavior and all available current Windows evidence pass, while required IDEA comparison and Linux/macOS native/provider layers remain unrun."
   ]
 }
