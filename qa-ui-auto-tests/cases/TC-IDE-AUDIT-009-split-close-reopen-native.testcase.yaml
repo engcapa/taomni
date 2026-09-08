@@ -1,0 +1,282 @@
+id: TC-IDE-AUDIT-009-split-close-reopen-native
+title: "Same-document split shares one history; close/cancel/discard/reopen/restart semantics"
+description: |
+  ED-AUDIT-009 A1/A2/A3 native gate case. Enters a disposable fixture workspace
+  through persisted recents and proves the split/close/reopen contract through
+  the packaged app UI:
+
+  1. One logical history across split leaves (A1): Split Right renders a second
+     editor pane for the same notes.txt buffer. Typing "SPLIT1" in the new
+     leaf appears in the primary leaf in real time. A single-char edit "X"
+     typed in the new leaf mirrors to the primary; Ctrl+Z pressed in the new
+     leaf removes it from BOTH leaves; Ctrl+Shift+Z re-applies it to BOTH -
+     edit/undo/redo are one shared history while each leaf keeps its own
+     caret/scroll state. (The shared ledger records per-keystroke entries, so
+     the undo target is one typed char rather than the whole burst.)
+  2. Close semantics (A2): Ctrl+S writes the buffer (disk sha proves the exact
+     bytes). Closing the non-last leaf's tab needs no confirm, keeps the
+     survivor's text AND its history (undo/redo still work there), and never
+     touches the disk. Closing the LAST view while dirty raises the
+     "Discard unsaved changes" confirm: Cancel is zero effect (buffer intact,
+     tab still open, disk unchanged); Confirm discards without any write (disk
+     keeps the last save). Ctrl+Shift+T reopens the tab and the editor reads
+     the CURRENT disk bytes (an external host_write_file between close and
+     reopen proves the read is fresh - the discarded dirty text is not
+     revived and no write happens during reopen).
+  3. Restart read through the persisted layout snapshot (A3): reload_window
+     destroys the webview JS context; re-entering the workspace through
+     recents restores the session from the localStorage layout snapshot
+     (taomni.codeWorkspace.layout.v2.<workspace-identity>, the identity
+     derived from the workspace roots) and re-reads the file from disk. The
+     same-document split re-created before the reload comes back as two
+     editor panes - something the recents lastActiveFile alone cannot do -
+     proving the snapshot drove the restore. A subsequent unsaved edit is
+     captured by the bounded recovery copy
+     (taomni.codeWorkspace.recovery.v1:<workspace-identity>, 400ms debounce);
+     the next reload opens the Workspace recovery dialog, and Recover all
+     restores the unsaved buffer text while the disk stays untouched.
+
+  Highest claim on green: L2 native (Linux), packaged app UI, real webview
+  localStorage persistence and real disk bytes. IDEA comparison (required
+  kind) is recorded separately as unrun on this box.
+covers: [F25.1, F25.5, F-Confirm-1]
+tags: [code-workspace, ide-editor, split-editor, close-reopen, recovery, native-gate, p1]
+modes: [native]
+fixtures: [reset_db, workspace_root]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-gate-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  # Enter the disposable fixture workspace through persisted recents. The
+  # workspace instance id is derived from the workspace identity (the
+  # deterministic recents identity of the roots), so the layout v2 snapshot
+  # and recovery entries survive reload_window.
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-audit009","name":"qa-audit009","roots":[{"id":"qa-audit009","name":"qa-audit009","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"qa-audit009","path":"notes.txt"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "scratch notes"
+      timeout_sec: 60
+
+  # ---- Segment 1: split renders a second leaf of the same document (A1) ----
+  - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+  - press: Control+Home
+  - click: '[data-testid="code-workspace-split-right"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]:not([data-editor-group-id="primary"])'
+      timeout_sec: 15
+  - eval_readonly:
+      expression: "document.querySelectorAll('.cm-editor').length === 2"
+      expect_truthy: true
+  # Let the split-induced re-render settle before typing (the audit-008 runs
+  # observed dropped key events when typing raced a re-render).
+  - wait: 2
+  # Type into the NEW leaf; the primary leaf must mirror it in real time.
+  - click: '[data-testid="code-workspace-editor-pane"]:not([data-editor-group-id="primary"]) .cm-content'
+  - press: Control+Home
+  - type: "SPLIT1"
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-editor'
+      contains: "SPLIT1"
+      timeout_sec: 30
+  - screenshot: tc-ide-audit-009-split-sync.png
+  # One shared history. The shared ledger records per-keystroke entries, so
+  # the undo target is a single typed char "X" (at the doc start, after
+  # parking the caret): one Ctrl+Z in the new leaf must remove it from BOTH
+  # leaves. (eval expressions cannot contain '=' - the primary leaf is the
+  # first .cm-editor in DOM order, so the assert indexes it positionally.)
+  - press: Control+Home
+  - type: "X"
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-editor'
+      contains: "XSPLIT1"
+      timeout_sec: 30
+  - press: Control+z
+  - eval_readonly:
+      expression: "!document.querySelectorAll('.cm-editor')[0].innerText.includes('XSPLIT1')"
+      expect_truthy: true
+  - eval_readonly:
+      expression: "!document.querySelectorAll('.cm-editor')[1].innerText.includes('XSPLIT1')"
+      expect_truthy: true
+  # ...and redo re-applies it to both.
+  - press: Control+Shift+z
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-editor'
+      contains: "XSPLIT1"
+      timeout_sec: 30
+  - eval_readonly:
+      expression: "document.querySelectorAll('.cm-editor')[1].innerText.includes('XSPLIT1')"
+      expect_truthy: true
+
+  # ---- Segment 2: save, close the non-last leaf (A2 keep text + history) ----
+  - press: Control+s
+  - assert_file_sha256:
+      path: "${fixture.workspace_root}/notes.txt"
+      equals: "bf93ec7aa56bdc61fc4621c86c95bd0c38cd646b171f260410d3fa06178a78db"
+      timeout_sec: 30
+  # The clean non-last view closes without any confirm dialog.
+  - click: '[data-testid="code-workspace-editor-pane"]:not([data-editor-group-id="primary"]) [title="Close"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"] .cm-editor'
+      timeout_sec: 15
+  - eval_readonly:
+      expression: "document.querySelectorAll('.cm-editor').length === 1"
+      expect_truthy: true
+  # The survivor keeps the text...
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-editor'
+      contains: "XSPLIT1"
+      timeout_sec: 15
+  # ...and its history: undo/redo still reach the shared document ledger.
+  - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+  - press: Control+Home
+  - press: Control+z
+  - eval_readonly:
+      expression: "!document.querySelector('.cm-editor').innerText.includes('XSPLIT1')"
+      expect_truthy: true
+  - press: Control+Shift+z
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-editor'
+      contains: "XSPLIT1"
+      timeout_sec: 30
+
+  # ---- Segment 3: dirty last view, cancel close = zero effect (A2) ----
+  - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+  - press: Control+Home
+  - type: "TAILDIRTY "
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-editor'
+      contains: "TAILDIRTY"
+      timeout_sec: 30
+  - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] [title="Close"]'
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      timeout_sec: 15
+  - click: '[data-testid="confirm-dialog-cancel"]'
+  - eval_readonly:
+      expression: "document.querySelector('.cm-editor').innerText.includes('TAILDIRTY')"
+      expect_truthy: true
+  # Zero effect: the tab is still open (editor still mounted) and no write
+  # reached the disk.
+  - assert_file_sha256:
+      path: "${fixture.workspace_root}/notes.txt"
+      equals: "bf93ec7aa56bdc61fc4621c86c95bd0c38cd646b171f260410d3fa06178a78db"
+      timeout_sec: 30
+
+  # ---- Segment 4: discard close writes nothing (A2) ----
+  - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] [title="Close"]'
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      timeout_sec: 15
+  - screenshot: tc-ide-audit-009-dirty-close-confirm.png
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  - assert_not_visible: '[data-testid="code-workspace-editor"]'
+  - assert_file_sha256:
+      path: "${fixture.workspace_root}/notes.txt"
+      equals: "bf93ec7aa56bdc61fc4621c86c95bd0c38cd646b171f260410d3fa06178a78db"
+      timeout_sec: 30
+
+  # ---- Segment 5: reopen reads CURRENT disk bytes, no dirty revival (A2) ----
+  # Mutate the disk externally while the file is closed, then reopen: the
+  # editor must show the new bytes (fresh read) and must NOT revive the
+  # discarded TAILDIRTY text.
+  - host_write_file:
+      path: "${fixture.workspace_root}/notes.txt"
+      text: "reloaded-from-disk\n"
+  - press: Control+Shift+T
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor"]'
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "reloaded-from-disk"
+      timeout_sec: 30
+  - eval_readonly:
+      expression: "!document.querySelector('.cm-editor').innerText.includes('TAILDIRTY')"
+      expect_truthy: true
+  - assert_file_sha256:
+      path: "${fixture.workspace_root}/notes.txt"
+      equals: "def2bdd6fe376421f97ec0d11cd08e6c81f5e6ee299586561ee09c9310ac8858"
+      timeout_sec: 30
+
+  # ---- Segment 6: restart reads the persisted layout snapshot (A3) ----
+  # After segment 5's clean reopen, reconcile removed the stale recovery copy,
+  # so re-entry restores purely from the localStorage layout snapshot
+  # (taomni.codeWorkspace.layout.v2.<workspace-identity>) with no recovery
+  # dialog. To attribute the restore to the SNAPSHOT rather than the recents
+  # lastActiveFile (which can only reopen one file in one pane), split again
+  # before reloading: after reload_window the only way BOTH panes come back
+  # is the snapshot-driven restore. The key-scan eval is used because the
+  # identity is derived from the fixture path.
+  - click: '[data-testid="code-workspace-split-right"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]:not([data-editor-group-id="primary"])'
+      timeout_sec: 15
+  - wait: 2
+  - eval_readonly:
+      expression: "Object.keys(localStorage).join('|').indexOf('taomni.codeWorkspace.layout.v2.') > -1 && Object.values(localStorage).join('|').indexOf('notes.txt') > -1"
+      expect_truthy: true
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor"]'
+      timeout_sec: 60
+  - eval_readonly:
+      expression: "document.querySelectorAll('.cm-editor').length === 2"
+      expect_truthy: true
+  - screenshot: tc-ide-audit-009-restart-split-restore.png
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "reloaded-from-disk"
+      timeout_sec: 60
+  - eval_readonly:
+      expression: "!document.querySelector('.cm-editor').innerText.includes('TAILDIRTY')"
+      expect_truthy: true
+  - assert_file_sha256:
+      path: "${fixture.workspace_root}/notes.txt"
+      equals: "def2bdd6fe376421f97ec0d11cd08e6c81f5e6ee299586561ee09c9310ac8858"
+      timeout_sec: 30
+
+  # ---- Segment 7: recovery dialog restores the unsaved buffer (A2/A3) ----
+  # An unsaved edit is captured by the bounded recovery copy (400ms debounce
+  # on top of the ~220ms editor text commit); the next reload surfaces it in
+  # the Workspace recovery dialog.
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+Home
+  - type: "RECOVERYDIRTY "
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "RECOVERYDIRTY"
+      timeout_sec: 30
+  - wait: 2
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="workspace-recovery-dialog"]'
+      timeout_sec: 60
+  - screenshot: tc-ide-audit-009-recovery-dialog.png
+  - click: '[data-testid="workspace-recovery-recover-all"]'
+  - assert_not_visible: '[data-testid="workspace-recovery-dialog"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "RECOVERYDIRTY"
+      timeout_sec: 30
+  - screenshot: tc-ide-audit-009-recovered.png
+  # The recovered text existed only in the recovery copy; the disk never saw it.
+  - assert_file_sha256:
+      path: "${fixture.workspace_root}/notes.txt"
+      equals: "def2bdd6fe376421f97ec0d11cd08e6c81f5e6ee299586561ee09c9310ac8858"
+      timeout_sec: 30

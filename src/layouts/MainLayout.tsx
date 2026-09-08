@@ -2184,7 +2184,14 @@ export function MainLayout() {
       codeWorkspace: {
         ...workspace,
         workspaceId: workspace.workspaceId ?? identity,
-        workspaceInstanceId: workspace.workspaceInstanceId ?? newWorkspaceInstanceId(),
+        // Derive the instance id from the workspace identity (the same
+        // deterministic recents id the tab already carries) instead of minting
+        // a fresh uuid per entry: the layout v2 snapshot and the bounded
+        // recovery copies are keyed by this id, so a fresh uuid per re-entry
+        // orphaned every snapshot/recovery entry across a reload or app
+        // restart. An explicit workspaceInstanceId (duplicate tab, detached
+        // window) still wins.
+        workspaceInstanceId: workspace.workspaceInstanceId ?? (identity || newWorkspaceInstanceId()),
         name: title,
       },
     });

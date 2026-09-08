@@ -5659,6 +5659,185 @@ describe("CodeWorkspaceTab", () => {
     expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-split").openFiles[fileKey]).toBeUndefined();
   });
 
+  // ED-AUDIT-009 A1: two real leaves of one file share ONE logical history —
+  // an edit in either leaf reaches the other in real time without clobbering
+  // its caret/scroll, and one undo/redo stroke issued from one leaf reverts
+  // (re-applies) in both leaves through the production keymap routing.
+  it("ED-AUDIT-009: same-file split leaves share one edit/undo history in real time", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-audit009-split",
+      workspaceInstanceId: "instance-audit009-split",
+      name: "Audit009 Split",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, _path: string) => (
+      file("src/main.ts", "alpha\nbeta\n")
+    ));
+    lspMocks.lspDetectServers.mockResolvedValue([csharpStatus({ available: false, active: false })]);
+    window.localStorage.setItem("taomni.codeWorkspace.layout.v1.instance-audit009-split", JSON.stringify({
+      version: 1,
+      splitOrientation: "vertical",
+      activeEditorGroupId: "primary",
+      editorGroups: {
+        primary: {
+          openOrder: ["root:app:src/main.ts"],
+          activeKey: "root:app:src/main.ts",
+          previewKey: null,
+          pinnedKeys: [],
+        },
+        secondary: {
+          openOrder: ["root:app:src/main.ts"],
+          activeKey: "root:app:src/main.ts",
+          previewKey: null,
+          pinnedKeys: [],
+        },
+      },
+    }));
+
+    renderWorkspace(workspace);
+    await screen.findAllByTitle("app / src/main.ts");
+
+    const panes = screen.getAllByTestId("code-workspace-editor-pane");
+    const primaryPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") === "primary")!;
+    const secondaryPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") === "secondary")!;
+    const primaryView = EditorView.findFromDOM(primaryPane.querySelector<HTMLElement>(".cm-editor")!)!;
+    const secondaryView = EditorView.findFromDOM(secondaryPane.querySelector<HTMLElement>(".cm-editor")!)!;
+    // History strokes target the editor surface (.cm-content): a pane-div
+    // target resolves as workspace focus, so the requiresEditor history
+    // actions are rejected before the shared owner is ever consulted.
+    const primaryContent = primaryPane.querySelector<HTMLElement>(".cm-content")!;
+    const secondaryContent = secondaryPane.querySelector<HTMLElement>(".cm-content")!;
+
+    // Edit in the primary leaf: the secondary leaf shows it in real time.
+    primaryView.dispatch({ changes: { from: 0, to: 0, insert: "HEAD;" } });
+    await waitFor(() => expect(secondaryView.state.doc.toString()).toBe("HEAD;alpha\nbeta\n"));
+    expect(primaryView.state.doc.toString()).toBe("HEAD;alpha\nbeta\n");
+
+    // Park the primary caret mid-document and scroll it away from the top;
+    // the secondary leaf's edit must not clobber either.
+    primaryView.dispatch({ selection: EditorSelection.cursor(5) });
+    const primaryScroller = primaryPane.querySelector<HTMLElement>(".cm-scroller")!;
+    primaryScroller.scrollTop = 40;
+    secondaryView.dispatch({
+      changes: { from: "HEAD;alpha\nbeta\n".length, to: "HEAD;alpha\nbeta\n".length, insert: "TAIL;" },
+    });
+    await waitFor(() => expect(primaryView.state.doc.toString()).toBe("HEAD;alpha\nbeta\nTAIL;"));
+    expect(secondaryView.state.doc.toString()).toBe("HEAD;alpha\nbeta\nTAIL;");
+    expect(primaryView.state.selection.main.head).toBe(5);
+    expect(primaryScroller.scrollTop).toBe(40);
+
+    // One Ctrl+Z in the SECONDARY leaf reverts the shared history in BOTH leaves.
+    fireEvent.keyDown(secondaryContent, { key: "z", ctrlKey: true });
+    await waitFor(() => expect(primaryView.state.doc.toString()).toBe("HEAD;alpha\nbeta\n"));
+    expect(secondaryView.state.doc.toString()).toBe("HEAD;alpha\nbeta\n");
+
+    // One redo from the PRIMARY leaf re-applies the same shared entry in both.
+    fireEvent.keyDown(primaryContent, { key: "z", ctrlKey: true, shiftKey: true });
+    await waitFor(() => expect(primaryView.state.doc.toString()).toBe("HEAD;alpha\nbeta\nTAIL;"));
+    expect(secondaryView.state.doc.toString()).toBe("HEAD;alpha\nbeta\nTAIL;");
+  });
+
+  // ED-AUDIT-009 A2: closing a non-last leaf keeps text AND history in the
+  // survivor (no didClose, no save); the last dirty view's cancel is a zero
+  // effect; confirming the discard closes without writing; the closed-tab
+  // reopen reads the saved disk bytes — discarded text is not revived.
+  it("ED-AUDIT-009: split close keeps survivor history, dirty cancel is zero effect, reopen reads saved bytes", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-audit009-close",
+      workspaceInstanceId: "instance-audit009-close",
+      name: "Audit009 Close",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, _path: string) => (
+      file("src/main.ts", "alpha\nbeta\n")
+    ));
+    lspMocks.lspDetectServers.mockResolvedValue([csharpStatus({ available: true, active: true })]);
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({ available: true, active: true }));
+
+    renderWorkspace(workspace);
+    await screen.findAllByTitle("app / src/main.ts");
+    await waitFor(() => expect(lspMocks.lspOpenDocument).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+    await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
+
+    const panes = screen.getAllByTestId("code-workspace-editor-pane");
+    const primaryPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") === "primary")!;
+    // A live split generates a fresh leaf id for the new pane (unlike the
+    // seeded V1 snapshot's "secondary"), so select it by set difference.
+    const splitPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") !== "primary")!;
+    const primaryView = EditorView.findFromDOM(primaryPane.querySelector<HTMLElement>(".cm-editor")!)!;
+    const splitView = EditorView.findFromDOM(splitPane.querySelector<HTMLElement>(".cm-editor")!)!;
+
+    // A dirty edit in the primary leaf reaches the split leaf.
+    primaryView.dispatch({ changes: { from: 0, to: 0, insert: "DIRTY;" } });
+    await waitFor(() => expect(splitView.state.doc.toString()).toBe("DIRTY;alpha\nbeta\n"));
+
+    // Close the primary tab: the other leaf still holds the buffer, so no
+    // discard confirm appears, no didClose fires, and nothing is written.
+    // The emptied leaf keeps rendering (it loses only its tab strip entry).
+    fireEvent.click(within(primaryPane).getByTitle("Close"));
+    await waitFor(() => expect(
+      within(primaryPane).queryByTitle("app / src/main.ts"),
+    ).not.toBeInTheDocument());
+    expect(lspMocks.lspCloseDocument).not.toHaveBeenCalled();
+    expect(confirmAppDialog).not.toHaveBeenCalled();
+    expect(workspaceMocks.workspaceWriteFile).not.toHaveBeenCalled();
+
+    // Re-resolve the survivor: the leaf that still holds the tab.
+    const survivorPane = screen.getAllByTestId("code-workspace-editor-pane").find(
+      (pane) => within(pane).queryByTitle("app / src/main.ts") !== null,
+    )!;
+    const survivorView = EditorView.findFromDOM(survivorPane.querySelector<HTMLElement>(".cm-editor")!)!;
+    expect(survivorView.state.doc.toString()).toBe("DIRTY;alpha\nbeta\n");
+    // History strokes go through the editor surface (.cm-content): a pane-div
+    // target resolves as workspace focus and the requiresEditor history
+    // actions are rejected before the shared owner is consulted.
+    const survivorContent = () => survivorPane.querySelector<HTMLElement>(".cm-content")!;
+
+    // The survivor keeps the shared history: undo reverts the pre-close edit.
+    fireEvent.keyDown(survivorContent(), { key: "z", ctrlKey: true });
+    await waitFor(() => expect(survivorView.state.doc.toString()).toBe("alpha\nbeta\n"));
+    // Redo makes the buffer dirty again for the cancel segment.
+    fireEvent.keyDown(survivorContent(), { key: "z", ctrlKey: true, shiftKey: true });
+    await waitFor(() => expect(survivorView.state.doc.toString()).toBe("DIRTY;alpha\nbeta\n"));
+
+    // Close the LAST dirty view: cancel must have zero effect.
+    vi.mocked(confirmAppDialog).mockImplementationOnce(async () => false);
+    fireEvent.click(within(survivorPane).getByTitle("Close"));
+    await waitFor(() => expect(vi.mocked(confirmAppDialog)).toHaveBeenCalledTimes(1));
+    expect(within(survivorPane).getByTitle("app / src/main.ts")).toBeInTheDocument();
+    expect(survivorView.state.doc.toString()).toBe("DIRTY;alpha\nbeta\n");
+    expect(workspaceMocks.workspaceWriteFile).not.toHaveBeenCalled();
+    expect(lspMocks.lspCloseDocument).not.toHaveBeenCalled();
+
+    // Confirming the discard closes the last view — still without writing.
+    fireEvent.click(within(survivorPane).getByTitle("Close"));
+    await waitFor(() => expect(lspMocks.lspCloseDocument).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTitle("app / src/main.ts")).not.toBeInTheDocument();
+    expect(workspaceMocks.workspaceWriteFile).not.toHaveBeenCalled();
+
+    // Reopen (Ctrl+Shift+T) reads the saved disk bytes: the discarded dirty
+    // text is not revived and the read is a fresh decode of the same file.
+    fireEvent.keyDown(window, { key: "T", ctrlKey: true, shiftKey: true });
+    const reopened = await screen.findByTitle("app / src/main.ts");
+    expect(reopened).toBeInTheDocument();
+    await waitFor(() => expect(
+      EditorView.findFromDOM(
+        screen.getAllByTestId("code-workspace-editor-pane")
+          .find((pane) => within(pane).queryByTitle("app / src/main.ts") !== null)!
+          .querySelector<HTMLElement>(".cm-editor")!,
+      )!.state.doc.toString(),
+    ).toBe("alpha\nbeta\n"));
+    expect(workspaceMocks.workspaceWriteFile).not.toHaveBeenCalled();
+  });
+
   it("keeps the committed layout and buffer recovery state when final-view didClose fails", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",

@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle } from "react";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 import { MainLayout } from "./MainLayout";
-import { useAppStore } from "../stores/appStore";
+import { useAppStore, recentWorkspaceIdFromParts } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { commitWelcomeRunSnapshot, exitApp, listSessions, markSessionConnected, writeTerminal, type SessionConfig } from "../lib/ipc";
 import { DEFAULT_TERMINAL_PROFILE, type TerminalProfile } from "../lib/terminalProfile";
@@ -651,6 +651,45 @@ describe("MainLayout attached SFTP sidebar", () => {
       expect(wrapper.style.display).toBe("block");
     });
     expect(panel).toBeInTheDocument();
+  });
+
+  it("derives the code workspace instance id from the workspace identity on recents re-entry", async () => {
+    // ED-AUDIT-009 A3: the layout v2 snapshot and bounded recovery copies are
+    // keyed by the workspace instance id, so re-entering a recents workspace
+    // must reuse the deterministic identity instead of minting a fresh uuid
+    // (which orphaned every snapshot/recovery entry across reload/restart).
+    useAppStore.setState({
+      tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false }],
+      activeTabId: "welcome",
+      recentWorkspaces: [
+        {
+          // Deliberately differs from the derived identity to prove the
+          // instance id is derived from the workspace parts, not copied.
+          id: "seeded-recents-id",
+          name: "ws-audit009",
+          roots: [{ id: "root-1", name: "ws-audit009", path: "/tmp/ws-audit009", kind: "folder" }],
+          looseFiles: [],
+          lastActiveFile: null,
+          lastOpenedAt: 1756100000000,
+          isGitRepo: false,
+        },
+      ],
+    });
+
+    render(<MainLayout />);
+
+    fireEvent.click(screen.getByTestId("welcome-history-tab-workspaces"));
+    fireEvent.click(screen.getByTestId("welcome-recent-workspace-row"));
+
+    await waitFor(() => {
+      const tab = useAppStore.getState().tabs.find((entry) => entry.type === "code-workspace");
+      expect(tab?.codeWorkspace?.workspaceInstanceId).toBeTruthy();
+    });
+    const tab = useAppStore.getState().tabs.find((entry) => entry.type === "code-workspace")!;
+    expect(tab.codeWorkspace?.workspaceInstanceId).not.toMatch(/^workspace-instance-/);
+    expect(tab.codeWorkspace?.workspaceInstanceId).toBe(
+      recentWorkspaceIdFromParts(tab.codeWorkspace?.roots ?? [], tab.codeWorkspace?.looseFiles ?? []),
+    );
   });
 
   it("passes a Git rail action to the sidebar for the active local terminal", () => {

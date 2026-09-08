@@ -252,11 +252,15 @@ export function useWorkspaceGitSnapshots({
       path: root.path,
     }))).then((detected) => {
       if (cancelled || !visibleRef.current) return;
-      gitRootsRef.current = detected;
-      setGitRoots(detected);
+      // A provider that resolves null (or a non-array) must degrade to "no
+      // git roots", not crash the workspace tab render (gitRoots[0] and the
+      // snapshot filter both assume an array).
+      const detectedRoots = Array.isArray(detected) ? detected : [];
+      gitRootsRef.current = detectedRoots;
+      setGitRoots(detectedRoots);
       setGitSnapshots((current) => Object.fromEntries(
         Object.entries(current).filter(([repoRoot]) => (
-          detected.some((root) => root.repoRoot === repoRoot)
+          detectedRoots.some((root) => root.repoRoot === repoRoot)
         )),
       ));
     }).catch((error) => {

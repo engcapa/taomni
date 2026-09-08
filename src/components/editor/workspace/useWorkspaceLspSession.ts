@@ -279,7 +279,10 @@ export function useWorkspaceLspSession({
       await lspSetJavaBundles(javaBundles);
       if (!isCurrentRequest()) return;
       const statuses = await lspDetectServers({ javaHome: home || null, forceRefresh });
-      if (isCurrentRequest()) setServerStatuses(statuses);
+      // A provider that resolves null (or a non-array) must degrade to "no
+      // servers", not crash the workspace tab render (serverStatuses.find
+      // assumes an array).
+      if (isCurrentRequest()) setServerStatuses(Array.isArray(statuses) ? statuses : []);
     } catch (error) {
       if (isCurrentRequest()) onError(errorMessage(error));
     }

@@ -5935,6 +5935,22 @@ controls:
     selector: '[data-testid="workspace-resource-cleanup-retry"]'
     kind: interactive
     optional: true
+  - id: workspace-recovery-dialog
+    selector: '[data-testid="workspace-recovery-dialog"]'
+    kind: display
+    optional: true       # opens on workspace mount when unsaved buffers or disk results exist
+  - id: workspace-recovery-recover-selected
+    selector: '[data-testid="workspace-recovery-recover-selected"]'
+    kind: interactive
+    optional: true       # enabled while a buffer row is selected
+  - id: workspace-recovery-recover-all
+    selector: '[data-testid="workspace-recovery-recover-all"]'
+    kind: interactive
+    optional: true       # buffers tab only; disabled with no entries
+  - id: workspace-recovery-discard-all
+    selector: '[data-testid="workspace-recovery-discard-all"]'
+    kind: interactive
+    optional: true       # buffers tab only; disabled with no entries
   - id: split-down
     selector: '[data-testid="code-workspace-split-down"]'
     kind: interactive
