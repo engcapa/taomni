@@ -115,6 +115,23 @@ describe("clipboardObservationContract", () => {
     expect(record.rectangular).toBe(false);
   });
 
+  it("keeps the OS effect fact when owner cancellation prevents the editor commit", () => {
+    const record = createClipboardReadObservation({
+      ...base,
+      operation: "paste",
+      result: {
+        outcome: "cancelled",
+        reason: "document-changed",
+        systemEffect: "performed",
+        fallbackSession: null,
+      },
+    });
+    expect(record.outcome).toBe("cancelled");
+    expect(record.systemEffect).toBe("performed");
+    expect(record.usedWorkspaceFallback).toBe(false);
+    expect(record.payloadLength).toBeNull();
+  });
+
   it("never carries clipboard text in the projected record", () => {
     const record = createClipboardWriteObservation({
       ...base,

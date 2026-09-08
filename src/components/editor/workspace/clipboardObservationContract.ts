@@ -27,6 +27,7 @@ export type ClipboardObservationOutcome =
   | "success"
   | "denied"
   | "stale-generation"
+  | "cancelled"
   | "unavailable"
   | "error";
 

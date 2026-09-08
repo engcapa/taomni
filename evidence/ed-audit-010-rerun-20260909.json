@@ -1,0 +1,90 @@
+{
+  "verified_at": "2026-09-09T02:40:00Z",
+  "head": "1fd5c1f4cd5b97ede76e260800514c2b5b075370",
+  "checks": [
+    {
+      "kind": "code-audit",
+      "command": "Inspection: CodeMirrorHost copy/cut/paste commands -> workspaceClipboardSession guarded system read/write -> src/lib/clipboard.ts OS/WebView boundary -> CodeWorkspaceTab workspace lease, observation metadata and history owner",
+      "result": "passed",
+      "summary": "The current production chain freezes document and selection before an awaited OS clipboard read/write, then checks view ownership, composition, document identity and selection before committing. cancelGuardedSystemRead/write preserves performed/not-performed/unknown OS effect on view-closed, composition, document-changed and selection-changed cancellation. Successful paste uses the external text only when it matches the session identity, distributes the real payload in one editor transaction, and leaves one undo recovery; denied, unknown, stale and cancelled outcomes remain typed and visible through the redacted clipboard observation status without creating a cancelled history entry.",
+      "acceptance": [
+        "ED-AUDIT-010-A1",
+        "ED-AUDIT-010-A2",
+        "ED-AUDIT-010-A3"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/workspaceClipboardSession.test.ts --maxWorkers=1",
+      "result": "failed",
+      "summary": "Baseline regression preserved before the implementation fix: 1 failed / 32 total because cancelGuardedSystemRead was not exported.",
+      "acceptance": []
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/workspaceClipboardSession.test.ts src/components/editor/workspace/workspaceClipboardHistory.test.ts src/components/editor/workspace/ClipboardHistoryPopup.test.tsx src/components/editor/workspace/clipboardObservationContract.test.ts src/components/editor/workspace/CodeMirrorHost.test.tsx --maxWorkers=1",
+      "result": "passed",
+      "summary": "5 test files passed; 101/101 tests passed. Coverage includes workspace lease/history isolation, permission and system-effect outcomes, stale/cancel guards, redacted observation metadata, mounted clipboard routing, multi-caret paste and one-undo recovery.",
+      "acceptance": [
+        "ED-AUDIT-010-A1",
+        "ED-AUDIT-010-A2",
+        "ED-AUDIT-010-A3"
+      ]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/CodeWorkspaceTab.tsx --path src/components/editor/workspace/CodeMirrorHost.tsx --path src/components/editor/workspace/CodeMirrorHost.test.tsx --path src/components/editor/workspace/clipboardObservationContract.ts --path src/components/editor/workspace/clipboardObservationContract.test.ts --path src/components/editor/workspace/workspaceClipboardSession.ts --path src/components/editor/workspace/workspaceClipboardSession.test.ts --json",
+      "result": "passed",
+      "summary": "All 7 owned TypeScript paths were checked; scoped_errors=0 and external_errors=0 across 0 files.",
+      "acceptance": [
+        "ED-AUDIT-010-A3"
+      ]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C3-01,TC-IDE-C3-03 --workers 1 --report-dir qa-ui-auto-report/ed-audit-010-browser-cancel-20260909 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows Chromium run run-20260909-020409-355880500 selected 2 and passed 2 with 0 failures and 0 skips. C3-01 asserted cross-leaf clipboard routing, history, one undo and lease cleanup; C3-03 asserted typed observation effect/outcome, denial fallback, multi-caret shape, focus and zoom. summary identity_stable=true; source identity b7dd2f870218a12d948e9452af58a21b285f562515a7286c933112c5930a29da and browser receipt are retained under the report directory.",
+      "acceptance": [
+        "ED-AUDIT-010-A1",
+        "ED-AUDIT-010-A2",
+        "ED-AUDIT-010-A3"
+      ]
+    },
+    {
+      "kind": "native",
+      "command": "python .agents/skills/qa-ui-auto/scripts/native_build.py --force",
+      "result": "passed",
+      "summary": "Built the isolated Windows debug application with QA identifier com.taomni.app.qa. The adjacent identity record reports source_sha256 b7dd2f870218a12d948e9452af58a21b285f562515a7286c933112c5930a29da, binary_sha256 b4b62b0b9a92fbf0f25eb9c0417b69ad3c6554fa77425429067bd9f89de4e47d, and platform Windows.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED010-clipboard-windows-native --report-dir qa-ui-auto-report/ed-audit-010-native-windows-cancel-20260909 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "First actual Windows packaged attempt run-20260909-021834-672448000 failed at step 6 before the clipboard workflow: WebDriver element click was intercepted by the welcome LaunchChat card. The failure receipt, screenshot and HTML are retained; no product behavior was claimed from this run.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED010-clipboard-windows-native --report-dir qa-ui-auto-report/ed-audit-010-native-windows-cancel-20260909 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows packaged WebView2 run run-20260909-022228-795025100 selected 1 and passed 1 with 0 failures and 0 skips. QA identity was com.taomni.app.qa on Windows; identity_stable=true and the receipt matched source/test-plan/bundle identities. The real fixture file was opened through the host filesystem, production copy observed performed, external OS clipboard payload replaced stale session text, two carets pasted the payload, metadata reported performed and caretCount=2 without exposing text, and one Control+Z restored both original lines.",
+      "acceptance": [
+        "ED-AUDIT-010-A1",
+        "ED-AUDIT-010-A2",
+        "ED-AUDIT-010-A3"
+      ]
+    }
+  ],
+  "unrun": [
+    "idea-comparison: IntelliJIdea2026.2 was not present on this host; only IntelliJIdea2025.1 and IntelliJIdea2026.1 directories were detected, so no identical fixture/action comparison was collected.",
+    "native Linux: no qualifying Tauri/WebKitGTK/X11 desktop runtime was available on this Windows host.",
+    "native macOS: no qualifying macOS QA bundle, WKWebView automation or manual QA-app run was available."
+  ],
+  "notes": [
+    "Verification used claimed baseline HEAD 1fd5c1f4cd5b97ede76e260800514c2b5b075370 with current production changes in the working tree; no production source changed after the browser/native runs before this evidence was written.",
+    "The native run used isolated fixture workspace and app-data roots. Browser VFS evidence is supplementary and does not replace the packaged Windows OS clipboard result.",
+    "Terminal status is implemented: production behavior and available Windows/browser evidence pass, but required IDEA comparison and cross-platform native layers remain unavailable."
+  ]
+}

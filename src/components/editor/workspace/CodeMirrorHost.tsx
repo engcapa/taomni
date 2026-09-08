@@ -99,7 +99,11 @@ import type {
 import type { ParameterPopupView } from "./referenceInfoSession";
 import { languageForPath } from "../../git/diffLanguage";
 import {
+  cancelGuardedSystemRead,
+  cancelGuardedSystemWrite,
   useWorkspaceClipboardSession,
+  type GuardedClipboardCancellationReason,
+  type GuardedSystemEffect,
   type GuardedSystemReadResult,
   type GuardedSystemWriteResult,
   type WorkspaceClipboardHandle,
@@ -462,6 +466,38 @@ function workspaceStoreFor(
   return context?.handle ?? null;
 }
 
+function clipboardCancellationReason(
+  view: EditorView,
+  docAtRequest: Text,
+  selectionAtRequest: EditorSelection,
+): GuardedClipboardCancellationReason | null {
+  if (!view.dom.isConnected) return "view-closed";
+  if (view.composing) return "composition";
+  if (view.state.doc !== docAtRequest) return "document-changed";
+  if (!view.state.selection.eq(selectionAtRequest, true)) return "selection-changed";
+  return null;
+}
+
+function clipboardCancellationMessage(
+  operation: "Cut" | "Paste",
+  reason: GuardedClipboardCancellationReason,
+  systemEffect: GuardedSystemEffect,
+): string {
+  const boundary = systemEffect === "performed"
+    ? "the system clipboard effect was performed"
+    : systemEffect === "not-performed"
+      ? "no system clipboard effect occurred"
+      : "the system clipboard effect is unknown";
+  const cause = reason === "view-closed"
+    ? "the editor closed"
+    : reason === "composition"
+      ? "input composition took ownership"
+      : reason === "document-changed"
+        ? "the document changed"
+        : "the selection changed";
+  return `${operation} cancelled because ${cause}; ${boundary}`;
+}
+
 function rememberEditorClipboardPayload(
   view: EditorView,
   payload: EditorClipboardPayload,
@@ -601,14 +637,13 @@ function pasteSystemClipboard(view: EditorView): boolean {
 
   if (handle) {
     void handle.readSystemClipboard({ readTextResult: readCodeWorkspaceClipboardText }).then((result) => {
-      if (
-        !view.dom.isConnected
-        || view.composing
-        || view.state.doc !== docAtRequest
-        || !view.state.selection.eq(selectionAtRequest, true)
-      ) {
-        // Stale/cancelled paste: no effect and, per the shared contract, no
-        // observation entry either.
+      const cancellation = clipboardCancellationReason(view, docAtRequest, selectionAtRequest);
+      if (cancellation) {
+        if (view.dom.isConnected) {
+          const cancelled = cancelGuardedSystemRead(result, cancellation);
+          reportClipboardReadObservation(view, "paste", cancelled, caretCountAtPaste);
+          context?.onUnavailable(clipboardCancellationMessage("Paste", cancellation, cancelled.systemEffect));
+        }
         return;
       }
       reportClipboardReadObservation(view, "paste", result, caretCountAtPaste);
@@ -698,6 +733,7 @@ function pasteSystemClipboard(view: EditorView): boolean {
 function pasteAsPlainText(view: EditorView): boolean {
   if (view.composing || view.state.readOnly) return false;
   const docAtRequest = view.state.doc;
+  const selectionAtRequest = view.state.selection;
   const context = clipboardContextByView.get(view);
   const handle = context?.handle;
 
@@ -705,7 +741,15 @@ function pasteAsPlainText(view: EditorView): boolean {
 
   if (handle) {
     void handle.readSystemClipboard({ readTextResult: readCodeWorkspaceClipboardText }).then((result) => {
-      if (!view.dom.isConnected || view.composing || view.state.doc !== docAtRequest) return;
+      const cancellation = clipboardCancellationReason(view, docAtRequest, selectionAtRequest);
+      if (cancellation) {
+        if (view.dom.isConnected) {
+          const cancelled = cancelGuardedSystemRead(result, cancellation);
+          reportClipboardReadObservation(view, "paste-plain", cancelled, caretCountAtPlainPaste);
+          context?.onUnavailable(clipboardCancellationMessage("Paste", cancellation, cancelled.systemEffect));
+        }
+        return;
+      }
       reportClipboardReadObservation(view, "paste-plain", result, caretCountAtPlainPaste);
       const text = result.outcome === "success" ? result.text : result.fallbackSession?.plainText ?? "";
       if (!text) {
@@ -777,12 +821,13 @@ function cutSystemClipboard(view: EditorView): boolean {
 
   if (handle) {
     void handle.writeSystemClipboard(payload.plainText).then((res) => {
-      if (
-        !view.dom.isConnected
-        || view.composing
-        || view.state.doc !== docAtRequest
-        || !view.state.selection.eq(selectionAtRequest, true)
-      ) {
+      const cancellation = clipboardCancellationReason(view, docAtRequest, selectionAtRequest);
+      if (cancellation) {
+        if (view.dom.isConnected) {
+          const cancelled = cancelGuardedSystemWrite(res, cancellation);
+          reportClipboardWriteObservation(view, "cut", cancelled, payload, caretCountAtCut);
+          context?.onUnavailable(clipboardCancellationMessage("Cut", cancellation, cancelled.systemEffect));
+        }
         return;
       }
       if (res.outcome === "success") {

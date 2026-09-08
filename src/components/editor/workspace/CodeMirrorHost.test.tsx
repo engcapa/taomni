@@ -6,7 +6,12 @@ import { undoDepth } from "@codemirror/commands";
 import { startCompletion } from "@codemirror/autocomplete";
 import { foldedRanges } from "@codemirror/language";
 import { EditorView } from "@codemirror/view";
-import { CodeMirrorHost } from "./CodeMirrorHost";
+import { CodeMirrorHost, type EditorCommandPort } from "./CodeMirrorHost";
+import {
+  acquireClipboardStore,
+  resetWorkspaceClipboardStores,
+  type GuardedSystemReadResult,
+} from "./workspaceClipboardSession";
 import { virtualSpaceOverflowField } from "./workspaceVirtualSpace";
 import { WorkspaceActionHost } from "./workspaceActionHost";
 import { WorkspaceDocumentTransactionOwner } from "./workspaceDocumentTransactionOwner";
@@ -402,6 +407,50 @@ describe("CodeMirrorHost search", () => {
       17,
     ));
     expect(view!.state.selection.mainIndex).toBe(1);
+  });
+
+  it("reports a performed OS read as cancelled when the mounted document changes", async () => {
+    let resolveRead!: (result: GuardedSystemReadResult) => void;
+    const readPending = new Promise<GuardedSystemReadResult>((resolve) => {
+      resolveRead = resolve;
+    });
+    const baseHandle = acquireClipboardStore("host-cancelled-read");
+    const readSystemClipboard = vi.fn(() => readPending);
+    const clipboardHandle = {
+      ...baseHandle,
+      readSystemClipboard,
+    };
+    const onObservation = vi.fn();
+    const onUnavailable = vi.fn();
+    let port: EditorCommandPort | null = null;
+    const rendered = renderEditor("alpha", vi.fn(), {
+      clipboardHandle,
+      onClipboardObservation: onObservation,
+      onClipboardUnavailable: onUnavailable,
+      onCommandPortChange: (registration) => {
+        port = registration.port;
+      },
+    });
+    const editor = rendered.container.querySelector<HTMLElement>(".cm-editor");
+    const view = EditorView.findFromDOM(editor!);
+    expect(view).not.toBeNull();
+
+    await waitFor(() => expect(port).not.toBeNull());
+    expect(port!.execute("paste")).toBe(true);
+    view!.dispatch({ changes: { from: 0, insert: "prefix-" } });
+    resolveRead({ outcome: "success", text: "late-payload", systemEffect: "performed" });
+
+    await waitFor(() => expect(onObservation).toHaveBeenCalledWith(expect.objectContaining({
+      operation: "paste",
+      outcome: "cancelled",
+      systemEffect: "performed",
+    })));
+    expect(view!.state.doc.toString()).toBe("prefix-alpha");
+    expect(onUnavailable).toHaveBeenCalledWith(expect.stringContaining("system clipboard effect was performed"));
+
+    rendered.unmount();
+    baseHandle.release();
+    resetWorkspaceClipboardStores();
   });
 
   it("forwards multi-range selection state to the context menu", async () => {

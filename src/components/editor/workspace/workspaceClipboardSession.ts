@@ -299,17 +299,50 @@ export interface GuardedClipboardIO {
 
 export type GuardedSystemEffect = "not-performed" | "performed" | "unknown";
 
+export type GuardedClipboardCancellationReason =
+  | "view-closed"
+  | "composition"
+  | "document-changed"
+  | "selection-changed";
+
 export type GuardedSystemWriteResult =
   | { outcome: "success"; systemEffect: "performed" }
   | { outcome: "denied"; systemEffect: "not-performed" | "performed" }
   | { outcome: "stale-generation"; baseGeneration: number; currentGeneration: number; systemEffect: "performed" | "unknown" }
+  | { outcome: "cancelled"; reason: GuardedClipboardCancellationReason; systemEffect: GuardedSystemEffect }
   | { outcome: "unavailable" | "error"; error?: string; systemEffect: "unknown" };
 
 export type GuardedSystemReadResult =
   | { outcome: "success"; text: string; systemEffect: "performed" }
   | { outcome: "denied"; systemEffect: "not-performed" | "performed"; fallbackSession: EditorClipboardSession | null }
   | { outcome: "stale-generation"; baseGeneration: number; currentGeneration: number; systemEffect: "performed" | "unknown"; fallbackSession: EditorClipboardSession | null }
+  | { outcome: "cancelled"; reason: GuardedClipboardCancellationReason; systemEffect: GuardedSystemEffect; fallbackSession: EditorClipboardSession | null }
   | { outcome: "unavailable" | "error"; error?: string; systemEffect: "unknown"; fallbackSession: EditorClipboardSession | null };
+
+/** Preserve the OS write fact when the editor owner cancels its commit. */
+export function cancelGuardedSystemWrite(
+  result: GuardedSystemWriteResult,
+  reason: GuardedClipboardCancellationReason,
+): GuardedSystemWriteResult {
+  return {
+    outcome: "cancelled",
+    reason,
+    systemEffect: result.systemEffect,
+  };
+}
+
+/** Preserve both the OS read fact and the fallback identity when a commit is cancelled. */
+export function cancelGuardedSystemRead(
+  result: GuardedSystemReadResult,
+  reason: GuardedClipboardCancellationReason,
+): GuardedSystemReadResult {
+  return {
+    outcome: "cancelled",
+    reason,
+    systemEffect: result.systemEffect,
+    fallbackSession: result.outcome === "success" ? null : result.fallbackSession,
+  };
+}
 
 export function createWebClipboardPermissionAdapter(): ClipboardPermissionAdapter {
   return {

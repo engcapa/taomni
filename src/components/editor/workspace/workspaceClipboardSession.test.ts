@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   CLIPBOARD_HISTORY_MAX_ITEMS,
   acquireClipboardStore,
+  cancelGuardedSystemRead,
   clipboardStoreForWorkspace,
   createDefaultClipboardPermissionAdapter,
   createNativeClipboardPermissionAdapter,
@@ -475,6 +476,20 @@ describe("ED-CLIP-001 consumer lease token ownership & accounting", () => {
 });
 
 describe("ED-CLIP-002 clipboard permission epoch and guarded system read/write", () => {
+  it("preserves the boundary effect when an owner cancels a completed read", () => {
+    const cancelled = cancelGuardedSystemRead(
+      { outcome: "success", text: "remote", systemEffect: "performed" },
+      "document-changed",
+    );
+
+    expect(cancelled).toEqual({
+      outcome: "cancelled",
+      reason: "document-changed",
+      systemEffect: "performed",
+      fallbackSession: null,
+    });
+  });
+
   it("attaches a permission adapter, queries initial state, and subscribes to changes", async () => {
     resetWorkspaceClipboardStores();
     let currentPerm: ClipboardPermissionState = "unknown";

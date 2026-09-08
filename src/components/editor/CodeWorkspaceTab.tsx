@@ -6704,6 +6704,8 @@ export function CodeWorkspaceTab({
       case "stale-generation":
         return `${action} ownership changed during the operation; ${effect}`
           + (record.usedWorkspaceFallback ? "; pasted from the workspace clipboard slot instead" : "");
+      case "cancelled":
+        return `${action} cancelled; ${effect}`;
       default:
         return `${action} could not reach the system clipboard; ${effect}`
           + (record.usedWorkspaceFallback ? "; pasted from the workspace clipboard slot instead" : "");
