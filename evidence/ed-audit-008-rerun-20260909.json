@@ -1,0 +1,94 @@
+{
+  "verified_at": "2026-09-08T17:19:30.2221483Z",
+  "head": "894a8e70985354f869de7e2b08b10e2d42aca613",
+  "checks": [
+    {
+      "kind": "code-audit",
+      "command": "Inspection: CodeWorkspaceTab Alt+Enter/provider-menu/Problems-context requestCodeActions and runCodeAction -> CanonicalCodeActionService requestCandidates/resolvePlan/planAction -> IntentionSession preview/resolve state -> applyPlan -> workspace edit postcondition/history/recovery",
+      "result": "passed",
+      "summary": "Alt+Enter, the provider menu, and the Problems/context action path share the CodeWorkspaceTab request/run owner. CanonicalCodeActionService freezes document, provider, project and request identity, returns an immutable plan, and keeps plan-only preview free of mutation. IntentionSession freezes candidates and resolve states; retry preserves the menu, while cancel, focus loss, file replacement and stale generation close or reject the old session. applyPlan validates the selected preview immediately before mutation, applies real workspace edits, verifies post hashes, records one history entry, and restores preimages through the recovery ledger on edit or command failure. A command failure after an edit remains an applied-effect/recovery outcome rather than a zero-effect success.",
+      "acceptance": [
+        "ED-AUDIT-008-A1",
+        "ED-AUDIT-008-A2",
+        "ED-AUDIT-008-A3"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/CodeWorkspaceTab.test.tsx src/components/editor/workspace/codeActionProviderAdapter.test.ts src/components/editor/workspace/intentionSession.test.ts src/components/editor/workspace/codeActionExecution.test.ts src/components/editor/workspace/workspaceEditApply.test.ts src/components/editor/workspace/workspaceEditHistory.test.ts src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts src/components/editor/workspace/workspaceSemanticIndex.test.ts src/components/editor/workspace/workspaceActionHostKeymap.test.ts src/components/editor/workspace/lspHyperlink.test.ts src/components/editor/workspace/semanticWorkspaceEdit.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "11 files passed; 220/220 tests passed. Coverage includes mounted entry routing, provider candidate/resolve/apply, malformed/null/failure/cancel/stale outcomes, preview/recovery, one history entry and undo, and unavailable zero-commit behavior.",
+      "acceptance": [
+        "ED-AUDIT-008-A1",
+        "ED-AUDIT-008-A2",
+        "ED-AUDIT-008-A3"
+      ]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/CodeWorkspaceTab.tsx --path src/components/editor/CodeWorkspaceTab.test.tsx --path src/components/editor/workspace/CodeMirrorHost.tsx --path src/components/editor/workspace/CodeMirrorHost.test.tsx --path src/components/editor/workspace/codeActionProviderAdapter.ts --path src/components/editor/workspace/codeActionProviderAdapter.test.ts --path src/components/editor/workspace/intentionSession.ts --path src/components/editor/workspace/intentionSession.test.ts --path src/components/editor/workspace/codeActionExecution.ts --path src/components/editor/workspace/codeActionExecution.test.ts --path src/components/editor/workspace/workspaceEditApply.ts --path src/components/editor/workspace/workspaceEditApply.test.ts --path src/components/editor/workspace/workspaceEditHistory.ts --path src/components/editor/workspace/workspaceEditHistory.test.ts --path src/components/editor/workspace/workspaceDocumentTransactionOwner.ts --path src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts --path src/components/editor/workspace/workspaceSemanticIndex.ts --path src/components/editor/workspace/workspaceSemanticIndex.test.ts --path src/components/editor/workspace/workspaceActionHost.ts --path src/components/editor/workspace/workspaceActionHost.test.ts --path src/components/editor/workspace/workspaceActionHostKeymap.test.ts --path src/components/editor/workspace/workspaceActionRegistry.ts --path src/components/editor/workspace/workspaceActionRegistry.test.ts --path src/components/editor/workspace/workspaceCodeMirrorKeymap.ts --path src/components/editor/workspace/lspHyperlink.ts --path src/components/editor/workspace/lspHyperlink.test.ts --path src/components/editor/workspace/semanticWorkspaceEdit.ts --path src/components/editor/workspace/semanticWorkspaceEdit.test.ts --json",
+      "result": "passed",
+      "summary": "All 26 ED008-owned TypeScript paths were checked; scoped_errors=0 and external_errors=0 across 0 files.",
+      "acceptance": [
+        "ED-AUDIT-008-A3"
+      ]
+    },
+    {
+      "kind": "provider",
+      "command": "$env:TAOMNI_FIXTURE_JAVA='C:/Program Files/Java/jdk-21/bin/java.exe'; $env:JDTLS_HOME='C:/Users/yuhan/AppData/Local/jdtls'; node src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-import-fixture.mjs",
+      "result": "passed",
+      "summary": "Real JDT LS 1.61.0.202607142124.jar on JDK 21.0.4 returned the provider diagnostic and 21 code actions for import-maven-single, resolved org.apache.commons.lang3.StringUtils, and recorded policy gating for ambiguous and stale generations. Transaction evidence changed the fixture hash from fa85c034632f35aa03d738d0acc975938918814283cc184ff97118b0d40b54b7 to ac694b9072804031b676cace1194cccd226ecb2f16eef13060a82ffb3d646f7a, restored the original hash exactly, and recorded cancellation rejected:-32800. Trace SHA-256: 4BAD2383443F4E8971F5FE550A7C01809E2C9A0FC55F9B14EE2CF1B33131A87A.",
+      "acceptance": [
+        "ED-AUDIT-008-A1",
+        "ED-AUDIT-008-A3"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/__fixtures__/jdtls/jdtlsAutoImportContract.test.ts src/components/editor/workspace/__fixtures__/jdtls/jdtlsTraceContract.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "2 files passed; 51/51 tests passed against the regenerated real-provider traces, including code-action capability and candidate contracts, resolve/import shape, cancellation, stale-generation policy gating, transaction hash restoration and Windows path sanitization.",
+      "acceptance": [
+        "ED-AUDIT-008-A3"
+      ]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-09-intention-unavailable-zero-commit-browser --report-dir qa-ui-auto-report/ed-audit-008-browser-current-20260909 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows Chromium actual run run-20260909-010933-787279300 selected 1 and passed 1 with 0 failures and 0 skips across 19 steps. The unavailable status was observable after the action entry and the browser editor remained unchanged, proving the renderer negative path had zero text effect. identity_stable=true; source_sha256=5dd6760e78c5312a2645b0ec72829530e9703395318bbe32cabd15bf656bf594; runner_sha256=9add17360fa7d0c11a7cf31f923ec3f24e5c16096e7608f077580ae15577a771; case_sha256=c5c8fc6046a1d8498ef078e4a4f65a0d4c47dd6d7b7f3e1b5f24be181c0a27a1; summary_sha256=124433f8444abd852ce965d5a935943e61134612a8a44fcce7180ffe3974316d; receipt_sha256=62EFF68C5CF687C56F585B57911927725897EB8070DB5816079916725A2B5D7D.",
+      "acceptance": [
+        "ED-AUDIT-008-A2"
+      ]
+    },
+    {
+      "kind": "native",
+      "command": "python .agents/skills/qa-ui-auto/scripts/native_build.py --force",
+      "result": "passed",
+      "summary": "Rebuilt the isolated Windows QA application as com.taomni.app.qa. The QA binary SHA-256 is c879a027c2fad7d2650e09046bca444fb05992ea6bd67ab8dd524a4557a57432 and the build source identity is 5dd6760e78c5312a2645b0ec72829530e9703395318bbe32cabd15bf656bf594.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-08 --report-dir qa-ui-auto-report/ed-audit-008-native-current-20260909 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows packaged actual run run-20260909-011617-807570300 selected 1 and passed 1 with 0 failures and 0 skips across 29 steps. The independently built com.taomni.app.qa Tauri/WebView2 runtime executed the real JDT LS intention through the provider menu and Alt+Enter/second entry path, observed the applied import, verified post-undo text and readonly postconditions. identity_stable=true; source_sha256=5dd6760e78c5312a2645b0ec72829530e9703395318bbe32cabd15bf656bf594; binary_sha256=c879a027c2fad7d2650e09046bca444fb05992ea6bd67ab8dd524a4557a57432; runner_sha256=9add17360fa7d0c11a7cf31f923ec3f24e5c16096e7608f077580ae15577a771; case_sha256=57809cbe0a0752695a08d11540690ccf38ddd9666ea0298a3a9965c25a8fa286; summary_sha256=dca0c411b38dbedfd7a76f81855dffd666974de69289e38cac047ffbc21aac0a; receipt_sha256=43D79FA2AAC4231B2700AA7105557179A7DF2B54AA10FCD4622069075BAA81BD.",
+      "acceptance": [
+        "ED-AUDIT-008-A1",
+        "ED-AUDIT-008-A3"
+      ]
+    }
+  ],
+  "unrun": [
+    "idea-comparison: no idea64.exe or idea.exe is on PATH and no IntelliJ IDEA 2026.2.x runtime was found; only IntelliJIdea2025.1 and IntelliJIdea2026.1 directories were observed, so no identical fixture/action observation was collected.",
+    "native Linux: no qualifying Linux Tauri/WebKitGTK desktop or X11 automation runtime was available on this Windows host.",
+    "native macOS: no qualifying macOS QA bundle, WKWebView automation or manual QA-app run was available.",
+    "provider Linux/macOS: the real JDT LS provider trace and packaged provider workflow were collected on Windows only; cross-platform provider behavior is not claimed."
+  ],
+  "notes": [
+    "Verification used the claimed baseline HEAD 894a8e70985354f869de7e2b08b10e2d42aca613. Production source was re-audited and unchanged during this attempt; the regenerated sanitized provider trace, evidence file and task-board update are task-owned changes captured by the final commit.",
+    "The prior ED008 evidence files remain retained with their chronological native failures and successful reruns; this file records the current baseline checks and does not remove earlier failure artifacts.",
+    "Browser evidence proves the renderer unavailable/zero-commit path. Provider evidence is real JDT LS stdio evidence with request, resolve, cancellation, stale-policy and hash postconditions. Native evidence is the independently built com.taomni.app.qa Windows Tauri/WebView2 application and crosses the packaged runtime boundary.",
+    "Capability ceiling: current Windows/provider L2 intention request, immutable preview, real apply, failure/recovery, stale/cancel handling, one-history undo and unavailable zero-commit behavior. This does not claim IDEA 2026.2.x comparison or Linux/macOS native/provider parity."
+  ]
+}
