@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "fixtureId": "refactor-maven-single",
-  "generatedAt": "2026-09-08T14:57:19.787Z",
+  "generatedAt": "2026-09-08T18:47:06.787Z",
   "sanitized": true,
   "toolchain": {
     "java": {
@@ -38,12 +38,12 @@
         "character": 25
       }
     },
-    "latencyMs": 2661
+    "latencyMs": 3060
   },
   "rename": {
     "targetSymbol": "signatureTargets",
     "newName": "executeWorkflow",
-    "latencyMs": 8470,
+    "latencyMs": 8409,
     "affectedFilesCount": 2,
     "files": [
       {
