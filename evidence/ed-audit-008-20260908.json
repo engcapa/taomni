@@ -1,6 +1,6 @@
 {
-  "verified_at": "2026-09-07T23:20:20Z",
-  "head": "7718c30118cd5edf515b8e64f98a0cb8bfebd4b1",
+  "verified_at": "2026-09-08T07:08:27Z",
+  "head": "14752ecfcab8e0d6bbb0b66bab2940052214ea53",
   "checks": [
     {
       "kind": "native",
@@ -113,20 +113,54 @@
       "result": "passed",
       "summary": "Alt+Enter, the gutter lightbulb and the Problems/context action path use the same CodeWorkspaceTab request and run owner. Provider status is preserved as unsupported/unavailable/empty/malformed/timeout/cancelled/failed, candidates are frozen in IntentionSession, and resolve builds an immutable plan. applyPlan captures preimages, revalidates document/provider/project identity before commit, applies the real workspace edit, verifies the postimage, registers one history entry, and restores through the same snapshot ledger on edit or command failure. Cancellation and stale paths return without history; partial effects are reported with recovery state rather than zero-effect text.",
       "acceptance": ["ED-AUDIT-008-A1", "ED-AUDIT-008-A2", "ED-AUDIT-008-A3"]
+    },
+    {
+      "kind": "provider",
+      "command": "$env:TAOMNI_FIXTURE_JAVA='C:\\Program Files\\Java\\jdk-21\\bin\\java.exe'; $env:JDTLS_HOME='C:\\Users\\yuhan\\AppData\\Local\\jdtls'; node src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-import-fixture.mjs",
+      "result": "passed",
+      "summary": "Current real JDT LS trace used JDK 21.0.4 and JDT LS 1.61.0.202607142124.jar; 21 provider actions included the resolved org.apache.commons.lang3.StringUtils import, apply changed the fixture hash, undo restored the exact hash, and cancellation rejected with -32800. Trace SHA-256: 284947059A1E704A2230B82FFFB7556C3C362E947D0A142AC37005FB60EE89B9.",
+      "acceptance": ["ED-AUDIT-008-A1", "ED-AUDIT-008-A3"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/CodeWorkspaceTab.test.tsx src/components/editor/workspace/codeActionProviderAdapter.test.ts src/components/editor/workspace/intentionSession.test.ts src/components/editor/workspace/codeActionExecution.test.ts src/components/editor/workspace/workspaceEditApply.test.ts src/components/editor/workspace/workspaceEditHistory.test.ts src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts src/components/editor/workspace/workspaceSemanticIndex.test.ts src/components/editor/workspace/workspaceActionHostKeymap.test.ts src/components/editor/workspace/lspHyperlink.test.ts src/components/editor/workspace/semanticWorkspaceEdit.test.ts",
+      "result": "passed",
+      "summary": "11 files passed; 219/219 tests passed on the current task tree. Assertions cover mounted entry routing, provider candidate/resolve/apply, malformed/null/failure/cancel/stale outcomes, preview/recovery, one history entry and undo, and unavailable zero-commit behavior.",
+      "acceptance": ["ED-AUDIT-008-A1", "ED-AUDIT-008-A2", "ED-AUDIT-008-A3"]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/CodeWorkspaceTab.tsx --path src/components/editor/CodeWorkspaceTab.test.tsx --path src/components/editor/workspace/CodeMirrorHost.tsx --path src/components/editor/workspace/codeActionProviderAdapter.ts --path src/components/editor/workspace/codeActionProviderAdapter.test.ts --path src/components/editor/workspace/lspHyperlink.ts --path src/components/editor/workspace/lspHyperlink.test.ts --path src/components/editor/workspace/workspaceActionHost.ts --path src/components/editor/workspace/workspaceActionHost.test.ts --path src/components/editor/workspace/workspaceActionHostKeymap.test.ts --path src/components/editor/workspace/workspaceActionRegistry.ts --path src/components/editor/workspace/workspaceCodeMirrorKeymap.ts --path src/components/editor/workspace/workspaceDocumentTransactionOwner.ts --path src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts --path src/components/editor/workspace/workspaceSemanticIndex.ts --path src/components/editor/workspace/workspaceSemanticIndex.test.ts --json",
+      "result": "passed",
+      "summary": "Current scoped check reported scoped_errors=0 and external_errors=0 across 0 files for all 16 owned TypeScript paths.",
+      "acceptance": ["ED-AUDIT-008-A3"]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-09-intention-unavailable-zero-commit-browser --report-dir qa-ui-auto-report/ed-audit-008-browser-20260908 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows browser run run-20260908-144934-642919700 selected 1 and passed 1 with 0 failed and 0 skipped. The typed unavailable status was observed after Alt+Enter and the editor still contained keep-me, proving the renderer negative path had zero text change. Source SHA-256 8e1951ec6764319f0e7554853ee5e695bf495f4e5f7b1a7b66c2ab49c2978c89; summary SHA-256 EEB4054D0399BA2AC41E9B328DCDC33FABE80466FEB209F6EBBBD0F099EEC54B; runner receipt SHA-256 3571D1F587123872882610551C94EFF121492C03BBC4EC99BF7EDC96A1858632.",
+      "acceptance": ["ED-AUDIT-008-A2"]
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-08 --report-dir qa-ui-auto-report/ed-audit-008-native-final-20260908-current2 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows packaged QA run run-20260908-150721-961492900 used com.taomni.app.qa and the independently built binary (SHA-256 fd6c4ab3a52233b7883dd2f910770e8f89b5732026a1a3816bf0b5bc0f32a7d7). TC-IDE-C8-08 selected 1 and passed 1 with 0 failed and 0 skipped; the real JDT LS intention was applied and undone through both the lightbulb and Alt+Enter paths. Source SHA-256 8e1951ec6764319f0e7554853ee5e695bf495f4e5f7b1a7b66c2ab49c2978c89; summary SHA-256 3A441C3D5D08E54B86322A95B8E0D78519AB97651626C18650D8F6BBDCF186E5; runner receipt receipt-run-20260908-150721-961492900 SHA-256 A178C734949E0208A02B6E22B133FF5337A8BD8A0164DEDDB8E5F1A3C7BABCF7.",
+      "acceptance": ["ED-AUDIT-008-A1", "ED-AUDIT-008-A3"]
     }
   ],
   "unrun": [
-    "browser: no browser case provides this card's provider-backed intention apply plus undo boundary; browser stubs are not substituted for the packaged/provider run.",
     "idea-comparison: no IntelliJ IDEA 2026.2.x runtime/build and no identical fixture/action observation were available.",
     "native Linux: no qualifying Linux Tauri/WebKitGTK desktop was available for this Windows run.",
     "native macOS: no qualifying macOS QA bundle, WKWebView automation or manual QA-app run was available.",
     "provider Linux/macOS: the real JDT LS provider trace was collected on Windows only; cross-platform provider behavior is not claimed."
   ],
   "notes": [
-    "Verification used the working tree rooted at baseline HEAD 7718c30118cd5edf515b8e64f98a0cb8bfebd4b1; native source and case identities bind the packaged run to the current uncommitted task tree.",
-    "The native failures are retained in chronological order before the passing run. The final run used the independently built com.taomni.app.qa application and matching receipt, not a renamed production binary.",
-    "The provider trace is real JDT LS stdio evidence and includes request/result/cancel facts plus apply/undo hashes; it does not prove the Taomni Tauri IPC/WebView path by itself.",
-    "The implementation reaches the Windows packaged/provider L2 slice. The terminal state remains implemented because the required browser and IDEA comparison layers are missing, and Linux/macOS native layers were not run.",
-    "The QA audit failure is a pre-existing/global catalog baseline issue surfaced after the required F25.5 catalog update; no coverage baseline ratchet or unrelated control repair was made."
+    "Verification used the current working tree from baseline HEAD 14752ecfcab8e0d6bbb0b66bab2940052214ea53; source identity 8e1951ec6764319f0e7554853ee5e695bf495f4e5f7b1a7b66c2ab49c2978c89 bound the current browser and native runs.",
+    "The native failures are retained in chronological order before the successful current rerun. The final run used the independently built com.taomni.app.qa application and matching receipt, not a renamed production binary.",
+    "The provider trace is real JDT LS stdio evidence and includes request/result/cancel facts plus apply/undo hashes; the packaged native case independently crossed the Taomni Tauri/WebView path.",
+    "The implementation reaches the Windows packaged/provider L2 slice and the browser unavailable L1 slice. The terminal state remains implemented because IDEA 2026.2.x comparison and Linux/macOS native/provider layers were not run.",
+    "The QA audit failure is a pre-existing/global catalog baseline issue surfaced after the required F25.5 catalog update: shallow controls 44->51, orphans 0->11, and F25.5 shallow 1->8; no coverage baseline ratchet or unrelated control repair was made."
   ]
 }

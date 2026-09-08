@@ -56,7 +56,10 @@ steps:
   - eval_readonly:
       expression: '!document.querySelector(".cm-content")?.textContent?.includes("import org.apache.commons.lang3.StringUtils;")'
       expect_truthy: true
-  - click: '[data-testid="code-workspace-editor"] .cm-line:nth-child(13)'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor"] [title="StringUtils cannot be resolved"]'
+      timeout_sec: 120
+  - click: '[data-testid="code-workspace-editor"] [title="StringUtils cannot be resolved"]'
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver

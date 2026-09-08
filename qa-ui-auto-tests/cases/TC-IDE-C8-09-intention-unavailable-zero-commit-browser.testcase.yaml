@@ -1,0 +1,40 @@
+id: TC-IDE-C8-09-intention-unavailable-zero-commit-browser
+title: "Code Actions unavailable path keeps browser editor unchanged"
+description: |
+  Browser-only gate for ED-AUDIT-008's typed unavailable boundary. The
+  renderer has no real language-server provider, so Alt+Enter must report the
+  unavailable code-action result and leave the editor text unchanged. This is
+  not provider or packaged native evidence; TC-IDE-C8-08 owns that boundary.
+covers: [F25.5]
+tags: [code-workspace, ide-c8, intention, unavailable-contract, browser-gate, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 180
+steps:
+  - open: "${cfg.app.base_url}"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="side-tab-tools"]'
+  - wait_for: '[data-testid="sidebar-tools-panel"]'
+  - click: '[data-testid="sidebar-tool-code-workspace"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - click: '[data-testid="code-workspace-tree-add-folder"]'
+  - wait_for: '[data-testid="text-input-dialog"]'
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for: '[data-testid="code-workspace-tree-file"]'
+  - click: '[data-testid="code-workspace-tree-file"]'
+  - wait_for: '[data-testid="code-workspace-editor-pane"]'
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - fill:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      value: "class IntentionUnavailable {\n    String marker = \"keep-me\";\n}"
+  - click: '[data-testid="code-workspace-tab"]'
+  - press: Alt+Enter
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "No code actions provided by the language server"
+      timeout_sec: 20
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "keep-me"
+      timeout_sec: 10
+  - screenshot: tc-ide-c8-09-intention-unavailable.png

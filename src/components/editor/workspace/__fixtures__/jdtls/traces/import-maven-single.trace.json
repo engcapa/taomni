@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "fixtureId": "import-maven-single",
-  "generatedAt": "2026-09-07T22:25:22.652Z",
+  "generatedAt": "2026-09-08T06:10:10.809Z",
   "sanitized": true,
   "toolchain": {
     "java": {
-      "path": "C:\\Program Files\\Java\\jdk-21\\bin\\java.exe",
+      "path": "C:/Program Files/Java/jdk-21/bin/java.exe",
       "version": "21.0.4",
       "info": {
         "line": "openjdk version \"21.0.4\" 2024-07-16 LTS",
@@ -14,7 +14,7 @@
       }
     },
     "jdtls": {
-      "home": "C:\\Users\\yuhan\\AppData\\Local\\jdtls",
+      "home": "C:/Users/yuhan/AppData/Local/jdtls",
       "version": "1.61.0.202607142124.jar"
     }
   },
