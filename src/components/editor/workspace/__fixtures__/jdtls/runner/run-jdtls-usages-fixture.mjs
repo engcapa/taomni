@@ -26,7 +26,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { LspClient, sha256 } from "./lsp-client.mjs";
 
 const RUNNER_DIR = dirname(fileURLToPath(import.meta.url));
@@ -90,6 +90,10 @@ function sanitizeUri(uri) {
   return String(uri ?? "").replace(homedir(), "~");
 }
 
+function fileUri(path) {
+  return pathToFileURL(path).href;
+}
+
 function classifyOwnership(uri) {
   const value = String(uri ?? "");
   if (/^jdt:\/\/|^cfr:\/\/|^fernflower:\/\//i.test(value)) return "decompiled";
@@ -120,14 +124,14 @@ async function main() {
   }
 
   const client = new LspClient(javaPath, launchArgs(jdtls, dataDir), {
-    workspaceFolders: [{ uri: `file://${projectDir}`, name: "usages-maven-single" }],
+    workspaceFolders: [{ uri: fileUri(projectDir), name: "usages-maven-single" }],
   }).start();
 
   try {
     await client.request("initialize", {
       processId: null,
-      rootUri: `file://${projectDir}`,
-      workspaceFolders: [{ uri: `file://${projectDir}`, name: "usages-maven-single" }],
+      rootUri: fileUri(projectDir),
+      workspaceFolders: [{ uri: fileUri(projectDir), name: "usages-maven-single" }],
       capabilities: {
         window: { workDoneProgress: true },
         textDocument: {
@@ -145,7 +149,7 @@ async function main() {
   const openFile = (relPath, text) => {
     client.notify("textDocument/didOpen", {
       textDocument: {
-        uri: `file://${join(projectDir, relPath)}`,
+        uri: fileUri(join(projectDir, relPath)),
         languageId: "java",
         version: 1,
         text,
@@ -180,7 +184,7 @@ async function main() {
     },
   ];
   for (const scenario of scenarios) {
-    const uri = `file://${join(projectDir, scenario.file)}`;
+    const uri = fileUri(join(projectDir, scenario.file));
     const attempts = [];
     let locations = null;
     const deadline = Date.now() + 300_000;

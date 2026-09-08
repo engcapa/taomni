@@ -1,0 +1,136 @@
+{
+  "verified_at": "2026-09-08T20:43:20.150Z",
+  "head": "c17f0fccfdabea3659f2f65e3694a447ea0c485a",
+  "checks": [
+    {
+      "kind": "code-audit",
+      "command": "Re-audit from claimed baseline c17f0fcc: CodeWorkspaceTab semantic command handlers -> lspDefinition/lspReferences provider requests -> current workspace/document/provider/project guards -> openLspLocation reveal -> navigation history",
+      "result": "passed",
+      "summary": "Definition peek, definitions, usages and references freeze one workspace/file/revision/provider/project origin and commit history only from the successful current reveal callback. Missing, cancelled, stale, revision-mismatched, project-generation-mismatched and workspace-mismatched results do not move focus or write history. Back returns to the frozen origin; close, failure and stale paths clear the pending navigation transaction.",
+      "acceptance": [
+        "ED-AUDIT-012-A1",
+        "ED-AUDIT-012-A2",
+        "ED-AUDIT-012-A3"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/CodeWorkspaceTab.test.tsx -t \"commits multi-result and references navigation only after a current reveal\" --maxWorkers=1",
+      "result": "failed",
+      "summary": "Initial mounted regression exposed a references-result refresh timing failure; the failure is retained before the production/test timing correction and successful rerun.",
+      "acceptance": []
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/useWorkspaceNavigation.test.tsx src/components/editor/workspace/navigationHistoryModel.test.ts src/components/editor/workspace/navigationHistoryV2.test.ts src/components/editor/workspace/UsagesScopeDialog.test.tsx src/components/editor/workspace/usageQuerySession.test.ts src/components/editor/workspace/javaSemanticEvidence.test.ts src/components/editor/workspace/__fixtures__/jdtls/jdtlsUsagesContract.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "7 files passed; 58/58 tests passed. The focused model/provider-contract group covers navigation history transactions, reveal/back state, usages scope/session guards, semantic evidence and the current JDT LS usages trace.",
+      "acceptance": [
+        "ED-AUDIT-012-A1",
+        "ED-AUDIT-012-A2",
+        "ED-AUDIT-012-A3"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/CodeWorkspaceTab.test.tsx -t \"commits multi-result and references navigation only after a current reveal\" --maxWorkers=1",
+      "result": "passed",
+      "summary": "1 test passed and 118 unrelated tests were skipped. The mounted production-owner regression covers multi-result definition reveal/back, references reveal/back, and rejection of a references result after the origin document revision becomes stale.",
+      "acceptance": [
+        "ED-AUDIT-012-A1",
+        "ED-AUDIT-012-A2"
+      ]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/CodeWorkspaceTab.tsx --path src/components/editor/CodeWorkspaceTab.test.tsx --json",
+      "result": "passed",
+      "summary": "Both ED-AUDIT-012-owned TypeScript paths have scoped_errors=0; external_errors=0 across 0 files.",
+      "acceptance": [
+        "ED-AUDIT-012-A3"
+      ]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C6-01 --report-dir qa-ui-auto-report/ed-audit-012-browser-20260909-c6-01 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Current Windows Chromium browser run for TC-IDE-C6-01 passed; the mounted semantic definition result workflow and observable navigation history assertions passed.",
+      "acceptance": [
+        "ED-AUDIT-012-A1",
+        "ED-AUDIT-012-A2"
+      ]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C6-02 --report-dir qa-ui-auto-report/ed-audit-012-browser-20260909-c6-02 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Current Windows Chromium browser run for TC-IDE-C6-02 passed; the mounted usages query/result workflow and navigation recovery assertions passed.",
+      "acceptance": [
+        "ED-AUDIT-012-A1",
+        "ED-AUDIT-012-A2"
+      ]
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C6-05-query-definition-reveal-history-native-windows --report-dir qa-ui-auto-report/ed-audit-012-native-windows-setup-rerun-20260909 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "A native rerun stopped during fixture-copy setup and produced no behavior evidence; it is retained as a setup failure, not a pass.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C6-05-query-definition-reveal-history-native-windows --report-dir qa-ui-auto-report/ed-audit-012-native-windows-caret-rerun-20260909 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "The first behavior rerun placed the caret on Assert.java rather than the intended definition symbol; its assertions failed and it is retained before the corrected caret action.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C6-05-query-definition-reveal-history-native-windows --report-dir qa-ui-auto-report/ed-audit-012-native-windows-20260909 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows packaged com.taomni.app.qa WebView2 run run-20260909-041652-969242100 passed with real F12 definition reveal and Back assertions. The corrected caret reached the intended symbol, JDT LS returned the target, focus moved to the target file, and Back restored the origin location.",
+      "acceptance": [
+        "ED-AUDIT-012-A1",
+        "ED-AUDIT-012-A2",
+        "ED-AUDIT-012-A3"
+      ]
+    },
+    {
+      "kind": "provider",
+      "command": "$env:TAOMNI_FIXTURE_JAVA='C:\\Program Files\\Java\\jdk-21\\bin\\java.exe'; $env:JDTLS_HOME='C:\\Users\\yuhan\\AppData\\Local\\jdtls'; node src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-usages-fixture.mjs",
+      "result": "failed",
+      "summary": "The initial real-provider run timed out because Windows paths were sent as malformed file://C:\\ URIs; JDT LS logs showed invalid URI handling. No provider pass is claimed for this attempt.",
+      "acceptance": []
+    },
+    {
+      "kind": "provider",
+      "command": "$env:TAOMNI_FIXTURE_JAVA='C:\\Program Files\\Java\\jdk-21\\bin\\java.exe'; $env:JDTLS_HOME='C:\\Users\\yuhan\\AppData\\Local\\jdtls'; node src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-usages-fixture.mjs",
+      "result": "passed",
+      "summary": "Real JDT LS 1.61.0.202607142124 on JDK 21.0.4 passed both maven-single usages scenarios after the pathToFileURL correction. Declaration/workspace usage and library-symbol usage facts satisfied the fixture; the regenerated trace is the tracked provider artifact.",
+      "acceptance": [
+        "ED-AUDIT-012-A1",
+        "ED-AUDIT-012-A3"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "node --check src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-usages-fixture.mjs",
+      "result": "passed",
+      "summary": "The corrected real-provider fixture runner parses successfully.",
+      "acceptance": []
+    }
+  ],
+  "unrun": [
+    "idea-comparison: IntelliJ IDEA 2026.2.x was not installed or available; no identical maven-single definition/usages/reveal/back observation was collected.",
+    "native Linux: no qualifying Linux Tauri/WebKitGTK/X11 runtime was available on this Windows host.",
+    "native macOS: no qualifying macOS Tauri/WKWebView or OS automation runtime was available.",
+    "provider Linux/macOS: the real JDT LS provider run was collected on Windows only; cross-platform provider behavior is not claimed."
+  ],
+  "notes": [
+    "Production effect chain: user definition/usages command -> mounted CodeWorkspaceTab owner -> real lspDefinition/lspReferences provider request -> frozen workspace/document/provider/project identities -> current reveal -> one origin/target history transaction -> Back recovery and stale-result status without focus pollution.",
+    "Verification was re-audited against claimed baseline HEAD c17f0fcc; the working tree contained the ED-AUDIT-012 production, test, fixture runner, trace and native-case changes during verification.",
+    "The QA static audit remained red from unrelated baseline drift (global shallow 44 -> 51, global orphans 0 -> 11, F25.5 shallow 1 -> 8); no baseline ratchet or unrelated QA cleanup was included.",
+    "Browser evidence is renderer/stub-boundary evidence. Native evidence is the packaged Windows Tauri/WebView2 runtime with real JDT LS and does not claim Linux/macOS or IDEA behavior.",
+    "Terminal status is implemented: production wiring and all available current Windows/provider evidence pass, while the required IDEA comparison and cross-platform native/provider layers remain unavailable."
+  ]
+}

@@ -691,6 +691,18 @@ type LspLocationOpenOptions = {
   onRevealed?: (ref: CodeWorkspaceFileRef, position: LspPosition) => void;
 };
 
+/**
+ * Frozen origin and live guard for one semantic result navigation. The
+ * handle is intentionally kept in refs/state owned by the mounted workspace
+ * tab so a result from another workspace or query cannot reuse it.
+ */
+type SemanticNavigationHandle = {
+  originFile: OpenFileState;
+  originRef: CodeWorkspaceFileRef;
+  originPosition: LspPosition;
+  isCurrent: () => boolean;
+};
+
 function semanticLocationsFromResult(result: {
   status: LspDocumentStatus;
   locations: LspLocation[];
@@ -1840,9 +1852,14 @@ export function CodeWorkspaceTab({
   const setPinnedDocLocked = useCallback((locked: boolean) => {
     patchWorkspaceUi(workspaceInstanceId, { pinnedDocLocked: locked });
   }, [patchWorkspaceUi, workspaceInstanceId]);
+  const locationPeekNavigationRef = useRef<SemanticNavigationHandle | null>(null);
   const setLocationPeek = useCallback((peek: LocationPeekState | null) => {
     patchWorkspaceUi(workspaceInstanceId, { locationPeek: peek });
   }, [patchWorkspaceUi, workspaceInstanceId]);
+  const closeLocationPeek = useCallback(() => {
+    locationPeekNavigationRef.current = null;
+    setLocationPeek(null);
+  }, [setLocationPeek]);
   const setSearchFocusNonce = useCallback((updater: number | ((prev: number) => number)) => {
     const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).searchFocusNonce;
     patchWorkspaceUi(workspaceInstanceId, {
@@ -2204,6 +2221,7 @@ export function CodeWorkspaceTab({
     locations: [],
     error: null,
   });
+  const referencesNavigationRef = useRef<SemanticNavigationHandle | null>(null);
   const referencesRequestSequenceRef = useRef(0);
   // §8.20.5 W4: ONE immutable usages session backs the tool window, the
   // lightweight Show Usages popup and the recent-query stack.
@@ -2697,7 +2715,11 @@ export function CodeWorkspaceTab({
         && current != null
         && current.documentRevision === documentRevision
         && currentUri === identity.uri
-        && lspSessionGeneration() === capturedLspSessionGeneration;
+        && lspSessionGeneration() === capturedLspSessionGeneration
+        && (
+          capturedFactsGeneration === undefined
+          || useProjectFactsStore.getState().getWorkspaceFacts(projectFactsRoot).generation === capturedFactsGeneration
+        );
     };
     const guards: SemanticQueryLiveGuards = {
       getLiveDocumentRevision: () => openFilesRef.current[file.key]?.documentRevision ?? -1,
@@ -13070,6 +13092,12 @@ export function CodeWorkspaceTab({
         if (!target.file || target.position === undefined) return;
         const snapshot = usageSessionRef.current?.getCurrent();
         if (snapshot && snapshot.state === "ready" && snapshot.envelope.results.length > 0) {
+          const navigation = referencesNavigationRef.current;
+          if (!navigation || !navigation.isCurrent()) {
+            setStatusMessage("Usages result became stale; rerun Find Usages before opening a result");
+            return;
+          }
+          locationPeekNavigationRef.current = navigation;
           setLocationPeek({
             title: `Usages of ${snapshot.symbol.displayName} (${snapshot.envelope.results.length})`,
             locations: snapshot.envelope.results.map(({ role: _role, ...location }) => location),
@@ -14763,6 +14791,24 @@ export function CodeWorkspaceTab({
   );
   getLspHoverRef.current = getLspHover;
 
+  const openSemanticLocation = useCallback(async (
+    location: LspLocation,
+    navigation: SemanticNavigationHandle,
+  ): Promise<boolean> => {
+    if (!navigation.isCurrent()) return false;
+    return openLspLocation(location, {
+      isCurrent: navigation.isCurrent,
+      originFile: navigation.originFile,
+      recordHistory: false,
+      onRevealed: (destinationRef, destinationPosition) => {
+        // The reveal is the commit boundary. A failed, missing, or stale
+        // target never records either side of the navigation transaction.
+        recordNavigationLocation(navigation.originRef, navigation.originPosition);
+        recordNavigationLocation(destinationRef, destinationPosition, { replaceSameFile: false });
+      },
+    });
+  }, [openLspLocation, recordNavigationLocation]);
+
   const navigateLocations = useCallback(async (
     title: string,
     locations: LspLocation[],
@@ -14776,26 +14822,30 @@ export function CodeWorkspaceTab({
     }
     if (isCurrent && !isCurrent()) return false;
     if (locations.length === 1) {
-      setLocationPeek(null);
+      closeLocationPeek();
       if (isCurrent && !isCurrent()) return false;
-      return openLspLocation(locations[0], {
-        isCurrent,
-        originFile: origin?.file,
-        recordHistory: !origin,
-        onRevealed: origin
-          ? (destinationRef, destinationPosition) => {
-            // Reveal is the irreversible boundary for this navigation. Keep
-            // the origin as the current entry, then add exactly one target.
-            recordNavigationLocation(origin.ref, origin.position);
-            recordNavigationLocation(destinationRef, destinationPosition, { replaceSameFile: false });
-          }
-          : undefined,
-      });
+      if (origin && isCurrent) {
+        return openSemanticLocation(locations[0], {
+          originFile: origin.file,
+          originRef: origin.ref,
+          originPosition: origin.position,
+          isCurrent,
+        });
+      }
+      return openLspLocation(locations[0], { isCurrent });
     }
     if (isCurrent && !isCurrent()) return false;
+    locationPeekNavigationRef.current = origin && isCurrent
+      ? {
+        originFile: origin.file,
+        originRef: origin.ref,
+        originPosition: origin.position,
+        isCurrent,
+      }
+      : null;
     setLocationPeek({ title, locations });
     return true;
-  }, [openLspLocation, recordNavigationLocation, setStatusMessage]);
+  }, [closeLocationPeek, openLspLocation, openSemanticLocation, setLocationPeek, setStatusMessage]);
 
   const goToDefinition = useCallback(
     async (file: OpenFileState, position: LspPosition) => {
@@ -14865,6 +14915,12 @@ export function CodeWorkspaceTab({
           return false;
         }
         if (!query.isCurrent()) return false;
+        locationPeekNavigationRef.current = {
+          originFile: file,
+          originRef: file.ref,
+          originPosition: position,
+          isCurrent: query.isCurrent,
+        };
         setLocationPeek({ title: "Quick Definition", locations: queryRes.items });
         return true;
       } catch (err) {
@@ -15391,6 +15447,7 @@ export function CodeWorkspaceTab({
     async (file: OpenFileState, position: LspPosition, selection: UsagesScopeSelection) => {
       referencesRequestSequenceRef.current += 1;
       const requestId = referencesRequestSequenceRef.current;
+      referencesNavigationRef.current = null;
       setBottomDockOpen(true);
       setBottomDockTab("references");
       setReferencesResult({
@@ -15579,6 +15636,12 @@ export function CodeWorkspaceTab({
         if (referencesRequestSequenceRef.current !== requestId || !queryContext.isCurrent()) return;
         const scopedLocations = (snapshot?.envelope.results ?? []).map(({ role: _role, ...location }) => location);
         setUsagesRecentsRevision((revision) => revision + 1);
+        referencesNavigationRef.current = {
+          originFile: live,
+          originRef: live.ref,
+          originPosition: position,
+          isCurrent: queryContext.isCurrent,
+        };
         setReferencesResult({
           loading: false,
           origin: live.subtitle,
@@ -15669,6 +15732,19 @@ export function CodeWorkspaceTab({
     }
     void runFindReferences(live, marker.position, usagesScopeSelection);
   }, [findReferences, runFindReferences, setStatusMessage, usagesScopeSelection]);
+
+  const openReferencesLocation = useCallback(async (location: LspLocation) => {
+    const navigation = referencesNavigationRef.current;
+    if (!navigation) {
+      setStatusMessage("References result has no live origin; rerun Find Usages before opening a result");
+      return false;
+    }
+    if (!navigation.isCurrent()) {
+      setStatusMessage("References result became stale; rerun Find Usages before opening a result");
+      return false;
+    }
+    return openSemanticLocation(location, navigation);
+  }, [openSemanticLocation, setStatusMessage]);
 
   const showEditorContextMenu = useCallback((
     file: OpenFileState,
@@ -18524,7 +18600,7 @@ export function CodeWorkspaceTab({
                 result={referencesResult}
                 roots={roots}
                 semanticIndex={semanticIndex.snapshot}
-                onOpenLocation={(location) => void openLspLocation(location)}
+                onOpenLocation={(location) => void openReferencesLocation(location)}
                 pinned={referencesPinned}
                 onPinChange={(pinned) => {
                   setReferencesPinned(pinned);
@@ -18882,10 +18958,15 @@ export function CodeWorkspaceTab({
         onQuickDocBack={referenceHistoryBack}
         onQuickDocForward={referenceHistoryForward}
         locationPeek={locationPeek}
-        onCloseLocationPeek={() => setLocationPeek(null)}
+        onCloseLocationPeek={closeLocationPeek}
         onOpenLocation={(location) => {
-          setLocationPeek(null);
-          void openLspLocation(location);
+          const navigation = locationPeekNavigationRef.current;
+          closeLocationPeek();
+          if (!navigation) {
+            setStatusMessage("Semantic result has no live origin; rerun the query before opening a result");
+            return;
+          }
+          void openSemanticLocation(location, navigation);
         }}
       />
       {treeContextMenu}

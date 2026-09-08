@@ -6836,6 +6836,135 @@ describe("CodeWorkspaceTab", () => {
     );
   });
 
+  it("commits multi-result and references navigation only after a current reveal", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-semantic-navigation-history",
+      workspaceInstanceId: "instance-semantic-navigation-history",
+      name: "Semantic navigation history",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/Program.cs" },
+    };
+    const status = documentStatus({
+      path: "/repo/app/src/Program.cs",
+      uri: "file:///repo/app/src/Program.cs",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({ definition: true, references: true }),
+    });
+    const firstTarget = {
+      uri: "file:///repo/app/src/First.cs",
+      path: "/repo/app/src/First.cs",
+      range: { start: { line: 1, character: 2 }, end: { line: 1, character: 8 } },
+    };
+    const secondTarget = {
+      uri: "file:///repo/app/src/Second.cs",
+      path: "/repo/app/src/Second.cs",
+      range: { start: { line: 2, character: 4 }, end: { line: 2, character: 10 } },
+    };
+    const contents: Record<string, string> = {
+      "src/Program.cs": "class Program {\n  void Main() {}\n}\n",
+      "src/First.cs": "class First {\n  void One() {}\n}\n",
+      "src/Second.cs": "class Second {\n  void One() {}\n  void Two() {}\n}\n",
+    };
+    workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => {
+      const text = contents[path];
+      if (text === undefined) throw new Error(`missing fixture ${path}`);
+      return file(path, text);
+    });
+    lspMocks.lspDetectServers.mockResolvedValue([csharpStatus({ available: true, active: true })]);
+    lspMocks.lspOpenDocument.mockImplementation(async (descriptor: { filePath: string; documentUri?: string | null }) => (
+      documentStatus({
+        ...status,
+        path: descriptor.filePath,
+        uri: descriptor.documentUri ?? status.uri,
+      })
+    ));
+    lspMocks.lspChangeDocument.mockResolvedValue(status);
+    lspMocks.lspGetDiagnostics.mockResolvedValue({ status, diagnostics: [] });
+    lspMocks.lspDefinition.mockResolvedValue({ status, locations: [firstTarget, secondTarget] });
+    lspMocks.lspReferences.mockResolvedValue({ status, locations: [firstTarget, secondTarget] });
+
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+
+    renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / src/Program.cs");
+    await waitFor(() => expect(registrationRef.current).not.toBeNull());
+    await waitFor(() => expect(registrationRef.current?.items.find(
+      (item) => item.id === "workspace.gotoDefinition",
+    )?.enabled).toBe(true));
+
+    await act(async () => {
+      await registrationRef.current?.executeAction("workspace.gotoDefinition");
+    });
+    const peek = await screen.findByTestId("code-workspace-location-peek");
+    const peekResults = within(peek).getAllByRole("button");
+    expect(peekResults).toHaveLength(2);
+    fireEvent.click(peekResults[1]);
+
+    const secondKey = "root:app:src/Second.cs";
+    const originKey = "root:app:src/Program.cs";
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      workspace.workspaceInstanceId!,
+    ).activeKey).toBe(secondKey));
+    const backButton = screen.getByTestId("code-workspace-nav-back");
+    await waitFor(() => expect(backButton).not.toBeDisabled());
+    fireEvent.click(backButton);
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      workspace.workspaceInstanceId!,
+    ).activeKey).toBe(originKey));
+    expect(backButton).toBeDisabled();
+
+    await act(async () => {
+      await registrationRef.current?.executeAction("workspace.findReferences");
+    });
+    fireEvent.click(await screen.findByTestId("usages-scope-confirm"));
+    const referencesPanel = await screen.findByTestId("code-workspace-references-panel");
+    await waitFor(() => expect(within(referencesPanel).getByTitle(/app\/src\/Second\.cs/)).toBeInTheDocument());
+    fireEvent.click(within(referencesPanel).getByTitle(/app\/src\/Second\.cs/));
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      workspace.workspaceInstanceId!,
+    ).activeKey).toBe(secondKey));
+    await waitFor(() => expect(backButton).not.toBeDisabled());
+    fireEvent.click(backButton);
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      workspace.workspaceInstanceId!,
+    ).activeKey).toBe(originKey));
+    expect(backButton).toBeDisabled();
+
+    await act(async () => {
+      useCodeWorkspaceStore.getState().updateOpenFiles(
+        workspace.workspaceInstanceId!,
+        (current) => ({
+          ...current,
+          [originKey]: {
+            ...current[originKey]!,
+            documentRevision: (current[originKey]?.documentRevision ?? 0) + 1,
+          },
+        }),
+      );
+    });
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      workspace.workspaceInstanceId!,
+    ).openFiles[originKey]?.documentRevision).toBe(1));
+    fireEvent.click(within(screen.getByTestId("code-workspace-references-panel")).getByTitle(/app\/src\/Second\.cs/));
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("stale"));
+    expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      workspace.workspaceInstanceId!,
+    ).activeKey).toBe(originKey);
+    expect(backButton).toBeDisabled();
+  });
+
   it("ingests workspace test coverage report and renders coverage dock panel", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
