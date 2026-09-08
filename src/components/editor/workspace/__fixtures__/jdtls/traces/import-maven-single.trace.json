@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "fixtureId": "import-maven-single",
-  "generatedAt": "2026-09-08T06:10:10.809Z",
+  "generatedAt": "2026-09-08T13:08:00.332Z",
   "sanitized": true,
   "toolchain": {
     "java": {
