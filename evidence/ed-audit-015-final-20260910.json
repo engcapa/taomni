@@ -1,0 +1,89 @@
+{
+  "verified_at": "2026-09-09T23:49:17.895Z",
+  "head": "377f00256fc5ada6dd42e8a056219624c831c9e1",
+  "checks": [
+    {
+      "kind": "browser",
+      "command": "qa-ui-auto runner: run --mode browser --config qa-ui-auto-tests/qa-ui-auto.ed015-browser.config.yaml --filter TC-IDE-C8-04-rearrange-cleanup-unavailable-browser --workers 1 --keep-runs 0 --require-pass (receipt-run-20260910-073321-003194100)",
+      "result": "failed",
+      "summary": "The current-checkout browser run timed out opening the temporary preview listener; no behavior result was claimed. This failure is retained before the successful rerun.",
+      "acceptance": []
+    },
+    {
+      "kind": "browser",
+      "command": "qa-ui-auto runner: run --mode browser --config qa-ui-auto-tests/qa-ui-auto.ed015-browser.config.yaml --filter TC-IDE-C8-04-rearrange-cleanup-unavailable-browser --workers 1 --keep-runs 0 --require-pass (receipt-run-20260910-073817-236069300)",
+      "result": "passed",
+      "summary": "Current production browser run on platform=Windows selected 1 case and passed 1/1 with 0 failed and 0 skipped across 25 steps. The real production entry reported that a dedicated arrangement provider is required and left editor text unchanged. summary.json and runner_receipt.json are retained under qa-ui-auto-report/ed-audit-015-browser-current-20260910/run-20260910-073817-236069300/.",
+      "acceptance": ["ED-AUDIT-015-A2"]
+    },
+    {
+      "kind": "code-audit",
+      "command": "Re-audit current production path: workspace.rearrangeCode -> dedicated source.rearrange request/resolve -> immutable plan/preview -> canonical workspace transaction -> post-hash -> history/undo/recovery",
+      "result": "passed",
+      "summary": "CodeWorkspaceTab freezes workspace, file, provider, document and project identities; codeActionProviderAdapter accepts only dedicated rearrange action kinds; the workflow rejects unavailable, empty, malformed, cross-file and stale results. A valid provider edit enters the canonical transaction owner, checks preconditions, verifies post hashes and records one undo/recovery entry. No formatting/import fallback or browser stub is used.",
+      "acceptance": ["ED-AUDIT-015-A2"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/rearrangeCleanupWorkflow.test.ts src/components/editor/workspace/codeActionProviderAdapter.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "49/49 focused tests passed, covering dedicated action filtering, provider unavailable/empty-action failures, cancellation, stale/conflict/failed zero-commit paths, read-only handling, post-hash verification and transaction undo/recovery.",
+      "acceptance": ["ED-AUDIT-015-A2", "ED-AUDIT-015-A3"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/CodeWorkspaceTab.test.tsx --testNamePattern=Rearrange --maxWorkers=1",
+      "result": "passed",
+      "summary": "1/1 mounted production-entry rearrange regression passed; the action is wired to the production handler and the unavailable result is observable without a false success.",
+      "acceptance": ["ED-AUDIT-015-A2", "ED-AUDIT-015-A3"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/lib/editor/lsp.test.ts src/components/editor/workspace/__fixtures__/jdtls/jdtlsRearrangeCleanupContract.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "13/13 tests passed. The LSP version contract and real pinned JDT LS trace confirm formatting/import capabilities are not relabeled as rearrange/cleanup; the provider probe is honest about source.rearrange being unadvertised.",
+      "acceptance": ["ED-AUDIT-015-A2", "ED-AUDIT-015-A3"]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents\\skills\\code-workspace-idea-task\\scripts\\typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src\\components\\editor\\CodeWorkspaceTab.tsx --path src\\components\\editor\\CodeWorkspaceTab.test.tsx --path src\\components\\editor\\workspace\\rearrangeCleanupWorkflow.ts --path src\\components\\editor\\workspace\\rearrangeCleanupWorkflow.test.ts --path src\\components\\editor\\workspace\\codeActionProviderAdapter.ts --path src\\components\\editor\\workspace\\codeActionProviderAdapter.test.ts --path src\\lib\\editor\\lsp.ts --json",
+      "result": "passed",
+      "summary": "All 7 owned TypeScript paths passed with scoped_errors=0 and external_errors=0 across 0 external files.",
+      "acceptance": ["ED-AUDIT-015-A3"]
+    },
+    {
+      "kind": "build",
+      "command": "pnpm.cmd build",
+      "result": "passed",
+      "summary": "Repository TypeScript/build gate passed with exit code 0 on the current task tree.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "python .agents\\skills\\qa-ui-auto\\scripts\\native_build.py --force",
+      "result": "passed",
+      "summary": "Built the independent packaged QA application with identifier com.taomni.app.qa from the current checkout. The generated package was used by the following native run.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "qa-ui-auto runner: run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-08 --report-dir qa-ui-auto-report/ed-audit-015-native-current-20260910 --keep-runs 0 --require-pass (receipt-run-20260910-074334-042965900)",
+      "result": "passed",
+      "summary": "Packaged com.taomni.app.qa WebView2 run on the recorded Windows runtime selected 1 and passed 1/1 with 0 failed and 0 skipped across 29 steps. Real JDT LS intention apply/undo crossed the native boundary and restored the fixture postcondition; source identity 179c40fc76d34d856935b02858761aa49e34b22c513cb8563cceb9b9b82b59b4. This proves packaged transaction/undo crossing only, not a capable rearrange provider.",
+      "acceptance": []
+    }
+  ],
+  "unrun": [
+    "provider: no real capable source.rearrange provider was available on the recorded runtime. JDT LS 1.61.0.202607102111.jar with JDK 21.0.4 reported source.rearrange=false; the capableWorkflowExecution fixture field is a contract simulation and cannot satisfy provider evidence.",
+    "native rearrange-capable workflow: no packaged native case could drive a provider-advertised dedicated rearrange action; the current native case is the real JDT LS intention transaction smoke.",
+    "idea-comparison: IntelliJ IDEA 2026.2.x was not run. This is optional observation evidence under the current backlog rule and does not block done when all other required evidence exists.",
+    "native Linux: no qualifying Linux Tauri/WebKitGTK/X11 runtime was available.",
+    "native macOS: no qualifying macOS Tauri/WKWebView or OS automation runtime was available."
+  ],
+  "notes": [
+    "The execution platform is recorded from the actual QA receipts as platform=Windows; no Windows version is hard-coded or inferred.",
+    "Status is implemented, not done: production wiring and all runnable current-path checks pass, but required real capable-provider evidence is absent and acceptance A1 cannot be provider-proven.",
+    "No fake provider response, browser stub, screenshot-only result or synthetic PASS was used as provider or native rearrange evidence.",
+    "The final provider ceiling is unavailable for the installed JDT LS; the production UI reports that prerequisite instead of claiming a rearrange effect."
+  ]
+}
