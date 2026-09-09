@@ -56,6 +56,7 @@ describe("§8.21.4 V3 codeActionProviderAdapter", () => {
     expect(capabilities.isPreferredSupport).toBe(true);
     expect(capabilities.dataSupport).toBe(true);
     expect((capabilities.codeActionLiteralSupport as any)?.codeActionKind?.valueSet).toContain("quickfix");
+    expect((capabilities.codeActionLiteralSupport as any)?.codeActionKind?.valueSet).toContain("source.rearrange");
   });
 
   it("evaluates ready provider outcome into CodeActionProviderResultV4", () => {
@@ -644,6 +645,49 @@ describe("§8.21.4 V3 Intention session recovery and preconditions", () => {
       );
 
       expect(outcome).toEqual({ state: "rejected", reason: "malformed" });
+    });
+
+    it("cleans up the resolve cancellation bridge when the provider throws synchronously", async () => {
+      const action: LspCodeAction = {
+        title: "Deferred rearrange",
+        kind: "source.rearrange",
+        isPreferred: true,
+        edit: null,
+        command: null,
+        commandArguments: null,
+        raw: { data: { resolveId: "sync-throw" } },
+      };
+      const candidate: CodeActionCandidate = {
+        id: "codeAction.jdtls.sync-throw",
+        title: action.title,
+        kind: action.kind ?? "",
+        isPreferred: true,
+        disabledReason: null,
+        resolveRequired: true,
+        rawAction: action,
+      };
+      const abort = new AbortController();
+      const resolveCodeAction = vi.fn((_candidate: LspCodeAction, signal?: AbortSignal) => {
+        expect(signal).toBeInstanceOf(AbortSignal);
+        throw new Error("resolve exploded synchronously");
+      });
+
+      const outcome = await service.resolvePlan(
+        candidate,
+        sampleContext,
+        { requestCodeActions: vi.fn(), resolveCodeAction },
+        sampleContext.document.revision,
+        sampleContext.provider.generation,
+        { signal: abort.signal },
+      );
+
+      expect(outcome).toEqual({
+        state: "unresolved",
+        reason: "Resolve failed: resolve exploded synchronously",
+        retryable: true,
+      });
+      abort.abort();
+      expect(resolveCodeAction).toHaveBeenCalledTimes(1);
     });
   });
 

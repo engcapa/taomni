@@ -92,6 +92,7 @@ export function buildCodeActionClientCapabilities(): Record<string, unknown> {
           "refactor.rewrite",
           "source",
           "source.organizeImports",
+          "source.rearrange",
           "source.fixAll",
         ],
       },
@@ -566,7 +567,11 @@ export class CanonicalCodeActionService {
     client: CodeActionProviderClient,
     currentDocumentRevision: number,
     currentProviderGeneration: number,
-    options: { timeoutMs?: number; allowedCommands?: readonly string[] } = {},
+    options: {
+      timeoutMs?: number;
+      allowedCommands?: readonly string[];
+      signal?: AbortSignal;
+    } = {},
   ): Promise<CodeActionResolveOutcome> {
     const timeoutMs = options.timeoutMs ?? 10_000;
     const frozenContext = snapshotCodeActionContext(context);
@@ -602,16 +607,36 @@ export class CanonicalCodeActionService {
 
     let resolvedAction = frozenCandidate.rawAction;
     if (frozenCandidate.resolveRequired && client.resolveCodeAction) {
+      if (options.signal?.aborted) {
+        return { state: "unresolved", reason: "Provider resolve was cancelled", retryable: true };
+      }
       try {
+        const resolveAbort = new AbortController();
         let timer: ReturnType<typeof setTimeout> | null = null;
-        const resolvePromise = client.resolveCodeAction(frozenCandidate.rawAction);
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          timer = setTimeout(() => reject(new Error("RESOLVE_TIMEOUT")), timeoutMs);
+        let rejectCancellation!: (reason: Error) => void;
+        const cancellationPromise = new Promise<never>((_, reject) => {
+          rejectCancellation = reject;
         });
-
-        const outcome = await Promise.race([resolvePromise, timeoutPromise]).finally(() => {
+        const onAbort = () => {
+          rejectCancellation(new Error("CODE_ACTION_CANCELLED"));
+          resolveAbort.abort();
+        };
+        options.signal?.addEventListener("abort", onAbort, { once: true });
+        let outcome: LspCodeAction | null;
+        try {
+          const resolvePromise = client.resolveCodeAction(frozenCandidate.rawAction, resolveAbort.signal);
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            timer = setTimeout(() => {
+              reject(new Error("RESOLVE_TIMEOUT"));
+              resolveAbort.abort();
+            }, timeoutMs);
+          });
+          outcome = await Promise.race([resolvePromise, timeoutPromise, cancellationPromise]);
+        } finally {
+          resolveAbort.abort();
           if (timer) clearTimeout(timer);
-        });
+          options.signal?.removeEventListener("abort", onAbort);
+        }
 
         if (outcome) {
           resolvedAction = outcome;
@@ -620,6 +645,9 @@ export class CanonicalCodeActionService {
         }
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
+        if (message === "CODE_ACTION_CANCELLED") {
+          return { state: "unresolved", reason: "Provider resolve was cancelled", retryable: true };
+        }
         return {
           state: "unresolved",
           reason: `Resolve failed: ${message}`,

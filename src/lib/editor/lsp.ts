@@ -281,6 +281,43 @@ function documentArgs(descriptor: LspDocumentDescriptor) {
   };
 }
 
+/**
+ * Stop awaiting a native request when its renderer owner is cancelled. The
+ * backend request may still finish in the background, but no caller can
+ * mistake its late result for the cancelled operation.
+ */
+function invokeWithAbort<T>(
+  command: string,
+  payload: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<T> {
+  if (!signal) return invoke<T>(command, payload);
+  if (signal.aborted) return Promise.reject(new Error("CODE_ACTION_CANCELLED"));
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      reject(new Error("CODE_ACTION_CANCELLED"));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    invoke<T>(command, payload).then(
+      (value) => {
+        if (settled) return;
+        settled = true;
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
+}
+
 export function lspListPresets(): Promise<LspServerPreset[]> {
   return invoke<LspServerPreset[]>("lsp_list_presets");
 }
@@ -857,8 +894,9 @@ export function lspCodeActions(
   range: LspRange,
   diagnostics?: unknown[] | null,
   only?: string[] | null,
+  signal?: AbortSignal,
 ): Promise<LspCodeActionsResult> {
-  return invoke<LspCodeActionsResult>("lsp_code_actions", {
+  return invokeWithAbort<LspCodeActionsResult>("lsp_code_actions", {
     ...documentArgs(descriptor),
     startLine: range.start.line,
     startCharacter: range.start.character,
@@ -866,17 +904,18 @@ export function lspCodeActions(
     endCharacter: range.end.character,
     diagnostics: diagnostics ?? null,
     only: only?.length ? only : null,
-  });
+  }, signal);
 }
 
 export function lspCodeActionResolve(
   descriptor: LspDocumentDescriptor,
   action: unknown,
+  signal?: AbortSignal,
 ): Promise<LspCodeActionResolveResult> {
-  return invoke<LspCodeActionResolveResult>("lsp_code_action_resolve", {
+  return invokeWithAbort<LspCodeActionResolveResult>("lsp_code_action_resolve", {
     ...documentArgs(descriptor),
     action,
-  });
+  }, signal);
 }
 
 export function lspExecuteCommand(

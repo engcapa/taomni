@@ -11,9 +11,11 @@
 import type {
   LspCapabilitySummary,
   LspDocumentStatus,
+  LspFileTextEdits,
   LspTextEdit,
   LspWorkspaceEdit,
 } from "../../../lib/editor/lsp";
+import { fileUriToFsPath, fsPathEquals } from "./codeWorkspaceModel";
 import { applyLspTextEditsToString } from "./lspTextEdits";
 import { sha256Hex } from "./projectAnalysisModel";
 import {
@@ -25,6 +27,101 @@ export interface RearrangeCapabilities {
   rearrangeSupported: boolean;
   providerId?: string;
   providerVersion?: string;
+}
+
+const REARRANGE_ACTION_KINDS = [
+  "source.rearrange",
+  "source.rearrangeCode",
+  "rearrange",
+] as const;
+
+/** A provider action is rearrange-capable only when its kind is explicit. */
+export function isRearrangeActionKind(kind: string | null | undefined): boolean {
+  const normalized = kind?.trim() ?? "";
+  return REARRANGE_ACTION_KINDS.some((base) => (
+    normalized === base || normalized.startsWith(`${base}.`)
+  ));
+}
+
+function sameTextEdit(left: LspTextEdit, right: LspTextEdit): boolean {
+  return left.newText === right.newText
+    && left.annotationId === right.annotationId
+    && left.range.start.line === right.range.start.line
+    && left.range.start.character === right.range.start.character
+    && left.range.end.line === right.range.end.line
+    && left.range.end.character === right.range.end.character;
+}
+
+function sameDocumentEdit(left: LspFileTextEdits, right: LspFileTextEdits): boolean {
+  return left.uri === right.uri
+    && left.path === right.path
+    && (left.version ?? null) === (right.version ?? null)
+    && JSON.stringify(left.annotationIds ?? []) === JSON.stringify(right.annotationIds ?? [])
+    && left.edits.length === right.edits.length
+    && left.edits.every((edit, index) => sameTextEdit(edit, right.edits[index]!));
+}
+
+export type RearrangeEditValidation =
+  | { valid: true; document: LspFileTextEdits; edits: readonly LspTextEdit[] }
+  | { valid: false; reason: string };
+
+function sameActionDocument(
+  document: LspFileTextEdits,
+  targetPath: string,
+  targetUri: string,
+): boolean {
+  if (document.uri.trim() !== targetUri.trim()) return false;
+  const documentPath = document.path?.trim()
+    || fileUriToFsPath(document.uri)
+    || "";
+  return documentPath.length > 0 && fsPathEquals(documentPath, targetPath);
+}
+
+/**
+ * Rearrange is a file-local text transformation. Keep this gate next to the
+ * planner so format/imports, command-only actions, resource operations, and
+ * accidental cross-file edits cannot enter the transaction owner.
+ */
+export function validateRearrangeActionEdit(
+  edit: LspWorkspaceEdit | null | undefined,
+  targetPath: string,
+  targetUri: string,
+  currentText?: string,
+): RearrangeEditValidation {
+  if (!edit) return { valid: false, reason: "Provider returned no rearrange edit" };
+  if (!Array.isArray(edit.documentEdits) || edit.documentEdits.length !== 1) {
+    return { valid: false, reason: "Rearrange provider must return exactly one document edit" };
+  }
+  if (edit.operations !== undefined) {
+    if (edit.operations.length !== 1 || edit.operations[0]?.kind !== "text") {
+      return { valid: false, reason: "Rearrange provider must return one text operation and no resource operations" };
+    }
+    const operation = edit.operations[0];
+    if (operation.kind !== "text" || !sameDocumentEdit(operation.document, edit.documentEdits[0])) {
+      return { valid: false, reason: "Rearrange provider returned inconsistent document edit operations" };
+    }
+  }
+  const document = edit.documentEdits[0];
+  if (!sameActionDocument(document, targetPath, targetUri)) {
+    return { valid: false, reason: "Rearrange provider returned an edit for a different file" };
+  }
+  if (document.edits.length === 0) {
+    return { valid: false, reason: "Rearrange provider returned an empty edit" };
+  }
+  if (document.edits.some((item) => !item || typeof item.newText !== "string")) {
+    return { valid: false, reason: "Rearrange provider returned a malformed text edit" };
+  }
+  if (currentText !== undefined) {
+    try {
+      const postText = applyLspTextEditsToString(currentText, document.edits);
+      if (postText === currentText) {
+        return { valid: false, reason: "Rearrange provider returned a no-op edit" };
+      }
+    } catch {
+      return { valid: false, reason: "Rearrange provider returned an invalid text range" };
+    }
+  }
+  return { valid: true, document, edits: document.edits };
 }
 
 export interface RearrangeInput {
@@ -61,10 +158,7 @@ export function resolveRearrangeCapabilities(
   }
 
   const codeActionKinds = capabilities.codeActionKinds ?? [];
-  const hasRearrangeCodeAction =
-    codeActionKinds.includes("source.rearrange") ||
-    codeActionKinds.includes("source.rearrangeCode") ||
-    codeActionKinds.includes("rearrange");
+  const hasRearrangeCodeAction = codeActionKinds.some((kind) => isRearrangeActionKind(kind));
   const isExplicitlySupported =
     (capabilities as unknown as { rearrangeSupported?: boolean }).rearrangeSupported === true;
 
@@ -279,6 +373,8 @@ export interface BuildRearrangePlanInput {
   targetUri: string;
   currentText: string;
   documentRevision?: number;
+  /** Native LSP document version, distinct from the renderer revision. */
+  documentVersion?: number | null;
   readOnly: boolean;
   provider: { id: string; version?: string };
   edits: readonly LspTextEdit[];
@@ -313,7 +409,7 @@ export function buildRearrangePlan(input: BuildRearrangePlanInput): WorkflowPlan
       {
         uri: input.targetUri,
         path: input.targetPath,
-        version: input.documentRevision,
+        version: input.documentVersion ?? null,
         edits: [...input.edits],
       },
     ],
@@ -347,6 +443,8 @@ export interface BuildCleanupPlanInput {
   targetUri: string;
   currentText: string;
   documentRevision?: number;
+  /** Native LSP document version, distinct from the renderer revision. */
+  documentVersion?: number | null;
   readOnly: boolean;
   profileId?: string;
   provider: { id: string; version?: string };
@@ -382,7 +480,7 @@ export function buildCleanupPlan(input: BuildCleanupPlanInput): WorkflowPlan {
       {
         uri: input.targetUri,
         path: input.targetPath,
-        version: input.documentRevision,
+        version: input.documentVersion ?? null,
         edits: [...input.edits],
       },
     ],

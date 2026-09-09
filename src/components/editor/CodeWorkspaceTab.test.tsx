@@ -2434,6 +2434,7 @@ describe("CodeWorkspaceTab", () => {
     await waitFor(() => expect(lspMocks.lspCodeActionResolve).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({ data: { fixId: "space" } }),
+      expect.any(AbortSignal),
     ));
     await waitFor(() => expect(selectCodeWorkspaceUi(
       useCodeWorkspaceStore.getState(),
@@ -2462,6 +2463,136 @@ describe("CodeWorkspaceTab", () => {
       useCodeWorkspaceStore.getState(),
       "instance-actions",
     ).openFiles["root:app:src/main.ts"]?.text).toBe("x =1"));
+  });
+
+  it("routes Rearrange Code through a dedicated provider action, post-hash, and one undo", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-rearrange-entry",
+      workspaceInstanceId: "instance-rearrange-entry",
+      name: "Rearrange entry",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/Example.java" },
+    };
+    const initialText = "class Example {\n  void b() {}\n  void a() {}\n}\n";
+    const rearrangedText = "class Example {\n  void a() {}\n  void b() {}\n}\n";
+    const disk = new Map([["src/Example.java", initialText]]);
+    const status = documentStatus({
+      path: "/repo/app/src/Example.java",
+      uri: "file:///repo/app/src/Example.java",
+      presetId: "jdtls",
+      displayName: "Eclipse JDT Language Server",
+      languageId: "java",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({
+        codeAction: true,
+        codeActionKinds: ["source.organizeImports", "source.rearrange"],
+      }),
+    });
+    const formatAction = {
+      title: "Format document",
+      kind: "source.format",
+      isPreferred: true,
+      edit: {
+        documentEdits: [{
+          uri: "file:///repo/app/src/Example.java",
+          path: "/repo/app/src/Example.java",
+          edits: [{
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+            newText: "// format\n",
+          }],
+        }],
+      },
+      command: null,
+      commandArguments: null,
+      raw: null,
+    };
+    const rearrangeAction = {
+      title: "Rearrange members",
+      kind: "source.rearrange",
+      isPreferred: true,
+      edit: {
+        documentEdits: [{
+          uri: "file:///repo/app/src/Example.java",
+          path: "/repo/app/src/Example.java",
+          edits: [{
+            range: { start: { line: 1, character: 0 }, end: { line: 3, character: 0 } },
+            newText: "  void a() {}\n  void b() {}\n",
+          }],
+        }],
+      },
+      command: null,
+      commandArguments: null,
+      raw: null,
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => (
+      file(path, disk.get(path) ?? initialText, { hash: `hash-${disk.get(path) ?? initialText}` })
+    ));
+    workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+      _rootPath: string,
+      path: string,
+      text: string,
+    ) => {
+      disk.set(path, text);
+      return writeAck(file(path, text, { hash: `hash-${text}` }));
+    });
+    lspMocks.lspOpenDocument.mockResolvedValue(status);
+    lspMocks.lspChangeDocument.mockResolvedValue(status);
+    lspMocks.lspSaveDocument.mockResolvedValue(status);
+    lspMocks.lspCodeActions.mockResolvedValue({
+      status,
+      actions: [formatAction, rearrangeAction],
+    });
+
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+    const rendered = renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / src/Example.java");
+    await waitFor(() => expect(registrationRef.current).not.toBeNull());
+
+    await act(async () => {
+      await registrationRef.current!.executeAction("workspace.rearrangeCode");
+    });
+    await waitFor(() => expect(lspMocks.lspCodeActions).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      ["source.rearrange"],
+      expect.any(AbortSignal),
+    ));
+    await waitFor(() => expect(disk.get("src/Example.java")).toBe(rearrangedText));
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-rearrange-entry",
+    ).openFiles["root:app:src/Example.java"]?.text).toBe(rearrangedText));
+    expect(lspMocks.lspCodeActionResolve).not.toHaveBeenCalled();
+    expect(vi.mocked(confirmAppDialog)).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Rearrange Code",
+    }));
+    expect(useAppStore.getState().statusMessage).toContain("post hash");
+    expect(useAppStore.getState().statusMessage).toContain("undo transaction");
+    expect(rendered.container.querySelector(".cm-content")?.textContent).toContain("void a() {}");
+
+    await waitFor(() => expect(
+      registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled,
+    ).toBe(true));
+    await act(async () => {
+      await registrationRef.current!.executeAction("workspace.undoWorkspaceEdit");
+    });
+    await waitFor(() => expect(disk.get("src/Example.java")).toBe(initialText));
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-rearrange-entry",
+    ).openFiles["root:app:src/Example.java"]?.text).toBe(initialText));
+    expect(rendered.container.querySelector(".cm-content")?.textContent).toContain("void b() {}");
+    await waitFor(() => expect(
+      registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled,
+    ).toBe(false));
   });
 
   it("shows the native provider failure instead of a generic empty-actions message", async () => {
@@ -3228,6 +3359,7 @@ describe("CodeWorkspaceTab", () => {
       diagnostic.range,
       [expect.objectContaining({ code: diagnostic.code, message: diagnostic.message })],
       undefined,
+      expect.any(AbortSignal),
     );
     expect(lspMocks.lspCodeActions).toHaveBeenNthCalledWith(
       2,
@@ -3238,6 +3370,7 @@ describe("CodeWorkspaceTab", () => {
       },
       [],
       undefined,
+      expect.any(AbortSignal),
     );
     expect(selectCodeWorkspaceUi(
       useCodeWorkspaceStore.getState(),
@@ -6809,6 +6942,7 @@ describe("CodeWorkspaceTab", () => {
       expect.anything(),
       expect.anything(),
       ["source.organizeImports"],
+      expect.any(AbortSignal),
     ));
     expect(useAppStore.getState().statusMessage).toBe("Imports organized");
 

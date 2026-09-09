@@ -3,10 +3,12 @@ import {
   buildCleanupPlan,
   buildRearrangePlan,
   cancelWorkflowPlan,
+  isRearrangeActionKind,
   planCleanup,
   planRearrange,
   resolveCleanupCapabilities,
   resolveRearrangeCapabilities,
+  validateRearrangeActionEdit,
   verifyWorkflowFreshness,
   verifyWorkflowPostHashes,
   verifyWorkflowPreconditions,
@@ -103,6 +105,106 @@ describe("ED-STYLE-002: Rearrange / Cleanup independent workflows", () => {
       );
       expect(caps.rearrangeSupported).toBe(false);
       expect(caps.providerId).toBe("Eclipse JDT Language Server");
+    });
+  });
+
+  describe("rearrange provider action and edit boundaries", () => {
+    const targetPath = "/repo/src/Example.java";
+    const targetUri = "file:///repo/src/Example.java";
+    const currentText = "class Example {\n  void b() {}\n}\n";
+    const validEdit = {
+      documentEdits: [{
+        uri: targetUri,
+        path: targetPath,
+        edits: [{
+          range: { start: { line: 1, character: 0 }, end: { line: 1, character: 0 } },
+          newText: "  // rearranged\n",
+        }],
+      }],
+    };
+
+    it("recognizes only dedicated rearrange kinds, never formatting or imports", () => {
+      expect(isRearrangeActionKind("source.rearrange")).toBe(true);
+      expect(isRearrangeActionKind("source.rearrange.members")).toBe(true);
+      expect(isRearrangeActionKind("source.rearrangeCode")).toBe(true);
+      expect(isRearrangeActionKind("rearrange")).toBe(true);
+      expect(isRearrangeActionKind("source.organizeImports")).toBe(false);
+      expect(isRearrangeActionKind("source.fixAll")).toBe(false);
+      expect(isRearrangeActionKind("format")).toBe(false);
+      expect(isRearrangeActionKind(null)).toBe(false);
+    });
+
+    it("accepts one changed text edit and rejects empty, no-op, cross-file, command-only, and resource edits", () => {
+      expect(validateRearrangeActionEdit(validEdit, targetPath, targetUri, currentText)).toMatchObject({ valid: true });
+      expect(validateRearrangeActionEdit(
+        { documentEdits: [{ ...validEdit.documentEdits[0], edits: [] }] },
+        targetPath,
+        targetUri,
+        currentText,
+      )).toEqual({ valid: false, reason: "Rearrange provider returned an empty edit" });
+      expect(validateRearrangeActionEdit(
+        {
+          documentEdits: [{
+            ...validEdit.documentEdits[0],
+            edits: [{
+              range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+              newText: "c",
+            }],
+          }],
+        },
+        targetPath,
+        targetUri,
+        currentText,
+      )).toEqual({ valid: false, reason: "Rearrange provider returned a no-op edit" });
+      expect(validateRearrangeActionEdit(
+        {
+          documentEdits: [{
+            ...validEdit.documentEdits[0],
+            uri: "file:///repo/src/Other.java",
+            path: "/repo/src/Other.java",
+          }],
+        },
+        targetPath,
+        targetUri,
+        currentText,
+      )).toEqual({ valid: false, reason: "Rearrange provider returned an edit for a different file" });
+      expect(validateRearrangeActionEdit(null, targetPath, targetUri, currentText)).toEqual({
+        valid: false,
+        reason: "Provider returned no rearrange edit",
+      });
+      expect(validateRearrangeActionEdit(
+        { ...validEdit, operations: [{
+          kind: "create",
+          uri: "file:///repo/src/New.java",
+          path: "/repo/src/New.java",
+          overwrite: false,
+          ignoreIfExists: false,
+          annotationId: null,
+        }] },
+        targetPath,
+        targetUri,
+        currentText,
+      )).toEqual({
+        valid: false,
+        reason: "Rearrange provider must return one text operation and no resource operations",
+      });
+    });
+
+    it("requires document edit operations to agree when a provider returns them", () => {
+      expect(validateRearrangeActionEdit({
+        ...validEdit,
+        operations: [{ kind: "text", document: validEdit.documentEdits[0] }],
+      }, targetPath, targetUri, currentText)).toMatchObject({ valid: true });
+      expect(validateRearrangeActionEdit({
+        ...validEdit,
+        operations: [{
+          kind: "text",
+          document: { ...validEdit.documentEdits[0], edits: [] },
+        }],
+      }, targetPath, targetUri, currentText)).toEqual({
+        valid: false,
+        reason: "Rearrange provider returned inconsistent document edit operations",
+      });
     });
   });
 
@@ -309,6 +411,7 @@ describe("ED-STYLE-002: Rearrange / Cleanup independent workflows", () => {
         targetUri: "file:///repo/src/Example.java",
         currentText: originalText,
         documentRevision: 1,
+        documentVersion: 42,
         readOnly: false,
         provider: { id: "ArrangementProvider", version: "1.0.0" },
         edits: [
@@ -327,6 +430,7 @@ describe("ED-STYLE-002: Rearrange / Cleanup independent workflows", () => {
       expect(plan.preconditions).toHaveLength(1);
       expect(plan.preconditions[0].preTextSha256).toBe(sha256Hex(originalText));
       expect(plan.preconditions[0].expectedPostHash).toBe(sha256Hex(rearrangedText));
+      expect(plan.edit.documentEdits[0].version).toBe(42);
       expect(plan.conflicts).toHaveLength(0);
       expect(plan.preview.entries).toHaveLength(1);
       expect(plan.preview.entries[0].path).toBe("/repo/src/Example.java");

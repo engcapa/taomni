@@ -441,6 +441,7 @@ import {
 } from "./workspace/intentionSession";
 import {
   CanonicalCodeActionService,
+  computeStableActionId,
   extractAffectedResourcesFromWorkspaceEdit,
   snapshotCodeActionContext,
   type CodeActionContextIdentity,
@@ -1169,10 +1170,13 @@ import {
   planWorkspaceRestore,
 } from "./workspace/workspaceRestoreModel";
 import {
+  buildRearrangePlan,
+  isRearrangeActionKind,
   planCleanup,
   planRearrange,
   resolveCleanupCapabilities,
   resolveRearrangeCapabilities,
+  validateRearrangeActionEdit,
 } from "./workspace/rearrangeCleanupWorkflow";
 
 interface ResourceCleanupRecoveryView {
@@ -10072,7 +10076,7 @@ export function CodeWorkspaceTab({
       });
 
       const client: CodeActionProviderClient = {
-        requestCodeActions: async (params) => {
+        requestCodeActions: async (params, signal) => {
           const result = await lspCodeActions(
             descriptor,
             params.range,
@@ -10088,6 +10092,7 @@ export function CodeWorkspaceTab({
               data: item.data,
             })),
             params.context.only ? [...params.context.only] : undefined,
+            signal,
           );
           updateLspStatusForFile(live, result.status);
           return { actions: result.actions, status: result.status };
@@ -10152,8 +10157,10 @@ export function CodeWorkspaceTab({
   const canonicalCodeActionServiceRef = useRef<CanonicalCodeActionService | null>(null);
   if (!canonicalCodeActionServiceRef.current) canonicalCodeActionServiceRef.current = new CanonicalCodeActionService();
   const intentionRequestAbortRef = useRef<AbortController | null>(null);
+  const rearrangeRequestAbortRef = useRef<AbortController | null>(null);
   useEffect(() => () => {
     intentionRequestAbortRef.current?.abort();
+    rearrangeRequestAbortRef.current?.abort();
     intentionSessionRef.current?.dispose();
   }, []);
   // Diagnostics whose provider suppression edit applied successfully
@@ -10226,9 +10233,9 @@ export function CodeWorkspaceTab({
       const candidate = sessionCandidate ?? candidateFromProviderAction(action, null);
       const client: CodeActionProviderClient = {
         requestCodeActions: async () => [action],
-        resolveCodeAction: async (candidateAction) => {
+        resolveCodeAction: async (candidateAction, signal) => {
           if (!candidateAction.raw) return null;
-          const result = await lspCodeActionResolve(descriptor, candidateAction.raw);
+          const result = await lspCodeActionResolve(descriptor, candidateAction.raw, signal);
           updateLspStatusForFile(file, result.status);
           return result.action;
         },
@@ -10513,6 +10520,377 @@ export function CodeWorkspaceTab({
     setStatusMessage,
     updateLspStatusForFile,
     workspaceEditHistory,
+  ]);
+
+  /**
+   * Rearrange owns a narrower provider contract than ordinary intentions:
+   * only a dedicated rearrange action may enter this file-local transaction.
+   * The provider request, preview, apply, post-hash, and undo therefore share
+   * one frozen document/provider identity.
+   */
+  const executeRearrangeCode = useCallback(async () => {
+    rearrangeRequestAbortRef.current?.abort();
+    const requestAbort = new AbortController();
+    rearrangeRequestAbortRef.current = requestAbort;
+    const cancel = () => {
+      setStatusMessage("Rearrange Code cancelled; no changes applied");
+    };
+
+    const file = activeFile;
+    if (!file || file.loading || file.library) {
+      setStatusMessage(file?.library
+        ? "Rearrange Code is unavailable for read-only library sources"
+        : "Rearrange Code requires an active workspace file");
+      return;
+    }
+
+    const fileKey = file.key;
+    const documentRevision = file.documentRevision;
+    const frozenText = file.text;
+    const targetPath = absolutePathForOpenFile(file);
+    const descriptor = lspDescriptorForFile(file);
+    const initialStatus = lspFilesRef.current[fileKey]?.status ?? null;
+    const capabilities = resolveRearrangeCapabilities(activeCapabilities, initialStatus);
+    const decision = planRearrange({
+      scope: "file",
+      targetPath,
+      languageId: activeLanguageId,
+      readOnly: !!file.library || workspaceResourceOperationLocked,
+      hasSelection: false,
+      capabilities,
+    });
+    if (decision.kind === "unavailable") {
+      setStatusMessage(decision.reason);
+      return;
+    }
+    if (!descriptor || !targetPath) {
+      setStatusMessage("Rearrange Code is unavailable because the active file has no local language-server path");
+      return;
+    }
+
+    const providerGeneration = lspSessionGeneration();
+    const projectFingerprint = projectAnalysisSnapshot?.projectFingerprint ?? "";
+    const wholeFileRange: LspRange = {
+      start: { line: 0, character: 0 },
+      end: { line: frozenText.split("\n").length, character: 0 },
+    };
+    const isFrozenFileCurrent = () => {
+      const current = openFilesRef.current[fileKey];
+      if (!current || current.loading || current.library) return false;
+      const currentPath = absolutePathForOpenFile(current);
+      return current.documentRevision === documentRevision
+        && current.text === frozenText
+        && currentPath !== null
+        && fsPathEquals(currentPath, targetPath);
+    };
+    const providerFailureReason = (result: CodeActionProviderResultV4 | null): string => {
+      if (!result) return "The language server did not return a rearrange provider result";
+      if (result.state === "unsupported" || result.state === "unavailable") return result.reason;
+      if (result.state === "failed" || result.state === "malformed") return result.message;
+      if (result.state === "empty") return "The rearrange provider returned no actions";
+      if (result.state === "timeout") return "The rearrange provider request timed out; retry it manually";
+      if (result.state === "cancelled") return "The rearrange provider request was cancelled";
+      return "The rearrange provider returned no dedicated rearrange action";
+    };
+
+    try {
+      if (requestAbort.signal.aborted) {
+        cancel();
+        return;
+      }
+      const live = await ensureWorkspaceSemanticDocumentsSynced(fileKey, semanticIndex.current().revision);
+      if (requestAbort.signal.aborted) {
+        cancel();
+        return;
+      }
+      if (!live || !isFrozenFileCurrent()) {
+        setStatusMessage("Rearrange Code became stale because the active document changed; request it again");
+        return;
+      }
+      const requested = await requestCodeActions(
+        live,
+        wholeFileRange,
+        [],
+        ["source.rearrange"],
+        { signal: requestAbort.signal },
+      );
+      if (requestAbort.signal.aborted || requested.providerResult?.state === "cancelled") {
+        cancel();
+        return;
+      }
+      if (!isFrozenFileCurrent()) {
+        setStatusMessage("Rearrange Code became stale because the active document changed; no changes were applied");
+        return;
+      }
+
+      const dedicatedActions = requested.providerActions.filter((providerAction) => (
+        isRearrangeActionKind(providerAction.action.kind)
+      ));
+      const selectedProviderAction = dedicatedActions.find((providerAction) => (
+        providerAction.action.isPreferred
+      )) ?? dedicatedActions[0];
+      if (!selectedProviderAction || !requested.context) {
+        setStatusMessage(
+          `Rearrange Code unavailable: ${providerFailureReason(requested.providerResult)}`,
+        );
+        return;
+      }
+
+      const providerAction = selectedProviderAction.action;
+      const candidate = {
+        id: computeStableActionId(providerAction, requested.context.provider.id),
+        title: providerAction.title,
+        kind: providerAction.kind ?? "",
+        isPreferred: providerAction.isPreferred,
+        disabledReason: selectedProviderAction.disabledReason,
+        resolveRequired: Boolean(
+          providerAction.raw
+          && typeof providerAction.raw === "object"
+          && !Array.isArray(providerAction.raw)
+          && "data" in providerAction.raw,
+        ),
+        rawAction: providerAction,
+        evidence: selectedProviderAction.evidence,
+      };
+      const client: CodeActionProviderClient = {
+        requestCodeActions: async () => [providerAction],
+        resolveCodeAction: async (action, signal) => {
+          if (!action.raw) return null;
+          const resolved = await lspCodeActionResolve(descriptor, action.raw, signal);
+          updateLspStatusForFile(file, resolved.status);
+          return resolved.action;
+        },
+      };
+      const resolveOutcome = await canonicalCodeActionServiceRef.current!.resolvePlan(
+        candidate,
+        requested.context,
+        client,
+        documentRevision,
+        providerGeneration,
+        { timeoutMs: INTENTION_RESOLVE_TIMEOUT_MS, signal: requestAbort.signal },
+      );
+      if (requestAbort.signal.aborted) {
+        cancel();
+        return;
+      }
+      if (resolveOutcome.state === "stale") {
+        setStatusMessage(`Rearrange Code became stale: ${resolveOutcome.reason}`);
+        return;
+      }
+      if (resolveOutcome.state === "unresolved") {
+        setStatusMessage(`Rearrange Code provider resolve failed: ${resolveOutcome.reason}`);
+        return;
+      }
+      if (resolveOutcome.state === "rejected") {
+        setStatusMessage(`Rearrange Code provider action rejected: ${resolveOutcome.reason}`);
+        return;
+      }
+
+      const validation = validateRearrangeActionEdit(
+        resolveOutcome.plan.edit,
+        targetPath,
+        requested.context.document.uri,
+        frozenText,
+      );
+      if (!validation.valid) {
+        setStatusMessage(`Rearrange Code unavailable: ${validation.reason}`);
+        return;
+      }
+      const workflowPlan = buildRearrangePlan({
+        scope: decision.scope,
+        targetPath,
+        targetUri: requested.context.document.uri,
+        currentText: frozenText,
+        documentRevision,
+        documentVersion: validation.document.version ?? lspDocumentVersion(fileKey),
+        readOnly: false,
+        provider: {
+          id: requested.context.provider.id,
+          version: requested.context.provider.version ?? undefined,
+        },
+        edits: validation.edits,
+        isDirty: file.dirty,
+      });
+      if (workflowPlan.conflicts.length > 0) {
+        setStatusMessage(`Rearrange Code conflict: ${workflowPlan.conflicts[0]!.message}`);
+        return;
+      }
+
+      const confirmed = await confirmAppDialog({
+        title: "Rearrange Code",
+        message: formatWorkspaceEditPreview(workflowPlan.preview),
+        confirmLabel: "Apply changes",
+      });
+      if (!confirmed || requestAbort.signal.aborted) {
+        cancel();
+        return;
+      }
+      if (!isFrozenFileCurrent()) {
+        setStatusMessage("Rearrange Code became stale after preview; no changes were applied");
+        return;
+      }
+
+      const canonicalPlan = {
+        actionId: candidate.id,
+        title: resolveOutcome.plan.title,
+        kind: resolveOutcome.plan.kind,
+        document: requested.context.document,
+        provider: requested.context.provider,
+        edit: workflowPlan.edit,
+        command: null,
+        evidence: selectedProviderAction.evidence,
+        createdAt: Date.now(),
+      } as const;
+      const result = await canonicalCodeActionServiceRef.current!.applyPlan(canonicalPlan, {
+        getLiveDocumentText: (uri) => uri === requested.context!.document.uri
+          ? openFilesRef.current[fileKey]?.text ?? null
+          : null,
+        getLiveDocumentRevision: (uri) => uri === requested.context!.document.uri
+          ? openFilesRef.current[fileKey]?.documentRevision ?? null
+          : null,
+        verifyIdentity: () => {
+          if (workspaceInstanceIdRef.current !== workspaceInstanceId) {
+            return { valid: false, status: "stale", reason: "Workspace identity changed" };
+          }
+          const current = openFilesRef.current[fileKey];
+          if (!current || current.library) {
+            return { valid: false, status: "stale", reason: "The target document was closed" };
+          }
+          if (current.documentRevision !== documentRevision) {
+            return {
+              valid: false,
+              status: "stale",
+              reason: `Document revision changed from ${documentRevision} to ${current.documentRevision}`,
+            };
+          }
+          const currentPath = absolutePathForOpenFile(current);
+          if (!currentPath || !fsPathEquals(currentPath, targetPath)) {
+            return { valid: false, status: "stale", reason: "The target document path changed" };
+          }
+          if (workspaceResourceOperationLocked || current.dirty) {
+            return { valid: false, status: "conflict", reason: "The target document changed during the preview" };
+          }
+          const currentDescriptor = lspDescriptorForFile(current);
+          const currentUri = currentDescriptor?.documentUri
+            ?? lspFilesRef.current[fileKey]?.status?.uri
+            ?? currentDescriptor?.filePath
+            ?? fileKey;
+          if (currentUri !== requested.context!.document.uri) {
+            return { valid: false, status: "stale", reason: "The language-server document identity changed" };
+          }
+          if (lspSessionGeneration() !== providerGeneration) {
+            return { valid: false, status: "stale", reason: "The language-server provider restarted" };
+          }
+          if ((projectAnalysisSnapshot?.projectFingerprint ?? "") !== projectFingerprint) {
+            return { valid: false, status: "stale", reason: "Project analysis changed" };
+          }
+          return { valid: true };
+        },
+        captureSnapshot: captureCodeActionTransactionSnapshot,
+        restoreSnapshot: restoreCodeActionTransactionSnapshot,
+        applyWorkspaceEdit: async (edit, transactionOptions) => (
+          applyLspWorkspaceEdit(edit, {
+            preview: false,
+            label: "Rearrange Code",
+            semanticGeneration: requested.semanticToken?.generation,
+            semanticRevision: requested.semanticToken?.revision,
+            semanticRequireReady: false,
+            semanticWorkspaceOnly: true,
+            recordHistory: false,
+            preflightMutation: transactionOptions?.onBeforeCommit,
+          })
+        ),
+        registerHistoryEntry: (entry) => {
+          workspaceEditHistory.push({
+            id: entry.id,
+            label: entry.label,
+            affectedPaths: entry.affectedUris,
+            undo: entry.undo,
+            redo: entry.redo,
+          });
+          setWorkspaceEditHistoryRevision((revision) => revision + 1);
+        },
+        registerRecoveryEntry: (entry) => {
+          workspaceEditHistory.push({
+            id: entry.id,
+            label: `Recover ${entry.label}`,
+            affectedPaths: entry.affectedUris,
+            undo: entry.recover,
+            redo: entry.recover,
+          });
+          setWorkspaceEditHistoryRevision((revision) => revision + 1);
+        },
+      }, { signal: requestAbort.signal });
+
+      if (result.status === "applied") {
+        const postHash = result.uriHashes[requested.context.document.uri]?.postHash
+          ?? (openFilesRef.current[fileKey]
+            ? sha256Hex(openFilesRef.current[fileKey]!.text)
+            : null);
+        const expectedPostHash = workflowPlan.expectedPostHashes[targetPath];
+        if (!postHash || postHash !== expectedPostHash) {
+          setStatusMessage(
+            `Rearrange Code postcondition failed: expected ${expectedPostHash}, received ${postHash ?? "no post hash"}`,
+          );
+          return;
+        }
+        if (!result.historyId) {
+          setStatusMessage("Rearrange Code produced no changed text; no undo transaction was recorded");
+          return;
+        }
+        setStatusMessage(
+          `Rearranged ${file.title}; post hash ${postHash}; undo transaction ${result.historyId}`,
+        );
+        return;
+      }
+      if (result.status === "cancelled") {
+        cancel();
+        return;
+      }
+      if (result.status === "stale" || result.status === "conflict") {
+        setStatusMessage(`Rearrange Code ${result.status}: ${result.reason}; no changes were applied`);
+        return;
+      }
+      if (result.status !== "failed") {
+        setStatusMessage("Rearrange Code ended without a committed result");
+        return;
+      }
+      const recovery = result.recoveryId
+        ? `; recovery ${result.recoveryId} ${result.recoveryState ?? "available"}`
+        : "";
+      setStatusMessage(`Rearrange Code failed: ${result.error}${recovery}`);
+    } catch (error) {
+      if (requestAbort.signal.aborted) {
+        cancel();
+      } else {
+        setStatusMessage(`Rearrange Code failed: ${errorMessage(error)}`);
+      }
+    } finally {
+      if (rearrangeRequestAbortRef.current === requestAbort) {
+        rearrangeRequestAbortRef.current = null;
+      }
+    }
+  }, [
+    absolutePathForOpenFile,
+    activeCapabilities,
+    activeFile,
+    activeLanguageId,
+    applyLspWorkspaceEdit,
+    captureCodeActionTransactionSnapshot,
+    ensureWorkspaceSemanticDocumentsSynced,
+    formatWorkspaceEditPreview,
+    lspDescriptorForFile,
+    lspDocumentVersion,
+    lspSessionGeneration,
+    projectAnalysisSnapshot?.projectFingerprint,
+    requestCodeActions,
+    restoreCodeActionTransactionSnapshot,
+    semanticIndex.current,
+    setStatusMessage,
+    updateLspStatusForFile,
+    workspaceEditHistory,
+    workspaceInstanceId,
+    workspaceResourceOperationLocked,
   ]);
 
   // §8.19.8 Generate Code: request provider source/generate CodeActions for
@@ -12566,26 +12944,8 @@ export function CodeWorkspaceTab({
       keywords: ["rearrange", "members", "order", "declarations", "structure"],
       when: () => !!activeFile,
       run: () => {
-        if (!activeFile) return;
-        const capabilities = resolveRearrangeCapabilities(
-          activeCapabilities,
-          activeLspState?.status,
-        );
-        const decision = planRearrange({
-          scope: "file",
-          targetPath: activeFile.path ?? activeFile.key,
-          languageId: activeLanguageId,
-          readOnly: !!activeFile.library || workspaceResourceOperationLocked,
-          hasSelection: false,
-          capabilities,
-        });
-        if (decision.kind === "unavailable") {
-          setStatusMessage(decision.reason);
-          return false;
-        }
-        setStatusMessage(
-          `Executing rearrange for ${activeFile.title ?? activeFile.path ?? "active file"} (${decision.provider?.id ?? "provider"})`,
-        );
+        if (!activeFile) return false;
+        void executeRearrangeCode();
         return true;
       },
     },
@@ -13873,6 +14233,7 @@ export function CodeWorkspaceTab({
     deleteSelected,
     editorCommandStateFor,
     equalizeActiveSplitRatios,
+    executeRearrangeCode,
     executeActiveEditorCommand,
     executeEditorCommand,
     findInDirectory,
