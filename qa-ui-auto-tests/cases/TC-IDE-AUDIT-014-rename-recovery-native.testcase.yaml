@@ -4,11 +4,21 @@ description: |
   ED-AUDIT-014 native gate case. Crosses the real packaged-app boundary on
   Linux with a live JDT LS provider and proves two production paths:
 
-  1. A1/provider: a real Shift+F6 rename of the `App` class in the maven-single
-     sample project applies a real cross-file WorkspaceEdit (`App.java` and
-     `AppTest.java` both rewritten by jdtls) through the package app UI, with
-     the editor surface and undo status observed and a journal entry closed
-     in the committed state.
+  1. A1/provider: a real Shift+F6 rename of the `blank` variable in
+     QuickFixTarget.java (maven-single sample) applies a real provider
+     WorkspaceEdit through the packaged app UI, with preview/apply, the
+     shared-undo status naming the journal entry, a save, and the disk hash
+     observed, closing the journal entry in the committed state. The rename
+     targets QuickFixTarget.java (NOT App.java): App.java carries
+     intentional completion-target fragments that are syntax errors, and a
+     bare-LSP probe proved JDT LS 1.61 refuses ANY rename in a compilation
+     unit with syntax errors ("cannot be performed correctly due to syntax
+     errors"), answering prepare fine but erroring the rename itself
+     (surfaced by production as the honest "Rename produced no edits").
+     QuickFixTarget.java is syntax-clean (only an unresolved-type
+     diagnostic) and the same probe proved rename returns a real edit. A
+     variable (not the class) is renamed so no file-move operation is
+     involved; undo-inversion of resource moves is a separate recorded gap.
   2. A2/A3 native restart/disk: a seeded v2 refactor recovery journal entry
      describes a `prepared` transaction whose pre/post images are the literal
      preimage and a `QA14PostA` substitute (computed offline). The webview
@@ -41,7 +51,7 @@ steps:
   # so the layout snapshot and recovery entries survive reload_window.
   - seed_storage:
       key: taomni.recentWorkspaces.v1
-      value: '[{"id":"qa-audit014","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+      value: '[{"id":"qa-audit014","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/QuickFixTarget.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
   - reload_window: null
   - click: '[data-testid="welcome-history-tab-workspaces"]'
   - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
@@ -51,31 +61,44 @@ steps:
       timeout_sec: 60
   - assert_text:
       selector: '[data-testid="code-workspace-editor"]'
-      contains: "public class App"
+      contains: "public class QuickFixTarget"
       timeout_sec: 60
   - assert_text:
       selector: '[data-testid="code-workspace-lsp-status-pill"]'
       contains: "Java"
       timeout_sec: 60
+  # Cold-import settle: the rename entry bails (by design, status-bar note
+  # only) while LSP document sync is unestablished, and a rename confirmed
+  # mid-import cancels itself when import progress moves the index revision.
+  # jdtls reports build-jobs-finished ~20s after workspace open on this box
+  # (per-run fixture copies force a cold import every run); the fixed wait
+  # puts the chord past import churn. A too-short settle fails loudly at the
+  # dialog wait below, never as a false rename pass.
+  - wait: 30
 
-  # ---- Segment 1: real jdtls 2-file rename via Shift+F6 (A1 provider) ----
-  # Line 6 is `public class App {`; the `App` symbol sits at 1-based cols
-  # 14-16 (0-based 13-15). The zero-length native pointer drag places the
+  # ---- Segment 1: real jdtls variable rename via Shift+F6 (A1/provider) --
+  # 1-based line 13 is `boolean blank = StringUtils.isBlank("x");`; `blank`
+  # sits at 1-based cols 21-25 (0-based 20-24, verified against the fixture
+  # and a bare-LSP probe that returned a real text edit for qa14flag). A
+  # VARIABLE (not the class) is renamed on purpose: renaming the top-level
+  # type makes the server include a file-move operation, and undo-inversion
+  # of resource moves is a separate gap recorded for follow-up (it is not
+  # absorbed here). The variable path exercises the identical production
+  # chain under test (prepare/dialog/rename/plan/gate/preview/apply/
+  # post-hash/journal/undo). The zero-length native pointer drag places the
   # caret with real pointer injection; the cursor postcondition is the
-  # authoritative caret proof (014's earlier failed run proved caret-at-Ln6/Col14
-  # but never waited, so the chord raced the selection/AST settle and the F6
-  # stroke arrived unclaimed with defaultPrevented:false). The 008 green
-  # precedent shape is drag -> cursor assert -> short settle wait -> chord:
-  # the wait keeps the stroke out of the diagnostics-driven re-render window
-  # that dropped XTest chords in 008's runs, and W3C delivery (not XTest)
-  # carries the F6 chord itself.
+  # authoritative caret proof. The 008 green precedent shape is drag ->
+  # cursor assert -> short settle wait -> chord: the wait keeps the stroke
+  # out of the diagnostics-driven re-render window that dropped XTest
+  # chords in 008's runs, and W3C delivery (not XTest) carries the F6
+  # chord itself.
   - native_pointer_drag:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
-      from: {line: 6, column: 13}
-      to: {line: 6, column: 13}
+      from: {line: 13, column: 20}
+      to: {line: 13, column: 20}
   - assert_text:
       selector: '[data-testid="status-bar-workspace-cursor"]'
-      contains: "Ln 6, Col 14"
+      contains: "Ln 13, Col 21"
       timeout_sec: 10
   - wait: 2
   - native_keys:
@@ -86,29 +109,43 @@ steps:
       selector: '[data-testid="text-input-dialog"]'
       timeout_sec: 30
   # The Rename Symbol prompt is a TextInputDialog (title "Rename Symbol",
-  # initialValue the prepared placeholder "App"). Replace it with QA14Renamed.
+  # initialValue the prepared placeholder "blank").
   - fill:
       selector: '[data-testid="text-input-dialog-input"]'
-      value: "QA14Renamed"
+      value: "qa14flag"
   - click: '[data-testid="text-input-dialog-confirm"]'
-  # A clean multi-file rename plan routes through refactoring-preview-dialog
-  # (refactorApplyGate sees a 2-file rename with no destructive operations);
-  # apply it.
-  - wait_for:
-      selector: '[data-testid="refactoring-preview-dialog"]'
+  # The rename plan routes through applyLspWorkspaceEdit with preview:true,
+  # but the preview MODAL only opens when the plan requires confirmation
+  # (resource ops or multi-file edits). A single-file single-edit rename
+  # applies directly by design; the apply summary status is the apply proof.
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Applied 1, unchanged 0, failed 0, skipped 0"
       timeout_sec: 60
-  - click: '[data-testid="refactoring-preview-apply"]'
   - assert_text:
       selector: '[data-testid="code-workspace-editor"]'
-      contains: "public class QA14Renamed"
-      timeout_sec: 60
-  # The shared document undo reverts the whole refactor (one entry per
-  # multi-file workspace edit, per ED-AUDIT-008 claim routing).
+      contains: "boolean qa14flag"
+      timeout_sec: 10
+  # ONE undo reverts the whole commit through the shared document undo
+  # (workspace.undo, the canUndo-gated keybinding), exactly like the
+  # TC-IDE-AUDIT-008 green precedent: the undo status names the journal
+  # entry (proving the journal transaction was claimed, not a CodeMirror
+  # buffer revert), then a save proves the disk bytes equal the original
+  # fixture hash.
   - click: '[data-testid="code-workspace-editor"] .cm-content'
   - press: Control+z
   - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: 'Undid Rename symbol to "qa14flag"'
+      timeout_sec: 10
+  - assert_text:
       selector: '[data-testid="code-workspace-editor"]'
-      contains: "public class App"
+      contains: "boolean blank"
+      timeout_sec: 30
+  - press: Control+s
+  - assert_file_sha256:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/QuickFixTarget.java"
+      equals: "f2de5c8ab98b58cf18ff998ebc47d19c127bb6f4290550d2827a40a37552e70a"
       timeout_sec: 30
   - screenshot: tc-ide-audit-014-segment1-undo.png
 

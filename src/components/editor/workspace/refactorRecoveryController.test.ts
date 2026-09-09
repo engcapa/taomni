@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   classifyRefactorRecoveryPreconditions,
+  createRestoreEchoSuppressor,
   executeRefactorRecovery,
+  RESTORE_ECHO_SUPPRESS_WINDOW_MS,
 } from "./refactorRecoveryController";
 import { sha256Hex } from "./projectAnalysisModel";
 import type { RefactorRecoveryJournalEntryV2 } from "./refactorPlan";
@@ -193,6 +195,34 @@ describe("ED-AUDIT-014: refactor recovery controller", () => {
       });
       expect(partial.state).toBe("pending");
       expect(partial.failures[0].uri).toBe("file:///workspace/B.java");
+    });
+  });
+
+  describe("createRestoreEchoSuppressor", () => {
+    it("suppresses the watcher echo of a just-restored path exactly once", () => {
+      const suppressor = createRestoreEchoSuppressor();
+      expect(suppressor.shouldSuppress("/workspace/A.java", 1000)).toBe(false);
+      suppressor.markRestored("/workspace/A.java", 1000);
+      expect(suppressor.shouldSuppress("/workspace/A.java", 1000)).toBe(true);
+      // The mark is consumed: a second echo for the same write reports.
+      expect(suppressor.shouldSuppress("/workspace/A.java", 1001)).toBe(false);
+    });
+
+    it("lets a genuinely later third-party change report normally", () => {
+      const suppressor = createRestoreEchoSuppressor();
+      suppressor.markRestored("/workspace/A.java", 1000);
+      expect(suppressor.shouldSuppress("/workspace/A.java", 1000 + RESTORE_ECHO_SUPPRESS_WINDOW_MS + 1)).toBe(false);
+    });
+
+    it("scopes marks per path and rejects clock skew", () => {
+      const suppressor = createRestoreEchoSuppressor();
+      suppressor.markRestored("/workspace/A.java", 2000);
+      expect(suppressor.shouldSuppress("/workspace/B.java", 2000)).toBe(false);
+      expect(suppressor.shouldSuppress("/workspace/A.java", 2000)).toBe(true);
+      // A pre-mark timestamp never matches; the failed check still consumes.
+      suppressor.markRestored("/workspace/C.java", 2000);
+      expect(suppressor.shouldSuppress("/workspace/C.java", 1999)).toBe(false);
+      expect(suppressor.shouldSuppress("/workspace/C.java", 2000)).toBe(false);
     });
   });
 });

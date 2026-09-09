@@ -413,6 +413,7 @@ import {
 } from "./workspace/refactorPlan";
 import {
   classifyRefactorRecoveryPreconditions,
+  createRestoreEchoSuppressor,
   executeRefactorRecovery,
 } from "./workspace/refactorRecoveryController";
 import { sha256Hex } from "./workspace/projectAnalysisModel";
@@ -2206,6 +2207,11 @@ export function CodeWorkspaceTab({
     throw new Error("Workspace resource history is not ready");
   });
   const replayWorkspaceEncodingRef = useRef<Map<string, { encoding: string; bom: boolean; eol?: "lf" | "crlf" | "cr" }> | null>(null);
+  // ED-AUDIT-014: comparison keys of closed-file paths just written by a
+  // refactor restore, so the file-watcher echo of our own write does not
+  // overwrite the "Refactor recovery complete" status with a misleading
+  // "File changed on disk" note. Only the status message is suppressed.
+  const restoreEchoSuppressorRef = useRef(createRestoreEchoSuppressor());
   // ED-AUDIT-008: set while a workspace-history restore replays through the
   // workspace-edit funnel. Open-buffer writes made inside that window are
   // recorded as "history-replay" mutations so the editor hosts treat the
@@ -6141,6 +6147,9 @@ export function CodeWorkspaceTab({
     });
     refreshTree();
     if (!file) {
+      // ED-AUDIT-014: a closed file we just restore-wrote echoes back
+      // through the watcher; skip only the misleading status note.
+      if (restoreEchoSuppressorRef.current.shouldSuppress(fsPathComparisonKey(normalizedPath))) return;
       setStatusMessage(`File changed on disk: ${change.path}`);
       return;
     }
@@ -9374,6 +9383,10 @@ export function CodeWorkspaceTab({
               ),
               { recordHistory: false },
             );
+            // ED-AUDIT-014: the watcher will echo this own-write back for
+            // closed files; mark it so the echo does not clobber the
+            // restore-complete status set after all writes settle.
+            restoreEchoSuppressorRef.current.markRestored(fsPathComparisonKey(targetPath));
           } finally {
             replayWorkspaceRestoreRef.current = false;
           }

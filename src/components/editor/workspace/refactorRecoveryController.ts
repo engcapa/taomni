@@ -166,3 +166,43 @@ export async function executeRefactorRecovery(
   execution.state = complete ? "rolled-back" : "pending";
   return execution;
 }
+
+/**
+ * ED-AUDIT-014 watcher-echo suppressor for restore-owned writes.
+ *
+ * Restoring a CLOSED file writes disk bytes the file watcher then reports
+ * back as an external change. Without suppression that echo overwrites the
+ * "Refactor recovery complete" status with a misleading "File changed on
+ * disk" note for a change the restore itself just made. The suppressor
+ * records comparison keys of just-restored paths; the shell skips only the
+ * STATUS message for a matching echo inside a short window (tree refresh
+ * and index invalidation still run). A genuinely later third-party change
+ * falls outside the window and is reported normally.
+ */
+export interface RestoreEchoSuppressor {
+  /** Record a successful restore-owned write of an already-keyed path. */
+  markRestored: (comparisonKey: string, now?: number) => void;
+  /**
+   * True when `comparisonKey` was restore-written within `windowMs`
+   * (consumes the mark so a second echo for the same write is not needed
+   * but a later real change still reports).
+   */
+  shouldSuppress: (comparisonKey: string, now?: number, windowMs?: number) => boolean;
+}
+
+export const RESTORE_ECHO_SUPPRESS_WINDOW_MS = 10_000;
+
+export function createRestoreEchoSuppressor(): RestoreEchoSuppressor {
+  const marks = new Map<string, number>();
+  return {
+    markRestored(comparisonKey: string, now: number = Date.now()) {
+      marks.set(comparisonKey, now);
+    },
+    shouldSuppress(comparisonKey: string, now: number = Date.now(), windowMs: number = RESTORE_ECHO_SUPPRESS_WINDOW_MS) {
+      const markedAt = marks.get(comparisonKey);
+      if (markedAt === undefined) return false;
+      marks.delete(comparisonKey);
+      return now - markedAt >= 0 && now - markedAt <= windowMs;
+    },
+  };
+}
