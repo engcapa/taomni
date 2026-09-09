@@ -1,0 +1,100 @@
+id: TC-IDE-AUDIT-016-cleanup-unavailable-native
+title: "Code Cleanup fail-closed on live JDT LS without a cleanup action"
+description: |
+  ED-AUDIT-016 native gate case for the unavailable branch. Crosses the real
+  packaged-app boundary on Linux with live Eclipse JDT LS 1.61.0, which
+  exposes no cleanup action kind (bundle + live probe verified: only
+  generate/organizeImports/overrideMethods/sortMembers). Code Cleanup is
+  invoked from Search Everywhere Actions on QuickFixTarget.java; the handler
+  discovers live (exact kind equality, never summary booleans), the
+  filtered request answers empty, and the handler reports no actions with
+  zero commits and no fake success. The disk hash of the target file is
+  unchanged.
+
+  The supported branch (real cleanup apply) is unprovable on this box for
+  lack of a capable provider; it is covered to the test-double model
+  boundary in unit/mounted tests and explicitly marked there. This case
+  proves the production fail-closed half on device.
+
+  Highest claim on green: L2 native + provider-backed (Linux) for the
+  unavailable path only. IDEA comparison (required kind) is recorded
+  separately as unrun on this box — no IDEA 2026.2.x.
+covers: [F25.5]
+tags: [code-workspace, ide-c8, cleanup, provider-fixture, native-gate, p1]
+modes: [native]
+fixtures: [reset_db, java_sample_projects, jdtls_required]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-gate-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  # Enter the real maven-single sample through persisted recents; WebDriver
+  # cannot operate the native folder picker opened by Add Folder.
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-audit016","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/QuickFixTarget.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "public class QuickFixTarget"
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: "Java"
+      timeout_sec: 60
+  # Cold-import settle: per-run fixture copies force a cold jdtls import;
+  # the live cleanup discovery needs the import done (014/015 precedent).
+  - wait: 30
+  # Provider readiness follows the 008 green precedent: place the caret
+  # inside the unresolved StringUtils token (1-based line 13, cols 29-39)
+  # and wait for the gutter lightbulb, which proves the provider published
+  # a semantic diagnostic for THIS file with a live round-trip. A codeAction
+  # request issued mid-import answers empty and would false-fail the
+  # fail-closed assert below.
+  - native_pointer_drag:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      from: {line: 13, column: 33}
+      to: {line: 13, column: 33}
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 13, Col 34"
+      timeout_sec: 10
+  - wait_for:
+      selector: '[data-testid="code-workspace-lightbulb"]'
+      timeout_sec: 60
+  # Production entry: Search Everywhere Actions -> Code Cleanup. The Actions
+  # tab is the 5th tab button; nth-child follows the C8-07 native precedent
+  # (role=tab queries do not resolve under the native driver). The filtered
+  # row is highlighted first; Enter runs it (no text= engine natively).
+  - press: Control+Shift+N
+  - wait_for:
+      selector: '[data-testid="code-workspace-search-everywhere"]'
+      timeout_sec: 30
+  - click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-child(5)'
+  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+  - type: Code Cleanup
+  - press: Enter
+  # Fail-closed proof: the discovery request filters by cleanup kinds
+  # only, so a healthy live server with no cleanup action answers an empty
+  # list (the 015 green run proves the same filter returns a real action
+  # when one exists). The lightbulb gate above rules out mid-import
+  # emptiness, making this a genuine absence proof with zero commits.
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Provider returned no actions"
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "boolean blank = StringUtils.isBlank"
+      timeout_sec: 10
+  - assert_file_sha256:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/QuickFixTarget.java"
+      equals: "f2de5c8ab98b58cf18ff998ebc47d19c127bb6f4290550d2827a40a37552e70a"
+      timeout_sec: 30
+  - screenshot: tc-ide-audit-016-cleanup-unavailable.png

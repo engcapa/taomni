@@ -771,3 +771,250 @@ export async function executeRearrangeTransaction(
   }
   return { ok: true, postHash: plan.expectedPostHashes[input.targetPath], operationCount: resolved.edits.length };
 }
+
+/**
+ * ED-AUDIT-016: production execute wiring for Code Cleanup.
+ * ---------------------------------------------------------------------------
+ * Mirrors the rearrange execute owner (ED-AUDIT-015): file scope with the
+ * default profile only; other scopes/profiles stay unavailable per spec.
+ */
+
+/**
+ * Provider action kinds that count as a dedicated batch-cleanup capability.
+ * Matched by exact kind equality only — never by summary booleans, title
+ * substring guessing, or relabeling format/organizeImports as cleanup.
+ * NOTE: Eclipse JDT LS 1.61 exposes no cleanup kind (bundle + live probe
+ * verified: only generate/organizeImports/overrideMethods/sortMembers), so
+ * this list matches nothing on this box today; the wiring below still
+ * performs the real request/resolve/plan/confirm/apply/post-verify chain
+ * for any provider that does advertise one of these kinds.
+ */
+export const CLEANUP_ACTION_KINDS: readonly string[] = [
+  "source.cleanup",
+  "source.fixAll",
+  "cleanup",
+];
+
+export function isCleanupActionKind(kind: string | null): boolean {
+  return kind !== null && CLEANUP_ACTION_KINDS.includes(kind);
+}
+
+export interface CleanupProviderAction {
+  kind: string | null;
+  title: string;
+  raw: unknown;
+}
+
+export type CleanupRequestState = "ok" | "stale" | "failed" | "cancelled";
+
+export interface CleanupRequestResult {
+  state: CleanupRequestState;
+  actions: readonly CleanupProviderAction[];
+  reason?: string;
+}
+
+export type CleanupResolveState = "resolved" | "failed" | "stale" | "unsupported";
+
+export interface CleanupResolveResult {
+  state: CleanupResolveState;
+  edits: readonly LspTextEdit[];
+  reason?: string;
+}
+
+export interface CleanupLiveDocument {
+  text: string;
+  revision: number;
+  readOnly: boolean;
+  dirty: boolean;
+}
+
+export interface CleanupPreviewSummary {
+  targetPath: string;
+  profileId: string;
+  operationCount: number;
+  preHashShort: string;
+  postHashShort: string;
+}
+
+export type CleanupApplyState = "applied" | "failed" | "conflict";
+
+export interface CleanupApplyResult {
+  state: CleanupApplyState;
+  postText?: string;
+  reason?: string;
+}
+
+export interface CleanupExecuteDeps {
+  requestActions(): Promise<CleanupRequestResult>;
+  resolveAction(action: CleanupProviderAction): Promise<CleanupResolveResult>;
+  readLive(): CleanupLiveDocument | null;
+  providerGeneration(): number;
+  confirmPreview(summary: CleanupPreviewSummary): Promise<boolean>;
+  applyEdit(edit: LspWorkspaceEdit): Promise<CleanupApplyResult>;
+}
+
+export interface CleanupExecuteInput {
+  scope: "file" | "directory" | "module" | "project";
+  targetPath: string;
+  targetUri: string;
+  readOnly: boolean;
+  profileId?: string;
+  capabilities: CleanupCapabilities;
+}
+
+export type CleanupExecuteResult =
+  | { ok: true; postHash: string; operationCount: number }
+  | { ok: false; reason: string; committed: false };
+
+/**
+ * ED-AUDIT-016 execute owner: zero-IO no-target/readonly/scope pre-gate ->
+ * freeze text -> request a dedicated cleanup action -> resolve to edits ->
+ * re-read live and plan with preview data -> precondition/freshness gates ->
+ * confirm gate -> canonical apply -> postcondition verify. Every early
+ * return commits nothing; only a post-hash-verified apply returns ok:true.
+ * Capability support is decided by live discovery (exact kind equality),
+ * never by advertised summaries — mirroring the rearrange owner, since no
+ * known provider advertises cleanup kinds.
+ */
+export async function executeCleanupTransaction(
+  deps: CleanupExecuteDeps,
+  input: CleanupExecuteInput,
+): Promise<CleanupExecuteResult> {
+  const fail = (reason: string): CleanupExecuteResult => ({ ok: false, reason, committed: false });
+
+  // 0. Zero-IO pre-gate: no target, readonly, or non-file scope/profile
+  // short-circuits without touching the provider. Scope is fixed to the
+  // current file with the default profile per spec; anything else stays
+  // unavailable with an exact reason instead of silently narrowing.
+  if (!input.targetPath) {
+    return fail("No target is selected for code cleanup");
+  }
+  if (input.readOnly) {
+    return fail(`${input.targetPath} is read-only and cannot be cleaned up`);
+  }
+  const profileId = input.profileId ?? "default";
+  if (input.scope !== "file") {
+    return fail(`Code Cleanup covers the current file only; ${input.scope} scope is unavailable`);
+  }
+  if (profileId !== "default") {
+    return fail(`Cleanup profile '${profileId}' is unavailable; only the default profile is supported`);
+  }
+
+  // 1. Freeze the live text. Same text-anchored (not revision-anchored)
+  // discipline as the rearrange owner.
+  const frozen = deps.readLive();
+  if (!frozen) {
+    return fail(`${input.targetPath} is no longer open; cleanup cancelled with zero effect`);
+  }
+  if (frozen.readOnly) {
+    return fail(`${input.targetPath} is read-only and cannot be cleaned up`);
+  }
+  const frozenGeneration = deps.providerGeneration();
+
+  // 2. Request dedicated provider actions (the request itself freezes identity).
+  const requested = await deps.requestActions();
+  if (requested.state !== "ok") {
+    return fail(requested.reason ?? `Cleanup request ${requested.state}; nothing applied`);
+  }
+
+  // 3. Resolve to a callable cleanup-kind action by exact kind equality.
+  const action = requested.actions.find((candidate) => isCleanupActionKind(candidate.kind)) ?? null;
+  if (!action) {
+    const seen = requested.actions
+      .map((candidate) => candidate.kind ?? "(no kind)")
+      .slice(0, 3)
+      .join(", ");
+    return fail(
+      seen
+        ? `Provider returned no cleanup action (received kinds: ${seen}). Code Cleanup requires a dedicated batch cleanup provider; nothing applied.`
+        : "Provider returned no actions. Code Cleanup requires a dedicated batch cleanup provider; nothing applied.",
+    );
+  }
+
+  // 4. Resolve the action to concrete edits.
+  const resolved = await deps.resolveAction(action);
+  if (resolved.state !== "resolved") {
+    return fail(resolved.reason ?? `Cleanup resolve ${resolved.state}; nothing applied`);
+  }
+  if (resolved.edits.length === 0) {
+    return fail(`Provider action '${action.title}' carried no edits; nothing applied`);
+  }
+
+  // 5. Re-read live and build the plan from post-resolve bytes.
+  const planLive = deps.readLive();
+  if (!planLive) {
+    return fail(`${input.targetPath} is no longer open; cleanup cancelled with zero effect`);
+  }
+  if (planLive.readOnly) {
+    return fail(`${input.targetPath} is read-only and cannot be cleaned up`);
+  }
+  const plan = buildCleanupPlan({
+    scope: "file",
+    targetPath: input.targetPath,
+    targetUri: input.targetUri,
+    currentText: planLive.text,
+    documentRevision: undefined,
+    readOnly: planLive.readOnly,
+    profileId,
+    provider: input.capabilities.providerId
+      ? { id: input.capabilities.providerId, version: input.capabilities.providerVersion }
+      : { id: "provider" },
+    edits: resolved.edits,
+    isDirty: planLive.dirty,
+  });
+  if (plan.conflicts.length > 0) {
+    return fail(plan.conflicts[0].message);
+  }
+  const live = deps.readLive();
+  if (!live) {
+    return fail(`${input.targetPath} is no longer open; cleanup cancelled with zero effect`);
+  }
+  const preconditions = verifyWorkflowPreconditions(plan, {
+    [input.targetPath]: { text: live.text, readOnly: live.readOnly },
+    [input.targetUri]: { text: live.text, readOnly: live.readOnly },
+  });
+  if (!preconditions.ok) {
+    return fail(preconditions.conflict?.message ?? `${input.targetPath} changed since plan generation; nothing applied`);
+  }
+  const freshness = verifyWorkflowFreshness(
+    { providerGeneration: frozenGeneration },
+    { providerGeneration: deps.providerGeneration() },
+  );
+  if (!freshness.ok) {
+    return fail(`Cleanup became stale: ${freshness.staleReason}; request it again`);
+  }
+
+  // 6. Preview confirm gate: cancel commits nothing. An empty edit is a
+  // no-change fact, reported without claiming fixes were applied.
+  const preHash = plan.preconditions[0]?.preTextSha256 ?? sha256Hex(frozen.text);
+  const postHash = plan.expectedPostHashes[input.targetPath] ?? "";
+  if (preHash === postHash) {
+    return fail("Cleanup produced no changes; nothing applied");
+  }
+  const confirmed = await deps.confirmPreview({
+    targetPath: input.targetPath,
+    profileId,
+    operationCount: resolved.edits.length,
+    preHashShort: preHash.slice(0, 12),
+    postHashShort: postHash.slice(0, 12),
+  });
+  if (!confirmed) {
+    cancelWorkflowPlan(plan);
+    return fail("Cleanup cancelled before applying; nothing changed");
+  }
+
+  // 7. Canonical apply, then postcondition verification against real bytes.
+  const applied = await deps.applyEdit(plan.edit);
+  if (applied.state !== "applied" || applied.postText === undefined) {
+    return fail(applied.reason ?? "Cleanup apply failed; see the workspace-edit ledger");
+  }
+  const post = verifyWorkflowPostHashes(plan.expectedPostHashes, {
+    [input.targetPath]: applied.postText,
+  });
+  if (!post.ok) {
+    return fail(
+      `Cleanup postcondition failed on ${post.mismatchedFiles.join(", ")}; applied effects are listed for recovery. Undo was not registered.`,
+    );
+  }
+  return { ok: true, postHash: plan.expectedPostHashes[input.targetPath], operationCount: resolved.edits.length };
+}

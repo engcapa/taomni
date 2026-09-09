@@ -3,6 +3,7 @@ import {
   buildCleanupPlan,
   buildRearrangePlan,
   cancelWorkflowPlan,
+  executeCleanupTransaction,
   executeRearrangeTransaction,
   planCleanup,
   planRearrange,
@@ -11,6 +12,7 @@ import {
   verifyWorkflowFreshness,
   verifyWorkflowPostHashes,
   verifyWorkflowPreconditions,
+  type CleanupExecuteDeps,
   type CleanupInput,
   type RearrangeExecuteDeps,
   type RearrangeInput,
@@ -629,5 +631,144 @@ describe("ED-AUDIT-015: executeRearrangeTransaction supported-branch wiring (mod
     const result = await executeRearrangeTransaction(deps, baseInput());
     expect(result.ok).toBe(false);
     expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+});
+
+describe("ED-AUDIT-016: executeCleanupTransaction supported-branch wiring (model boundary)", () => {
+  const PRE = "package com.example;\n\npublic class Service {\n    public void beta() {}\n    public void alpha() {}\n}\n";
+  const POST = "package com.example;\n\npublic class Service {\n    public void alpha() {}\n    public void beta() {}\n}\n";
+  const CLEANUP_EDITS = [
+    {
+      range: { start: { line: 3, character: 0 }, end: { line: 4, character: 26 } },
+      newText: "    public void alpha() {}\n    public void beta() {}",
+    },
+  ];
+
+  function liveDoc(text: string = PRE, revision = 7) {
+    return { text, revision, readOnly: false, dirty: false };
+  }
+
+  function baseDeps(overrides: Partial<CleanupExecuteDeps> = {}): CleanupExecuteDeps {
+    return {
+      requestActions: vi.fn(async () => ({
+        state: "ok" as const,
+        actions: [{ kind: "source.cleanup", title: "Clean up", raw: { id: 1 } }],
+      })),
+      resolveAction: vi.fn(async () => ({
+        state: "resolved" as const,
+        edits: [...CLEANUP_EDITS],
+      })),
+      readLive: vi.fn(() => liveDoc()),
+      providerGeneration: vi.fn(() => 3),
+      confirmPreview: vi.fn(async () => true),
+      applyEdit: vi.fn(async () => ({ state: "applied" as const, postText: POST })),
+      ...overrides,
+    };
+  }
+
+  function baseInput() {
+    return {
+      scope: "file" as const,
+      targetPath: "src/Service.java",
+      targetUri: "file:///repo/src/Service.java",
+      readOnly: false,
+      capabilities: { cleanupSupported: true, providerId: "test-cleanup", providerVersion: "0" },
+    };
+  }
+
+  it("applies one verified transaction on the supported path", async () => {
+    const deps = baseDeps();
+    const result = await executeCleanupTransaction(deps, baseInput());
+    expect(result).toEqual({ ok: true, postHash: sha256Hex(POST), operationCount: 1 });
+    expect(deps.applyEdit).toHaveBeenCalledTimes(1);
+    expect(deps.confirmPreview).toHaveBeenCalledTimes(1);
+  });
+
+  it("short-circuits missing target, readonly, scope, and profile with zero IO", async () => {
+    const deps = baseDeps();
+    expect((await executeCleanupTransaction(deps, { ...baseInput(), targetPath: null as unknown as string })).ok).toBe(false);
+    expect((await executeCleanupTransaction(baseDeps(), { ...baseInput(), readOnly: true })).ok).toBe(false);
+    expect((await executeCleanupTransaction(baseDeps(), { ...baseInput(), scope: "project" as const })).ok).toBe(false);
+    expect((await executeCleanupTransaction(baseDeps(), { ...baseInput(), profileId: "full-cleanup" })).ok).toBe(false);
+    expect(deps.requestActions).not.toHaveBeenCalled();
+  });
+
+  it("discovers cleanup kinds live despite unsupported advertised caps", async () => {
+    const deps = baseDeps();
+    const result = await executeCleanupTransaction(deps, {
+      ...baseInput(),
+      capabilities: { cleanupSupported: false, providerId: "Eclipse JDT Language Server" },
+    });
+    expect(result).toEqual({ ok: true, postHash: sha256Hex(POST), operationCount: 1 });
+    expect(deps.requestActions).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses when the provider returns no cleanup-kind action", async () => {
+    const deps = baseDeps({
+      requestActions: vi.fn(async () => ({
+        state: "ok" as const,
+        actions: [{ kind: "source.organizeImports", title: "Organize imports", raw: {} }],
+      })),
+    });
+    const result = await executeCleanupTransaction(deps, baseInput());
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.committed).toBe(false);
+      expect(result.reason).toContain("no cleanup action");
+    }
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("refuses resolve failures and empty edits with zero commits", async () => {
+    const failed = baseDeps({
+      resolveAction: vi.fn(async () => ({ state: "failed" as const, edits: [], reason: "boom" })),
+    });
+    expect((await executeCleanupTransaction(failed, baseInput())).ok).toBe(false);
+    const empty = baseDeps({
+      resolveAction: vi.fn(async () => ({ state: "resolved" as const, edits: [] })),
+    });
+    expect((await executeCleanupTransaction(empty, baseInput())).ok).toBe(false);
+    expect(failed.applyEdit).not.toHaveBeenCalled();
+    expect(empty.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("reports no-change without claiming fixes", async () => {
+    const deps = baseDeps({
+      resolveAction: vi.fn(async () => ({
+        state: "resolved" as const,
+        edits: [{ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }, newText: "" }],
+      })),
+    });
+    const result = await executeCleanupTransaction(deps, baseInput());
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toContain("no changes");
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+    expect(deps.confirmPreview).not.toHaveBeenCalled();
+  });
+
+  it("cancels at the preview gate with zero commits", async () => {
+    const deps = baseDeps({ confirmPreview: vi.fn(async () => false) });
+    const result = await executeCleanupTransaction(deps, baseInput());
+    expect(result.ok).toBe(false);
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("refuses dirty-buffer conflicts and stale generations with zero commits", async () => {
+    const dirty = baseDeps({ readLive: vi.fn(() => ({ ...liveDoc(), dirty: true })) });
+    expect((await executeCleanupTransaction(dirty, baseInput())).ok).toBe(false);
+    expect(dirty.applyEdit).not.toHaveBeenCalled();
+
+    let generation = 3;
+    const stale = baseDeps({
+      providerGeneration: vi.fn(() => generation),
+      // Flip the generation mid-flight (during resolve, before the
+      // freshness gate): the frozen generation no longer matches live.
+      resolveAction: vi.fn(async () => {
+        generation = 9;
+        return { state: "resolved" as const, edits: [...CLEANUP_EDITS] };
+      }),
+    });
+    expect((await executeCleanupTransaction(stale, baseInput())).ok).toBe(false);
+    expect(stale.applyEdit).not.toHaveBeenCalled();
   });
 });

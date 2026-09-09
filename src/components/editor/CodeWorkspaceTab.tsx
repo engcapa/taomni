@@ -1115,10 +1115,11 @@ import {
   planWorkspaceRestore,
 } from "./workspace/workspaceRestoreModel";
 import {
-  planCleanup,
   resolveCleanupCapabilities,
   resolveRearrangeCapabilities,
+  executeCleanupTransaction,
   executeRearrangeTransaction,
+  CLEANUP_ACTION_KINDS,
   REARRANGE_ACTION_KINDS,
 } from "./workspace/rearrangeCleanupWorkflow";
 
@@ -11868,6 +11869,135 @@ export function CodeWorkspaceTab({
     workspaceResourceOperationLocked,
   ]);
 
+  // ED-AUDIT-016: production execute owner for Code Cleanup. The fake
+  // success stub is gone: the file-scope default-profile branch performs a
+  // real request or a real typed failure, mirroring the rearrange owner.
+  const runCleanupExecute = useCallback(async (file: OpenFileState): Promise<boolean> => {
+    const frozenKey = file.key;
+    const frozenInstanceId = workspaceInstanceId;
+    const targetPath = absolutePathForOpenFile(file) ?? file.path ?? file.key;
+    const descriptor = lspDescriptorForFile(file);
+    if (!descriptor) {
+      const message = `Cannot resolve the language server for ${file.title ?? frozenKey}`;
+      setStatusMessage(message);
+      return false;
+    }
+    const targetUri = descriptor.documentUri ?? descriptor.filePath ?? frozenKey;
+    const result = await executeCleanupTransaction(
+      {
+        requestActions: async () => {
+          const live = openFilesRef.current[frozenKey];
+          if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
+            return {
+              state: "cancelled",
+              actions: [],
+              reason: "Cleanup cancelled: the file closed or the workspace changed; nothing applied",
+            };
+          }
+          const lines = live.text.split("\n");
+          const range: LspRange = {
+            start: { line: 0, character: 0 },
+            end: {
+              line: Math.max(0, lines.length - 1),
+              character: lines.length > 0 ? lines[lines.length - 1].length : 0,
+            },
+          };
+          const res = await requestCodeActions(live, range, [], [...CLEANUP_ACTION_KINDS]);
+          if (res.requestFailure) {
+            return {
+              state: res.requestFailure.kind === "stale" ? "stale" : "failed",
+              actions: [],
+              reason: res.requestFailure.message,
+            };
+          }
+          return {
+            state: "ok",
+            actions: res.actions.map((action) => ({ kind: action.kind, title: action.title, raw: action.raw })),
+          };
+        },
+        resolveAction: async (action) => {
+          const live = openFilesRef.current[frozenKey];
+          if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
+            return { state: "stale", edits: [], reason: "Cleanup cancelled: the file closed during resolve; nothing applied" };
+          }
+          try {
+            const resolved = await lspCodeActionResolve(descriptor, action.raw);
+            const edits = (resolved.action?.edit?.documentEdits ?? [])
+              .filter((entry) => entry.uri === targetUri || (entry.path != null && fsPathEquals(entry.path, targetPath)))
+              .flatMap((entry) => entry.edits);
+            if (!resolved.action || edits.length === 0) {
+              return {
+                state: "unsupported",
+                edits: [],
+                reason: `Provider action '${action.title}' carried no usable edit for ${targetPath}; nothing applied`,
+              };
+            }
+            return { state: "resolved", edits };
+          } catch (err) {
+            return { state: "failed", edits: [], reason: `Cleanup resolve failed: ${errorMessage(err)}; nothing applied` };
+          }
+        },
+        readLive: () => {
+          const live = openFilesRef.current[frozenKey];
+          if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) return null;
+          return {
+            text: live.text,
+            revision: live.documentRevision,
+            readOnly: !!live.library || workspaceResourceOperationLocked,
+            dirty: !!live.dirty,
+          };
+        },
+        providerGeneration: () => lspSessionGeneration(),
+        confirmPreview: (summary) => confirmAppDialog({
+          title: "Code cleanup preview",
+          message: `${summary.targetPath} [${summary.profileId}]: ${summary.operationCount} edits. Pre ${summary.preHashShort} → post ${summary.postHashShort}. Apply the cleanup?`,
+          confirmLabel: "Apply cleanup",
+        }),
+        applyEdit: async (edit) => {
+          try {
+            const outcomes = await applyLspWorkspaceEdit(edit, { recordHistory: true, label: "Code Cleanup" });
+            const response = workspaceEditApplyResponse(outcomes);
+            if (!response.applied) {
+              return { state: "failed", reason: response.failureReason ?? "Cleanup apply failed; see the workspace-edit ledger" };
+            }
+            const live = openFilesRef.current[frozenKey];
+            if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
+              return { state: "conflict", reason: `${targetPath} closed during apply; verify the disk state before retrying` };
+            }
+            return { state: "applied", postText: live.text };
+          } catch (err) {
+            return { state: "failed", reason: `Cleanup apply failed: ${errorMessage(err)}` };
+          }
+        },
+      },
+      {
+        scope: "file",
+        targetPath,
+        targetUri,
+        readOnly: !!file.library || workspaceResourceOperationLocked,
+        capabilities: resolveCleanupCapabilities(activeCapabilities, activeLspState?.status),
+      },
+    );
+    if (result.ok) {
+      setStatusMessage(
+        `Cleaned up ${file.title ?? targetPath} (${result.operationCount} edits in one transaction); undo restores the preimage`,
+      );
+      return true;
+    }
+    setStatusMessage(result.reason);
+    return false;
+  }, [
+    absolutePathForOpenFile,
+    activeCapabilities,
+    activeLspState,
+    applyLspWorkspaceEdit,
+    lspDescriptorForFile,
+    lspSessionGeneration,
+    requestCodeActions,
+    workspaceInstanceId,
+    workspaceResourceOperationLocked,
+  ]);
+
   const workspaceCommands = useMemo<WorkspaceCommand[]>(() => [
     {
       id: "editor.completeStatement",
@@ -12410,25 +12540,7 @@ export function CodeWorkspaceTab({
       when: () => !!activeFile,
       run: () => {
         if (!activeFile) return;
-        const capabilities = resolveCleanupCapabilities(
-          activeCapabilities,
-          activeLspState?.status,
-        );
-        const decision = planCleanup({
-          scope: "file",
-          targetPath: activeFile.path ?? activeFile.key,
-          languageId: activeLanguageId,
-          readOnly: !!activeFile.library || workspaceResourceOperationLocked,
-          capabilities,
-        });
-        if (decision.kind === "unavailable") {
-          setStatusMessage(decision.reason);
-          return false;
-        }
-        setStatusMessage(
-          `Executing code cleanup for ${activeFile.title ?? activeFile.path ?? "active file"} (${decision.profileId}, ${decision.provider?.id ?? "provider"})`,
-        );
-        return true;
+        return runCleanupExecute(activeFile);
       },
     },
     {

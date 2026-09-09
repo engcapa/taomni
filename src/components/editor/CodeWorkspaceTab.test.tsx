@@ -6895,17 +6895,18 @@ describe("CodeWorkspaceTab", () => {
     expect(registrationRef.current?.items.find((item) => item.id === "workspace.recompileActiveFile")?.enabled).toBe(true);
 
     // 9. ED-STYLE-002: Rearrange Code & Code Cleanup fail-closed with honest unavailable reasons
+    // (live discovery: the mock provider returns no arrangement/cleanup kinds).
     expect(registrationRef.current?.items.find((item) => item.id === "workspace.rearrangeCode")?.enabled).toBe(true);
     await act(async () => {
       registrationRef.current?.execute("workspace.rearrangeCode");
     });
-    expect(useAppStore.getState().statusMessage).toContain("does not support member-rearrangement for csharp");
+    expect(useAppStore.getState().statusMessage).toContain("Provider returned no rearrange action");
 
     expect(registrationRef.current?.items.find((item) => item.id === "workspace.codeCleanup")?.enabled).toBe(true);
     await act(async () => {
       registrationRef.current?.execute("workspace.codeCleanup");
     });
-    expect(useAppStore.getState().statusMessage).toContain("does not support code cleanup for csharp");
+    expect(useAppStore.getState().statusMessage).toContain("Provider returned no cleanup action");
   });
 
   it("routes every common semantic navigation command through the provider host", async () => {
@@ -9316,6 +9317,183 @@ end_of_record
       });
       await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("cancelled"));
       expect(fileText("instance-rearrange-cancel")).toBe(SERVICE_PRE);
+      expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("ED-AUDIT-016 cleanup execute wiring (mounted, model boundary for the supported path)", () => {
+    const SERVICE_PRE = "package com.example;\n\npublic class Service {\n    public void beta() {}\n    public void alpha() {}\n}\n";
+    const SERVICE_POST = "package com.example;\n\npublic class Service {\n    public void alpha() {}\n    public void beta() {}\n}\n";
+    const CLEANUP_EDIT = {
+      range: { start: { line: 3, character: 0 }, end: { line: 4, character: 26 } },
+      newText: "    public void alpha() {}\n    public void beta() {}",
+    };
+
+    function cleanupWorkspace(instance: string): CodeWorkspaceTabInfo {
+      return {
+        repoRoot: "/repo/app",
+        workspaceId: "ws-cleanup",
+        workspaceInstanceId: instance,
+        name: "Cleanup",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: "src/Service.java" },
+      };
+    }
+
+    function mockCleanupServer(codeActionKinds: string[]) {
+      workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+      workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/Service.java", SERVICE_PRE));
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _rootPath: string,
+        path: string,
+        text: string,
+      ) => writeAck(file(path, text, { hash: `hash-${text}` })));
+      lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+        path: "/repo/app/src/Service.java",
+        uri: "file:///repo/app/src/Service.java",
+        presetId: "jdtls",
+        languageId: "java",
+        displayName: "Eclipse JDT Language Server",
+        available: true,
+        active: true,
+        capabilities: defaultCapabilities({ codeAction: true, codeActionKinds }),
+      }));
+    }
+
+    function fileText(instance: string): string | undefined {
+      return selectCodeWorkspaceUi(
+        useCodeWorkspaceStore.getState(),
+        instance,
+      ).openFiles["root:app:src/Service.java"]?.text;
+    }
+
+    it("reports honest unavailable via live discovery when cleanup is unadvertised", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockCleanupServer(["quickfix", "source.organizeImports"]);
+      vi.mocked(confirmAppDialog).mockClear();
+      lspMocks.lspCodeActions.mockClear();
+      lspMocks.lspCodeActions.mockResolvedValue({
+        status: documentStatus({ available: true, active: true }),
+        actions: [
+          { title: "Organize imports", kind: "source.organizeImports", raw: {} },
+        ],
+      });
+
+      renderWorkspace(cleanupWorkspace("instance-cleanup-unavail"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.codeCleanup");
+      });
+      // Advertised summaries never arbitrate: live discovery finds no
+      // cleanup-kind action and reports the received kinds, zero commits.
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Provider returned no cleanup action"));
+      expect(fileText("instance-cleanup-unavail")).toBe(SERVICE_PRE);
+      expect(lspMocks.lspCodeActions).toHaveBeenCalled();
+      expect(confirmAppDialog).not.toHaveBeenCalled();
+    });
+
+    it("commits one verified transaction from the action entry on the supported path", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockCleanupServer(["source.cleanup"]);
+      vi.mocked(confirmAppDialog).mockClear();
+      vi.mocked(confirmAppDialog).mockResolvedValue(true);
+      const cleanupAction = {
+        title: "Clean up",
+        kind: "source.cleanup",
+        isPreferred: true,
+        edit: null,
+        command: null,
+        commandArguments: null,
+        raw: { title: "Clean up" },
+      };
+      lspMocks.lspCodeActions.mockResolvedValue({
+        status: documentStatus({ available: true, active: true }),
+        actions: [cleanupAction],
+      });
+      lspMocks.lspCodeActionResolve.mockResolvedValue({
+        status: documentStatus({ available: true, active: true }),
+        action: {
+          ...cleanupAction,
+          edit: {
+            documentEdits: [{
+              uri: "file:///repo/app/src/Service.java",
+              path: "/repo/app/src/Service.java",
+              edits: [CLEANUP_EDIT],
+            }],
+          },
+        },
+      });
+
+      renderWorkspace(cleanupWorkspace("instance-cleanup-apply"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.codeCleanup");
+      });
+      await waitFor(() => expect(confirmAppDialog).toHaveBeenCalledWith(expect.objectContaining({
+        title: "Code cleanup preview",
+      })));
+      await waitFor(() => expect(fileText("instance-cleanup-apply")).toBe(SERVICE_POST));
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Cleaned up"));
+      // Test-double provider: this proves the handler wiring (request ->
+      // resolve -> plan -> confirm -> apply -> post-verify), not a live
+      // capable provider.
+    });
+
+    it("cancels at the preview gate with zero commits", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockCleanupServer(["source.cleanup"]);
+      vi.mocked(confirmAppDialog).mockClear();
+      vi.mocked(confirmAppDialog).mockResolvedValue(false);
+      const cleanupAction = {
+        title: "Clean up",
+        kind: "source.cleanup",
+        isPreferred: true,
+        edit: null,
+        command: null,
+        commandArguments: null,
+        raw: { title: "Clean up" },
+      };
+      lspMocks.lspCodeActions.mockResolvedValue({
+        status: documentStatus({ available: true, active: true }),
+        actions: [cleanupAction],
+      });
+      lspMocks.lspCodeActionResolve.mockResolvedValue({
+        status: documentStatus({ available: true, active: true }),
+        action: {
+          ...cleanupAction,
+          edit: {
+            documentEdits: [{
+              uri: "file:///repo/app/src/Service.java",
+              path: "/repo/app/src/Service.java",
+              edits: [CLEANUP_EDIT],
+            }],
+          },
+        },
+      });
+
+      renderWorkspace(cleanupWorkspace("instance-cleanup-cancel"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.codeCleanup");
+      });
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("cancelled"));
+      expect(fileText("instance-cleanup-cancel")).toBe(SERVICE_PRE);
       expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
     });
   });
