@@ -675,6 +675,21 @@ function gitWorkspaceRootsKey(roots: readonly GitWorkspaceRootInfo[]): string {
   return roots.map((root) => root.repoRoot).sort((a, b) => a.localeCompare(b)).join("\n");
 }
 
+/**
+ * Layout snapshots belong to a workspace definition across close/reopen and
+ * app restart. A duplicated live tab supplies its own instance id; normal
+ * opens use the stable definition id before falling back to the computed
+ * roots/files identity.
+ */
+export function resolveCodeWorkspaceInstanceId(
+  workspace: Pick<CodeWorkspaceTabInfo, "workspaceInstanceId" | "workspaceId">,
+  definitionIdentity: string,
+): string {
+  return workspace.workspaceInstanceId?.trim()
+    || workspace.workspaceId?.trim()
+    || definitionIdentity;
+}
+
 export function MainLayout() {
   const t = useT();
   const {
@@ -2184,7 +2199,7 @@ export function MainLayout() {
       codeWorkspace: {
         ...workspace,
         workspaceId: workspace.workspaceId ?? identity,
-        workspaceInstanceId: workspace.workspaceInstanceId ?? newWorkspaceInstanceId(),
+        workspaceInstanceId: resolveCodeWorkspaceInstanceId(workspace, identity),
         name: title,
       },
     });

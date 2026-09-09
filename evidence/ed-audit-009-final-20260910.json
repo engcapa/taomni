@@ -1,0 +1,97 @@
+{
+  "verified_at": "2026-09-09T19:31:00Z",
+  "head": "17cefdb6b58336f7992c97872d119820f86de921",
+  "checks": [
+    {
+      "kind": "code-audit",
+      "command": "Inspection: MainLayout recent-workspace identity -> CodeWorkspaceTab workspaceInstanceId -> workspaceDocumentTransactionOwner canonical fileKey/history and CodeMirrorHost per-leaf view lease -> workspaceLayoutPersistence snapshot -> close/reopen cleanup and restart restore",
+      "result": "passed",
+      "summary": "Current production tracing confirms stable workspace definition identity is reused for recent-workspace reopen while duplicate live tabs retain unique runtime instances; one document owner carries shared text, revision, undo and redo, each leaf retains independent selection/scroll/fold state, dirty last-leaf cancel has zero effect, failed cleanup/save paths remain observable, closed-leaf cleanup is stale-safe, and the existing v2 layout snapshot restores the split tree and file view after restart.",
+      "acceptance": [
+        "ED-AUDIT-009-A1",
+        "ED-AUDIT-009-A2",
+        "ED-AUDIT-009-A3"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/layouts/MainLayout.test.tsx src/components/editor/workspace/workspaceLayoutPersistence.test.ts src/components/editor/workspace/workspaceTabPolicy.test.ts src/components/editor/workspace/workspaceTabPolicyV3.test.ts src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts src/components/editor/workspace/EditorGroup.test.tsx src/components/editor/workspace/CodeMirrorHost.test.tsx --maxWorkers=1",
+      "result": "passed",
+      "summary": "7 test files passed; 139/139 tests passed. Covers stable recent-workspace identity, old snapshot defaults and orphan filtering, recursive split and tab policy invariants, shared document undo/redo, mounted editor routing and per-leaf view behavior.",
+      "acceptance": [
+        "ED-AUDIT-009-A1",
+        "ED-AUDIT-009-A2",
+        "ED-AUDIT-009-A3"
+      ]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/layouts/MainLayout.tsx --path src/layouts/MainLayout.test.tsx --path src/components/editor/CodeWorkspaceTab.tsx --path src/components/editor/CodeWorkspaceTab.test.tsx --path src/components/editor/workspace/CodeMirrorHost.tsx --path src/components/editor/workspace/CodeMirrorHost.test.tsx --path src/components/editor/workspace/EditorGroup.tsx --path src/components/editor/workspace/EditorGroup.test.tsx --path src/components/editor/workspace/workspaceLayoutPersistence.ts --path src/components/editor/workspace/workspaceLayoutPersistence.test.ts --path src/components/editor/workspace/workspaceTabPolicy.ts --path src/components/editor/workspace/workspaceTabPolicy.test.ts --path src/components/editor/workspace/workspaceTabPolicyV3.ts --path src/components/editor/workspace/workspaceTabPolicyV3.test.ts --path src/components/editor/workspace/workspaceDocumentTransactionOwner.ts --path src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts --json",
+      "result": "passed",
+      "summary": "All 16 ED009-owned TypeScript paths were checked; scoped_errors=0 and external_errors=0 across 0 files.",
+      "acceptance": [
+        "ED-AUDIT-009-A3"
+      ]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C4-01,TC-IDE-C4-02 --report-dir qa-ui-auto-report/ed-audit-009-browser-current-20260910 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "Initial current-source browser attempt run-20260910-032753-537181900 selected 2 but both failed at welcome-panel startup because the reused port-5000 preview served a stale bundle with a React metadata error; no ED009 action ran.",
+      "acceptance": []
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C4-01,TC-IDE-C4-02 --report-dir qa-ui-auto-report/ed-audit-009-browser-current-20260910 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Current rebuilt browser run-20260910-033041-771612400 on the Windows runtime selected 2 and passed 2 with 0 failures and 0 skips. TC-IDE-C4-01 covered tab-policy lifecycle, dirty confirmation and receipt state; TC-IDE-C4-02 covered three-leaf split and structured close/reopen. identity_stable=true; source_sha256=179c40fc76d34d856935b02858761aa49e34b22c513cb8563cceb9b9b82b59b4; runner_sha256=6e3e74caf26ed9090af07624d1cbedd6ae066224f3c6beee815aa05239cacaf9; case_sha256 values=67269433ea5a7d42b0c0b652acfac6abe86a336455991c6e10b5891046a9975a,f955ca59106c958b4b765c872162fa1f7fc1f8ff13f61f8004c1095624bcbbe7; summary_sha256=b4cf12326c84f4c1c5dc8ba3549f479ac907b28345c2c5ec008e51124d5f67d6; receipt_sha256=5414589f61a3ff75034cef308cc54d72680f144b5ac3c7cf31591164cafa35c0.",
+      "acceptance": [
+        "ED-AUDIT-009-A1",
+        "ED-AUDIT-009-A2"
+      ]
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED009-split-reopen-native --workers 1 --report-dir qa-ui-auto-report/ed-audit-009-native-current-20260910 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "Chronological native retries retained: run-20260910-030732-575152100 failed because the Windows WebDriver rejected an unsupported nth=0 selector; run-20260910-030939-904761500 failed before redo because the primary editor had lost DOM focus.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED009-split-reopen-native --workers 1 --report-dir qa-ui-auto-report/ed-audit-009-native-current-20260910 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "run-20260910-031329-175818500 reached shared editing, undo and close-cancel, then failed because the save shortcut target lacked DOM focus; run-20260910-031420-844246200 reached the real save and host-file assertion, then exposed that the production save observation contract is saved rather than clean.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED009-split-reopen-native --workers 1 --report-dir qa-ui-auto-report/ed-audit-009-native-current-20260910 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "run-20260910-031527-476744500 and run-20260910-031827-215981300 reached the pre-restart two-leaf flow but the test's storage enumeration predicate was invalid for the WebView localStorage surface; run-20260910-032242-134387700 reached native_restart_app and failed only because the Welcome workspaces tab click was intercepted during layout settling.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED009-split-reopen-native --workers 1 --report-dir qa-ui-auto-report/ed-audit-009-native-current-20260910 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Final run-20260910-032440-299620100 was an actual Windows packaged run: 1 selected, 1 passed, 0 failed, 0 skipped, identity_stable=true, QA application com.taomni.app.qa, source_sha256=179c40fc76d34d856935b02858761aa49e34b22c513cb8563cceb9b9b82b59b4, binary_sha256=55c6a13b48d975b3b5b9b163f17638b896b63b297bd287237c54280c7fae5042. The case opened a real host file, verified shared text and undo/redo in two leaves, closed a non-final leaf, cancelled the final dirty close without effect, saved and re-read host bytes, restarted the packaged app, restored the split snapshot and content, then closed and reopened the file.",
+      "acceptance": [
+        "ED-AUDIT-009-A1",
+        "ED-AUDIT-009-A2",
+        "ED-AUDIT-009-A3"
+      ]
+    }
+  ],
+  "unrun": [
+    "native Linux: no qualifying Tauri/WebKitGTK desktop runtime was available on the current Windows runtime; no Linux result is inferred.",
+    "native macOS: no qualifying WKWebView QA bundle or macOS manual run was available on the current Windows runtime; no macOS result is inferred.",
+    "idea-comparison: no IntelliJ IDEA 2026.2.x runtime was available; comparison is optional for this card and no behavior delta is claimed."
+  ],
+  "notes": [
+    "Verification was performed against the claimed baseline HEAD 17cefdb6b58336f7992c97872d119820f86de921 plus this card's uncommitted production, test and case changes.",
+    "The browser stale-bundle failure and all native retry failures are retained chronologically in the report directory and represented above; the final checks use the rebuilt/current source identity.",
+    "The backlog platform rule is expressed as current runtime environment; this evidence does not hard-code Windows 11 and does not generalize the Windows result to other operating systems.",
+    "Capability ceiling: current runtime L2 split/shared-history and close/reopen behavior with packaged host-file persistence; IDEA comparison and other OS native behavior remain unverified."
+  ]
+}

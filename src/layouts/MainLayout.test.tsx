@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { forwardRef, useEffect, useImperativeHandle } from "react";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
-import { MainLayout } from "./MainLayout";
+import { MainLayout, resolveCodeWorkspaceInstanceId } from "./MainLayout";
 import { useAppStore } from "../stores/appStore";
 import { useSessionStore } from "../stores/sessionStore";
 import { commitWelcomeRunSnapshot, exitApp, listSessions, markSessionConnected, writeTerminal, type SessionConfig } from "../lib/ipc";
@@ -486,6 +486,18 @@ describe("MainLayout attached SFTP sidebar", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  it("reuses a stable workspace identity when reopening a recent workspace", () => {
+    expect(resolveCodeWorkspaceInstanceId({ workspaceId: "workspace-definition" }, "calculated-definition")).toBe(
+      "workspace-definition",
+    );
+    expect(resolveCodeWorkspaceInstanceId({ workspaceInstanceId: "workspace-instance-live", workspaceId: "workspace-definition" }, "calculated-definition")).toBe(
+      "workspace-instance-live",
+    );
+    expect(resolveCodeWorkspaceInstanceId({ workspaceId: "  " }, "calculated-definition")).toBe(
+      "calculated-definition",
+    );
   });
 
   it("opens the attached SFTP sidebar without remounting the terminal", () => {

@@ -1,0 +1,199 @@
+id: TC-IDE-ED009-split-reopen-native
+title: "Native split shared history, dirty close cancel, and restart restore"
+description: |
+  ED-AUDIT-009 packaged native slice. Opens a real host file from the isolated
+  workspace_root fixture, edits the same document through two editor leaves,
+  verifies shared text/history and independent leaf ownership, closes a
+  non-final leaf, cancels the final dirty close with zero effect, saves the
+  real file, then restarts the packaged app and reopens the recent workspace.
+  The post-restart assertions require the persisted split layout and file
+  content to be restored from the production workspace snapshot.
+  Browser C4 cases remain supplementary renderer/VFS evidence.
+covers: [F25.5]
+tags: [code-workspace, ide-ed009, split, shared-history, reopen, restart, native-gate, p1]
+modes: [native]
+native_platforms: [Windows]
+fixtures: [reset_db, workspace_root]
+timeout_sec: 420
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-ed009-split-reopen-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-ed009","name":"qa-ed009","roots":[{"id":"r1","name":"qa-ed009","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"r1","path":"README.md"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+  - click: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+  - wait_for: '[data-testid="code-workspace-editor-pane"]'
+  - assert_file_contains:
+      path: "${fixture.workspace_root}/README.md"
+      contains: "qa workspace root"
+
+  # Seed the open buffer through the mounted native editor while the file was
+  # opened through the real host filesystem boundary.
+  - fill:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      value: "ed009-one\ned009-two"
+  - wait: 1
+  - click: '[data-testid="code-workspace-split-right"]'
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-content").length === 2'
+      expect_truthy: true
+  - wait: 1
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-content").length === 2 && document.querySelectorAll(".cm-content")[0]?.textContent === document.querySelectorAll(".cm-content")[1]?.textContent && document.querySelectorAll(".cm-content")[0]?.textContent?.includes("ed009-two")'
+      expect_truthy: true
+
+  # Each leaf dispatches through the same document owner. The second edit is
+  # visible in both leaves, and undo/redo from opposite leaves is shared.
+  - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] [data-testid="code-workspace-editor"] .cm-content'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] [data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [Control+End]
+  - type: " left"
+  - wait: 1
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-content").length === 2 && document.querySelectorAll(".cm-content")[0]?.textContent === document.querySelectorAll(".cm-content")[1]?.textContent && document.querySelectorAll(".cm-content")[0]?.textContent?.includes("ed009-two left")'
+      expect_truthy: true
+  - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id^="leaf-"] [data-testid="code-workspace-editor"] .cm-content'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id^="leaf-"] [data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [Control+End]
+  - type: " right"
+  - wait: 1
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-content").length === 2 && document.querySelectorAll(".cm-content")[0]?.textContent === document.querySelectorAll(".cm-content")[1]?.textContent && document.querySelectorAll(".cm-content")[0]?.textContent?.includes("ed009-two left right")'
+      expect_truthy: true
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id^="leaf-"] [data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [Control+z]
+  - wait: 1
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-content").length === 2 && document.querySelectorAll(".cm-content")[0]?.textContent === document.querySelectorAll(".cm-content")[1]?.textContent && document.querySelectorAll(".cm-content")[0]?.textContent?.includes("ed009-two left") && !document.querySelectorAll(".cm-content")[0]?.textContent?.includes("right")'
+      expect_truthy: true
+  - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] [data-testid="code-workspace-editor"] .cm-content'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] [data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [Control+Shift+z]
+  - wait: 1
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-content").length === 2 && document.querySelectorAll(".cm-content")[0]?.textContent === document.querySelectorAll(".cm-content")[1]?.textContent && document.querySelectorAll(".cm-content")[0]?.textContent?.includes("ed009-two left right")'
+      expect_truthy: true
+
+  # Closing the active non-final split retains the shared document and dirty
+  # buffer in the surviving leaf.
+  - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id^="leaf-"] [data-testid="code-workspace-editor"] .cm-content'
+  - click: '[data-testid="code-workspace-split-close"]'
+  - wait: 1
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-content").length === 1'
+      expect_truthy: true
+  - eval_readonly:
+      expression: 'document.querySelector(".cm-content")?.textContent?.includes("ed009-two left right") === true'
+      expect_truthy: true
+
+  # The last dirty view must reject close without changing the buffer or
+  # layout. The app-owned dialog is the production cancellation boundary.
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+F4
+  - wait_for: '[data-testid="confirm-dialog"]'
+  - assert_text:
+      selector: '[data-testid="confirm-dialog"]'
+      contains: "unsaved"
+  - click: '[data-testid="confirm-dialog-cancel"]'
+  - wait: 1
+  - assert_not_visible: '[data-testid="confirm-dialog"]'
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-save-observation"]'
+      name: data-state
+      equals: dirty
+  - eval_readonly:
+      expression: 'document.querySelector(".cm-content")?.textContent?.includes("ed009-two left right") === true'
+      expect_truthy: true
+
+  # Save through the production keymap and independently verify host bytes.
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [Control+s]
+  - wait: 2
+  - assert_file_contains:
+      path: "${fixture.workspace_root}/README.md"
+      contains: "ed009-two left right"
+      timeout_sec: 30
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-save-observation"]'
+      name: data-state
+      equals: saved
+
+  # Recreate the split in a clean state and require its existing localStorage
+  # snapshot to contain the recursive split tree before the app restart.
+  - click: '[data-testid="code-workspace-split-right"]'
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-content").length === 2'
+      expect_truthy: true
+  - wait: 1
+  - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] [data-testid="code-workspace-editor"] .cm-content'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] [data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [Control+Home]
+  - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id^="leaf-"] [data-testid="code-workspace-editor"] .cm-content'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id^="leaf-"] [data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: [Control+End]
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-content").length === 2'
+      expect_truthy: true
+  - native_restart_app: null
+  - wait_for: '[data-testid="welcome-panel"]'
+  - wait: 1
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - wait_for: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for: '[data-testid="code-workspace-editor-pane"]'
+  - wait: 2
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-content").length === 2'
+      expect_truthy: true
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-content").length === 2 && document.querySelectorAll(".cm-content")[0]?.textContent === document.querySelectorAll(".cm-content")[1]?.textContent && document.querySelectorAll(".cm-content")[0]?.textContent?.includes("ed009-two left right")'
+      expect_truthy: true
+  - assert_file_contains:
+      path: "${fixture.workspace_root}/README.md"
+      contains: "ed009-two left right"
+      timeout_sec: 30
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-content").length === 2'
+      expect_truthy: true
+
+  # Native close/reopen after restart still uses the surviving workspace's
+  # production closed-tab stack and restores the real file content.
+  - click: '[data-testid="code-workspace-split-close"]'
+  - wait: 1
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-content").length === 1'
+      expect_truthy: true
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+F4
+  - wait: 1
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-content").length === 0'
+      expect_truthy: true
+  - press: Control+Shift+T
+  - wait_for: '[data-testid="code-workspace-editor-pane"]'
+  - wait: 1
+  - eval_readonly:
+      expression: 'document.querySelector(".cm-content")?.textContent?.includes("ed009-two left right") === true'
+      expect_truthy: true
