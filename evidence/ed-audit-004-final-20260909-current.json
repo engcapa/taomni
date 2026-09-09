@@ -1,0 +1,107 @@
+{
+  "verified_at": "2026-09-09T12:47:00Z",
+  "head": "c13550d4d54f3f1ae4c7f2f8bf76282ef7d5cd0e",
+  "checks": [
+    {
+      "kind": "code-audit",
+      "command": "Re-audit from claimed baseline c13550d4: CodeWorkspaceTab.saveFile -> executeSaveTransaction -> runSaveNormalizationPipeline -> PreparedSave -> commitOpenBufferPreparedSave/commitClosedFilePreparedSave -> one encoded writer -> workspace_write_file_encoded -> receipt/writeback/recovery observation",
+      "result": "passed",
+      "summary": "The current production chain freezes document revision, style/provider/project and disk identities plus encoding/EOL/BOM policy before awaits; the six-stage plan is immutable and organize-imports is plan-only. The single writer encodes once and reports native intent/old/written byte facts. Pre-write cancellation, stale input, external hash conflict, known failure, closed owner, unknown effect read-back, recovery blocking and provider/writeback discard remain distinct. UI Save status exposes the receipt and effect axes; Undo changes the buffer/history boundary and requires another Save for disk changes.",
+      "acceptance": [
+        "ED-AUDIT-004-A1",
+        "ED-AUDIT-004-A2",
+        "ED-AUDIT-004-A3"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/saveCommit.test.ts src/components/editor/workspace/saveNormalizationPipeline.test.ts src/components/editor/workspace/saveOrganizeImportsAdapter.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "3 files passed; 65/65 tests passed. Assertions cover policy precedence, exact EOL/encoding/BOM bytes, immutable six-stage normalization, organize-imports plan-only behavior, pre-write cancellation, typing races, closed-owner writeback, conflict, known failure, unknown effect, recovery classification and one-write receipt facts.",
+      "acceptance": [
+        "ED-AUDIT-004-A1",
+        "ED-AUDIT-004-A2"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/CodeWorkspaceTab.test.tsx --maxWorkers=1 -t \"P0-S / N1.7 Atomic Save Commit Host Race Tests\"",
+      "result": "passed",
+      "summary": "1 mounted production-owner file passed; 9 selected tests passed and 112 unrelated tests were skipped. The selected assertions cover receipt wiring, pre-write typing cancellation, stale dirty writeback, closed-owner discard and unknown-effect recovery with automatic retry blocked.",
+      "acceptance": [
+        "ED-AUDIT-004-A2",
+        "ED-AUDIT-004-A3"
+      ]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/workspace/saveCommit.ts --path src/components/editor/workspace/saveNormalizationPipeline.ts --path src/components/editor/workspace/saveOrganizeImportsAdapter.ts --path src/components/editor/CodeWorkspaceTab.tsx --path src/lib/editor/workspace.ts --path src/components/editor/workspace/saveCommit.test.ts --path src/components/editor/workspace/saveNormalizationPipeline.test.ts --path src/components/editor/workspace/saveOrganizeImportsAdapter.test.ts --path src/components/editor/CodeWorkspaceTab.test.tsx --json",
+      "result": "passed",
+      "summary": "All 9 owned TypeScript paths passed with scoped_errors=0 and external_errors=0 across 0 external files.",
+      "acceptance": [
+        "ED-AUDIT-004-A3"
+      ]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C0-02 --report-dir qa-ui-auto-report/ed-audit-004-browser-current-20260909-rerun --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "The first current-checkout browser attempt timed out during Page.goto because the Vite dev process accepted the connection but did not return HTTP while scanning the repository; an independent curl request reproduced the timeout. No product assertion or PASS is claimed from this attempt; the raw report is qa-ui-auto-report/ed-audit-004-browser-current-20260909-rerun/run-20260909-202430-316487800.",
+      "acceptance": []
+    },
+    {
+      "kind": "build",
+      "command": "pnpm.cmd build",
+      "result": "passed",
+      "summary": "Current checkout TypeScript and production browser build passed; 4677 modules transformed and Vite exited 0.",
+      "acceptance": []
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C0-02 --report-dir qa-ui-auto-report/ed-audit-004-browser-current-20260909-preview --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Current checkout browser preview run run-20260909-203333-172035200 selected 1 and passed 1 with 0 failed and 0 skipped across 52 steps. It asserted production UI Save receipt state, final and encoded hashes, writeCount=1, dirty/saved/clean transitions, status live-region/name/role, textbox semantics, focus retention, 200% editor size and one undo. identity_stable=true; source_sha256=197c0e54f9e55e0cd3b408e57a20766b9c0b37c9c1e71a2a0cb60bd65f4472ae; runner_sha256=6e3e74caf26ed9090af07624d1cbedd6ae066224f3c6beee815aa05239cacaf9; case_sha256=ad3def4f299740ba5549dbdc78c443e53899115aa71b4424758e5daf35d264a9; matching summary.json and runner_receipt.json are retained. The preview is renderer/VFS-bound and does not prove native disk.",
+      "acceptance": [
+        "ED-AUDIT-004-A1"
+      ]
+    },
+    {
+      "kind": "rust",
+      "command": "cargo test --lib encoded_write_",
+      "result": "passed",
+      "summary": "7/7 focused Rust encoded-writer tests passed; 1281 tests were filtered out. The suite covers missing target/hash precondition, encoding failure, target failure effect and byte facts, hash conflict, successful intent/old-hash acknowledgement and ISO-8859-1 round trip; existing compiler warnings remain.",
+      "acceptance": [
+        "ED-AUDIT-004-A1",
+        "ED-AUDIT-004-A2"
+      ]
+    },
+    {
+      "kind": "native",
+      "command": "python .agents/skills/qa-ui-auto/scripts/native_build.py --force",
+      "result": "passed",
+      "summary": "Built the independent current-source QA application with identifier com.taomni.app.qa at src-tauri/target/qa-ui-auto/debug/taomni.exe; source_sha256=197c0e54f9e55e0cd3b408e57a20766b9c0b37c9c1e71a2a0cb60bd65f4472ae, binary_sha256=94bcef3a6f54218905915069f85c632038b0b4f4b2caf6bfce901c8f31092a8c. The recorded build runtime is the current Windows platform, debug profile, rustc 1.96.0 and node v24.15.0.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C0-03 --report-dir qa-ui-auto-report/ed-audit-004-native-current-20260909-rerun --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Packaged current-source com.taomni.app.qa WebView2 run run-20260909-203807-181214500 selected 1 and passed 1 with 0 failed and 0 skipped. The isolated real host workspace reconciled receipt and disk bytes for UTF-8/LF (12 bytes, eeaa468182b0e8c7135b54857097d25bf00a76ff1c092477c30ff3d5eb04e63d), UTF-8/CRLF (13 bytes, 56ceb35c3dfe02fbfc25f847721413c20acddb4357c615e9da7d9b58b1c154fd), UTF-8 BOM/CRLF (16 bytes, 054939300b51321329d2b335a9ae5e6117640f91370d210e8135f1b1d00b278e) and UTF-16LE BOM/LF (24 bytes, 282b28b92e5d8136518adeb45c5ddc3f820ee2a5eaad5fc3ab90e34645ceeb65). identity_stable=true; source_sha256=197c0e54f9e55e0cd3b408e57a20766b9c0b37c9c1e71a2a0cb60bd65f4472ae; runner_sha256=6e3e74caf26ed9090af07624d1cbedd6ae066224f3c6beee815aa05239cacaf9; case_sha256=33a83c7a85b9dd403bb7eb2ad2409210f4018a313b24c42ad57dd966173f753c; matching summary/receipt and native-save-observations.json are retained. Isolated AppData/LocalAppData and QA fixture cleanup were used.",
+      "acceptance": [
+        "ED-AUDIT-004-A1",
+        "ED-AUDIT-004-A3"
+      ]
+    }
+  ],
+  "unrun": [
+    "idea-comparison: no qualifying IntelliJ IDEA 2026.2.x runtime was available, so no identical Save/Undo, encoding/EOL/BOM, conflict or input-race observation was collected; this is optional under the current task-board rule.",
+    "native Linux/WebKitGTK/X11: no qualifying runtime was available in the current environment.",
+    "native macOS/WKWebView: no qualifying runtime or OS automation host was available in the current environment."
+  ],
+  "notes": [
+    "The production save implementation was re-audited against claimed baseline HEAD c13550d4d54f3f1ae4c7f2f8bf76282ef7d5cd0e; no production source changed during this attempt. The only task-owned source change is this evidence record plus the ED-AUDIT-004 backlog transition.",
+    "Browser evidence is renderer/VFS-bound. Native evidence crosses the packaged com.taomni.app.qa WebView2 runtime and real host filesystem. Rust evidence covers the native encoded writer. No screenshot, synthetic receipt, browser stub or fake provider response is used as a substitute for native disk evidence.",
+    "The current platform is reported only as the runtime actually executed. No conclusion is made about other operating systems or IDEA behavior. No performance evidence is required by ED-AUDIT-004.",
+    "Terminal status: done. All acceptance IDs are covered by passed checks and every required evidence kind has a final passed check. The highest supported claim is current-runtime L2 save behavior with packaged native byte reconciliation; optional IDEA comparison and other-platform native layers remain unrun."
+  ]
+}
