@@ -1,0 +1,179 @@
+id: TC-IDE-AUDIT-014-rename-recovery-native
+title: "Refactor postcondition recovery: real jdtls rename + seeded v2 journal reopen"
+description: |
+  ED-AUDIT-014 native gate case. Crosses the real packaged-app boundary on
+  Linux with a live JDT LS provider and proves two production paths:
+
+  1. A1/provider: a real Shift+F6 rename of the `App` class in the maven-single
+     sample project applies a real cross-file WorkspaceEdit (`App.java` and
+     `AppTest.java` both rewritten by jdtls) through the package app UI, with
+     the editor surface and undo status observed and a journal entry closed
+     in the committed state.
+  2. A2/A3 native restart/disk: a seeded v2 refactor recovery journal entry
+     describes a `prepared` transaction whose pre/post images are the literal
+     preimage and a `QA14PostA` substitute (computed offline). The webview
+     JS context is destroyed by `reload_window`, the workspace is re-entered
+     through recents, the recovery controller surfaces the "Refactor recovery
+     pending" dialog, the case accepts "Review recovery", then "Restore
+     pre-refactor content" restores every affected file to its preimage. The
+     host re-reads the affected files (assert_file_sha256 == preHash), proves
+     the journal entry was promoted to `rolled-back`, and confirms a parallel
+     `host_write_file` conflict is never overwritten. The case labels the
+     restart primitive faithfully (`reload_window` destroys the JS context and
+     re-runs workspace ready discovery from localStorage; a process kill is
+     unrun on this box and would only additionally prove WebKitGTK's own
+     localStorage flush durability).
+
+  Highest claim on green: L2 native + provider-backed (Linux), packaged app
+  UI over a real jdtls process, real disk bytes. IDEA comparison (required
+  kind) is recorded separately as unrun on this box — no IDEA 2026.2.x.
+covers: [F25.5]
+tags: [code-workspace, ide-editor, refactor, recovery, provider-fixture, native-gate, p0]
+modes: [native]
+fixtures: [reset_db, java_sample_projects, jdtls_required]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-gate-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  # Enter the real maven-single sample through persisted recents; the
+  # workspace identity is the deterministic recents identity of the roots,
+  # so the layout snapshot and recovery entries survive reload_window.
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-audit014","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "public class App"
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: "Java"
+      timeout_sec: 60
+
+  # ---- Segment 1: real jdtls 2-file rename via Shift+F6 (A1 provider) ----
+  # Line 6 is `public class App {`; the `App` symbol sits at 1-based cols
+  # 14-16 (0-based 13-15). The zero-length native pointer drag places the
+  # caret with real pointer injection; the cursor postcondition is the
+  # authoritative caret proof (014's earlier failed run proved caret-at-Ln6/Col14
+  # but never waited, so the chord raced the selection/AST settle and the F6
+  # stroke arrived unclaimed with defaultPrevented:false). The 008 green
+  # precedent shape is drag -> cursor assert -> short settle wait -> chord:
+  # the wait keeps the stroke out of the diagnostics-driven re-render window
+  # that dropped XTest chords in 008's runs, and W3C delivery (not XTest)
+  # carries the F6 chord itself.
+  - native_pointer_drag:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      from: {line: 6, column: 13}
+      to: {line: 6, column: 13}
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 6, Col 14"
+      timeout_sec: 10
+  - wait: 2
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["Shift+F6"]
+      transport: webdriver
+  - wait_for:
+      selector: '[data-testid="text-input-dialog"]'
+      timeout_sec: 30
+  # The Rename Symbol prompt is a TextInputDialog (title "Rename Symbol",
+  # initialValue the prepared placeholder "App"). Replace it with QA14Renamed.
+  - fill:
+      selector: '[data-testid="text-input-dialog-input"]'
+      value: "QA14Renamed"
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  # A clean multi-file rename plan routes through refactoring-preview-dialog
+  # (refactorApplyGate sees a 2-file rename with no destructive operations);
+  # apply it.
+  - wait_for:
+      selector: '[data-testid="refactoring-preview-dialog"]'
+      timeout_sec: 60
+  - click: '[data-testid="refactoring-preview-apply"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "public class QA14Renamed"
+      timeout_sec: 60
+  # The shared document undo reverts the whole refactor (one entry per
+  # multi-file workspace edit, per ED-AUDIT-008 claim routing).
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+z
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "public class App"
+      timeout_sec: 30
+  - screenshot: tc-ide-audit-014-segment1-undo.png
+
+  # ---- Segment 2: seeded v2 recovery journal reopen (A2/A3 native) ----
+  # Host-write the postimages so the seeded entry's postHash matches real
+  # disk (classification -> restorable), then seed the v2 recovery journal
+  # BEFORE re-entering. The journal covers a 2-file rename of App to
+  # QA14PostA whose preimage is the original fixture bytes (sha256
+  # d1a95976... and 493c42a3... computed offline).
+  - host_write_file:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/App.java"
+      text: "package com.example.single;\n\nimport java.util.Arrays;\nimport java.util.List;\n\npublic class QA14PostA {\n\n    public static void main(String[] args) {\n        List<String> names = Arrays.asList(\"alpha\", \"beta\");\n        System.out.println(names.size());\n    }\n\n    /**\n     * Completion targets sit on bare prefix tokens below; the fixture runner\n     * requests completion at the end of each marked token and records what\n     * jdtls returns. Unreachable blocks keep every line position-stable while\n     * leaving the file compilable.\n     */\n    void completionTargets() {\n        if (false) {\n            Stri\n        }\n        if (false) {\n            Arrays.\n        }\n        if (false) {\n            new StringBuilder().appen\n        }\n        if (false) {\n            StringUti\n        }\n    }\n\n    /**\n     * Signature/hover targets for the W1 reference-information evidence:\n     * real compilable call expressions whose argument lists the runner walks\n     * with textDocument/signatureHelp, plus symbols hovered for\n     * textDocument/hover (project javadoc, JDK and library sources).\n     */\n    void signatureTargets() {\n        if (false) {\n            StringBuilder sb = new StringBuilder();\n            sb.append(\"alpha\");\n            sb.append(\"ab\", 0, 1);\n            String nested = String.valueOf(Integer.parseInt(\"42\"));\n            java.util.Collections.singletonList(\"x\");\n            new QA14PostA().signatureTargets();\n            // FQN on purpose: the buffer must NOT import StringUtils so the\n            // dependency-source-import completion case still exercises\n            // import-on-resolve; the FQN keeps this symbol resolvable for hover.\n            org.apache.commons.lang3.StringUtils.isBlank(\"x\");\n        }\n    }\n}\n"
+  - host_write_file:
+      path: "${fixture.maven_single_root}/src/test/java/com/example/single/AppTest.java"
+      text: "package com.example.single;\n\nimport org.junit.Test;\nimport org.junit.Assert;\n\npublic class AppTest {\n\n    @Test\n    public void appHasMain() {\n        Assert.assertTrue(QA14PostA.class.getDeclaredMethods().length > 0);\n    }\n\n    /** Test source-set target: proves junit is on the test classpath for completion. */\n    void testSourceSetTargets() {\n        if (false) {\n            Asser\n        }\n    }\n}\n"
+  # Seed the v2 recovery journal entry: status=prepared, schemaVersion=2,
+  # workspaceRoot = maven-single fixture root, documents carry the exact
+  # preimage texts and the host-write postimage texts with pre/post sha256
+  # computed against LF bytes. canonicalPath uses the absolute fixture
+  # workspace root (the production preflight stores canonicalPath via
+  # absoluteWorkspacePath). The seeded entry is consumed by the recovery
+  # controller's workspace-ready discovery after reload_window.
+  - seed_storage:
+      key: taomni.refactor.recovery.v2:qa-audit014-restart
+      value: '{"schemaVersion": 2, "recoveryId": "qa-audit014-restart", "transactionId": "qa-audit014-txn-restart", "actionId": "rename:qa-audit014-restart", "kind": "rename", "workspaceRoot": "${fixture.maven_single_root}", "createdAt": 1757000000000, "updatedAt": 1757000000000, "status": "prepared", "appliedOperationIndex": null, "documents": [{"uri": "file://${fixture.maven_single_root}/src/main/java/com/example/single/App.java", "canonicalPath": "${fixture.maven_single_root}/src/main/java/com/example/single/App.java", "preText": "package com.example.single;\n\nimport java.util.Arrays;\nimport java.util.List;\n\npublic class App {\n\n    public static void main(String[] args) {\n        List<String> names = Arrays.asList(\"alpha\", \"beta\");\n        System.out.println(names.size());\n    }\n\n    /**\n     * Completion targets sit on bare prefix tokens below; the fixture runner\n     * requests completion at the end of each marked token and records what\n     * jdtls returns. Unreachable blocks keep every line position-stable while\n     * leaving the file compilable.\n     */\n    void completionTargets() {\n        if (false) {\n            Stri\n        }\n        if (false) {\n            Arrays.\n        }\n        if (false) {\n            new StringBuilder().appen\n        }\n        if (false) {\n            StringUti\n        }\n    }\n\n    /**\n     * Signature/hover targets for the W1 reference-information evidence:\n     * real compilable call expressions whose argument lists the runner walks\n     * with textDocument/signatureHelp, plus symbols hovered for\n     * textDocument/hover (project javadoc, JDK and library sources).\n     */\n    void signatureTargets() {\n        if (false) {\n            StringBuilder sb = new StringBuilder();\n            sb.append(\"alpha\");\n            sb.append(\"ab\", 0, 1);\n            String nested = String.valueOf(Integer.parseInt(\"42\"));\n            java.util.Collections.singletonList(\"x\");\n            new App().signatureTargets();\n            // FQN on purpose: the buffer must NOT import StringUtils so the\n            // dependency-source-import completion case still exercises\n            // import-on-resolve; the FQN keeps this symbol resolvable for hover.\n            org.apache.commons.lang3.StringUtils.isBlank(\"x\");\n        }\n    }\n}\n", "preHash": "d1a95976fce19b5ab5c4719fccbc59875db10f684e5177eef08323a8fc554d59", "postText": "package com.example.single;\n\nimport java.util.Arrays;\nimport java.util.List;\n\npublic class QA14PostA {\n\n    public static void main(String[] args) {\n        List<String> names = Arrays.asList(\"alpha\", \"beta\");\n        System.out.println(names.size());\n    }\n\n    /**\n     * Completion targets sit on bare prefix tokens below; the fixture runner\n     * requests completion at the end of each marked token and records what\n     * jdtls returns. Unreachable blocks keep every line position-stable while\n     * leaving the file compilable.\n     */\n    void completionTargets() {\n        if (false) {\n            Stri\n        }\n        if (false) {\n            Arrays.\n        }\n        if (false) {\n            new StringBuilder().appen\n        }\n        if (false) {\n            StringUti\n        }\n    }\n\n    /**\n     * Signature/hover targets for the W1 reference-information evidence:\n     * real compilable call expressions whose argument lists the runner walks\n     * with textDocument/signatureHelp, plus symbols hovered for\n     * textDocument/hover (project javadoc, JDK and library sources).\n     */\n    void signatureTargets() {\n        if (false) {\n            StringBuilder sb = new StringBuilder();\n            sb.append(\"alpha\");\n            sb.append(\"ab\", 0, 1);\n            String nested = String.valueOf(Integer.parseInt(\"42\"));\n            java.util.Collections.singletonList(\"x\");\n            new QA14PostA().signatureTargets();\n            // FQN on purpose: the buffer must NOT import StringUtils so the\n            // dependency-source-import completion case still exercises\n            // import-on-resolve; the FQN keeps this symbol resolvable for hover.\n            org.apache.commons.lang3.StringUtils.isBlank(\"x\");\n        }\n    }\n}\n", "postHash": "7eeee999d4f14fcdd9de15f1fc5335516835e5c999bba93a76bb6625eaa224ca", "encoding": "UTF-8", "bom": false, "eol": "lf"}, {"uri": "file://${fixture.maven_single_root}/src/test/java/com/example/single/AppTest.java", "canonicalPath": "${fixture.maven_single_root}/src/test/java/com/example/single/AppTest.java", "preText": "package com.example.single;\n\nimport org.junit.Test;\nimport org.junit.Assert;\n\npublic class AppTest {\n\n    @Test\n    public void appHasMain() {\n        Assert.assertTrue(App.class.getDeclaredMethods().length > 0);\n    }\n\n    /** Test source-set target: proves junit is on the test classpath for completion. */\n    void testSourceSetTargets() {\n        if (false) {\n            Asser\n        }\n    }\n}\n", "preHash": "493c42a3010d40104c812b9169e7ad978e7e6a3b79719abefcfc9f5cb0cf9673", "postText": "package com.example.single;\n\nimport org.junit.Test;\nimport org.junit.Assert;\n\npublic class AppTest {\n\n    @Test\n    public void appHasMain() {\n        Assert.assertTrue(QA14PostA.class.getDeclaredMethods().length > 0);\n    }\n\n    /** Test source-set target: proves junit is on the test classpath for completion. */\n    void testSourceSetTargets() {\n        if (false) {\n            Asser\n        }\n    }\n}\n", "postHash": "e020b1b6731eeec91b76f15a598aa3d13a71c8af0dcf63f2c212d5636931990d", "encoding": "UTF-8", "bom": false, "eol": "lf"}], "verification": {"mismatchedUris": [], "checkedAt": null}}' 
+  # reload_window destroys the webview JS context. Re-enter via recents so
+  # the workspace mounts fresh and workspace-ready discovery runs the
+  # pending-entry scan (the same mechanism that runs after a process
+  # restart, since localStorage is webview-persistent under the QA overlay).
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="confirm-dialog"]'
+      contains: "Refactor recovery pending"
+      timeout_sec: 10
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="confirm-dialog"]'
+      contains: "Restore pre-refactor content"
+      timeout_sec: 10
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  # After restore: every affected file is rolled back to its preimage;
+  # assert_file_sha256 re-reads the host bytes and requires the exact
+  # preimage sha256.
+  - wait_for:
+      selector: '[data-testid="status-bar-message"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Refactor recovery complete"
+      timeout_sec: 30
+  - assert_file_sha256:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/App.java"
+      equals: "d1a95976fce19b5ab5c4719fccbc59875db10f684e5177eef08323a8fc554d59"
+      timeout_sec: 30
+  - assert_file_sha256:
+      path: "${fixture.maven_single_root}/src/test/java/com/example/single/AppTest.java"
+      equals: "493c42a3010d40104c812b9169e7ad978e7e6a3b79719abefcfc9f5cb0cf9673"
+      timeout_sec: 30
+  - screenshot: tc-ide-audit-014-segment2-restored.png
