@@ -520,3 +520,238 @@ export function cancelWorkflowPlan(_plan?: WorkflowPlan): {
     effects: [],
   };
 }
+
+// ---------------------------------------------------------------------------
+// ED-AUDIT-015: production execute wiring for Rearrange Code.
+// ---------------------------------------------------------------------------
+
+/**
+ * Provider action kinds that count as a dedicated arrangement capability.
+ * Matched by exact kind equality only — never by summary booleans or title
+ * substring guessing.
+ */
+export const REARRANGE_ACTION_KINDS: readonly string[] = [
+  "source.rearrange",
+  "source.rearrangeCode",
+  "rearrange",
+];
+
+export function isRearrangeActionKind(kind: string | null): boolean {
+  return kind !== null && REARRANGE_ACTION_KINDS.includes(kind);
+}
+
+export interface RearrangeProviderAction {
+  kind: string | null;
+  title: string;
+  raw: unknown;
+}
+
+export type RearrangeRequestState = "ok" | "stale" | "failed" | "cancelled";
+
+export interface RearrangeRequestResult {
+  state: RearrangeRequestState;
+  actions: readonly RearrangeProviderAction[];
+  reason?: string;
+}
+
+export type RearrangeResolveState = "resolved" | "failed" | "stale" | "unsupported";
+
+export interface RearrangeResolveResult {
+  state: RearrangeResolveState;
+  edits: readonly LspTextEdit[];
+  reason?: string;
+}
+
+export interface RearrangeLiveDocument {
+  text: string;
+  revision: number;
+  readOnly: boolean;
+  dirty: boolean;
+}
+
+export interface RearrangePreviewSummary {
+  targetPath: string;
+  operationCount: number;
+  preHashShort: string;
+  postHashShort: string;
+}
+
+export type RearrangeApplyState = "applied" | "failed" | "conflict";
+
+export interface RearrangeApplyResult {
+  state: RearrangeApplyState;
+  postText?: string;
+  reason?: string;
+}
+
+export interface RearrangeExecuteDeps {
+  requestActions(): Promise<RearrangeRequestResult>;
+  resolveAction(action: RearrangeProviderAction): Promise<RearrangeResolveResult>;
+  readLive(): RearrangeLiveDocument | null;
+  providerGeneration(): number;
+  confirmPreview(summary: RearrangePreviewSummary): Promise<boolean>;
+  applyEdit(edit: LspWorkspaceEdit): Promise<RearrangeApplyResult>;
+}
+
+export interface RearrangeExecuteInput {
+  scope: "selection" | "file";
+  targetPath: string;
+  targetUri: string;
+  readOnly: boolean;
+  hasSelection: boolean;
+  capabilities: RearrangeCapabilities;
+}
+
+export type RearrangeExecuteResult =
+  | { ok: true; postHash: string; operationCount: number }
+  | { ok: false; reason: string; committed: false };
+
+/**
+ * ED-AUDIT-015 execute owner: gate -> freeze text/provider-generation ->
+ * request a dedicated rearrange action -> resolve to edits -> re-read live
+ * and plan with preview data -> precondition/freshness gates -> confirm gate
+ * -> canonical apply -> postcondition verify. Every early return commits
+ * nothing; only a post-hash-verified apply returns ok:true.
+ *
+ * Revision pinning is deliberately text-anchored, not revision-anchored: a
+ * background LSP sync may bump the document revision without changing a
+ * byte (observed: 0 -> 1 on open), and refusing that would be a false
+ * stale. The plan carries no pinned revision, so the applier's version gate
+ * is bypassed by design; instead the frozen text hash is re-verified
+ * immediately before apply, and the postcondition hash after it. A
+ * same-text revision bump is therefore harmless, while any byte change
+ * refuses. Supported-branch callers MUST mark test-double coverage as
+ * model-boundary: only a live capable provider proves the provider half of
+ * this chain.
+ */
+export async function executeRearrangeTransaction(
+  deps: RearrangeExecuteDeps,
+  input: RearrangeExecuteInput,
+): Promise<RearrangeExecuteResult> {
+  const fail = (reason: string): RearrangeExecuteResult => ({ ok: false, reason, committed: false });
+
+  // 0. Plan gate: no target, readonly, or unsupported capability short-circuits
+  // with zero IO.
+  const decision = planRearrange({
+    scope: input.scope,
+    targetPath: input.targetPath,
+    languageId: null,
+    readOnly: input.readOnly,
+    hasSelection: input.hasSelection,
+    capabilities: input.capabilities,
+  });
+  if (decision.kind === "unavailable") return fail(decision.reason);
+
+  // 1. Freeze the live text for closed/readonly gating. The preimage used by
+  // the plan is re-read after resolve (step 5) so a benign background sync
+  // between request and plan never trips a false stale.
+  const frozen = deps.readLive();
+  if (!frozen) {
+    return fail(`${input.targetPath} is no longer open; rearrange cancelled with zero effect`);
+  }
+  if (frozen.readOnly) {
+    return fail(`${input.targetPath} is read-only and cannot be rearranged`);
+  }
+  const frozenGeneration = deps.providerGeneration();
+
+  // 2. Request dedicated provider actions (the request itself freezes identity).
+  const requested = await deps.requestActions();
+  if (requested.state !== "ok") {
+    return fail(requested.reason ?? `Rearrange request ${requested.state}; nothing applied`);
+  }
+
+  // 3. Resolve to a callable rearrange-kind action by exact kind equality.
+  const action = requested.actions.find((candidate) => isRearrangeActionKind(candidate.kind)) ?? null;
+  if (!action) {
+    const seen = requested.actions
+      .map((candidate) => candidate.kind ?? "(no kind)")
+      .slice(0, 3)
+      .join(", ");
+    return fail(
+      seen
+        ? `Provider returned no rearrange action (received kinds: ${seen}). Rearrange Code requires a dedicated arrangement provider; nothing applied.`
+        : "Provider returned no actions. Rearrange Code requires a dedicated arrangement provider; nothing applied.",
+    );
+  }
+
+  // 4. Resolve the action to concrete edits.
+  const resolved = await deps.resolveAction(action);
+  if (resolved.state !== "resolved") {
+    return fail(resolved.reason ?? `Rearrange resolve ${resolved.state}; nothing applied`);
+  }
+  if (resolved.edits.length === 0) {
+    return fail(`Provider action '${action.title}' carried no edits; nothing applied`);
+  }
+
+  // 5. Re-read live and build the plan from post-resolve bytes with preview
+  // data. No pinned revision travels into the plan: the text hash below is
+  // the ground truth, and a same-text revision bump re-anchors silently.
+  const planLive = deps.readLive();
+  if (!planLive) {
+    return fail(`${input.targetPath} is no longer open; rearrange cancelled with zero effect`);
+  }
+  if (planLive.readOnly) {
+    return fail(`${input.targetPath} is read-only and cannot be rearranged`);
+  }
+  const plan = buildRearrangePlan({
+    scope: decision.scope,
+    targetPath: input.targetPath,
+    targetUri: input.targetUri,
+    currentText: planLive.text,
+    documentRevision: undefined,
+    readOnly: planLive.readOnly,
+    provider: decision.provider ?? { id: "provider" },
+    edits: resolved.edits,
+    isDirty: planLive.dirty,
+  });
+  if (plan.conflicts.length > 0) {
+    return fail(plan.conflicts[0].message);
+  }
+  const live = deps.readLive();
+  if (!live) {
+    return fail(`${input.targetPath} is no longer open; rearrange cancelled with zero effect`);
+  }
+  const preconditions = verifyWorkflowPreconditions(plan, {
+    [input.targetPath]: { text: live.text, readOnly: live.readOnly },
+    [input.targetUri]: { text: live.text, readOnly: live.readOnly },
+  });
+  if (!preconditions.ok) {
+    return fail(preconditions.conflict?.message ?? `${input.targetPath} changed since plan generation; nothing applied`);
+  }
+  const freshness = verifyWorkflowFreshness(
+    { providerGeneration: frozenGeneration },
+    { providerGeneration: deps.providerGeneration() },
+  );
+  if (!freshness.ok) {
+    return fail(`Rearrange became stale: ${freshness.staleReason}; request it again`);
+  }
+
+  // 6. Preview confirm gate: cancel commits nothing.
+  const preHash = plan.preconditions[0]?.preTextSha256 ?? sha256Hex(frozen.text);
+  const postHash = plan.expectedPostHashes[input.targetPath] ?? "";
+  const confirmed = await deps.confirmPreview({
+    targetPath: input.targetPath,
+    operationCount: resolved.edits.length,
+    preHashShort: preHash.slice(0, 12),
+    postHashShort: postHash.slice(0, 12),
+  });
+  if (!confirmed) {
+    cancelWorkflowPlan(plan);
+    return fail("Rearrange cancelled before applying; nothing changed");
+  }
+
+  // 7. Canonical apply, then postcondition verification against real bytes.
+  const applied = await deps.applyEdit(plan.edit);
+  if (applied.state !== "applied" || applied.postText === undefined) {
+    return fail(applied.reason ?? "Rearrange apply failed; see the workspace-edit ledger");
+  }
+  const post = verifyWorkflowPostHashes(plan.expectedPostHashes, {
+    [input.targetPath]: applied.postText,
+  });
+  if (!post.ok) {
+    return fail(
+      `Rearrange postcondition failed on ${post.mismatchedFiles.join(", ")}; applied effects are listed for recovery. Undo was not registered.`,
+    );
+  }
+  return { ok: true, postHash: plan.expectedPostHashes[input.targetPath], operationCount: resolved.edits.length };
+}

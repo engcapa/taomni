@@ -9139,4 +9139,174 @@ end_of_record
       expect(Object.keys(window.localStorage).filter((key) => key.startsWith(RECOVERY_V2_PREFIX))).toHaveLength(0);
     });
   });
+
+  describe("ED-AUDIT-015 rearrange execute wiring (mounted, model boundary for the supported path)", () => {
+    const SERVICE_PRE = "package com.example;\n\npublic class Service {\n    public void beta() {}\n    public void alpha() {}\n}\n";
+    const SERVICE_POST = "package com.example;\n\npublic class Service {\n    public void alpha() {}\n    public void beta() {}\n}\n";
+    const SWAP_EDIT = {
+      range: { start: { line: 3, character: 0 }, end: { line: 4, character: 26 } },
+      newText: "    public void alpha() {}\n    public void beta() {}",
+    };
+
+    function rearrangeWorkspace(instance: string): CodeWorkspaceTabInfo {
+      return {
+        repoRoot: "/repo/app",
+        workspaceId: "ws-rearrange",
+        workspaceInstanceId: instance,
+        name: "Rearrange",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: "src/Service.java" },
+      };
+    }
+
+    function mockRearrangeServer(codeActionKinds: string[]) {
+      workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+      workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/Service.java", SERVICE_PRE));
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _rootPath: string,
+        path: string,
+        text: string,
+      ) => writeAck(file(path, text, { hash: `hash-${text}` })));
+      lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+        path: "/repo/app/src/Service.java",
+        uri: "file:///repo/app/src/Service.java",
+        presetId: "jdtls",
+        languageId: "java",
+        displayName: "Eclipse JDT Language Server",
+        available: true,
+        active: true,
+        capabilities: defaultCapabilities({ codeAction: true, codeActionKinds }),
+      }));
+    }
+
+    function fileText(instance: string): string | undefined {
+      return selectCodeWorkspaceUi(
+        useCodeWorkspaceStore.getState(),
+        instance,
+      ).openFiles["root:app:src/Service.java"]?.text;
+    }
+
+    it("reports honest unavailable with zero provider IO when rearrange is unadvertised", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockRearrangeServer(["quickfix", "source.organizeImports"]);
+      vi.mocked(confirmAppDialog).mockClear();
+      lspMocks.lspCodeActions.mockClear();
+
+      renderWorkspace(rearrangeWorkspace("instance-rearrange-unavail"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.rearrangeCode");
+      });
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("does not support member-rearrangement"));
+      expect(fileText("instance-rearrange-unavail")).toBe(SERVICE_PRE);
+      // Plan gate short-circuits before any provider request.
+      expect(lspMocks.lspCodeActions).not.toHaveBeenCalled();
+      expect(confirmAppDialog).not.toHaveBeenCalled();
+    });
+
+    it("commits one verified transaction from the action entry on the supported path", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockRearrangeServer(["source.rearrange"]);
+      vi.mocked(confirmAppDialog).mockClear();
+      vi.mocked(confirmAppDialog).mockResolvedValue(true);
+      const rearrangeAction = {
+        title: "Rearrange members",
+        kind: "source.rearrange",
+        isPreferred: true,
+        edit: null,
+        command: null,
+        commandArguments: null,
+        raw: { title: "Rearrange members" },
+      };
+      lspMocks.lspCodeActions.mockResolvedValue({
+        status: documentStatus({ available: true, active: true }),
+        actions: [rearrangeAction],
+      });
+      lspMocks.lspCodeActionResolve.mockResolvedValue({
+        status: documentStatus({ available: true, active: true }),
+        action: {
+          ...rearrangeAction,
+          edit: {
+            documentEdits: [{
+              uri: "file:///repo/app/src/Service.java",
+              path: "/repo/app/src/Service.java",
+              edits: [SWAP_EDIT],
+            }],
+          },
+        },
+      });
+
+      renderWorkspace(rearrangeWorkspace("instance-rearrange-apply"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.rearrangeCode");
+      });
+      await waitFor(() => expect(confirmAppDialog).toHaveBeenCalledWith(expect.objectContaining({
+        title: "Rearrange preview",
+      })));
+      await waitFor(() => expect(fileText("instance-rearrange-apply")).toBe(SERVICE_POST));
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Rearranged"));
+      // Test-double provider: this proves the handler wiring (request ->
+      // resolve -> plan -> confirm -> apply -> post-verify), not a live
+      // capable provider.
+    });
+
+    it("cancels at the preview gate with zero commits", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockRearrangeServer(["source.rearrange"]);
+      vi.mocked(confirmAppDialog).mockClear();
+      vi.mocked(confirmAppDialog).mockResolvedValue(false);
+      const rearrangeAction = {
+        title: "Rearrange members",
+        kind: "source.rearrange",
+        isPreferred: true,
+        edit: null,
+        command: null,
+        commandArguments: null,
+        raw: { title: "Rearrange members" },
+      };
+      lspMocks.lspCodeActions.mockResolvedValue({
+        status: documentStatus({ available: true, active: true }),
+        actions: [rearrangeAction],
+      });
+      lspMocks.lspCodeActionResolve.mockResolvedValue({
+        status: documentStatus({ available: true, active: true }),
+        action: {
+          ...rearrangeAction,
+          edit: {
+            documentEdits: [{
+              uri: "file:///repo/app/src/Service.java",
+              path: "/repo/app/src/Service.java",
+              edits: [SWAP_EDIT],
+            }],
+          },
+        },
+      });
+
+      renderWorkspace(rearrangeWorkspace("instance-rearrange-cancel"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.rearrangeCode");
+      });
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("cancelled"));
+      expect(fileText("instance-rearrange-cancel")).toBe(SERVICE_PRE);
+      expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
+    });
+  });
 });

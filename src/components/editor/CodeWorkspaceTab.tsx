@@ -1114,9 +1114,10 @@ import {
 } from "./workspace/workspaceRestoreModel";
 import {
   planCleanup,
-  planRearrange,
   resolveCleanupCapabilities,
   resolveRearrangeCapabilities,
+  executeRearrangeTransaction,
+  REARRANGE_ACTION_KINDS,
 } from "./workspace/rearrangeCleanupWorkflow";
 
 interface ResourceCleanupRecoveryView {
@@ -11685,6 +11686,142 @@ export function CodeWorkspaceTab({
   // §8.18.5 closed-tab reopen stack (session-only, max 50, never persisted).
   const [closedTabsStack, setClosedTabsStack] = useState<readonly ClosedTabEntry[]>([]);
 
+  // ED-AUDIT-015: production execute owner for Rearrange Code. The action
+  // entry below only checks that a file is open; every capability decision,
+  // provider request, preview confirm, apply and postcondition check lives
+  // here and in executeRearrangeTransaction, so a supported decision can
+  // never again degrade to a bare status message plus `return true`.
+  const runRearrangeExecute = useCallback(async (file: OpenFileState): Promise<boolean> => {
+    const frozenKey = file.key;
+    const frozenInstanceId = workspaceInstanceId;
+    // Absolute target: provider edit entries carry absolute disk paths or
+    // URIs, while file.path is workspace-relative. Match with path-aware
+    // equality so a well-formed provider edit is never filtered out, and a
+    // foreign-path edit never leaks into this file.
+    const targetPath = absolutePathForOpenFile(file) ?? file.path ?? file.key;
+    const descriptor = lspDescriptorForFile(file);
+    if (!descriptor) {
+      const message = `Cannot resolve the language server for ${file.title ?? frozenKey}`;
+      setStatusMessage(message);
+      return false;
+    }
+    const targetUri = descriptor.documentUri ?? descriptor.filePath ?? frozenKey;
+    const result = await executeRearrangeTransaction(
+      {
+        requestActions: async () => {
+          const live = openFilesRef.current[frozenKey];
+          if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
+            return {
+              state: "cancelled",
+              actions: [],
+              reason: "Rearrange cancelled: the file closed or the workspace changed; nothing applied",
+            };
+          }
+          const lines = live.text.split("\n");
+          const range: LspRange = {
+            start: { line: 0, character: 0 },
+            end: {
+              line: Math.max(0, lines.length - 1),
+              character: lines.length > 0 ? lines[lines.length - 1].length : 0,
+            },
+          };
+          const res = await requestCodeActions(live, range, [], [...REARRANGE_ACTION_KINDS]);
+          if (res.requestFailure) {
+            return {
+              state: res.requestFailure.kind === "stale" ? "stale" : "failed",
+              actions: [],
+              reason: res.requestFailure.message,
+            };
+          }
+          return {
+            state: "ok",
+            actions: res.actions.map((action) => ({ kind: action.kind, title: action.title, raw: action.raw })),
+          };
+        },
+        resolveAction: async (action) => {
+          const live = openFilesRef.current[frozenKey];
+          if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
+            return { state: "stale", edits: [], reason: "Rearrange cancelled: the file closed during resolve; nothing applied" };
+          }
+          try {
+            const resolved = await lspCodeActionResolve(descriptor, action.raw);
+            const edits = (resolved.action?.edit?.documentEdits ?? [])
+              .filter((entry) => entry.uri === targetUri || (entry.path != null && fsPathEquals(entry.path, targetPath)))
+              .flatMap((entry) => entry.edits);
+            if (!resolved.action || edits.length === 0) {
+              return {
+                state: "unsupported",
+                edits: [],
+                reason: `Provider action '${action.title}' carried no usable edit for ${targetPath}; nothing applied`,
+              };
+            }
+            return { state: "resolved", edits };
+          } catch (err) {
+            return { state: "failed", edits: [], reason: `Rearrange resolve failed: ${errorMessage(err)}; nothing applied` };
+          }
+        },
+        readLive: () => {
+          const live = openFilesRef.current[frozenKey];
+          if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) return null;
+          return {
+            text: live.text,
+            revision: live.documentRevision,
+            readOnly: !!live.library || workspaceResourceOperationLocked,
+            dirty: !!live.dirty,
+          };
+        },
+        providerGeneration: () => lspSessionGeneration(),
+        confirmPreview: (summary) => confirmAppDialog({
+          title: "Rearrange preview",
+          message: `${summary.targetPath}: ${summary.operationCount} edits. Pre ${summary.preHashShort} → post ${summary.postHashShort}. Apply the rearrangement?`,
+          confirmLabel: "Apply rearrange",
+        }),
+        applyEdit: async (edit) => {
+          try {
+            const outcomes = await applyLspWorkspaceEdit(edit, { recordHistory: true });
+            const response = workspaceEditApplyResponse(outcomes);
+            if (!response.applied) {
+              return { state: "failed", reason: response.failureReason ?? "Rearrange apply failed; see the workspace-edit ledger" };
+            }
+            const live = openFilesRef.current[frozenKey];
+            if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
+              return { state: "conflict", reason: `${targetPath} closed during apply; verify the disk state before retrying` };
+            }
+            return { state: "applied", postText: live.text };
+          } catch (err) {
+            return { state: "failed", reason: `Rearrange apply failed: ${errorMessage(err)}` };
+          }
+        },
+      },
+      {
+        scope: "file",
+        targetPath,
+        targetUri,
+        readOnly: !!file.library || workspaceResourceOperationLocked,
+        hasSelection: false,
+        capabilities: resolveRearrangeCapabilities(activeCapabilities, activeLspState?.status),
+      },
+    );
+    if (result.ok) {
+      setStatusMessage(
+        `Rearranged ${file.title ?? targetPath} (${result.operationCount} edits in one transaction); undo restores the preimage`,
+      );
+      return true;
+    }
+    setStatusMessage(result.reason);
+    return false;
+  }, [
+    absolutePathForOpenFile,
+    activeCapabilities,
+    activeLspState,
+    applyLspWorkspaceEdit,
+    lspDescriptorForFile,
+    lspSessionGeneration,
+    requestCodeActions,
+    workspaceInstanceId,
+    workspaceResourceOperationLocked,
+  ]);
+
   const workspaceCommands = useMemo<WorkspaceCommand[]>(() => [
     {
       id: "editor.completeStatement",
@@ -12215,27 +12352,8 @@ export function CodeWorkspaceTab({
       keywords: ["rearrange", "members", "order", "declarations", "structure"],
       when: () => !!activeFile,
       run: () => {
-        if (!activeFile) return;
-        const capabilities = resolveRearrangeCapabilities(
-          activeCapabilities,
-          activeLspState?.status,
-        );
-        const decision = planRearrange({
-          scope: "file",
-          targetPath: activeFile.path ?? activeFile.key,
-          languageId: activeLanguageId,
-          readOnly: !!activeFile.library || workspaceResourceOperationLocked,
-          hasSelection: false,
-          capabilities,
-        });
-        if (decision.kind === "unavailable") {
-          setStatusMessage(decision.reason);
-          return false;
-        }
-        setStatusMessage(
-          `Executing rearrange for ${activeFile.title ?? activeFile.path ?? "active file"} (${decision.provider?.id ?? "provider"})`,
-        );
-        return true;
+        if (!activeFile) return false;
+        return runRearrangeExecute(activeFile);
       },
     },
     {
@@ -13563,6 +13681,7 @@ export function CodeWorkspaceTab({
     resolveEditorTarget,
     roots.length,
     runEditorAiActionAtCursor,
+    runRearrangeExecute,
     saveFile,
     scanWorkspaceCoverage,
     seSymbolsAvailable,
