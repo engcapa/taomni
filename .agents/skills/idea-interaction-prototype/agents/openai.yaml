@@ -1,0 +1,4 @@
+interface:
+  display_name: "IDEA 交互原型"
+  short_description: "按任务卡实测本地 IDEA 并截图，生成单 HTML 交互原型和维护完成状态"
+  default_prompt: "使用 $idea-interaction-prototype 领取一个原型尚未 done 的 IDEA 行为任务卡，在指定版本 IDEA 中实测截图并交付单 HTML 交互原型。"
