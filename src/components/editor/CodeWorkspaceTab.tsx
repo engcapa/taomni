@@ -1109,6 +1109,7 @@ import {
 } from "./workspace/workspaceSemanticIndex";
 import { useWorkspaceSemanticIndex } from "./workspace/useWorkspaceSemanticIndex";
 import {
+  createRestoreTimingRecorder,
   executeBoundedAsyncQueue,
   planWorkspaceRestore,
 } from "./workspace/workspaceRestoreModel";
@@ -3442,6 +3443,17 @@ export function CodeWorkspaceTab({
           const restoreRun = { workspaceInstanceId, cancelled: false, cancelPending: false };
           restoreRunRef.current = restoreRun;
           const isCurrent = () => restoreRunRef.current === restoreRun && !restoreRun.cancelled;
+          // ED-AUDIT-013: app-clock restore milestones for the performance
+          // contract (request -> active ready -> all ready). activeReady
+          // marks the active-open drain; the case proves editability with a
+          // real keystroke right after, and the completion line below lands
+          // in the run console artifact for aggregation. Durations derive
+          // from these marks, never from runner step timings.
+          const restoreTimings = createRestoreTimingRecorder(
+            plan.activeTargets.length,
+            plan.backgroundTargets.length,
+          );
+          restoreTimings.markRequested();
 
           // Restore active group selection
           if (plan.activeGroupId) {
@@ -3461,8 +3473,19 @@ export function CodeWorkspaceTab({
               isCurrent,
             }),
             3,
-          ).then(() => {
-            if (plan.backgroundTargets.length === 0) return [];
+          ).then((activeOutcomes) => {
+            restoreTimings.markActiveReady();
+            if (!isCurrent()) restoreTimings.markCancelled();
+            if (plan.backgroundTargets.length === 0) {
+              restoreTimings.markAllReady();
+              console.log(`[restore-timings] ${JSON.stringify({
+                workspaceInstanceId,
+                ...restoreTimings.toJSON(),
+                activeSettled: activeOutcomes.length,
+                backgroundSettled: 0,
+              })}`);
+              return [];
+            }
             return executeBoundedAsyncQueue(
               plan.backgroundTargets,
               (target) => openFile(target.ref, {
@@ -3473,7 +3496,17 @@ export function CodeWorkspaceTab({
                 isCurrent,
               }),
               3,
-            );
+            ).then((backgroundOutcomes) => {
+              restoreTimings.markAllReady();
+              if (!isCurrent()) restoreTimings.markCancelled();
+              console.log(`[restore-timings] ${JSON.stringify({
+                workspaceInstanceId,
+                ...restoreTimings.toJSON(),
+                activeSettled: activeOutcomes.length,
+                backgroundSettled: backgroundOutcomes.length,
+              })}`);
+              return backgroundOutcomes;
+            });
           });
           return;
         }

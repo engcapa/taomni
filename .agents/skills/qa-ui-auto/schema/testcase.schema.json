@@ -70,7 +70,8 @@
      "java25_projects",
      "git_diff_repo",
      "welcome_recents",
-     "editor_typing_fixtures"
+     "editor_typing_fixtures",
+     "restore_24tab_fixtures"
     ]
    },
    "uniqueItems": true

@@ -108,3 +108,62 @@ export function getLineDiffCacheKey(
 ): string {
   return `${filePath}@${headOid ?? "untracked"}:${textVersion}`;
 }
+
+export interface RestoreTimingMarks {
+  requestedAt: number | null;
+  activeReadyAt: number | null;
+  allReadyAt: number | null;
+  cancelled: boolean;
+  activeCount: number;
+  backgroundCount: number;
+}
+
+export interface RestoreTimingRecorder {
+  readonly marks: RestoreTimingMarks;
+  markRequested(at?: number): void;
+  markActiveReady(at?: number): void;
+  markAllReady(at?: number): void;
+  markCancelled(): void;
+  toJSON(): RestoreTimingMarks;
+}
+
+/**
+ * ED-AUDIT-013: monotonic recorder for the three workspace-restore moments
+ * the performance contract measures: restore requested, focused active
+ * leaf/leaves ready, and background drain complete. First write wins per
+ * milestone so StrictMode remounts and repeated drains cannot rewrite
+ * history; cancellation is a flag, never a timestamp rewrite. Durations
+ * derive from app-clock differences, never from runner step timings.
+ */
+export function createRestoreTimingRecorder(
+  activeCount: number,
+  backgroundCount: number,
+): RestoreTimingRecorder {
+  const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+  const marks: RestoreTimingMarks = {
+    requestedAt: null,
+    activeReadyAt: null,
+    allReadyAt: null,
+    cancelled: false,
+    activeCount,
+    backgroundCount,
+  };
+  return {
+    marks,
+    markRequested(at: number = now()) {
+      if (marks.requestedAt === null) marks.requestedAt = at;
+    },
+    markActiveReady(at: number = now()) {
+      if (marks.activeReadyAt === null) marks.activeReadyAt = at;
+    },
+    markAllReady(at: number = now()) {
+      if (marks.allReadyAt === null) marks.allReadyAt = at;
+    },
+    markCancelled() {
+      marks.cancelled = true;
+    },
+    toJSON() {
+      return { ...marks };
+    },
+  };
+}
