@@ -40,6 +40,14 @@ tags: [code-workspace, ide-c2, completion, provider-fixture, native-gate, p1]
 modes: [native]
 fixtures: [reset_db, java_sample_projects, jdtls_required]
 timeout_sec: 600
+# Provider toolchain precondition: the maven-single fixture contract pins
+# JDK 21.0.4 (see __fixtures__/jdtls/README.md; the committed trace was
+# recorded on Zulu 21.0.4). The app auto-detects its tooling JDK as
+# Settings -> JAVA_HOME -> PATH -> common layouts, and /data/dev is not
+# scanned: invoking with the box default JDK 25 leaves dep-requiring
+# completions (this card's lang3 twin) empty while JDK-only locations
+# still complete, which fails as a popup timeout. Run native with e.g.
+# JAVA_HOME=/data/dev/jdk-21 so the launched JDT LS matches the fixture.
 steps:
   - open: "${cfg.app.base_url}"
   - vault_first_run: "qa-native-gate-password"
@@ -67,11 +75,31 @@ steps:
 
   # ---- Import-on-resolve accept: one dispatch, one undo ----
   # Caret after the bare `StringUti` token (1-based line 30; the trace's
-  # 0-based line 29 character 21).
+  # 0-based line 29 character 21). XTest bursts lose keys on some Linux
+  # desktops (29 downs landed on line 18 in run-20260909-123956), so the
+  # descent is paced in verified chunks: each waypoint assert is a
+  # condition-based wait and a misnavigation still fails here instead of
+  # as a confusing popup-content mismatch. No acceptance assertion changed.
   - click: '[data-testid="code-workspace-editor"] .cm-content'
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["Control+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "End"]
+      keys: ["Control+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown"]
+  - wait: 0.5
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 11,"
+      timeout_sec: 10
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown"]
+  - wait: 0.5
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 21,"
+      timeout_sec: 10
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "End"]
   # The status bar is 1-based: line 30 col 22 = caret after the bare
   # `StringUti` token. Assert it before firing completion so a misnavigation
   # fails here instead of as a confusing popup-content mismatch.
@@ -141,11 +169,28 @@ steps:
       timeout_sec: 30
 
   # ---- Snippet accept: call text lands, Tab advances the stop, one undo ----
-  # Caret after the `appen` prefix (1-based line 27).
+  # Caret after the `appen` prefix (1-based line 27). Same paced descent as
+  # above: XTest bursts lose keys on some Linux desktops.
   - click: '[data-testid="code-workspace-editor"] .cm-content'
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["Control+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "End"]
+      keys: ["Control+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown"]
+  - wait: 0.5
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 11,"
+      timeout_sec: 10
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown"]
+  - wait: 0.5
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 21,"
+      timeout_sec: 10
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "End"]
   # Line 27 col 38 = caret after the `appen` prefix of
   # `new StringBuilder().appen`.
   - assert_text:
