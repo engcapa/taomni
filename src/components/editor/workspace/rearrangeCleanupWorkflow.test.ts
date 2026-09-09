@@ -513,15 +513,35 @@ describe("ED-AUDIT-015: executeRearrangeTransaction supported-branch wiring (mod
     expect(deps.confirmPreview).toHaveBeenCalledTimes(1);
   });
 
-  it("short-circuits unsupported capabilities with zero IO", async () => {
+  it("short-circuits missing target and readonly with zero IO", async () => {
     const deps = baseDeps();
+    const noTarget = await executeRearrangeTransaction(deps, {
+      ...baseInput(),
+      targetPath: null as unknown as string,
+    });
+    expect(noTarget.ok).toBe(false);
+    const readOnly = await executeRearrangeTransaction(baseDeps(), {
+      ...baseInput(),
+      readOnly: true,
+    });
+    expect(readOnly.ok).toBe(false);
+    expect(deps.requestActions).not.toHaveBeenCalled();
+  });
+
+  it("discovers source.sortMembers live despite unsupported advertised caps", async () => {
+    const deps = baseDeps({
+      requestActions: vi.fn(async () => ({
+        state: "ok" as const,
+        actions: [{ kind: "source.sortMembers", title: "Sort Members", raw: { id: 9 } }],
+      })),
+    });
     const result = await executeRearrangeTransaction(deps, {
       ...baseInput(),
-      capabilities: { rearrangeSupported: false, providerId: "plain-lsp" },
+      capabilities: { rearrangeSupported: false, providerId: "Eclipse JDT Language Server" },
     });
-    expect(result.ok).toBe(false);
-    expect(deps.requestActions).not.toHaveBeenCalled();
-    expect(deps.applyEdit).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true, postHash: sha256Hex(POST), operationCount: 1 });
+    expect(deps.requestActions).toHaveBeenCalledTimes(1);
+    expect(deps.applyEdit).toHaveBeenCalledTimes(1);
   });
 
   it("refuses when the provider returns no rearrange-kind action", async () => {

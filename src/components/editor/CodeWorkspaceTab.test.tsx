@@ -9187,7 +9187,7 @@ end_of_record
       ).openFiles["root:app:src/Service.java"]?.text;
     }
 
-    it("reports honest unavailable with zero provider IO when rearrange is unadvertised", async () => {
+    it("reports honest unavailable via live discovery when rearrange is unadvertised", async () => {
       const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
       const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
         if (next) registrationRef.current = next;
@@ -9195,6 +9195,13 @@ end_of_record
       mockRearrangeServer(["quickfix", "source.organizeImports"]);
       vi.mocked(confirmAppDialog).mockClear();
       lspMocks.lspCodeActions.mockClear();
+      // Live discovery returns only the advertised non-rearrange actions.
+      lspMocks.lspCodeActions.mockResolvedValue({
+        status: documentStatus({ available: true, active: true }),
+        actions: [
+          { title: "Organize imports", kind: "source.organizeImports", raw: {} },
+        ],
+      });
 
       renderWorkspace(rearrangeWorkspace("instance-rearrange-unavail"), { onCommandsChange });
       await screen.findByTitle("app / src/Service.java");
@@ -9203,10 +9210,13 @@ end_of_record
       await act(async () => {
         await registrationRef.current?.executeAction("workspace.rearrangeCode");
       });
-      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("does not support member-rearrangement"));
+      // Advertised summaries never arbitrate (JDT LS never advertises
+      // arrangement kinds): the handler discovers live, finds no
+      // rearrange-kind action, and reports the received kinds with zero
+      // commits and no fake success.
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Provider returned no rearrange action"));
       expect(fileText("instance-rearrange-unavail")).toBe(SERVICE_PRE);
-      // Plan gate short-circuits before any provider request.
-      expect(lspMocks.lspCodeActions).not.toHaveBeenCalled();
+      expect(lspMocks.lspCodeActions).toHaveBeenCalled();
       expect(confirmAppDialog).not.toHaveBeenCalled();
     });
 

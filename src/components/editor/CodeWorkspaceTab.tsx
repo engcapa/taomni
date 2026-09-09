@@ -11824,7 +11824,7 @@ export function CodeWorkspaceTab({
         }),
         applyEdit: async (edit) => {
           try {
-            const outcomes = await applyLspWorkspaceEdit(edit, { recordHistory: true });
+            const outcomes = await applyLspWorkspaceEdit(edit, { recordHistory: true, label: "Rearrange Code" });
             const response = workspaceEditApplyResponse(outcomes);
             if (!response.applied) {
               return { state: "failed", reason: response.failureReason ?? "Rearrange apply failed; see the workspace-edit ledger" };

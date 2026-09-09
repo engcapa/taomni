@@ -528,12 +528,17 @@ export function cancelWorkflowPlan(_plan?: WorkflowPlan): {
 /**
  * Provider action kinds that count as a dedicated arrangement capability.
  * Matched by exact kind equality only — never by summary booleans or title
- * substring guessing.
+ * substring guessing. `source.sortMembers` is the Eclipse JDT LS
+ * member-arrangement action (Sort Members support, JDT LS 1.61 #2169;
+ * JavaCodeActionKind in the pinned 1.61.0 bundle; live-verified against the
+ * pinned server with a bare-LSP probe returning a real edit). JDT LS never
+ * advertises it in codeActionKinds, so discovery is live-only by design.
  */
 export const REARRANGE_ACTION_KINDS: readonly string[] = [
   "source.rearrange",
   "source.rearrangeCode",
   "rearrange",
+  "source.sortMembers",
 ];
 
 export function isRearrangeActionKind(kind: string | null): boolean {
@@ -630,17 +635,28 @@ export async function executeRearrangeTransaction(
 ): Promise<RearrangeExecuteResult> {
   const fail = (reason: string): RearrangeExecuteResult => ({ ok: false, reason, committed: false });
 
-  // 0. Plan gate: no target, readonly, or unsupported capability short-circuits
-  // with zero IO.
-  const decision = planRearrange({
-    scope: input.scope,
-    targetPath: input.targetPath,
-    languageId: null,
-    readOnly: input.readOnly,
-    hasSelection: input.hasSelection,
-    capabilities: input.capabilities,
-  });
-  if (decision.kind === "unavailable") return fail(decision.reason);
+  // 0. Zero-IO pre-gate: no target or readonly short-circuits without
+  // touching the provider. Advertised capability support is deliberately
+  // NOT decided here: Eclipse JDT LS never advertises arrangement kinds in
+  // codeActionKinds (contract-pinned), so the summary boolean cannot
+  // arbitrate — the spec requires resolving to a callable action, never
+  // summary booleans or title guessing. Live discovery at step 3 is the
+  // sole support arbiter; its absence fails typed with received kinds.
+  // Messages mirror planRearrange so display paths stay consistent.
+  const requestedScope: "selection" | "file" =
+    input.scope === "selection" && input.hasSelection ? "selection" : "file";
+  if (!input.targetPath) {
+    return fail("No file is open to rearrange");
+  }
+  if (input.readOnly) {
+    return fail(`${input.targetPath} is read-only and cannot be rearranged`);
+  }
+  const decision = {
+    scope: requestedScope,
+    provider: input.capabilities.providerId
+      ? { id: input.capabilities.providerId, version: input.capabilities.providerVersion }
+      : undefined,
+  };
 
   // 1. Freeze the live text for closed/readonly gating. The preimage used by
   // the plan is re-read after resolve (step 5) so a benign background sync

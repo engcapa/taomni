@@ -37,9 +37,15 @@ steps:
   - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
   - type: Rearrange Code
   - click: '[data-testid="code-workspace-search-everywhere"] >> text=Rearrange Code'
+  # Unavailable path under live discovery (ED-AUDIT-015): advertised
+  # summaries never arbitrate, so the handler issues the live codeAction
+  # request; the browser stub has no synchronizable language server and the
+  # request fails closed with zero commits and no fake success. The exact
+  # message names the sync precondition (deterministic in browser: docs
+  # never sync without a real server).
   - assert_text:
       selector: '[data-testid="status-bar-message"]'
-      contains: "Rearrange Code requires a dedicated arrangement provider"
+      contains: "finish synchronizing current editor buffers"
       timeout_sec: 20
   - assert_text:
       selector: '[data-testid="code-workspace-editor"]'

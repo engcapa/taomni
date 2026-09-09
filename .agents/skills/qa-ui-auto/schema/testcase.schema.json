@@ -71,7 +71,8 @@
      "git_diff_repo",
      "welcome_recents",
      "editor_typing_fixtures",
-     "restore_24tab_fixtures"
+     "restore_24tab_fixtures",
+     "sortable_java_fixtures"
     ]
    },
    "uniqueItems": true
