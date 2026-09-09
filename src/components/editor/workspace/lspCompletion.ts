@@ -1300,6 +1300,8 @@ export function cycleLspSnippetChoice(view: EditorView): boolean {
 
 /** Move the selection to the next placeholder span; false when exhausted. */
 export function advanceLspSnippetTabstop(view: EditorView): boolean {
+  // ED-AUDIT-011: Tab during IME composition belongs to the candidate window.
+  if (view.composing) return false;
   const session = lspSnippetSessions.get(view);
   if (!session || view.state.doc.length !== session.docLength) {
     lspSnippetSessions.delete(view);
@@ -1333,6 +1335,8 @@ export function advanceLspSnippetTabstop(view: EditorView): boolean {
 
 /** Clear the active tabstop session (Escape semantics). */
 export function cancelLspSnippetSession(view: EditorView): boolean {
+  // ED-AUDIT-011: Escape during IME composition cancels the candidate, not the snippet.
+  if (view.composing) return false;
   return lspSnippetSessions.delete(view);
 }
 
@@ -1343,6 +1347,8 @@ export function cancelLspSnippetSession(view: EditorView): boolean {
  * re-selects itself instead of letting indentLess fire inside the template.
  */
 export function retreatLspSnippetTabstop(view: EditorView): boolean {
+  // ED-AUDIT-011: Shift-Tab during IME composition belongs to the candidate window.
+  if (view.composing) return false;
   const session = lspSnippetSessions.get(view);
   if (!session || view.state.doc.length !== session.docLength) return false;
   session.index = Math.max(0, session.index - 1);

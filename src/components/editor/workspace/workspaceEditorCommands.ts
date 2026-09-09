@@ -706,6 +706,9 @@ export const selectAllEditorOccurrences: Command = (view) => {
 };
 
 export const escapeEditorSelections: Command = (view) => {
+  // ED-AUDIT-011: Escape during IME composition belongs to the candidate
+  // window; never collapse carets or clear occurrence state mid-composition.
+  if (view.composing) return false;
   if (view.state.field(occurrenceSessionField, false)) {
     view.dispatch({ effects: setOccurrenceSession.of(false) });
     return true;

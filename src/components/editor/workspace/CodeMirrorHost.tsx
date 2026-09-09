@@ -2404,6 +2404,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
           {
             key: "Tab",
             run: (view) => {
+              // ED-AUDIT-011: Tab during IME composition selects the candidate.
+              if (view.composing) return false;
               if (acceptCompletion(view)) return true;
               if (expandLiveTemplateAt(
                 view,
@@ -2415,7 +2417,11 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
           },
           {
             key: "Shift-Tab",
-            run: (view) => retreatLspSnippetTabstop(view),
+            run: (view) => {
+              // ED-AUDIT-011: Shift-Tab during composition belongs to the IME.
+              if (view.composing) return false;
+              return retreatLspSnippetTabstop(view);
+            },
           },
         ])),
         keymap.of([
@@ -2432,9 +2438,18 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
                 // last slot consults the session via ref and returns false
                 // when nothing of this kind is open, so Esc never claims a
                 // keystroke it did not consume.
+                // ED-AUDIT-011: Escape during IME composition cancels the
+                // candidate window; workspace snippet/selection/parameter
+                // owners must not consume it (callee guards also return false).
                 { key: "Escape", run: (view: EditorView) => cancelLspSnippetSession(view) },
                 { key: "Escape", run: escapeEditorSelections },
-                { key: "Escape", run: () => onParameterEscapeRef.current?.() ?? false },
+                {
+                  key: "Escape",
+                  run: (view: EditorView) => {
+                    if (view.composing) return false;
+                    return onParameterEscapeRef.current?.() ?? false;
+                  },
+                },
               ]
             : [
                 // Transitional unhosted fallback: standalone embedders/tests
