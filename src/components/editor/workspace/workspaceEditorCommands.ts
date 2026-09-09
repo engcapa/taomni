@@ -156,13 +156,17 @@ export function buildMultiCaretPastePlan(
   // the documented contract share one distribution rule. N segments x N carets
   // map 1:1; fewer segments cycle deterministically; extra segments are
   // dropped (first N win); no segments fall back to whole plainText per caret.
-  // External OS text never carries session segments (see
+  // Single-caret exception: one caret always receives the whole plainText so a
+  // multi-segment copy is never lossy on paste (matches the long-standing
+  // ED-CLIP-004 fallback regression); distribution rules apply across 2+
+  // carets only. External OS text never carries session segments (see
   // payloadForSystemClipboardText identity check), so the whole-block fallback
-  // only applies when segment identity was already discarded.
+  // only applies when segment identity was already discarded or when a single
+  // caret cannot express a distribution.
   const segments = payload.segments;
   const caretCount = normalized.ranges.length;
   let distributed: readonly string[];
-  if (!segments || segments.length === 0) {
+  if (!segments || segments.length === 0 || caretCount <= 1) {
     distributed = normalized.ranges.map(() => payload.plainText);
   } else if (segments.length === caretCount) {
     distributed = [...segments];

@@ -44,4 +44,18 @@ describe("ED-AUDIT-010 production paste distribution matches planPaste", () => {
     const inserts = (plan!.changes as unknown as Array<{ insert?: string }>).map((c) => c.insert);
     expect(inserts).toEqual(["a", "b"]);
   });
+
+  it("pastes the whole block to a single caret without dropping segments (2 segments -> 1 caret)", () => {
+    const state = stateWithCarets("ab", 1);
+    const plan = buildMultiCaretPastePlan(state, {
+      plainText: "X\nY",
+      segments: ["X", "Y"],
+      sourceEol: "lf",
+      rectangular: false,
+    });
+    expect(plan).not.toBeNull();
+    const inserts = (plan!.changes as unknown as Array<{ insert?: string }>).map((c) => c.insert);
+    // ED-CLIP-004 regression: single-caret fallback must not lose the copy.
+    expect(inserts).toEqual(["X\nY"]);
+  });
 });
