@@ -152,9 +152,25 @@ export function buildMultiCaretPastePlan(
 ): MultiCaretPastePlan | null {
   if (state.readOnly) return null;
   const normalized = normalizeEditorSelections(state.selection.ranges, state.selection.mainIndex);
-  const distributed = payload.segments?.length === normalized.ranges.length
-    ? payload.segments
-    : normalized.ranges.map(() => payload.plainText);
+  // ED-AUDIT-010: mirror workspaceClipboardSession.planPaste so production and
+  // the documented contract share one distribution rule. N segments x N carets
+  // map 1:1; fewer segments cycle deterministically; extra segments are
+  // dropped (first N win); no segments fall back to whole plainText per caret.
+  // External OS text never carries session segments (see
+  // payloadForSystemClipboardText identity check), so the whole-block fallback
+  // only applies when segment identity was already discarded.
+  const segments = payload.segments;
+  const caretCount = normalized.ranges.length;
+  let distributed: readonly string[];
+  if (!segments || segments.length === 0) {
+    distributed = normalized.ranges.map(() => payload.plainText);
+  } else if (segments.length === caretCount) {
+    distributed = [...segments];
+  } else if (segments.length < caretCount) {
+    distributed = normalized.ranges.map((_, index) => segments[index % segments.length]);
+  } else {
+    distributed = normalized.ranges.map((_, index) => segments[index]);
+  }
   const inserts = distributed.map((text) => normalizeClipboardEol(text, state.lineBreak));
   const changes = normalized.ranges.map((range, index) => ({
     from: range.from,
