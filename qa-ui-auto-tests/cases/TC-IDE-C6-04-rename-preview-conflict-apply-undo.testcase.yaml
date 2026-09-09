@@ -1,15 +1,15 @@
 id: TC-IDE-C6-04
-title: "Rename preview conflict/apply/undo under jdtls"
+title: "Real JDT LS two-file rename preview cancellation, apply and undo"
 description: |
-  §8.19.10 gate case C6-04. Capability ids: rename.preview-conflict /
-  semantic.workspace-edit-undo. Required mode: PROVIDER FIXTURE — rename
-  conflict detection and cross-file WorkspaceEdit apply need jdtls.
-  Browser runs must report environment-blocked, never passed. Highest
-  claim on green: L2 provider-backed (Linux).
+  ED-AUDIT-014 normal transaction evidence. Use a compilable isolated Maven
+  project, navigate to signatureTargets, cancel a real two-file preview and
+  verify both preimage hashes, then apply and undo the same rename through
+  production UI. Independently read both host files after each operation.
+  Conflict/recovery failures have separate focused and restart-recovery cases.
 covers: [F25.5]
 tags: [code-workspace, ide-c6, rename, provider-fixture, p1]
 modes: [native]
-fixtures: [reset_db, java_sample_projects, jdtls_required]
+fixtures: [reset_db, java_rename_project, jdtls_required]
 timeout_sec: 600
 steps:
   - open: "${cfg.app.base_url}"
@@ -30,5 +30,102 @@ steps:
       contains: "public static void main"
       timeout_sec: 60
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Shift+F6
-  - screenshot: tc-ide-c6b-preview.png
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: Java
+      timeout_sec: 60
+  - press: Control+g
+  - fill:
+      selector: 'input[name="line"]'
+      value: '${fixture.rename_caret}'
+  - click: '.cm-dialog button[type="submit"]'
+  - assert_not_visible: 'input[name="line"]'
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: '${fixture.rename_cursor_status}'
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-of-type(5)'
+  - fill:
+      selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+      value: Rename Symbol
+  - assert_text:
+      selector: '[data-testid="code-workspace-search-everywhere"] [data-index="0"]'
+      contains: Rename Symbol
+  - press: Enter
+  - wait_for:
+      selector: '[data-testid="text-input-dialog-input"]'
+      timeout_sec: 120
+  - fill:
+      selector: '[data-testid="text-input-dialog-input"]'
+      value: executeWorkflow
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for:
+      selector: '[data-testid="refactoring-preview-dialog"]'
+      timeout_sec: 120
+  - assert_text:
+      selector: '[data-testid="refactoring-preview-dialog"]'
+      contains: AppTest.java
+  - click: '[data-testid="refactoring-preview-cancel"]'
+  - assert_file_sha256:
+      path: '${fixture.rename_app_file}'
+      equals: '${fixture.rename_app_pre_hash}'
+  - assert_file_sha256:
+      path: '${fixture.rename_test_file}'
+      equals: '${fixture.rename_test_pre_hash}'
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+g
+  - fill:
+      selector: 'input[name="line"]'
+      value: '${fixture.rename_caret}'
+  - click: '.cm-dialog button[type="submit"]'
+  - assert_not_visible: 'input[name="line"]'
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: '${fixture.rename_cursor_status}'
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-of-type(5)'
+  - fill:
+      selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+      value: Rename Symbol
+  - assert_text:
+      selector: '[data-testid="code-workspace-search-everywhere"] [data-index="0"]'
+      contains: Rename Symbol
+  - press: Enter
+  - wait_for:
+      selector: '[data-testid="text-input-dialog-input"]'
+      timeout_sec: 120
+  - fill:
+      selector: '[data-testid="text-input-dialog-input"]'
+      value: executeWorkflow
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for:
+      selector: '[data-testid="refactoring-preview-dialog"]'
+      timeout_sec: 120
+  - assert_text:
+      selector: '[data-testid="refactoring-preview-dialog"]'
+      contains: AppTest.java
+  - click: '[data-testid="refactoring-preview-apply"]'
+  - assert_file_sha256:
+      path: '${fixture.rename_app_file}'
+      equals: '${fixture.rename_app_post_hash}'
+  - assert_file_sha256:
+      path: '${fixture.rename_test_file}'
+      equals: '${fixture.rename_test_post_hash}'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: executeWorkflow
+  - press:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      key: Control+z
+  - assert_file_sha256:
+      path: '${fixture.rename_app_file}'
+      equals: '${fixture.rename_app_pre_hash}'
+  - assert_file_sha256:
+      path: '${fixture.rename_test_file}'
+      equals: '${fixture.rename_test_pre_hash}'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: signatureTargets
+  - screenshot: tc-ide-c6b-after-undo.png

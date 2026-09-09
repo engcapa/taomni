@@ -2537,6 +2537,113 @@ describe("CodeWorkspaceTab", () => {
     ).openFiles["root:app:src/main.ts"]?.text).toBe("const value = 1;");
   });
 
+  it("keeps a rename current while background provider progress is active", async () => {
+    const { workspace, disk } = setupMountedRenameFixture("instance-mounted-rename-progress");
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+    let resolvePrompt: ((value: string | null) => void) | null = null;
+    vi.mocked(promptAppDialog).mockImplementationOnce(() => new Promise<string | null>((resolve) => {
+      resolvePrompt = resolve;
+    }));
+
+    renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(registrationRef.current).not.toBeNull());
+
+    const execution = registrationRef.current!.executeAction("workspace.renameSymbol");
+    await waitFor(() => expect(lspMocks.lspPrepareRename).toHaveBeenCalled());
+    await act(async () => {
+      await emit("lsp://work-done-progress", {
+        workspaceId: workspace.workspaceInstanceId,
+        presetId: "java",
+        serverLabel: "Java",
+        rootUri: "file:///repo/app",
+        token: "maven-import",
+        kind: "begin",
+        title: "Importing Maven project",
+        message: "Resolving project",
+        percentage: 20,
+        cancellable: false,
+      });
+    });
+    await waitFor(() => expect(screen.getByTestId("analysis-semantic-index")).toHaveTextContent(
+      "Active provider work: Java:file:///repo/app",
+    ));
+
+    resolvePrompt!("renamed");
+    await act(async () => {
+      await execution;
+    });
+    await waitFor(() => expect(lspMocks.lspRename).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(disk.get("src/main.ts")).toBe("const renamed = 1;"));
+  });
+
+  it("captures closed files before applying a multi-file provider rename", async () => {
+    const { workspace, disk } = setupMountedRenameFixture("instance-mounted-multi-file-rename");
+    disk.set("src/other.ts", "const value = 2;");
+    lspMocks.lspRename.mockResolvedValueOnce({
+      status: documentStatus({
+        path: "/repo/app/src/main.ts",
+        uri: "file:///repo/app/src/main.ts",
+        available: true,
+        active: true,
+        capabilities: defaultCapabilities({ rename: true }),
+      }),
+      edit: {
+        documentEdits: [
+          {
+            uri: "file:///repo/app/src/main.ts",
+            path: "/repo/app/src/main.ts",
+            edits: [{
+              range: {
+                start: { line: 0, character: 6 },
+                end: { line: 0, character: 11 },
+              },
+              newText: "renamed",
+            }],
+          },
+          {
+            uri: "file:///repo/app/src/other.ts",
+            path: "/repo/app/src/other.ts",
+            edits: [{
+              range: {
+                start: { line: 0, character: 6 },
+                end: { line: 0, character: 11 },
+              },
+              newText: "renamed",
+            }],
+          },
+        ],
+      },
+    });
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+    vi.mocked(promptAppDialog).mockResolvedValueOnce("renamed");
+
+    renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(registrationRef.current).not.toBeNull());
+
+    await act(async () => {
+      await registrationRef.current!.executeAction("workspace.renameSymbol");
+    });
+    const preview = await screen.findByTestId("refactoring-preview-dialog");
+    fireEvent.click(within(preview).getByTestId("refactoring-preview-apply"));
+    await waitFor(() => expect(disk.get("src/main.ts")).toBe("const renamed = 1;"));
+    await waitFor(() => expect(disk.get("src/other.ts")).toBe("const renamed = 2;"));
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Applied 2"));
+
+    await act(async () => {
+      await registrationRef.current!.executeAction("workspace.undoWorkspaceEdit");
+    });
+    await waitFor(() => expect(disk.get("src/main.ts")).toBe("const value = 1;"));
+    await waitFor(() => expect(disk.get("src/other.ts")).toBe("const value = 2;"));
+  });
+
   it("blocks a mounted rename on a disk postcondition mismatch and exposes recovery without history", async () => {
     const { workspace, disk } = setupMountedRenameFixture("instance-mounted-mismatch");
     const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };

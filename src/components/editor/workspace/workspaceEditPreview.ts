@@ -1,8 +1,10 @@
 import type {
   LspChangeAnnotation,
+  LspFileTextEdits,
   LspWorkspaceEdit,
   LspWorkspaceEditOperation,
 } from "../../../lib/editor/lsp";
+import { resolveWorkspaceEditPath } from "./codeWorkspaceModel";
 
 export interface WorkspaceEditPreviewEntry {
   operationIndex: number;
@@ -47,6 +49,40 @@ function displayPath(path: string | null | undefined, uri: string | null | undef
 export function workspaceEditOperations(edit: LspWorkspaceEdit): LspWorkspaceEditOperation[] {
   if (edit.operations?.length) return edit.operations;
   return edit.documentEdits.map((document) => ({ kind: "text", document }));
+}
+
+/** Normalize all local WorkspaceEdit targets before any preview or mutation. */
+export function normalizeWorkspaceEditPaths(
+  edit: LspWorkspaceEdit,
+  workspaceRoots: readonly { path: string }[] = [],
+): LspWorkspaceEdit {
+  const roots = workspaceRoots.map((root) => root.path);
+  const normalizeDocument = (document: LspFileTextEdits): LspFileTextEdits => ({
+    ...document,
+    path: resolveWorkspaceEditPath(document.path, document.uri, roots),
+  });
+  const documentEdits = edit.documentEdits.map(normalizeDocument);
+  const operations = edit.operations?.map((operation): LspWorkspaceEditOperation => {
+    if (operation.kind === "text") {
+      return { ...operation, document: normalizeDocument(operation.document) };
+    }
+    if (operation.kind === "rename") {
+      return {
+        ...operation,
+        oldPath: resolveWorkspaceEditPath(operation.oldPath, operation.oldUri, roots),
+        newPath: resolveWorkspaceEditPath(operation.newPath, operation.newUri, roots),
+      };
+    }
+    return {
+      ...operation,
+      path: resolveWorkspaceEditPath(operation.path, operation.uri, roots),
+    };
+  });
+  return {
+    ...edit,
+    documentEdits,
+    ...(edit.operations ? { operations } : {}),
+  };
 }
 
 /**

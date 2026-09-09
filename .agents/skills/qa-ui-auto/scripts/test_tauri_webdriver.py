@@ -207,6 +207,39 @@ class NativeSessionPointerClickTest(TestCase):
         ))
 
 
+class NativeSessionClickTest(TestCase):
+    def test_click_centers_css_target_before_element_click(self) -> None:
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.session_id = "session-1"
+        session.find = Mock(return_value="element-1")
+        session.execute = Mock(return_value=True)
+        session.request = Mock(return_value=None)
+
+        result = session.click('[data-testid="welcome-history-tab-workspaces"]')
+
+        self.assertEqual(result, 'clicked [data-testid="welcome-history-tab-workspaces"]')
+        session.execute.assert_called_once_with(
+            "const el = document.querySelector(\"[data-testid=\\\"welcome-history-tab-workspaces\\\"]\");"
+            "if (el) el.scrollIntoView({block: 'center', inline: 'nearest'});"
+            "return !!el;"
+        )
+        self.assertEqual(
+            session.request.call_args.args[:2],
+            ("POST", session.endpoint("/element/element-1/click")),
+        )
+
+    def test_click_does_not_query_selector_for_text_strategy(self) -> None:
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.session_id = "session-1"
+        session.find = Mock(return_value="element-1")
+        session.execute = Mock()
+        session.request = Mock(return_value=None)
+
+        session.click("text=Recent workspaces")
+
+        session.execute.assert_not_called()
+
+
 class NativeSessionPressComboTest(TestCase):
     def test_press_combo_releases_webdriver_input_sources(self) -> None:
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))

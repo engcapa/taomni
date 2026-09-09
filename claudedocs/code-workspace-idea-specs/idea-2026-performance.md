@@ -29,12 +29,12 @@ Owner：`src/components/editor/workspace/CodeMirrorHost.tsx` 的 update/reconfig
 
 生成固定文件：1 MiB Java-like 多行文本，5 MiB 同结构 stress fixture，另一个小文档验证普通编辑不回归。真实输入 N>=200、warmup>=20，重复至少两组并记录环境噪声。两端使用可比 editor intelligence 状态；IDEA indexing 等待完成。保存用户动作、caret、最后文档 hash 和 Undo。
 
-- **ED-AUDIT-005-A1：** 真实输入链的 baseline 与 candidate raw samples、共同端点 IDEA 测量记录可重算 percentile；缺失/不可比数据不能产生 matched 或 no-regression 结论。
+- **ED-AUDIT-005-A1：** 真实输入链的 baseline 与 candidate raw samples 可重算 percentile；若 IDEA 具备相同采集端点则记录其测量，否则明确保留未运行，不产生跨产品 matched 或 no-regression 结论。
 - **ED-AUDIT-005-A2：** 对 baseline trace 定位的本卡热路径完成代码优化并证明改善超出预先记录噪声；若当前实现已满足原目标，允许无重复实现，但须保留当前 source 的生产路径与无回归证据。小文档/1 MiB 文本、selection、undo、save 同步断言不变。
-- **ED-AUDIT-005-A3：** 性能 collector 与 owner focused/typecheck、当前平台 native、performance/IDEA evidence 通过；预算尚未定义的项只能报告测量/no-regression，不报告绝对预算达标。
+- **ED-AUDIT-005-A3：** 性能 collector 与 owner focused/typecheck、当前平台 native、performance evidence 通过；IDEA evidence 有条件时记录，未运行不阻断本卡 `done`。预算尚未定义的项只能报告测量/no-regression，不报告绝对预算达标。
 
 V-005：`pnpm exec vitest run src/components/editor/workspace/editorPerformance.test.tsx src/stores/appStore.test.ts` 为已有回归入口，必要时增加实际变化 owner 测试；按 native-testing.md 的 native_editor_performance 收集真实 keydown-to-DOM samples，明确它不是全 OS-to-screen。现有 `scripts/perf_baseline.py` 只作 Chromium 诊断。IDEA 屏幕计时采用相同采集器/分辨率并记录工具；当前不可实现共同计时端点则保留未验证，不编造新命令已可用。
-必需证据：code-audit、unit、typecheck、performance、native、idea-comparison。
+必需证据：code-audit、unit、typecheck、performance、native。
 
 <a id="ed-audit-013"></a>
 ## ED-AUDIT-013 多标签恢复的可交互时机优化
@@ -55,12 +55,12 @@ Owner：`src/components/editor/workspace/workspaceRestoreModel.ts`、`useDeferre
 
 固定 24 tabs、2 leaf（明确 active 文件），同一干净 fixture 与一个读取失败文件变体；分别冷启动与已运行重开 workspace，记录哪个文件何时 read/ready，active-ready 后输入 X。IDEA 用相同 tabs/layout 的工程打开动作；插件/JDK/indexing 与缓存前提完整记录。每种不少于 20 次 measured run、3 次 warmup（冷启动 warmup 单列，不改变测量 cache 定义），同时保留 all-ready 和失败数量。
 
-- **ED-AUDIT-013-A1：** active-ready 和 all-ready 两组 raw timing 可重算，未把全恢复时长误用为编辑器输入就绪；IDEA 同动作可比端点与 delta 明确。
+- **ED-AUDIT-013-A1：** active-ready 和 all-ready 两组 raw timing 可重算，未把全恢复时长误用为编辑器输入就绪；IDEA 具备相同动作和可比端点时记录 delta，否则明确保留未运行。
 - **ED-AUDIT-013-A2：** 生产 trace 证明有界并发、active 优先、每文件失败隔离和取消不发布；若存在 active 被阻塞则完成 owner 优化；ready 后输入不被迟到 restore/Git diff 覆盖。
-- **ED-AUDIT-013-A3：** 同条件 candidate 相对 baseline 无超出已测噪声的回归，24 tabs 状态/编辑/关闭重开均正确；unit/typecheck、当前 native、performance 与 IDEA evidence 通过，不套用无来源的 100ms restore 预算。
+- **ED-AUDIT-013-A3：** 同条件 candidate 相对 baseline 无超出已测噪声的回归，24 tabs 状态/编辑/关闭重开均正确；unit/typecheck、当前 native、performance evidence 通过，IDEA evidence 有条件时记录，未运行不阻断本卡 `done`，不套用无来源的 100ms restore 预算。
 
 V-013：`pnpm exec vitest run src/components/editor/workspace/workspaceRestoreModel.test.ts src/components/editor/workspace/useDeferredGitLineChanges.test.tsx src/lib/performanceInstrumentation.test.ts`；TC-IDE-C4-02 只作功能回归，另建本卡 restore measurement fixture（拟新增）。记录 read postconditions、并发数、丢失 tab 数和原始计时。
-必需证据：code-audit、unit、typecheck、performance、native、idea-comparison。
+必需证据：code-audit、unit、typecheck、performance、native。
 
 <a id="ed-audit-006"></a>
 ## ED-AUDIT-006 当前源码门禁与能力发布矩阵

@@ -2,20 +2,26 @@ import type { LspWorkspaceEditOperation } from "../../../lib/editor/lsp";
 import {
   isAbsoluteFsPath,
   normalizeFsPath,
+  resolveWorkspaceEditPath,
   relativePathWithinRoot,
 } from "./codeWorkspaceModel";
 
 export function workspaceEditOperationPaths(
   operation: LspWorkspaceEditOperation,
+  workspaceRoots: readonly string[] = [],
 ): string[] {
   if (operation.kind === "text") {
-    return operation.document.path?.trim() ? [operation.document.path] : [];
+    const path = resolveWorkspaceEditPath(operation.document.path, operation.document.uri, workspaceRoots);
+    return path ? [path] : [];
   }
   if (operation.kind === "rename") {
-    return [operation.oldPath, operation.newPath]
-      .filter((path): path is string => typeof path === "string" && path.trim().length > 0);
+    return [
+      resolveWorkspaceEditPath(operation.oldPath, operation.oldUri, workspaceRoots),
+      resolveWorkspaceEditPath(operation.newPath, operation.newUri, workspaceRoots),
+    ].filter((path): path is string => path !== null);
   }
-  return operation.path?.trim() ? [operation.path] : [];
+  const path = resolveWorkspaceEditPath(operation.path, operation.uri, workspaceRoots);
+  return path ? [path] : [];
 }
 
 /**
@@ -35,7 +41,7 @@ export function validateSemanticWorkspaceEditPaths(
     return "Semantic WorkspaceEdit requires at least one absolute workspace root";
   }
   for (const operation of operations) {
-    const paths = workspaceEditOperationPaths(operation);
+    const paths = workspaceEditOperationPaths(operation, roots);
     const expectedPathCount = operation.kind === "rename" ? 2 : 1;
     if (paths.length !== expectedPathCount) {
       return "Semantic WorkspaceEdit contains a non-local or missing filesystem path";

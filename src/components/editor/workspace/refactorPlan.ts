@@ -3,7 +3,12 @@ import type {
   LspWorkspaceEdit,
   LspWorkspaceEditOperation,
 } from "../../../lib/editor/lsp";
-import { fsPathEquals, normalizeFsPath, relativePathWithinRoot } from "./codeWorkspaceModel";
+import {
+  fsPathEquals,
+  normalizeFsPath,
+  relativePathWithinRoot,
+  resolveWorkspaceEditPath,
+} from "./codeWorkspaceModel";
 import type { CapabilityEvidenceV3 } from "./capabilityEvidence";
 import { workspaceEditOperations } from "./workspaceEditPreview";
 import { useProjectFactsStore } from "../../../stores/projectFactsStore";
@@ -321,8 +326,41 @@ function matchOpenFile(
  * Accurately maps revisions, disk hashes, and expected post-hashes per document precondition.
  */
 export function buildRefactorPlan(input: BuildRefactorPlanInput): RefactorPlanV4 {
-  const operations = workspaceEditOperations(input.edit);
   const roots = input.roots;
+  const operations = workspaceEditOperations(input.edit).map((operation) => {
+    if (operation.kind === "text") {
+      return {
+        ...operation,
+        document: {
+          ...operation.document,
+          path: resolveWorkspaceEditPath(
+            operation.document.path,
+            operation.document.uri,
+            roots.map((root) => root.path),
+          ),
+        },
+      };
+    }
+    if (operation.kind === "rename") {
+      return {
+        ...operation,
+        oldPath: resolveWorkspaceEditPath(
+          operation.oldPath,
+          operation.oldUri,
+          roots.map((root) => root.path),
+        ),
+        newPath: resolveWorkspaceEditPath(
+          operation.newPath,
+          operation.newUri,
+          roots.map((root) => root.path),
+        ),
+      };
+    }
+    return {
+      ...operation,
+      path: resolveWorkspaceEditPath(operation.path, operation.uri, roots.map((root) => root.path)),
+    };
+  });
   const openFiles = input.openFiles ?? {};
   const rawConflicts = input.conflicts ?? [];
 
@@ -383,7 +421,11 @@ export function buildRefactorPlan(input: BuildRefactorPlanInput): RefactorPlanV4
     const matched = matchOpenFile(info.uri, info.path, openFiles);
     const rev = matched?.documentRevision ?? matched?.revision ?? null;
     const diskHash = matched?.diskHash ?? matched?.expectedDiskHash ?? null;
-    const canonical = info.path ?? (info.uri?.startsWith("file:") ? decodeURIComponent(info.uri.replace(/^file:\/\//i, "")) : null);
+    const canonical = info.path ?? resolveWorkspaceEditPath(
+      null,
+      info.uri,
+      roots.map((root) => root.path),
+    );
 
     // ED-REF-001-A2: read-only library / external conflict
     if (info.owner !== "workspace") {

@@ -117,6 +117,8 @@ export interface WorkspaceActionHostOptions {
   onExecuted?: (actionId: string, result: ActionResult) => void;
 }
 
+export type WorkspaceActionHostListener = () => void;
+
 /**
  * Matching identity of a stroke: canonical physical code + modifiers, display
  * key dropped. Both definition-derived and event-derived strokes funnel
@@ -349,6 +351,7 @@ export class WorkspaceActionHost {
   private commands = new Map<string, WorkspaceCommand>();
   private inFlightActions = new Set<string>();
   private generation = 0;
+  private readonly generationListeners = new Set<WorkspaceActionHostListener>();
   private disposed = false;
   /** Monotonic per-host evaluation identity (§8.19.2 evaluationId). */
   private evaluationCounter = 0;
@@ -379,6 +382,21 @@ export class WorkspaceActionHost {
     return this.generation;
   }
 
+  /**
+   * Subscribe to imperative registry changes so external-store projections
+   * cannot retain prepared evaluations from an older host generation.
+   */
+  subscribe(listener: WorkspaceActionHostListener): () => void {
+    if (this.disposed) return () => {};
+    this.generationListeners.add(listener);
+    return () => this.generationListeners.delete(listener);
+  }
+
+  private bumpGeneration(): void {
+    this.generation += 1;
+    for (const listener of Array.from(this.generationListeners)) listener();
+  }
+
   isDisposed(): boolean {
     return this.disposed;
   }
@@ -396,6 +414,7 @@ export class WorkspaceActionHost {
     this.actionLayers.clear();
     this.actionLayerBases.clear();
     this.commands.clear();
+    this.generationListeners.clear();
   }
 
   /**
@@ -407,7 +426,7 @@ export class WorkspaceActionHost {
     if (this.keymapScheme === scheme) return;
     this.keymapScheme = scheme;
     this.cancelPendingChord("scheme changed");
-    this.generation += 1;
+    this.bumpGeneration();
   }
 
   getKeymapScheme(): KeymapSchemeV3 | null {
@@ -479,7 +498,7 @@ export class WorkspaceActionHost {
     if (this.disposed) return () => {};
     const token = Symbol(`action:${action.id}`);
     this.pushActionLayer(action, token, null);
-    this.generation += 1;
+    this.bumpGeneration();
     return () => this.removeActionLayer(action.id, token);
   }
 
@@ -491,13 +510,13 @@ export class WorkspaceActionHost {
     const token = Symbol("actions");
     const ownerViewId = options.ownerViewId ?? null;
     for (const action of actions) this.pushActionLayer(action, token, ownerViewId);
-    this.generation += 1;
+    this.bumpGeneration();
     return () => {
       let changed = false;
       for (const action of actions) {
         changed = this.removeActionLayer(action.id, token, false) || changed;
       }
-      if (changed) this.generation += 1;
+      if (changed) this.bumpGeneration();
     };
   }
 
@@ -555,7 +574,7 @@ export class WorkspaceActionHost {
       if (base) this.actions.set(actionId, base);
       else this.actions.delete(actionId);
     }
-    if (bumpGeneration) this.generation += 1;
+    if (bumpGeneration) this.bumpGeneration();
     return true;
   }
 
@@ -609,7 +628,7 @@ export class WorkspaceActionHost {
       installedAdapters.set(command.id, adapter);
       this.actions.set(command.id, adapter);
     }
-    this.generation += 1;
+    this.bumpGeneration();
 
     return () => {
       let changed = false;
@@ -624,7 +643,7 @@ export class WorkspaceActionHost {
           changed = true;
         }
       }
-      if (changed) this.generation += 1;
+      if (changed) this.bumpGeneration();
     };
   }
 

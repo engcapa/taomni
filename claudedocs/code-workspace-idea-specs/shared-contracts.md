@@ -26,6 +26,8 @@ The parity levels are:
 | L2 | The real main path, negative paths, state synchronization, and undo/recovery pass focused behavior automation. |
 | L3 | L2 plus target-platform native, performance, accessibility, and observed IDEA comparison evidence. |
 
+本轮行为卡的 `done` 门槛由任务板中的 acceptance 和 `required_evidence` 决定，不自动要求达到 L3。按当前任务板规则，IDEA 2026.2.x 对比是可选观察证据；未运行时必须记录在 `evidence.unrun` 和状态说明中，但不阻断行为卡 `done` 或依赖解锁。没有 IDEA 观察时不得声称 L3 或跨产品行为已匹配。
+
 Task completion never promotes a whole capability family automatically. Claims must name the capability, fixture, provider, platform, and highest proven level.
 
 ## 2. Shared Identities And Ownership

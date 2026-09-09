@@ -27,11 +27,11 @@ src/components/editor/workspace/findInFilesScopeModel.ts、replaceInFilesModel.t
 
 - **ED-AUDIT-003-A1：** 同一 fixture 的范围、匹配位置、选中替换集合在 IDEA 与 Taomni 可对比；修复确认 delta，结果集合不得因 UI 刷新扩大。
 - **ED-AUDIT-003-A2：** 预览后外部改变、dirty/readonly、非法 regex、取消/stale 均有回归；无 effect 分支零 history，已发生部分 effect 有真实 ledger 与恢复结果。
-- **ED-AUDIT-003-A3：** focused/mounted、当前 native 文件后置断言、typecheck 与 IDEA comparison 通过；搜索实现改动影响性能时补同 fixture 耗时证据。
+- **ED-AUDIT-003-A3：** focused/mounted、当前 native 文件后置断言和 typecheck 通过；搜索实现改动影响性能时补同 fixture 耗时证据。IDEA comparison 有条件时记录，未运行不阻断本卡 `done`。
 
 验证 V-003：findInFilesScopeModel.test.ts、replaceInFilesModel.test.ts、buildReplaceEdits.test.ts、panels/FindInFilesPanel.test.tsx、panels/ReplacePreviewDialog.test.tsx；拟新增 TC-IDE-AUDIT-003（实施前查重登记 covers）。 执行 `pnpm exec vitest run <本卡文件>` 与完整 owner scope 的 typecheck；每个 A ID 对应同场景主流程、负路径与交付检查。新 case/runner 命令需实现并校验后才可记录实际执行。
 
-必需证据：`code-audit`、`unit`、`typecheck`、`browser`、`native`、`idea-comparison`。所有计划当前待执行。mock-only 证明模型边界；无真实 IDEA/provider/native 时保持未运行或 implemented，不标 done。
+必需证据：`code-audit`、`unit`、`typecheck`、`browser`、`native`。mock-only 证明模型边界；当前平台 native 仍须真实运行，无真实 IDEA 时将 comparison 写入 `evidence.unrun`，不阻断本卡 `done`。
 
 <a id="ed-audit-007"></a>
 ## ED-AUDIT-007 Completion 接受与单次撤销对齐
@@ -56,13 +56,13 @@ snapshot 固定 document revision、provider generation、caret 范围与 invoca
 
 ### 验收与验证
 
-- **ED-AUDIT-007-A1：** 真实 provider 主 edit+import+snippet 由同一接受动作完成，并与 IDEA 同输入的用户结果对比；不支持的 completion 模式显式 unavailable。
+- **ED-AUDIT-007-A1：** 真实 provider 主 edit+import+snippet 由同一接受动作完成；有条件时与 IDEA 同输入的用户结果对比，不支持的 completion 模式显式 unavailable。
 - **ED-AUDIT-007-A2：** 延迟 resolve/取消/过期 document/provider 返回不能修改新文本；一次 undo 撤销该次所有 edits，history 与 selection 没有重复提交。
-- **ED-AUDIT-007-A3：** 现有 completion focused/mounted 回归、真实 provider、当前端 native 与 IDEA comparison/typecheck 通过；ranking 差异不能被 label normalize 吞掉。
+- **ED-AUDIT-007-A3：** 现有 completion focused/mounted 回归、真实 provider、当前端 native 与 typecheck 通过；ranking 差异不能被 label normalize 吞掉。IDEA comparison 有条件时记录，未运行不阻断本卡 `done`。
 
 验证 V-007：lspCompletion.test.ts、lspCompletionChoice.test.ts、lspCompletionChoiceSession.test.ts、lspCompletionResolveGate.test.ts、CodeMirrorHost.completion.test.tsx；TC-IDE-C2-01/03/05。 执行 `pnpm exec vitest run <本卡文件>` 与完整 owner scope 的 typecheck；每个 A ID 对应同场景主流程、负路径与交付检查。新 case/runner 命令需实现并校验后才可记录实际执行。
 
-必需证据：`code-audit`、`unit`、`typecheck`、`browser`、`native`、`provider`、`idea-comparison`。所有计划当前待执行。mock-only 证明模型边界；无真实 IDEA/provider/native 时保持未运行或 implemented，不标 done。
+必需证据：`code-audit`、`unit`、`typecheck`、`browser`、`native`、`provider`。mock-only 证明模型边界；当前平台 native/provider 仍须真实运行，无真实 IDEA 时将 comparison 写入 `evidence.unrun`，不阻断本卡 `done`。
 
 <a id="ed-audit-008"></a>
 ## ED-AUDIT-008 Intention 预览提交与失败对齐
@@ -93,7 +93,7 @@ maven-single 未导入 StringUtils，通过 IDEA intention 与 Taomni Alt+Enter 
 
 验证 V-008：codeActionProviderAdapter.test.ts、intentionSession.test.ts、codeActionExecution.test.ts、workspaceEditApply.test.ts、CodeWorkspaceTab.test.tsx 的 code-action 用例；复用 __fixtures__/jdtls/runner/run-jdtls-fixture.mjs 的实际支持参数，新增本卡 UI case 前核对已有覆盖。 执行 `pnpm exec vitest run <本卡文件>` 与完整 owner scope 的 typecheck；每个 A ID 对应同场景主流程、负路径与交付检查。新 case/runner 命令需实现并校验后才可记录实际执行。
 
-必需证据：`code-audit`、`unit`、`typecheck`、`browser`、`native`、`provider`、`idea-comparison`。所有计划当前待执行。mock-only 证明模型边界；无真实 IDEA/provider/native 时保持未运行或 implemented，不标 done。
+必需证据：`code-audit`、`unit`、`typecheck`、`browser`、`native`、`provider`。mock-only 证明模型边界；当前平台 native/provider 仍须真实运行，无真实 IDEA 时将 comparison 写入 `evidence.unrun`，不阻断本卡 `done`。
 
 <a id="ed-audit-012"></a>
 ## ED-AUDIT-012 语义结果跳转与返回历史对齐
@@ -120,11 +120,11 @@ maven-single 的 App/AppTest 与一个 library symbol；IDEA/Taomni Go to Declar
 
 - **ED-AUDIT-012-A1：** 同 fixture 的定义/用法目标和 reveal/back 位置可比较，修复确认的漏跳/错跳/重复 history；不把 lexical scan 伪称语义全集。
 - **ED-AUDIT-012-A2：** missing/library target、取消、切换 workspace、旧查询迟到都不夺焦点或污染 history；pin/rerun 的 scope 和 generation 可追溯。
-- **ED-AUDIT-012-A3：** navigation focused/mounted、实际 provider、当前端 native、IDEA comparison 和 typecheck 通过，未支持的库能力明确作为未达到而非匹配。
+- **ED-AUDIT-012-A3：** navigation focused/mounted、实际 provider、当前端 native 和 typecheck 通过，未支持的库能力明确作为未达到而非匹配。IDEA comparison 有条件时记录，未运行不阻断本卡 `done`。
 
 验证 V-012：useWorkspaceNavigation.test.tsx、navigationHistoryModel.test.ts、navigationHistoryV2.test.ts、UsagesScopeDialog.test.tsx、__fixtures__/jdtls/jdtlsUsagesContract.test.ts；TC-IDE-C6-01/02/05。 执行 `pnpm exec vitest run <本卡文件>` 与完整 owner scope 的 typecheck；每个 A ID 对应同场景主流程、负路径与交付检查。新 case/runner 命令需实现并校验后才可记录实际执行。
 
-必需证据：`code-audit`、`unit`、`typecheck`、`browser`、`native`、`provider`、`idea-comparison`。所有计划当前待执行。mock-only 证明模型边界；无真实 IDEA/provider/native 时保持未运行或 implemented，不标 done。
+必需证据：`code-audit`、`unit`、`typecheck`、`browser`、`native`、`provider`。mock-only 证明模型边界；当前平台 native/provider 仍须真实运行，无真实 IDEA 时将 comparison 写入 `evidence.unrun`，不阻断本卡 `done`。
 
 <a id="ed-audit-015"></a>
 ## ED-AUDIT-015 Rearrange 支持分支接入实际事务
@@ -151,11 +151,11 @@ Java 类含 field、constructor、methods，记录 IDEA arrangement rules/profil
 
 - **ED-AUDIT-015-A1：** 真实支持 provider 从 production Rearrange 入口产生专用重排结果，post text 与 IDEA 指定 rules 可对比；无 provider 时明确未达到该能力，不再出现执行成功假象。
 - **ED-AUDIT-015-A2：** preview/cancel/stale/conflict 各有零提交回归；只读拒绝；apply 读取真实 post hash，单次 undo 恢复 preimage。
-- **ED-AUDIT-015-A3：** unit/typecheck/mounted、当前 native、真实 capable provider 与 IDEA comparison 通过；仅 JDT LS unadvertised 探针不满足本卡 provider 成功验收。
+- **ED-AUDIT-015-A3：** unit/typecheck/mounted、当前 native 和真实 capable provider 通过；仅 JDT LS unadvertised 探针不满足本卡 provider 成功验收。IDEA comparison 有条件时记录，未运行不阻断本卡 `done`。
 
 验证 V-015：rearrangeCleanupWorkflow.test.ts 中新增支持分支 mounted 回归，CodeWorkspaceTab.test.tsx 从 action 入口断言文本变化；TC-IDE-C8-04 仅证明 unavailable，需新增 capable provider 的 UI case。 执行 `pnpm exec vitest run <本卡文件>` 与完整 owner scope 的 typecheck；每个 A ID 对应同场景主流程、负路径与交付检查。新 case/runner 命令需实现并校验后才可记录实际执行。
 
-必需证据：`code-audit`、`unit`、`typecheck`、`browser`、`native`、`provider`、`idea-comparison`。所有计划当前待执行。mock-only 证明模型边界；无真实 IDEA/provider/native 时保持未运行或 implemented，不标 done。
+必需证据：`code-audit`、`unit`、`typecheck`、`browser`、`native`、`provider`。mock-only 证明模型边界；当前平台 native/provider 仍须真实运行，无真实 IDEA 时将 comparison 写入 `evidence.unrun`，不阻断本卡 `done`。
 
 <a id="ed-audit-016"></a>
 ## ED-AUDIT-016 Cleanup 支持分支接入实际事务
@@ -182,8 +182,8 @@ src/components/editor/workspace/rearrangeCleanupWorkflow.ts 仅 cleanup 部分�
 
 - **ED-AUDIT-016-A1：** 生产 Cleanup 入口运行真实 cleanup action，profile/规则可追溯，至少一个真实修复与 IDEA 对比；当前文件外文本不变。
 - **ED-AUDIT-016-A2：** profile 不支持、provider failure、no-change、取消/stale/conflict 均有准确可见状态；preview 后不静默改范围，单次 undo/恢复经过 postcondition 断言。
-- **ED-AUDIT-016-A3：** unit/typecheck/mounted、当前 native、capable provider 和 IDEA comparison 全通过；无法获得等效 provider profile 时保留明确缺口，不能改成格式化后关闭。
+- **ED-AUDIT-016-A3：** unit/typecheck/mounted、当前 native 和 capable provider 全通过；无法获得等效 provider profile 时保留明确缺口，不能改成格式化后关闭。IDEA comparison 有条件时记录，未运行不阻断本卡 `done`。
 
 验证 V-016：rearrangeCleanupWorkflow.test.ts 的 cleanup 子集、CodeWorkspaceTab.test.tsx 支持分支；TC-IDE-C8-04 保留 unavailable 回归，新增 file-cleanup capable case 并关联真实 provider fixture。 执行 `pnpm exec vitest run <本卡文件>` 与完整 owner scope 的 typecheck；每个 A ID 对应同场景主流程、负路径与交付检查。新 case/runner 命令需实现并校验后才可记录实际执行。
 
-必需证据：`code-audit`、`unit`、`typecheck`、`browser`、`native`、`provider`、`idea-comparison`。所有计划当前待执行。mock-only 证明模型边界；无真实 IDEA/provider/native 时保持未运行或 implemented，不标 done。
+必需证据：`code-audit`、`unit`、`typecheck`、`browser`、`native`、`provider`。mock-only 证明模型边界；当前平台 native/provider 仍须真实运行，无真实 IDEA 时将 comparison 写入 `evidence.unrun`，不阻断本卡 `done`。

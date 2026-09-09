@@ -2,6 +2,7 @@ import { renderHook, act } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useWorkspaceActionsController } from "./useWorkspaceActionsController";
 import type { WorkspaceCommand } from "./workspaceCommands";
+import { createKeymapScheme } from "./workspaceKeymapScheme";
 
 describe("useWorkspaceActionsController", () => {
   it("registers commands and executes them by id", () => {
@@ -146,5 +147,42 @@ describe("useWorkspaceActionsController", () => {
 
     rerender({ focus: "tree" });
     expect(result.current.snapshot[0].state.availability).toBe("disabled");
+  });
+
+  it("refreshes frozen evaluations after an imperative host generation change", async () => {
+    const runMock = vi.fn(() => true);
+    const commands: WorkspaceCommand[] = [
+      {
+        id: "workspace.renameSymbol",
+        title: "Rename Symbol",
+        category: "Refactor",
+        run: runMock,
+      },
+    ];
+    const { result } = renderHook(() => useWorkspaceActionsController({
+      workspaceId: "workspace-generation-refresh",
+      commands,
+      activeFocus: "editor",
+      contextData: { hasActiveFile: true },
+    }));
+
+    const before = result.current.snapshot.find((entry) => entry.id === "workspace.renameSymbol");
+    expect(before).toBeDefined();
+    act(() => {
+      result.current.host.setKeymapScheme(createKeymapScheme({
+        id: "user",
+        name: "User",
+        base: "idea-windows-linux",
+      }));
+    });
+
+    const after = result.current.snapshot.find((entry) => entry.id === "workspace.renameSymbol");
+    expect(after?.evaluation.hostGeneration).toBe(result.current.host.getGeneration());
+    await expect(result.current.host.executePrepared(before!.evaluation)).resolves.toMatchObject({
+      kind: "failed",
+      reason: "stale-owner",
+    });
+    await expect(result.current.host.executePrepared(after!.evaluation)).resolves.toMatchObject({ kind: "applied" });
+    expect(runMock).toHaveBeenCalledOnce();
   });
 });

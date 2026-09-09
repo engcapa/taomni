@@ -276,6 +276,16 @@ class NativeSession:
 
     def click(self, selector: str) -> str:
         element = self.find(selector, interactive=True)
+        # Tauri pages commonly place the target inside an app-owned overflow
+        # container. WebDriver's element-click scroll algorithm can calculate
+        # a viewport point from the document rather than that nested scroller,
+        # so explicitly center CSS targets before issuing the real click.
+        if not selector.startswith(("text=", "role=")):
+            self.execute(
+                f"const el = document.querySelector({json.dumps(selector)});"
+                "if (el) el.scrollIntoView({block: 'center', inline: 'nearest'});"
+                "return !!el;"
+            )
         self.request("POST", self.element_path(element, "/click"), {})
         return f"clicked {selector}"
 

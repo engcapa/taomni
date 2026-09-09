@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from typing import Callable, Protocol
 
 from . import editor_performance, git_diff_repo, java25_projects, java_sample_projects, jdtls_required, linux_x11_required, reset_db, sftp_required, ssh_required, welcome_recents, workspace_root
+from . import java_rename_project
 
 
 class FixtureContext(Protocol):
@@ -48,6 +49,7 @@ REGISTRY: dict[str, Fixture] = {
     "linux_x11_required": Fixture("linux_x11_required", linux_x11_required.setup),
     "workspace_root": Fixture("workspace_root", workspace_root.setup, workspace_root.teardown),
     "java_sample_projects": Fixture("java_sample_projects", java_sample_projects.setup),
+    "java_rename_project": Fixture("java_rename_project", java_rename_project.setup),
     "java25_projects": Fixture("java25_projects", java25_projects.setup),
     "editor_performance": Fixture("editor_performance", editor_performance.setup),
     "git_diff_repo": Fixture("git_diff_repo", git_diff_repo.setup, git_diff_repo.teardown),

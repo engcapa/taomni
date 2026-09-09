@@ -162,6 +162,12 @@
 - `[data-testid="code-workspace-lightbulb"]` — interactive [optional] — F25.5.intention-lightbulb
 - `[data-testid^="code-workspace-intention-"]` — interactive [optional] — F25.5.intention-candidate
   ↳ `[data-testid="code-workspace-intention-intention.provider.4df1ac6fd1001c47"]` — alias
+- `input[name="line"]` — interactive [optional] — F25.5.editor-goto-line-input
+- `.cm-dialog button[type="submit"]` — interactive [optional] — F25.5.editor-goto-line-submit
+- `[data-testid="status-bar-workspace-cursor"]` — display [optional] — F25.5.editor-cursor-status
+- `[data-testid="refactoring-preview-dialog"]` — display [optional] — F25.5.refactoring-preview-dialog
+- `[data-testid="refactoring-preview-cancel"]` — interactive [optional] — F25.5.refactoring-preview-cancel
+- `[data-testid="refactoring-preview-apply"]` — interactive [optional] — F25.5.refactoring-preview-apply
 - `[data-testid="workspace-recovery-dialog"]` — display [optional] — F25.5.workspace-recovery-dialog
 - `[data-testid="workspace-recovery-refactors"]` — display [optional] — F25.5.workspace-recovery-refactors
 - `[data-testid="workspace-recovery-refactors-tab"]` — interactive [optional] — F25.5.workspace-recovery-refactors-tab

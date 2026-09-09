@@ -123,6 +123,14 @@ export function useWorkspaceActionsController({
     };
   }, [ensureLiveHost, host]);
 
+  // The host can change generation from imperative keymap/action registration
+  // effects outside this hook's prop dependency graph. Refresh projections so
+  // Search Everywhere never executes an evaluation that is already stale.
+  useEffect(() => {
+    if (host.isDisposed()) return;
+    return host.subscribe(() => setRevision((r) => r + 1));
+  }, [host]);
+
   // Synchronize registered commands with the host
   useEffect(() => {
     if (host.isDisposed()) return;

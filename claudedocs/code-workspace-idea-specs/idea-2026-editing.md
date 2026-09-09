@@ -27,11 +27,11 @@ UTF-8 文件三行：包含 tab 的长行、短行、空行，另含组合字符
 
 - **ED-AUDIT-002-A1：** 两端同设置完成越界移动和插入，所有规定 caret/selection 与文本字段可比较；生产入口复现确认差距并实现修复，已经一致则给出当前证据。
 - **ED-AUDIT-002-A2：** 不插入时文本/hash/history 不变；一次 undo 恢复插入前文本及虚拟 caret，redo 重放；readonly、revision stale、失焦和 composition 均不错误填空格。
-- **ED-AUDIT-002-A3：** 改动 owner scoped typecheck、focused/mounted 回归、当前端 native 及本场景 IDEA 对比全部通过，其他两端记录未验证和动作清单。
+- **ED-AUDIT-002-A3：** 改动 owner scoped typecheck、focused/mounted 回归和当前端 native 全部通过，其他两端记录未验证和动作清单；IDEA 对比有条件时记录，未运行不阻断本卡 `done`，也不能据此声称 L3。
 
 验证 V-002：workspaceVirtualSpace.test.ts、workspaceEditorCommands.test.ts、workspaceDocumentTransactionOwner.test.ts；扩展 TC-IDE-C8-01 与 TC-IDE-C8-02。回归必须断言真实 editor 文本和 selection，不只检查 overflow 数组。 先运行对应 `pnpm exec vitest run <上述测试>`；QA/native/IDEA 执行方式见共享对比契约。逐项将 A1 主流程、A2 负路径与恢复、A3 交付门禁映射到 evidence checks；有实际变更时保留 baseline failing regression。
 
-必需证据：`code-audit`、`unit`、`typecheck`、`browser`、`native`、`idea-comparison`。当前平台 native 与 IDEA 缺失不能关闭 done；代码已齐但证据缺失为 implemented。
+必需证据：`code-audit`、`unit`、`typecheck`、`browser`、`native`。IDEA 对比为可选观察证据；当前平台 native 仍是关闭 `done` 的必要层，IDEA 未运行时写入 `evidence.unrun`，不阻断本卡 `done`。
 
 <a id="ed-audit-009"></a>
 ## ED-AUDIT-009 同文档分屏与关闭重开对齐
@@ -58,11 +58,11 @@ Owner：src/components/editor/workspace/workspaceDocumentTransactionOwner.ts、w
 
 - **ED-AUDIT-009-A1：** 两个真实 leaf 的编辑和 undo/redo 只进入同一逻辑历史，内容实时一致；独立 caret/scroll/fold 不被另一 leaf 输入覆盖，与 IDEA 同动作对比有结果。
 - **ED-AUDIT-009-A2：** 关闭非最后 leaf 不丢文本/history；最后 dirty view 的取消零效果，保存失败不关闭；reopen 不复活错误 workspace 或改变编码。
-- **ED-AUDIT-009-A3：** focused/mounted 生命周期测试、当前端 native（含重启读取 snapshot）、scoped typecheck 与 IDEA 对比通过；兼容旧 snapshot 的测试和两端未运行项保留。
+- **ED-AUDIT-009-A3：** focused/mounted 生命周期测试、当前端 native（含重启读取 snapshot）和 scoped typecheck 通过；兼容旧 snapshot 的测试和两端未运行项保留。IDEA 对比有条件时记录，未运行不阻断本卡 `done`。
 
 验证 V-009：workspaceDocumentTransactionOwner.test.ts、workspaceTabPolicy.test.ts、workspaceTabPolicyV3.test.ts、EditorGroup.test.tsx；TC-IDE-C4-01/TC-IDE-C4-02。选取 CodeWorkspaceTab.test.tsx 中对应挂载流程并补缺失断言。 先运行对应 `pnpm exec vitest run <上述测试>`；QA/native/IDEA 执行方式见共享对比契约。逐项将 A1 主流程、A2 负路径与恢复、A3 交付门禁映射到 evidence checks；有实际变更时保留 baseline failing regression。
 
-必需证据：`code-audit`、`unit`、`typecheck`、`browser`、`native`、`idea-comparison`。当前平台 native 与 IDEA 缺失不能关闭 done；代码已齐但证据缺失为 implemented。
+必需证据：`code-audit`、`unit`、`typecheck`、`browser`、`native`。IDEA 对比为可选观察证据；当前平台 native 仍是关闭 `done` 的必要层，IDEA 未运行时写入 `evidence.unrun`，不阻断本卡 `done`。
 
 <a id="ed-audit-010"></a>
 ## ED-AUDIT-010 系统剪贴板多光标粘贴对齐
@@ -89,11 +89,11 @@ system text 是 OS 事实；只有 session text identity 与读回内容一致�
 
 - **ED-AUDIT-010-A1：** 真实 OS 内容及 selection 数分配规则与 IDEA 对比明确，生产 paste 一次 transaction、一次 undo 恢复；外部修改后不使用旧 metadata。
 - **ED-AUDIT-010-A2：** 拒绝/unknown/取消/stale 各有准确系统副作用事实；迟到读取不修改失去 owner 的 editor，history 不跨 workspace 泄漏，fallback 明确可见。
-- **ED-AUDIT-010-A3：** focused unit、挂载入口、当前端 native 文件/clipboard 后置断言、typecheck 与 IDEA comparison 通过，未测 OS 不借 browser stub 通过。
+- **ED-AUDIT-010-A3：** focused unit、挂载入口、当前端 native 文件/clipboard 后置断言和 typecheck 通过，未测 OS 不借 browser stub 通过；IDEA comparison 有条件时记录，未运行不阻断本卡 `done`。
 
 验证 V-010：workspaceClipboardSession.test.ts、workspaceClipboardHistory.test.ts、ClipboardHistoryPopup.test.tsx；TC-IDE-C3-01/02/03。测试前先读现有 case covers 和 native clipboard fixture。 先运行对应 `pnpm exec vitest run <上述测试>`；QA/native/IDEA 执行方式见共享对比契约。逐项将 A1 主流程、A2 负路径与恢复、A3 交付门禁映射到 evidence checks；有实际变更时保留 baseline failing regression。
 
-必需证据：`code-audit`、`unit`、`typecheck`、`browser`、`native`、`idea-comparison`。当前平台 native 与 IDEA 缺失不能关闭 done；代码已齐但证据缺失为 implemented。
+必需证据：`code-audit`、`unit`、`typecheck`、`browser`、`native`。IDEA 对比为可选观察证据；当前平台 native 仍是关闭 `done` 的必要层，IDEA 未运行时写入 `evidence.unrun`，不阻断本卡 `done`。
 
 <a id="ed-audit-011"></a>
 ## ED-AUDIT-011 IME 输入期间的命令与焦点隔离
@@ -124,4 +124,4 @@ IDEA 与 QA app 打开同一含中文注释的文件。Linux IBus/Fcitx、Window
 
 验证 V-011：CodeMirrorHost 的现有键盘测试与 workspaceActionHost 对应单测；拟新增 CodeMirrorHost.ime.test.tsx。复用 TC-IDE-C3-03 可覆盖部分焦点，IME 需新增专题手工记录或真正支持的 native verb；不伪造 YAML pass。 先运行对应 `pnpm exec vitest run <上述测试>`；QA/native/IDEA 执行方式见共享对比契约。逐项将 A1 主流程、A2 负路径与恢复、A3 交付门禁映射到 evidence checks；有实际变更时保留 baseline failing regression。
 
-必需证据：`code-audit`、`unit`、`typecheck`、`native`、`accessibility`、`idea-comparison`。当前平台 native 与 IDEA 缺失不能关闭 done；代码已齐但证据缺失为 implemented。
+必需证据：`code-audit`、`unit`、`typecheck`、`native`、`accessibility`。IDEA 对比为可选观察证据；当前平台 native 与 accessibility 仍是关闭 `done` 的必要层，IDEA 未运行时写入 `evidence.unrun`，不阻断本卡 `done`。

@@ -395,6 +395,7 @@ import {
 import { validateSemanticWorkspaceEditPaths } from "./workspace/semanticWorkspaceEdit";
 import {
   formatWorkspaceEditPreview,
+  normalizeWorkspaceEditPaths,
   workspaceEditOperations,
   type WorkspaceEditPreview,
 } from "./workspace/workspaceEditPreview";
@@ -4445,13 +4446,6 @@ export function CodeWorkspaceTab({
       if (relative === null) continue;
       if (!relative) return null;
       try {
-        const listing = await workspaceListDir(root.path, parentPath(relative));
-        if (listing.state !== "ready") return null;
-        const entry = listing.entries.find((candidate) => candidate.path === relative);
-        if (!entry) return { path: normalizedPath, exists: false, text: null };
-        // Restoring a directory, symlink, or special node as a regular file
-        // would be data loss. Those transactions remain deliberately ineligible.
-        if (entry.fileType !== "file") return null;
         const file = await workspaceReadFile(root.path, relative);
         const eol = file.text.includes("\r\n") ? ("crlf" as const) : file.text.includes("\r") && !file.text.includes("\n") ? ("cr" as const) : ("lf" as const);
         return {
@@ -4463,6 +4457,19 @@ export function CodeWorkspaceTab({
           eol,
         };
       } catch {
+        // Reading directly avoids coupling recovery preimages to an
+        // eventually-consistent directory listing. Keep the listing fallback
+        // for missing paths and to reject directories/symlinks/special nodes
+        // rather than treating an unreadable resource as a text preimage.
+        try {
+          const listing = await workspaceListDir(root.path, parentPath(relative));
+          if (listing.state !== "ready") return null;
+          const entry = listing.entries.find((candidate) => candidate.path === relative);
+          if (!entry) return { path: normalizedPath, exists: false, text: null };
+          if (entry.fileType !== "file") return null;
+        } catch {
+          return null;
+        }
         return null;
       }
     }
@@ -8825,14 +8832,15 @@ export function CodeWorkspaceTab({
     edit: LspWorkspaceEdit,
     options: WorkspaceEditApplyOptions = {},
   ) => {
-    const orderedOperations = workspaceEditOperations(edit);
+    const normalizedEdit = normalizeWorkspaceEditPaths(edit, rootsRef.current);
+    const orderedOperations = workspaceEditOperations(normalizedEdit);
     const shouldRecordHistory = options.recordHistory !== false;
     // Refactor recovery needs the same preimage even when a higher-level code
     // action service owns the user-facing history entry.
     const shouldCaptureSnapshots = orderedOperations.length > 0
       && (shouldRecordHistory || options.plan !== undefined);
     const beforeSnapshots = shouldCaptureSnapshots
-      ? await captureWorkspaceEditPathSnapshots(edit)
+      ? await captureWorkspaceEditPathSnapshots(normalizedEdit)
       : null;
     const beforeBookmarks = beforeSnapshots
       ? captureWorkspaceEditBookmarkSnapshot(beforeSnapshots.map((snapshot) => snapshot.path))
@@ -8842,8 +8850,8 @@ export function CodeWorkspaceTab({
       : null;
     // §8.19.1: the edit actually applied after preview filtering drives any
     // resume slicing — never the pre-confirmation original.
-    let resolvedEdit = edit;
-    let selectedEdit = edit;
+    let resolvedEdit = normalizedEdit;
+    let selectedEdit = normalizedEdit;
     let operationIndexOffset = 0;
     const applyTransactionId = nextSaveTransactionId("tx-wedit");
     const refactorRecoveryEntryState = { current: null as RefactorRecoveryJournalEntry | null };
@@ -9118,7 +9126,7 @@ export function CodeWorkspaceTab({
       },
     });
     assertWorkspaceEditOwner();
-    let outcomes = await applyWorkspaceEdit(edit, buildHooks(true));
+    let outcomes = await applyWorkspaceEdit(normalizedEdit, buildHooks(true));
     let allOutcomes = [...outcomes];
     // §8.19.1: per-operation effect ledger with an explicit resume boundary.
     // A partial run stops at the failed operation; the user may re-run the
@@ -15114,17 +15122,18 @@ export function CodeWorkspaceTab({
         return;
       }
       const beforeRename = semanticIndex.current();
-      if (
-        beforeRename.revision !== buildToken.revision
-        || beforeRename.activeProviders.length > 0
-      ) {
+      // Rename is a direct provider query. Background indexing progress makes
+      // the aggregate index non-ready, but it does not invalidate this
+      // response while the captured workspace revision is unchanged.
+      if (!workspaceSemanticIndexQueryIsCurrent(beforeRename, buildToken)) {
         semanticIndex.abandonBuild(buildToken);
         setStatusMessage("Rename was cancelled because the workspace changed while the dialog was open");
         return;
       }
       const renamed = await lspRename(descriptor, position, nextName);
       updateLspStatusForFile(live, renamed.status);
-      const operationCount = workspaceEditOperations(renamed.edit).length;
+      const normalizedRenameEdit = normalizeWorkspaceEditPaths(renamed.edit, rootsRef.current);
+      const operationCount = workspaceEditOperations(normalizedRenameEdit).length;
       if (operationCount === 0) {
         semanticIndex.finishQuery(buildToken, { kind: "rename", resultCount: 0 });
         setStatusMessage("Rename produced no edits");
@@ -15136,7 +15145,7 @@ export function CodeWorkspaceTab({
       });
       if (
         !completion.accepted
-        || !workspaceSemanticIndexBuildIsCurrent(completion.snapshot, buildToken)
+        || !workspaceSemanticIndexQueryIsCurrent(completion.snapshot, buildToken)
       ) {
         setStatusMessage("Rename result became stale because the workspace changed; run Rename again");
         return;
@@ -15162,7 +15171,7 @@ export function CodeWorkspaceTab({
         actionId: `rename:${documentUri}:${position.line}:${position.character}`,
         kind: "rename",
         evidence,
-        edit: renamed.edit,
+        edit: normalizedRenameEdit,
         roots: rootsRef.current,
         openFiles: openFilesRef.current,
         completeness: {
@@ -15189,12 +15198,15 @@ export function CodeWorkspaceTab({
           return;
         }
       }
-      await applyLspWorkspaceEdit(renamed.edit, {
+      await applyLspWorkspaceEdit(normalizedRenameEdit, {
         preview: true,
         label: `Rename symbol to "${nextName}"`,
         semanticGeneration: buildToken.generation,
         semanticRevision: buildToken.revision,
         semanticWorkspaceOnly: true,
+        // A direct rename response remains valid during unrelated provider
+        // progress; the revision guard still runs immediately before writes.
+        semanticRequireReady: false,
         plan,
       });
     } catch (err) {

@@ -24,6 +24,9 @@ use tokio::sync::{Mutex, Notify, RwLock, mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
 const REQUEST_TIMEOUT_SECS: u64 = 8;
+/// Rename providers may need to resolve a project-wide index before returning
+/// the WorkspaceEdit that the editor previews and applies.
+const REFACTOR_REQUEST_TIMEOUT_SECS: u64 = 60;
 /// Project-scope jdtls `executeCommand`s (java-debug's `resolveMainClass` /
 /// `resolveClasspath` / `startDebugSession`, java-test discovery) search or
 /// resolve the whole project and activate an OSGi bundle on first use, so they
@@ -6725,12 +6728,13 @@ pub async fn lsp_prepare_rename(
         }
     };
     let result = session
-        .request(
+        .request_with_timeout(
             "textDocument/prepareRename",
             json!({
                 "textDocument": { "uri": document.uri },
                 "position": { "line": line, "character": character },
             }),
+            REFACTOR_REQUEST_TIMEOUT_SECS,
         )
         .await;
     let status = state
@@ -6742,12 +6746,19 @@ pub async fn lsp_prepare_rename(
         )
         .await;
     match result {
-        Ok(Value::Null) | Err(_) => Ok(LspPrepareRenameResult {
+        Ok(Value::Null) => Ok(LspPrepareRenameResult {
             status,
             range: None,
             placeholder: None,
             allowed: false,
             message: Some("Rename is not available at this position".into()),
+        }),
+        Err(error) => Ok(LspPrepareRenameResult {
+            status,
+            range: None,
+            placeholder: None,
+            allowed: false,
+            message: Some(format!("Rename provider request failed: {error}")),
         }),
         Ok(value) => {
             // Range | { range, placeholder } | { defaultBehavior: true }
@@ -6820,16 +6831,17 @@ pub async fn lsp_rename(
         }
     };
     let result = session
-        .request(
+        .request_with_timeout(
             "textDocument/rename",
             json!({
                 "textDocument": { "uri": document.uri },
                 "position": { "line": line, "character": character },
                 "newName": new_name,
             }),
+            REFACTOR_REQUEST_TIMEOUT_SECS,
         )
         .await
-        .unwrap_or(Value::Null);
+        .map_err(|error| format!("Rename provider request failed: {error}"))?;
     let status = state
         .lsp
         .document_status(
@@ -12840,6 +12852,12 @@ Java(TM) SE Runtime Environment (build 17.0.4+11-LTS-179)
         // cuts them off mid-flight and the Debug button then looks like a no-op.
         assert!(JAVA_COMMAND_TIMEOUT_SECS > REQUEST_TIMEOUT_SECS);
         assert!(BUILD_WORKSPACE_TIMEOUT_SECS > JAVA_COMMAND_TIMEOUT_SECS);
+    }
+
+    #[test]
+    fn refactor_provider_requests_get_a_longer_budget_than_interactive_requests() {
+        assert!(REFACTOR_REQUEST_TIMEOUT_SECS > REQUEST_TIMEOUT_SECS);
+        assert!(REFACTOR_REQUEST_TIMEOUT_SECS >= 60);
     }
 
     #[test]

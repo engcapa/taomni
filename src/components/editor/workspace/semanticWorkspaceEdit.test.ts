@@ -41,10 +41,11 @@ describe("validateSemanticWorkspaceEditPaths", () => {
     ], ["/repo"])).toMatch(/outside the workspace.*\/outside\.ts/);
   });
 
-  it("rejects missing, virtual, relative, and incomplete rename paths", () => {
+  it("rejects missing and virtual paths while resolving relative paths", () => {
     expect(validateSemanticWorkspaceEditPaths([text(null)], ["/repo"])).toMatch(/missing filesystem path/);
-    expect(validateSemanticWorkspaceEditPaths([text("jdt://contents/String.class")], ["/repo"])).toMatch(/not an absolute local file/);
-    expect(validateSemanticWorkspaceEditPaths([text("src/a.ts")], ["/repo"])).toMatch(/not an absolute local file/);
+    expect(validateSemanticWorkspaceEditPaths([text("jdt://contents/String.class")], ["/repo"])).toMatch(/non-local or missing filesystem path/);
+    // Provider-relative paths are resolved against the opened workspace root.
+    expect(validateSemanticWorkspaceEditPaths([text("src/a.ts")], ["/repo"])).toBeNull();
     expect(validateSemanticWorkspaceEditPaths([rename("/repo/a.ts", null)], ["/repo"])).toMatch(/missing filesystem path/);
   });
 

@@ -159,10 +159,17 @@ export function createLspHyperlinkExtension(hooks: LspHyperlinkHooks): Extension
           window.clearTimeout(this.probeTimer);
           this.probeTimer = null;
         }
-        this.view.dispatch({
-          effects: [setModHeldEffect.of(false), setHyperlinkEffect.of(null)],
-        });
         this.view.dom.classList.remove("cm-lsp-hyperlink-cursor");
+        // A CodeMirror panel can focus its input during EditorView.update.
+        // Invalidate probes immediately, but dispatch only after that update
+        // unwinds. A renewed modifier or destroyed view supersedes cleanup.
+        const token = this.probeToken;
+        queueMicrotask(() => {
+          if (this.disposed || this.modHeld || token !== this.probeToken) return;
+          this.view.dispatch({
+            effects: [setModHeldEffect.of(false), setHyperlinkEffect.of(null)],
+          });
+        });
       }
 
       private clearLinkOnly() {

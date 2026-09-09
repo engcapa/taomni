@@ -67,6 +67,7 @@
      "linux_x11_required",
      "workspace_root",
      "java_sample_projects",
+     "java_rename_project",
      "java25_projects",
      "editor_performance",
      "git_diff_repo",

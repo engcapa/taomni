@@ -22,7 +22,7 @@
 
 ED-AUDIT-001 负责在 `claudedocs/code-workspace-idea-specs/idea-comparison.schema.json` 定义 JSON Schema，在 `.agents/skills/code-workspace-idea-task/scripts/compare_idea.py` 实现标准库 CLI 校验。schema 文档与 CLI 规则保持一致；已有解析工具可复用，不引入新的平台 driver。
 
-每个文件含以下字段。实际采样文件写入被忽略的 `qa-ui-auto-report/idea-comparison/<task>/<run>/`，入库文档只记录脱敏结论、hash、执行步骤及可获取原始产物的位置。
+每个文件含以下字段。实际采样文件写入被忽略的 `qa-ui-auto-report/idea-comparison/<task>/<run>/`，入库文档只记录脱敏结论、hash、执行步骤及可获取原始产物的位置。对行为卡而言，IDEA 2026.2.x 是可选观察层；未运行必须保留明确原因，不得伪造结果，也不阻断任务板按其它 required evidence 关闭 `done`。
 
 | 字段 | 类型 / 要求 |
 |---|---|

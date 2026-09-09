@@ -556,6 +556,66 @@ export function isAbsoluteFsPath(path: string): boolean {
   return parseFsPath(path).absolute;
 }
 
+/**
+ * Convert a local `file:` URI to the same normalized filesystem syntax used by
+ * workspace roots. Virtual provider URIs (for example `jar:` and `jdt:`) are
+ * intentionally rejected because they do not identify writable files.
+ */
+export function fileUriToFsPath(uri: string): string | null {
+  const trimmed = uri.trim();
+  if (!/^file:/i.test(trimmed)) return null;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol.toLowerCase() !== "file:") return null;
+    let path = decodeURIComponent(parsed.pathname);
+    const host = parsed.hostname;
+    if (host && host.toLowerCase() !== "localhost") {
+      path = /^[A-Za-z]:$/.test(host)
+        ? `${host}${path}`
+        : `//${host}${path}`;
+    }
+    if (/^\/[A-Za-z]:[\\/]/.test(path)) path = path.slice(1);
+    if (!isAbsoluteFsPath(path)) return null;
+    return normalizeFsPath(path);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve a provider WorkspaceEdit target to a local path. Providers normally
+ * return an absolute path, but LSP responses may contain only a file URI or a
+ * workspace-relative path. Relative paths are accepted only after binding to
+ * an explicit workspace root and proving the result remains inside it.
+ */
+export function resolveWorkspaceEditPath(
+  path: string | null | undefined,
+  uri: string | null | undefined,
+  workspaceRoots: readonly string[] = [],
+): string | null {
+  for (const raw of [path, uri]) {
+    const candidate = raw?.trim();
+    if (!candidate) continue;
+
+    const uriPath = fileUriToFsPath(candidate);
+    if (uriPath) return uriPath;
+    if (isDocumentUri(candidate)) continue;
+
+    const normalized = normalizeFsPath(candidate);
+    if (isAbsoluteFsPath(normalized)) return normalized;
+    for (const rootValue of workspaceRoots) {
+      const root = normalizeFsPath(rootValue.trim());
+      if (!isAbsoluteFsPath(root)) continue;
+      const relative = normalized.replace(/^\/+/, "");
+      if (!relative || relative.startsWith("../") || relative === "..") continue;
+      const rootPrefix = root === "/" || root.endsWith("/") ? root : `${root}/`;
+      const bound = normalizeFsPath(`${rootPrefix}${relative}`);
+      if (relativePathWithinRoot(root, bound) !== null) return bound;
+    }
+  }
+  return null;
+}
+
 export function relativePathWithinRoot(rootPath: string, filePath: string): string | null {
   if (!isAbsoluteFsPath(rootPath) || !isAbsoluteFsPath(filePath)) return null;
   const root = normalizeFsPath(rootPath);

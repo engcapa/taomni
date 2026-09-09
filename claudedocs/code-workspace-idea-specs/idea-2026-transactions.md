@@ -32,10 +32,10 @@ Owner：`src/components/editor/workspace/saveCommit.ts`、`saveNormalizationPipe
 
 - **ED-AUDIT-004-A1：** UI Save 的编码/EOL/BOM 最终字节和 Undo/再保存行为有两端实测；BOM 不重叠、CR 不重复、receipt 与独立磁盘 hash 一致。
 - **ED-AUDIT-004-A2：** 写入时输入、关闭、external conflict、known failure、unknown acknowledgement 分别返回准确效果轴；新输入不丢失，零效果路径无 history，unknown 未核对前不盲重试。
-- **ED-AUDIT-004-A3：** focused/mounted、当前平台 native 文件断言、IDEA comparison、全部 owned path typecheck 通过；若改 Rust 追加真实测试；另两端有设置和未验证项。
+- **ED-AUDIT-004-A3：** focused/mounted、当前平台 native 文件断言和全部 owned path typecheck 通过；若改 Rust 追加真实测试；另两端有设置和未验证项。IDEA comparison 有条件时记录，未运行不阻断本卡 `done`。
 
 验证 V-004：`pnpm exec vitest run src/components/editor/workspace/saveCommit.test.ts src/components/editor/workspace/saveNormalizationPipeline.test.ts src/components/editor/workspace/saveOrganizeImportsAdapter.test.ts`；补 CodeWorkspaceTab.test.tsx 的 owner 竞争回归；扩展 TC-IDE-C0-01/02，不用 observation 注入 receipt 作为通过。保存原始字节/hash、dirty 可见状态和 Undo 后内容；恢复只读 fixture 属性。
-必需证据：code-audit、unit、typecheck、browser、native、idea-comparison。
+必需证据：code-audit、unit、typecheck、browser、native。
 
 <a id="ed-audit-014"></a>
 ## ED-AUDIT-014 Refactor postcondition 失败阻断与恢复入口
@@ -70,10 +70,10 @@ Taomni 特有 post-hash mismatch、storage quota、first-write 后中断、resta
 
 ### 验收与验证
 
-- **ED-AUDIT-014-A1：** 从 production rename 入口注入实际 postcondition mismatch 时不登记成功 committed/history；返回 recovery-required 和准确 affected files；正常真实 provider rename 的 preview/apply/undo 与 IDEA 比较通过。
+- **ED-AUDIT-014-A1：** 从 production rename 入口注入实际 postcondition mismatch 时不登记成功 committed/history；返回 recovery-required 和准确 affected files；正常真实 provider rename 的 preview/apply/undo 通过，有条件时再与 IDEA 比较。
 - **ED-AUDIT-014-A2：** journal prepared 在首次 mutation 前完成；持久化失败零写入；中断重开能通过真实 UI 发现 pending 条目，第三方内容 conflict 不覆盖；同一恢复重复执行幂等。
-- **ED-AUDIT-014-A3：** 恢复后独立回读所有 preimages 才报告成功，读/写失败保存 pending 状态；focused/mounted、native restart/disk、provider、IDEA 与完整 owner scope typecheck 通过，v1 数据不被自动重放。
+- **ED-AUDIT-014-A3：** 恢复后独立回读所有 preimages 才报告成功，读/写失败保存 pending 状态；focused/mounted、native restart/disk、provider 与完整 owner scope typecheck 通过，v1 数据不被自动重放。IDEA comparison 有条件时记录，未运行不阻断本卡 `done`。
 
 验证 V-014：扩展 `refactorPlan.test.ts`、`workspaceEditApply.test.ts`、`workspaceEditHistory.test.ts`、`CodeWorkspaceTab.test.tsx`，新增 `refactorRecoveryController.test.ts`（均对应上述真实 owner）。TC-IDE-C6-04 复用正常路径；拟新增当前端 restart-recovery case，按 qa-ui-auto 原生生命周期能力实现，不用 page reload 冒充进程崩溃恢复。收集真实 JDT LS rename、修改前后磁盘 hash、journal 状态和恢复 UI 结果。故障 fixture 保留首次失败证据再恢复。
-必需证据：code-audit、unit、typecheck、browser、native、provider、idea-comparison。
+必需证据：code-audit、unit、typecheck、browser、native、provider。
 

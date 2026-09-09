@@ -5694,6 +5694,30 @@ controls:
     kind: interactive
     optional: true       # only while a provider code-action menu is open
   # ED-AUDIT-014: persistent refactor recovery UI and disk-result tabs.
+  - id: editor-goto-line-input
+    selector: 'input[name="line"]'
+    kind: interactive
+    optional: true       # CodeMirror-owned Go to Line panel
+  - id: editor-goto-line-submit
+    selector: '.cm-dialog button[type="submit"]'
+    kind: interactive
+    optional: true       # CodeMirror-owned Go to Line panel
+  - id: editor-cursor-status
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    kind: display
+    optional: true       # while an editor has an active document
+  - id: refactoring-preview-dialog
+    selector: '[data-testid="refactoring-preview-dialog"]'
+    kind: display
+    optional: true       # after a real provider edit passes the rename warning
+  - id: refactoring-preview-cancel
+    selector: '[data-testid="refactoring-preview-cancel"]'
+    kind: interactive
+    optional: true       # while a refactor preview is open
+  - id: refactoring-preview-apply
+    selector: '[data-testid="refactoring-preview-apply"]'
+    kind: interactive
+    optional: true       # while a refactor preview is open
   - id: workspace-recovery-dialog
     selector: '[data-testid="workspace-recovery-dialog"]'
     kind: display
