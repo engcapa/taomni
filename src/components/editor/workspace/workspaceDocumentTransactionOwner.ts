@@ -36,6 +36,7 @@ export interface DocumentChangeDelta {
 
 export type DocumentTransactionOrigin =
   | "user-input"
+  | "composition"
   | "remote-sync"
   | "undo"
   | "redo"
@@ -95,6 +96,12 @@ interface DocumentRecord {
   views: Set<string>;
   undo: HistoryEntry[];
   redo: HistoryEntry[];
+  /**
+   * ED-IMPROVE-008: the source view whose IME composition currently owns the
+   * newest undo entry. Composition deltas coalesce into that one entry until
+   * the composition is finalized, cancelled or invalidated by another origin.
+   */
+  openCompositionViewId: string | null;
 }
 
 interface AppliedChanges {
@@ -199,6 +206,7 @@ export class WorkspaceDocumentTransactionOwner {
       views: new Set(),
       undo: [],
       redo: [],
+      openCompositionViewId: null,
     });
     return text;
   }
@@ -331,14 +339,46 @@ export class WorkspaceDocumentTransactionOwner {
       }
     }
 
+    // ED-IMPROVE-008: a non-composition transaction closes any open IME
+    // coalescing session before it records its own history, so a stale
+    // composition can never swallow or merge into an unrelated edit. A
+    // cancel that reverts to the pre-composition text drops the transient
+    // entry instead of consuming an undo step.
+    let compositionCancelConsumed = false;
+    if (origin !== "composition") {
+      const openEntry = record.openCompositionViewId !== null
+        ? record.undo[record.undo.length - 1]
+        : undefined;
+      if (openEntry && applied.text === openEntry.beforeText) {
+        record.undo.pop();
+        compositionCancelConsumed = true;
+      }
+      this.finalizeComposition(fileKey);
+    }
     record.text = applied.text;
-    if (canRecordHistory(origin) && !isHistoryReplay(origin)) {
-      record.undo.push({
-        beforeText,
-        afterText: applied.text,
-        forward: applied.changes,
-        inverse: applied.inverse,
-      });
+    if (canRecordHistory(origin) && !isHistoryReplay(origin) && !compositionCancelConsumed) {
+      const open = origin === "composition" && record.openCompositionViewId === sourceViewId
+        ? record.undo[record.undo.length - 1]
+        : undefined;
+      if (open) {
+        // Extend the open composition entry with the net text transition.
+        open.afterText = applied.text;
+        open.forward = [singleReplacement(open.beforeText, applied.text)];
+        open.inverse = [singleReplacement(applied.text, open.beforeText)];
+        if (open.beforeText === open.afterText) {
+          record.undo.pop();
+        }
+      } else {
+        record.undo.push({
+          beforeText,
+          afterText: applied.text,
+          forward: applied.changes,
+          inverse: applied.inverse,
+        });
+        if (origin === "composition") {
+          record.openCompositionViewId = sourceViewId;
+        }
+      }
       if (
         record.undo.length > LARGE_FILE_UNDO_DEPTH &&
         applied.text.length > UNDO_RETENTION_CHAR_THRESHOLD
@@ -372,8 +412,21 @@ export class WorkspaceDocumentTransactionOwner {
     return this.dispatchTransaction(fileKey, sourceViewId, [singleReplacement(record.text, text)], origin);
   }
 
+  /**
+   * ED-IMPROVE-008: close the open IME composition session for a document.
+   * Called on compositionend, blur, view destroy and workspace switch; a
+   * cancelled composition that left no net change has already dropped its
+   * entry, so this only releases ownership.
+   */
+  finalizeComposition(fileKey: string): void {
+    const record = this.documentsByFile.get(fileKey);
+    if (!record) return;
+    record.openCompositionViewId = null;
+  }
+
   undo(fileKey: string, sourceViewId: string): DocumentTransaction | null {
     const record = this.documentsByFile.get(fileKey);
+    if (record) record.openCompositionViewId = null;
     const entry = record?.undo[record.undo.length - 1];
     if (!record || !entry || record.text !== entry.afterText) return null;
     const applied = applyChanges(record.text, entry.inverse);
@@ -394,6 +447,7 @@ export class WorkspaceDocumentTransactionOwner {
 
   redo(fileKey: string, sourceViewId: string): DocumentTransaction | null {
     const record = this.documentsByFile.get(fileKey);
+    if (record) record.openCompositionViewId = null;
     const entry = record?.redo[record.redo.length - 1];
     if (!record || !entry || record.text !== entry.beforeText) return null;
     const applied = applyChanges(record.text, entry.forward);

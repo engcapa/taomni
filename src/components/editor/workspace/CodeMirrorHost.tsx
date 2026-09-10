@@ -2125,6 +2125,10 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   onViewStateChangeRef.current = onViewStateChange;
   const lastEmittedViewStateRef = useRef<string | null>(null);
   const viewStateEmitTimerRef = useRef<number | null>(null);
+  // ED-IMPROVE-008: IME composition ownership. While active, doc changes are
+  // dispatched with the composition origin so the owner coalesces them into
+  // one logical undo; blur/destroy/end finalize and release the session.
+  const compositionActiveRef = useRef(false);
   const onExpandSelectionRef = useRef(onExpandSelection);
   const onLightbulbRef = useRef(onLightbulb);
   const onGitChangeClickRef = useRef(onGitChangeClick);
@@ -2715,11 +2719,14 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
                   });
                 });
                 if (deltas.length > 0) {
+                  const composingInput = compositionActiveRef.current
+                    || update.view.composing
+                    || update.transactions.some((tr) => tr.isUserEvent("input.type.compose"));
                   const sharedTransaction = transactionOwnerRef.current.dispatchTransaction(
                     fileKeyRef.current,
                     viewIdRef.current,
                     deltas,
-                    "user-input",
+                    composingInput ? "composition" : "user-input",
                   );
                   if (!sharedTransaction) {
                     const rejectedView = update.view;
@@ -2821,6 +2828,25 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       event.preventDefault();
     };
     view.contentDOM.addEventListener("keydown", compositionNavigationGuard, true);
+    const compositionStartGuard = () => {
+      compositionActiveRef.current = true;
+    };
+    const compositionEndGuard = () => {
+      compositionActiveRef.current = false;
+      const owner = transactionOwnerRef.current;
+      const key = fileKeyRef.current;
+      if (owner && key) owner.finalizeComposition(key);
+    };
+    const compositionBlurGuard = () => {
+      if (!compositionActiveRef.current) return;
+      compositionActiveRef.current = false;
+      const owner = transactionOwnerRef.current;
+      const key = fileKeyRef.current;
+      if (owner && key) owner.finalizeComposition(key);
+    };
+    view.contentDOM.addEventListener("compositionstart", compositionStartGuard, true);
+    view.contentDOM.addEventListener("compositionend", compositionEndGuard, true);
+    view.contentDOM.addEventListener("blur", compositionBlurGuard, true);
     emitSelection(view);
     emitViewport(view);
 
@@ -2925,7 +2951,14 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       requestParameterInfoRef.current = null;
       cancelActiveHoverResize(activeHoverResizeSessionRef);
       clipboardContextByView.delete(view);
+      compositionActiveRef.current = false;
+      if (transactionOwnerRef.current && fileKeyRef.current) {
+        transactionOwnerRef.current.finalizeComposition(fileKeyRef.current);
+      }
       view.contentDOM.removeEventListener("keydown", compositionNavigationGuard, true);
+      view.contentDOM.removeEventListener("compositionstart", compositionStartGuard, true);
+      view.contentDOM.removeEventListener("compositionend", compositionEndGuard, true);
+      view.contentDOM.removeEventListener("blur", compositionBlurGuard, true);
       view.destroy();
       viewRef.current = null;
       if (owner && sharedFileKey) owner.releaseView(sharedFileKey, sharedViewId);

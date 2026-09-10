@@ -10163,12 +10163,6 @@ end_of_record
       return "root:app:src/Long.java";
     }
 
-    async function settlePersistence(): Promise<void> {
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 750));
-      });
-    }
-
     function storedViewStates(instance: string): Record<string, Record<string, {
       mainSelection: { anchor: number; head: number };
     }>> {

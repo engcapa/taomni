@@ -328,3 +328,82 @@ describe("ED-AUDIT-005: large-file undo depth bound", () => {
     expect(owner.getHistoryState("mid.txt").undoDepth).toBe(LARGE_FILE_UNDO_DEPTH);
   });
 });
+
+// ---------------------------------------------------------------------------
+// ED-IMPROVE-008: one confirmed IME composition is one logical undo, a
+// cancelled composition consumes no undo, and a competing origin breaks the
+// coalescing session instead of merging into it.
+// ---------------------------------------------------------------------------
+describe("ED-IMPROVE-008: composition history coalescing", () => {
+  function insertAt(owner: WorkspaceDocumentTransactionOwner, viewId: string, at: number, text: string) {
+    const record = "x".repeat(at);
+    void record;
+    return owner.dispatchTransaction(
+      "ime.ts",
+      viewId,
+      [{ from: at, to: at, insert: text }],
+      "composition",
+    );
+  }
+
+  it("coalesces successive composition deltas into one undo entry", () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    owner.acquireView("ime.ts", "primary", "hello ");
+    // Progressively composing "你好" as the IME updates the preedit.
+    insertAt(owner, "primary", 6, "n");
+    insertAt(owner, "primary", 7, "i");
+    insertAt(owner, "primary", 8, "h");
+    insertAt(owner, "primary", 9, "a");
+    insertAt(owner, "primary", 10, "o");
+    expect(owner.getHistoryState("ime.ts")).toMatchObject({ undoDepth: 1 });
+    expect(owner.getDocument("ime.ts")).toBe("hello nihao");
+
+    owner.finalizeComposition("ime.ts");
+    const undone = owner.undo("ime.ts", "primary");
+    expect(undone).not.toBeNull();
+    expect(owner.getDocument("ime.ts")).toBe("hello ");
+    expect(owner.getHistoryState("ime.ts")).toMatchObject({ undoDepth: 0 });
+  });
+
+  it("drops a cancelled composition so it consumes no undo step", () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    owner.acquireView("ime.ts", "primary", "hello");
+    owner.dispatchTransaction("ime.ts", "primary", [{ from: 5, to: 5, insert: "!" }], "user-input");
+    expect(owner.getHistoryState("ime.ts")).toMatchObject({ undoDepth: 1 });
+
+    // Compose then cancel: the final revert arrives as a normal transaction.
+    insertAt(owner, "primary", 6, "n");
+    insertAt(owner, "primary", 7, "i");
+    owner.dispatchTransaction("ime.ts", "primary", [{ from: 6, to: 8, insert: "" }], "user-input");
+    expect(owner.getDocument("ime.ts")).toBe("hello!");
+    expect(owner.getHistoryState("ime.ts")).toMatchObject({ undoDepth: 1 });
+
+    // The one remaining undo belongs to the real edit, not the cancelled IME.
+    owner.undo("ime.ts", "primary");
+    expect(owner.getDocument("ime.ts")).toBe("hello");
+  });
+
+  it("does not merge a new composition into an unrelated open entry", () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    owner.acquireView("ime.ts", "primary", "");
+    insertAt(owner, "primary", 0, "a");
+    // A different origin breaks the session.
+    owner.dispatchTransaction("ime.ts", "primary", [{ from: 1, to: 1, insert: "b" }], "user-input");
+    insertAt(owner, "primary", 2, "c");
+    expect(owner.getHistoryState("ime.ts")).toMatchObject({ undoDepth: 3 });
+    expect(owner.getDocument("ime.ts")).toBe("abc");
+  });
+
+  it("closes composition ownership on undo/redo and external replacement", () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    owner.acquireView("ime.ts", "primary", "");
+    insertAt(owner, "primary", 0, "x");
+    owner.undo("ime.ts", "primary");
+    expect(owner.getDocument("ime.ts")).toBe("");
+    insertAt(owner, "primary", 0, "y");
+    // After undo, a new composition starts a fresh entry rather than merging.
+    expect(owner.getHistoryState("ime.ts")).toMatchObject({ undoDepth: 1 });
+    owner.replaceDocument("ime.ts", "secondary", "external", "external-disk");
+    expect(owner.getDocument("ime.ts")).toBe("external");
+  });
+});

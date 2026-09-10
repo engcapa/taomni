@@ -1421,3 +1421,35 @@ describe("ED-IMPROVE-007 leaf/file view snapshots", () => {
     expect(after!.state.selection.main.head).toBe(doc.indexOf("delta"));
   });
 });
+
+describe("ED-IMPROVE-008 IME composition lifecycle wiring", () => {
+  afterEach(() => cleanup());
+
+  it("finalizes composition ownership on compositionend and blur and keeps typing working", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const rendered = renderEditor("hello ", vi.fn(), {
+      transactionOwner: owner,
+      viewId: "primary",
+      fileKey: "ime.ts",
+    });
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    act(() => {
+      content.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+      content.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "n" }));
+    });
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+    act(() => {
+      view.dispatch({ changes: { from: 6, insert: "x" } });
+    });
+    await waitFor(() => expect(owner.getDocument("ime.ts")).toBe("hello x"));
+    // Blur during a fresh composition must release ownership without losing text.
+    act(() => {
+      content.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+      content.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
+    });
+    act(() => {
+      view.dispatch({ changes: { from: 7, insert: "y" } });
+    });
+    await waitFor(() => expect(owner.getDocument("ime.ts")).toBe("hello xy"));
+  });
+});
