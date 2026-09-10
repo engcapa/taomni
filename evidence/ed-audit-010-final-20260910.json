@@ -1,0 +1,73 @@
+{
+  "verified_at": "2026-09-10T00:09:18.202Z",
+  "head": "556be7c5e8d5344e0cf0ef495fd884be07aa1bae",
+  "checks": [
+    {
+      "kind": "browser",
+      "command": "qa-ui-auto runner: run --mode browser --config qa-ui-auto-tests/qa-ui-auto.ed010-browser.config.yaml --filter TC-IDE-C3-01,TC-IDE-C3-03 --workers 1 --report-dir qa-ui-auto-report/ed-audit-010-browser-current-20260910 --keep-runs 0 --require-pass (receipt-run-20260910-075826-824696900)",
+      "result": "failed",
+      "summary": "Initial current-checkout browser attempt failed at step 1 because the Vite development module load did not reach DOMContentLoaded within the runner timeout. No clipboard behavior was claimed; the failure artifacts are retained before the preview rerun.",
+      "acceptance": []
+    },
+    {
+      "kind": "browser",
+      "command": "qa-ui-auto runner: run --mode browser --config qa-ui-auto-tests/qa-ui-auto.ed010-browser.config.yaml --filter TC-IDE-C3-01,TC-IDE-C3-03 --workers 1 --report-dir qa-ui-auto-report/ed-audit-010-browser-current-20260910 --keep-runs 0 --require-pass (receipt-run-20260910-080322-230522600)",
+      "result": "passed",
+      "summary": "Current production browser run on platform=Windows selected 2 and passed 2/2 with 0 failed and 0 skipped. TC-IDE-C3-01 asserted cross-leaf clipboard routing, history, one undo and lease cleanup; TC-IDE-C3-03 asserted metadata-only typed observation, multi-caret shape, focus, 200% editor zoom and undo. Source identity 179c40fc76d34d856935b02858761aa49e34b22c513cb8563cceb9b9b82b59b4, runner identity 6e3e74caf26ed9090af07624d1cbedd6ae066224f3c6beee815aa05239cacaf9, case identities 0f20486990ca10c96d1cf7a1a55f34bffdb30154a381f70137423a936f3a6451 and 3ed48cb27b7861cffcd9c06c1968d6ef505e3cfaa0e70838f0ebb40419cee0a7. Reports retain summary.json and runner_receipt.json.",
+      "acceptance": ["ED-AUDIT-010-A2", "ED-AUDIT-010-A3"]
+    },
+    {
+      "kind": "code-audit",
+      "command": "Re-audit current production path: CodeMirrorHost copy/cut/paste -> workspaceClipboardSession guarded system read/write -> src/lib/clipboard.ts WebView/Tauri boundary -> CodeWorkspaceTab workspace lease, observation metadata, history and transaction owner",
+      "result": "passed",
+      "summary": "The production chain uses a workspace-scoped ref-counted session and one paste transaction across split views and carets. It freezes document/selection/view ownership before awaiting the OS boundary, preserves performed/not-performed/unknown effects for denial, stale, cancellation and error, invalidates stale metadata when external clipboard text differs, exposes redacted outcome/effect/permission/caret metadata, and routes one undo through the canonical document owner. Workspace close clears the session/history without persisting payload text.",
+      "acceptance": ["ED-AUDIT-010-A1", "ED-AUDIT-010-A2", "ED-AUDIT-010-A3"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/workspaceClipboardSession.test.ts src/components/editor/workspace/workspaceClipboardHistory.test.ts src/components/editor/workspace/ClipboardHistoryPopup.test.tsx src/components/editor/workspace/clipboardObservationContract.test.ts src/components/editor/workspace/CodeMirrorHost.test.tsx --maxWorkers=1",
+      "result": "passed",
+      "summary": "5 test files passed; 101/101 tests passed. Coverage includes workspace lease/history isolation, multi-caret mapping, permission and system-effect outcomes, denied/unknown/stale/cancelled guards, redacted observation metadata, mounted routing, external payload replacement and one-undo paste recovery.",
+      "acceptance": ["ED-AUDIT-010-A1", "ED-AUDIT-010-A2", "ED-AUDIT-010-A3"]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents\\skills\\code-workspace-idea-task\\scripts\\typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src\\components\\editor\\CodeWorkspaceTab.tsx --path src\\components\\editor\\CodeWorkspaceTab.test.tsx --path src\\components\\editor\\workspace\\CodeMirrorHost.tsx --path src\\components\\editor\\workspace\\CodeMirrorHost.test.tsx --path src\\components\\editor\\workspace\\workspaceClipboardSession.ts --path src\\components\\editor\\workspace\\workspaceClipboardSession.test.ts --path src\\components\\editor\\workspace\\workspaceClipboardHistory.test.ts --path src\\components\\editor\\workspace\\ClipboardHistoryPopup.tsx --path src\\components\\editor\\workspace\\ClipboardHistoryPopup.test.tsx --path src\\components\\editor\\workspace\\clipboardObservationContract.ts --path src\\components\\editor\\workspace\\clipboardObservationContract.test.ts --path src\\lib\\clipboard.ts --path src\\lib\\clipboard.test.ts --json",
+      "result": "passed",
+      "summary": "All 13 owned TypeScript paths passed with scoped_errors=0 and external_errors=0 across 0 external files.",
+      "acceptance": ["ED-AUDIT-010-A3"]
+    },
+    {
+      "kind": "build",
+      "command": "pnpm.cmd build",
+      "result": "passed",
+      "summary": "The current checkout TypeScript and Vite production build passed with exit code 0. Existing chunk-size and ineffective-dynamic-import warnings were non-fatal.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "python .agents\\skills\\qa-ui-auto\\scripts\\native_build.py --force",
+      "result": "passed",
+      "summary": "Built the independent packaged QA application with identifier com.taomni.app.qa from the current checkout. Identity record source_sha256=179c40fc76d34d856935b02858761aa49e34b22c513cb8563cceb9b9b82b59b4, binary_sha256=068f5684f3af1b28909acab0afaa73f3adf4f55cc4cbf8e582cc4ec64b3d20b3, platform=Windows.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "qa-ui-auto runner: run --mode native --config qa-ui-auto-tests/qa-ui-auto.ed010-native.config.yaml --filter TC-IDE-ED010-clipboard-windows-native --report-dir qa-ui-auto-report/ed-audit-010-native-current-20260910 --keep-runs 0 --require-pass (receipt-run-20260910-080719-013252300)",
+      "result": "passed",
+      "summary": "Current packaged com.taomni.app.qa WebView2 run on platform=Windows selected 1 and passed 1/1 with 0 failed and 0 skipped. The real host fixture file was opened, production copy reported success/performed, the native WebView clipboard API replaced the OS payload after session copy, two carets pasted the external payload with success/performed and caretCount=2, the observation seam did not expose clipboard text, and one Control+Z restored both original lines. Source identity 179c40fc76d34d856935b02858761aa49e34b22c513cb8563cceb9b9b82b59b4, runner identity 6e3e74caf26ed9090af07624d1cbedd6ae066224f3c6beee815aa05239cacaf9, case identity 74348c18f2bbc82aeb45dc458ed4842695952654ab7c5b68f50edfbd4726a785, QA app id com.taomni.app.qa. Reports retain summary.json and runner_receipt.json.",
+      "acceptance": ["ED-AUDIT-010-A1", "ED-AUDIT-010-A2", "ED-AUDIT-010-A3"]
+    }
+  ],
+  "unrun": [
+    "idea-comparison: IntelliJ IDEA 2026.2.x was not run. This is optional observation evidence under the current backlog rule and does not block done.",
+    "native Linux: no qualifying Linux Tauri/WebKitGTK/X11 runtime was available; the Linux-only external-owner denial case remains unverified on Linux.",
+    "native macOS: no qualifying macOS QA bundle, WKWebView automation or manual QA-app run was available."
+  ],
+  "notes": [
+    "The execution platform is recorded from the actual QA receipts as platform=Windows; no Windows version is hard-coded or inferred.",
+    "The browser config and native config used port 5300 because Windows excluded ports 5000-5009. Both temporary configs were deleted after execution and are not part of the task commit; the runner receipts preserve the exact commands and identities.",
+    "Browser VFS evidence is supplementary. The native result crossed the packaged WebView2 and host clipboard/file boundaries and independently asserted the post-paste document and undo state.",
+    "No screenshot-only assertion, browser stub, synthetic PASS or persisted clipboard payload was used as native evidence."
+  ]
+}
