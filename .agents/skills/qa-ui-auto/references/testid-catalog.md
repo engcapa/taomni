@@ -152,13 +152,26 @@
 - `[data-testid="code-workspace-tree-pane"]` — display [optional] — F25.5.tree-pane
 - `[data-testid="code-workspace-tree-root"]` — interactive [optional] — F25.5.tree-root-row
 - `[data-testid="code-workspace-tree-file"]` — interactive [optional] — F25.5.tree-file-row
+- `[data-testid="code-workspace-tree-dir"]` — interactive [optional] — F25.5.tree-dir-row
+- `[data-testid="code-workspace-view-tree"]` — display [optional] — F25.5.tree-view
+- `[data-testid="new-java-class-package"]` — interactive [optional] — F25.5.new-java-class-package
+- `[data-testid="new-java-class-submit"]` — interactive [optional] — F25.5.new-java-class-submit
+- `[data-testid="external-file-conflict-dialog"]` — display [optional] — F25.5.external-file-conflict-dialog
+- `[data-testid="external-file-conflict-dialog"] button[aria-label="Dismiss external file conflict"]` — interactive [optional] — F25.5.external-file-conflict-dismiss
+- `[data-testid="refactoring-preview-dialog"]` — display [optional] — F25.5.refactoring-preview-dialog
+- `[data-testid="refactoring-preview-apply"]` — interactive [optional] — F25.5.refactoring-preview-apply
 - `[data-testid="code-workspace-tree-filter"]` — interactive [optional] — F25.5.tree-filter
 - `[data-testid="code-workspace-flat-file"]` — interactive [optional] — F25.5.tree-flat-file-row
 - `[data-testid="code-workspace-editor-pane"]` — display — F25.5.editor-pane
 - `[data-testid="code-workspace-editor"]` — display [optional] — F25.5.editor-host
 - `[data-testid="code-workspace-editor-tab-strip"]` — display [optional] — F25.5.editor-tab-strip
+- `[data-editor-group-id="primary"] [data-testid="code-workspace-editor-tab-strip"]` — interactive [optional] — F25.5.editor-leaf-primary-tab-strip
+- `[data-editor-group-id="secondary"]` — display [optional] — F25.5.editor-leaf-secondary-pane
+- `[data-editor-group-id="secondary"] .cm-content` — interactive [optional] — F25.5.editor-leaf-secondary-content
+- `[data-editor-group-id="secondary"] [data-testid="code-workspace-editor-tab-strip"]` — interactive [optional] — F25.5.editor-leaf-secondary-tab-strip
 - `[data-testid="code-workspace-editor"] .cm-content` — interactive [optional] — F25.5.editor-content
 - `.cm-tooltip-autocomplete` — display [optional] — F25.5.editor-completion-popup
+- `[data-testid="code-workspace-lightbulb"]` — interactive [optional] — F25.5.editor-lightbulb
 - `[data-testid="code-workspace-file-status"]` — display [optional] — F25.5.file-status
 - `[data-testid="code-workspace-save-observation"]` — display [optional] — F25.5.save-observation
 - `[data-testid="code-workspace-clipboard-observation"]` — display [optional] — F25.5.clipboard-observation
@@ -220,6 +233,10 @@
 - `[data-testid="workspace-resource-cleanup-recovery"]` — display [optional] — F25.5.resource-cleanup-recovery
 - `[data-testid="workspace-resource-cleanup-recovery-item"]` — display [optional] — F25.5.resource-cleanup-recovery-item
 - `[data-testid="workspace-resource-cleanup-retry"]` — interactive [optional] — F25.5.resource-cleanup-retry
+- `[data-testid="workspace-recovery-dialog"]` — display [optional] — F25.5.workspace-recovery-dialog
+- `[data-testid="workspace-recovery-recover-selected"]` — interactive [optional] — F25.5.workspace-recovery-recover-selected
+- `[data-testid="workspace-recovery-recover-all"]` — interactive [optional] — F25.5.workspace-recovery-recover-all
+- `[data-testid="workspace-recovery-discard-all"]` — interactive [optional] — F25.5.workspace-recovery-discard-all
 - `[data-testid="code-workspace-split-down"]` — interactive [optional] — F25.5.split-down
 - `[data-testid="code-workspace-split-close"]` — interactive [optional] — F25.5.split-close
 - `[data-testid="keymap-scheme-select"]` — interactive [optional] — F25.5.keymap-scheme-select
@@ -298,6 +315,7 @@
 - `[data-testid="code-workspace-tab"]` — display — F25.1.workspace
 - `[data-testid="code-workspace-git-panel-toggle"]` — interactive [optional] — F25.1.git-panel-toggle
 - `[data-testid="code-workspace-tree"]` — display [optional] — F25.1.tree-container
+- `[data-testid="debug-subtab-breakpoints"]` — interactive [optional] — F25.1.debug-subtab-breakpoints
 - `[data-testid="code-workspace-split-equalize"]` — interactive [optional] — F25.1.split-equalize
 - `[data-testid="code-workspace-split-unsplit-all"]` — interactive [optional] — F25.1.split-unsplit-all
 - `[data-testid="code-workspace-build-project"]` — interactive [optional] — F25.1.build-current-project

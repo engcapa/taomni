@@ -5715,6 +5715,25 @@ controls:
     selector: '[data-testid="code-workspace-editor-tab-strip"]'
     kind: display
     optional: true       # only with an open buffer
+  # ED-IMPROVE-007: per-leaf identity selectors used by the view-state restore
+  # case; the pane attribute is set by EditorGroup and the tab strip activates
+  # a leaf without moving its caret.
+  - id: editor-leaf-primary-tab-strip
+    selector: '[data-editor-group-id="primary"] [data-testid="code-workspace-editor-tab-strip"]'
+    kind: interactive
+    optional: true
+  - id: editor-leaf-secondary-pane
+    selector: '[data-editor-group-id="secondary"]'
+    kind: display
+    optional: true
+  - id: editor-leaf-secondary-content
+    selector: '[data-editor-group-id="secondary"] .cm-content'
+    kind: interactive
+    optional: true
+  - id: editor-leaf-secondary-tab-strip
+    selector: '[data-editor-group-id="secondary"] [data-testid="code-workspace-editor-tab-strip"]'
+    kind: interactive
+    optional: true
   - id: editor-content                 # CodeMirror contenteditable inside the editor surface
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     kind: interactive
