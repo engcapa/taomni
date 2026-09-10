@@ -4954,6 +4954,10 @@ controls:
     selector: '[data-testid="code-workspace-tree"]'
     kind: display
     optional: true       # mounted with the workspace tree pane
+  - id: debug-subtab-breakpoints
+    selector: '[data-testid="debug-subtab-breakpoints"]'
+    kind: interactive
+    optional: true       # breakpoints sub-tab in the debug panel header
   - id: split-equalize
     selector: '[data-testid="code-workspace-split-equalize"]'
     kind: interactive
@@ -5660,6 +5664,30 @@ controls:
     selector: '[data-testid="code-workspace-tree-file"]'
     kind: interactive
     optional: true
+  - id: tree-dir-row
+    selector: '[data-testid="code-workspace-tree-dir"]'
+    kind: interactive
+    optional: true       # directory rows; cases refine with [data-path="..."] (C8-07)
+  - id: tree-view
+    selector: '[data-testid="code-workspace-view-tree"]'
+    kind: display
+    optional: true       # tree view container used by template flows
+  - id: new-java-class-package
+    selector: '[data-testid="new-java-class-package"]'
+    kind: interactive
+    optional: true       # package input inside the New Java Class dialog
+  - id: new-java-class-submit
+    selector: '[data-testid="new-java-class-submit"]'
+    kind: interactive
+    optional: true       # submit button inside the New Java Class dialog
+  - id: external-file-conflict-dialog
+    selector: '[data-testid="external-file-conflict-dialog"]'
+    kind: display
+    optional: true       # save-conflict dialog surfaced in the workspace shell (C0-01)
+  - id: external-file-conflict-dismiss
+    selector: '[data-testid="external-file-conflict-dialog"] button[aria-label="Dismiss external file conflict"]'
+    kind: interactive
+    optional: true       # dismiss leaves buffer and disk untouched (C0-01)
   - id: tree-filter
     selector: '[data-testid="code-workspace-tree-filter"]'
     kind: interactive
