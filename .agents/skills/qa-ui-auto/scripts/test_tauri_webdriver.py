@@ -10,7 +10,7 @@ from unittest import TestCase, skipUnless
 from unittest.mock import Mock, call, patch
 
 from qa_ui_auto import native_steps
-from tauri_webdriver import NativeSession
+from tauri_webdriver import NativeSession, WebDriverError
 
 
 class NativeSessionTransportTest(TestCase):
@@ -220,7 +220,7 @@ class NativeSessionClickTest(TestCase):
         self.assertEqual(result, 'clicked [data-testid="welcome-history-tab-workspaces"]')
         session.execute.assert_called_once_with(
             "const el = document.querySelector(\"[data-testid=\\\"welcome-history-tab-workspaces\\\"]\");"
-            "if (el) el.scrollIntoView({block: 'center', inline: 'nearest'});"
+            "if (el) el.scrollIntoView({block: 'end', inline: 'nearest'});"
             "return !!el;"
         )
         self.assertEqual(
@@ -238,6 +238,19 @@ class NativeSessionClickTest(TestCase):
         session.click("text=Recent workspaces")
 
         session.execute.assert_not_called()
+
+    def test_click_retries_intercepted_css_target_with_pointer_actions(self) -> None:
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.session_id = "session-1"
+        session.find = Mock(return_value="element-1")
+        session.execute = Mock(return_value=True)
+        session.request = Mock(side_effect=[WebDriverError("element click intercepted"), None])
+        session.pointer_click = Mock(return_value={"x": 10, "y": 20})
+
+        result = session.click('[data-testid="welcome-history-tab-workspaces"]')
+
+        self.assertEqual(result, 'clicked [data-testid="welcome-history-tab-workspaces"]')
+        session.pointer_click.assert_called_once_with('[data-testid="welcome-history-tab-workspaces"]')
 
 
 class NativeSessionPressComboTest(TestCase):

@@ -1446,6 +1446,98 @@ def _do_eval_readonly(ctx: NativeStepContext, args: Any) -> str:
     return _eval_readonly(ctx, args)
 
 
+@_verb("capture_workspace_restore_performance")
+def _capture_workspace_restore_performance(ctx: NativeStepContext, args: Any) -> str:
+    """Persist the current production restore observation without driving it."""
+    if not isinstance(args, dict):
+        raise StepError(
+            "capture_workspace_restore_performance: expected "
+            "{artifact_name, sample_id?, group?, require_tab_count?}"
+        )
+    artifact_name = str(args.get("artifact_name", "workspace-restore-performance.json"))
+    if Path(artifact_name).name != artifact_name or not artifact_name.endswith(".json"):
+        raise StepError("capture_workspace_restore_performance: artifact_name must be a JSON filename")
+    wait_timeout_sec = max(0.0, float(args.get("wait_timeout_sec", 0)))
+    wait_deadline = time.monotonic() + (
+        min(wait_timeout_sec, remaining_timeout(wait_timeout_sec)) if wait_timeout_sec > 0 else 0
+    )
+    run: dict[str, Any] | None = None
+    while True:
+        raw_runs = ctx.session.execute(
+            "return window.__TAOMNI_WORKSPACE_RESTORE_PERFORMANCE__?.runs ?? [];"
+        )
+        if isinstance(raw_runs, list) and raw_runs:
+            candidate = raw_runs[-1]
+            if not isinstance(candidate, dict):
+                raise StepError("capture_workspace_restore_performance: production observation has invalid shape")
+            run = candidate
+            if candidate.get("activeReadyAtMs") is not None and candidate.get("allReadyAtMs") is not None:
+                break
+        if time.monotonic() >= wait_deadline:
+            if run is None:
+                raise StepError("capture_workspace_restore_performance: production restore observation is missing")
+            raise StepError(
+                "capture_workspace_restore_performance: active-ready/all-ready timing is incomplete"
+            )
+        time.sleep(min(0.1, max(0.01, wait_deadline - time.monotonic())))
+    assert run is not None
+    required_tab_count = args.get("require_tab_count")
+    if required_tab_count is not None:
+        expected = int(required_tab_count)
+        actual = int(run.get("activeTargetCount", 0)) + int(run.get("backgroundTargetCount", 0))
+        if actual != expected:
+            raise StepError(
+                f"capture_workspace_restore_performance: expected {expected} targets, got {actual}"
+            )
+    events = run.get("events")
+    if not isinstance(events, list):
+        raise StepError("capture_workspace_restore_performance: event list is missing")
+    read_starts = [event for event in events if isinstance(event, dict) and event.get("kind") == "read-start"]
+    settled = [
+        event for event in events
+        if isinstance(event, dict) and event.get("kind") in {"ready", "failed", "cancelled"}
+    ]
+    if len(read_starts) != len(set(event.get("key") for event in read_starts)):
+        raise StepError("capture_workspace_restore_performance: duplicate read target observed")
+    if len(set(event.get("key") for event in read_starts)) != len(set(event.get("key") for event in settled)):
+        raise StepError("capture_workspace_restore_performance: read/settled target counts disagree")
+    required_failures = args.get("require_failed_count")
+    if required_failures is not None:
+        actual_failures = sum(1 for event in settled if event.get("kind") == "failed")
+        if actual_failures != int(required_failures):
+            raise StepError(
+                f"capture_workspace_restore_performance: expected {required_failures} failures, "
+                f"got {actual_failures}"
+            )
+    payload = {
+        "schemaVersion": 1,
+        "kind": "workspace-restore-performance",
+        "sampleId": str(args.get("sample_id", artifact_name.removesuffix(".json"))),
+        "group": str(args.get("group", "current")),
+        "environment": {
+            "platform": platform.platform(),
+            "python": platform.python_version(),
+            "webview": "packaged Tauri WebDriver session",
+        },
+        "run": run,
+        "derived": {
+            "activeReadyMs": run["activeReadyAtMs"] - run["startedAtMs"],
+            "allReadyMs": run["allReadyAtMs"] - run["startedAtMs"],
+            "readStartCount": len(read_starts),
+            "settledCount": len(settled),
+            "failedCount": sum(1 for event in settled if event.get("kind") == "failed"),
+            "cancelledCount": sum(1 for event in settled if event.get("kind") == "cancelled"),
+        },
+    }
+    output = ctx.case_dir / artifact_name
+    output.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return (
+        f"captured restore performance {payload['sampleId']} "
+        f"active={payload['derived']['activeReadyMs']:.2f}ms "
+        f"all={payload['derived']['allReadyMs']:.2f}ms"
+    )
+
+
 @_verb("hover")
 def _do_hover(ctx: NativeStepContext, args: Any) -> str:
     return _hover(ctx, args)

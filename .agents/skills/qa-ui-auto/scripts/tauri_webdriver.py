@@ -283,10 +283,23 @@ class NativeSession:
         if not selector.startswith(("text=", "role=")):
             self.execute(
                 f"const el = document.querySelector({json.dumps(selector)});"
-                "if (el) el.scrollIntoView({block: 'center', inline: 'nearest'});"
+                "if (el) el.scrollIntoView({block: 'end', inline: 'nearest'});"
                 "return !!el;"
             )
-        self.request("POST", self.element_path(element, "/click"), {})
+        try:
+            self.request("POST", self.element_path(element, "/click"), {})
+        except WebDriverError as error:
+            if "element click intercepted" not in str(error).lower():
+                raise
+            # Edge can auto-scroll a nested application pane to a point that
+            # is covered by a sibling card. Retry with a fresh rect and real
+            # W3C pointer actions so the current viewport geometry is used.
+            self.execute(
+                f"const el = document.querySelector({json.dumps(selector)});"
+                "if (el) el.scrollIntoView({block: 'end', inline: 'nearest'});"
+                "return !!el;"
+            )
+            self.pointer_click(selector)
         return f"clicked {selector}"
 
     def dblclick(self, selector: str) -> str:

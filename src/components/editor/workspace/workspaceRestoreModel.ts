@@ -98,6 +98,143 @@ export async function executeBoundedAsyncQueue<T, R>(
   return results;
 }
 
+export type WorkspaceRestorePerformanceOutcome = "ready" | "failed" | "cancelled";
+
+export interface WorkspaceRestorePerformanceEvent {
+  kind: "start" | "read-start" | WorkspaceRestorePerformanceOutcome | "all-ready" | "cancelled";
+  key?: string;
+  groupId?: EditorGroupId;
+  active?: boolean;
+  atMs: number;
+  elapsedMs: number;
+  error?: string;
+}
+
+export interface WorkspaceRestorePerformanceRun {
+  schemaVersion: 1;
+  runId: string;
+  workspaceInstanceId: string;
+  activeGroupId: EditorGroupId | null;
+  activeTargetCount: number;
+  backgroundTargetCount: number;
+  startedAtMs: number;
+  activeReadyAtMs: number | null;
+  allReadyAtMs: number | null;
+  cancelledAtMs: number | null;
+  events: WorkspaceRestorePerformanceEvent[];
+}
+
+export interface WorkspaceRestorePerformanceController {
+  readStarted(target: Pick<RestoreTarget, "key" | "groupId" | "active">): void;
+  targetSettled(
+    target: Pick<RestoreTarget, "key" | "groupId" | "active">,
+    outcome: WorkspaceRestorePerformanceOutcome,
+    error?: string,
+  ): void;
+  allReady(): void;
+  cancelled(reason?: string): void;
+  snapshot(): WorkspaceRestorePerformanceRun;
+}
+
+type RestorePerformanceGlobal = typeof globalThis & {
+  __TAOMNI_WORKSPACE_RESTORE_PERFORMANCE__?: {
+    runs: WorkspaceRestorePerformanceRun[];
+  };
+};
+
+let restorePerformanceSequence = 0;
+
+function restorePerformanceNow(): number {
+  return typeof performance === "undefined" ? Date.now() : performance.now();
+}
+
+function restorePerformanceGlobal(): { runs: WorkspaceRestorePerformanceRun[] } {
+  const target = globalThis as RestorePerformanceGlobal;
+  if (!target.__TAOMNI_WORKSPACE_RESTORE_PERFORMANCE__) {
+    target.__TAOMNI_WORKSPACE_RESTORE_PERFORMANCE__ = { runs: [] };
+  }
+  return target.__TAOMNI_WORKSPACE_RESTORE_PERFORMANCE__;
+}
+
+function copyRestorePerformanceRun(run: WorkspaceRestorePerformanceRun): WorkspaceRestorePerformanceRun {
+  return {
+    ...run,
+    events: run.events.map((event) => ({ ...event })),
+  };
+}
+
+/**
+ * Passive restore timing observation. It records the real production read
+ * lifecycle in memory for QA collection; it never schedules, cancels, or
+ * changes a restore operation.
+ */
+export function beginWorkspaceRestorePerformance(
+  workspaceInstanceId: string,
+  activeTargets: readonly RestoreTarget[],
+  backgroundTargets: readonly RestoreTarget[],
+  activeGroupId: EditorGroupId | null,
+): WorkspaceRestorePerformanceController {
+  const startedAtMs = restorePerformanceNow();
+  const run: WorkspaceRestorePerformanceRun = {
+    schemaVersion: 1,
+    runId: `${workspaceInstanceId}:restore:${restorePerformanceSequence += 1}`,
+    workspaceInstanceId,
+    activeGroupId,
+    activeTargetCount: activeTargets.length,
+    backgroundTargetCount: backgroundTargets.length,
+    startedAtMs,
+    activeReadyAtMs: null,
+    allReadyAtMs: null,
+    cancelledAtMs: null,
+    events: [],
+  };
+  const global = restorePerformanceGlobal();
+  global.runs.push(run);
+  if (global.runs.length > 8) global.runs.splice(0, global.runs.length - 8);
+
+  const addEvent = (
+    kind: WorkspaceRestorePerformanceEvent["kind"],
+    target?: Pick<RestoreTarget, "key" | "groupId" | "active">,
+    error?: string,
+  ) => {
+    const atMs = restorePerformanceNow();
+    run.events.push({
+      kind,
+      ...(target ? { key: target.key, groupId: target.groupId, active: target.active } : {}),
+      atMs,
+      elapsedMs: Math.max(0, atMs - startedAtMs),
+      ...(error ? { error } : {}),
+    });
+  };
+  addEvent("start");
+
+  return {
+    readStarted: (target) => addEvent("read-start", target),
+    targetSettled: (target, outcome, error) => {
+      addEvent(outcome, target, error);
+      if (
+        outcome === "ready"
+        && target.active
+        && target.groupId === activeGroupId
+        && run.activeReadyAtMs === null
+      ) {
+        run.activeReadyAtMs = run.events[run.events.length - 1]!.atMs;
+      }
+    },
+    allReady: () => {
+      if (run.allReadyAtMs !== null || run.cancelledAtMs !== null) return;
+      addEvent("all-ready");
+      run.allReadyAtMs = run.events[run.events.length - 1]!.atMs;
+    },
+    cancelled: (reason) => {
+      if (run.cancelledAtMs !== null || run.allReadyAtMs !== null) return;
+      addEvent("cancelled", undefined, reason);
+      run.cancelledAtMs = run.events[run.events.length - 1]!.atMs;
+    },
+    snapshot: () => copyRestorePerformanceRun(run),
+  };
+}
+
 /**
  * Generates cache key for git line diff calculation (§8.17.4 / ED-PERF-003).
  */

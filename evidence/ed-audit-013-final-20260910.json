@@ -1,0 +1,74 @@
+{
+  "verified_at": "2026-09-10T04:56:42.1822756Z",
+  "head": "12705ea64939cbfff0bd5d32ccdb505055524169",
+  "checks": [
+    {
+      "kind": "code-audit",
+      "command": "Re-audit current production path: CodeWorkspaceTab restore effect -> planWorkspaceRestore/executeBoundedAsyncQueue -> real workspace read/openFile -> active/background readiness observation -> failure/cancel/stale guards -> editor input and reopen recovery",
+      "result": "passed",
+      "summary": "The production restore owner separates the focused active target in each leaf from background targets, runs both through the bounded 2-4 worker queue, isolates one read failure, and keeps consuming later targets. The owner and identity guard prevents unmount/stale results from publishing; passive performance observation records start/read/ready/failed/cancelled/all-ready only. Late background completion does not overwrite newer user input, and native restart plus undo assertions cover recovery.",
+      "acceptance": ["ED-AUDIT-013-A2"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/workspaceRestoreModel.test.ts src/lib/performanceInstrumentation.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "2 test files passed; 10/10 tests passed for active/all-ready timing, isolated failure, cancellation without all-ready, queue behavior, cache identity, percentile instrumentation, observer isolation, and provider failure propagation.",
+      "acceptance": ["ED-AUDIT-013-A2", "ED-AUDIT-013-A3"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/CodeWorkspaceTab.test.tsx --maxWorkers=1 --testNamePattern=\"allows focused restore input before a slower second leaf finishes\"",
+      "result": "passed",
+      "summary": "The mounted production-owner regression passed 1/1; 122 unrelated tests were skipped. The focused editor accepted input before the slower second leaf resolved and retained that input after the late restore completed.",
+      "acceptance": ["ED-AUDIT-013-A2", "ED-AUDIT-013-A3"]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/CodeWorkspaceTab.tsx --path src/components/editor/CodeWorkspaceTab.test.tsx --path src/components/editor/workspace/workspaceRestoreModel.ts --path src/components/editor/workspace/workspaceRestoreModel.test.ts --json",
+      "result": "passed",
+      "summary": "All 4 owned TypeScript paths were checked; scoped_errors=0 and external_errors=0 across 0 external files.",
+      "acceptance": ["ED-AUDIT-013-A3"]
+    },
+    {
+      "kind": "performance",
+      "command": "PYTHONPATH=.agents/skills/qa-ui-auto/scripts python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED013-workspace-restore-performance-native --workers 1 --report-dir qa-ui-auto-report/ed-audit-013-baseline --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Current-production baseline retained 3 warmup and 20 measured runs with 40 raw cold/warm artifacts under qa-ui-auto-report/ed-audit-013-baseline-20260910. Nearest-rank combined percentiles were active-ready p50/p95/p99=223.2/437.6/485.5 ms and all-ready p50/p95/p99=7017.9/7896.2/8574.7 ms. Every sample recorded 24 reads, 24 settled, 1 failed read, and 0 cancelled.",
+      "acceptance": ["ED-AUDIT-013-A1", "ED-AUDIT-013-A3"]
+    },
+    {
+      "kind": "performance",
+      "command": "PYTHONPATH=.agents/skills/qa-ui-auto/scripts python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED013-workspace-restore-performance-native --workers 1 --report-dir qa-ui-auto-report/ed-audit-013-candidate --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Current-production candidate retained 3 warmup and 20 measured runs with 40 raw cold/warm artifacts under qa-ui-auto-report/ed-audit-013-candidate-20260910. Nearest-rank combined percentiles were active-ready p50/p95/p99=192.5/338.5/366.6 ms and all-ready p50/p95/p99=5557.7/6795.9/7598.9 ms. Every sample recorded 24 reads, 24 settled, 1 failed read, and 0 cancelled; candidate was faster than the frozen baseline in both reported groups with no measured regression.",
+      "acceptance": ["ED-AUDIT-013-A1", "ED-AUDIT-013-A3"]
+    },
+    {
+      "kind": "native",
+      "command": "PYTHONPATH=.agents/skills/qa-ui-auto/scripts python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED013-workspace-restore-performance-native --workers 1 --report-dir qa-ui-auto-report/ed-audit-013-native-representative-20260910-rerun7 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "The first packaged com.taomni.app.qa run exited 1 because the capture was attempted before the production restore observation was published. The receipt and artifacts are retained chronologically; no behavior pass is claimed from this run.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "PYTHONPATH=.agents/skills/qa-ui-auto/scripts python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED013-workspace-restore-performance-native --workers 1 --report-dir qa-ui-auto-report/ed-audit-013-native-representative-20260910-rerun8 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Packaged com.taomni.app.qa on the actual recorded runtime selected 1 and passed 1/1 across 35 steps with 0 failed and 0 skipped. Binary SHA-256=10dfc1941c42aa00ead58246d91863e79bcc3f45a8cacdfeae5a509555c6f511 and source SHA-256=b27f11226896bfb73bfb2b09b8e09f9d4dee6f77d205f95a496018ff1692c57f. The real native fixture used 24 tabs in 2 leaves, 23 existing files plus 1 missing file, accepted input in the focused leaf, recorded 1 isolated failure, and verified restart/reopen and undo behavior.",
+      "acceptance": ["ED-AUDIT-013-A1", "ED-AUDIT-013-A2", "ED-AUDIT-013-A3"]
+    }
+  ],
+  "unrun": [
+    "idea-comparison: IntelliJ IDEA 2026.2.x was not available; no identical fixture/action observation was collected. This is optional under the current backlog rule and does not block done.",
+    "native Linux: no qualifying Linux Tauri/WebKitGTK desktop runtime was available.",
+    "native macOS: no qualifying macOS Tauri/WKWebView or OS automation runtime was available."
+  ],
+  "notes": [
+    "The actual QA receipt reports platform=Windows and the performance artifact records platform=Windows-10-10.0.26200-SP0; no Windows version is hard-coded or generalized to other operating systems.",
+    "The raw performance evidence is retained in the two dated report directories. Percentiles use nearest-rank over the combined measured cold/warm samples; no unsourced absolute restore budget is claimed.",
+    "The broader catalog check reported 197 cases, 197 IDs, and 0 lint errors. A repo-wide audit also retained the pre-existing global F25.5 shallow/orphan regression; this card did not modify that global baseline.",
+    "No browser stub, screenshot-only result, synthetic PASS, injected observation state, or fake provider response was used as native or performance evidence.",
+    "The evidence proves this restore capability at the current runtime with L2 behavior plus native/performance coverage. It does not claim L3 or cross-product IDEA parity without the optional IDEA observation."
+  ]
+}

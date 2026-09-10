@@ -70,6 +70,7 @@
      "java_rename_project",
      "java25_projects",
      "editor_performance",
+     "workspace_restore_performance",
      "git_diff_repo",
      "welcome_recents"
     ]
@@ -175,6 +176,9 @@
     },
     "native_editor_performance": {
      "$ref": "#/$defs/native_editor_performance_arg"
+    },
+    "capture_workspace_restore_performance": {
+     "$ref": "#/$defs/capture_workspace_restore_performance_arg"
     },
     "native_click": {
      "$ref": "#/$defs/native_click_arg"
@@ -763,6 +767,23 @@
     "fixture_path": {"type": "string", "minLength": 1},
     "fixture_label": {"type": "string", "minLength": 1},
     "artifact_name": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._-]+\\.json$"}
+   }
+  },
+  "capture_workspace_restore_performance_arg": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": ["artifact_name"],
+   "properties": {
+    "artifact_name": {
+     "type": "string",
+     "minLength": 1,
+     "pattern": "^[A-Za-z0-9._-]+\\.json$"
+    },
+    "sample_id": {"type": "string", "minLength": 1},
+    "group": {"type": "string", "minLength": 1},
+    "wait_timeout_sec": {"type": "number", "minimum": 0},
+    "require_tab_count": {"type": "integer", "minimum": 1},
+    "require_failed_count": {"type": "integer", "minimum": 0}
    }
   },
   "native_click_arg": {

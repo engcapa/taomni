@@ -6463,6 +6463,82 @@ describe("CodeWorkspaceTab", () => {
     expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledTimes(3);
   });
 
+  it("allows focused restore input before a slower second leaf finishes", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-restore-active-ready",
+      workspaceInstanceId: "instance-restore-active-ready",
+      name: "Restore active ready",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/active.ts" },
+    };
+    let resolveBackground: ((value: WorkspaceFile) => void) | null = null;
+    const background = new Promise<WorkspaceFile>((resolve) => {
+      resolveBackground = resolve;
+    });
+    workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => {
+      if (path === "src/background.ts") return background;
+      return file(path, "export const active = true;\n");
+    });
+    window.localStorage.setItem("taomni.codeWorkspace.layout.v1.instance-restore-active-ready", JSON.stringify({
+      version: 1,
+      bottomDockOpen: false,
+      bottomDockTab: "search",
+      rightPaneOpen: false,
+      rightPaneTab: "outline",
+      languagePanelOpen: false,
+      splitOrientation: "vertical",
+      activeEditorGroupId: "primary",
+      expandedRootIds: [],
+      expandedDirKeys: [],
+      editorGroups: {
+        primary: {
+          openOrder: ["root:app:src/active.ts"],
+          activeKey: "root:app:src/active.ts",
+          previewKey: null,
+          pinnedKeys: [],
+        },
+        secondary: {
+          openOrder: ["root:app:src/background.ts"],
+          activeKey: "root:app:src/background.ts",
+          previewKey: null,
+          pinnedKeys: [],
+        },
+      },
+    }));
+
+    const rendered = renderWorkspace(workspace, {}, { strict: true });
+    const editor = await screen.findByText("export const active = true;");
+    const content = editor.closest(".cm-content") as HTMLElement | null;
+    expect(content).not.toBeNull();
+    const view = EditorView.findFromDOM(content!);
+    expect(view).not.toBeNull();
+
+    act(() => {
+      view!.dispatch({
+        changes: { from: view!.state.doc.length, insert: "const typedAfterReady = true;\n" },
+        userEvent: "input.type",
+      });
+    });
+    await waitFor(() => expect(
+      selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-restore-active-ready")
+        .openFiles["root:app:src/active.ts"]?.text,
+    ).toContain("typedAfterReady"));
+
+    expect(resolveBackground).not.toBeNull();
+    await act(async () => {
+      resolveBackground!(file("src/background.ts", "export const background = true;\n"));
+      await background;
+    });
+    await screen.findByTitle("app / src/background.ts");
+    expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-restore-active-ready",
+    ).openFiles["root:app:src/active.ts"]?.text).toContain("typedAfterReady");
+    rendered.unmount();
+  });
+
   it("routes editor actions through ActionHost to the active recursive leaf", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",

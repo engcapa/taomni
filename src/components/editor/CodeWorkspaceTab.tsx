@@ -1166,8 +1166,10 @@ import {
 } from "./workspace/workspaceSemanticIndex";
 import { useWorkspaceSemanticIndex } from "./workspace/useWorkspaceSemanticIndex";
 import {
+  beginWorkspaceRestorePerformance,
   executeBoundedAsyncQueue,
   planWorkspaceRestore,
+  type WorkspaceRestorePerformanceController,
 } from "./workspace/workspaceRestoreModel";
 import {
   buildRearrangePlan,
@@ -2367,6 +2369,7 @@ export function CodeWorkspaceTab({
     workspaceInstanceId: string;
     cancelled: boolean;
     cancelPending: boolean;
+    performance: WorkspaceRestorePerformanceController;
   } | null>(null);
 
   useEffect(() => {
@@ -2382,6 +2385,7 @@ export function CodeWorkspaceTab({
       queueMicrotask(() => {
         if (restoreRunRef.current !== cleanupRun || !cleanupRun.cancelPending) return;
         cleanupRun.cancelled = true;
+        cleanupRun.performance.cancelled("workspace-unmounted");
         restoreRunRef.current = null;
       });
     };
@@ -3554,9 +3558,49 @@ export function CodeWorkspaceTab({
           ) return;
           initialOpenedKeyRef.current = `restored:${workspaceInstanceId}`;
           const plan = planWorkspaceRestore(snapshot, looseFiles);
-          const restoreRun = { workspaceInstanceId, cancelled: false, cancelPending: false };
+          const restorePerformance = beginWorkspaceRestorePerformance(
+            workspaceInstanceId,
+            plan.activeTargets,
+            plan.backgroundTargets,
+            plan.activeGroupId,
+          );
+          const restoreRun = {
+            workspaceInstanceId,
+            cancelled: false,
+            cancelPending: false,
+            performance: restorePerformance,
+          };
           restoreRunRef.current = restoreRun;
           const isCurrent = () => restoreRunRef.current === restoreRun && !restoreRun.cancelled;
+          const restoreTarget = async (target: typeof plan.activeTargets[number], activate: boolean) => {
+            restorePerformance.readStarted(target);
+            try {
+              await openFile(target.ref, {
+                groupId: target.groupId,
+                preview: target.preview,
+                activate,
+                restoring: true,
+                isCurrent,
+              });
+            } catch (error) {
+              restorePerformance.targetSettled(target, "failed", errorMessage(error));
+              throw error;
+            }
+            if (!isCurrent()) {
+              restorePerformance.targetSettled(target, "cancelled");
+              return;
+            }
+            const restored = openFilesRef.current[target.key];
+            if (restored && !restored.loading && !restored.error) {
+              restorePerformance.targetSettled(target, "ready");
+            } else {
+              restorePerformance.targetSettled(
+                target,
+                "failed",
+                restored?.error ?? "restore did not publish a ready buffer",
+              );
+            }
+          };
 
           // Restore active group selection
           if (plan.activeGroupId) {
@@ -3568,27 +3612,26 @@ export function CodeWorkspaceTab({
           // unbounded active reads on top of the background pool.
           void executeBoundedAsyncQueue(
             plan.activeTargets,
-            (target) => openFile(target.ref, {
-              groupId: target.groupId,
-              preview: target.preview,
-              activate: true,
-              restoring: true,
-              isCurrent,
-            }),
+            (target) => restoreTarget(target, true),
             3,
           ).then(() => {
-            if (plan.backgroundTargets.length === 0) return [];
+            if (!isCurrent()) {
+              restorePerformance.cancelled("restore-owner-changed");
+              return [];
+            }
+            if (plan.backgroundTargets.length === 0) {
+              restorePerformance.allReady();
+              return [];
+            }
             return executeBoundedAsyncQueue(
               plan.backgroundTargets,
-              (target) => openFile(target.ref, {
-                groupId: target.groupId,
-                preview: target.preview,
-                activate: false,
-                restoring: true,
-                isCurrent,
-              }),
+              (target) => restoreTarget(target, false),
               3,
-            );
+            ).then((results) => {
+              if (isCurrent()) restorePerformance.allReady();
+              else restorePerformance.cancelled("restore-owner-changed");
+              return results;
+            });
           });
           return;
         }

@@ -1,0 +1,97 @@
+id: TC-IDE-ED013-workspace-restore-performance-native
+title: "ED-AUDIT-013 native 24-tab restore readiness and input"
+description: |
+  Measures the current packaged Code Workspace restore path with 24 persisted
+  tabs in two leaves, including one missing file. The focused primary leaf must
+  render and accept a real native edit while the secondary leaf and background
+  reads continue. The second cycle is a process-restart workspace reopen using
+  the same isolated QA profile, so cold/start and warm/reopen observations are
+  retained separately. The capture verb only reads production observations.
+covers: [F25.5]
+tags: [code-workspace, performance, restore, native-gate, p1]
+modes: [native]
+native_platforms: [Linux, Windows]
+fixtures: [reset_db, workspace_restore_performance]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-ed013-restore-performance-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: "${fixture.workspace_restore_recent_json}"
+  - seed_storage:
+      key: "${fixture.workspace_restore_layout_key}"
+      value: "${fixture.workspace_restore_layout_json}"
+  - native_restart_app: null
+  - wait_for: '[data-testid="welcome-panel"]'
+  - eval_readonly:
+      expression: 'localStorage.getItem("${fixture.workspace_restore_layout_key}")?.includes("\"type\":\"split\"")'
+      expect_truthy: true
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - wait_for: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_restore_root}"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_restore_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+  - eval_readonly:
+      expression: 'localStorage.getItem("${fixture.workspace_restore_layout_key}")?.includes("\"type\":\"split\"")'
+      expect_truthy: true
+  - wait_for: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="secondary"] .cm-content'
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-content").length > 1'
+      expect_truthy: true
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+      contains: "${fixture.workspace_restore_active_marker}"
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+      transport: webdriver
+      keys: [x]
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+      contains: x
+      timeout_sec: 30
+  - capture_workspace_restore_performance:
+      artifact_name: workspace-restore-cold.json
+      sample_id: "${env.TAOMNI_ED013_SAMPLE}-cold"
+      group: "${env.TAOMNI_ED013_GROUP}"
+      wait_timeout_sec: 30
+      require_tab_count: 24
+      require_failed_count: 1
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+      transport: webdriver
+      keys: [Control+z]
+  - native_restart_app: null
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - wait_for: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_restore_root}"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_restore_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+      contains: "${fixture.workspace_restore_active_marker}"
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+      transport: webdriver
+      keys: [x]
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+      contains: x
+      timeout_sec: 30
+  - capture_workspace_restore_performance:
+      artifact_name: workspace-restore-warm.json
+      sample_id: "${env.TAOMNI_ED013_SAMPLE}-warm"
+      group: "${env.TAOMNI_ED013_GROUP}"
+      wait_timeout_sec: 30
+      require_tab_count: 24
+      require_failed_count: 1
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+      transport: webdriver
+      keys: [Control+z]

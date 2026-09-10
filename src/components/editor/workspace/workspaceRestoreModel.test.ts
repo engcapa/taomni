@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  beginWorkspaceRestorePerformance,
   executeBoundedAsyncQueue,
   getLineDiffCacheKey,
   planWorkspaceRestore,
@@ -139,5 +140,60 @@ describe("ED-PERF-003: workspaceRestoreModel", () => {
     expect(key1).toBe(key2);
     expect(key1).not.toBe(key3);
     expect(keyUntracked).toBe("/repo/src/A.ts@untracked:1");
+  });
+
+  it("records focused active readiness separately from all-ready and preserves failures", () => {
+    const makeTarget = (key: string, groupId: "primary" | "secondary", active: boolean) => ({
+      key,
+      ref: { kind: "root" as const, rootId: "root", path: key },
+      groupId,
+      preview: false,
+      active,
+    });
+    const focused = makeTarget("active.ts", "primary", true);
+    const otherActive = makeTarget("secondary.ts", "secondary", true);
+    const background = makeTarget("missing.ts", "primary", false);
+    const controller = beginWorkspaceRestorePerformance(
+      "restore-test",
+      [focused, otherActive],
+      [background],
+      "primary",
+    );
+
+    controller.readStarted(focused);
+    controller.targetSettled(focused, "ready");
+    let snapshot = controller.snapshot();
+    expect(snapshot.activeReadyAtMs).not.toBeNull();
+    expect(snapshot.allReadyAtMs).toBeNull();
+
+    controller.readStarted(otherActive);
+    controller.targetSettled(otherActive, "ready");
+    controller.readStarted(background);
+    controller.targetSettled(background, "failed", "file missing");
+    controller.allReady();
+    snapshot = controller.snapshot();
+
+    expect(snapshot.allReadyAtMs).not.toBeNull();
+    expect(snapshot.events.filter((event) => event.kind === "failed")).toHaveLength(1);
+    expect(snapshot.events.find((event) => event.kind === "failed")).toMatchObject({
+      key: "missing.ts",
+      error: "file missing",
+    });
+    expect(snapshot.events.some((event) => event.kind === "start")).toBe(true);
+  });
+
+  it("records cancellation without publishing all-ready", () => {
+    const controller = beginWorkspaceRestorePerformance("cancel-test", [], [], "primary");
+
+    controller.cancelled("workspace-owner-changed");
+    controller.allReady();
+
+    const snapshot = controller.snapshot();
+    expect(snapshot.cancelledAtMs).not.toBeNull();
+    expect(snapshot.allReadyAtMs).toBeNull();
+    expect(snapshot.events.at(-1)).toMatchObject({
+      kind: "cancelled",
+      error: "workspace-owner-changed",
+    });
   });
 });
