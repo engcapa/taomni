@@ -19,6 +19,8 @@ Fixtures are referenced from a testcase's `fixtures: [...]` list. Builtin set:
                     restore active-ready/all-ready timing measurement
 * sortable_java_fixtures - native-only maven-single copy plus an unsorted
                     SortMembers.java for live source.sortMembers rearrange
+* file_move_recovery_fixtures - native-only fresh folder with a simulated
+                    Old.java -> New.java server-side move for recovery reversal
 
 Custom fixtures should live in this package and register via `register(name, fn)`.
 """
@@ -28,7 +30,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Protocol
 
-from . import editor_typing_fixtures, git_diff_repo, java25_projects, java_sample_projects, jdtls_required, linux_x11_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, welcome_recents, workspace_root
+from . import editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_sample_projects, jdtls_required, linux_x11_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, welcome_recents, workspace_root
 
 
 class FixtureContext(Protocol):
@@ -59,6 +61,7 @@ REGISTRY: dict[str, Fixture] = {
     "editor_typing_fixtures": Fixture("editor_typing_fixtures", editor_typing_fixtures.setup, editor_typing_fixtures.teardown),
     "restore_24tab_fixtures": Fixture("restore_24tab_fixtures", restore_24tab_fixtures.setup, restore_24tab_fixtures.teardown),
     "sortable_java_fixtures": Fixture("sortable_java_fixtures", sortable_java_fixtures.setup),
+    "file_move_recovery_fixtures": Fixture("file_move_recovery_fixtures", file_move_recovery_fixtures.setup),
 }
 
 

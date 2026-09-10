@@ -8867,6 +8867,7 @@ end_of_record
           recoveryDocument("file:///repo/app/src/main.ts", "/repo/app/src/main.ts", PRE["src/main.ts"], POST["src/main.ts"]),
           recoveryDocument("file:///repo/app/src/other.ts", "/repo/app/src/other.ts", PRE["src/other.ts"], POST["src/other.ts"]),
         ],
+        resourceMoves: [],
         verification: { mismatchedUris: [], checkedAt: null },
       });
       expect(result.ok).toBe(true);

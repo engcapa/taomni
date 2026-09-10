@@ -75,6 +75,32 @@ describe("buildWorkspacePathSnapshotEdit", () => {
     expect(edit.documentEdits[0]?.edits[0]?.newText).toBe("old contents");
   });
 
+  it("ED-FOLLOW-001: single undo of a file move deletes the new path and recreates the old one", () => {
+    // A1 record: the live single-undo path already reverses relocations via
+    // snapshot replay (deletes run before creates so the swap cannot
+    // collide); the gap this card closes is crash-recovery blindness, not
+    // the undo replay itself.
+    const edit = buildWorkspacePathSnapshotEdit(
+      [
+        { path: "/repo/Old.java", exists: false, text: null },
+        { path: "/repo/New.java", exists: true, text: "class New {}" },
+      ],
+      [
+        { path: "/repo/Old.java", exists: true, text: "class Old {}" },
+        { path: "/repo/New.java", exists: false, text: null },
+      ],
+    );
+    const kinds = edit.operations?.map((operation) => operation.kind);
+    expect(kinds).toEqual(["delete", "create", "text"]);
+    const deleteOp = edit.operations?.[0];
+    const createOp = edit.operations?.[1];
+    expect(deleteOp).toMatchObject({ kind: "delete", path: "/repo/New.java" });
+    expect(createOp).toMatchObject({ kind: "create", path: "/repo/Old.java" });
+    expect(edit.documentEdits).toHaveLength(1);
+    expect(edit.documentEdits[0]?.path).toBe("/repo/Old.java");
+    expect(edit.documentEdits[0]?.edits[0]?.newText).toBe("class Old {}");
+  });
+
   it("rejects directory or special-resource snapshots", () => {
     expect(() => buildWorkspacePathSnapshotEdit(
       [{ path: "/repo/src", exists: false, text: null }],

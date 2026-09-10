@@ -20,6 +20,7 @@ import {
   updateRefactorRecoveryJournalV2,
   clearRefactorRecoveryJournalV2,
   refactorJournalPostImageMatches,
+  resolveRecoveryDocTarget,
   type RefactorPlanV4,
   type RefactorRecoveryDocumentSnapshotV2,
 } from "./refactorPlan";
@@ -764,7 +765,7 @@ describe("ED-AUDIT-014: v2 refactor recovery journal", () => {
     expect(entry.documents[1].eol).toBe("crlf");
   });
 
-  it("keeps an explicit unsupported boundary for resource operations", () => {
+  it("ED-FOLLOW-001: journals a pure file move with the moved bytes' content proof", () => {
     const resourceEdit: LspWorkspaceEdit = {
       documentEdits: [],
       operations: [{
@@ -785,9 +786,111 @@ describe("ED-AUDIT-014: v2 refactor recovery journal", () => {
       workspaceRoot: "/workspace",
       transactionId: "tx-wedit-test-2",
     });
-    expect(preparation.state).toBe("unsupported");
-    if (preparation.state !== "unsupported") return;
-    expect(preparation.reason).toContain("text-only");
+    expect(preparation.state).toBe("prepared");
+    if (preparation.state !== "prepared") return;
+    expect(preparation.entry.documents).toHaveLength(0);
+    expect(preparation.entry.resourceMoves).toHaveLength(1);
+    expect(preparation.entry.resourceMoves[0]).toMatchObject({
+      oldPath: "/workspace/A.java",
+      newPath: "/workspace/A2.java",
+    });
+    // No text op rides the move: no content proof, reversal moves bytes only.
+    expect(preparation.entry.resourceMoves[0].contentHash).toBeNull();
+  });
+
+  it("ED-FOLLOW-001: keeps an explicit unsupported boundary for create/delete", () => {
+    for (const kind of ["create", "delete"] as const) {
+      const resourceEdit: LspWorkspaceEdit = {
+        documentEdits: [],
+        operations: [kind === "create"
+          ? {
+            kind: "create" as const,
+            uri: "file:///workspace/C.java",
+            path: "/workspace/C.java",
+            overwrite: false,
+            ignoreIfExists: false,
+            annotationId: null,
+          }
+          : {
+            kind: "delete" as const,
+            uri: "file:///workspace/A.java",
+            path: "/workspace/A.java",
+            recursive: false,
+            ignoreIfNotExists: false,
+            annotationId: null,
+          }],
+      };
+      const preparation = prepareRefactorRecoveryJournalV2({
+        plan: planFor(resourceEdit),
+        edit: resourceEdit,
+        preImages: [],
+        workspaceRoot: "/workspace",
+        transactionId: `tx-wedit-test-2${kind}`,
+      });
+      expect(preparation.state).toBe("unsupported");
+      if (preparation.state !== "unsupported") continue;
+      expect(preparation.reason).toContain("create/delete");
+    }
+  });
+
+  it("ED-FOLLOW-001: pins the content proof from the matching text-op preimage on mixed edits", () => {
+    const mixedEdit: LspWorkspaceEdit = {
+      documentEdits: [{
+        uri: "file:///workspace/A.java",
+        path: "/workspace/A.java",
+        edits: [{ range: { start: { line: 0, character: 4 }, end: { line: 0, character: 9 } }, newText: "nextAlpha" }],
+      }],
+      operations: [
+        {
+          kind: "text",
+          document: {
+            uri: "file:///workspace/A.java",
+            path: "/workspace/A.java",
+            version: null,
+            edits: [{ range: { start: { line: 0, character: 4 }, end: { line: 0, character: 9 } }, newText: "nextAlpha" }],
+          },
+        },
+        {
+          kind: "rename",
+          oldUri: "file:///workspace/A.java",
+          oldPath: "/workspace/A.java",
+          newUri: "file:///workspace/A2.java",
+          newPath: "/workspace/A2.java",
+          overwrite: false,
+          ignoreIfExists: false,
+          annotationId: null,
+        },
+      ],
+    };
+    const preparation = prepareRefactorRecoveryJournalV2({
+      plan: planFor(mixedEdit),
+      edit: mixedEdit,
+      preImages: [preImages[0]],
+      workspaceRoot: "/workspace",
+      transactionId: "tx-wedit-test-2mixed",
+    });
+    expect(preparation.state).toBe("prepared");
+    if (preparation.state !== "prepared") return;
+    expect(preparation.entry.documents).toHaveLength(1);
+    expect(preparation.entry.resourceMoves).toHaveLength(1);
+    expect(preparation.entry.resourceMoves[0].contentHash).toBe(sha256Hex("int alpha = 1;"));
+  });
+
+  it("ED-FOLLOW-001: resolves journal document targets through moves by live existence", () => {
+    const moves = [{
+      oldUri: "file:///workspace/A.java",
+      newUri: "file:///workspace/A2.java",
+      oldPath: "/workspace/A.java",
+      newPath: "/workspace/A2.java",
+      contentHash: null,
+    }];
+    const doc = { uri: "file:///workspace/A.java", canonicalPath: "/workspace/A.java" };
+    expect(resolveRecoveryDocTarget(doc, moves, () => false)).toBe("/workspace/A2.java");
+    expect(resolveRecoveryDocTarget(doc, moves, () => true)).toBe("/workspace/A.java");
+    const direct = { uri: "file:///workspace/A2.java", canonicalPath: "/workspace/A2.java" };
+    expect(resolveRecoveryDocTarget(direct, moves, () => false)).toBe("/workspace/A2.java");
+    const foreign = { uri: "file:///workspace/B.java", canonicalPath: "/workspace/B.java" };
+    expect(resolveRecoveryDocTarget(foreign, moves, () => false)).toBe("/workspace/B.java");
   });
 
   it("reports incomplete when a text target has no captured preimage", () => {

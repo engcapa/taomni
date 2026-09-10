@@ -774,10 +774,39 @@ export interface RefactorRecoveryJournalEntryV2 {
   /** Index of the last settled operation before the run stopped; null when the full edit applied. */
   appliedOperationIndex: number | null;
   documents: readonly RefactorRecoveryDocumentSnapshotV2[];
+  /**
+   * ED-FOLLOW-001: server-side file moves journalled alongside the text
+   * documents. A rename's content usually also rides a text op (whose
+   * snapshot carries the pre/post images); the move record pins the
+   * old->new path pair so crash recovery can reverse the relocation itself.
+   * Empty for text-only transactions and for entries written before moves
+   * were journalled.
+   */
+  resourceMoves: readonly RefactorRecoveryResourceMoveV1[];
   verification: {
     mismatchedUris: readonly string[];
     checkedAt: number | null;
+    /**
+     * ED-FOLLOW-001: new-paths the recovery run moved back to their old
+     * paths. Read by QA to prove the reversal happened; never inferred.
+     */
+    reversedMoves?: readonly string[];
   };
+}
+
+/**
+ * ED-FOLLOW-001: one journalled server-side file relocation.
+ * `contentHash` is the hash of the moved bytes at prepare time, taken from
+ * the matching text-op preimage when the moved file also carries text edits;
+ * null when the move has no text op (reversal then moves bytes without a
+ * content proof and reports the move as content-unverified).
+ */
+export interface RefactorRecoveryResourceMoveV1 {
+  oldUri: string;
+  newUri: string;
+  oldPath: string | null;
+  newPath: string | null;
+  contentHash: string | null;
 }
 
 export type RefactorJournalWriteResult =
@@ -817,6 +846,21 @@ export function isRefactorRecoveryJournalEntryV2(
     if (typeof snapshot.preText !== "string" || typeof snapshot.preHash !== "string") return false;
     if (typeof snapshot.postText !== "string" || typeof snapshot.postHash !== "string") return false;
     if (typeof snapshot.encoding !== "string" || typeof snapshot.bom !== "boolean") return false;
+  }
+  // ED-FOLLOW-001: resourceMoves is optional so pre-move entries stay
+  // readable; when present every move must carry its path pair.
+  if (entry.resourceMoves !== undefined) {
+    if (!Array.isArray(entry.resourceMoves)) return false;
+    for (const move of entry.resourceMoves) {
+      if (!move || typeof move !== "object") return false;
+      const candidate = move as RefactorRecoveryResourceMoveV1;
+      if (typeof candidate.oldUri !== "string" || typeof candidate.newUri !== "string") return false;
+      if (
+        candidate.oldPath !== null && typeof candidate.oldPath !== "string"
+        || candidate.newPath !== null && typeof candidate.newPath !== "string"
+        || candidate.contentHash !== null && typeof candidate.contentHash !== "string"
+      ) return false;
+    }
   }
   if (!entry.verification || typeof entry.verification !== "object") return false;
   if (!Array.isArray(entry.verification.mismatchedUris)) return false;
@@ -959,15 +1003,63 @@ export function refactorJournalPostImageMatches(
 
 /**
  * Typed journal preparation for a plan-gated edit. `unsupported` marks the
- * explicit recovery boundary for resource operations (create/rename/delete):
- * the transaction proceeds without a journal instead of faking coverage.
+ * explicit recovery boundary for create/delete resource operations: the
+ * transaction proceeds without a journal instead of faking coverage.
  * `incomplete` means a text target has no preimage — the caller must abort
  * before any mutation because a complete journal cannot be built.
+ *
+ * ED-FOLLOW-001: rename (file-move) operations ARE journalled — the move
+ * pair plus the moved bytes' content hash ride the entry so crash recovery
+ * can reverse the relocation. Only create/delete stay unsupported.
  */
 export type RefactorRecoveryJournalPreparation =
   | { state: "prepared"; entry: RefactorRecoveryJournalEntryV2 }
   | { state: "unsupported"; reason: string }
   | { state: "incomplete"; reason: string };
+
+function recoveryMovePath(uri: string, path: string | null): string | null {
+  if (path) return path;
+  if (/^file:/i.test(uri)) {
+    try {
+      return decodeURIComponent(uri.replace(/^file:\/\//i, ""));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * ED-FOLLOW-001: resolves the live read target of a journal document through
+ * journalled file moves. A text op addressed to the pre-move path reads at
+ * the new path once the old path is gone (and back at the old path after a
+ * reversal moved it home). `oldExists` is the live existence of the move's
+ * old path; without a matching move the recorded target is used unchanged.
+ */
+export function resolveRecoveryDocTarget(
+  doc: { uri: string; canonicalPath: string | null },
+  moves: readonly RefactorRecoveryResourceMoveV1[],
+  oldExists: (oldPath: string) => boolean,
+): string {
+  const recorded = doc.canonicalPath || doc.uri;
+  for (const move of moves) {
+    if (!move.oldPath || !move.newPath) continue;
+    const recordedNorm = normalizeFsPath(recorded);
+    if (
+      normalizeFsPath(move.oldPath) === recordedNorm
+      || normalizeFsPath(move.oldUri) === recordedNorm
+    ) {
+      return oldExists(move.oldPath) ? recorded : move.newPath;
+    }
+    if (
+      normalizeFsPath(move.newPath) === recordedNorm
+      || normalizeFsPath(move.newUri) === recordedNorm
+    ) {
+      return recorded;
+    }
+  }
+  return recorded;
+}
 
 export function prepareRefactorRecoveryJournalV2(input: {
   plan: RefactorPlanV4;
@@ -979,17 +1071,47 @@ export function prepareRefactorRecoveryJournalV2(input: {
   const { plan, edit, preImages, workspaceRoot, transactionId } = input;
   const operations = workspaceEditOperations(edit);
   const textOperations = operations.filter((operation) => operation.kind === "text");
-  if (textOperations.length !== operations.length) {
+  const renameOperations = operations.filter((operation) => operation.kind === "rename");
+  const unsupportedOperations = operations.filter((operation) => (
+    operation.kind !== "text" && operation.kind !== "rename"
+  ));
+  if (unsupportedOperations.length > 0) {
     return {
       state: "unsupported",
-      reason: "Recovery journal covers text-only edits; resource operations (create/rename/delete) have no crash recovery",
+      reason: "Recovery journal covers text edits and file moves; create/delete resource operations have no crash recovery",
     };
   }
-  if (textOperations.length === 0) {
+  if (textOperations.length === 0 && renameOperations.length === 0) {
     return {
       state: "unsupported",
-      reason: "Edit contains no text operations to journal",
+      reason: "Edit contains no text operations or file moves to journal",
     };
+  }
+  const resourceMoves: RefactorRecoveryResourceMoveV1[] = [];
+  for (const operation of renameOperations) {
+    if (operation.kind !== "rename") continue;
+    const oldPath = recoveryMovePath(operation.oldUri, operation.oldPath);
+    const newPath = recoveryMovePath(operation.newUri, operation.newPath);
+    if (!oldPath || !newPath) {
+      return {
+        state: "incomplete",
+        reason: `File move has no resolvable path pair (${operation.oldUri} -> ${operation.newUri}); refusing to mutate without a recovery journal`,
+      };
+    }
+    // The moved bytes' content proof comes from the matching text-op
+    // preimage when the moved file also carries text edits; null otherwise
+    // (reversal then moves bytes without a content proof).
+    const matchingPreImage = preImages.find((candidate) => (
+      (candidate.canonicalPath !== null && normalizeFsPath(candidate.canonicalPath) === normalizeFsPath(oldPath))
+      || candidate.uri === operation.oldUri
+    ));
+    resourceMoves.push({
+      oldUri: operation.oldUri,
+      newUri: operation.newUri,
+      oldPath,
+      newPath,
+      contentHash: matchingPreImage ? sha256Hex(matchingPreImage.preText) : null,
+    });
   }
   const documents: RefactorRecoveryDocumentSnapshotV2[] = [];
   for (const operation of textOperations) {
@@ -1035,6 +1157,7 @@ export function prepareRefactorRecoveryJournalV2(input: {
       status: "prepared",
       appliedOperationIndex: null,
       documents: Object.freeze(documents),
+      resourceMoves: Object.freeze(resourceMoves),
       verification: { mismatchedUris: Object.freeze([]), checkedAt: null },
     },
   };

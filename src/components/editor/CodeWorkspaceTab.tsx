@@ -9090,6 +9090,17 @@ export function CodeWorkspaceTab({
         for (const snapshot of afterSnapshots ?? []) {
           if (snapshot.text !== null) actualPostTexts[snapshot.path] = snapshot.text;
         }
+        // ED-FOLLOW-001: a journal document addressed to a pre-move path
+        // verifies against the moved-home... post-move bytes at the new
+        // path. Without this alias every rename transaction would fail its
+        // own postcondition even though the move applied exactly as planned.
+        for (const move of preparedJournal.resourceMoves ?? []) {
+          if (!move.oldPath || !move.newPath) continue;
+          const movedText = actualPostTexts[move.newPath];
+          if (movedText !== undefined && actualPostTexts[move.oldPath] === undefined) {
+            actualPostTexts[move.oldPath] = movedText;
+          }
+        }
         const journalMismatches = preparedJournal.documents.flatMap((doc) => {
           const target = doc.canonicalPath || doc.uri;
           const actual = actualPostTexts[target];
@@ -9303,9 +9314,15 @@ export function CodeWorkspaceTab({
     ownerInstanceId: string,
   ): Promise<void> => {
     const released = () => workspaceInstanceIdRef.current !== ownerInstanceId;
-    const resourceList = entry.documents
-      .map((doc) => doc.canonicalPath ?? doc.uri)
-      .join("\n");
+    const documentList = entry.documents
+      .map((doc) => doc.canonicalPath ?? doc.uri);
+    // ED-FOLLOW-001: journalled file moves are listed alongside the text
+    // documents so the pending entry honestly describes the relocation the
+    // restore will reverse.
+    const moveList = (entry.resourceMoves ?? [])
+      .filter((move) => move.oldPath && move.newPath)
+      .map((move) => `${move.oldPath} → ${move.newPath} (moved back on restore)`);
+    const resourceList = [...documentList, ...moveList].join("\n");
     const review = await confirmAppDialog({
       title: "Refactor recovery pending",
       message: `A previous ${entry.kind} transaction was interrupted or failed its postcondition check. Affected files:\n${resourceList}\n\nReview the pending recovery entry?`,
@@ -9315,6 +9332,14 @@ export function CodeWorkspaceTab({
     const preconditions = await classifyRefactorRecoveryPreconditions(entry, async (path) => {
       const snapshot = await readWorkspaceEditPathSnapshot(path);
       return snapshot && snapshot.text !== null ? { text: snapshot.text } : null;
+    }, {
+      // ED-FOLLOW-001: move endpoints need existence distinct from
+      // readability (a missing old path is the expected restorable state,
+      // not an unreadable file).
+      pathExists: async (path) => {
+        const snapshot = await readWorkspaceEditPathSnapshot(path);
+        return snapshot === null ? null : snapshot.exists;
+      },
     });
     if (released()) return;
     if (preconditions.overall === "already-restored") {
@@ -9341,13 +9366,13 @@ export function CodeWorkspaceTab({
     }
     const restore = await confirmAppDialog({
       title: "Restore pre-refactor content",
-      message: `Restore ${entry.documents.length} file(s) to their pre-refactor content?\n${resourceList}`,
+      message: `Restore ${entry.documents.length} file(s) to their pre-refactor content`
+        + `${moveList.length > 0 ? ` and move ${moveList.length} relocated file(s) back` : ""}?\n${resourceList}`,
       confirmLabel: "Restore files",
     });
     if (released() || !restore) return;
     const execution = await executeRefactorRecovery(entry, preconditions, {
-      restoreText: async (doc) => {
-        const targetPath = doc.canonicalPath || doc.uri;
+      restoreText: async (doc) => {        const targetPath = doc.canonicalPath || doc.uri;
         const current = await readWorkspaceEditPathSnapshot(targetPath);
         if (!current || !current.exists || current.text === null) {
           throw new Error(`Cannot restore ${targetPath}: current content unreadable`);
@@ -9399,30 +9424,70 @@ export function CodeWorkspaceTab({
         const snapshot = await readWorkspaceEditPathSnapshot(doc.canonicalPath || doc.uri);
         return snapshot && snapshot.text !== null ? { text: snapshot.text } : null;
       },
+      // ED-FOLLOW-001: reverse one journalled file move (new path back to
+      // the old path) through the same resource-operation path the forward
+      // move used, so locks, buffer remapping, and tree refresh all apply.
+      reverseResourceMove: async (move) => {
+        if (!move.oldPath || !move.newPath) {
+          throw new Error("Journalled move has no resolvable path pair");
+        }
+        await applyLspResourceOperation({
+          kind: "rename",
+          oldUri: move.newUri,
+          oldPath: move.newPath,
+          newUri: move.oldUri,
+          newPath: move.oldPath,
+          overwrite: false,
+          ignoreIfExists: false,
+          annotationId: null,
+        });
+        refreshTree();
+        // The reversal's own watcher echo must not clobber the
+        // restore-complete status (same rationale as the 014 suppressor).
+        restoreEchoSuppressorRef.current.markRestored(fsPathComparisonKey(move.oldPath));
+        restoreEchoSuppressorRef.current.markRestored(fsPathComparisonKey(move.newPath));
+      },
+      pathExists: async (path) => {
+        const snapshot = await readWorkspaceEditPathSnapshot(path);
+        if (snapshot === null) throw new Error(`Cannot stat ${path}: not a regular file`);
+        return snapshot.exists;
+      },
+      readMoveText: async (path) => {
+        const snapshot = await readWorkspaceEditPathSnapshot(path);
+        return snapshot && snapshot.text !== null ? { text: snapshot.text } : null;
+      },
     });
     if (released()) return;
     if (execution.state === "rolled-back") {
       updateRefactorRecoveryJournalV2(entry.recoveryId, (current) => ({
         ...current,
         status: "rolled-back",
-        verification: { mismatchedUris: Object.freeze([]), checkedAt: Date.now() },
+        verification: {
+          mismatchedUris: Object.freeze([]),
+          checkedAt: Date.now(),
+          reversedMoves: Object.freeze([...execution.reversedMoves]),
+        },
       }));
       setStatusMessage(
         `Refactor recovery complete: restored ${execution.restoredUris.length}, `
-          + `already restored ${execution.skippedUris.length}.`,
+          + `already restored ${execution.skippedUris.length}`
+          + `${execution.reversedMoves.length > 0 ? `, moved back ${execution.reversedMoves.length}` : ""}`
+          + `${execution.contentUnverifiedMoves.length > 0 ? ` (${execution.contentUnverifiedMoves.length} move(s) without a content proof)` : ""}.`,
       );
       return;
     }
     const problems = [
       ...execution.conflicts.map((conflict) => `${conflict.canonicalPath ?? conflict.uri}: third-party content (not overwritten)`),
       ...execution.failures.map((failure) => `${failure.canonicalPath ?? failure.uri}: ${failure.reason}`),
+      ...execution.moveConflicts.map((conflict) => `${conflict.newUri}: ${conflict.reason}`),
+      ...execution.moveFailures.map((failure) => `${failure.newUri}: ${failure.reason}`),
     ];
     await confirmAppDialog({
       title: "Refactor recovery incomplete",
       message: `Restored ${execution.restoredUris.length} of ${entry.documents.length} file(s). Pending entry kept:\n${problems.join("\n")}`,
       confirmLabel: "Keep pending",
     });
-  }, [applyLspWorkspaceEditNow, readWorkspaceEditPathSnapshot, setStatusMessage]);
+  }, [applyLspResourceOperation, applyLspWorkspaceEditNow, readWorkspaceEditPathSnapshot, refreshTree, setStatusMessage]);
   refactorRecoveryPromptRef.current = promptRefactorRecoveryEntry;
 
   useEffect(() => {

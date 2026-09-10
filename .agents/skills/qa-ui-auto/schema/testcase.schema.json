@@ -72,7 +72,8 @@
      "welcome_recents",
      "editor_typing_fixtures",
      "restore_24tab_fixtures",
-     "sortable_java_fixtures"
+     "sortable_java_fixtures",
+     "file_move_recovery_fixtures"
     ]
    },
    "uniqueItems": true
