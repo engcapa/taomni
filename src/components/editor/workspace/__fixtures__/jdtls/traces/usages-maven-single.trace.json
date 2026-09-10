@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "fixtureId": "usages-maven-single",
-  "generatedAt": "2026-09-08T20:30:01.260Z",
+  "generatedAt": "2026-09-10T01:22:46.235Z",
   "sanitized": true,
   "toolchain": {
     "java": {
@@ -26,11 +26,11 @@
       "notes": "workspace symbol: declaration plus workspace usage rows expected",
       "attempts": [
         {
-          "ms": 15799,
+          "ms": 12186,
           "itemCount": 3
         }
       ],
-      "msTotal": 15799,
+      "msTotal": 12186,
       "itemCount": 3,
       "satisfied": true,
       "declarationHit": true,
@@ -88,11 +88,11 @@
       "notes": "commons-lang3 FQN usage: the workspace usage row itself is the proof (JDT returns no jar declaration here)",
       "attempts": [
         {
-          "ms": 1918,
+          "ms": 1320,
           "itemCount": 1
         }
       ],
-      "msTotal": 1918,
+      "msTotal": 1320,
       "itemCount": 1,
       "satisfied": true,
       "declarationHit": true,

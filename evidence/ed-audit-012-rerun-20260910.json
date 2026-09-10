@@ -1,0 +1,110 @@
+{
+  "verified_at": "2026-09-10T01:45:21.492Z",
+  "head": "ede537d934e52dc8a0ccfaee3528503fec1fc9cb",
+  "checks": [
+    {
+      "kind": "code-audit",
+      "command": "Re-audit current production path: CodeWorkspaceTab definition/references handlers -> WorkspaceSemanticQueryHost -> real LSP provider -> guarded reveal -> one origin/target navigation history transaction -> Back recovery",
+      "result": "passed",
+      "summary": "Current production freezes workspace, file, document revision, provider generation and project identity before await. Pre-fetch, post-fetch and delivery guards reject missing, cancelled, stale, workspace-mismatched and revision-mismatched results; openLspLocation separates workspace paths from library URIs. History is written only from the successful onRevealed callback, with origin and destination recorded once; failed, cancelled and stale results do not move focus or write history. Usage snapshots retain scope/provider/project identity for pin, recent restore and rerun.",
+      "acceptance": ["ED-AUDIT-012-A1", "ED-AUDIT-012-A2", "ED-AUDIT-012-A3"]
+    },
+    {
+      "kind": "provider",
+      "command": "$env:TAOMNI_FIXTURE_JAVA='C:\\Program Files\\Java\\jdk-21\\bin\\java.exe'; $env:JDTLS_HOME='C:\\Users\\yuhan\\AppData\\Local\\jdtls'; node src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-usages-fixture.mjs",
+      "result": "passed",
+      "summary": "Real JDT LS 1.61.0.202607142124.jar on JDK 21.0.4 completed the usages-maven-single workspace-symbol-App and library-symbol-StringUtils requests. Both scenarios were satisfied, declaration/workspace usage facts were observed, failures=[] and no cancellation was requested by this provider fixture. The regenerated trace is src/components/editor/workspace/__fixtures__/jdtls/traces/usages-maven-single.trace.json.",
+      "acceptance": ["ED-AUDIT-012-A1", "ED-AUDIT-012-A3"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/useWorkspaceNavigation.test.tsx src/components/editor/workspace/navigationHistoryModel.test.ts src/components/editor/workspace/navigationHistoryV2.test.ts src/components/editor/workspace/UsagesScopeDialog.test.tsx src/components/editor/workspace/usageQuerySession.test.ts src/components/editor/workspace/javaSemanticEvidence.test.ts src/components/editor/workspace/__fixtures__/jdtls/jdtlsUsagesContract.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "7 test files passed; 58/58 tests passed. Assertions cover navigation history/back-forward, reveal state, usage scope and immutable snapshots, pin/rerun identity and stale states, semantic evidence and the regenerated JDT LS trace contract.",
+      "acceptance": ["ED-AUDIT-012-A1", "ED-AUDIT-012-A2", "ED-AUDIT-012-A3"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/CodeWorkspaceTab.test.tsx -t \"commits multi-result and references navigation only after a current reveal\" --maxWorkers=1",
+      "result": "passed",
+      "summary": "The mounted production-owner regression passed 1/1 with 121 unrelated tests skipped. It covers multi-result definition reveal/back, references reveal/back and rejection of a references result after the origin revision becomes stale.",
+      "acceptance": ["ED-AUDIT-012-A1", "ED-AUDIT-012-A2"]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/CodeWorkspaceTab.tsx --path src/components/editor/CodeWorkspaceTab.test.tsx --path src/components/editor/workspace/useWorkspaceNavigation.ts --path src/components/editor/workspace/useWorkspaceNavigation.test.tsx --path src/components/editor/workspace/navigationHistoryModel.ts --path src/components/editor/workspace/navigationHistoryModel.test.ts --path src/components/editor/workspace/navigationHistoryV2.test.ts --path src/components/editor/workspace/UsagesScopeDialog.tsx --path src/components/editor/workspace/UsagesScopeDialog.test.tsx --path src/components/editor/workspace/usageQuerySession.ts --path src/components/editor/workspace/usageQuerySession.test.ts --path src/components/editor/workspace/javaSemanticEvidence.ts --path src/components/editor/workspace/javaSemanticEvidence.test.ts --path src/components/editor/workspace/__fixtures__/jdtls/jdtlsUsagesContract.test.ts --json",
+      "result": "passed",
+      "summary": "All 14 owned TypeScript paths were checked with scoped_errors=0 and external_errors=0 across 0 files.",
+      "acceptance": ["ED-AUDIT-012-A3"]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C6-01 --report-dir qa-ui-auto-report/ed-audit-012-browser-current-20260910-c6-01 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "Initial current-checkout browser run selected the case but failed at open with ERR_CONNECTION_REFUSED because no browser service was listening on the configured localhost:5000.",
+      "acceptance": []
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-report/ed-audit-012-browser-current-20260910.config.yaml --filter TC-IDE-C6-01 --report-dir qa-ui-auto-report/ed-audit-012-browser-current-20260910-c6-01-rerun --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "After moving Vite to the permitted 127.0.0.1:5300 port, the first dev-server conversion did not reach domcontentloaded within 30 seconds. No behavior result was claimed; the failure artifact is retained before the preview rerun.",
+      "acceptance": []
+    },
+    {
+      "kind": "build",
+      "command": "pnpm.cmd build",
+      "result": "passed",
+      "summary": "TypeScript and Vite browser build completed successfully; 4677 modules transformed and exit code 0.",
+      "acceptance": []
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-report/ed-audit-012-browser-current-20260910.config.yaml --filter TC-IDE-C6-01 --report-dir qa-ui-auto-report/ed-audit-012-browser-current-20260910-c6-01-preview --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows Chromium actual run selected 1 and passed 1/1 with 0 failed and 0 skipped. The current source identity is 29d0d14c76047002e3ad7e36c9e9c31332ae0bee26163bfb844c03bd566dcdf9; receipt receipt-run-20260910-093543-884116400 exitCode 0.",
+      "acceptance": ["ED-AUDIT-012-A1", "ED-AUDIT-012-A2"]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-report/ed-audit-012-browser-current-20260910.config.yaml --filter TC-IDE-C6-02 --report-dir qa-ui-auto-report/ed-audit-012-browser-current-20260910-c6-02-preview --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows Chromium actual run selected 1 and passed 1/1 with 0 failed and 0 skipped. The semantic query browser case completed with the same current source identity 29d0d14c76047002e3ad7e36c9e9c31332ae0bee26163bfb844c03bd566dcdf9; receipt receipt-run-20260910-093627-830791900 exitCode 0.",
+      "acceptance": ["ED-AUDIT-012-A1", "ED-AUDIT-012-A2"]
+    },
+    {
+      "kind": "native",
+      "command": "python .agents/skills/qa-ui-auto/scripts/native_build.py --force",
+      "result": "passed",
+      "summary": "The independent packaged QA application built successfully with identifier com.taomni.app.qa at src-tauri/target/qa-ui-auto/debug/taomni.exe.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C6-05-query-definition-reveal-history-native-windows --report-dir qa-ui-auto-report/ed-audit-012-native-current-20260910-c6-05-windows --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "The first current native attempt stopped during isolated fixture copy because the relative report path produced Windows path-length/setup errors; zero behavior steps ran and no native pass was claimed.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C6-05-query-definition-reveal-history-native-windows --report-dir C:/taomni-e012-native --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Windows packaged com.taomni.app.qa WebView2 run selected 1 and passed 1/1 with 0 failed and 0 skipped across 24 steps. Real JDT LS opened App.java from the AppTest.java F12 origin and the Back action restored AppTest.java and its origin text. QA binary SHA-256 is 58fa191dfe39fe9e4dc3679e72824ded64f04aef0166ab05626a5f1eaea47d02; source identity is 29d0d14c76047002e3ad7e36c9e9c31332ae0bee26163bfb844c03bd566dcdf9; receipt receipt-run-20260910-094200-642784800 exitCode 0.",
+      "acceptance": ["ED-AUDIT-012-A1", "ED-AUDIT-012-A2", "ED-AUDIT-012-A3"]
+    }
+  ],
+  "unrun": [
+    "idea-comparison: IntelliJ IDEA 2026.2.x was not available; no identical fixture/action observation was collected. Optional under the current backlog rule.",
+    "native Linux: no qualifying Linux Tauri/WebKitGTK/X11 runtime was available on the current execution host.",
+    "native macOS: no qualifying macOS Tauri/WKWebView or OS automation runtime was available on the current execution host.",
+    "provider Linux/macOS: the real JDT LS provider run was collected on the current runtime only; cross-platform provider behavior is not claimed."
+  ],
+  "notes": [
+    "Current runtime platform is recorded from the runner receipts as Windows; no Windows release/version is hard-coded or inferred.",
+    "The browser passes use the built dist served by vite preview on 127.0.0.1:5300 because the configured 5000 port is Windows-excluded; browser evidence remains renderer/stub-boundary evidence.",
+    "The native pass uses isolated APPDATA/LOCALAPPDATA, a disposable copied maven-single fixture and the real provider process; no browser stub, screenshot-only result, synthetic receipt or hand-built provider response was used.",
+    "The regenerated provider trace changed only runtime timestamp and measured durations; source/result hashes, scenario identities and failures remain contract-checked.",
+    "The full repository test suite and unrelated QA static baseline were not used as ED012 completion gates; this card uses its focused owner scope and required evidence kinds."
+  ]
+}
