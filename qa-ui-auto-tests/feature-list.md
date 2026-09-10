@@ -5125,6 +5125,10 @@ controls:
   - id: debug-panel
     selector: '[data-testid="debug-panel"]'
     kind: display
+  - id: debug-subtab-breakpoints
+    selector: '[data-testid="debug-subtab-breakpoints"]'
+    kind: interactive
+    optional: true       # rendered when the Debug panel exposes its Breakpoints subtab
   - id: debug-stop
     selector: '[data-testid="debug-stop"]'
     kind: interactive
@@ -5650,6 +5654,14 @@ controls:
     optional: true       # focusable project tree container
   - id: tree-root-row                 # expands a workspace root before listing children
     selector: '[data-testid="code-workspace-tree-root"]'
+    kind: interactive
+    optional: true
+  - id: tree-directory-row            # expands a directory before listing children
+    selector: '[data-testid="code-workspace-tree-dir"]'
+    kind: interactive
+    optional: true
+  - id: tree-view-toggle              # switches between the project tree and flat file views
+    selector: '[data-testid="code-workspace-view-tree"]'
     kind: interactive
     optional: true
   - id: tree-file-row                  # rows render via a shared component; exact id varies per file
@@ -6273,6 +6285,10 @@ controls:
     selector: '[data-testid="new-java-class-dialog"]'
     kind: display
     optional: true
+  - id: new-java-class-package
+    selector: '[data-testid="new-java-class-package"]'
+    kind: display
+    optional: true
   - id: new-java-class-name-input
     selector: '[data-testid="new-java-class-name-input"]'
     kind: interactive
@@ -6283,6 +6299,10 @@ controls:
     optional: true
   - id: new-java-class-confirm
     selector: '[data-testid="new-java-class-confirm"]'
+    kind: interactive
+    optional: true
+  - id: new-java-class-submit
+    selector: '[data-testid="new-java-class-submit"]'
     kind: interactive
     optional: true
   - id: new-java-class-cancel

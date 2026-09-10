@@ -151,6 +151,8 @@
 - `[data-testid="code-workspace-tree-add-folder"]` — interactive [optional] — F25.5.tree-add-folder
 - `[data-testid="code-workspace-tree-pane"]` — display [optional] — F25.5.tree-pane
 - `[data-testid="code-workspace-tree-root"]` — interactive [optional] — F25.5.tree-root-row
+- `[data-testid="code-workspace-tree-dir"]` — interactive [optional] — F25.5.tree-directory-row
+- `[data-testid="code-workspace-view-tree"]` — interactive [optional] — F25.5.tree-view-toggle
 - `[data-testid="code-workspace-tree-file"]` — interactive [optional] — F25.5.tree-file-row
 - `[data-testid="code-workspace-tree-filter"]` — interactive [optional] — F25.5.tree-filter
 - `[data-testid="code-workspace-flat-file"]` — interactive [optional] — F25.5.tree-flat-file-row
@@ -305,9 +307,11 @@
 - `[data-testid="file-template-save-button"]` — interactive [optional] — F25.5.file-template-save-button
 - `[data-testid="file-template-reset-button"]` — interactive [optional] — F25.5.file-template-reset-button
 - `[data-testid="new-java-class-dialog"]` — display [optional] — F25.5.new-java-class-dialog
+- `[data-testid="new-java-class-package"]` — display [optional] — F25.5.new-java-class-package
 - `[data-testid="new-java-class-name-input"]` — interactive [optional] — F25.5.new-java-class-name-input
 - `[data-testid="new-java-class-kind-select"]` — interactive [optional] — F25.5.new-java-class-kind-select
 - `[data-testid="new-java-class-confirm"]` — interactive [optional] — F25.5.new-java-class-confirm
+- `[data-testid="new-java-class-submit"]` — interactive [optional] — F25.5.new-java-class-submit
 - `[data-testid="new-java-class-cancel"]` — interactive [optional] — F25.5.new-java-class-cancel
 
 ## code-workspace/execution (F25.1)
@@ -363,6 +367,7 @@
 - `[data-testid^="tests-rerun-"]` — interactive [optional] — F25.1.tests-rerun
 - `[data-testid^="tests-failure-details-"]` — interactive [optional] — F25.1.tests-failure-details
 - `[data-testid="debug-panel"]` — display — F25.1.debug-panel
+- `[data-testid="debug-subtab-breakpoints"]` — interactive [optional] — F25.1.debug-subtab-breakpoints
 - `[data-testid="debug-stop"]` — interactive [optional] — F25.1.debug-stop
 - `.taomni-debug-current-line` — display [optional] — F25.1.debug-current-line
 - `[data-testid="debug-active-configuration"]` — interactive [optional] — F25.1.debug-active-configuration

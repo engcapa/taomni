@@ -1,10 +1,10 @@
 {
   "version": 1,
   "totals": {
-    "features_with_controls": 66,
-    "required": 371,
-    "covered_required": 348,
-    "shallow": 44,
+    "features_with_controls": 67,
+    "required": 394,
+    "covered_required": 376,
+    "shallow": 51,
     "orphans": 0
   },
   "features": {
@@ -14,8 +14,8 @@
       "shallow": 0
     },
     "F1.3": {
-      "required": 10,
-      "covered_required": 10,
+      "required": 11,
+      "covered_required": 11,
       "shallow": 0
     },
     "F1.5": {
@@ -24,8 +24,8 @@
       "shallow": 0
     },
     "F1.6": {
-      "required": 16,
-      "covered_required": 16,
+      "required": 23,
+      "covered_required": 23,
       "shallow": 2
     },
     "F1.7": {
@@ -310,7 +310,7 @@
     },
     "F-MAIL-4": {
       "required": 5,
-      "covered_required": 0,
+      "covered_required": 5,
       "shallow": 0
     },
     "F-Sockscap-1": {
@@ -324,9 +324,9 @@
       "shallow": 1
     },
     "F25.5": {
-      "required": 1,
-      "covered_required": 1,
-      "shallow": 1
+      "required": 3,
+      "covered_required": 3,
+      "shallow": 8
     },
     "F25.2": {
       "required": 10,
@@ -336,6 +336,11 @@
     "F25.3": {
       "required": 0,
       "covered_required": 0,
+      "shallow": 0
+    },
+    "F26.1": {
+      "required": 13,
+      "covered_required": 13,
       "shallow": 0
     }
   }
