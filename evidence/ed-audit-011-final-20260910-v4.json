@@ -1,0 +1,105 @@
+{
+  "verified_at": "2026-09-10T07:38:00Z",
+  "head": "7ad9e96e9716d8ca9117777c8e2b25896d70f739",
+  "checks": [
+    {
+      "kind": "code-audit",
+      "command": "Re-audit current production path from HEAD 7ad9e96e: CodeMirrorHost composition/blur/unmount listeners -> WorkspaceActionHost IME/stale-owner gate -> mounted editor action owner -> CodeMirror transaction/history",
+      "result": "passed",
+      "summary": "The current production owner cancels pending chords at compositionstart, compositionend, blur and unmount; capture handling prevents composing navigation from moving the editor caret; WorkspaceActionHost rejects composing, Process, Unidentified, Dead and AltGraph events and stale view owners; normal editor undo remains owned by the live document transaction. No production source gap was found in this re-audit.",
+      "acceptance": [
+        "ED-AUDIT-011-A1",
+        "ED-AUDIT-011-A2",
+        "ED-AUDIT-011-A3"
+      ]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/CodeMirrorHost.test.tsx src/components/editor/workspace/workspaceActionHost.test.ts src/components/editor/workspace/workspaceActionHostKeymap.test.ts src/components/editor/workspace/workspaceKeymapScheme.test.ts src/components/editor/workspace/workspaceKeymapRuntime.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "5 test files passed; 82/82 tests passed. Coverage includes composing navigation, composition/blur/unmount cleanup, dead-key and AltGraph rejection, stale owner handling, keymap normalization and normal shortcut recovery.",
+      "acceptance": [
+        "ED-AUDIT-011-A2",
+        "ED-AUDIT-011-A3"
+      ]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/workspace/CodeMirrorHost.tsx --path src/components/editor/workspace/CodeMirrorHost.test.tsx --path src/components/editor/workspace/workspaceActionHost.ts --path src/components/editor/workspace/workspaceActionHost.test.ts --path src/components/editor/workspace/workspaceActionHostKeymap.test.ts --path src/components/editor/workspace/workspaceKeymapScheme.ts --path src/components/editor/workspace/workspaceKeymapScheme.test.ts --path src/components/editor/workspace/workspaceKeymapRuntime.test.ts --json",
+      "result": "passed",
+      "summary": "All 8 owned TypeScript paths passed with scoped_errors=0 and external_errors=0 across 0 external files.",
+      "acceptance": [
+        "ED-AUDIT-011-A3"
+      ]
+    },
+    {
+      "kind": "qa-lint",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto audit --json",
+      "result": "passed",
+      "summary": "197 testcase files, 197 unique IDs, case errors=0, feature errors=0 and catalog_stale=false; the report retains unrelated existing orphan-selector and untouched-control gaps.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED011-ime-windows-native --report-dir qa-ui-auto-report/ed-audit-011-native-current-20260910-v3 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "Current packaged com.taomni.app.qa WebView2 run on the recorded Windows runtime used real Win32 SendInput and reached the IME boundary, but the pre-edit click placed the committed candidate on the second line while the case expected the first line. The observation recorded target_hkl=0x8040804 and restored=true; this run did not prove completion, cancellation or undo.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED011-ime-windows-native --report-dir qa-ui-auto-report/ed-audit-011-native-current-20260910-v4 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "After deterministic Control+Home/End caret placement, the real IME composition remained on the first editor line, but the case incorrectly required that line to remain exactly alpha during pre-edit. The captured DOM and screenshot showed real Microsoft Pinyin pre-edit text without a line jump; candidate completion was not claimed.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED011-ime-windows-native --report-dir qa-ui-auto-report/ed-audit-011-native-current-20260910-v5 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "The real packaged run passed composition isolation and reached Enter confirmation. The active Windows input dictionary selected 你哈 after ArrowDown, while the case hard-coded 你好; the captured post-confirmation DOM was alpha你哈 / second. No cancellation or undo pass was inferred from this failure.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED011-ime-windows-native --report-dir qa-ui-auto-report/ed-audit-011-native-current-20260910-v6 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "A real ArrowUp return attempt did not restore the first candidate in this Microsoft Pinyin session; Enter again produced alpha你哈 / second. Candidate ordering is therefore no longer treated as the contract, and the testcase was changed to cancel the navigated composition before a fresh first-candidate confirmation.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED011-ime-windows-native --report-dir qa-ui-auto-report/ed-audit-011-native-current-20260910-v7 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "The current testcase could not send its first native IME key: Windows returned PermissionError/WinError 5 from SendInput before a candidate action. Teardown restored the keyboard layout (prior_hkl=0x8040804, restored=true). A direct foreground diagnostic identified the Windows default lock screen as the active window, so no behavior pass was claimed.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH='.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-ED011-ime-windows-native --report-dir qa-ui-auto-report/ed-audit-011-native-current-20260910-v8 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "The immediate retry failed with the same WinError 5 at the first real SendInput call while the foreground remained the Windows default lock screen. The runner emitted a receipt and restored the input layout; native IME completion/recovery is still unverified.",
+      "acceptance": []
+    },
+    {
+      "kind": "accessibility",
+      "command": "Accessibility assertions in TC-IDE-ED011-ime-windows-native: textbox role, aria-multiline, DOM focus and 200% editor size before native IME; focus, composition isolation, cancel, recovery and undo after native IME",
+      "result": "failed",
+      "summary": "The packaged runs that reached the editor passed role=textbox, aria-multiline=true, DOM focus and 26px editor size, and the real composition stayed on one line. The complete current-platform IME confirmation/cancellation/recovery/undo sequence did not finish, and no screen-reader observation was available; the required accessibility layer therefore remains incomplete.",
+      "acceptance": []
+    }
+  ],
+  "unrun": [
+    "native IME completion/recovery: blocked by the current locked desktop after earlier real runs stopped at candidate-contract assertions; resume with the desktop unlocked.",
+    "accessibility screen-reader/manual observation: no qualifying interactive desktop and screen-reader session was available.",
+    "native Linux: no qualifying Linux Tauri/WebKitGTK/X11 runtime was available on the current execution host.",
+    "native macOS: no qualifying macOS Tauri/WKWebView or OS automation runtime was available on the current execution host.",
+    "idea-comparison: IntelliJ IDEA 2026.2.x was not run; optional under the current backlog rule and not a substitute for native/accessibility evidence."
+  ],
+  "notes": [
+    "The working tree was verified against Git HEAD 7ad9e96e plus this card's testcase edits; no production editor source was changed in this attempt.",
+    "The actual runner receipts identify the execution platform as Windows and the native observation reports Windows-10-10.0.26200-SP0; no Windows 11 claim is made and no other OS behavior is inferred.",
+    "The native path used the independent com.taomni.app.qa package, real Win32 SendInput, the configured 00000804 input layout and WebView2. No browser composition event, screenshot-only assertion, synthetic receipt or model response was used as native evidence.",
+    "Terminal status is implemented: production implementation and non-native gates are complete, while current-platform native IME completion and the complete accessibility layer remain failed/unavailable because the desktop was locked."
+  ]
+}
