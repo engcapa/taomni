@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "fixtureId": "rearrange-cleanup-maven-single",
-  "generatedAt": "2026-09-05T05:15:13.330Z",
+  "generatedAt": "2026-09-10T05:28:08.402Z",
   "sanitized": true,
   "toolchain": {
     "java": {
-      "path": "/data/dev/jdk-21/bin/java",
+      "path": "C:\\Program Files\\Java\\jdk-21\\bin\\java.exe",
       "version": "21.0.4",
       "info": {
         "line": "openjdk version \"21.0.4\" 2024-07-16 LTS",
@@ -14,8 +14,8 @@
       }
     },
     "jdtls": {
-      "home": "/home/zhyhang/.local/share/jdtls",
-      "version": "1.61.0.202607102111.jar"
+      "home": "C:\\Users\\yuhan\\AppData\\Local\\jdtls",
+      "version": "1.61.0.202607142124.jar"
     }
   },
   "capabilities": {

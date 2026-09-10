@@ -20,7 +20,7 @@ import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { LspClient, sha256 } from "./lsp-client.mjs";
 
 const RUNNER_DIR = dirname(fileURLToPath(import.meta.url));
@@ -90,17 +90,18 @@ async function main() {
   mkdirSync(workDir, { recursive: true });
   mkdirSync(dataDir, { recursive: true });
   cpSync(join(PROJECTS_DIR, "maven-single"), workDir, { recursive: true });
+  const workspaceUri = pathToFileURL(workDir).href;
 
   const client = new LspClient(javaPath, launchArgs(jdtls, dataDir), {
-    workspaceFolders: [{ uri: `file://${workDir}`, name: "rearrange-maven-single" }],
+    workspaceFolders: [{ uri: workspaceUri, name: "rearrange-maven-single" }],
   }).start();
 
   let initializeResult = null;
   try {
     initializeResult = await client.request("initialize", {
       processId: null,
-      rootUri: `file://${workDir}`,
-      workspaceFolders: [{ uri: `file://${workDir}`, name: "rearrange-maven-single" }],
+      rootUri: workspaceUri,
+      workspaceFolders: [{ uri: workspaceUri, name: "rearrange-maven-single" }],
       capabilities: {
         textDocument: {
           synchronization: { dynamicRegistration: false, didSave: true },
@@ -157,10 +158,10 @@ async function main() {
   };
 
   try {
-    client.notify("exit", {});
+    await client.shutdown();
   } catch { /* ignore */ }
-  rmSync(workDir, { recursive: true, force: true });
-  rmSync(dataDir, { recursive: true, force: true });
+  rmSync(workDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  rmSync(dataDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 
   const trace = {
     schemaVersion: 1,

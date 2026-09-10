@@ -1,0 +1,15 @@
+app:
+  base_url: http://127.0.0.1:5001
+  mode: browser
+
+webdriver:
+  host: 127.0.0.1
+  port: 4444
+  native_port: 4445
+  tauri_driver: tauri-driver
+  native_driver: C:/Users/yuhan/AppData/Local/TaomniQA/bin/msedgedriver.exe
+  startup_timeout: 30
+
+report:
+  dir: qa-ui-auto-report
+  keep_runs: 10
