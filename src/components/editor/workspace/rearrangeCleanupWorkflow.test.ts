@@ -3,11 +3,13 @@ import {
   buildCleanupPlan,
   buildRearrangePlan,
   cancelWorkflowPlan,
+  isCleanupActionKind,
   isRearrangeActionKind,
   planCleanup,
   planRearrange,
   resolveCleanupCapabilities,
   resolveRearrangeCapabilities,
+  validateCleanupActionEdit,
   validateRearrangeActionEdit,
   verifyWorkflowFreshness,
   verifyWorkflowPostHashes,
@@ -16,6 +18,7 @@ import {
   type RearrangeInput,
 } from "./rearrangeCleanupWorkflow";
 import { sha256Hex } from "./projectAnalysisModel";
+import type { LspCapabilitySummary } from "../../../lib/editor/lsp";
 
 describe("ED-STYLE-002: Rearrange / Cleanup independent workflows", () => {
   describe("resolveRearrangeCapabilities", () => {
@@ -209,7 +212,7 @@ describe("ED-STYLE-002: Rearrange / Cleanup independent workflows", () => {
   });
 
   describe("resolveCleanupCapabilities", () => {
-    it("resolves supported when codeActionKinds includes source.cleanup or source.fixAll", () => {
+    it("resolves supported when codeActionKinds includes dedicated source.cleanup", () => {
       const caps = resolveCleanupCapabilities({
         completion: true,
         signatureHelp: true,
@@ -236,6 +239,16 @@ describe("ED-STYLE-002: Rearrange / Cleanup independent workflows", () => {
       });
       expect(caps.cleanupSupported).toBe(true);
       expect(caps.supportedProfiles).toContain("default");
+    });
+
+    it("does not relabel source.fixAll as Code Cleanup", () => {
+      const caps = resolveCleanupCapabilities({
+        codeActionKinds: ["source.fixAll"],
+      } as LspCapabilitySummary);
+      expect(isCleanupActionKind("source.cleanup")).toBe(true);
+      expect(isCleanupActionKind("source.cleanup.default")).toBe(true);
+      expect(isCleanupActionKind("source.fixAll")).toBe(false);
+      expect(caps.cleanupSupported).toBe(false);
     });
 
     it("resolves unsupported when null capabilities provided", () => {
@@ -398,6 +411,25 @@ describe("ED-STYLE-002: Rearrange / Cleanup independent workflows", () => {
         profileId: "full-cleanup",
       });
     });
+
+    it("reports an unsupported profile instead of selecting a weaker one", () => {
+      const decision = planCleanup({
+        scope: "file",
+        targetPath: "/repo/src/Main.java",
+        languageId: "java",
+        readOnly: false,
+        profileId: "inspection-only",
+        capabilities: {
+          cleanupSupported: true,
+          providerId: "Cleanup Provider",
+          supportedProfiles: ["default"],
+        },
+      });
+      expect(decision.kind).toBe("unavailable");
+      if (decision.kind === "unavailable") {
+        expect(decision.reason).toContain("does not support the inspection-only code cleanup profile");
+      }
+    });
   });
 
   describe("workflow plan, preview, conflict, and cancel (ED-STYLE-002-A3)", () => {
@@ -434,6 +466,31 @@ describe("ED-STYLE-002: Rearrange / Cleanup independent workflows", () => {
       expect(plan.conflicts).toHaveLength(0);
       expect(plan.preview.entries).toHaveLength(1);
       expect(plan.preview.entries[0].path).toBe("/repo/src/Example.java");
+    });
+
+    it("keeps a provider no-change result observable and file-local", () => {
+      const noChangeEdit = {
+        documentEdits: [{
+          uri: "file:///repo/src/Example.java",
+          path: "/repo/src/Example.java",
+          edits: [],
+        }],
+      };
+      expect(validateCleanupActionEdit(
+        noChangeEdit,
+        "/repo/src/Example.java",
+        "file:///repo/src/Example.java",
+        originalText,
+      )).toMatchObject({ valid: true, edits: [] });
+      expect(validateCleanupActionEdit(
+        noChangeEdit,
+        "/repo/src/Other.java",
+        "file:///repo/src/Other.java",
+        originalText,
+      )).toEqual({
+        valid: false,
+        reason: "Cleanup provider returned an edit for a different file",
+      });
     });
 
     it("detects dirty buffer or read-only conflict at plan generation", () => {

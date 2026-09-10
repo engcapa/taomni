@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "fixtureId": "rearrange-cleanup-maven-single",
-  "generatedAt": "2026-09-10T12:01:18.317Z",
+  "generatedAt": "2026-09-10T13:11:57.954Z",
   "sanitized": true,
   "toolchain": {
     "java": {

@@ -35,10 +35,23 @@ const REARRANGE_ACTION_KINDS = [
   "rearrange",
 ] as const;
 
+const CLEANUP_ACTION_KINDS = [
+  "source.cleanup",
+  "cleanup",
+] as const;
+
 /** A provider action is rearrange-capable only when its kind is explicit. */
 export function isRearrangeActionKind(kind: string | null | undefined): boolean {
   const normalized = kind?.trim() ?? "";
   return REARRANGE_ACTION_KINDS.some((base) => (
+    normalized === base || normalized.startsWith(`${base}.`)
+  ));
+}
+
+/** A provider action is cleanup-capable only when its kind is explicitly cleanup. */
+export function isCleanupActionKind(kind: string | null | undefined): boolean {
+  const normalized = kind?.trim() ?? "";
+  return CLEANUP_ACTION_KINDS.some((base) => (
     normalized === base || normalized.startsWith(`${base}.`)
   ));
 }
@@ -119,6 +132,50 @@ export function validateRearrangeActionEdit(
       }
     } catch {
       return { valid: false, reason: "Rearrange provider returned an invalid text range" };
+    }
+  }
+  return { valid: true, document, edits: document.edits };
+}
+
+export type CleanupEditValidation =
+  | { valid: true; document: LspFileTextEdits; edits: readonly LspTextEdit[] }
+  | { valid: false; reason: string };
+
+/**
+ * Cleanup is also file-local, but an empty edit is a valid provider no-change
+ * result. Keep that fact observable instead of turning it into a fake success.
+ */
+export function validateCleanupActionEdit(
+  edit: LspWorkspaceEdit | null | undefined,
+  targetPath: string,
+  targetUri: string,
+  currentText?: string,
+): CleanupEditValidation {
+  if (!edit) return { valid: false, reason: "Provider returned no cleanup edit" };
+  if (!Array.isArray(edit.documentEdits) || edit.documentEdits.length !== 1) {
+    return { valid: false, reason: "Cleanup provider must return exactly one document edit" };
+  }
+  if (edit.operations !== undefined) {
+    if (edit.operations.length !== 1 || edit.operations[0]?.kind !== "text") {
+      return { valid: false, reason: "Cleanup provider must return one text operation and no resource operations" };
+    }
+    const operation = edit.operations[0];
+    if (operation.kind !== "text" || !sameDocumentEdit(operation.document, edit.documentEdits[0])) {
+      return { valid: false, reason: "Cleanup provider returned inconsistent document edit operations" };
+    }
+  }
+  const document = edit.documentEdits[0];
+  if (!sameActionDocument(document, targetPath, targetUri)) {
+    return { valid: false, reason: "Cleanup provider returned an edit for a different file" };
+  }
+  if (document.edits.some((item) => !item || typeof item.newText !== "string")) {
+    return { valid: false, reason: "Cleanup provider returned a malformed text edit" };
+  }
+  if (currentText !== undefined) {
+    try {
+      applyLspTextEditsToString(currentText, document.edits);
+    } catch {
+      return { valid: false, reason: "Cleanup provider returned an invalid text range" };
     }
   }
   return { valid: true, document, edits: document.edits };
@@ -266,10 +323,7 @@ export function resolveCleanupCapabilities(
   }
 
   const codeActionKinds = capabilities.codeActionKinds ?? [];
-  const hasCleanupCodeAction =
-    codeActionKinds.includes("source.cleanup") ||
-    codeActionKinds.includes("source.fixAll") ||
-    codeActionKinds.includes("cleanup");
+  const hasCleanupCodeAction = codeActionKinds.some((kind) => isCleanupActionKind(kind));
   const isExplicitlySupported =
     (capabilities as unknown as { cleanupSupported?: boolean }).cleanupSupported === true;
 
@@ -287,7 +341,7 @@ export function resolveCleanupCapabilities(
     (capabilities as unknown as { supportedProfiles?: readonly string[] }).supportedProfiles ??
     (capabilities as unknown as { cleanupProvider?: { supportedProfiles?: readonly string[] } })
       ?.cleanupProvider?.supportedProfiles ??
-    ["default", "full-cleanup"];
+    ["default"];
 
   return {
     cleanupSupported: Boolean(hasCleanupCodeAction || isExplicitlySupported),
@@ -325,11 +379,24 @@ export function planCleanup(input: CleanupInput): CleanupDecision {
     };
   }
 
+  const profileId = input.profileId ?? "default";
+  if (
+    input.capabilities.supportedProfiles
+    && !input.capabilities.supportedProfiles.includes(profileId)
+  ) {
+    const providerLabel = input.capabilities.providerId ?? "The cleanup provider";
+    return {
+      kind: "unavailable",
+      scope: input.scope,
+      reason: `${providerLabel} does not support the ${profileId} code cleanup profile`,
+    };
+  }
+
   const decision: CleanupDecision = {
     kind: "execute",
     scope: input.scope,
     stage: "cleanup",
-    profileId: input.profileId ?? "default",
+    profileId,
   };
   if (input.capabilities.providerId) {
     decision.provider = {

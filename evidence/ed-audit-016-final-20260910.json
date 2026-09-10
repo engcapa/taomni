@@ -1,0 +1,96 @@
+{
+  "verified_at": "2026-09-10T13:14:22.2888414Z",
+  "head": "cb4d074526e99cb440dfc2d6182c64977f5215cb",
+  "checks": [
+    {
+      "kind": "code-audit",
+      "command": "Re-audit current production path: workspace.codeCleanup -> frozen file/view/provider/document/project identity -> dedicated source.cleanup request -> action filtering/resolve -> immutable preview -> canonical transaction apply/post-hash -> undo/recovery",
+      "result": "passed",
+      "summary": "CodeWorkspaceTab now owns a dedicated cleanup entry. It rejects missing/read-only files and unsupported profiles, requests only source.cleanup, filters unrelated actions, preserves cancellation/stale/conflict/failure/no-change states, and routes accepted file-local edits through the canonical transaction owner with post-hash and undo/recovery. source.fixAll and source.organizeImports are never relabeled as Cleanup. Per the latest caller rule, the real source.cleanup=false capability boundary is accepted for completion; no positive cleanup mutation is claimed.",
+      "acceptance": ["ED-AUDIT-016-A1", "ED-AUDIT-016-A2", "ED-AUDIT-016-A3"]
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-report/ed-audit-016-browser.config.yaml --filter TC-IDE-C8-04-rearrange-cleanup-unavailable-browser --report-dir qa-ui-auto-report/ed-audit-016-browser-current-20260910 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Actual Windows Chromium run selected 1 and passed 1/1 with 0 failures and 0 skips across 33 steps. The mounted production Rearrange and Code Cleanup actions reported dedicated-provider unavailable messages and left editor text unchanged. source_sha256=7eb0ecb7e1a924d48485e69d5b3e3dfd7c73dc46dea06d269bb9622da360e019, case_sha256=833d78bf8f7e7d4adde86695aa1295270200740a91fecdb3e2fea87f414469f9, runner_sha256=6f382928933341e0f8e64042d87888116d2919c8711b87932e7a1fd9cf5a93ee, summary=qa-ui-auto-report/ed-audit-016-browser-current-20260910/run-20260910-204818-033264900/summary.json, receipt=receipt-run-20260910-204818-033264900 exitCode 0. Browser evidence is renderer-bound.",
+      "acceptance": ["ED-AUDIT-016-A2"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/CodeWorkspaceTab.test.tsx --maxWorkers=1",
+      "result": "failed",
+      "summary": "Initial complete mounted component run exposed a cleanup fixture range that exceeded the fixture document; no completion claim was made from this run. The fixture was corrected before the final focused rerun.",
+      "acceptance": []
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/rearrangeCleanupWorkflow.test.ts src/components/editor/workspace/codeActionProviderAdapter.test.ts src/components/editor/CodeWorkspaceTab.test.tsx src/lib/editor/lsp.test.ts src/components/editor/workspace/__fixtures__/jdtls/jdtlsRearrangeCleanupContract.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "5 test files and 189/189 tests passed. Coverage includes dedicated cleanup kind/profile filtering, file-local edit validation, no-change, unsupported/failure/cancel/stale/conflict/read-only paths, mounted production entry, canonical apply/post-hash, undo/recovery, and the real JDT LS false-capability trace contract. The capableWorkflowExecution fixture is used only as a deterministic workflow-contract test, not as provider evidence.",
+      "acceptance": ["ED-AUDIT-016-A1", "ED-AUDIT-016-A2", "ED-AUDIT-016-A3"]
+    },
+    {
+      "kind": "qa-lint",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto audit --gate",
+      "result": "failed",
+      "summary": "The repository-wide coverage gate reported pre-existing/global baseline regressions (F25.5 shallow coverage and existing orphan selectors). No baseline ratchet or unrelated catalog change was made for this card; the selected native case itself passed schema validation and execution.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "python .agents/skills/qa-ui-auto/scripts/native_build.py --force",
+      "result": "passed",
+      "summary": "Built the independently packaged current QA application with identifier com.taomni.app.qa at src-tauri/target/qa-ui-auto/debug/taomni.exe. The build included the current frontend and Rust sources; native execution later verified the recorded source and binary identities.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-10-cleanup-unavailable-native --report-dir qa-ui-auto-report/ed-audit-016-native-current-20260910 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "Actual Windows packaged-run attempt selected 1 but failed before the behavior assertion because the WebDriver rejected the browser-only role selector. No product result was inferred; summary and receipt are retained under run-20260910-210433-442917900.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-10-cleanup-unavailable-native --report-dir qa-ui-auto-report/ed-audit-016-native-current-20260910-r2 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "Actual Windows packaged-run attempt reached the production workspace but the action result was still searching because the case clicked before filtered results stabilized. The file remained visually unchanged, but no behavior pass was claimed; summary and receipt are retained under run-20260910-210840-205941700.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-10-cleanup-unavailable-native --report-dir qa-ui-auto-report/ed-audit-016-native-current-20260910-r3 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Actual packaged com.taomni.app.qa WebView2 run on platform=Windows selected 1 and passed 1/1 with 0 failures and 0 skips across 21 steps. The real JDT LS workspace opened, production Search Everywhere -> Code Cleanup reported the dedicated batch cleanup provider prerequisite, and read-only DOM assertions confirmed StringUtils remained without a cleanup/import mutation. identity_stable=true, source_sha256=7eb0ecb7e1a924d48485e69d5b3e3dfd7c73dc46dea06d269bb9622da360e019, binary_sha256=45c4ff1934bdaf36545f80317d210f81e5fced532a0d29dfbe03fe4b7476953e, case_sha256=bbbdf3e7499c01f719a7fff823a0757da7b21f508f298382045a9b8db8268243, runner_sha256=6f382928933341e0f8e64042d87888116d2919c8711b87932e7a1fd9cf5a93ee, summary=qa-ui-auto-report/ed-audit-016-native-current-20260910-r3/run-20260910-211034-728997900/summary.json, receipt=receipt-run-20260910-211034-728997900 exitCode 0. The receipt records isolated APPDATA/LOCALAPPDATA and the QA binary identity.",
+      "acceptance": ["ED-AUDIT-016-A2", "ED-AUDIT-016-A3"]
+    },
+    {
+      "kind": "provider",
+      "command": "$env:TAOMNI_FIXTURE_JAVA = 'C:\\Program Files\\Java\\jdk-21\\bin\\java.exe'; $env:JDTLS_HOME = 'C:\\Users\\yuhan\\AppData\\Local\\jdtls'; node src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-rearrange-cleanup-fixture.mjs",
+      "result": "passed",
+      "summary": "Real Eclipse JDT Language Server 1.61.0.202607142124.jar on JDK 21.0.4 initialized the isolated rearrange-cleanup-maven-single fixture with failures=[]. Its actual capabilities included source.organizeImports and formatting, while source.rearrange=false and source.cleanup=false. The production contract resolves both capabilities to fail-closed unavailable reasons and never relabels formatting or organize-imports as Cleanup. Per the latest caller rule, this real source.cleanup=false boundary is completion evidence for the Cleanup card. No positive cleanup mutation or synthetic capableWorkflowExecution field is claimed.",
+      "acceptance": ["ED-AUDIT-016-A1", "ED-AUDIT-016-A2", "ED-AUDIT-016-A3"]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src/components/editor/CodeWorkspaceTab.tsx --path src/components/editor/CodeWorkspaceTab.test.tsx --path src/components/editor/workspace/rearrangeCleanupWorkflow.ts --path src/components/editor/workspace/rearrangeCleanupWorkflow.test.ts --path src/components/editor/workspace/codeActionProviderAdapter.ts --path src/components/editor/workspace/codeActionProviderAdapter.test.ts --path src/lib/editor/lsp.ts --path src/components/editor/workspace/__fixtures__/jdtls/jdtlsRearrangeCleanupContract.test.ts --json",
+      "result": "passed",
+      "summary": "All 8 owned TypeScript paths passed with scoped_errors=0 and external_errors=0 across 0 external files.",
+      "acceptance": ["ED-AUDIT-016-A3"]
+    }
+  ],
+  "unrun": [
+    "positive cleanup mutation: no provider advertised source.cleanup; the latest caller rule accepts the real source.cleanup=false boundary as completion evidence, so no positive mutation is claimed",
+    "IDEA comparison: IntelliJ IDEA 2026.2.x was not run; no cross-product delta or repair equivalence is claimed",
+    "native Linux: no qualifying Linux Tauri/WebKitGTK/X11 runtime was available",
+    "native macOS: no qualifying macOS Tauri/WKWebView or OS automation runtime was available"
+  ],
+  "notes": [
+    "Verification ran against the claimed baseline HEAD cb4d074526e99cb440dfc2d6182c64977f5215cb and the current working tree before the task commit.",
+    "The actual execution platform is recorded as Windows from the QA receipts; no Windows version is hard-coded and no other OS behavior is inferred.",
+    "The real trace records source.rearrange=false and source.cleanup=false. Per the latest caller instruction, source.cleanup=false is a valid done basis for this card; the capability ceiling remains fail-closed unavailable and does not claim a positive Cleanup repair.",
+    "The production effect chain is action entry -> frozen identity -> dedicated provider capability/request -> explicit unavailable or canonical preview/apply -> post-hash -> undo/recovery. No browser stub, screenshot-only assertion, fake provider response, or synthetic PASS was used as provider evidence.",
+    "Terminal status is done under the latest caller rule: the production wiring and real current-runtime source.cleanup=false provider evidence pass the accepted capability-boundary criterion."
+  ]
+}

@@ -1,0 +1,57 @@
+id: TC-IDE-C8-10-cleanup-unavailable-native
+title: "Code Cleanup reports the real JDT LS unavailable capability in packaged native runtime"
+description: |
+  ED-AUDIT-016 native gate. Opens the isolated Maven fixture in the packaged
+  QA application, waits for the real JDT LS document status, invokes Code
+  Cleanup from the production action surface, and verifies the provider's
+  dedicated cleanup capability is unavailable. The editor keeps the original
+  unresolved StringUtils text and receives no cleanup/import mutation.
+  The companion provider trace records source.cleanup=false from the same
+  pinned JDT LS toolchain; this case proves the packaged production boundary.
+covers: [F25.5]
+tags: [code-workspace, ide-c8, cleanup, provider-fixture, native-gate, p1]
+modes: [native]
+fixtures: [reset_db, java_sample_projects, jdtls_required]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-gate-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-c8-10","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/QuickFixTarget.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 90
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "StringUtils"
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: "Java"
+      timeout_sec: 60
+  - press: Control+Shift+N
+  - wait_for:
+      selector: '[data-testid="code-workspace-search-everywhere"]'
+      timeout_sec: 30
+  - click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-of-type(5)'
+  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+  - type: Code Cleanup
+  - assert_text:
+      selector: '[data-testid="code-workspace-search-everywhere"]'
+      contains: "Code Cleanup..."
+      timeout_sec: 30
+  - click: '[data-testid="code-workspace-search-everywhere"] button[data-index="0"]'
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Code Cleanup requires a dedicated batch cleanup provider"
+      timeout_sec: 30
+  - eval_readonly:
+      expression: 'document.querySelector(".cm-content")?.textContent?.includes("StringUtils") === true && !document.querySelector(".cm-content")?.textContent?.includes("import org.apache.commons.lang3.StringUtils;")'
+      expect_truthy: true
+  - screenshot: tc-ide-c8-10-cleanup-unavailable-native.png

@@ -2595,6 +2595,119 @@ describe("CodeWorkspaceTab", () => {
     ).toBe(false));
   });
 
+  it("routes Code Cleanup through a dedicated provider action, profile, post-hash, and one undo", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-cleanup-entry",
+      workspaceInstanceId: "instance-cleanup-entry",
+      name: "Cleanup entry",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/Example.java" },
+    };
+    const initialText = "class Example {\n  @Deprecated\n  void old() {}\n}\n";
+    const cleanedText = "class Example {\n  void old() {}\n}\n";
+    const disk = new Map([["src/Example.java", initialText]]);
+    const status = documentStatus({
+      path: "/repo/app/src/Example.java",
+      uri: "file:///repo/app/src/Example.java",
+      presetId: "cleanup-provider",
+      displayName: "Cleanup Provider",
+      languageId: "java",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({
+        codeAction: true,
+        codeActionKinds: ["source.cleanup"],
+      }),
+    });
+    const cleanupAction = {
+      title: "Clean up file",
+      kind: "source.cleanup",
+      isPreferred: true,
+      edit: {
+        documentEdits: [{
+          uri: "file:///repo/app/src/Example.java",
+          path: "/repo/app/src/Example.java",
+          edits: [{
+            range: { start: { line: 1, character: 0 }, end: { line: 3, character: 0 } },
+            newText: "  void old() {}\n",
+          }],
+        }],
+      },
+      command: null,
+      commandArguments: null,
+      raw: null,
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => (
+      file(path, disk.get(path) ?? initialText, { hash: `hash-${disk.get(path) ?? initialText}` })
+    ));
+    workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+      _rootPath: string,
+      path: string,
+      text: string,
+    ) => {
+      disk.set(path, text);
+      return writeAck(file(path, text, { hash: `hash-${text}` }));
+    });
+    lspMocks.lspOpenDocument.mockResolvedValue(status);
+    lspMocks.lspChangeDocument.mockResolvedValue(status);
+    lspMocks.lspSaveDocument.mockResolvedValue(status);
+    lspMocks.lspCodeActions.mockResolvedValue({
+      status,
+      actions: [cleanupAction],
+    });
+
+    const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+    const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+      if (next) registrationRef.current = next;
+    });
+    const rendered = renderWorkspace(workspace, { onCommandsChange });
+    await screen.findByTitle("app / src/Example.java");
+    await waitFor(() => expect(registrationRef.current).not.toBeNull());
+
+    await act(async () => {
+      await registrationRef.current!.executeAction("workspace.codeCleanup");
+    });
+    await waitFor(() => expect(lspMocks.lspCodeActions).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      ["source.cleanup"],
+      expect.any(AbortSignal),
+    ));
+    await waitFor(() => expect(disk.get("src/Example.java")).toBe(cleanedText));
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-cleanup-entry",
+    ).openFiles["root:app:src/Example.java"]?.text).toBe(cleanedText));
+    expect(lspMocks.lspCodeActionResolve).not.toHaveBeenCalled();
+    expect(vi.mocked(confirmAppDialog)).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Code Cleanup",
+    }));
+    expect(useAppStore.getState().statusMessage).toContain("post hash");
+    expect(useAppStore.getState().statusMessage).toContain("undo transaction");
+    expect(rendered.container.querySelector(".cm-content")?.textContent).toContain("void old() {}");
+    expect(rendered.container.querySelector(".cm-content")?.textContent).not.toContain("@Deprecated");
+
+    await waitFor(() => expect(
+      registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled,
+    ).toBe(true));
+    await act(async () => {
+      await registrationRef.current!.executeAction("workspace.undoWorkspaceEdit");
+    });
+    await waitFor(() => expect(disk.get("src/Example.java")).toBe(initialText));
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-cleanup-entry",
+    ).openFiles["root:app:src/Example.java"]?.text).toBe(initialText));
+    expect(rendered.container.querySelector(".cm-content")?.textContent).toContain("@Deprecated");
+    await waitFor(() => expect(
+      registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled,
+    ).toBe(false));
+  });
+
   it("shows the native provider failure instead of a generic empty-actions message", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
