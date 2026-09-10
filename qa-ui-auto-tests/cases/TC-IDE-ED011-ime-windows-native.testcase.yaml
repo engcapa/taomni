@@ -4,7 +4,7 @@ description: |
   ED-AUDIT-011 packaged Windows slice. The native runner activates the
   configured Windows Chinese input layout and sends Win32 SendInput keys into
   the real com.taomni.app.qa WebView2 editor. The case checks the composing
-  candidate/navigation boundary, Enter confirmation, Escape cancellation,
+  candidate/navigation boundary, Space confirmation, Escape cancellation,
   keyboard focus, textbox semantics, the product's 200% editor size and one
   post-composition undo. It does not use browser composition events as native
   IME evidence.
@@ -63,21 +63,25 @@ steps:
       equals: textbox
   - assert_attribute:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
+      name: aria-label
+      equals: "Code editor"
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
       name: aria-multiline
       equals: "true"
   - eval_readonly:
       expression: 'document.activeElement === document.querySelector(".cm-content") && getComputedStyle(document.querySelector(".cm-content")).fontSize === "26px"'
       expect_truthy: true
 
-  # Compose "nihao" through the OS input method. The first candidate remains
-  # pending while ArrowDown belongs to the candidate window, not the editor.
+  # Confirm a Microsoft Pinyin composition first. Candidate ordering is not a
+  # contract, but confirmation must commit a CJK result as one editor edit.
   - native_windows_ime_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       layout: "00000804"
-      label: candidate-compose
+      label: confirmation-compose
       keys: [n, i, h, a, o]
   - eval_readonly:
-      expression: 'document.activeElement === document.querySelector(".cm-content") && document.querySelectorAll(".cm-line").length === 2 && document.querySelectorAll(".cm-line")[0]?.textContent?.startsWith("alpha") && document.querySelectorAll(".cm-line")[1]?.textContent === "second"'
+      expression: 'document.activeElement === document.querySelector(".cm-content") && document.querySelectorAll(".cm-line")[0]?.textContent?.startsWith("alpha") && document.querySelectorAll(".cm-line")[1]?.textContent === "second"'
       expect_truthy: true
   - native_windows_ime_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
@@ -88,29 +92,14 @@ steps:
       expect_truthy: true
   - native_windows_ime_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
-      label: candidate-cancel
-      keys: [Escape]
+      label: candidate-confirm
+      keys: [Space]
   - eval_readonly:
-      expression: 'document.activeElement === document.querySelector(".cm-content") && document.querySelectorAll(".cm-line")[0]?.textContent === "alpha" && document.querySelectorAll(".cm-line")[1]?.textContent === "second"'
+      expression: '/^alpha[\u3400-\u9fff]+\nsecond$/.test(document.querySelector(".cm-content").taomniDocumentSnapshot ?? "")'
       expect_truthy: true
 
-  # Confirm the first Microsoft Pinyin candidate in a fresh composition, then
-  # start a second composition and cancel it. The committed text must be one
-  # edit; candidate ordering is intentionally not used as a contract.
-  - native_windows_ime_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      label: confirmation-compose
-      keys: [n, i, h, a, o]
-  - eval_readonly:
-      expression: 'document.activeElement === document.querySelector(".cm-content") && document.querySelectorAll(".cm-line")[0]?.textContent?.startsWith("alpha") && document.querySelectorAll(".cm-line")[1]?.textContent === "second"'
-      expect_truthy: true
-  - native_windows_ime_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      label: candidate-confirm
-      keys: [Enter]
-  - eval_readonly:
-      expression: 'document.querySelectorAll(".cm-line")[0]?.textContent === "alpha你好" && document.querySelectorAll(".cm-line")[1]?.textContent === "second"'
-      expect_truthy: true
+  # A second composition must be cancellable without changing the committed
+  # text or the two-line shape.
   - native_windows_ime_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       label: cancellation-compose
@@ -120,15 +109,19 @@ steps:
       label: cancellation-escape
       keys: [Escape]
   - eval_readonly:
-      expression: 'document.querySelectorAll(".cm-line")[0]?.textContent === "alpha你好" && document.activeElement === document.querySelector(".cm-content")'
+      expression: '/^alpha[\u3400-\u9fff]+\nsecond$/.test(document.querySelector(".cm-content").taomniDocumentSnapshot ?? "") && document.activeElement === document.querySelector(".cm-content")'
+      expect_truthy: true
+  - wait: 1
+  - eval_readonly:
+      expression: '/^alpha[\u3400-\u9fff]+\nsecond$/.test(document.querySelector(".cm-content").taomniDocumentSnapshot ?? "") && document.activeElement === document.querySelector(".cm-content")'
       expect_truthy: true
 
   # After compositionend/cancel, the normal workspace shortcut is available
   # again and one undo removes the one confirmed IME transaction.
-  - native_keys:
+  - native_windows_ime_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
-      transport: webdriver
+      label: post-composition-undo
       keys: [Control+z]
   - eval_readonly:
-      expression: 'document.querySelectorAll(".cm-line")[0]?.textContent === "alpha" && document.querySelectorAll(".cm-line")[1]?.textContent === "second" && document.activeElement === document.querySelector(".cm-content")'
+      expression: 'document.querySelector(".cm-content").taomniDocumentSnapshot === "alpha\nsecond" && document.activeElement === document.querySelector(".cm-content")'
       expect_truthy: true

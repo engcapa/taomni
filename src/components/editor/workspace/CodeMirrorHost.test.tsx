@@ -934,6 +934,48 @@ describe("§8.21.3 V2-C virtual space and region provenance in CodeMirrorHost", 
     expect(actionHost.hasPendingChord()).toBe(false);
   });
 
+  it("keeps one shared undo boundary for committed IME input and drops cancellation", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const actionHost = new WorkspaceActionHost({ workspaceId: "ws-ime-history" });
+    const rendered = renderEditor("alpha", vi.fn(), {
+      transactionOwner: owner,
+      fileKey: "ime.txt",
+      viewId: "ime-view",
+      workspaceActionHost: actionHost,
+    });
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!);
+    expect(view).not.toBeNull();
+    rendered.content.focus();
+
+    fireEvent.compositionStart(rendered.content);
+    act(() => {
+      view!.dispatch({ changes: { from: 5, to: 5, insert: "ni" } });
+      view!.dispatch({ changes: { from: 5, to: 7, insert: "你号" } });
+    });
+    fireEvent.compositionEnd(rendered.content, { data: "你号" });
+    await waitFor(() => expect(owner.getHistoryState("ime.txt")).toMatchObject({ undoDepth: 1 }));
+
+    expect(owner.getDocument("ime.txt")).toBe("alpha你号");
+    expect(rendered.content).toHaveAttribute("aria-label", "Code editor");
+    fireEvent.compositionStart(rendered.content);
+    act(() => {
+      view!.dispatch({ changes: { from: 7, to: 7, insert: "zhong" } });
+      view!.dispatch({ changes: { from: 7, to: 12, insert: "" } });
+    });
+    fireEvent.compositionEnd(rendered.content, { data: "" });
+    await waitFor(() => expect(owner.getDocument("ime.txt")).toBe("alpha你号"));
+
+    expect(owner.getHistoryState("ime.txt")).toMatchObject({ undoDepth: 1, redoDepth: 0 });
+    await act(async () => {
+      const result = await actionHost.execute("workspace.undo", {
+        focus: "editor",
+        hasActiveFile: true,
+      });
+      expect(result.kind).toBe("applied");
+    });
+    expect(view!.state.doc.toString()).toBe("alpha");
+  });
+
   it("consumes appearance.virtualSpace policy in production editor", async () => {
     const actionHost = new WorkspaceActionHost({ workspaceId: "ws-test-vspace" });
     const rendered = renderEditor("first line\nsecond", vi.fn(), {

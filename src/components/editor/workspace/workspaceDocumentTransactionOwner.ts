@@ -78,6 +78,10 @@ interface DocumentRecord {
   views: Set<string>;
   undo: HistoryEntry[];
   redo: HistoryEntry[];
+  composition: {
+    viewId: string;
+    beforeText: string;
+  } | null;
 }
 
 interface AppliedChanges {
@@ -184,6 +188,7 @@ export class WorkspaceDocumentTransactionOwner {
       views: new Set(),
       undo: [],
       redo: [],
+      composition: null,
     });
     return text;
   }
@@ -208,6 +213,9 @@ export class WorkspaceDocumentTransactionOwner {
   releaseView(fileKey: string, viewId: string): boolean {
     const record = this.documentsByFile.get(fileKey);
     if (!record || !record.views.delete(viewId)) return false;
+    if (record.composition?.viewId === viewId) {
+      this.cancelComposition(fileKey, viewId);
+    }
     this.notifyLeaseChanged({
       fileKey,
       viewId,
@@ -245,6 +253,65 @@ export class WorkspaceDocumentTransactionOwner {
       undoDepth: record?.undo.length ?? 0,
       redoDepth: record?.redo.length ?? 0,
     };
+  }
+
+  /** Mark the current document snapshot as the start of one IME transaction. */
+  beginComposition(fileKey: string, viewId: string): boolean {
+    const record = this.documentsByFile.get(fileKey);
+    if (!record || record.composition) return false;
+    record.composition = { viewId, beforeText: record.text };
+    return true;
+  }
+
+  /**
+   * Commit a composition as one undo entry, or discard its transient edits.
+   * CodeMirror publishes each pre-edit replacement as a document transaction;
+   * the shared owner must keep those visible to sibling views without making
+   * them independently undoable.
+   */
+  endComposition(fileKey: string, viewId: string, committed: boolean): void {
+    const record = this.documentsByFile.get(fileKey);
+    const composition = record?.composition;
+    if (!record || !composition || composition.viewId !== viewId) return;
+    record.composition = null;
+
+    if (!committed) {
+      if (record.text !== composition.beforeText) {
+        const correction = applyChanges(
+          record.text,
+          [singleReplacement(record.text, composition.beforeText)],
+        );
+        if (correction) {
+          record.text = correction.text;
+          this.publish(fileKey, viewId, record, correction.changes, "remote-sync");
+        }
+      }
+      return;
+    }
+
+    if (record.text === composition.beforeText) return;
+    const grouped = applyChanges(
+      composition.beforeText,
+      [singleReplacement(composition.beforeText, record.text)],
+    );
+    if (!grouped || grouped.text !== record.text) return;
+    record.undo.push({
+      beforeText: composition.beforeText,
+      afterText: record.text,
+      forward: grouped.changes,
+      inverse: grouped.inverse,
+    });
+    record.redo = [];
+    this.notifyObserver(this.observer.onHistoryReceipt, {
+      fileKey,
+      revision: record.revision,
+      origin: "user-input",
+    });
+  }
+
+  /** Cancel a composition when its owning editor unmounts before compositionend. */
+  cancelComposition(fileKey: string, viewId: string): void {
+    this.endComposition(fileKey, viewId, false);
   }
 
   subscribe(fileKey: string, listener: DocumentTransactionListener): () => void {
@@ -310,7 +377,8 @@ export class WorkspaceDocumentTransactionOwner {
     }
 
     record.text = applied.text;
-    if (canRecordHistory(origin) && !isHistoryReplay(origin)) {
+    const isCompositionUpdate = record.composition?.viewId === sourceViewId;
+    if (canRecordHistory(origin) && !isHistoryReplay(origin) && !isCompositionUpdate) {
       record.undo.push({
         beforeText,
         afterText: applied.text,
@@ -346,6 +414,7 @@ export class WorkspaceDocumentTransactionOwner {
 
   undo(fileKey: string, sourceViewId: string): DocumentTransaction | null {
     const record = this.documentsByFile.get(fileKey);
+    if (record?.composition) return null;
     const entry = record?.undo[record.undo.length - 1];
     if (!record || !entry || record.text !== entry.afterText) return null;
     const applied = applyChanges(record.text, entry.inverse);
@@ -366,6 +435,7 @@ export class WorkspaceDocumentTransactionOwner {
 
   redo(fileKey: string, sourceViewId: string): DocumentTransaction | null {
     const record = this.documentsByFile.get(fileKey);
+    if (record?.composition) return null;
     const entry = record?.redo[record.redo.length - 1];
     if (!record || !entry || record.text !== entry.beforeText) return null;
     const applied = applyChanges(record.text, entry.forward);

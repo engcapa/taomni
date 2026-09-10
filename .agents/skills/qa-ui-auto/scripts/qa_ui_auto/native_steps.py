@@ -1657,11 +1657,21 @@ _WINDOWS_INPUT_LAYOUT_REQUEST = 0x0050
 _WINDOWS_KEYEVENTF_KEYUP = 0x0002
 _WINDOWS_INPUT_KEYBOARD = 1
 _WINDOWS_KLF_ACTIVATE = 0x00000001
+_WINDOWS_WM_IME_CONTROL = 0x0283
+_WINDOWS_IMC_GETCONVERSIONMODE = 0x0001
+_WINDOWS_IMC_SETCONVERSIONMODE = 0x0002
+_WINDOWS_IMC_GETSENTENCEMODE = 0x0003
+_WINDOWS_IMC_GETOPENSTATUS = 0x0005
+_WINDOWS_IMC_SETOPENSTATUS = 0x0006
+_WINDOWS_IME_CMODE_NATIVE = 0x0001
 _WINDOWS_VK = {
     "BACKSPACE": 0x08,
+    "CONTROL": 0x11,
+    "CTRL": 0x11,
     "TAB": 0x09,
     "ENTER": 0x0D,
     "ESCAPE": 0x1B,
+    "SHIFT": 0x10,
     "SPACE": 0x20,
     "ARROWLEFT": 0x25,
     "ARROWUP": 0x26,
@@ -1845,6 +1855,196 @@ def _windows_gui_thread_info(user32: Any, thread_id: int) -> dict[str, Any]:
     }
 
 
+def _windows_child_windows(user32: Any, hwnd: int) -> list[tuple[int, str]]:
+    user32.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+    user32.GetClassNameW.restype = ctypes.c_int
+    callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    children: list[tuple[int, str]] = []
+
+    def visit(child_hwnd: int, _lparam: int) -> int:
+        class_buffer = ctypes.create_unicode_buffer(256)
+        user32.GetClassNameW(child_hwnd, class_buffer, len(class_buffer))
+        children.append((int(child_hwnd), class_buffer.value))
+        return 1
+
+    callback = callback_type(visit)
+    user32.EnumChildWindows(hwnd, callback, 0)
+    return children
+
+
+def _windows_ime_conversion_info(user32: Any, hwnd: int, thread_id: int) -> dict[str, Any]:
+    """Read the real IMM32 state associated with the focused native control."""
+    imm32 = ctypes.WinDLL("imm32", use_last_error=True)
+    imm32.ImmGetContext.argtypes = [wintypes.HWND]
+    imm32.ImmGetContext.restype = ctypes.c_void_p
+    imm32.ImmReleaseContext.argtypes = [wintypes.HWND, ctypes.c_void_p]
+    imm32.ImmReleaseContext.restype = wintypes.BOOL
+    imm32.ImmGetOpenStatus.argtypes = [ctypes.c_void_p]
+    imm32.ImmGetOpenStatus.restype = wintypes.BOOL
+    imm32.ImmGetConversionStatus.argtypes = [
+        ctypes.c_void_p,
+        ctypes.POINTER(wintypes.DWORD),
+        ctypes.POINTER(wintypes.DWORD),
+    ]
+    imm32.ImmGetConversionStatus.restype = wintypes.BOOL
+    imm32.ImmGetDefaultIMEWnd.argtypes = [wintypes.HWND]
+    imm32.ImmGetDefaultIMEWnd.restype = wintypes.HWND
+    user32.SendMessageW.argtypes = [
+        wintypes.HWND,
+        wintypes.UINT,
+        wintypes.WPARAM,
+        wintypes.LPARAM,
+    ]
+    user32.SendMessageW.restype = ctypes.c_ssize_t
+
+    gui_info = _windows_gui_thread_info(user32, thread_id)
+    children = _windows_child_windows(user32, int(hwnd))
+    candidates = [int(gui_info.get("focus") or 0), int(hwnd)]
+    candidates.extend(child_hwnd for child_hwnd, _class_name in children)
+    for target_hwnd in dict.fromkeys(candidates):
+        if not target_hwnd:
+            continue
+        context = imm32.ImmGetContext(target_hwnd)
+        if not context:
+            continue
+        try:
+            conversion = wintypes.DWORD()
+            sentence = wintypes.DWORD()
+            status_read = bool(
+                imm32.ImmGetConversionStatus(
+                    context,
+                    ctypes.byref(conversion),
+                    ctypes.byref(sentence),
+                )
+            )
+            return {
+                "available": True,
+                "source": "imm-context",
+                "window": f"0x{target_hwnd:x}",
+                "open": bool(imm32.ImmGetOpenStatus(context)),
+                "conversionStatusRead": status_read,
+                "conversionMode": f"0x{conversion.value:x}" if status_read else None,
+                "sentenceMode": f"0x{sentence.value:x}" if status_read else None,
+                "nativeMode": bool(status_read and conversion.value & 0x0001),
+                "windowClass": next(
+                    (class_name for child_hwnd, class_name in [(target_hwnd, ""), *children]
+                     if child_hwnd == target_hwnd),
+                    None,
+                ),
+            }
+        finally:
+            imm32.ImmReleaseContext(target_hwnd, context)
+    for target_hwnd in dict.fromkeys(candidates):
+        if not target_hwnd:
+            continue
+        ime_window = int(imm32.ImmGetDefaultIMEWnd(target_hwnd) or 0)
+        if not ime_window:
+            continue
+        conversion = int(
+            user32.SendMessageW(
+                ime_window,
+                _WINDOWS_WM_IME_CONTROL,
+                _WINDOWS_IMC_GETCONVERSIONMODE,
+                0,
+            )
+        )
+        sentence = int(
+            user32.SendMessageW(
+                ime_window,
+                _WINDOWS_WM_IME_CONTROL,
+                _WINDOWS_IMC_GETSENTENCEMODE,
+                0,
+            )
+        )
+        open_status = int(
+            user32.SendMessageW(
+                ime_window,
+                _WINDOWS_WM_IME_CONTROL,
+                _WINDOWS_IMC_GETOPENSTATUS,
+                0,
+            )
+        )
+        return {
+            "available": True,
+            "source": "default-ime-window",
+            "window": f"0x{target_hwnd:x}",
+            "imeWindow": f"0x{ime_window:x}",
+            "open": bool(open_status),
+            "conversionStatusRead": True,
+            "conversionMode": f"0x{conversion:x}",
+            "sentenceMode": f"0x{sentence:x}",
+            "nativeMode": bool(conversion & _WINDOWS_IME_CMODE_NATIVE),
+        }
+    return {
+        "available": False,
+        "source": None,
+        "window": None,
+        "imeWindow": None,
+        "open": None,
+        "conversionStatusRead": False,
+        "conversionMode": None,
+        "sentenceMode": None,
+        "nativeMode": None,
+        "candidateWindows": [
+            {"hwnd": f"0x{child_hwnd:x}", "class": class_name}
+            for child_hwnd, class_name in children[:32]
+        ],
+    }
+
+
+def _windows_ime_send_control(user32: Any, ime_window: int, control: int, value: int) -> int:
+    user32.SendMessageW.argtypes = [
+        wintypes.HWND,
+        wintypes.UINT,
+        wintypes.WPARAM,
+        wintypes.LPARAM,
+    ]
+    user32.SendMessageW.restype = ctypes.c_ssize_t
+    return int(
+        user32.SendMessageW(
+            ime_window,
+            _WINDOWS_WM_IME_CONTROL,
+            control,
+            value,
+        )
+    )
+
+
+def _windows_enable_native_ime(
+    user32: Any,
+    hwnd: int,
+    thread_id: int,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    before = _windows_ime_conversion_info(user32, hwnd, thread_id)
+    if not before.get("available") or before.get("source") != "default-ime-window":
+        raise StepError(
+            "native_windows_ime_keys: Windows default IME conversion state is unavailable; "
+            f"observed {before!r}"
+        )
+    ime_window = int(str(before["imeWindow"]), 16)
+    conversion_mode = int(str(before["conversionMode"]), 16)
+    restore = {
+        "source": before["source"],
+        "ime_window": ime_window,
+        "open": bool(before.get("open")),
+        "conversion_mode": conversion_mode,
+    }
+    _windows_ime_send_control(user32, ime_window, _WINDOWS_IMC_SETOPENSTATUS, 1)
+    _windows_ime_send_control(
+        user32,
+        ime_window,
+        _WINDOWS_IMC_SETCONVERSIONMODE,
+        conversion_mode | _WINDOWS_IME_CMODE_NATIVE,
+    )
+    after = _windows_ime_conversion_info(user32, hwnd, thread_id)
+    if not after.get("available") or not after.get("nativeMode"):
+        raise StepError(
+            "native_windows_ime_keys: could not enable native Chinese conversion mode; "
+            f"observed {after!r}"
+        )
+    return before, after, restore
+
+
 def _windows_activate_layout(user32: Any, hwnd: int, layout_name: str) -> tuple[int, int]:
     user32.LoadKeyboardLayoutW.argtypes = [wintypes.LPCWSTR, wintypes.UINT]
     user32.LoadKeyboardLayoutW.restype = ctypes.c_void_p
@@ -1884,30 +2084,45 @@ def _windows_key_vk(key: str) -> int:
     if value is None:
         raise StepError(
             "native_windows_ime_keys: unsupported key "
-            f"{key!r}; supported letters/digits, arrows, Enter, Escape, Tab, Space and Backspace"
+            f"{key!r}; supported letters/digits, Control/Shift chords, arrows, Enter, Escape, Tab, Space and Backspace"
         )
     return value
 
 
-def _windows_send_keys(user32: Any, keys: list[str]) -> None:
+def _windows_send_key_event(user32: Any, vk: int, flags: int) -> None:
     user32.SendInput.argtypes = [wintypes.UINT, ctypes.POINTER(_WindowsInput), ctypes.c_int]
     user32.SendInput.restype = wintypes.UINT
+    event = _WindowsInput()
+    event.type = _WINDOWS_INPUT_KEYBOARD
+    event.ki = _WindowsKeybdInput(
+        wVk=vk,
+        wScan=0,
+        dwFlags=flags,
+        time=0,
+        dwExtraInfo=0,
+    )
+    sent = int(user32.SendInput(1, ctypes.byref(event), ctypes.sizeof(_WindowsInput)))
+    if sent != 1:
+        raise ctypes.WinError(ctypes.get_last_error())
+    time.sleep(0.045)
+
+
+def _windows_send_keys(user32: Any, keys: list[str]) -> None:
     for key in keys:
-        vk = _windows_key_vk(key)
-        for flags in (0, _WINDOWS_KEYEVENTF_KEYUP):
-            event = _WindowsInput()
-            event.type = _WINDOWS_INPUT_KEYBOARD
-            event.ki = _WindowsKeybdInput(
-                wVk=vk,
-                wScan=0,
-                dwFlags=flags,
-                time=0,
-                dwExtraInfo=0,
-            )
-            sent = int(user32.SendInput(1, ctypes.byref(event), ctypes.sizeof(_WindowsInput)))
-            if sent != 1:
-                raise ctypes.WinError(ctypes.get_last_error())
-            time.sleep(0.045)
+        parts = [part.strip() for part in key.split("+") if part.strip()]
+        if not parts:
+            raise StepError("native_windows_ime_keys: empty key chord")
+        virtual_keys = [_windows_key_vk(part) for part in parts]
+        if len(virtual_keys) == 1:
+            _windows_send_key_event(user32, virtual_keys[0], 0)
+            _windows_send_key_event(user32, virtual_keys[0], _WINDOWS_KEYEVENTF_KEYUP)
+            continue
+        for virtual_key in virtual_keys[:-1]:
+            _windows_send_key_event(user32, virtual_key, 0)
+        _windows_send_key_event(user32, virtual_keys[-1], 0)
+        _windows_send_key_event(user32, virtual_keys[-1], _WINDOWS_KEYEVENTF_KEYUP)
+        for virtual_key in reversed(virtual_keys[:-1]):
+            _windows_send_key_event(user32, virtual_key, _WINDOWS_KEYEVENTF_KEYUP)
 
 
 def _append_windows_ime_observation(ctx: NativeStepContext, entry: dict[str, Any]) -> None:
@@ -1932,6 +2147,32 @@ def _append_windows_ime_observation(ctx: NativeStepContext, entry: dict[str, Any
     )
 
 
+def _install_windows_ime_event_observer(ctx: NativeStepContext) -> None:
+    ctx.session.execute(
+        "window.__QA_NATIVE_IME_EVENTS__=[];"
+        "window.__QA_NATIVE_IME_EVENT_TYPES__=['compositionstart','compositionupdate',"
+        "'compositionend','beforeinput','input','keydown','keyup'];"
+        "window.__QA_NATIVE_IME_EVENT_RECORD__=(event)=>window.__QA_NATIVE_IME_EVENTS__.push({"
+        "type:event.type,key:event.key ?? null,code:event.code ?? null,"
+        "isComposing:event.isComposing ?? null,inputType:event.inputType ?? null,"
+        "data:event.data ?? null,defaultPrevented:event.defaultPrevented});"
+        "for(const type of window.__QA_NATIVE_IME_EVENT_TYPES__)"
+        "window.addEventListener(type,window.__QA_NATIVE_IME_EVENT_RECORD__,true);"
+        "return true;"
+    )
+
+
+def _read_windows_ime_event_observer(ctx: NativeStepContext) -> list[dict[str, Any]]:
+    events = ctx.session.execute(
+        "const types=window.__QA_NATIVE_IME_EVENT_TYPES__ ?? [];"
+        "const record=window.__QA_NATIVE_IME_EVENT_RECORD__;"
+        "for(const type of types)"
+        "window.removeEventListener(type,record,true);"
+        "return window.__QA_NATIVE_IME_EVENTS__ ?? [];"
+    )
+    return events if isinstance(events, list) else []
+
+
 def _restore_windows_input_method(self: NativeStepContext) -> None:
     state = self._windows_ime_state
     if state is None:
@@ -1944,9 +2185,29 @@ def _restore_windows_input_method(self: NativeStepContext) -> None:
     user32.ActivateKeyboardLayout.restype = ctypes.c_void_p
     hwnd = int(state["hwnd"])
     prior_hkl = int(state["prior_hkl"])
+    mode_toggles = int(state.get("mode_toggles", 0))
+    ime_restore = state.get("ime_restore")
     restored = False
+    ime_restored = ime_restore is None
     error: str | None = None
     try:
+        if isinstance(ime_restore, dict):
+            ime_window = int(ime_restore["ime_window"])
+            _windows_ime_send_control(
+                user32,
+                ime_window,
+                _WINDOWS_IMC_SETCONVERSIONMODE,
+                int(ime_restore["conversion_mode"]),
+            )
+            _windows_ime_send_control(
+                user32,
+                ime_window,
+                _WINDOWS_IMC_SETOPENSTATUS,
+                1 if ime_restore["open"] else 0,
+            )
+            ime_restored = True
+        if mode_toggles % 2:
+            _windows_send_keys(user32, ["Shift"])
         if prior_hkl:
             if not user32.PostMessageW(
                 hwnd,
@@ -1965,6 +2226,8 @@ def _restore_windows_input_method(self: NativeStepContext) -> None:
         "action": "restore",
         "layout": state["layout"],
         "prior_hkl": f"0x{prior_hkl:x}" if prior_hkl else None,
+        "modeTogglesRestored": mode_toggles,
+        "imeRestored": ime_restored,
         "restored": restored,
         "error": error,
     })
@@ -1979,8 +2242,9 @@ def _do_native_windows_ime_keys(ctx: NativeStepContext, args: Any) -> str:
 
     The runner never fabricates composition events. It activates the requested
     layout for the packaged QA window, sends Win32 key input, and leaves the
-    DOM/native postcondition to the testcase. The prior layout is restored by
-    NativeStepContext teardown, including failed runs.
+    DOM/native postcondition to the testcase. The prior layout and any odd
+    number of explicit Shift mode toggles are restored by NativeStepContext
+    teardown, including failed runs.
     """
     if platform.system() != "Windows":
         raise StepError("native_windows_ime_keys: requires Windows")
@@ -2012,8 +2276,17 @@ def _do_native_windows_ime_keys(ctx: NativeStepContext, args: Any) -> str:
             "layout": layout,
             "prior_hkl": prior_hkl,
             "target_hkl": target_hkl,
+            "mode_toggles": 0,
         }
+        ime_setup_before, ime_setup_after, ime_restore = _windows_enable_native_ime(
+            user32,
+            hwnd,
+            _thread_id,
+        )
+        ctx._windows_ime_state["ime_restore"] = ime_restore
     else:
+        ime_setup_before = None
+        ime_setup_after = None
         state = ctx._windows_ime_state
         if layout != state["layout"]:
             raise StepError(
@@ -2023,9 +2296,22 @@ def _do_native_windows_ime_keys(ctx: NativeStepContext, args: Any) -> str:
         hwnd = int(state["hwnd"])
         target_hkl = int(state["target_hkl"])
 
+    ime_before = _windows_ime_conversion_info(user32, hwnd, int(ctx._windows_ime_state["thread_id"]))
+    _install_windows_ime_event_observer(ctx)
     _windows_send_keys(user32, keys)
+    if ctx._windows_ime_state is not None:
+        ctx._windows_ime_state["mode_toggles"] += sum(
+            1 for key in keys if key.strip().upper() == "SHIFT"
+        )
     time.sleep(0.5)
+    observed_events = _read_windows_ime_event_observer(ctx)
+    document_observation = ctx.session.execute(
+        f"const el=document.querySelector({json.dumps(selector)});"
+        "return {snapshot:el?.taomniDocumentSnapshot ?? null,"
+        "lines:el ? Array.from(el.querySelectorAll('.cm-line')).map(line=>line.textContent) : []};"
+    )
     after = _windows_foreground_info(user32)
+    ime_after = _windows_ime_conversion_info(user32, hwnd, int(ctx._windows_ime_state["thread_id"]))
     _append_windows_ime_observation(ctx, {
         "action": label,
         "selector": selector,
@@ -2034,6 +2320,12 @@ def _do_native_windows_ime_keys(ctx: NativeStepContext, args: Any) -> str:
         "keys": keys,
         "foreground_before": before,
         "foreground_after": after,
+        "ime_before": ime_before,
+        "ime_after": ime_after,
+        "ime_setup_before": ime_setup_before,
+        "ime_setup_after": ime_setup_after,
+        "observed_events": observed_events,
+        "document_observation": document_observation,
         "result": "Win32 keys injected; testcase DOM postcondition is authoritative",
     })
     return f"injected {len(keys)} Windows IME keys through layout {layout}"

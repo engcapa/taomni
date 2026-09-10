@@ -2370,6 +2370,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       doc: initialDoc,
       selection: initialSelection,
       extensions: [
+        EditorView.contentAttributes.of({ "aria-label": "Code editor" }),
         lineNumbers(),
         foldGutter(),
         // Language-aware region grammar; unknown languages never fold.
@@ -2779,8 +2780,20 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     view.scrollDOM.addEventListener("scroll", onScroll, { passive: true });
     reportViewState(view);
     const actionHost = workspaceActionHostRef.current;
-    const cancelPendingChordOnComposition = () => {
+    const beginComposition = () => {
       actionHost?.cancelPendingChord("composition boundary");
+      if (owner && sharedFileKey) owner.beginComposition(sharedFileKey, sharedViewId);
+    };
+    const endComposition = (event: CompositionEvent) => {
+      actionHost?.cancelPendingChord("composition boundary");
+      if (!owner || !sharedFileKey) return;
+      const committed = event.data.length > 0;
+      // CodeMirror may flush the final input mutation in the microtask queued
+      // by its compositionend handler. Finish the shared history entry after
+      // that flush so an empty Escape update is discarded rather than undone.
+      queueMicrotask(() => {
+        owner.endComposition(sharedFileKey, sharedViewId, committed);
+      });
     };
     const cancelPendingChordOnBlur = () => {
       actionHost?.cancelPendingChord("editor blur");
@@ -2795,8 +2808,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       // action from moving the caret before the composition is committed.
       event.preventDefault();
     };
-    view.contentDOM.addEventListener("compositionstart", cancelPendingChordOnComposition);
-    view.contentDOM.addEventListener("compositionend", cancelPendingChordOnComposition);
+    view.contentDOM.addEventListener("compositionstart", beginComposition);
+    view.contentDOM.addEventListener("compositionend", endComposition);
     view.contentDOM.addEventListener("blur", cancelPendingChordOnBlur);
     view.contentDOM.addEventListener("keydown", compositionNavigationGuard, true);
     emitSelection(view);
@@ -2887,13 +2900,14 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       legacyBridgeRegistration?.dispose();
       bridgeRegistration?.dispose();
       unregisterEditorActions?.();
+      if (owner && sharedFileKey) owner.cancelComposition(sharedFileKey, sharedViewId);
       clearPendingSelectionEmit();
       requestParameterInfoRef.current = null;
       cancelActiveHoverResize(activeHoverResizeSessionRef);
       actionHost?.cancelPendingChord("editor unmount");
       clipboardContextByView.delete(view);
-      view.contentDOM.removeEventListener("compositionstart", cancelPendingChordOnComposition);
-      view.contentDOM.removeEventListener("compositionend", cancelPendingChordOnComposition);
+      view.contentDOM.removeEventListener("compositionstart", beginComposition);
+      view.contentDOM.removeEventListener("compositionend", endComposition);
       view.contentDOM.removeEventListener("blur", cancelPendingChordOnBlur);
       view.contentDOM.removeEventListener("keydown", compositionNavigationGuard, true);
       view.scrollDOM.removeEventListener("scroll", onScroll);

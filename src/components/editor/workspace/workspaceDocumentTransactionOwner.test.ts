@@ -46,6 +46,37 @@ describe("§8.26 / ED-MULTIVIEW-002: WorkspaceDocumentTransactionOwner", () => {
     expect(received).toHaveLength(1);
   });
 
+  it("groups committed composition updates and discards cancelled pre-edit history", () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    owner.acquireView("ime.txt", "primary", "alpha");
+
+    expect(owner.beginComposition("ime.txt", "primary")).toBe(true);
+    owner.dispatchTransaction("ime.txt", "primary", [
+      { from: 5, to: 5, insert: "ni" },
+    ]);
+    owner.dispatchTransaction("ime.txt", "primary", [
+      { from: 5, to: 7, insert: "你号", deleted: "ni" },
+    ]);
+    owner.endComposition("ime.txt", "primary", true);
+
+    expect(owner.getDocument("ime.txt")).toBe("alpha你号");
+    expect(owner.getHistoryState("ime.txt")).toMatchObject({ undoDepth: 1, redoDepth: 0 });
+
+    expect(owner.beginComposition("ime.txt", "primary")).toBe(true);
+    owner.dispatchTransaction("ime.txt", "primary", [
+      { from: 7, to: 7, insert: "zhong" },
+    ]);
+    owner.dispatchTransaction("ime.txt", "primary", [
+      { from: 7, to: 12, insert: "", deleted: "zhong" },
+    ]);
+    owner.endComposition("ime.txt", "primary", false);
+
+    expect(owner.getDocument("ime.txt")).toBe("alpha你号");
+    expect(owner.getHistoryState("ime.txt")).toMatchObject({ undoDepth: 1, redoDepth: 0 });
+    expect(owner.undo("ime.txt", "primary")?.origin).toBe("undo");
+    expect(owner.getDocument("ime.txt")).toBe("alpha");
+  });
+
   it("coordinates incremental delta between two simulated CodeMirror views with echo suppression", () => {
     const owner = new WorkspaceDocumentTransactionOwner();
     const initialText = "function hello() {\n  return 42;\n}\n";
