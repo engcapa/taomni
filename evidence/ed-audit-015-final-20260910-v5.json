@@ -1,0 +1,97 @@
+{
+  "verified_at": "2026-09-10T12:15:22.6904802Z",
+  "head": "087e44f363aaaaa861e29df8c26d40a0089181cf",
+  "checks": [
+    {
+      "kind": "code-audit",
+      "command": "Re-audit current production path: workspace.rearrangeCode -> frozen workspace/file/provider/document/project identity -> dedicated source.rearrange request/resolve -> action filtering -> immutable preview -> canonical workspace transaction -> post-hash -> history/undo/recovery",
+      "result": "passed",
+      "summary": "CodeWorkspaceTab owns the production entry and freezes identities before await. The adapter accepts only dedicated rearrange action kinds; the workflow rejects unavailable, empty, malformed, cross-file and stale results, preserves cancellation/conflict/read-only/failure states, and sends valid edits through the canonical transaction owner for post-hash verification, undo and recovery. Formatting and organize-imports are never relabeled as rearrange.",
+      "acceptance": ["ED-AUDIT-015-A2"]
+    },
+    {
+      "kind": "provider",
+      "command": "$env:TAOMNI_FIXTURE_JAVA = 'C:\\Program Files\\Java\\jdk-21\\bin\\java.exe'; $env:JDTLS_HOME = 'C:\\Users\\yuhan\\AppData\\Local\\jdtls'; node src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-rearrange-cleanup-fixture.mjs",
+      "result": "passed",
+      "summary": "Real Eclipse JDT Language Server 1.61.0.202607142124.jar on JDK 21.0.4 with JDK 21.0.4 initialized the isolated rearrange-cleanup-maven-single fixture and produced a failure-free sanitized trace. Raw actions include source.organizeImports, while source.rearrange=false and source.cleanup=false; the production result is the explicit fail-closed unavailable explanation. Per the latest user directive, this real false-capability result satisfies the provider boundary for this card; no positive rearrange mutation is claimed.",
+      "acceptance": ["ED-AUDIT-015-A1", "ED-AUDIT-015-A2", "ED-AUDIT-015-A3"]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents\\skills\\code-workspace-idea-task\\scripts\\typecheck_scope.py --command \"pnpm.cmd exec tsc -b --pretty false\" --path src\\components\\editor\\CodeWorkspaceTab.tsx --path src\\components\\editor\\CodeWorkspaceTab.test.tsx --path src\\components\\editor\\workspace\\rearrangeCleanupWorkflow.ts --path src\\components\\editor\\workspace\\rearrangeCleanupWorkflow.test.ts --path src\\components\\editor\\workspace\\codeActionProviderAdapter.ts --path src\\components\\editor\\workspace\\codeActionProviderAdapter.test.ts --path src\\lib\\editor\\lsp.ts --json",
+      "result": "passed",
+      "summary": "All 7 owned TypeScript paths passed with scoped_errors=0 and external_errors=0 across 0 external files.",
+      "acceptance": ["ED-AUDIT-015-A3"]
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm.cmd exec vitest run src/components/editor/workspace/rearrangeCleanupWorkflow.test.ts src/components/editor/workspace/codeActionProviderAdapter.test.ts src/components/editor/CodeWorkspaceTab.test.tsx src/lib/editor/lsp.test.ts src/components/editor/workspace/__fixtures__/jdtls/jdtlsRearrangeCleanupContract.test.ts --maxWorkers=1",
+      "result": "passed",
+      "summary": "5 test files and 185 tests passed. Assertions cover mounted production entry, dedicated provider filtering, unavailable/empty/malformed boundaries, cancellation, stale/conflict/failure zero-commit paths, read-only handling, post-hash verification, transaction undo/recovery, and the real JDT LS false-capability trace contract.",
+      "acceptance": ["ED-AUDIT-015-A2", "ED-AUDIT-015-A3"]
+    },
+    {
+      "kind": "build",
+      "command": "pnpm.cmd build",
+      "result": "passed",
+      "summary": "Current checkout passed TypeScript build and Vite production build; 4677 modules transformed and the production bundle was emitted to dist/.",
+      "acceptance": []
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-report/ed-audit-015-browser-current-20260910-v2/config-5010.yaml --filter TC-IDE-C8-04-rearrange-cleanup-unavailable-browser --workers 1 --report-dir qa-ui-auto-report/ed-audit-015-browser-done-20260910-r2 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "The current Vite development server run timed out at Page.goto during cold module compilation; no case step or behavior assertion ran.",
+      "acceptance": []
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-report/ed-audit-015-browser-current-20260910-v2/config-5010.yaml --filter TC-IDE-C8-04-rearrange-cleanup-unavailable-browser --workers 1 --report-dir qa-ui-auto-report/ed-audit-015-browser-done-20260910-r2-v2 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "A second current Vite development server run timed out at Page.goto; no case step or behavior assertion ran.",
+      "acceptance": []
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-report/ed-audit-015-browser-current-20260910-v2/config-5010.yaml --filter TC-IDE-C8-04-rearrange-cleanup-unavailable-browser --workers 1 --report-dir qa-ui-auto-report/ed-audit-015-browser-done-20260910-r2-v3 --keep-runs 0 --require-pass",
+      "result": "failed",
+      "summary": "After restarting the current Vite development server, Page.goto still timed out before any case step; no behavior assertion ran.",
+      "acceptance": []
+    },
+    {
+      "kind": "browser",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode browser --config qa-ui-auto-report/ed-audit-015-browser-current-20260910-v2/config-5010.yaml --filter TC-IDE-C8-04-rearrange-cleanup-unavailable-browser --workers 1 --report-dir qa-ui-auto-report/ed-audit-015-browser-done-20260910-static-r2 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Actual browser run against the current production dist preview on platform=Windows selected 1 and passed 1/1 with 0 failures and 0 skips. The mounted production Rearrange entry reported that a dedicated arrangement provider is required and kept editor text unchanged; source_sha256=a0b08bab71e98d3466416b8d3b21f3c952e50549b2560c7f90ae6763287ee93a, receipt=receipt-run-20260910-201118-943978100.",
+      "acceptance": ["ED-AUDIT-015-A1", "ED-AUDIT-015-A2"]
+    },
+    {
+      "kind": "native",
+      "command": "python .agents\\skills\\qa-ui-auto\\scripts\\native_build.py --force",
+      "result": "passed",
+      "summary": "Built the independently packaged current QA application with identifier com.taomni.app.qa from the current checkout; its source fingerprint and binary identity were accepted by the native harness.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "$env:PYTHONPATH = '.agents/skills/qa-ui-auto/scripts'; python -m qa_ui_auto run --mode native --config qa-ui-auto-tests/qa-ui-auto.config.yaml --filter TC-IDE-C8-08 --report-dir qa-ui-auto-report/ed-audit-015-native-done-20260910-r2 --keep-runs 0 --require-pass",
+      "result": "passed",
+      "summary": "Actual packaged com.taomni.app.qa WebView2 run on platform=Windows selected 1 and passed 1/1 with 0 failures and 0 skips. Real JDT LS intention apply/undo crossed the native boundary and restored the fixture postcondition; identity_stable=true, binary_sha256=83cf13910b3578785620505892b81b704ec641ae5d63128016fcb4b2f6fa6342, source_sha256=a0b08bab71e98d3466416b8d3b21f3c952e50549b2560c7f90ae6763287ee93a, receipt=receipt-run-20260910-201405-643445800.",
+      "acceptance": ["ED-AUDIT-015-A3"]
+    }
+  ],
+  "unrun": [
+    "positive capable source.rearrange mutation: no installed provider advertised the action; the latest user directive accepts the real JDT LS source.rearrange=false fail-closed result as the provider pass for this card, so no positive rearrangement claim is made.",
+    "native positive rearrange workflow: no provider-advertised rearrange action was available; TC-IDE-C8-08 verifies the real native transaction/undo boundary with JDT LS.",
+    "idea-comparison: IntelliJ IDEA 2026.2.x was not run; optional under the current board rule.",
+    "native Linux: no qualifying Linux Tauri/WebKitGTK/X11 runtime was available.",
+    "native macOS: no qualifying macOS Tauri/WKWebView or OS automation runtime was available."
+  ],
+  "notes": [
+    "The execution platform is recorded from actual receipts as platform=Windows; no Windows version is hard-coded and no other OS behavior is inferred.",
+    "Per the latest user instruction, JDT LS source.rearrange=false is an accepted provider result when the production path clearly reports unavailable and produces no false success. This closes the unavailable-capability branch only; it does not claim a positive member reorder.",
+    "No fake provider response, screenshot-only result, synthetic PASS, or capableWorkflowExecution fixture field was used as runtime/provider evidence.",
+    "Production effect chain: action entry -> capability/request -> immutable preview -> canonical transaction -> post-hash -> undo/recovery, or explicit unavailable/cancelled/stale/conflict/read-only/malformed/failure with zero commit.",
+    "The current provider trace is retained at src/components/editor/workspace/__fixtures__/jdtls/traces/rearrange-cleanup-maven-single.trace.json and records source.rearrange=false with failures=[]."
+  ]
+}
