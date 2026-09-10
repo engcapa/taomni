@@ -7,9 +7,11 @@
 import type { LspFileTextEdits, LspTextEdit, LspWorkspaceEdit } from "../../../lib/editor/lsp";
 import type { WorkspaceSearchMatch } from "../../../lib/editor/workspaceSearch";
 import { fsPathComparisonKey } from "./codeWorkspaceModel";
+import type { FindInFilesScopePlan } from "./findInFilesScopeModel";
 import {
   buildWorkspaceEditPreview,
   filterWorkspaceEditByUsages,
+  workspaceEditOperations,
   type WorkspaceEditPreview,
 } from "./workspaceEditPreview";
 
@@ -233,6 +235,125 @@ export function createReplaceInFilesPlan(
     totalMatches: totalPreview.textEditCount,
     includedMatches: preview.textEditCount,
   };
+}
+
+// ---------------------------------------------------------------------------
+// ED-IMPROVE-005: one frozen preview snapshot drives the whole commit. Scope,
+// query/options, replacement, selected match keys and the source edit
+// signature are captured before the preview opens; the commit validates the
+// selected edits against that snapshot and can never expand the set from a
+// refreshed search, changed scope or newly added files.
+// ---------------------------------------------------------------------------
+
+export interface ReplaceScopeIdentity {
+  kind: string;
+  roots: readonly string[];
+  explicitFiles: readonly string[];
+  fileMask: string | null;
+  generation: number | null;
+}
+
+export interface ReplaceQueryIdentity {
+  query: string;
+  caseSensitive: boolean;
+  wholeWord: boolean;
+  regexp: boolean;
+  includeGlobs: readonly string[];
+  excludeGlobs: readonly string[];
+}
+
+export interface ReplacePreviewSnapshot {
+  scope: ReplaceScopeIdentity;
+  query: ReplaceQueryIdentity;
+  replacement: string;
+  /** Stable UTF-16 usage keys for every frozen match. */
+  matchKeys: readonly string[];
+  matchCount: number;
+  editSignature: string;
+  capturedAt: number;
+}
+
+export function replaceScopeIdentityFromPlan(
+  plan: FindInFilesScopePlan,
+): ReplaceScopeIdentity {
+  return {
+    kind: plan.kind,
+    roots: plan.status === "ready" ? [...plan.roots] : [],
+    explicitFiles: plan.status === "ready" ? [...(plan.explicitFiles ?? [])] : [],
+    fileMask: plan.fileMask ?? null,
+    generation: plan.generation ?? null,
+  };
+}
+
+export function replaceMatchStableKey(match: ReplaceInFilesMatch): string {
+  return `${match.filePath}:${match.startLine}:${match.startCharacter}:${match.endLine}:${match.endCharacter}`;
+}
+
+/** Deterministic signature of every text edit in a WorkspaceEdit. */
+export function replaceEditSignature(edit: LspWorkspaceEdit): string {
+  return workspaceEditOperations(edit).map((operation) => {
+    if (operation.kind !== "text") {
+      const path = operation.kind === "rename"
+        ? `${operation.oldPath ?? operation.oldUri}->${operation.newPath ?? operation.newUri}`
+        : operation.path ?? operation.uri;
+      return `${operation.kind}:${path}`;
+    }
+    const path = operation.document.path ?? operation.document.uri;
+    const edits = operation.document.edits
+      .map((item) => [
+        item.range.start.line,
+        item.range.start.character,
+        item.range.end.line,
+        item.range.end.character,
+        item.newText,
+      ].join(":"))
+      .join("|");
+    return `${operation.kind}:${path}#${edits}`;
+  }).join(";");
+}
+
+export interface ReplaceSelectionValidation {
+  ok: boolean;
+  reason?: string;
+}
+
+/**
+ * ED-IMPROVE-005: the commit may only deliver selections that exist in the
+ * frozen snapshot, one edit per selected match, all carrying the frozen
+ * replacement text. Any drift is an internal conflict, never a partial write.
+ */
+export function validateReplacePreviewSelection(
+  snapshot: ReplacePreviewSnapshot,
+  selectedMatchKeys: ReadonlySet<string>,
+  filteredEdit: LspWorkspaceEdit,
+): ReplaceSelectionValidation {
+  const frozenKeys = new Set(snapshot.matchKeys);
+  for (const key of selectedMatchKeys) {
+    if (!frozenKeys.has(key)) {
+      return {
+        ok: false,
+        reason: `Selection ${key} is not part of the frozen replace preview; reopen the preview`,
+      };
+    }
+  }
+  const edits = workspaceEditOperations(filteredEdit).flatMap((operation) => (
+    operation.kind === "text" ? operation.document.edits : []
+  ));
+  if (edits.length !== selectedMatchKeys.size) {
+    return {
+      ok: false,
+      reason: `Frozen selection has ${selectedMatchKeys.size} matches but the edit carries ${edits.length}; reopen the preview`,
+    };
+  }
+  for (const edit of edits) {
+    if (edit.newText !== snapshot.replacement) {
+      return {
+        ok: false,
+        reason: "The edit text differs from the frozen replacement; reopen the preview",
+      };
+    }
+  }
+  return { ok: true };
 }
 
 /** Minimal structural view of one applier outcome (per-document operation). */

@@ -584,6 +584,65 @@ describe("ED-FIND-004: replace preview commit flow in FindInFilesPanel", () => {
     expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(next)).toBe(false);
   });
 
+  it("commits the replacement frozen at preview time when the input changes later (ED-IMPROVE-005 A1)", async () => {
+    const onReplaceMatches = vi.fn(
+      async (
+        _matches: WorkspaceSearchMatch[],
+        _replacement: string,
+        _edit: LspWorkspaceEdit,
+      ): Promise<{ ok: boolean; appliedCount?: number; fileCount?: number }> =>
+        ({ ok: true as const, appliedCount: 2, fileCount: 2 }),
+    );
+    await openPreview(onReplaceMatches);
+
+    // The user edits the replacement input after the preview froze its plan.
+    fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "changed-later" } });
+    fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+
+    await waitFor(() => expect(onReplaceMatches).toHaveBeenCalledTimes(1));
+    const call = onReplaceMatches.mock.calls[0];
+    if (!call) throw new Error("expected commit arguments");
+    const [, replacement, edit] = call;
+    expect(replacement).toBe("thread");
+    expect(edit.documentEdits[0]!.edits[0]!.newText).toBe("thread");
+  });
+
+  it("shows the frozen scope identity captured before the preview (ED-IMPROVE-005 A1)", async () => {
+    await openPreview(vi.fn(async () => ({ ok: true as const })));
+    const scope = screen.getByTestId("code-workspace-replace-scope");
+    expect(scope).toHaveTextContent("Frozen preview: project");
+    expect(scope).toHaveTextContent("query “needle”");
+  });
+
+  it("keeps the frozen scope and set when query/scope inputs change after the preview opens (ED-IMPROVE-005 A1)", async () => {
+    const onReplaceMatches = vi.fn(
+      async (
+        _matches: WorkspaceSearchMatch[],
+        _replacement: string,
+        _edit: LspWorkspaceEdit,
+      ): Promise<{ ok: boolean; appliedCount?: number; fileCount?: number }> =>
+        ({ ok: true as const, appliedCount: 2, fileCount: 2 }),
+    );
+    await openPreview(onReplaceMatches);
+
+    // Live UI inputs move after the freeze; the frozen snapshot must still
+    // drive the scope label, the replacement and the committed match set.
+    fireEvent.change(screen.getByLabelText("Search query"), { target: { value: "other-query" } });
+    fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "changed-later" } });
+    fireEvent.change(screen.getByLabelText("Include globs"), { target: { value: "*.md" } });
+    expect(screen.getByTestId("code-workspace-replace-scope")).toHaveTextContent("query “needle”");
+    expect(screen.getByTestId("code-workspace-replace-counts")).toHaveTextContent("2 of 2");
+
+    fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+    await waitFor(() => expect(onReplaceMatches).toHaveBeenCalledTimes(1));
+    const call = onReplaceMatches.mock.calls[0];
+    if (!call) throw new Error("expected commit arguments");
+    const [filtered, replacement, edit] = call;
+    expect(filtered).toHaveLength(2);
+    expect(replacement).toBe("thread");
+    expect(edit.documentEdits[0]!.edits[0]!.newText).toBe("thread");
+  });
+
   it("keeps the preview open and shows the blocker message on conflict (A2)", async () => {
     const onReplaceMatches = vi.fn(
       async () => ({ ok: false as const, message: "Replace blocked: dirty buffer" }),

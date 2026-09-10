@@ -30,9 +30,13 @@ import {
   buildReplaceInFilesWorkspaceEdit,
   codePointOffsetToUtf16Offset,
   createReplaceInFilesPlan,
+  replaceEditSignature,
   replaceMatchAbsolutePath,
+  replaceScopeIdentityFromPlan,
   searchMatchesToReplaceInputs,
+  validateReplacePreviewSelection,
   type ReplaceInFilesPlan,
+  type ReplacePreviewSnapshot,
 } from "../replaceInFilesModel";
 import { ReplacePreviewDialog } from "./ReplacePreviewDialog";
 import {
@@ -174,6 +178,20 @@ function groupKey(match: WorkspaceSearchMatch): string {
   return `${match.rootId}:${match.path}`;
 }
 
+/**
+ * ED-IMPROVE-005: display label for the frozen preview scope so the dialog
+ * shows exactly which roots/mask/generation/query the frozen set came from.
+ */
+function replaceScopeLabel(snapshot: ReplacePreviewSnapshot): string {
+  const { scope, query } = snapshot;
+  const targets = scope.roots.length > 0
+    ? `${scope.roots.length} root${scope.roots.length === 1 ? "" : "s"}`
+    : `${scope.explicitFiles.length} file${scope.explicitFiles.length === 1 ? "" : "s"}`;
+  const mask = scope.fileMask ? ` · mask ${scope.fileMask}` : "";
+  const generation = scope.generation != null ? ` · facts G${scope.generation}` : "";
+  return `Frozen preview: ${scope.kind} · ${targets}${mask}${generation} · query “${query.query}”`;
+}
+
 /** Join key shared by preview usages and search matches for exclusion. */
 function usageJoinKeyForMatch(match: WorkspaceSearchMatch): string {
   const line = Math.max(0, match.lineNumber - 1);
@@ -208,13 +226,16 @@ export function FindInFilesPanel({
   const [groups, setGroups] = useState<MatchGroup[]>([]);
   const [summary, setSummary] = useState<SearchSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
-  /** ED-FIND-004: frozen replace preview (plan + source edit + matches). */
+  /** ED-FIND-004/005: frozen replace preview (plan + source edit + matches +
+   * scope/query/replacement snapshot). */
   const [replacePreview, setReplacePreview] = useState<{
     edit: LspWorkspaceEdit;
     plan: ReplaceInFilesPlan;
     matches: WorkspaceSearchMatch[];
     usageToMatchKey: ReadonlyMap<string, string>;
     stableToUsageId: ReadonlyMap<string, string>;
+    replacement: string;
+    snapshot: ReplacePreviewSnapshot;
   } | null>(null);
   const [replaceCommitting, setReplaceCommitting] = useState(false);
   const [replaceCommitError, setReplaceCommitError] = useState<string | null>(null);
@@ -580,35 +601,84 @@ export function FindInFilesPanel({
       }
       if (list && list.length === 0) remaining.delete(key);
     }
+    const snapshot: ReplacePreviewSnapshot = {
+      scope: replaceScopeIdentityFromPlan(scopePlan),
+      query: {
+        query: query.trim(),
+        caseSensitive,
+        wholeWord,
+        regexp,
+        includeGlobs: splitGlobs(includeGlobs),
+        excludeGlobs: splitGlobs(excludeGlobs),
+      },
+      replacement,
+      matchKeys: allMatches.map(workspaceSearchMatchKey),
+      matchCount: modelMatches.length,
+      editSignature: replaceEditSignature(edit),
+      capturedAt: Date.now(),
+    };
     setReplaceCommitError(null);
-    setReplacePreview({ edit, plan, matches: allMatches, usageToMatchKey, stableToUsageId });
-  }, [allMatches, onReplaceMatches, replacement, replacePreview]);
+    setReplacePreview({
+      edit,
+      plan,
+      matches: allMatches,
+      usageToMatchKey,
+      stableToUsageId,
+      replacement,
+      snapshot,
+    });
+  }, [
+    allMatches,
+    caseSensitive,
+    excludeGlobs,
+    includeGlobs,
+    onReplaceMatches,
+    query,
+    regexp,
+    replacePreview,
+    replacement,
+    scopePlan,
+    wholeWord,
+  ]);
 
   const commitReplacePreview = useCallback(async (excludedStableKeys: ReadonlySet<string>) => {
-    if (!replacePreview || !onReplaceMatches) return;
+    const preview = replacePreview;
+    if (!preview || !onReplaceMatches) return;
     // Stable content keys back to the ORIGINAL plan usage ids (positional
     // ids shift across recomputes, so the dialog never sees them).
     const excludedUsageIds = new Set<string>();
     for (const stableKey of excludedStableKeys) {
-      const usageId = replacePreview.stableToUsageId.get(stableKey);
+      const usageId = preview.stableToUsageId.get(stableKey);
       if (usageId) excludedUsageIds.add(usageId);
     }
     const excludedMatchKeys = new Set<string>();
     for (const usageId of excludedUsageIds) {
-      const key = replacePreview.usageToMatchKey.get(usageId);
+      const key = preview.usageToMatchKey.get(usageId);
       if (key) excludedMatchKeys.add(key);
     }
-    const filteredMatches = replacePreview.matches.filter(
+    const filteredMatches = preview.matches.filter(
       (match) => !excludedMatchKeys.has(workspaceSearchMatchKey(match)),
     );
     const filteredEdit = createReplaceInFilesPlan(
-      replacePreview.edit,
+      preview.edit,
       excludedUsageIds,
     ).filteredEdit;
+    // ED-IMPROVE-005: the frozen snapshot is the only source of truth; the
+    // selected set must be a subset of it with one frozen-replacement edit
+    // per match. Live replacement/query/scope changes cannot alter it.
+    const selection = validateReplacePreviewSelection(
+      preview.snapshot,
+      new Set(filteredMatches.map(workspaceSearchMatchKey)),
+      filteredEdit,
+    );
+    if (!selection.ok) {
+      setReplaceCommitError(selection.reason ?? "Replace selection is stale; reopen the preview");
+      return;
+    }
     setReplaceCommitting(true);
     setReplaceCommitError(null);
     try {
-      const result = await onReplaceMatches(filteredMatches, replacement, filteredEdit);
+      const result = await onReplaceMatches(filteredMatches, preview.replacement, filteredEdit);
       if (result.ok) {
         setReplacePreview(null);
       } else {
@@ -889,7 +959,8 @@ export function FindInFilesPanel({
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 p-4">
           <ReplacePreviewDialog
             edit={replacePreview.edit}
-            replacement={replacement}
+            replacement={replacePreview.replacement}
+            scopeLabel={replaceScopeLabel(replacePreview.snapshot)}
             committing={replaceCommitting}
             commitError={replaceCommitError}
             onCommit={(excluded) => void commitReplacePreview(excluded)}

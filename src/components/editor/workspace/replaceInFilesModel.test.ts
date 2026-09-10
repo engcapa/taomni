@@ -3,12 +3,18 @@ import {
   buildReplaceInFilesWorkspaceEdit,
   codePointOffsetToUtf16Offset,
   createReplaceInFilesPlan,
+  replaceEditSignature,
+  replaceMatchStableKey,
+  replaceScopeIdentityFromPlan,
   searchMatchesToReplaceInputs,
   summarizeReplaceCommitReport,
   validateReplacePreconditions,
+  validateReplacePreviewSelection,
   verifyReplaceMatchFreshness,
   type ReplaceInFilesMatch,
+  type ReplacePreviewSnapshot,
 } from "./replaceInFilesModel";
+import { planFindInFilesScope } from "./findInFilesScopeModel";
 import { applyLspTextEditsToString } from "./lspTextEdits";
 
 describe("ED-FIND-004: replaceInFilesModel preview, exclude, conflict guard, commit", () => {
@@ -290,5 +296,100 @@ describe("ED-IMPROVE-004: code-point offsets map to UTF-16 LSP ranges", () => {
       { ...input, startCharacter: -1, endCharacter: 3 },
     ]);
     expect(negative).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ED-IMPROVE-005: the frozen preview snapshot is the commit's single source
+// of truth for scope, query, replacement, selected matches and edit identity.
+// ---------------------------------------------------------------------------
+describe("ED-IMPROVE-005: frozen replace preview snapshot", () => {
+  const sampleMatches: ReplaceInFilesMatch[] = [
+    { filePath: "/ws/A.java", startLine: 1, startCharacter: 2, endLine: 1, endCharacter: 5, matchedText: "foo" },
+    { filePath: "/ws/B.java", startLine: 3, startCharacter: 0, endLine: 3, endCharacter: 3, matchedText: "foo" },
+    { filePath: "/ws/test/A.test.java", startLine: 0, startCharacter: 4, endLine: 0, endCharacter: 7, matchedText: "foo" },
+  ];
+
+  function snapshotFor(edit: ReturnType<typeof buildReplaceInFilesWorkspaceEdit>): ReplacePreviewSnapshot {
+    return {
+      scope: {
+        kind: "project",
+        roots: ["/ws"],
+        explicitFiles: [],
+        fileMask: "*.java",
+        generation: 3,
+      },
+      query: {
+        query: "foo",
+        caseSensitive: false,
+        wholeWord: false,
+        regexp: false,
+        includeGlobs: ["**/*.java"],
+        excludeGlobs: ["*.test.java"],
+      },
+      replacement: "bar",
+      matchKeys: sampleMatches.map(replaceMatchStableKey),
+      matchCount: sampleMatches.length,
+      editSignature: replaceEditSignature(edit),
+      capturedAt: 1,
+    };
+  }
+
+  it("derives the scope identity from a live scope plan", () => {
+    const plan = planFindInFilesScope(
+      { kind: "project", workspaceRoot: "/ws", fileMask: "*.java" },
+      { generation: 7 } as never,
+    );
+    expect(replaceScopeIdentityFromPlan(plan)).toEqual({
+      kind: "project",
+      roots: ["/ws"],
+      explicitFiles: [],
+      fileMask: "*.java",
+      generation: 7,
+    });
+  });
+
+  it("builds a deterministic edit signature that changes with the text or ranges", () => {
+    const edit = buildReplaceInFilesWorkspaceEdit({ matches: sampleMatches, replacementText: "bar" });
+    const same = buildReplaceInFilesWorkspaceEdit({ matches: sampleMatches, replacementText: "bar" });
+    const otherText = buildReplaceInFilesWorkspaceEdit({ matches: sampleMatches, replacementText: "baz" });
+    const otherRange = buildReplaceInFilesWorkspaceEdit({
+      matches: sampleMatches.map((match, index) => index === 0 ? { ...match, startCharacter: 1 } : match),
+      replacementText: "bar",
+    });
+    expect(replaceEditSignature(edit)).toBe(replaceEditSignature(same));
+    expect(replaceEditSignature(edit)).not.toBe(replaceEditSignature(otherText));
+    expect(replaceEditSignature(edit)).not.toBe(replaceEditSignature(otherRange));
+  });
+
+  it("accepts a selected subset that stays inside the frozen snapshot", () => {
+    const edit = buildReplaceInFilesWorkspaceEdit({ matches: sampleMatches, replacementText: "bar" });
+    const snapshot = snapshotFor(edit);
+    const filtered = createReplaceInFilesPlan(edit, new Set(["0:0"])).filteredEdit;
+    const subsetKeys = new Set(sampleMatches.slice(1).map(replaceMatchStableKey));
+    expect(validateReplacePreviewSelection(snapshot, subsetKeys, filtered)).toEqual({ ok: true });
+  });
+
+  it("rejects selections outside the snapshot, count drift and replacement drift", () => {
+    const edit = buildReplaceInFilesWorkspaceEdit({ matches: sampleMatches, replacementText: "bar" });
+    const snapshot = snapshotFor(edit);
+    const allKeys = new Set(sampleMatches.map(replaceMatchStableKey));
+
+    const outside = validateReplacePreviewSelection(
+      snapshot,
+      new Set([...allKeys, "/ws/new.java:0:0:0:3"]),
+      edit,
+    );
+    expect(outside.ok).toBe(false);
+    expect(outside.reason).toContain("not part of the frozen replace preview");
+
+    const wrongCount = validateReplacePreviewSelection(snapshot, new Set(), edit);
+    expect(wrongCount.ok).toBe(false);
+    expect(wrongCount.reason).toContain("reopen the preview");
+
+    const driftedEdit = buildReplaceInFilesWorkspaceEdit({ matches: sampleMatches, replacementText: "baz" });
+    const driftedText = validateReplacePreviewSelection(snapshot, allKeys, driftedEdit);
+    expect(driftedText.ok).toBe(false);
+    expect(driftedText.reason).toContain("frozen replacement");
   });
 });
