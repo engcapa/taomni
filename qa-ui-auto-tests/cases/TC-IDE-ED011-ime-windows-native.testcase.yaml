@@ -73,14 +73,14 @@ steps:
       label: candidate-compose
       keys: [n, i, h, a, o]
   - eval_readonly:
-      expression: 'document.activeElement === document.querySelector(".cm-content") && document.querySelectorAll(".cm-line")[1]?.textContent === "second"'
+      expression: 'document.activeElement === document.querySelector(".cm-content") && document.querySelectorAll(".cm-line").length === 2 && document.querySelectorAll(".cm-line")[0]?.textContent === "alpha" && document.querySelectorAll(".cm-line")[1]?.textContent?.startsWith("second")'
       expect_truthy: true
   - native_windows_ime_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       label: candidate-navigation
       keys: [ArrowDown]
   - eval_readonly:
-      expression: 'document.activeElement === document.querySelector(".cm-content") && document.querySelectorAll(".cm-line")[1]?.textContent === "second"'
+      expression: 'document.activeElement === document.querySelector(".cm-content") && document.querySelectorAll(".cm-line").length === 2 && document.querySelectorAll(".cm-line")[0]?.textContent === "alpha" && document.querySelectorAll(".cm-line")[1]?.textContent?.startsWith("second")'
       expect_truthy: true
 
   # Confirm the first Microsoft Pinyin candidate, then start a second
