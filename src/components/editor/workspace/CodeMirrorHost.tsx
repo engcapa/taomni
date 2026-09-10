@@ -10,6 +10,7 @@ import {
 import {
   ChangeSet,
   Compartment,
+  EditorSelection,
   EditorState,
   Prec,
   Transaction,
@@ -70,10 +71,13 @@ import {
 import {
   bracketMatching,
   foldAll,
+  foldEffect,
   foldGutter,
+  foldedRanges,
   indentOnInput,
   indentUnit,
   unfoldAll,
+  unfoldEffect,
 } from "@codemirror/language";
 import { openSearchPanel, search } from "@codemirror/search";
 import { renderFormatted } from "../../../lib/chat/renderFormatted";
@@ -173,6 +177,12 @@ import {
   type RegionFoldingProvenance,
 } from "./workspaceEditorCommands";
 import {
+  MAX_VIEW_STATE_FOLDS,
+  MAX_VIEW_STATE_SELECTIONS,
+  type PersistedEditorViewState,
+  type PersistedViewSelection,
+} from "./workspaceLayoutPersistence";
+import {
   buildEditorHostActions,
   buildEditorPrimitiveKeybindings,
 } from "./workspaceCodeMirrorKeymap";
@@ -198,6 +208,72 @@ import {
   virtualSpaceTypingHandler,
 } from "./workspaceVirtualSpace";
 import type { WorkspaceActionHost } from "./workspaceActionHost";
+
+/**
+ * ED-IMPROVE-007: capture this view's caret/selection, scroll and fold state.
+ * Pure over the CodeMirror view so the workspace can store it in memory and
+ * persist it with the layout without serializing per keystroke.
+ */
+export function captureEditorViewState(view: EditorView): PersistedEditorViewState {
+  const selection = view.state.selection;
+  const main = selection.main;
+  const selections: PersistedViewSelection[] = [];
+  for (const range of selection.ranges) {
+    if (range === main) continue;
+    if (selections.length >= MAX_VIEW_STATE_SELECTIONS - 1) break;
+    selections.push({ anchor: range.anchor, head: range.head });
+  }
+  const folds: PersistedEditorViewState["folds"] = [];
+  const folded = foldedRanges(view.state);
+  for (const iter = folded.iter(); iter.value && folds.length < MAX_VIEW_STATE_FOLDS; iter.next()) {
+    if (iter.to <= iter.from) continue;
+    folds.push({ from: iter.from, to: iter.to });
+  }
+  return {
+    mainSelection: { anchor: main.anchor, head: main.head },
+    selections,
+    scrollTop: view.scrollDOM?.scrollTop ?? 0,
+    folds,
+  };
+}
+
+/**
+ * ED-IMPROVE-007: apply a persisted snapshot once when the view mounts.
+ * Offsets beyond the live document are clamped and folds outside it are
+ * dropped, so a stale or corrupt snapshot can never throw or select garbage.
+ */
+export function applyPersistedEditorViewState(
+  view: EditorView,
+  state: PersistedEditorViewState,
+): void {
+  const docLength = view.state.doc.length;
+  const clamp = (value: number): number => Math.max(0, Math.min(docLength, Math.floor(value)));
+  const toRange = (range: PersistedViewSelection) => EditorSelection.range(
+    clamp(range.anchor),
+    clamp(range.head),
+  );
+  const ranges = [
+    toRange(state.mainSelection),
+    ...state.selections.slice(0, MAX_VIEW_STATE_SELECTIONS - 1).map(toRange),
+  ];
+  view.dispatch({
+    selection: EditorSelection.create(ranges, 0),
+    scrollIntoView: false,
+  });
+  for (const fold of state.folds) {
+    const from = clamp(fold.from);
+    const to = clamp(fold.to);
+    if (to <= from || to > docLength) continue;
+    view.dispatch({ effects: foldEffect.of({ from, to }) });
+  }
+  if (state.scrollTop > 0 && view.scrollDOM) {
+    const maxScroll = Math.max(
+      0,
+      view.scrollDOM.scrollHeight - view.scrollDOM.clientHeight,
+    );
+    view.scrollDOM.scrollTop = Math.min(state.scrollTop, maxScroll);
+  }
+}
 
 export interface EditorRevealTarget {
   line: number;
@@ -322,6 +398,14 @@ interface CodeMirrorHostProps {
   onSelectionChange?: (selection: EditorSelectionRange) => void;
   onFoldProvenanceChange?: (provenance: RegionFoldingProvenance | null) => void;
   onViewportChange?: (range: LspRange) => void;
+  /**
+   * ED-IMPROVE-007: one-shot caret/selection/scroll/fold snapshot for this
+   * leaf/file, applied when the view mounts. Later user input is never
+   * overwritten by a late restore because it is only applied here.
+   */
+  initialViewState?: PersistedEditorViewState | null;
+  /** Reports view-state changes for in-memory capture and debounced persistence. */
+  onViewStateChange?: (state: PersistedEditorViewState) => void;
   onExpandSelection?: (selection: EditorSelectionRange) => Promise<LspRange[] | null>;
   onLightbulb?: (line: number) => void;
   onGitChangeClick?: (change: GitLineChange) => void;
@@ -1814,6 +1898,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   onSelectionChange,
   onFoldProvenanceChange,
   onViewportChange,
+  initialViewState = null,
+  onViewStateChange,
   onExpandSelection,
   onLightbulb,
   onGitChangeClick,
@@ -2031,6 +2117,14 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onFoldProvenanceChangeRef = useRef(onFoldProvenanceChange);
   const onViewportChangeRef = useRef(onViewportChange);
+  // ED-IMPROVE-007: the initial snapshot is read once at view creation; later
+  // prop changes never re-apply it over the user's live caret/scroll.
+  const initialViewStateRef = useRef(initialViewState);
+  initialViewStateRef.current = initialViewState;
+  const onViewStateChangeRef = useRef(onViewStateChange);
+  onViewStateChangeRef.current = onViewStateChange;
+  const lastEmittedViewStateRef = useRef<string | null>(null);
+  const viewStateEmitTimerRef = useRef<number | null>(null);
   const onExpandSelectionRef = useRef(onExpandSelection);
   const onLightbulbRef = useRef(onLightbulb);
   const onGitChangeClickRef = useRef(onGitChangeClick);
@@ -2223,6 +2317,26 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       selectionEmitTimerRef.current = window.setTimeout(() => {
         selectionEmitTimerRef.current = null;
         if (viewRef.current === view) emitSelection(view);
+      }, delay);
+    };
+    // ED-IMPROVE-007: capture is cheap and stays in memory; identical
+    // snapshots are dropped so a scroll or caret move does not schedule a
+    // persistence write per event.
+    const scheduleViewStateEmit = (view: EditorView, delay = 150) => {
+      if (!onViewStateChangeRef.current) return;
+      if (viewStateEmitTimerRef.current !== null) {
+        window.clearTimeout(viewStateEmitTimerRef.current);
+      }
+      viewStateEmitTimerRef.current = window.setTimeout(() => {
+        viewStateEmitTimerRef.current = null;
+        if (viewRef.current !== view) return;
+        const handler = onViewStateChangeRef.current;
+        if (!handler) return;
+        const captured = captureEditorViewState(view);
+        const serialized = JSON.stringify(captured);
+        if (serialized === lastEmittedViewStateRef.current) return;
+        lastEmittedViewStateRef.current = serialized;
+        handler(captured);
       }, delay);
     };
     const saveHandler = () => {
@@ -2671,12 +2785,31 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             scheduleSelectionEmit(update.view, update.docChanged ? 125 : 0);
           }
           if (update.viewportChanged) emitViewport(update.view);
+          // ED-IMPROVE-007: capture caret/selection/scroll/fold changes for
+          // this leaf/file; persisted later with the layout snapshot.
+          if (
+            update.selectionSet
+            || update.docChanged
+            || update.viewportChanged
+            || update.transactions.some((tr) => tr.effects.some(
+              (effect) => effect.is(foldEffect) || effect.is(unfoldEffect),
+            ))
+          ) {
+            scheduleViewStateEmit(update.view, update.docChanged ? 250 : 150);
+          }
         }),
       ],
     });
     const view = new EditorView({ state, parent: hostRef.current });
     editorLanguageByView.set(view, liveTemplateLanguageForPath(pathRef.current));
     viewRef.current = view;
+    // ED-IMPROVE-007: one-shot restore of this leaf/file's own caret,
+    // selection, scroll and folds. Applied before any user input and never
+    // re-applied on prop changes, so late updates cannot overwrite typing.
+    const initialViewState = initialViewStateRef.current;
+    if (initialViewState) {
+      applyPersistedEditorViewState(view, initialViewState);
+    }
     const compositionNavigationGuard = (event: KeyboardEvent) => {
       if (
         (!view.composing && event.isComposing !== true)
@@ -2785,6 +2918,10 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       bridgeRegistration?.dispose();
       unregisterEditorActions?.();
       clearPendingSelectionEmit();
+      if (viewStateEmitTimerRef.current !== null) {
+        window.clearTimeout(viewStateEmitTimerRef.current);
+        viewStateEmitTimerRef.current = null;
+      }
       requestParameterInfoRef.current = null;
       cancelActiveHoverResize(activeHoverResizeSessionRef);
       clipboardContextByView.delete(view);

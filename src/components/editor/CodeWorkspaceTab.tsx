@@ -269,6 +269,8 @@ import {
   snapshotFromWorkspaceUi,
   uniqueOrderedKeys,
   writeWorkspaceLayoutSnapshot,
+  type PersistedEditorViewState,
+  type WorkspaceViewStates,
 } from "./workspace/workspaceLayoutPersistence";
 import { LocalHistoryDialog } from "./workspace/LocalHistoryDialog";
 import { CodeStyleSettingsDialog } from "./workspace/CodeStyleSettingsDialog";
@@ -1397,12 +1399,22 @@ export function CodeWorkspaceTab({
   // Restore chrome/layout once per instance, then seed expand keys only when empty.
   const layoutHydratedRef = useRef<string | null>(null);
   const layoutRestoredOpenFilesRef = useRef(false);
+  // ED-IMPROVE-007: in-memory per-leaf/file view snapshots; hydrated from the
+  // layout snapshot before the first editor mounts so a reopen/restart applies
+  // the right leaf's caret, selection, scroll and folds.
+  const [hydratedViewStates] = useState<WorkspaceViewStates>(() => (
+    readWorkspaceLayoutSnapshot(workspaceInstanceId)?.viewStates ?? {}
+  ));
+  const viewStatesRef = useRef<WorkspaceViewStates>(hydratedViewStates);
+  const [viewStateRevision, setViewStateRevision] = useState(0);
   useEffect(() => {
     if (layoutHydratedRef.current === workspaceInstanceId) return;
     layoutHydratedRef.current = workspaceInstanceId;
     layoutRestoredOpenFilesRef.current = false;
+    viewStatesRef.current = {};
     const snapshot = readWorkspaceLayoutSnapshot(workspaceInstanceId);
     if (snapshot) {
+      viewStatesRef.current = snapshot.viewStates ?? {};
       if (snapshot.layoutRecovered) {
         setStatusMessage("Recovered invalid workspace layout into a single editor leaf");
       }
@@ -2583,6 +2595,25 @@ export function CodeWorkspaceTab({
     cleanupRequestTokenRef.current += 1;
   }, [workspaceInstanceId]);
 
+  // ED-IMPROVE-007: view snapshots stay in memory and persist with the next
+  // debounced layout write. A late report from a replaced view/workspace is
+  // dropped instead of resurrecting an old leaf's caret.
+  const handleViewStateChange = useCallback((
+    groupId: EditorGroupId,
+    fileKey: string,
+    state: PersistedEditorViewState,
+  ) => {
+    if (!mountedRef.current || workspaceInstanceIdRef.current !== workspaceInstanceId) return;
+    const current = viewStatesRef.current;
+    const leaf = current[groupId];
+    if (leaf?.[fileKey] === state) return;
+    viewStatesRef.current = {
+      ...current,
+      [groupId]: { ...(leaf ?? {}), [fileKey]: state },
+    };
+    setViewStateRevision((revision) => revision + 1);
+  }, [workspaceInstanceId]);
+
   const semanticQueryHostRef = useRef(new WorkspaceSemanticQueryHost({
     onRequest: ({ kind }) => {
       publishWorkspaceObservation((bridge) => bridge.observeProviderRequest(kind));
@@ -3582,6 +3613,7 @@ export function CodeWorkspaceTab({
         editorGroups: persistableGroups,
         layoutTreeV2: workspaceUi.layoutTreeV2,
         tabPolicy: tabPolicyRef.current,
+        viewStates: viewStatesRef.current,
       }), {
         // §8.17.4 step 3: persistence refusals surface as a recovery
         // diagnostic, not only a console line.
@@ -3603,6 +3635,7 @@ export function CodeWorkspaceTab({
     workspaceInstanceId,
     workspaceUi.layoutTreeV2,
     tabPolicyRevision,
+    viewStateRevision,
   ]);
 
   const applyFileActionResourceOperation = useCallback((
@@ -17830,6 +17863,8 @@ export function CodeWorkspaceTab({
         transactionOwner={documentTransactionOwnerRef.current}
         onWorkspaceHistoryClaim={claimWorkspaceHistory}
         readOnly={workspaceResourceOperationLocked}
+        initialViewState={groupFile ? viewStatesRef.current[groupId]?.[groupFile.key] ?? null : null}
+        onViewStateChange={handleViewStateChange}
         softWrap={groupSoftWrap}
         appearance={groupAppearance}
         renderedDocEnabled={groupReaderMode}

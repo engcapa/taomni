@@ -5,6 +5,7 @@ import { EditorSelection } from "@codemirror/state";
 import { undoDepth } from "@codemirror/commands";
 import { startCompletion } from "@codemirror/autocomplete";
 import { EditorView } from "@codemirror/view";
+import { foldedRanges } from "@codemirror/language";
 import { CodeMirrorHost } from "./CodeMirrorHost";
 import {
   setVirtualOverflow,
@@ -1301,5 +1302,122 @@ describe("ED-SAVE-004 editor recovery decoration synchronization", () => {
     });
     expect(dispatchSpy.mock.calls.length).toBeGreaterThan(1);
     expect(rendered.container.querySelector(".cm-git-change-modified")).toBeTruthy();
+  });
+});
+
+describe("ED-IMPROVE-007 leaf/file view snapshots", () => {
+  afterEach(() => cleanup());
+
+  function findView(rendered: { container: HTMLElement }): EditorView {
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!);
+    expect(view).not.toBeNull();
+    return view!;
+  }
+
+  it("applies a persisted main selection and multi-cursor once at mount", () => {
+    const doc = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8";
+    const rendered = renderEditor(doc, vi.fn(), {
+      initialViewState: {
+        mainSelection: { anchor: 12, head: 12 },
+        selections: [{ anchor: 6, head: 6 }],
+        scrollTop: 0,
+        folds: [],
+      },
+    });
+    const view = findView(rendered);
+    expect(view.state.selection.main.head).toBe(12);
+    expect(view.state.selection.ranges).toHaveLength(2);
+    expect(view.state.selection.ranges.map((range) => range.head).sort((a, b) => a - b)).toEqual([6, 12]);
+  });
+
+  it("applies persisted folds and reports them in the captured state", async () => {
+    const doc = "function a() {\n  body1;\n  body2;\n}\nfunction b() {\n  other;\n}\n";
+    const onViewStateChange = vi.fn();
+    const rendered = renderEditor(doc, vi.fn(), {
+      initialViewState: {
+        mainSelection: { anchor: 0, head: 0 },
+        selections: [],
+        scrollTop: 0,
+        folds: [{ from: 0, to: doc.indexOf("function b") }],
+      },
+      onViewStateChange,
+    });
+    const view = findView(rendered);
+    expect(foldedRanges(view.state).size).toBeGreaterThan(0);
+    await waitFor(() => expect(onViewStateChange).toHaveBeenCalled());
+    const captured = onViewStateChange.mock.calls.at(-1)![0];
+    expect(captured.folds.length).toBeGreaterThan(0);
+  });
+
+  it("clamps corrupt or out-of-range persisted offsets instead of throwing", () => {
+    const doc = "short";
+    const rendered = renderEditor(doc, vi.fn(), {
+      initialViewState: {
+        mainSelection: { anchor: 9999, head: -5 },
+        selections: [{ anchor: 4000, head: 4000 }],
+        scrollTop: 5000,
+        folds: [{ from: 100, to: 200 }, { from: 3, to: 1 }],
+      },
+    });
+    const view = findView(rendered);
+    for (const range of view.state.selection.ranges) {
+      expect(range.anchor).toBeGreaterThanOrEqual(0);
+      expect(range.anchor).toBeLessThanOrEqual(doc.length);
+      expect(range.head).toBeGreaterThanOrEqual(0);
+      expect(range.head).toBeLessThanOrEqual(doc.length);
+    }
+    expect(foldedRanges(view.state).size).toBe(0);
+  });
+
+  it("emits the captured state on selection changes and dedupes identical snapshots", async () => {
+    const doc = Array.from({ length: 40 }, (_, index) => `line ${index}`).join("\n");
+    const onViewStateChange = vi.fn();
+    const rendered = renderEditor(doc, vi.fn(), { onViewStateChange });
+    const view = findView(rendered);
+    act(() => {
+      view.dispatch({ selection: EditorSelection.cursor(10) });
+    });
+    await waitFor(() => expect(onViewStateChange).toHaveBeenCalled());
+    const captured = onViewStateChange.mock.calls.at(-1)![0];
+    expect(captured.mainSelection.head).toBe(10);
+    const callsAfterSelection = onViewStateChange.mock.calls.length;
+    act(() => {
+      view.dispatch({ selection: EditorSelection.cursor(10) });
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 220));
+    });
+    expect(onViewStateChange.mock.calls.length).toBe(callsAfterSelection);
+  });
+
+  it("never re-applies a later initialViewState prop over live user input", async () => {
+    const doc = "alpha\nbeta\ngamma\ndelta\nepsilon";
+    const onChange = vi.fn();
+    const rendered = renderEditor(doc, onChange, {
+      initialViewState: {
+        mainSelection: { anchor: 0, head: 0 },
+        selections: [],
+        scrollTop: 0,
+        folds: [],
+      },
+    });
+    const view = findView(rendered);
+    act(() => {
+      view.dispatch({ selection: EditorSelection.cursor(doc.indexOf("delta")) });
+    });
+    // A late prop update carrying a stale snapshot must not move the caret.
+    rendered.rerender(
+      <CodeMirrorHost
+        {...rendered.props}
+        initialViewState={{
+          mainSelection: { anchor: 0, head: 0 },
+          selections: [],
+          scrollTop: 0,
+          folds: [],
+        }}
+      />,
+    );
+    const after = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!);
+    expect(after!.state.selection.main.head).toBe(doc.indexOf("delta"));
   });
 });

@@ -10143,4 +10143,106 @@ end_of_record
       expect(confirmAppDialog).not.toHaveBeenCalled();
     });
   });
+
+  describe("ED-IMPROVE-007 per-leaf/file view snapshots (mounted)", () => {
+    const LONG_DOC = Array.from({ length: 60 }, (_, index) => `line ${index}`).join("\n");
+
+    function viewWorkspace(instance: string): CodeWorkspaceTabInfo {
+      return {
+        repoRoot: "/repo/app",
+        workspaceId: "ws-improve007",
+        workspaceInstanceId: instance,
+        name: "Improve 007",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: "src/Long.java" },
+      };
+    }
+
+    function fileKeyFor(): string {
+      return "root:app:src/Long.java";
+    }
+
+    async function settlePersistence(): Promise<void> {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 750));
+      });
+    }
+
+    function storedViewStates(instance: string): Record<string, Record<string, {
+      mainSelection: { anchor: number; head: number };
+    }>> {
+      const raw = window.localStorage.getItem(`taomni.codeWorkspace.layout.v2.${instance}`);
+      if (!raw) return {};
+      return JSON.parse(raw).viewStates ?? {};
+    }
+
+    it("pushes per-leaf caret state into the layout snapshot after the debounce", async () => {
+      workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+      workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/Long.java", LONG_DOC, { hash: "hash-long" }));
+      lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({ available: true, active: false }));
+
+      renderWorkspace(viewWorkspace("instance-improve007-persist"));
+      await screen.findByTitle("app / src/Long.java");
+      const pane = screen.getAllByTestId("code-workspace-editor-pane")[0]!;
+      const view = EditorView.findFromDOM(pane.querySelector(".cm-editor")!)!;
+      act(() => {
+        view.dispatch({ selection: EditorSelection.cursor(40) });
+      });
+      await waitFor(() => expect(
+        Object.keys(storedViewStates("instance-improve007-persist")).length,
+      ).toBeGreaterThan(0), { timeout: 4000 });
+      const states = storedViewStates("instance-improve007-persist");
+      const leafIds = Object.keys(states);
+      expect(leafIds.length).toBeGreaterThan(0);
+      const persisted = leafIds
+        .map((leafId) => states[leafId]?.[fileKeyFor()]?.mainSelection.head)
+        .filter((head): head is number => typeof head === "number");
+      expect(persisted).toContain(40);
+    });
+
+    it("keeps independent caret state for the same file in two leaves and restores the right leaf after reopen", async () => {
+      workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+      workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/Long.java", LONG_DOC, { hash: "hash-long" }));
+      lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({ available: true, active: false }));
+
+      renderWorkspace(viewWorkspace("instance-improve007-split"));
+      await screen.findByTitle("app / src/Long.java");
+      const firstPane = screen.getAllByTestId("code-workspace-editor-pane")[0]!;
+      const firstView = EditorView.findFromDOM(firstPane.querySelector(".cm-editor")!)!;
+      act(() => {
+        firstView.dispatch({ selection: EditorSelection.cursor(40) });
+      });
+      await waitFor(() => {
+        const heads = Object.values(storedViewStates("instance-improve007-split"))
+          .map((files) => files[fileKeyFor()]?.mainSelection.head);
+        expect(heads).toContain(40);
+      }, { timeout: 4000 });
+
+      fireEvent.click(screen.getByTestId("code-workspace-split-right"));
+      await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
+      const panes = screen.getAllByTestId("code-workspace-editor-pane");
+      const secondView = EditorView.findFromDOM(panes[1]!.querySelector(".cm-editor")!)!;
+      act(() => {
+        secondView.dispatch({ selection: EditorSelection.cursor(10) });
+      });
+      await waitFor(() => {
+        const heads = Object.values(storedViewStates("instance-improve007-split"))
+          .map((files) => files[fileKeyFor()]?.mainSelection.head);
+        expect(heads).toContain(10);
+        expect(heads).toContain(40);
+      }, { timeout: 4000 });
+
+      const states = storedViewStates("instance-improve007-split");
+      const heads = Object.values(states)
+        .map((files) => files[fileKeyFor()]?.mainSelection.head)
+        .filter((head): head is number => typeof head === "number")
+        .sort((a, b) => a - b);
+      // Same document, two leaves: each leaf kept its own caret.
+      expect(heads).toEqual([10, 40]);
+
+      // Restart/reopen restore is covered by the CodeMirrorHost one-shot
+      // apply tests and the native C4-03 reload_window case.
+    });
+  });
 });
