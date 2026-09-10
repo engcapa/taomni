@@ -1,0 +1,101 @@
+# Code Workspace B 分支评审完善任务板（2026-09）
+
+## 1. 任务规则与基线
+
+本板由 2026-09-10 分支比较评审产生，面向 `wip/code-workspace-idea-parity-20260909`，审查基线为 `c6bc315c7d6450d3e8f304a357bb50080f3f98a5`。原 [ED-AUDIT 任务板](./code-workspace-idea-parity-backlog-2026-09-audit.md) 及 ED-FOLLOW-001..004 的状态、ownership 和历史证据保持原样。本板是新增完善任务，不重新领取历史 done 卡。
+
+每次只领取一张依赖已完成的卡，先核对当前生产 caller，再实施或补验；本文的评审事实不是未来实现的通过证据。使用 `code-workspace-idea-task`，每次显式选择新板：
+
+```bash
+python .agents/skills/code-workspace-idea-task/scripts/task_board.py --doc claudedocs/code-workspace-idea-parity-backlog-2026-09-b-review.md validate
+python .agents/skills/code-workspace-idea-task/scripts/task_board.py --doc claudedocs/code-workspace-idea-parity-backlog-2026-09-b-review.md list --claimable
+```
+
+原分支 A `feat/code-workspace-idea-2026-parity-audit` 的审查 HEAD `e7ac0575` 仅作实现参考。按 handler/owner 吸收经验证的改进，不整块覆盖 B 的组件或批量搬运历史提交。尤其保留 B 的 virtual caret undo、snippet 单次接受、剪贴板分配、live `source.sortMembers`、文件移动恢复和内存保留上限。
+
+## 2. 详细规格索引
+
+| 规格 | 内容 |
+|---|---|
+| [本轮详细规格](./code-workspace-idea-specs/idea-2026-b-review.md) | 11 张卡的代码事实、职责、验收、fixture、验证与上限 |
+| [共享合同](./code-workspace-idea-specs/shared-contracts.md) | owner、身份、结果、事务和证据语义 |
+| [原语义规格](./code-workspace-idea-specs/idea-2026-semantic.md) | Replace、Intention、Rearrange、Cleanup 原始目标 |
+| [原编辑规格](./code-workspace-idea-specs/idea-2026-editing.md) | 分屏、剪贴板和 IME 原始目标 |
+| [原保存与恢复规格](./code-workspace-idea-specs/idea-2026-transactions.md) | 保存副作用和重构恢复 |
+| [原性能规格](./code-workspace-idea-specs/idea-2026-performance.md) | 同条件测量、恢复与当前源码门禁 |
+| [原后续卡](./code-workspace-idea-specs/idea-2026-followups.md) | 已完成的文件移动、进程回收、断言和保留量治理 |
+
+## 3. 交付标准
+
+每张新卡拥有独立的 `ED-IMPROVE-xxx-A1/A2/A3`，全部初始为 `ready`；依赖只引用本板 ID。领取、状态更新与 evidence 使用现有脚本，不能把计划的测试或评审探针写成实现后的 passed。
+
+本轮沿用已接受的平台和 IDEA 边界：完成当前实际执行平台的真实 native/provider/accessibility/performance 验证即可满足相应平台要求，Windows、Linux、macOS 分列实测和 unverified；IDEA 2026.2.x 同样本实测可选，未运行明确记录，不产生等价或 L3 声称。缺失本卡 required_evidence 仍不能 done。
+
+Rearrange 必须保住真实 JDT LS `source.sortMembers` 正向链路。Cleanup 沿用已记录的 provider 能力上限：没有真实专用 cleanup/profile 时可以验证真实 unavailable 边界和确定性事务合同，不把 test-double 当 capable provider，不以 `source.fixAll` 或格式化冒充等效 Cleanup；不要求为本轮建设新的 provider engine。
+
+本板全仓 `pnpm build` 和最终矩阵由 ED-IMPROVE-011 独家负责；功能卡完整列出 owned paths，运行 scoped typecheck。任何实际 Rust/IPC 变更追加真实 Rust 验证。涉及 YAML/controls/runner 时使用 `qa-ui-auto`；证据包含 summary、receipt、source/case/runner identity 和实际退出码。只读 DOM/模型探针不能替代 native 运行。
+
+同一源码基线才可横向比较性能；保留 raw samples、warmup、计时端点和噪声。不用 A 的 Windows 数值给 B 的 Linux 实现排名，不把更少历史保留与输入延迟改善混为一谈。禁止为了绿灯下调预算、排除失败用例或降低 coverage baseline。
+
+## 4. 排序与职责协调
+
+先处理 P0 的异步误提交、后验记账和 Unicode 误改。语义工作流按 001 → 002 → 003 顺序交接；替换按 004 → 005；共享编辑器生命周期按 007 → 008 → 009。006 只持有保存 writer/handler，010 只持有生成目录；011 在其余十卡完成后重跑集成门禁。
+
+共享 `CodeWorkspaceTab.tsx` 按明确 handler 归属而非整文件占有；合并或后续改动若影响已通过卡的生产链，011 必须补跑受影响验证。不得借“抽象改造”重写整份 Tab。静态目录卡先恢复当前门禁，后续功能卡自行同步新增 controls，最终由 011 再次检查。
+
+## 5. 任务卡
+
+### ED-IMPROVE-001 Rearrange／Cleanup 异步身份与预览后零提交保护
+<!-- ide-task {"id":"ED-IMPROVE-001","status":"ready","priority":"P0","size":"M","depends_on":[],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-001","acceptance":["ED-IMPROVE-001-A1","ED-IMPROVE-001-A2","ED-IMPROVE-001-A3"],"required_evidence":["code-audit","unit","typecheck","browser","native","provider"],"audit":{"date":"2026-09-10","head":"c6bc315c7d6450d3e8f304a357bb50080f3f98a5","finding":"已确认：executeRearrangeTransaction/executeCleanupTransaction 在 confirmPreview 前校验，确认后直接 apply；resolve 后重新读取文本建立计划且 documentRevision=undefined，旧响应可被套用到新文本。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+[设计、代码职责、验收与验证](./code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-001)。
+
+### ED-IMPROVE-002 工作流 postcondition 与 history／恢复效果统一
+<!-- ide-task {"id":"ED-IMPROVE-002","status":"ready","priority":"P0","size":"M","depends_on":["ED-IMPROVE-001"],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-002","acceptance":["ED-IMPROVE-002-A1","ED-IMPROVE-002-A2","ED-IMPROVE-002-A3"],"required_evidence":["code-audit","unit","typecheck","browser","native","provider"],"audit":{"date":"2026-09-10","head":"c6bc315c7d6450d3e8f304a357bb50080f3f98a5","finding":"已确认：runRearrangeExecute/runCleanupExecute 以 recordHistory:true 应用后才在外层校验 post hash；失败仍返回 committed:false 并声称 Undo was not registered，与已发生效果及历史不一致。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+[设计、代码职责、验收与验证](./code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-002)。
+
+### ED-IMPROVE-003 专用 provider action 完整载荷与能力边界校验
+<!-- ide-task {"id":"ED-IMPROVE-003","status":"ready","priority":"P1","size":"M","depends_on":["ED-IMPROVE-002"],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-003","acceptance":["ED-IMPROVE-003-A1","ED-IMPROVE-003-A2","ED-IMPROVE-003-A3"],"required_evidence":["code-audit","unit","typecheck","browser","native","provider"],"audit":{"date":"2026-09-10","head":"c6bc315c7d6450d3e8f304a357bb50080f3f98a5","finding":"已确认代码边界：resolveAction 过滤本文件 documentEdits 后丢弃其余载荷，未整体拒绝跨文件/resource operations；Cleanup 接受 source.fixAll，缺乏专用 profile 等效证据。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+[设计、代码职责、验收与验证](./code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-003)。
+
+### ED-IMPROVE-004 文件替换统一 Unicode UTF-16 坐标
+<!-- ide-task {"id":"ED-IMPROVE-004","status":"ready","priority":"P0","size":"M","depends_on":[],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-004","acceptance":["ED-IMPROVE-004-A1","ED-IMPROVE-004-A2","ED-IMPROVE-004-A3"],"required_evidence":["code-audit","unit","typecheck","browser","native"],"audit":{"date":"2026-09-10","head":"c6bc315c7d6450d3e8f304a357bb50080f3f98a5","finding":"已确认：searchMatchesToReplaceInputs 将搜索 code-point 偏移直接写入 LSP UTF-16 range；😀foo 中 foo→bar 的生产映射与应用探针得到破损代理项及残留 o。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+[设计、代码职责、验收与验证](./code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-004)。
+
+### ED-IMPROVE-005 替换预览范围与提交集合不可变
+<!-- ide-task {"id":"ED-IMPROVE-005","status":"ready","priority":"P1","size":"M","depends_on":["ED-IMPROVE-004"],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-005","acceptance":["ED-IMPROVE-005-A1","ED-IMPROVE-005-A2","ED-IMPROVE-005-A3"],"required_evidence":["code-audit","unit","typecheck","browser","native"],"audit":{"date":"2026-09-10","head":"c6bc315c7d6450d3e8f304a357bb50080f3f98a5","finding":"待补强边界：B 已有 replace ledger，但缺少 A 的范围/roots/project generation/替换内容/磁盘 preimages 统一冻结快照；需从 FindInFilesPanel 到 onReplaceMatches 逐项复核并补齐。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+[设计、代码职责、验收与验证](./code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-005)。
+
+### ED-IMPROVE-006 原生保存失败的字节事实与临时文件清理
+<!-- ide-task {"id":"ED-IMPROVE-006","status":"ready","priority":"P1","size":"M","depends_on":[],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-006","acceptance":["ED-IMPROVE-006-A1","ED-IMPROVE-006-A2","ED-IMPROVE-006-A3"],"required_evidence":["code-audit","unit","typecheck","rust","native"],"audit":{"date":"2026-09-10","head":"c6bc315c7d6450d3e8f304a357bb50080f3f98a5","finding":"已确认代码差异：write_workspace_bytes 的 read/mkdir/open/write/sync 等前置失败未统一保留 intent/old hash 和零目标效果，临时写失败缺少统一清理；吸收 A 的边界处理并保留 B 输入竞争修复。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+[设计、代码职责、验收与验证](./code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-006)。
+
+### ED-IMPROVE-007 每个 leaf／file 的光标滚动折叠快照恢复
+<!-- ide-task {"id":"ED-IMPROVE-007","status":"ready","priority":"P1","size":"M","depends_on":[],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-007","acceptance":["ED-IMPROVE-007-A1","ED-IMPROVE-007-A2","ED-IMPROVE-007-A3"],"required_evidence":["code-audit","unit","typecheck","browser","native","performance"],"audit":{"date":"2026-09-10","head":"c6bc315c7d6450d3e8f304a357bb50080f3f98a5","finding":"已确认能力差异：B 已恢复 layout 和标签，但 CodeMirrorHost/EditorGroup 未接入 A 的每 leaf/file view snapshot；需补重开/重启后的 selection、scroll、fold 独立恢复。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+[设计、代码职责、验收与验证](./code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-007)。
+
+### ED-IMPROVE-008 IME 确认取消与单次撤销的共享历史边界
+<!-- ide-task {"id":"ED-IMPROVE-008","status":"ready","priority":"P1","size":"M","depends_on":["ED-IMPROVE-007"],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-008","acceptance":["ED-IMPROVE-008-A1","ED-IMPROVE-008-A2","ED-IMPROVE-008-A3"],"required_evidence":["code-audit","unit","typecheck","native","accessibility"],"audit":{"date":"2026-09-10","head":"c6bc315c7d6450d3e8f304a357bb50080f3f98a5","finding":"待补强行为证据：B 有 Tab/Escape composing guards，现有 native C3-02 尾段只验证中途粘贴抑制和 Escape 后焦点；未完整证明候选确认、取消、undo 及 lifecycle 的共享历史边界。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+[设计、代码职责、验收与验证](./code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-008)。
+
+### ED-IMPROVE-009 异步剪贴板取消与真实系统副作用记账
+<!-- ide-task {"id":"ED-IMPROVE-009","status":"ready","priority":"P1","size":"M","depends_on":["ED-IMPROVE-008"],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-009","acceptance":["ED-IMPROVE-009-A1","ED-IMPROVE-009-A2","ED-IMPROVE-009-A3"],"required_evidence":["code-audit","unit","typecheck","browser","native"],"audit":{"date":"2026-09-10","head":"c6bc315c7d6450d3e8f304a357bb50080f3f98a5","finding":"已确认代码差异：CodeMirrorHost 异步 paste/cut 的文档/selection/composition 过期分支直接返回；缺少 A 的带 systemEffect 的取消观察。保留 B 已修正的多光标分配。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+[设计、代码职责、验收与验证](./code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-009)。
+
+### ED-IMPROVE-010 同步 QA 控制目录并恢复静态门禁
+<!-- ide-task {"id":"ED-IMPROVE-010","status":"ready","priority":"P1","size":"S","depends_on":[],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-010","acceptance":["ED-IMPROVE-010-A1","ED-IMPROVE-010-A2","ED-IMPROVE-010-A3"],"required_evidence":["code-audit","qa-lint","document"],"audit":{"date":"2026-09-10","head":"c6bc315c7d6450d3e8f304a357bb50080f3f98a5","finding":"已确认：对 c6bc315c 的 QA audit --gate 退出 1，testid-catalog stale；feature.controls 中 recovery/refactoring/lightbulb 等条目未同步到生成目录，不能用局部 OK 文案视为整体通过。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+[设计、代码职责、验收与验证](./code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-010)。
+
+### ED-IMPROVE-011 B 完善轮最终源码门禁与能力矩阵
+<!-- ide-task {"id":"ED-IMPROVE-011","status":"ready","priority":"P1","size":"M","depends_on":["ED-IMPROVE-001","ED-IMPROVE-002","ED-IMPROVE-003","ED-IMPROVE-004","ED-IMPROVE-005","ED-IMPROVE-006","ED-IMPROVE-007","ED-IMPROVE-008","ED-IMPROVE-009","ED-IMPROVE-010"],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-011","acceptance":["ED-IMPROVE-011-A1","ED-IMPROVE-011-A2","ED-IMPROVE-011-A3"],"required_evidence":["code-audit","build","qa-lint","document"],"audit":{"date":"2026-09-10","head":"c6bc315c7d6450d3e8f304a357bb50080f3f98a5","finding":"集成交付任务：原 ED-AUDIT-006 矩阵以较早源码为基准，未覆盖后续改动和本轮发现；需从最终源码重建本板 acceptance、runtime identity 和能力上限汇总，不能累加历史 done 作为当前全绿。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+[设计、代码职责、验收与验证](./code-workspace-idea-specs/idea-2026-b-review.md#ed-improve-011)。
