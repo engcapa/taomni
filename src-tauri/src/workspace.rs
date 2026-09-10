@@ -3283,20 +3283,72 @@ struct WrittenBytesAck {
     written_byte_length: u64,
 }
 
+/// ED-IMPROVE-006: deterministic fault stages for the byte writer's own
+/// tests. Production always passes `None`; the enum lets the Rust tests prove
+/// each pre-replace failure keeps the target bytes untouched, reports the
+/// intended-bytes identity and removes this writer's temp file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WriteBytesFault {
+    None,
+    TempOpen,
+    TempWrite,
+    TempSync,
+    Replace,
+}
+
+fn injected_write_fault(operation: &str) -> std::io::Error {
+    std::io::Error::other(format!("{operation}: injected write-bytes fault"))
+}
+
+/// Best-effort removal of this writer's temp file, preserving the failure
+/// facts and appending a cleanup diagnostic when removal itself fails. The
+/// exact temp path came from this call's UUID, so another file is never
+/// removed; `NotFound` is treated as already clean.
+fn temp_failure_with_cleanup(tmp: &Path, mut error: WorkspaceWriteError) -> WorkspaceWriteError {
+    match fs::remove_file(tmp) {
+        Ok(()) => error,
+        Err(cleanup_error) if cleanup_error.kind() == std::io::ErrorKind::NotFound => error,
+        Err(cleanup_error) => {
+            error.message = format!(
+                "{}; temp cleanup failed for {}: {cleanup_error}",
+                error.message,
+                tmp.display()
+            );
+            error
+        }
+    }
+}
+
 fn write_workspace_bytes(
     target: &Path,
     bytes: Vec<u8>,
     expected_hash: Option<&str>,
 ) -> Result<WrittenBytesAck, WorkspaceWriteError> {
+    write_workspace_bytes_with_fault(target, bytes, expected_hash, WriteBytesFault::None)
+}
+
+fn write_workspace_bytes_with_fault(
+    target: &Path,
+    bytes: Vec<u8>,
+    expected_hash: Option<&str>,
+    fault: WriteBytesFault,
+) -> Result<WrittenBytesAck, WorkspaceWriteError> {
     // §8.19.1: compute the pre-mutation bytes identity before touching disk.
-    // This read also serves the hash precondition when one was requested; the
-    // observed value is carried on every failure fact either way.
+    // Every failure after this point carries it, so an unknown or zero-effect
+    // error still lets the frontend record the real intended bytes.
+    let intent_hash = sha256_hex(&bytes);
+    let intent_byte_length = bytes.len() as u64;
+    let with_intent =
+        |error: WorkspaceWriteError| error.with_intent(intent_hash.clone(), intent_byte_length);
+    // The pre-mutation read also serves the hash precondition when one was
+    // requested; the observed value is carried on every failure fact either way.
     let old_hash: Option<String> = match fs::read(target) {
         Ok(current) => Some(sha256_hex(&current)),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
         Err(error) => {
-            return Err(classify_io_error("read target", &error)
-                .with_effect(WorkspaceWriteEffect::None, None));
+            return Err(with_intent(classify_io_error("read target", &error))
+                .with_effect(WorkspaceWriteEffect::None, None)
+                .with_old_hash(None));
         }
     };
     let expected = expected_hash
@@ -3305,11 +3357,12 @@ fn write_workspace_bytes(
     // A requested precondition against a missing target is a stale snapshot:
     // creating the file would silently violate the caller's expectation.
     if expected.is_some() && old_hash.is_none() {
-        return Err(WorkspaceWriteError::new(
+        return Err(with_intent(WorkspaceWriteError::new(
             WorkspaceWriteErrorKind::Io,
             "read target: expected-hash precondition requires an existing target",
-        )
-        .with_effect(WorkspaceWriteEffect::None, None));
+        ))
+        .with_effect(WorkspaceWriteEffect::None, None)
+        .with_old_hash(None));
     }
     if let Some(expected) = expected {
         if let Some(current_hash) = old_hash.as_deref() {
@@ -3323,32 +3376,94 @@ fn write_workspace_bytes(
                     effect: Some(WorkspaceWriteEffect::None),
                     written_hash: None,
                     written_byte_length: None,
-                    intent_hash: Some(sha256_hex(&bytes)),
-                    intent_byte_length: Some(bytes.len() as u64),
+                    intent_hash: Some(intent_hash),
+                    intent_byte_length: Some(intent_byte_length),
                     old_hash: old_hash.clone(),
                 });
             }
         }
     }
-    let parent = target.parent().ok_or_else(|| {
-        WorkspaceWriteError::new(
-            WorkspaceWriteErrorKind::Io,
-            "Cannot resolve parent directory for target",
-        )
-    })?;
-    fs::create_dir_all(parent).map_err(|error| classify_io_error("mkdir parent", &error))?;
+    let parent = match target.parent() {
+        Some(parent) => parent,
+        None => {
+            return Err(with_intent(WorkspaceWriteError::new(
+                WorkspaceWriteErrorKind::Io,
+                "Cannot resolve parent directory for target",
+            ))
+            .with_effect(WorkspaceWriteEffect::None, None)
+            .with_old_hash(old_hash));
+        }
+    };
+    // A failed parent creation may still have created auxiliary directories;
+    // the target bytes themselves are provably untouched.
+    if let Err(error) = fs::create_dir_all(parent) {
+        return Err(with_intent(classify_io_error("mkdir parent", &error))
+            .with_effect(WorkspaceWriteEffect::None, None)
+            .with_old_hash(old_hash));
+    }
     let tmp = parent.join(format!(".taomni-write-{}", uuid::Uuid::new_v4().simple()));
-    {
+    if fault == WriteBytesFault::TempOpen {
+        return Err(with_intent(classify_io_error(
+            "open temp file",
+            &injected_write_fault("open temp file"),
+        ))
+        .with_effect(WorkspaceWriteEffect::None, None)
+        .with_old_hash(old_hash));
+    }
+    let temp_write_stage = (|| -> Result<(), WorkspaceWriteError> {
         use std::io::Write;
         let mut file = fs::OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(&tmp)
             .map_err(|error| classify_io_error("open temp file", &error))?;
+        if fault == WriteBytesFault::TempWrite {
+            // Leave a partial temp file behind, then fail the stage so
+            // cleanup and the zero-effect facts can be proven.
+            file.write_all(&bytes[..bytes.len() / 2])
+                .map_err(|error| classify_io_error("write temp file", &error))?;
+            return Err(classify_io_error(
+                "write temp file",
+                &injected_write_fault("write temp file"),
+            ));
+        }
         file.write_all(&bytes)
             .map_err(|error| classify_io_error("write temp file", &error))?;
+        if fault == WriteBytesFault::TempSync {
+            return Err(classify_io_error(
+                "sync temp file",
+                &injected_write_fault("sync temp file"),
+            ));
+        }
         file.sync_all()
             .map_err(|error| classify_io_error("sync temp file", &error))?;
+        Ok(())
+    })();
+    if let Err(error) = temp_write_stage {
+        // The handle is dropped when the stage closure returns, so cleanup
+        // can actually delete the temp file on Windows as well.
+        return Err(temp_failure_with_cleanup(
+            &tmp,
+            with_intent(error)
+                .with_effect(WorkspaceWriteEffect::None, None)
+                .with_old_hash(old_hash),
+        ));
+    }
+    if fault == WriteBytesFault::Replace {
+        let effect = if target.exists() {
+            WorkspaceWriteEffect::None
+        } else {
+            WorkspaceWriteEffect::Unknown
+        };
+        return Err(temp_failure_with_cleanup(
+            &tmp,
+            with_intent(classify_io_error(
+                "rename temp file",
+                &injected_write_fault("rename temp file"),
+            ))
+            .with_effect(effect, None)
+            .with_old_hash(old_hash),
+        ));
     }
     if let Err(error) = replace_file(&tmp, target) {
         let remove_result = fs::remove_file(&tmp);
@@ -3362,10 +3477,18 @@ fn write_workspace_bytes(
         };
         // §8.19.1: an uncertain outcome must still carry the intended-bytes
         // identity so the frontend ledger can record a non-null intent hash.
-        return Err(classify_io_error("rename temp file", &error)
+        let mut failure = classify_io_error("rename temp file", &error)
             .with_effect(effect, None)
-            .with_intent(sha256_hex(&bytes), bytes.len() as u64)
-            .with_old_hash(old_hash));
+            .with_intent(intent_hash, intent_byte_length)
+            .with_old_hash(old_hash);
+        if let Err(cleanup_error) = remove_result {
+            failure.message = format!(
+                "{}; temp cleanup failed for {}: {cleanup_error}",
+                failure.message,
+                tmp.display()
+            );
+        }
+        return Err(failure);
     }
     Ok(WrittenBytesAck {
         old_hash,
@@ -3654,7 +3777,9 @@ mod tests {
         ));
         assert!(is_workspace_write_temp_path(".taomni-write-abc"));
         assert!(!is_workspace_write_temp_path("/ws/src/Main.java"));
-        assert!(!is_workspace_write_temp_path("/ws/.taomni-write-notes/keep.java"));
+        assert!(!is_workspace_write_temp_path(
+            "/ws/.taomni-write-notes/keep.java"
+        ));
     }
 
     #[test]
@@ -3754,6 +3879,138 @@ mod tests {
             Some(sha256_hex(b"new").as_str())
         );
         assert_eq!(err.old_hash.as_deref(), Some(sha256_hex(b"old").as_str()));
+    }
+
+    fn write_temp_entries(dir: &Path) -> Vec<String> {
+        fs::read_dir(dir)
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.file_name().to_string_lossy().to_string())
+            .filter(|name| is_workspace_write_temp_path(name))
+            .collect()
+    }
+
+    // ED-IMPROVE-006 A1: every pre-replace failure identifies the intended
+    // bytes, proves zero target effect where it can, and removes this writer's
+    // temp file without touching any other entry.
+    #[test]
+    fn write_workspace_bytes_read_failure_reports_zero_effect_with_intent() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("target-dir");
+        fs::create_dir(&target).unwrap();
+        let err = write_workspace_bytes(&target, b"new".to_vec(), None).unwrap_err();
+        assert_eq!(err.kind, WorkspaceWriteErrorKind::Io);
+        assert_eq!(err.effect, Some(WorkspaceWriteEffect::None));
+        assert_eq!(
+            err.intent_hash.as_deref(),
+            Some(sha256_hex(b"new").as_str())
+        );
+        assert_eq!(err.intent_byte_length, Some(3));
+        assert_eq!(err.old_hash, None);
+        assert!(write_temp_entries(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn write_workspace_bytes_missing_precondition_target_carries_intent() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("missing.txt");
+        let err = write_workspace_bytes(&target, b"new".to_vec(), Some("abc")).unwrap_err();
+        assert_eq!(err.effect, Some(WorkspaceWriteEffect::None));
+        assert_eq!(
+            err.intent_hash.as_deref(),
+            Some(sha256_hex(b"new").as_str())
+        );
+        assert_eq!(err.old_hash, None);
+        assert!(write_temp_entries(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn write_workspace_bytes_temp_stage_failures_clean_up_and_keep_bytes() {
+        for fault in [
+            WriteBytesFault::TempOpen,
+            WriteBytesFault::TempWrite,
+            WriteBytesFault::TempSync,
+            WriteBytesFault::Replace,
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let target = dir.path().join("existing.txt");
+            fs::write(&target, b"old").unwrap();
+            // A foreign entry that must survive the cleanup.
+            let foreign = dir.path().join(".taomni-write-foreign-owned");
+            fs::write(&foreign, b"foreign").unwrap();
+            let foreign_name = foreign.file_name().unwrap().to_string_lossy().to_string();
+
+            let err = write_workspace_bytes_with_fault(&target, b"new-bytes".to_vec(), None, fault)
+                .unwrap_err();
+            assert_eq!(
+                err.effect,
+                Some(WorkspaceWriteEffect::None),
+                "stage {fault:?} must prove zero target effect"
+            );
+            assert_eq!(
+                err.intent_hash.as_deref(),
+                Some(sha256_hex(b"new-bytes").as_str()),
+                "stage {fault:?} must carry the intended hash"
+            );
+            assert_eq!(err.intent_byte_length, Some(9), "stage {fault:?}");
+            assert_eq!(
+                err.old_hash.as_deref(),
+                Some(sha256_hex(b"old").as_str()),
+                "stage {fault:?} must carry the old hash"
+            );
+            assert_eq!(
+                fs::read(&target).unwrap(),
+                b"old".to_vec(),
+                "stage {fault:?} must leave the target untouched"
+            );
+            let leftovers: Vec<String> = write_temp_entries(dir.path())
+                .into_iter()
+                .filter(|name| name != &foreign_name)
+                .collect();
+            assert!(
+                leftovers.is_empty(),
+                "stage {fault:?} must remove its own temp file, found {leftovers:?}"
+            );
+            assert_eq!(fs::read(&foreign).unwrap(), b"foreign".to_vec());
+        }
+    }
+
+    #[test]
+    fn write_workspace_bytes_parent_is_file_reports_zero_effect() {
+        let dir = tempfile::tempdir().unwrap();
+        let parent_file = dir.path().join("parent.txt");
+        fs::write(&parent_file, b"not a dir").unwrap();
+        let target = parent_file.join("child.txt");
+        let err = write_workspace_bytes(&target, b"new".to_vec(), None).unwrap_err();
+        assert_eq!(err.kind, WorkspaceWriteErrorKind::Io);
+        assert_eq!(err.effect, Some(WorkspaceWriteEffect::None));
+        assert_eq!(
+            err.intent_hash.as_deref(),
+            Some(sha256_hex(b"new").as_str())
+        );
+        assert_eq!(err.old_hash, None);
+        assert_eq!(fs::read(&parent_file).unwrap(), b"not a dir".to_vec());
+        assert!(write_temp_entries(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn write_workspace_bytes_replace_failure_on_missing_target_is_unknown() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("fresh.txt");
+        let err = write_workspace_bytes_with_fault(
+            &target,
+            b"new".to_vec(),
+            None,
+            WriteBytesFault::Replace,
+        )
+        .unwrap_err();
+        assert_eq!(err.effect, Some(WorkspaceWriteEffect::Unknown));
+        assert_eq!(
+            err.intent_hash.as_deref(),
+            Some(sha256_hex(b"new").as_str())
+        );
+        assert_eq!(err.old_hash, None);
+        assert!(write_temp_entries(dir.path()).is_empty());
     }
 
     #[test]
