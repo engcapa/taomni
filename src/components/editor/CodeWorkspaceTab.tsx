@@ -639,6 +639,7 @@ import type { ShellShortcutClaim } from "./workspace/shellShortcutRouter";
 import type { WorkspaceFocus } from "./workspace/workspaceActionRegistry";
 import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
 import {
+  codePointOffsetToUtf16Offset,
   replaceMatchAbsolutePath,
   searchMatchesToReplaceInputs,
   summarizeReplaceCommitReport,
@@ -8215,10 +8216,11 @@ export function CodeWorkspaceTab({
     (match: WorkspaceSearchMatch, options: { preview: boolean }) => {
       const ref: CodeWorkspaceFileRef = { kind: "root", rootId: match.rootId, path: match.path };
       // Backend line numbers are 1-based; reveal targets follow LSP 0-based.
+      // ED-IMPROVE-004: backend offsets are code points, reveal ranges are UTF-16.
       const line = Math.max(0, match.lineNumber - 1);
       revealEditorLocation(fileKey(ref), {
-        start: { line, character: match.matchStart },
-        end: { line, character: match.matchEnd },
+        start: { line, character: codePointOffsetToUtf16Offset(match.lineText, match.matchStart) },
+        end: { line, character: codePointOffsetToUtf16Offset(match.lineText, match.matchEnd) },
       });
       void openFile(ref, { preview: options.preview });
     },

@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   buildReplaceInFilesWorkspaceEdit,
+  codePointOffsetToUtf16Offset,
   createReplaceInFilesPlan,
+  searchMatchesToReplaceInputs,
   summarizeReplaceCommitReport,
   validateReplacePreconditions,
   verifyReplaceMatchFreshness,
   type ReplaceInFilesMatch,
 } from "./replaceInFilesModel";
+import { applyLspTextEditsToString } from "./lspTextEdits";
 
 describe("ED-FIND-004: replaceInFilesModel preview, exclude, conflict guard, commit", () => {
   const sampleMatches: ReplaceInFilesMatch[] = [
@@ -178,5 +181,114 @@ describe("ED-AUDIT-003: replace commit report from the applier ledger", () => {
     expect(report.ok).toBe(true);
     expect(report.appliedCount).toBe(1);
     expect(report.fileCount).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ED-IMPROVE-004: the backend reports Unicode code-point offsets, while LSP
+// ranges and the editor use UTF-16 code units. Every consumer must share one
+// mapping so preview, navigation, freshness and commit agree.
+// ---------------------------------------------------------------------------
+describe("ED-IMPROVE-004: code-point offsets map to UTF-16 LSP ranges", () => {
+  const LINE = "const s = \"\u{1F600}foo\";";
+  const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+  function searchMatch(overrides: {
+    lineText?: string;
+    matchStart?: number;
+    matchEnd?: number;
+  } = {}) {
+    return {
+      rootId: "app",
+      rootName: "app",
+      rootPath: "/ws",
+      path: "src/a.ts",
+      lineNumber: 1,
+      column: 1,
+      matchStart: 12,
+      matchEnd: 15,
+      lineText: LINE,
+      ...overrides,
+    };
+  }
+
+  it("converts code-point indices to UTF-16 indices", () => {
+    expect(codePointOffsetToUtf16Offset(LINE, 0)).toBe(0);
+    expect(codePointOffsetToUtf16Offset(LINE, 11)).toBe(11);
+    expect(codePointOffsetToUtf16Offset(LINE, 12)).toBe(13);
+    expect(codePointOffsetToUtf16Offset(LINE, 13)).toBe(14);
+    expect(codePointOffsetToUtf16Offset(LINE, 15)).toBe(16);
+    expect(codePointOffsetToUtf16Offset(LINE, 99)).toBe(LINE.length);
+    expect(codePointOffsetToUtf16Offset(LINE, -3)).toBe(0);
+  });
+
+  it("maps a match after an astral prefix and rewrites it without broken surrogates", () => {
+    const [input] = searchMatchesToReplaceInputs([searchMatch()]);
+    expect(input.matchedText).toBe("foo");
+    expect(input.startCharacter).toBe(13);
+    expect(input.endCharacter).toBe(16);
+
+    const edit = buildReplaceInFilesWorkspaceEdit({
+      matches: [input],
+      replacementText: "bar",
+    });
+    const next = applyLspTextEditsToString(LINE, edit.documentEdits[0].edits);
+    expect(next).toBe("const s = \"\u{1F600}bar\";");
+    expect(LONE_SURROGATE.test(next)).toBe(false);
+  });
+
+  it("handles multiple astral prefixes and an astral target", () => {
+    const line = "\u{1F600}\u{1F680}foo\u{1F600}";
+    const [fooMatch] = searchMatchesToReplaceInputs([
+      searchMatch({ lineText: line, matchStart: 2, matchEnd: 5 }),
+    ]);
+    expect(fooMatch.startCharacter).toBe(4);
+    expect(fooMatch.endCharacter).toBe(7);
+    const fooEdit = buildReplaceInFilesWorkspaceEdit({ matches: [fooMatch], replacementText: "bar" });
+    const afterFoo = applyLspTextEditsToString(line, fooEdit.documentEdits[0].edits);
+    expect(afterFoo).toBe("\u{1F600}\u{1F680}bar\u{1F600}");
+    expect(LONE_SURROGATE.test(afterFoo)).toBe(false);
+
+    const [emojiMatch] = searchMatchesToReplaceInputs([
+      searchMatch({ lineText: line, matchStart: 0, matchEnd: 1 }),
+    ]);
+    expect(emojiMatch.startCharacter).toBe(0);
+    expect(emojiMatch.endCharacter).toBe(2);
+    expect(emojiMatch.matchedText).toBe("\u{1F600}");
+    const emojiEdit = buildReplaceInFilesWorkspaceEdit({ matches: [emojiMatch], replacementText: "x" });
+    const afterEmoji = applyLspTextEditsToString(line, emojiEdit.documentEdits[0].edits);
+    expect(afterEmoji).toBe("x\u{1F680}foo\u{1F600}");
+    expect(LONE_SURROGATE.test(afterEmoji)).toBe(false);
+  });
+
+  it("keeps freshness slicing in the same UTF-16 coordinates", () => {
+    const [input] = searchMatchesToReplaceInputs([searchMatch()]);
+    const disk = new Map([["/ws/src/a.ts", `${LINE}\n`]]);
+    expect(verifyReplaceMatchFreshness(disk, [input])).toEqual([]);
+
+    const shifted = `const s = "X\u{1F600}foo";\n`;
+    const shiftedConflicts = verifyReplaceMatchFreshness(
+      new Map([["/ws/src/a.ts", shifted]]),
+      [input],
+    );
+    expect(shiftedConflicts).toHaveLength(1);
+    expect(shiftedConflicts[0].reason).toContain("changed since search");
+  });
+
+  it("rejects illegal offsets instead of truncating to a wrong position", () => {
+    const [input] = searchMatchesToReplaceInputs([searchMatch()]);
+    const disk = new Map([["/ws/src/a.ts", `${LINE}\n`]]);
+    const outOfRange = verifyReplaceMatchFreshness(disk, [
+      { ...input, startCharacter: 999, endCharacter: 1002 },
+    ]);
+    expect(outOfRange).toHaveLength(1);
+    const reversed = verifyReplaceMatchFreshness(disk, [
+      { ...input, startCharacter: 16, endCharacter: 13 },
+    ]);
+    expect(reversed).toHaveLength(1);
+    const negative = verifyReplaceMatchFreshness(disk, [
+      { ...input, startCharacter: -1, endCharacter: 3 },
+    ]);
+    expect(negative).toHaveLength(1);
   });
 });

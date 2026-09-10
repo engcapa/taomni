@@ -31,6 +31,25 @@ export function replaceMatchAbsolutePath(match: WorkspaceSearchMatch): string {
 }
 
 /**
+ * ED-IMPROVE-004: the Rust search backend reports Unicode code-point offsets
+ * (see workspace_search.rs char_offset), while LSP ranges and the editor use
+ * UTF-16 code units. This is the single conversion used by preview,
+ * navigation, freshness and commit so every consumer agrees.
+ */
+export function codePointOffsetToUtf16Offset(lineText: string, offset: number): number {
+  if (offset <= 0) return 0;
+  let utf16 = 0;
+  let codePoints = 0;
+  while (utf16 < lineText.length && codePoints < offset) {
+    const code = lineText.codePointAt(utf16);
+    if (code === undefined) break;
+    utf16 += code > 0xffff ? 2 : 1;
+    codePoints += 1;
+  }
+  return utf16;
+}
+
+/**
  * ED-FIND-004: shared search-match mapping used by the preview dialog owner
  * and the commit owner so both sides agree on file paths, ranges, and the
  * matched text the freshness recheck compares against disk.
@@ -39,14 +58,16 @@ export function searchMatchesToReplaceInputs(matches: readonly WorkspaceSearchMa
   return matches.map((match) => {
     const absolute = replaceMatchAbsolutePath(match);
     const line = Math.max(0, match.lineNumber - 1);
+    const startCharacter = codePointOffsetToUtf16Offset(match.lineText, match.matchStart);
+    const endCharacter = codePointOffsetToUtf16Offset(match.lineText, match.matchEnd);
     return {
       filePath: absolute,
       fileUri: `file://${absolute}`,
       startLine: line,
-      startCharacter: match.matchStart,
+      startCharacter,
       endLine: line,
-      endCharacter: match.matchEnd,
-      matchedText: Array.from(match.lineText).slice(match.matchStart, match.matchEnd).join(""),
+      endCharacter,
+      matchedText: match.lineText.slice(startCharacter, endCharacter),
     };
   });
 }
@@ -160,10 +181,17 @@ export function verifyReplaceMatchFreshness(
     }
     const lines = diskText.split("\n");
     const line = lines[match.startLine];
+    const start = match.startCharacter;
+    const end = match.endCharacter;
     if (
-      line === undefined ||
-      match.startLine !== match.endLine ||
-      Array.from(line).slice(match.startCharacter, match.endCharacter).join("") !== match.matchedText
+      line === undefined
+      || match.startLine !== match.endLine
+      || !Number.isInteger(start)
+      || !Number.isInteger(end)
+      || start < 0
+      || end < start
+      || end > line.length
+      || line.slice(start, end) !== match.matchedText
     ) {
       conflicts.push({
         path: match.filePath,

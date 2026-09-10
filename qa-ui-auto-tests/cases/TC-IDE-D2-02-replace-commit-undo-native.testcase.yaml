@@ -8,6 +8,13 @@ description: |
   restores the original bytes. Dirty/disk preconditions run before apply;
   preview exclusion and cancel are covered by unit tests and the browser
   gate. Highest claim on green: L2 provider-backed (Linux).
+
+  ED-IMPROVE-004 extension: a second segment searches "notes" across
+  notes.txt and the astral-prefixed unicode.txt ("😀notes"). The preview
+  must count 2 of 2, the commit must write exact UTF-8/LF bytes for both
+  files (sha256 pinned; a code-point/UTF-16 mix-up would produce a broken
+  surrogate and a different hash), and one workspace undo must restore both
+  original files in a single transaction.
 covers: [F25.5]
 tags: [code-workspace, ide-find, replace, native-gate, p1]
 modes: [native]
@@ -72,5 +79,55 @@ steps:
   - assert_file_contains:
       path: "${fixture.workspace_root}/notes.txt"
       contains: "scratch notes"
+      timeout_sec: 30
+  # ---------------------------------------------------------------------
+  # ED-IMPROVE-004: astral-prefixed, multi-file replace with exact bytes.
+  # unicode.txt starts with an emoji before the match, so a code-point
+  # offset used as a UTF-16 character would split the surrogate pair.
+  # ---------------------------------------------------------------------
+  - native_click:
+      selector: '[aria-label="Search query"]'
+  - native_keys:
+      selector: '[aria-label="Search query"]'
+      keys: ["Control+a", "n", "o", "t", "e", "s", "Enter"]
+  - click: '[data-testid="code-workspace-find-run-search"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-find-in-files-panel"]'
+      contains: "unicode.txt"
+      timeout_sec: 60
+  - native_click:
+      selector: '[aria-label="Replace text"]'
+  - native_keys:
+      selector: '[aria-label="Replace text"]'
+      keys: ["Control+a", "r", "e", "m", "a", "r", "k", "s"]
+  - click: '[data-testid="code-workspace-find-replace-all"]'
+  - wait_for: '[data-testid="code-workspace-replace-preview"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-replace-counts"]'
+      contains: "2 of 2"
+      timeout_sec: 10
+  - click: '[data-testid="code-workspace-replace-commit"]'
+  # Exact bytes: UTF-8 emoji intact, LF endings, no replacement character.
+  - assert_file_sha256:
+      path: "${fixture.workspace_root}/unicode.txt"
+      equals: "f92df32d9b7e0ac26c410d4ee14c41700f02512e25fb701732bba1931b7e78c8"
+      timeout_sec: 30
+  - assert_file_sha256:
+      path: "${fixture.workspace_root}/notes.txt"
+      equals: "1547844594dec1a34955217c21adc261063b390647aae0582e7a70f952dccc0a"
+      timeout_sec: 30
+  # ONE workspace undo restores BOTH original files (single transaction).
+  - native_click:
+      selector: '[aria-label="Search query"]'
+  - native_keys:
+      selector: '[aria-label="Search query"]'
+      keys: ["Control+z"]
+  - assert_file_sha256:
+      path: "${fixture.workspace_root}/unicode.txt"
+      equals: "fd567d8fb0684d0ac4754b8453a837f68113374f0abd92135fb6959b37d1b6c3"
+      timeout_sec: 30
+  - assert_file_sha256:
+      path: "${fixture.workspace_root}/notes.txt"
+      equals: "d10eea22971a9850a14277b8e4b2f5922c5f27530a9d216774c8029d6340a538"
       timeout_sec: 30
   - screenshot: tc-ide-d2-02-replace-undo.png

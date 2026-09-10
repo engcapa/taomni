@@ -11,6 +11,7 @@ import {
   FindInFilesPanel,
   matchSegments,
 } from "./FindInFilesPanel";
+import { applyLspTextEditsToString } from "../lspTextEdits";
 
 const searchMocks = vi.hoisted(() => ({
   newWorkspaceSearchId: vi.fn(() => "search-1"),
@@ -537,6 +538,50 @@ describe("ED-FIND-004: replace preview commit flow in FindInFilesPanel", () => {
     expect(replacement).toBe("thread");
     expect(edit.documentEdits).toHaveLength(1);
     await waitFor(() => expect(screen.queryByTestId("code-workspace-replace-preview")).not.toBeInTheDocument());
+  });
+
+  it("commits UTF-16 ranges for a match after an astral prefix (ED-IMPROVE-004 A1)", async () => {
+    const onReplaceMatches = vi.fn(
+      async (
+        _matches: WorkspaceSearchMatch[],
+        _replacement: string,
+        _edit: LspWorkspaceEdit,
+      ): Promise<{ ok: boolean; appliedCount?: number; fileCount?: number }> =>
+        ({ ok: true as const, appliedCount: 1, fileCount: 1 }),
+    );
+    render(
+      <FindInFilesPanel
+        roots={roots}
+        onOpenMatch={vi.fn()}
+        onReplaceMatches={onReplaceMatches}
+      />,
+    );
+    const emit = await runSearch();
+    const lineText = "const s = \"\u{1F600}foo\";";
+    const matches = [
+      searchMatch({ lineNumber: 1, lineText, matchStart: 12, matchEnd: 15, column: 13 }),
+    ];
+    act(() => {
+      emit({ ...doneEvent(), kind: "batch", matches });
+      emit(doneEvent({ totalMatches: matches.length }));
+    });
+    fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "bar" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+    expect(await screen.findByTestId("code-workspace-replace-preview")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+
+    await waitFor(() => expect(onReplaceMatches).toHaveBeenCalledTimes(1));
+    const call = onReplaceMatches.mock.calls[0];
+    if (!call) throw new Error("expected commit arguments");
+    const edit = call[2];
+    expect(edit.documentEdits).toHaveLength(1);
+    expect(edit.documentEdits[0]!.edits[0]!.range).toEqual({
+      start: { line: 0, character: 13 },
+      end: { line: 0, character: 16 },
+    });
+    const next = applyLspTextEditsToString(lineText, edit.documentEdits[0]!.edits);
+    expect(next).toBe("const s = \"\u{1F600}bar\";");
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(next)).toBe(false);
   });
 
   it("keeps the preview open and shows the blocker message on conflict (A2)", async () => {

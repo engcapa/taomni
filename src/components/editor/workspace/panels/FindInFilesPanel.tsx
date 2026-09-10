@@ -28,6 +28,7 @@ import type { LspWorkspaceEdit } from "../../../../lib/editor/lsp";
 import { workspaceSearchMatchKey } from "../buildReplaceEdits";
 import {
   buildReplaceInFilesWorkspaceEdit,
+  codePointOffsetToUtf16Offset,
   createReplaceInFilesPlan,
   replaceMatchAbsolutePath,
   searchMatchesToReplaceInputs,
@@ -176,7 +177,11 @@ function groupKey(match: WorkspaceSearchMatch): string {
 /** Join key shared by preview usages and search matches for exclusion. */
 function usageJoinKeyForMatch(match: WorkspaceSearchMatch): string {
   const line = Math.max(0, match.lineNumber - 1);
-  return `${replaceMatchAbsolutePath(match)}:${line}:${match.matchStart}:${line}:${match.matchEnd}`;
+  // ED-IMPROVE-004: preview usage keys carry UTF-16 LSP characters, so the
+  // backend's code-point offsets are converted through the shared mapping.
+  const start = codePointOffsetToUtf16Offset(match.lineText, match.matchStart);
+  const end = codePointOffsetToUtf16Offset(match.lineText, match.matchEnd);
+  return `${replaceMatchAbsolutePath(match)}:${line}:${start}:${line}:${end}`;
 }
 
 function groupTitle(match: WorkspaceSearchMatch): string {

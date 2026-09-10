@@ -18,6 +18,9 @@ from typing import Any
 SEED_FILES = {
     "README.md": "# qa workspace root\n\nSeeded by the qa-ui-auto workspace_root fixture.\n",
     "notes.txt": "scratch notes\n",
+    # ED-IMPROVE-004: astral-prefixed line so replace-in-files proves the
+    # code-point -> UTF-16 mapping against real disk bytes.
+    "unicode.txt": "\U0001F600notes\n",
 }
 
 
