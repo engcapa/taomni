@@ -4294,6 +4294,69 @@ export function CodeWorkspaceTab({
     if (!root) return null;
     return absoluteWorkspacePath(root, file.ref.path);
   }, [findRoot]);
+  /**
+   * ED-FOLLOW-003: path-keyed open-buffer view for buildRefactorPlan.
+   * The live openFiles map is keyed by file key (`root:<id>:<path>`), which
+   * matchOpenFile can never resolve — passing it straight through silently
+   * disabled every open-buffer plan guard (dirty edits, revision skew). The
+   * view re-keys by absolute path and file URI so the guards see the
+   * buffers. Deliberately narrow: only staleness/dirty signals ride it
+   * (documentRevision, LSP revision, dirty, library). Buffer text and disk
+   * hashes stay out so the plan's hash machinery keeps its current
+   * snapshot-driven semantics (notably the EOL-tolerant journal path).
+   *
+   * Revision is reported only while the server has NOT acknowledged the
+   * latest buffer text (isLspDocumentSynced false). documentRevision bumps
+   * per edit while the sync version bumps per flushed didChange, so a
+   * coalesced burst always skews the counters even though the server holds
+   * the latest text — reporting the raw version would false-positive every
+   * rename after any typing burst. Omitting it when synced makes the plan
+   * guard mean exactly "the server has not seen the latest bytes".
+   */
+  const buildPlanOpenFiles = useCallback((): Record<string, {
+    documentRevision?: number;
+    revision?: number;
+    canonicalPath?: string;
+    dirty?: boolean;
+    library?: unknown;
+  }> => {
+    const view: Record<string, {
+      documentRevision?: number;
+      revision?: number;
+      canonicalPath?: string;
+      dirty?: boolean;
+      library?: unknown;
+    }> = {};
+    for (const file of Object.values(openFilesRef.current)) {
+      if (file.loading) continue;
+      const absolutePath = absolutePathForOpenFile(file);
+      if (!absolutePath) continue;
+      const normalized = normalizeFsPath(absolutePath);
+      const entry: {
+        documentRevision?: number;
+        revision?: number;
+        canonicalPath?: string;
+        dirty?: boolean;
+        library?: unknown;
+      } = {
+        documentRevision: file.documentRevision,
+        canonicalPath: normalized,
+        dirty: file.dirty === true,
+      };
+      if (!isLspDocumentSynced(file.key, file.text)) {
+        const syncedRevision = lspDocumentVersion(file.key);
+        if (syncedRevision !== null && syncedRevision !== undefined) {
+          entry.revision = syncedRevision;
+        }
+      }
+      if (file.library != null) {
+        entry.library = file.library;
+      }
+      view[normalized] = entry;
+      view[`file://${normalized}`] = entry;
+    }
+    return view;
+  }, [absolutePathForOpenFile, isLspDocumentSynced, lspDocumentVersion]);
   const inspectionPathForFileKey = useCallback((fileKeyValue: string): string => {
     const open = openFilesRef.current[fileKeyValue];
     const ref = open?.ref;
@@ -15129,7 +15192,7 @@ export function CodeWorkspaceTab({
         evidence,
         edit: renamed.edit,
         roots: rootsRef.current,
-        openFiles: openFilesRef.current,
+        openFiles: buildPlanOpenFiles(),
         completeness: {
           value: "partial",
           source: "protocol-bounded",
@@ -15348,7 +15411,7 @@ export function CodeWorkspaceTab({
         evidence,
         edit: deletion.edit,
         roots: rootsRef.current,
-        openFiles: openFilesRef.current,
+        openFiles: buildPlanOpenFiles(),
         completeness: {
           value: deletion.complete ? "complete" : "partial",
           source: "client-observed-bounded",

@@ -5688,6 +5688,14 @@ controls:
     selector: '[data-testid="external-file-conflict-dialog"] button[aria-label="Dismiss external file conflict"]'
     kind: interactive
     optional: true       # dismiss leaves buffer and disk untouched (C0-01)
+  - id: refactoring-preview-dialog
+    selector: '[data-testid="refactoring-preview-dialog"]'
+    kind: display
+    optional: true       # rename refactoring preview modal (C6-04)
+  - id: refactoring-preview-apply
+    selector: '[data-testid="refactoring-preview-apply"]'
+    kind: interactive
+    optional: true       # applies the previewed refactoring (C6-04)
   - id: tree-filter
     selector: '[data-testid="code-workspace-tree-filter"]'
     kind: interactive

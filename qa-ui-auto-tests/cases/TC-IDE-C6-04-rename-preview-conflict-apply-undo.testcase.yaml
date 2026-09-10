@@ -6,6 +6,29 @@ description: |
   conflict detection and cross-file WorkspaceEdit apply need jdtls.
   Browser runs must report environment-blocked, never passed. Highest
   claim on green: L2 provider-backed (Linux).
+
+  Two segments over QuickFixTarget.java (syntax-clean; only an
+  unresolved-type diagnostic, so the provider answers real edits):
+
+  A. Preview conflict: caret on `blank` (line 13, zero-based drag column
+     20, cursor postcondition authoritative), one typed space dirties the
+     buffer, Shift+F6 -> Rename prompt -> confirm. The plan gate blocks on
+     the unsaved-buffer error conflict: status names "Rename blocked" and
+     "unsaved buffer edits", the prompt closes, zero bytes are written
+     (disk hash asserted unchanged at the end of segment B).
+  B. Preview apply/undo with a file move: buffer cleaned deterministically
+     (drag + Backspace + save + pristine-sha proof, which also re-syncs the
+     buffer — a buffer-level undo alone leaves a documentRevision/LSP
+     revision skew that reports the same refusal), caret dragged to the
+     class name (line 9, zero-based column 13), Shift+F6 -> prompt prefill
+     pinned to "QuickFixTarget" -> fill "Qa06Target" (submission pinned via
+     DOM read, distinguishing a silent default-submit early return from a
+     downstream stall) -> confirm. The class rename carries a file-move
+     operation, so the preview modal opens: the case asserts the preview
+     dialog, the new name, and the resource-operation count, applies, and
+     proves the moved file on disk. One shared undo then reverses the whole
+     transaction (text + move-back through snapshot replay); a save proves
+     the disk bytes equal the pristine fixture hash f2de5c8a.
 covers: [F25.5]
 tags: [code-workspace, ide-c6, rename, provider-fixture, p1]
 modes: [native]
@@ -19,16 +42,164 @@ steps:
   # operate the native folder picker opened by Add Folder to Workspace.
   - seed_storage:
       key: taomni.recentWorkspaces.v1
-      value: '[{"id":"qa-c6-04","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+      value: '[{"id":"qa-c6-04","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/QuickFixTarget.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
   - reload_window: null
   - click: '[data-testid="welcome-history-tab-workspaces"]'
   - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
   - wait_for: '[data-testid="code-workspace-tab"]'
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 60
   - assert_text:
       selector: '[data-testid="code-workspace-editor"]'
-      contains: "public static void main"
+      contains: "public class QuickFixTarget"
       timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: "Java"
+      timeout_sec: 60
+  # ---- Segment A: dirty-buffer preview conflict (honest refusal) ----
+  # 1-based line 13 is `boolean blank = StringUtils.isBlank("x");`; `blank`
+  # sits at 1-based cols 21-25 (zero-based drag column 20). The zero-length
+  # pointer drag places the caret; the cursor postcondition is authoritative.
+  - native_pointer_drag:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      from: {line: 13, column: 20}
+      to: {line: 13, column: 20}
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 13, Col 21"
+      timeout_sec: 10
+  - type: " "
+  # Let the dirty-buffer diagnostics/index rebuild settle before Shift+F6:
+  # stroking into a running rebuild invalidates the rename build token and
+  # strands the flow in a stale references search (failure-native evidence
+  # of the first hardened run).
+  - wait: 10
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["Shift+F6"]
+      transport: webdriver
+  - wait_for:
+      selector: '[data-testid="text-input-dialog"]'
+      timeout_sec: 30
+  - fill:
+      selector: '[data-testid="text-input-dialog-input"]'
+      value: "qa06blocked"
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  # The plan gate blocks on the unsaved-buffer error conflict: no preview,
+  # no apply, status names the refusal. The prompt closes on confirm.
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Rename blocked"
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "unsaved buffer edits"
+      timeout_sec: 10
+  - assert_not_visible: '[data-testid="text-input-dialog"]'
+  # Clean the typed space deterministically: the space sits at zero-based
+  # index 20 (caret was at column 20 when typed), so a caret at column 21
+  # with Backspace removes exactly it. Focus is proven by the cursor
+  # postcondition. A save then proves byte-cleanliness against the pristine
+  # fixture hash AND re-syncs the buffer (a buffer-level undo alone leaves
+  # a documentRevision/LSP-revision skew that reports the same "unsaved
+  # buffer edits" refusal). If the space were already gone this eats the
+  # `b` of `blank` and the sha assert fails loudly instead of silently.
+  - native_pointer_drag:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      from: {line: 13, column: 21}
+      to: {line: 13, column: 21}
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 13, Col 22"
+      timeout_sec: 10
+  - press: Backspace
+  - press: Control+s
+  - assert_file_sha256:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/QuickFixTarget.java"
+      equals: "f2de5c8ab98b58cf18ff998ebc47d19c127bb6f4290550d2827a40a37552e70a"
+      timeout_sec: 30
+  # ---- Segment B: class rename through the preview modal, then undo ----
+  # `QuickFixTarget` sits on 1-based line 9 at 1-based cols 14-29
+  # (zero-based drag column 13). Renaming the top-level type makes the
+  # server include a file-move operation, which forces the preview modal.
+  - native_pointer_drag:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      from: {line: 9, column: 13}
+      to: {line: 9, column: 13}
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 9, Col 14"
+      timeout_sec: 10
+  - wait: 2
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["Shift+F6"]
+      transport: webdriver
+  - wait_for:
+      selector: '[data-testid="text-input-dialog"]'
+      timeout_sec: 30
+  # Pin the prompt prefill (prepare resolved the class symbol) and the
+  # submitted value: a confirm that submits the unchanged default takes the
+  # silent early-return (no status, no apply), which must be distinguishable
+  # from a downstream stall.
+  - assert_attribute:
+      selector: '[data-testid="text-input-dialog-input"]'
+      name: "value"
+      equals: "QuickFixTarget"
+  - fill:
+      selector: '[data-testid="text-input-dialog-input"]'
+      value: "Qa06Target"
+  - eval_readonly:
+      expression: "document.querySelector('[data-testid' + String.fromCharCode(61) + '\"text-input-dialog-input\"]')?.value"
+      contains: "Qa06Target"
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  # The class rename carries a file-move operation (the dialog reports "1
+  # resource operation(s)"), so the preview modal opens instead of the
+  # direct-apply path of single-edit renames. A bare-LSP probe with empty
+  # client capabilities returned only a legacy single text edit for the
+  # same rename; the app negotiates full capabilities and observes the
+  # move op — the probe shortfall is recorded, not absorbed.
+  - wait_for:
+      selector: '[data-testid="refactoring-preview-dialog"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="refactoring-preview-dialog"]'
+      contains: "Qa06Target"
+      timeout_sec: 10
+  - assert_text:
+      selector: '[data-testid="refactoring-preview-dialog"]'
+      contains: "1 resource operation"
+      timeout_sec: 10
+  - screenshot: tc-ide-c6-04-preview.png
+  - click: '[data-testid="refactoring-preview-apply"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "class Qa06Target"
+      timeout_sec: 30
+  - press: Control+s
+  - assert_file_contains:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/Qa06Target.java"
+      contains: "class Qa06Target"
+      timeout_sec: 30
+  # ONE shared undo reverts the whole transaction (text edits plus the
+  # move-back); the undo status names the journal entry, proving the journal
+  # transaction was claimed rather than a buffer revert. A save proves the
+  # disk bytes equal the pristine fixture hash.
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Shift+F6
-  - screenshot: tc-ide-c6b-preview.png
+  - press: Control+z
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: 'Undid Rename symbol to "Qa06Target"'
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "public class QuickFixTarget"
+      timeout_sec: 30
+  - press: Control+s
+  - assert_file_sha256:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/QuickFixTarget.java"
+      equals: "f2de5c8ab98b58cf18ff998ebc47d19c127bb6f4290550d2827a40a37552e70a"
+      timeout_sec: 30
+  - screenshot: tc-ide-c6-04-undo.png

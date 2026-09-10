@@ -381,6 +381,30 @@ describe("buildRefactorPlan & verifyExclusionSafety §8.20.6 & §8.21.2", () => 
   });
 
   describe("ED-REF-001: Multi-file rename, dirty conflicts, and library guards", () => {
+    it("ED-FOLLOW-003: file-key-shaped openFiles never match, so guards stay silent rather than misattribute", () => {
+      // Regression pin for the production bug where the shell passed its
+      // key-keyed openFiles map (`root:<id>:<path>`) straight through: no
+      // entry ever matched, so the dirty guard was dead for rename. The
+      // shell must pass a path-keyed view (buildPlanOpenFiles); a key-keyed
+      // map must not phantom-match some other file's state.
+      const plan = buildRefactorPlan({
+        actionId: "rename-no-phantom",
+        kind: "rename",
+        evidence: dummyEvidence,
+        edit: {
+          documentEdits: [{
+            uri: "file:///workspace/A.java",
+            path: "/workspace/A.java",
+            edits: [{ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } }, newText: "b" }],
+          }],
+        },
+        roots: [{ path: "/workspace" }],
+        openFiles: {
+          "root:ws:/workspace/A.java": { revision: 1, documentRevision: 2, dirty: true },
+        },
+      });
+      expect(plan.conflicts).toHaveLength(0);
+    });
     it("builds multi-file rename plan and blocks on dirty buffer conflict", () => {
       const multiFileEdit: LspWorkspaceEdit = {
         documentEdits: [
