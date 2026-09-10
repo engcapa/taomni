@@ -1122,8 +1122,11 @@ import {
   resolveRearrangeCapabilities,
   executeCleanupTransaction,
   executeRearrangeTransaction,
+  validateWorkflowProviderAction,
   CLEANUP_ACTION_KINDS,
   REARRANGE_ACTION_KINDS,
+  isCleanupActionKind,
+  isRearrangeActionKind,
 } from "./workspace/rearrangeCleanupWorkflow";
 
 interface ResourceCleanupRecoveryView {
@@ -11986,7 +11989,12 @@ export function CodeWorkspaceTab({
       setStatusMessage(message);
       return false;
     }
-    const targetUri = descriptor.documentUri ?? descriptor.filePath ?? frozenKey;
+    // ED-IMPROVE-003: prefer the language-server document URI the provider
+    // will echo back in its payload; descriptor.filePath may be workspace-relative.
+    const targetUri = descriptor.documentUri
+      ?? lspFilesRef.current[frozenKey]?.status?.uri
+      ?? descriptor.filePath
+      ?? frozenKey;
     const result = await executeRearrangeTransaction(
       {
         requestActions: async () => {
@@ -12026,17 +12034,22 @@ export function CodeWorkspaceTab({
           }
           try {
             const resolved = await lspCodeActionResolve(descriptor, action.raw);
-            const edits = (resolved.action?.edit?.documentEdits ?? [])
-              .filter((entry) => entry.uri === targetUri || (entry.path != null && fsPathEquals(entry.path, targetPath)))
-              .flatMap((entry) => entry.edits);
-            if (!resolved.action || edits.length === 0) {
-              return {
-                state: "unsupported",
-                edits: [],
-                reason: `Provider action '${action.title}' carried no usable edit for ${targetPath}; nothing applied`,
-              };
+            // ED-IMPROVE-003: validate the complete payload before it can
+            // become a plan; cross-file/resource/command/disabled/malformed
+            // payloads are rejected here with their category and reason.
+            const validation = validateWorkflowProviderAction({
+              action: resolved.action,
+              targetUri,
+              targetPath,
+              documentText: live.text,
+              documentRevision: live.documentRevision,
+              isSupportedKind: isRearrangeActionKind,
+              capabilityLabel: "Rearrange Code",
+            });
+            if (!validation.ok) {
+              return { state: validation.state, edits: [], reason: validation.reason };
             }
-            return { state: "resolved", edits };
+            return { state: "resolved", edits: validation.edits };
           } catch (err) {
             return { state: "failed", edits: [], reason: `Rearrange resolve failed: ${errorMessage(err)}; nothing applied` };
           }
@@ -12168,7 +12181,11 @@ export function CodeWorkspaceTab({
       setStatusMessage(message);
       return false;
     }
-    const targetUri = descriptor.documentUri ?? descriptor.filePath ?? frozenKey;
+    // ED-IMPROVE-003: same URI precedence as the rearrange owner.
+    const targetUri = descriptor.documentUri
+      ?? lspFilesRef.current[frozenKey]?.status?.uri
+      ?? descriptor.filePath
+      ?? frozenKey;
     const result = await executeCleanupTransaction(
       {
         requestActions: async () => {
@@ -12208,17 +12225,21 @@ export function CodeWorkspaceTab({
           }
           try {
             const resolved = await lspCodeActionResolve(descriptor, action.raw);
-            const edits = (resolved.action?.edit?.documentEdits ?? [])
-              .filter((entry) => entry.uri === targetUri || (entry.path != null && fsPathEquals(entry.path, targetPath)))
-              .flatMap((entry) => entry.edits);
-            if (!resolved.action || edits.length === 0) {
-              return {
-                state: "unsupported",
-                edits: [],
-                reason: `Provider action '${action.title}' carried no usable edit for ${targetPath}; nothing applied`,
-              };
+            // ED-IMPROVE-003: same complete-payload validation as Rearrange;
+            // generic fixAll/format payloads never pass as Cleanup.
+            const validation = validateWorkflowProviderAction({
+              action: resolved.action,
+              targetUri,
+              targetPath,
+              documentText: live.text,
+              documentRevision: live.documentRevision,
+              isSupportedKind: isCleanupActionKind,
+              capabilityLabel: "Code Cleanup",
+            });
+            if (!validation.ok) {
+              return { state: validation.state, edits: [], reason: validation.reason };
             }
-            return { state: "resolved", edits };
+            return { state: "resolved", edits: validation.edits };
           } catch (err) {
             return { state: "failed", edits: [], reason: `Cleanup resolve failed: ${errorMessage(err)}; nothing applied` };
           }

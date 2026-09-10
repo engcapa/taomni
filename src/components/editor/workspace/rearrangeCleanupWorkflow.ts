@@ -15,6 +15,7 @@ import type {
   LspWorkspaceEdit,
 } from "../../../lib/editor/lsp";
 import { applyLspTextEditsToString } from "./lspTextEdits";
+import { fsPathEquals } from "./codeWorkspaceModel";
 import { sha256Hex } from "./projectAnalysisModel";
 import {
   buildWorkspaceEditPreview,
@@ -1040,6 +1041,204 @@ function mapResolveFailureState(
   return "failed";
 }
 
+// ---------------------------------------------------------------------------
+// ED-IMPROVE-003: complete provider-payload validation for the dedicated
+// rearrange/cleanup actions. The workflow only ever gets an immutable,
+// current-file-only text-edit plan; anything else fails typed instead of
+// being silently filtered or partially executed.
+// ---------------------------------------------------------------------------
+
+export interface WorkflowProviderActionPayload {
+  kind: string | null;
+  title: string;
+  edit: LspWorkspaceEdit | null;
+  command: string | null;
+  commandArguments: unknown;
+  raw: unknown;
+}
+
+export interface WorkflowActionValidationInput {
+  action: WorkflowProviderActionPayload | null;
+  targetUri: string;
+  targetPath: string;
+  documentText: string;
+  documentRevision?: number;
+  isSupportedKind(kind: string | null): boolean;
+  capabilityLabel: string;
+}
+
+export type WorkflowActionValidation =
+  | { ok: true; edits: readonly LspTextEdit[] }
+  | {
+      ok: false;
+      state: "unsupported" | "stale" | "failed";
+      reason: string;
+    };
+
+function workflowActionIsDisabled(raw: unknown): boolean {
+  return typeof raw === "object"
+    && raw !== null
+    && (raw as { disabled?: unknown }).disabled === true;
+}
+
+function workflowEditRangeIsValid(edit: LspTextEdit): boolean {
+  const { start, end } = edit.range;
+  const positionIsWellFormed = (line: number, character: number): boolean => (
+    Number.isInteger(line)
+    && Number.isInteger(character)
+    && line >= 0
+    && character >= 0
+  );
+  if (!positionIsWellFormed(start.line, start.character)
+    || !positionIsWellFormed(end.line, end.character)) {
+    return false;
+  }
+  if (start.line > end.line) return false;
+  return start.line < end.line || start.character <= end.character;
+}
+
+export function validateWorkflowProviderAction(
+  input: WorkflowActionValidationInput,
+): WorkflowActionValidation {
+  const { action, targetUri, targetPath, capabilityLabel } = input;
+  if (!action) {
+    return {
+      ok: false,
+      state: "failed",
+      reason: `${capabilityLabel} resolve returned no action; nothing applied`,
+    };
+  }
+  if (workflowActionIsDisabled(action.raw)) {
+    return {
+      ok: false,
+      state: "unsupported",
+      reason: `${capabilityLabel} action '${action.title}' is disabled by the provider; nothing applied`,
+    };
+  }
+  if (!input.isSupportedKind(action.kind)) {
+    return {
+      ok: false,
+      state: "unsupported",
+      reason: `${capabilityLabel} resolve returned kind '${action.kind ?? "(no kind)"}' instead of a dedicated action kind; nothing applied`,
+    };
+  }
+  if (!action.edit) {
+    return {
+      ok: false,
+      state: "unsupported",
+      reason: action.command
+        ? `${capabilityLabel} action '${action.title}' is command-only (${action.command}); command side effects are not supported; nothing applied`
+        : `${capabilityLabel} action '${action.title}' carried no edit; nothing applied`,
+    };
+  }
+  if (action.command) {
+    return {
+      ok: false,
+      state: "unsupported",
+      reason: `${capabilityLabel} action '${action.title}' carries both an edit and the command '${action.command}'; mixed payloads are not supported; nothing applied`,
+    };
+  }
+  const operations = action.edit.operations ?? [];
+  const resourceOperations = operations.filter((operation) => operation.kind !== "text");
+  if (resourceOperations.length > 0) {
+    const kinds = resourceOperations
+      .map((operation) => operation.kind)
+      .filter((kind, index, all) => all.indexOf(kind) === index)
+      .join(", ");
+    return {
+      ok: false,
+      state: "unsupported",
+      reason: `${capabilityLabel} action '${action.title}' carries resource operations (${kinds}); only current-file text edits are supported; nothing applied`,
+    };
+  }
+  // LSP `documentChanges` entries arrive as ordered operations while `changes`
+  // entries appear in both `documentEdits` and `operations`; operations are
+  // authoritative when present, exactly like the canonical applier.
+  const documentEntries = operations.length > 0
+    ? operations.flatMap((operation) => operation.kind === "text" ? [operation.document] : [])
+    : (action.edit.documentEdits ?? []);
+  if (documentEntries.length === 0) {
+    return {
+      ok: false,
+      state: "unsupported",
+      reason: `${capabilityLabel} action '${action.title}' carried no document edits; nothing applied`,
+    };
+  }
+  const edits: LspTextEdit[] = [];
+  for (const entry of documentEntries) {
+    const uriMatches = !!entry.uri && entry.uri === targetUri;
+    const pathMatches = entry.path != null && fsPathEquals(entry.path, targetPath);
+    if (entry.uri && entry.path) {
+      if (!uriMatches || !pathMatches) {
+        return {
+          ok: false,
+          state: "unsupported",
+          reason: `${capabilityLabel} action '${action.title}' addresses a different or contradictory document (uri ${entry.uri}, path ${entry.path}) instead of ${targetPath}; nothing applied`,
+        };
+      }
+    } else if (entry.uri) {
+      if (!uriMatches) {
+        return {
+          ok: false,
+          state: "unsupported",
+          reason: `${capabilityLabel} action '${action.title}' edits a different document (${entry.uri}) instead of ${targetUri}; nothing applied`,
+        };
+      }
+    } else if (entry.path) {
+      if (!pathMatches) {
+        return {
+          ok: false,
+          state: "unsupported",
+          reason: `${capabilityLabel} action '${action.title}' edits a different document (${entry.path}) instead of ${targetPath}; nothing applied`,
+        };
+      }
+    } else {
+      return {
+        ok: false,
+        state: "failed",
+        reason: `${capabilityLabel} action '${action.title}' carried a malformed document entry without uri or path; nothing applied`,
+      };
+    }
+    if (
+      entry.version != null
+      && input.documentRevision != null
+      && entry.version !== input.documentRevision
+    ) {
+      return {
+        ok: false,
+        state: "stale",
+        reason: `${capabilityLabel} action '${action.title}' targets document version ${entry.version} but the live document is at ${input.documentRevision}; nothing applied`,
+      };
+    }
+    edits.push(...entry.edits);
+  }
+  if (edits.length === 0) {
+    return {
+      ok: false,
+      state: "unsupported",
+      reason: `${capabilityLabel} action '${action.title}' carried no usable edits; nothing applied`,
+    };
+  }
+  const lines = input.documentText.split("\n");
+  for (const edit of edits) {
+    // A real JDT LS sortMembers edit can address positions past the last
+    // document line; the canonical applier clamps those exactly like
+    // offsetFromLspPositionInString, and the postcondition hash still decides.
+    // Only structurally malformed (negative/non-integer) or reversed ranges
+    // are rejected here.
+    if (!workflowEditRangeIsValid(edit)) {
+      const { start, end } = edit.range;
+      return {
+        ok: false,
+        state: "failed",
+        reason: `${capabilityLabel} action '${action.title}' carried a malformed or reversed edit range`
+          + ` (${start.line}:${start.character} -> ${end.line}:${end.character}, document has ${lines.length} lines); nothing applied`,
+      };
+    }
+  }
+  return { ok: true, edits };
+}
+
 /**
  * ED-AUDIT-016: production execute wiring for Code Cleanup.
  * ---------------------------------------------------------------------------
@@ -1051,6 +1250,9 @@ function mapResolveFailureState(
  * Provider action kinds that count as a dedicated batch-cleanup capability.
  * Matched by exact kind equality only — never by summary booleans, title
  * substring guessing, or relabeling format/organizeImports as cleanup.
+ * ED-IMPROVE-003: generic `source.fixAll` is NOT an equivalent Cleanup kind —
+ * without a dedicated cleanup/profile contract a fixAll payload stays
+ * unavailable instead of being executed under the Cleanup label.
  * NOTE: Eclipse JDT LS 1.61 exposes no cleanup kind (bundle + live probe
  * verified: only generate/organizeImports/overrideMethods/sortMembers), so
  * this list matches nothing on this box today; the wiring below still
@@ -1059,7 +1261,6 @@ function mapResolveFailureState(
  */
 export const CLEANUP_ACTION_KINDS: readonly string[] = [
   "source.cleanup",
-  "source.fixAll",
   "cleanup",
 ];
 
