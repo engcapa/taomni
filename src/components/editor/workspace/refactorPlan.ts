@@ -133,6 +133,18 @@ export interface RefactorPlanV4 {
 
 export type RefactorPlanV3 = RefactorPlanV4;
 
+/**
+ * ED-IMPROVE-002: the subset of a refactor plan the shared apply boundary
+ * needs to prepare a crash-recovery journal and verify post-hashes. Workflow
+ * execute owners build this directly from their own frozen plan instead of
+ * creating a second competing recovery/history system.
+ */
+export interface WorkspaceEditRecoveryPlan {
+  actionId: string;
+  kind: RefactorKind;
+  documents: readonly RefactorDocumentPreconditionV4[];
+}
+
 export interface RefactorGateDecision {
   allowed: boolean;
   requiresConfirm: boolean;
@@ -575,7 +587,7 @@ export function verifyExclusionSafety(
  * expected post-hashes computed during plan construction.
  */
 export function verifyRefactorPostHashes(
-  plan: RefactorPlanV4,
+  plan: Pick<RefactorPlanV4, "documents">,
   actualPostTexts: Record<string, string>,
 ): {
   allMatched: boolean;
@@ -1062,7 +1074,7 @@ export function resolveRecoveryDocTarget(
 }
 
 export function prepareRefactorRecoveryJournalV2(input: {
-  plan: RefactorPlanV4;
+  plan: WorkspaceEditRecoveryPlan;
   edit: LspWorkspaceEdit;
   preImages: readonly RefactorRecoveryPreImageV2[];
   workspaceRoot: string;

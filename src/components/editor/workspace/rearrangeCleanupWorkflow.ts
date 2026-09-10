@@ -581,12 +581,20 @@ export interface RearrangePreviewSummary {
   postHashShort: string;
 }
 
-export type RearrangeApplyState = "applied" | "failed" | "conflict";
+export type RearrangeApplyState =
+  | "applied"
+  | "recovery-required"
+  | "unknown-effect"
+  | "failed"
+  | "conflict";
 
 export interface RearrangeApplyResult {
   state: RearrangeApplyState;
   postText?: string;
   reason?: string;
+  recoveryId?: string | null;
+  affectedPaths?: readonly string[];
+  historyId?: string | null;
 }
 
 /**
@@ -600,7 +608,32 @@ export type WorkflowExecuteFailureState =
   | "cancelled"
   | "stale"
   | "conflict"
-  | "failed";
+  | "failed"
+  | "recovery-required"
+  | "unknown-effect";
+
+/**
+ * ED-IMPROVE-002: the effect axis is independent of the execution status. A
+ * failed operation may still have performed work (`performed`/`partial`) or
+ * have an unprovable OS result (`unknown`); only `none` proves zero effect.
+ */
+export type WorkflowEffect =
+  | { kind: "none" }
+  | { kind: "performed"; paths: readonly string[]; recoveryId: string | null }
+  | { kind: "partial"; paths: readonly string[]; recoveryId: string | null }
+  | { kind: "unknown"; paths: readonly string[]; recoveryId: string | null };
+
+/**
+ * ED-IMPROVE-002: identity facts the execute owner hands to the canonical
+ * apply boundary so it can build one recovery journal and verify the exact
+ * post-hash the workflow planned.
+ */
+export interface WorkflowApplyContext {
+  targetPath: string;
+  targetUri: string;
+  preText: string;
+  expectedPostHash: string;
+}
 
 export type WorkflowIdentityCheck =
   | { ok: true }
@@ -695,8 +728,15 @@ export interface RearrangeExecuteDeps {
   /** Monotonic UI request token; a newer value supersedes the in-flight run. */
   requestToken?(): number;
   confirmPreview(summary: RearrangePreviewSummary): Promise<boolean>;
-  /** Canonical apply; receives the pre-mutation identity barrier. */
-  applyEdit(edit: LspWorkspaceEdit, guard: WorkflowMutationGuard): Promise<RearrangeApplyResult>;
+  /**
+   * Canonical apply; receives the pre-mutation identity barrier and the
+   * frozen postcondition facts used for the recovery journal and history.
+   */
+  applyEdit(
+    edit: LspWorkspaceEdit,
+    guard: WorkflowMutationGuard,
+    context: WorkflowApplyContext,
+  ): Promise<RearrangeApplyResult>;
 }
 
 export interface RearrangeExecuteInput {
@@ -709,8 +749,14 @@ export interface RearrangeExecuteInput {
 }
 
 export type RearrangeExecuteResult =
-  | { ok: true; postHash: string; operationCount: number }
-  | { ok: false; state: WorkflowExecuteFailureState; reason: string; committed: false };
+  | { ok: true; postHash: string; operationCount: number; historyId: string | null }
+  | {
+    ok: false;
+    state: WorkflowExecuteFailureState;
+    reason: string;
+    effect: WorkflowEffect;
+    committed: false;
+  };
 
 /**
  * ED-AUDIT-015 + ED-IMPROVE-001 execute owner: gate -> freeze text/provider-
@@ -739,7 +785,8 @@ export async function executeRearrangeTransaction(
   const fail = (
     state: WorkflowExecuteFailureState,
     reason: string,
-  ): RearrangeExecuteResult => ({ ok: false, state, reason, committed: false });
+    effect: WorkflowEffect = { kind: "none" },
+  ): RearrangeExecuteResult => ({ ok: false, state, reason, effect, committed: false });
 
   // 0. Zero-IO pre-gate: no target or readonly short-circuits without
   // touching the provider. Advertised capability support is deliberately
@@ -897,9 +944,44 @@ export async function executeRearrangeTransaction(
   }
 
   // 7. Canonical apply with the last identity check inside the shared apply
-  // boundary, then postcondition verification against real bytes.
-  const applied = await deps.applyEdit(plan.edit, guard);
+  // boundary, then postcondition verification against real bytes. The apply
+  // owner prepares the recovery journal before the first mutation, registers
+  // exactly one success history entry only after the independent
+  // postcondition matches, and reports the effect axis separately.
+  const applied = await deps.applyEdit(plan.edit, guard, {
+    targetPath: input.targetPath,
+    targetUri: input.targetUri,
+    preText: planLive.text,
+    expectedPostHash: postHash,
+  });
   if (applied.state !== "applied" || applied.postText === undefined) {
+    // ED-IMPROVE-002: an explicit effect fact from the apply boundary wins
+    // over the pre-mutation identity guard. A failed save can have mutated the
+    // open buffer or the disk already; re-labelling that as "stale" would hide
+    // a real/unknown effect.
+    if (applied.state === "unknown-effect") {
+      return fail(
+        "unknown-effect",
+        applied.reason ?? "Rearrange write result is unknown; verify the file before retrying",
+        {
+          kind: "unknown",
+          paths: applied.affectedPaths ?? [input.targetPath],
+          recoveryId: applied.recoveryId ?? null,
+        },
+      );
+    }
+    if (applied.state === "recovery-required") {
+      return fail(
+        "recovery-required",
+        applied.reason
+          ?? "Rearrange applied but its postcondition could not be verified; recover from the pending journal",
+        {
+          kind: "performed",
+          paths: applied.affectedPaths ?? [input.targetPath],
+          recoveryId: applied.recoveryId ?? null,
+        },
+      );
+    }
     const current = guard.check();
     if (!current.ok) {
       return fail(
@@ -909,21 +991,37 @@ export async function executeRearrangeTransaction(
           : `${current.reason}; nothing applied`,
       );
     }
+    const performed = applied.affectedPaths && applied.affectedPaths.length > 0;
     return fail(
       applied.state === "conflict" ? "conflict" : "failed",
       applied.reason ?? "Rearrange apply failed; see the workspace-edit ledger",
+      performed
+        ? {
+          kind: "partial",
+          paths: applied.affectedPaths ?? [],
+          recoveryId: applied.recoveryId ?? null,
+        }
+        : { kind: "none" },
     );
   }
   const post = verifyWorkflowPostHashes(plan.expectedPostHashes, {
     [input.targetPath]: applied.postText,
   });
   if (!post.ok) {
+    // The canonical apply verifies the same frozen hash before registering
+    // history, so this is only reachable for a late change after that check.
     return fail(
       "failed",
-      `Rearrange postcondition failed on ${post.mismatchedFiles.join(", ")}; applied effects are listed for recovery. Undo was not registered.`,
+      `Rearrange postcondition failed on ${post.mismatchedFiles.join(", ")}; the workspace-edit history/recovery entry owns the applied effects.`,
+      { kind: "performed", paths: [input.targetPath], recoveryId: applied.recoveryId ?? null },
     );
   }
-  return { ok: true, postHash: plan.expectedPostHashes[input.targetPath], operationCount: resolved.edits.length };
+  return {
+    ok: true,
+    postHash: plan.expectedPostHashes[input.targetPath],
+    operationCount: resolved.edits.length,
+    historyId: applied.historyId ?? null,
+  };
 }
 
 function mapRequestFailureState(
@@ -1006,12 +1104,20 @@ export interface CleanupPreviewSummary {
   postHashShort: string;
 }
 
-export type CleanupApplyState = "applied" | "failed" | "conflict";
+export type CleanupApplyState =
+  | "applied"
+  | "recovery-required"
+  | "unknown-effect"
+  | "failed"
+  | "conflict";
 
 export interface CleanupApplyResult {
   state: CleanupApplyState;
   postText?: string;
   reason?: string;
+  recoveryId?: string | null;
+  affectedPaths?: readonly string[];
+  historyId?: string | null;
 }
 
 export interface CleanupExecuteDeps {
@@ -1022,8 +1128,15 @@ export interface CleanupExecuteDeps {
   /** Monotonic UI request token; a newer value supersedes the in-flight run. */
   requestToken?(): number;
   confirmPreview(summary: CleanupPreviewSummary): Promise<boolean>;
-  /** Canonical apply; receives the pre-mutation identity barrier. */
-  applyEdit(edit: LspWorkspaceEdit, guard: WorkflowMutationGuard): Promise<CleanupApplyResult>;
+  /**
+   * Canonical apply; receives the pre-mutation identity barrier and the
+   * frozen postcondition facts used for the recovery journal and history.
+   */
+  applyEdit(
+    edit: LspWorkspaceEdit,
+    guard: WorkflowMutationGuard,
+    context: WorkflowApplyContext,
+  ): Promise<CleanupApplyResult>;
 }
 
 export interface CleanupExecuteInput {
@@ -1036,8 +1149,14 @@ export interface CleanupExecuteInput {
 }
 
 export type CleanupExecuteResult =
-  | { ok: true; postHash: string; operationCount: number }
-  | { ok: false; state: WorkflowExecuteFailureState; reason: string; committed: false };
+  | { ok: true; postHash: string; operationCount: number; historyId: string | null }
+  | {
+    ok: false;
+    state: WorkflowExecuteFailureState;
+    reason: string;
+    effect: WorkflowEffect;
+    committed: false;
+  };
 
 /**
  * ED-AUDIT-016 + ED-IMPROVE-001 execute owner: zero-IO no-target/readonly/
@@ -1055,7 +1174,8 @@ export async function executeCleanupTransaction(
   const fail = (
     state: WorkflowExecuteFailureState,
     reason: string,
-  ): CleanupExecuteResult => ({ ok: false, state, reason, committed: false });
+    effect: WorkflowEffect = { kind: "none" },
+  ): CleanupExecuteResult => ({ ok: false, state, reason, effect, committed: false });
 
   // 0. Zero-IO pre-gate: no target, readonly, or non-file scope/profile
   // short-circuits without touching the provider. Scope is fixed to the
@@ -1211,9 +1331,40 @@ export async function executeCleanupTransaction(
   }
 
   // 7. Canonical apply with the last identity check inside the shared apply
-  // boundary, then postcondition verification against real bytes.
-  const applied = await deps.applyEdit(plan.edit, guard);
+  // boundary, then postcondition verification against real bytes. Mirrors the
+  // rearrange owner's journal/history/effect contract.
+  const applied = await deps.applyEdit(plan.edit, guard, {
+    targetPath: input.targetPath,
+    targetUri: input.targetUri,
+    preText: planLive.text,
+    expectedPostHash: postHash,
+  });
   if (applied.state !== "applied" || applied.postText === undefined) {
+    // ED-IMPROVE-002: explicit effect facts win over the pre-mutation guard,
+    // exactly like the rearrange owner.
+    if (applied.state === "unknown-effect") {
+      return fail(
+        "unknown-effect",
+        applied.reason ?? "Cleanup write result is unknown; verify the file before retrying",
+        {
+          kind: "unknown",
+          paths: applied.affectedPaths ?? [input.targetPath],
+          recoveryId: applied.recoveryId ?? null,
+        },
+      );
+    }
+    if (applied.state === "recovery-required") {
+      return fail(
+        "recovery-required",
+        applied.reason
+          ?? "Cleanup applied but its postcondition could not be verified; recover from the pending journal",
+        {
+          kind: "performed",
+          paths: applied.affectedPaths ?? [input.targetPath],
+          recoveryId: applied.recoveryId ?? null,
+        },
+      );
+    }
     const current = guard.check();
     if (!current.ok) {
       return fail(
@@ -1223,9 +1374,17 @@ export async function executeCleanupTransaction(
           : `${current.reason}; nothing applied`,
       );
     }
+    const performed = applied.affectedPaths && applied.affectedPaths.length > 0;
     return fail(
       applied.state === "conflict" ? "conflict" : "failed",
       applied.reason ?? "Cleanup apply failed; see the workspace-edit ledger",
+      performed
+        ? {
+          kind: "partial",
+          paths: applied.affectedPaths ?? [],
+          recoveryId: applied.recoveryId ?? null,
+        }
+        : { kind: "none" },
     );
   }
   const post = verifyWorkflowPostHashes(plan.expectedPostHashes, {
@@ -1234,8 +1393,14 @@ export async function executeCleanupTransaction(
   if (!post.ok) {
     return fail(
       "failed",
-      `Cleanup postcondition failed on ${post.mismatchedFiles.join(", ")}; applied effects are listed for recovery. Undo was not registered.`,
+      `Cleanup postcondition failed on ${post.mismatchedFiles.join(", ")}; the workspace-edit history/recovery entry owns the applied effects.`,
+      { kind: "performed", paths: [input.targetPath], recoveryId: applied.recoveryId ?? null },
     );
   }
-  return { ok: true, postHash: plan.expectedPostHashes[input.targetPath], operationCount: resolved.edits.length };
+  return {
+    ok: true,
+    postHash: plan.expectedPostHashes[input.targetPath],
+    operationCount: resolved.edits.length,
+    historyId: applied.historyId ?? null,
+  };
 }

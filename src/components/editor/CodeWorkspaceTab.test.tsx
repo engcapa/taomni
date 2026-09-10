@@ -9611,4 +9611,335 @@ end_of_record
       expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
     });
   });
+
+  describe("ED-IMPROVE-002 workflow postcondition/history/recovery (mounted)", () => {
+    const SERVICE_PRE = "package com.example;\n\npublic class Service {\n    public void beta() {}\n    public void alpha() {}\n}\n";
+    const SERVICE_POST = "package com.example;\n\npublic class Service {\n    public void alpha() {}\n    public void beta() {}\n}\n";
+    const SWAP_EDIT = {
+      range: { start: { line: 3, character: 0 }, end: { line: 4, character: 26 } },
+      newText: "    public void alpha() {}\n    public void beta() {}",
+    };
+    const RECOVERY_V2_PREFIX = "taomni.refactor.recovery.v2:";
+    const OPEN_KEY = "root:app:src/Service.java";
+
+    function workflowWorkspace(instance: string): CodeWorkspaceTabInfo {
+      return {
+        repoRoot: "/repo/app",
+        workspaceId: "ws-improve002",
+        workspaceInstanceId: instance,
+        name: "Improve 002",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: "src/Service.java" },
+      };
+    }
+
+    function fileText(instance: string): string | undefined {
+      return selectCodeWorkspaceUi(
+        useCodeWorkspaceStore.getState(),
+        instance,
+      ).openFiles[OPEN_KEY]?.text;
+    }
+
+    function mockWorkflowProvider(kind: "source.rearrange" | "source.cleanup") {
+      workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+      workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/Service.java", SERVICE_PRE, { hash: "hash-pre" }));
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _rootPath: string,
+        path: string,
+        text: string,
+      ) => writeAck(file(path, text, { hash: `hash-${text}` })));
+      lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+        path: "/repo/app/src/Service.java",
+        uri: "file:///repo/app/src/Service.java",
+        presetId: "jdtls",
+        languageId: "java",
+        displayName: "Eclipse JDT Language Server",
+        available: true,
+        active: true,
+        capabilities: defaultCapabilities({ codeAction: true, codeActionKinds: [kind] }),
+      }));
+      const action = {
+        title: kind === "source.rearrange" ? "Rearrange members" : "Clean up",
+        kind,
+        isPreferred: true,
+        edit: null,
+        command: null,
+        commandArguments: null,
+        raw: { title: kind },
+      };
+      lspMocks.lspCodeActions.mockResolvedValue({
+        status: documentStatus({ available: true, active: true }),
+        actions: [action],
+      });
+      lspMocks.lspCodeActionResolve.mockResolvedValue({
+        status: documentStatus({ available: true, active: true }),
+        action: {
+          ...action,
+          edit: {
+            documentEdits: [{
+              uri: "file:///repo/app/src/Service.java",
+              path: "/repo/app/src/Service.java",
+              edits: [SWAP_EDIT],
+            }],
+          },
+        },
+      });
+    }
+
+    function storedJournals(): Array<{ key: string; entry: { status: string } }> {
+      return Object.keys(window.localStorage)
+        .filter((key) => key.startsWith(RECOVERY_V2_PREFIX))
+        .map((key) => ({ key, entry: JSON.parse(window.localStorage.getItem(key)!) }));
+    }
+
+    function installRecordingStorage(
+      onWrite?: (key: string, value: string) => void,
+    ): { restore: () => void; keys: () => string[] } {
+      const backing = new Map<string, string>();
+      const fake: Storage = {
+        get length() { return backing.size; },
+        clear: () => backing.clear(),
+        getItem: (k) => backing.get(k) ?? null,
+        key: (i) => Array.from(backing.keys())[i] ?? null,
+        removeItem: (k) => { backing.delete(k); },
+        setItem: (k, v) => { onWrite?.(k, v); backing.set(k, v); },
+      };
+      const original = window.localStorage;
+      Object.defineProperty(window, "localStorage", { value: fake, configurable: true, writable: true });
+      return {
+        restore: () => Object.defineProperty(window, "localStorage", { value: original, configurable: true, writable: true }),
+        keys: () => Array.from(backing.keys()),
+      };
+    }
+
+    async function runWorkflow(
+      registrationRef: { current: WorkspaceCommandRegistration | null },
+      commandId: string,
+    ): Promise<void> {
+      await act(async () => {
+        await registrationRef.current?.executeAction(commandId);
+      });
+    }
+
+    it("registers exactly one success history entry whose single undo/redo spans the transaction", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockWorkflowProvider("source.rearrange");
+      vi.mocked(confirmAppDialog).mockClear();
+      vi.mocked(confirmAppDialog).mockResolvedValue(true);
+
+      renderWorkspace(workflowWorkspace("instance-improve002-normal"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await runWorkflow(registrationRef, "workspace.rearrangeCode");
+      await waitFor(() => expect(fileText("instance-improve002-normal")).toBe(SERVICE_POST));
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Rearranged"));
+      // The committed journal is closed, not left pending.
+      expect(storedJournals().filter((entry) => entry.entry.status === "committed")).toHaveLength(1);
+
+      // The shared editor undo claims the journal entry: one Ctrl+Z restores
+      // the whole transaction, a second one is a no-op (exactly one entry).
+      const pane = screen.getByTestId("code-workspace-editor-pane");
+      fireEvent.keyDown(pane, { key: "z", ctrlKey: true });
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Undid Rearrange Code"));
+      expect(fileText("instance-improve002-normal")).toBe(SERVICE_PRE);
+      fireEvent.keyDown(pane, { key: "z", ctrlKey: true });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 30));
+      });
+      expect(fileText("instance-improve002-normal")).toBe(SERVICE_PRE);
+
+      // The journal entry stays redoable at the history-owner level; the
+      // native AUDIT-015 redo stroke exercises the surface route.
+    });
+
+    it("aborts with zero writes when the workflow recovery journal cannot be persisted", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockWorkflowProvider("source.rearrange");
+      vi.mocked(confirmAppDialog).mockClear();
+      vi.mocked(confirmAppDialog).mockResolvedValue(true);
+      const storage = installRecordingStorage((key) => {
+        if (key.startsWith(RECOVERY_V2_PREFIX)) throw new Error("quota exceeded");
+      });
+      try {
+        renderWorkspace(workflowWorkspace("instance-improve002-quota"), { onCommandsChange });
+        await screen.findByTitle("app / src/Service.java");
+        await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+        await runWorkflow(registrationRef, "workspace.rearrangeCode");
+        await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
+          "Refactor recovery journal could not be persisted",
+        ));
+        expect(useAppStore.getState().statusMessage).toContain("quota exceeded");
+        expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
+        expect(fileText("instance-improve002-quota")).toBe(SERVICE_PRE);
+        expect(storedJournals()).toHaveLength(0);
+        expect(storage.keys().filter((key) => key.startsWith(RECOVERY_V2_PREFIX))).toHaveLength(0);
+      } finally {
+        storage.restore();
+      }
+    });
+
+    it("keeps a postcondition mismatch out of success history and leaves a pending journal", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockWorkflowProvider("source.rearrange");
+      vi.mocked(confirmAppDialog).mockClear();
+      vi.mocked(confirmAppDialog).mockResolvedValue(true);
+      const concurrentText = `${SERVICE_POST}// third-party typing during save\n`;
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _rootPath: string,
+        path: string,
+        text: string,
+      ) => {
+        // A concurrent writer replaces the buffer while the save is in
+        // flight, so the writeback is a stale snapshot: disk gets the applied
+        // text, the live buffer keeps the newer third-party text. The
+        // canonical postcondition must detect the mismatch and refuse a
+        // success history entry.
+        useCodeWorkspaceStore.getState().updateOpenFiles(
+          "instance-improve002-mismatch",
+          (current) => {
+            const target = current[OPEN_KEY];
+            if (!target) return current;
+            return {
+              ...current,
+              [OPEN_KEY]: {
+                ...target,
+                text: concurrentText,
+                dirty: true,
+                documentRevision: (target.documentRevision ?? 0) + 2,
+              },
+            };
+          },
+        );
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        return writeAck(file(path, text, { hash: `hash-${text}` }));
+      });
+
+      renderWorkspace(workflowWorkspace("instance-improve002-mismatch"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await runWorkflow(registrationRef, "workspace.rearrangeCode");
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
+        "postcondition could not be verified",
+      ));
+      expect(fileText("instance-improve002-mismatch")).toBe(concurrentText);
+      expect(useAppStore.getState().statusMessage).not.toContain("Rearranged Service.java");
+      const journals = storedJournals();
+      expect(journals).toHaveLength(1);
+      expect(journals[0]!.entry.status).toBe("recovery-required");
+    });
+
+    it("treats an unreadable post-state as recovery-required without success history", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockWorkflowProvider("source.rearrange");
+      vi.mocked(confirmAppDialog).mockClear();
+      vi.mocked(confirmAppDialog).mockResolvedValue(true);
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _rootPath: string,
+        path: string,
+        text: string,
+      ) => {
+        // The buffer closes while the save is in flight; the post-state read
+        // then falls back to disk, which this fault makes unreadable.
+        useCodeWorkspaceStore.getState().updateOpenFiles(
+          "instance-improve002-unreadable",
+          (current) => {
+            const next = { ...current };
+            delete next[OPEN_KEY];
+            return next;
+          },
+        );
+        workspaceMocks.workspaceListDir.mockRejectedValue(new Error("post-state listing failed"));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        return writeAck(file(path, text, { hash: `hash-${text}` }));
+      });
+
+      renderWorkspace(workflowWorkspace("instance-improve002-unreadable"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await runWorkflow(registrationRef, "workspace.rearrangeCode");
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
+        "postcondition could not be verified",
+      ));
+      expect(useAppStore.getState().statusMessage).not.toContain("Rearranged Service.java");
+      const journals = storedJournals();
+      expect(journals).toHaveLength(1);
+      expect(journals[0]!.entry.status).toBe("recovery-required");
+    });
+
+    it("surfaces an unknown write acknowledgement without success history", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockWorkflowProvider("source.rearrange");
+      vi.mocked(confirmAppDialog).mockClear();
+      vi.mocked(confirmAppDialog).mockResolvedValue(true);
+      workspaceMocks.workspaceReadFileWithEncoding.mockResolvedValue(
+        file("src/Service.java", "foreign bytes on disk\n", { hash: "foreign-disk-hash" }),
+      );
+      workspaceMocks.workspaceWriteFileEncoded.mockRejectedValue(Object.assign(
+        new Error("atomic replace acknowledgement was lost"),
+        {
+          kind: "io",
+          effect: "unknown",
+          intentHash: "intended-rearranged-hash",
+          intentByteLength: SERVICE_POST.length,
+          oldHash: "hash-pre",
+        },
+      ));
+
+      renderWorkspace(workflowWorkspace("instance-improve002-unknown"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await runWorkflow(registrationRef, "workspace.rearrangeCode");
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toMatch(
+        /write result is unknown/i,
+      ));
+      expect(useAppStore.getState().statusMessage).not.toContain("Rearranged Service.java");
+      const journals = storedJournals();
+      expect(journals).toHaveLength(1);
+      expect(journals[0]!.entry.status).toBe("recovery-required");
+    });
+
+    it("cleanup shares the single-history journal contract", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockWorkflowProvider("source.cleanup");
+      vi.mocked(confirmAppDialog).mockClear();
+      vi.mocked(confirmAppDialog).mockResolvedValue(true);
+
+      renderWorkspace(workflowWorkspace("instance-improve002-cleanup"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await runWorkflow(registrationRef, "workspace.codeCleanup");
+      await waitFor(() => expect(fileText("instance-improve002-cleanup")).toBe(SERVICE_POST));
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Cleaned up"));
+
+      const pane = screen.getByTestId("code-workspace-editor-pane");
+      fireEvent.keyDown(pane, { key: "z", ctrlKey: true });
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Undid Code Cleanup"));
+      expect(fileText("instance-improve002-cleanup")).toBe(SERVICE_PRE);
+    });
+  });
 });

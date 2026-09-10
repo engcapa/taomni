@@ -387,8 +387,10 @@ import {
   sliceWorkspaceEditForResume,
   summarizeWorkspaceEditOutcomes,
   workspaceEditApplyResponse,
+  WorkspaceEditOpenBufferSaveFailure,
   type WorkspaceEditApplyHooks,
   type WorkspaceEditApplyOutcome,
+  type WorkspaceEditApplyTransactionSummary,
 } from "./workspace/workspaceEditApply";
 import { validateSemanticWorkspaceEditPaths } from "./workspace/semanticWorkspaceEdit";
 import {
@@ -410,6 +412,7 @@ import {
   type RefactorPlanV3,
   type RefactorRecoveryJournalEntryV2,
   type RefactorRecoveryPreImageV2,
+  type WorkspaceEditRecoveryPlan,
 } from "./workspace/refactorPlan";
 import {
   classifyRefactorRecoveryPreconditions,
@@ -5712,6 +5715,8 @@ export function CodeWorkspaceTab({
       encoding?: string;
       bom?: boolean;
     },
+    /** ED-IMPROVE-002: observes the shared committer's typed result. */
+    onCommitResult?: (result: SaveCommitResult) => void,
   ): Promise<WorkspaceFile | null> => {
     const file = openFilesRef.current[key];
     if (!file || file.loading) {
@@ -5753,6 +5758,7 @@ export function CodeWorkspaceTab({
     });
 
     const result = await commitOpenBufferPreparedSave(prepared);
+    onCommitResult?.(result);
     if (result.diskEffect === "committed") return result.file;
     return null;
   }, [
@@ -8813,9 +8819,14 @@ export function CodeWorkspaceTab({
     /** Restrict provider edits to the opened workspace roots. */
     semanticWorkspaceOnly?: boolean;
     /** Optional refactoring plan with completeness, conflicts, and required groups. */
-    plan?: RefactorPlanV3;
+    plan?: RefactorPlanV3 | WorkspaceEditRecoveryPlan;
     /** Canonical transaction guard, invoked after preview and immediately before mutation. */
     preflightMutation?: () => Promise<void> | void;
+    /**
+     * ED-IMPROVE-002: structured transaction facts (effect, postcondition,
+     * history/recovery identity) reported by the shell's apply owner.
+     */
+    onTransactionSummary?: (summary: WorkspaceEditApplyTransactionSummary) => void;
     /** Reports the exact edit selected by the preview dialog. */
     onActiveEditResolved?: (edit: LspWorkspaceEdit) => void;
   };
@@ -8884,10 +8895,17 @@ export function CodeWorkspaceTab({
       // its dirty flag and the committer's error message for in-editor
       // recovery.
       saveOpenBuffer: async (key, nextText) => {
-        const saved = await saveOpenBufferText(key, nextText);
+        const commitResult: { current: SaveCommitResult | null } = { current: null };
+        const saved = await saveOpenBufferText(key, nextText, undefined, (result) => {
+          commitResult.current = result;
+        });
         if (!saved) {
           const error = openFilesRef.current[key]?.error;
-          throw new Error(error || `save did not commit for open buffer ${key}`);
+          const message = error || `save did not commit for open buffer ${key}`;
+          throw new WorkspaceEditOpenBufferSaveFailure(
+            message,
+            commitResult.current?.diskEffect === "unknown" ? "unknown" : "none",
+          );
         }
       },
       readDisk: async (absolutePath) => {
@@ -8983,7 +9001,7 @@ export function CodeWorkspaceTab({
                     label: options.label?.trim() || preview.label,
                   },
                   originalEdit: edit,
-                  plan: options.plan,
+                  plan: options.plan && "operations" in options.plan ? options.plan : undefined,
                   resolve,
                 });
               });
@@ -9105,6 +9123,11 @@ export function CodeWorkspaceTab({
         applyResult.disposition === "partial"
         && applyResult.nextOperationIndex !== null
         && options.recordHistory !== false
+        // ED-IMPROVE-002: never auto-retry a boundary whose OS result is
+        // unproven; the recovery center owns the file until it is resolved.
+        && !allOutcomes.some((outcome) => (
+          outcome.status === "failed" && outcome.diskEffect === "unknown"
+        ))
       ) {
         // Bounded resume loop; each pass re-applies only the unapplied suffix.
         for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -9138,6 +9161,43 @@ export function CodeWorkspaceTab({
         allOutcomes.flatMap((outcome) => outcome.status.startsWith("applied") ? [outcome.path] : []),
       );
     }
+    // ED-IMPROVE-002: one structured summary per apply run. The effect axis is
+    // independent of the execution status: `unknown` marks a write whose OS
+    // result could not be proven even though the operation reported failure.
+    const appliedEffectPaths = allOutcomes
+      .filter((outcome) => outcome.status.startsWith("applied"))
+      .map((outcome) => outcome.path);
+    const hasFailedOperation = allOutcomes.some((outcome) => (
+      outcome.status === "failed" || outcome.status === "skipped"
+    ));
+    const hasUnknownDiskEffect = allOutcomes.some((outcome) => (
+      outcome.status === "failed" && outcome.diskEffect === "unknown"
+    ));
+    const transactionEffect: WorkspaceEditApplyTransactionSummary["effect"] = hasUnknownDiskEffect
+      ? "unknown"
+      : appliedEffectPaths.length === 0
+        ? "none"
+        : hasFailedOperation
+          ? "partial"
+          : "performed";
+    let historyEntryId: string | null = null;
+    const emitTransactionSummary = (
+      postcondition: WorkspaceEditApplyTransactionSummary["postcondition"],
+      recoveryId: string | null,
+    ): void => {
+      const failedOutcomes = allOutcomes.filter((outcome) => outcome.status === "failed");
+      const reason = failedOutcomes.find((outcome) => outcome.diskEffect === "unknown")?.reason
+        ?? failedOutcomes[0]?.reason
+        ?? null;
+      options.onTransactionSummary?.({
+        effect: transactionEffect,
+        postcondition,
+        historyId: historyEntryId,
+        recoveryId,
+        affectedPaths: appliedEffectPaths,
+        reason,
+      });
+    };
     let historyUnavailable = options.recordHistory !== false
       && orderedOperations.length > 0
       && beforeSnapshots === null
@@ -9241,6 +9301,10 @@ export function CodeWorkspaceTab({
       }
       if (recoveryMessage !== null) {
         setStatusMessage(recoveryMessage);
+        emitTransactionSummary(
+          afterSnapshots ? "mismatch" : "unreadable",
+          preparedJournalRef.current?.recoveryId ?? null,
+        );
         return outcomes;
       }
       if (afterSnapshots && changed) {
@@ -9286,23 +9350,46 @@ export function CodeWorkspaceTab({
         };
         workspaceEditHistory.push(entry);
         setWorkspaceEditHistoryRevision((revision) => revision + 1);
+        historyEntryId = entry.id;
       }
     } else {
       const preparedJournal = preparedJournalRef.current;
       if (preparedJournal) {
-        // Nothing mutated: postconditions hold trivially; close the journal
-        // so no pending entry lingers for a no-op transaction.
-        updateRefactorRecoveryJournalV2(preparedJournal.recoveryId, (entry) => ({
-          ...entry,
-          status: "committed",
-          verification: { mismatchedUris: Object.freeze([]), checkedAt: Date.now() },
-        }));
+        if (hasUnknownDiskEffect) {
+          // ED-IMPROVE-002: a failed operation whose OS result could not be
+          // proven must not close the journal as a no-op. Keep the preimages
+          // discoverable for recovery.
+          updateRefactorRecoveryJournalV2(preparedJournal.recoveryId, (entry) => ({
+            ...entry,
+            status: "recovery-required",
+            verification: {
+              mismatchedUris: Object.freeze(
+                allOutcomes
+                  .filter((outcome) => outcome.status === "failed" && outcome.diskEffect === "unknown")
+                  .map((outcome) => outcome.path),
+              ),
+              checkedAt: Date.now(),
+            },
+          }));
+        } else {
+          // Nothing mutated: postconditions hold trivially; close the journal
+          // so no pending entry lingers for a no-op transaction.
+          updateRefactorRecoveryJournalV2(preparedJournal.recoveryId, (entry) => ({
+            ...entry,
+            status: "committed",
+            verification: { mismatchedUris: Object.freeze([]), checkedAt: Date.now() },
+          }));
+        }
       }
     }
     setStatusMessage([
       summarizeWorkspaceEditOutcomes(outcomes),
       historyUnavailable ? "Undo unavailable: workspace resource snapshot is incomplete" : null,
     ].filter(Boolean).join("; "));
+    emitTransactionSummary(
+      !mutated ? "not-applied" : afterSnapshots === null ? "unreadable" : "verified",
+      !mutated && hasUnknownDiskEffect ? preparedJournalRef.current?.recoveryId ?? null : null,
+    );
     return outcomes;
   }, [
     absolutePathForOpenFile,
@@ -11971,22 +12058,68 @@ export function CodeWorkspaceTab({
           message: `${summary.targetPath}: ${summary.operationCount} edits. Pre ${summary.preHashShort} → post ${summary.postHashShort}. Apply the rearrangement?`,
           confirmLabel: "Apply rearrange",
         }),
-        applyEdit: async (edit, guard) => {
+        applyEdit: async (edit, guard, applyContext) => {
+          const summaryHolder: { current: WorkspaceEditApplyTransactionSummary | null } = { current: null };
           try {
             const outcomes = await applyLspWorkspaceEdit(edit, {
               recordHistory: true,
               label: "Rearrange Code",
+              // ED-IMPROVE-002: the canonical apply boundary prepares the
+              // crash-recovery journal before the first mutation, verifies the
+              // frozen post-hash independently, and registers the single
+              // success history entry only after that verification.
+              plan: {
+                actionId: `rearrange:${frozenKey}`,
+                kind: "other",
+                documents: [{
+                  uri: applyContext.targetUri,
+                  canonicalPath: applyContext.targetPath,
+                  expectedDocumentRevision: null,
+                  expectedDiskHash: null,
+                  owner: "workspace",
+                  preTextSha256: sha256Hex(applyContext.preText),
+                  expectedPostHash: applyContext.expectedPostHash,
+                }],
+              },
               preflightMutation: () => guard.assertCurrent(),
+              onTransactionSummary: (next) => {
+                summaryHolder.current = next;
+              },
             });
             const response = workspaceEditApplyResponse(outcomes);
+            const summary = summaryHolder.current;
+            if (summary && summary.effect === "unknown") {
+              return {
+                state: "unknown-effect",
+                reason: `Rearrange write result is unknown: ${summary.reason ?? response.failureReason ?? "the OS acknowledgement was lost"}`
+                  + `; verify ${targetPath} in the recovery center before retrying`,
+                recoveryId: summary.recoveryId,
+                affectedPaths: summary.affectedPaths,
+              };
+            }
+            if (summary && (summary.postcondition === "mismatch" || summary.postcondition === "unreadable")) {
+              return {
+                state: "recovery-required",
+                reason: `Rearrange postcondition could not be verified after applying`
+                  + ` (${summary.postcondition}: ${summary.reason ?? "unknown cause"});`
+                  + ` recovery ${summary.recoveryId ?? "entry"} lists the affected files`,
+                recoveryId: summary.recoveryId,
+                affectedPaths: summary.affectedPaths,
+              };
+            }
             if (!response.applied) {
-              return { state: "failed", reason: response.failureReason ?? "Rearrange apply failed; see the workspace-edit ledger" };
+              return {
+                state: "failed",
+                reason: response.failureReason ?? "Rearrange apply failed; see the workspace-edit ledger",
+                recoveryId: summary?.recoveryId ?? null,
+                affectedPaths: summary?.affectedPaths ?? [],
+              };
             }
             const live = openFilesRef.current[frozenKey];
             if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
               return { state: "conflict", reason: `${targetPath} closed during apply; verify the disk state before retrying` };
             }
-            return { state: "applied", postText: live.text };
+            return { state: "applied", postText: live.text, historyId: summary?.historyId ?? null };
           } catch (err) {
             return { state: "failed", reason: `Rearrange apply failed: ${errorMessage(err)}` };
           }
@@ -12107,22 +12240,66 @@ export function CodeWorkspaceTab({
           message: `${summary.targetPath} [${summary.profileId}]: ${summary.operationCount} edits. Pre ${summary.preHashShort} → post ${summary.postHashShort}. Apply the cleanup?`,
           confirmLabel: "Apply cleanup",
         }),
-        applyEdit: async (edit, guard) => {
+        applyEdit: async (edit, guard, applyContext) => {
+          const summaryHolder: { current: WorkspaceEditApplyTransactionSummary | null } = { current: null };
           try {
             const outcomes = await applyLspWorkspaceEdit(edit, {
               recordHistory: true,
               label: "Code Cleanup",
+              // ED-IMPROVE-002: same canonical journal/postcondition/history
+              // contract as the rearrange owner.
+              plan: {
+                actionId: `cleanup:${frozenKey}`,
+                kind: "other",
+                documents: [{
+                  uri: applyContext.targetUri,
+                  canonicalPath: applyContext.targetPath,
+                  expectedDocumentRevision: null,
+                  expectedDiskHash: null,
+                  owner: "workspace",
+                  preTextSha256: sha256Hex(applyContext.preText),
+                  expectedPostHash: applyContext.expectedPostHash,
+                }],
+              },
               preflightMutation: () => guard.assertCurrent(),
+              onTransactionSummary: (next) => {
+                summaryHolder.current = next;
+              },
             });
             const response = workspaceEditApplyResponse(outcomes);
+            const summary = summaryHolder.current;
+            if (summary && summary.effect === "unknown") {
+              return {
+                state: "unknown-effect",
+                reason: `Cleanup write result is unknown: ${summary.reason ?? response.failureReason ?? "the OS acknowledgement was lost"}`
+                  + `; verify ${targetPath} in the recovery center before retrying`,
+                recoveryId: summary.recoveryId,
+                affectedPaths: summary.affectedPaths,
+              };
+            }
+            if (summary && (summary.postcondition === "mismatch" || summary.postcondition === "unreadable")) {
+              return {
+                state: "recovery-required",
+                reason: `Cleanup postcondition could not be verified after applying`
+                  + ` (${summary.postcondition}: ${summary.reason ?? "unknown cause"});`
+                  + ` recovery ${summary.recoveryId ?? "entry"} lists the affected files`,
+                recoveryId: summary.recoveryId,
+                affectedPaths: summary.affectedPaths,
+              };
+            }
             if (!response.applied) {
-              return { state: "failed", reason: response.failureReason ?? "Cleanup apply failed; see the workspace-edit ledger" };
+              return {
+                state: "failed",
+                reason: response.failureReason ?? "Cleanup apply failed; see the workspace-edit ledger",
+                recoveryId: summary?.recoveryId ?? null,
+                affectedPaths: summary?.affectedPaths ?? [],
+              };
             }
             const live = openFilesRef.current[frozenKey];
             if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
               return { state: "conflict", reason: `${targetPath} closed during apply; verify the disk state before retrying` };
             }
-            return { state: "applied", postText: live.text };
+            return { state: "applied", postText: live.text, historyId: summary?.historyId ?? null };
           } catch (err) {
             return { state: "failed", reason: `Cleanup apply failed: ${errorMessage(err)}` };
           }
