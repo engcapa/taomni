@@ -100,11 +100,13 @@ import type { ParameterPopupView } from "./referenceInfoSession";
 import { languageForPath } from "../../git/diffLanguage";
 import {
   useWorkspaceClipboardSession,
+  type GuardedSystemEffect,
   type GuardedSystemReadResult,
   type GuardedSystemWriteResult,
   type WorkspaceClipboardHandle,
 } from "./workspaceClipboardSession";
 import {
+  createClipboardCancelledObservation,
   createClipboardReadObservation,
   createClipboardWriteObservation,
   type ClipboardObservationOperation,
@@ -544,6 +546,38 @@ function reportClipboardReadObservation(
   }));
 }
 
+/**
+ * ED-IMPROVE-009: report a late clipboard result whose owner moved on, keeping
+ * the OS effect that already happened instead of dropping the observation.
+ */
+function reportClipboardCancelledObservation(
+  view: EditorView,
+  operation: ClipboardObservationOperation,
+  systemEffect: GuardedSystemEffect,
+  caretCount: number,
+  shape: {
+    baseGeneration?: number | null;
+    usedWorkspaceFallback?: boolean;
+    segmentCount?: number | null;
+    rectangular?: boolean;
+    payloadLength?: number | null;
+  } = {},
+): void {
+  const context = clipboardContextByView.get(view);
+  if (!context?.onObservation) return;
+  const snapshot = context.handle?.getSnapshot();
+  context.onObservation(createClipboardCancelledObservation({
+    operation,
+    systemEffect,
+    permission: snapshot?.permission ?? "unknown",
+    permissionGeneration: snapshot?.permissionGeneration ?? 0,
+    historyExclusion: snapshot?.exclusion ?? "recorded",
+    payloadRevision: snapshot?.payloadRevision ?? 0,
+    caretCount,
+    ...shape,
+  }));
+}
+
 type ClipboardStoreLike = Pick<WorkspaceClipboardHandle, "write" | "read" | "pasteFromHistory">
   & Partial<Pick<WorkspaceClipboardHandle, "historyExclusion">>;
 
@@ -698,8 +732,15 @@ function pasteSystemClipboard(view: EditorView): boolean {
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
-        // Stale/cancelled paste: no effect and, per the shared contract, no
-        // observation entry either.
+        // ED-IMPROVE-009: the paste is cancelled with no document/focus effect,
+        // but the OS read effect that already happened is still reported.
+        reportClipboardCancelledObservation(view, "paste", result.systemEffect, caretCountAtPaste, {
+          baseGeneration: result.outcome === "stale-generation" ? result.baseGeneration : null,
+          usedWorkspaceFallback: result.outcome !== "success" && !!result.fallbackSession,
+          segmentCount: result.outcome === "success" ? null : result.fallbackSession?.segments?.length ?? null,
+          rectangular: result.outcome === "success" ? false : result.fallbackSession?.rectangular ?? false,
+          payloadLength: result.outcome === "success" ? result.text.length : result.fallbackSession?.plainText.length ?? null,
+        });
         return;
       }
       reportClipboardReadObservation(view, "paste", result, caretCountAtPaste);
@@ -722,7 +763,7 @@ function pasteSystemClipboard(view: EditorView): boolean {
             ? "System clipboard access denied — pasted from in-workspace session slot instead"
             : result.outcome === "stale-generation"
             ? "Clipboard permission changed during read — pasted from in-workspace session slot instead"
-            : "System clipboard access denied — pasted from in-workspace session slot instead";
+            : "System clipboard read result is unknown — pasted from in-workspace session slot instead";
           context?.onUnavailable(reasonMsg);
           view.focus();
         } else {
@@ -730,7 +771,7 @@ function pasteSystemClipboard(view: EditorView): boolean {
             ? "System clipboard access denied and no in-workspace clipboard session available"
             : result.outcome === "stale-generation"
             ? "Clipboard permission changed during read and no in-workspace clipboard session available"
-            : "System clipboard access denied and no in-workspace clipboard session available";
+            : "System clipboard read result is unknown and no in-workspace clipboard session available";
           context?.onUnavailable(reasonMsg);
         }
       }
@@ -741,13 +782,23 @@ function pasteSystemClipboard(view: EditorView): boolean {
   void readCodeWorkspaceClipboardText()
     .then((result) => {
       if (
-        !result.ok
-        || !view.dom.isConnected
+        !view.dom.isConnected
         || view.composing
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
-        if (!result.ok && view.dom.isConnected && !view.composing) {
+        // ED-IMPROVE-009: cancelled paste keeps the OS read fact.
+        reportClipboardCancelledObservation(
+          view,
+          "paste",
+          result.ok ? "not-performed" : "unknown",
+          caretCountAtPaste,
+          { payloadLength: result.ok ? result.text.length : null },
+        );
+        return;
+      }
+      {
+        if (!result.ok) {
           const fallbackStore = workspaceStoreFor(context);
           const session = fallbackStore ? fallbackStore.read() : null;
           if (session) {
@@ -760,16 +811,16 @@ function pasteSystemClipboard(view: EditorView): boolean {
               rectangular: session.rectangular,
             });
             context?.onUnavailable(
-              "System clipboard access denied — pasted from in-workspace session slot instead",
+              "System clipboard read did not complete — pasted from in-workspace session slot instead",
             );
             view.focus();
           } else {
             context?.onUnavailable(
-              "System clipboard access denied and no in-workspace clipboard session available",
+              "System clipboard read did not complete and no in-workspace clipboard session available",
             );
           }
+          return;
         }
-        return;
       }
       pasteEditorClipboardPayload(
         view,
@@ -789,6 +840,7 @@ function pasteSystemClipboard(view: EditorView): boolean {
 function pasteAsPlainText(view: EditorView): boolean {
   if (view.composing || view.state.readOnly) return false;
   const docAtRequest = view.state.doc;
+  const selectionAtRequest = view.state.selection;
   const context = clipboardContextByView.get(view);
   const handle = context?.handle;
 
@@ -796,7 +848,19 @@ function pasteAsPlainText(view: EditorView): boolean {
 
   if (handle) {
     void handle.readSystemClipboard({ readTextResult: readCodeWorkspaceClipboardText }).then((result) => {
-      if (!view.dom.isConnected || view.composing || view.state.doc !== docAtRequest) return;
+      if (
+        !view.dom.isConnected
+        || view.composing
+        || view.state.doc !== docAtRequest
+        || !view.state.selection.eq(selectionAtRequest, true)
+      ) {
+        reportClipboardCancelledObservation(view, "paste-plain", result.systemEffect, caretCountAtPlainPaste, {
+          baseGeneration: result.outcome === "stale-generation" ? result.baseGeneration : null,
+          usedWorkspaceFallback: result.outcome !== "success" && !!result.fallbackSession,
+          payloadLength: result.outcome === "success" ? result.text.length : result.fallbackSession?.plainText.length ?? null,
+        });
+        return;
+      }
       reportClipboardReadObservation(view, "paste-plain", result, caretCountAtPlainPaste);
       const text = result.outcome === "success" ? result.text : result.fallbackSession?.plainText ?? "";
       if (!text) {
@@ -805,7 +869,7 @@ function pasteAsPlainText(view: EditorView): boolean {
             ? "Nothing to paste"
             : result.outcome === "denied"
             ? "System clipboard access denied and no in-workspace clipboard session available"
-            : "System clipboard access denied and no in-workspace clipboard session available",
+            : "System clipboard read result is unknown and no in-workspace clipboard session available",
         );
         return;
       }
@@ -827,12 +891,26 @@ function pasteAsPlainText(view: EditorView): boolean {
 
   void readCodeWorkspaceClipboardText()
     .then((result) => {
-      if (!view.dom.isConnected || view.composing || view.state.doc !== docAtRequest) return;
+      if (
+        !view.dom.isConnected
+        || view.composing
+        || view.state.doc !== docAtRequest
+        || !view.state.selection.eq(selectionAtRequest, true)
+      ) {
+        reportClipboardCancelledObservation(
+          view,
+          "paste-plain",
+          result.ok ? "not-performed" : "unknown",
+          caretCountAtPlainPaste,
+          { payloadLength: result.ok ? result.text.length : null },
+        );
+        return;
+      }
       const session = workspaceStoreFor(context)?.read() ?? null;
       const text = result.ok ? result.text : session?.plainText ?? "";
       if (!text) {
         context?.onUnavailable(
-          result.ok ? "Nothing to paste" : "System clipboard access denied and no in-workspace clipboard session available",
+          result.ok ? "Nothing to paste" : "System clipboard read did not complete and no in-workspace clipboard session available",
         );
         return;
       }
@@ -874,6 +952,14 @@ function cutSystemClipboard(view: EditorView): boolean {
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
+        // ED-IMPROVE-009: the cut is cancelled with no document/focus effect,
+        // but a possibly-performed OS write keeps its real effect fact.
+        reportClipboardCancelledObservation(view, "cut", res.systemEffect, caretCountAtCut, {
+          baseGeneration: res.outcome === "stale-generation" ? res.baseGeneration : null,
+          segmentCount: payload.segments ? payload.segments.length : null,
+          rectangular: payload.rectangular,
+          payloadLength: payload.plainText.length,
+        });
         return;
       }
       if (res.outcome === "success") {
@@ -912,6 +998,11 @@ function cutSystemClipboard(view: EditorView): boolean {
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
+        reportClipboardCancelledObservation(view, "cut", "unknown", caretCountAtCut, {
+          segmentCount: payload.segments ? payload.segments.length : null,
+          rectangular: payload.rectangular,
+          payloadLength: payload.plainText.length,
+        });
         return;
       }
       rememberEditorClipboardPayload(view, payload);

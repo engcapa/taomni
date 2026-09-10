@@ -28,7 +28,10 @@ export type ClipboardObservationOutcome =
   | "denied"
   | "stale-generation"
   | "unavailable"
-  | "error";
+  | "error"
+  /** ED-IMPROVE-009: the await settled after the owning view/document/
+   * selection/composition moved on; the OS effect axis is still reported. */
+  | "cancelled";
 
 export interface ClipboardObservationRecord {
   readonly operation: ClipboardObservationOperation;
@@ -133,6 +136,43 @@ export function createClipboardReadObservation(
     segmentCount: fallback?.segments ? fallback.segments.length : null,
     rectangular: fallback?.rectangular ?? false,
     payloadLength,
+    historyExclusion: input.historyExclusion,
+    payloadRevision: input.payloadRevision,
+    caretCount: input.caretCount,
+    observedAt: input.observedAt ?? Date.now(),
+  };
+}
+
+export interface ClipboardCancelledObservationInput extends ClipboardObservationInputBase {
+  /** The OS-boundary effect that already happened, never downgraded. */
+  systemEffect: GuardedSystemEffect;
+  baseGeneration?: number | null;
+  usedWorkspaceFallback?: boolean;
+  segmentCount?: number | null;
+  rectangular?: boolean;
+  payloadLength?: number | null;
+}
+
+/**
+ * ED-IMPROVE-009: a late read/write result whose owner moved on. The action is
+ * cancelled for UI purposes, but the system effect keeps whatever the OS
+ * boundary actually did (`performed` can never become `not-performed`, and an
+ * unprovable result stays `unknown`).
+ */
+export function createClipboardCancelledObservation(
+  input: ClipboardCancelledObservationInput,
+): ClipboardObservationRecord {
+  return {
+    operation: input.operation,
+    outcome: "cancelled",
+    systemEffect: input.systemEffect,
+    permission: input.permission,
+    permissionGeneration: input.permissionGeneration,
+    baseGeneration: input.baseGeneration ?? null,
+    usedWorkspaceFallback: input.usedWorkspaceFallback ?? false,
+    segmentCount: input.segmentCount ?? null,
+    rectangular: input.rectangular ?? false,
+    payloadLength: input.payloadLength ?? null,
     historyExclusion: input.historyExclusion,
     payloadRevision: input.payloadRevision,
     caretCount: input.caretCount,

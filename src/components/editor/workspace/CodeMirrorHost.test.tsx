@@ -1453,3 +1453,114 @@ describe("ED-IMPROVE-008 IME composition lifecycle wiring", () => {
     await waitFor(() => expect(owner.getDocument("ime.ts")).toBe("hello xy"));
   });
 });
+
+describe("ED-IMPROVE-009 late clipboard results report a cancelled observation", () => {
+  afterEach(() => cleanup());
+
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((res) => { resolve = res; });
+    return { promise, resolve };
+  }
+
+  function stubHandle(
+    read: () => Promise<unknown>,
+    write: () => Promise<unknown>,
+  ) {
+    return {
+      workspaceId: "ws-009",
+      attachConsumer: () => ({ detach: () => {} }),
+      getSnapshot: () => ({
+        permission: "granted",
+        permissionGeneration: 3,
+        exclusion: "recorded",
+        payloadRevision: 1,
+      }),
+      readSystemClipboard: read,
+      writeSystemClipboard: write,
+      write: () => { throw new Error("unused"); },
+      read: () => null,
+      clear: () => {},
+      release: () => {},
+      historyEntries: () => [],
+      pasteFromHistory: () => null,
+      removeHistoryEntry: () => false,
+      clearHistory: () => {},
+      setHistoryEnabled: () => {},
+      isHistoryEnabled: () => true,
+      setHistoryLimits: () => {},
+      historyLimits: () => ({ maxItems: 0, maxTotalBytes: 0 }),
+      historyExclusion: () => "recorded",
+      setPermission: () => {},
+      permission: () => "granted",
+      attachPermissionAdapter: () => () => {},
+      syncPermission: async () => "granted",
+      subscribe: () => () => {},
+    };
+  }
+
+  it("reports a cancelled paste with the OS read effect after the selection moved", async () => {
+    const pending = deferred<unknown>();
+    const observations: unknown[] = [];
+    let port: { execute: (id: string, options?: unknown) => boolean } | null = null;
+    const handle = stubHandle(() => pending.promise, async () => ({ outcome: "success", systemEffect: "performed" }));
+    renderEditor("hello world", vi.fn(), {
+      clipboardHandle: handle as never,
+      onClipboardObservation: (record) => { observations.push(record); },
+      onCommandPortChange: (registration) => { port = registration.port as never; },
+    });
+    await waitFor(() => expect(port).not.toBeNull());
+    const view = EditorView.findFromDOM(document.querySelector(".cm-editor")!)!;
+    act(() => {
+      port!.execute("paste");
+    });
+    act(() => {
+      view.dispatch({ selection: EditorSelection.cursor(5) });
+    });
+    act(() => {
+      pending.resolve({ outcome: "success", text: "payload", systemEffect: "performed" });
+    });
+    await waitFor(() => expect(observations).toHaveLength(1));
+    expect(observations[0]).toMatchObject({
+      operation: "paste",
+      outcome: "cancelled",
+      systemEffect: "performed",
+      permission: "granted",
+    });
+    expect(view.state.doc.toString()).toBe("hello world");
+  });
+
+  it("keeps a performed cut write fact after the document changed", async () => {
+    const pending = deferred<unknown>();
+    const observations: unknown[] = [];
+    let port: { execute: (id: string, options?: unknown) => boolean } | null = null;
+    const handle = stubHandle(async () => ({ outcome: "denied", systemEffect: "not-performed", fallbackSession: null }), () => pending.promise);
+    const rendered = renderEditor("hello world", vi.fn(), {
+      clipboardHandle: handle as never,
+      onClipboardObservation: (record) => { observations.push(record); },
+      onCommandPortChange: (registration) => { port = registration.port as never; },
+    });
+    await waitFor(() => expect(port).not.toBeNull());
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+    act(() => {
+      view.dispatch({ selection: EditorSelection.range(0, 5) });
+    });
+    act(() => {
+      port!.execute("cut");
+    });
+    act(() => {
+      view.dispatch({ selection: EditorSelection.cursor(0) });
+    });
+    act(() => {
+      pending.resolve({ outcome: "denied", systemEffect: "performed" });
+    });
+    await waitFor(() => expect(observations).toHaveLength(1));
+    expect(observations[0]).toMatchObject({
+      operation: "cut",
+      outcome: "cancelled",
+      systemEffect: "performed",
+    });
+    // No cut happened: the document keeps its text.
+    expect(view.state.doc.toString()).toBe("hello world");
+  });
+});
