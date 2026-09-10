@@ -1627,6 +1627,15 @@ export function CodeWorkspaceTab({
    */
   const mountedRef = useMountedRef();
   const [workspaceResourceOperationLocked, setWorkspaceResourceOperationLocked] = useState(false);
+  // ED-IMPROVE-001: live mirror so an awaited rearrange/cleanup run observes a
+  // read-only toggle that happens after the callback closure was created.
+  const workspaceResourceOperationLockedRef = useRef(workspaceResourceOperationLocked);
+  workspaceResourceOperationLockedRef.current = workspaceResourceOperationLocked;
+  // ED-IMPROVE-001: monotonic per-workflow request tokens. A newer invocation
+  // (double entry) supersedes the in-flight one, which then fails typed stale
+  // before any mutation.
+  const rearrangeRequestTokenRef = useRef(0);
+  const cleanupRequestTokenRef = useRef(0);
   const workspaceEditQueueRef = useRef<Promise<void>>(Promise.resolve());
   const providerCommandSemanticGuardRef = useRef<{
     generation: number;
@@ -2558,6 +2567,13 @@ export function CodeWorkspaceTab({
 
   useEffect(() => {
     setExternalFileConflicts([]);
+  }, [workspaceInstanceId]);
+
+  // ED-IMPROVE-001: switching the workspace supersedes any in-flight
+  // rearrange/cleanup identity even before readLive observes the switch.
+  useEffect(() => {
+    rearrangeRequestTokenRef.current += 1;
+    cleanupRequestTokenRef.current += 1;
   }, [workspaceInstanceId]);
 
   const semanticQueryHostRef = useRef(new WorkspaceSemanticQueryHost({
@@ -11869,6 +11885,9 @@ export function CodeWorkspaceTab({
   const runRearrangeExecute = useCallback(async (file: OpenFileState): Promise<boolean> => {
     const frozenKey = file.key;
     const frozenInstanceId = workspaceInstanceId;
+    // ED-IMPROVE-001: a new invocation (double entry) owns the workflow; the
+    // older run's token no longer matches and it fails typed stale.
+    ++rearrangeRequestTokenRef.current;
     // Absolute target: provider edit entries carry absolute disk paths or
     // URIs, while file.path is workspace-relative. Match with path-aware
     // equality so a well-formed provider edit is never filtered out, and a
@@ -11941,19 +11960,24 @@ export function CodeWorkspaceTab({
           return {
             text: live.text,
             revision: live.documentRevision,
-            readOnly: !!live.library || workspaceResourceOperationLocked,
+            readOnly: !!live.library || workspaceResourceOperationLockedRef.current,
             dirty: !!live.dirty,
           };
         },
         providerGeneration: () => lspSessionGeneration(),
+        requestToken: () => rearrangeRequestTokenRef.current,
         confirmPreview: (summary) => confirmAppDialog({
           title: "Rearrange preview",
           message: `${summary.targetPath}: ${summary.operationCount} edits. Pre ${summary.preHashShort} → post ${summary.postHashShort}. Apply the rearrangement?`,
           confirmLabel: "Apply rearrange",
         }),
-        applyEdit: async (edit) => {
+        applyEdit: async (edit, guard) => {
           try {
-            const outcomes = await applyLspWorkspaceEdit(edit, { recordHistory: true, label: "Rearrange Code" });
+            const outcomes = await applyLspWorkspaceEdit(edit, {
+              recordHistory: true,
+              label: "Rearrange Code",
+              preflightMutation: () => guard.assertCurrent(),
+            });
             const response = workspaceEditApplyResponse(outcomes);
             if (!response.applied) {
               return { state: "failed", reason: response.failureReason ?? "Rearrange apply failed; see the workspace-edit ledger" };
@@ -11972,7 +11996,7 @@ export function CodeWorkspaceTab({
         scope: "file",
         targetPath,
         targetUri,
-        readOnly: !!file.library || workspaceResourceOperationLocked,
+        readOnly: !!file.library || workspaceResourceOperationLockedRef.current,
         hasSelection: false,
         capabilities: resolveRearrangeCapabilities(activeCapabilities, activeLspState?.status),
       },
@@ -11994,7 +12018,6 @@ export function CodeWorkspaceTab({
     lspSessionGeneration,
     requestCodeActions,
     workspaceInstanceId,
-    workspaceResourceOperationLocked,
   ]);
 
   // ED-AUDIT-016: production execute owner for Code Cleanup. The fake
@@ -12003,6 +12026,8 @@ export function CodeWorkspaceTab({
   const runCleanupExecute = useCallback(async (file: OpenFileState): Promise<boolean> => {
     const frozenKey = file.key;
     const frozenInstanceId = workspaceInstanceId;
+    // ED-IMPROVE-001: same request-token supersession as the rearrange owner.
+    ++cleanupRequestTokenRef.current;
     const targetPath = absolutePathForOpenFile(file) ?? file.path ?? file.key;
     const descriptor = lspDescriptorForFile(file);
     if (!descriptor) {
@@ -12071,19 +12096,24 @@ export function CodeWorkspaceTab({
           return {
             text: live.text,
             revision: live.documentRevision,
-            readOnly: !!live.library || workspaceResourceOperationLocked,
+            readOnly: !!live.library || workspaceResourceOperationLockedRef.current,
             dirty: !!live.dirty,
           };
         },
         providerGeneration: () => lspSessionGeneration(),
+        requestToken: () => cleanupRequestTokenRef.current,
         confirmPreview: (summary) => confirmAppDialog({
           title: "Code cleanup preview",
           message: `${summary.targetPath} [${summary.profileId}]: ${summary.operationCount} edits. Pre ${summary.preHashShort} → post ${summary.postHashShort}. Apply the cleanup?`,
           confirmLabel: "Apply cleanup",
         }),
-        applyEdit: async (edit) => {
+        applyEdit: async (edit, guard) => {
           try {
-            const outcomes = await applyLspWorkspaceEdit(edit, { recordHistory: true, label: "Code Cleanup" });
+            const outcomes = await applyLspWorkspaceEdit(edit, {
+              recordHistory: true,
+              label: "Code Cleanup",
+              preflightMutation: () => guard.assertCurrent(),
+            });
             const response = workspaceEditApplyResponse(outcomes);
             if (!response.applied) {
               return { state: "failed", reason: response.failureReason ?? "Cleanup apply failed; see the workspace-edit ledger" };
@@ -12102,7 +12132,7 @@ export function CodeWorkspaceTab({
         scope: "file",
         targetPath,
         targetUri,
-        readOnly: !!file.library || workspaceResourceOperationLocked,
+        readOnly: !!file.library || workspaceResourceOperationLockedRef.current,
         capabilities: resolveCleanupCapabilities(activeCapabilities, activeLspState?.status),
       },
     );
@@ -12123,7 +12153,6 @@ export function CodeWorkspaceTab({
     lspSessionGeneration,
     requestCodeActions,
     workspaceInstanceId,
-    workspaceResourceOperationLocked,
   ]);
 
   const workspaceCommands = useMemo<WorkspaceCommand[]>(() => [

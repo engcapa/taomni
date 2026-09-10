@@ -589,13 +589,114 @@ export interface RearrangeApplyResult {
   reason?: string;
 }
 
+/**
+ * Typed terminal failure states for one execute attempt (shared-contract §3).
+ * A caller never has to guess from prose whether the provider was absent, the
+ * user cancelled, a frozen identity went stale, or execution actually failed.
+ */
+export type WorkflowExecuteFailureState =
+  | "unsupported"
+  | "unavailable"
+  | "cancelled"
+  | "stale"
+  | "conflict"
+  | "failed";
+
+export type WorkflowIdentityCheck =
+  | { ok: true }
+  | { ok: false; state: "cancelled" | "stale" | "conflict"; reason: string };
+
+/**
+ * ED-IMPROVE-001: frozen-identity barrier shared by the workflow execute
+ * owner and the canonical apply boundary. The workflow checks it after every
+ * await window; the Tab apply adapter wires `assertCurrent` into
+ * `preflightMutation`, so the last check runs immediately before the first
+ * irreversible mutation, after preview dialogs have closed.
+ */
+export interface WorkflowMutationGuard {
+  check(): WorkflowIdentityCheck;
+  assertCurrent(): void;
+}
+
+interface WorkflowIdentityDeps {
+  readLive(): RearrangeLiveDocument | CleanupLiveDocument | null;
+  providerGeneration(): number;
+  requestToken?(): number;
+}
+
+interface FrozenWorkflowIdentity {
+  targetPath: string;
+  textSha256: string;
+  providerGeneration: number;
+  requestToken?: number;
+}
+
+function buildWorkflowMutationGuard(
+  deps: WorkflowIdentityDeps,
+  frozen: FrozenWorkflowIdentity,
+): WorkflowMutationGuard {
+  const check = (): WorkflowIdentityCheck => {
+    const live = deps.readLive();
+    if (!live) {
+      return {
+        ok: false,
+        state: "cancelled",
+        reason: `${frozen.targetPath} closed or the workspace changed`,
+      };
+    }
+    if (live.readOnly) {
+      return {
+        ok: false,
+        state: "conflict",
+        reason: `${frozen.targetPath} became read-only`,
+      };
+    }
+    if (sha256Hex(live.text) !== frozen.textSha256) {
+      return {
+        ok: false,
+        state: "stale",
+        reason: `${frozen.targetPath} changed since the frozen preimage`,
+      };
+    }
+    if (
+      frozen.requestToken !== undefined
+      && deps.requestToken
+      && deps.requestToken() !== frozen.requestToken
+    ) {
+      return {
+        ok: false,
+        state: "stale",
+        reason: "a newer request superseded this one",
+      };
+    }
+    if (deps.providerGeneration() !== frozen.providerGeneration) {
+      return {
+        ok: false,
+        state: "stale",
+        reason: `provider generation changed (${frozen.providerGeneration} -> ${deps.providerGeneration()})`,
+      };
+    }
+    return { ok: true };
+  };
+  return {
+    check,
+    assertCurrent() {
+      const current = check();
+      if (!current.ok) throw new Error(current.reason);
+    },
+  };
+}
+
 export interface RearrangeExecuteDeps {
   requestActions(): Promise<RearrangeRequestResult>;
   resolveAction(action: RearrangeProviderAction): Promise<RearrangeResolveResult>;
   readLive(): RearrangeLiveDocument | null;
   providerGeneration(): number;
+  /** Monotonic UI request token; a newer value supersedes the in-flight run. */
+  requestToken?(): number;
   confirmPreview(summary: RearrangePreviewSummary): Promise<boolean>;
-  applyEdit(edit: LspWorkspaceEdit): Promise<RearrangeApplyResult>;
+  /** Canonical apply; receives the pre-mutation identity barrier. */
+  applyEdit(edit: LspWorkspaceEdit, guard: WorkflowMutationGuard): Promise<RearrangeApplyResult>;
 }
 
 export interface RearrangeExecuteInput {
@@ -609,31 +710,36 @@ export interface RearrangeExecuteInput {
 
 export type RearrangeExecuteResult =
   | { ok: true; postHash: string; operationCount: number }
-  | { ok: false; reason: string; committed: false };
+  | { ok: false; state: WorkflowExecuteFailureState; reason: string; committed: false };
 
 /**
- * ED-AUDIT-015 execute owner: gate -> freeze text/provider-generation ->
- * request a dedicated rearrange action -> resolve to edits -> re-read live
- * and plan with preview data -> precondition/freshness gates -> confirm gate
- * -> canonical apply -> postcondition verify. Every early return commits
- * nothing; only a post-hash-verified apply returns ok:true.
+ * ED-AUDIT-015 + ED-IMPROVE-001 execute owner: gate -> freeze text/provider-
+ * generation/request-token -> request a dedicated rearrange action -> resolve
+ * to edits -> re-read live and plan from the frozen preimage -> precondition/
+ * freshness gates -> confirm gate -> post-confirm identity gate -> canonical
+ * apply with a final pre-mutation guard -> postcondition verify. Every early
+ * return commits nothing; only a post-hash-verified apply returns ok:true.
  *
  * Revision pinning is deliberately text-anchored, not revision-anchored: a
  * background LSP sync may bump the document revision without changing a
- * byte (observed: 0 -> 1 on open), and refusing that would be a false
- * stale. The plan carries no pinned revision, so the applier's version gate
- * is bypassed by design; instead the frozen text hash is re-verified
- * immediately before apply, and the postcondition hash after it. A
- * same-text revision bump is therefore harmless, while any byte change
- * refuses. Supported-branch callers MUST mark test-double coverage as
- * model-boundary: only a live capable provider proves the provider half of
- * this chain.
+ * byte (observed: 0 -> 1 on open), so refusing that would be a false stale.
+ * A same-text revision bump re-anchors silently; any byte change refuses at
+ * the next guard. The plan carries no pinned revision, so the applier's
+ * version gate stays bypassed by design — the frozen text hash is re-verified
+ * by the workflow after every await window and by the shared apply boundary
+ * immediately before the first mutation.
+ *
+ * Supported-branch callers MUST mark test-double coverage as model-boundary:
+ * only a live capable provider proves the provider half of this chain.
  */
 export async function executeRearrangeTransaction(
   deps: RearrangeExecuteDeps,
   input: RearrangeExecuteInput,
 ): Promise<RearrangeExecuteResult> {
-  const fail = (reason: string): RearrangeExecuteResult => ({ ok: false, reason, committed: false });
+  const fail = (
+    state: WorkflowExecuteFailureState,
+    reason: string,
+  ): RearrangeExecuteResult => ({ ok: false, state, reason, committed: false });
 
   // 0. Zero-IO pre-gate: no target or readonly short-circuits without
   // touching the provider. Advertised capability support is deliberately
@@ -646,10 +752,10 @@ export async function executeRearrangeTransaction(
   const requestedScope: "selection" | "file" =
     input.scope === "selection" && input.hasSelection ? "selection" : "file";
   if (!input.targetPath) {
-    return fail("No file is open to rearrange");
+    return fail("unavailable", "No file is open to rearrange");
   }
   if (input.readOnly) {
-    return fail(`${input.targetPath} is read-only and cannot be rearranged`);
+    return fail("conflict", `${input.targetPath} is read-only and cannot be rearranged`);
   }
   const decision = {
     scope: requestedScope,
@@ -658,23 +764,42 @@ export async function executeRearrangeTransaction(
       : undefined,
   };
 
-  // 1. Freeze the live text for closed/readonly gating. The preimage used by
-  // the plan is re-read after resolve (step 5) so a benign background sync
-  // between request and plan never trips a false stale.
+  // 1. Freeze every identity the operation depends on before the first
+  // await: text hash (ground truth), provider generation and UI request
+  // token. File/workspace identity is carried by readLive() (null once the
+  // file closes or the workspace switches).
   const frozen = deps.readLive();
   if (!frozen) {
-    return fail(`${input.targetPath} is no longer open; rearrange cancelled with zero effect`);
+    return fail("cancelled", `${input.targetPath} is no longer open; rearrange cancelled with zero effect`);
   }
   if (frozen.readOnly) {
-    return fail(`${input.targetPath} is read-only and cannot be rearranged`);
+    return fail("conflict", `${input.targetPath} is read-only and cannot be rearranged`);
   }
   const frozenGeneration = deps.providerGeneration();
+  const frozenToken = deps.requestToken?.();
+  const frozenTextSha256 = sha256Hex(frozen.text);
+  const guard = buildWorkflowMutationGuard(deps, {
+    targetPath: input.targetPath,
+    textSha256: frozenTextSha256,
+    providerGeneration: frozenGeneration,
+    requestToken: frozenToken,
+  });
+  const guardFailure = (window: string): RearrangeExecuteResult | null => {
+    const current = guard.check();
+    if (current.ok) return null;
+    return fail(current.state, `${window} rejected the stale plan: ${current.reason}; nothing applied`);
+  };
 
   // 2. Request dedicated provider actions (the request itself freezes identity).
   const requested = await deps.requestActions();
   if (requested.state !== "ok") {
-    return fail(requested.reason ?? `Rearrange request ${requested.state}; nothing applied`);
+    return fail(
+      mapRequestFailureState(requested.state),
+      requested.reason ?? `Rearrange request ${requested.state}; nothing applied`,
+    );
   }
+  const afterRequest = guardFailure("Rearrange after the provider request");
+  if (afterRequest) return afterRequest;
 
   // 3. Resolve to a callable rearrange-kind action by exact kind equality.
   const action = requested.actions.find((candidate) => isRearrangeActionKind(candidate.kind)) ?? null;
@@ -684,30 +809,39 @@ export async function executeRearrangeTransaction(
       .slice(0, 3)
       .join(", ");
     return fail(
+      "unsupported",
       seen
         ? `Provider returned no rearrange action (received kinds: ${seen}). Rearrange Code requires a dedicated arrangement provider; nothing applied.`
         : "Provider returned no actions. Rearrange Code requires a dedicated arrangement provider; nothing applied.",
     );
   }
 
-  // 4. Resolve the action to concrete edits.
+  // 4. Resolve the action to concrete edits, then reject if the provider or
+  // document identity moved while the resolve was in flight.
   const resolved = await deps.resolveAction(action);
   if (resolved.state !== "resolved") {
-    return fail(resolved.reason ?? `Rearrange resolve ${resolved.state}; nothing applied`);
+    return fail(
+      mapResolveFailureState(resolved.state),
+      resolved.reason ?? `Rearrange resolve ${resolved.state}; nothing applied`,
+    );
   }
   if (resolved.edits.length === 0) {
-    return fail(`Provider action '${action.title}' carried no edits; nothing applied`);
+    return fail("unsupported", `Provider action '${action.title}' carried no edits; nothing applied`);
   }
+  const afterResolve = guardFailure("Rearrange after the provider resolve");
+  if (afterResolve) return afterResolve;
 
-  // 5. Re-read live and build the plan from post-resolve bytes with preview
-  // data. No pinned revision travels into the plan: the text hash below is
-  // the ground truth, and a same-text revision bump re-anchors silently.
+  // 5. Build the plan from the verified frozen preimage. A changed buffer is
+  // never re-anchored onto stale edits.
   const planLive = deps.readLive();
   if (!planLive) {
-    return fail(`${input.targetPath} is no longer open; rearrange cancelled with zero effect`);
+    return fail("cancelled", `${input.targetPath} is no longer open; rearrange cancelled with zero effect`);
   }
   if (planLive.readOnly) {
-    return fail(`${input.targetPath} is read-only and cannot be rearranged`);
+    return fail("conflict", `${input.targetPath} is read-only and cannot be rearranged`);
+  }
+  if (sha256Hex(planLive.text) !== frozenTextSha256) {
+    return fail("stale", `${input.targetPath} changed since the frozen preimage; request the rearrange again`);
   }
   const plan = buildRearrangePlan({
     scope: decision.scope,
@@ -721,29 +855,30 @@ export async function executeRearrangeTransaction(
     isDirty: planLive.dirty,
   });
   if (plan.conflicts.length > 0) {
-    return fail(plan.conflicts[0].message);
-  }
-  const live = deps.readLive();
-  if (!live) {
-    return fail(`${input.targetPath} is no longer open; rearrange cancelled with zero effect`);
+    return fail("conflict", plan.conflicts[0].message);
   }
   const preconditions = verifyWorkflowPreconditions(plan, {
-    [input.targetPath]: { text: live.text, readOnly: live.readOnly },
-    [input.targetUri]: { text: live.text, readOnly: live.readOnly },
+    [input.targetPath]: { text: planLive.text, readOnly: planLive.readOnly },
+    [input.targetUri]: { text: planLive.text, readOnly: planLive.readOnly },
   });
   if (!preconditions.ok) {
-    return fail(preconditions.conflict?.message ?? `${input.targetPath} changed since plan generation; nothing applied`);
+    return fail(
+      preconditions.conflict?.reason === "read-only" ? "conflict" : "stale",
+      preconditions.conflict?.message ?? `${input.targetPath} changed since plan generation; nothing applied`,
+    );
   }
   const freshness = verifyWorkflowFreshness(
     { providerGeneration: frozenGeneration },
     { providerGeneration: deps.providerGeneration() },
   );
   if (!freshness.ok) {
-    return fail(`Rearrange became stale: ${freshness.staleReason}; request it again`);
+    return fail("stale", `Rearrange became stale: ${freshness.staleReason}; request it again`);
   }
 
-  // 6. Preview confirm gate: cancel commits nothing.
-  const preHash = plan.preconditions[0]?.preTextSha256 ?? sha256Hex(frozen.text);
+  // 6. Preview confirm gate: cancel commits nothing. A document that moved
+  // while the preview was open invalidates the whole plan instead of being
+  // re-anchored.
+  const preHash = plan.preconditions[0]?.preTextSha256 ?? frozenTextSha256;
   const postHash = plan.expectedPostHashes[input.targetPath] ?? "";
   const confirmed = await deps.confirmPreview({
     targetPath: input.targetPath,
@@ -753,23 +888,58 @@ export async function executeRearrangeTransaction(
   });
   if (!confirmed) {
     cancelWorkflowPlan(plan);
-    return fail("Rearrange cancelled before applying; nothing changed");
+    return fail("cancelled", "Rearrange cancelled before applying; nothing changed");
+  }
+  const afterPreview = guardFailure("Rearrange after the preview confirmation");
+  if (afterPreview) {
+    cancelWorkflowPlan(plan);
+    return afterPreview;
   }
 
-  // 7. Canonical apply, then postcondition verification against real bytes.
-  const applied = await deps.applyEdit(plan.edit);
+  // 7. Canonical apply with the last identity check inside the shared apply
+  // boundary, then postcondition verification against real bytes.
+  const applied = await deps.applyEdit(plan.edit, guard);
   if (applied.state !== "applied" || applied.postText === undefined) {
-    return fail(applied.reason ?? "Rearrange apply failed; see the workspace-edit ledger");
+    const current = guard.check();
+    if (!current.ok) {
+      return fail(
+        current.state,
+        applied.reason
+          ? `${current.reason}: ${applied.reason}`
+          : `${current.reason}; nothing applied`,
+      );
+    }
+    return fail(
+      applied.state === "conflict" ? "conflict" : "failed",
+      applied.reason ?? "Rearrange apply failed; see the workspace-edit ledger",
+    );
   }
   const post = verifyWorkflowPostHashes(plan.expectedPostHashes, {
     [input.targetPath]: applied.postText,
   });
   if (!post.ok) {
     return fail(
+      "failed",
       `Rearrange postcondition failed on ${post.mismatchedFiles.join(", ")}; applied effects are listed for recovery. Undo was not registered.`,
     );
   }
   return { ok: true, postHash: plan.expectedPostHashes[input.targetPath], operationCount: resolved.edits.length };
+}
+
+function mapRequestFailureState(
+  state: RearrangeRequestState | CleanupRequestState,
+): WorkflowExecuteFailureState {
+  if (state === "cancelled") return "cancelled";
+  if (state === "stale") return "stale";
+  return "failed";
+}
+
+function mapResolveFailureState(
+  state: RearrangeResolveState | CleanupResolveState,
+): WorkflowExecuteFailureState {
+  if (state === "unsupported") return "unsupported";
+  if (state === "stale") return "stale";
+  return "failed";
 }
 
 /**
@@ -849,8 +1019,11 @@ export interface CleanupExecuteDeps {
   resolveAction(action: CleanupProviderAction): Promise<CleanupResolveResult>;
   readLive(): CleanupLiveDocument | null;
   providerGeneration(): number;
+  /** Monotonic UI request token; a newer value supersedes the in-flight run. */
+  requestToken?(): number;
   confirmPreview(summary: CleanupPreviewSummary): Promise<boolean>;
-  applyEdit(edit: LspWorkspaceEdit): Promise<CleanupApplyResult>;
+  /** Canonical apply; receives the pre-mutation identity barrier. */
+  applyEdit(edit: LspWorkspaceEdit, guard: WorkflowMutationGuard): Promise<CleanupApplyResult>;
 }
 
 export interface CleanupExecuteInput {
@@ -864,58 +1037,78 @@ export interface CleanupExecuteInput {
 
 export type CleanupExecuteResult =
   | { ok: true; postHash: string; operationCount: number }
-  | { ok: false; reason: string; committed: false };
+  | { ok: false; state: WorkflowExecuteFailureState; reason: string; committed: false };
 
 /**
- * ED-AUDIT-016 execute owner: zero-IO no-target/readonly/scope pre-gate ->
- * freeze text -> request a dedicated cleanup action -> resolve to edits ->
- * re-read live and plan with preview data -> precondition/freshness gates ->
- * confirm gate -> canonical apply -> postcondition verify. Every early
- * return commits nothing; only a post-hash-verified apply returns ok:true.
- * Capability support is decided by live discovery (exact kind equality),
- * never by advertised summaries — mirroring the rearrange owner, since no
- * known provider advertises cleanup kinds.
+ * ED-AUDIT-016 + ED-IMPROVE-001 execute owner: zero-IO no-target/readonly/
+ * scope pre-gate -> freeze text/generation/token -> request a dedicated
+ * cleanup action -> resolve to edits -> plan from the verified frozen
+ * preimage -> precondition/freshness gates -> no-change fact -> confirm gate
+ * -> post-confirm identity gate -> canonical apply with a final pre-mutation
+ * guard -> postcondition verify. Capability support is decided by live
+ * discovery (exact kind equality), never by advertised summaries.
  */
 export async function executeCleanupTransaction(
   deps: CleanupExecuteDeps,
   input: CleanupExecuteInput,
 ): Promise<CleanupExecuteResult> {
-  const fail = (reason: string): CleanupExecuteResult => ({ ok: false, reason, committed: false });
+  const fail = (
+    state: WorkflowExecuteFailureState,
+    reason: string,
+  ): CleanupExecuteResult => ({ ok: false, state, reason, committed: false });
 
   // 0. Zero-IO pre-gate: no target, readonly, or non-file scope/profile
   // short-circuits without touching the provider. Scope is fixed to the
   // current file with the default profile per spec; anything else stays
   // unavailable with an exact reason instead of silently narrowing.
   if (!input.targetPath) {
-    return fail("No target is selected for code cleanup");
+    return fail("unavailable", "No target is selected for code cleanup");
   }
   if (input.readOnly) {
-    return fail(`${input.targetPath} is read-only and cannot be cleaned up`);
+    return fail("conflict", `${input.targetPath} is read-only and cannot be cleaned up`);
   }
   const profileId = input.profileId ?? "default";
   if (input.scope !== "file") {
-    return fail(`Code Cleanup covers the current file only; ${input.scope} scope is unavailable`);
+    return fail("unavailable", `Code Cleanup covers the current file only; ${input.scope} scope is unavailable`);
   }
   if (profileId !== "default") {
-    return fail(`Cleanup profile '${profileId}' is unavailable; only the default profile is supported`);
+    return fail("unavailable", `Cleanup profile '${profileId}' is unavailable; only the default profile is supported`);
   }
 
-  // 1. Freeze the live text. Same text-anchored (not revision-anchored)
+  // 1. Freeze every identity before the first await. Same text-anchored
   // discipline as the rearrange owner.
   const frozen = deps.readLive();
   if (!frozen) {
-    return fail(`${input.targetPath} is no longer open; cleanup cancelled with zero effect`);
+    return fail("cancelled", `${input.targetPath} is no longer open; cleanup cancelled with zero effect`);
   }
   if (frozen.readOnly) {
-    return fail(`${input.targetPath} is read-only and cannot be cleaned up`);
+    return fail("conflict", `${input.targetPath} is read-only and cannot be cleaned up`);
   }
   const frozenGeneration = deps.providerGeneration();
+  const frozenToken = deps.requestToken?.();
+  const frozenTextSha256 = sha256Hex(frozen.text);
+  const guard = buildWorkflowMutationGuard(deps, {
+    targetPath: input.targetPath,
+    textSha256: frozenTextSha256,
+    providerGeneration: frozenGeneration,
+    requestToken: frozenToken,
+  });
+  const guardFailure = (window: string): CleanupExecuteResult | null => {
+    const current = guard.check();
+    if (current.ok) return null;
+    return fail(current.state, `${window} rejected the stale plan: ${current.reason}; nothing applied`);
+  };
 
   // 2. Request dedicated provider actions (the request itself freezes identity).
   const requested = await deps.requestActions();
   if (requested.state !== "ok") {
-    return fail(requested.reason ?? `Cleanup request ${requested.state}; nothing applied`);
+    return fail(
+      mapRequestFailureState(requested.state),
+      requested.reason ?? `Cleanup request ${requested.state}; nothing applied`,
+    );
   }
+  const afterRequest = guardFailure("Cleanup after the provider request");
+  if (afterRequest) return afterRequest;
 
   // 3. Resolve to a callable cleanup-kind action by exact kind equality.
   const action = requested.actions.find((candidate) => isCleanupActionKind(candidate.kind)) ?? null;
@@ -925,28 +1118,38 @@ export async function executeCleanupTransaction(
       .slice(0, 3)
       .join(", ");
     return fail(
+      "unsupported",
       seen
         ? `Provider returned no cleanup action (received kinds: ${seen}). Code Cleanup requires a dedicated batch cleanup provider; nothing applied.`
         : "Provider returned no actions. Code Cleanup requires a dedicated batch cleanup provider; nothing applied.",
     );
   }
 
-  // 4. Resolve the action to concrete edits.
+  // 4. Resolve the action to concrete edits, then reject if the provider or
+  // document identity moved while the resolve was in flight.
   const resolved = await deps.resolveAction(action);
   if (resolved.state !== "resolved") {
-    return fail(resolved.reason ?? `Cleanup resolve ${resolved.state}; nothing applied`);
+    return fail(
+      mapResolveFailureState(resolved.state),
+      resolved.reason ?? `Cleanup resolve ${resolved.state}; nothing applied`,
+    );
   }
   if (resolved.edits.length === 0) {
-    return fail(`Provider action '${action.title}' carried no edits; nothing applied`);
+    return fail("unsupported", `Provider action '${action.title}' carried no edits; nothing applied`);
   }
+  const afterResolve = guardFailure("Cleanup after the provider resolve");
+  if (afterResolve) return afterResolve;
 
-  // 5. Re-read live and build the plan from post-resolve bytes.
+  // 5. Build the plan from the verified frozen preimage.
   const planLive = deps.readLive();
   if (!planLive) {
-    return fail(`${input.targetPath} is no longer open; cleanup cancelled with zero effect`);
+    return fail("cancelled", `${input.targetPath} is no longer open; cleanup cancelled with zero effect`);
   }
   if (planLive.readOnly) {
-    return fail(`${input.targetPath} is read-only and cannot be cleaned up`);
+    return fail("conflict", `${input.targetPath} is read-only and cannot be cleaned up`);
+  }
+  if (sha256Hex(planLive.text) !== frozenTextSha256) {
+    return fail("stale", `${input.targetPath} changed since the frozen preimage; request the cleanup again`);
   }
   const plan = buildCleanupPlan({
     scope: "file",
@@ -963,33 +1166,32 @@ export async function executeCleanupTransaction(
     isDirty: planLive.dirty,
   });
   if (plan.conflicts.length > 0) {
-    return fail(plan.conflicts[0].message);
-  }
-  const live = deps.readLive();
-  if (!live) {
-    return fail(`${input.targetPath} is no longer open; cleanup cancelled with zero effect`);
+    return fail("conflict", plan.conflicts[0].message);
   }
   const preconditions = verifyWorkflowPreconditions(plan, {
-    [input.targetPath]: { text: live.text, readOnly: live.readOnly },
-    [input.targetUri]: { text: live.text, readOnly: live.readOnly },
+    [input.targetPath]: { text: planLive.text, readOnly: planLive.readOnly },
+    [input.targetUri]: { text: planLive.text, readOnly: planLive.readOnly },
   });
   if (!preconditions.ok) {
-    return fail(preconditions.conflict?.message ?? `${input.targetPath} changed since plan generation; nothing applied`);
+    return fail(
+      preconditions.conflict?.reason === "read-only" ? "conflict" : "stale",
+      preconditions.conflict?.message ?? `${input.targetPath} changed since plan generation; nothing applied`,
+    );
   }
   const freshness = verifyWorkflowFreshness(
     { providerGeneration: frozenGeneration },
     { providerGeneration: deps.providerGeneration() },
   );
   if (!freshness.ok) {
-    return fail(`Cleanup became stale: ${freshness.staleReason}; request it again`);
+    return fail("stale", `Cleanup became stale: ${freshness.staleReason}; request it again`);
   }
 
   // 6. Preview confirm gate: cancel commits nothing. An empty edit is a
   // no-change fact, reported without claiming fixes were applied.
-  const preHash = plan.preconditions[0]?.preTextSha256 ?? sha256Hex(frozen.text);
+  const preHash = plan.preconditions[0]?.preTextSha256 ?? frozenTextSha256;
   const postHash = plan.expectedPostHashes[input.targetPath] ?? "";
   if (preHash === postHash) {
-    return fail("Cleanup produced no changes; nothing applied");
+    return fail("unavailable", "Cleanup produced no changes; nothing applied");
   }
   const confirmed = await deps.confirmPreview({
     targetPath: input.targetPath,
@@ -1000,19 +1202,38 @@ export async function executeCleanupTransaction(
   });
   if (!confirmed) {
     cancelWorkflowPlan(plan);
-    return fail("Cleanup cancelled before applying; nothing changed");
+    return fail("cancelled", "Cleanup cancelled before applying; nothing changed");
+  }
+  const afterPreview = guardFailure("Cleanup after the preview confirmation");
+  if (afterPreview) {
+    cancelWorkflowPlan(plan);
+    return afterPreview;
   }
 
-  // 7. Canonical apply, then postcondition verification against real bytes.
-  const applied = await deps.applyEdit(plan.edit);
+  // 7. Canonical apply with the last identity check inside the shared apply
+  // boundary, then postcondition verification against real bytes.
+  const applied = await deps.applyEdit(plan.edit, guard);
   if (applied.state !== "applied" || applied.postText === undefined) {
-    return fail(applied.reason ?? "Cleanup apply failed; see the workspace-edit ledger");
+    const current = guard.check();
+    if (!current.ok) {
+      return fail(
+        current.state,
+        applied.reason
+          ? `${current.reason}: ${applied.reason}`
+          : `${current.reason}; nothing applied`,
+      );
+    }
+    return fail(
+      applied.state === "conflict" ? "conflict" : "failed",
+      applied.reason ?? "Cleanup apply failed; see the workspace-edit ledger",
+    );
   }
   const post = verifyWorkflowPostHashes(plan.expectedPostHashes, {
     [input.targetPath]: applied.postText,
   });
   if (!post.ok) {
     return fail(
+      "failed",
       `Cleanup postcondition failed on ${post.mismatchedFiles.join(", ")}; applied effects are listed for recovery. Undo was not registered.`,
     );
   }

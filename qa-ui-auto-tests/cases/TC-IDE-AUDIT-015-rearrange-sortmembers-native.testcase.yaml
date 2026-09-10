@@ -19,6 +19,11 @@ description: |
   4. One shared undo names the Rearrange Code journal entry, a save returns
      the exact original bytes (sha256 pinned from the host-written source),
      proving single-undo preimage restore.
+  5. ED-IMPROVE-001: while the first preview dialog is open, an external
+     process rewrites the file; the clean buffer reloads from disk, so
+     confirming that old preview must be rejected with a typed stale status
+     and zero writes (exact bytes of the external revision stay on disk)
+     before the normal rearrange flow runs on the restored preimage.
 
   Highest claim on green: L2 native + provider-backed (Linux), packaged app
   UI over a real jdtls process, real disk bytes. IDEA comparison (required
@@ -58,6 +63,83 @@ steps:
   # every run (build-jobs-finished ~20s); the live codeAction discovery
   # behind Rearrange Code needs the import done, like the 014 gate.
   - wait: 30
+  # ---------------------------------------------------------------------
+  # ED-IMPROVE-001 phase: a document that changes while the preview is open
+  # must invalidate the plan (zero writes), instead of committing edits built
+  # for the old preimage.
+  # ---------------------------------------------------------------------
+  - press: Control+Shift+N
+  - wait_for:
+      selector: '[data-testid="code-workspace-search-everywhere"]'
+      timeout_sec: 30
+  - click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-child(5)'
+  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+  - type: Rearrange Code
+  - press: Enter
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="confirm-dialog"]'
+      contains: "Rearrange preview"
+      timeout_sec: 10
+  # A real external process rewrites the file while the preview dialog is
+  # open. The buffer is clean, so the workspace watcher reloads it from disk.
+  - host_write_file:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      text: |
+        package com.example.single;
+
+        public class SortMembers {
+            void zebra() {
+            }
+        }
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "SortMembers.java from disk"
+      timeout_sec: 30
+  # Confirming the stale preview is rejected with a typed reason, the
+  # external revision stays on disk, and no rearrange status appears.
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "changed since the frozen preimage"
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "void zebra"
+      timeout_sec: 10
+  - assert_file_sha256:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      equals: "224c54e2637efff8c89c5d0fc2901fd0254fdb3a8d88b35b45e6a336955a1e02"
+      timeout_sec: 30
+  # Restore the exact fixture preimage before the positive path.
+  - host_write_file:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      text: |
+        package com.example.single;
+
+        public class SortMembers {
+            void zebra() {
+            }
+
+            void apple() {
+            }
+
+            private int laterField = 2;
+            private int earlyField = 1;
+        }
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "SortMembers.java from disk"
+      timeout_sec: 30
+  - assert_file_sha256:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      equals: "68142feae5f38ffc310302e58f6a211c61c9d68994cfa5b643d2fbcaf239f93b"
+      timeout_sec: 30
+  # ---------------------------------------------------------------------
+  # Positive path: live discovery -> preview -> apply -> single undo.
+  # ---------------------------------------------------------------------
   # Production entry: Search Everywhere Actions -> Rearrange Code (the
   # workspace.rearrangeCode command). The Actions tab is the 5th tab button
   # (All/Classes/Files/Symbols/Actions/Text); the nth-child selector follows
