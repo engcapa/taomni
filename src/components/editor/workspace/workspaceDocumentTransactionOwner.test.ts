@@ -3,6 +3,7 @@ import { EditorState, ChangeSet } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import {
   WorkspaceDocumentTransactionOwner,
+  LARGE_FILE_UNDO_DEPTH,
   remoteTransactionAnnotation,
   type DocumentChangeDelta,
   type DocumentTransaction,
@@ -285,5 +286,45 @@ describe("§8.26 / ED-MULTIVIEW-002: WorkspaceDocumentTransactionOwner", () => {
     expect(owner.getDocument("main.ts")).toBe("package app;\n\nclass Main {}\n");
     expect(owner.redo("main.ts", "primary")).not.toBeNull();
     expect(owner.getDocument("main.ts")).toBe(applied);
+  });
+});
+
+describe("ED-AUDIT-005: large-file undo depth bound", () => {
+  // 2 MiB initial text trips the large-file threshold; each keystroke then
+  // retains full before/after texts, which grew unbounded (~GBs on 5 MiB).
+  const bigText = `// pad\n${"x".repeat(2 * 1024 * 1024)}`;
+
+  function typeChar(owner: WorkspaceDocumentTransactionOwner, key: string, ch: string) {
+    const doc = owner.getDocument(key) ?? "";
+    const tr = owner.dispatchTransaction(key, "primary", [{ from: doc.length, to: doc.length, insert: ch }], "user-input");
+    expect(tr).not.toBeNull();
+  }
+
+  it("caps retained undo entries on large documents while undo stays correct", () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    owner.initializeDocument("big.txt", bigText);
+    for (let i = 0; i < LARGE_FILE_UNDO_DEPTH + 10; i += 1) typeChar(owner, "big.txt", "k");
+    const state = owner.getHistoryState("big.txt");
+    expect(state.undoDepth).toBe(LARGE_FILE_UNDO_DEPTH);
+    expect(state.canUndo).toBe(true);
+    // The kept tail still inverts: one undo removes exactly the last char.
+    const before = owner.getDocument("big.txt") ?? "";
+    expect(owner.undo("big.txt", "primary")).not.toBeNull();
+    expect(owner.getDocument("big.txt")).toBe(before.slice(0, -1));
+    expect(owner.getHistoryState("big.txt").undoDepth).toBe(LARGE_FILE_UNDO_DEPTH - 1);
+  });
+
+  it("leaves small-document history unbounded", () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    owner.initializeDocument("small.txt", "hello");
+    for (let i = 0; i < LARGE_FILE_UNDO_DEPTH + 10; i += 1) typeChar(owner, "small.txt", "k");
+    expect(owner.getHistoryState("small.txt").undoDepth).toBe(LARGE_FILE_UNDO_DEPTH + 10);
+  });
+
+  it("caps retention above the 512 KiB cost threshold even below M6-B mode", () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    owner.initializeDocument("mid.txt", `// pad\n${"y".repeat(600 * 1024)}`);
+    for (let i = 0; i < LARGE_FILE_UNDO_DEPTH + 5; i += 1) typeChar(owner, "mid.txt", "k");
+    expect(owner.getHistoryState("mid.txt").undoDepth).toBe(LARGE_FILE_UNDO_DEPTH);
   });
 });

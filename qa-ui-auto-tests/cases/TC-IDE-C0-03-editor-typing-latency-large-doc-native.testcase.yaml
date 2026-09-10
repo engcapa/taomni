@@ -113,7 +113,15 @@ steps:
       timeout_sec: 30
 
   # ---- 5 MiB document: degraded (large-file) mode, reported separately ----
+  # Post-save settle (same re-render race as the Small switch below): the
+  # 1 MiB saves fan out tree refreshes that can detach the row node between
+  # resolve and click. The tab-strip assert proves the switch.
+  - wait: 5
   - click: '[data-testid="code-workspace-tree-file"][data-path="Stress5MiB.txt"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-tab-strip"]'
+      contains: "Stress5MiB.txt"
+      timeout_sec: 30
   - assert_text:
       selector: '[data-testid="code-workspace-editor"]'
       contains: "SyntheticFixture"
@@ -169,9 +177,29 @@ steps:
       path: "${fixture.editor_perf_root}/Stress5MiB.txt"
       equals: "${fixture.editor_perf_Stress5MiB_after_sha256}"
       timeout_sec: 60
+  # Post-save settle: the 5 MiB save fans out tree refreshes and status
+  # updates; clicking the Small.txt row inside that re-render window lands
+  # on a detached node and the editor never switches (observed 2/3 runs).
+  # The fixed wait lets the refresh flush; the tab-strip wait below then
+  # proves the switch instead of assuming the click.
+  - wait: 5
 
   # ---- Small document: ordinary edits do not regress ----
-  - click: '[data-testid="code-workspace-tree-file"][data-path="Small.txt"]'
+  # Opened via Search Everywhere Files, not the tree: after the 5 MiB save,
+  # late tree refreshes were observed resetting the tree selection back to
+  # Large1MiB (tab strip momentarily shows Small.txt, then the surface falls
+  # back), while palette-driven file open does not depend on tree selection.
+  - press: Control+Shift+N
+  - wait_for:
+      selector: '[data-testid="code-workspace-search-everywhere"]'
+      timeout_sec: 30
+  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Go to file"]'
+  - type: Small.txt
+  - press: Enter
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-tab-strip"]'
+      contains: "Small.txt"
+      timeout_sec: 30
   - assert_text:
       selector: '[data-testid="code-workspace-editor"]'
       contains: "SyntheticFixture"

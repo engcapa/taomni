@@ -9,6 +9,23 @@ import { Annotation, ChangeSet } from "@codemirror/state";
 
 export const remoteTransactionAnnotation = Annotation.define<boolean>();
 
+/**
+ * ED-AUDIT-005: large-file undo depth bound. Each history entry retains full
+ * before/after texts, so unbounded per-keystroke recording on multi-MB
+ * documents retains gigabytes and GC-stalls the renderer (observed: 5 MiB
+ * save disconnects and post-save UI breakage; renderer RSS grew ~160 MB in
+ * 10 s of 1 MiB typing). Once a document exceeds UNDO_RETENTION_CHAR_THRESHOLD
+ * only the most recent LARGE_FILE_UNDO_DEPTH entries are kept; smaller
+ * documents keep the historical unbounded behavior. The threshold sits an
+ * order of magnitude below the M6-B degraded-mode threshold because retention
+ * cost is per-keystroke bytes, and the depth stays generous for measured
+ * flows (single-digit undo depths) while bounding retention to ~2x text
+ * bytes per kept entry.
+ */
+export const LARGE_FILE_UNDO_DEPTH = 50;
+/** Retention cap engages above ~512 KiB of text (cost-based, not the M6-B mode gate). */
+export const UNDO_RETENTION_CHAR_THRESHOLD = 512_000;
+
 export interface DocumentChangeDelta {
   from: number;
   to: number;
@@ -322,6 +339,12 @@ export class WorkspaceDocumentTransactionOwner {
         forward: applied.changes,
         inverse: applied.inverse,
       });
+      if (
+        record.undo.length > LARGE_FILE_UNDO_DEPTH &&
+        applied.text.length > UNDO_RETENTION_CHAR_THRESHOLD
+      ) {
+        record.undo.splice(0, record.undo.length - LARGE_FILE_UNDO_DEPTH);
+      }
       record.redo = [];
     }
     const transaction = this.publish(fileKey, sourceViewId, record, applied.changes, origin);
