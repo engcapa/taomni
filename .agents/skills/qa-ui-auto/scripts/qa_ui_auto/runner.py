@@ -394,6 +394,11 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
             # stopping its LSP sessions, orphaning the jdtls JVM; teardown
             # reaps exactly the PIDs this case spawned.
             jdtls_before = _jdtls_pids()
+            # ED-FOLLOW-004: baseline QA app PIDs as well. On driver
+            # disconnects/timeouts session.close never runs and the whole
+            # app (+ renderer) lingers; teardown reaps exactly the PIDs this
+            # case spawned so one failed run cannot load the next.
+            qa_apps_before = _matching_pids(QA_APP_ORPHAN_MARKERS)
             if c.skip:
                 r.update(status="skipped", fixtures_skipped=c.skip)
                 results.append(r)
@@ -464,8 +469,13 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                         # ends its process), so reaping its orphaned jdtls
                         # children cannot dangle any live session map. Never
                         # raises; survivors are recorded, not failed.
+                        # ED-FOLLOW-004: also reap a lingering QA app itself
+                        # (disconnects skip session.close). Same contract.
                         with suppress(Exception):
-                            r["teardown"] = {"jdtls": _reap_orphaned_jdtls(jdtls_before)}
+                            r["teardown"] = {
+                                "jdtls": _reap_orphaned_jdtls(jdtls_before),
+                                "qa_apps": _reap_lingering_qa_apps(qa_apps_before),
+                            }
                         r["timings"]["cleanup_sec"] = time.monotonic() - cleanup_started
             except WebDriverError as e:
                 r["status"] = "failed"
@@ -500,14 +510,20 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
 
 
 JDTLS_ORPHAN_MARKER = "org.eclipse.jdt.ls.core"
+# ED-FOLLOW-004: disconnect-timeout runs skip session.close, leaking the
+# whole QA app + its renderer (~600 MiB each) onto the box; each leak makes
+# the next run more loaded (observed death spiral across C0-03 attempts).
+# Only binaries under the QA-only build dir match — a developer's own
+# taomni (production install or workspace target/) never does.
+QA_APP_ORPHAN_MARKERS = ("target/qa-ui-auto/debug/taomni", "target/qa-ui-auto/release/taomni")
 
 
-def _jdtls_pids(proc_root: Path | str = "/proc") -> set[int]:
-    """PIDs whose command line shows a JDT LS JVM (ED-FOLLOW-002).
+def _matching_pids(markers: tuple[str, ...], proc_root: Path | str = "/proc") -> set[int]:
+    """PIDs whose command line contains any marker (Linux /proc only).
 
-    Linux /proc only; anywhere else returns empty so teardown stays a no-op.
-    Missing/unreadable pid dirs are skipped: racing process exits must not
-    break the snapshot.
+    Anywhere else returns empty so teardown stays a no-op. Missing or
+    unreadable pid dirs are skipped: racing process exits must not break
+    the snapshot.
     """
     found: set[int] = set()
     proc = Path(proc_root)
@@ -520,18 +536,32 @@ def _jdtls_pids(proc_root: Path | str = "/proc") -> set[int]:
             command = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
         except OSError:
             continue
-        if JDTLS_ORPHAN_MARKER in command:
+        if _matches_any_marker(command, markers):
             found.add(int(entry.name))
     return found
 
 
-def _pid_still_jdtls(pid: int, proc_root: Path | str = "/proc") -> bool:
-    """Re-checks the marker at kill time (PID-reuse guard)."""
+def _matches_any_marker(command: str, markers: tuple[str, ...]) -> bool:
+    return any(marker in command for marker in markers)
+
+
+def _pid_still_matches(pid: int, markers: tuple[str, ...], proc_root: Path | str = "/proc") -> bool:
+    """Re-checks the markers at kill time (PID-reuse guard)."""
     try:
         command = (Path(proc_root) / str(pid) / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
     except OSError:
         return False
-    return JDTLS_ORPHAN_MARKER in command
+    return _matches_any_marker(command, markers)
+
+
+def _jdtls_pids(proc_root: Path | str = "/proc") -> set[int]:
+    """PIDs whose command line shows a JDT LS JVM (ED-FOLLOW-002)."""
+    return _matching_pids((JDTLS_ORPHAN_MARKER,), proc_root)
+
+
+def _pid_still_jdtls(pid: int, proc_root: Path | str = "/proc") -> bool:
+    """Re-checks the marker at kill time (PID-reuse guard)."""
+    return _pid_still_matches(pid, (JDTLS_ORPHAN_MARKER,), proc_root)
 
 
 def _reap_orphaned_jdtls(
@@ -549,23 +579,66 @@ def _reap_orphaned_jdtls(
     Never raises: teardown hygiene must not turn a green case red; anything
     left standing is reported in `surviving` for the evidence trail.
     """
+    return _reap_matching_pids(
+        before,
+        (JDTLS_ORPHAN_MARKER,),
+        term_timeout=term_timeout,
+        kill_timeout=kill_timeout,
+        proc_root=proc_root,
+        kill=kill,
+    )
+
+
+def _reap_lingering_qa_apps(
+    before: set[int],
+    *,
+    term_timeout: float = 3.0,
+    kill_timeout: float = 3.0,
+    proc_root: Path | str = "/proc",
+    kill: Any | None = None,
+) -> dict[str, list[int]]:
+    """SIGTERM then SIGKILL QA app PIDs that appeared after `before` (ED-FOLLOW-004).
+
+    session.close() ends the QA app on the happy path; on driver disconnects
+    and timeouts it never runs and the app (+ renderer) lingers. Same
+    never-raise, PID-reuse-guarded contract as the jdtls reap.
+    """
+    return _reap_matching_pids(
+        before,
+        QA_APP_ORPHAN_MARKERS,
+        term_timeout=term_timeout,
+        kill_timeout=kill_timeout,
+        proc_root=proc_root,
+        kill=kill,
+    )
+
+
+def _reap_matching_pids(
+    before: set[int],
+    markers: tuple[str, ...],
+    *,
+    term_timeout: float = 3.0,
+    kill_timeout: float = 3.0,
+    proc_root: Path | str = "/proc",
+    kill: Any | None = None,
+) -> dict[str, list[int]]:
     import signal as _signal
 
     signal_pid = kill if kill is not None else os.kill
-    candidates = sorted(_jdtls_pids(proc_root) - set(before))
+    candidates = sorted(_matching_pids(markers, proc_root) - set(before))
     reaped: list[int] = []
     surviving: list[int] = []
     for pid in candidates:
-        if not _pid_still_jdtls(pid, proc_root):
+        if not _pid_still_matches(pid, markers, proc_root):
             continue
         try:
             signal_pid(pid, _signal.SIGTERM)
         except (OSError, ProcessLookupError):
             continue
         deadline = time.time() + term_timeout
-        while time.time() < deadline and _pid_still_jdtls(pid, proc_root):
+        while time.time() < deadline and _pid_still_matches(pid, markers, proc_root):
             time.sleep(0.1)
-        if not _pid_still_jdtls(pid, proc_root):
+        if not _pid_still_matches(pid, markers, proc_root):
             reaped.append(pid)
             continue
         try:
@@ -573,9 +646,9 @@ def _reap_orphaned_jdtls(
         except (OSError, ProcessLookupError):
             continue
         deadline = time.time() + kill_timeout
-        while time.time() < deadline and _pid_still_jdtls(pid, proc_root):
+        while time.time() < deadline and _pid_still_matches(pid, markers, proc_root):
             time.sleep(0.1)
-        (reaped if not _pid_still_jdtls(pid, proc_root) else surviving).append(pid)
+        (reaped if not _pid_still_matches(pid, markers, proc_root) else surviving).append(pid)
     return {"reaped": reaped, "surviving": surviving}
 
 

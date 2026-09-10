@@ -1595,6 +1595,36 @@ function sameCodeStyle(a?: EffectiveCodeStyle, b?: EffectiveCodeStyle): boolean 
 
 const EMPTY_LIST: readonly never[] = [];
 
+/**
+ * ED-FOLLOW-004: bounds the pending local-document echo list by retained
+ * bytes as well as entry count. Each echo holds a FULL document text so a
+ * lagging controlled prop pins up to 64 whole copies (77 MiB per 1 MiB doc,
+ * ~320 MiB per 5 MiB doc) until an exact (text, revision) echo matches —
+ * and pins them permanently when it never does. Eviction is oldest-first,
+ * which preserves the matching invariant: the consumer only ever matches
+ * the latest prop snapshot, and an older-than-kept echo would have been
+ * dropped by the consume splice anyway. Small docs are unaffected (64
+ * short texts never reach the byte cap).
+ */
+export const MAX_PENDING_ECHO_CHARS = 8 * 1024 * 1024;
+export const MAX_PENDING_ECHO_ENTRIES = 64;
+
+export function trimPendingLocalDocumentEchoes(
+  pendingEchoes: Array<{ text: string; expectedDocumentRevision: number }>,
+  maxEntries: number = MAX_PENDING_ECHO_ENTRIES,
+  maxChars: number = MAX_PENDING_ECHO_CHARS,
+): void {
+  if (pendingEchoes.length > maxEntries) {
+    pendingEchoes.splice(0, pendingEchoes.length - maxEntries);
+  }
+  let total = 0;
+  for (const entry of pendingEchoes) total += entry.text.length;
+  while (pendingEchoes.length > 1 && total > maxChars) {
+    total -= pendingEchoes[0]!.text.length;
+    pendingEchoes.splice(0, 1);
+  }
+}
+
 function sameOptionalArray<T>(
   a?: readonly T[],
   b?: readonly T[],
@@ -1936,7 +1966,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       || lastPendingEcho.expectedDocumentRevision !== expectedDocumentRevision
     ) {
       pendingEchoes.push({ text, expectedDocumentRevision });
-      if (pendingEchoes.length > 64) pendingEchoes.splice(0, pendingEchoes.length - 64);
+      trimPendingLocalDocumentEchoes(pendingEchoes);
     }
   };
   const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);

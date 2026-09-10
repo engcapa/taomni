@@ -5,7 +5,7 @@ import { CompletionContext } from "@codemirror/autocomplete";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createFixtureCompletionSource, MAX_COMPLETION_OPTIONS } from "./lspCompletion";
-import { CodeMirrorHost } from "./CodeMirrorHost";
+import { CodeMirrorHost, trimPendingLocalDocumentEchoes } from "./CodeMirrorHost";
 import type { LspCompletionResult, LspDiagnostic, LspDocumentStatus } from "../../../lib/editor/lsp";
 
 const TYPING_FIXTURE = Array.from({ length: 400 }, (_, line) =>
@@ -332,5 +332,36 @@ describe("Editor typing and completion performance verification", () => {
 
     expect(samplesMs).toHaveLength(TYPING_MEASURED_SAMPLES);
     expect(view!.state.doc.length).toBe(TYPING_FIXTURE.length + TYPING_WARMUP_SAMPLES + TYPING_MEASURED_SAMPLES);
+  });
+});
+
+describe("ED-FOLLOW-004 pending echo retention bound", () => {
+  const echo = (chars: number, rev: number) => ({ text: "x".repeat(chars), expectedDocumentRevision: rev });
+
+  it("keeps small-doc echoes under the entry cap only", () => {
+    const echoes = Array.from({ length: 70 }, (_, i) => echo(10, i));
+    trimPendingLocalDocumentEchoes(echoes);
+    expect(echoes).toHaveLength(64);
+    expect(echoes[0]!.expectedDocumentRevision).toBe(6);
+    expect(echoes[63]!.expectedDocumentRevision).toBe(69);
+  });
+
+  it("evicts oldest-first by bytes and always keeps the latest echo", () => {
+    const oneMiB = 1024 * 1024;
+    const echoes = Array.from({ length: 10 }, (_, i) => echo(oneMiB, i));
+    trimPendingLocalDocumentEchoes(echoes);
+    // 8 MiB cap: newest ~8 echoes survive; the latest is always present so
+    // exact-match consumption keeps working.
+    expect(echoes.length).toBeLessThanOrEqual(8);
+    expect(echoes.length).toBeGreaterThanOrEqual(1);
+    expect(echoes[echoes.length - 1]!.expectedDocumentRevision).toBe(9);
+    const total = echoes.reduce((sum, entry) => sum + entry.text.length, 0);
+    expect(total).toBeLessThanOrEqual(8 * 1024 * 1024);
+  });
+
+  it("never trims the sole echo even when it exceeds the byte cap", () => {
+    const echoes = [echo(9 * 1024 * 1024, 1)];
+    trimPendingLocalDocumentEchoes(echoes);
+    expect(echoes).toHaveLength(1);
   });
 });
