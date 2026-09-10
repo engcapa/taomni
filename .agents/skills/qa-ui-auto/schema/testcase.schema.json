@@ -164,6 +164,9 @@
     "native_ime_keys": {
      "$ref": "#/$defs/native_ime_keys_arg"
     },
+    "native_windows_ime_keys": {
+     "$ref": "#/$defs/native_windows_ime_keys_arg"
+    },
     "native_keys": {
      "$ref": "#/$defs/native_keys_arg"
     },
@@ -664,6 +667,37 @@
       "type": "string",
       "minLength": 1
      }
+    }
+   }
+  },
+  "native_windows_ime_keys_arg": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "selector",
+    "keys"
+   ],
+   "properties": {
+    "selector": {
+     "$ref": "#/$defs/selector"
+    },
+    "layout": {
+     "type": "string",
+     "pattern": "^[0-9A-Fa-f]{8}$",
+     "default": "00000804",
+     "description": "Windows keyboard layout identifier; 00000804 is Simplified Chinese Microsoft Pinyin."
+    },
+    "keys": {
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "type": "string",
+      "minLength": 1
+     }
+    },
+    "label": {
+     "type": "string",
+     "minLength": 1
     }
    }
   },

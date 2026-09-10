@@ -23,6 +23,8 @@ Native-only verbs:
                           Clipboard API for native Windows clipboard flows.
 * native_pointer_drag - modifier-aware pointer drag in the packaged WebKitGTK
                         session, targeted from read-only line/column geometry.
+* native_windows_ime_keys - Win32 SendInput through a real Windows input
+                            layout/IME, with layout restoration at teardown.
 """
 
 from __future__ import annotations
@@ -38,6 +40,7 @@ import signal
 import stat
 import subprocess
 import sys
+from ctypes import wintypes
 from .deadline import budget_time as time, remaining_timeout
 from contextlib import suppress
 from pathlib import Path
@@ -69,6 +72,7 @@ class NativeStepContext:
         self._clipboard_owner_text: str | None = None
         self._host_clipboard_before: str | None = None
         self._host_clipboard_captured = False
+        self._windows_ime_state: dict[str, Any] | None = None
 
     def restore_host_permissions(self) -> None:
         """Best-effort rollback for report-scoped fault injection.
@@ -83,6 +87,7 @@ class NativeStepContext:
             except OSError:
                 pass
         self._permission_restores.clear()
+        self._restore_windows_input_method()
         self._release_clipboard_owner()
         self._restore_host_clipboard()
 
@@ -1554,6 +1559,392 @@ def _do_native_keys(ctx: NativeStepContext, args: Any) -> str:
         encoding="utf-8",
     )
     return f"injected {len(keys)} {transport} keys into focused native control"
+
+
+_WINDOWS_INPUT_LAYOUT_REQUEST = 0x0050
+_WINDOWS_KEYEVENTF_KEYUP = 0x0002
+_WINDOWS_INPUT_KEYBOARD = 1
+_WINDOWS_KLF_ACTIVATE = 0x00000001
+_WINDOWS_VK = {
+    "BACKSPACE": 0x08,
+    "TAB": 0x09,
+    "ENTER": 0x0D,
+    "ESCAPE": 0x1B,
+    "SPACE": 0x20,
+    "ARROWLEFT": 0x25,
+    "ARROWUP": 0x26,
+    "ARROWRIGHT": 0x27,
+    "ARROWDOWN": 0x28,
+}
+
+
+class _WindowsKeybdInput(ctypes.Structure):
+    _fields_ = [
+        ("wVk", wintypes.WORD),
+        ("wScan", wintypes.WORD),
+        ("dwFlags", wintypes.DWORD),
+        ("time", wintypes.DWORD),
+        ("dwExtraInfo", ctypes.c_size_t),
+    ]
+
+
+class _WindowsInputUnion(ctypes.Union):
+    # INPUT's union is sized by MOUSEINPUT (32 bytes on Win64), even when the
+    # keyboard member is the only one used here. SendInput rejects a shorter
+    # structure with ERROR_INVALID_PARAMETER.
+    _fields_ = [
+        ("ki", _WindowsKeybdInput),
+        ("_layout_padding", ctypes.c_byte * 32),
+    ]
+
+
+class _WindowsInput(ctypes.Structure):
+    _anonymous_ = ("data",)
+    _fields_ = [
+        ("type", wintypes.DWORD),
+        ("data", _WindowsInputUnion),
+    ]
+
+
+class _WindowsGuiThreadInfo(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wintypes.DWORD),
+        ("flags", wintypes.DWORD),
+        ("hwndActive", wintypes.HWND),
+        ("hwndFocus", wintypes.HWND),
+        ("hwndCapture", wintypes.HWND),
+        ("hwndMenuOwner", wintypes.HWND),
+        ("hwndMoveSize", wintypes.HWND),
+        ("hwndCaret", wintypes.HWND),
+        ("rcCaret", wintypes.RECT),
+    ]
+
+
+def _windows_user32() -> Any:
+    if platform.system() != "Windows":
+        raise StepError("native_windows_ime_keys: requires Windows")
+    return ctypes.WinDLL("user32", use_last_error=True)
+
+
+def _windows_foreground_info(user32: Any) -> dict[str, Any]:
+    hwnd = int(user32.GetForegroundWindow() or 0)
+    if hwnd == 0:
+        return {"hwnd": None, "title": "", "class": ""}
+    title_length = int(user32.GetWindowTextLengthW(hwnd))
+    title_buffer = ctypes.create_unicode_buffer(max(title_length + 1, 1))
+    user32.GetWindowTextW(hwnd, title_buffer, len(title_buffer))
+    class_buffer = ctypes.create_unicode_buffer(256)
+    user32.GetClassNameW(hwnd, class_buffer, len(class_buffer))
+    return {
+        "hwnd": f"0x{hwnd:x}",
+        "title": title_buffer.value,
+        "class": class_buffer.value,
+    }
+
+
+def _windows_process_image(kernel32: Any, pid: int) -> str | None:
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = ctypes.c_void_p
+    kernel32.QueryFullProcessImageNameW.argtypes = [
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        wintypes.LPWSTR,
+        ctypes.POINTER(wintypes.DWORD),
+    ]
+    kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not handle:
+        return None
+    try:
+        buffer = ctypes.create_unicode_buffer(32768)
+        size = wintypes.DWORD(len(buffer))
+        if not kernel32.QueryFullProcessImageNameW(handle, 0, buffer, ctypes.byref(size)):
+            return None
+        return buffer.value
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _windows_application_window(application: Path) -> tuple[int, int]:
+    user32 = _windows_user32()
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.GetCurrentThreadId.restype = wintypes.DWORD
+    expected = os.path.normcase(str(application.resolve()))
+    found: list[tuple[int, int]] = []
+    callback_type = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+    def visit(hwnd: int, _lparam: int) -> int:
+        if not user32.IsWindowVisible(hwnd):
+            return 1
+        pid = wintypes.DWORD()
+        thread_id = int(user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid)))
+        image = _windows_process_image(kernel32, int(pid.value))
+        if image is None:
+            return 1
+        normalized = os.path.normcase(str(Path(image).resolve()))
+        if normalized == expected:
+            found.append((int(hwnd), thread_id))
+            return 0
+        return 1
+
+    callback = callback_type(visit)
+    user32.EnumWindows(callback, 0)
+    if not found:
+        raise StepError(
+            "native_windows_ime_keys: could not find a visible window for "
+            f"{application.resolve()}"
+        )
+    hwnd, thread_id = found[0]
+    user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+    user32.AttachThreadInput.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.BOOL]
+    user32.AttachThreadInput.restype = wintypes.BOOL
+    user32.SetActiveWindow.argtypes = [wintypes.HWND]
+    user32.SetActiveWindow.restype = wintypes.HWND
+    user32.SetFocus.argtypes = [wintypes.HWND]
+    user32.SetFocus.restype = wintypes.HWND
+    user32.SwitchToThisWindow.argtypes = [wintypes.HWND, wintypes.BOOL]
+    user32.SwitchToThisWindow.restype = None
+    foreground = int(user32.GetForegroundWindow() or 0)
+    foreground_thread = wintypes.DWORD()
+    if foreground:
+        user32.GetWindowThreadProcessId(foreground, ctypes.byref(foreground_thread))
+    current_thread = int(kernel32.GetCurrentThreadId())
+    attached_threads: list[int] = []
+    if foreground_thread.value and foreground_thread.value != current_thread:
+        if user32.AttachThreadInput(current_thread, foreground_thread.value, True):
+            attached_threads.append(foreground_thread.value)
+    if thread_id != current_thread and user32.AttachThreadInput(current_thread, thread_id, True):
+        attached_threads.append(thread_id)
+    try:
+        user32.BringWindowToTop(hwnd)
+        user32.SwitchToThisWindow(hwnd, True)
+        user32.SetActiveWindow(hwnd)
+        user32.SetFocus(hwnd)
+        user32.SetForegroundWindow(hwnd)
+    finally:
+        for attached_thread in reversed(attached_threads):
+            user32.AttachThreadInput(current_thread, attached_thread, False)
+    time.sleep(0.15)
+    gui_info = _windows_gui_thread_info(user32, thread_id)
+    if int(user32.GetForegroundWindow() or 0) != hwnd and not (
+        gui_info["active"] == hwnd or gui_info["focus"] == hwnd
+    ):
+        raise StepError(
+            "native_windows_ime_keys: QA application did not receive GUI focus "
+            f"(expected=0x{hwnd:x}, foreground={_windows_foreground_info(user32)}, "
+            f"thread={gui_info})"
+        )
+    return hwnd, thread_id
+
+
+def _windows_gui_thread_info(user32: Any, thread_id: int) -> dict[str, Any]:
+    user32.GetGUIThreadInfo.argtypes = [wintypes.DWORD, ctypes.POINTER(_WindowsGuiThreadInfo)]
+    user32.GetGUIThreadInfo.restype = wintypes.BOOL
+    info = _WindowsGuiThreadInfo()
+    info.cbSize = ctypes.sizeof(_WindowsGuiThreadInfo)
+    if not user32.GetGUIThreadInfo(thread_id, ctypes.byref(info)):
+        return {"active": None, "focus": None, "flags": None}
+    return {
+        "active": int(info.hwndActive or 0),
+        "focus": int(info.hwndFocus or 0),
+        "flags": int(info.flags),
+    }
+
+
+def _windows_activate_layout(user32: Any, hwnd: int, layout_name: str) -> tuple[int, int]:
+    user32.LoadKeyboardLayoutW.argtypes = [wintypes.LPCWSTR, wintypes.UINT]
+    user32.LoadKeyboardLayoutW.restype = ctypes.c_void_p
+    user32.GetKeyboardLayout.argtypes = [wintypes.DWORD]
+    user32.GetKeyboardLayout.restype = ctypes.c_void_p
+    user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, ctypes.c_void_p]
+    user32.PostMessageW.restype = wintypes.BOOL
+    prior_thread_layout = user32.GetKeyboardLayout(0)
+    prior_thread_value = int(getattr(prior_thread_layout, "value", prior_thread_layout) or 0)
+    target = user32.LoadKeyboardLayoutW(layout_name, _WINDOWS_KLF_ACTIVATE)
+    if not target:
+        raise ctypes.WinError(ctypes.get_last_error())
+    target_value = int(getattr(target, "value", target) or 0)
+    thread_id = wintypes.DWORD()
+    if not user32.GetWindowThreadProcessId(hwnd, ctypes.byref(thread_id)):
+        raise StepError("native_windows_ime_keys: could not read QA window thread")
+    prior = user32.GetKeyboardLayout(thread_id.value)
+    prior_value = int(getattr(prior, "value", prior) or 0)
+    if not prior_value:
+        prior_value = prior_thread_value
+    if not user32.PostMessageW(
+        hwnd,
+        _WINDOWS_INPUT_LAYOUT_REQUEST,
+        0,
+        ctypes.c_void_p(target_value),
+    ):
+        raise ctypes.WinError(ctypes.get_last_error())
+    time.sleep(0.3)
+    return prior_value, target_value
+
+
+def _windows_key_vk(key: str) -> int:
+    normalized = key.strip().upper()
+    if len(normalized) == 1 and normalized.isascii() and normalized.isalnum():
+        return ord(normalized)
+    value = _WINDOWS_VK.get(normalized)
+    if value is None:
+        raise StepError(
+            "native_windows_ime_keys: unsupported key "
+            f"{key!r}; supported letters/digits, arrows, Enter, Escape, Tab, Space and Backspace"
+        )
+    return value
+
+
+def _windows_send_keys(user32: Any, keys: list[str]) -> None:
+    user32.SendInput.argtypes = [wintypes.UINT, ctypes.POINTER(_WindowsInput), ctypes.c_int]
+    user32.SendInput.restype = wintypes.UINT
+    for key in keys:
+        vk = _windows_key_vk(key)
+        for flags in (0, _WINDOWS_KEYEVENTF_KEYUP):
+            event = _WindowsInput()
+            event.type = _WINDOWS_INPUT_KEYBOARD
+            event.ki = _WindowsKeybdInput(
+                wVk=vk,
+                wScan=0,
+                dwFlags=flags,
+                time=0,
+                dwExtraInfo=0,
+            )
+            sent = int(user32.SendInput(1, ctypes.byref(event), ctypes.sizeof(_WindowsInput)))
+            if sent != 1:
+                raise ctypes.WinError(ctypes.get_last_error())
+            time.sleep(0.045)
+
+
+def _append_windows_ime_observation(ctx: NativeStepContext, entry: dict[str, Any]) -> None:
+    artifact = ctx.case_dir / "native-windows-ime-observation.json"
+    observations: list[dict[str, Any]] = []
+    if artifact.exists():
+        try:
+            loaded = json.loads(artifact.read_text(encoding="utf-8"))
+            if isinstance(loaded, list):
+                observations = loaded
+        except (OSError, json.JSONDecodeError):
+            observations = []
+    observations.append({
+        "platform": platform.platform(),
+        "transport": "Win32 SendInput -> Windows input layout -> WebView2",
+        "verifiedAtUnixMs": int(time.time() * 1000),
+        **entry,
+    })
+    artifact.write_text(
+        json.dumps(observations, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _restore_windows_input_method(self: NativeStepContext) -> None:
+    state = self._windows_ime_state
+    if state is None:
+        return
+    self._windows_ime_state = None
+    user32 = _windows_user32()
+    user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, ctypes.c_void_p]
+    user32.PostMessageW.restype = wintypes.BOOL
+    user32.ActivateKeyboardLayout.argtypes = [ctypes.c_void_p, wintypes.UINT]
+    user32.ActivateKeyboardLayout.restype = ctypes.c_void_p
+    hwnd = int(state["hwnd"])
+    prior_hkl = int(state["prior_hkl"])
+    restored = False
+    error: str | None = None
+    try:
+        if prior_hkl:
+            if not user32.PostMessageW(
+                hwnd,
+                _WINDOWS_INPUT_LAYOUT_REQUEST,
+                0,
+                ctypes.c_void_p(prior_hkl),
+            ):
+                raise ctypes.WinError(ctypes.get_last_error())
+            runner_layout = user32.ActivateKeyboardLayout(ctypes.c_void_p(prior_hkl), 0)
+            restored = bool(runner_layout)
+            if not restored:
+                raise ctypes.WinError(ctypes.get_last_error())
+    except Exception as exc:  # noqa: BLE001
+        error = str(exc)
+    _append_windows_ime_observation(self, {
+        "action": "restore",
+        "layout": state["layout"],
+        "prior_hkl": f"0x{prior_hkl:x}" if prior_hkl else None,
+        "restored": restored,
+        "error": error,
+    })
+
+
+NativeStepContext._restore_windows_input_method = _restore_windows_input_method
+
+
+@_verb("native_windows_ime_keys")
+def _do_native_windows_ime_keys(ctx: NativeStepContext, args: Any) -> str:
+    """Inject real Windows keyboard input through a configured IME layout.
+
+    The runner never fabricates composition events. It activates the requested
+    layout for the packaged QA window, sends Win32 key input, and leaves the
+    DOM/native postcondition to the testcase. The prior layout is restored by
+    NativeStepContext teardown, including failed runs.
+    """
+    if platform.system() != "Windows":
+        raise StepError("native_windows_ime_keys: requires Windows")
+    if not isinstance(args, dict) or "selector" not in args or "keys" not in args:
+        raise StepError("native_windows_ime_keys: expected {selector, layout?, keys, label?}")
+    selector = str(args["selector"])
+    keys = args["keys"]
+    layout = str(args.get("layout", "00000804"))
+    label = str(args.get("label", "keys"))
+    if not selector or not isinstance(keys, list) or not keys or not all(isinstance(key, str) for key in keys):
+        raise StepError("native_windows_ime_keys: selector and non-empty string keys are required")
+    focused = ctx.session.execute(
+        f"const el = document.querySelector({json.dumps(selector)});"
+        "return !!el && (document.activeElement === el || el.contains(document.activeElement));"
+    )
+    if not focused:
+        raise StepError(
+            f"native_windows_ime_keys: target must already have DOM focus: {selector}"
+        )
+
+    user32 = _windows_user32()
+    before = _windows_foreground_info(user32)
+    if ctx._windows_ime_state is None:
+        hwnd, _thread_id = _windows_application_window(ctx.session.application)
+        prior_hkl, target_hkl = _windows_activate_layout(user32, hwnd, layout)
+        ctx._windows_ime_state = {
+            "hwnd": hwnd,
+            "thread_id": _thread_id,
+            "layout": layout,
+            "prior_hkl": prior_hkl,
+            "target_hkl": target_hkl,
+        }
+    else:
+        state = ctx._windows_ime_state
+        if layout != state["layout"]:
+            raise StepError(
+                "native_windows_ime_keys: changing layout during one composition session "
+                "would invalidate the native IME boundary"
+            )
+        hwnd = int(state["hwnd"])
+        target_hkl = int(state["target_hkl"])
+
+    _windows_send_keys(user32, keys)
+    time.sleep(0.5)
+    after = _windows_foreground_info(user32)
+    _append_windows_ime_observation(ctx, {
+        "action": label,
+        "selector": selector,
+        "layout": layout,
+        "target_hkl": f"0x{target_hkl:x}",
+        "keys": keys,
+        "foreground_before": before,
+        "foreground_after": after,
+        "result": "Win32 keys injected; testcase DOM postcondition is authoritative",
+    })
+    return f"injected {len(keys)} Windows IME keys through layout {layout}"
 
 
 @_verb("assert_native_process_delta")
