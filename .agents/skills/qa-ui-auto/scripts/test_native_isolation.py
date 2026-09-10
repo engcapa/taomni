@@ -276,5 +276,84 @@ class RoutineEntryTest(unittest.TestCase):
             self.assertEqual(dict(os.environ), before)
 
 
+class JdtlsReapTest(unittest.TestCase):
+    """ED-FOLLOW-002: per-case teardown reaps exactly the spawned jdtls JVMs."""
+
+    def make_proc(self, root: Path, entries: dict[int, str]) -> Path:
+        proc = root / "proc"
+        for pid, cmdline in entries.items():
+            piddir = proc / str(pid)
+            piddir.mkdir(parents=True)
+            (piddir / "cmdline").write_bytes(cmdline.replace(" ", "\0").encode())
+        return proc
+
+    def test_snapshot_finds_only_jdtls_and_skips_foreign_or_gone_pids(self):
+        with TemporaryDirectory() as directory:
+            proc = self.make_proc(Path(directory), {
+                101: "java -Declipse.application=org.eclipse.jdt.ls.core.id1 -data /tmp/x",
+                102: "/usr/bin/python runner.py",
+                103: "java -jar /opt/other.jar",
+            })
+            self.assertEqual(runner._jdtls_pids(proc), {101})
+            self.assertEqual(runner._jdtls_pids(Path(directory) / "missing"), set())
+
+    def test_reap_signals_only_new_pids_then_escalates_and_never_raises(self):
+        import signal as signal_module
+
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            proc = self.make_proc(root, {
+                101: "java -Declipse.application=org.eclipse.jdt.ls.core.id1",
+                102: "java -Declipse.application=org.eclipse.jdt.ls.core.id1",
+                103: "java -Declipse.application=org.eclipse.jdt.ls.core.id1",
+            })
+            before = {101}  # operator's own IDE: never touched
+            signals: list[tuple[int, int]] = []
+
+            def fake_kill(pid: int, sig: int) -> None:
+                signals.append((pid, sig))
+                if pid == 102 and sig == signal_module.SIGTERM:
+                    # 102 exits on TERM: its pid dir vanishes.
+                    import shutil
+                    shutil.rmtree(proc / "102")
+                if pid == 103:
+                    # 103 ignores every signal: it survives.
+                    return
+                if pid == 101:
+                    raise AssertionError("pre-existing pid must never be signalled")
+
+            result = runner._reap_orphaned_jdtls(before, term_timeout=0.05, kill_timeout=0.05,
+                                                 proc_root=proc, kill=fake_kill)
+            terms = [pid for pid, sig in signals if sig == signal_module.SIGTERM]
+            kills = [pid for pid, sig in signals if sig == signal_module.SIGKILL]
+            self.assertEqual(sorted(terms), [102, 103])
+            self.assertEqual(kills, [103])
+            self.assertEqual(result, {"reaped": [102], "surviving": [103]})
+
+    def test_reap_skips_pid_reuse_and_tolerates_kill_errors(self):
+        import signal as signal_module
+
+        with TemporaryDirectory() as directory:
+            proc = self.make_proc(Path(directory), {
+                201: "java -Declipse.application=org.eclipse.jdt.ls.core.id1",
+            })
+            # The pid is recycled by an unrelated process before teardown.
+            (proc / "201" / "cmdline").write_bytes(b"/usr/bin/python\0other\0")
+            signals: list[tuple[int, int]] = []
+            result = runner._reap_orphaned_jdtls(set(), term_timeout=0.01, kill_timeout=0.01,
+                                                 proc_root=proc,
+                                                 kill=lambda pid, sig: signals.append((pid, sig)))
+            self.assertEqual(signals, [])
+            self.assertEqual(result, {"reaped": [], "surviving": []})
+
+            def dying_kill(pid: int, sig: int) -> None:
+                raise ProcessLookupError("already gone")
+
+            (proc / "201" / "cmdline").write_bytes(b"java -Declipse.application=org.eclipse.jdt.ls.core.id1\0")
+            result = runner._reap_orphaned_jdtls(set(), term_timeout=0.01, kill_timeout=0.01,
+                                                 proc_root=proc, kill=dying_kill)
+            self.assertEqual(result, {"reaped": [], "surviving": []})
+
+
 if __name__ == "__main__":
     unittest.main()

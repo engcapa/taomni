@@ -389,6 +389,11 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
             }
             r["timings"] = {}
             deadline = Deadline(c.timeout_sec)
+            # ED-FOLLOW-002: baseline JDT LS PIDs before the case starts. The
+            # QA app process is closed per case (session.close) without
+            # stopping its LSP sessions, orphaning the jdtls JVM; teardown
+            # reaps exactly the PIDs this case spawned.
+            jdtls_before = _jdtls_pids()
             if c.skip:
                 r.update(status="skipped", fixtures_skipped=c.skip)
                 results.append(r)
@@ -455,6 +460,12 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                         )
                         with suppress(Exception):
                             session.close()
+                        # ED-FOLLOW-002: the app is dead here (session.close
+                        # ends its process), so reaping its orphaned jdtls
+                        # children cannot dangle any live session map. Never
+                        # raises; survivors are recorded, not failed.
+                        with suppress(Exception):
+                            r["teardown"] = {"jdtls": _reap_orphaned_jdtls(jdtls_before)}
                         r["timings"]["cleanup_sec"] = time.monotonic() - cleanup_started
             except WebDriverError as e:
                 r["status"] = "failed"
@@ -486,6 +497,86 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
             r["duration_sec"] = time.time() - started
             results.append(r)
     return results
+
+
+JDTLS_ORPHAN_MARKER = "org.eclipse.jdt.ls.core"
+
+
+def _jdtls_pids(proc_root: Path | str = "/proc") -> set[int]:
+    """PIDs whose command line shows a JDT LS JVM (ED-FOLLOW-002).
+
+    Linux /proc only; anywhere else returns empty so teardown stays a no-op.
+    Missing/unreadable pid dirs are skipped: racing process exits must not
+    break the snapshot.
+    """
+    found: set[int] = set()
+    proc = Path(proc_root)
+    if not proc.is_dir():
+        return found
+    for entry in proc.iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            command = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
+        except OSError:
+            continue
+        if JDTLS_ORPHAN_MARKER in command:
+            found.add(int(entry.name))
+    return found
+
+
+def _pid_still_jdtls(pid: int, proc_root: Path | str = "/proc") -> bool:
+    """Re-checks the marker at kill time (PID-reuse guard)."""
+    try:
+        command = (Path(proc_root) / str(pid) / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
+    except OSError:
+        return False
+    return JDTLS_ORPHAN_MARKER in command
+
+
+def _reap_orphaned_jdtls(
+    before: set[int],
+    *,
+    term_timeout: float = 3.0,
+    kill_timeout: float = 3.0,
+    proc_root: Path | str = "/proc",
+    kill: Any | None = None,
+) -> dict[str, list[int]]:
+    """SIGTERM then SIGKILL JDT LS PIDs that appeared after `before` (ED-FOLLOW-002).
+
+    Only PIDs still matching the marker at signal time are touched, and
+    pre-existing PIDs (e.g. the operator's own IDE) are never signalled.
+    Never raises: teardown hygiene must not turn a green case red; anything
+    left standing is reported in `surviving` for the evidence trail.
+    """
+    import signal as _signal
+
+    signal_pid = kill if kill is not None else os.kill
+    candidates = sorted(_jdtls_pids(proc_root) - set(before))
+    reaped: list[int] = []
+    surviving: list[int] = []
+    for pid in candidates:
+        if not _pid_still_jdtls(pid, proc_root):
+            continue
+        try:
+            signal_pid(pid, _signal.SIGTERM)
+        except (OSError, ProcessLookupError):
+            continue
+        deadline = time.time() + term_timeout
+        while time.time() < deadline and _pid_still_jdtls(pid, proc_root):
+            time.sleep(0.1)
+        if not _pid_still_jdtls(pid, proc_root):
+            reaped.append(pid)
+            continue
+        try:
+            signal_pid(pid, _signal.SIGKILL)
+        except (OSError, ProcessLookupError):
+            continue
+        deadline = time.time() + kill_timeout
+        while time.time() < deadline and _pid_still_jdtls(pid, proc_root):
+            time.sleep(0.1)
+        (reaped if not _pid_still_jdtls(pid, proc_root) else surviving).append(pid)
+    return {"reaped": reaped, "surviving": surviving}
 
 
 def _capture_native_failure(session: Any, case_dir: Path) -> dict:
