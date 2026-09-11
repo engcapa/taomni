@@ -562,6 +562,59 @@ describe("ED-AUDIT-015: executeRearrangeTransaction supported-branch wiring (mod
     expect(deps.applyEdit).not.toHaveBeenCalled();
   });
 
+  it("refuses a disabled rearrange candidate at request time before resolve (ED-MAIN-002)", async () => {
+    const deps = baseDeps({
+      requestActions: vi.fn(async () => ({
+        state: "ok" as const,
+        actions: [{
+          kind: "source.sortMembers",
+          title: "Sort Members",
+          raw: { disabled: { reason: "cannot sort now" } },
+        }],
+      })),
+    });
+    const result = await executeRearrangeTransaction(deps, baseInput());
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.state).toBe("unsupported");
+      expect(result.reason).toContain("cannot sort now");
+      expect(result.committed).toBe(false);
+    }
+    expect(deps.resolveAction).not.toHaveBeenCalled();
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+    expect(deps.confirmPreview).not.toHaveBeenCalled();
+  });
+
+  it("skips a disabled candidate when a same-kind enabled action exists (ED-MAIN-002)", async () => {
+    const deps = baseDeps({
+      requestActions: vi.fn(async () => ({
+        state: "ok" as const,
+        actions: [
+          { kind: "source.sortMembers", title: "Sort Members (blocked)", raw: { disabled: { reason: "nope" } } },
+          { kind: "source.sortMembers", title: "Sort Members", raw: {} },
+        ],
+      })),
+    });
+    const result = await executeRearrangeTransaction(deps, baseInput());
+    expect(result.ok).toBe(true);
+    expect(deps.resolveAction).toHaveBeenCalledTimes(1);
+    expect(deps.applyEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces the standard disabled reason returned only at resolve time (ED-MAIN-002)", async () => {
+    const deps = baseDeps({
+      resolveAction: vi.fn(async () => ({
+        state: "unsupported" as const,
+        edits: [],
+        reason: "Rearrange Code action 'Sort Members' is disabled by the provider: blocked by the project; nothing applied",
+      })),
+    });
+    const result = await executeRearrangeTransaction(deps, baseInput());
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toContain("blocked by the project");
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+
   it("refuses resolve failures and empty edits with zero commits", async () => {
     const failed = baseDeps({
       resolveAction: vi.fn(async () => ({ state: "failed" as const, edits: [], reason: "boom" })),
@@ -719,6 +772,28 @@ describe("ED-AUDIT-016: executeCleanupTransaction supported-branch wiring (model
       expect(result.committed).toBe(false);
       expect(result.reason).toContain("no cleanup action");
     }
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("refuses a disabled cleanup candidate at request time before resolve (ED-MAIN-002)", async () => {
+    const deps = baseDeps({
+      requestActions: vi.fn(async () => ({
+        state: "ok" as const,
+        actions: [{
+          kind: "source.cleanup",
+          title: "Clean up",
+          raw: { disabled: { reason: "cleanup is unavailable for this file" } },
+        }],
+      })),
+    });
+    const result = await executeCleanupTransaction(deps, baseInput());
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.state).toBe("unsupported");
+      expect(result.reason).toContain("cleanup is unavailable for this file");
+      expect(result.committed).toBe(false);
+    }
+    expect(deps.resolveAction).not.toHaveBeenCalled();
     expect(deps.applyEdit).not.toHaveBeenCalled();
   });
 
@@ -1371,6 +1446,32 @@ describe("ED-IMPROVE-003: provider action payload validation (model boundary)", 
       expect(result.reason).toContain("disabled");
     }
   });
+
+  it("rejects the standard disabled reason object and surfaces the reason", () => {
+    const result = validate(payload({ raw: { disabled: { reason: "cannot sort members" } } }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.state).toBe("unsupported");
+      expect(result.reason).toContain("disabled");
+      expect(result.reason).toContain("cannot sort members");
+    }
+  });
+
+  it("rejects an empty disabled object with a fallback reason", () => {
+    const result = validate(payload({ raw: { disabled: {} } }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.state).toBe("unsupported");
+      expect(result.reason).toContain("did not supply a reason");
+    }
+  });
+
+  it("does not reject null/false/absent disabled values", () => {
+    for (const raw of [{ disabled: null }, { disabled: false }, {}, { disabled: "no" }]) {
+      expect(validate(payload({ raw })).ok).toBe(true);
+    }
+  });
+
 
   it("rejects malformed and reversed ranges but keeps clamping-compatible ones", () => {
     const reversed = validate(payload({

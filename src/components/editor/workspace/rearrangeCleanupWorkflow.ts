@@ -850,8 +850,17 @@ export async function executeRearrangeTransaction(
   if (afterRequest) return afterRequest;
 
   // 3. Resolve to a callable rearrange-kind action by exact kind equality.
-  const action = requested.actions.find((candidate) => isRearrangeActionKind(candidate.kind)) ?? null;
-  if (!action) {
+  // ED-MAIN-002: a provider-disabled candidate is refused here, before any
+  // resolve/preview/commit; a same-kind enabled candidate still wins.
+  const selection = selectEnabledWorkflowAction(requested.actions, isRearrangeActionKind);
+  if (!selection.action) {
+    if (selection.disabled) {
+      return fail(
+        "unsupported",
+        `Rearrange action '${selection.disabled.action.title}' is disabled by the provider`
+          + `${formatWorkflowDisabledReason(selection.disabled.reason)}; nothing applied`,
+      );
+    }
     const seen = requested.actions
       .map((candidate) => candidate.kind ?? "(no kind)")
       .slice(0, 3)
@@ -863,6 +872,7 @@ export async function executeRearrangeTransaction(
         : "Provider returned no actions. Rearrange Code requires a dedicated arrangement provider; nothing applied.",
     );
   }
+  const action = selection.action;
 
   // 4. Resolve the action to concrete edits, then reject if the provider or
   // document identity moved while the resolve was in flight.
@@ -1075,10 +1085,63 @@ export type WorkflowActionValidation =
       reason: string;
     };
 
+/**
+ * ED-MAIN-002: a provider action is disabled either by the legacy boolean
+ * `disabled: true` or by the LSP-standard `disabled: { reason }` object.
+ * Missing/null/false values are not disabled; an empty object still is.
+ */
+export interface WorkflowActionDisabledFact {
+  disabled: boolean;
+  reason: string | null;
+}
+
+export function readWorkflowActionDisabled(raw: unknown): WorkflowActionDisabledFact {
+  if (typeof raw !== "object" || raw === null) return { disabled: false, reason: null };
+  const value = (raw as { disabled?: unknown }).disabled;
+  if (value === true) return { disabled: true, reason: null };
+  if (typeof value === "object" && value !== null) {
+    const reasonValue = (value as { reason?: unknown }).reason;
+    const reason = typeof reasonValue === "string" && reasonValue.trim().length > 0
+      ? reasonValue.trim()
+      : null;
+    return { disabled: true, reason };
+  }
+  return { disabled: false, reason: null };
+}
+
 function workflowActionIsDisabled(raw: unknown): boolean {
-  return typeof raw === "object"
-    && raw !== null
-    && (raw as { disabled?: unknown }).disabled === true;
+  return readWorkflowActionDisabled(raw).disabled;
+}
+
+function formatWorkflowDisabledReason(reason: string | null): string {
+  return reason ? `: ${reason}` : " (the provider did not supply a reason)";
+}
+
+interface WorkflowActionSelection<T extends { kind: string | null; raw: unknown; title: string }> {
+  action: T | null;
+  disabled: { action: T; reason: string | null } | null;
+}
+
+/**
+ * Keep the existing first-matching-kind selection strategy but skip a disabled
+ * candidate when a same-kind enabled candidate exists. Request-stage callers
+ * use this to refuse before any resolve/preview/commit.
+ */
+function selectEnabledWorkflowAction<T extends { kind: string | null; raw: unknown; title: string }>(
+  actions: readonly T[],
+  isSupportedKind: (kind: string | null) => boolean,
+): WorkflowActionSelection<T> {
+  let disabled: { action: T; reason: string | null } | null = null;
+  for (const candidate of actions) {
+    if (!isSupportedKind(candidate.kind)) continue;
+    const fact = readWorkflowActionDisabled(candidate.raw);
+    if (fact.disabled) {
+      if (!disabled) disabled = { action: candidate, reason: fact.reason };
+      continue;
+    }
+    return { action: candidate, disabled: null };
+  }
+  return { action: null, disabled };
 }
 
 function workflowEditRangeIsValid(edit: LspTextEdit): boolean {
@@ -1109,10 +1172,11 @@ export function validateWorkflowProviderAction(
     };
   }
   if (workflowActionIsDisabled(action.raw)) {
+    const { reason } = readWorkflowActionDisabled(action.raw);
     return {
       ok: false,
       state: "unsupported",
-      reason: `${capabilityLabel} action '${action.title}' is disabled by the provider; nothing applied`,
+      reason: `${capabilityLabel} action '${action.title}' is disabled by the provider${formatWorkflowDisabledReason(reason)}; nothing applied`,
     };
   }
   if (!input.isSupportedKind(action.kind)) {
@@ -1432,8 +1496,16 @@ export async function executeCleanupTransaction(
   if (afterRequest) return afterRequest;
 
   // 3. Resolve to a callable cleanup-kind action by exact kind equality.
-  const action = requested.actions.find((candidate) => isCleanupActionKind(candidate.kind)) ?? null;
-  if (!action) {
+  // ED-MAIN-002: request-stage disabled refusal, before resolve/preview/commit.
+  const selection = selectEnabledWorkflowAction(requested.actions, isCleanupActionKind);
+  if (!selection.action) {
+    if (selection.disabled) {
+      return fail(
+        "unsupported",
+        `Cleanup action '${selection.disabled.action.title}' is disabled by the provider`
+          + `${formatWorkflowDisabledReason(selection.disabled.reason)}; nothing applied`,
+      );
+    }
     const seen = requested.actions
       .map((candidate) => candidate.kind ?? "(no kind)")
       .slice(0, 3)
@@ -1445,6 +1517,7 @@ export async function executeCleanupTransaction(
         : "Provider returned no actions. Code Cleanup requires a dedicated batch cleanup provider; nothing applied.",
     );
   }
+  const action = selection.action;
 
   // 4. Resolve the action to concrete edits, then reject if the provider or
   // document identity moved while the resolve was in flight.

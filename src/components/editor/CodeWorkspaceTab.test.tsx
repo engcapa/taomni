@@ -9222,6 +9222,45 @@ end_of_record
       expect(confirmAppDialog).not.toHaveBeenCalled();
     });
 
+    it("refuses a provider-disabled rearrange action before resolve and shows the reason (ED-MAIN-002)", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockRearrangeServer(["source.rearrange"]);
+      vi.mocked(confirmAppDialog).mockClear();
+      lspMocks.lspCodeActions.mockClear();
+      lspMocks.lspCodeActionResolve.mockClear();
+      // LSP standard disabled object: the action is returned by discovery but
+      // the provider marks it disabled with a reason.
+      lspMocks.lspCodeActions.mockResolvedValue({
+        status: documentStatus({ available: true, active: true }),
+        actions: [{
+          title: "Rearrange members",
+          kind: "source.rearrange",
+          isPreferred: true,
+          edit: null,
+          command: null,
+          commandArguments: null,
+          raw: { title: "Rearrange members", disabled: { reason: "cannot rearrange generated file" } },
+        }],
+      });
+
+      renderWorkspace(rearrangeWorkspace("instance-rearrange-disabled"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.rearrangeCode");
+      });
+      await waitFor(() => expect(useAppStore.getState().statusMessage)
+        .toContain("cannot rearrange generated file"));
+      expect(useAppStore.getState().statusMessage).toContain("disabled by the provider");
+      expect(lspMocks.lspCodeActionResolve).not.toHaveBeenCalled();
+      expect(confirmAppDialog).not.toHaveBeenCalled();
+      expect(fileText("instance-rearrange-disabled")).toBe(SERVICE_PRE);
+    });
+
     it("commits one verified transaction from the action entry on the supported path", async () => {
       const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
       const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
