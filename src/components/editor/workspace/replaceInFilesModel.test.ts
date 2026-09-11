@@ -3,8 +3,11 @@ import {
   buildReplaceInFilesWorkspaceEdit,
   codePointOffsetToUtf16Offset,
   createReplaceInFilesPlan,
+  findReplacePreimage,
   replaceEditSignature,
   replaceMatchStableKey,
+  replacePreimageExpectedHashes,
+  replacePreimagePathKey,
   replaceScopeIdentityFromPlan,
   searchMatchesToReplaceInputs,
   summarizeReplaceCommitReport,
@@ -463,5 +466,58 @@ describe("ED-IMPROVE-005: frozen replace preview snapshot", () => {
     const driftedText = validateReplacePreviewSelection(snapshot, allKeys, driftedEdit);
     expect(driftedText.ok).toBe(false);
     expect(driftedText.reason).toContain("frozen replacement");
+  });
+
+  it("rejects a same-count selection whose path/range was swapped (ED-MAIN-005)", () => {
+    const edit = buildReplaceInFilesWorkspaceEdit({ matches: sampleMatches, replacementText: "bar" });
+    const snapshot = snapshotFor(edit);
+    const allKeys = new Set(sampleMatches.map(replaceMatchStableKey));
+    // Same number of edits and the frozen replacement, but one range moved.
+    const swapped = buildReplaceInFilesWorkspaceEdit({
+      matches: sampleMatches.map((match, index) => (
+        index === 0 ? { ...match, startCharacter: match.startCharacter + 1 } : match
+      )),
+      replacementText: "bar",
+    });
+    const result = validateReplacePreviewSelection(snapshot, allKeys, swapped, edit);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain("not part of the original replace plan");
+    // The genuine frozen edit still passes the per-item source check.
+    expect(validateReplacePreviewSelection(snapshot, allKeys, edit, edit)).toEqual({ ok: true });
+  });
+
+  it("derives per-file expected hashes from the frozen preimages (ED-MAIN-005)", () => {
+    expect(replacePreimageExpectedHashes({})).toEqual(new Map());
+    const preimages = [
+      {
+        path: "/ws/A.java",
+        uri: "file:///ws/A.java",
+        textHash: "hash-a",
+        encoding: "UTF-8",
+        bom: false,
+        eol: "lf" as const,
+        bufferRevision: 3,
+        dirty: false,
+        readOnly: false,
+        workspaceInstanceId: "ws",
+      },
+      {
+        path: "C:\\Ws\\B.java",
+        uri: "file:///C:/Ws/B.java",
+        textHash: "hash-b",
+        encoding: "UTF-8",
+        bom: false,
+        eol: "crlf" as const,
+        bufferRevision: null,
+        dirty: true,
+        readOnly: true,
+        workspaceInstanceId: "ws",
+      },
+    ];
+    const hashes = replacePreimageExpectedHashes({ preimages });
+    expect(hashes.get("/ws/a.java")).toBe("hash-a");
+    expect(hashes.get(replacePreimagePathKey("C:\\Ws\\B.java"))).toBe("hash-b");
+    expect(findReplacePreimage({ preimages }, "/ws/A.java")?.textHash).toBe("hash-a");
+    expect(findReplacePreimage({ preimages }, "/ws/missing.java")).toBeNull();
   });
 });

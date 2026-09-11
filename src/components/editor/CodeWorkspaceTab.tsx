@@ -643,11 +643,14 @@ import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
 import {
   codePointOffsetToUtf16Offset,
   replaceMatchAbsolutePath,
+  replacePreimageExpectedHashes,
+  replacePreimagePathKey,
   searchMatchesToReplaceInputs,
   summarizeReplaceCommitReport,
   validateReplacePreconditions,
   verifyReplaceMatchFreshness,
   type FileRevisionGuard,
+  type ReplaceFilePreimage,
 } from "./workspace/replaceInFilesModel";
 import type {
   CodeWorkspaceFileRef,
@@ -8260,6 +8263,47 @@ export function CodeWorkspaceTab({
     [openFile, revealEditorLocation],
   );
 
+  // ED-MAIN-005: read the frozen per-file preimage before the replace preview
+  // can be confirmed. The hash is text-only from the same read the commit's
+  // precondition uses, so a later disk change is refused instead of re-anchored.
+  const prepareReplacePreimages = useCallback(async (
+    paths: readonly string[],
+  ): Promise<readonly ReplaceFilePreimage[]> => {
+    const preimages: ReplaceFilePreimage[] = [];
+    for (const absolute of paths) {
+      const open = Object.values(openFilesRef.current).find((file) => {
+        const currentPath = absolutePathForOpenFile(file);
+        return currentPath !== null && fsPathEquals(currentPath, absolute);
+      });
+      const containing = rootsRef.current.find(
+        (root) => relativePathWithinRoot(root.path, absolute) !== null,
+      );
+      if (!containing) {
+        throw new Error(`Replace preview refused: ${absolute} is outside the workspace`);
+      }
+      const relative = relativePathWithinRoot(containing.path, absolute) ?? "";
+      const disk = await workspaceReadFile(containing.path, relative);
+      const eol = disk.text.includes("\r\n")
+        ? ("crlf" as const)
+        : disk.text.includes("\r") && !disk.text.includes("\n")
+          ? ("cr" as const)
+          : ("lf" as const);
+      preimages.push({
+        path: absolute,
+        uri: `file://${absolute}`,
+        textHash: disk.hash,
+        encoding: disk.encoding ?? "UTF-8",
+        bom: disk.bom ?? false,
+        eol,
+        bufferRevision: open?.documentRevision ?? null,
+        dirty: open?.dirty ?? false,
+        readOnly: !!open?.library || workspaceResourceOperationLockedRef.current,
+        workspaceInstanceId,
+      });
+    }
+    return preimages;
+  }, [absolutePathForOpenFile, workspaceInstanceId]);
+
   const structureFileRef = useRef<string | null>(null);
 
   const pinQuickDocumentation = useCallback((content: QuickDocContent) => {
@@ -8867,6 +8911,13 @@ export function CodeWorkspaceTab({
     onTransactionSummary?: (summary: WorkspaceEditApplyTransactionSummary) => void;
     /** Reports the exact edit selected by the preview dialog. */
     onActiveEditResolved?: (edit: LspWorkspaceEdit) => void;
+    /**
+     * ED-MAIN-005: frozen per-file disk hashes (normalized path key -> text
+     * hash) captured when the replace preview opened. The closed-file read
+     * refuses when live disk no longer matches, so an old range can never be
+     * re-anchored onto text read again later.
+     */
+    expectedDiskHashes?: ReadonlyMap<string, string> | null;
   };
 
   const applyLspWorkspaceEditNow = useCallback(async (
@@ -8874,6 +8925,9 @@ export function CodeWorkspaceTab({
     options: WorkspaceEditApplyOptions = {},
   ) => {
     const orderedOperations = workspaceEditOperations(edit);
+    // ED-MAIN-005: frozen replace-preimage hashes bind the closed-file write to
+    // the text read when the preview opened.
+    const expectedDiskHashes = options.expectedDiskHashes ?? null;
     const beforeSnapshots = options.recordHistory !== false && orderedOperations.length > 0
       ? await captureWorkspaceEditPathSnapshots(edit)
       : null;
@@ -8891,6 +8945,13 @@ export function CodeWorkspaceTab({
     // mutation — and its typed persistence result gates the transaction.
     // Held in a holder object because the assignment happens inside a closure.
     const preparedJournalRef: { current: RefactorRecoveryJournalEntryV2 | null } = { current: null };
+    const assertExpectedDiskHash = (absolutePath: string, diskHash: string | null | undefined): void => {
+      if (!expectedDiskHashes) return;
+      const expected = expectedDiskHashes.get(replacePreimagePathKey(absolutePath));
+      if (expected !== undefined && (diskHash == null || diskHash !== expected)) {
+        throw new Error(`${absolutePath} changed since the frozen replace preview; reopen the preview`);
+      }
+    };
     const buildHooks = (allowPreview: boolean): WorkspaceEditApplyHooks => ({
       resolvePath: (file) => {
         if (file.path) return normalizeFsPath(file.path);
@@ -8953,6 +9014,7 @@ export function CodeWorkspaceTab({
           if (rel === null) continue;
           try {
             const disk = await workspaceReadFile(root.path, rel);
+            assertExpectedDiskHash(absolutePath, disk.hash);
             const eol = disk.text.includes("\r\n") ? ("crlf" as const) : disk.text.includes("\r") && !disk.text.includes("\n") ? ("cr" as const) : ("lf" as const);
             return {
               text: disk.text,
@@ -8967,6 +9029,7 @@ export function CodeWorkspaceTab({
         }
         try {
           const disk = await workspaceReadLooseFile(absolutePath);
+          assertExpectedDiskHash(absolutePath, disk.hash);
           const eol = disk.text.includes("\r\n") ? ("crlf" as const) : disk.text.includes("\r") && !disk.text.includes("\n") ? ("cr" as const) : ("lf" as const);
           return {
             text: disk.text,
@@ -18907,7 +18970,8 @@ export function CodeWorkspaceTab({
                 includePreset={searchIncludePreset}
                 queryPreset={searchQueryPreset}
                 onOpenMatch={openSearchMatch}
-                onReplaceMatches={async (matches, replacement, edit) => {
+                onPrepareReplacePreimages={prepareReplacePreimages}
+                onReplaceMatches={async (matches, replacement, edit, snapshot) => {
                   void replacement;
                   // ED-FIND-004 A2/A3: pre-commit recheck (dirty open buffers,
                   // unreadable disk, matches moved since search) before the
@@ -18976,7 +19040,13 @@ export function CodeWorkspaceTab({
                   // document (readonly file, disk write failure, declined
                   // retry) must surface the real applied set — never a
                   // planned-count "all complete" report.
-                  const outcomes = await applyLspWorkspaceEdit(edit);
+                  // ED-MAIN-005: hand the frozen preview hashes to the applier
+                  // so the closed-file write precondition is the preview
+                  // preimage, not the second read.
+                  const expectedDiskHashes = replacePreimageExpectedHashes(snapshot);
+                  const outcomes = await applyLspWorkspaceEdit(edit, {
+                    expectedDiskHashes: expectedDiskHashes.size > 0 ? expectedDiskHashes : null,
+                  });
                   const report = summarizeReplaceCommitReport(outcomes, modelMatches);
                   setStatusMessage(report.message);
                   return {

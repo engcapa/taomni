@@ -313,6 +313,25 @@ export interface ReplaceQueryIdentity {
   excludeGlobs: readonly string[];
 }
 
+/**
+ * ED-MAIN-005: the per-file preimage captured when the preview opens. The
+ * commit feeds the disk hashes back to the applier as the write precondition so
+ * the old ranges can never be re-anchored onto text read again later.
+ */
+export interface ReplaceFilePreimage {
+  path: string;
+  uri: string;
+  /** Hash of the preview-read text; the applier's disk precondition. */
+  textHash: string;
+  encoding: string;
+  bom: boolean;
+  eol: "lf" | "crlf" | "cr" | null;
+  bufferRevision: number | null;
+  dirty: boolean;
+  readOnly: boolean;
+  workspaceInstanceId: string;
+}
+
 export interface ReplacePreviewSnapshot {
   scope: ReplaceScopeIdentity;
   query: ReplaceQueryIdentity;
@@ -322,6 +341,35 @@ export interface ReplacePreviewSnapshot {
   matchCount: number;
   editSignature: string;
   capturedAt: number;
+  /** Optional for legacy snapshots; ED-MAIN-005 fills it at preview time. */
+  preimages?: readonly ReplaceFilePreimage[];
+}
+
+export function replacePreimagePathKey(path: string): string {
+  return path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
+
+export function findReplacePreimage(
+  snapshot: Pick<ReplacePreviewSnapshot, "preimages">,
+  path: string,
+): ReplaceFilePreimage | null {
+  const key = replacePreimagePathKey(path);
+  return snapshot.preimages?.find((preimage) => replacePreimagePathKey(preimage.path) === key) ?? null;
+}
+
+/**
+ * ED-MAIN-005: per-file precondition map consumed by the applier. Only files
+ * with a captured preimage get an expected hash; legacy snapshots stay on the
+ * existing freshness gate.
+ */
+export function replacePreimageExpectedHashes(
+  snapshot: Pick<ReplacePreviewSnapshot, "preimages">,
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const preimage of snapshot.preimages ?? []) {
+    map.set(replacePreimagePathKey(preimage.path), preimage.textHash);
+  }
+  return map;
 }
 
 export function replaceScopeIdentityFromPlan(
@@ -373,10 +421,21 @@ export interface ReplaceSelectionValidation {
  * frozen snapshot, one edit per selected match, all carrying the frozen
  * replacement text. Any drift is an internal conflict, never a partial write.
  */
+function replaceEditKey(path: string, edit: LspTextEdit): string {
+  return [
+    replacePreimagePathKey(path),
+    edit.range.start.line,
+    edit.range.start.character,
+    edit.range.end.line,
+    edit.range.end.character,
+  ].join(":");
+}
+
 export function validateReplacePreviewSelection(
   snapshot: ReplacePreviewSnapshot,
   selectedMatchKeys: ReadonlySet<string>,
   filteredEdit: LspWorkspaceEdit,
+  sourceEdit?: LspWorkspaceEdit,
 ): ReplaceSelectionValidation {
   const frozenKeys = new Set(snapshot.matchKeys);
   for (const key of selectedMatchKeys) {
@@ -387,7 +446,10 @@ export function validateReplacePreviewSelection(
       };
     }
   }
-  const edits = workspaceEditOperations(filteredEdit).flatMap((operation) => (
+  const textOperations = workspaceEditOperations(filteredEdit).filter(
+    (operation) => operation.kind === "text",
+  );
+  const edits = textOperations.flatMap((operation) => (
     operation.kind === "text" ? operation.document.edits : []
   ));
   if (edits.length !== selectedMatchKeys.size) {
@@ -402,6 +464,28 @@ export function validateReplacePreviewSelection(
         ok: false,
         reason: "The edit text differs from the frozen replacement; reopen the preview",
       };
+    }
+  }
+  // ED-MAIN-005: each filtered edit must be the exact frozen path/range from the
+  // original plan, not a same-count selection that swapped a path or range.
+  if (sourceEdit) {
+    const sourceKeys = new Set<string>();
+    for (const operation of workspaceEditOperations(sourceEdit)) {
+      if (operation.kind !== "text") continue;
+      const path = operation.document.path ?? operation.document.uri;
+      for (const edit of operation.document.edits) sourceKeys.add(replaceEditKey(path, edit));
+    }
+    for (const operation of textOperations) {
+      if (operation.kind !== "text") continue;
+      const path = operation.document.path ?? operation.document.uri;
+      for (const edit of operation.document.edits) {
+        if (!sourceKeys.has(replaceEditKey(path, edit))) {
+          return {
+            ok: false,
+            reason: `Frozen edit ${path}:${edit.range.start.line}:${edit.range.start.character} is not part of the original replace plan; reopen the preview`,
+          };
+        }
+      }
     }
   }
   return { ok: true };

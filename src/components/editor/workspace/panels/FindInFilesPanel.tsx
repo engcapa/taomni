@@ -35,6 +35,7 @@ import {
   replaceScopeIdentityFromPlan,
   searchMatchesToReplaceInputs,
   validateReplacePreviewSelection,
+  type ReplaceFilePreimage,
   type ReplaceInFilesPlan,
   type ReplacePreviewSnapshot,
 } from "../replaceInFilesModel";
@@ -52,7 +53,15 @@ interface FindInFilesPanelProps {
     matches: WorkspaceSearchMatch[],
     replacement: string,
     edit: LspWorkspaceEdit,
+    snapshot: ReplacePreviewSnapshot,
   ) => Promise<{ ok: boolean; appliedCount?: number; fileCount?: number; message?: string }>;
+  /**
+   * ED-MAIN-005: read the frozen per-file preimage before the preview can be
+   * confirmed. Returns the preimages for the given absolute paths.
+   */
+  onPrepareReplacePreimages?: (
+    paths: readonly string[],
+  ) => Promise<readonly ReplaceFilePreimage[]>;
   /** Bump to move focus into the query input (Ctrl+Shift+F). */
   focusNonce?: number;
   /** Bump the nonce to overwrite the include globs ("Find in Directory..."). */
@@ -210,6 +219,7 @@ export function FindInFilesPanel({
   roots,
   onOpenMatch,
   onReplaceMatches,
+  onPrepareReplacePreimages,
   focusNonce = 0,
   includePreset,
   queryPreset,
@@ -574,7 +584,7 @@ export function FindInFilesPanel({
     );
   }, [languagesByPath]);
 
-  const replaceAll = useCallback(() => {
+  const replaceAll = useCallback(async () => {
     if (!onReplaceMatches || allMatches.length === 0 || replacePreview) return;
     // ED-FIND-004 A1: freeze the preimage — model matches, edit, and plan —
     // at dialog open. Commit reconfirms against live disk state (A2/A3).
@@ -589,6 +599,19 @@ export function FindInFilesPanel({
     }
     const edit = buildReplaceInFilesWorkspaceEdit({ matches: modelMatches, replacementText: replacement });
     const plan = createReplaceInFilesPlan(edit);
+    // ED-MAIN-005: freeze the per-file preimage before the preview can be
+    // confirmed. A prepare failure is visible and commits nothing.
+    let preimages: readonly ReplaceFilePreimage[] = [];
+    if (onPrepareReplacePreimages) {
+      try {
+        preimages = await onPrepareReplacePreimages(
+          [...new Set(modelMatches.map((match) => match.filePath))],
+        );
+      } catch (error) {
+        setReplaceCommitError(error instanceof Error ? error.message : String(error));
+        return;
+      }
+    }
     // Join preview usage ids back to search-match keys for exclusion.
     const remaining = new Map<string, WorkspaceSearchMatch[]>();
     for (const match of allMatches) {
@@ -624,6 +647,7 @@ export function FindInFilesPanel({
       matchCount: modelMatches.length,
       editSignature: replaceEditSignature(edit),
       capturedAt: Date.now(),
+      preimages,
     };
     setReplaceCommitError(null);
     setReplacePreview({
@@ -640,6 +664,7 @@ export function FindInFilesPanel({
     caseSensitive,
     excludeGlobs,
     includeGlobs,
+    onPrepareReplacePreimages,
     onReplaceMatches,
     query,
     regexp,
@@ -678,6 +703,7 @@ export function FindInFilesPanel({
       preview.snapshot,
       new Set(filteredMatches.map(workspaceSearchMatchKey)),
       filteredEdit,
+      preview.edit,
     );
     if (!selection.ok) {
       setReplaceCommitError(selection.reason ?? "Replace selection is stale; reopen the preview");
@@ -686,7 +712,12 @@ export function FindInFilesPanel({
     setReplaceCommitting(true);
     setReplaceCommitError(null);
     try {
-      const result = await onReplaceMatches(filteredMatches, preview.replacement, filteredEdit);
+      const result = await onReplaceMatches(
+        filteredMatches,
+        preview.replacement,
+        filteredEdit,
+        preview.snapshot,
+      );
       if (result.ok) {
         setReplacePreview(null);
       } else {
@@ -863,6 +894,15 @@ export function FindInFilesPanel({
           )}
         </span>
       </div>
+      {replaceCommitError && !replacePreview ? (
+        <div
+          role="alert"
+          data-testid="code-workspace-replace-error"
+          className="border-b border-red-500/30 bg-red-500/10 px-2 py-1 text-[11px] text-red-500"
+        >
+          {replaceCommitError}
+        </div>
+      ) : null}
       {(summary?.truncated || summary?.cancelled) && (
         <div className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[10px] text-amber-500">
           {summary.cancelled ? "Search cancelled — results are partial." : `Match limit reached (${MAX_TOTAL_MATCHES}) — refine the query to see everything.`}

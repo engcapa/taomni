@@ -643,6 +643,93 @@ describe("ED-FIND-004: replace preview commit flow in FindInFilesPanel", () => {
     expect(edit.documentEdits[0]!.edits[0]!.newText).toBe("thread");
   });
 
+  it("captures frozen preimages before the preview and passes them to the commit (ED-MAIN-005)", async () => {
+    const onReplaceMatches = vi.fn(
+      async (
+        _matches: WorkspaceSearchMatch[],
+        _replacement: string,
+        _edit: LspWorkspaceEdit,
+        _snapshot: unknown,
+      ): Promise<{ ok: boolean; appliedCount?: number; fileCount?: number }> =>
+        ({ ok: true as const, appliedCount: 2, fileCount: 2 }),
+    );
+    const onPrepareReplacePreimages = vi.fn(async (paths: readonly string[]) =>
+      paths.map((path) => ({
+        path,
+        uri: `file://${path}`,
+        textHash: `hash:${path}`,
+        encoding: "UTF-8",
+        bom: false,
+        eol: "lf" as const,
+        bufferRevision: 1,
+        dirty: false,
+        readOnly: false,
+        workspaceInstanceId: "ws",
+      })),
+    );
+    render(
+      <FindInFilesPanel
+        roots={roots}
+        onOpenMatch={vi.fn()}
+        onReplaceMatches={onReplaceMatches}
+        onPrepareReplacePreimages={onPrepareReplacePreimages}
+      />,
+    );
+    const emit = await runSearch();
+    const matches = [
+      searchMatch({ lineNumber: 1, lineText: "needle one", matchStart: 0, matchEnd: 6, column: 1 }),
+      searchMatch({ path: "src/b.ts", lineNumber: 3, lineText: "needle three", matchStart: 0, matchEnd: 6, column: 1 }),
+    ];
+    act(() => {
+      emit({ ...doneEvent(), kind: "batch", matches });
+      emit(doneEvent({ totalMatches: matches.length }));
+    });
+    fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "thread" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+    expect(await screen.findByTestId("code-workspace-replace-preview")).toBeInTheDocument();
+    expect(onPrepareReplacePreimages).toHaveBeenCalledTimes(1);
+    expect(onPrepareReplacePreimages.mock.calls[0]![0]).toHaveLength(2);
+
+    fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+    await waitFor(() => expect(onReplaceMatches).toHaveBeenCalledTimes(1));
+    const snapshot = onReplaceMatches.mock.calls[0]![3] as {
+      preimages?: Array<{ textHash: string; eol: string }>;
+    };
+    expect(snapshot.preimages).toHaveLength(2);
+    expect(snapshot.preimages?.[0]?.textHash).toContain("hash:");
+    expect(snapshot.preimages?.[0]?.eol).toBe("lf");
+  });
+
+  it("shows a preimage prepare failure and commits nothing (ED-MAIN-005)", async () => {
+    const onReplaceMatches = vi.fn();
+    const onPrepareReplacePreimages = vi.fn(async () => {
+      throw new Error("cannot read src/b.ts");
+    });
+    render(
+      <FindInFilesPanel
+        roots={roots}
+        onOpenMatch={vi.fn()}
+        onReplaceMatches={onReplaceMatches}
+        onPrepareReplacePreimages={onPrepareReplacePreimages}
+      />,
+    );
+    const emit = await runSearch();
+    const matches = [
+      searchMatch({ lineNumber: 1, lineText: "needle one", matchStart: 0, matchEnd: 6, column: 1 }),
+      searchMatch({ path: "src/b.ts", lineNumber: 3, lineText: "needle three", matchStart: 0, matchEnd: 6, column: 1 }),
+    ];
+    act(() => {
+      emit({ ...doneEvent(), kind: "batch", matches });
+      emit(doneEvent({ totalMatches: matches.length }));
+    });
+    fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "thread" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+    expect(await screen.findByTestId("code-workspace-replace-error"))
+      .toHaveTextContent("cannot read src/b.ts");
+    expect(screen.queryByTestId("code-workspace-replace-preview")).not.toBeInTheDocument();
+    expect(onReplaceMatches).not.toHaveBeenCalled();
+  });
+
   it("keeps the preview open and shows the blocker message on conflict (A2)", async () => {
     const onReplaceMatches = vi.fn(
       async () => ({ ok: false as const, message: "Replace blocked: dirty buffer" }),
