@@ -18949,7 +18949,14 @@ export function CodeWorkspaceTab({
                     diskTexts.set(absolute, diskText);
                     guards.push({ path: absolute, isDirty: open?.dirty ?? false });
                   }
-                  const modelMatches = searchMatchesToReplaceInputs(matches);
+                  let modelMatches: ReturnType<typeof searchMatchesToReplaceInputs>;
+                  try {
+                    modelMatches = searchMatchesToReplaceInputs(matches);
+                  } catch (error) {
+                    const message = error instanceof Error ? error.message : String(error);
+                    setStatusMessage(message);
+                    return { ok: false, message };
+                  }
                   const freshness = verifyReplaceMatchFreshness(diskTexts, modelMatches);
                   const precondition = validateReplacePreconditions(guards);
                   const conflicts = [

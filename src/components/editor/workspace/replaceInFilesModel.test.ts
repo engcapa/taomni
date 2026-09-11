@@ -299,6 +299,78 @@ describe("ED-IMPROVE-004: code-point offsets map to UTF-16 LSP ranges", () => {
   });
 });
 
+describe("ED-MAIN-004: mixed EOL and illegal search coordinates", () => {
+  function matchForLine(lineText: string, lineNumber: number, matchStart: number, matchEnd: number) {
+    return {
+      rootId: "app",
+      rootName: "app",
+      rootPath: "/ws",
+      path: "src/a.ts",
+      lineNumber,
+      column: 1,
+      matchStart,
+      matchEnd,
+      lineText,
+    };
+  }
+
+  it("accepts a match on a CR-only second line and keeps LF/CRLF/CR consistent", () => {
+    const [input] = searchMatchesToReplaceInputs([matchForLine("foo", 2, 0, 3)]);
+    expect(input.startLine).toBe(1);
+    expect(input.matchedText).toBe("foo");
+    expect(verifyReplaceMatchFreshness(
+      new Map([["/ws/src/a.ts", "abc\rfoo"]]),
+      [input],
+    )).toEqual([]);
+    expect(verifyReplaceMatchFreshness(
+      new Map([["/ws/src/a.ts", "abc\nfoo"]]),
+      [input],
+    )).toEqual([]);
+    expect(verifyReplaceMatchFreshness(
+      new Map([["/ws/src/a.ts", "abc\r\nfoo"]]),
+      [input],
+    )).toEqual([]);
+  });
+
+  it("builds and applies an edit on a CR-only line without byte drift", () => {
+    const [input] = searchMatchesToReplaceInputs([matchForLine("foo", 2, 0, 3)]);
+    const edit = buildReplaceInFilesWorkspaceEdit({ matches: [input], replacementText: "bar" });
+    expect(applyLspTextEditsToString("abc\rfoo", edit.documentEdits[0].edits)).toBe("abc\rbar");
+  });
+
+  it("throws a typed reason for negative/fraction/NaN/out-of-range/reversed raw offsets", () => {
+    const bads = [
+      { matchStart: -1, matchEnd: 2 },
+      { matchStart: 1.5, matchEnd: 2 },
+      { matchStart: Number.NaN, matchEnd: 2 },
+      { matchStart: 0, matchEnd: 99 },
+      { matchStart: 3, matchEnd: 1 },
+    ];
+    for (const bad of bads) {
+      expect(() => searchMatchesToReplaceInputs([
+        matchForLine("foo", 1, bad.matchStart, bad.matchEnd),
+      ])).toThrow(/invalid offset .* replace refused/i);
+    }
+    // The thrown error is a distinct typed class the panel/commit owners catch.
+    try {
+      searchMatchesToReplaceInputs([matchForLine("foo", 1, -1, 2)]);
+      throw new Error("expected a throw");
+    } catch (error) {
+      expect((error as Error).name).toBe("InvalidSearchMatchCoordinatesError");
+    }
+  });
+
+  it("keeps a valid astral-prefixed match exact and rejects offsets past the line", () => {
+    const line = "\u{1F600}foo";
+    const [ok] = searchMatchesToReplaceInputs([matchForLine(line, 1, 1, 4)]);
+    expect(ok.matchedText).toBe("foo");
+    expect(ok.startCharacter).toBe(2);
+    expect(ok.endCharacter).toBe(5);
+    expect(() => searchMatchesToReplaceInputs([matchForLine(line, 1, 0, 5)]))
+      .toThrow(/invalid offset .* replace refused/i);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // ED-IMPROVE-005: the frozen preview snapshot is the commit's single source
 // of truth for scope, query, replacement, selected matches and edit identity.

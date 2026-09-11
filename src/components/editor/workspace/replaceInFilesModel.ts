@@ -8,6 +8,7 @@ import type { LspFileTextEdits, LspTextEdit, LspWorkspaceEdit } from "../../../l
 import type { WorkspaceSearchMatch } from "../../../lib/editor/workspaceSearch";
 import { fsPathComparisonKey } from "./codeWorkspaceModel";
 import type { FindInFilesScopePlan } from "./findInFilesScopeModel";
+import { offsetFromLspPositionInString } from "./lspTextEdits";
 import {
   buildWorkspaceEditPreview,
   filterWorkspaceEditByUsages,
@@ -39,16 +40,43 @@ export function replaceMatchAbsolutePath(match: WorkspaceSearchMatch): string {
  * navigation, freshness and commit so every consumer agrees.
  */
 export function codePointOffsetToUtf16Offset(lineText: string, offset: number): number {
-  if (offset <= 0) return 0;
+  const converted = codePointOffsetToUtf16OffsetChecked(lineText, offset);
+  return converted ?? Math.max(0, Math.min(lineText.length, Math.trunc(offset) || 0));
+}
+
+/**
+ * ED-MAIN-004: strict conversion that never silently clamps. Returns null for
+ * negative, non-integer, NaN, or past-the-line code-point offsets so callers
+ * can surface a reason instead of writing at a different valid position.
+ */
+export function codePointOffsetToUtf16OffsetChecked(
+  lineText: string,
+  offset: number,
+): number | null {
+  if (!Number.isInteger(offset) || offset < 0) return null;
   let utf16 = 0;
   let codePoints = 0;
   while (utf16 < lineText.length && codePoints < offset) {
     const code = lineText.codePointAt(utf16);
-    if (code === undefined) break;
+    if (code === undefined) return null;
     utf16 += code > 0xffff ? 2 : 1;
     codePoints += 1;
   }
-  return utf16;
+  return codePoints === offset ? utf16 : null;
+}
+
+/**
+ * Thrown when a backend search match carries illegal code-point coordinates.
+ * The panel and commit owners catch it and surface a zero-commit reason.
+ */
+export class InvalidSearchMatchCoordinatesError extends Error {
+  readonly path: string;
+
+  constructor(path: string, lineNumber: number, offset: number) {
+    super(`Search match at ${path}:${lineNumber} has an invalid offset ${offset}; replace refused`);
+    this.name = "InvalidSearchMatchCoordinatesError";
+    this.path = path;
+  }
 }
 
 /**
@@ -60,8 +88,19 @@ export function searchMatchesToReplaceInputs(matches: readonly WorkspaceSearchMa
   return matches.map((match) => {
     const absolute = replaceMatchAbsolutePath(match);
     const line = Math.max(0, match.lineNumber - 1);
-    const startCharacter = codePointOffsetToUtf16Offset(match.lineText, match.matchStart);
-    const endCharacter = codePointOffsetToUtf16Offset(match.lineText, match.matchEnd);
+    // ED-MAIN-004: validate the raw code-point offsets before conversion. A
+    // negative/fractional/NaN/past-the-line/reversed match must not be clamped
+    // into a different valid range.
+    const startCharacter = codePointOffsetToUtf16OffsetChecked(match.lineText, match.matchStart);
+    const endCharacter = codePointOffsetToUtf16OffsetChecked(match.lineText, match.matchEnd);
+    if (
+      startCharacter === null
+      || endCharacter === null
+      || endCharacter < startCharacter
+    ) {
+      const badOffset = startCharacter === null ? match.matchStart : match.matchEnd;
+      throw new InvalidSearchMatchCoordinatesError(absolute, match.lineNumber, badOffset);
+    }
     return {
       filePath: absolute,
       fileUri: `file://${absolute}`,
@@ -181,20 +220,32 @@ export function verifyReplaceMatchFreshness(
       });
       continue;
     }
-    const lines = diskText.split("\n");
-    const line = lines[match.startLine];
     const start = match.startCharacter;
     const end = match.endCharacter;
     if (
-      line === undefined
-      || match.startLine !== match.endLine
+      match.startLine !== match.endLine
       || !Number.isInteger(start)
       || !Number.isInteger(end)
       || start < 0
       || end < start
-      || end > line.length
-      || line.slice(start, end) !== match.matchedText
     ) {
+      conflicts.push({
+        path: match.filePath,
+        reason: `Match "${match.matchedText}" changed since search (line ${match.startLine + 1})`,
+      });
+      continue;
+    }
+    // ED-MAIN-004: use the same LF/CRLF/CR-aware position mapping as the
+    // applier so a match on a non-LF line is not falsely judged stale.
+    const startOffset = offsetFromLspPositionInString(diskText, {
+      line: match.startLine,
+      character: start,
+    });
+    const endOffset = offsetFromLspPositionInString(diskText, {
+      line: match.endLine,
+      character: end,
+    });
+    if (endOffset < startOffset || diskText.slice(startOffset, endOffset) !== match.matchedText) {
       conflicts.push({
         path: match.filePath,
         reason: `Match "${match.matchedText}" changed since search (line ${match.startLine + 1})`,

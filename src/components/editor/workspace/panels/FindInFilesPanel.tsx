@@ -578,7 +578,15 @@ export function FindInFilesPanel({
     if (!onReplaceMatches || allMatches.length === 0 || replacePreview) return;
     // ED-FIND-004 A1: freeze the preimage — model matches, edit, and plan —
     // at dialog open. Commit reconfirms against live disk state (A2/A3).
-    const modelMatches = searchMatchesToReplaceInputs(allMatches);
+    // ED-MAIN-004: an illegal backend match offset is reported with a reason
+    // instead of being clamped into a different valid range.
+    let modelMatches: ReturnType<typeof searchMatchesToReplaceInputs>;
+    try {
+      modelMatches = searchMatchesToReplaceInputs(allMatches);
+    } catch (error) {
+      setReplaceCommitError(error instanceof Error ? error.message : String(error));
+      return;
+    }
     const edit = buildReplaceInFilesWorkspaceEdit({ matches: modelMatches, replacementText: replacement });
     const plan = createReplaceInFilesPlan(edit);
     // Join preview usage ids back to search-match keys for exclusion.
