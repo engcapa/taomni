@@ -1657,4 +1657,97 @@ describe("ED-IMPROVE-009 late clipboard results report a cancelled observation",
     // No cut happened: the document keeps its text.
     expect(view.state.doc.toString()).toBe("hello world");
   });
+
+  // ED-MAIN-007: an async paste whose owner moved must not edit the background
+  // buffer, steal focus back, or add history, but its OS effect is still
+  // observed through the frozen endpoint.
+  it("keeps a paste out of a background buffer and does not steal focus when the owner moved (ED-MAIN-007)", async () => {
+    const pending = deferred<unknown>();
+    const observations: unknown[] = [];
+    const owner = new WorkspaceDocumentTransactionOwner();
+    let port: { execute: (id: string, options?: unknown) => boolean } | null = null;
+    const handle = stubHandle(() => pending.promise, async () => ({ outcome: "success", systemEffect: "performed" }));
+    const rendered = renderEditor("hello world", vi.fn(), {
+      clipboardHandle: handle as never,
+      transactionOwner: owner,
+      viewId: "primary",
+      fileKey: "owner.ts",
+      onClipboardObservation: (record) => { observations.push(record); },
+      onCommandPortChange: (registration) => { port = registration.port as never; },
+    });
+    await waitFor(() => expect(port).not.toBeNull());
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    act(() => { content.focus(); });
+    expect(view.hasFocus).toBe(true);
+
+    act(() => { port!.execute("paste"); });
+    const search = document.createElement("input");
+    document.body.appendChild(search);
+    act(() => { search.focus(); });
+    act(() => { pending.resolve({ outcome: "success", text: "payload", systemEffect: "performed" }); });
+
+    await waitFor(() => expect(observations).toHaveLength(1));
+    expect(observations[0]).toMatchObject({
+      operation: "paste",
+      outcome: "cancelled",
+      systemEffect: "performed",
+    });
+    expect(view.state.doc.toString()).toBe("hello world");
+    expect(document.activeElement).toBe(search);
+    expect(owner.getHistoryState("owner.ts").undoDepth).toBe(0);
+    search.remove();
+  });
+
+  // A legitimate menu/context-menu paste runs while the editor does not hold
+  // DOM focus but no newer surface claimed it; it must still apply.
+  it("still pastes for an authorized menu owner that is not focused at request (ED-MAIN-007)", async () => {
+    const pending = deferred<unknown>();
+    let port: { execute: (id: string, options?: unknown) => boolean } | null = null;
+    const handle = stubHandle(() => pending.promise, async () => ({ outcome: "success", systemEffect: "performed" }));
+    const rendered = renderEditor("hello world", vi.fn(), {
+      clipboardHandle: handle as never,
+      onCommandPortChange: (registration) => { port = registration.port as never; },
+    });
+    await waitFor(() => expect(port).not.toBeNull());
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    const menu = document.createElement("button");
+    document.body.appendChild(menu);
+
+    act(() => { content.focus(); });
+    // The menu takes focus before the command executes (owner generation moves
+    // before the request, so no change is observed while it is pending).
+    act(() => { menu.focus(); });
+    act(() => { port!.execute("paste"); });
+    act(() => { pending.resolve({ outcome: "success", text: "payload", systemEffect: "performed" }); });
+
+    await waitFor(() => expect(view.state.doc.toString()).toContain("payload"));
+    menu.remove();
+  });
+
+  it("observes an OS effect that returns after the view was destroyed (ED-MAIN-007)", async () => {
+    const pending = deferred<unknown>();
+    const observations: unknown[] = [];
+    let port: { execute: (id: string, options?: unknown) => boolean } | null = null;
+    const handle = stubHandle(() => pending.promise, async () => ({ outcome: "success", systemEffect: "performed" }));
+    const rendered = renderEditor("hello world", vi.fn(), {
+      clipboardHandle: handle as never,
+      onClipboardObservation: (record) => { observations.push(record); },
+      onCommandPortChange: (registration) => { port = registration.port as never; },
+    });
+    await waitFor(() => expect(port).not.toBeNull());
+    act(() => { port!.execute("paste"); });
+    // The whole host unmounts (its clipboard WeakMap entry is released) while
+    // the OS read is still in flight.
+    rendered.unmount();
+    act(() => { pending.resolve({ outcome: "denied", systemEffect: "performed" }); });
+
+    await waitFor(() => expect(observations).toHaveLength(1));
+    expect(observations[0]).toMatchObject({
+      operation: "paste",
+      outcome: "cancelled",
+      systemEffect: "performed",
+    });
+  });
 });

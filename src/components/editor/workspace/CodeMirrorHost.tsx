@@ -541,15 +541,64 @@ let nextEditorHostViewId = 0;
 // (bound at mount) so the module-level helpers stay pure and testable.
 const clipboardContextByView = new WeakMap<
   EditorView,
-  {
-    workspaceId: string | null;
-    onUnavailable: (message: string) => void;
-    /** ED-CLIP-004: typed metadata-only observation of the guarded result. */
-    onObservation?: (record: ClipboardObservationRecord) => void;
-    /** Refcounted session handle (§8.18.4); null for legacy non-workspace views. */
-    handle: WorkspaceClipboardHandle | null;
-  }
+  ClipboardObservationEndpoint
 >();
+
+interface ClipboardObservationEndpoint {
+  workspaceId: string | null;
+  onUnavailable: (message: string) => void;
+  /** ED-CLIP-004: typed metadata-only observation of the guarded result. */
+  onObservation?: (record: ClipboardObservationRecord) => void;
+  /** Refcounted session handle (§8.18.4); null for legacy non-workspace views. */
+  handle: WorkspaceClipboardHandle | null;
+  /** ED-MAIN-007: whether this view is still the active/visible workspace leaf. */
+  isActive?: () => boolean;
+}
+
+// ED-MAIN-007: an async clipboard request freezes its owner generation and
+// request token. A request whose owner moved on (focus left without an
+// authorizing menu, another leaf became active, or a newer request started)
+// must not edit, focus, or record history, but its already-performed OS effect
+// is still observed through the frozen endpoint.
+const clipboardOwnerGenerationByView = new WeakMap<EditorView, { generation: number }>();
+const clipboardRequestTokenByView = new WeakMap<EditorView, number>();
+
+function clipboardOwnerGeneration(view: EditorView): number {
+  return clipboardOwnerGenerationByView.get(view)?.generation ?? 0;
+}
+
+export function bumpClipboardOwnerGeneration(view: EditorView): void {
+  const state = clipboardOwnerGenerationByView.get(view) ?? { generation: 0 };
+  state.generation += 1;
+  clipboardOwnerGenerationByView.set(view, state);
+}
+
+function nextClipboardRequestToken(view: EditorView): number {
+  const next = (clipboardRequestTokenByView.get(view) ?? 0) + 1;
+  clipboardRequestTokenByView.set(view, next);
+  return next;
+}
+
+function clipboardRequestIsCurrent(view: EditorView, token: number): boolean {
+  return (clipboardRequestTokenByView.get(view) ?? 0) === token;
+}
+
+function clipboardOwnerLost(
+  view: EditorView,
+  endpoint: ClipboardObservationEndpoint | undefined,
+  ownerGenerationAtRequest: number,
+  requestToken: number,
+): boolean {
+  if (!view.dom.isConnected) return true;
+  if (endpoint?.isActive && !endpoint.isActive()) return true;
+  if (!clipboardRequestIsCurrent(view, requestToken)) return true;
+  // A focus loss with no authorized menu owner (the generation moved after the
+  // request) means another surface claimed focus; do not steal it back.
+  if (!view.hasFocus && clipboardOwnerGeneration(view) !== ownerGenerationAtRequest) {
+    return true;
+  }
+  return false;
+}
 
 /**
  * ED-CLIP-004: project one settled guarded clipboard result into the typed
@@ -557,13 +606,12 @@ const clipboardContextByView = new WeakMap<
  * shape of whatever was actually inserted (OS text or workspace fallback).
  */
 function reportClipboardWriteObservation(
-  view: EditorView,
+  context: ClipboardObservationEndpoint | undefined,
   operation: ClipboardObservationOperation,
   result: GuardedSystemWriteResult,
   payload: EditorClipboardPayload,
   caretCount: number,
 ): void {
-  const context = clipboardContextByView.get(view);
   if (!context?.onObservation) return;
   const handle = context.handle;
   const snapshot = handle?.getSnapshot();
@@ -584,12 +632,11 @@ function reportClipboardWriteObservation(
 }
 
 function reportClipboardReadObservation(
-  view: EditorView,
+  context: ClipboardObservationEndpoint | undefined,
   operation: ClipboardObservationOperation,
   result: GuardedSystemReadResult,
   caretCount: number,
 ): void {
-  const context = clipboardContextByView.get(view);
   if (!context?.onObservation) return;
   const handle = context.handle;
   const snapshot = handle?.getSnapshot();
@@ -609,7 +656,7 @@ function reportClipboardReadObservation(
  * the OS effect that already happened instead of dropping the observation.
  */
 function reportClipboardCancelledObservation(
-  view: EditorView,
+  endpoint: ClipboardObservationEndpoint | undefined,
   operation: ClipboardObservationOperation,
   systemEffect: GuardedSystemEffect,
   caretCount: number,
@@ -621,10 +668,9 @@ function reportClipboardCancelledObservation(
     payloadLength?: number | null;
   } = {},
 ): void {
-  const context = clipboardContextByView.get(view);
-  if (!context?.onObservation) return;
-  const snapshot = context.handle?.getSnapshot();
-  context.onObservation(createClipboardCancelledObservation({
+  if (!endpoint?.onObservation) return;
+  const snapshot = endpoint.handle?.getSnapshot();
+  endpoint.onObservation(createClipboardCancelledObservation({
     operation,
     systemEffect,
     permission: snapshot?.permission ?? "unknown",
@@ -742,7 +788,7 @@ function writeEditorSelectionToClipboard(view: EditorView): boolean {
       // Reported after the payload landed in the slot so the observation's
       // revision/exclusion fields describe the committed state, not the
       // pre-write one.
-      reportClipboardWriteObservation(view, "copy", res, payload, caretCountAtCopy);
+      reportClipboardWriteObservation(context, "copy", res, payload, caretCountAtCopy);
     });
     return true;
   }
@@ -779,20 +825,24 @@ function pasteSystemClipboard(view: EditorView): boolean {
   const selectionAtRequest = view.state.selection;
   const context = clipboardContextByView.get(view);
   const handle = context?.handle;
+  const requestToken = nextClipboardRequestToken(view);
+  const ownerGenerationAtRequest = clipboardOwnerGeneration(view);
 
   const caretCountAtPaste = view.state.selection.ranges.length;
 
   if (handle) {
     void handle.readSystemClipboard({ readTextResult: readCodeWorkspaceClipboardText }).then((result) => {
       if (
-        !view.dom.isConnected
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
         || view.composing
+        || view.state.readOnly
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
-        // ED-IMPROVE-009: the paste is cancelled with no document/focus effect,
-        // but the OS read effect that already happened is still reported.
-        reportClipboardCancelledObservation(view, "paste", result.systemEffect, caretCountAtPaste, {
+        // ED-IMPROVE-009 / ED-MAIN-007: the paste is cancelled with no document
+        // or focus effect, but the OS read effect that already happened is
+        // still reported through the frozen endpoint.
+        reportClipboardCancelledObservation(context, "paste", result.systemEffect, caretCountAtPaste, {
           baseGeneration: result.outcome === "stale-generation" ? result.baseGeneration : null,
           usedWorkspaceFallback: result.outcome !== "success" && !!result.fallbackSession,
           segmentCount: result.outcome === "success" ? null : result.fallbackSession?.segments?.length ?? null,
@@ -801,7 +851,7 @@ function pasteSystemClipboard(view: EditorView): boolean {
         });
         return;
       }
-      reportClipboardReadObservation(view, "paste", result, caretCountAtPaste);
+      reportClipboardReadObservation(context, "paste", result, caretCountAtPaste);
       if (result.outcome === "success") {
         pasteEditorClipboardPayload(
           view,
@@ -840,14 +890,15 @@ function pasteSystemClipboard(view: EditorView): boolean {
   void readCodeWorkspaceClipboardText()
     .then((result) => {
       if (
-        !view.dom.isConnected
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
         || view.composing
+        || view.state.readOnly
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
-        // ED-IMPROVE-009: cancelled paste keeps the OS read fact.
+        // ED-IMPROVE-009 / ED-MAIN-007: cancelled paste keeps the OS read fact.
         reportClipboardCancelledObservation(
-          view,
+          context,
           "paste",
           result.ok ? "not-performed" : "unknown",
           caretCountAtPaste,
@@ -901,25 +952,28 @@ function pasteAsPlainText(view: EditorView): boolean {
   const selectionAtRequest = view.state.selection;
   const context = clipboardContextByView.get(view);
   const handle = context?.handle;
+  const requestToken = nextClipboardRequestToken(view);
+  const ownerGenerationAtRequest = clipboardOwnerGeneration(view);
 
   const caretCountAtPlainPaste = view.state.selection.ranges.length;
 
   if (handle) {
     void handle.readSystemClipboard({ readTextResult: readCodeWorkspaceClipboardText }).then((result) => {
       if (
-        !view.dom.isConnected
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
         || view.composing
+        || view.state.readOnly
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
-        reportClipboardCancelledObservation(view, "paste-plain", result.systemEffect, caretCountAtPlainPaste, {
+        reportClipboardCancelledObservation(context, "paste-plain", result.systemEffect, caretCountAtPlainPaste, {
           baseGeneration: result.outcome === "stale-generation" ? result.baseGeneration : null,
           usedWorkspaceFallback: result.outcome !== "success" && !!result.fallbackSession,
           payloadLength: result.outcome === "success" ? result.text.length : result.fallbackSession?.plainText.length ?? null,
         });
         return;
       }
-      reportClipboardReadObservation(view, "paste-plain", result, caretCountAtPlainPaste);
+      reportClipboardReadObservation(context, "paste-plain", result, caretCountAtPlainPaste);
       const text = result.outcome === "success" ? result.text : result.fallbackSession?.plainText ?? "";
       if (!text) {
         context?.onUnavailable(
@@ -950,13 +1004,14 @@ function pasteAsPlainText(view: EditorView): boolean {
   void readCodeWorkspaceClipboardText()
     .then((result) => {
       if (
-        !view.dom.isConnected
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
         || view.composing
+        || view.state.readOnly
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
         reportClipboardCancelledObservation(
-          view,
+          context,
           "paste-plain",
           result.ok ? "not-performed" : "unknown",
           caretCountAtPlainPaste,
@@ -999,20 +1054,23 @@ function cutSystemClipboard(view: EditorView): boolean {
   const selectionAtRequest = view.state.selection;
   const context = clipboardContextByView.get(view);
   const handle = context?.handle;
+  const requestToken = nextClipboardRequestToken(view);
+  const ownerGenerationAtRequest = clipboardOwnerGeneration(view);
 
   const caretCountAtCut = view.state.selection.ranges.length;
 
   if (handle) {
     void handle.writeSystemClipboard(payload.plainText).then((res) => {
       if (
-        !view.dom.isConnected
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
         || view.composing
+        || view.state.readOnly
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
-        // ED-IMPROVE-009: the cut is cancelled with no document/focus effect,
-        // but a possibly-performed OS write keeps its real effect fact.
-        reportClipboardCancelledObservation(view, "cut", res.systemEffect, caretCountAtCut, {
+        // ED-IMPROVE-009 / ED-MAIN-007: the cut is cancelled with no document
+        // or focus effect, but a possibly-performed OS write keeps its fact.
+        reportClipboardCancelledObservation(context, "cut", res.systemEffect, caretCountAtCut, {
           baseGeneration: res.outcome === "stale-generation" ? res.baseGeneration : null,
           segmentCount: payload.segments ? payload.segments.length : null,
           rectangular: payload.rectangular,
@@ -1043,7 +1101,7 @@ function cutSystemClipboard(view: EditorView): boolean {
         context?.onUnavailable(reasonMsg);
         view.focus();
       }
-      reportClipboardWriteObservation(view, "cut", res, payload, caretCountAtCut);
+      reportClipboardWriteObservation(context, "cut", res, payload, caretCountAtCut);
     });
     return true;
   }
@@ -1051,12 +1109,13 @@ function cutSystemClipboard(view: EditorView): boolean {
   void writeText(payload.plainText)
     .then(() => {
       if (
-        !view.dom.isConnected
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
         || view.composing
+        || view.state.readOnly
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
-        reportClipboardCancelledObservation(view, "cut", "unknown", caretCountAtCut, {
+        reportClipboardCancelledObservation(context, "cut", "unknown", caretCountAtCut, {
           segmentCount: payload.segments ? payload.segments.length : null,
           rectangular: payload.rectangular,
           payloadLength: payload.plainText.length,
@@ -2281,6 +2340,9 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   // ED-MAIN-006: CodeMirror flushes the final composition change in a microtask
   // after compositionend, so the owner finalize is deferred to the next macrotask.
   const compositionEndFinalizeRef = useRef<number | null>(null);
+  // ED-MAIN-007: latest visible/active-leaf state for the async clipboard owner.
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
   const onExpandSelectionRef = useRef(onExpandSelection);
   const onLightbulbRef = useRef(onLightbulb);
   const onGitChangeClickRef = useRef(onGitChangeClick);
@@ -3016,9 +3078,18 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       compositionActiveRef.current = false;
       finalizeCompositionNow();
     };
+    // ED-MAIN-007: any focus loss that leaves this view bumps the clipboard
+    // owner generation, so an in-flight result can detect that another surface
+    // (search box, sibling leaf, other window) claimed focus.
+    const clipboardFocusOutGuard = (event: FocusEvent) => {
+      const next = event.relatedTarget as Node | null;
+      if (next && view.dom.contains(next)) return;
+      bumpClipboardOwnerGeneration(view);
+    };
     view.contentDOM.addEventListener("compositionstart", compositionStartGuard, true);
     view.contentDOM.addEventListener("compositionend", compositionEndGuard, true);
     view.contentDOM.addEventListener("blur", compositionBlurGuard, true);
+    view.contentDOM.addEventListener("focusout", clipboardFocusOutGuard, true);
     emitSelection(view);
     emitViewport(view);
 
@@ -3132,6 +3203,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       view.contentDOM.removeEventListener("compositionstart", compositionStartGuard, true);
       view.contentDOM.removeEventListener("compositionend", compositionEndGuard, true);
       view.contentDOM.removeEventListener("blur", compositionBlurGuard, true);
+      view.contentDOM.removeEventListener("focusout", clipboardFocusOutGuard, true);
       view.destroy();
       viewRef.current = null;
       if (owner && sharedFileKey) owner.releaseView(sharedFileKey, sharedViewId);
@@ -3154,6 +3226,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       onUnavailable: (message) => onClipboardUnavailableRef.current(message),
       onObservation: (record) => onClipboardObservationRef.current(record),
       handle: effectiveClipboardHandle ?? null,
+      isActive: () => visibleRef.current,
     });
     return () => {
       lease?.detach();
@@ -3161,9 +3234,17 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         workspaceId: null,
         onUnavailable: () => {},
         handle: null,
+        isActive: () => false,
       });
     };
   }, [effectiveClipboardHandle, clipboardWorkspaceId, fileKey]);
+
+  // ED-MAIN-007: hiding a leaf (switching editor group) invalidates any
+  // in-flight clipboard request owned by it.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view && !visible) bumpClipboardOwnerGeneration(view);
+  }, [visible]);
 
   useEffect(() => {
     const view = viewRef.current;
