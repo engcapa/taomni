@@ -9841,6 +9841,42 @@ end_of_record
       expect(journals[0]!.entry.status).toBe("recovery-required");
     });
 
+    // ED-MAIN-001: a clean-buffer workflow edit mutates the buffer before the
+    // awaited save. When that save fails, the mounted transaction must report
+    // the already-performed buffer effect, keep the journal discoverable for
+    // recovery, and never register a normal success history entry.
+    it("reports the performed buffer effect and recovery-required when the workflow save fails (ED-MAIN-001)", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockWorkflowProvider("source.rearrange");
+      vi.mocked(confirmAppDialog).mockClear();
+      vi.mocked(confirmAppDialog).mockResolvedValue(true);
+      // The disk write reports a proven zero disk effect (e.g. a readonly or
+      // rejected save) after the buffer has already taken the applied text.
+      workspaceMocks.workspaceWriteFileEncoded.mockRejectedValue(Object.assign(
+        new Error("cannot replace readonly file"),
+        { kind: "io", effect: "none" },
+      ));
+
+      renderWorkspace(workflowWorkspace("instance-main001-buffer-effect"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await runWorkflow(registrationRef, "workspace.rearrangeCode");
+      // The applied text is present in the buffer even though the save failed.
+      await waitFor(() => expect(fileText("instance-main001-buffer-effect")).toBe(SERVICE_POST));
+      const message = useAppStore.getState().statusMessage;
+      expect(message).toContain("postcondition could not be verified");
+      expect(message).not.toContain("Rearranged Service.java");
+      // The prepared journal is not closed as a committed no-op.
+      const journals = storedJournals();
+      expect(journals).toHaveLength(1);
+      expect(journals[0]!.entry.status).toBe("recovery-required");
+      expect(workspaceMocks.workspaceWriteFileEncoded).toHaveBeenCalledTimes(1);
+    });
+
     it("treats an unreadable post-state as recovery-required without success history", async () => {
       const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
       const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {

@@ -6,6 +6,7 @@ import {
   sliceWorkspaceEditForResume,
   summarizeWorkspaceEditOutcomes,
   workspaceEditApplyResponse,
+  WorkspaceEditOpenBufferSaveFailure,
 } from "./workspaceEditApply";
 import { workspaceEditOperations } from "./workspaceEditPreview";
 import { buildFinalBytesReceipt, buildPreparedSave, type SaveCommitResult } from "./saveCommit";
@@ -377,6 +378,97 @@ describe("applyWorkspaceEdit", () => {
     expect(applyToOpenBuffer).toHaveBeenCalled();
     expect(saveOpenBuffer).toHaveBeenCalled();
     expect(outcomes[0]).toMatchObject({ status: "failed", reason: "disk full" });
+  });
+
+  // ED-MAIN-001: a clean-buffer edit mutates memory before the awaited save.
+  // When the save fails the outcome must expose the performed buffer effect so
+  // the shell can report "buffer performed, disk none" instead of zero effect.
+  it("reports the performed buffer effect when an open-clean save fails (ED-MAIN-001)", async () => {
+    const applyToOpenBuffer = vi.fn();
+    const saveOpenBuffer = vi.fn(async () => {
+      throw new Error("disk full");
+    });
+    const outcomes = await applyWorkspaceEdit(
+      edit("file:///repo/effect.ts", "/repo/effect.ts", "Z"),
+      {
+        resolvePath: (file) => file.path,
+        getOpenBuffer: () => ({ text: "x", dirty: false, key: "effect" }),
+        applyToOpenBuffer,
+        saveOpenBuffer,
+        readDisk: async () => null,
+        writeDisk: async () => committedDisk(),
+      },
+    );
+    expect(applyToOpenBuffer).toHaveBeenCalledWith("effect", "Z");
+    expect(outcomes[0]).toMatchObject({
+      status: "failed",
+      reason: "disk full",
+      bufferEffect: "performed",
+    });
+  });
+
+  it("reports an unknown disk effect plus the performed buffer effect (ED-MAIN-001)", async () => {
+    const outcomes = await applyWorkspaceEdit(
+      edit("file:///repo/unknown-buffer.ts", "/repo/unknown-buffer.ts", "Z"),
+      {
+        resolvePath: (file) => file.path,
+        getOpenBuffer: () => ({ text: "x", dirty: false, key: "unknown-buffer" }),
+        applyToOpenBuffer: () => {},
+        saveOpenBuffer: async () => {
+          throw new WorkspaceEditOpenBufferSaveFailure("write acknowledgement lost", "unknown");
+        },
+        readDisk: async () => null,
+        writeDisk: async () => committedDisk(),
+      },
+    );
+    expect(outcomes[0]).toMatchObject({
+      status: "failed",
+      diskEffect: "unknown",
+      bufferEffect: "performed",
+    });
+  });
+
+  it("keeps zero buffer effect when the edit resolves to identical text and the save fails (ED-MAIN-001)", async () => {
+    const applyToOpenBuffer = vi.fn();
+    const outcomes = await applyWorkspaceEdit(
+      edit("file:///repo/same.ts", "/repo/same.ts", "x"),
+      {
+        resolvePath: (file) => file.path,
+        getOpenBuffer: () => ({ text: "x", dirty: false, key: "same" }),
+        applyToOpenBuffer,
+        saveOpenBuffer: async () => {
+          throw new WorkspaceEditOpenBufferSaveFailure("readonly", "none");
+        },
+        readDisk: async () => null,
+        writeDisk: async () => committedDisk(),
+      },
+    );
+    expect(outcomes[0]).toMatchObject({
+      status: "failed",
+      diskEffect: "none",
+      bufferEffect: "none",
+    });
+  });
+
+  it("keeps a pre-mutation failure at zero buffer effect (ED-MAIN-001)", async () => {
+    const applyToOpenBuffer = vi.fn();
+    const outcomes = await applyWorkspaceEdit(
+      edit("file:///repo/stale.ts", "/repo/stale.ts", "Z"),
+      {
+        resolvePath: (file) => file.path,
+        getOpenBuffer: () => ({ text: "x", dirty: false, key: "stale" }),
+        applyToOpenBuffer,
+        saveOpenBuffer: async () => {},
+        readDisk: async () => null,
+        writeDisk: async () => committedDisk(),
+        preflightMutation: () => {
+          throw new Error("semantic snapshot changed");
+        },
+      },
+    );
+    expect(applyToOpenBuffer).not.toHaveBeenCalled();
+    expect(outcomes[0]).toMatchObject({ status: "failed", reason: "semantic snapshot changed" });
+    expect((outcomes[0] as { bufferEffect?: string }).bufferEffect).toBeUndefined();
   });
 
   it("rejects a stale versioned TextDocumentEdit before changing the buffer", async () => {

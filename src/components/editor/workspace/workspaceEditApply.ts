@@ -14,7 +14,18 @@ import {
 } from "./workspaceEditPreview";
 
 export type WorkspaceEditApplyOutcome =
-  | { operationIndex: number; path: string; status: "applied-open"; dirty: boolean }
+  | {
+    operationIndex: number;
+    path: string;
+    status: "applied-open";
+    dirty: boolean;
+    /**
+     * ED-MAIN-001: whether the in-memory buffer text actually changed. A
+     * `none` value keeps an edit that resolves to identical text from being
+     * counted as a mutation when a later await fails.
+     */
+    bufferEffect?: "none" | "performed";
+  }
   | { operationIndex: number; path: string; status: "applied-disk"; result?: SaveCommitResult }
   | { operationIndex: number; path: string; status: "applied-create" }
   | { operationIndex: number; path: string; status: "applied-rename" }
@@ -26,6 +37,12 @@ export type WorkspaceEditApplyOutcome =
     path: string;
     status: "failed";
     reason: string;
+    /**
+     * ED-MAIN-001: the in-memory buffer effect that already happened before a
+     * later await failed. `performed` means the buffer text changed even though
+     * the operation is reported as failed; absent means no buffer mutation.
+     */
+    bufferEffect?: "none" | "performed";
     /**
      * ED-IMPROVE-002: the write's own effect fact when it reached a disk
      * boundary. `unknown` means the OS write may have happened even though the
@@ -310,6 +327,9 @@ async function applyTextDocumentEdit(
     return { operationIndex, path: file.uri, status: "skipped", reason: "unresolvable path" };
   }
   if (!file.edits.length) return { operationIndex, path, status: "noop" };
+  // ED-MAIN-001: track the in-memory mutation separately from the disk result
+  // so a failed save after `applyToOpenBuffer` still reports the buffer effect.
+  let bufferMutated = false;
   try {
     const open = hooks.getOpenBuffer(path);
     if (file.version != null && !open) {
@@ -338,13 +358,28 @@ async function applyTextDocumentEdit(
         };
       }
       const next = applyLspTextEditsToString(open.text, file.edits);
+      const changed = next !== open.text;
       if (!open.dirty) {
         hooks.applyToOpenBuffer(open.key, next);
+        bufferMutated = changed;
         await hooks.saveOpenBuffer(open.key, next);
-        return { operationIndex, path, status: "applied-open", dirty: false };
+        return {
+          operationIndex,
+          path,
+          status: "applied-open",
+          dirty: false,
+          bufferEffect: changed ? "performed" : "none",
+        };
       }
       hooks.applyToOpenBuffer(open.key, next);
-      return { operationIndex, path, status: "applied-open", dirty: true };
+      bufferMutated = changed;
+      return {
+        operationIndex,
+        path,
+        status: "applied-open",
+        dirty: true,
+        bufferEffect: changed ? "performed" : "none",
+      };
     }
     const disk = await hooks.readDisk(path);
     if (!disk) {
@@ -381,6 +416,12 @@ async function applyTextDocumentEdit(
       reason: error instanceof Error ? error.message : String(error),
       ...(error instanceof WorkspaceEditOpenBufferSaveFailure
         ? { diskEffect: error.diskEffect }
+        : {}),
+      // ED-MAIN-001: a clean-buffer save that rejects after the buffer write
+      // has already happened must carry the performed buffer effect; a
+      // pre-mutation failure stays at zero effect.
+      ...(bufferMutated || error instanceof WorkspaceEditOpenBufferSaveFailure
+        ? { bufferEffect: bufferMutated ? ("performed" as const) : ("none" as const) }
         : {}),
     };
   }

@@ -9192,18 +9192,26 @@ export function CodeWorkspaceTab({
     ))) {
       refreshTree();
     }
-    const mutated = allOutcomes.some((outcome) => outcome.status.startsWith("applied"));
+    // ED-MAIN-001: an open-buffer edit mutates memory before an awaited save.
+    // A failed save must still count the already-performed buffer effect so the
+    // transaction is never reported as a zero-effect no-op.
+    const bufferEffectPerformed = (outcome: WorkspaceEditApplyOutcome): boolean => (
+      outcome.status === "failed" && outcome.bufferEffect === "performed"
+    );
+    const mutated = allOutcomes.some((outcome) => outcome.status.startsWith("applied") || bufferEffectPerformed(outcome));
     if (mutated) {
       semanticIndex.invalidate(
         "workspace-edit",
-        allOutcomes.flatMap((outcome) => outcome.status.startsWith("applied") ? [outcome.path] : []),
+        allOutcomes.flatMap((outcome) => (
+          outcome.status.startsWith("applied") || bufferEffectPerformed(outcome) ? [outcome.path] : []
+        )),
       );
     }
     // ED-IMPROVE-002: one structured summary per apply run. The effect axis is
     // independent of the execution status: `unknown` marks a write whose OS
     // result could not be proven even though the operation reported failure.
     const appliedEffectPaths = allOutcomes
-      .filter((outcome) => outcome.status.startsWith("applied"))
+      .filter((outcome) => outcome.status.startsWith("applied") || bufferEffectPerformed(outcome))
       .map((outcome) => outcome.path);
     const hasFailedOperation = allOutcomes.some((outcome) => (
       outcome.status === "failed" || outcome.status === "skipped"
@@ -9328,6 +9336,28 @@ export function CodeWorkspaceTab({
           recoveryMessage = `Refactor postcondition failed (${reason}); recovery required. `
             + `Applied changes on: ${appliedEffects.length > 0 ? appliedEffects.join(", ") : "none"}. `
             + `Undo was not registered; the pending recovery entry lists every affected file.`;
+        } else if (hasFailedOperation) {
+          // ED-MAIN-001: the buffer effect was already performed but a later
+          // await (a disk save) failed. The post-image may match the mutated
+          // buffer, but the transaction is not a verified success, so keep the
+          // prepared journal discoverable for recovery instead of committing it
+          // as a no-op or registering normal success history.
+          const failedEffects = allOutcomes
+            .filter((outcome) => outcome.status === "failed")
+            .map((outcome) => outcome.path);
+          updateRefactorRecoveryJournalV2(preparedJournal.recoveryId, (entry) => ({
+            ...entry,
+            status: "recovery-required",
+            appliedOperationIndex: failureBoundaryIndex,
+            verification: {
+              mismatchedUris: Object.freeze(failedEffects),
+              checkedAt: Date.now(),
+            },
+          }));
+          recoveryMessage = `Workspace edit is incomplete (a write failed after the buffer changed); `
+            + `recovery required. Applied changes on: `
+            + `${appliedEffectPaths.length > 0 ? appliedEffectPaths.join(", ") : "none"}. `
+            + `Undo was not registered; the pending recovery entry lists every affected file.`;
         } else {
           updateRefactorRecoveryJournalV2(preparedJournal.recoveryId, (entry) => ({
             ...entry,
@@ -9343,6 +9373,17 @@ export function CodeWorkspaceTab({
           afterSnapshots ? "mismatch" : "unreadable",
           preparedJournalRef.current?.recoveryId ?? null,
         );
+        return outcomes;
+      }
+      if (hasFailedOperation) {
+        // ED-MAIN-001: a buffer effect was performed but the transaction
+        // failed without a prepared recovery journal (no journal plan). The
+        // transaction must not be reported as a verified success nor register
+        // normal success history.
+        setStatusMessage(
+          `Workspace edit is incomplete: ${summarizeWorkspaceEditOutcomes(outcomes)}`,
+        );
+        emitTransactionSummary(afterSnapshots ? "mismatch" : "unreadable", null);
         return outcomes;
       }
       if (afterSnapshots && changed) {
