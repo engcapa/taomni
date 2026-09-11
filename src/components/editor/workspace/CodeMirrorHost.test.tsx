@@ -1,12 +1,12 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
-import { EditorSelection } from "@codemirror/state";
+import { EditorSelection, Text } from "@codemirror/state";
 import { undoDepth } from "@codemirror/commands";
 import { startCompletion } from "@codemirror/autocomplete";
 import { EditorView } from "@codemirror/view";
 import { foldedRanges } from "@codemirror/language";
-import { CodeMirrorHost } from "./CodeMirrorHost";
+import { CodeMirrorHost, documentTextIdentity } from "./CodeMirrorHost";
 import {
   setVirtualOverflow,
   virtualOverflowAt,
@@ -1419,6 +1419,54 @@ describe("ED-IMPROVE-007 leaf/file view snapshots", () => {
     );
     const after = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!);
     expect(after!.state.selection.main.head).toBe(doc.indexOf("delta"));
+  });
+
+  it("identifies different same-length documents with distinct identities (ED-MAIN-009)", () => {
+    const a = Text.of(["abc", "def"]);
+    const b = Text.of(["abc", "deg"]);
+    expect(a.length).toBe(b.length);
+    expect(documentTextIdentity(a)).not.toBe(documentTextIdentity(b));
+    expect(documentTextIdentity(a)).toBe(documentTextIdentity(Text.of(["abc", "def"])));
+  });
+
+  it("restores a captured snapshot only while the text identity matches (ED-MAIN-009)", async () => {
+    const doc = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8";
+    const onViewStateChange = vi.fn();
+    const first = renderEditor(doc, vi.fn(), { onViewStateChange });
+    const firstView = findView(first);
+    act(() => {
+      firstView.dispatch({ selection: EditorSelection.cursor(12) });
+    });
+    await waitFor(() => expect(onViewStateChange).toHaveBeenCalled());
+    const captured = onViewStateChange.mock.calls.at(-1)![0];
+    expect(captured.textIdentity).toBe(documentTextIdentity(firstView.state.doc));
+    cleanup();
+
+    // Same text: the persisted caret is restored.
+    const restored = renderEditor(doc, vi.fn(), { initialViewState: captured });
+    expect(findView(restored).state.selection.main.head).toBe(12);
+    cleanup();
+
+    // Same length, changed content: the stale positioning is dropped, not
+    // re-anchored onto the new text.
+    const changed = `${doc.slice(0, 12)}X${doc.slice(13)}`;
+    expect(changed.length).toBe(doc.length);
+    const dropped = renderEditor(changed, vi.fn(), { initialViewState: captured });
+    expect(findView(dropped).state.selection.main.head).toBe(0);
+  });
+
+  it("captures a horizontal scroll offset with the view state (ED-MAIN-009)", async () => {
+    const doc = Array.from({ length: 20 }, (_, index) => `line ${index}`).join("\n");
+    const onViewStateChange = vi.fn();
+    const rendered = renderEditor(doc, vi.fn(), { onViewStateChange });
+    const view = findView(rendered);
+    if (view.scrollDOM) view.scrollDOM.scrollLeft = 42;
+    act(() => {
+      view.dispatch({ selection: EditorSelection.cursor(10) });
+    });
+    await waitFor(() => expect(onViewStateChange).toHaveBeenCalled());
+    const captured = onViewStateChange.mock.calls.at(-1)![0];
+    expect(captured.scrollLeft).toBe(view.scrollDOM?.scrollLeft ?? 0);
   });
 });
 

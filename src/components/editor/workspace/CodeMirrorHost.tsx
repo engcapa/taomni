@@ -211,10 +211,36 @@ import {
 } from "./workspaceVirtualSpace";
 import type { WorkspaceActionHost } from "./workspaceActionHost";
 
+// ED-MAIN-009: content identity is memoized by CodeMirror Text identity, so
+// repeated captures from scrolling or caret moves reuse one hash and the
+// document is never re-serialized per keystroke (capture itself is debounced).
+const viewStateTextIdentityCache = new WeakMap<Text, string>();
+
+export function documentTextIdentity(doc: Text): string {
+  const cached = viewStateTextIdentityCache.get(doc);
+  if (cached !== undefined) return cached;
+  let hash = 0x811c9dc5;
+  for (const iter = doc.iter(); !iter.next().done;) {
+    const chunk = iter.value;
+    for (let index = 0; index < chunk.length; index += 1) {
+      hash ^= chunk.charCodeAt(index);
+      hash = Math.imul(hash, 0x01000193);
+    }
+    if (iter.lineBreak) {
+      hash ^= 10;
+      hash = Math.imul(hash, 0x01000193);
+    }
+  }
+  const identity = `${doc.length}:${(hash >>> 0).toString(16)}`;
+  viewStateTextIdentityCache.set(doc, identity);
+  return identity;
+}
+
 /**
  * ED-IMPROVE-007: capture this view's caret/selection, scroll and fold state.
  * Pure over the CodeMirror view so the workspace can store it in memory and
- * persist it with the layout without serializing per keystroke.
+ * persist it with the layout without serializing per keystroke. ED-MAIN-009
+ * adds the content identity and the horizontal scroll offset.
  */
 export function captureEditorViewState(view: EditorView): PersistedEditorViewState {
   const selection = view.state.selection;
@@ -236,6 +262,8 @@ export function captureEditorViewState(view: EditorView): PersistedEditorViewSta
     selections,
     scrollTop: view.scrollDOM?.scrollTop ?? 0,
     folds,
+    textIdentity: documentTextIdentity(view.state.doc),
+    scrollLeft: view.scrollDOM?.scrollLeft ?? 0,
   };
 }
 
@@ -248,6 +276,15 @@ export function applyPersistedEditorViewState(
   view: EditorView,
   state: PersistedEditorViewState,
 ): void {
+  // ED-MAIN-009: a snapshot that carries a content identity only restores its
+  // selection/folds/scroll when the live text still matches. Legacy snapshots
+  // without an identity keep the original clamp behavior.
+  if (
+    state.textIdentity !== undefined
+    && state.textIdentity !== documentTextIdentity(view.state.doc)
+  ) {
+    return;
+  }
   const docLength = view.state.doc.length;
   const clamp = (value: number): number => Math.max(0, Math.min(docLength, Math.floor(value)));
   const toRange = (range: PersistedViewSelection) => EditorSelection.range(
@@ -268,12 +305,16 @@ export function applyPersistedEditorViewState(
     if (to <= from || to > docLength) continue;
     view.dispatch({ effects: foldEffect.of({ from, to }) });
   }
-  if (state.scrollTop > 0 && view.scrollDOM) {
-    const maxScroll = Math.max(
-      0,
-      view.scrollDOM.scrollHeight - view.scrollDOM.clientHeight,
-    );
-    view.scrollDOM.scrollTop = Math.min(state.scrollTop, maxScroll);
+  if (view.scrollDOM && (state.scrollTop > 0 || (state.scrollLeft ?? 0) > 0)) {
+    const dom = view.scrollDOM;
+    if (state.scrollTop > 0) {
+      const maxScrollTop = Math.max(0, dom.scrollHeight - dom.clientHeight);
+      dom.scrollTop = Math.min(state.scrollTop, maxScrollTop);
+    }
+    if ((state.scrollLeft ?? 0) > 0) {
+      const maxScrollLeft = Math.max(0, dom.scrollWidth - dom.clientWidth);
+      dom.scrollLeft = Math.min(state.scrollLeft ?? 0, maxScrollLeft);
+    }
   }
 }
 

@@ -50,6 +50,15 @@ export interface PersistedEditorViewState {
   selections: PersistedViewSelection[];
   scrollTop: number;
   folds: PersistedViewFold[];
+  /**
+   * ED-MAIN-009: content identity of the buffer this snapshot belongs to.
+   * Optional so legacy/pre-009 snapshots keep their original clamp behavior;
+   * a snapshot whose identity is present but no longer matches the live text
+   * drops its selection/folds/scroll instead of re-anchoring onto new content.
+   */
+  textIdentity?: string;
+  /** Horizontal scroll offset (ED-MAIN-009); legacy snapshots default to 0. */
+  scrollLeft?: number;
 }
 
 /** leaf id -> file key -> view state. */
@@ -257,6 +266,12 @@ function normalizeEditorViewState(value: unknown): PersistedEditorViewState | nu
     selections,
     scrollTop: asViewOffset(source.scrollTop) ?? 0,
     folds,
+    ...(typeof source.textIdentity === "string" && source.textIdentity.length > 0
+      ? { textIdentity: source.textIdentity }
+      : {}),
+    ...(asViewOffset(source.scrollLeft) !== null
+      ? { scrollLeft: asViewOffset(source.scrollLeft) ?? 0 }
+      : {}),
   };
 }
 

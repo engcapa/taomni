@@ -334,6 +334,39 @@ describe("ED-IMPROVE-007 view state persistence", () => {
     });
   });
 
+  it("normalizes the ED-MAIN-009 content identity and horizontal scroll", () => {
+    const normalized = normalizeWorkspaceLayoutSnapshot({
+      ...defaultWorkspaceLayoutSnapshot(),
+      viewStates: {
+        primary: {
+          "root:app:a.ts": {
+            mainSelection: { anchor: 1, head: 2 },
+            selections: [],
+            scrollTop: 10,
+            folds: [],
+            textIdentity: "12:abc123",
+            scrollLeft: 88,
+          },
+          "root:app:b.ts": {
+            mainSelection: { anchor: 0, head: 0 },
+            selections: [],
+            scrollTop: 0,
+            folds: [],
+            textIdentity: "",
+            scrollLeft: -4,
+          },
+        },
+      },
+    });
+    expect(normalized.viewStates?.primary?.["root:app:a.ts"]).toMatchObject({
+      textIdentity: "12:abc123",
+      scrollLeft: 88,
+    });
+    // An empty identity and a negative scroll fall back to legacy defaults.
+    expect(normalized.viewStates?.primary?.["root:app:b.ts"]?.textIdentity).toBeUndefined();
+    expect(normalized.viewStates?.primary?.["root:app:b.ts"]?.scrollLeft ?? 0).toBe(0);
+  });
+
   it("keeps pre-007 snapshots restoring without a viewStates field", () => {
     const snapshot = defaultWorkspaceLayoutSnapshot();
     const raw = JSON.parse(JSON.stringify(snapshot));
