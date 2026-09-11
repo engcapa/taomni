@@ -12119,13 +12119,18 @@ export function CodeWorkspaceTab({
               targetPath,
               documentText: live.text,
               documentRevision: live.documentRevision,
+              documentVersion: lspDocumentVersion(live.key),
               isSupportedKind: isRearrangeActionKind,
               capabilityLabel: "Rearrange Code",
             });
             if (!validation.ok) {
               return { state: validation.state, edits: [], reason: validation.reason };
             }
-            return { state: "resolved", edits: validation.edits };
+            return {
+              state: "resolved",
+              edits: validation.edits,
+              documentVersion: validation.documentVersion,
+            };
           } catch (err) {
             return { state: "failed", edits: [], reason: `Rearrange resolve failed: ${errorMessage(err)}; nothing applied` };
           }
@@ -12237,6 +12242,7 @@ export function CodeWorkspaceTab({
     activeLspState,
     applyLspWorkspaceEdit,
     lspDescriptorForFile,
+    lspDocumentVersion,
     lspSessionGeneration,
     requestCodeActions,
     workspaceInstanceId,
@@ -12309,13 +12315,18 @@ export function CodeWorkspaceTab({
               targetPath,
               documentText: live.text,
               documentRevision: live.documentRevision,
+              documentVersion: lspDocumentVersion(live.key),
               isSupportedKind: isCleanupActionKind,
               capabilityLabel: "Code Cleanup",
             });
             if (!validation.ok) {
               return { state: validation.state, edits: [], reason: validation.reason };
             }
-            return { state: "resolved", edits: validation.edits };
+            return {
+              state: "resolved",
+              edits: validation.edits,
+              documentVersion: validation.documentVersion,
+            };
           } catch (err) {
             return { state: "failed", edits: [], reason: `Cleanup resolve failed: ${errorMessage(err)}; nothing applied` };
           }
@@ -12424,6 +12435,7 @@ export function CodeWorkspaceTab({
     activeLspState,
     applyLspWorkspaceEdit,
     lspDescriptorForFile,
+    lspDocumentVersion,
     lspSessionGeneration,
     requestCodeActions,
     workspaceInstanceId,

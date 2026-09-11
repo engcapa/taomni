@@ -339,6 +339,29 @@ describe("ED-STYLE-002: Rearrange / Cleanup independent workflows", () => {
       expect(plan.preview.entries[0].path).toBe("/repo/src/Example.java");
     });
 
+    it("carries the provider LSP version into the immutable plan edit, separate from the editor revision (ED-MAIN-003)", () => {
+      const plan = buildRearrangePlan({
+        scope: "file",
+        targetPath: "/repo/src/Example.java",
+        targetUri: "file:///repo/src/Example.java",
+        currentText: originalText,
+        documentRevision: 42,
+        documentVersion: 7,
+        readOnly: false,
+        provider: { id: "p" },
+        edits: [
+          {
+            range: { start: { line: 1, character: 0 }, end: { line: 3, character: 0 } },
+            newText: "  void a() {}\n  void b() {}\n",
+          },
+        ],
+      });
+      // The LSP version gates the first mutation; the editor revision stays a
+      // separate precondition identity.
+      expect(plan.edit.documentEdits[0]?.version).toBe(7);
+      expect(plan.preconditions[0]?.documentRevision).toBe(42);
+    });
+
     it("detects dirty buffer or read-only conflict at plan generation", () => {
       const planDirty = buildRearrangePlan({
         scope: "file",
@@ -516,6 +539,26 @@ describe("ED-AUDIT-015: executeRearrangeTransaction supported-branch wiring (mod
     expect(result).toMatchObject({ ok: true, postHash: sha256Hex(POST), operationCount: 1 });
     expect(deps.applyEdit).toHaveBeenCalledTimes(1);
     expect(deps.confirmPreview).toHaveBeenCalledTimes(1);
+  });
+
+  it("propagates the resolved LSP document version into the edit handed to apply (ED-MAIN-003)", async () => {
+    const applyEdit = vi.fn(async (..._args: unknown[]) => (
+      { state: "applied" as const, postText: POST }
+    ));
+    const deps = baseDeps({
+      resolveAction: vi.fn(async () => ({
+        state: "resolved" as const,
+        edits: [...SWAP_EDITS],
+        documentVersion: 7,
+      })),
+      applyEdit,
+    });
+    const result = await executeRearrangeTransaction(deps, baseInput());
+    expect(result.ok).toBe(true);
+    const appliedEdit = applyEdit.mock.calls[0]?.[0] as {
+      documentEdits?: Array<{ version?: number }>;
+    } | undefined;
+    expect(appliedEdit?.documentEdits?.[0]?.version).toBe(7);
   });
 
   it("short-circuits missing target and readonly with zero IO", async () => {
@@ -1360,6 +1403,7 @@ describe("ED-IMPROVE-003: provider action payload validation (model boundary)", 
       targetPath: TARGET_PATH,
       documentText: TEXT,
       documentRevision: revision,
+      documentVersion: revision,
       isSupportedKind: isRearrangeActionKind,
       capabilityLabel: "Rearrange Code",
     });
@@ -1367,7 +1411,7 @@ describe("ED-IMPROVE-003: provider action payload validation (model boundary)", 
 
   it("accepts a current-file-only text-edit payload", () => {
     const result = validate(payload());
-    expect(result).toEqual({ ok: true, edits: [EDIT] });
+    expect(result).toEqual({ ok: true, edits: [EDIT], documentVersion: null });
   });
 
   it("rejects a cross-file edit instead of filtering it out", () => {
@@ -1394,7 +1438,7 @@ describe("ED-IMPROVE-003: provider action payload validation (model boundary)", 
         operations: [{ kind: "text", document: { uri: TARGET_URI, path: TARGET_PATH, edits: [EDIT] } }],
       },
     }));
-    expect(result).toEqual({ ok: true, edits: [EDIT] });
+    expect(result).toEqual({ ok: true, edits: [EDIT], documentVersion: null });
   });
 
   it("rejects resource operations even when a text edit is present", () => {
@@ -1535,6 +1579,47 @@ describe("ED-IMPROVE-003: provider action payload validation (model boundary)", 
       expect(result.reason).toContain("version 4");
       expect(result.reason).toContain("7");
     }
+  });
+
+  it("accepts a versioned edit whose LSP version matches the provider document (ED-MAIN-003)", () => {
+    const result = validate(payload({
+      edit: {
+        documentEdits: [{ uri: TARGET_URI, path: TARGET_PATH, version: 7, edits: [EDIT] }],
+      },
+    }), 7);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.documentVersion).toBe(7);
+      expect(result.edits).toEqual([EDIT]);
+    }
+  });
+
+  it("rejects a versioned edit when the provider-synchronized version is unknown (ED-MAIN-003)", () => {
+    const result = validateWorkflowProviderAction({
+      action: payload({
+        edit: {
+          documentEdits: [{ uri: TARGET_URI, path: TARGET_PATH, version: 7, edits: [EDIT] }],
+        },
+      }),
+      targetUri: TARGET_URI,
+      targetPath: TARGET_PATH,
+      documentText: TEXT,
+      documentRevision: 99,
+      documentVersion: null,
+      isSupportedKind: isRearrangeActionKind,
+      capabilityLabel: "Rearrange Code",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.state).toBe("stale");
+      expect(result.reason).toContain("provider-synchronized document version is unknown");
+    }
+  });
+
+  it("keeps an unversioned payload on the hash gates with a null document version (ED-MAIN-003)", () => {
+    const result = validate(payload());
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.documentVersion).toBeNull();
   });
 
   it("rejects a null action and an unsupported resolved kind", () => {
