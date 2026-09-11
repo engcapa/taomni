@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   defaultWorkspaceLayoutSnapshot,
+  enrichViewStatesWithIdentity,
   fileRefFromFileKey,
   normalizeWorkspaceLayoutSnapshot,
+  textIdentityFromString,
   pushWorkspaceSearchHistory,
   readWorkspaceLayoutSnapshot,
   readWorkspaceSearchHistory,
@@ -365,6 +367,27 @@ describe("ED-IMPROVE-007 view state persistence", () => {
     // An empty identity and a negative scroll fall back to legacy defaults.
     expect(normalized.viewStates?.primary?.["root:app:b.ts"]?.textIdentity).toBeUndefined();
     expect(normalized.viewStates?.primary?.["root:app:b.ts"]?.scrollLeft ?? 0).toBe(0);
+  });
+
+  it("overwrites model view states with the exact live text identity (ED-MAIN-009)", () => {
+    const enriched = enrichViewStatesWithIdentity(
+      {
+        primary: {
+          "root:app:a.ts": {
+            mainSelection: { anchor: 1, head: 2 },
+            selections: [],
+            scrollTop: 10,
+            folds: [],
+            textIdentity: "stale-throttled-value",
+            scrollLeft: 5,
+          },
+        },
+      },
+      (key) => (key === "root:app:a.ts" ? "hello\r\nworld" : undefined),
+    );
+    const state = enriched.primary?.["root:app:a.ts"];
+    expect(state?.textIdentity).toBe(textIdentityFromString("hello\nworld"));
+    expect(state?.scrollLeft).toBe(5);
   });
 
   it("keeps pre-007 snapshots restoring without a viewStates field", () => {

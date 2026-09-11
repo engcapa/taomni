@@ -264,6 +264,7 @@ import {
 } from "../../lib/localHistory";
 import {
   defaultWorkspaceLayoutSnapshot,
+  enrichViewStatesWithIdentity,
   layoutSnapshotHasOpenFiles,
   readWorkspaceLayoutSnapshot,
   snapshotFromWorkspaceUi,
@@ -3616,7 +3617,12 @@ export function CodeWorkspaceTab({
         editorGroups: persistableGroups,
         layoutTreeV2: workspaceUi.layoutTreeV2,
         tabPolicy: tabPolicyRef.current,
-        viewStates: viewStatesRef.current,
+        // ED-MAIN-009: capture throttles the content hash; the debounced persist
+        // writes the exact identity so restart restore compares real content.
+        viewStates: enrichViewStatesWithIdentity(
+          viewStatesRef.current,
+          (fileKey) => openFilesRef.current[fileKey]?.text,
+        ),
       }), {
         // §8.17.4 step 3: persistence refusals surface as a recovery
         // diagnostic, not only a console line.

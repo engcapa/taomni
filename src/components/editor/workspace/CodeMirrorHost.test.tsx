@@ -7,6 +7,7 @@ import { startCompletion } from "@codemirror/autocomplete";
 import { EditorView } from "@codemirror/view";
 import { foldedRanges } from "@codemirror/language";
 import { CodeMirrorHost, documentTextIdentity } from "./CodeMirrorHost";
+import { textIdentityFromString } from "./workspaceLayoutPersistence";
 import {
   setVirtualOverflow,
   virtualOverflowAt,
@@ -1427,6 +1428,10 @@ describe("ED-IMPROVE-007 leaf/file view snapshots", () => {
     expect(a.length).toBe(b.length);
     expect(documentTextIdentity(a)).not.toBe(documentTextIdentity(b));
     expect(documentTextIdentity(a)).toBe(documentTextIdentity(Text.of(["abc", "def"])));
+    // The iterator hash must equal the persist-time string hash for the same
+    // content, including CRLF input.
+    expect(documentTextIdentity(a)).toBe(textIdentityFromString("abc\ndef"));
+    expect(documentTextIdentity(a)).toBe(textIdentityFromString("abc\r\ndef"));
   });
 
   it("restores a captured snapshot only while the text identity matches (ED-MAIN-009)", async () => {

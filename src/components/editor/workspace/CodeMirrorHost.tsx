@@ -211,28 +211,45 @@ import {
 } from "./workspaceVirtualSpace";
 import type { WorkspaceActionHost } from "./workspaceActionHost";
 
-// ED-MAIN-009: content identity is memoized by CodeMirror Text identity, so
-// repeated captures from scrolling or caret moves reuse one hash and the
-// document is never re-serialized per keystroke (capture itself is debounced).
-const viewStateTextIdentityCache = new WeakMap<Text, string>();
+// ED-MAIN-009: hashing a multi-megabyte document costs ~100ms, so capture
+// throttles it. The debounced persist recomputes the exact identity via
+// workspaceLayoutPersistence.enrichViewStatesWithIdentity, and this iterator
+// hash must stay byte-for-byte equal to textIdentityFromString for the same
+// content (line endings normalized to "\n").
+const IDENTITY_THROTTLE_MS = 1_000;
+const viewStateIdentityCache = new WeakMap<EditorView, {
+  doc: Text;
+  identity: string;
+  at: number;
+}>();
 
-export function documentTextIdentity(doc: Text): string {
-  const cached = viewStateTextIdentityCache.get(doc);
-  if (cached !== undefined) return cached;
+function hashDocumentText(doc: Text): string {
   let hash = 0x811c9dc5;
+  // The iterator yields line-break chunks ("\n") as values of their own, so
+  // hashing every chunk's characters reproduces the string hash exactly.
   for (const iter = doc.iter(); !iter.next().done;) {
     const chunk = iter.value;
     for (let index = 0; index < chunk.length; index += 1) {
       hash ^= chunk.charCodeAt(index);
       hash = Math.imul(hash, 0x01000193);
     }
-    if (iter.lineBreak) {
-      hash ^= 10;
-      hash = Math.imul(hash, 0x01000193);
-    }
   }
-  const identity = `${doc.length}:${(hash >>> 0).toString(16)}`;
-  viewStateTextIdentityCache.set(doc, identity);
+  return `${doc.length}:${(hash >>> 0).toString(16)}`;
+}
+
+/** Exact content identity for a CodeMirror document (uncached). */
+export function documentTextIdentity(doc: Text): string {
+  return hashDocumentText(doc);
+}
+
+function throttledDocumentTextIdentity(view: EditorView): string {
+  const doc = view.state.doc;
+  const cached = viewStateIdentityCache.get(view);
+  if (cached && cached.doc === doc) return cached.identity;
+  const now = Date.now();
+  if (cached && now - cached.at < IDENTITY_THROTTLE_MS) return cached.identity;
+  const identity = hashDocumentText(doc);
+  viewStateIdentityCache.set(view, { doc, identity, at: now });
   return identity;
 }
 
@@ -262,7 +279,7 @@ export function captureEditorViewState(view: EditorView): PersistedEditorViewSta
     selections,
     scrollTop: view.scrollDOM?.scrollTop ?? 0,
     folds,
-    textIdentity: documentTextIdentity(view.state.doc),
+    textIdentity: throttledDocumentTextIdentity(view),
     scrollLeft: view.scrollDOM?.scrollLeft ?? 0,
   };
 }

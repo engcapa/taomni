@@ -64,6 +64,44 @@ export interface PersistedEditorViewState {
 /** leaf id -> file key -> view state. */
 export type WorkspaceViewStates = Record<string, Record<string, PersistedEditorViewState>>;
 
+/**
+ * ED-MAIN-009: content identity of a buffer. Line endings are normalized to
+ * `\n` first so the result matches the CodeMirror `Text` iterator hash in
+ * CodeMirrorHost for the same content. This is the exact (persist-time) form.
+ */
+export function textIdentityFromString(text: string): string {
+  const normalized = text.replace(/\r\n?/g, "\n");
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < normalized.length; index += 1) {
+    hash ^= normalized.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `${normalized.length}:${(hash >>> 0).toString(16)}`;
+}
+
+/**
+ * ED-MAIN-009: overwrite each snapshot's content identity with the exact hash
+ * of the current buffer text. Capture throttles the hash to keep animation and
+ * typing cheap, so the debounced persist recomputes the authoritative value.
+ */
+export function enrichViewStatesWithIdentity(
+  viewStates: WorkspaceViewStates,
+  getText: (fileKey: string) => string | undefined,
+): WorkspaceViewStates {
+  const result: WorkspaceViewStates = {};
+  for (const [leafId, files] of Object.entries(viewStates)) {
+    const perFile: Record<string, PersistedEditorViewState> = {};
+    for (const [fileKey, state] of Object.entries(files)) {
+      const text = getText(fileKey);
+      perFile[fileKey] = text === undefined
+        ? state
+        : { ...state, textIdentity: textIdentityFromString(text) };
+    }
+    result[leafId] = perFile;
+  }
+  return result;
+}
+
 export interface PersistedEditorGroup {
   openOrder: string[];
   activeKey: string | null;
