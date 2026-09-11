@@ -1505,6 +1505,47 @@ describe("ED-IMPROVE-008 IME composition lifecycle wiring", () => {
     });
     await waitFor(() => expect(owner.getDocument("ime.ts")).toBe("hello xy"));
   });
+
+  // ED-MAIN-006: CodeMirror schedules its final composition flush in a
+  // microtask (`Promise.resolve().then(flush)`) after compositionend. A
+  // capture-phase finalize would split that final update into a second undo
+  // entry, so one undo must still return to the pre-composition text.
+  it("keeps one undo when CodeMirror flushes the final composition change after compositionend", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const rendered = renderEditor("hello ", vi.fn(), {
+      transactionOwner: owner,
+      viewId: "primary",
+      fileKey: "ime.ts",
+    });
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+    const appendCompose = (text: string) => {
+      view.dispatch({
+        changes: { from: view.state.doc.length, insert: text },
+        userEvent: "input.type.compose",
+      });
+    };
+
+    act(() => {
+      content.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    });
+    act(() => appendCompose("n"));
+    act(() => appendCompose("i"));
+    // compositionend fires before CodeMirror's deferred final flush.
+    act(() => {
+      content.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "你" }));
+    });
+    await act(async () => {
+      await Promise.resolve();
+      appendCompose("你");
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+
+    expect(owner.getDocument("ime.ts")).toBe("hello ni你");
+    expect(owner.getHistoryState("ime.ts").undoDepth).toBe(1);
+    owner.undo("ime.ts", "primary");
+    expect(owner.getDocument("ime.ts")).toBe("hello ");
+  });
 });
 
 describe("ED-IMPROVE-009 late clipboard results report a cancelled observation", () => {

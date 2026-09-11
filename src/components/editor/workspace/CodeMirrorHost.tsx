@@ -2278,6 +2278,9 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   // dispatched with the composition origin so the owner coalesces them into
   // one logical undo; blur/destroy/end finalize and release the session.
   const compositionActiveRef = useRef(false);
+  // ED-MAIN-006: CodeMirror flushes the final composition change in a microtask
+  // after compositionend, so the owner finalize is deferred to the next macrotask.
+  const compositionEndFinalizeRef = useRef<number | null>(null);
   const onExpandSelectionRef = useRef(onExpandSelection);
   const onLightbulbRef = useRef(onLightbulb);
   const onGitChangeClickRef = useRef(onGitChangeClick);
@@ -2977,21 +2980,41 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       event.preventDefault();
     };
     view.contentDOM.addEventListener("keydown", compositionNavigationGuard, true);
+    const clearPendingCompositionFinalize = () => {
+      if (compositionEndFinalizeRef.current === null) return;
+      window.clearTimeout(compositionEndFinalizeRef.current);
+      compositionEndFinalizeRef.current = null;
+    };
+    const finalizeCompositionNow = () => {
+      const owner = transactionOwnerRef.current;
+      const key = fileKeyRef.current;
+      if (owner && key) owner.finalizeComposition(key);
+    };
     const compositionStartGuard = () => {
+      // A new session cancels a still-pending finalize from the previous one.
+      clearPendingCompositionFinalize();
       compositionActiveRef.current = true;
     };
     const compositionEndGuard = () => {
       compositionActiveRef.current = false;
-      const owner = transactionOwnerRef.current;
-      const key = fileKeyRef.current;
-      if (owner && key) owner.finalizeComposition(key);
+      // ED-MAIN-006: do not release the composition owner synchronously here.
+      // CodeMirror dispatches the final composition change from
+      // `Promise.resolve().then(flush)` after compositionend; finalizing now
+      // would split that update into a second undo entry. Defer to the next
+      // macrotask (past all pending microtasks) so the flush extends the same
+      // owner entry first.
+      clearPendingCompositionFinalize();
+      compositionEndFinalizeRef.current = window.setTimeout(() => {
+        compositionEndFinalizeRef.current = null;
+        if (compositionActiveRef.current) return;
+        finalizeCompositionNow();
+      }, 0);
     };
     const compositionBlurGuard = () => {
+      clearPendingCompositionFinalize();
       if (!compositionActiveRef.current) return;
       compositionActiveRef.current = false;
-      const owner = transactionOwnerRef.current;
-      const key = fileKeyRef.current;
-      if (owner && key) owner.finalizeComposition(key);
+      finalizeCompositionNow();
     };
     view.contentDOM.addEventListener("compositionstart", compositionStartGuard, true);
     view.contentDOM.addEventListener("compositionend", compositionEndGuard, true);
@@ -3101,6 +3124,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       cancelActiveHoverResize(activeHoverResizeSessionRef);
       clipboardContextByView.delete(view);
       compositionActiveRef.current = false;
+      clearPendingCompositionFinalize();
       if (transactionOwnerRef.current && fileKeyRef.current) {
         transactionOwnerRef.current.finalizeComposition(fileKeyRef.current);
       }
