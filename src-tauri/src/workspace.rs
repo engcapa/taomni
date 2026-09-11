@@ -2979,13 +2979,15 @@ fn ensure_inside(root: &Path, target: &Path) -> Result<(), String> {
     }
 }
 
+/// Atomically replace `target` with `tmp`.
+///
+/// Every supported platform replaces an existing regular file in one step:
+/// POSIX `rename(2)` and Windows `MoveFileExW` with `MOVEFILE_REPLACE_EXISTING`
+/// (what `std::fs::rename` maps to). The previous target bytes therefore stay
+/// in place until the new bytes are committed, so a failed replace never leaves
+/// the workspace without its old contents. Never delete the target first — the
+/// old delete-then-rename sequence lost the only copy when the rename failed.
 fn replace_file(tmp: &Path, target: &Path) -> std::io::Result<()> {
-    #[cfg(windows)]
-    {
-        if target.exists() {
-            fs::remove_file(target)?;
-        }
-    }
     fs::rename(tmp, target)
 }
 
@@ -3467,9 +3469,9 @@ fn write_workspace_bytes_with_fault(
     }
     if let Err(error) = replace_file(&tmp, target) {
         let remove_result = fs::remove_file(&tmp);
-        // Windows replace deletes the target before renaming; if the rename
-        // then fails the target may be gone even though the new bytes never
-        // landed. Only report `None` when the target still exists.
+        // The replace primitive is atomic on every supported platform, so a
+        // failed replace leaves the old target in place. Only report `None`
+        // when the target still exists and this run removed its own temp.
         let effect = if target.exists() && remove_result.is_ok() {
             WorkspaceWriteEffect::None
         } else {
@@ -3991,6 +3993,43 @@ mod tests {
         assert_eq!(err.old_hash, None);
         assert_eq!(fs::read(&parent_file).unwrap(), b"not a dir".to_vec());
         assert!(write_temp_entries(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn replace_file_preserves_existing_target_on_failure_and_replaces_on_success() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("existing.txt");
+        fs::write(&target, b"old").unwrap();
+
+        // A failing replace (missing source) must not delete the old target.
+        let missing = dir.path().join("missing-temp");
+        assert!(replace_file(&missing, &target).is_err());
+        assert_eq!(
+            fs::read(&target).unwrap(),
+            b"old".to_vec(),
+            "a failed replace must leave the old bytes in place"
+        );
+
+        // A successful replace swaps the bytes and consumes the temp file.
+        let tmp = dir.path().join("new-temp");
+        fs::write(&tmp, b"new").unwrap();
+        replace_file(&tmp, &target).unwrap();
+        assert_eq!(fs::read(&target).unwrap(), b"new".to_vec());
+        assert!(!tmp.exists());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn replace_file_failure_keeps_windows_target_bytes() {
+        // Regression for the delete-then-rename window: on Windows a failed
+        // replace used to remove the only copy of the old bytes. The target
+        // must survive a failed replace.
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("existing.txt");
+        fs::write(&target, b"old").unwrap();
+        let missing = dir.path().join("missing-temp");
+        assert!(replace_file(&missing, &target).is_err());
+        assert_eq!(fs::read(&target).unwrap(), b"old".to_vec());
     }
 
     #[test]
