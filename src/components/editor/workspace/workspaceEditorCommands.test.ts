@@ -1,4 +1,4 @@
-import { EditorSelection, EditorState } from "@codemirror/state";
+import { ChangeSet, EditorSelection, EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { history, undo, undoDepth } from "@codemirror/commands";
 import { javascript } from "@codemirror/lang-javascript";
@@ -40,7 +40,9 @@ import {
   workspaceEditorKeymap,
 } from "./workspaceEditorCommands";
 import {
+  setVirtualOverflow,
   virtualOverflowAt,
+  virtualOverflowRestoreField,
   virtualSpaceOverflowField,
   virtualSpaceTypingHandler,
 } from "./workspaceVirtualSpace";
@@ -253,6 +255,46 @@ describe("workspace editor commands", () => {
     expect(view.state.doc.toString()).toBe("abcdeXf\nx    X");
     expect(undo(view)).toBe(true);
     expect(view.state.doc.toString()).toBe("abcdef\nx");
+    view.destroy();
+  });
+
+  it("ED-AUDIT-002: pasting at a virtual caret pads in one transaction and one undo restores text plus caret", () => {
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: "abcdef\nx",
+        selection: EditorSelection.cursor(5),
+        extensions: [
+          EditorState.allowMultipleSelections.of(true),
+          editorVirtualSpacePolicy.of({ afterLineEnd: true, atFileBottom: false }),
+          virtualOverflowRestoreField,
+          virtualSpaceOverflowField,
+          history(),
+        ],
+      }),
+    });
+    view.dispatch({
+      selection: EditorSelection.cursor(5),
+      effects: setVirtualOverflow.of(new Map([[5, 3]])),
+    });
+
+    expect(pasteEditorClipboardPayload(view, {
+      plainText: "hi",
+      segments: ["hi"],
+      sourceEol: "lf",
+      rectangular: false,
+    })).toBe(true);
+    expect(view.state.doc.toString()).toBe("abcde   hif\nx");
+
+    // Replays the production shared-owner undo dispatch (applySharedTransactionToView).
+    const changeSet = ChangeSet.of([{ from: 5, to: 10, insert: "" }], view.state.doc.length);
+    view.dispatch({
+      changes: [{ from: 5, to: 10, insert: "" }],
+      selection: view.state.selection.map(changeSet),
+      userEvent: "undo",
+    });
+    expect(view.state.doc.toString()).toBe("abcdef\nx");
+    expect(view.state.selection.main.head).toBe(5);
+    expect(virtualOverflowAt(view.state, 5)).toBe(3);
     view.destroy();
   });
 

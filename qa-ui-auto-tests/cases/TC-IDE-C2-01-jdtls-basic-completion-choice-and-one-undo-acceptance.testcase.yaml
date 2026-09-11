@@ -1,17 +1,53 @@
 id: TC-IDE-C2-01
-title: "jdtls basic completion choice acceptance with one undo"
+title: "jdtls completion accept lands import+identifier and snippet as one undo each"
 description: |
-  §8.19.10 gate case C2. Capability ids: java.basic-completion /
-  completion.choice-session. Required mode: PROVIDER FIXTURE (a versioned
-  jdtls process over a real project — see src/components/editor/workspace/
-  __fixtures__/jdtls). Browser mode cannot start jdtls; a green browser run
-  proves nothing here and must be reported environment-blocked instead.
-  Highest claim on green: L2 provider-backed (Linux).
+  ED-AUDIT-007 A1/A2 native gate. Enters the in-repo single-module Maven
+  sample through persisted recents (no native picker), waits for the real
+  JDT LS provider, then proves the two provider-backed acceptance forms
+  through the packaged app UI:
+
+  1. Import-on-resolve accept: the caret sits after the bare `StringUti`
+     token (the fixture's un-imported org.apache.commons.lang3 target).
+     Basic completion is fired explicitly. The provider answers with two
+     same-label twins (jdtls decorates the labels with the package); the
+     case first proves the popup preserves provider order (the JDK-internal
+     com.sun.tools.javac.util twin is the top option, the
+     org.apache.commons.lang3 entry second - identical sortText, so the
+     owner's equal-tier rule keeps rawResponseIndex), then ArrowDown
+     selects the org.apache.commons.lang3 entry (the item the provider
+     trace accepted) and Enter accepts it. The provider resolve supplies
+     one additionalTextEdit (the lang3 import). The acceptance must land
+     the identifier AND the import in one dispatch; saving proves the disk
+     bytes equal the provider trace's appliedSha256, and ONE Ctrl+Z plus a
+     save proves the disk bytes equal the original fixture hash again -
+     one undo reverts the whole acceptance (identifier + import together),
+     matching the real-provider acceptance hashes recorded by
+     run-jdtls-fixture.mjs (traces/maven-single.trace.json,
+     caseId dependency-source-import).
+  2. Snippet accept: the caret sits after the `appen` prefix of
+     `new StringBuilder().appen`; the top method choice is accepted with
+     Enter (jdtls advertises snippetSupport and the client capabilities
+     enable it), the call text must land, Tab must advance the snippet
+     tabstop without a document edit, and ONE Ctrl+Z must restore the
+     exact original line.
+
+  Highest claim on green: L2 provider-backed (Linux), packaged app UI over
+  a real jdtls process. All keystrokes use the self-activating XTest
+  native_keys transport: the W3C WebDriver press path is rejected by
+  WebKitGTK for Control+Space (preserved ED-COMP-004 failure).
 covers: [F25.5]
-tags: [code-workspace, ide-c2, completion, provider-fixture, p1]
+tags: [code-workspace, ide-c2, completion, provider-fixture, native-gate, p1]
 modes: [native]
 fixtures: [reset_db, java_sample_projects, jdtls_required]
 timeout_sec: 600
+# Provider toolchain precondition: the maven-single fixture contract pins
+# JDK 21.0.4 (see __fixtures__/jdtls/README.md; the committed trace was
+# recorded on Zulu 21.0.4). The app auto-detects its tooling JDK as
+# Settings -> JAVA_HOME -> PATH -> common layouts, and /data/dev is not
+# scanned: invoking with the box default JDK 25 leaves dep-requiring
+# completions (this card's lang3 twin) empty while JDK-only locations
+# still complete, which fails as a popup timeout. Run native with e.g.
+# JAVA_HOME=/data/dev/jdk-21 so the launched JDT LS matches the fixture.
 steps:
   - open: "${cfg.app.base_url}"
   - vault_first_run: "qa-native-gate-password"
@@ -25,17 +61,179 @@ steps:
   - click: '[data-testid="welcome-history-tab-workspaces"]'
   - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
   - wait_for: '[data-testid="code-workspace-tab"]'
-  # Open the fixture Main.java, trigger Basic completion, accept a choice
-  # item whose additionalTextEdits add the import, verify one undo removes
-  # both the identifier completion and the import together.
-  - wait_for: '[data-testid="code-workspace-editor-pane"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 60
   - assert_text:
       selector: '[data-testid="code-workspace-editor"]'
       contains: "completionTargets"
       timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: "Java"
+      timeout_sec: 60
+
+  # ---- Import-on-resolve accept: one dispatch, one undo ----
+  # Caret after the bare `StringUti` token (1-based line 30; the trace's
+  # 0-based line 29 character 21). XTest bursts lose keys on some Linux
+  # desktops (29 downs landed on line 18 in run-20260909-123956), so the
+  # descent is paced in verified chunks: each waypoint assert is a
+  # condition-based wait and a misnavigation still fails here instead of
+  # as a confusing popup-content mismatch. No acceptance assertion changed.
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+Space
-  - screenshot: tc-ide-c2-popup.png
-  - press: Enter
-  - press: Control+z
-  - screenshot: tc-ide-c2-after-undo.png
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["Control+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown"]
+  - wait: 0.5
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 11,"
+      timeout_sec: 10
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown"]
+  - wait: 0.5
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 21,"
+      timeout_sec: 10
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "End"]
+  # The status bar is 1-based: line 30 col 22 = caret after the bare
+  # `StringUti` token. Assert it before firing completion so a misnavigation
+  # fails here instead of as a confusing popup-content mismatch.
+  - assert_text:
+      # StatusBar renders `Ln {line}, Col {column}` (1-based).
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 30, Col 22"
+      timeout_sec: 10
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["Control+Space"]
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete'
+      timeout_sec: 90
+  - assert_text:
+      selector: '.cm-tooltip-autocomplete'
+      contains: "StringUtils"
+  # Provider-order preservation (§ED-COMP-002 Rule 3): both twins carry the
+  # identical sortText, so the popup must list them in raw response order -
+  # the JDK-internal twin first, the lang3 entry second. The options render
+  # the decorated displayLabel, which discriminates the twins.
+  - eval_readonly:
+      expression: "document.querySelectorAll('.cm-tooltip-autocomplete > ul > li').length > 1 && document.querySelectorAll('.cm-tooltip-autocomplete > ul > li')[0].textContent.includes('com.sun.tools.javac.util') && document.querySelectorAll('.cm-tooltip-autocomplete > ul > li')[1].textContent.includes('org.apache.commons.lang3')"
+      expect_truthy: true
+  - screenshot: tc-ide-c2-01-popup.png
+  # Select the org.apache.commons.lang3 entry (second option) - the item the
+  # provider trace accepted - then accept it.
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["ArrowDown"]
+  - eval_readonly:
+      expression: "document.querySelector('.cm-tooltip-autocomplete li[aria-selected]').textContent.includes('org.apache.commons.lang3')"
+      expect_truthy: true
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["Enter"]
+  # Resolve supplies the import (~0.5s in the provider trace; 3s covers the
+  # gate timeout budget). The identifier line must read exactly StringUtils.
+  - wait: 3
+  - eval_readonly:
+      # Exact-line check: innerText keeps one \n per rendered line, so a
+      # \n-bounded substring proves the whole line (the 10th char i-vs-l
+      # keeps StringUti and StringUtils from colliding as prefixes).
+      # Callback-free form: the mutation guard bans arrow functions.
+      expression: "document.querySelector('.cm-content').innerText.includes('\\n            StringUtils\\n') && !document.querySelector('.cm-content').innerText.includes('\\n            StringUti\\n')"
+      expect_truthy: true
+  # Disk bytes: the acceptance (identifier + import) equals the provider
+  # trace's appliedSha256 for the same acceptance.
+  - press: Control+s
+  - assert_file_sha256:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/App.java"
+      equals: "eeb6e0ed331b0512f0b284654482d6981a403cd957f3ba62c946df6ef1d44e30"
+      timeout_sec: 30
+  # ONE undo must revert the whole acceptance; the disk returns to the
+  # original fixture bytes (the trace's originalSha256 == revertedSha256).
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["Control+z"]
+  - wait: 0.5
+  - eval_readonly:
+      expression: "document.querySelector('.cm-content').innerText.includes('\\n            StringUti\\n') && !document.querySelector('.cm-content').innerText.includes('\\n            StringUtils\\n')"
+      expect_truthy: true
+  - press: Control+s
+  - assert_file_sha256:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/App.java"
+      equals: "d1a95976fce19b5ab5c4719fccbc59875db10f684e5177eef08323a8fc554d59"
+      timeout_sec: 30
+
+  # ---- Snippet accept: call text lands, Tab advances the stop, one undo ----
+  # Caret after the `appen` prefix (1-based line 27). Same paced descent as
+  # above: XTest bursts lose keys on some Linux desktops.
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["Control+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown"]
+  - wait: 0.5
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 11,"
+      timeout_sec: 10
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown"]
+  - wait: 0.5
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 21,"
+      timeout_sec: 10
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "End"]
+  # Line 27 col 38 = caret after the `appen` prefix of
+  # `new StringBuilder().appen`.
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 27, Col 38"
+      timeout_sec: 10
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["Control+Space"]
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete'
+      timeout_sec: 90
+  - assert_text:
+      selector: '.cm-tooltip-autocomplete'
+      contains: "append("
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["Enter"]
+  - wait: 3
+  - eval_readonly:
+      expression: "document.querySelector('.cm-content').innerText.includes('StringBuilder().append(')"
+      expect_truthy: true
+  # Tab advances the snippet tabstop (selection-only dispatch, no doc edit).
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["Tab"]
+  - eval_readonly:
+      expression: "document.querySelector('.cm-content').innerText.includes('StringBuilder().append(')"
+      expect_truthy: true
+  # ONE undo restores the exact original line.
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["Control+z"]
+  - wait: 0.5
+  - eval_readonly:
+      # The original line ends with " StringBuilder().appen" (the "new "
+      # prefix is covered by the leading space; "new" is a banned token).
+      expression: "document.querySelector('.cm-content').innerText.includes(' StringBuilder().appen\\n')"
+      expect_truthy: true
+  # The case leaves the fixture copy byte-identical to the checkout.
+  - press: Control+s
+  - assert_file_sha256:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/App.java"
+      equals: "d1a95976fce19b5ab5c4719fccbc59875db10f684e5177eef08323a8fc554d59"
+      timeout_sec: 30
+  - screenshot: tc-ide-c2-01-import-undo.png

@@ -11,6 +11,7 @@ import {
   FindInFilesPanel,
   matchSegments,
 } from "./FindInFilesPanel";
+import { applyLspTextEditsToString } from "../lspTextEdits";
 
 const searchMocks = vi.hoisted(() => ({
   newWorkspaceSearchId: vi.fn(() => "search-1"),
@@ -539,6 +540,109 @@ describe("ED-FIND-004: replace preview commit flow in FindInFilesPanel", () => {
     await waitFor(() => expect(screen.queryByTestId("code-workspace-replace-preview")).not.toBeInTheDocument());
   });
 
+  it("commits UTF-16 ranges for a match after an astral prefix (ED-IMPROVE-004 A1)", async () => {
+    const onReplaceMatches = vi.fn(
+      async (
+        _matches: WorkspaceSearchMatch[],
+        _replacement: string,
+        _edit: LspWorkspaceEdit,
+      ): Promise<{ ok: boolean; appliedCount?: number; fileCount?: number }> =>
+        ({ ok: true as const, appliedCount: 1, fileCount: 1 }),
+    );
+    render(
+      <FindInFilesPanel
+        roots={roots}
+        onOpenMatch={vi.fn()}
+        onReplaceMatches={onReplaceMatches}
+      />,
+    );
+    const emit = await runSearch();
+    const lineText = "const s = \"\u{1F600}foo\";";
+    const matches = [
+      searchMatch({ lineNumber: 1, lineText, matchStart: 12, matchEnd: 15, column: 13 }),
+    ];
+    act(() => {
+      emit({ ...doneEvent(), kind: "batch", matches });
+      emit(doneEvent({ totalMatches: matches.length }));
+    });
+    fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "bar" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+    expect(await screen.findByTestId("code-workspace-replace-preview")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+
+    await waitFor(() => expect(onReplaceMatches).toHaveBeenCalledTimes(1));
+    const call = onReplaceMatches.mock.calls[0];
+    if (!call) throw new Error("expected commit arguments");
+    const edit = call[2];
+    expect(edit.documentEdits).toHaveLength(1);
+    expect(edit.documentEdits[0]!.edits[0]!.range).toEqual({
+      start: { line: 0, character: 13 },
+      end: { line: 0, character: 16 },
+    });
+    const next = applyLspTextEditsToString(lineText, edit.documentEdits[0]!.edits);
+    expect(next).toBe("const s = \"\u{1F600}bar\";");
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(next)).toBe(false);
+  });
+
+  it("commits the replacement frozen at preview time when the input changes later (ED-IMPROVE-005 A1)", async () => {
+    const onReplaceMatches = vi.fn(
+      async (
+        _matches: WorkspaceSearchMatch[],
+        _replacement: string,
+        _edit: LspWorkspaceEdit,
+      ): Promise<{ ok: boolean; appliedCount?: number; fileCount?: number }> =>
+        ({ ok: true as const, appliedCount: 2, fileCount: 2 }),
+    );
+    await openPreview(onReplaceMatches);
+
+    // The user edits the replacement input after the preview froze its plan.
+    fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "changed-later" } });
+    fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+
+    await waitFor(() => expect(onReplaceMatches).toHaveBeenCalledTimes(1));
+    const call = onReplaceMatches.mock.calls[0];
+    if (!call) throw new Error("expected commit arguments");
+    const [, replacement, edit] = call;
+    expect(replacement).toBe("thread");
+    expect(edit.documentEdits[0]!.edits[0]!.newText).toBe("thread");
+  });
+
+  it("shows the frozen scope identity captured before the preview (ED-IMPROVE-005 A1)", async () => {
+    await openPreview(vi.fn(async () => ({ ok: true as const })));
+    const scope = screen.getByTestId("code-workspace-replace-scope");
+    expect(scope).toHaveTextContent("Frozen preview: project");
+    expect(scope).toHaveTextContent("query “needle”");
+  });
+
+  it("keeps the frozen scope and set when query/scope inputs change after the preview opens (ED-IMPROVE-005 A1)", async () => {
+    const onReplaceMatches = vi.fn(
+      async (
+        _matches: WorkspaceSearchMatch[],
+        _replacement: string,
+        _edit: LspWorkspaceEdit,
+      ): Promise<{ ok: boolean; appliedCount?: number; fileCount?: number }> =>
+        ({ ok: true as const, appliedCount: 2, fileCount: 2 }),
+    );
+    await openPreview(onReplaceMatches);
+
+    // Live UI inputs move after the freeze; the frozen snapshot must still
+    // drive the scope label, the replacement and the committed match set.
+    fireEvent.change(screen.getByLabelText("Search query"), { target: { value: "other-query" } });
+    fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "changed-later" } });
+    fireEvent.change(screen.getByLabelText("Include globs"), { target: { value: "*.md" } });
+    expect(screen.getByTestId("code-workspace-replace-scope")).toHaveTextContent("query “needle”");
+    expect(screen.getByTestId("code-workspace-replace-counts")).toHaveTextContent("2 of 2");
+
+    fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+    await waitFor(() => expect(onReplaceMatches).toHaveBeenCalledTimes(1));
+    const call = onReplaceMatches.mock.calls[0];
+    if (!call) throw new Error("expected commit arguments");
+    const [filtered, replacement, edit] = call;
+    expect(filtered).toHaveLength(2);
+    expect(replacement).toBe("thread");
+    expect(edit.documentEdits[0]!.edits[0]!.newText).toBe("thread");
+  });
+
   it("keeps the preview open and shows the blocker message on conflict (A2)", async () => {
     const onReplaceMatches = vi.fn(
       async () => ({ ok: false as const, message: "Replace blocked: dirty buffer" }),
@@ -560,5 +664,38 @@ describe("ED-FIND-004: replace preview commit flow in FindInFilesPanel", () => {
     fireEvent.click(screen.getByTestId("code-workspace-replace-cancel"));
     expect(screen.queryByTestId("code-workspace-replace-preview")).not.toBeInTheDocument();
     expect(onReplaceMatches).not.toHaveBeenCalled();
+  });
+
+  // ED-AUDIT-003: a superseded search invalidates the frozen preview so a
+  // stale plan can never commit after the result set moved underneath it.
+  it("closes the frozen replace preview when a new search supersedes it (A2 stale)", async () => {
+    const onReplaceMatches = vi.fn();
+    await openPreview(onReplaceMatches);
+    expect(screen.getByTestId("code-workspace-replace-preview")).toBeInTheDocument();
+
+    await runSearch("second");
+    await waitFor(() =>
+      expect(screen.queryByTestId("code-workspace-replace-preview")).not.toBeInTheDocument());
+    expect(onReplaceMatches).not.toHaveBeenCalled();
+  });
+
+  // ED-AUDIT-003: an invalid regex surfaces as a search error before any
+  // replace entry point can open; the Replace All gate stays disabled.
+  it("shows an invalid regex error before preview and keeps Replace All disabled (A2)", async () => {
+    render(
+      <FindInFilesPanel roots={roots} onOpenMatch={vi.fn()} onReplaceMatches={vi.fn()} />,
+    );
+    const unlisten = vi.fn();
+    searchMocks.subscribeWorkspaceSearch.mockResolvedValue(unlisten);
+    searchMocks.workspaceSearchStart.mockRejectedValue(
+      new Error("Invalid search pattern: unclosed group"),
+    );
+    fireEvent.change(screen.getByLabelText("Search query"), { target: { value: "foo(bar" } });
+    // Enable the Regular expression toggle, then run the search.
+    fireEvent.click(screen.getByRole("button", { name: "Regular expression" }));
+    fireEvent.keyDown(screen.getByLabelText("Search query"), { key: "Enter" });
+    await waitFor(() => expect(screen.getByTestId("code-workspace-find-error")).toBeInTheDocument());
+    expect(screen.getByTestId("code-workspace-find-error")).toHaveTextContent("Invalid search pattern");
+    expect(screen.getByRole("button", { name: "Preview replace all matches" })).toBeDisabled();
   });
 });

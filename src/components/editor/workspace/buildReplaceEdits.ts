@@ -1,5 +1,6 @@
 import type { LspTextEdit, LspWorkspaceEdit } from "../../../lib/editor/lsp";
 import type { WorkspaceSearchMatch } from "../../../lib/editor/workspaceSearch";
+import { codePointOffsetToUtf16Offset } from "./replaceInFilesModel";
 
 function matchKey(match: WorkspaceSearchMatch): string {
   return `${match.rootId}:${match.path}:${match.lineNumber}:${match.matchStart}:${match.matchEnd}`;
@@ -22,8 +23,8 @@ export function buildReplaceWorkspaceEdit(
     const line = Math.max(0, match.lineNumber - 1);
     const edit: LspTextEdit = {
       range: {
-        start: { line, character: match.matchStart },
-        end: { line, character: match.matchEnd },
+        start: { line, character: codePointOffsetToUtf16Offset(match.lineText, match.matchStart) },
+        end: { line, character: codePointOffsetToUtf16Offset(match.lineText, match.matchEnd) },
       },
       newText: replacement,
     };

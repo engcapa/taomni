@@ -410,6 +410,14 @@ controls:
     selector: '[data-testid="status-bar-workspace-eol"]'
     kind: interactive
     optional: true       # active Code Workspace file only
+  - id: workspace-cursor
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    kind: display
+    optional: true       # active Code Workspace file only (debounced caret)
+  - id: workspace-large-file
+    selector: '[data-testid="status-bar-workspace-large-file"]'
+    kind: display
+    optional: true       # only when the open file exceeds large-file thresholds
 -->
 
 - 显示活跃连接数
@@ -4946,6 +4954,10 @@ controls:
     selector: '[data-testid="code-workspace-tree"]'
     kind: display
     optional: true       # mounted with the workspace tree pane
+  - id: debug-subtab-breakpoints
+    selector: '[data-testid="debug-subtab-breakpoints"]'
+    kind: interactive
+    optional: true       # breakpoints sub-tab in the debug panel header
   - id: split-equalize
     selector: '[data-testid="code-workspace-split-equalize"]'
     kind: interactive
@@ -5652,6 +5664,38 @@ controls:
     selector: '[data-testid="code-workspace-tree-file"]'
     kind: interactive
     optional: true
+  - id: tree-dir-row
+    selector: '[data-testid="code-workspace-tree-dir"]'
+    kind: interactive
+    optional: true       # directory rows; cases refine with [data-path="..."] (C8-07)
+  - id: tree-view
+    selector: '[data-testid="code-workspace-view-tree"]'
+    kind: display
+    optional: true       # tree view container used by template flows
+  - id: new-java-class-package
+    selector: '[data-testid="new-java-class-package"]'
+    kind: interactive
+    optional: true       # package input inside the New Java Class dialog
+  - id: new-java-class-submit
+    selector: '[data-testid="new-java-class-submit"]'
+    kind: interactive
+    optional: true       # submit button inside the New Java Class dialog
+  - id: external-file-conflict-dialog
+    selector: '[data-testid="external-file-conflict-dialog"]'
+    kind: display
+    optional: true       # save-conflict dialog surfaced in the workspace shell (C0-01)
+  - id: external-file-conflict-dismiss
+    selector: '[data-testid="external-file-conflict-dialog"] button[aria-label="Dismiss external file conflict"]'
+    kind: interactive
+    optional: true       # dismiss leaves buffer and disk untouched (C0-01)
+  - id: refactoring-preview-dialog
+    selector: '[data-testid="refactoring-preview-dialog"]'
+    kind: display
+    optional: true       # rename refactoring preview modal (C6-04)
+  - id: refactoring-preview-apply
+    selector: '[data-testid="refactoring-preview-apply"]'
+    kind: interactive
+    optional: true       # applies the previewed refactoring (C6-04)
   - id: tree-filter
     selector: '[data-testid="code-workspace-tree-filter"]'
     kind: interactive
@@ -5671,6 +5715,25 @@ controls:
     selector: '[data-testid="code-workspace-editor-tab-strip"]'
     kind: display
     optional: true       # only with an open buffer
+  # ED-IMPROVE-007: per-leaf identity selectors used by the view-state restore
+  # case; the pane attribute is set by EditorGroup and the tab strip activates
+  # a leaf without moving its caret.
+  - id: editor-leaf-primary-tab-strip
+    selector: '[data-editor-group-id="primary"] [data-testid="code-workspace-editor-tab-strip"]'
+    kind: interactive
+    optional: true
+  - id: editor-leaf-secondary-pane
+    selector: '[data-editor-group-id="secondary"]'
+    kind: display
+    optional: true
+  - id: editor-leaf-secondary-content
+    selector: '[data-editor-group-id="secondary"] .cm-content'
+    kind: interactive
+    optional: true
+  - id: editor-leaf-secondary-tab-strip
+    selector: '[data-editor-group-id="secondary"] [data-testid="code-workspace-editor-tab-strip"]'
+    kind: interactive
+    optional: true
   - id: editor-content                 # CodeMirror contenteditable inside the editor surface
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     kind: interactive
@@ -5679,6 +5742,10 @@ controls:
     selector: '.cm-tooltip-autocomplete'
     kind: display
     optional: true       # CodeMirror-owned completion list while suggestions are active
+  - id: editor-lightbulb               # gutter quick-fix button for the diagnostic line
+    selector: '[data-testid="code-workspace-lightbulb"]'
+    kind: interactive
+    optional: true       # only while the active line carries a provider diagnostic
   - id: file-status
     selector: '[data-testid="code-workspace-file-status"]'
     kind: display
@@ -5923,6 +5990,22 @@ controls:
     selector: '[data-testid="workspace-resource-cleanup-retry"]'
     kind: interactive
     optional: true
+  - id: workspace-recovery-dialog
+    selector: '[data-testid="workspace-recovery-dialog"]'
+    kind: display
+    optional: true       # opens on workspace mount when unsaved buffers or disk results exist
+  - id: workspace-recovery-recover-selected
+    selector: '[data-testid="workspace-recovery-recover-selected"]'
+    kind: interactive
+    optional: true       # enabled while a buffer row is selected
+  - id: workspace-recovery-recover-all
+    selector: '[data-testid="workspace-recovery-recover-all"]'
+    kind: interactive
+    optional: true       # buffers tab only; disabled with no entries
+  - id: workspace-recovery-discard-all
+    selector: '[data-testid="workspace-recovery-discard-all"]'
+    kind: interactive
+    optional: true       # buffers tab only; disabled with no entries
   - id: split-down
     selector: '[data-testid="code-workspace-split-down"]'
     kind: interactive

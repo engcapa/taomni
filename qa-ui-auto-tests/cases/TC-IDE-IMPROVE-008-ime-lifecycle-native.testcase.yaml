@@ -1,0 +1,86 @@
+id: TC-IDE-IMPROVE-008-ime-lifecycle-native
+title: "Real fcitx5 IME confirm/cancel: one logical undo and a cancel that consumes none"
+description: |
+  ED-IMPROVE-008 native gate case. Drives the packaged app through the real
+  Linux/X11 fcitx5 wbpy engine on a disposable workspace root:
+
+  1. An ASCII marker "zz" is typed first, so undo depth is non-empty.
+  2. "nihao" is composed and committed through a real candidate selection
+     (Space). The assertion proves the preedit disappeared and a CJK
+     candidate landed — a synthetic KeyboardEvent cannot produce this.
+  3. ONE Ctrl+Z removes the whole committed composition but keeps "zz",
+     proving the composition is one logical undo entry.
+  4. A second composition is cancelled with Escape: the document is
+     unchanged and no CJK lands.
+  5. ONE further Ctrl+Z removes "zz", proving the cancelled composition
+     consumed no undo step and no history entry was left behind.
+  6. Keyboard focus, role=textbox and aria-multiline stay intact after the
+     cancel; 200% zoom and screen-reader runs are recorded as unrun.
+
+  Highest claim on green: L2 native (Linux) + accessibility dimensions that
+  were actually observed; Windows/macOS IME transports are unverified.
+covers: [F25.1, F25.5]
+tags: [code-workspace, ide-c0, ime, accessibility, native-gate, p1]
+modes: [native]
+native_platforms: [Linux]
+fixtures: [linux_x11_required, reset_db, workspace_root]
+timeout_sec: 300
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-ime-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-ime","name":"qa-ime","roots":[{"id":"r1","name":"qa-ime","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"r1","path":"notes.txt"},"lastOpenedAt":1788537600000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 60
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  # Real keyboard-only baseline marker.
+  - type: "zz"
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-content")[0].textContent.includes("zz")'
+      expect_truthy: true
+  # Real IME commit through fcitx5 wbpy: candidate selection with Space.
+  - native_ime_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      expected_engine: wbpy
+      keys: ["n", "i", "h", "a", "o", "Space"]
+  - eval_readonly:
+      expression: 'JSON.stringify([/[\u4e00-\u9fff]/.test(document.querySelectorAll(".cm-content")[0].textContent), document.querySelectorAll(".cm-content")[0].textContent.includes("nihao")])'
+      contains: "[true,false]"
+  - screenshot: tc-ide-improve008-committed.png
+  # One undo removes the whole confirmed composition, not one keystroke.
+  - press: Control+z
+  - eval_readonly:
+      expression: 'JSON.stringify([/[\u4e00-\u9fff]/.test(document.querySelectorAll(".cm-content")[0].textContent), document.querySelectorAll(".cm-content")[0].textContent.includes("zz")])'
+      contains: "[false,true]"
+  # A cancelled composition leaves no text and no history entry.
+  - native_ime_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      expected_engine: wbpy
+      keys: ["n", "i", "h", "a", "o", "Escape"]
+  - eval_readonly:
+      expression: 'JSON.stringify([/[\u4e00-\u9fff]/.test(document.querySelectorAll(".cm-content")[0].textContent), document.querySelectorAll(".cm-content")[0].textContent.includes("zz")])'
+      contains: "[false,true]"
+  - press: Control+z
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-content")[0].textContent.includes("zz")'
+      expect_truthy: false
+  # Accessibility after the cancel: focus, role and multiline state intact.
+  - eval_readonly:
+      expression: 'document.activeElement === document.querySelectorAll(".cm-content")[0]'
+      expect_truthy: true
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      name: role
+      equals: textbox
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      name: aria-multiline
+      equals: "true"
+  - screenshot: tc-ide-improve008-cancelled.png

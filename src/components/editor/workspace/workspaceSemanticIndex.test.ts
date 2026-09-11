@@ -11,6 +11,7 @@ import {
   setWorkspaceSemanticIndexActiveProviders,
   workspaceSemanticIndexBuildIsCurrent,
   workspaceSemanticIndexIsCurrent,
+  workspaceSemanticIndexTokenRevisionCurrent,
 } from "./workspaceSemanticIndex";
 
 describe("workspaceSemanticIndex", () => {
@@ -55,6 +56,37 @@ describe("workspaceSemanticIndex", () => {
       error: null,
       revision: 1,
     });
+  });
+
+  // ED-AUDIT-008 A1 regression: jdtls keeps reporting workDoneProgress while a
+  // code-action response is in flight, so the snapshot is still "building"
+  // with activeProviders when the produced candidates arrive. That background
+  // progress must not stale a revision-pinned response — gating it with
+  // workspaceSemanticIndexBuildIsCurrent blocked the quick-fix menu on roughly
+  // half of the native runs ("Refactor actions became stale…" with an
+  // unchanged workspace). Revision equality is the whole freshness contract
+  // for an already-produced response; cross-revision results stay rejected.
+  it("keeps a revision-pinned response usable while provider progress is still active", () => {
+    const initial = createWorkspaceSemanticIndexSnapshot();
+    const build = beginWorkspaceSemanticIndexBuild(initial, "language-server", 20);
+    const completed = completeWorkspaceSemanticIndexBuild(build.snapshot, build.token, 30);
+    // jdtls reports a new workDoneProgress after the build completed.
+    const progressing = setWorkspaceSemanticIndexActiveProviders(
+      completed,
+      ["jdtls:build"],
+    );
+
+    expect(progressing.status).toBe("building");
+    expect(progressing.revision).toBe(build.token.revision);
+    // The strict build gate (used for launching new provider work) is false…
+    expect(workspaceSemanticIndexBuildIsCurrent(progressing, build.token)).toBe(false);
+    // …but the produced response stays fresh at the same revision.
+    expect(workspaceSemanticIndexTokenRevisionCurrent(progressing, build.token)).toBe(true);
+
+    // A workspace edit during the request still stales the produced response.
+    const edited = invalidateWorkspaceSemanticIndex(progressing, "document-edited");
+    expect(edited.revision).not.toBe(build.token.revision);
+    expect(workspaceSemanticIndexTokenRevisionCurrent(edited, build.token)).toBe(false);
   });
 
   it("ignores obsolete completions after a newer generation starts", () => {

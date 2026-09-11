@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
   "fixtureId": "maven-single",
-  "generatedAt": "2026-09-04T00:02:08.228Z",
+  "generatedAt": "2026-09-08T00:19:42.182Z",
   "sanitized": true,
   "toolchain": {
     "java": {
-      "path": "/data/dev/jdk-21/bin/java",
-      "version": "21.0.4",
+      "path": "/data/dev/jdk-25/bin/java",
+      "version": "25.0.2",
       "info": {
-        "line": "openjdk version \"21.0.4\" 2024-07-16 LTS",
-        "major": 21,
-        "version": "21.0.4"
+        "line": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+        "major": 25,
+        "version": "25.0.2"
       }
     },
     "jdtls": {
@@ -37,7 +37,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 2224,
+          "msTotal": 2121,
           "itemCount": 50,
           "isIncomplete": true,
           "satisfied": true,
@@ -61,7 +61,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 392,
+          "msTotal": 406,
           "itemCount": 58,
           "isIncomplete": true,
           "satisfied": true,
@@ -85,7 +85,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 60,
+          "msTotal": 42,
           "itemCount": 14,
           "isIncomplete": false,
           "satisfied": true,
@@ -167,7 +167,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 133,
+          "msTotal": 125,
           "itemCount": 2,
           "isIncomplete": false,
           "satisfied": true,
@@ -176,7 +176,7 @@
         }
       ],
       "resolve": {
-        "ms": 645,
+        "ms": 600,
         "additionalEditCount": 1,
         "additionalEditTexts": [
           "\n\nimport org.apache.commons.lang3.StringUtils;"
@@ -202,7 +202,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 171,
+          "msTotal": 163,
           "itemCount": 50,
           "isIncomplete": true,
           "satisfied": true,
@@ -225,7 +225,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 123,
+        "msTotal": 65,
         "signaturesCount": 13,
         "labels": [
           "append(double d) : StringBuilder",
@@ -261,7 +261,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 74,
+        "msTotal": 69,
         "signaturesCount": 13,
         "labels": [
           "append(double d) : StringBuilder",
@@ -297,7 +297,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 91,
+        "msTotal": 74,
         "signaturesCount": 3,
         "labels": [
           "parseInt(String s) : int",
@@ -323,7 +323,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 65,
+        "msTotal": 55,
         "signaturesCount": 9,
         "labels": [
           "valueOf(double d) : String",
@@ -355,7 +355,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 162,
+        "msTotal": 135,
         "signaturesCount": 1,
         "labels": [
           "singletonList(T o) : List<T>"
@@ -381,9 +381,9 @@
       "supersede": {
         "firstOutcome": "rejected:-32800",
         "firstCancelled": true,
-        "msFirst": 59,
+        "msFirst": 68,
         "secondSatisfied": true,
-        "msSecond": 53
+        "msSecond": 65
       },
       "notes": "$/cancelRequest on the in-flight request mirrors the production cancel bridge; second request must satisfy"
     },
@@ -397,7 +397,7 @@
       },
       "scopeRequested": "default",
       "hover": {
-        "msFirst": 54,
+        "msFirst": 51,
         "attempts": 1,
         "contentsPresent": true,
         "contentsKind": "markup-array",
@@ -418,7 +418,7 @@
       },
       "scopeRequested": "default",
       "hover": {
-        "msFirst": 123,
+        "msFirst": 129,
         "attempts": 1,
         "contentsPresent": true,
         "contentsKind": "markup-array",
@@ -439,7 +439,7 @@
       },
       "scopeRequested": "default",
       "hover": {
-        "msFirst": 43,
+        "msFirst": 64,
         "attempts": 1,
         "contentsPresent": true,
         "contentsKind": "markup-array",
@@ -513,7 +513,7 @@
     "appliedSha256": "a1a321c4326cdfef25e6aec6ccce42ec1f06395f10ba44154a0f424b5105dec2",
     "originalSha256": "f2de5c8ab98b58cf18ff998ebc47d19c127bb6f4290550d2827a40a37552e70a",
     "revertedRestoresOriginalHash": true,
-    "msTotal": 730,
+    "msTotal": 863,
     "satisfied": true,
     "reason": null,
     "resolvedShape": {
@@ -575,8 +575,8 @@
       }
     ],
     "importProgress": {
-      "events": 42,
-      "beginTokens": 13,
+      "events": 38,
+      "beginTokens": 12,
       "titles": [
         "Synchronizing projects",
         "Building",
@@ -600,16 +600,16 @@
     }
   },
   "analysisTiming": {
-    "firstCompletionSatisfiedMs": 8642,
+    "firstCompletionSatisfiedMs": 8070,
     "offlineCacheHint": {
-      "coldSessionFirstSatisfiedMs": 8642,
-      "restartedSessionFirstSatisfiedMs": 5976,
+      "coldSessionFirstSatisfiedMs": 8070,
+      "restartedSessionFirstSatisfiedMs": 6992,
       "fasterThanCold": true
     }
   },
   "restart": {
     "performed": true,
-    "msToReadyAfterRestart": 6083,
+    "msToReadyAfterRestart": 7123,
     "completionOkAfterRestart": true,
     "signatureHelpOkAfterRestart": true,
     "reason": null,

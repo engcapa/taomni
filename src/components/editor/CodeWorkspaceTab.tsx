@@ -269,6 +269,8 @@ import {
   snapshotFromWorkspaceUi,
   uniqueOrderedKeys,
   writeWorkspaceLayoutSnapshot,
+  type PersistedEditorViewState,
+  type WorkspaceViewStates,
 } from "./workspace/workspaceLayoutPersistence";
 import { LocalHistoryDialog } from "./workspace/LocalHistoryDialog";
 import { CodeStyleSettingsDialog } from "./workspace/CodeStyleSettingsDialog";
@@ -387,8 +389,10 @@ import {
   sliceWorkspaceEditForResume,
   summarizeWorkspaceEditOutcomes,
   workspaceEditApplyResponse,
+  WorkspaceEditOpenBufferSaveFailure,
   type WorkspaceEditApplyHooks,
   type WorkspaceEditApplyOutcome,
+  type WorkspaceEditApplyTransactionSummary,
 } from "./workspace/workspaceEditApply";
 import { validateSemanticWorkspaceEditPaths } from "./workspace/semanticWorkspaceEdit";
 import {
@@ -402,10 +406,22 @@ import {
   refactorApplyGate,
   evaluateDestructiveRefactorAvailability,
   verifyRefactorPostHashes,
-  buildRefactorRecoveryJournalEntry,
-  recordRefactorRecoveryJournal,
+  refactorJournalPostImageMatches,
+  prepareRefactorRecoveryJournalV2,
+  recordRefactorRecoveryJournalV2,
+  updateRefactorRecoveryJournalV2,
+  listRefactorRecoveryJournalsV2,
   type RefactorPlanV3,
+  type RefactorRecoveryJournalEntryV2,
+  type RefactorRecoveryPreImageV2,
+  type WorkspaceEditRecoveryPlan,
 } from "./workspace/refactorPlan";
+import {
+  classifyRefactorRecoveryPreconditions,
+  createRestoreEchoSuppressor,
+  executeRefactorRecovery,
+} from "./workspace/refactorRecoveryController";
+import { sha256Hex } from "./workspace/projectAnalysisModel";
 import { KeymapCheatSheetDialog } from "./workspace/KeymapCheatSheetDialog";
 import { KeymapSettingsDialog } from "./workspace/KeymapSettingsDialog";
 import {
@@ -417,6 +433,7 @@ import { TabSwitcher, type TabSwitcherEntry, type TabSwitcherToolWindow } from "
 import { DapAdapterGuideDialog } from "./workspace/DapAdapterGuideDialog";
 import {
   buildWorkspacePathSnapshotEdit,
+  workspaceEditUndoPrecondition,
   WorkspaceEditHistory,
   type WorkspaceEditHistoryEntry,
   type WorkspaceEditPathSnapshot,
@@ -624,8 +641,10 @@ import type { ShellShortcutClaim } from "./workspace/shellShortcutRouter";
 import type { WorkspaceFocus } from "./workspace/workspaceActionRegistry";
 import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
 import {
+  codePointOffsetToUtf16Offset,
   replaceMatchAbsolutePath,
   searchMatchesToReplaceInputs,
+  summarizeReplaceCommitReport,
   validateReplacePreconditions,
   verifyReplaceMatchFreshness,
   type FileRevisionGuard,
@@ -1092,18 +1111,25 @@ import {
 import {
   changedWorkspaceSemanticBufferPaths,
   workspaceSemanticIndexBuildIsCurrent,
+  workspaceSemanticIndexTokenRevisionCurrent,
   type WorkspaceSemanticIndexBuildToken,
 } from "./workspace/workspaceSemanticIndex";
 import { useWorkspaceSemanticIndex } from "./workspace/useWorkspaceSemanticIndex";
 import {
+  createRestoreTimingRecorder,
   executeBoundedAsyncQueue,
   planWorkspaceRestore,
 } from "./workspace/workspaceRestoreModel";
 import {
-  planCleanup,
-  planRearrange,
   resolveCleanupCapabilities,
   resolveRearrangeCapabilities,
+  executeCleanupTransaction,
+  executeRearrangeTransaction,
+  validateWorkflowProviderAction,
+  CLEANUP_ACTION_KINDS,
+  REARRANGE_ACTION_KINDS,
+  isCleanupActionKind,
+  isRearrangeActionKind,
 } from "./workspace/rearrangeCleanupWorkflow";
 
 interface ResourceCleanupRecoveryView {
@@ -1373,12 +1399,22 @@ export function CodeWorkspaceTab({
   // Restore chrome/layout once per instance, then seed expand keys only when empty.
   const layoutHydratedRef = useRef<string | null>(null);
   const layoutRestoredOpenFilesRef = useRef(false);
+  // ED-IMPROVE-007: in-memory per-leaf/file view snapshots; hydrated from the
+  // layout snapshot before the first editor mounts so a reopen/restart applies
+  // the right leaf's caret, selection, scroll and folds.
+  const [hydratedViewStates] = useState<WorkspaceViewStates>(() => (
+    readWorkspaceLayoutSnapshot(workspaceInstanceId)?.viewStates ?? {}
+  ));
+  const viewStatesRef = useRef<WorkspaceViewStates>(hydratedViewStates);
+  const [viewStateRevision, setViewStateRevision] = useState(0);
   useEffect(() => {
     if (layoutHydratedRef.current === workspaceInstanceId) return;
     layoutHydratedRef.current = workspaceInstanceId;
     layoutRestoredOpenFilesRef.current = false;
+    viewStatesRef.current = {};
     const snapshot = readWorkspaceLayoutSnapshot(workspaceInstanceId);
     if (snapshot) {
+      viewStatesRef.current = snapshot.viewStates ?? {};
       if (snapshot.layoutRecovered) {
         setStatusMessage("Recovered invalid workspace layout into a single editor leaf");
       }
@@ -1610,6 +1646,15 @@ export function CodeWorkspaceTab({
    */
   const mountedRef = useMountedRef();
   const [workspaceResourceOperationLocked, setWorkspaceResourceOperationLocked] = useState(false);
+  // ED-IMPROVE-001: live mirror so an awaited rearrange/cleanup run observes a
+  // read-only toggle that happens after the callback closure was created.
+  const workspaceResourceOperationLockedRef = useRef(workspaceResourceOperationLocked);
+  workspaceResourceOperationLockedRef.current = workspaceResourceOperationLocked;
+  // ED-IMPROVE-001: monotonic per-workflow request tokens. A newer invocation
+  // (double entry) supersedes the in-flight one, which then fails typed stale
+  // before any mutation.
+  const rearrangeRequestTokenRef = useRef(0);
+  const cleanupRequestTokenRef = useRef(0);
   const workspaceEditQueueRef = useRef<Promise<void>>(Promise.resolve());
   const providerCommandSemanticGuardRef = useRef<{
     generation: number;
@@ -2191,6 +2236,17 @@ export function CodeWorkspaceTab({
     throw new Error("Workspace resource history is not ready");
   });
   const replayWorkspaceEncodingRef = useRef<Map<string, { encoding: string; bom: boolean; eol?: "lf" | "crlf" | "cr" }> | null>(null);
+  // ED-AUDIT-014: comparison keys of closed-file paths just written by a
+  // refactor restore, so the file-watcher echo of our own write does not
+  // overwrite the "Refactor recovery complete" status with a misleading
+  // "File changed on disk" note. Only the status message is suppressed.
+  const restoreEchoSuppressorRef = useRef(createRestoreEchoSuppressor());
+  // ED-AUDIT-008: set while a workspace-history restore replays through the
+  // workspace-edit funnel. Open-buffer writes made inside that window are
+  // recorded as "history-replay" mutations so the editor hosts treat the
+  // resulting store snapshot as a journal-owned restore (origin "undo") and
+  // never mirror it as a second undoable document entry.
+  const replayWorkspaceRestoreRef = useRef(false);
   const goToDefinitionRef = useRef<(file: OpenFileState, position: LspPosition) => Promise<boolean>>(async () => false);
   const peekDefinitionRef = useRef<(file: OpenFileState, position: LspPosition) => Promise<boolean>>(async () => false);
   const goToDeclarationRef = useRef<(file: OpenFileState, position: LspPosition) => Promise<boolean>>(async () => false);
@@ -2530,6 +2586,32 @@ export function CodeWorkspaceTab({
 
   useEffect(() => {
     setExternalFileConflicts([]);
+  }, [workspaceInstanceId]);
+
+  // ED-IMPROVE-001: switching the workspace supersedes any in-flight
+  // rearrange/cleanup identity even before readLive observes the switch.
+  useEffect(() => {
+    rearrangeRequestTokenRef.current += 1;
+    cleanupRequestTokenRef.current += 1;
+  }, [workspaceInstanceId]);
+
+  // ED-IMPROVE-007: view snapshots stay in memory and persist with the next
+  // debounced layout write. A late report from a replaced view/workspace is
+  // dropped instead of resurrecting an old leaf's caret.
+  const handleViewStateChange = useCallback((
+    groupId: EditorGroupId,
+    fileKey: string,
+    state: PersistedEditorViewState,
+  ) => {
+    if (!mountedRef.current || workspaceInstanceIdRef.current !== workspaceInstanceId) return;
+    const current = viewStatesRef.current;
+    const leaf = current[groupId];
+    if (leaf?.[fileKey] === state) return;
+    viewStatesRef.current = {
+      ...current,
+      [groupId]: { ...(leaf ?? {}), [fileKey]: state },
+    };
+    setViewStateRevision((revision) => revision + 1);
   }, [workspaceInstanceId]);
 
   const semanticQueryHostRef = useRef(new WorkspaceSemanticQueryHost({
@@ -3422,6 +3504,17 @@ export function CodeWorkspaceTab({
           const restoreRun = { workspaceInstanceId, cancelled: false, cancelPending: false };
           restoreRunRef.current = restoreRun;
           const isCurrent = () => restoreRunRef.current === restoreRun && !restoreRun.cancelled;
+          // ED-AUDIT-013: app-clock restore milestones for the performance
+          // contract (request -> active ready -> all ready). activeReady
+          // marks the active-open drain; the case proves editability with a
+          // real keystroke right after, and the completion line below lands
+          // in the run console artifact for aggregation. Durations derive
+          // from these marks, never from runner step timings.
+          const restoreTimings = createRestoreTimingRecorder(
+            plan.activeTargets.length,
+            plan.backgroundTargets.length,
+          );
+          restoreTimings.markRequested();
 
           // Restore active group selection
           if (plan.activeGroupId) {
@@ -3441,8 +3534,19 @@ export function CodeWorkspaceTab({
               isCurrent,
             }),
             3,
-          ).then(() => {
-            if (plan.backgroundTargets.length === 0) return [];
+          ).then((activeOutcomes) => {
+            restoreTimings.markActiveReady();
+            if (!isCurrent()) restoreTimings.markCancelled();
+            if (plan.backgroundTargets.length === 0) {
+              restoreTimings.markAllReady();
+              console.log(`[restore-timings] ${JSON.stringify({
+                workspaceInstanceId,
+                ...restoreTimings.toJSON(),
+                activeSettled: activeOutcomes.length,
+                backgroundSettled: 0,
+              })}`);
+              return [];
+            }
             return executeBoundedAsyncQueue(
               plan.backgroundTargets,
               (target) => openFile(target.ref, {
@@ -3453,7 +3557,17 @@ export function CodeWorkspaceTab({
                 isCurrent,
               }),
               3,
-            );
+            ).then((backgroundOutcomes) => {
+              restoreTimings.markAllReady();
+              if (!isCurrent()) restoreTimings.markCancelled();
+              console.log(`[restore-timings] ${JSON.stringify({
+                workspaceInstanceId,
+                ...restoreTimings.toJSON(),
+                activeSettled: activeOutcomes.length,
+                backgroundSettled: backgroundOutcomes.length,
+              })}`);
+              return backgroundOutcomes;
+            });
           });
           return;
         }
@@ -3499,6 +3613,7 @@ export function CodeWorkspaceTab({
         editorGroups: persistableGroups,
         layoutTreeV2: workspaceUi.layoutTreeV2,
         tabPolicy: tabPolicyRef.current,
+        viewStates: viewStatesRef.current,
       }), {
         // §8.17.4 step 3: persistence refusals surface as a recovery
         // diagnostic, not only a console line.
@@ -3520,6 +3635,7 @@ export function CodeWorkspaceTab({
     workspaceInstanceId,
     workspaceUi.layoutTreeV2,
     tabPolicyRevision,
+    viewStateRevision,
   ]);
 
   const applyFileActionResourceOperation = useCallback((
@@ -4064,6 +4180,9 @@ export function CodeWorkspaceTab({
       savedText: nextSavedText,
       dirty: calculatedDirty,
       documentRevision: nextRevision,
+      // ED-AUDIT-008: only a history replay marks the snapshot as a restore;
+      // the explicit assignment also clears a stale flag carried by `current`.
+      historyReplay: reason === "history-replay",
     };
 
     openFilesRef.current = { ...openFilesRef.current, [key]: next };
@@ -4231,6 +4350,69 @@ export function CodeWorkspaceTab({
     if (!root) return null;
     return absoluteWorkspacePath(root, file.ref.path);
   }, [findRoot]);
+  /**
+   * ED-FOLLOW-003: path-keyed open-buffer view for buildRefactorPlan.
+   * The live openFiles map is keyed by file key (`root:<id>:<path>`), which
+   * matchOpenFile can never resolve — passing it straight through silently
+   * disabled every open-buffer plan guard (dirty edits, revision skew). The
+   * view re-keys by absolute path and file URI so the guards see the
+   * buffers. Deliberately narrow: only staleness/dirty signals ride it
+   * (documentRevision, LSP revision, dirty, library). Buffer text and disk
+   * hashes stay out so the plan's hash machinery keeps its current
+   * snapshot-driven semantics (notably the EOL-tolerant journal path).
+   *
+   * Revision is reported only while the server has NOT acknowledged the
+   * latest buffer text (isLspDocumentSynced false). documentRevision bumps
+   * per edit while the sync version bumps per flushed didChange, so a
+   * coalesced burst always skews the counters even though the server holds
+   * the latest text — reporting the raw version would false-positive every
+   * rename after any typing burst. Omitting it when synced makes the plan
+   * guard mean exactly "the server has not seen the latest bytes".
+   */
+  const buildPlanOpenFiles = useCallback((): Record<string, {
+    documentRevision?: number;
+    revision?: number;
+    canonicalPath?: string;
+    dirty?: boolean;
+    library?: unknown;
+  }> => {
+    const view: Record<string, {
+      documentRevision?: number;
+      revision?: number;
+      canonicalPath?: string;
+      dirty?: boolean;
+      library?: unknown;
+    }> = {};
+    for (const file of Object.values(openFilesRef.current)) {
+      if (file.loading) continue;
+      const absolutePath = absolutePathForOpenFile(file);
+      if (!absolutePath) continue;
+      const normalized = normalizeFsPath(absolutePath);
+      const entry: {
+        documentRevision?: number;
+        revision?: number;
+        canonicalPath?: string;
+        dirty?: boolean;
+        library?: unknown;
+      } = {
+        documentRevision: file.documentRevision,
+        canonicalPath: normalized,
+        dirty: file.dirty === true,
+      };
+      if (!isLspDocumentSynced(file.key, file.text)) {
+        const syncedRevision = lspDocumentVersion(file.key);
+        if (syncedRevision !== null && syncedRevision !== undefined) {
+          entry.revision = syncedRevision;
+        }
+      }
+      if (file.library != null) {
+        entry.library = file.library;
+      }
+      view[normalized] = entry;
+      view[`file://${normalized}`] = entry;
+    }
+    return view;
+  }, [absolutePathForOpenFile, isLspDocumentSynced, lspDocumentVersion]);
   const inspectionPathForFileKey = useCallback((fileKeyValue: string): string => {
     const open = openFilesRef.current[fileKeyValue];
     const ref = open?.ref;
@@ -5570,6 +5752,8 @@ export function CodeWorkspaceTab({
       encoding?: string;
       bom?: boolean;
     },
+    /** ED-IMPROVE-002: observes the shared committer's typed result. */
+    onCommitResult?: (result: SaveCommitResult) => void,
   ): Promise<WorkspaceFile | null> => {
     const file = openFilesRef.current[key];
     if (!file || file.loading) {
@@ -5611,6 +5795,7 @@ export function CodeWorkspaceTab({
     });
 
     const result = await commitOpenBufferPreparedSave(prepared);
+    onCommitResult?.(result);
     if (result.diskEffect === "committed") return result.file;
     return null;
   }, [
@@ -6085,10 +6270,15 @@ export function CodeWorkspaceTab({
     });
     refreshTree();
     if (!file) {
+      // ED-AUDIT-014: a closed file we just restore-wrote echoes back
+      // through the watcher; skip only the misleading status note.
+      if (restoreEchoSuppressorRef.current.shouldSuppress(fsPathComparisonKey(normalizedPath))) return;
       setStatusMessage(`File changed on disk: ${change.path}`);
       return;
     }
-    if (file.library || file.saving) return;
+    if (file.library || file.saving) {
+      return;
+    }
     if (change.type === 3) {
       if (file.dirty) {
         enqueueExternalFileConflict(file, null);
@@ -8059,10 +8249,11 @@ export function CodeWorkspaceTab({
     (match: WorkspaceSearchMatch, options: { preview: boolean }) => {
       const ref: CodeWorkspaceFileRef = { kind: "root", rootId: match.rootId, path: match.path };
       // Backend line numbers are 1-based; reveal targets follow LSP 0-based.
+      // ED-IMPROVE-004: backend offsets are code points, reveal ranges are UTF-16.
       const line = Math.max(0, match.lineNumber - 1);
       revealEditorLocation(fileKey(ref), {
-        start: { line, character: match.matchStart },
-        end: { line, character: match.matchEnd },
+        start: { line, character: codePointOffsetToUtf16Offset(match.lineText, match.matchStart) },
+        end: { line, character: codePointOffsetToUtf16Offset(match.lineText, match.matchEnd) },
       });
       void openFile(ref, { preview: options.preview });
     },
@@ -8666,9 +8857,14 @@ export function CodeWorkspaceTab({
     /** Restrict provider edits to the opened workspace roots. */
     semanticWorkspaceOnly?: boolean;
     /** Optional refactoring plan with completeness, conflicts, and required groups. */
-    plan?: RefactorPlanV3;
+    plan?: RefactorPlanV3 | WorkspaceEditRecoveryPlan;
     /** Canonical transaction guard, invoked after preview and immediately before mutation. */
     preflightMutation?: () => Promise<void> | void;
+    /**
+     * ED-IMPROVE-002: structured transaction facts (effect, postcondition,
+     * history/recovery identity) reported by the shell's apply owner.
+     */
+    onTransactionSummary?: (summary: WorkspaceEditApplyTransactionSummary) => void;
     /** Reports the exact edit selected by the preview dialog. */
     onActiveEditResolved?: (edit: LspWorkspaceEdit) => void;
   };
@@ -8690,6 +8886,11 @@ export function CodeWorkspaceTab({
     // §8.19.1: the edit actually applied after preview filtering drives any
     // resume slicing — never the pre-confirmation original.
     let resolvedEdit = edit;
+    // ED-AUDIT-014: the v2 recovery journal is prepared once per apply run,
+    // inside preflightMutation — after preview confirmation, before the first
+    // mutation — and its typed persistence result gates the transaction.
+    // Held in a holder object because the assignment happens inside a closure.
+    const preparedJournalRef: { current: RefactorRecoveryJournalEntryV2 | null } = { current: null };
     const buildHooks = (allowPreview: boolean): WorkspaceEditApplyHooks => ({
       resolvePath: (file) => {
         if (file.path) return normalizeFsPath(file.path);
@@ -8711,10 +8912,39 @@ export function CodeWorkspaceTab({
         }
         return null;
       },
-      applyToOpenBuffer: (key, nextText) => updateFileText(key, nextText),
+      applyToOpenBuffer: (key, nextText) => {
+        // ED-AUDIT-008: a restore replaying through this funnel must not
+        // create a second undoable document entry beside the journal
+        // transaction that owns the change, so its buffer write is recorded
+        // as a history replay (see replayWorkspaceRestoreRef).
+        if (replayWorkspaceRestoreRef.current) {
+          mutateOpenBuffer(key, { text: nextText, error: null }, "history-replay");
+          return;
+        }
+        updateFileText(key, nextText);
+      },
       // §5.2.9 open-clean: apply then save so the buffer is not left dirty.
+      // ED-AUDIT-003: the shared committer reports a failed or cancelled disk
+      // write as a typed result (null here), not a rejection. The applier
+      // contract is Promise<void>, so the only truthful failure signal is a
+      // throw — otherwise a readonly or conflicted save would be recorded as
+      // a phantom "applied-open" and the workspace-edit report would claim a
+      // completion the disk never reached. The buffer keeps the applied text,
+      // its dirty flag and the committer's error message for in-editor
+      // recovery.
       saveOpenBuffer: async (key, nextText) => {
-        await saveOpenBufferText(key, nextText);
+        const commitResult: { current: SaveCommitResult | null } = { current: null };
+        const saved = await saveOpenBufferText(key, nextText, undefined, (result) => {
+          commitResult.current = result;
+        });
+        if (!saved) {
+          const error = openFilesRef.current[key]?.error;
+          const message = error || `save did not commit for open buffer ${key}`;
+          throw new WorkspaceEditOpenBufferSaveFailure(
+            message,
+            commitResult.current?.diskEffect === "unknown" ? "unknown" : "none",
+          );
+        }
       },
       readDisk: async (absolutePath) => {
         // Prefer workspace APIs via root-relative path when possible.
@@ -8809,7 +9039,7 @@ export function CodeWorkspaceTab({
                     label: options.label?.trim() || preview.label,
                   },
                   originalEdit: edit,
-                  plan: options.plan,
+                  plan: options.plan && "operations" in options.plan ? options.plan : undefined,
                   resolve,
                 });
               });
@@ -8826,19 +9056,66 @@ export function CodeWorkspaceTab({
         : undefined,
       preflightMutation: options.preflightMutation
         || (options.semanticGeneration != null && options.semanticRevision != null)
+        || options.plan
         ? async () => {
           await options.preflightMutation?.();
-          if (options.semanticGeneration == null || options.semanticRevision == null) return;
-          const current = semanticIndex.current();
-          const semanticToken = {
-            generation: options.semanticGeneration!,
-            revision: options.semanticRevision!,
-          };
-          const valid = options.semanticRequireReady === false
-            ? current.revision === semanticToken.revision
-            : workspaceSemanticIndexBuildIsCurrent(current, semanticToken);
-          if (!valid) {
-            throw new Error("Semantic result became stale before changes were applied; run the action again");
+          if (options.semanticGeneration == null || options.semanticRevision == null) {
+            // fall through to journal preparation below
+          } else {
+            const current = semanticIndex.current();
+            const semanticToken = {
+              generation: options.semanticGeneration!,
+              revision: options.semanticRevision!,
+            };
+            const valid = options.semanticRequireReady === false
+              ? current.revision === semanticToken.revision
+              : workspaceSemanticIndexBuildIsCurrent(current, semanticToken);
+            if (!valid) {
+              throw new Error("Semantic result became stale before changes were applied; run the action again");
+            }
+          }
+          // ED-AUDIT-014: prepare the v2 recovery journal before the first
+          // mutation. A persistence failure aborts the whole transaction with
+          // zero writes; a text target without a preimage does the same.
+          if (options.plan && options.recordHistory !== false && beforeSnapshots && !preparedJournalRef.current) {
+            const preImages: RefactorRecoveryPreImageV2[] = [];
+            for (const operation of workspaceEditOperations(resolvedEdit)) {
+              if (operation.kind !== "text") continue;
+              const targetPath = operation.document.path ? normalizeFsPath(operation.document.path) : null;
+              const snapshot = targetPath
+                ? beforeSnapshots.find((candidate) => fsPathEquals(candidate.path, targetPath))
+                : undefined;
+              if (!snapshot || snapshot.text === null) continue;
+              preImages.push({
+                uri: operation.document.uri,
+                canonicalPath: snapshot.path,
+                preText: snapshot.text,
+                encoding: snapshot.encoding,
+                bom: snapshot.bom,
+                eol: snapshot.eol ?? null,
+              });
+            }
+            const preparation = prepareRefactorRecoveryJournalV2({
+              plan: options.plan,
+              edit: resolvedEdit,
+              preImages,
+              workspaceRoot: rootsRef.current[0]?.path ?? "",
+              transactionId: applyTransactionId,
+            });
+            if (preparation.state === "incomplete") {
+              throw new Error(preparation.reason);
+            }
+            if (preparation.state === "prepared") {
+              const writeResult = recordRefactorRecoveryJournalV2(preparation.entry);
+              if (!writeResult.ok) {
+                throw new Error(
+                  `Refactor recovery journal could not be persisted, no changes were applied. `
+                    + `Retry the action. Reason: ${writeResult.reason}`,
+                );
+              }
+              preparedJournalRef.current = preparation.entry;
+            }
+            // "unsupported" (resource operations) keeps the explicit no-recovery boundary.
           }
         }
         : undefined,
@@ -8856,13 +9133,15 @@ export function CodeWorkspaceTab({
         options.onActiveEditResolved?.(activeEdit);
       },
     });
+    // ED-AUDIT-014: the transaction id exists before the first apply pass so
+    // the prepared recovery journal and the effect ledger share one identity.
+    const applyTransactionId = nextSaveTransactionId("tx-wedit");
     let outcomes = await applyWorkspaceEdit(edit, buildHooks(true));
     let allOutcomes = [...outcomes];
     // §8.19.1: per-operation effect ledger with an explicit resume boundary.
     // A partial run stops at the failed operation; the user may re-run the
     // unapplied suffix, and every remaining text operation re-validates its
     // disk hash / open-buffer version before writing.
-    const applyTransactionId = nextSaveTransactionId("tx-wedit");
     const historySafePaths = new Set(
       (beforeSnapshots ?? [])
         .filter((snapshot) => snapshot.exists && snapshot.text !== null)
@@ -8882,6 +9161,11 @@ export function CodeWorkspaceTab({
         applyResult.disposition === "partial"
         && applyResult.nextOperationIndex !== null
         && options.recordHistory !== false
+        // ED-IMPROVE-002: never auto-retry a boundary whose OS result is
+        // unproven; the recovery center owns the file until it is resolved.
+        && !allOutcomes.some((outcome) => (
+          outcome.status === "failed" && outcome.diskEffect === "unknown"
+        ))
       ) {
         // Bounded resume loop; each pass re-applies only the unapplied suffix.
         for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -8915,12 +9199,50 @@ export function CodeWorkspaceTab({
         allOutcomes.flatMap((outcome) => outcome.status.startsWith("applied") ? [outcome.path] : []),
       );
     }
+    // ED-IMPROVE-002: one structured summary per apply run. The effect axis is
+    // independent of the execution status: `unknown` marks a write whose OS
+    // result could not be proven even though the operation reported failure.
+    const appliedEffectPaths = allOutcomes
+      .filter((outcome) => outcome.status.startsWith("applied"))
+      .map((outcome) => outcome.path);
+    const hasFailedOperation = allOutcomes.some((outcome) => (
+      outcome.status === "failed" || outcome.status === "skipped"
+    ));
+    const hasUnknownDiskEffect = allOutcomes.some((outcome) => (
+      outcome.status === "failed" && outcome.diskEffect === "unknown"
+    ));
+    const transactionEffect: WorkspaceEditApplyTransactionSummary["effect"] = hasUnknownDiskEffect
+      ? "unknown"
+      : appliedEffectPaths.length === 0
+        ? "none"
+        : hasFailedOperation
+          ? "partial"
+          : "performed";
+    let historyEntryId: string | null = null;
+    const emitTransactionSummary = (
+      postcondition: WorkspaceEditApplyTransactionSummary["postcondition"],
+      recoveryId: string | null,
+    ): void => {
+      const failedOutcomes = allOutcomes.filter((outcome) => outcome.status === "failed");
+      const reason = failedOutcomes.find((outcome) => outcome.diskEffect === "unknown")?.reason
+        ?? failedOutcomes[0]?.reason
+        ?? null;
+      options.onTransactionSummary?.({
+        effect: transactionEffect,
+        postcondition,
+        historyId: historyEntryId,
+        recoveryId,
+        affectedPaths: appliedEffectPaths,
+        reason,
+      });
+    };
     let historyUnavailable = options.recordHistory !== false
       && orderedOperations.length > 0
       && beforeSnapshots === null
       && mutated;
+    let afterSnapshots: WorkspaceEditPathSnapshot[] | null = null;
     if (beforeSnapshots && mutated) {
-      const afterSnapshots = await captureWorkspaceEditPathSnapshots(edit);
+      afterSnapshots = await captureWorkspaceEditPathSnapshots(edit);
       if (!afterSnapshots) historyUnavailable = true;
       const afterBookmarks = afterSnapshots
         ? captureWorkspaceEditBookmarkSnapshot(afterSnapshots.map((snapshot) => snapshot.path))
@@ -8932,37 +9254,110 @@ export function CodeWorkspaceTab({
         || snapshot.encoding !== beforeSnapshots[index]?.encoding
         || snapshot.bom !== beforeSnapshots[index]?.bom
       ));
-      if (afterSnapshots && changed) {
-        if (options.plan) {
-          const actualPostTexts: Record<string, string> = {};
-          for (const s of afterSnapshots) {
-            if (s.text !== null) actualPostTexts[s.path] = s.text;
-          }
-          const postHashCheck = verifyRefactorPostHashes(options.plan, actualPostTexts);
-          if (!postHashCheck.allMatched) {
-            console.warn("[refactor] Post-refactor hash mismatch detected:", postHashCheck.mismatches);
-          }
-          const preTexts: Record<string, string> = {};
-          for (const s of beforeSnapshots) {
-            if (s.text !== null) preTexts[s.path] = s.text;
-          }
-          const recoveryEntry = buildRefactorRecoveryJournalEntry(
-            options.plan,
-            preTexts,
-            rootsRef.current[0]?.path ?? "",
-          );
-          if (recoveryEntry) {
-            recoveryEntry.status = "committed";
-            recordRefactorRecoveryJournal(recoveryEntry);
+      // ED-AUDIT-014: finalize the prepared journal against the real
+      // post-state before any success is reported or history registered.
+      // Every journalled document (open buffers and closed disk files alike)
+      // is verified; a mismatch or unreadable post-state marks the entry
+      // recovery-required, lists every applied effect, and never registers
+      // the normal success history.
+      let recoveryMessage: string | null = null;
+      const preparedJournal = preparedJournalRef.current;
+      if (preparedJournal) {
+        const actualPostTexts: Record<string, string> = {};
+        for (const snapshot of afterSnapshots ?? []) {
+          if (snapshot.text !== null) actualPostTexts[snapshot.path] = snapshot.text;
+        }
+        // ED-FOLLOW-001: a journal document addressed to a pre-move path
+        // verifies against the moved-home... post-move bytes at the new
+        // path. Without this alias every rename transaction would fail its
+        // own postcondition even though the move applied exactly as planned.
+        for (const move of preparedJournal.resourceMoves ?? []) {
+          if (!move.oldPath || !move.newPath) continue;
+          const movedText = actualPostTexts[move.newPath];
+          if (movedText !== undefined && actualPostTexts[move.oldPath] === undefined) {
+            actualPostTexts[move.oldPath] = movedText;
           }
         }
+        const journalMismatches = preparedJournal.documents.flatMap((doc) => {
+          const target = doc.canonicalPath || doc.uri;
+          const actual = actualPostTexts[target];
+          if (actual === undefined) {
+            return [{ uri: doc.uri, path: target, unreadable: true }];
+          }
+          return refactorJournalPostImageMatches(doc, actual)
+            ? []
+            : [{ uri: doc.uri, path: target, unreadable: false }];
+        });
+        const postHashCheck = options.plan
+          ? verifyRefactorPostHashes(options.plan, actualPostTexts)
+          : { allMatched: true, mismatches: [], verifiedDocuments: 0 };
+        const failureBoundaryIndex = allOutcomes.find((outcome) => (
+          outcome.operationIndex !== null
+          && (outcome.status === "failed" || outcome.status === "skipped")
+        ))?.operationIndex ?? null;
+        if (!afterSnapshots || journalMismatches.length > 0 || !postHashCheck.allMatched) {
+          const mismatchedPaths = Array.from(new Set([
+            ...journalMismatches.map((mismatch) => mismatch.path),
+            ...postHashCheck.mismatches.map((mismatch) => {
+              const doc = options.plan?.documents.find((candidate) => candidate.uri === mismatch.uri);
+              return doc?.canonicalPath ?? mismatch.uri;
+            }),
+          ]));
+          const appliedEffects = allOutcomes
+            .filter((outcome) => outcome.status.startsWith("applied"))
+            .map((outcome) => outcome.path);
+          const reason = !afterSnapshots
+            ? "post-state could not be read"
+            : `mismatch on ${mismatchedPaths.join(", ")}`;
+          updateRefactorRecoveryJournalV2(preparedJournal.recoveryId, (entry) => ({
+            ...entry,
+            status: "recovery-required",
+            appliedOperationIndex: failureBoundaryIndex,
+            verification: {
+              mismatchedUris: Object.freeze([
+                ...journalMismatches.map((mismatch) => mismatch.uri),
+                ...postHashCheck.mismatches.map((mismatch) => mismatch.uri),
+              ]),
+              checkedAt: Date.now(),
+            },
+          }));
+          console.warn("[refactor] Post-refactor postcondition failure detected:", {
+            journalMismatches,
+            planMismatches: postHashCheck.mismatches,
+          });
+          recoveryMessage = `Refactor postcondition failed (${reason}); recovery required. `
+            + `Applied changes on: ${appliedEffects.length > 0 ? appliedEffects.join(", ") : "none"}. `
+            + `Undo was not registered; the pending recovery entry lists every affected file.`;
+        } else {
+          updateRefactorRecoveryJournalV2(preparedJournal.recoveryId, (entry) => ({
+            ...entry,
+            status: "committed",
+            appliedOperationIndex: null,
+            verification: { mismatchedUris: Object.freeze([]), checkedAt: Date.now() },
+          }));
+        }
+      }
+      if (recoveryMessage !== null) {
+        setStatusMessage(recoveryMessage);
+        emitTransactionSummary(
+          afterSnapshots ? "mismatch" : "unreadable",
+          preparedJournalRef.current?.recoveryId ?? null,
+        );
+        return outcomes;
+      }
+      if (afterSnapshots && changed) {
+        const afterSnapshotList = afterSnapshots;
         const affectedBookmarkIds = Array.from(new Set([
           ...(beforeBookmarks ?? []).map((bookmark) => bookmark.id),
           ...(afterBookmarks ?? []).map((bookmark) => bookmark.id),
         ]));
         const afterTabs = captureWorkspaceEditTabSnapshot(
-          afterSnapshots.map((snapshot) => snapshot.path),
+          afterSnapshotList.map((snapshot) => snapshot.path),
         );
+        // ED-AUDIT-014: plan-gated undo verifies the live state still matches
+        // the recorded post-state; later user edits (disk or open buffer)
+        // block the undo instead of being overwritten.
+        const planUndoPaths = options.plan ? afterSnapshotList : null;
         workspaceEditHistorySequenceRef.current += 1;
         const label = options.label?.trim() || "Workspace edit";
         const entry: WorkspaceEditHistoryEntry = {
@@ -8970,24 +9365,69 @@ export function CodeWorkspaceTab({
           label,
           affectedPaths: beforeSnapshots.map((snapshot) => snapshot.path),
           undo: async () => {
+            if (planUndoPaths) {
+              const currentTexts: Record<string, string> = {};
+              for (const snapshot of planUndoPaths) {
+                const current = await readWorkspaceEditPathSnapshot(snapshot.path);
+                if (current && current.text !== null) currentTexts[snapshot.path] = current.text;
+              }
+              const precondition = workspaceEditUndoPrecondition(planUndoPaths, currentTexts);
+              if (precondition.blocked) {
+                throw new Error(`Undo blocked to protect later edits: ${precondition.reasons.join("; ")}`);
+              }
+            }
             await replayWorkspacePathSnapshotsRef.current(beforeSnapshots);
             restoreWorkspaceBookmarkSnapshot(beforeBookmarks ?? [], affectedBookmarkIds);
             if (beforeTabs) await restoreWorkspaceEditTabs(beforeTabs);
           },
           redo: async () => {
-            await replayWorkspacePathSnapshotsRef.current(afterSnapshots);
+            await replayWorkspacePathSnapshotsRef.current(afterSnapshotList);
             restoreWorkspaceBookmarkSnapshot(afterBookmarks ?? [], affectedBookmarkIds);
             await restoreWorkspaceEditTabs(afterTabs);
           },
         };
         workspaceEditHistory.push(entry);
         setWorkspaceEditHistoryRevision((revision) => revision + 1);
+        historyEntryId = entry.id;
+      }
+    } else {
+      const preparedJournal = preparedJournalRef.current;
+      if (preparedJournal) {
+        if (hasUnknownDiskEffect) {
+          // ED-IMPROVE-002: a failed operation whose OS result could not be
+          // proven must not close the journal as a no-op. Keep the preimages
+          // discoverable for recovery.
+          updateRefactorRecoveryJournalV2(preparedJournal.recoveryId, (entry) => ({
+            ...entry,
+            status: "recovery-required",
+            verification: {
+              mismatchedUris: Object.freeze(
+                allOutcomes
+                  .filter((outcome) => outcome.status === "failed" && outcome.diskEffect === "unknown")
+                  .map((outcome) => outcome.path),
+              ),
+              checkedAt: Date.now(),
+            },
+          }));
+        } else {
+          // Nothing mutated: postconditions hold trivially; close the journal
+          // so no pending entry lingers for a no-op transaction.
+          updateRefactorRecoveryJournalV2(preparedJournal.recoveryId, (entry) => ({
+            ...entry,
+            status: "committed",
+            verification: { mismatchedUris: Object.freeze([]), checkedAt: Date.now() },
+          }));
+        }
       }
     }
     setStatusMessage([
       summarizeWorkspaceEditOutcomes(outcomes),
       historyUnavailable ? "Undo unavailable: workspace resource snapshot is incomplete" : null,
     ].filter(Boolean).join("; "));
+    emitTransactionSummary(
+      !mutated ? "not-applied" : afterSnapshots === null ? "unreadable" : "verified",
+      !mutated && hasUnknownDiskEffect ? preparedJournalRef.current?.recoveryId ?? null : null,
+    );
     return outcomes;
   }, [
     absolutePathForOpenFile,
@@ -8999,6 +9439,8 @@ export function CodeWorkspaceTab({
     formatWorkspaceEditPreview,
     isLspDocumentSynced,
     lspDocumentVersion,
+    mutateOpenBuffer,
+    readWorkspaceEditPathSnapshot,
     refreshTree,
     saveOpenBufferText,
     setStatusMessage,
@@ -9033,13 +9475,20 @@ export function CodeWorkspaceTab({
         ]),
     );
     try {
-      const outcomes = await applyLspWorkspaceEditNow(
-        buildWorkspacePathSnapshotEdit(currentSnapshots, snapshots),
-        { recordHistory: false },
-      );
-      const response = workspaceEditApplyResponse(outcomes);
-      if (!response.applied) {
-        throw new Error(response.failureReason ?? "Workspace history replay failed");
+      // ED-AUDIT-008: open-buffer writes inside this replay are restores, not
+      // fresh edits — the journal transaction owns their history.
+      replayWorkspaceRestoreRef.current = true;
+      try {
+        const outcomes = await applyLspWorkspaceEditNow(
+          buildWorkspacePathSnapshotEdit(currentSnapshots, snapshots),
+          { recordHistory: false },
+        );
+        const response = workspaceEditApplyResponse(outcomes);
+        if (!response.applied) {
+          throw new Error(response.failureReason ?? "Workspace history replay failed");
+        }
+      } finally {
+        replayWorkspaceRestoreRef.current = false;
       }
     } finally {
       replayWorkspaceEncodingRef.current = null;
@@ -9054,6 +9503,223 @@ export function CodeWorkspaceTab({
     workspaceEditQueueRef.current = pending.then(() => undefined, () => undefined);
     return pending;
   }, [applyLspWorkspaceEditNow]);
+
+  // ED-AUDIT-014: pending refactor recovery entries are surfaced through the
+  // existing confirmation workflow when the workspace becomes ready. The
+  // runner is held in a ref because it closes over callbacks defined above.
+  const refactorRecoveryPromptRef = useRef<(
+    (entry: RefactorRecoveryJournalEntryV2, ownerInstanceId: string) => Promise<void>
+  ) | null>(null);
+  const handledRefactorRecoveryIdsRef = useRef<Set<string>>(new Set());
+  const handledRefactorRecoveryOwnerRef = useRef<string | null>(null);
+
+  const promptRefactorRecoveryEntry = useCallback(async (
+    entry: RefactorRecoveryJournalEntryV2,
+    ownerInstanceId: string,
+  ): Promise<void> => {
+    const released = () => workspaceInstanceIdRef.current !== ownerInstanceId;
+    const documentList = entry.documents
+      .map((doc) => doc.canonicalPath ?? doc.uri);
+    // ED-FOLLOW-001: journalled file moves are listed alongside the text
+    // documents so the pending entry honestly describes the relocation the
+    // restore will reverse.
+    const moveList = (entry.resourceMoves ?? [])
+      .filter((move) => move.oldPath && move.newPath)
+      .map((move) => `${move.oldPath} → ${move.newPath} (moved back on restore)`);
+    const resourceList = [...documentList, ...moveList].join("\n");
+    const review = await confirmAppDialog({
+      title: "Refactor recovery pending",
+      message: `A previous ${entry.kind} transaction was interrupted or failed its postcondition check. Affected files:\n${resourceList}\n\nReview the pending recovery entry?`,
+      confirmLabel: "Review recovery",
+    });
+    if (released() || !review) return;
+    const preconditions = await classifyRefactorRecoveryPreconditions(entry, async (path) => {
+      const snapshot = await readWorkspaceEditPathSnapshot(path);
+      return snapshot && snapshot.text !== null ? { text: snapshot.text } : null;
+    }, {
+      // ED-FOLLOW-001: move endpoints need existence distinct from
+      // readability (a missing old path is the expected restorable state,
+      // not an unreadable file).
+      pathExists: async (path) => {
+        const snapshot = await readWorkspaceEditPathSnapshot(path);
+        return snapshot === null ? null : snapshot.exists;
+      },
+    });
+    if (released()) return;
+    if (preconditions.overall === "already-restored") {
+      updateRefactorRecoveryJournalV2(entry.recoveryId, (current) => ({
+        ...current,
+        status: "rolled-back",
+        verification: { mismatchedUris: Object.freeze([]), checkedAt: Date.now() },
+      }));
+      setStatusMessage("Refactor recovery: every affected file already matches its pre-refactor content; entry closed.");
+      return;
+    }
+    if (preconditions.overall === "conflict" || preconditions.overall === "unreadable") {
+      const blocked = preconditions.documents.filter((doc) => (
+        doc.state === "conflict" || doc.state === "unreadable"
+      ));
+      await confirmAppDialog({
+        title: "Refactor recovery blocked",
+        message: `These files changed since the transaction and will not be overwritten:\n${
+          blocked.map((doc) => `${doc.canonicalPath ?? doc.uri} (${doc.state})`).join("\n")
+        }\n\nThe pending entry is kept; resolve the files externally and reopen the workspace to retry.`,
+        confirmLabel: "Keep pending",
+      });
+      return;
+    }
+    const restore = await confirmAppDialog({
+      title: "Restore pre-refactor content",
+      message: `Restore ${entry.documents.length} file(s) to their pre-refactor content`
+        + `${moveList.length > 0 ? ` and move ${moveList.length} relocated file(s) back` : ""}?\n${resourceList}`,
+      confirmLabel: "Restore files",
+    });
+    if (released() || !restore) return;
+    const execution = await executeRefactorRecovery(entry, preconditions, {
+      restoreText: async (doc) => {        const targetPath = doc.canonicalPath || doc.uri;
+        const current = await readWorkspaceEditPathSnapshot(targetPath);
+        if (!current || !current.exists || current.text === null) {
+          throw new Error(`Cannot restore ${targetPath}: current content unreadable`);
+        }
+        // Re-verify immediately before writing: content changed between the
+        // classification and this write is never overwritten.
+        const currentHash = sha256Hex(current.text);
+        if (currentHash === doc.preHash) return; // already restored; read-back confirms
+        if (currentHash !== doc.postHash) {
+          throw new Error(`${targetPath}: content changed during recovery; file left untouched`);
+        }
+        replayWorkspaceEncodingRef.current = new Map([
+          [fsPathComparisonKey(targetPath), {
+            encoding: doc.encoding,
+            bom: doc.bom,
+            eol: doc.eol ?? undefined,
+          }],
+        ]);
+        try {
+          // ED-AUDIT-008: recovery restores are journal-owned history too.
+          replayWorkspaceRestoreRef.current = true;
+          try {
+            await applyLspWorkspaceEditNow(
+              buildWorkspacePathSnapshotEdit(
+                [current],
+                [{
+                  path: targetPath,
+                  exists: true,
+                  text: doc.preText,
+                  encoding: doc.encoding,
+                  bom: doc.bom,
+                  eol: doc.eol ?? undefined,
+                }],
+              ),
+              { recordHistory: false },
+            );
+            // ED-AUDIT-014: the watcher will echo this own-write back for
+            // closed files; mark it so the echo does not clobber the
+            // restore-complete status set after all writes settle.
+            restoreEchoSuppressorRef.current.markRestored(fsPathComparisonKey(targetPath));
+          } finally {
+            replayWorkspaceRestoreRef.current = false;
+          }
+        } finally {
+          replayWorkspaceEncodingRef.current = null;
+        }
+      },
+      readBack: async (doc) => {
+        const snapshot = await readWorkspaceEditPathSnapshot(doc.canonicalPath || doc.uri);
+        return snapshot && snapshot.text !== null ? { text: snapshot.text } : null;
+      },
+      // ED-FOLLOW-001: reverse one journalled file move (new path back to
+      // the old path) through the same resource-operation path the forward
+      // move used, so locks, buffer remapping, and tree refresh all apply.
+      reverseResourceMove: async (move) => {
+        if (!move.oldPath || !move.newPath) {
+          throw new Error("Journalled move has no resolvable path pair");
+        }
+        await applyLspResourceOperation({
+          kind: "rename",
+          oldUri: move.newUri,
+          oldPath: move.newPath,
+          newUri: move.oldUri,
+          newPath: move.oldPath,
+          overwrite: false,
+          ignoreIfExists: false,
+          annotationId: null,
+        });
+        refreshTree();
+        // The reversal's own watcher echo must not clobber the
+        // restore-complete status (same rationale as the 014 suppressor).
+        restoreEchoSuppressorRef.current.markRestored(fsPathComparisonKey(move.oldPath));
+        restoreEchoSuppressorRef.current.markRestored(fsPathComparisonKey(move.newPath));
+      },
+      pathExists: async (path) => {
+        const snapshot = await readWorkspaceEditPathSnapshot(path);
+        if (snapshot === null) throw new Error(`Cannot stat ${path}: not a regular file`);
+        return snapshot.exists;
+      },
+      readMoveText: async (path) => {
+        const snapshot = await readWorkspaceEditPathSnapshot(path);
+        return snapshot && snapshot.text !== null ? { text: snapshot.text } : null;
+      },
+    });
+    if (released()) return;
+    if (execution.state === "rolled-back") {
+      updateRefactorRecoveryJournalV2(entry.recoveryId, (current) => ({
+        ...current,
+        status: "rolled-back",
+        verification: {
+          mismatchedUris: Object.freeze([]),
+          checkedAt: Date.now(),
+          reversedMoves: Object.freeze([...execution.reversedMoves]),
+        },
+      }));
+      setStatusMessage(
+        `Refactor recovery complete: restored ${execution.restoredUris.length}, `
+          + `already restored ${execution.skippedUris.length}`
+          + `${execution.reversedMoves.length > 0 ? `, moved back ${execution.reversedMoves.length}` : ""}`
+          + `${execution.contentUnverifiedMoves.length > 0 ? ` (${execution.contentUnverifiedMoves.length} move(s) without a content proof)` : ""}.`,
+      );
+      return;
+    }
+    const problems = [
+      ...execution.conflicts.map((conflict) => `${conflict.canonicalPath ?? conflict.uri}: third-party content (not overwritten)`),
+      ...execution.failures.map((failure) => `${failure.canonicalPath ?? failure.uri}: ${failure.reason}`),
+      ...execution.moveConflicts.map((conflict) => `${conflict.newUri}: ${conflict.reason}`),
+      ...execution.moveFailures.map((failure) => `${failure.newUri}: ${failure.reason}`),
+    ];
+    await confirmAppDialog({
+      title: "Refactor recovery incomplete",
+      message: `Restored ${execution.restoredUris.length} of ${entry.documents.length} file(s). Pending entry kept:\n${problems.join("\n")}`,
+      confirmLabel: "Keep pending",
+    });
+  }, [applyLspResourceOperation, applyLspWorkspaceEditNow, readWorkspaceEditPathSnapshot, refreshTree, setStatusMessage]);
+  refactorRecoveryPromptRef.current = promptRefactorRecoveryEntry;
+
+  useEffect(() => {
+    if (handledRefactorRecoveryOwnerRef.current !== workspaceInstanceId) {
+      handledRefactorRecoveryOwnerRef.current = workspaceInstanceId;
+      handledRefactorRecoveryIdsRef.current = new Set();
+    }
+    let disposed = false;
+    const discover = async () => {
+      const rootPath = roots[0]?.path;
+      const runner = refactorRecoveryPromptRef.current;
+      if (!rootPath || !runner) return;
+      const listing = listRefactorRecoveryJournalsV2(rootPath);
+      const pending = listing.entries.filter((entry) => (
+        entry.status === "prepared" || entry.status === "recovery-required"
+      ));
+      for (const entry of pending) {
+        if (disposed) return;
+        if (handledRefactorRecoveryIdsRef.current.has(entry.recoveryId)) continue;
+        handledRefactorRecoveryIdsRef.current.add(entry.recoveryId);
+        await runner(entry, workspaceInstanceId);
+      }
+    };
+    void discover();
+    return () => {
+      disposed = true;
+    };
+  }, [roots, workspaceInstanceId]);
 
   const workspaceEditHistoryState = useMemo(
     () => workspaceEditHistory.state(),
@@ -9085,6 +9751,22 @@ export function CodeWorkspaceTab({
       setWorkspaceEditHistoryRevision((revision) => revision + 1);
     }
   }, [setStatusMessage, workspaceEditHistory]);
+
+  // ED-AUDIT-008: the workspace-edit journal and the per-document CodeMirror
+  // ledger are two history owners over the same Ctrl+Z stroke. The newest
+  // user-visible transaction wins: while the journal can serve the requested
+  // direction the editor's shared undo/redo routes there; `undefined` hands
+  // the stroke back to the document ledger (character-level history). A busy
+  // journal blocks the stroke entirely so a document undo can never interleave
+  // with a running multi-file restore.
+  const claimWorkspaceHistory = useCallback((action: "undo" | "redo"): boolean | undefined => {
+    const state = workspaceEditHistory.state();
+    if (state.busy) return false;
+    if (action === "undo" ? !state.canUndo : !state.canRedo) return undefined;
+    if (action === "undo") void undoWorkspaceEdit();
+    else void redoWorkspaceEdit();
+    return true;
+  }, [redoWorkspaceEdit, undoWorkspaceEdit, workspaceEditHistory]);
 
   useEffect(() => {
     let unlisten: UnlistenFn | null = null;
@@ -9304,20 +9986,34 @@ export function CodeWorkspaceTab({
     providerActions: readonly ProviderActionV4[];
     context: CodeActionContextIdentity | null;
     semanticToken: WorkspaceSemanticIndexBuildToken | null;
+    /**
+     * Why the candidates are unusable; null when the request completed
+     * normally. `message` is the accurate user-facing outcome and has already
+     * been surfaced on the status line by the time the caller sees it.
+     */
+    requestFailure: {
+      kind: "stale" | "sync-pending" | "descriptor-missing" | "failed" | "provider";
+      message: string;
+    } | null;
   }> => {
     const caps = lspFilesRef.current[file.key]?.status?.capabilities;
     if (caps && !caps.codeAction) {
-      return { actions: [], providerActions: [], context: null, semanticToken: null };
+      return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: null };
     }
     const semanticQuery = only.some((kind) => kind === "refactor" || kind.startsWith("refactor."));
     const expectedRevision = semanticIndex.current().revision;
     const live = await ensureWorkspaceSemanticDocumentsSynced(file.key, expectedRevision);
     if (!live) {
-      setStatusMessage(`${semanticQuery ? "Refactor" : "Code actions"} require the language server to finish synchronizing current editor buffers`);
-      return { actions: [], providerActions: [], context: null, semanticToken: null };
+      const message = `${semanticQuery ? "Refactor" : "Code actions"} require the language server to finish synchronizing current editor buffers`;
+      setStatusMessage(message);
+      return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: { kind: "sync-pending", message } };
     }
     const descriptor = lspDescriptorForFile(live);
-    if (!descriptor) return { actions: [], providerActions: [], context: null, semanticToken: null };
+    if (!descriptor) {
+      const message = `Cannot resolve the language server for ${semanticQuery ? "refactor" : "code"} actions`;
+      setStatusMessage(message);
+      return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: { kind: "descriptor-missing", message } };
+    }
     const buildToken = semanticIndex.beginBuild("language-server");
     try {
       const context = snapshotCodeActionContext({
@@ -9373,12 +10069,36 @@ export function CodeWorkspaceTab({
         kind: semanticQuery ? "refactor" : "code-action",
         resultCount: rawActions.length,
       });
-      return completion.accepted
-        ? { actions: rawActions, providerActions, context, semanticToken: buildToken }
-        : { actions: [], providerActions: [], context: null, semanticToken: null };
+      if (!completion.accepted) {
+        // The workspace revision moved while the provider was producing these
+        // candidates. The response is unusable; say so instead of falling
+        // through to the generic "no actions" message.
+        const message = `${semanticQuery ? "Refactor actions" : "Code actions"} became stale because the workspace changed while requesting them; request them again`;
+        setStatusMessage(message);
+        return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: { kind: "stale", message } };
+      }
+      // The provider envelope classifies non-ready outcomes (failed / timeout
+      // / malformed / unsupported / cancelled). Surface its message instead of
+      // collapsing the request into a generic "no actions" claim; a null
+      // response ("empty") genuinely means the server offered nothing.
+      if (serviceRes.state !== "ready" && serviceRes.state !== "empty") {
+        const message = serviceRes.state === "malformed" || serviceRes.state === "failed"
+          ? serviceRes.message
+          : serviceRes.state === "unsupported"
+            ? serviceRes.reason
+            : serviceRes.state === "timeout"
+              ? "Code action request timed out before the provider answered; try again"
+              : "Code action request was cancelled";
+        setStatusMessage(message);
+        return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: { kind: "provider", message } };
+      }
+      return { actions: rawActions, providerActions, context, semanticToken: buildToken, requestFailure: null };
     } catch (error) {
-      semanticIndex.failBuild(buildToken, errorMessage(error));
-      return { actions: [], providerActions: [], context: null, semanticToken: null };
+      const detail = errorMessage(error);
+      semanticIndex.failBuild(buildToken, detail);
+      const message = `Code actions request failed: ${detail}`;
+      setStatusMessage(message);
+      return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: { kind: "failed", message } };
     }
   }, [
     ensureWorkspaceSemanticDocumentsSynced,
@@ -9431,9 +10151,12 @@ export function CodeWorkspaceTab({
   ): Promise<{ ok: boolean; message: string | null; retryable: boolean }> => {
     try {
       const assertSemanticCurrent = () => {
+        // Revision-pinned freshness: background provider progress does not
+        // stale an already-produced candidate list (see
+        // workspaceSemanticIndexTokenRevisionCurrent).
         if (
           semanticToken
-          && !workspaceSemanticIndexBuildIsCurrent(semanticIndex.current(), semanticToken)
+          && !workspaceSemanticIndexTokenRevisionCurrent(semanticIndex.current(), semanticToken)
         ) {
           throw new Error("Refactor result became stale because the workspace changed; request it again");
         }
@@ -9626,9 +10349,9 @@ export function CodeWorkspaceTab({
           }
           if (
             semanticToken
-            && !workspaceSemanticIndexBuildIsCurrent(semanticIndex.current(), semanticToken)
+            && !workspaceSemanticIndexTokenRevisionCurrent(semanticIndex.current(), semanticToken)
           ) {
-            return { valid: false, status: "stale", reason: "The workspace semantic index changed" };
+            return { valid: false, status: "stale", reason: "The workspace changed after the actions were requested" };
           }
           return { valid: true };
         },
@@ -9641,6 +10364,11 @@ export function CodeWorkspaceTab({
             label: executablePlan.title,
             semanticGeneration: semanticToken?.generation,
             semanticRevision: semanticToken?.revision,
+            // Revision-pinned freshness (ED-AUDIT-008): the candidates were
+            // produced against this revision, so background provider progress
+            // (jdtls workDoneProgress) must not abort the apply. Cross-revision
+            // edits are still rejected by the revision equality check.
+            semanticRequireReady: false,
             plan: refactorPlan,
             recordHistory: false,
             preflightMutation: transactionOptions?.onBeforeCommit,
@@ -9777,12 +10505,18 @@ export function CodeWorkspaceTab({
     };
     setGenerateCode((prev) => ({ ...prev, open: true, phase: "loading", error: null }));
     const requested = await requestCodeActions(file, range, [], ["source"]);
-    if (
-      requested.semanticToken
-      && !workspaceSemanticIndexBuildIsCurrent(semanticIndex.current(), requested.semanticToken)
-    ) {
-      setGenerateCode({ open: true, phase: "error", candidates: [], error: "Generation actions became stale because the workspace changed; retry to request them again" });
+    if (requested.requestFailure) {
+      // Stale keeps its context-specific wording; every other failure kind
+      // already surfaced its accurate message on the status line.
       generateCodeContextRef.current = null;
+      setGenerateCode({
+        open: true,
+        phase: "error",
+        candidates: [],
+        error: requested.requestFailure.kind === "stale"
+          ? "Generation actions became stale because the workspace changed; retry to request them again"
+          : requested.requestFailure.message,
+      });
       return;
     }
     const filtered = filterGenerateCodeActions(requested.actions);
@@ -9807,7 +10541,7 @@ export function CodeWorkspaceTab({
       })),
       error: null,
     });
-  }, [activeFile, requestCodeActions, semanticIndex.current, setStatusMessage]);
+  }, [activeFile, requestCodeActions, setStatusMessage]);
 
   const closeGenerateDialog = useCallback(() => {
     generateCodeContextRef.current = null;
@@ -9827,7 +10561,7 @@ export function CodeWorkspaceTab({
     const outcome = await applyGenerateSelection(selection, {
       actionFor: (candidate) => context.actions[Number(candidate.id)],
       isStale: () => !!context.semanticToken
-        && !workspaceSemanticIndexBuildIsCurrent(semanticIndex.current(), context.semanticToken!),
+        && !workspaceSemanticIndexTokenRevisionCurrent(semanticIndex.current(), context.semanticToken!),
       run: (action) => runCodeAction(action, context.file, context.semanticToken),
     });
     if (outcome.failedIndex != null) {
@@ -9945,13 +10679,12 @@ export function CodeWorkspaceTab({
     );
     if (requestAbort.signal.aborted || intentionRequestAbortRef.current !== requestAbort) return;
 
-    if (requested.semanticToken && !workspaceSemanticIndexBuildIsCurrent(
-      semanticIndex.current(),
-      requested.semanticToken,
-    )) {
-      setStatusMessage("Refactor actions became stale because the workspace changed; request them again");
-      return;
-    }
+    // Request-window staleness is decided by finishQuery acceptance inside
+    // requestCodeActions: the response is revision-pinned, and background
+    // provider progress (jdtls workDoneProgress) must not stale a produced
+    // result. Every requestFailure classification already surfaced its
+    // accurate status message there.
+    if (requested.requestFailure) return;
     if (!requested.context) {
       setStatusMessage(`No ${sectionLabel} provided by the language server`);
       return;
@@ -10043,7 +10776,6 @@ export function CodeWorkspaceTab({
     openTreeContextMenuAt,
     requestCodeActions,
     runCodeAction,
-    semanticIndex.current,
     setStatusMessage,
   ]);
 
@@ -10943,17 +11675,25 @@ export function CodeWorkspaceTab({
       start: { line: 0, character: 0 },
       end: { line: file.text.split("\n").length, character: 0 },
     };
-    const { actions, semanticToken } = await requestCodeActions(
+    const requested = await requestCodeActions(
       file,
       wholeFileRange,
       [],
       ["source.organizeImports"],
     );
-    if (!actions.length) {
+    if (requested.requestFailure) {
+      // Stale keeps its context-specific wording; every other failure kind
+      // already surfaced its accurate message on the status line.
+      if (requested.requestFailure.kind === "stale") {
+        setStatusMessage("Import optimization became stale because the workspace changed; request it again");
+      }
+      return;
+    }
+    if (!requested.actions.length) {
       setStatusMessage("No import optimization available from language server");
       return;
     }
-    await runCodeAction(actions[0], file, semanticToken);
+    await runCodeAction(requested.actions[0], file, requested.semanticToken);
     setStatusMessage("Imports organized");
   }, [activeFile, requestCodeActions, runCodeAction, setStatusMessage]);
 
@@ -11261,6 +12001,392 @@ export function CodeWorkspaceTab({
 
   // §8.18.5 closed-tab reopen stack (session-only, max 50, never persisted).
   const [closedTabsStack, setClosedTabsStack] = useState<readonly ClosedTabEntry[]>([]);
+
+  // ED-AUDIT-015: production execute owner for Rearrange Code. The action
+  // entry below only checks that a file is open; every capability decision,
+  // provider request, preview confirm, apply and postcondition check lives
+  // here and in executeRearrangeTransaction, so a supported decision can
+  // never again degrade to a bare status message plus `return true`.
+  const runRearrangeExecute = useCallback(async (file: OpenFileState): Promise<boolean> => {
+    const frozenKey = file.key;
+    const frozenInstanceId = workspaceInstanceId;
+    // ED-IMPROVE-001: a new invocation (double entry) owns the workflow; the
+    // older run's token no longer matches and it fails typed stale.
+    ++rearrangeRequestTokenRef.current;
+    // Absolute target: provider edit entries carry absolute disk paths or
+    // URIs, while file.path is workspace-relative. Match with path-aware
+    // equality so a well-formed provider edit is never filtered out, and a
+    // foreign-path edit never leaks into this file.
+    const targetPath = absolutePathForOpenFile(file) ?? file.path ?? file.key;
+    const descriptor = lspDescriptorForFile(file);
+    if (!descriptor) {
+      const message = `Cannot resolve the language server for ${file.title ?? frozenKey}`;
+      setStatusMessage(message);
+      return false;
+    }
+    // ED-IMPROVE-003: prefer the language-server document URI the provider
+    // will echo back in its payload; descriptor.filePath may be workspace-relative.
+    const targetUri = descriptor.documentUri
+      ?? lspFilesRef.current[frozenKey]?.status?.uri
+      ?? descriptor.filePath
+      ?? frozenKey;
+    const result = await executeRearrangeTransaction(
+      {
+        requestActions: async () => {
+          const live = openFilesRef.current[frozenKey];
+          if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
+            return {
+              state: "cancelled",
+              actions: [],
+              reason: "Rearrange cancelled: the file closed or the workspace changed; nothing applied",
+            };
+          }
+          const lines = live.text.split("\n");
+          const range: LspRange = {
+            start: { line: 0, character: 0 },
+            end: {
+              line: Math.max(0, lines.length - 1),
+              character: lines.length > 0 ? lines[lines.length - 1].length : 0,
+            },
+          };
+          const res = await requestCodeActions(live, range, [], [...REARRANGE_ACTION_KINDS]);
+          if (res.requestFailure) {
+            return {
+              state: res.requestFailure.kind === "stale" ? "stale" : "failed",
+              actions: [],
+              reason: res.requestFailure.message,
+            };
+          }
+          return {
+            state: "ok",
+            actions: res.actions.map((action) => ({ kind: action.kind, title: action.title, raw: action.raw })),
+          };
+        },
+        resolveAction: async (action) => {
+          const live = openFilesRef.current[frozenKey];
+          if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
+            return { state: "stale", edits: [], reason: "Rearrange cancelled: the file closed during resolve; nothing applied" };
+          }
+          try {
+            const resolved = await lspCodeActionResolve(descriptor, action.raw);
+            // ED-IMPROVE-003: validate the complete payload before it can
+            // become a plan; cross-file/resource/command/disabled/malformed
+            // payloads are rejected here with their category and reason.
+            const validation = validateWorkflowProviderAction({
+              action: resolved.action,
+              targetUri,
+              targetPath,
+              documentText: live.text,
+              documentRevision: live.documentRevision,
+              isSupportedKind: isRearrangeActionKind,
+              capabilityLabel: "Rearrange Code",
+            });
+            if (!validation.ok) {
+              return { state: validation.state, edits: [], reason: validation.reason };
+            }
+            return { state: "resolved", edits: validation.edits };
+          } catch (err) {
+            return { state: "failed", edits: [], reason: `Rearrange resolve failed: ${errorMessage(err)}; nothing applied` };
+          }
+        },
+        readLive: () => {
+          const live = openFilesRef.current[frozenKey];
+          if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) return null;
+          return {
+            text: live.text,
+            revision: live.documentRevision,
+            readOnly: !!live.library || workspaceResourceOperationLockedRef.current,
+            dirty: !!live.dirty,
+          };
+        },
+        providerGeneration: () => lspSessionGeneration(),
+        requestToken: () => rearrangeRequestTokenRef.current,
+        confirmPreview: (summary) => confirmAppDialog({
+          title: "Rearrange preview",
+          message: `${summary.targetPath}: ${summary.operationCount} edits. Pre ${summary.preHashShort} → post ${summary.postHashShort}. Apply the rearrangement?`,
+          confirmLabel: "Apply rearrange",
+        }),
+        applyEdit: async (edit, guard, applyContext) => {
+          const summaryHolder: { current: WorkspaceEditApplyTransactionSummary | null } = { current: null };
+          try {
+            const outcomes = await applyLspWorkspaceEdit(edit, {
+              recordHistory: true,
+              label: "Rearrange Code",
+              // ED-IMPROVE-002: the canonical apply boundary prepares the
+              // crash-recovery journal before the first mutation, verifies the
+              // frozen post-hash independently, and registers the single
+              // success history entry only after that verification.
+              plan: {
+                actionId: `rearrange:${frozenKey}`,
+                kind: "other",
+                documents: [{
+                  uri: applyContext.targetUri,
+                  canonicalPath: applyContext.targetPath,
+                  expectedDocumentRevision: null,
+                  expectedDiskHash: null,
+                  owner: "workspace",
+                  preTextSha256: sha256Hex(applyContext.preText),
+                  expectedPostHash: applyContext.expectedPostHash,
+                }],
+              },
+              preflightMutation: () => guard.assertCurrent(),
+              onTransactionSummary: (next) => {
+                summaryHolder.current = next;
+              },
+            });
+            const response = workspaceEditApplyResponse(outcomes);
+            const summary = summaryHolder.current;
+            if (summary && summary.effect === "unknown") {
+              return {
+                state: "unknown-effect",
+                reason: `Rearrange write result is unknown: ${summary.reason ?? response.failureReason ?? "the OS acknowledgement was lost"}`
+                  + `; verify ${targetPath} in the recovery center before retrying`,
+                recoveryId: summary.recoveryId,
+                affectedPaths: summary.affectedPaths,
+              };
+            }
+            if (summary && (summary.postcondition === "mismatch" || summary.postcondition === "unreadable")) {
+              return {
+                state: "recovery-required",
+                reason: `Rearrange postcondition could not be verified after applying`
+                  + ` (${summary.postcondition}: ${summary.reason ?? "unknown cause"});`
+                  + ` recovery ${summary.recoveryId ?? "entry"} lists the affected files`,
+                recoveryId: summary.recoveryId,
+                affectedPaths: summary.affectedPaths,
+              };
+            }
+            if (!response.applied) {
+              return {
+                state: "failed",
+                reason: response.failureReason ?? "Rearrange apply failed; see the workspace-edit ledger",
+                recoveryId: summary?.recoveryId ?? null,
+                affectedPaths: summary?.affectedPaths ?? [],
+              };
+            }
+            const live = openFilesRef.current[frozenKey];
+            if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
+              return { state: "conflict", reason: `${targetPath} closed during apply; verify the disk state before retrying` };
+            }
+            return { state: "applied", postText: live.text, historyId: summary?.historyId ?? null };
+          } catch (err) {
+            return { state: "failed", reason: `Rearrange apply failed: ${errorMessage(err)}` };
+          }
+        },
+      },
+      {
+        scope: "file",
+        targetPath,
+        targetUri,
+        readOnly: !!file.library || workspaceResourceOperationLockedRef.current,
+        hasSelection: false,
+        capabilities: resolveRearrangeCapabilities(activeCapabilities, activeLspState?.status),
+      },
+    );
+    if (result.ok) {
+      setStatusMessage(
+        `Rearranged ${file.title ?? targetPath} (${result.operationCount} edits in one transaction); undo restores the preimage`,
+      );
+      return true;
+    }
+    setStatusMessage(result.reason);
+    return false;
+  }, [
+    absolutePathForOpenFile,
+    activeCapabilities,
+    activeLspState,
+    applyLspWorkspaceEdit,
+    lspDescriptorForFile,
+    lspSessionGeneration,
+    requestCodeActions,
+    workspaceInstanceId,
+  ]);
+
+  // ED-AUDIT-016: production execute owner for Code Cleanup. The fake
+  // success stub is gone: the file-scope default-profile branch performs a
+  // real request or a real typed failure, mirroring the rearrange owner.
+  const runCleanupExecute = useCallback(async (file: OpenFileState): Promise<boolean> => {
+    const frozenKey = file.key;
+    const frozenInstanceId = workspaceInstanceId;
+    // ED-IMPROVE-001: same request-token supersession as the rearrange owner.
+    ++cleanupRequestTokenRef.current;
+    const targetPath = absolutePathForOpenFile(file) ?? file.path ?? file.key;
+    const descriptor = lspDescriptorForFile(file);
+    if (!descriptor) {
+      const message = `Cannot resolve the language server for ${file.title ?? frozenKey}`;
+      setStatusMessage(message);
+      return false;
+    }
+    // ED-IMPROVE-003: same URI precedence as the rearrange owner.
+    const targetUri = descriptor.documentUri
+      ?? lspFilesRef.current[frozenKey]?.status?.uri
+      ?? descriptor.filePath
+      ?? frozenKey;
+    const result = await executeCleanupTransaction(
+      {
+        requestActions: async () => {
+          const live = openFilesRef.current[frozenKey];
+          if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
+            return {
+              state: "cancelled",
+              actions: [],
+              reason: "Cleanup cancelled: the file closed or the workspace changed; nothing applied",
+            };
+          }
+          const lines = live.text.split("\n");
+          const range: LspRange = {
+            start: { line: 0, character: 0 },
+            end: {
+              line: Math.max(0, lines.length - 1),
+              character: lines.length > 0 ? lines[lines.length - 1].length : 0,
+            },
+          };
+          const res = await requestCodeActions(live, range, [], [...CLEANUP_ACTION_KINDS]);
+          if (res.requestFailure) {
+            return {
+              state: res.requestFailure.kind === "stale" ? "stale" : "failed",
+              actions: [],
+              reason: res.requestFailure.message,
+            };
+          }
+          return {
+            state: "ok",
+            actions: res.actions.map((action) => ({ kind: action.kind, title: action.title, raw: action.raw })),
+          };
+        },
+        resolveAction: async (action) => {
+          const live = openFilesRef.current[frozenKey];
+          if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
+            return { state: "stale", edits: [], reason: "Cleanup cancelled: the file closed during resolve; nothing applied" };
+          }
+          try {
+            const resolved = await lspCodeActionResolve(descriptor, action.raw);
+            // ED-IMPROVE-003: same complete-payload validation as Rearrange;
+            // generic fixAll/format payloads never pass as Cleanup.
+            const validation = validateWorkflowProviderAction({
+              action: resolved.action,
+              targetUri,
+              targetPath,
+              documentText: live.text,
+              documentRevision: live.documentRevision,
+              isSupportedKind: isCleanupActionKind,
+              capabilityLabel: "Code Cleanup",
+            });
+            if (!validation.ok) {
+              return { state: validation.state, edits: [], reason: validation.reason };
+            }
+            return { state: "resolved", edits: validation.edits };
+          } catch (err) {
+            return { state: "failed", edits: [], reason: `Cleanup resolve failed: ${errorMessage(err)}; nothing applied` };
+          }
+        },
+        readLive: () => {
+          const live = openFilesRef.current[frozenKey];
+          if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) return null;
+          return {
+            text: live.text,
+            revision: live.documentRevision,
+            readOnly: !!live.library || workspaceResourceOperationLockedRef.current,
+            dirty: !!live.dirty,
+          };
+        },
+        providerGeneration: () => lspSessionGeneration(),
+        requestToken: () => cleanupRequestTokenRef.current,
+        confirmPreview: (summary) => confirmAppDialog({
+          title: "Code cleanup preview",
+          message: `${summary.targetPath} [${summary.profileId}]: ${summary.operationCount} edits. Pre ${summary.preHashShort} → post ${summary.postHashShort}. Apply the cleanup?`,
+          confirmLabel: "Apply cleanup",
+        }),
+        applyEdit: async (edit, guard, applyContext) => {
+          const summaryHolder: { current: WorkspaceEditApplyTransactionSummary | null } = { current: null };
+          try {
+            const outcomes = await applyLspWorkspaceEdit(edit, {
+              recordHistory: true,
+              label: "Code Cleanup",
+              // ED-IMPROVE-002: same canonical journal/postcondition/history
+              // contract as the rearrange owner.
+              plan: {
+                actionId: `cleanup:${frozenKey}`,
+                kind: "other",
+                documents: [{
+                  uri: applyContext.targetUri,
+                  canonicalPath: applyContext.targetPath,
+                  expectedDocumentRevision: null,
+                  expectedDiskHash: null,
+                  owner: "workspace",
+                  preTextSha256: sha256Hex(applyContext.preText),
+                  expectedPostHash: applyContext.expectedPostHash,
+                }],
+              },
+              preflightMutation: () => guard.assertCurrent(),
+              onTransactionSummary: (next) => {
+                summaryHolder.current = next;
+              },
+            });
+            const response = workspaceEditApplyResponse(outcomes);
+            const summary = summaryHolder.current;
+            if (summary && summary.effect === "unknown") {
+              return {
+                state: "unknown-effect",
+                reason: `Cleanup write result is unknown: ${summary.reason ?? response.failureReason ?? "the OS acknowledgement was lost"}`
+                  + `; verify ${targetPath} in the recovery center before retrying`,
+                recoveryId: summary.recoveryId,
+                affectedPaths: summary.affectedPaths,
+              };
+            }
+            if (summary && (summary.postcondition === "mismatch" || summary.postcondition === "unreadable")) {
+              return {
+                state: "recovery-required",
+                reason: `Cleanup postcondition could not be verified after applying`
+                  + ` (${summary.postcondition}: ${summary.reason ?? "unknown cause"});`
+                  + ` recovery ${summary.recoveryId ?? "entry"} lists the affected files`,
+                recoveryId: summary.recoveryId,
+                affectedPaths: summary.affectedPaths,
+              };
+            }
+            if (!response.applied) {
+              return {
+                state: "failed",
+                reason: response.failureReason ?? "Cleanup apply failed; see the workspace-edit ledger",
+                recoveryId: summary?.recoveryId ?? null,
+                affectedPaths: summary?.affectedPaths ?? [],
+              };
+            }
+            const live = openFilesRef.current[frozenKey];
+            if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
+              return { state: "conflict", reason: `${targetPath} closed during apply; verify the disk state before retrying` };
+            }
+            return { state: "applied", postText: live.text, historyId: summary?.historyId ?? null };
+          } catch (err) {
+            return { state: "failed", reason: `Cleanup apply failed: ${errorMessage(err)}` };
+          }
+        },
+      },
+      {
+        scope: "file",
+        targetPath,
+        targetUri,
+        readOnly: !!file.library || workspaceResourceOperationLockedRef.current,
+        capabilities: resolveCleanupCapabilities(activeCapabilities, activeLspState?.status),
+      },
+    );
+    if (result.ok) {
+      setStatusMessage(
+        `Cleaned up ${file.title ?? targetPath} (${result.operationCount} edits in one transaction); undo restores the preimage`,
+      );
+      return true;
+    }
+    setStatusMessage(result.reason);
+    return false;
+  }, [
+    absolutePathForOpenFile,
+    activeCapabilities,
+    activeLspState,
+    applyLspWorkspaceEdit,
+    lspDescriptorForFile,
+    lspSessionGeneration,
+    requestCodeActions,
+    workspaceInstanceId,
+  ]);
 
   const workspaceCommands = useMemo<WorkspaceCommand[]>(() => [
     {
@@ -11792,27 +12918,8 @@ export function CodeWorkspaceTab({
       keywords: ["rearrange", "members", "order", "declarations", "structure"],
       when: () => !!activeFile,
       run: () => {
-        if (!activeFile) return;
-        const capabilities = resolveRearrangeCapabilities(
-          activeCapabilities,
-          activeLspState?.status,
-        );
-        const decision = planRearrange({
-          scope: "file",
-          targetPath: activeFile.path ?? activeFile.key,
-          languageId: activeLanguageId,
-          readOnly: !!activeFile.library || workspaceResourceOperationLocked,
-          hasSelection: false,
-          capabilities,
-        });
-        if (decision.kind === "unavailable") {
-          setStatusMessage(decision.reason);
-          return false;
-        }
-        setStatusMessage(
-          `Executing rearrange for ${activeFile.title ?? activeFile.path ?? "active file"} (${decision.provider?.id ?? "provider"})`,
-        );
-        return true;
+        if (!activeFile) return false;
+        return runRearrangeExecute(activeFile);
       },
     },
     {
@@ -11823,25 +12930,7 @@ export function CodeWorkspaceTab({
       when: () => !!activeFile,
       run: () => {
         if (!activeFile) return;
-        const capabilities = resolveCleanupCapabilities(
-          activeCapabilities,
-          activeLspState?.status,
-        );
-        const decision = planCleanup({
-          scope: "file",
-          targetPath: activeFile.path ?? activeFile.key,
-          languageId: activeLanguageId,
-          readOnly: !!activeFile.library || workspaceResourceOperationLocked,
-          capabilities,
-        });
-        if (decision.kind === "unavailable") {
-          setStatusMessage(decision.reason);
-          return false;
-        }
-        setStatusMessage(
-          `Executing code cleanup for ${activeFile.title ?? activeFile.path ?? "active file"} (${decision.profileId}, ${decision.provider?.id ?? "provider"})`,
-        );
-        return true;
+        return runCleanupExecute(activeFile);
       },
     },
     {
@@ -12699,8 +13788,13 @@ export function CodeWorkspaceTab({
       keybinding: "Ctrl+Z",
       keybindings: ["Cmd+Z"],
       keywords: ["undo", "workspace edit", "refactor"],
+      // ED-AUDIT-008: inside the editor surface the shared document undo
+      // (workspace.undo) owns Ctrl+Z and claims the journal through
+      // claimWorkspaceHistory; this action only serves non-editor focus so
+      // the two never compete for the same stroke.
       when: (context) => context.focus !== "tree"
         && context.focus !== "terminal"
+        && context.focus !== "editor"
         && workspaceEditHistoryState.canUndo
         && !workspaceEditHistoryState.busy,
       run: () => void undoWorkspaceEdit(),
@@ -12716,6 +13810,7 @@ export function CodeWorkspaceTab({
       keywords: ["redo", "workspace edit", "refactor"],
       when: (context) => context.focus !== "tree"
         && context.focus !== "terminal"
+        && context.focus !== "editor"
         && workspaceEditHistoryState.canRedo
         && !workspaceEditHistoryState.busy,
       run: () => void redoWorkspaceEdit(),
@@ -13134,6 +14229,7 @@ export function CodeWorkspaceTab({
     resolveEditorTarget,
     roots.length,
     runEditorAiActionAtCursor,
+    runRearrangeExecute,
     saveFile,
     scanWorkspaceCoverage,
     seSymbolsAvailable,
@@ -14358,7 +15454,7 @@ export function CodeWorkspaceTab({
         evidence,
         edit: renamed.edit,
         roots: rootsRef.current,
-        openFiles: openFilesRef.current,
+        openFiles: buildPlanOpenFiles(),
         completeness: {
           value: "partial",
           source: "protocol-bounded",
@@ -14577,7 +15673,7 @@ export function CodeWorkspaceTab({
         evidence,
         edit: deletion.edit,
         roots: rootsRef.current,
-        openFiles: openFilesRef.current,
+        openFiles: buildPlanOpenFiles(),
         completeness: {
           value: deletion.complete ? "complete" : "partial",
           source: "client-observed-bounded",
@@ -16765,7 +17861,10 @@ export function CodeWorkspaceTab({
         onDismissBanner={(key) => setDismissedBannerKeys((prev) => new Set(prev).add(key))}
         workspaceActionHost={actionsController.host}
         transactionOwner={documentTransactionOwnerRef.current}
+        onWorkspaceHistoryClaim={claimWorkspaceHistory}
         readOnly={workspaceResourceOperationLocked}
+        initialViewState={groupFile ? viewStatesRef.current[groupId]?.[groupFile.key] ?? null : null}
+        onViewStateChange={handleViewStateChange}
         softWrap={groupSoftWrap}
         appearance={groupAppearance}
         renderedDocEnabled={groupReaderMode}
@@ -17812,13 +18911,20 @@ export function CodeWorkspaceTab({
                     setStatusMessage(message);
                     return { ok: false, message };
                   }
-                  await applyLspWorkspaceEdit(edit);
-                  const fileCount = byFile.size;
-                  const appliedCount = matches.length;
-                  setStatusMessage(
-                    `Replaced ${appliedCount} occurrence${appliedCount === 1 ? "" : "s"} in ${fileCount} file${fileCount === 1 ? "" : "s"} — Ctrl+Z to undo`,
-                  );
-                  return { ok: true, appliedCount, fileCount };
+                  // ED-AUDIT-003: the applier's per-operation ledger is the
+                  // only truth for what actually changed. A failed or skipped
+                  // document (readonly file, disk write failure, declined
+                  // retry) must surface the real applied set — never a
+                  // planned-count "all complete" report.
+                  const outcomes = await applyLspWorkspaceEdit(edit);
+                  const report = summarizeReplaceCommitReport(outcomes, modelMatches);
+                  setStatusMessage(report.message);
+                  return {
+                    ok: report.ok,
+                    appliedCount: report.appliedCount,
+                    fileCount: report.fileCount,
+                    ...(report.ok ? {} : { message: report.message }),
+                  };
                 }}
               />
             ),

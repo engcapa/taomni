@@ -585,9 +585,12 @@ describe("ED-TEMPLATE-001: File and Code Templates production flow in CodeWorksp
       );
     });
 
-    // Now execute undo
+    // ED-AUDIT-008: the created file opens in the editor, so the journal
+    // action is focus-gated off the editor surface; the undo stroke is taken
+    // from non-editor focus (window target), which routes to the journal
+    // directly.
     await act(async () => {
-      await registrationRef.current!.executeAction("workspace.undoWorkspaceEdit");
+      fireEvent.keyDown(window, { key: "z", ctrlKey: true });
     });
 
     // Undo calls delete on the created file via workspaceApplyResourceOperation

@@ -5,8 +5,14 @@ import { EditorSelection } from "@codemirror/state";
 import { undoDepth } from "@codemirror/commands";
 import { startCompletion } from "@codemirror/autocomplete";
 import { EditorView } from "@codemirror/view";
+import { foldedRanges } from "@codemirror/language";
 import { CodeMirrorHost } from "./CodeMirrorHost";
-import { virtualSpaceOverflowField } from "./workspaceVirtualSpace";
+import {
+  setVirtualOverflow,
+  virtualOverflowAt,
+  virtualSpaceOverflowField,
+  virtualSpaceTypingHandler,
+} from "./workspaceVirtualSpace";
 import { WorkspaceActionHost } from "./workspaceActionHost";
 import { WorkspaceDocumentTransactionOwner } from "./workspaceDocumentTransactionOwner";
 import type { GitLineChange } from "./gitEditorChrome";
@@ -985,6 +991,149 @@ describe("§8.26 ED-MULTIVIEW-002 shared document host wiring", () => {
     expect(owner.getHistoryState("shared.ts")).toMatchObject({ canUndo: true, canRedo: false });
   });
 
+  // ED-AUDIT-008: the workspace-edit journal claims a stroke before the
+  // document ledger. A `true` claim consumes the stroke without touching the
+  // ledger; `undefined` hands it back; `false` blocks it while the journal is
+  // busy.
+  it("ED-AUDIT-008: lets the workspace-edit journal claim undo and redo strokes", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const actionHost = new WorkspaceActionHost({ workspaceId: "ws-journal-claim" });
+    const initial = "hello";
+    const claims: Array<{ action: "undo" | "redo"; result: boolean | undefined }> = [];
+    let nextClaim: boolean | undefined;
+    const rendered = render(
+      <CodeMirrorHost
+        {...sharedProps(owner, "primary", initial, vi.fn(), actionHost)}
+        onWorkspaceHistoryClaim={(action) => {
+          const result = nextClaim;
+          claims.push({ action, result });
+          return result;
+        }}
+      />,
+    );
+    const view = EditorView.findFromDOM(rendered.container.querySelector<HTMLElement>(".cm-editor")!);
+    expect(view).not.toBeNull();
+    view!.dispatch({ changes: { from: initial.length, to: initial.length, insert: "!" } });
+    expect(view!.state.doc.toString()).toBe("hello!");
+
+    // Journal claim: the stroke is consumed and the document ledger keeps
+    // its entry.
+    nextClaim = true;
+    await act(async () => {
+      const result = await actionHost.execute("workspace.undo", { focus: "editor", hasActiveFile: true });
+      expect(result.kind).toBe("applied");
+    });
+    expect(claims).toEqual([{ action: "undo", result: true }]);
+    expect(view!.state.doc.toString()).toBe("hello!");
+    expect(owner.getHistoryState("shared.ts")).toMatchObject({ canUndo: true, undoDepth: 1 });
+
+    // Busy journal: the stroke is blocked, the ledger still must not act.
+    nextClaim = false;
+    await act(async () => {
+      const result = await actionHost.execute("workspace.undo", { focus: "editor", hasActiveFile: true });
+      expect(result).toMatchObject({ kind: "no-op", reason: "condition-not-met" });
+    });
+    expect(view!.state.doc.toString()).toBe("hello!");
+    expect(owner.getHistoryState("shared.ts").undoDepth).toBe(1);
+
+    // No journal entry in this direction: the document ledger proceeds.
+    nextClaim = undefined;
+    await act(async () => {
+      const result = await actionHost.execute("workspace.undo", { focus: "editor", hasActiveFile: true });
+      expect(result.kind).toBe("applied");
+    });
+    expect(view!.state.doc.toString()).toBe(initial);
+    expect(owner.getHistoryState("shared.ts")).toMatchObject({ canUndo: false, canRedo: true });
+  });
+
+  // ED-AUDIT-008: a history-replay snapshot (journal undo/redo restore) is
+  // reconciled as an "undo"-origin transaction — visible to every view, but
+  // recorded as no second document-ledger entry, so a follow-up document
+  // undo cannot re-apply the change the journal just undid.
+  it("ED-AUDIT-008: reconciles a history-replay snapshot without recording a document-ledger entry", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const actionHost = new WorkspaceActionHost({ workspaceId: "ws-history-replay" });
+    const initial = "class Main {}\n";
+    const applied = "import util.Foo;\n\nclass Main {}\n";
+    const onChange = vi.fn();
+    const props = sharedProps(owner, "primary", initial, onChange, actionHost);
+    const rendered = render(<CodeMirrorHost {...props} historyReplay={false} />);
+    const view = EditorView.findFromDOM(rendered.container.querySelector<HTMLElement>(".cm-editor")!);
+    expect(view).not.toBeNull();
+
+    // The apply reaches the ledger as a normal external snapshot.
+    rendered.rerender(<CodeMirrorHost {...props} doc={applied} historyReplay={false} />);
+    await act(async () => {});
+    expect(view!.state.doc.toString()).toBe(applied);
+    expect(owner.getHistoryState("shared.ts")).toMatchObject({ canUndo: true, undoDepth: 1 });
+
+    // The journal restore replays the pre-apply snapshot with the replay
+    // marker: the view reverts, the store-facing onChange stays quiet, and
+    // the ledger keeps exactly one (now stale) entry.
+    rendered.rerender(<CodeMirrorHost {...props} doc={initial} historyReplay={true} />);
+    await act(async () => {});
+    expect(view!.state.doc.toString()).toBe(initial);
+    expect(owner.getDocument("shared.ts")).toBe(initial);
+    expect(owner.getHistoryState("shared.ts").undoDepth).toBe(1);
+    expect(owner.undo("shared.ts", "primary")).toBeNull();
+    expect(view!.state.doc.toString()).toBe(initial);
+  });
+
+  it("ED-AUDIT-002: one undo through the shared owner restores the virtual caret with the text", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const actionHost = new WorkspaceActionHost({ workspaceId: "ws-vspace-undo" });
+    const initial = "first line\nsecond";
+    const rendered = render(
+      <CodeMirrorHost
+        {...sharedProps(owner, "primary", initial, vi.fn(), actionHost)}
+        appearance={{
+          fontFamily: "monospace",
+          fontSizePx: 14,
+          lineHeight: 1.5,
+          ligatures: false,
+          colorSchemeId: "default",
+          highContrast: false,
+          virtualSpace: { afterLineEnd: true, atFileBottom: true },
+        }}
+      />,
+    );
+    const view = EditorView.findFromDOM(rendered.container.querySelector<HTMLElement>(".cm-editor")!);
+    expect(view).not.toBeNull();
+
+    // Park a virtual caret past the end of line 0 (offset 10) with 3 columns.
+    view!.dispatch({
+      selection: EditorSelection.cursor(10),
+      effects: setVirtualOverflow.of(new Map([[10, 3]])),
+    });
+    expect(virtualOverflowAt(view!.state, 10)).toBe(3);
+
+    // Typing consumes the overflow: padding + text in one transaction that
+    // reaches the shared owner through the host's update listener.
+    expect((virtualSpaceTypingHandler as any).value(view!, 10, 10, "X")).toBe(true);
+    expect(view!.state.doc.toString()).toBe("first line   X\nsecond");
+    expect(owner.getDocument("shared.ts")).toBe("first line   X\nsecond");
+
+    // The production undo action routes through the shared owner.
+    await act(async () => {
+      const result = await actionHost.execute("workspace.undo", { focus: "editor", hasActiveFile: true });
+      expect(result.kind).toBe("applied");
+    });
+    expect(view!.state.doc.toString()).toBe(initial);
+    expect(view!.state.selection.main.head).toBe(10);
+    expect(virtualOverflowAt(view!.state, 10)).toBe(3);
+    expect(owner.getDocument("shared.ts")).toBe(initial);
+
+    // The restored caret is live: the next insertion re-manufactures padding.
+    expect((virtualSpaceTypingHandler as any).value(view!, 10, 10, "Z")).toBe(true);
+    expect(view!.state.doc.toString()).toBe("first line   Z\nsecond");
+    await act(async () => {
+      const result = await actionHost.execute("workspace.undo", { focus: "editor", hasActiveFile: true });
+      expect(result.kind).toBe("applied");
+    });
+    expect(view!.state.doc.toString()).toBe(initial);
+    expect(virtualOverflowAt(view!.state, 10)).toBe(3);
+  });
+
   it("keeps a native replacement burst ahead of delayed controlled document echoes after undo", async () => {
     const owner = new WorkspaceDocumentTransactionOwner();
     const actionHost = new WorkspaceActionHost({ workspaceId: "ws-shared-recovery" });
@@ -1153,5 +1302,265 @@ describe("ED-SAVE-004 editor recovery decoration synchronization", () => {
     });
     expect(dispatchSpy.mock.calls.length).toBeGreaterThan(1);
     expect(rendered.container.querySelector(".cm-git-change-modified")).toBeTruthy();
+  });
+});
+
+describe("ED-IMPROVE-007 leaf/file view snapshots", () => {
+  afterEach(() => cleanup());
+
+  function findView(rendered: { container: HTMLElement }): EditorView {
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!);
+    expect(view).not.toBeNull();
+    return view!;
+  }
+
+  it("applies a persisted main selection and multi-cursor once at mount", () => {
+    const doc = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8";
+    const rendered = renderEditor(doc, vi.fn(), {
+      initialViewState: {
+        mainSelection: { anchor: 12, head: 12 },
+        selections: [{ anchor: 6, head: 6 }],
+        scrollTop: 0,
+        folds: [],
+      },
+    });
+    const view = findView(rendered);
+    expect(view.state.selection.main.head).toBe(12);
+    expect(view.state.selection.ranges).toHaveLength(2);
+    expect(view.state.selection.ranges.map((range) => range.head).sort((a, b) => a - b)).toEqual([6, 12]);
+  });
+
+  it("applies persisted folds and reports them in the captured state", async () => {
+    const doc = "function a() {\n  body1;\n  body2;\n}\nfunction b() {\n  other;\n}\n";
+    const onViewStateChange = vi.fn();
+    const rendered = renderEditor(doc, vi.fn(), {
+      initialViewState: {
+        mainSelection: { anchor: 0, head: 0 },
+        selections: [],
+        scrollTop: 0,
+        folds: [{ from: 0, to: doc.indexOf("function b") }],
+      },
+      onViewStateChange,
+    });
+    const view = findView(rendered);
+    expect(foldedRanges(view.state).size).toBeGreaterThan(0);
+    await waitFor(() => expect(onViewStateChange).toHaveBeenCalled());
+    const captured = onViewStateChange.mock.calls.at(-1)![0];
+    expect(captured.folds.length).toBeGreaterThan(0);
+  });
+
+  it("clamps corrupt or out-of-range persisted offsets instead of throwing", () => {
+    const doc = "short";
+    const rendered = renderEditor(doc, vi.fn(), {
+      initialViewState: {
+        mainSelection: { anchor: 9999, head: -5 },
+        selections: [{ anchor: 4000, head: 4000 }],
+        scrollTop: 5000,
+        folds: [{ from: 100, to: 200 }, { from: 3, to: 1 }],
+      },
+    });
+    const view = findView(rendered);
+    for (const range of view.state.selection.ranges) {
+      expect(range.anchor).toBeGreaterThanOrEqual(0);
+      expect(range.anchor).toBeLessThanOrEqual(doc.length);
+      expect(range.head).toBeGreaterThanOrEqual(0);
+      expect(range.head).toBeLessThanOrEqual(doc.length);
+    }
+    expect(foldedRanges(view.state).size).toBe(0);
+  });
+
+  it("emits the captured state on selection changes and dedupes identical snapshots", async () => {
+    const doc = Array.from({ length: 40 }, (_, index) => `line ${index}`).join("\n");
+    const onViewStateChange = vi.fn();
+    const rendered = renderEditor(doc, vi.fn(), { onViewStateChange });
+    const view = findView(rendered);
+    act(() => {
+      view.dispatch({ selection: EditorSelection.cursor(10) });
+    });
+    await waitFor(() => expect(onViewStateChange).toHaveBeenCalled());
+    const captured = onViewStateChange.mock.calls.at(-1)![0];
+    expect(captured.mainSelection.head).toBe(10);
+    const callsAfterSelection = onViewStateChange.mock.calls.length;
+    act(() => {
+      view.dispatch({ selection: EditorSelection.cursor(10) });
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 220));
+    });
+    expect(onViewStateChange.mock.calls.length).toBe(callsAfterSelection);
+  });
+
+  it("never re-applies a later initialViewState prop over live user input", async () => {
+    const doc = "alpha\nbeta\ngamma\ndelta\nepsilon";
+    const onChange = vi.fn();
+    const rendered = renderEditor(doc, onChange, {
+      initialViewState: {
+        mainSelection: { anchor: 0, head: 0 },
+        selections: [],
+        scrollTop: 0,
+        folds: [],
+      },
+    });
+    const view = findView(rendered);
+    act(() => {
+      view.dispatch({ selection: EditorSelection.cursor(doc.indexOf("delta")) });
+    });
+    // A late prop update carrying a stale snapshot must not move the caret.
+    rendered.rerender(
+      <CodeMirrorHost
+        {...rendered.props}
+        initialViewState={{
+          mainSelection: { anchor: 0, head: 0 },
+          selections: [],
+          scrollTop: 0,
+          folds: [],
+        }}
+      />,
+    );
+    const after = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!);
+    expect(after!.state.selection.main.head).toBe(doc.indexOf("delta"));
+  });
+});
+
+describe("ED-IMPROVE-008 IME composition lifecycle wiring", () => {
+  afterEach(() => cleanup());
+
+  it("finalizes composition ownership on compositionend and blur and keeps typing working", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const rendered = renderEditor("hello ", vi.fn(), {
+      transactionOwner: owner,
+      viewId: "primary",
+      fileKey: "ime.ts",
+    });
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    act(() => {
+      content.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+      content.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "n" }));
+    });
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+    act(() => {
+      view.dispatch({ changes: { from: 6, insert: "x" } });
+    });
+    await waitFor(() => expect(owner.getDocument("ime.ts")).toBe("hello x"));
+    // Blur during a fresh composition must release ownership without losing text.
+    act(() => {
+      content.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+      content.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
+    });
+    act(() => {
+      view.dispatch({ changes: { from: 7, insert: "y" } });
+    });
+    await waitFor(() => expect(owner.getDocument("ime.ts")).toBe("hello xy"));
+  });
+});
+
+describe("ED-IMPROVE-009 late clipboard results report a cancelled observation", () => {
+  afterEach(() => cleanup());
+
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((res) => { resolve = res; });
+    return { promise, resolve };
+  }
+
+  function stubHandle(
+    read: () => Promise<unknown>,
+    write: () => Promise<unknown>,
+  ) {
+    return {
+      workspaceId: "ws-009",
+      attachConsumer: () => ({ detach: () => {} }),
+      getSnapshot: () => ({
+        permission: "granted",
+        permissionGeneration: 3,
+        exclusion: "recorded",
+        payloadRevision: 1,
+      }),
+      readSystemClipboard: read,
+      writeSystemClipboard: write,
+      write: () => { throw new Error("unused"); },
+      read: () => null,
+      clear: () => {},
+      release: () => {},
+      historyEntries: () => [],
+      pasteFromHistory: () => null,
+      removeHistoryEntry: () => false,
+      clearHistory: () => {},
+      setHistoryEnabled: () => {},
+      isHistoryEnabled: () => true,
+      setHistoryLimits: () => {},
+      historyLimits: () => ({ maxItems: 0, maxTotalBytes: 0 }),
+      historyExclusion: () => "recorded",
+      setPermission: () => {},
+      permission: () => "granted",
+      attachPermissionAdapter: () => () => {},
+      syncPermission: async () => "granted",
+      subscribe: () => () => {},
+    };
+  }
+
+  it("reports a cancelled paste with the OS read effect after the selection moved", async () => {
+    const pending = deferred<unknown>();
+    const observations: unknown[] = [];
+    let port: { execute: (id: string, options?: unknown) => boolean } | null = null;
+    const handle = stubHandle(() => pending.promise, async () => ({ outcome: "success", systemEffect: "performed" }));
+    renderEditor("hello world", vi.fn(), {
+      clipboardHandle: handle as never,
+      onClipboardObservation: (record) => { observations.push(record); },
+      onCommandPortChange: (registration) => { port = registration.port as never; },
+    });
+    await waitFor(() => expect(port).not.toBeNull());
+    const view = EditorView.findFromDOM(document.querySelector(".cm-editor")!)!;
+    act(() => {
+      port!.execute("paste");
+    });
+    act(() => {
+      view.dispatch({ selection: EditorSelection.cursor(5) });
+    });
+    act(() => {
+      pending.resolve({ outcome: "success", text: "payload", systemEffect: "performed" });
+    });
+    await waitFor(() => expect(observations).toHaveLength(1));
+    expect(observations[0]).toMatchObject({
+      operation: "paste",
+      outcome: "cancelled",
+      systemEffect: "performed",
+      permission: "granted",
+    });
+    expect(view.state.doc.toString()).toBe("hello world");
+  });
+
+  it("keeps a performed cut write fact after the document changed", async () => {
+    const pending = deferred<unknown>();
+    const observations: unknown[] = [];
+    let port: { execute: (id: string, options?: unknown) => boolean } | null = null;
+    const handle = stubHandle(async () => ({ outcome: "denied", systemEffect: "not-performed", fallbackSession: null }), () => pending.promise);
+    const rendered = renderEditor("hello world", vi.fn(), {
+      clipboardHandle: handle as never,
+      onClipboardObservation: (record) => { observations.push(record); },
+      onCommandPortChange: (registration) => { port = registration.port as never; },
+    });
+    await waitFor(() => expect(port).not.toBeNull());
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+    act(() => {
+      view.dispatch({ selection: EditorSelection.range(0, 5) });
+    });
+    act(() => {
+      port!.execute("cut");
+    });
+    act(() => {
+      view.dispatch({ selection: EditorSelection.cursor(0) });
+    });
+    act(() => {
+      pending.resolve({ outcome: "denied", systemEffect: "performed" });
+    });
+    await waitFor(() => expect(observations).toHaveLength(1));
+    expect(observations[0]).toMatchObject({
+      operation: "cut",
+      outcome: "cancelled",
+      systemEffect: "performed",
+    });
+    // No cut happened: the document keeps its text.
+    expect(view.state.doc.toString()).toBe("hello world");
   });
 });

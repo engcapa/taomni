@@ -41,3 +41,16 @@ describe("buildReplaceWorkspaceEdit", () => {
     expect(edit.documentEdits).toHaveLength(2);
   });
 });
+
+describe("ED-IMPROVE-004: buildReplaceWorkspaceEdit UTF-16 ranges", () => {
+  it("maps a match after an astral prefix to UTF-16 characters", () => {
+    const lineText = "const s = \"\u{1F600}foo\";";
+    const edit = buildReplaceWorkspaceEdit([
+      match({ lineText, matchStart: 12, matchEnd: 15, lineNumber: 1 }),
+    ], "bar");
+    expect(edit.documentEdits[0]!.edits[0]!.range).toEqual({
+      start: { line: 0, character: 13 },
+      end: { line: 0, character: 16 },
+    });
+  });
+});

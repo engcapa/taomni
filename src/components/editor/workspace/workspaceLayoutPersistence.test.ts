@@ -245,3 +245,102 @@ describe("workspaceLayoutPersistence", () => {
     expect(restored.tabPolicyBackup).toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// ED-IMPROVE-007: per-leaf/file view snapshots survive normalization with
+// bounds and keep old snapshots (no viewStates field) restoring.
+// ---------------------------------------------------------------------------
+describe("ED-IMPROVE-007 view state persistence", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("round-trips per-leaf/file view states", () => {
+    const snapshot = defaultWorkspaceLayoutSnapshot();
+    snapshot.viewStates = {
+      primary: {
+        "root:app:src/main.ts": {
+          mainSelection: { anchor: 12, head: 20 },
+          selections: [{ anchor: 3, head: 3 }],
+          scrollTop: 240.7,
+          folds: [{ from: 10, to: 40 }, { from: 80, to: 120 }],
+        },
+      },
+      secondary: {
+        "root:app:src/main.ts": {
+          mainSelection: { anchor: 0, head: 0 },
+          selections: [],
+          scrollTop: 0,
+          folds: [],
+        },
+      },
+    };
+    writeWorkspaceLayoutSnapshot("ws-007", snapshot);
+    const loaded = readWorkspaceLayoutSnapshot("ws-007");
+    expect(loaded?.viewStates).toEqual({
+      primary: {
+        "root:app:src/main.ts": {
+          mainSelection: { anchor: 12, head: 20 },
+          selections: [{ anchor: 3, head: 3 }],
+          scrollTop: 240,
+          folds: [{ from: 10, to: 40 }, { from: 80, to: 120 }],
+        },
+      },
+      secondary: {
+        "root:app:src/main.ts": {
+          mainSelection: { anchor: 0, head: 0 },
+          selections: [],
+          scrollTop: 0,
+          folds: [],
+        },
+      },
+    });
+    // Same document, two leaves: independent snapshots.
+    expect(loaded?.viewStates?.primary?.["root:app:src/main.ts"]?.mainSelection.head).toBe(20);
+    expect(loaded?.viewStates?.secondary?.["root:app:src/main.ts"]?.mainSelection.head).toBe(0);
+  });
+
+  it("drops corrupt, reversed and out-of-shape entries and bounds the arrays", () => {
+    const normalized = normalizeWorkspaceLayoutSnapshot({
+      ...defaultWorkspaceLayoutSnapshot(),
+      viewStates: {
+        primary: {
+          "root:app:a.ts": {
+            mainSelection: { anchor: 1, head: 2 },
+            selections: [
+              { anchor: 3, head: 4 },
+              { anchor: -1, head: 0 },
+              { anchor: "x", head: 2 },
+            ],
+            scrollTop: "nope",
+            folds: [{ from: 5, to: 5 }, { from: 9, to: 4 }, { from: 1, to: 3 }],
+          },
+          "root:app:bad.ts": { mainSelection: "nope" },
+          "root:app:empty.ts": null,
+        },
+        "": { "root:app:x.ts": { mainSelection: { anchor: 0, head: 0 } } },
+        secondary: {},
+      },
+    });
+    expect(normalized.viewStates).toEqual({
+      primary: {
+        "root:app:a.ts": {
+          mainSelection: { anchor: 1, head: 2 },
+          selections: [{ anchor: 3, head: 4 }],
+          scrollTop: 0,
+          folds: [{ from: 1, to: 3 }],
+        },
+      },
+    });
+  });
+
+  it("keeps pre-007 snapshots restoring without a viewStates field", () => {
+    const snapshot = defaultWorkspaceLayoutSnapshot();
+    const raw = JSON.parse(JSON.stringify(snapshot));
+    delete raw.viewStates;
+    window.localStorage.setItem("taomni.codeWorkspace.layout.v2.ws-007-legacy", JSON.stringify(raw));
+    const loaded = readWorkspaceLayoutSnapshot("ws-007-legacy");
+    expect(loaded).not.toBeNull();
+    expect(loaded?.viewStates).toEqual({});
+  });
+});

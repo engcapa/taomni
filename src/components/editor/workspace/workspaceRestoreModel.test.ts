@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  createRestoreTimingRecorder,
   executeBoundedAsyncQueue,
   getLineDiffCacheKey,
   planWorkspaceRestore,
@@ -139,5 +140,52 @@ describe("ED-PERF-003: workspaceRestoreModel", () => {
     expect(key1).toBe(key2);
     expect(key1).not.toBe(key3);
     expect(keyUntracked).toBe("/repo/src/A.ts@untracked:1");
+  });
+});
+
+describe("ED-AUDIT-013: restore timing recorder", () => {
+  it("records request/active/all milestones in order with counts", () => {
+    const recorder = createRestoreTimingRecorder(2, 22);
+    expect(recorder.marks.requestedAt).toBeNull();
+    recorder.markRequested(100);
+    recorder.markActiveReady(150);
+    recorder.markAllReady(900);
+    expect(recorder.toJSON()).toEqual({
+      requestedAt: 100,
+      activeReadyAt: 150,
+      allReadyAt: 900,
+      cancelled: false,
+      activeCount: 2,
+      backgroundCount: 22,
+    });
+  });
+
+  it("keeps the first write per milestone so remounts cannot rewrite history", () => {
+    const recorder = createRestoreTimingRecorder(1, 0);
+    recorder.markRequested(100);
+    recorder.markRequested(200);
+    recorder.markActiveReady(150);
+    recorder.markActiveReady(160);
+    recorder.markAllReady(300);
+    recorder.markAllReady(310);
+    expect(recorder.toJSON()).toEqual({
+      requestedAt: 100,
+      activeReadyAt: 150,
+      allReadyAt: 300,
+      cancelled: false,
+      activeCount: 1,
+      backgroundCount: 0,
+    });
+  });
+
+  it("flags cancellation without rewriting timestamps", () => {
+    const recorder = createRestoreTimingRecorder(2, 22);
+    recorder.markRequested(100);
+    recorder.markCancelled();
+    recorder.markAllReady(900);
+    const snapshot = recorder.toJSON();
+    expect(snapshot.cancelled).toBe(true);
+    expect(snapshot.requestedAt).toBe(100);
+    expect(snapshot.allReadyAt).toBe(900);
   });
 });

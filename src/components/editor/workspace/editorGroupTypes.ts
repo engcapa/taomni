@@ -50,6 +50,14 @@ export interface OpenFileViewModel {
    * which fails on same-length edits.
    */
   documentRevision: number;
+  /**
+   * ED-AUDIT-008: the buffer text was written by a workspace-history restore
+   * (journal undo/redo or recovery), not by an external disk change. The
+   * editor host routes such snapshots through the shared owner with the
+   * "undo" transaction origin so the restore never records a second undoable
+   * document entry next to the journal transaction that owns it.
+   */
+  historyReplay?: boolean;
   error: string | null;
   /** Set for language-server-provided library sources (read-only, no file on disk). */
   library?: OpenFileLibrarySource | null;

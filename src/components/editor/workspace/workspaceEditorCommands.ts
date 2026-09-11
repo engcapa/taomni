@@ -11,6 +11,7 @@ import {
   editorVirtualSpacePolicy,
   paddingForOverflow,
   setVirtualOverflow,
+  setVirtualOverflowRestore,
   virtualSpaceOverflowField,
   type VirtualOverflowMap,
 } from "./workspaceVirtualSpace";
@@ -151,9 +152,29 @@ export function buildMultiCaretPastePlan(
 ): MultiCaretPastePlan | null {
   if (state.readOnly) return null;
   const normalized = normalizeEditorSelections(state.selection.ranges, state.selection.mainIndex);
-  const distributed = payload.segments?.length === normalized.ranges.length
-    ? payload.segments
-    : normalized.ranges.map(() => payload.plainText);
+  // ED-AUDIT-010: mirror workspaceClipboardSession.planPaste so production and
+  // the documented contract share one distribution rule. N segments x N carets
+  // map 1:1; fewer segments cycle deterministically; extra segments are
+  // dropped (first N win); no segments fall back to whole plainText per caret.
+  // Single-caret exception: one caret always receives the whole plainText so a
+  // multi-segment copy is never lossy on paste (matches the long-standing
+  // ED-CLIP-004 fallback regression); distribution rules apply across 2+
+  // carets only. External OS text never carries session segments (see
+  // payloadForSystemClipboardText identity check), so the whole-block fallback
+  // only applies when segment identity was already discarded or when a single
+  // caret cannot express a distribution.
+  const segments = payload.segments;
+  const caretCount = normalized.ranges.length;
+  let distributed: readonly string[];
+  if (!segments || segments.length === 0 || caretCount <= 1) {
+    distributed = normalized.ranges.map(() => payload.plainText);
+  } else if (segments.length === caretCount) {
+    distributed = [...segments];
+  } else if (segments.length < caretCount) {
+    distributed = normalized.ranges.map((_, index) => segments[index % segments.length]);
+  } else {
+    distributed = normalized.ranges.map((_, index) => segments[index]);
+  }
   const inserts = distributed.map((text) => normalizeClipboardEol(text, state.lineBreak));
   const changes = normalized.ranges.map((range, index) => ({
     from: range.from,
@@ -201,7 +222,14 @@ export function pasteEditorClipboardPayload(
     changes,
     selection: plan.selection,
     ...(overflow && overflow.size > 0
-      ? { effects: setVirtualOverflow.of(new Map()) }
+      ? {
+          effects: [
+            setVirtualOverflow.of(new Map()),
+            // ED-AUDIT-002: record the consumed overflow so one undo restores
+            // the pasted text and the virtual caret together.
+            setVirtualOverflowRestore.of(overflow),
+          ],
+        }
       : {}),
     userEvent: "input.paste",
     scrollIntoView: true,
@@ -682,6 +710,9 @@ export const selectAllEditorOccurrences: Command = (view) => {
 };
 
 export const escapeEditorSelections: Command = (view) => {
+  // ED-AUDIT-011: Escape during IME composition belongs to the candidate
+  // window; never collapse carets or clear occurrence state mid-composition.
+  if (view.composing) return false;
   if (view.state.field(occurrenceSessionField, false)) {
     view.dispatch({ effects: setOccurrenceSession.of(false) });
     return true;

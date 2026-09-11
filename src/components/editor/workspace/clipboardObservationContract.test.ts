@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertClipboardObservationIsRedacted,
+  createClipboardCancelledObservation,
   createClipboardReadObservation,
   createClipboardWriteObservation,
 } from "./clipboardObservationContract";
@@ -124,5 +125,83 @@ describe("clipboardObservationContract", () => {
     });
     expect(JSON.stringify(record)).not.toContain("secret-token-value");
     expect(() => assertClipboardObservationIsRedacted(record)).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ED-IMPROVE-009: a late clipboard result whose owner moved on is reported as
+// cancelled while keeping the real OS effect fact.
+// ---------------------------------------------------------------------------
+describe("ED-IMPROVE-009 cancelled clipboard observations", () => {
+  it("keeps a performed write fact on a cancelled cut", () => {
+    const record = createClipboardCancelledObservation({
+      operation: "cut",
+      systemEffect: "performed",
+      permission: "granted",
+      permissionGeneration: 4,
+      historyExclusion: "recorded",
+      payloadRevision: 2,
+      caretCount: 3,
+      segmentCount: 2,
+      rectangular: false,
+      payloadLength: 6,
+    });
+    expect(record).toMatchObject({
+      operation: "cut",
+      outcome: "cancelled",
+      systemEffect: "performed",
+      caretCount: 3,
+      segmentCount: 2,
+      payloadLength: 6,
+    });
+    assertClipboardObservationIsRedacted(record);
+  });
+
+  it("keeps an unknown write fact on a cancelled cut and a cancelled read", () => {
+    const write = createClipboardCancelledObservation({
+      operation: "cut",
+      systemEffect: "unknown",
+      permission: "unknown",
+      permissionGeneration: 0,
+      historyExclusion: "recorded",
+      payloadRevision: 0,
+      caretCount: 1,
+    });
+    expect(write.systemEffect).toBe("unknown");
+    expect(write.outcome).toBe("cancelled");
+
+    const read = createClipboardCancelledObservation({
+      operation: "paste",
+      systemEffect: "unknown",
+      permission: "denied",
+      permissionGeneration: 5,
+      historyExclusion: "recorded",
+      payloadRevision: 1,
+      caretCount: 3,
+      usedWorkspaceFallback: true,
+      payloadLength: 4,
+    });
+    expect(read).toMatchObject({
+      outcome: "cancelled",
+      systemEffect: "unknown",
+      usedWorkspaceFallback: true,
+      permission: "denied",
+    });
+    assertClipboardObservationIsRedacted(read);
+  });
+
+  it("never downgrades a performed effect and never carries payload text", () => {
+    const direct = createClipboardWriteObservation({
+      operation: "copy",
+      result: { outcome: "success", systemEffect: "performed" },
+      payload: { plainText: "secret", rectangular: false },
+      permission: "granted",
+      permissionGeneration: 1,
+      historyExclusion: "recorded",
+      payloadRevision: 0,
+      caretCount: 1,
+    });
+    expect(direct.systemEffect).toBe("performed");
+    assertClipboardObservationIsRedacted(direct);
   });
 });

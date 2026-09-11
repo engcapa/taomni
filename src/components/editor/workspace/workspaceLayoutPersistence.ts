@@ -26,6 +26,34 @@ export const WORKSPACE_LAYOUT_STORAGE_PREFIX = "taomni.codeWorkspace.layout.v1."
 export const WORKSPACE_SEARCH_HISTORY_PREFIX = "taomni.codeWorkspace.searchHistory.v1.";
 export const MAX_SEARCH_HISTORY = 20;
 export const MAX_RESTORED_OPEN_FILES = 24;
+/** ED-IMPROVE-007: bounded per-view snapshot caps. */
+export const MAX_VIEW_STATE_SELECTIONS = 8;
+export const MAX_VIEW_STATE_FOLDS = 200;
+
+export interface PersistedViewSelection {
+  anchor: number;
+  head: number;
+}
+
+export interface PersistedViewFold {
+  from: number;
+  to: number;
+}
+
+/**
+ * ED-IMPROVE-007: one leaf/file view snapshot. Offsets are UTF-16 document
+ * offsets owned by this leaf only; the shared text/history stay with the
+ * document transaction owner.
+ */
+export interface PersistedEditorViewState {
+  mainSelection: PersistedViewSelection;
+  selections: PersistedViewSelection[];
+  scrollTop: number;
+  folds: PersistedViewFold[];
+}
+
+/** leaf id -> file key -> view state. */
+export type WorkspaceViewStates = Record<string, Record<string, PersistedEditorViewState>>;
 
 export interface PersistedEditorGroup {
   openOrder: string[];
@@ -61,6 +89,11 @@ export interface WorkspaceLayoutSnapshotV2 {
   expandedDirKeys: string[];
   layoutTreeV2: LayoutNode;
   editorGroups: Record<string, PersistedEditorGroup>;
+  /**
+   * ED-IMPROVE-007 per-leaf/file caret, selection, scroll and fold snapshots.
+   * Optional on raw input so pre-007 snapshots keep restoring.
+   */
+  viewStates?: WorkspaceViewStates;
   /**
    * §8.19.6 per-workspace tab policy (schema v3). Optional on raw input;
    * normalization always materializes it: corrupt/v2 payloads migrate
@@ -175,6 +208,72 @@ export function defaultWorkspaceLayoutSnapshot(): WorkspaceLayoutSnapshotV2 {
       secondary: createEmptyPersistedGroup(),
     },
   };
+}
+
+function asViewOffset(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.floor(value)
+    : null;
+}
+
+function normalizeViewSelection(value: unknown): PersistedViewSelection | null {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Record<string, unknown>;
+  const anchor = asViewOffset(source.anchor);
+  const head = asViewOffset(source.head);
+  if (anchor === null || head === null) return null;
+  return { anchor, head };
+}
+
+function normalizeViewFold(value: unknown): PersistedViewFold | null {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Record<string, unknown>;
+  const from = asViewOffset(source.from);
+  const to = asViewOffset(source.to);
+  if (from === null || to === null || to <= from) return null;
+  return { from, to };
+}
+
+function normalizeEditorViewState(value: unknown): PersistedEditorViewState | null {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Record<string, unknown>;
+  const mainSelection = normalizeViewSelection(source.mainSelection);
+  if (!mainSelection) return null;
+  const selections = Array.isArray(source.selections)
+    ? source.selections
+      .map(normalizeViewSelection)
+      .filter((selection): selection is PersistedViewSelection => selection !== null)
+      .filter((selection) => selection.anchor !== mainSelection.anchor || selection.head !== mainSelection.head)
+      .slice(0, MAX_VIEW_STATE_SELECTIONS - 1)
+    : [];
+  const folds = Array.isArray(source.folds)
+    ? source.folds
+      .map(normalizeViewFold)
+      .filter((fold): fold is PersistedViewFold => fold !== null)
+      .slice(0, MAX_VIEW_STATE_FOLDS)
+    : [];
+  return {
+    mainSelection,
+    selections,
+    scrollTop: asViewOffset(source.scrollTop) ?? 0,
+    folds,
+  };
+}
+
+function normalizeWorkspaceViewStates(value: unknown): WorkspaceViewStates {
+  if (!value || typeof value !== "object") return {};
+  const normalized: WorkspaceViewStates = {};
+  for (const [leafId, files] of Object.entries(value as Record<string, unknown>)) {
+    if (!leafId || !files || typeof files !== "object") continue;
+    const perFile: Record<string, PersistedEditorViewState> = {};
+    for (const [fileKey, state] of Object.entries(files as Record<string, unknown>)) {
+      if (!fileKey) continue;
+      const normalizedState = normalizeEditorViewState(state);
+      if (normalizedState) perFile[fileKey] = normalizedState;
+    }
+    if (Object.keys(perFile).length > 0) normalized[leafId] = perFile;
+  }
+  return normalized;
 }
 
 export function normalizeWorkspaceLayoutSnapshot(value: unknown): WorkspaceLayoutSnapshotV2 {
@@ -294,6 +393,7 @@ export function normalizeWorkspaceLayoutSnapshot(value: unknown): WorkspaceLayou
     tabPolicy: policyMigration.policy,
     ...(policyBackup != null ? { tabPolicyBackup: policyBackup } : {}),
     editorGroups: normalizedGroups,
+    viewStates: normalizeWorkspaceViewStates(source.viewStates),
     layoutRecovered,
   };
 }
@@ -432,6 +532,8 @@ export function snapshotFromWorkspaceUi(input: {
     layoutTreeV2: LayoutNode;
   /** §8.19.6 per-workspace tab policy (v3); normalized on write. */
   tabPolicy?: WorkspaceTabPolicyV3;
+  /** ED-IMPROVE-007 per-leaf/file view snapshots; normalized on write. */
+  viewStates?: WorkspaceViewStates;
 
 }): WorkspaceLayoutSnapshotV2 {
   const toPersisted = (group: CodeWorkspaceEditorGroupState): PersistedEditorGroup => ({
@@ -470,6 +572,7 @@ export function snapshotFromWorkspaceUi(input: {
     layoutTreeV2: layoutTree,
     tabPolicy: input.tabPolicy ?? { ...DEFAULT_WORKSPACE_TAB_POLICY_V3 },
     editorGroups: persistedGroups,
+    viewStates: input.viewStates ?? {},
   });
 }
 

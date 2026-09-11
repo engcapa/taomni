@@ -1,0 +1,115 @@
+id: TC-IDE-FOLLOW-001-file-move-recovery-native
+title: "File-move recovery: seeded v2 journal with a journalled relocation reverses the move"
+description: |
+  ED-FOLLOW-001 native gate case. Crosses the real packaged-app boundary on
+  Linux and proves the crash-recovery half of file-move undo that ED-AUDIT-014
+  left blind (v2 journals were text-only; resource operations had no
+  coverage):
+
+  A1 record: the live single-undo path already reverses relocations via
+  snapshot replay (delete-new/create-old/write-pre, unit-proven in
+  workspaceEditHistory.test.ts); the shipped gap was restart recovery, where
+  a rename transaction journalled nothing and the moved file stayed moved.
+
+  A3 native restart/disk: the host-side fixture pre-stages a completed
+  server-side move (Old.java gone, New.java present with the post bytes) in
+  a fresh plain-folder workspace. A seeded v2 journal entry carries one text
+  document (Old.java pre/post images) plus one resourceMoves record with the
+  moved bytes' content proof. The webview JS context is destroyed by
+  reload_window, the workspace is re-entered through recents, the recovery
+  controller surfaces "Refactor recovery pending" (listing the relocation),
+  the case accepts "Review recovery", then the restore confirm (naming the
+  move-back), and the controller reverses New.java -> Old.java through the
+  shell's real resource-operation path before restoring the preimage bytes.
+  The host re-reads Old.java (assert_file_sha256 == preHash a749a308...),
+  and the persisted journal entry is read back as rolled-back with the
+  reversed move recorded (never inferred). The runner labels the restart
+  primitive faithfully (reload_window destroys the JS context and re-runs
+  workspace ready discovery from localStorage; a process kill is unrun on
+  this box and would only additionally prove WebKitGTK's own localStorage
+  flush durability).
+
+  Highest claim on green: L2 native (Linux), packaged app UI over real disk
+  bytes. No provider is involved (plain folder, no jdtls); IDEA comparison
+  is unrun on this box — no IDEA 2026.2.x.
+covers: [F25.5]
+tags: [code-workspace, ide-editor, refactor, recovery, native-gate, p1]
+modes: [native]
+fixtures: [reset_db, file_move_recovery_fixtures]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-gate-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  # Enter the fresh file-move workspace through persisted recents; the
+  # workspace identity is the deterministic recents identity of the roots,
+  # so the recovery entries survive reload_window.
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-follow001","name":"file-move","roots":[{"id":"file-move","name":"file-move","path":"${fixture.file_move_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"file-move","path":"New.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.file_move_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "public class New"
+      timeout_sec: 60
+  # Seed the v2 recovery journal entry: status=prepared, one text document
+  # (Old.java pre/post images, LF bytes) plus one journalled file move with
+  # the moved bytes' content proof (post sha256). The fixture pre-staged the
+  # post-move disk (Old.java missing, New.java present) so classification
+  # resolves restorable with the document target mapped to the new path.
+  - seed_storage:
+      key: taomni.refactor.recovery.v2:qa-follow001-move
+      value: '{"schemaVersion": 2, "recoveryId": "qa-follow001-move", "transactionId": "qa-follow001-txn", "actionId": "rename:qa-follow001-move", "kind": "rename", "workspaceRoot": "${fixture.file_move_root}", "createdAt": 1757000000000, "updatedAt": 1757000000000, "status": "prepared", "appliedOperationIndex": null, "documents": [{"uri": "file://${fixture.file_move_root}/Old.java", "canonicalPath": "${fixture.file_move_root}/Old.java", "preText": "public class Old {\n    int value = 1;\n}\n", "preHash": "a749a3089d9f0838bf00ec965d7a57cdcf50c2e608be8de907c05a46f5b78cb7", "postText": "public class New {\n    int value = 1;\n}\n", "postHash": "009a8da946e78e5b18007a8395db2344c9435a2191d29c673753077d5603a215", "encoding": "UTF-8", "bom": false, "eol": "lf"}], "resourceMoves": [{"oldUri": "file://${fixture.file_move_root}/Old.java", "newUri": "file://${fixture.file_move_root}/New.java", "oldPath": "${fixture.file_move_root}/Old.java", "newPath": "${fixture.file_move_root}/New.java", "contentHash": "009a8da946e78e5b18007a8395db2344c9435a2191d29c673753077d5603a215"}], "verification": {"mismatchedUris": [], "checkedAt": null}}'
+  # reload_window destroys the webview JS context. Re-enter via recents so
+  # the workspace mounts fresh and workspace-ready discovery runs the
+  # pending-entry scan (the same mechanism that runs after a process
+  # restart, since localStorage is webview-persistent under the QA overlay).
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.file_move_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="confirm-dialog"]'
+      contains: "Refactor recovery pending"
+      timeout_sec: 10
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="confirm-dialog"]'
+      contains: "move 1 relocated file"
+      timeout_sec: 10
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  # After restore: the move is reversed (Old.java back) and the bytes are
+  # the preimage; assert_file_sha256 re-reads the host bytes and requires
+  # the exact preimage sha256.
+  - wait_for:
+      selector: '[data-testid="status-bar-message"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "moved back 1"
+      timeout_sec: 30
+  - assert_file_sha256:
+      path: "${fixture.file_move_root}/Old.java"
+      equals: "a749a3089d9f0838bf00ec965d7a57cdcf50c2e608be8de907c05a46f5b78cb7"
+      timeout_sec: 30
+  # The persisted entry proves the reversal happened: rolled-back status
+  # with the reversed move recorded (read from storage, never inferred).
+  - eval_readonly:
+      expression: "localStorage.getItem('taomni.refactor.recovery.v2:qa-follow001-move')"
+      contains: "rolled-back"
+  - eval_readonly:
+      expression: "localStorage.getItem('taomni.refactor.recovery.v2:qa-follow001-move')"
+      contains: "reversedMoves"
+  - screenshot: tc-ide-follow-001-move-reversed.png

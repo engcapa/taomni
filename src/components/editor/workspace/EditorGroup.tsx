@@ -83,6 +83,7 @@ import {
   type WorkspaceTabPolicyV3,
 } from "./workspaceTabPolicy";
 import type { RegionFoldingProvenance } from "./workspaceEditorCommands";
+import type { PersistedEditorViewState } from "./workspaceLayoutPersistence";
 
 export type MarkdownViewMode = "edit" | "preview" | "split";
 
@@ -196,6 +197,13 @@ interface EditorGroupProps {
   workspaceActionHost?: WorkspaceActionHost | null;
   /** §8.26 / ED-MULTIVIEW-002: shared document transaction owner across splits. */
   transactionOwner?: WorkspaceDocumentTransactionOwner | null;
+  /**
+   * ED-AUDIT-008: claim a Ctrl+Z / Ctrl+Shift+Z stroke for the workspace-edit
+   * journal before the document ledger acts. `true` = the journal consumed
+   * the stroke, `false` = the journal is busy and the stroke is blocked,
+   * `undefined` = the journal has nothing in this direction.
+   */
+  onWorkspaceHistoryClaim?: (action: "undo" | "redo") => boolean | undefined;
   /** Current buffer revision used to seed the shared document owner. */
   documentRevision?: number;
   onHover: (
@@ -239,6 +247,14 @@ interface EditorGroupProps {
   parameterPopup?: ParameterPopupView | null;
   onSelectionChange: (selection: EditorSelectionRange) => void;
   onViewportChange: (range: LspRange) => void;
+  /** ED-IMPROVE-007: this leaf/file's persisted caret/scroll/fold snapshot. */
+  initialViewState?: PersistedEditorViewState | null;
+  /** ED-IMPROVE-007: reports view-state changes for in-memory capture. */
+  onViewStateChange?: (
+    groupId: EditorGroupId,
+    fileKey: string,
+    state: PersistedEditorViewState,
+  ) => void;
   onExpandSelection: (file: OpenFileViewModel, selection: EditorSelectionRange) => Promise<LspRange[] | null>;
   onLightbulb: (line: number) => void;
   onEditorContextMenu: (file: OpenFileViewModel, request: EditorContextMenuRequest & { groupId: string }) => void;
@@ -354,10 +370,13 @@ export function EditorGroup({
   onParameterInvalidate,
   onParameterEscape,
   transactionOwner = null,
+  onWorkspaceHistoryClaim,
   documentRevision = 0,
   parameterPopup = null,
   onSelectionChange,
   onViewportChange,
+  initialViewState = null,
+  onViewStateChange,
   onExpandSelection,
   onLightbulb,
   onEditorContextMenu,
@@ -821,7 +840,13 @@ export function EditorGroup({
                         key={`${activeFile.key}:edit`}
                         fileKey={activeFile.key}
                         viewId={groupId}
+                        initialViewState={initialViewState}
+                        onViewStateChange={onViewStateChange
+                          ? (state) => onViewStateChange(groupId, activeFile.key, state)
+                          : undefined}
                         transactionOwner={transactionOwner}
+                        onWorkspaceHistoryClaim={onWorkspaceHistoryClaim}
+                        historyReplay={activeFile.historyReplay ?? false}
                         documentRevision={activeFile.documentRevision ?? documentRevision}
                         clipboardWorkspaceId={workspaceInstanceId}
                         onClipboardUnavailable={onClipboardUnavailable}
@@ -895,7 +920,13 @@ export function EditorGroup({
                       key={activeFile.key}
                       fileKey={activeFile.key}
                       viewId={groupId}
+                      initialViewState={initialViewState}
+                      onViewStateChange={onViewStateChange
+                        ? (state) => onViewStateChange(groupId, activeFile.key, state)
+                        : undefined}
                       transactionOwner={transactionOwner}
+                      onWorkspaceHistoryClaim={onWorkspaceHistoryClaim}
+                      historyReplay={activeFile.historyReplay ?? false}
                       documentRevision={activeFile.documentRevision ?? documentRevision}
                       clipboardWorkspaceId={workspaceInstanceId}
                       onClipboardUnavailable={onClipboardUnavailable}

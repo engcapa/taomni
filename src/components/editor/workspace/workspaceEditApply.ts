@@ -21,7 +21,34 @@ export type WorkspaceEditApplyOutcome =
   | { operationIndex: number; path: string; status: "applied-delete" }
   | { operationIndex: number; path: string; status: "noop" }
   | { operationIndex: number | null; path: string; status: "skipped"; reason: string }
-  | { operationIndex: number | null; path: string; status: "failed"; reason: string };
+  | {
+    operationIndex: number | null;
+    path: string;
+    status: "failed";
+    reason: string;
+    /**
+     * ED-IMPROVE-002: the write's own effect fact when it reached a disk
+     * boundary. `unknown` means the OS write may have happened even though the
+     * operation failed. Absent means the failure had no disk boundary (for
+     * example a pre-mutation validation failure).
+     */
+    diskEffect?: "none" | "unknown";
+  };
+
+/**
+ * ED-IMPROVE-002: thrown by the open-buffer save hook when the shared save
+ * committer returns a non-committed result, so the applier can keep the typed
+ * disk effect instead of flattening `unknown` into a plain failure.
+ */
+export class WorkspaceEditOpenBufferSaveFailure extends Error {
+  readonly diskEffect: "none" | "unknown";
+
+  constructor(message: string, diskEffect: "none" | "unknown") {
+    super(message);
+    this.name = "WorkspaceEditOpenBufferSaveFailure";
+    this.diskEffect = diskEffect;
+  }
+}
 
 export interface WorkspaceEditApplyResponse {
   applied: boolean;
@@ -344,6 +371,7 @@ async function applyTextDocumentEdit(
       reason: writeResult.diskEffect === "unknown"
         ? `${failureReason}; result unknown — resolve the file in the recovery center before retrying`
         : failureReason,
+      diskEffect: writeResult.diskEffect === "unknown" ? "unknown" : "none",
     };
   } catch (error) {
     return {
@@ -351,6 +379,9 @@ async function applyTextDocumentEdit(
       path,
       status: "failed",
       reason: error instanceof Error ? error.message : String(error),
+      ...(error instanceof WorkspaceEditOpenBufferSaveFailure
+        ? { diskEffect: error.diskEffect }
+        : {}),
     };
   }
 }
@@ -546,6 +577,21 @@ export function workspaceEditApplyResponse(
     failureReason: failure.reason,
     failedChange: failure.operationIndex,
   };
+}
+
+/**
+ * ED-IMPROVE-002: structured whole-transaction facts reported by the shell's
+ * apply owner. Workflow callers use these to separate execution status from
+ * the effect actually observed (none/performed/partial/unknown) and to name
+ * the success history entry or the pending recovery entry.
+ */
+export interface WorkspaceEditApplyTransactionSummary {
+  effect: "none" | "performed" | "partial" | "unknown";
+  postcondition: "verified" | "mismatch" | "unreadable" | "not-applied";
+  historyId: string | null;
+  recoveryId: string | null;
+  affectedPaths: readonly string[];
+  reason: string | null;
 }
 
 export function summarizeWorkspaceEditOutcomes(outcomes: WorkspaceEditApplyOutcome[]): string {

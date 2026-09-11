@@ -333,6 +333,7 @@ export function WorkspaceRecoveryDialog({
                       ref={primaryRef}
                       type="button"
                       disabled={busy}
+                      data-testid="workspace-recovery-recover-selected"
                       className="inline-flex h-8 items-center gap-1.5 rounded bg-[var(--taomni-accent)] px-3 text-[11px] font-medium text-white hover:brightness-110 disabled:opacity-50"
                       onClick={() => void onRecover(selected)}
                     >
@@ -362,6 +363,7 @@ export function WorkspaceRecoveryDialog({
               <button
                 type="button"
                 disabled={busy || entries.length === 0}
+                data-testid="workspace-recovery-recover-all"
                 className="h-8 rounded px-3 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
                 onClick={() => void runRecoverAll()}
               >
@@ -370,6 +372,7 @@ export function WorkspaceRecoveryDialog({
               <button
                 type="button"
                 disabled={busy || entries.length === 0}
+                data-testid="workspace-recovery-discard-all"
                 className="h-8 rounded px-3 text-[11px] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
                 onClick={onDiscardAll}
               >

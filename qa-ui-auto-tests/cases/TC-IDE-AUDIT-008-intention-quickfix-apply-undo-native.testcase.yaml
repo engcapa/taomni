@@ -1,0 +1,224 @@
+id: TC-IDE-AUDIT-008-intention-quickfix-apply-undo-native
+title: "Intention quick fix apply, one undo, and second-entry parity under jdtls"
+description: |
+  ED-AUDIT-008 A1/A3 native gate case. Enters the in-repo single-module Maven
+  sample through persisted recents, opens the W3 quick-fix target
+  (QuickFixTarget.java references StringUtils without importing it), waits for
+  the real JDT LS diagnostic, and proves the canonical intention commit chain
+  through the packaged app UI from two real entry points:
+
+  1. Alt+Enter at the caret inside the unresolved `StringUtils` token opens
+     the frozen intention menu. The offered list must contain both provider
+     import twins (com.sun.tools.javac.util and org.apache.commons.lang3) and
+     "Add all missing imports", matching the provider trace's offeredTitles.
+     Clicking "Import 'StringUtils' (org.apache.commons.lang3)" resolves
+     through the real provider, applies the single-file WorkspaceEdit with no
+     preview dialog (affectedFileCount == 1), and lands the import. Saving
+     proves the disk bytes equal the provider trace's appliedSha256, and ONE
+     Ctrl+Z (workspace.undoWorkspaceEdit, the canUndo-gated keybinding) plus a
+     save proves the disk bytes equal the original fixture hash again - one
+     undo reverts the whole commit, and the status message names the undo
+     transaction.
+  2. The gutter lightbulb (openCodeActionsForLine) opens the same frozen
+     menu for the same diagnostic; clicking the same action produces the same
+     actual commit (identical appliedSha256 on disk) and is again reverted by
+     one Ctrl+Z back to the original fixture hash. Two real UI entries thus
+     produce the same commit and one history entry each.
+
+  Highest claim on green: L2 provider-backed (Linux), packaged app UI over a
+  real jdtls process. Provider facts come from
+  src/components/editor/workspace/__fixtures__/jdtls/traces/maven-single.trace.json
+  (caseId import-quick-fix): actionTitle, offeredTitles, appliedSha256,
+  originalSha256, revertedRestoresOriginalHash. Resolve-null, malformed,
+  command-failure recovery, preview-cancel, and stale results are simulated at
+  the regression layer (mounted CodeWorkspaceTab tests + adapter unit tests)
+  per the spec, which records that IDEA cannot precisely reproduce them.
+covers: [F25.5]
+tags: [code-workspace, ide-editor, code-actions, provider-fixture, native-gate, p1]
+modes: [native]
+fixtures: [reset_db, java_sample_projects, jdtls_required]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-gate-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  # Enter the real sample project through persisted recents; WebDriver cannot
+  # operate the native folder picker opened by Add Folder to Workspace.
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-audit008","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/QuickFixTarget.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "quickFixTargets"
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: "Java"
+      timeout_sec: 60
+  # The unresolved-type diagnostic must be published before any entry can
+  # offer the import quick fix; the lightbulb marker is its editor surface.
+  - wait_for:
+      selector: '[data-testid="code-workspace-lightbulb"]'
+      timeout_sec: 90
+  # Let the diagnostics-driven re-render settle before interacting; the
+  # lightbulb insertion re-render was observed to coincide with dropped
+  # XTest key chords (run run-20260908-085746 lost one ArrowDown of twelve,
+  # run-20260908-091529 observed zero of one Control+g), so this case drives
+  # caret placement and chords through the W3C pointer/key action transports
+  # only, which delivered every observed event in the key-observation logs.
+  - wait: 2
+
+  # ---- Entry 1: Alt+Enter at the caret inside the unresolved token ----
+  # Line 13 (1-based) is `            boolean blank = StringUtils.isBlank("x");`
+  # (53 chars); the caret must sit inside `StringUtils` (1-based cols 29-39).
+  # A zero-length native pointer drag at the exact CodeMirror position
+  # (line 13, 0-based column 33 = Ln 13, Col 34) places the caret with real
+  # pointer injection - no key-chord walk needed.
+  - native_pointer_drag:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      from: {line: 13, column: 33}
+      to: {line: 13, column: 33}
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 13, Col 34"
+      timeout_sec: 10
+  # native_keys (webdriver transport) uses the same W3C press_combos delivery as
+  # press but additionally verifies DOM focus and records the observed keydown
+  # (native-key-observation.json: altKey/defaultPrevented), which run-092018
+  # lacked because press installs no observer.
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["Alt+Enter"]
+      transport: webdriver
+  - wait_for:
+      selector: '[data-testid="context-menu"]'
+      timeout_sec: 90
+  # The frozen menu must offer the provider's real candidate list (the trace's
+  # offeredTitles): both import twins plus the add-all fix.
+  - assert_text:
+      selector: '[data-testid="context-menu"]'
+      contains: "Import 'StringUtils' (org.apache.commons.lang3)"
+      timeout_sec: 10
+  - assert_text:
+      selector: '[data-testid="context-menu"]'
+      contains: "Import 'StringUtils' (com.sun.tools.javac.util)"
+      timeout_sec: 10
+  - assert_text:
+      selector: '[data-testid="context-menu"]'
+      contains: "Add all missing imports"
+      timeout_sec: 10
+  - screenshot: tc-ide-audit-008-altenter-menu.png
+  # The intention menu item testid is the deterministic candidate id
+  # (intention.provider.<sha256("provider-code-action quickfix <title>")[:16]>),
+  # so the click targets exactly the trace's accepted action; a wrong
+  # derivation fails loudly, hash asserts prove the right action. The
+  # descendant form derives from the registered context-menu control.
+  - native_click:
+      selector: '[data-testid="context-menu"] [data-testid="code-workspace-intention-intention.provider.4df1ac6fd1001c47"]'
+  # Resolve + apply (~0.9s in the provider trace). The status line is
+  # transient: jdtls's post-edit recompile pushes a "Building" work-done
+  # progress that overwrites it, so the status assert polls immediately from
+  # the click (0.3s samples) instead of after a fixed wait.
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Applied code action"
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "import org.apache.commons.lang3.StringUtils;"
+      timeout_sec: 30
+  # Disk bytes equal the provider trace's appliedSha256 for the same commit.
+  - press: Control+s
+  - assert_file_sha256:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/QuickFixTarget.java"
+      equals: "a1a321c4326cdfef25e6aec6ccce42ec1f06395f10ba44154a0f424b5105dec2"
+      timeout_sec: 30
+  # ONE undo reverts the whole commit; the disk returns to the original
+  # fixture bytes (the trace's originalSha256 == reverted hash). The context
+  # menu moved focus, so re-click the content first; the chord goes through
+  # the W3C key-action transport. In editor focus the stroke is owned by the
+  # shared document undo (workspace.undo), which claims the workspace-edit
+  # journal (ED-AUDIT-008 claim routing) - the journal action itself is
+  # focus-gated off the editor surface, so either way exactly one Ctrl+Z
+  # reaches the journal transaction. The undo status is sampled immediately
+  # (same transient-overwrite reasoning as the apply status above).
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+z
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Undid Import 'StringUtils'"
+      timeout_sec: 10
+  - eval_readonly:
+      expression: "!document.querySelector('.cm-content').innerText.includes('import org.apache.commons.lang3')"
+      expect_truthy: true
+  - press: Control+s
+  - assert_file_sha256:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/QuickFixTarget.java"
+      equals: "f2de5c8ab98b58cf18ff998ebc47d19c127bb6f4290550d2827a40a37552e70a"
+      timeout_sec: 30
+
+  # ---- Entry 2: the gutter lightbulb opens the same frozen menu ----
+  # The undo restored the unresolved reference, so the diagnostic (and the
+  # lightbulb) return through the real provider sync.
+  - wait_for:
+      selector: '[data-testid="code-workspace-lightbulb"]'
+      timeout_sec: 90
+  # The reappearing lightbulb only proves the diagnostic was re-published;
+  # jdtls's post-undo reanalysis can still hold the shared AST at that moment,
+  # and its codeAction handler answers an empty list while the AST is
+  # unavailable (run-20260908-145311: the click ~0.5s after the lightbulb
+  # returned got an empty list -> status "No code actions provided by the
+  # language server" with the pill already back at 1E; lsp.rs converts an
+  # errored request to Null -> [] as well). Let the reanalysis settle before
+  # the click; the menu wait below then covers only resolve latency.
+  - wait: 15
+  - click: '[data-testid="code-workspace-lightbulb"]'
+  - wait_for:
+      selector: '[data-testid="context-menu"]'
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="context-menu"]'
+      contains: "Import 'StringUtils' (org.apache.commons.lang3)"
+      timeout_sec: 10
+  - screenshot: tc-ide-audit-008-lightbulb-menu.png
+  - native_click:
+      selector: '[data-testid="context-menu"] [data-testid="code-workspace-intention-intention.provider.4df1ac6fd1001c47"]'
+  # Same transient-status ordering as entry 1: poll immediately.
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Applied code action"
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "import org.apache.commons.lang3.StringUtils;"
+      timeout_sec: 30
+  # The second real entry produces the SAME actual commit: identical disk
+  # bytes, and again exactly one undo back to the original fixture bytes.
+  - press: Control+s
+  - assert_file_sha256:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/QuickFixTarget.java"
+      equals: "a1a321c4326cdfef25e6aec6ccce42ec1f06395f10ba44154a0f424b5105dec2"
+      timeout_sec: 30
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+z
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Undid Import 'StringUtils'"
+      timeout_sec: 10
+  - eval_readonly:
+      expression: "!document.querySelector('.cm-content').innerText.includes('import org.apache.commons.lang3')"
+      expect_truthy: true
+  - press: Control+s
+  # The case leaves the fixture copy byte-identical to the checkout.
+  - assert_file_sha256:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/QuickFixTarget.java"
+      equals: "f2de5c8ab98b58cf18ff998ebc47d19c127bb6f4290550d2827a40a37552e70a"
+      timeout_sec: 30
+  - screenshot: tc-ide-audit-008-reverted.png

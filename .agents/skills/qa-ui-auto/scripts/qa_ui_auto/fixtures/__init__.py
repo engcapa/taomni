@@ -13,6 +13,16 @@ Fixtures are referenced from a testcase's `fixtures: [...]` list. Builtin set:
                     ${fixture.maven_single_root} / ${fixture.gradle_single_root}
 * java25_projects - create and compile isolated Maven + Gradle Java 25 projects
 * git_diff_repo    - native-only reproducible Git history and worktree state
+* editor_typing_fixtures - native-only deterministic 1 MiB / 5 MiB / small
+                    Java-like plain-text fixtures for editor typing latency
+* restore_24tab_fixtures - native-only deterministic 24-file workspace for
+                    restore active-ready/all-ready timing measurement
+* sortable_java_fixtures - native-only maven-single copy plus an unsorted
+                    SortMembers.java for live source.sortMembers rearrange
+* file_move_recovery_fixtures - native-only fresh folder with a simulated
+                    Old.java -> New.java server-side move for recovery reversal
+* view_state_fixtures - native-only 60-line Long.java for per-leaf caret,
+                    scroll and fold restore across reload_window
 
 Custom fixtures should live in this package and register via `register(name, fn)`.
 """
@@ -22,7 +32,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Protocol
 
-from . import git_diff_repo, java25_projects, java_sample_projects, jdtls_required, linux_x11_required, reset_db, sftp_required, ssh_required, welcome_recents, workspace_root
+from . import editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_sample_projects, jdtls_required, linux_x11_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, welcome_recents, workspace_root
 
 
 class FixtureContext(Protocol):
@@ -50,6 +60,11 @@ REGISTRY: dict[str, Fixture] = {
     "java25_projects": Fixture("java25_projects", java25_projects.setup),
     "git_diff_repo": Fixture("git_diff_repo", git_diff_repo.setup, git_diff_repo.teardown),
     "welcome_recents": Fixture("welcome_recents", welcome_recents.setup, welcome_recents.teardown),
+    "editor_typing_fixtures": Fixture("editor_typing_fixtures", editor_typing_fixtures.setup, editor_typing_fixtures.teardown),
+    "restore_24tab_fixtures": Fixture("restore_24tab_fixtures", restore_24tab_fixtures.setup, restore_24tab_fixtures.teardown),
+    "sortable_java_fixtures": Fixture("sortable_java_fixtures", sortable_java_fixtures.setup),
+    "file_move_recovery_fixtures": Fixture("file_move_recovery_fixtures", file_move_recovery_fixtures.setup),
+    "view_state_fixtures": Fixture("view_state_fixtures", view_state_fixtures.setup),
 }
 
 

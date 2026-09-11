@@ -105,6 +105,7 @@ export function createLspHyperlinkExtension(hooks: LspHyperlinkHooks): Extension
   plugin = ViewPlugin.fromClass(
     class implements HyperlinkPlugin {
       private modHeld = false;
+      private destroyed = false;
       private lastPos: number | null = null;
       private probeToken = 0;
       private probeTimer: number | null = null;
@@ -132,7 +133,12 @@ export function createLspHyperlinkExtension(hooks: LspHyperlinkHooks): Extension
 
       update(update: ViewUpdate) {
         if (update.docChanged && this.lastPos !== null) {
-          this.refreshAt(this.lastPos, false);
+          // Dispatching from inside update() is forbidden (CM6 throws
+          // "CodeMirror plugin crashed", e.g. Ctrl+Z with the pointer still
+          // over the content); re-validate after the transaction settles.
+          queueMicrotask(() => {
+            if (!this.destroyed && this.lastPos !== null) this.refreshAt(this.lastPos, false);
+          });
         }
         const held = update.state.field(modHeldField);
         const hasLink = update.state.field(hyperlinkField).size > 0;
@@ -140,6 +146,7 @@ export function createLspHyperlinkExtension(hooks: LspHyperlinkHooks): Extension
       }
 
       destroy() {
+        this.destroyed = true;
         window.removeEventListener("keydown", this.onKeyDown, true);
         window.removeEventListener("keyup", this.onKeyUp, true);
         window.removeEventListener("blur", this.onWindowBlur);

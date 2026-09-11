@@ -232,3 +232,32 @@ export function buildWorkspacePathSnapshotEdit(
 
   return { documentEdits, operations };
 }
+
+/**
+ * ED-AUDIT-014: undo precondition check for plan-gated (refactor) history
+ * entries. Undo must never overwrite edits that happened after the recorded
+ * state: a later disk edit, a deleted file, or an open buffer with newer
+ * unsaved content all block the undo with an explicit reason instead of
+ * silently clobbering user work.
+ */
+export interface WorkspaceEditUndoPrecondition {
+  blocked: boolean;
+  reasons: string[];
+}
+
+export function workspaceEditUndoPrecondition(
+  recordedSnapshots: readonly WorkspaceEditPathSnapshot[],
+  currentTexts: Record<string, string>,
+): WorkspaceEditUndoPrecondition {
+  const reasons: string[] = [];
+  for (const snapshot of recordedSnapshots) {
+    if (snapshot.text === null) continue;
+    const current = currentTexts[snapshot.path];
+    if (current === undefined) {
+      reasons.push(`${snapshot.path}: current content unreadable`);
+    } else if (current !== snapshot.text) {
+      reasons.push(`${snapshot.path}: content changed after the recorded state`);
+    }
+  }
+  return { blocked: reasons.length > 0, reasons };
+}

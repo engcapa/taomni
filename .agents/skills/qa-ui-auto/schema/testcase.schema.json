@@ -69,7 +69,12 @@
      "java_sample_projects",
      "java25_projects",
      "git_diff_repo",
-     "welcome_recents"
+     "welcome_recents",
+     "editor_typing_fixtures",
+     "restore_24tab_fixtures",
+     "sortable_java_fixtures",
+     "file_move_recovery_fixtures",
+     "view_state_fixtures"
     ]
    },
    "uniqueItems": true
@@ -175,6 +180,9 @@
     },
     "native_set_writable": {
      "$ref": "#/$defs/native_set_writable_arg"
+    },
+    "host_write_file": {
+     "$ref": "#/$defs/host_write_file_arg"
     },
     "native_clipboard_owner": {
      "$ref": "#/$defs/native_clipboard_owner_arg"
@@ -375,7 +383,8 @@
       },
       "equals": {
        "type": "string",
-       "pattern": "^[a-f0-9]{64}$"
+       "description": "exact lowercase SHA-256 hex digest, or a ${fixture.*} placeholder that resolves to one before the step runs",
+       "pattern": "^([a-f0-9]{64}|\\$\\{fixture\\.[A-Za-z0-9_]+\\})$"
       },
       "timeout_sec": {
        "type": "number",
@@ -709,11 +718,28 @@
    "properties": {
     "selector": {"$ref": "#/$defs/selector"},
     "keys": {
-     "type": "array",
-     "minItems": 5,
-     "items": {"type": "string", "minLength": 1, "maxLength": 1}
+     "anyOf": [
+      {
+       "type": "array",
+       "minItems": 5,
+       "items": {"type": "string", "minLength": 1, "maxLength": 1}
+      },
+      {
+       "type": "string",
+       "minLength": 5,
+       "description": "typed one character at a time; same semantics as the single-char array form"
+      }
+     ]
     },
-    "max_p95_ms": {"type": "number", "exclusiveMinimum": 0}
+    "max_p95_ms": {"type": "number", "exclusiveMinimum": 0},
+    "capture_text": {
+     "type": "boolean",
+     "description": "default true; false skips per-mutation textContent reads so multi-megabyte documents are not dominated by probe overhead"
+    },
+    "label": {
+     "type": "string",
+     "description": "names the per-invocation artifact native-editor-performance-<label>.json so repeated measurement groups accumulate instead of overwriting"
+    }
    }
   },
   "native_click_arg": {
@@ -817,6 +843,23 @@
     },
     "writable": {
      "type": "boolean"
+    }
+   }
+  },
+  "host_write_file_arg": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "path",
+    "text"
+   ],
+   "properties": {
+    "path": {
+     "type": "string",
+     "minLength": 1
+    },
+    "text": {
+     "type": "string"
     }
    }
   },

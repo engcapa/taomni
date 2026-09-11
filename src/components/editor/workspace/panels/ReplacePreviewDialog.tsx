@@ -19,6 +19,8 @@ export interface ReplacePreviewDialogProps {
   edit: LspWorkspaceEdit;
   /** Replacement text shown in the header. */
   replacement: string;
+  /** ED-IMPROVE-005: frozen scope/query identity captured before the preview. */
+  scopeLabel?: string;
   committing: boolean;
   commitError: string | null;
   onCommit: (excludedKeys: ReadonlySet<string>) => void;
@@ -32,6 +34,7 @@ export function stableUsageKey(path: string, startLine: number, startCharacter: 
 export function ReplacePreviewDialog({
   edit,
   replacement,
+  scopeLabel,
   committing,
   commitError,
   onCommit,
@@ -104,6 +107,14 @@ export function ReplacePreviewDialog({
         >
           {live.includedMatches} of {live.totalMatches} occurrences · replace with “{replacement}”
         </div>
+        {scopeLabel && (
+          <div
+            data-testid="code-workspace-replace-scope"
+            className="mt-0.5 text-[10px] text-[var(--taomni-code-muted)]"
+          >
+            {scopeLabel}
+          </div>
+        )}
       </div>
       <div className="min-h-0 flex-1 overflow-auto py-1">
         {byFile.map(([path, usages]) => {

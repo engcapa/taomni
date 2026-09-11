@@ -6,9 +6,12 @@
 
 import type { LspFileTextEdits, LspTextEdit, LspWorkspaceEdit } from "../../../lib/editor/lsp";
 import type { WorkspaceSearchMatch } from "../../../lib/editor/workspaceSearch";
+import { fsPathComparisonKey } from "./codeWorkspaceModel";
+import type { FindInFilesScopePlan } from "./findInFilesScopeModel";
 import {
   buildWorkspaceEditPreview,
   filterWorkspaceEditByUsages,
+  workspaceEditOperations,
   type WorkspaceEditPreview,
 } from "./workspaceEditPreview";
 
@@ -30,6 +33,25 @@ export function replaceMatchAbsolutePath(match: WorkspaceSearchMatch): string {
 }
 
 /**
+ * ED-IMPROVE-004: the Rust search backend reports Unicode code-point offsets
+ * (see workspace_search.rs char_offset), while LSP ranges and the editor use
+ * UTF-16 code units. This is the single conversion used by preview,
+ * navigation, freshness and commit so every consumer agrees.
+ */
+export function codePointOffsetToUtf16Offset(lineText: string, offset: number): number {
+  if (offset <= 0) return 0;
+  let utf16 = 0;
+  let codePoints = 0;
+  while (utf16 < lineText.length && codePoints < offset) {
+    const code = lineText.codePointAt(utf16);
+    if (code === undefined) break;
+    utf16 += code > 0xffff ? 2 : 1;
+    codePoints += 1;
+  }
+  return utf16;
+}
+
+/**
  * ED-FIND-004: shared search-match mapping used by the preview dialog owner
  * and the commit owner so both sides agree on file paths, ranges, and the
  * matched text the freshness recheck compares against disk.
@@ -38,14 +60,16 @@ export function searchMatchesToReplaceInputs(matches: readonly WorkspaceSearchMa
   return matches.map((match) => {
     const absolute = replaceMatchAbsolutePath(match);
     const line = Math.max(0, match.lineNumber - 1);
+    const startCharacter = codePointOffsetToUtf16Offset(match.lineText, match.matchStart);
+    const endCharacter = codePointOffsetToUtf16Offset(match.lineText, match.matchEnd);
     return {
       filePath: absolute,
       fileUri: `file://${absolute}`,
       startLine: line,
-      startCharacter: match.matchStart,
+      startCharacter,
       endLine: line,
-      endCharacter: match.matchEnd,
-      matchedText: Array.from(match.lineText).slice(match.matchStart, match.matchEnd).join(""),
+      endCharacter,
+      matchedText: match.lineText.slice(startCharacter, endCharacter),
     };
   });
 }
@@ -159,10 +183,17 @@ export function verifyReplaceMatchFreshness(
     }
     const lines = diskText.split("\n");
     const line = lines[match.startLine];
+    const start = match.startCharacter;
+    const end = match.endCharacter;
     if (
-      line === undefined ||
-      match.startLine !== match.endLine ||
-      Array.from(line).slice(match.startCharacter, match.endCharacter).join("") !== match.matchedText
+      line === undefined
+      || match.startLine !== match.endLine
+      || !Number.isInteger(start)
+      || !Number.isInteger(end)
+      || start < 0
+      || end < start
+      || end > line.length
+      || line.slice(start, end) !== match.matchedText
     ) {
       conflicts.push({
         path: match.filePath,
@@ -203,5 +234,198 @@ export function createReplaceInFilesPlan(
     excludedUsageIds,
     totalMatches: totalPreview.textEditCount,
     includedMatches: preview.textEditCount,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// ED-IMPROVE-005: one frozen preview snapshot drives the whole commit. Scope,
+// query/options, replacement, selected match keys and the source edit
+// signature are captured before the preview opens; the commit validates the
+// selected edits against that snapshot and can never expand the set from a
+// refreshed search, changed scope or newly added files.
+// ---------------------------------------------------------------------------
+
+export interface ReplaceScopeIdentity {
+  kind: string;
+  roots: readonly string[];
+  explicitFiles: readonly string[];
+  fileMask: string | null;
+  generation: number | null;
+}
+
+export interface ReplaceQueryIdentity {
+  query: string;
+  caseSensitive: boolean;
+  wholeWord: boolean;
+  regexp: boolean;
+  includeGlobs: readonly string[];
+  excludeGlobs: readonly string[];
+}
+
+export interface ReplacePreviewSnapshot {
+  scope: ReplaceScopeIdentity;
+  query: ReplaceQueryIdentity;
+  replacement: string;
+  /** Stable UTF-16 usage keys for every frozen match. */
+  matchKeys: readonly string[];
+  matchCount: number;
+  editSignature: string;
+  capturedAt: number;
+}
+
+export function replaceScopeIdentityFromPlan(
+  plan: FindInFilesScopePlan,
+): ReplaceScopeIdentity {
+  return {
+    kind: plan.kind,
+    roots: plan.status === "ready" ? [...plan.roots] : [],
+    explicitFiles: plan.status === "ready" ? [...(plan.explicitFiles ?? [])] : [],
+    fileMask: plan.fileMask ?? null,
+    generation: plan.generation ?? null,
+  };
+}
+
+export function replaceMatchStableKey(match: ReplaceInFilesMatch): string {
+  return `${match.filePath}:${match.startLine}:${match.startCharacter}:${match.endLine}:${match.endCharacter}`;
+}
+
+/** Deterministic signature of every text edit in a WorkspaceEdit. */
+export function replaceEditSignature(edit: LspWorkspaceEdit): string {
+  return workspaceEditOperations(edit).map((operation) => {
+    if (operation.kind !== "text") {
+      const path = operation.kind === "rename"
+        ? `${operation.oldPath ?? operation.oldUri}->${operation.newPath ?? operation.newUri}`
+        : operation.path ?? operation.uri;
+      return `${operation.kind}:${path}`;
+    }
+    const path = operation.document.path ?? operation.document.uri;
+    const edits = operation.document.edits
+      .map((item) => [
+        item.range.start.line,
+        item.range.start.character,
+        item.range.end.line,
+        item.range.end.character,
+        item.newText,
+      ].join(":"))
+      .join("|");
+    return `${operation.kind}:${path}#${edits}`;
+  }).join(";");
+}
+
+export interface ReplaceSelectionValidation {
+  ok: boolean;
+  reason?: string;
+}
+
+/**
+ * ED-IMPROVE-005: the commit may only deliver selections that exist in the
+ * frozen snapshot, one edit per selected match, all carrying the frozen
+ * replacement text. Any drift is an internal conflict, never a partial write.
+ */
+export function validateReplacePreviewSelection(
+  snapshot: ReplacePreviewSnapshot,
+  selectedMatchKeys: ReadonlySet<string>,
+  filteredEdit: LspWorkspaceEdit,
+): ReplaceSelectionValidation {
+  const frozenKeys = new Set(snapshot.matchKeys);
+  for (const key of selectedMatchKeys) {
+    if (!frozenKeys.has(key)) {
+      return {
+        ok: false,
+        reason: `Selection ${key} is not part of the frozen replace preview; reopen the preview`,
+      };
+    }
+  }
+  const edits = workspaceEditOperations(filteredEdit).flatMap((operation) => (
+    operation.kind === "text" ? operation.document.edits : []
+  ));
+  if (edits.length !== selectedMatchKeys.size) {
+    return {
+      ok: false,
+      reason: `Frozen selection has ${selectedMatchKeys.size} matches but the edit carries ${edits.length}; reopen the preview`,
+    };
+  }
+  for (const edit of edits) {
+    if (edit.newText !== snapshot.replacement) {
+      return {
+        ok: false,
+        reason: "The edit text differs from the frozen replacement; reopen the preview",
+      };
+    }
+  }
+  return { ok: true };
+}
+
+/** Minimal structural view of one applier outcome (per-document operation). */
+export interface ReplaceApplyOutcomeLike {
+  path: string;
+  status: string;
+  reason?: string;
+}
+
+export interface ReplaceCommitReport {
+  ok: boolean;
+  /** Occurrences actually written: planned matches inside applied files. */
+  appliedCount: number;
+  /** Planned files with at least one applied operation. */
+  fileCount: number;
+  plannedCount: number;
+  plannedFileCount: number;
+  /** "path: reason" for every failed or skipped operation. */
+  blockers: string[];
+  /** One-line user report; never claims completion beyond the real ledger. */
+  message: string;
+}
+
+const APPLIED_OUTCOME_STATUSES = new Set([
+  "applied-open",
+  "applied-disk",
+  "applied-create",
+  "applied-rename",
+  "applied-delete",
+]);
+
+/**
+ * ED-AUDIT-003: the applier's per-operation ledger is the only truth for what
+ * actually changed. A failed or skipped document must surface the real applied
+ * set — the report never claims the planned counts when effects stopped early,
+ * and a declined retry leaves the replace preview open with the blocker list.
+ */
+export function summarizeReplaceCommitReport(
+  outcomes: readonly ReplaceApplyOutcomeLike[],
+  matches: readonly ReplaceInFilesMatch[],
+): ReplaceCommitReport {
+  const appliedPaths = new Set<string>();
+  const blockers: string[] = [];
+  for (const outcome of outcomes) {
+    if (APPLIED_OUTCOME_STATUSES.has(outcome.status)) {
+      appliedPaths.add(fsPathComparisonKey(outcome.path));
+    }
+    if (outcome.status === "failed" || outcome.status === "skipped") {
+      blockers.push(`${outcome.path}: ${outcome.reason ?? "blocked"}`);
+    }
+  }
+  const plannedKeys = Array.from(new Set(matches.map((match) => fsPathComparisonKey(match.filePath))));
+  const appliedCount = matches.filter((match) => appliedPaths.has(fsPathComparisonKey(match.filePath))).length;
+  const fileCount = plannedKeys.filter((key) => appliedPaths.has(key)).length;
+  const ok = blockers.length === 0;
+  const occurrence = (count: number) => `${count} occurrence${count === 1 ? "" : "s"}`;
+  const file = (count: number) => `${count} file${count === 1 ? "" : "s"}`;
+  let message: string;
+  if (ok) {
+    message = `Replaced ${occurrence(appliedCount)} in ${file(fileCount)} — Ctrl+Z to undo`;
+  } else if (appliedCount === 0) {
+    message = `Replace blocked, nothing applied: ${blockers.join("; ")}`;
+  } else {
+    message = `Replace partially applied: ${appliedCount} of ${matches.length} occurrences in ${fileCount} of ${plannedKeys.length} files; blocked: ${blockers.join("; ")}`;
+  }
+  return {
+    ok,
+    appliedCount,
+    fileCount,
+    plannedCount: matches.length,
+    plannedFileCount: plannedKeys.length,
+    blockers,
+    message,
   };
 }

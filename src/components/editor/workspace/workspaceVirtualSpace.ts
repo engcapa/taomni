@@ -63,6 +63,28 @@ export const setVirtualOverflow = StateEffect.define<VirtualOverflowMap>();
 
 const MAX_OVERFLOW_COLUMNS = 200;
 
+/**
+ * ED-AUDIT-002: overflow consumed by a real insertion is recorded here so the
+ * undo transaction that reverts that insertion can restore the virtual caret
+ * (IDEA keeps the caret past EOL after undoing a virtual-space insert). The
+ * record survives plain typing/selection traffic and is invalidated by an
+ * explicit overflow manipulation (Escape, Home, navigation) or a newer
+ * consumption. Must be declared before `virtualSpaceOverflowField`.
+ */
+export const setVirtualOverflowRestore = StateEffect.define<VirtualOverflowMap>();
+
+export const virtualOverflowRestoreField = StateField.define<VirtualOverflowMap>({
+  create: () => new Map<number, number>(),
+  update(value, tr) {
+    const restore = tr.effects.find((candidate) => candidate.is(setVirtualOverflowRestore));
+    if (restore) return restore.value;
+    // An overflow write that is not a consumption (Escape, Home, movement)
+    // invalidates the pending restore record.
+    if (tr.effects.some((candidate) => candidate.is(setVirtualOverflow))) return new Map();
+    return value;
+  },
+});
+
 export const virtualSpaceOverflowField = StateField.define<VirtualOverflowMap>({
   create: () => new Map<number, number>(),
   update(value, tr) {
@@ -88,6 +110,19 @@ export const virtualSpaceOverflowField = StateField.define<VirtualOverflowMap>({
         if (overflow != null) retained.set(range.head, overflow);
       }
       return retained.size === value.size ? value : retained;
+    }
+    if (tr.isUserEvent("undo")) {
+      // ED-AUDIT-002: an undo landing a caret back on a recorded pre-insert
+      // head restores that virtual caret; other heads stay real.
+      const restore = tr.startState.field(virtualOverflowRestoreField, false);
+      if (restore && restore.size > 0) {
+        const restored = new Map<number, number>();
+        for (const range of tr.state.selection.ranges) {
+          const overflow = restore.get(range.head);
+          if (overflow != null && overflow > 0) restored.set(range.head, overflow);
+        }
+        if (restored.size > 0) return restored;
+      }
     }
     return new Map();
   },
@@ -295,9 +330,10 @@ export function paddingForOverflow(overflow: number): string {
  * first real insertion manufactures its padding spaces IN THE SAME
  * transaction. IME composition events are ignored (no padding while
  * composing); without overflow this defers to CodeMirror's default handler.
+ * The consumed overflow is recorded for the undo restore (ED-AUDIT-002).
  */
 export const virtualSpaceTypingHandler = EditorView.inputHandler.of((view, _from, _to, text) => {
-  if (view.composing || !text) return false;
+  if (view.composing || view.state.readOnly || !text) return false;
   const field = view.state.field(virtualSpaceOverflowField, false);
   if (!field || field.size === 0) return false;
   const state = view.state;
@@ -312,7 +348,10 @@ export const virtualSpaceTypingHandler = EditorView.inputHandler.of((view, _from
     };
   });
   if (!anyPadding) return false;
-  view.dispatch(result);
+  view.dispatch({
+    ...result,
+    effects: setVirtualOverflowRestore.of(new Map(field)),
+  });
   return true;
 });
 
@@ -675,7 +714,7 @@ export function virtualDeleteCommand(view: EditorView): boolean {
 }
 
 export function virtualEnterCommand(view: EditorView): boolean {
-  if (view.composing) return false;
+  if (view.composing || view.state.readOnly) return false;
   const field = view.state.field(virtualSpaceOverflowField, false);
   if (!field || field.size === 0) return false;
   const state = view.state;
@@ -690,7 +729,10 @@ export function virtualEnterCommand(view: EditorView): boolean {
     };
   });
   if (!anyPadding) return false;
-  view.dispatch(result);
+  view.dispatch({
+    ...result,
+    effects: setVirtualOverflowRestore.of(new Map(field)),
+  });
   return true;
 }
 

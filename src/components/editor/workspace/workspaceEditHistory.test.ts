@@ -3,6 +3,7 @@ import {
   WorkspaceEditHistory,
   buildWorkspacePathSnapshotEdit,
   buildWorkspaceTextSnapshotEdit,
+  workspaceEditUndoPrecondition,
 } from "./workspaceEditHistory";
 
 describe("WorkspaceEditHistory", () => {
@@ -74,6 +75,32 @@ describe("buildWorkspacePathSnapshotEdit", () => {
     expect(edit.documentEdits[0]?.edits[0]?.newText).toBe("old contents");
   });
 
+  it("ED-FOLLOW-001: single undo of a file move deletes the new path and recreates the old one", () => {
+    // A1 record: the live single-undo path already reverses relocations via
+    // snapshot replay (deletes run before creates so the swap cannot
+    // collide); the gap this card closes is crash-recovery blindness, not
+    // the undo replay itself.
+    const edit = buildWorkspacePathSnapshotEdit(
+      [
+        { path: "/repo/Old.java", exists: false, text: null },
+        { path: "/repo/New.java", exists: true, text: "class New {}" },
+      ],
+      [
+        { path: "/repo/Old.java", exists: true, text: "class Old {}" },
+        { path: "/repo/New.java", exists: false, text: null },
+      ],
+    );
+    const kinds = edit.operations?.map((operation) => operation.kind);
+    expect(kinds).toEqual(["delete", "create", "text"]);
+    const deleteOp = edit.operations?.[0];
+    const createOp = edit.operations?.[1];
+    expect(deleteOp).toMatchObject({ kind: "delete", path: "/repo/New.java" });
+    expect(createOp).toMatchObject({ kind: "create", path: "/repo/Old.java" });
+    expect(edit.documentEdits).toHaveLength(1);
+    expect(edit.documentEdits[0]?.path).toBe("/repo/Old.java");
+    expect(edit.documentEdits[0]?.edits[0]?.newText).toBe("class Old {}");
+  });
+
   it("rejects directory or special-resource snapshots", () => {
     expect(() => buildWorkspacePathSnapshotEdit(
       [{ path: "/repo/src", exists: false, text: null }],
@@ -97,5 +124,48 @@ describe("buildWorkspaceTextSnapshotEdit", () => {
     expect(edit.operations).toHaveLength(2);
     expect(edit.documentEdits[0]?.edits[0]?.range.end).toEqual({ line: 2, character: 0 });
     expect(edit.documentEdits[1]?.edits[0]?.range.end).toEqual({ line: 0, character: 6 });
+  });
+});
+
+describe("workspaceEditUndoPrecondition (ED-AUDIT-014)", () => {
+  const recorded = [
+    { path: "/repo/a.ts", exists: true, text: "after refactor" },
+    { path: "/repo/b.ts", exists: true, text: "after refactor b" },
+  ];
+
+  it("allows undo when every recorded text still matches the current content", () => {
+    const result = workspaceEditUndoPrecondition(recorded, {
+      "/repo/a.ts": "after refactor",
+      "/repo/b.ts": "after refactor b",
+    });
+    expect(result.blocked).toBe(false);
+    expect(result.reasons).toEqual([]);
+  });
+
+  it("blocks undo when a later edit changed a recorded file", () => {
+    const result = workspaceEditUndoPrecondition(recorded, {
+      "/repo/a.ts": "user typed after the refactor",
+      "/repo/b.ts": "after refactor b",
+    });
+    expect(result.blocked).toBe(true);
+    expect(result.reasons[0]).toContain("/repo/a.ts");
+    expect(result.reasons[0]).toContain("changed after the recorded state");
+  });
+
+  it("blocks undo when a recorded file is unreadable or missing", () => {
+    const result = workspaceEditUndoPrecondition(recorded, {
+      "/repo/a.ts": "after refactor",
+    });
+    expect(result.blocked).toBe(true);
+    expect(result.reasons[0]).toContain("unreadable");
+  });
+
+  it("skips recorded non-existence when checking preconditions", () => {
+    // A file recorded as absent (text: null) has no recorded text to protect.
+    const result = workspaceEditUndoPrecondition(
+      [{ path: "/repo/removed.ts", exists: false, text: null }],
+      {},
+    );
+    expect(result.blocked).toBe(false);
   });
 });

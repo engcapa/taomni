@@ -10,6 +10,7 @@ import {
 import {
   ChangeSet,
   Compartment,
+  EditorSelection,
   EditorState,
   Prec,
   Transaction,
@@ -70,10 +71,13 @@ import {
 import {
   bracketMatching,
   foldAll,
+  foldEffect,
   foldGutter,
+  foldedRanges,
   indentOnInput,
   indentUnit,
   unfoldAll,
+  unfoldEffect,
 } from "@codemirror/language";
 import { openSearchPanel, search } from "@codemirror/search";
 import { renderFormatted } from "../../../lib/chat/renderFormatted";
@@ -96,11 +100,13 @@ import type { ParameterPopupView } from "./referenceInfoSession";
 import { languageForPath } from "../../git/diffLanguage";
 import {
   useWorkspaceClipboardSession,
+  type GuardedSystemEffect,
   type GuardedSystemReadResult,
   type GuardedSystemWriteResult,
   type WorkspaceClipboardHandle,
 } from "./workspaceClipboardSession";
 import {
+  createClipboardCancelledObservation,
   createClipboardReadObservation,
   createClipboardWriteObservation,
   type ClipboardObservationOperation,
@@ -112,6 +118,7 @@ import {
   advanceLspSnippetTabstop,
   cancelLspSnippetSession,
   cycleLspSnippetChoice,
+  retreatLspSnippetTabstop,
   createLspCompletionSource,
   LspCompletionController,
   lspSnippetSessionInvalidator,
@@ -172,6 +179,12 @@ import {
   type RegionFoldingProvenance,
 } from "./workspaceEditorCommands";
 import {
+  MAX_VIEW_STATE_FOLDS,
+  MAX_VIEW_STATE_SELECTIONS,
+  type PersistedEditorViewState,
+  type PersistedViewSelection,
+} from "./workspaceLayoutPersistence";
+import {
   buildEditorHostActions,
   buildEditorPrimitiveKeybindings,
 } from "./workspaceCodeMirrorKeymap";
@@ -191,11 +204,78 @@ import { observeSyntaxFacts, treeRevisionField } from "./workspaceSyntaxFacts";
 import {
   desiredVisualColumnField,
   isEditorGeometryReady,
+  virtualOverflowRestoreField,
   virtualSpaceClickHandler,
   virtualSpaceOverflowField,
   virtualSpaceTypingHandler,
 } from "./workspaceVirtualSpace";
 import type { WorkspaceActionHost } from "./workspaceActionHost";
+
+/**
+ * ED-IMPROVE-007: capture this view's caret/selection, scroll and fold state.
+ * Pure over the CodeMirror view so the workspace can store it in memory and
+ * persist it with the layout without serializing per keystroke.
+ */
+export function captureEditorViewState(view: EditorView): PersistedEditorViewState {
+  const selection = view.state.selection;
+  const main = selection.main;
+  const selections: PersistedViewSelection[] = [];
+  for (const range of selection.ranges) {
+    if (range === main) continue;
+    if (selections.length >= MAX_VIEW_STATE_SELECTIONS - 1) break;
+    selections.push({ anchor: range.anchor, head: range.head });
+  }
+  const folds: PersistedEditorViewState["folds"] = [];
+  const folded = foldedRanges(view.state);
+  for (const iter = folded.iter(); iter.value && folds.length < MAX_VIEW_STATE_FOLDS; iter.next()) {
+    if (iter.to <= iter.from) continue;
+    folds.push({ from: iter.from, to: iter.to });
+  }
+  return {
+    mainSelection: { anchor: main.anchor, head: main.head },
+    selections,
+    scrollTop: view.scrollDOM?.scrollTop ?? 0,
+    folds,
+  };
+}
+
+/**
+ * ED-IMPROVE-007: apply a persisted snapshot once when the view mounts.
+ * Offsets beyond the live document are clamped and folds outside it are
+ * dropped, so a stale or corrupt snapshot can never throw or select garbage.
+ */
+export function applyPersistedEditorViewState(
+  view: EditorView,
+  state: PersistedEditorViewState,
+): void {
+  const docLength = view.state.doc.length;
+  const clamp = (value: number): number => Math.max(0, Math.min(docLength, Math.floor(value)));
+  const toRange = (range: PersistedViewSelection) => EditorSelection.range(
+    clamp(range.anchor),
+    clamp(range.head),
+  );
+  const ranges = [
+    toRange(state.mainSelection),
+    ...state.selections.slice(0, MAX_VIEW_STATE_SELECTIONS - 1).map(toRange),
+  ];
+  view.dispatch({
+    selection: EditorSelection.create(ranges, 0),
+    scrollIntoView: false,
+  });
+  for (const fold of state.folds) {
+    const from = clamp(fold.from);
+    const to = clamp(fold.to);
+    if (to <= from || to > docLength) continue;
+    view.dispatch({ effects: foldEffect.of({ from, to }) });
+  }
+  if (state.scrollTop > 0 && view.scrollDOM) {
+    const maxScroll = Math.max(
+      0,
+      view.scrollDOM.scrollHeight - view.scrollDOM.clientHeight,
+    );
+    view.scrollDOM.scrollTop = Math.min(state.scrollTop, maxScroll);
+  }
+}
 
 export interface EditorRevealTarget {
   line: number;
@@ -219,6 +299,20 @@ interface CodeMirrorHostProps {
   viewId?: string;
   /** Shared document transaction owner (§8.26 / ED-MULTIVIEW-002). */
   transactionOwner?: WorkspaceDocumentTransactionOwner | null;
+  /**
+   * ED-AUDIT-008: claim a Ctrl+Z / Ctrl+Shift+Z stroke for the workspace-edit
+   * journal before the document ledger acts. `true` = the journal consumed
+   * the stroke, `false` = the journal is busy and the stroke is blocked,
+   * `undefined` = the journal has nothing in this direction.
+   */
+  onWorkspaceHistoryClaim?: (action: "undo" | "redo") => boolean | undefined;
+  /**
+   * ED-AUDIT-008: the controlled snapshot is a workspace-history restore
+   * (journal undo/redo or recovery). Its reconciliation runs as an
+   * "undo"-origin transaction so no second undoable document entry is
+   * recorded beside the journal transaction that owns the change.
+   */
+  historyReplay?: boolean;
   /** Store revision used when the first view creates the canonical document. */
   documentRevision?: number;
   doc: string;
@@ -306,6 +400,14 @@ interface CodeMirrorHostProps {
   onSelectionChange?: (selection: EditorSelectionRange) => void;
   onFoldProvenanceChange?: (provenance: RegionFoldingProvenance | null) => void;
   onViewportChange?: (range: LspRange) => void;
+  /**
+   * ED-IMPROVE-007: one-shot caret/selection/scroll/fold snapshot for this
+   * leaf/file, applied when the view mounts. Later user input is never
+   * overwritten by a late restore because it is only applied here.
+   */
+  initialViewState?: PersistedEditorViewState | null;
+  /** Reports view-state changes for in-memory capture and debounced persistence. */
+  onViewStateChange?: (state: PersistedEditorViewState) => void;
   onExpandSelection?: (selection: EditorSelectionRange) => Promise<LspRange[] | null>;
   onLightbulb?: (line: number) => void;
   onGitChangeClick?: (change: GitLineChange) => void;
@@ -441,6 +543,38 @@ function reportClipboardReadObservation(
     historyExclusion: snapshot?.exclusion ?? "recorded",
     payloadRevision: snapshot?.payloadRevision ?? 0,
     caretCount,
+  }));
+}
+
+/**
+ * ED-IMPROVE-009: report a late clipboard result whose owner moved on, keeping
+ * the OS effect that already happened instead of dropping the observation.
+ */
+function reportClipboardCancelledObservation(
+  view: EditorView,
+  operation: ClipboardObservationOperation,
+  systemEffect: GuardedSystemEffect,
+  caretCount: number,
+  shape: {
+    baseGeneration?: number | null;
+    usedWorkspaceFallback?: boolean;
+    segmentCount?: number | null;
+    rectangular?: boolean;
+    payloadLength?: number | null;
+  } = {},
+): void {
+  const context = clipboardContextByView.get(view);
+  if (!context?.onObservation) return;
+  const snapshot = context.handle?.getSnapshot();
+  context.onObservation(createClipboardCancelledObservation({
+    operation,
+    systemEffect,
+    permission: snapshot?.permission ?? "unknown",
+    permissionGeneration: snapshot?.permissionGeneration ?? 0,
+    historyExclusion: snapshot?.exclusion ?? "recorded",
+    payloadRevision: snapshot?.payloadRevision ?? 0,
+    caretCount,
+    ...shape,
   }));
 }
 
@@ -598,8 +732,15 @@ function pasteSystemClipboard(view: EditorView): boolean {
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
-        // Stale/cancelled paste: no effect and, per the shared contract, no
-        // observation entry either.
+        // ED-IMPROVE-009: the paste is cancelled with no document/focus effect,
+        // but the OS read effect that already happened is still reported.
+        reportClipboardCancelledObservation(view, "paste", result.systemEffect, caretCountAtPaste, {
+          baseGeneration: result.outcome === "stale-generation" ? result.baseGeneration : null,
+          usedWorkspaceFallback: result.outcome !== "success" && !!result.fallbackSession,
+          segmentCount: result.outcome === "success" ? null : result.fallbackSession?.segments?.length ?? null,
+          rectangular: result.outcome === "success" ? false : result.fallbackSession?.rectangular ?? false,
+          payloadLength: result.outcome === "success" ? result.text.length : result.fallbackSession?.plainText.length ?? null,
+        });
         return;
       }
       reportClipboardReadObservation(view, "paste", result, caretCountAtPaste);
@@ -622,7 +763,7 @@ function pasteSystemClipboard(view: EditorView): boolean {
             ? "System clipboard access denied — pasted from in-workspace session slot instead"
             : result.outcome === "stale-generation"
             ? "Clipboard permission changed during read — pasted from in-workspace session slot instead"
-            : "System clipboard access denied — pasted from in-workspace session slot instead";
+            : "System clipboard read result is unknown — pasted from in-workspace session slot instead";
           context?.onUnavailable(reasonMsg);
           view.focus();
         } else {
@@ -630,7 +771,7 @@ function pasteSystemClipboard(view: EditorView): boolean {
             ? "System clipboard access denied and no in-workspace clipboard session available"
             : result.outcome === "stale-generation"
             ? "Clipboard permission changed during read and no in-workspace clipboard session available"
-            : "System clipboard access denied and no in-workspace clipboard session available";
+            : "System clipboard read result is unknown and no in-workspace clipboard session available";
           context?.onUnavailable(reasonMsg);
         }
       }
@@ -641,13 +782,23 @@ function pasteSystemClipboard(view: EditorView): boolean {
   void readCodeWorkspaceClipboardText()
     .then((result) => {
       if (
-        !result.ok
-        || !view.dom.isConnected
+        !view.dom.isConnected
         || view.composing
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
-        if (!result.ok && view.dom.isConnected && !view.composing) {
+        // ED-IMPROVE-009: cancelled paste keeps the OS read fact.
+        reportClipboardCancelledObservation(
+          view,
+          "paste",
+          result.ok ? "not-performed" : "unknown",
+          caretCountAtPaste,
+          { payloadLength: result.ok ? result.text.length : null },
+        );
+        return;
+      }
+      {
+        if (!result.ok) {
           const fallbackStore = workspaceStoreFor(context);
           const session = fallbackStore ? fallbackStore.read() : null;
           if (session) {
@@ -660,16 +811,16 @@ function pasteSystemClipboard(view: EditorView): boolean {
               rectangular: session.rectangular,
             });
             context?.onUnavailable(
-              "System clipboard access denied — pasted from in-workspace session slot instead",
+              "System clipboard read did not complete — pasted from in-workspace session slot instead",
             );
             view.focus();
           } else {
             context?.onUnavailable(
-              "System clipboard access denied and no in-workspace clipboard session available",
+              "System clipboard read did not complete and no in-workspace clipboard session available",
             );
           }
+          return;
         }
-        return;
       }
       pasteEditorClipboardPayload(
         view,
@@ -689,6 +840,7 @@ function pasteSystemClipboard(view: EditorView): boolean {
 function pasteAsPlainText(view: EditorView): boolean {
   if (view.composing || view.state.readOnly) return false;
   const docAtRequest = view.state.doc;
+  const selectionAtRequest = view.state.selection;
   const context = clipboardContextByView.get(view);
   const handle = context?.handle;
 
@@ -696,7 +848,19 @@ function pasteAsPlainText(view: EditorView): boolean {
 
   if (handle) {
     void handle.readSystemClipboard({ readTextResult: readCodeWorkspaceClipboardText }).then((result) => {
-      if (!view.dom.isConnected || view.composing || view.state.doc !== docAtRequest) return;
+      if (
+        !view.dom.isConnected
+        || view.composing
+        || view.state.doc !== docAtRequest
+        || !view.state.selection.eq(selectionAtRequest, true)
+      ) {
+        reportClipboardCancelledObservation(view, "paste-plain", result.systemEffect, caretCountAtPlainPaste, {
+          baseGeneration: result.outcome === "stale-generation" ? result.baseGeneration : null,
+          usedWorkspaceFallback: result.outcome !== "success" && !!result.fallbackSession,
+          payloadLength: result.outcome === "success" ? result.text.length : result.fallbackSession?.plainText.length ?? null,
+        });
+        return;
+      }
       reportClipboardReadObservation(view, "paste-plain", result, caretCountAtPlainPaste);
       const text = result.outcome === "success" ? result.text : result.fallbackSession?.plainText ?? "";
       if (!text) {
@@ -705,7 +869,7 @@ function pasteAsPlainText(view: EditorView): boolean {
             ? "Nothing to paste"
             : result.outcome === "denied"
             ? "System clipboard access denied and no in-workspace clipboard session available"
-            : "System clipboard access denied and no in-workspace clipboard session available",
+            : "System clipboard read result is unknown and no in-workspace clipboard session available",
         );
         return;
       }
@@ -727,12 +891,26 @@ function pasteAsPlainText(view: EditorView): boolean {
 
   void readCodeWorkspaceClipboardText()
     .then((result) => {
-      if (!view.dom.isConnected || view.composing || view.state.doc !== docAtRequest) return;
+      if (
+        !view.dom.isConnected
+        || view.composing
+        || view.state.doc !== docAtRequest
+        || !view.state.selection.eq(selectionAtRequest, true)
+      ) {
+        reportClipboardCancelledObservation(
+          view,
+          "paste-plain",
+          result.ok ? "not-performed" : "unknown",
+          caretCountAtPlainPaste,
+          { payloadLength: result.ok ? result.text.length : null },
+        );
+        return;
+      }
       const session = workspaceStoreFor(context)?.read() ?? null;
       const text = result.ok ? result.text : session?.plainText ?? "";
       if (!text) {
         context?.onUnavailable(
-          result.ok ? "Nothing to paste" : "System clipboard access denied and no in-workspace clipboard session available",
+          result.ok ? "Nothing to paste" : "System clipboard read did not complete and no in-workspace clipboard session available",
         );
         return;
       }
@@ -774,6 +952,14 @@ function cutSystemClipboard(view: EditorView): boolean {
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
+        // ED-IMPROVE-009: the cut is cancelled with no document/focus effect,
+        // but a possibly-performed OS write keeps its real effect fact.
+        reportClipboardCancelledObservation(view, "cut", res.systemEffect, caretCountAtCut, {
+          baseGeneration: res.outcome === "stale-generation" ? res.baseGeneration : null,
+          segmentCount: payload.segments ? payload.segments.length : null,
+          rectangular: payload.rectangular,
+          payloadLength: payload.plainText.length,
+        });
         return;
       }
       if (res.outcome === "success") {
@@ -812,6 +998,11 @@ function cutSystemClipboard(view: EditorView): boolean {
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
+        reportClipboardCancelledObservation(view, "cut", "unknown", caretCountAtCut, {
+          segmentCount: payload.segments ? payload.segments.length : null,
+          rectangular: payload.rectangular,
+          payloadLength: payload.plainText.length,
+        });
         return;
       }
       rememberEditorClipboardPayload(view, payload);
@@ -1579,6 +1770,36 @@ function sameCodeStyle(a?: EffectiveCodeStyle, b?: EffectiveCodeStyle): boolean 
 
 const EMPTY_LIST: readonly never[] = [];
 
+/**
+ * ED-FOLLOW-004: bounds the pending local-document echo list by retained
+ * bytes as well as entry count. Each echo holds a FULL document text so a
+ * lagging controlled prop pins up to 64 whole copies (77 MiB per 1 MiB doc,
+ * ~320 MiB per 5 MiB doc) until an exact (text, revision) echo matches —
+ * and pins them permanently when it never does. Eviction is oldest-first,
+ * which preserves the matching invariant: the consumer only ever matches
+ * the latest prop snapshot, and an older-than-kept echo would have been
+ * dropped by the consume splice anyway. Small docs are unaffected (64
+ * short texts never reach the byte cap).
+ */
+export const MAX_PENDING_ECHO_CHARS = 8 * 1024 * 1024;
+export const MAX_PENDING_ECHO_ENTRIES = 64;
+
+export function trimPendingLocalDocumentEchoes(
+  pendingEchoes: Array<{ text: string; expectedDocumentRevision: number }>,
+  maxEntries: number = MAX_PENDING_ECHO_ENTRIES,
+  maxChars: number = MAX_PENDING_ECHO_CHARS,
+): void {
+  if (pendingEchoes.length > maxEntries) {
+    pendingEchoes.splice(0, pendingEchoes.length - maxEntries);
+  }
+  let total = 0;
+  for (const entry of pendingEchoes) total += entry.text.length;
+  while (pendingEchoes.length > 1 && total > maxChars) {
+    total -= pendingEchoes[0]!.text.length;
+    pendingEchoes.splice(0, 1);
+  }
+}
+
 function sameOptionalArray<T>(
   a?: readonly T[],
   b?: readonly T[],
@@ -1696,6 +1917,12 @@ function applySharedTransactionToView(view: EditorView, transaction: DocumentTra
       remoteTransactionAnnotation.of(true),
       Transaction.addToHistory.of(false),
     ],
+    // ED-AUDIT-002: replayed undo/redo transactions carry the matching
+    // userEvent so the virtual-space overflow field can restore the virtual
+    // caret on undo and drop it on redo.
+    ...(transaction.origin === "undo" || transaction.origin === "redo"
+      ? { userEvent: transaction.origin }
+      : {}),
   });
   return true;
 }
@@ -1727,6 +1954,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   fileKey = path,
   viewId,
   transactionOwner = null,
+  onWorkspaceHistoryClaim,
+  historyReplay = false,
   documentRevision = 0,
   doc,
   visible,
@@ -1760,6 +1989,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   onSelectionChange,
   onFoldProvenanceChange,
   onViewportChange,
+  initialViewState = null,
+  onViewStateChange,
   onExpandSelection,
   onLightbulb,
   onGitChangeClick,
@@ -1808,6 +2039,10 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   fileKeyRef.current = fileKey;
   const transactionOwnerRef = useRef(transactionOwner);
   transactionOwnerRef.current = transactionOwner;
+  const workspaceHistoryClaimRef = useRef(onWorkspaceHistoryClaim);
+  workspaceHistoryClaimRef.current = onWorkspaceHistoryClaim;
+  const historyReplayRef = useRef(historyReplay);
+  historyReplayRef.current = historyReplay;
   const documentRevisionRef = useRef(documentRevision);
   documentRevisionRef.current = documentRevision;
   // §8.18.2: the mount-once editor effect reads the live host through a ref so
@@ -1908,7 +2143,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       || lastPendingEcho.expectedDocumentRevision !== expectedDocumentRevision
     ) {
       pendingEchoes.push({ text, expectedDocumentRevision });
-      if (pendingEchoes.length > 64) pendingEchoes.splice(0, pendingEchoes.length - 64);
+      trimPendingLocalDocumentEchoes(pendingEchoes);
     }
   };
   const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
@@ -1973,6 +2208,18 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const onSelectionChangeRef = useRef(onSelectionChange);
   const onFoldProvenanceChangeRef = useRef(onFoldProvenanceChange);
   const onViewportChangeRef = useRef(onViewportChange);
+  // ED-IMPROVE-007: the initial snapshot is read once at view creation; later
+  // prop changes never re-apply it over the user's live caret/scroll.
+  const initialViewStateRef = useRef(initialViewState);
+  initialViewStateRef.current = initialViewState;
+  const onViewStateChangeRef = useRef(onViewStateChange);
+  onViewStateChangeRef.current = onViewStateChange;
+  const lastEmittedViewStateRef = useRef<string | null>(null);
+  const viewStateEmitTimerRef = useRef<number | null>(null);
+  // ED-IMPROVE-008: IME composition ownership. While active, doc changes are
+  // dispatched with the composition origin so the owner coalesces them into
+  // one logical undo; blur/destroy/end finalize and release the session.
+  const compositionActiveRef = useRef(false);
   const onExpandSelectionRef = useRef(onExpandSelection);
   const onLightbulbRef = useRef(onLightbulb);
   const onGitChangeClickRef = useRef(onGitChangeClick);
@@ -2167,6 +2414,26 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         if (viewRef.current === view) emitSelection(view);
       }, delay);
     };
+    // ED-IMPROVE-007: capture is cheap and stays in memory; identical
+    // snapshots are dropped so a scroll or caret move does not schedule a
+    // persistence write per event.
+    const scheduleViewStateEmit = (view: EditorView, delay = 150) => {
+      if (!onViewStateChangeRef.current) return;
+      if (viewStateEmitTimerRef.current !== null) {
+        window.clearTimeout(viewStateEmitTimerRef.current);
+      }
+      viewStateEmitTimerRef.current = window.setTimeout(() => {
+        viewStateEmitTimerRef.current = null;
+        if (viewRef.current !== view) return;
+        const handler = onViewStateChangeRef.current;
+        if (!handler) return;
+        const captured = captureEditorViewState(view);
+        const serialized = JSON.stringify(captured);
+        if (serialized === lastEmittedViewStateRef.current) return;
+        lastEmittedViewStateRef.current = serialized;
+        handler(captured);
+      }, delay);
+    };
     const saveHandler = () => {
       onSaveRef.current();
       return true;
@@ -2252,7 +2519,9 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         // §8.19.8 treeRevision source for semantic-edit evidence envelopes.
         treeRevisionField,
         // §8.19.5 / §8.21.3 Virtual Space: overflow tracking, typing materialization,
-        // vertical desired column preservation, and click-past-EOL.
+        // vertical desired column preservation, and click-past-EOL. The restore
+        // field must precede the overflow field (ED-AUDIT-002 undo restore).
+        virtualOverflowRestoreField,
         virtualSpaceOverflowField,
         desiredVisualColumnField,
         virtualSpaceTypingHandler,
@@ -2365,13 +2634,17 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         // 2) Else expand an exact live/postfix template under the caret
         //    even when the popup is closed (sout + Tab without waiting).
         // 3) Else cycle a choice placeholder's options (§8.18.3 interactive
-        //    choice session), else plain LSP snippet tabstops (combined
-        //    snippet+import acceptance committed in one transaction).
-        // 4) Else fall through to CM snippet tabstops / indentWithTab.
+        //    choice session), else plain LSP snippet tabstops (all snippet
+        //    acceptances commit in one transaction and own their session).
+        // 4) Else fall through to indentWithTab. The final tabstop exits
+        //    with a caret-only move (never an undoable indent), and
+        //    Shift-Tab walks back through the stops while the session lives.
         Prec.high(keymap.of([
           {
             key: "Tab",
             run: (view) => {
+              // ED-AUDIT-011: Tab during IME composition selects the candidate.
+              if (view.composing) return false;
               if (acceptCompletion(view)) return true;
               if (expandLiveTemplateAt(
                 view,
@@ -2379,6 +2652,14 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
               )) return true;
               if (activeLspSnippetChoices(view)) return cycleLspSnippetChoice(view);
               return advanceLspSnippetTabstop(view);
+            },
+          },
+          {
+            key: "Shift-Tab",
+            run: (view) => {
+              // ED-AUDIT-011: Shift-Tab during composition belongs to the IME.
+              if (view.composing) return false;
+              return retreatLspSnippetTabstop(view);
             },
           },
         ])),
@@ -2396,9 +2677,18 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
                 // last slot consults the session via ref and returns false
                 // when nothing of this kind is open, so Esc never claims a
                 // keystroke it did not consume.
+                // ED-AUDIT-011: Escape during IME composition cancels the
+                // candidate window; workspace snippet/selection/parameter
+                // owners must not consume it (callee guards also return false).
                 { key: "Escape", run: (view: EditorView) => cancelLspSnippetSession(view) },
                 { key: "Escape", run: escapeEditorSelections },
-                { key: "Escape", run: () => onParameterEscapeRef.current?.() ?? false },
+                {
+                  key: "Escape",
+                  run: (view: EditorView) => {
+                    if (view.composing) return false;
+                    return onParameterEscapeRef.current?.() ?? false;
+                  },
+                },
               ]
             : [
                 // Transitional unhosted fallback: standalone embedders/tests
@@ -2520,11 +2810,14 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
                   });
                 });
                 if (deltas.length > 0) {
+                  const composingInput = compositionActiveRef.current
+                    || update.view.composing
+                    || update.transactions.some((tr) => tr.isUserEvent("input.type.compose"));
                   const sharedTransaction = transactionOwnerRef.current.dispatchTransaction(
                     fileKeyRef.current,
                     viewIdRef.current,
                     deltas,
-                    "user-input",
+                    composingInput ? "composition" : "user-input",
                   );
                   if (!sharedTransaction) {
                     const rejectedView = update.view;
@@ -2590,12 +2883,31 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             scheduleSelectionEmit(update.view, update.docChanged ? 125 : 0);
           }
           if (update.viewportChanged) emitViewport(update.view);
+          // ED-IMPROVE-007: capture caret/selection/scroll/fold changes for
+          // this leaf/file; persisted later with the layout snapshot.
+          if (
+            update.selectionSet
+            || update.docChanged
+            || update.viewportChanged
+            || update.transactions.some((tr) => tr.effects.some(
+              (effect) => effect.is(foldEffect) || effect.is(unfoldEffect),
+            ))
+          ) {
+            scheduleViewStateEmit(update.view, update.docChanged ? 250 : 150);
+          }
         }),
       ],
     });
     const view = new EditorView({ state, parent: hostRef.current });
     editorLanguageByView.set(view, liveTemplateLanguageForPath(pathRef.current));
     viewRef.current = view;
+    // ED-IMPROVE-007: one-shot restore of this leaf/file's own caret,
+    // selection, scroll and folds. Applied before any user input and never
+    // re-applied on prop changes, so late updates cannot overwrite typing.
+    const initialViewState = initialViewStateRef.current;
+    if (initialViewState) {
+      applyPersistedEditorViewState(view, initialViewState);
+    }
     const compositionNavigationGuard = (event: KeyboardEvent) => {
       if (
         (!view.composing && event.isComposing !== true)
@@ -2607,6 +2919,25 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       event.preventDefault();
     };
     view.contentDOM.addEventListener("keydown", compositionNavigationGuard, true);
+    const compositionStartGuard = () => {
+      compositionActiveRef.current = true;
+    };
+    const compositionEndGuard = () => {
+      compositionActiveRef.current = false;
+      const owner = transactionOwnerRef.current;
+      const key = fileKeyRef.current;
+      if (owner && key) owner.finalizeComposition(key);
+    };
+    const compositionBlurGuard = () => {
+      if (!compositionActiveRef.current) return;
+      compositionActiveRef.current = false;
+      const owner = transactionOwnerRef.current;
+      const key = fileKeyRef.current;
+      if (owner && key) owner.finalizeComposition(key);
+    };
+    view.contentDOM.addEventListener("compositionstart", compositionStartGuard, true);
+    view.contentDOM.addEventListener("compositionend", compositionEndGuard, true);
+    view.contentDOM.addEventListener("blur", compositionBlurGuard, true);
     emitSelection(view);
     emitViewport(view);
 
@@ -2651,6 +2982,11 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         isEditorGeometryReady: () => isEditorGeometryReady(view),
         runEditorCommand: (command) => command(view),
         undo: () => {
+          // ED-AUDIT-008: the workspace-edit journal is the newest
+          // user-visible history owner; when it can serve this stroke the
+          // document ledger must not act on it.
+          const claimed = workspaceHistoryClaimRef.current?.("undo");
+          if (claimed !== undefined) return claimed;
           const currentOwner = transactionOwnerRef.current;
           if (!currentOwner) return undefined;
           if (view.state.readOnly || view.composing) return false;
@@ -2666,6 +3002,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
           return true;
         },
         redo: () => {
+          const claimed = workspaceHistoryClaimRef.current?.("redo");
+          if (claimed !== undefined) return claimed;
           const currentOwner = transactionOwnerRef.current;
           if (!currentOwner) return undefined;
           if (view.state.readOnly || view.composing) return false;
@@ -2697,10 +3035,21 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       bridgeRegistration?.dispose();
       unregisterEditorActions?.();
       clearPendingSelectionEmit();
+      if (viewStateEmitTimerRef.current !== null) {
+        window.clearTimeout(viewStateEmitTimerRef.current);
+        viewStateEmitTimerRef.current = null;
+      }
       requestParameterInfoRef.current = null;
       cancelActiveHoverResize(activeHoverResizeSessionRef);
       clipboardContextByView.delete(view);
+      compositionActiveRef.current = false;
+      if (transactionOwnerRef.current && fileKeyRef.current) {
+        transactionOwnerRef.current.finalizeComposition(fileKeyRef.current);
+      }
       view.contentDOM.removeEventListener("keydown", compositionNavigationGuard, true);
+      view.contentDOM.removeEventListener("compositionstart", compositionStartGuard, true);
+      view.contentDOM.removeEventListener("compositionend", compositionEndGuard, true);
+      view.contentDOM.removeEventListener("blur", compositionBlurGuard, true);
       view.destroy();
       viewRef.current = null;
       if (owner && sharedFileKey) owner.releaseView(sharedFileKey, sharedViewId);
@@ -3117,16 +3466,25 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         if (previousPropDocument !== doc) {
           // A changed prop is an external/store snapshot. Make it one shared
           // transaction so every split sees the same replacement and history
-          // remains owned by the canonical document.
+          // remains owned by the canonical document. ED-AUDIT-008: a
+          // workspace-history restore is journaled at transaction level, so
+          // its reconciliation records no second document-ledger entry —
+          // otherwise a follow-up Ctrl+Z would re-apply the undone change.
           const transaction = owner.replaceDocument(
             fileKeyRef.current,
             viewIdRef.current,
             doc,
-            "external-disk",
+            historyReplayRef.current ? "undo" : "external-disk",
           );
-          if (transaction) applySharedTransactionToView(view, transaction);
-          lastDocumentTextRef.current = view.state.doc.toString();
-          return;
+          if (transaction) {
+            applySharedTransactionToView(view, transaction);
+            lastDocumentTextRef.current = view.state.doc.toString();
+            return;
+          }
+          // replaceDocument declined (no canonical record, or the record
+          // already holds this text). Fall through to the direct snapshot
+          // apply below so a programmatic store change still reaches this
+          // view instead of being swallowed with a stale document.
         }
         if (currentText === canonical || lastDocumentTextRef.current === canonical) {
           // React may still expose the previous store value while a live
@@ -3137,7 +3495,9 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       }
     }
 
-    if (lastDocumentTextRef.current === doc) return;
+    if (lastDocumentTextRef.current === doc) {
+      return;
+    }
     applyingExternalDocRef.current = true;
     try {
       applyDocumentSnapshotToView(view, doc);

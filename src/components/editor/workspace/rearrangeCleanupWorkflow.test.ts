@@ -1,16 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildCleanupPlan,
   buildRearrangePlan,
   cancelWorkflowPlan,
+  executeCleanupTransaction,
+  executeRearrangeTransaction,
+  isCleanupActionKind,
+  isRearrangeActionKind,
   planCleanup,
   planRearrange,
   resolveCleanupCapabilities,
   resolveRearrangeCapabilities,
+  validateWorkflowProviderAction,
   verifyWorkflowFreshness,
   verifyWorkflowPostHashes,
   verifyWorkflowPreconditions,
+  type CleanupExecuteDeps,
   type CleanupInput,
+  type RearrangeExecuteDeps,
   type RearrangeInput,
 } from "./rearrangeCleanupWorkflow";
 import { sha256Hex } from "./projectAnalysisModel";
@@ -455,3 +462,994 @@ describe("ED-STYLE-002: Rearrange / Cleanup independent workflows", () => {
   });
 });
 
+
+describe("ED-AUDIT-015: executeRearrangeTransaction supported-branch wiring (model boundary)", () => {
+  const PRE = "package com.example;\n\npublic class Service {\n    public void beta() {}\n    public void alpha() {}\n}\n";
+  const POST = "package com.example;\n\npublic class Service {\n    public void alpha() {}\n    public void beta() {}\n}\n";
+  const SWAP_EDITS = [
+    {
+      range: { start: { line: 3, character: 0 }, end: { line: 4, character: 26 } },
+      newText: "    public void alpha() {}\n    public void beta() {}",
+    },
+  ];
+
+  function liveDoc(text: string = PRE, revision = 7) {
+    return { text, revision, readOnly: false, dirty: false };
+  }
+
+  function supportedCaps() {
+    return { rearrangeSupported: true, providerId: "test-arrange", providerVersion: "0" };
+  }
+
+  function baseDeps(overrides: Partial<RearrangeExecuteDeps> = {}): RearrangeExecuteDeps {
+    return {
+      requestActions: vi.fn(async () => ({
+        state: "ok" as const,
+        actions: [{ kind: "source.rearrange", title: "Rearrange members", raw: { id: 1 } }],
+      })),
+      resolveAction: vi.fn(async () => ({
+        state: "resolved" as const,
+        edits: [...SWAP_EDITS],
+      })),
+      readLive: vi.fn(() => liveDoc()),
+      providerGeneration: vi.fn(() => 3),
+      confirmPreview: vi.fn(async () => true),
+      applyEdit: vi.fn(async () => ({ state: "applied" as const, postText: POST })),
+      ...overrides,
+    };
+  }
+
+  function baseInput() {
+    return {
+      scope: "file" as const,
+      targetPath: "src/Service.java",
+      targetUri: "file:///repo/src/Service.java",
+      readOnly: false,
+      hasSelection: false,
+      capabilities: supportedCaps(),
+    };
+  }
+
+  it("applies one verified transaction on the supported path", async () => {
+    const deps = baseDeps();
+    const result = await executeRearrangeTransaction(deps, baseInput());
+    expect(result).toMatchObject({ ok: true, postHash: sha256Hex(POST), operationCount: 1 });
+    expect(deps.applyEdit).toHaveBeenCalledTimes(1);
+    expect(deps.confirmPreview).toHaveBeenCalledTimes(1);
+  });
+
+  it("short-circuits missing target and readonly with zero IO", async () => {
+    const deps = baseDeps();
+    const noTarget = await executeRearrangeTransaction(deps, {
+      ...baseInput(),
+      targetPath: null as unknown as string,
+    });
+    expect(noTarget.ok).toBe(false);
+    const readOnly = await executeRearrangeTransaction(baseDeps(), {
+      ...baseInput(),
+      readOnly: true,
+    });
+    expect(readOnly.ok).toBe(false);
+    expect(deps.requestActions).not.toHaveBeenCalled();
+  });
+
+  it("discovers source.sortMembers live despite unsupported advertised caps", async () => {
+    const deps = baseDeps({
+      requestActions: vi.fn(async () => ({
+        state: "ok" as const,
+        actions: [{ kind: "source.sortMembers", title: "Sort Members", raw: { id: 9 } }],
+      })),
+    });
+    const result = await executeRearrangeTransaction(deps, {
+      ...baseInput(),
+      capabilities: { rearrangeSupported: false, providerId: "Eclipse JDT Language Server" },
+    });
+    expect(result).toMatchObject({ ok: true, postHash: sha256Hex(POST), operationCount: 1 });
+    expect(deps.requestActions).toHaveBeenCalledTimes(1);
+    expect(deps.applyEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses when the provider returns no rearrange-kind action", async () => {
+    const deps = baseDeps({
+      requestActions: vi.fn(async () => ({
+        state: "ok" as const,
+        actions: [{ kind: "source.organizeImports", title: "Organize imports", raw: {} }],
+      })),
+    });
+    const result = await executeRearrangeTransaction(deps, baseInput());
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.committed).toBe(false);
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("refuses resolve failures and empty edits with zero commits", async () => {
+    const failed = baseDeps({
+      resolveAction: vi.fn(async () => ({ state: "failed" as const, edits: [], reason: "boom" })),
+    });
+    expect((await executeRearrangeTransaction(failed, baseInput())).ok).toBe(false);
+    const empty = baseDeps({
+      resolveAction: vi.fn(async () => ({ state: "resolved" as const, edits: [] })),
+    });
+    expect((await executeRearrangeTransaction(empty, baseInput())).ok).toBe(false);
+    expect(failed.applyEdit).not.toHaveBeenCalled();
+    expect(empty.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("refuses dirty-buffer conflicts and stale generations with zero commits", async () => {
+    const dirty = baseDeps({ readLive: vi.fn(() => ({ ...liveDoc(), dirty: true })) });
+    const dirtyResult = await executeRearrangeTransaction(dirty, baseInput());
+    expect(dirtyResult.ok).toBe(false);
+    expect(dirty.applyEdit).not.toHaveBeenCalled();
+
+    let generation = 3;
+    const stale = baseDeps({
+      providerGeneration: vi.fn(() => generation),
+      // Flip the generation mid-flight (during resolve, before the
+      // freshness gate): the frozen generation no longer matches live.
+      resolveAction: vi.fn(async () => {
+        generation = 9;
+        return { state: "resolved" as const, edits: [...SWAP_EDITS] };
+      }),
+    });
+    expect((await executeRearrangeTransaction(stale, baseInput())).ok).toBe(false);
+    expect(stale.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("cancels at the preview gate with zero commits", async () => {
+    const deps = baseDeps({ confirmPreview: vi.fn(async () => false) });
+    const result = await executeRearrangeTransaction(deps, baseInput());
+    expect(result).toEqual({ ok: false, state: "cancelled", reason: "Rearrange cancelled before applying; nothing changed", effect: { kind: "none" }, committed: false });
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("reports postcondition mismatch without claiming success", async () => {
+    const deps = baseDeps({
+      applyEdit: vi.fn(async () => ({ state: "applied" as const, postText: PRE })),
+    });
+    const result = await executeRearrangeTransaction(deps, baseInput());
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toContain("postcondition failed");
+  });
+
+  it("refuses a closed file with zero commits", async () => {
+    const deps = baseDeps({ readLive: vi.fn(() => null) });
+    const result = await executeRearrangeTransaction(deps, baseInput());
+    expect(result.ok).toBe(false);
+    expect(deps.requestActions).not.toHaveBeenCalled();
+  });
+
+  it("tolerates a same-text revision bump between freeze and apply", async () => {
+    // Background LSP sync may bump the revision without changing a byte;
+    // that must re-anchor silently instead of refusing as stale.
+    const reads = [liveDoc(PRE, 7), liveDoc(PRE, 7), liveDoc(PRE, 8), liveDoc(PRE, 8)];
+    const deps = baseDeps({ readLive: vi.fn(() => reads.shift() ?? liveDoc(PRE, 8)) });
+    const result = await executeRearrangeTransaction(deps, baseInput());
+    expect(result).toMatchObject({ ok: true, postHash: sha256Hex(POST), operationCount: 1 });
+    expect(deps.applyEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses when the text changes between plan and apply", async () => {
+    const reads = [liveDoc(PRE, 7), liveDoc(PRE, 7), liveDoc("edited meanwhile", 8)];
+    const deps = baseDeps({ readLive: vi.fn(() => reads.shift() ?? liveDoc("edited meanwhile", 8)) });
+    const result = await executeRearrangeTransaction(deps, baseInput());
+    expect(result.ok).toBe(false);
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+});
+
+describe("ED-AUDIT-016: executeCleanupTransaction supported-branch wiring (model boundary)", () => {
+  const PRE = "package com.example;\n\npublic class Service {\n    public void beta() {}\n    public void alpha() {}\n}\n";
+  const POST = "package com.example;\n\npublic class Service {\n    public void alpha() {}\n    public void beta() {}\n}\n";
+  const CLEANUP_EDITS = [
+    {
+      range: { start: { line: 3, character: 0 }, end: { line: 4, character: 26 } },
+      newText: "    public void alpha() {}\n    public void beta() {}",
+    },
+  ];
+
+  function liveDoc(text: string = PRE, revision = 7) {
+    return { text, revision, readOnly: false, dirty: false };
+  }
+
+  function baseDeps(overrides: Partial<CleanupExecuteDeps> = {}): CleanupExecuteDeps {
+    return {
+      requestActions: vi.fn(async () => ({
+        state: "ok" as const,
+        actions: [{ kind: "source.cleanup", title: "Clean up", raw: { id: 1 } }],
+      })),
+      resolveAction: vi.fn(async () => ({
+        state: "resolved" as const,
+        edits: [...CLEANUP_EDITS],
+      })),
+      readLive: vi.fn(() => liveDoc()),
+      providerGeneration: vi.fn(() => 3),
+      confirmPreview: vi.fn(async () => true),
+      applyEdit: vi.fn(async () => ({ state: "applied" as const, postText: POST })),
+      ...overrides,
+    };
+  }
+
+  function baseInput() {
+    return {
+      scope: "file" as const,
+      targetPath: "src/Service.java",
+      targetUri: "file:///repo/src/Service.java",
+      readOnly: false,
+      capabilities: { cleanupSupported: true, providerId: "test-cleanup", providerVersion: "0" },
+    };
+  }
+
+  it("applies one verified transaction on the supported path", async () => {
+    const deps = baseDeps();
+    const result = await executeCleanupTransaction(deps, baseInput());
+    expect(result).toMatchObject({ ok: true, postHash: sha256Hex(POST), operationCount: 1 });
+    expect(deps.applyEdit).toHaveBeenCalledTimes(1);
+    expect(deps.confirmPreview).toHaveBeenCalledTimes(1);
+  });
+
+  it("short-circuits missing target, readonly, scope, and profile with zero IO", async () => {
+    const deps = baseDeps();
+    expect((await executeCleanupTransaction(deps, { ...baseInput(), targetPath: null as unknown as string })).ok).toBe(false);
+    expect((await executeCleanupTransaction(baseDeps(), { ...baseInput(), readOnly: true })).ok).toBe(false);
+    expect((await executeCleanupTransaction(baseDeps(), { ...baseInput(), scope: "project" as const })).ok).toBe(false);
+    expect((await executeCleanupTransaction(baseDeps(), { ...baseInput(), profileId: "full-cleanup" })).ok).toBe(false);
+    expect(deps.requestActions).not.toHaveBeenCalled();
+  });
+
+  it("discovers cleanup kinds live despite unsupported advertised caps", async () => {
+    const deps = baseDeps();
+    const result = await executeCleanupTransaction(deps, {
+      ...baseInput(),
+      capabilities: { cleanupSupported: false, providerId: "Eclipse JDT Language Server" },
+    });
+    expect(result).toMatchObject({ ok: true, postHash: sha256Hex(POST), operationCount: 1 });
+    expect(deps.requestActions).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses when the provider returns no cleanup-kind action", async () => {
+    const deps = baseDeps({
+      requestActions: vi.fn(async () => ({
+        state: "ok" as const,
+        actions: [{ kind: "source.organizeImports", title: "Organize imports", raw: {} }],
+      })),
+    });
+    const result = await executeCleanupTransaction(deps, baseInput());
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.committed).toBe(false);
+      expect(result.reason).toContain("no cleanup action");
+    }
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("refuses resolve failures and empty edits with zero commits", async () => {
+    const failed = baseDeps({
+      resolveAction: vi.fn(async () => ({ state: "failed" as const, edits: [], reason: "boom" })),
+    });
+    expect((await executeCleanupTransaction(failed, baseInput())).ok).toBe(false);
+    const empty = baseDeps({
+      resolveAction: vi.fn(async () => ({ state: "resolved" as const, edits: [] })),
+    });
+    expect((await executeCleanupTransaction(empty, baseInput())).ok).toBe(false);
+    expect(failed.applyEdit).not.toHaveBeenCalled();
+    expect(empty.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("reports no-change without claiming fixes", async () => {
+    const deps = baseDeps({
+      resolveAction: vi.fn(async () => ({
+        state: "resolved" as const,
+        edits: [{ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }, newText: "" }],
+      })),
+    });
+    const result = await executeCleanupTransaction(deps, baseInput());
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toContain("no changes");
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+    expect(deps.confirmPreview).not.toHaveBeenCalled();
+  });
+
+  it("cancels at the preview gate with zero commits", async () => {
+    const deps = baseDeps({ confirmPreview: vi.fn(async () => false) });
+    const result = await executeCleanupTransaction(deps, baseInput());
+    expect(result.ok).toBe(false);
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("refuses dirty-buffer conflicts and stale generations with zero commits", async () => {
+    const dirty = baseDeps({ readLive: vi.fn(() => ({ ...liveDoc(), dirty: true })) });
+    expect((await executeCleanupTransaction(dirty, baseInput())).ok).toBe(false);
+    expect(dirty.applyEdit).not.toHaveBeenCalled();
+
+    let generation = 3;
+    const stale = baseDeps({
+      providerGeneration: vi.fn(() => generation),
+      // Flip the generation mid-flight (during resolve, before the
+      // freshness gate): the frozen generation no longer matches live.
+      resolveAction: vi.fn(async () => {
+        generation = 9;
+        return { state: "resolved" as const, edits: [...CLEANUP_EDITS] };
+      }),
+    });
+    expect((await executeCleanupTransaction(stale, baseInput())).ok).toBe(false);
+    expect(stale.applyEdit).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ED-IMPROVE-001: every await window re-verifies the frozen identity, and the
+// shared apply boundary performs the final pre-mutation check. Baseline
+// regression: a preview-window text change used to commit the old edits.
+// ---------------------------------------------------------------------------
+describe("ED-IMPROVE-001: frozen identity across request/resolve/preview (model boundary)", () => {
+  const PRE = "package com.example;\n\npublic class Service {\n    void beta() {}\n    void alpha() {}\n}\n";
+  const POST = "package com.example;\n\npublic class Service {\n    void alpha() {}\n    void beta() {}\n}\n";
+  const EDITS = [
+    {
+      range: { start: { line: 3, character: 0 }, end: { line: 4, character: 19 } },
+      newText: "    void alpha() {}\n    void beta() {}",
+    },
+  ];
+
+  function live(text: string, revision = 7) {
+    return { text, revision, readOnly: false, dirty: false };
+  }
+
+  function rearrangeDeps(overrides: Partial<RearrangeExecuteDeps> = {}): RearrangeExecuteDeps {
+    return {
+      requestActions: vi.fn(async () => ({
+        state: "ok" as const,
+        actions: [{ kind: "source.sortMembers", title: "Sort Members", raw: { id: 1 } }],
+      })),
+      resolveAction: vi.fn(async () => ({ state: "resolved" as const, edits: [...EDITS] })),
+      readLive: vi.fn(() => live(PRE)),
+      providerGeneration: vi.fn(() => 3),
+      confirmPreview: vi.fn(async () => true),
+      applyEdit: vi.fn(async () => ({ state: "applied" as const, postText: POST })),
+      ...overrides,
+    };
+  }
+
+  function cleanupDeps(overrides: Partial<CleanupExecuteDeps> = {}): CleanupExecuteDeps {
+    return {
+      requestActions: vi.fn(async () => ({
+        state: "ok" as const,
+        actions: [{ kind: "source.cleanup", title: "Clean up", raw: { id: 1 } }],
+      })),
+      resolveAction: vi.fn(async () => ({ state: "resolved" as const, edits: [...EDITS] })),
+      readLive: vi.fn(() => live(PRE)),
+      providerGeneration: vi.fn(() => 3),
+      confirmPreview: vi.fn(async () => true),
+      applyEdit: vi.fn(async () => ({ state: "applied" as const, postText: POST })),
+      ...overrides,
+    };
+  }
+
+  function rearrangeInput() {
+    return {
+      scope: "file" as const,
+      targetPath: "src/Service.java",
+      targetUri: "file:///repo/src/Service.java",
+      readOnly: false,
+      hasSelection: false,
+      capabilities: { rearrangeSupported: true, providerId: "test-arrange", providerVersion: "0" },
+    };
+  }
+
+  function cleanupInput() {
+    return {
+      scope: "file" as const,
+      targetPath: "src/Service.java",
+      targetUri: "file:///repo/src/Service.java",
+      readOnly: false,
+      capabilities: { cleanupSupported: true, providerId: "test-cleanup", providerVersion: "0" },
+    };
+  }
+
+  it("refuses text changed during the provider request window", async () => {
+    let text = PRE;
+    const deps = rearrangeDeps({
+      readLive: vi.fn(() => live(text)),
+      requestActions: vi.fn(async () => {
+        text = "class XY {}";
+        return { state: "ok" as const, actions: [{ kind: "source.sortMembers", title: "Sort Members", raw: {} }] };
+      }),
+    });
+    const result = await executeRearrangeTransaction(deps, rearrangeInput());
+    expect(result).toMatchObject({ ok: false, state: "stale", committed: false });
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+    expect(deps.confirmPreview).not.toHaveBeenCalled();
+  });
+
+  it("refuses text changed during the provider resolve window", async () => {
+    let text = PRE;
+    const deps = rearrangeDeps({
+      readLive: vi.fn(() => live(text)),
+      resolveAction: vi.fn(async () => {
+        text = "class XY {}";
+        return { state: "resolved" as const, edits: [...EDITS] };
+      }),
+    });
+    const result = await executeRearrangeTransaction(deps, rearrangeInput());
+    expect(result).toMatchObject({ ok: false, state: "stale", committed: false });
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("refuses text changed during the preview confirmation window", async () => {
+    let text = PRE;
+    const deps = rearrangeDeps({
+      readLive: vi.fn(() => live(text)),
+      confirmPreview: vi.fn(async () => {
+        text = "class XY {}";
+        return true;
+      }),
+    });
+    const result = await executeRearrangeTransaction(deps, rearrangeInput());
+    expect(result).toMatchObject({ ok: false, state: "stale", committed: false });
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("refuses provider generation changes during the preview confirmation window", async () => {
+    let generation = 3;
+    const deps = rearrangeDeps({
+      providerGeneration: vi.fn(() => generation),
+      confirmPreview: vi.fn(async () => {
+        generation = 4;
+        return true;
+      }),
+    });
+    const result = await executeRearrangeTransaction(deps, rearrangeInput());
+    expect(result).toMatchObject({ ok: false, state: "stale", committed: false });
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("refuses a closed file or workspace switch during the preview window", async () => {
+    let current: ReturnType<typeof live> | null = live(PRE);
+    const deps = rearrangeDeps({
+      readLive: vi.fn(() => current),
+      confirmPreview: vi.fn(async () => {
+        current = null;
+        return true;
+      }),
+    });
+    const result = await executeRearrangeTransaction(deps, rearrangeInput());
+    expect(result).toMatchObject({ ok: false, state: "cancelled", committed: false });
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("refuses a read-only toggle during the preview window", async () => {
+    let readOnly = false;
+    const deps = rearrangeDeps({
+      readLive: vi.fn(() => ({ ...live(PRE), readOnly })),
+      confirmPreview: vi.fn(async () => {
+        readOnly = true;
+        return true;
+      }),
+    });
+    const result = await executeRearrangeTransaction(deps, rearrangeInput());
+    expect(result).toMatchObject({ ok: false, state: "conflict", committed: false });
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("refuses a request superseded by a newer one (double-entry)", async () => {
+    let token = 1;
+    const deps = rearrangeDeps({
+      requestToken: () => token,
+      confirmPreview: vi.fn(async () => {
+        token = 2;
+        return true;
+      }),
+    });
+    const result = await executeRearrangeTransaction(deps, rearrangeInput());
+    expect(result).toMatchObject({ ok: false, state: "stale", committed: false });
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("re-verifies identity inside the shared apply boundary before mutation", async () => {
+    let text = PRE;
+    const deps = rearrangeDeps({
+      readLive: vi.fn(() => live(text)),
+      applyEdit: vi.fn(async (_edit, guard) => {
+        text = "late external edit";
+        expect(() => guard.assertCurrent()).toThrow(/changed since/);
+        return { state: "failed" as const, reason: "preflight rejected" };
+      }),
+    });
+    const result = await executeRearrangeTransaction(deps, rearrangeInput());
+    expect(result).toMatchObject({ ok: false, state: "stale", committed: false });
+  });
+
+  it("tolerates a same-text revision bump during the preview window", async () => {
+    let revision = 7;
+    const deps = rearrangeDeps({
+      readLive: vi.fn(() => live(PRE, revision)),
+      confirmPreview: vi.fn(async () => {
+        revision = 9;
+        return true;
+      }),
+    });
+    const result = await executeRearrangeTransaction(deps, rearrangeInput());
+    expect(result).toMatchObject({ ok: true, postHash: sha256Hex(POST), operationCount: 1 });
+  });
+
+  it("cleanup mirrors the preview-window identity refusal", async () => {
+    let text = PRE;
+    const deps = cleanupDeps({
+      readLive: vi.fn(() => live(text)),
+      confirmPreview: vi.fn(async () => {
+        text = "class XY {}";
+        return true;
+      }),
+    });
+    const result = await executeCleanupTransaction(deps, cleanupInput());
+    expect(result).toMatchObject({ ok: false, state: "stale", committed: false });
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("cleanup mirrors closed-file, read-only, token and generation refusals", async () => {
+    const failureState = async (deps: CleanupExecuteDeps): Promise<string> => {
+      const result = await executeCleanupTransaction(deps, cleanupInput());
+      return result.ok ? "ok" : result.state;
+    };
+    let current: ReturnType<typeof live> | null = live(PRE);
+    const closed = cleanupDeps({
+      readLive: vi.fn(() => current),
+      confirmPreview: vi.fn(async () => {
+        current = null;
+        return true;
+      }),
+    });
+    expect(await failureState(closed)).toBe("cancelled");
+
+    let readOnly = false;
+    const readonly = cleanupDeps({
+      readLive: vi.fn(() => ({ ...live(PRE), readOnly })),
+      confirmPreview: vi.fn(async () => {
+        readOnly = true;
+        return true;
+      }),
+    });
+    expect(await failureState(readonly)).toBe("conflict");
+
+    let token = 1;
+    const superseded = cleanupDeps({
+      requestToken: () => token,
+      confirmPreview: vi.fn(async () => {
+        token = 2;
+        return true;
+      }),
+    });
+    expect(await failureState(superseded)).toBe("stale");
+
+    let generation = 3;
+    const stale = cleanupDeps({
+      providerGeneration: vi.fn(() => generation),
+      confirmPreview: vi.fn(async () => {
+        generation = 4;
+        return true;
+      }),
+    });
+    expect(await failureState(stale)).toBe("stale");
+    expect(closed.applyEdit).not.toHaveBeenCalled();
+    expect(readonly.applyEdit).not.toHaveBeenCalled();
+    expect(superseded.applyEdit).not.toHaveBeenCalled();
+    expect(stale.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("cleanup re-verifies identity inside the shared apply boundary", async () => {
+    let text = PRE;
+    const deps = cleanupDeps({
+      readLive: vi.fn(() => live(text)),
+      applyEdit: vi.fn(async (_edit, guard) => {
+        text = "late external edit";
+        expect(() => guard.assertCurrent()).toThrow(/changed since/);
+        return { state: "failed" as const, reason: "preflight rejected" };
+      }),
+    });
+    const result = await executeCleanupTransaction(deps, cleanupInput());
+    expect(result).toMatchObject({ ok: false, state: "stale", committed: false });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ED-IMPROVE-002: execution status and effect facts stay separate; success
+// history/recovery identity is produced by the canonical apply boundary.
+// ---------------------------------------------------------------------------
+describe("ED-IMPROVE-002: effect/history/recovery result contract (model boundary)", () => {
+  const PRE = "package com.example;\n\npublic class Service {\n    void beta() {}\n    void alpha() {}\n}\n";
+  const POST = "package com.example;\n\npublic class Service {\n    void alpha() {}\n    void beta() {}\n}\n";
+  const EDITS = [
+    {
+      range: { start: { line: 3, character: 0 }, end: { line: 4, character: 19 } },
+      newText: "    void alpha() {}\n    void beta() {}",
+    },
+  ];
+
+  function live(text: string) {
+    return { text, revision: 7, readOnly: false, dirty: false };
+  }
+
+  function rearrangeDeps(overrides: Partial<RearrangeExecuteDeps> = {}): RearrangeExecuteDeps {
+    return {
+      requestActions: vi.fn(async () => ({
+        state: "ok" as const,
+        actions: [{ kind: "source.sortMembers", title: "Sort Members", raw: { id: 1 } }],
+      })),
+      resolveAction: vi.fn(async () => ({ state: "resolved" as const, edits: [...EDITS] })),
+      readLive: vi.fn(() => live(PRE)),
+      providerGeneration: vi.fn(() => 3),
+      confirmPreview: vi.fn(async () => true),
+      applyEdit: vi.fn(async () => ({ state: "applied" as const, postText: POST, historyId: "h-1" })),
+      ...overrides,
+    };
+  }
+
+  function cleanupDeps(overrides: Partial<CleanupExecuteDeps> = {}): CleanupExecuteDeps {
+    return {
+      requestActions: vi.fn(async () => ({
+        state: "ok" as const,
+        actions: [{ kind: "source.cleanup", title: "Clean up", raw: { id: 1 } }],
+      })),
+      resolveAction: vi.fn(async () => ({ state: "resolved" as const, edits: [...EDITS] })),
+      readLive: vi.fn(() => live(PRE)),
+      providerGeneration: vi.fn(() => 3),
+      confirmPreview: vi.fn(async () => true),
+      applyEdit: vi.fn(async () => ({ state: "applied" as const, postText: POST, historyId: "h-1" })),
+      ...overrides,
+    };
+  }
+
+  function rearrangeInput() {
+    return {
+      scope: "file" as const,
+      targetPath: "src/Service.java",
+      targetUri: "file:///repo/src/Service.java",
+      readOnly: false,
+      hasSelection: false,
+      capabilities: { rearrangeSupported: true, providerId: "test-arrange", providerVersion: "0" },
+    };
+  }
+
+  function cleanupInput() {
+    return {
+      scope: "file" as const,
+      targetPath: "src/Service.java",
+      targetUri: "file:///repo/src/Service.java",
+      readOnly: false,
+      capabilities: { cleanupSupported: true, providerId: "test-cleanup", providerVersion: "0" },
+    };
+  }
+
+  it("reports the canonical success history id on the verified path", async () => {
+    const deps = rearrangeDeps();
+    const result = await executeRearrangeTransaction(deps, rearrangeInput());
+    expect(result).toEqual({ ok: true, postHash: sha256Hex(POST), operationCount: 1, historyId: "h-1" });
+  });
+
+  it("passes the frozen postcondition facts into the canonical apply boundary", async () => {
+    const contexts: unknown[] = [];
+    const deps = rearrangeDeps({
+      applyEdit: vi.fn(async (_edit, _guard, context) => {
+        contexts.push(context);
+        return { state: "applied" as const, postText: POST, historyId: "h-2" };
+      }),
+    });
+    const result = await executeRearrangeTransaction(deps, rearrangeInput());
+    expect(result).toMatchObject({ ok: true, historyId: "h-2" });
+    expect(contexts).toEqual([{
+      targetPath: "src/Service.java",
+      targetUri: "file:///repo/src/Service.java",
+      preText: PRE,
+      expectedPostHash: sha256Hex(POST),
+    }]);
+  });
+
+  it("propagates a recovery-required apply with performed effect and no committed success", async () => {
+    const deps = rearrangeDeps({
+      applyEdit: vi.fn(async () => ({
+        state: "recovery-required" as const,
+        reason: "postcondition mismatch on src/Service.java",
+        recoveryId: "rec-9",
+        affectedPaths: ["src/Service.java"],
+      })),
+    });
+    const result = await executeRearrangeTransaction(deps, rearrangeInput());
+    expect(result).toEqual({
+      ok: false,
+      state: "recovery-required",
+      reason: "postcondition mismatch on src/Service.java",
+      effect: { kind: "performed", paths: ["src/Service.java"], recoveryId: "rec-9" },
+      committed: false,
+    });
+  });
+
+  it("propagates an unknown write acknowledgement as unknown effect", async () => {
+    const deps = rearrangeDeps({
+      applyEdit: vi.fn(async () => ({
+        state: "unknown-effect" as const,
+        reason: "result unknown — resolve the file in the recovery center",
+        recoveryId: "tx-unknown",
+        affectedPaths: ["src/Service.java"],
+      })),
+    });
+    const result = await executeRearrangeTransaction(deps, rearrangeInput());
+    expect(result).toMatchObject({
+      ok: false,
+      state: "unknown-effect",
+      effect: { kind: "unknown", paths: ["src/Service.java"], recoveryId: "tx-unknown" },
+      committed: false,
+    });
+  });
+
+  it("reports a partial effect when only some operations applied before failure", async () => {
+    const deps = rearrangeDeps({
+      applyEdit: vi.fn(async () => ({
+        state: "failed" as const,
+        reason: "second operation failed",
+        recoveryId: null,
+        affectedPaths: ["src/Service.java"],
+      })),
+    });
+    const result = await executeRearrangeTransaction(deps, rearrangeInput());
+    expect(result).toMatchObject({
+      ok: false,
+      state: "failed",
+      effect: { kind: "partial", paths: ["src/Service.java"], recoveryId: null },
+      committed: false,
+    });
+  });
+
+  it("treats a defensive post-hash mismatch as performed, not committed", async () => {
+    const deps = rearrangeDeps({
+      applyEdit: vi.fn(async () => ({ state: "applied" as const, postText: "third-party text" })),
+    });
+    const result = await executeRearrangeTransaction(deps, rearrangeInput());
+    expect(result).toMatchObject({
+      ok: false,
+      state: "failed",
+      effect: { kind: "performed", paths: ["src/Service.java"] },
+      committed: false,
+    });
+    if (!result.ok) expect(result.reason).toContain("workspace-edit history/recovery entry");
+  });
+
+  it("cleanup mirrors the recovery-required and unknown-effect mapping", async () => {
+    const recovery = cleanupDeps({
+      applyEdit: vi.fn(async () => ({
+        state: "recovery-required" as const,
+        reason: "cleanup postcondition mismatch",
+        recoveryId: "rec-10",
+        affectedPaths: ["src/Service.java"],
+      })),
+    });
+    const recoveryResult = await executeCleanupTransaction(recovery, cleanupInput());
+    expect(recoveryResult).toMatchObject({
+      ok: false,
+      state: "recovery-required",
+      effect: { kind: "performed", recoveryId: "rec-10" },
+      committed: false,
+    });
+
+    const unknown = cleanupDeps({
+      applyEdit: vi.fn(async () => ({
+        state: "unknown-effect" as const,
+        reason: "ack unknown",
+        recoveryId: "tx-11",
+        affectedPaths: ["src/Service.java"],
+      })),
+    });
+    const unknownResult = await executeCleanupTransaction(unknown, cleanupInput());
+    expect(unknownResult).toMatchObject({
+      ok: false,
+      state: "unknown-effect",
+      effect: { kind: "unknown", recoveryId: "tx-11" },
+      committed: false,
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ED-IMPROVE-003: the complete provider payload must be validated before it
+// can become a plan; silent filtering/partial execution is not allowed.
+// ---------------------------------------------------------------------------
+describe("ED-IMPROVE-003: provider action payload validation (model boundary)", () => {
+  const TEXT = "class A {\n  void beta() {}\n  void alpha() {}\n}\n";
+  const TARGET_URI = "file:///repo/src/A.java";
+  const TARGET_PATH = "/repo/src/A.java";
+  const EDIT = {
+    range: {
+      start: { line: 1, character: 0 },
+      end: { line: 2, character: 15 },
+    },
+    newText: "  void alpha() {}\n  void beta() {}",
+  };
+
+  function payload(overrides: Record<string, unknown> = {}) {
+    return {
+      kind: "source.rearrange",
+      title: "Rearrange members",
+      edit: {
+        documentEdits: [{ uri: TARGET_URI, path: TARGET_PATH, edits: [EDIT] }],
+      },
+      command: null,
+      commandArguments: null,
+      raw: {},
+      ...overrides,
+    };
+  }
+
+  function validate(action: ReturnType<typeof payload> | null, revision?: number) {
+    return validateWorkflowProviderAction({
+      action,
+      targetUri: TARGET_URI,
+      targetPath: TARGET_PATH,
+      documentText: TEXT,
+      documentRevision: revision,
+      isSupportedKind: isRearrangeActionKind,
+      capabilityLabel: "Rearrange Code",
+    });
+  }
+
+  it("accepts a current-file-only text-edit payload", () => {
+    const result = validate(payload());
+    expect(result).toEqual({ ok: true, edits: [EDIT] });
+  });
+
+  it("rejects a cross-file edit instead of filtering it out", () => {
+    const result = validate(payload({
+      edit: {
+        documentEdits: [
+          { uri: TARGET_URI, path: TARGET_PATH, edits: [EDIT] },
+          { uri: "file:///repo/src/B.java", path: "/repo/src/B.java", edits: [EDIT] },
+        ],
+      },
+    }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.state).toBe("unsupported");
+      expect(result.reason).toContain("/repo/src/B.java");
+      expect(result.reason).toContain("nothing applied");
+    }
+  });
+
+  it("accepts an LSP documentChanges text operation payload", () => {
+    const result = validate(payload({
+      edit: {
+        documentEdits: [],
+        operations: [{ kind: "text", document: { uri: TARGET_URI, path: TARGET_PATH, edits: [EDIT] } }],
+      },
+    }));
+    expect(result).toEqual({ ok: true, edits: [EDIT] });
+  });
+
+  it("rejects resource operations even when a text edit is present", () => {
+    const result = validate(payload({
+      edit: {
+        documentEdits: [{ uri: TARGET_URI, path: TARGET_PATH, edits: [EDIT] }],
+        operations: [{ kind: "rename", oldUri: TARGET_URI, newUri: "file:///repo/src/B.java" }],
+      },
+    }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toContain("resource operations (rename)");
+  });
+
+  it("rejects a command-only payload and an edit+command payload", () => {
+    const commandOnly = validate(payload({ edit: null, command: "editor.action.foo" }));
+    expect(commandOnly.ok).toBe(false);
+    if (!commandOnly.ok) expect(commandOnly.reason).toContain("command-only");
+
+    const mixed = validate(payload({ command: "editor.action.foo" }));
+    expect(mixed.ok).toBe(false);
+    if (!mixed.ok) expect(mixed.reason).toContain("both an edit and the command");
+  });
+
+  it("rejects URI/path contradictions and foreign URIs", () => {
+    const contradiction = validate(payload({
+      edit: { documentEdits: [{ uri: TARGET_URI, path: "/repo/src/Other.java", edits: [EDIT] }] },
+    }));
+    expect(contradiction.ok).toBe(false);
+    if (!contradiction.ok) expect(contradiction.reason).toContain("contradictory");
+
+    const foreignUri = validate(payload({
+      edit: { documentEdits: [{ uri: "file:///repo/src/B.java", edits: [EDIT] }] },
+    }));
+    expect(foreignUri.ok).toBe(false);
+    if (!foreignUri.ok) expect(foreignUri.reason).toContain("different document");
+
+    const malformed = validate(payload({
+      edit: { documentEdits: [{ edits: [EDIT] }] },
+    }));
+    expect(malformed.ok).toBe(false);
+    if (!malformed.ok) expect(malformed.reason).toContain("malformed");
+  });
+
+  it("rejects disabled actions", () => {
+    const result = validate(payload({ raw: { disabled: true } }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.state).toBe("unsupported");
+      expect(result.reason).toContain("disabled");
+    }
+  });
+
+  it("rejects malformed and reversed ranges but keeps clamping-compatible ones", () => {
+    const reversed = validate(payload({
+      edit: {
+        documentEdits: [{
+          uri: TARGET_URI,
+          path: TARGET_PATH,
+          edits: [{
+            range: { start: { line: 2, character: 5 }, end: { line: 1, character: 0 } },
+            newText: "x",
+          }],
+        }],
+      },
+    }));
+    expect(reversed.ok).toBe(false);
+    if (!reversed.ok) {
+      expect(reversed.state).toBe("failed");
+      expect(reversed.reason).toContain("malformed or reversed");
+    }
+
+    const negative = validate(payload({
+      edit: {
+        documentEdits: [{
+          uri: TARGET_URI,
+          path: TARGET_PATH,
+          edits: [{
+            range: { start: { line: 1, character: -2 }, end: { line: 1, character: 3 } },
+            newText: "x",
+          }],
+        }],
+      },
+    }));
+    expect(negative.ok).toBe(false);
+
+    // A real provider can address past the last line; the canonical applier
+    // clamps those, so they stay valid here and the postcondition decides.
+    const pastEnd = validate(payload({
+      edit: {
+        documentEdits: [{
+          uri: TARGET_URI,
+          path: TARGET_PATH,
+          edits: [{
+            range: { start: { line: 3, character: 1 }, end: { line: 16, character: 31 } },
+            newText: "  void alpha() {}\n  void beta() {}",
+          }],
+        }],
+      },
+    }));
+    expect(pastEnd.ok).toBe(true);
+  });
+
+  it("rejects a version mismatch as stale", () => {
+    const result = validate(payload({
+      edit: {
+        documentEdits: [{ uri: TARGET_URI, path: TARGET_PATH, version: 4, edits: [EDIT] }],
+      },
+    }), 7);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.state).toBe("stale");
+      expect(result.reason).toContain("version 4");
+      expect(result.reason).toContain("7");
+    }
+  });
+
+  it("rejects a null action and an unsupported resolved kind", () => {
+    const nullAction = validate(null);
+    expect(nullAction.ok).toBe(false);
+    if (!nullAction.ok) expect(nullAction.state).toBe("failed");
+
+    const wrongKind = validate(payload({ kind: "quickfix" }));
+    expect(wrongKind.ok).toBe(false);
+    if (!wrongKind.ok) expect(wrongKind.reason).toContain("dedicated action kind");
+  });
+
+  it("treats generic source.fixAll as not-cleanup while dedicated kinds stay accepted", () => {
+    expect(isCleanupActionKind("source.fixAll")).toBe(false);
+    expect(isCleanupActionKind("source.cleanup")).toBe(true);
+    expect(isCleanupActionKind("cleanup")).toBe(true);
+    expect(isRearrangeActionKind("source.sortMembers")).toBe(true);
+  });
+});
