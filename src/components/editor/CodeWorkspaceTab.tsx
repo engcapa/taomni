@@ -367,9 +367,9 @@ import {
 import type { ClipboardObservationRecord } from "./workspace/clipboardObservationContract";
 import {
   WorkspaceObservationBridge,
-  type WorkspaceObservationSnapshot,
   type WorkspaceSaveObservationResult,
 } from "./workspace/workspaceObservationBridge";
+import { WorkspaceObservationBoundary } from "./workspace/WorkspaceObservationBoundary";
 import { buildEditorContextMenuItems } from "./workspace/editorContextMenu";
 import { fieldDeclarationAt } from "./workspace/dataBreakpointTarget";
 import { openSettingsSection } from "../../lib/settingsNavigation";
@@ -1225,24 +1225,11 @@ export function CodeWorkspaceTab({
   );
   const observationBridgeRef = useRef(observationBridge);
   observationBridgeRef.current = observationBridge;
-  const [, setObservationRevision] = useState(0);
   const publishWorkspaceObservation = useCallback((
     update: (bridge: WorkspaceObservationBridge) => void,
   ) => {
     update(observationBridgeRef.current);
-    // WorkspaceObservationBridge notifies the subscription below in dev/test.
-    // Its production instance is intentionally disabled, so forcing a React
-    // render here made every editor transaction rerender the whole workspace
-    // for telemetry that cannot change in the packaged app.
   }, []);
-  const workspaceObservation: WorkspaceObservationSnapshot = observationBridge.getSnapshot();
-  useEffect(() => {
-    const unsubscribe = observationBridge.subscribe(() => {
-      setObservationRevision((revision) => revision + 1);
-    });
-    setObservationRevision((revision) => revision + 1);
-    return unsubscribe;
-  }, [observationBridge]);
   const semanticIndex = useWorkspaceSemanticIndex(workspaceInstanceId);
   const referenceInfoController = useMemo(
     () => new ReferenceInfoController(workspaceInstanceId),
@@ -10594,14 +10581,22 @@ export function CodeWorkspaceTab({
   // the gutter bulb, Problems quick fix and Search Actions. Candidates carry
   // stable ids; resolve state and disabled reasons live here, not in UI copies.
   const intentionSessionRef = useRef<IntentionSession | null>(null);
-  if (!intentionSessionRef.current) intentionSessionRef.current = new IntentionSession();
   const canonicalCodeActionServiceRef = useRef<CanonicalCodeActionService | null>(null);
   if (!canonicalCodeActionServiceRef.current) canonicalCodeActionServiceRef.current = new CanonicalCodeActionService();
   const intentionRequestAbortRef = useRef<AbortController | null>(null);
-  useEffect(() => () => {
-    intentionRequestAbortRef.current?.abort();
-    intentionSessionRef.current?.dispose();
-  }, []);
+  useEffect(() => {
+    // StrictMode replays setup after cleanup in tauri dev. A disposed session
+    // cannot be reused: each setup owns a fresh session and cleans up exactly
+    // that instance, including requests from a previous workspace binding.
+    const session = new IntentionSession();
+    intentionSessionRef.current = session;
+    return () => {
+      intentionRequestAbortRef.current?.abort();
+      intentionRequestAbortRef.current = null;
+      session.dispose();
+      if (intentionSessionRef.current === session) intentionSessionRef.current = null;
+    };
+  }, [workspaceInstanceId]);
   // Diagnostics whose provider suppression edit applied successfully
   // ("Suppressed in source"); distinct from local hide (profile suppressions).
   const [suppressedInSourceKeys, setSuppressedInSourceKeys] = useState<Set<string>>(new Set());
@@ -11246,7 +11241,7 @@ export function CodeWorkspaceTab({
           menuItems.push({ label: "", separator: true });
         }
       }
-      openTreeContextMenuAt(clientX, clientY, menuItems);
+      openTreeContextMenuAt(clientX, clientY, menuItems, { appearance: "code-candidates" });
     };
     openFrozenMenu();
   }, [
@@ -13570,7 +13565,7 @@ export function CodeWorkspaceTab({
       keybinding: "Alt+Enter",
       keywords: ["quickfix", "bulb", "intention"],
       when: (context) => context.focus !== "tree" && context.focus !== "terminal" && !!activeFile && !activeFile.loading,
-      run: (context) => void openCodeActionsAtCursor(context),
+      run: (context) => openCodeActionsAtCursor(context),
     },
     {
       id: "workspace.gotoTypeDefinition",
@@ -18664,13 +18659,11 @@ export function CodeWorkspaceTab({
 
   return (
     <WorkspaceClipboardSessionContext.Provider value={clipboardHandle}>
-      <div
+      <WorkspaceObservationBoundary
         ref={rootRef}
+        bridge={observationBridge}
         data-testid="code-workspace-tab"
         data-layout-revision={layoutRevision}
-        data-observation-status={workspaceObservation.observationStatus}
-        data-observation-revision={workspaceObservation.observationRevision}
-        data-observation-fresh={String(workspaceObservation.isFresh)}
         data-clipboard-revision={clipboardSnapshot.revision}
         data-clipboard-history-revision={clipboardSnapshot.historyRevision}
         data-clipboard-consumer-count={clipboardSnapshot.consumerCount}
@@ -18690,39 +18683,6 @@ export function CodeWorkspaceTab({
         data-reopen-stack-count={closedTabsStack.length}
         className="relative h-full w-full min-h-0 flex flex-col overflow-hidden bg-[var(--taomni-code-bg)] text-[var(--taomni-code-text)]"
       >
-        <div
-          id="code-workspace-observation"
-          data-testid="code-workspace-observation"
-          role="status"
-          aria-label="Workspace observation status"
-          aria-live="polite"
-          data-status={workspaceObservation.observationStatus}
-          data-source={workspaceObservation.source}
-          data-ready={String(workspaceObservation.isFresh)}
-          data-revision={workspaceObservation.observationRevision}
-          data-observed-at={workspaceObservation.observedAt || undefined}
-          data-document-revision-count={workspaceObservation.isFresh
-            ? Object.keys(workspaceObservation.documentRevisions).length
-            : undefined}
-          data-provider-request-count={workspaceObservation.isFresh
-            ? Object.values(workspaceObservation.providerRequestCounts).reduce((sum, count) => sum + count, 0)
-            : undefined}
-          data-provider-cancel-count={workspaceObservation.isFresh
-            ? Object.values(workspaceObservation.providerCancelCounts).reduce((sum, count) => sum + count, 0)
-            : undefined}
-          data-disk-write-count={workspaceObservation.isFresh ? workspaceObservation.diskWriteCount : undefined}
-          data-resource-lease-count={workspaceObservation.isFresh ? workspaceObservation.resourceLeaseCount : undefined}
-          data-history-receipt-count={workspaceObservation.isFresh ? workspaceObservation.historyReceiptCount : undefined}
-          data-clipboard-session-revision={workspaceObservation.isFresh
-            ? workspaceObservation.clipboardSessionRevision
-            : undefined}
-          data-clipboard-consumer-count={workspaceObservation.isFresh
-            ? workspaceObservation.clipboardConsumerCount
-            : undefined}
-          className="sr-only"
-        >
-          {workspaceObservation.isFresh ? "Workspace observation ready" : "Workspace observation unavailable"}
-        </div>
         <div
           id="code-workspace-save-observation"
           data-testid="code-workspace-save-observation"
@@ -20371,7 +20331,7 @@ export function CodeWorkspaceTab({
           onClose={autoImportCandidatePrompt.onClose}
         />
       )}
-      </div>
+      </WorkspaceObservationBoundary>
     </WorkspaceClipboardSessionContext.Provider>
   );
 }

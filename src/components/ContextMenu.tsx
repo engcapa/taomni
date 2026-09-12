@@ -17,7 +17,11 @@ export interface MenuItem {
   customPanel?: React.ReactNode;
 }
 
-interface ContextMenuProps {
+export interface ContextMenuAppearance {
+  appearance?: "default" | "code-candidates";
+}
+
+interface ContextMenuProps extends ContextMenuAppearance {
   items: MenuItem[];
   x: number;
   y: number;
@@ -26,7 +30,7 @@ interface ContextMenuProps {
 
 const MENU_MARGIN = 6;
 
-export function ContextMenu({ items, x, y, onClose }: ContextMenuProps) {
+export function ContextMenu({ items, x, y, onClose, appearance }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: x, top: y });
 
@@ -64,16 +68,16 @@ export function ContextMenu({ items, x, y, onClose }: ContextMenuProps) {
     zIndex: 9999,
   };
 
-  return <MenuSurface ref={ref} items={items} onClose={onClose} style={style} />;
+  return <MenuSurface ref={ref} appearance={appearance} items={items} onClose={onClose} style={style} />;
 }
 
-export const MenuSurface = forwardRef<HTMLDivElement, {
+export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
   items: MenuItem[];
   onClose: () => void;
   style?: CSSProperties;
   isSubmenu?: boolean;
   onBack?: () => void;
-}>(({ items, onClose, style, isSubmenu, onBack }, forwardedRef) => {
+}>(({ items, onClose, style, isSubmenu, onBack, appearance }, forwardedRef) => {
   const innerRef = useRef<HTMLDivElement | null>(null);
 
   const selectableIndices = useMemo(() => {
@@ -180,6 +184,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, {
       tabIndex={-1}
       data-testid="context-menu"
       data-taomni-context-menu=""
+      data-appearance={appearance}
       className="min-w-[220px] py-1 rounded shadow-lg border text-[12px] outline-none"
       style={{
         background: "var(--taomni-panel-bg)",
@@ -405,15 +410,15 @@ function MenuRow({
 }
 
 export function useContextMenu() {
-  const [menu, setMenu] = useState<{ x: number; y: number; items: MenuItem[] } | null>(null);
+  const [menu, setMenu] = useState<ContextMenuAppearance & { x: number; y: number; items: MenuItem[] } | null>(null);
 
   const show = useCallback((e: React.MouseEvent, items: MenuItem[]) => {
     e.preventDefault();
     e.stopPropagation();
     setMenu({ x: e.clientX, y: e.clientY, items });
   }, []);
-  const showAt = useCallback((x: number, y: number, items: MenuItem[]) => {
-    flushSync(() => setMenu({ x, y, items }));
+  const showAt = useCallback((x: number, y: number, items: MenuItem[], options?: ContextMenuAppearance) => {
+    flushSync(() => setMenu({ x, y, items, ...options }));
   }, []);
   const refreshItems = useCallback((items: MenuItem[]) => {
     setMenu((current) => current ? { ...current, items } : current);
@@ -429,7 +434,7 @@ export function useContextMenu() {
     refreshItems,
     close,
     render: menu ? (
-      <ContextMenu items={menu.items} x={menu.x} y={menu.y} onClose={close} />
+      <ContextMenu appearance={menu.appearance} items={menu.items} x={menu.x} y={menu.y} onClose={close} />
     ) : null,
     isOpen: menu !== null,
   }), [close, menu, refreshItems, show, showAt]);

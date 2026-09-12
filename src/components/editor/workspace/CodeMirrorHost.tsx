@@ -1523,18 +1523,6 @@ const WORKSPACE_EDITOR_STYLE = EditorView.theme({
 });
 
 const LSP_EDITOR_STYLE = EditorView.theme({
-  ".cm-tooltip-autocomplete > ul > li": {
-    cursor: "pointer",
-  },
-  ".cm-tooltip-autocomplete > ul > li[aria-selected][role=option]": {
-    backgroundColor: "#1d4ed8",
-    color: "#ffffff",
-    boxShadow: "inset 3px 0 #93c5fd",
-  },
-  ".cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionIcon, .cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionMatchedText": {
-    color: "inherit",
-    opacity: "1",
-  },
   ".cm-lsp-diagnostic-error": {
     textDecoration: "underline wavy #ef4444 1px",
     textUnderlineOffset: "2px",
@@ -2407,6 +2395,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   };
   const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
   const selectionEmitTimerRef = useRef<number | null>(null);
+  const viewportEmitTimerRef = useRef<number | null>(null);
   const renderedDiagnosticsRef = useRef(diagnostics);
   const renderedReadOnlyRef = useRef(readOnly);
   const renderedSoftWrapRef = useRef(softWrap);
@@ -2681,6 +2670,22 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         selectionEmitTimerRef.current = null;
         if (viewRef.current === view) emitSelection(view);
       }, delay);
+    };
+    const clearPendingViewportEmit = () => {
+      if (viewportEmitTimerRef.current === null) return;
+      window.clearTimeout(viewportEmitTimerRef.current);
+      viewportEmitTimerRef.current = null;
+    };
+    const scheduleViewportEmit = (view: EditorView, defer: boolean) => {
+      clearPendingViewportEmit();
+      if (!defer) {
+        emitViewport(view);
+        return;
+      }
+      viewportEmitTimerRef.current = window.setTimeout(() => {
+        viewportEmitTimerRef.current = null;
+        if (viewRef.current === view) emitViewport(view);
+      }, 125);
     };
     // ED-IMPROVE-007: capture is cheap and stays in memory; identical
     // snapshots are dropped so a scroll or caret move does not schedule a
@@ -3167,7 +3172,14 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             // than causing a React render for every keypress.
             scheduleSelectionEmit(update.view, update.docChanged ? 125 : 0);
           }
-          if (update.viewportChanged) emitViewport(update.view);
+          // Viewport offsets move with the document even when no scrolling
+          // occurs. Publishing them synchronously on each key bypasses the
+          // text/caret batching and rerenders the entire workspace. Keep the
+          // final live range (including a subsequent CodeMirror measure) for
+          // inlay hints, while ordinary scrolling still publishes immediately.
+          if (update.docChanged || update.viewportChanged) {
+            scheduleViewportEmit(update.view, update.docChanged || viewportEmitTimerRef.current !== null);
+          }
           if (!restoringInitialViewStateRef.current && (
             update.selectionSet
             || update.docChanged
@@ -3429,6 +3441,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       bridgeRegistration?.dispose();
       unregisterEditorActions?.();
       clearPendingSelectionEmit();
+      clearPendingViewportEmit();
       if (viewStateEmitTimerRef.current !== null) {
         window.clearTimeout(viewStateEmitTimerRef.current);
         viewStateEmitTimerRef.current = null;

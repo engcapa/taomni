@@ -468,6 +468,41 @@ describe("CodeMirrorHost search", () => {
     expect(editor?.contains(document.activeElement)).toBe(true);
   });
 
+  it("publishes the final typing viewport after idle without updating workspace UI for every key", async () => {
+    vi.useFakeTimers();
+    try {
+      const onViewportChange = vi.fn();
+      const rendered = renderEditor("class Example {}", vi.fn(), { onViewportChange });
+      const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+      await act(async () => { await vi.advanceTimersByTimeAsync(150); });
+      onViewportChange.mockClear();
+      for (const character of "abc") {
+        act(() => view.dispatch({
+          changes: { from: view.state.doc.length, insert: character },
+          userEvent: "input.type",
+        }));
+        await act(async () => { await vi.advanceTimersByTimeAsync(40); });
+      }
+      expect(rendered.onChange).toHaveBeenCalledTimes(3);
+      expect(view.state.doc.toString()).toBe("class Example {}abc");
+      expect(onViewportChange).not.toHaveBeenCalled();
+      await act(async () => { await vi.advanceTimersByTimeAsync(150); });
+      expect(onViewportChange).toHaveBeenCalledTimes(1);
+      expect(onViewportChange).toHaveBeenLastCalledWith({
+        start: { line: 0, character: 0 },
+        end: { line: 0, character: 19 },
+      });
+      act(() => view.dispatch({ changes: { from: 19, insert: "d" } }));
+      rendered.unmount();
+      onViewportChange.mockClear();
+      await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+      expect(onViewportChange).not.toHaveBeenCalled();
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
+  });
+
   it("renders usage/inlay chrome, reports its viewport, and requests semantic selection", async () => {
     const onViewportChange = vi.fn();
     const onExpandSelection = vi.fn(async () => [{

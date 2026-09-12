@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  eventLogicalKey,
   workspaceCommandMatchesKeybinding,
   workspaceCommandToActionDefinition,
   type WorkspaceCommand,
@@ -18,6 +19,10 @@ function command(overrides: Partial<WorkspaceCommand> = {}): WorkspaceCommand {
 }
 
 describe("workspaceCommands", () => {
+  it("uses physical code when WebKitGTK reports Unidentified", () => {
+    expect(eventLogicalKey({ key: "Unidentified", code: "Enter" })).toBe("enter");
+    expect(eventLogicalKey({ key: "Unidentified", code: "NumpadEnter" })).toBe("enter");
+  });
   it("matches exact modifier combinations, named arrows, and Numpad operators", () => {
     expect(workspaceCommandMatchesKeybinding(command(), {
       key: "f",

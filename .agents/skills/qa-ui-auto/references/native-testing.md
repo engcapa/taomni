@@ -29,6 +29,13 @@ platform, compiler, Node and recorded environment match; `--force` rebuilds.
 The harness rejects a mismatching recorded source fingerprint. Legacy records
 without source fingerprints cannot establish current-source execution coverage.
 
+The Rust debug profile still bundles React's production frontend by default.
+For `tauri dev` lifecycle regressions, set `NODE_ENV=development` when invoking
+`native_build.py`; the build identity records this input and prevents reuse
+across React modes. This exercises development StrictMode with real native
+services, but does not test the Vite dev server or HMR transport. Record that
+distinction and verify the expected frontend mode in the selected scenario.
+
 The harness redirects Linux XDG data/config/cache or Windows AppData/LocalAppData
 to this run, then restores its environment on exit. `reset_db` only clears QA
 application state inside verified run roots. Native runs are sequential. The

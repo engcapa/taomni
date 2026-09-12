@@ -2411,11 +2411,12 @@ describe("CodeWorkspaceTab", () => {
   // V-ALT-01: Linux WebKitGTK reports real chords such as Alt+Enter as
   // key="Unidentified" with a physical code. The unified dispatcher must still
   // open the Code Actions menu and leave the buffer untouched.
-  it("opens code actions for the Linux Alt+Enter event shape (Unidentified + code)", async () => {
+  it.each(["Enter", "Unidentified"])("opens code actions under StrictMode for Alt+Enter key=%s", async (key) => {
+    const instanceId = `instance-actions-alt-enter-${key}`;
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
-      workspaceId: "ws-actions-linux-alt-enter",
-      workspaceInstanceId: "instance-actions-linux-alt-enter",
+      workspaceId: `ws-actions-alt-enter-${key}`,
+      workspaceInstanceId: instanceId,
       name: "Actions Linux",
       roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
       looseFiles: [],
@@ -2443,18 +2444,21 @@ describe("CodeWorkspaceTab", () => {
       }],
     });
 
-    renderWorkspace(workspace);
+    const rendered = renderWorkspace(workspace, {}, { strict: true });
     await screen.findByTitle("app / src/main.ts");
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+    await waitFor(() => expect(rendered.container.querySelector(".cm-content")).not.toBeNull());
 
-    fireEvent.keyDown(window, { key: "Unidentified", code: "Enter", altKey: true });
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    content.focus();
+    fireEvent.keyDown(content, { key, code: "Enter", altKey: true });
 
     expect(await screen.findByRole("button", { name: "Insert space" })).toBeInTheDocument();
     expect(lspMocks.lspCodeActions).toHaveBeenCalled();
     // Focus and buffer stay untouched: no newline was inserted.
     expect(selectCodeWorkspaceUi(
       useCodeWorkspaceStore.getState(),
-      "instance-actions-linux-alt-enter",
+      instanceId,
     ).openFiles["root:app:src/main.ts"]?.text).toBe("x=1");
   });
 
