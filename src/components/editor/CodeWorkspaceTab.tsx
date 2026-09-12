@@ -4240,9 +4240,12 @@ export function CodeWorkspaceTab({
       savedText: nextSavedText,
       dirty: calculatedDirty,
       documentRevision: nextRevision,
-      // ED-AUDIT-008: only a history replay marks the snapshot as a restore;
-      // the explicit assignment also clears a stale flag carried by `current`.
-      historyReplay: reason === "history-replay",
+      // Preserve the replay identity across save metadata/writeback for the
+      // same text. React may observe these together with the restored text;
+      // clearing it early would create a second document undo entry.
+      historyReplay: reason === "history-replay"
+        || (current.historyReplay === true && !isTextChanged
+          && (reason === "save-metadata" || reason === "save-writeback")),
     };
 
     openFilesRef.current = { ...openFilesRef.current, [key]: next };
@@ -5224,6 +5227,7 @@ export function CodeWorkspaceTab({
    */
   const commitClosedFilePreparedSave = useCallback(async (
     prepared: PreparedSave,
+    assertBeforeWrite?: () => void,
   ): Promise<SaveCommitResult> => {
     const registry = saveTransactionRegistryRef.current;
     const owner = registry.begin(prepared.workspaceId, prepared.fileKey, prepared.transactionId);
@@ -5261,6 +5265,11 @@ export function CodeWorkspaceTab({
       const ownerBeforeWrite = registry.check(owner);
       if (!ownerBeforeWrite.active) {
         return cancelledSaveCommit(prepared, "pre-write", ownerBeforeWrite.reason);
+      }
+      try {
+        assertBeforeWrite?.();
+      } catch (error) {
+        return cancelledSaveCommit(prepared, "pre-write", errorMessage(error));
       }
       try {
         ack = await writeTextSnapshot({
@@ -9009,16 +9018,63 @@ export function CodeWorkspaceTab({
     // ED-AUDIT-014: the transaction id exists before the first apply pass so
     // the prepared recovery journal and the effect ledger share one identity.
     const applyTransactionId = nextSaveTransactionId("tx-wedit");
-    const buildHooks = (allowPreview: boolean): WorkspaceEditApplyHooks => ({
+    const selectedPreimages = (activeEdit: LspWorkspaceEdit): readonly ReplaceFilePreimage[] => {
+      if (options.kind !== "replace" || !options.expectedPreimages) return [];
+      return workspaceEditOperations(activeEdit).flatMap((operation) => {
+        if (operation.kind !== "text") return [];
+        const path = operation.document.path;
+        const candidates = options.expectedPreimages!.filter((preimage) => path && fsPathEquals(preimage.path, path));
+        if (candidates.length !== 1) throw new Error(`Replace refused: missing or ambiguous frozen preimage for ${path}`);
+        return candidates;
+      });
+    };
+    const assertReplaceIdentity = (preimage: ReplaceFilePreimage) => {
+      if (workspaceInstanceIdRef.current !== workspaceInstanceId
+        || (preimage.workspaceInstanceId && preimage.workspaceInstanceId !== workspaceInstanceIdRef.current)) {
+        throw new Error("Replace refused: workspace changed during apply");
+      }
+      if (!rootsRef.current.some((root) => relativePathWithinRoot(root.path, preimage.path) !== null)) {
+        throw new Error(`${preimage.path} is outside the workspace; replace refused`);
+      }
+      const open = Object.values(openFilesRef.current).find((file) => {
+        const path = absolutePathForOpenFile(file);
+        return path !== null && fsPathEquals(path, preimage.path);
+      });
+      if (workspaceResourceOperationLockedRef.current || open?.library) {
+        throw new Error(`${preimage.path} is read-only; replace refused`);
+      }
+      if (open) {
+        if (preimage.bufferRevision === null) throw new Error(`${preimage.path} was opened since replace preview; please retry`);
+        if (open.dirty) throw new Error(`${preimage.path} has unsaved modifications in the editor`);
+        if (open.documentRevision !== preimage.bufferRevision) throw new Error(`${preimage.path} was modified in the editor since replace preview; please retry`);
+      } else if (preimage.bufferRevision !== null) {
+        throw new Error(`${preimage.path} was closed since replace preview; please retry`);
+      }
+      return open;
+    };
+    const assertPassBoundary = (pass: { edit: LspWorkspaceEdit; mutationStarted: boolean }) => {
+      if (workspaceInstanceIdRef.current !== workspaceInstanceId || workspaceResourceOperationLockedRef.current) {
+        throw new Error("Workspace changed or became read-only before mutation");
+      }
+      if (!pass.mutationStarted) {
+        for (const preimage of selectedPreimages(pass.edit)) assertReplaceIdentity(preimage);
+      }
+    };
+    const buildHooks = (
+      allowPreview: boolean,
+      pass = { edit: resolvedEdit, mutationStarted: false },
+    ): WorkspaceEditApplyHooks => ({
       resolvePath: (file) => {
         if (file.path) return normalizeFsPath(file.path);
         return null;
       },
       getOpenBuffer: (absolutePath) => {
+        if (workspaceInstanceIdRef.current !== workspaceInstanceId || workspaceResourceOperationLockedRef.current) return null;
         const normalized = normalizeFsPath(absolutePath);
         for (const file of Object.values(openFilesRef.current)) {
           const path = absolutePathForOpenFile(file);
           if (path && fsPathEquals(path, normalized)) {
+            if (file.library) return null;
             return {
               text: file.text,
               dirty: file.dirty,
@@ -9031,30 +9087,16 @@ export function CodeWorkspaceTab({
         }
         return null;
       },
-      assertTextDocumentPreconditions: (path, open) => {
+      assertTextDocumentPreconditions: (path) => {
         if (options.kind === "replace" && options.expectedPreimages) {
           const preimage = options.expectedPreimages.find((p) => fsPathEquals(p.path, path));
-          if (preimage) {
-            if (open) {
-              if (open.dirty) {
-                throw new Error(`${path} has unsaved modifications; replace refused`);
-              }
-              const currentRev = open.revision ?? open.version;
-              if (preimage.bufferRevision !== null && currentRev !== preimage.bufferRevision) {
-                throw new Error(`${path} was modified in editor since replace preview; please retry`);
-              }
-              if (preimage.bufferRevision === null) {
-                throw new Error(`${path} was opened since replace preview; please retry`);
-              }
-            } else {
-              if (preimage.bufferRevision !== null) {
-                throw new Error(`${path} was closed since replace preview; please retry`);
-              }
-            }
-          }
+          if (!preimage) throw new Error(`${path} is missing a frozen replace preimage`);
+          assertReplaceIdentity(preimage);
         }
       },
+      assertMutationBoundary: () => assertPassBoundary(pass),
       applyToOpenBuffer: (key, nextText) => {
+        pass.mutationStarted = true;
         // ED-AUDIT-008: a restore replaying through this funnel must not
         // create a second undoable document entry beside the journal
         // transaction that owns the change, so its buffer write is recorded
@@ -9154,7 +9196,17 @@ export function CodeWorkspaceTab({
             },
           }),
         });
-        return commitClosedFilePreparedSave(prepared);
+        return commitClosedFilePreparedSave(prepared, () => {
+          // The committer awaits local-history reads too. Keep the whole-set
+          // guard live until it actually invokes the first byte writer.
+          assertPassBoundary(pass);
+          if (options.kind === "replace" && options.expectedPreimages) {
+            const preimage = options.expectedPreimages.find((candidate) => fsPathEquals(candidate.path, absolutePath));
+            if (!preimage) throw new Error(`${absolutePath} is missing a frozen replace preimage`);
+            assertReplaceIdentity(preimage);
+          }
+          pass.mutationStarted = true;
+        });
       },
       confirmChangeAnnotations: async (annotations) => {
         const visible = annotations.slice(0, 8);
@@ -9206,28 +9258,9 @@ export function CodeWorkspaceTab({
           await options.preflightMutation?.();
           // ED-REPAIR-002: In replace, verify all preimages before any file is touched
           if (options.kind === "replace" && options.expectedPreimages) {
-            for (const preimage of options.expectedPreimages) {
-              if (preimage.workspaceInstanceId && preimage.workspaceInstanceId !== workspaceInstanceIdRef.current) {
-                throw new Error("Replace refused: workspace changed during apply");
-              }
-              const open = Object.values(openFilesRef.current).find((file) => {
-                const path = absolutePathForOpenFile(file);
-                return path !== null && fsPathEquals(path, preimage.path);
-              });
-              if (open) {
-                if (preimage.bufferRevision === null) {
-                  throw new Error(`${preimage.path} was opened since replace preview; please retry`);
-                }
-                if (open.dirty) {
-                  throw new Error(`${preimage.path} has unsaved modifications in the editor`);
-                }
-                if (open.documentRevision !== preimage.bufferRevision) {
-                  throw new Error(`${preimage.path} was modified in the editor since replace preview; please retry`);
-                }
-              } else {
-                if (preimage.bufferRevision !== null) {
-                  throw new Error(`${preimage.path} was closed since replace preview; please retry`);
-                }
+            for (const preimage of selectedPreimages(pass.edit)) {
+              const open = assertReplaceIdentity(preimage);
+              if (!open) {
                 const containing = rootsRef.current.find(
                   (root) => relativePathWithinRoot(root.path, preimage.path) !== null,
                 );
@@ -9259,13 +9292,13 @@ export function CodeWorkspaceTab({
           // ED-AUDIT-014 / ED-REPAIR-004: prepare the v2 recovery journal before the first
           // mutation. A persistence failure aborts the whole transaction with
           // zero writes; a text target without a preimage does the same.
-          if (options.recordHistory !== false && beforeSnapshots && !preparedJournalRef.current) {
+          if (options.recordHistory !== false && !preparedJournalRef.current) {
             const preImages: RefactorRecoveryPreImageV2[] = [];
             for (const operation of workspaceEditOperations(resolvedEdit)) {
               if (operation.kind !== "text") continue;
               const targetPath = operation.document.path ? normalizeFsPath(operation.document.path) : null;
               const snapshot = targetPath
-                ? beforeSnapshots.find((candidate) => fsPathEquals(candidate.path, targetPath))
+                ? beforeSnapshots?.find((candidate) => fsPathEquals(candidate.path, targetPath))
                 : undefined;
               if (!snapshot || snapshot.text === null) continue;
               preImages.push({
@@ -9317,8 +9350,11 @@ export function CodeWorkspaceTab({
       renameFile: (operation) => applyLspResourceOperation(operation),
       deleteFile: (operation) => applyLspResourceOperation(operation),
       onActiveEditResolved: (activeEdit) => {
-        resolvedEdit = activeEdit;
-        options.onActiveEditResolved?.(activeEdit);
+        pass.edit = activeEdit;
+        if (allowPreview) {
+          resolvedEdit = activeEdit;
+          options.onActiveEditResolved?.(activeEdit);
+        }
       },
     });
     let outcomes = await applyWorkspaceEdit(edit, buildHooks(true));
@@ -9355,6 +9391,17 @@ export function CodeWorkspaceTab({
     const getSettledOutcomesList = () => Array.from(settledOutcomes.values()).sort(
       (a, b) => (a.operationIndex ?? 0) - (b.operationIndex ?? 0),
     );
+    const settleSuffix = (suffix: WorkspaceEditApplyOutcome[], startIndex: number) => {
+      for (const outcome of suffix) {
+        // A suffix-wide preflight failure belongs to its absolute resume
+        // boundary, and must remain visible in the final transaction ledger.
+        const settled = outcome.operationIndex === null
+          ? { ...outcome, operationIndex: startIndex }
+          : outcome;
+        allOutcomesHistory.push(settled);
+        settledOutcomes.set(settled.operationIndex ?? startIndex, settled);
+      }
+    };
     const buildApplyResult = () => buildWorkspaceEditApplyResultV2({
       transactionId: applyTransactionId,
       operations: workspaceEditOperations(resolvedEdit),
@@ -9386,7 +9433,7 @@ export function CodeWorkspaceTab({
 
           if (retryKind === "retry-save-only") {
             const failedOp = allOperations[failedIndex];
-            if (failedOp?.kind !== "text" || !failedOutcome.expectedPostText) {
+            if (failedOp?.kind !== "text" || failedOutcome.expectedPostText === undefined) {
               break;
             }
             const docPath = failedOp.document.path ?? failedOp.document.uri;
@@ -9413,10 +9460,7 @@ export function CodeWorkspaceTab({
               if (nextIndex < allOperations.length) {
                 const remainingEdit = sliceWorkspaceEditForResume(resolvedEdit, nextIndex);
                 const suffixOutcomes = await applyWorkspaceEdit(remainingEdit, buildHooks(false), nextIndex);
-                for (const o of suffixOutcomes) {
-                  allOutcomesHistory.push(o);
-                  if (o.operationIndex !== null) settledOutcomes.set(o.operationIndex, o);
-                }
+                settleSuffix(suffixOutcomes, nextIndex);
               }
             }
           } else {
@@ -9431,10 +9475,7 @@ export function CodeWorkspaceTab({
             if (!resume) break;
             const remainingEdit = sliceWorkspaceEditForResume(resolvedEdit, failedIndex);
             const suffixOutcomes = await applyWorkspaceEdit(remainingEdit, buildHooks(false), failedIndex);
-            for (const o of suffixOutcomes) {
-              allOutcomesHistory.push(o);
-              if (o.operationIndex !== null) settledOutcomes.set(o.operationIndex, o);
-            }
+            settleSuffix(suffixOutcomes, failedIndex);
           }
 
           applyResult = buildApplyResult();
@@ -19389,13 +19430,18 @@ export function CodeWorkspaceTab({
                   // preimage, not the second read.
                   // ED-REPAIR-002: pass expectedPreimages to enforce open buffer revision and dirty
                   // integrity throughout mutation.
-                  const expectedDiskHashes = replacePreimageExpectedHashes(snapshot);
+                  const selectedPaths = new Set(Array.from(byFile.keys(), replacePreimagePathKey));
+                  const selectedSnapshot = {
+                    ...snapshot,
+                    preimages: snapshot.preimages?.filter((preimage) => selectedPaths.has(replacePreimagePathKey(preimage.path))),
+                  };
+                  const expectedDiskHashes = replacePreimageExpectedHashes(selectedSnapshot);
                   const summaryHolder: { current: WorkspaceEditApplyTransactionSummary | null } = { current: null };
                   const outcomes = await applyLspWorkspaceEdit(edit, {
                     label: "Replace in files",
                     kind: "replace",
                     expectedDiskHashes: expectedDiskHashes.size > 0 ? expectedDiskHashes : null,
-                    expectedPreimages: snapshot.preimages ?? null,
+                    expectedPreimages: selectedSnapshot.preimages ?? null,
                     onTransactionSummary: (summary) => {
                       summaryHolder.current = summary;
                     },

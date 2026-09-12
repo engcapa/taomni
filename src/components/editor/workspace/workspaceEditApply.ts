@@ -174,7 +174,7 @@ export function classifyWorkspaceEditOperationRetry(
     return "unretryable";
   }
   if (outcome.bufferEffect === "performed" && outcome.diskEffect === "none") {
-    if (!outcome.expectedPostText) {
+    if (outcome.expectedPostText === undefined) {
       return "unretryable";
     }
     return "retry-save-only";
@@ -215,7 +215,8 @@ export async function retryOpenBufferSave(
       bufferEffect: "performed",
     };
   }
-  const open = hooks.getOpenBuffer(path);
+  const initial = hooks.getOpenBuffer(path);
+  const open = initial ? { ...initial } : null;
   if (!open) {
     return {
       operationIndex,
@@ -289,6 +290,13 @@ export async function retryOpenBufferSave(
     };
   }
   try {
+    // readDisk yields to editor input, tab changes, and LSP version updates.
+    // Validate the frozen session again in the same turn that starts the save.
+    const current = hooks.getOpenBuffer(path);
+    if (!current || current.key !== open.key || current.text !== expectedPostText
+      || current.version !== open.version || current.revision !== open.revision) {
+      throw new Error("buffer session or content changed during retry precheck; retry aborted to protect newer edits");
+    }
     await hooks.saveOpenBuffer(open.key, open.text);
     return {
       operationIndex,
@@ -431,6 +439,7 @@ export interface WorkspaceEditApplyHooks {
     dirty: boolean;
     key: string;
     version?: number | null;
+    revision?: number | null;
     /** True only when the LSP server has this exact buffer text. */
     lspSynced?: boolean;
   } | null;
@@ -482,6 +491,8 @@ export interface WorkspaceEditApplyHooks {
   confirmChangeAnnotations?: (annotations: LspChangeAnnotation[]) => Promise<boolean>;
   /** Final consistency barrier after dialogs and immediately before mutation. */
   preflightMutation?: () => Promise<void> | void;
+  /** Synchronous whole-set guard at the actual mutation boundary, after reads. */
+  assertMutationBoundary?: () => void;
   /**
    * Validate every operation path before confirmation or mutation. Semantic
    * refactors use this to enforce workspace-root ownership and reject loose
@@ -565,6 +576,7 @@ async function applyTextDocumentEdit(
       expectedPostText = next;
       openBufferKey = open.key;
       openBufferVersion = open.version;
+      hooks.assertMutationBoundary?.();
       if (!open.dirty) {
         hooks.applyToOpenBuffer(open.key, next);
         bufferMutated = changed;
@@ -596,6 +608,8 @@ async function applyTextDocumentEdit(
       (disk.text.includes("\r\n") ? "crlf" : disk.text.includes("\r") && !disk.text.includes("\n") ? "cr" : "lf");
     const nextRaw = applyLspTextEditsToString(disk.text, file.edits);
     const next = normalizeLineEndings(nextRaw, diskEol);
+    hooks.assertTextDocumentPreconditions?.(path, hooks.getOpenBuffer(path));
+    hooks.assertMutationBoundary?.();
     // §8.19.1: the shared committer's typed result decides the outcome — an
     // uncertain write is never reported as applied.
     const writeResult = await hooks.writeDisk(path, next, disk.hash, disk.encoding, disk.bom, diskEol);

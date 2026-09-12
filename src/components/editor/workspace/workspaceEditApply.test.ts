@@ -1005,6 +1005,33 @@ describe("applyWorkspaceEdit", () => {
   });
 
   describe("ED-REPAIR-001: Buffer edit save failure retry safety", () => {
+    it.each(["text", "key", "version", "revision", "closed"])("rejects %s changes during the retry disk read", async (change) => {
+      let live: { text: string; dirty: boolean; key: string; version: number; revision: number } | null = {
+        text: "foobar", dirty: true, key: "foo", version: 1, revision: 2,
+      };
+      const save = vi.fn(async () => {});
+      const outcome = await retryOpenBufferSave({
+        operationIndex: 0,
+        document: { uri: "file:///repo/foo.ts", path: "/repo/foo.ts", edits: [] },
+        expectedPostText: "foobar",
+        hooks: {
+          resolvePath: (doc) => doc.path,
+          getOpenBuffer: () => live,
+          applyToOpenBuffer: vi.fn(),
+          saveOpenBuffer: save,
+          readDisk: async () => {
+            await Promise.resolve();
+            if (change === "closed") live = null;
+            else live = { ...live!, [change]: change === "text" ? "foobar NEW" : change === "key" ? "new-session" : 3 };
+            return { text: "foo", hash: "pre" };
+          },
+          writeDisk: async () => committedDisk(),
+        },
+      });
+      expect(outcome).toMatchObject({ status: "failed", diskEffect: "none", bufferEffect: "performed" });
+      expect(save).not.toHaveBeenCalled();
+    });
+
     it("captures post-image and buffer identities on known-zero open buffer save failure and classifies as retry-save-only (ED-REPAIR-001-A1)", async () => {
       let openBufferText = "foo";
       let openBufferDirty = false;

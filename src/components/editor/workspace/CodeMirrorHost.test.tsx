@@ -1309,6 +1309,28 @@ describe("ED-SAVE-004 editor recovery decoration synchronization", () => {
 describe("ED-IMPROVE-007 leaf/file view snapshots", () => {
   afterEach(() => cleanup());
 
+  it.each([false, true])("restores deferred axes independently unless the user intervenes: %s", (intervene) => {
+    const rendered = renderEditor("hello world", vi.fn(), {
+      initialViewState: { mainSelection: { anchor: 4, head: 4 }, selections: [], scrollTop: 100, scrollLeft: 80, folds: [] },
+    });
+    const view = findView(rendered);
+    expect(view.state.selection.main.head).toBe(4);
+    if (intervene) fireEvent.wheel(view.scrollDOM);
+    Object.defineProperties(view.scrollDOM, {
+      clientHeight: { configurable: true, value: 100 },
+      scrollHeight: { configurable: true, value: 500 },
+    });
+    act(() => view.dispatch({}));
+    expect(view.scrollDOM.scrollTop).toBe(intervene ? 0 : 100);
+    Object.defineProperties(view.scrollDOM, {
+      clientWidth: { configurable: true, value: 100 },
+      scrollWidth: { configurable: true, value: 500 },
+    });
+    act(() => view.dispatch({}));
+    expect(view.scrollDOM.scrollLeft).toBe(intervene ? 0 : 80);
+    expect(view.state.selection.main.head).toBe(4);
+  });
+
   function findView(rendered: { container: HTMLElement }): EditorView {
     const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!);
     expect(view).not.toBeNull();
@@ -1600,6 +1622,25 @@ describe("ED-IMPROVE-008 IME composition lifecycle wiring", () => {
 
 describe("ED-REPAIR-007 IME end/blur/reentry session lifecycle", () => {
   afterEach(() => cleanup());
+
+  it("keeps the final microtask flush after end and blur in the same undo entry", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const rendered = renderEditor("", vi.fn(), { transactionOwner: owner, viewId: "primary", fileKey: "ime-late.ts" });
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+    await act(async () => {
+      view.contentDOM.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+      view.dispatch({ changes: { from: 0, insert: "ni" }, userEvent: "input.type.compose" });
+      view.contentDOM.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "你" }));
+      view.contentDOM.dispatchEvent(new FocusEvent("blur"));
+      await Promise.resolve();
+      view.dispatch({ changes: { from: 0, to: 2, insert: "你" }, userEvent: "input.type.compose" });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+    expect(owner.getDocument("ime-late.ts")).toBe("你");
+    expect(owner.getHistoryState("ime-late.ts").undoDepth).toBe(1);
+    owner.undo("ime-late.ts", "primary");
+    expect(owner.getDocument("ime-late.ts")).toBe("");
+  });
 
   it("produces two distinct undo entries across two composition sessions separated by blur (ED-REPAIR-007-A1)", async () => {
     const owner = new WorkspaceDocumentTransactionOwner();

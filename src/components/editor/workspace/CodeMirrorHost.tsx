@@ -333,7 +333,10 @@ export function applyPersistedEditorViewState(
       (targetScrollTop > 0 && !canScrollVertically)
       || (targetScrollLeft > 0 && !canScrollHorizontally)
     ) {
-      deferredScroll = { scrollTop: targetScrollTop, scrollLeft: targetScrollLeft };
+      deferredScroll = {
+        scrollTop: canScrollVertically ? 0 : targetScrollTop,
+        scrollLeft: canScrollHorizontally ? 0 : targetScrollLeft,
+      };
     }
     if (targetScrollTop > 0 && canScrollVertically) {
       const maxScrollTop = Math.max(0, dom.scrollHeight - dom.clientHeight);
@@ -2474,6 +2477,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const viewStateEmitTimerRef = useRef<number | null>(null);
   const pendingDeferredScrollRef = useRef<{ scrollTop: number; scrollLeft: number } | null>(null);
   const userInteractedSinceMountRef = useRef(false);
+  const restoringInitialViewStateRef = useRef(false);
   // ED-IMPROVE-008 & ED-REPAIR-007: IME composition ownership and session lifecycle.
   const compositionActiveRef = useRef(false);
   const compositionSessionSeqRef = useRef(0);
@@ -3074,14 +3078,24 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
                   });
                 });
                 if (deltas.length > 0) {
-                  const currentSession = currentCompositionSessionRef.current;
+                  let currentSession = currentCompositionSessionRef.current;
+                  const compositionTransaction = update.transactions.some((tr) => tr.isUserEvent("input.type.compose"));
+                  if (currentSession?.status === "end_pending" && !compositionTransaction
+                    && !compositionActiveRef.current && !update.view.composing) {
+                    // Ordinary typing can arrive before the finalize timer.
+                    // Only CodeMirror's final compose flush extends the old session.
+                    currentSession.owner.finalizeComposition(currentSession.fileKey, currentSession.id);
+                    currentSession.status = "finalized";
+                    currentCompositionSessionRef.current = null;
+                    currentSession = null;
+                  }
                   const isSessionComposing = currentSession !== null && (
                     currentSession.status === "active" || currentSession.status === "end_pending"
                   );
                   const composingInput = isSessionComposing
                     || compositionActiveRef.current
                     || update.view.composing
-                    || update.transactions.some((tr) => tr.isUserEvent("input.type.compose"));
+                    || compositionTransaction;
                   const sessionId = isSessionComposing ? currentSession?.id : undefined;
                   const sharedTransaction = transactionOwnerRef.current.dispatchTransaction(
                     fileKeyRef.current,
@@ -3154,11 +3168,11 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             scheduleSelectionEmit(update.view, update.docChanged ? 125 : 0);
           }
           if (update.viewportChanged) emitViewport(update.view);
-          if (
+          if (!restoringInitialViewStateRef.current && (
             update.selectionSet
             || update.docChanged
             || update.transactions.some((tr) => tr.isUserEvent("select") || tr.isUserEvent("input"))
-          ) {
+          )) {
             userInteractedSinceMountRef.current = true;
             pendingDeferredScrollRef.current = null;
           }
@@ -3175,12 +3189,16 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
               if (target.scrollTop > 0 && canScrollVertically) {
                 const maxScrollTop = Math.max(0, dom.scrollHeight - dom.clientHeight);
                 dom.scrollTop = Math.min(target.scrollTop, maxScrollTop);
+                target.scrollTop = 0;
               }
               if (target.scrollLeft > 0 && canScrollHorizontally) {
                 const maxScrollLeft = Math.max(0, dom.scrollWidth - dom.clientWidth);
                 dom.scrollLeft = Math.min(target.scrollLeft, maxScrollLeft);
+                target.scrollLeft = 0;
               }
-              pendingDeferredScrollRef.current = null;
+              if (target.scrollTop === 0 && target.scrollLeft === 0) {
+                pendingDeferredScrollRef.current = null;
+              }
             }
           }
           // ED-IMPROVE-007: capture caret/selection/scroll/fold changes for
@@ -3206,10 +3224,14 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     // re-applied on prop changes, so late updates cannot overwrite typing.
     const initialViewState = initialViewStateRef.current;
     if (initialViewState) {
-      const restoreResult = applyPersistedEditorViewState(view, initialViewState);
-      if (restoreResult.deferredScroll) {
+      restoringInitialViewStateRef.current = true;
+      try {
+        const restoreResult = applyPersistedEditorViewState(view, initialViewState);
         pendingDeferredScrollRef.current = restoreResult.deferredScroll;
+      } finally {
+        restoringInitialViewStateRef.current = false;
       }
+      view.requestMeasure();
     }
     const cancelDeferredScroll = () => {
       userInteractedSinceMountRef.current = true;
@@ -3289,12 +3311,9 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       }, 0);
     };
     const compositionBlurGuard = () => {
-      clearPendingCompositionFinalize();
-      const session = currentCompositionSessionRef.current;
-      if (session && session.status !== "finalized") {
-        finalizeSession(session);
-      }
-      compositionActiveRef.current = false;
+      // Blur may precede CodeMirror's final microtask flush just like end.
+      // Preserve this session until that flush has joined its undo entry.
+      compositionEndGuard();
     };
     // ED-MAIN-007: any focus loss that leaves this view bumps the clipboard
     // owner generation, so an in-flight result can detect that another surface

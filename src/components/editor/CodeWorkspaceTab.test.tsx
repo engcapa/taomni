@@ -9788,6 +9788,8 @@ end_of_record
       fireEvent.keyDown(pane, { key: "z", ctrlKey: true });
       await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Undid Rearrange Code"));
       expect(fileText("instance-improve002-normal")).toBe(SERVICE_PRE);
+      expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-improve002-normal")
+        .openFiles[OPEN_KEY]?.historyReplay).toBe(true);
       fireEvent.keyDown(pane, { key: "z", ctrlKey: true });
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 30));
@@ -10693,6 +10695,57 @@ end_of_record
       fireEvent.click(within(preview).getByTestId("refactoring-preview-apply"));
     }
 
+    it("refuses text mutations when recovery snapshots cannot be captured", async () => {
+      const { disk, workspace, onCommandsChange } = setupWorkspace("missing-snapshots", "src/c.ts");
+      vi.mocked(confirmAppDialog).mockReset().mockResolvedValue(true);
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/c.ts");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+      workspaceMocks.workspaceListDir.mockRejectedValue(new Error("listing unavailable"));
+      await act(async () => {
+        await emit("lsp://workspace-apply-edit", {
+          requestId: "missing-snapshots", workspaceId: workspace.workspaceInstanceId,
+          edit: { documentEdits: [{ uri: "file:///repo/app/src/a.ts", path: "/repo/app/src/a.ts",
+            edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 11 } }, newText: "ALPHA" }] }] },
+        });
+      });
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toMatch(/preimage|snapshot/i));
+      expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
+      expect(disk["src/a.ts"]).toBe(PRE["src/a.ts"]);
+    });
+
+    it("retries successive failure boundaries against the full confirmed plan and undoes all files", async () => {
+      const { disk, workspace, onCommandsChange } = setupWorkspace("successive-retries", "src/c.ts");
+      disk["src/d.ts"] = "hello delta";
+      vi.mocked(confirmAppDialog).mockReset().mockResolvedValue(true);
+      const attempts = new Map<string, number>();
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (_root: string, path: string, text: string) => {
+        const attempt = (attempts.get(path) ?? 0) + 1;
+        attempts.set(path, attempt);
+        if ((path === "src/b.ts" || path === "src/d.ts") && attempt === 1) {
+          throw new Error("temporary write failure");
+        }
+        disk[path] = text;
+        return writeAck(file(path, text, { hash: `hash-${text}` }));
+      });
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/c.ts");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+      await applyEditWithPreview(workspace.workspaceInstanceId, {
+        documentEdits: ["a", "b", "d"].map((name) => ({
+          uri: `file:///repo/app/src/${name}.ts`, path: `/repo/app/src/${name}.ts`,
+          edits: [{ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } }, newText: "HELLO" }],
+        })),
+      });
+      await waitFor(() => expect(disk["src/d.ts"]).toBe("HELLO delta"));
+      expect(attempts).toEqual(new Map([["src/a.ts", 1], ["src/b.ts", 2], ["src/d.ts", 2]]));
+      await waitFor(() => expect(storedRecoveryEntries().some(({ entry }) => entry.status === "committed")).toBe(true));
+      await act(async () => { fireEvent.keyDown(window, { key: "z", ctrlKey: true }); });
+      await waitFor(() => expect(disk["src/a.ts"]).toBe(PRE["src/a.ts"]));
+      expect(disk["src/b.ts"]).toBe(PRE["src/b.ts"]);
+      expect(disk["src/d.ts"]).toBe("hello delta");
+    });
+
     it("creates recovery journal for plan-less text edits, captures partial failure effects, and restores via recovery entry", async () => {
       const { disk, workspace, registrationRef, onCommandsChange } = setupWorkspace("planless-partial", "src/c.ts");
       vi.mocked(confirmAppDialog).mockReset().mockResolvedValue(true);
@@ -11028,7 +11081,7 @@ end_of_record
       return { disk, workspace, registrationRef, onCommandsChange };
     }
 
-    it("aborts replace with zero disk writes when file B is modified before first write (ED-REPAIR-002-A1)", async () => {
+    it.each(["disk-before", "open-during-final-read", "open-during-history-read", "excluded"])("validates exactly the selected replace set before the first effect: %s (ED-REPAIR-002-A1)", async (scenario) => {
       const { disk, workspace, registrationRef, onCommandsChange } = setupWorkspace("repair-002-b-modified", "src/c.ts");
       disk["src/c.ts"] = "hello reader";
       disk["src/a.ts"] = "hello needle";
@@ -11110,21 +11163,56 @@ end_of_record
       const preview = await screen.findByTestId("code-workspace-replace-preview");
       expect(preview).toBeInTheDocument();
 
-      // Before clicking Replace All, modify file B on disk externally!
-      disk["src/b.ts"] = "hello modified";
+      if (scenario.startsWith("open-during")) {
+        let readsOfB = 0;
+        let readsOfA = 0;
+        workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => {
+          // Commit reads B for outer validation, recovery snapshot, then final preflight.
+          // A is read again by the applier (4) and the local-history committer (5).
+          if (path === "src/b.ts") readsOfB += 1;
+          if (path === "src/a.ts") readsOfA += 1;
+          if ((scenario === "open-during-final-read" && path === "src/b.ts" && readsOfB === 3)
+            || (scenario === "open-during-history-read" && path === "src/a.ts" && readsOfA === 5)) {
+            useCodeWorkspaceStore.getState().updateOpenFiles(workspace.workspaceInstanceId!, (current) => ({
+              ...current,
+              "root:app:src/b.ts": { ...current["root:app:src/c.ts"]!, key: "root:app:src/b.ts", path: "src/b.ts",
+                ref: { kind: "root", rootId: "app", path: "src/b.ts" },
+                text: "hello user typing", savedText: "hello needle", dirty: true, documentRevision: 1 },
+            }));
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
+          return file(path, disk[path]!, { hash: `hash-${disk[path]!}` });
+        });
+      } else {
+        if (scenario === "excluded") {
+          fireEvent.click(within(preview).getByLabelText("Include all matches in /repo/app/src/b.ts"));
+        }
+        disk["src/b.ts"] = "hello modified";
+      }
 
       // Click Replace All
       fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
 
+      if (scenario === "excluded") {
+        await waitFor(() => expect(disk["src/a.ts"]).toBe("hello REPLACED"));
+        expect(disk["src/b.ts"]).toBe("hello modified");
+        await waitFor(() => expect(registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled).toBe(true));
+        await act(async () => { await registrationRef.current?.executeAction("workspace.undoWorkspaceEdit"); });
+        await waitFor(() => expect(disk["src/a.ts"]).toBe("hello needle"));
+        expect(disk["src/b.ts"]).toBe("hello modified");
+        return;
+      }
+
       // Preflight detects disk hash mismatch on src/b.ts and refuses with zero writes
       await waitFor(() => {
         const status = useAppStore.getState().statusMessage;
-        expect(status).toContain("changed on disk since");
+        expect(status).toMatch(scenario === "disk-before" ? /changed on disk since/ : /opened since replace preview|unsaved modifications/);
       });
 
       // Both files must have ZERO writes applied
       expect(disk["src/a.ts"]).toBe("hello needle");
-      expect(disk["src/b.ts"]).toBe("hello modified");
+      expect(disk["src/b.ts"]).toBe(scenario === "disk-before" ? "hello modified" : "hello needle");
+      expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
     });
 
     it("preserves file A effect when file B write fails after first write (ED-REPAIR-002-A2)", async () => {
