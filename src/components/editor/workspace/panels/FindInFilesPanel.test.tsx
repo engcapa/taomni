@@ -785,4 +785,31 @@ describe("ED-FIND-004: replace preview commit flow in FindInFilesPanel", () => {
     expect(screen.getByTestId("code-workspace-find-error")).toHaveTextContent("Invalid search pattern");
     expect(screen.getByRole("button", { name: "Preview replace all matches" })).toBeDisabled();
   });
+
+  // ED-REPAIR-003: an illegal search-match coordinate (e.g. non-positive lineNumber)
+  // surfaces as a replace error before preview open; zero commit.
+  it("shows an illegal coordinate error when backend match has invalid line number (ED-REPAIR-003-A1)", async () => {
+    const onReplaceMatches = vi.fn();
+    render(
+      <FindInFilesPanel
+        roots={roots}
+        onOpenMatch={vi.fn()}
+        onReplaceMatches={onReplaceMatches}
+      />,
+    );
+    const emit = await runSearch();
+    const matches = [
+      searchMatch({ lineNumber: 0, lineText: "needle", matchStart: 0, matchEnd: 6, column: 1 }),
+    ];
+    act(() => {
+      emit({ ...doneEvent(), kind: "batch", matches });
+      emit(doneEvent({ totalMatches: matches.length }));
+    });
+    fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "thread" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+    expect(await screen.findByTestId("code-workspace-replace-error"))
+      .toHaveTextContent("invalid line number 0");
+    expect(screen.queryByTestId("code-workspace-replace-preview")).not.toBeInTheDocument();
+    expect(onReplaceMatches).not.toHaveBeenCalled();
+  });
 });

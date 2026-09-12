@@ -8,7 +8,7 @@ import type { LspFileTextEdits, LspTextEdit, LspWorkspaceEdit } from "../../../l
 import type { WorkspaceSearchMatch } from "../../../lib/editor/workspaceSearch";
 import { fsPathComparisonKey } from "./codeWorkspaceModel";
 import type { FindInFilesScopePlan } from "./findInFilesScopeModel";
-import { offsetFromLspPositionInString } from "./lspTextEdits";
+import { offsetFromLspPositionInStringStrict } from "./lspTextEdits";
 import {
   buildWorkspaceEditPreview,
   filterWorkspaceEditByUsages,
@@ -73,21 +73,28 @@ export class InvalidSearchMatchCoordinatesError extends Error {
   readonly path: string;
 
   constructor(path: string, lineNumber: number, offset: number) {
-    super(`Search match at ${path}:${lineNumber} has an invalid offset ${offset}; replace refused`);
+    const detail = (!Number.isInteger(lineNumber) || lineNumber < 1)
+      ? `an invalid line number ${lineNumber}`
+      : `an invalid offset ${offset}`;
+    super(`Search match at ${path}:${lineNumber} has ${detail}; replace refused`);
     this.name = "InvalidSearchMatchCoordinatesError";
     this.path = path;
   }
 }
 
 /**
- * ED-FIND-004: shared search-match mapping used by the preview dialog owner
- * and the commit owner so both sides agree on file paths, ranges, and the
- * matched text the freshness recheck compares against disk.
+ * ED-FIND-004 / ED-REPAIR-003: shared search-match mapping used by the preview
+ * dialog owner and the commit owner so both sides agree on file paths, ranges,
+ * and the matched text the freshness recheck compares against disk. Validates
+ * that lineNumber is a positive integer and code-point offsets are valid.
  */
 export function searchMatchesToReplaceInputs(matches: readonly WorkspaceSearchMatch[]): ReplaceInFilesMatch[] {
   return matches.map((match) => {
     const absolute = replaceMatchAbsolutePath(match);
-    const line = Math.max(0, match.lineNumber - 1);
+    if (!Number.isInteger(match.lineNumber) || match.lineNumber < 1) {
+      throw new InvalidSearchMatchCoordinatesError(absolute, match.lineNumber, match.matchStart);
+    }
+    const line = match.lineNumber - 1;
     // ED-MAIN-004: validate the raw code-point offsets before conversion. A
     // negative/fractional/NaN/past-the-line/reversed match must not be clamped
     // into a different valid range.
@@ -224,6 +231,10 @@ export function verifyReplaceMatchFreshness(
     const end = match.endCharacter;
     if (
       match.startLine !== match.endLine
+      || !Number.isInteger(match.startLine)
+      || match.startLine < 0
+      || !Number.isInteger(match.endLine)
+      || match.endLine < 0
       || !Number.isInteger(start)
       || !Number.isInteger(end)
       || start < 0
@@ -235,17 +246,23 @@ export function verifyReplaceMatchFreshness(
       });
       continue;
     }
-    // ED-MAIN-004: use the same LF/CRLF/CR-aware position mapping as the
-    // applier so a match on a non-LF line is not falsely judged stale.
-    const startOffset = offsetFromLspPositionInString(diskText, {
+    // ED-REPAIR-003: strict LF/CRLF/CR-aware position mapping that returns null
+    // on disappeared or shortened lines, invalid line numbers, or out-of-range
+    // character offsets instead of clamping.
+    const startOffset = offsetFromLspPositionInStringStrict(diskText, {
       line: match.startLine,
       character: start,
     });
-    const endOffset = offsetFromLspPositionInString(diskText, {
+    const endOffset = offsetFromLspPositionInStringStrict(diskText, {
       line: match.endLine,
       character: end,
     });
-    if (endOffset < startOffset || diskText.slice(startOffset, endOffset) !== match.matchedText) {
+    if (
+      startOffset === null
+      || endOffset === null
+      || endOffset < startOffset
+      || diskText.slice(startOffset, endOffset) !== match.matchedText
+    ) {
       conflicts.push({
         path: match.filePath,
         reason: `Match "${match.matchedText}" changed since search (line ${match.startLine + 1})`,
