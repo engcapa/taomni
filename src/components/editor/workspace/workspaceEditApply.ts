@@ -50,6 +50,13 @@ export type WorkspaceEditApplyOutcome =
      * example a pre-mutation validation failure).
      */
     diskEffect?: "none" | "unknown";
+    /**
+     * ED-REPAIR-001: post-image and buffer identities captured when an open
+     * buffer mutation succeeded in memory but persisting it failed known-zero.
+     */
+    expectedPostText?: string;
+    openBufferKey?: string;
+    openBufferVersion?: number | null;
   };
 
 /**
@@ -102,6 +109,8 @@ export interface WorkspaceEditOperationEffect {
    */
   result: SaveCommitResult | ResourceOperationResult | null;
   undoState: "available" | "unavailable";
+  bufferEffect?: "none" | "performed";
+  diskEffect?: "none" | "unknown" | "committed";
 }
 
 /** Whole-transaction apply result (§8.19.1 WorkspaceEditApplyResultV2). */
@@ -144,6 +153,165 @@ export function sliceWorkspaceEditForResume(
   return { ...edit, documentEdits: edit.documentEdits.slice(startOperationIndex) };
 }
 
+export type WorkspaceEditOperationRetryKind =
+  | "retry-full"
+  | "retry-save-only"
+  | "unretryable";
+
+/**
+ * ED-REPAIR-001: classify whether a failed boundary can be retried and which
+ * retry strategy is required. A buffer effect that already modified in-memory
+ * text must never re-apply text operations; it may only retry safe persistence.
+ * An unknown disk effect must never be blindly retried.
+ */
+export function classifyWorkspaceEditOperationRetry(
+  outcome: WorkspaceEditApplyOutcome,
+): WorkspaceEditOperationRetryKind {
+  if (outcome.status !== "failed") {
+    return "unretryable";
+  }
+  if (outcome.diskEffect === "unknown") {
+    return "unretryable";
+  }
+  if (outcome.bufferEffect === "performed" && outcome.diskEffect === "none") {
+    if (!outcome.expectedPostText) {
+      return "unretryable";
+    }
+    return "retry-save-only";
+  }
+  if (outcome.bufferEffect !== "performed") {
+    return "retry-full";
+  }
+  return "unretryable";
+}
+
+export interface RetryOpenBufferSaveInput {
+  operationIndex: number;
+  document: LspFileTextEdits;
+  expectedPostText: string;
+  expectedKey?: string;
+  expectedVersion?: number | null;
+  hooks: WorkspaceEditApplyHooks;
+}
+
+/**
+ * ED-REPAIR-001: retry persisting an open clean buffer whose in-memory edit
+ * already succeeded, without re-applying the text edit. Validates document
+ * session, version, unmodified post-image buffer text, and disk preconditions
+ * before attempting the save.
+ */
+export async function retryOpenBufferSave(
+  input: RetryOpenBufferSaveInput,
+): Promise<WorkspaceEditApplyOutcome> {
+  const { operationIndex, document, expectedPostText, expectedKey, expectedVersion, hooks } = input;
+  const path = hooks.resolvePath(document);
+  if (!path) {
+    return {
+      operationIndex,
+      path: document.uri,
+      status: "failed",
+      reason: "unresolvable path",
+      diskEffect: "none",
+      bufferEffect: "performed",
+    };
+  }
+  const open = hooks.getOpenBuffer(path);
+  if (!open) {
+    return {
+      operationIndex,
+      path,
+      status: "failed",
+      reason: "document is no longer open in buffer; cannot safely retry save",
+      diskEffect: "none",
+      bufferEffect: "performed",
+    };
+  }
+  if (expectedKey && open.key !== expectedKey) {
+    return {
+      operationIndex,
+      path,
+      status: "failed",
+      reason: "buffer session changed; cannot safely retry save",
+      diskEffect: "none",
+      bufferEffect: "performed",
+    };
+  }
+  if (expectedVersion != null && open.version !== expectedVersion) {
+    return {
+      operationIndex,
+      path,
+      status: "failed",
+      reason: `document version mismatch (expected ${expectedVersion}, current ${open.version ?? "unknown"})`,
+      diskEffect: "none",
+      bufferEffect: "performed",
+    };
+  }
+  if (document.version != null && open.version !== document.version) {
+    return {
+      operationIndex,
+      path,
+      status: "failed",
+      reason: `document version mismatch (expected ${document.version}, current ${open.version ?? "unknown"})`,
+      diskEffect: "none",
+      bufferEffect: "performed",
+    };
+  }
+  if (open.text !== expectedPostText) {
+    return {
+      operationIndex,
+      path,
+      status: "failed",
+      reason: "buffer content has changed (new user typing detected); retry aborted to protect newer edits",
+      diskEffect: "none",
+      bufferEffect: "performed",
+    };
+  }
+  try {
+    const disk = await hooks.readDisk(path);
+    if (!disk) {
+      return {
+        operationIndex,
+        path,
+        status: "failed",
+        reason: "file not found on disk during retry precheck",
+        diskEffect: "none",
+        bufferEffect: "performed",
+      };
+    }
+  } catch (err) {
+    return {
+      operationIndex,
+      path,
+      status: "failed",
+      reason: `disk precondition check failed: ${err instanceof Error ? err.message : String(err)}`,
+      diskEffect: "none",
+      bufferEffect: "performed",
+    };
+  }
+  try {
+    await hooks.saveOpenBuffer(open.key, open.text);
+    return {
+      operationIndex,
+      path,
+      status: "applied-open",
+      dirty: false,
+      bufferEffect: "performed",
+    };
+  } catch (error) {
+    return {
+      operationIndex,
+      path,
+      status: "failed",
+      reason: error instanceof Error ? error.message : String(error),
+      diskEffect: error instanceof WorkspaceEditOpenBufferSaveFailure ? error.diskEffect : "none",
+      bufferEffect: "performed",
+      expectedPostText,
+      openBufferKey: open.key,
+      openBufferVersion: open.version,
+    };
+  }
+}
+
 /**
  * Assemble the v2 whole-transaction result from ordered outcomes (§8.19.1):
  * a first blocked/failed boundary stops the run, everything before it is
@@ -175,11 +343,19 @@ export function buildWorkspaceEditApplyResultV2(input: {
     };
   }
 
+  // ED-REPAIR-001: preserve latest settled outcome per operation index
+  const latestOutcomesByIndex = new Map<number, WorkspaceEditApplyOutcome>();
+  for (const outcome of outcomes) {
+    if (outcome.operationIndex !== null) {
+      latestOutcomesByIndex.set(outcome.operationIndex, outcome);
+    }
+  }
+
   const effects: WorkspaceEditOperationEffect[] = [];
   let failureBoundary: number | null = null;
-  for (const outcome of outcomes) {
-    if (outcome.operationIndex === null) continue;
-    const index = outcome.operationIndex;
+  const recordedIndices = Array.from(latestOutcomesByIndex.keys()).sort((a, b) => a - b);
+  for (const index of recordedIndices) {
+    const outcome = latestOutcomesByIndex.get(index)!;
     const operation = operations[index];
     const kind = operation?.kind ?? "text";
     const targetPath = operation
@@ -223,6 +399,8 @@ export function buildWorkspaceEditApplyResultV2(input: {
       undoState: appliedOrSettled
         ? undoAvailability?.(index, kind, targetPath) ?? "unavailable"
         : "unavailable",
+      bufferEffect: ("bufferEffect" in outcome && outcome.bufferEffect) ? outcome.bufferEffect : (outcome.status === "applied-open" ? "performed" : "none"),
+      diskEffect: ("diskEffect" in outcome && outcome.diskEffect) ? outcome.diskEffect : (outcome.status === "applied-disk" ? "committed" : "none"),
     });
   }
 
@@ -330,6 +508,9 @@ async function applyTextDocumentEdit(
   // ED-MAIN-001: track the in-memory mutation separately from the disk result
   // so a failed save after `applyToOpenBuffer` still reports the buffer effect.
   let bufferMutated = false;
+  let expectedPostText: string | undefined;
+  let openBufferKey: string | undefined;
+  let openBufferVersion: number | null | undefined;
   try {
     const open = hooks.getOpenBuffer(path);
     if (file.version != null && !open) {
@@ -359,6 +540,9 @@ async function applyTextDocumentEdit(
       }
       const next = applyLspTextEditsToString(open.text, file.edits);
       const changed = next !== open.text;
+      expectedPostText = next;
+      openBufferKey = open.key;
+      openBufferVersion = open.version;
       if (!open.dirty) {
         hooks.applyToOpenBuffer(open.key, next);
         bufferMutated = changed;
@@ -423,6 +607,11 @@ async function applyTextDocumentEdit(
       ...(bufferMutated || error instanceof WorkspaceEditOpenBufferSaveFailure
         ? { bufferEffect: bufferMutated ? ("performed" as const) : ("none" as const) }
         : {}),
+      ...(bufferMutated ? {
+        expectedPostText,
+        openBufferKey,
+        openBufferVersion,
+      } : {}),
     };
   }
 }
@@ -470,6 +659,7 @@ function workspaceEditAnnotationPreflight(edit: LspWorkspaceEdit): {
 export async function applyWorkspaceEdit(
   edit: LspWorkspaceEdit,
   hooks: WorkspaceEditApplyHooks,
+  startIndex = 0,
 ): Promise<WorkspaceEditApplyOutcome[]> {
   const annotationPreflight = workspaceEditAnnotationPreflight(edit);
   if (annotationPreflight.error) {
@@ -567,7 +757,8 @@ export async function applyWorkspaceEdit(
     }
   }
   const outcomes: WorkspaceEditApplyOutcome[] = [];
-  for (const [operationIndex, operation] of workspaceEditOperations(activeEdit).entries()) {
+  for (const [offset, operation] of workspaceEditOperations(activeEdit).entries()) {
+    const operationIndex = startIndex + offset;
     if (operation.kind === "text") {
       const outcome = await applyTextDocumentEdit(operation.document, operationIndex, hooks);
       outcomes.push(outcome);

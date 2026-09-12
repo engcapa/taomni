@@ -387,6 +387,8 @@ import { isLargeFileContent } from "./workspace/largeFile";
 import {
   applyWorkspaceEdit,
   buildWorkspaceEditApplyResultV2,
+  classifyWorkspaceEditOperationRetry,
+  retryOpenBufferSave,
   sliceWorkspaceEditForResume,
   summarizeWorkspaceEditOutcomes,
   workspaceEditApplyResponse,
@@ -9206,7 +9208,27 @@ export function CodeWorkspaceTab({
     // the prepared recovery journal and the effect ledger share one identity.
     const applyTransactionId = nextSaveTransactionId("tx-wedit");
     let outcomes = await applyWorkspaceEdit(edit, buildHooks(true));
-    let allOutcomes = [...outcomes];
+    const preMutation = outcomes.find((outcome) => outcome.operationIndex === null);
+    if (preMutation) {
+      setStatusMessage(summarizeWorkspaceEditOutcomes(outcomes));
+      options.onTransactionSummary?.({
+        effect: "none",
+        postcondition: "not-applied",
+        historyId: null,
+        recoveryId: null,
+        affectedPaths: [],
+        reason: ("reason" in preMutation && preMutation.reason) ? preMutation.reason : null,
+      });
+      return outcomes;
+    }
+    const allOutcomesHistory: WorkspaceEditApplyOutcome[] = [...outcomes];
+    const settledOutcomes = new Map<number, WorkspaceEditApplyOutcome>();
+    for (const outcome of outcomes) {
+      if (outcome.operationIndex !== null) {
+        settledOutcomes.set(outcome.operationIndex, outcome);
+      }
+    }
+
     // §8.19.1: per-operation effect ledger with an explicit resume boundary.
     // A partial run stops at the failed operation; the user may re-run the
     // unapplied suffix, and every remaining text operation re-validates its
@@ -9216,44 +9238,99 @@ export function CodeWorkspaceTab({
         .filter((snapshot) => snapshot.exists && snapshot.text !== null)
         .map((snapshot) => fsPathComparisonKey(snapshot.path)),
     );
-    const buildApplyResult = (runs: WorkspaceEditApplyOutcome[]) => buildWorkspaceEditApplyResultV2({
+    const getSettledOutcomesList = () => Array.from(settledOutcomes.values()).sort(
+      (a, b) => (a.operationIndex ?? 0) - (b.operationIndex ?? 0),
+    );
+    const buildApplyResult = () => buildWorkspaceEditApplyResultV2({
       transactionId: applyTransactionId,
       operations: workspaceEditOperations(resolvedEdit),
-      outcomes: runs,
+      outcomes: getSettledOutcomesList(),
       undoAvailability: beforeSnapshots
         ? (_index, _kind, targetPath) => historySafePaths.has(fsPathComparisonKey(targetPath)) ? "available" : "unavailable"
         : undefined,
     });
     {
-      let applyResult = buildApplyResult(outcomes);
+      let applyResult = buildApplyResult();
+      const allOperations = workspaceEditOperations(resolvedEdit);
       if (
         applyResult.disposition === "partial"
         && applyResult.nextOperationIndex !== null
         && options.recordHistory !== false
-        // ED-IMPROVE-002: never auto-retry a boundary whose OS result is
-        // unproven; the recovery center owns the file until it is resolved.
-        && !allOutcomes.some((outcome) => (
-          outcome.status === "failed" && outcome.diskEffect === "unknown"
-        ))
       ) {
-        // Bounded resume loop; each pass re-applies only the unapplied suffix.
+        // Bounded resume loop; ED-REPAIR-001: retry only unexecuted operations or retry persistence safely
         for (let attempt = 0; attempt < 5; attempt += 1) {
-          const totalCount = workspaceEditOperations(resolvedEdit).length;
-          const resume = await confirmAppDialog({
-            title: "Workspace edit partially applied",
-            message: `${applyResult.nextOperationIndex} of ${totalCount} changes were applied. `
-              + `Retry the remaining ${totalCount - applyResult.nextOperationIndex} from the failed boundary?`,
-            confirmLabel: "Retry remaining changes",
-          });
-          if (!resume) break;
-          resolvedEdit = sliceWorkspaceEditForResume(resolvedEdit, applyResult.nextOperationIndex);
-          outcomes = await applyWorkspaceEdit(resolvedEdit, buildHooks(false));
-          allOutcomes = [...allOutcomes, ...outcomes];
-          applyResult = buildApplyResult(outcomes);
+          const failedIndex = applyResult.nextOperationIndex;
+          const failedOutcome = settledOutcomes.get(failedIndex);
+          if (!failedOutcome || failedOutcome.status !== "failed") {
+            break;
+          }
+          const retryKind = classifyWorkspaceEditOperationRetry(failedOutcome);
+          if (retryKind === "unretryable") {
+            // ED-IMPROVE-002 / ED-REPAIR-001: disk unknown or unretryable state blocks blind retry
+            break;
+          }
+
+          if (retryKind === "retry-save-only") {
+            const failedOp = allOperations[failedIndex];
+            if (failedOp?.kind !== "text" || !failedOutcome.expectedPostText) {
+              break;
+            }
+            const docPath = failedOp.document.path ?? failedOp.document.uri;
+            const resume = await confirmAppDialog({
+              title: "Workspace edit save failed",
+              message: `Edits to ${docPath} were applied to the open buffer, but saving to disk failed (${failedOutcome.reason}). `
+                + `Retry saving and continue remaining operations?`,
+              confirmLabel: "Retry save",
+            });
+            if (!resume) break;
+            const retryOutcome = await retryOpenBufferSave({
+              operationIndex: failedIndex,
+              document: failedOp.document,
+              expectedPostText: failedOutcome.expectedPostText,
+              expectedKey: failedOutcome.openBufferKey,
+              expectedVersion: failedOutcome.openBufferVersion,
+              hooks: buildHooks(false),
+            });
+            allOutcomesHistory.push(retryOutcome);
+            settledOutcomes.set(failedIndex, retryOutcome);
+
+            if (retryOutcome.status.startsWith("applied")) {
+              const nextIndex = failedIndex + 1;
+              if (nextIndex < allOperations.length) {
+                const remainingEdit = sliceWorkspaceEditForResume(resolvedEdit, nextIndex);
+                const suffixOutcomes = await applyWorkspaceEdit(remainingEdit, buildHooks(false), nextIndex);
+                for (const o of suffixOutcomes) {
+                  allOutcomesHistory.push(o);
+                  if (o.operationIndex !== null) settledOutcomes.set(o.operationIndex, o);
+                }
+              }
+            }
+          } else {
+            // retry-full
+            const totalCount = allOperations.length;
+            const resume = await confirmAppDialog({
+              title: "Workspace edit partially applied",
+              message: `${failedIndex} of ${totalCount} changes were applied. `
+                + `Retry the remaining ${totalCount - failedIndex} from the failed boundary?`,
+              confirmLabel: "Retry remaining changes",
+            });
+            if (!resume) break;
+            const remainingEdit = sliceWorkspaceEditForResume(resolvedEdit, failedIndex);
+            const suffixOutcomes = await applyWorkspaceEdit(remainingEdit, buildHooks(false), failedIndex);
+            for (const o of suffixOutcomes) {
+              allOutcomesHistory.push(o);
+              if (o.operationIndex !== null) settledOutcomes.set(o.operationIndex, o);
+            }
+          }
+
+          applyResult = buildApplyResult();
           if (applyResult.disposition !== "partial" || applyResult.nextOperationIndex === null) break;
         }
       }
     }
+    outcomes = getSettledOutcomesList();
+    const allOutcomes = allOutcomesHistory;
+
     if (allOutcomes.some((outcome) => (
       outcome.status === "applied-create"
       || outcome.status === "applied-rename"
@@ -9276,15 +9353,19 @@ export function CodeWorkspaceTab({
         )),
       );
     }
-    // ED-IMPROVE-002: one structured summary per apply run. The effect axis is
+    // ED-IMPROVE-002 / ED-REPAIR-001: one structured summary per apply run. The effect axis is
     // independent of the execution status: `unknown` marks a write whose OS
     // result could not be proven even though the operation reported failure.
-    const appliedEffectPaths = allOutcomes
-      .filter((outcome) => outcome.status.startsWith("applied") || bufferEffectPerformed(outcome))
-      .map((outcome) => outcome.path);
-    const hasFailedOperation = allOutcomes.some((outcome) => (
-      outcome.status === "failed" || outcome.status === "skipped"
+    const appliedEffectPaths = Array.from(new Set(
+      allOutcomes
+        .filter((outcome) => outcome.status.startsWith("applied") || bufferEffectPerformed(outcome))
+        .map((outcome) => outcome.path),
     ));
+    const allOperations = workspaceEditOperations(resolvedEdit);
+    const hasUnsettledOrFailedOperation = allOperations.some((_, index) => {
+      const settled = settledOutcomes.get(index);
+      return !settled || settled.status === "failed" || settled.status === "skipped";
+    });
     const hasUnknownDiskEffect = allOutcomes.some((outcome) => (
       outcome.status === "failed" && outcome.diskEffect === "unknown"
     ));
@@ -9292,7 +9373,7 @@ export function CodeWorkspaceTab({
       ? "unknown"
       : appliedEffectPaths.length === 0
         ? "none"
-        : hasFailedOperation
+        : hasUnsettledOrFailedOperation
           ? "partial"
           : "performed";
     let historyEntryId: string | null = null;
@@ -9405,7 +9486,7 @@ export function CodeWorkspaceTab({
           recoveryMessage = `Refactor postcondition failed (${reason}); recovery required. `
             + `Applied changes on: ${appliedEffects.length > 0 ? appliedEffects.join(", ") : "none"}. `
             + `Undo was not registered; the pending recovery entry lists every affected file.`;
-        } else if (hasFailedOperation) {
+        } else if (hasUnsettledOrFailedOperation) {
           // ED-MAIN-001: the buffer effect was already performed but a later
           // await (a disk save) failed. The post-image may match the mutated
           // buffer, but the transaction is not a verified success, so keep the
@@ -9444,7 +9525,7 @@ export function CodeWorkspaceTab({
         );
         return outcomes;
       }
-      if (hasFailedOperation) {
+      if (hasUnsettledOrFailedOperation) {
         // ED-MAIN-001: a buffer effect was performed but the transaction
         // failed without a prepared recovery journal (no journal plan). The
         // transaction must not be reported as a verified success nor register
@@ -9452,7 +9533,10 @@ export function CodeWorkspaceTab({
         setStatusMessage(
           `Workspace edit is incomplete: ${summarizeWorkspaceEditOutcomes(outcomes)}`,
         );
-        emitTransactionSummary(afterSnapshots ? "mismatch" : "unreadable", null);
+        emitTransactionSummary(
+          afterSnapshots ? "mismatch" : "unreadable",
+          preparedJournalRef.current?.recoveryId ?? null,
+        );
         return outcomes;
       }
       if (afterSnapshots && changed) {

@@ -2,11 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import {
   applyWorkspaceEdit,
   buildWorkspaceEditApplyResultV2,
+  classifyWorkspaceEditOperationRetry,
   parseWorkspaceEditResumeToken,
+  retryOpenBufferSave,
   sliceWorkspaceEditForResume,
   summarizeWorkspaceEditOutcomes,
   workspaceEditApplyResponse,
   WorkspaceEditOpenBufferSaveFailure,
+  type WorkspaceEditApplyOutcome,
 } from "./workspaceEditApply";
 import { workspaceEditOperations } from "./workspaceEditPreview";
 import { buildFinalBytesReceipt, buildPreparedSave, type SaveCommitResult } from "./saveCommit";
@@ -998,6 +1001,274 @@ describe("applyWorkspaceEdit", () => {
       targetPath: "/repo/a.ts",
       result: null,
       undoState: "unavailable",
+    });
+  });
+
+  describe("ED-REPAIR-001: Buffer edit save failure retry safety", () => {
+    it("captures post-image and buffer identities on known-zero open buffer save failure and classifies as retry-save-only (ED-REPAIR-001-A1)", async () => {
+      let openBufferText = "foo";
+      let openBufferDirty = false;
+      const fooEdit = {
+        documentEdits: [{
+          uri: "file:///repo/foo.ts",
+          path: "/repo/foo.ts",
+          edits: [{
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
+            newText: "foobar",
+          }],
+        }],
+      };
+      const outcomes = await applyWorkspaceEdit(fooEdit, {
+        resolvePath: (file) => file.path,
+        getOpenBuffer: () => ({ text: openBufferText, dirty: openBufferDirty, key: "key-foo", version: 1 }),
+        applyToOpenBuffer: (_key, nextText) => {
+          openBufferText = nextText;
+          openBufferDirty = true;
+        },
+        saveOpenBuffer: async () => {
+          throw new WorkspaceEditOpenBufferSaveFailure("readonly disk", "none");
+        },
+        readDisk: async () => null,
+        writeDisk: async () => committedDisk(),
+      });
+
+      expect(outcomes).toHaveLength(1);
+      const outcome = outcomes[0]!;
+      expect(outcome).toMatchObject({
+        operationIndex: 0,
+        path: "/repo/foo.ts",
+        status: "failed",
+        bufferEffect: "performed",
+        diskEffect: "none",
+        expectedPostText: "foobar",
+        openBufferKey: "key-foo",
+        openBufferVersion: 1,
+      });
+      // The buffer in memory holds foobar
+      expect(openBufferText).toBe("foobar");
+      expect(classifyWorkspaceEditOperationRetry(outcome)).toBe("retry-save-only");
+    });
+
+    it("retryOpenBufferSave persists post-image to disk without re-applying text edits (ED-REPAIR-001-A1)", async () => {
+      let openBufferText = "foobar";
+      let openBufferDirty = true;
+      let diskSavedText: string | null = null;
+      const saveHook = vi.fn(async (_key: string, nextText: string) => {
+        diskSavedText = nextText;
+        openBufferDirty = false;
+      });
+
+      const retryOutcome = await retryOpenBufferSave({
+        operationIndex: 0,
+        document: {
+          uri: "file:///repo/foo.ts",
+          path: "/repo/foo.ts",
+          edits: [{
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
+            newText: "foobar",
+          }],
+        },
+        expectedPostText: "foobar",
+        expectedKey: "key-foo",
+        expectedVersion: 1,
+        hooks: {
+          resolvePath: (file) => file.path,
+          getOpenBuffer: () => ({ text: openBufferText, dirty: openBufferDirty, key: "key-foo", version: 1 }),
+          applyToOpenBuffer: (_key, nextText) => {
+            openBufferText = nextText;
+          },
+          saveOpenBuffer: saveHook,
+          readDisk: async () => ({ text: "foo", hash: "hash-foo" }),
+          writeDisk: async () => committedDisk(),
+        },
+      });
+
+      expect(retryOutcome).toMatchObject({
+        operationIndex: 0,
+        path: "/repo/foo.ts",
+        status: "applied-open",
+        dirty: false,
+        bufferEffect: "performed",
+      });
+      expect(saveHook).toHaveBeenCalledWith("key-foo", "foobar");
+      expect(diskSavedText).toBe("foobar");
+      // foobar NEVER becomes foobarbar!
+      expect(openBufferText).toBe("foobar");
+    });
+
+    it("retryOpenBufferSave refuses to save when buffer text changed due to new typing (ED-REPAIR-001-A2)", async () => {
+      const saveHook = vi.fn(async () => {});
+      const retryOutcome = await retryOpenBufferSave({
+        operationIndex: 0,
+        document: {
+          uri: "file:///repo/foo.ts",
+          path: "/repo/foo.ts",
+          edits: [{
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
+            newText: "foobar",
+          }],
+        },
+        expectedPostText: "foobar",
+        expectedKey: "key-foo",
+        expectedVersion: 1,
+        hooks: {
+          resolvePath: (file) => file.path,
+          getOpenBuffer: () => ({ text: "foobar-new-typing", dirty: true, key: "key-foo", version: 1 }),
+          applyToOpenBuffer: () => {},
+          saveOpenBuffer: saveHook,
+          readDisk: async () => ({ text: "foo", hash: "hash-foo" }),
+          writeDisk: async () => committedDisk(),
+        },
+      });
+
+      expect(retryOutcome.status).toBe("failed");
+      expect("reason" in retryOutcome && retryOutcome.reason).toContain("new user typing detected");
+      expect(saveHook).not.toHaveBeenCalled();
+    });
+
+    it("retryOpenBufferSave refuses to save when disk precondition fails (ED-REPAIR-001-A2)", async () => {
+      const saveHook = vi.fn(async () => {});
+      const retryOutcome = await retryOpenBufferSave({
+        operationIndex: 0,
+        document: {
+          uri: "file:///repo/foo.ts",
+          path: "/repo/foo.ts",
+          edits: [{
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
+            newText: "foobar",
+          }],
+        },
+        expectedPostText: "foobar",
+        expectedKey: "key-foo",
+        expectedVersion: 1,
+        hooks: {
+          resolvePath: (file) => file.path,
+          getOpenBuffer: () => ({ text: "foobar", dirty: true, key: "key-foo", version: 1 }),
+          applyToOpenBuffer: () => {},
+          saveOpenBuffer: saveHook,
+          readDisk: async () => {
+            throw new Error("external disk hash changed since preview");
+          },
+          writeDisk: async () => committedDisk(),
+        },
+      });
+
+      expect(retryOutcome.status).toBe("failed");
+      expect("reason" in retryOutcome && retryOutcome.reason).toContain("disk precondition check failed");
+      expect(saveHook).not.toHaveBeenCalled();
+    });
+
+    it("retryOpenBufferSave refuses to save when buffer is closed or session changed (ED-REPAIR-001-A2)", async () => {
+      const saveHook = vi.fn(async () => {});
+      const closedOutcome = await retryOpenBufferSave({
+        operationIndex: 0,
+        document: {
+          uri: "file:///repo/foo.ts",
+          path: "/repo/foo.ts",
+          edits: [],
+        },
+        expectedPostText: "foobar",
+        expectedKey: "key-foo",
+        hooks: {
+          resolvePath: (file) => file.path,
+          getOpenBuffer: () => null,
+          applyToOpenBuffer: () => {},
+          saveOpenBuffer: saveHook,
+          readDisk: async () => ({ text: "foo", hash: "hash-foo" }),
+          writeDisk: async () => committedDisk(),
+        },
+      });
+      expect(closedOutcome.status).toBe("failed");
+      expect("reason" in closedOutcome && closedOutcome.reason).toContain("no longer open");
+
+      const sessionChangedOutcome = await retryOpenBufferSave({
+        operationIndex: 0,
+        document: {
+          uri: "file:///repo/foo.ts",
+          path: "/repo/foo.ts",
+          edits: [],
+        },
+        expectedPostText: "foobar",
+        expectedKey: "key-foo",
+        hooks: {
+          resolvePath: (file) => file.path,
+          getOpenBuffer: () => ({ text: "foobar", dirty: true, key: "key-foo-reopened" }),
+          applyToOpenBuffer: () => {},
+          saveOpenBuffer: saveHook,
+          readDisk: async () => ({ text: "foo", hash: "hash-foo" }),
+          writeDisk: async () => committedDisk(),
+        },
+      });
+      expect(sessionChangedOutcome.status).toBe("failed");
+      expect("reason" in sessionChangedOutcome && sessionChangedOutcome.reason).toContain("session changed");
+      expect(saveHook).not.toHaveBeenCalled();
+    });
+
+    it("classifyWorkspaceEditOperationRetry refuses blind retry for unknown disk effects (ED-REPAIR-001-A1)", () => {
+      expect(classifyWorkspaceEditOperationRetry({
+        operationIndex: 0,
+        path: "/repo/foo.ts",
+        status: "failed",
+        reason: "write ack lost",
+        diskEffect: "unknown",
+        bufferEffect: "performed",
+      })).toBe("unretryable");
+
+      expect(classifyWorkspaceEditOperationRetry({
+        operationIndex: 0,
+        path: "/repo/foo.ts",
+        status: "failed",
+        reason: "preflight error",
+        diskEffect: "none",
+        bufferEffect: "none",
+      })).toBe("retry-full");
+    });
+
+    it("reconciles multi-operation retry settling all operations into committed without duplicate effects (ED-REPAIR-001-A2)", () => {
+      const operations = workspaceEditOperations({
+        documentEdits: [
+          edit("file:///repo/a.ts", "/repo/a.ts", "A").documentEdits[0]!,
+          edit("file:///repo/b.ts", "/repo/b.ts", "B").documentEdits[0]!,
+          edit("file:///repo/c.ts", "/repo/c.ts", "C").documentEdits[0]!,
+        ],
+      });
+
+      // Initial pass: op 0 applied, op 1 failed known-zero
+      const initialOutcomes: WorkspaceEditApplyOutcome[] = [
+        { operationIndex: 0, path: "/repo/a.ts", status: "applied-open", dirty: false, bufferEffect: "performed" },
+        { operationIndex: 1, path: "/repo/b.ts", status: "failed", reason: "save failed", diskEffect: "none", bufferEffect: "performed", expectedPostText: "B" },
+      ];
+      const initialResult = buildWorkspaceEditApplyResultV2({
+        transactionId: "tx-multi",
+        operations,
+        outcomes: initialOutcomes,
+      });
+      expect(initialResult.disposition).toBe("partial");
+      expect(initialResult.nextOperationIndex).toBe(1);
+      expect(initialResult.effects).toHaveLength(2);
+      expect(initialResult.effects[1]!.bufferEffect).toBe("performed");
+      expect(initialResult.effects[1]!.diskEffect).toBe("none");
+
+      // Retry pass: op 1 retried successfully, op 2 executed and applied
+      const settledOutcomes: WorkspaceEditApplyOutcome[] = [
+        ...initialOutcomes,
+        { operationIndex: 1, path: "/repo/b.ts", status: "applied-open", dirty: false, bufferEffect: "performed" },
+        { operationIndex: 2, path: "/repo/c.ts", status: "applied-disk", result: committedDisk("/repo/c.ts") },
+      ];
+      const finalResult = buildWorkspaceEditApplyResultV2({
+        transactionId: "tx-multi",
+        operations,
+        outcomes: settledOutcomes,
+      });
+      expect(finalResult.disposition).toBe("committed");
+      expect(finalResult.nextOperationIndex).toBeNull();
+      expect(finalResult.resumeToken).toBeNull();
+      expect(finalResult.effects).toHaveLength(3);
+      expect(finalResult.effects.map((e) => e.operationId)).toEqual([
+        "tx-multi:op-0",
+        "tx-multi:op-1",
+        "tx-multi:op-2",
+      ]);
     });
   });
 });
