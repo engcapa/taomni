@@ -1271,4 +1271,97 @@ describe("applyWorkspaceEdit", () => {
       ]);
     });
   });
+
+  describe("ED-REPAIR-002: assertTextDocumentPreconditions hook in applyWorkspaceEdit", () => {
+    it("fails with zero effects when assertTextDocumentPreconditions throws on op 0 (ED-REPAIR-002-A1)", async () => {
+      const applyToOpenBuffer = vi.fn();
+      const saveOpenBuffer = vi.fn();
+      const readDisk = vi.fn();
+      const writeDisk = vi.fn();
+
+      const outcomes = await applyWorkspaceEdit(
+        {
+          documentEdits: [
+            edit("file:///repo/a.ts", "/repo/a.ts", "A").documentEdits[0]!,
+            edit("file:///repo/b.ts", "/repo/b.ts", "B").documentEdits[0]!,
+          ],
+        },
+        {
+          resolvePath: (file) => file.path,
+          getOpenBuffer: (path) => ({ text: "orig", dirty: false, key: `key:${path}` }),
+          applyToOpenBuffer,
+          saveOpenBuffer,
+          readDisk,
+          writeDisk,
+          assertTextDocumentPreconditions: (path) => {
+            if (path === "/repo/a.ts") {
+              throw new Error("precondition failed on a.ts");
+            }
+          },
+        },
+      );
+
+      expect(outcomes).toHaveLength(1);
+      expect(outcomes[0]).toMatchObject({
+        operationIndex: 0,
+        path: "/repo/a.ts",
+        status: "failed",
+        reason: "precondition failed on a.ts",
+        diskEffect: "none",
+        bufferEffect: "none",
+      });
+      expect(applyToOpenBuffer).not.toHaveBeenCalled();
+      expect(saveOpenBuffer).not.toHaveBeenCalled();
+      expect(readDisk).not.toHaveBeenCalled();
+      expect(writeDisk).not.toHaveBeenCalled();
+    });
+
+    it("preserves op 0 effects when assertTextDocumentPreconditions fails on op 1 (ED-REPAIR-002-A2)", async () => {
+      const applyToOpenBuffer = vi.fn();
+      const saveOpenBuffer = vi.fn();
+      const readDisk = vi.fn();
+      const writeDisk = vi.fn();
+
+      const outcomes = await applyWorkspaceEdit(
+        {
+          documentEdits: [
+            edit("file:///repo/a.ts", "/repo/a.ts", "A").documentEdits[0]!,
+            edit("file:///repo/b.ts", "/repo/b.ts", "B").documentEdits[0]!,
+          ],
+        },
+        {
+          resolvePath: (file) => file.path,
+          getOpenBuffer: (path) => ({ text: "orig", dirty: false, key: `key:${path}` }),
+          applyToOpenBuffer,
+          saveOpenBuffer,
+          readDisk,
+          writeDisk,
+          assertTextDocumentPreconditions: (path) => {
+            if (path === "/repo/b.ts") {
+              throw new Error("buffer revision mismatch on b.ts");
+            }
+          },
+        },
+      );
+
+      expect(outcomes).toHaveLength(2);
+      // Op 0 succeeded
+      expect(outcomes[0]).toMatchObject({
+        operationIndex: 0,
+        path: "/repo/a.ts",
+        status: "applied-open",
+      });
+      // Op 1 failed with zero effect
+      expect(outcomes[1]).toMatchObject({
+        operationIndex: 1,
+        path: "/repo/b.ts",
+        status: "failed",
+        reason: "buffer revision mismatch on b.ts",
+        diskEffect: "none",
+        bufferEffect: "none",
+      });
+      expect(applyToOpenBuffer).toHaveBeenCalledTimes(1);
+      expect(applyToOpenBuffer).toHaveBeenCalledWith("key:/repo/a.ts", "Arig");
+    });
+  });
 });

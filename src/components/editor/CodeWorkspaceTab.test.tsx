@@ -42,6 +42,7 @@ import { EditorSelection } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { globalEditorConfigResolver } from "./workspace/editorConfigResolver";
 import { acquireClipboardStore, resetWorkspaceClipboardStores } from "./workspace/workspaceClipboardSession";
+import * as workspaceSearchModule from "../../lib/editor/workspaceSearch";
 
 const workspaceMocks = vi.hoisted(() => ({
   workspaceListDir: vi.fn(),
@@ -10987,6 +10988,248 @@ end_of_record
       });
       await waitFor(() => expect(disk["src/A.java"]).toBe("hello UPPER_A"));
       expect(disk["src/a.java"]).toBe("hello lower_a");
+    });
+  });
+
+  describe("ED-REPAIR-002: replace preflight and open buffer freeze conditions (mounted)", () => {
+    function setupWorkspace(instanceId: string, openFile: string) {
+      const disk: Record<string, string> = {};
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: `ws-${instanceId}`,
+        workspaceInstanceId: `instance-${instanceId}`,
+        name: instanceId,
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: openFile },
+      };
+      workspaceMocks.workspaceListDir.mockImplementation(async (_root: string, path: string) => (
+        path === "src"
+          ? Object.keys(disk).map((rel) => entry(rel.split("/").pop()!, rel))
+          : [entry("src", "src", "dir")]
+      ));
+      workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => {
+        if (!(path in disk)) throw new Error(`missing fixture file: ${path}`);
+        return file(path, disk[path]!, { hash: `hash-${disk[path]!}` });
+      });
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _root: string,
+        path: string,
+        text: string,
+      ) => {
+        disk[path] = text;
+        return writeAck(file(path, text, { hash: `hash-${text}` }));
+      });
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      return { disk, workspace, registrationRef, onCommandsChange };
+    }
+
+    it("aborts replace with zero disk writes when file B is modified before first write (ED-REPAIR-002-A1)", async () => {
+      const { disk, workspace, registrationRef, onCommandsChange } = setupWorkspace("repair-002-b-modified", "src/c.ts");
+      disk["src/c.ts"] = "hello reader";
+      disk["src/a.ts"] = "hello needle";
+      disk["src/b.ts"] = "hello needle";
+
+      let searchHandler: ((event: workspaceSearchModule.WorkspaceSearchEvent) => void) | null = null;
+      const unlisten = vi.fn();
+      vi.spyOn(workspaceSearchModule, "subscribeWorkspaceSearch").mockImplementation(async (_id, handler) => {
+        searchHandler = handler;
+        return unlisten;
+      });
+      vi.spyOn(workspaceSearchModule, "workspaceSearchStart").mockResolvedValue("search-repair-002");
+
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/c.ts");
+
+      // Open find in files panel
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.findInFiles");
+      });
+
+      const searchInput = await screen.findByLabelText("Search query");
+      fireEvent.change(searchInput, { target: { value: "needle" } });
+      fireEvent.keyDown(searchInput, { key: "Enter" });
+
+      await waitFor(() => expect(searchHandler).not.toBeNull());
+
+      // Emit search matches for a.ts and b.ts
+      await act(async () => {
+        searchHandler?.({
+          searchId: "search-repair-002",
+          kind: "batch",
+          matches: [
+            {
+              rootId: "app",
+              rootName: "app",
+              rootPath: "/repo/app",
+              path: "src/a.ts",
+              lineNumber: 1,
+              column: 7,
+              matchStart: 6,
+              matchEnd: 12,
+              lineText: "hello needle",
+            },
+            {
+              rootId: "app",
+              rootName: "app",
+              rootPath: "/repo/app",
+              path: "src/b.ts",
+              lineNumber: 1,
+              column: 7,
+              matchStart: 6,
+              matchEnd: 12,
+              lineText: "hello needle",
+            },
+          ],
+          truncated: false,
+          cancelled: false,
+          filesScanned: 2,
+          totalMatches: 2,
+          error: null,
+        });
+        searchHandler?.({
+          searchId: "search-repair-002",
+          kind: "done",
+          matches: [],
+          truncated: false,
+          cancelled: false,
+          filesScanned: 2,
+          totalMatches: 2,
+          error: null,
+        });
+      });
+
+      // Enter replace text and preview
+      fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "REPLACED" } });
+      fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+
+      const preview = await screen.findByTestId("code-workspace-replace-preview");
+      expect(preview).toBeInTheDocument();
+
+      // Before clicking Replace All, modify file B on disk externally!
+      disk["src/b.ts"] = "hello modified";
+
+      // Click Replace All
+      fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+
+      // Preflight detects disk hash mismatch on src/b.ts and refuses with zero writes
+      await waitFor(() => {
+        const status = useAppStore.getState().statusMessage;
+        expect(status).toContain("changed on disk since");
+      });
+
+      // Both files must have ZERO writes applied
+      expect(disk["src/a.ts"]).toBe("hello needle");
+      expect(disk["src/b.ts"]).toBe("hello modified");
+    });
+
+    it("preserves file A effect when file B write fails after first write (ED-REPAIR-002-A2)", async () => {
+      const { disk, workspace, registrationRef, onCommandsChange } = setupWorkspace("repair-002-b-fail", "src/c.ts");
+      disk["src/c.ts"] = "hello reader";
+      disk["src/a.ts"] = "hello needle";
+      disk["src/b.ts"] = "hello needle";
+
+      let searchHandler: ((event: workspaceSearchModule.WorkspaceSearchEvent) => void) | null = null;
+      const unlisten = vi.fn();
+      vi.spyOn(workspaceSearchModule, "subscribeWorkspaceSearch").mockImplementation(async (_id, handler) => {
+        searchHandler = handler;
+        return unlisten;
+      });
+      vi.spyOn(workspaceSearchModule, "workspaceSearchStart").mockResolvedValue("search-repair-002-post");
+
+      // Inject write failure on src/b.ts
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _root: string,
+        path: string,
+        text: string,
+      ) => {
+        if (path === "src/b.ts") {
+          throw new Error("disk I/O error on b.ts");
+        }
+        disk[path] = text;
+        return writeAck(file(path, text, { hash: `hash-${text}` }));
+      });
+
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/c.ts");
+
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.findInFiles");
+      });
+
+      const searchInput = await screen.findByLabelText("Search query");
+      fireEvent.change(searchInput, { target: { value: "needle" } });
+      fireEvent.keyDown(searchInput, { key: "Enter" });
+
+      await waitFor(() => expect(searchHandler).not.toBeNull());
+
+      await act(async () => {
+        searchHandler?.({
+          searchId: "search-repair-002-post",
+          kind: "batch",
+          matches: [
+            {
+              rootId: "app",
+              rootName: "app",
+              rootPath: "/repo/app",
+              path: "src/a.ts",
+              lineNumber: 1,
+              column: 7,
+              matchStart: 6,
+              matchEnd: 12,
+              lineText: "hello needle",
+            },
+            {
+              rootId: "app",
+              rootName: "app",
+              rootPath: "/repo/app",
+              path: "src/b.ts",
+              lineNumber: 1,
+              column: 7,
+              matchStart: 6,
+              matchEnd: 12,
+              lineText: "hello needle",
+            },
+          ],
+          truncated: false,
+          cancelled: false,
+          filesScanned: 2,
+          totalMatches: 2,
+          error: null,
+        });
+        searchHandler?.({
+          searchId: "search-repair-002-post",
+          kind: "done",
+          matches: [],
+          truncated: false,
+          cancelled: false,
+          filesScanned: 2,
+          totalMatches: 2,
+          error: null,
+        });
+      });
+
+      fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "REPLACED" } });
+      fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+
+      const preview = await screen.findByTestId("code-workspace-replace-preview");
+      expect(preview).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+
+      // Operation A succeeded and its effect is preserved on disk!
+      await waitFor(() => expect(disk["src/a.ts"]).toBe("hello REPLACED"));
+      // Operation B failed and was not modified
+      expect(disk["src/b.ts"]).toBe("hello needle");
+
+      // Status message indicates failure / recovery required
+      await waitFor(() => {
+        const status = useAppStore.getState().statusMessage;
+        expect(status).toContain("recovery required");
+      });
     });
   });
 });

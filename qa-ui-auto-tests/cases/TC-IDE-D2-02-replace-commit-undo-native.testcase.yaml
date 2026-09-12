@@ -49,6 +49,7 @@ steps:
       selector: '[aria-label="Search query"]'
   - native_keys:
       selector: '[aria-label="Search query"]'
+      transport: webdriver
       keys: ["Control+a", "s", "c", "r", "a", "t", "c", "h", "Enter"]
   - click: '[data-testid="code-workspace-find-run-search"]'
   - assert_text:
@@ -59,6 +60,7 @@ steps:
       selector: '[aria-label="Replace text"]'
   - native_keys:
       selector: '[aria-label="Replace text"]'
+      transport: webdriver
       keys: ["Control+a", "s", "n", "a", "t", "c", "h"]
   - click: '[data-testid="code-workspace-find-replace-all"]'
   - wait_for: '[data-testid="code-workspace-replace-preview"]'
@@ -75,6 +77,7 @@ steps:
       selector: '[aria-label="Search query"]'
   - native_keys:
       selector: '[aria-label="Search query"]'
+      transport: webdriver
       keys: ["Control+z"]
   - assert_file_contains:
       path: "${fixture.workspace_root}/notes.txt"
@@ -89,6 +92,7 @@ steps:
       selector: '[aria-label="Search query"]'
   - native_keys:
       selector: '[aria-label="Search query"]'
+      transport: webdriver
       keys: ["Control+a", "n", "o", "t", "e", "s", "Enter"]
   - click: '[data-testid="code-workspace-find-run-search"]'
   - assert_text:
@@ -99,6 +103,7 @@ steps:
       selector: '[aria-label="Replace text"]'
   - native_keys:
       selector: '[aria-label="Replace text"]'
+      transport: webdriver
       keys: ["Control+a", "r", "e", "m", "a", "r", "k", "s"]
   - click: '[data-testid="code-workspace-find-replace-all"]'
   - wait_for: '[data-testid="code-workspace-replace-preview"]'
@@ -121,6 +126,7 @@ steps:
       selector: '[aria-label="Search query"]'
   - native_keys:
       selector: '[aria-label="Search query"]'
+      transport: webdriver
       keys: ["Control+z"]
   - assert_file_sha256:
       path: "${fixture.workspace_root}/unicode.txt"
@@ -148,6 +154,7 @@ steps:
       selector: '[aria-label="Search query"]'
   - native_keys:
       selector: '[aria-label="Search query"]'
+      transport: webdriver
       keys: ["Control+a", "m", "a", "t", "c", "h", "Enter"]
   - click: '[data-testid="code-workspace-find-run-search"]'
   - assert_text:
@@ -162,6 +169,7 @@ steps:
       selector: '[aria-label="Replace text"]'
   - native_keys:
       selector: '[aria-label="Replace text"]'
+      transport: webdriver
       keys: ["Control+a", "s", "w", "a", "p", "p", "e", "d"]
   - click: '[data-testid="code-workspace-find-replace-all"]'
   - wait_for: '[data-testid="code-workspace-replace-preview"]'
@@ -182,6 +190,7 @@ steps:
       selector: '[aria-label="Search query"]'
   - native_keys:
       selector: '[aria-label="Search query"]'
+      transport: webdriver
       keys: ["Control+z"]
   - assert_file_sha256:
       path: "${fixture.workspace_root}/A.java"

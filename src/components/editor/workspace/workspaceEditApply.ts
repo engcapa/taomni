@@ -493,6 +493,14 @@ export interface WorkspaceEditApplyHooks {
    * resume slicing must use this edit, never the pre-confirmation original.
    */
   onActiveEditResolved?: (edit: LspWorkspaceEdit) => void;
+  /**
+   * ED-REPAIR-002: Precondition assertion before an individual text document
+   * edit is applied. Called before modifying open buffers or reading disk.
+   */
+  assertTextDocumentPreconditions?: (
+    path: string,
+    open: { text: string; dirty: boolean; key: string; version?: number | null; revision?: number | null; lspSynced?: boolean } | null,
+  ) => void;
 }
 
 async function applyTextDocumentEdit(
@@ -513,6 +521,20 @@ async function applyTextDocumentEdit(
   let openBufferVersion: number | null | undefined;
   try {
     const open = hooks.getOpenBuffer(path);
+    if (hooks.assertTextDocumentPreconditions) {
+      try {
+        hooks.assertTextDocumentPreconditions(path, open);
+      } catch (error) {
+        return {
+          operationIndex,
+          path,
+          status: "failed",
+          reason: error instanceof Error ? error.message : String(error),
+          diskEffect: "none",
+          bufferEffect: "none",
+        };
+      }
+    }
     if (file.version != null && !open) {
       return {
         operationIndex,

@@ -608,7 +608,15 @@ export function validateReplacePreviewSelection(
       };
     }
   }
-  const textOperations = workspaceEditOperations(filteredEdit).filter(
+  const allOperations = workspaceEditOperations(filteredEdit);
+  const resourceOperations = allOperations.filter((operation) => operation.kind !== "text");
+  if (resourceOperations.length > 0) {
+    return {
+      ok: false,
+      reason: "Resource operations are not permitted in Replace in Files; only text edits are allowed",
+    };
+  }
+  const textOperations = allOperations.filter(
     (operation) => operation.kind === "text",
   );
   const edits = textOperations.flatMap((operation) => (
@@ -620,12 +628,25 @@ export function validateReplacePreviewSelection(
       reason: `Frozen selection has ${selectedMatchKeys.size} matches but the edit carries ${edits.length}; reopen the preview`,
     };
   }
-  for (const edit of edits) {
-    if (edit.newText !== snapshot.replacement) {
-      return {
-        ok: false,
-        reason: "The edit text differs from the frozen replacement; reopen the preview",
-      };
+  const seenEditKeys = new Set<string>();
+  for (const operation of textOperations) {
+    if (operation.kind !== "text") continue;
+    const path = operation.document.path ?? operation.document.uri;
+    for (const edit of operation.document.edits) {
+      const key = replaceEditKey(path, edit);
+      if (seenEditKeys.has(key)) {
+        return {
+          ok: false,
+          reason: `Duplicate edit detected for ${path}:${edit.range.start.line}:${edit.range.start.character}; reopen the preview`,
+        };
+      }
+      seenEditKeys.add(key);
+      if (edit.newText !== snapshot.replacement) {
+        return {
+          ok: false,
+          reason: "The edit text differs from the frozen replacement; reopen the preview",
+        };
+      }
     }
   }
   // ED-MAIN-005: each filtered edit must be the exact frozen path/range from the
@@ -651,6 +672,128 @@ export function validateReplacePreviewSelection(
     }
   }
   return { ok: true };
+}
+
+export interface ReplacePreflightFileInput {
+  path: string;
+  exists: boolean;
+  diskHash: string | null;
+  diskText: string | null;
+  encoding?: string;
+  bom?: boolean;
+  eol?: "lf" | "crlf" | "cr" | null;
+  isOpen: boolean;
+  openBufferRevision: number | null;
+  openBufferDirty: boolean;
+  openBufferReadOnly: boolean;
+}
+
+export interface ReplacePreflightConflict {
+  path: string;
+  reason: string;
+}
+
+export interface ReplacePreflightResult {
+  canCommit: boolean;
+  conflicts: readonly ReplacePreflightConflict[];
+}
+
+/**
+ * ED-REPAIR-002: Atomic whole-set preflight check before any file mutation.
+ * Verifies that all selected files exist, match their frozen preimages on disk,
+ * and have matching buffer revision and clean/read-write status. If any file fails,
+ * the entire replace plan is rejected with zero mutations.
+ */
+export function validateReplacePreflight(
+  snapshot: ReplacePreviewSnapshot,
+  currentWorkspaceInstanceId: string,
+  files: readonly ReplacePreflightFileInput[],
+): ReplacePreflightResult {
+  const conflicts: ReplacePreflightConflict[] = [];
+
+  if (snapshot.requestIdentity && snapshot.requestIdentity.workspaceInstanceId !== currentWorkspaceInstanceId) {
+    return {
+      canCommit: false,
+      conflicts: [{
+        path: "workspace",
+        reason: `workspace instance mismatch (snapshot: ${snapshot.requestIdentity.workspaceInstanceId}, current: ${currentWorkspaceInstanceId}); reopen the preview`,
+      }],
+    };
+  }
+
+  for (const file of files) {
+    if (!file.exists || file.diskHash === null || file.diskText === null) {
+      conflicts.push({
+        path: file.path,
+        reason: "file not found on disk or unreadable; reopen the preview",
+      });
+      continue;
+    }
+
+    const preimage = findReplacePreimage(snapshot, file.path);
+    if (!preimage) {
+      conflicts.push({
+        path: file.path,
+        reason: "file is not part of the frozen replace preview; reopen the preview",
+      });
+      continue;
+    }
+
+    if (preimage.workspaceInstanceId && preimage.workspaceInstanceId !== currentWorkspaceInstanceId) {
+      conflicts.push({
+        path: file.path,
+        reason: `workspace instance changed since preview (${preimage.workspaceInstanceId} -> ${currentWorkspaceInstanceId}); reopen the preview`,
+      });
+      continue;
+    }
+
+    // Disk hash precondition
+    if (file.diskHash !== preimage.textHash) {
+      conflicts.push({
+        path: file.path,
+        reason: `${file.path} changed on disk since the frozen replace preview; reopen the preview`,
+      });
+      continue;
+    }
+
+    // Open buffer session and revision precondition
+    const wasOpenAtPreview = preimage.bufferRevision !== null;
+    if (file.isOpen !== wasOpenAtPreview) {
+      conflicts.push({
+        path: file.path,
+        reason: file.isOpen
+          ? `${file.path} was opened in the editor since the frozen preview; reopen the preview`
+          : `${file.path} was closed in the editor since the frozen preview; reopen the preview`,
+      });
+      continue;
+    }
+
+    if (file.isOpen) {
+      if (file.openBufferDirty) {
+        conflicts.push({
+          path: file.path,
+          reason: `${file.path} has unsaved modifications in the editor`,
+        });
+      }
+      if (file.openBufferReadOnly) {
+        conflicts.push({
+          path: file.path,
+          reason: `${file.path} is read-only in the editor`,
+        });
+      }
+      if (preimage.bufferRevision !== null && file.openBufferRevision !== preimage.bufferRevision) {
+        conflicts.push({
+          path: file.path,
+          reason: `${file.path} was modified in the editor since the frozen replace preview (revision changed from ${preimage.bufferRevision} to ${file.openBufferRevision}); reopen the preview`,
+        });
+      }
+    }
+  }
+
+  return {
+    canCommit: conflicts.length === 0,
+    conflicts,
+  };
 }
 
 /** Minimal structural view of one applier outcome (per-document operation). */

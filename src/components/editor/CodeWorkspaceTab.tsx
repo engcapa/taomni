@@ -82,6 +82,7 @@ import {
   type StructuredTestResults,
   type WorkspaceWriteAck,
 } from "../../lib/editor/workspace";
+import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
 import {
   gitBlameLines,
   gitBlobPair,
@@ -645,7 +646,7 @@ import {
 } from "./workspace/workspaceCommands";
 import type { ShellShortcutClaim } from "./workspace/shellShortcutRouter";
 import type { WorkspaceFocus } from "./workspace/workspaceActionRegistry";
-import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
+import { buildReplaceWorkspaceEdit, workspaceSearchMatchKey } from "./workspace/buildReplaceEdits";
 import {
   codePointOffsetToUtf16Offset,
   collectReplacePreimages,
@@ -654,10 +655,11 @@ import {
   replacePreimagePathKey,
   searchMatchesToReplaceInputs,
   summarizeReplaceCommitReport,
-  validateReplacePreconditions,
+  validateReplacePreflight,
+  validateReplacePreviewSelection,
   verifyReplaceMatchFreshness,
-  type FileRevisionGuard,
   type ReplaceFilePreimage,
+  type ReplacePreflightFileInput,
   type ReplacePrepareOptions,
 } from "./workspace/replaceInFilesModel";
 import type {
@@ -8922,6 +8924,12 @@ export function CodeWorkspaceTab({
      * re-anchored onto text read again later.
      */
     expectedDiskHashes?: ReadonlyMap<string, string> | null;
+    /**
+     * ED-REPAIR-002: frozen per-file preimages captured when the replace
+     * preview opened. Enforces open buffer revision/dirty integrity and
+     * closed-file disk hash integrity before and during mutation.
+     */
+    expectedPreimages?: readonly ReplaceFilePreimage[] | null;
   };
 
   const applyLspWorkspaceEditNow = useCallback(async (
@@ -8974,11 +8982,35 @@ export function CodeWorkspaceTab({
               dirty: file.dirty,
               key: file.key,
               version: lspDocumentVersion(file.key),
+              revision: file.documentRevision ?? null,
               lspSynced: isLspDocumentSynced(file.key, file.text),
             };
           }
         }
         return null;
+      },
+      assertTextDocumentPreconditions: (path, open) => {
+        if (options.kind === "replace" && options.expectedPreimages) {
+          const preimage = options.expectedPreimages.find((p) => fsPathEquals(p.path, path));
+          if (preimage) {
+            if (open) {
+              if (open.dirty) {
+                throw new Error(`${path} has unsaved modifications; replace refused`);
+              }
+              const currentRev = open.revision ?? open.version;
+              if (preimage.bufferRevision !== null && currentRev !== preimage.bufferRevision) {
+                throw new Error(`${path} was modified in editor since replace preview; please retry`);
+              }
+              if (preimage.bufferRevision === null) {
+                throw new Error(`${path} was opened since replace preview; please retry`);
+              }
+            } else {
+              if (preimage.bufferRevision !== null) {
+                throw new Error(`${path} was closed since replace preview; please retry`);
+              }
+            }
+          }
+        }
       },
       applyToOpenBuffer: (key, nextText) => {
         // ED-AUDIT-008: a restore replaying through this funnel must not
@@ -9127,8 +9159,46 @@ export function CodeWorkspaceTab({
       preflightMutation: options.preflightMutation
         || (options.semanticGeneration != null && options.semanticRevision != null)
         || options.recordHistory !== false
+        || (options.kind === "replace" && Boolean(options.expectedPreimages))
         ? async () => {
           await options.preflightMutation?.();
+          // ED-REPAIR-002: In replace, verify all preimages before any file is touched
+          if (options.kind === "replace" && options.expectedPreimages) {
+            for (const preimage of options.expectedPreimages) {
+              if (preimage.workspaceInstanceId && preimage.workspaceInstanceId !== workspaceInstanceIdRef.current) {
+                throw new Error("Replace refused: workspace changed during apply");
+              }
+              const open = Object.values(openFilesRef.current).find((file) => {
+                const path = absolutePathForOpenFile(file);
+                return path !== null && fsPathEquals(path, preimage.path);
+              });
+              if (open) {
+                if (preimage.bufferRevision === null) {
+                  throw new Error(`${preimage.path} was opened since replace preview; please retry`);
+                }
+                if (open.dirty) {
+                  throw new Error(`${preimage.path} has unsaved modifications in the editor`);
+                }
+                if (open.documentRevision !== preimage.bufferRevision) {
+                  throw new Error(`${preimage.path} was modified in the editor since replace preview; please retry`);
+                }
+              } else {
+                if (preimage.bufferRevision !== null) {
+                  throw new Error(`${preimage.path} was closed since replace preview; please retry`);
+                }
+                const containing = rootsRef.current.find(
+                  (root) => relativePathWithinRoot(root.path, preimage.path) !== null,
+                );
+                if (containing) {
+                  const rel = relativePathWithinRoot(containing.path, preimage.path) ?? "";
+                  const disk = await workspaceReadFile(containing.path, rel);
+                  if (disk.hash !== preimage.textHash) {
+                    throw new Error(`${preimage.path} changed on disk since replace preview; please retry`);
+                  }
+                }
+              }
+            }
+          }
           if (options.semanticGeneration == null || options.semanticRevision == null) {
             // fall through to journal preparation below
           } else {
@@ -19148,9 +19218,18 @@ export function CodeWorkspaceTab({
                 onPrepareReplacePreimages={prepareReplacePreimages}
                 onReplaceMatches={async (matches, replacement, edit, snapshot) => {
                   void replacement;
-                  // ED-FIND-004 A2/A3: pre-commit recheck (dirty open buffers,
-                  // unreadable disk, matches moved since search) before the
-                  // shared WorkspaceEdit path applies anything.
+                  if (!snapshot) {
+                    const message = "Replace refused: replace preview snapshot missing";
+                    setStatusMessage(message);
+                    return { ok: false, message };
+                  }
+                  if (snapshot.requestIdentity && snapshot.requestIdentity.workspaceInstanceId !== workspaceInstanceId) {
+                    const message = "Replace refused: workspace instance mismatch";
+                    setStatusMessage(message);
+                    return { ok: false, message };
+                  }
+                  // ED-FIND-004 A2/A3 / ED-REPAIR-002: pre-commit atomic whole-set preflight
+                  // before the shared WorkspaceEdit path applies anything.
                   const byFile = new Map<string, WorkspaceSearchMatch[]>();
                   for (const match of matches) {
                     const absolute = replaceMatchAbsolutePath(match);
@@ -19161,33 +19240,80 @@ export function CodeWorkspaceTab({
                   if (byFile.size === 0) {
                     return { ok: false, message: "Nothing to replace" };
                   }
-                  const guards: FileRevisionGuard[] = [];
+
+                  // ED-REPAIR-002: Validate selected matches and edits against the frozen snapshot
+                  const selectedMatchKeys = new Set(matches.map(workspaceSearchMatchKey));
+                  const expectedEdit = buildReplaceWorkspaceEdit(matches, snapshot.replacement);
+                  const selectionValidation = validateReplacePreviewSelection(
+                    snapshot,
+                    selectedMatchKeys,
+                    edit,
+                    expectedEdit,
+                  );
+                  if (!selectionValidation.ok) {
+                    const message = selectionValidation.reason ?? "Selection validation failed";
+                    setStatusMessage(message);
+                    return { ok: false, message };
+                  }
+
+                  // ED-REPAIR-002: Whole-set atomic preflight across ALL files before any mutation
+                  const preflightInputs: ReplacePreflightFileInput[] = [];
                   const diskTexts = new Map<string, string>();
                   for (const absolute of byFile.keys()) {
-                    const open = Object.values(openFilesRef.current).find((file) => {
-                      const currentPath = absolutePathForOpenFile(file);
-                      return currentPath !== null && fsPathEquals(currentPath, absolute);
-                    });
                     const containing = rootsRef.current.find(
                       (root) => relativePathWithinRoot(root.path, absolute) !== null,
                     );
                     if (!containing) {
-                      return { ok: false, message: `Replace refused: ${absolute} is outside the workspace` };
+                      const message = `Replace refused: ${absolute} is outside the workspace`;
+                      setStatusMessage(message);
+                      return { ok: false, message };
                     }
+                    const open = Object.values(openFilesRef.current).find((file) => {
+                      const currentPath = absolutePathForOpenFile(file);
+                      return currentPath !== null && fsPathEquals(currentPath, absolute);
+                    });
+                    let exists = false;
+                    let diskHash: string | null = null;
                     let diskText: string | null = null;
+                    let encoding: string | undefined;
+                    let bom: boolean | undefined;
+                    let eol: ("lf" | "crlf" | "cr") | undefined;
                     try {
                       const relative = relativePathWithinRoot(containing.path, absolute) ?? "";
                       const disk = await workspaceReadFile(containing.path, relative);
+                      exists = true;
+                      diskHash = disk.hash;
                       diskText = disk.text;
+                      encoding = disk.encoding;
+                      bom = disk.bom;
+                      eol = disk.text.includes("\r\n") ? "crlf" : disk.text.includes("\r") && !disk.text.includes("\n") ? "cr" : "lf";
                     } catch {
-                      diskText = null;
+                      exists = false;
                     }
-                    if (diskText === null) {
-                      return { ok: false, message: `Replace refused: cannot read ${absolute}` };
+                    if (diskText !== null) {
+                      diskTexts.set(absolute, diskText);
                     }
-                    diskTexts.set(absolute, diskText);
-                    guards.push({ path: absolute, isDirty: open?.dirty ?? false });
+                    preflightInputs.push({
+                      path: absolute,
+                      exists,
+                      diskHash,
+                      diskText,
+                      encoding,
+                      bom,
+                      eol,
+                      isOpen: Boolean(open),
+                      openBufferRevision: open?.documentRevision ?? null,
+                      openBufferDirty: open?.dirty ?? false,
+                      openBufferReadOnly: Boolean(open?.library) || workspaceResourceOperationLockedRef.current,
+                    });
                   }
+
+                  const preflight = validateReplacePreflight(
+                    snapshot,
+                    workspaceInstanceId,
+                    preflightInputs,
+                  );
+
                   let modelMatches: ReturnType<typeof searchMatchesToReplaceInputs>;
                   try {
                     modelMatches = searchMatchesToReplaceInputs(matches);
@@ -19197,9 +19323,8 @@ export function CodeWorkspaceTab({
                     return { ok: false, message };
                   }
                   const freshness = verifyReplaceMatchFreshness(diskTexts, modelMatches);
-                  const precondition = validateReplacePreconditions(guards);
                   const conflicts = [
-                    ...precondition.conflicts,
+                    ...preflight.conflicts,
                     ...freshness.map((conflict) => ({
                       path: conflict.path,
                       reason: conflict.reason,
@@ -19210,6 +19335,7 @@ export function CodeWorkspaceTab({
                     setStatusMessage(message);
                     return { ok: false, message };
                   }
+
                   // ED-AUDIT-003: the applier's per-operation ledger is the
                   // only truth for what actually changed. A failed or skipped
                   // document (readonly file, disk write failure, declined
@@ -19218,12 +19344,15 @@ export function CodeWorkspaceTab({
                   // ED-MAIN-005: hand the frozen preview hashes to the applier
                   // so the closed-file write precondition is the preview
                   // preimage, not the second read.
+                  // ED-REPAIR-002: pass expectedPreimages to enforce open buffer revision and dirty
+                  // integrity throughout mutation.
                   const expectedDiskHashes = replacePreimageExpectedHashes(snapshot);
                   const summaryHolder: { current: WorkspaceEditApplyTransactionSummary | null } = { current: null };
                   const outcomes = await applyLspWorkspaceEdit(edit, {
                     label: "Replace in files",
                     kind: "replace",
                     expectedDiskHashes: expectedDiskHashes.size > 0 ? expectedDiskHashes : null,
+                    expectedPreimages: snapshot.preimages ?? null,
                     onTransactionSummary: (summary) => {
                       summaryHolder.current = summary;
                     },
