@@ -1,12 +1,13 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
-import { EditorSelection } from "@codemirror/state";
+import { EditorSelection, Text } from "@codemirror/state";
 import { undoDepth } from "@codemirror/commands";
 import { startCompletion } from "@codemirror/autocomplete";
 import { EditorView } from "@codemirror/view";
 import { foldedRanges } from "@codemirror/language";
-import { CodeMirrorHost } from "./CodeMirrorHost";
+import { CodeMirrorHost, documentTextIdentity } from "./CodeMirrorHost";
+import { textIdentityFromString } from "./workspaceLayoutPersistence";
 import {
   setVirtualOverflow,
   virtualOverflowAt,
@@ -465,6 +466,41 @@ describe("CodeMirrorHost search", () => {
 
     const editor = container.querySelector<HTMLElement>(".cm-editor");
     expect(editor?.contains(document.activeElement)).toBe(true);
+  });
+
+  it("publishes the final typing viewport after idle without updating workspace UI for every key", async () => {
+    vi.useFakeTimers();
+    try {
+      const onViewportChange = vi.fn();
+      const rendered = renderEditor("class Example {}", vi.fn(), { onViewportChange });
+      const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+      await act(async () => { await vi.advanceTimersByTimeAsync(150); });
+      onViewportChange.mockClear();
+      for (const character of "abc") {
+        act(() => view.dispatch({
+          changes: { from: view.state.doc.length, insert: character },
+          userEvent: "input.type",
+        }));
+        await act(async () => { await vi.advanceTimersByTimeAsync(40); });
+      }
+      expect(rendered.onChange).toHaveBeenCalledTimes(3);
+      expect(view.state.doc.toString()).toBe("class Example {}abc");
+      expect(onViewportChange).not.toHaveBeenCalled();
+      await act(async () => { await vi.advanceTimersByTimeAsync(150); });
+      expect(onViewportChange).toHaveBeenCalledTimes(1);
+      expect(onViewportChange).toHaveBeenLastCalledWith({
+        start: { line: 0, character: 0 },
+        end: { line: 0, character: 19 },
+      });
+      act(() => view.dispatch({ changes: { from: 19, insert: "d" } }));
+      rendered.unmount();
+      onViewportChange.mockClear();
+      await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+      expect(onViewportChange).not.toHaveBeenCalled();
+    } finally {
+      cleanup();
+      vi.useRealTimers();
+    }
   });
 
   it("renders usage/inlay chrome, reports its viewport, and requests semantic selection", async () => {
@@ -1308,6 +1344,28 @@ describe("ED-SAVE-004 editor recovery decoration synchronization", () => {
 describe("ED-IMPROVE-007 leaf/file view snapshots", () => {
   afterEach(() => cleanup());
 
+  it.each([false, true])("restores deferred axes independently unless the user intervenes: %s", (intervene) => {
+    const rendered = renderEditor("hello world", vi.fn(), {
+      initialViewState: { mainSelection: { anchor: 4, head: 4 }, selections: [], scrollTop: 100, scrollLeft: 80, folds: [] },
+    });
+    const view = findView(rendered);
+    expect(view.state.selection.main.head).toBe(4);
+    if (intervene) fireEvent.wheel(view.scrollDOM);
+    Object.defineProperties(view.scrollDOM, {
+      clientHeight: { configurable: true, value: 100 },
+      scrollHeight: { configurable: true, value: 500 },
+    });
+    act(() => view.dispatch({}));
+    expect(view.scrollDOM.scrollTop).toBe(intervene ? 0 : 100);
+    Object.defineProperties(view.scrollDOM, {
+      clientWidth: { configurable: true, value: 100 },
+      scrollWidth: { configurable: true, value: 500 },
+    });
+    act(() => view.dispatch({}));
+    expect(view.scrollDOM.scrollLeft).toBe(intervene ? 0 : 80);
+    expect(view.state.selection.main.head).toBe(4);
+  });
+
   function findView(rendered: { container: HTMLElement }): EditorView {
     const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!);
     expect(view).not.toBeNull();
@@ -1420,6 +1478,108 @@ describe("ED-IMPROVE-007 leaf/file view snapshots", () => {
     const after = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!);
     expect(after!.state.selection.main.head).toBe(doc.indexOf("delta"));
   });
+
+  it("identifies different same-length documents with distinct identities (ED-MAIN-009)", () => {
+    const a = Text.of(["abc", "def"]);
+    const b = Text.of(["abc", "deg"]);
+    expect(a.length).toBe(b.length);
+    expect(documentTextIdentity(a)).not.toBe(documentTextIdentity(b));
+    expect(documentTextIdentity(a)).toBe(documentTextIdentity(Text.of(["abc", "def"])));
+    // The iterator hash must equal the persist-time string hash for the same
+    // content, including CRLF input.
+    expect(documentTextIdentity(a)).toBe(textIdentityFromString("abc\ndef"));
+    expect(documentTextIdentity(a)).toBe(textIdentityFromString("abc\r\ndef"));
+  });
+
+  it("restores a captured snapshot only while the text identity matches (ED-MAIN-009)", async () => {
+    const doc = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8";
+    const onViewStateChange = vi.fn();
+    const first = renderEditor(doc, vi.fn(), { onViewStateChange });
+    const firstView = findView(first);
+    act(() => {
+      firstView.dispatch({ selection: EditorSelection.cursor(12) });
+    });
+    await waitFor(() => expect(onViewStateChange).toHaveBeenCalled());
+    const captured = onViewStateChange.mock.calls.at(-1)![0];
+    expect(captured.textIdentity).toBe(documentTextIdentity(firstView.state.doc));
+    cleanup();
+
+    // Same text: the persisted caret is restored.
+    const restored = renderEditor(doc, vi.fn(), { initialViewState: captured });
+    expect(findView(restored).state.selection.main.head).toBe(12);
+    cleanup();
+
+    // Same length, changed content: the stale positioning is dropped, not
+    // re-anchored onto the new text.
+    const changed = `${doc.slice(0, 12)}X${doc.slice(13)}`;
+    expect(changed.length).toBe(doc.length);
+    const dropped = renderEditor(changed, vi.fn(), { initialViewState: captured });
+    expect(findView(dropped).state.selection.main.head).toBe(0);
+  });
+
+  it("captures a horizontal scroll offset with the view state (ED-MAIN-009)", async () => {
+    const doc = Array.from({ length: 20 }, (_, index) => `line ${index}`).join("\n");
+    const onViewStateChange = vi.fn();
+    const rendered = renderEditor(doc, vi.fn(), { onViewStateChange });
+    const view = findView(rendered);
+    if (view.scrollDOM) view.scrollDOM.scrollLeft = 42;
+    act(() => {
+      view.dispatch({ selection: EditorSelection.cursor(10) });
+    });
+    await waitFor(() => expect(onViewStateChange).toHaveBeenCalled());
+    const captured = onViewStateChange.mock.calls.at(-1)![0];
+    expect(captured.scrollLeft).toBe(view.scrollDOM?.scrollLeft ?? 0);
+  });
+
+  it("captures new text identity within 1s of typing without using stale wall-clock identity (ED-REPAIR-009-A1)", async () => {
+    const initialText = "hello world\nsecond line";
+    const onViewStateChange = vi.fn();
+    const rendered = renderEditor(initialText, vi.fn(), { onViewStateChange });
+    const view = findView(rendered);
+
+    // Edit the text within 1s of mounting
+    act(() => {
+      view.dispatch({
+        changes: { from: 6, to: 11, insert: "taomni" },
+        selection: EditorSelection.cursor(12),
+      });
+    });
+
+    await waitFor(() => expect(onViewStateChange).toHaveBeenCalled());
+    const captured = onViewStateChange.mock.calls.at(-1)![0];
+    // Captured identity must match the new doc, NOT the initial text
+    expect(captured.textIdentity).toBe(documentTextIdentity(view.state.doc));
+    expect(captured.textIdentity).not.toBe(textIdentityFromString(initialText));
+    expect(captured.mainSelection.head).toBe(12);
+    cleanup();
+
+    // Reopening with the new text must restore the caret at 12
+    const updatedText = "hello taomni\nsecond line";
+    const restored = renderEditor(updatedText, vi.fn(), { initialViewState: captured });
+    expect(findView(restored).state.selection.main.head).toBe(12);
+    cleanup();
+  });
+
+  it("performs tail capture on unmount when view state emit is pending (ED-REPAIR-009-A1, A2)", () => {
+    const doc = "alpha\nbeta\ngamma";
+    const onViewStateChange = vi.fn();
+    const rendered = renderEditor(doc, vi.fn(), { onViewStateChange });
+    const view = findView(rendered);
+
+    // Move selection but unmount immediately before the 150ms debounce fires
+    act(() => {
+      view.dispatch({ selection: EditorSelection.cursor(7) });
+    });
+    expect(onViewStateChange).not.toHaveBeenCalled();
+
+    // Cleanup triggers synchronous unmount tail capture
+    cleanup();
+
+    expect(onViewStateChange).toHaveBeenCalledTimes(1);
+    const captured = onViewStateChange.mock.calls[0]![0];
+    expect(captured.mainSelection.head).toBe(7);
+    expect(captured.textIdentity).toBe(textIdentityFromString(doc));
+  });
 });
 
 describe("ED-IMPROVE-008 IME composition lifecycle wiring", () => {
@@ -1451,6 +1611,293 @@ describe("ED-IMPROVE-008 IME composition lifecycle wiring", () => {
       view.dispatch({ changes: { from: 7, insert: "y" } });
     });
     await waitFor(() => expect(owner.getDocument("ime.ts")).toBe("hello xy"));
+  });
+
+  // ED-MAIN-006: CodeMirror schedules its final composition flush in a
+  // microtask (`Promise.resolve().then(flush)`) after compositionend. A
+  // capture-phase finalize would split that final update into a second undo
+  // entry, so one undo must still return to the pre-composition text.
+  it("keeps one undo when CodeMirror flushes the final composition change after compositionend", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const rendered = renderEditor("hello ", vi.fn(), {
+      transactionOwner: owner,
+      viewId: "primary",
+      fileKey: "ime.ts",
+    });
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+    const appendCompose = (text: string) => {
+      view.dispatch({
+        changes: { from: view.state.doc.length, insert: text },
+        userEvent: "input.type.compose",
+      });
+    };
+
+    act(() => {
+      content.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    });
+    act(() => appendCompose("n"));
+    act(() => appendCompose("i"));
+    // compositionend fires before CodeMirror's deferred final flush.
+    act(() => {
+      content.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "你" }));
+    });
+    await act(async () => {
+      await Promise.resolve();
+      appendCompose("你");
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+
+    expect(owner.getDocument("ime.ts")).toBe("hello ni你");
+    expect(owner.getHistoryState("ime.ts").undoDepth).toBe(1);
+    owner.undo("ime.ts", "primary");
+    expect(owner.getDocument("ime.ts")).toBe("hello ");
+  });
+});
+
+describe("ED-REPAIR-007 IME end/blur/reentry session lifecycle", () => {
+  afterEach(() => cleanup());
+
+  it("keeps the final microtask flush after end and blur in the same undo entry", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const rendered = renderEditor("", vi.fn(), { transactionOwner: owner, viewId: "primary", fileKey: "ime-late.ts" });
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+    await act(async () => {
+      view.contentDOM.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+      view.dispatch({ changes: { from: 0, insert: "ni" }, userEvent: "input.type.compose" });
+      view.contentDOM.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "你" }));
+      view.contentDOM.dispatchEvent(new FocusEvent("blur"));
+      await Promise.resolve();
+      view.dispatch({ changes: { from: 0, to: 2, insert: "你" }, userEvent: "input.type.compose" });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+    expect(owner.getDocument("ime-late.ts")).toBe("你");
+    expect(owner.getHistoryState("ime-late.ts").undoDepth).toBe(1);
+    owner.undo("ime-late.ts", "primary");
+    expect(owner.getDocument("ime-late.ts")).toBe("");
+  });
+
+  it("produces two distinct undo entries across two composition sessions separated by blur (ED-REPAIR-007-A1)", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const rendered = renderEditor("", vi.fn(), {
+      transactionOwner: owner,
+      viewId: "primary",
+      fileKey: "ime-blur.ts",
+    });
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+
+    // Session 1: compose "你"
+    act(() => {
+      content.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    });
+    act(() => {
+      view.dispatch({
+        changes: { from: 0, insert: "你" },
+        userEvent: "input.type.compose",
+      });
+    });
+    act(() => {
+      content.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "你" }));
+      // Blur arrives immediately before timer fires
+      content.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
+    });
+
+    expect(owner.getDocument("ime-blur.ts")).toBe("你");
+    expect(owner.getHistoryState("ime-blur.ts").undoDepth).toBe(1);
+
+    // Session 2: compose "好"
+    act(() => {
+      content.dispatchEvent(new FocusEvent("focus", { bubbles: true }));
+      content.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    });
+    act(() => {
+      view.dispatch({
+        changes: { from: 1, insert: "好" },
+        userEvent: "input.type.compose",
+      });
+    });
+    act(() => {
+      content.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "好" }));
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+
+    expect(owner.getDocument("ime-blur.ts")).toBe("你好");
+    expect(owner.getHistoryState("ime-blur.ts").undoDepth).toBe(2);
+
+    // Undo 1: reverts "好", leaving "你"
+    act(() => {
+      owner.undo("ime-blur.ts", "primary");
+    });
+    expect(owner.getDocument("ime-blur.ts")).toBe("你");
+    expect(owner.getHistoryState("ime-blur.ts").undoDepth).toBe(1);
+
+    // Undo 2: reverts "你", leaving ""
+    act(() => {
+      owner.undo("ime-blur.ts", "primary");
+    });
+    expect(owner.getDocument("ime-blur.ts")).toBe("");
+    expect(owner.getHistoryState("ime-blur.ts").undoDepth).toBe(0);
+  });
+
+  it("produces two distinct undo entries when next composition starts before end timer (ED-REPAIR-007-A1)", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const rendered = renderEditor("", vi.fn(), {
+      transactionOwner: owner,
+      viewId: "primary",
+      fileKey: "ime-fast.ts",
+    });
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+
+    // Session 1: "你"
+    act(() => {
+      content.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    });
+    act(() => {
+      view.dispatch({
+        changes: { from: 0, insert: "你" },
+        userEvent: "input.type.compose",
+      });
+    });
+    act(() => {
+      content.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "你" }));
+      // Immediately start session 2 before macrotask timer
+      content.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    });
+    act(() => {
+      view.dispatch({
+        changes: { from: 1, insert: "好" },
+        userEvent: "input.type.compose",
+      });
+    });
+    act(() => {
+      content.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "好" }));
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+
+    expect(owner.getDocument("ime-fast.ts")).toBe("你好");
+    expect(owner.getHistoryState("ime-fast.ts").undoDepth).toBe(2);
+
+    // Undo step 1 reverts "好"
+    owner.undo("ime-fast.ts", "primary");
+    expect(owner.getDocument("ime-fast.ts")).toBe("你");
+
+    // Undo step 2 reverts "你"
+    owner.undo("ime-fast.ts", "primary");
+    expect(owner.getDocument("ime-fast.ts")).toBe("");
+  });
+
+  it("finalizes active preedit on blur before compositionend without error (ED-REPAIR-007-A1)", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const rendered = renderEditor("", vi.fn(), {
+      transactionOwner: owner,
+      viewId: "primary",
+      fileKey: "ime-blur-mid.ts",
+    });
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+
+    act(() => {
+      content.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    });
+    act(() => {
+      view.dispatch({
+        changes: { from: 0, insert: "pre" },
+        userEvent: "input.type.compose",
+      });
+    });
+    // Blur during preedit before compositionend
+    act(() => {
+      content.dispatchEvent(new FocusEvent("blur", { bubbles: true }));
+    });
+
+    // Subsequent compositionend does not corrupt state
+    act(() => {
+      content.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "pre" }));
+    });
+
+    // Normal typing follows
+    act(() => {
+      view.dispatch({
+        changes: { from: 3, insert: "!" },
+      });
+    });
+    expect(owner.getDocument("ime-blur-mid.ts")).toBe("pre!");
+    expect(owner.getHistoryState("ime-blur-mid.ts").undoDepth).toBe(2);
+  });
+
+  it("safely finalizes composition on unmount and ignores late timer (ED-REPAIR-007-A2)", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    owner.acquireView("ime-unmount.ts", "secondary", "");
+    const rendered = renderEditor("", vi.fn(), {
+      transactionOwner: owner,
+      viewId: "primary",
+      fileKey: "ime-unmount.ts",
+    });
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+
+    act(() => {
+      content.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    });
+    act(() => {
+      view.dispatch({
+        changes: { from: 0, insert: "unmount-test" },
+        userEvent: "input.type.compose",
+      });
+      content.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "unmount-test" }));
+    });
+
+    // Unmount before timer fires
+    rendered.unmount();
+
+    // Fast-forward any timers
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+
+    // Owner should retain text and have finalized composition session
+    expect(owner.getDocument("ime-unmount.ts")).toBe("unmount-test");
+    expect(owner.getHistoryState("ime-unmount.ts").undoDepth).toBe(1);
+    owner.undo("ime-unmount.ts", "secondary");
+    expect(owner.getDocument("ime-unmount.ts")).toBe("");
+  });
+
+  it("finalizes session on fileKey switch and does not pollute new file (ED-REPAIR-007-A2)", async () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    const rendered = renderEditor("", vi.fn(), {
+      transactionOwner: owner,
+      viewId: "primary",
+      fileKey: "fileA.ts",
+    });
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+
+    act(() => {
+      content.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    });
+    act(() => {
+      view.dispatch({
+        changes: { from: 0, insert: "typedA" },
+        userEvent: "input.type.compose",
+      });
+      content.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "typedA" }));
+    });
+
+    // Switch fileKey prop to fileB.ts
+    rendered.rerender(<CodeMirrorHost {...rendered.props} fileKey="fileB.ts" doc="" />);
+
+    // Now fileA composition should be finalized
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+
+    expect(owner.getDocument("fileA.ts")).toBe("typedA");
   });
 });
 
@@ -1562,5 +2009,411 @@ describe("ED-IMPROVE-009 late clipboard results report a cancelled observation",
     });
     // No cut happened: the document keeps its text.
     expect(view.state.doc.toString()).toBe("hello world");
+  });
+
+  // ED-MAIN-007: an async paste whose owner moved must not edit the background
+  // buffer, steal focus back, or add history, but its OS effect is still
+  // observed through the frozen endpoint.
+  it("keeps a paste out of a background buffer and does not steal focus when the owner moved (ED-MAIN-007)", async () => {
+    const pending = deferred<unknown>();
+    const observations: unknown[] = [];
+    const owner = new WorkspaceDocumentTransactionOwner();
+    let port: { execute: (id: string, options?: unknown) => boolean } | null = null;
+    const handle = stubHandle(() => pending.promise, async () => ({ outcome: "success", systemEffect: "performed" }));
+    const rendered = renderEditor("hello world", vi.fn(), {
+      clipboardHandle: handle as never,
+      transactionOwner: owner,
+      viewId: "primary",
+      fileKey: "owner.ts",
+      onClipboardObservation: (record) => { observations.push(record); },
+      onCommandPortChange: (registration) => { port = registration.port as never; },
+    });
+    await waitFor(() => expect(port).not.toBeNull());
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    act(() => { content.focus(); });
+    expect(view.hasFocus).toBe(true);
+
+    act(() => { port!.execute("paste"); });
+    const search = document.createElement("input");
+    document.body.appendChild(search);
+    act(() => { search.focus(); });
+    act(() => { pending.resolve({ outcome: "success", text: "payload", systemEffect: "performed" }); });
+
+    await waitFor(() => expect(observations).toHaveLength(1));
+    expect(observations[0]).toMatchObject({
+      operation: "paste",
+      outcome: "cancelled",
+      systemEffect: "performed",
+    });
+    expect(view.state.doc.toString()).toBe("hello world");
+    expect(document.activeElement).toBe(search);
+    expect(owner.getHistoryState("owner.ts").undoDepth).toBe(0);
+    search.remove();
+  });
+
+  // A legitimate menu/context-menu paste runs while the editor does not hold
+  // DOM focus but no newer surface claimed it; it must still apply.
+  it("still pastes for an authorized menu owner that is not focused at request (ED-MAIN-007)", async () => {
+    const pending = deferred<unknown>();
+    let port: { execute: (id: string, options?: unknown) => boolean } | null = null;
+    const handle = stubHandle(() => pending.promise, async () => ({ outcome: "success", systemEffect: "performed" }));
+    const rendered = renderEditor("hello world", vi.fn(), {
+      clipboardHandle: handle as never,
+      onCommandPortChange: (registration) => { port = registration.port as never; },
+    });
+    await waitFor(() => expect(port).not.toBeNull());
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    const menu = document.createElement("button");
+    document.body.appendChild(menu);
+
+    act(() => { content.focus(); });
+    // The menu takes focus before the command executes (owner generation moves
+    // before the request, so no change is observed while it is pending).
+    act(() => { menu.focus(); });
+    act(() => { port!.execute("paste"); });
+    act(() => { pending.resolve({ outcome: "success", text: "payload", systemEffect: "performed" }); });
+
+    await waitFor(() => expect(view.state.doc.toString()).toContain("payload"));
+    menu.remove();
+  });
+
+  it("observes an OS effect that returns after the view was destroyed (ED-MAIN-007)", async () => {
+    const pending = deferred<unknown>();
+    const observations: unknown[] = [];
+    let port: { execute: (id: string, options?: unknown) => boolean } | null = null;
+    const handle = stubHandle(() => pending.promise, async () => ({ outcome: "success", systemEffect: "performed" }));
+    const rendered = renderEditor("hello world", vi.fn(), {
+      clipboardHandle: handle as never,
+      onClipboardObservation: (record) => { observations.push(record); },
+      onCommandPortChange: (registration) => { port = registration.port as never; },
+    });
+    await waitFor(() => expect(port).not.toBeNull());
+    act(() => { port!.execute("paste"); });
+    // The whole host unmounts (its clipboard WeakMap entry is released) while
+    // the OS read is still in flight.
+    rendered.unmount();
+    act(() => { pending.resolve({ outcome: "denied", systemEffect: "performed" }); });
+
+    await waitFor(() => expect(observations).toHaveLength(1));
+    expect(observations[0]).toMatchObject({
+      operation: "paste",
+      outcome: "cancelled",
+      systemEffect: "performed",
+    });
+  });
+});
+
+describe("ED-REPAIR-008 irreversible clipboard owner loss and multi-split isolation", () => {
+  afterEach(() => cleanup());
+
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((res) => { resolve = res; });
+    return { promise, resolve };
+  }
+
+  function stubHandle(
+    read: () => Promise<unknown>,
+    write: () => Promise<unknown>,
+  ) {
+    return {
+      workspaceId: "ws-008",
+      attachConsumer: () => ({ detach: () => {} }),
+      getSnapshot: () => ({
+        permission: "granted",
+        permissionGeneration: 3,
+        exclusion: "recorded",
+        payloadRevision: 1,
+      }),
+      readSystemClipboard: read,
+      writeSystemClipboard: write,
+      write: () => { throw new Error("unused"); },
+      read: () => null,
+      clear: () => {},
+      release: () => {},
+      historyEntries: () => [],
+      pasteFromHistory: () => null,
+      removeHistoryEntry: () => false,
+      clearHistory: () => {},
+      setHistoryEnabled: () => {},
+      isHistoryEnabled: () => true,
+      setHistoryLimits: () => {},
+      historyLimits: () => ({ maxItems: 0, maxTotalBytes: 0 }),
+      historyExclusion: () => "recorded",
+      setPermission: () => {},
+      permission: () => "granted",
+      attachPermissionAdapter: () => () => {},
+      syncPermission: async () => "granted",
+      subscribe: () => () => {},
+    };
+  }
+
+  it("rejects pending paste when focus moves from editor to search box and back to editor (editor -> search -> editor) (ED-REPAIR-008-A1)", async () => {
+    const pending = deferred<unknown>();
+    const observations: unknown[] = [];
+    const owner = new WorkspaceDocumentTransactionOwner();
+    let port: { execute: (id: string, options?: unknown) => boolean } | null = null;
+    const handle = stubHandle(() => pending.promise, async () => ({ outcome: "success", systemEffect: "performed" }));
+    const rendered = renderEditor("hello world", vi.fn(), {
+      clipboardHandle: handle as never,
+      transactionOwner: owner,
+      viewId: "primary",
+      fileKey: "search-focus.ts",
+      onClipboardObservation: (record) => { observations.push(record); },
+      onCommandPortChange: (registration) => { port = registration.port as never; },
+    });
+    await waitFor(() => expect(port).not.toBeNull());
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    act(() => { content.focus(); });
+    expect(view.hasFocus).toBe(true);
+
+    act(() => { port!.execute("paste"); });
+
+    // Focus moves to search input
+    const search = document.createElement("input");
+    document.body.appendChild(search);
+    act(() => { search.focus(); });
+
+    // Focus returns back to the editor before the promise settles
+    act(() => { content.focus(); });
+    expect(view.hasFocus).toBe(true);
+
+    // Pending read settles
+    act(() => { pending.resolve({ outcome: "success", text: "injected-payload", systemEffect: "performed" }); });
+
+    await waitFor(() => expect(observations).toHaveLength(1));
+    expect(observations[0]).toMatchObject({
+      operation: "paste",
+      outcome: "cancelled",
+      systemEffect: "performed",
+    });
+    // Document must be unchanged, undo depth must be 0
+    expect(view.state.doc.toString()).toBe("hello world");
+    expect(owner.getHistoryState("search-focus.ts").undoDepth).toBe(0);
+    search.remove();
+  });
+
+  it("rejects pending paste when active leaf moves to another group and returns (leaf A -> B -> A) (ED-REPAIR-008-A1)", async () => {
+    const pending = deferred<unknown>();
+    const observations: unknown[] = [];
+    let port: { execute: (id: string, options?: unknown) => boolean } | null = null;
+    const handle = stubHandle(() => pending.promise, async () => ({ outcome: "success", systemEffect: "performed" }));
+    const rendered = renderEditor("hello world", vi.fn(), {
+      clipboardHandle: handle as never,
+      active: true,
+      visible: true,
+      onClipboardObservation: (record) => { observations.push(record); },
+      onCommandPortChange: (registration) => { port = registration.port as never; },
+    });
+    await waitFor(() => expect(port).not.toBeNull());
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+
+    act(() => { port!.execute("paste"); });
+
+    // Group switches away from leaf A (active -> false)
+    rendered.rerender(<CodeMirrorHost {...rendered.props} active={false} visible={true} />);
+
+    // Group switches back to leaf A (active -> true)
+    rendered.rerender(<CodeMirrorHost {...rendered.props} active={true} visible={true} />);
+
+    // Pending read settles
+    act(() => { pending.resolve({ outcome: "success", text: "injected-payload", systemEffect: "performed" }); });
+
+    await waitFor(() => expect(observations).toHaveLength(1));
+    expect(observations[0]).toMatchObject({
+      operation: "paste",
+      outcome: "cancelled",
+      systemEffect: "performed",
+    });
+    expect(view.state.doc.toString()).toBe("hello world");
+  });
+
+  it("rejects pending paste when workspace visibility toggles off and on (workspace A -> B -> A) (ED-REPAIR-008-A1)", async () => {
+    const pending = deferred<unknown>();
+    const observations: unknown[] = [];
+    let port: { execute: (id: string, options?: unknown) => boolean } | null = null;
+    const handle = stubHandle(() => pending.promise, async () => ({ outcome: "success", systemEffect: "performed" }));
+    const rendered = renderEditor("hello world", vi.fn(), {
+      clipboardHandle: handle as never,
+      visible: true,
+      onClipboardObservation: (record) => { observations.push(record); },
+      onCommandPortChange: (registration) => { port = registration.port as never; },
+    });
+    await waitFor(() => expect(port).not.toBeNull());
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+
+    act(() => { port!.execute("paste"); });
+
+    // Workspace hidden
+    rendered.rerender(<CodeMirrorHost {...rendered.props} visible={false} />);
+
+    // Workspace shown again
+    rendered.rerender(<CodeMirrorHost {...rendered.props} visible={true} />);
+
+    // Pending read settles
+    act(() => { pending.resolve({ outcome: "success", text: "injected-payload", systemEffect: "performed" }); });
+
+    await waitFor(() => expect(observations).toHaveLength(1));
+    expect(observations[0]).toMatchObject({
+      operation: "paste",
+      outcome: "cancelled",
+      systemEffect: "performed",
+    });
+    expect(view.state.doc.toString()).toBe("hello world");
+  });
+
+  it("rejects older paste when a newer paste request was initiated (ED-REPAIR-008-A1)", async () => {
+    const pending1 = deferred<unknown>();
+    const pending2 = deferred<unknown>();
+    let readCallCount = 0;
+    const observations: unknown[] = [];
+    let port: { execute: (id: string, options?: unknown) => boolean } | null = null;
+    const handle = stubHandle(
+      () => {
+        readCallCount++;
+        return readCallCount === 1 ? pending1.promise : pending2.promise;
+      },
+      async () => ({ outcome: "success", systemEffect: "performed" }),
+    );
+    const rendered = renderEditor("hello world", vi.fn(), {
+      clipboardHandle: handle as never,
+      onClipboardObservation: (record) => { observations.push(record); },
+      onCommandPortChange: (registration) => { port = registration.port as never; },
+    });
+    await waitFor(() => expect(port).not.toBeNull());
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+    act(() => {
+      view.dispatch({ selection: EditorSelection.range(0, 11) });
+    });
+
+    // Trigger first paste
+    act(() => { port!.execute("paste"); });
+
+    // Trigger second paste
+    act(() => { port!.execute("paste"); });
+
+    // Second paste settles first and applies
+    act(() => { pending2.resolve({ outcome: "success", text: "new-text", systemEffect: "performed" }); });
+    await waitFor(() => expect(view.state.doc.toString()).toBe("new-text"));
+
+    // First paste settles later and must be cancelled
+    act(() => { pending1.resolve({ outcome: "success", text: "old-text", systemEffect: "performed" }); });
+
+    await waitFor(() => expect(observations).toHaveLength(2));
+    const cancelled = observations.find((o) => (o as { outcome: string }).outcome === "cancelled");
+    expect(cancelled).toBeDefined();
+    // Document must keep new-text, not old-text
+    expect(view.state.doc.toString()).toBe("new-text");
+  });
+
+  it("cancels pending menu paste when focus moves to search box before settle (menu -> search) (ED-REPAIR-008-A2)", async () => {
+    const pending = deferred<unknown>();
+    const observations: unknown[] = [];
+    let port: { execute: (id: string, options?: unknown) => boolean } | null = null;
+    const handle = stubHandle(() => pending.promise, async () => ({ outcome: "success", systemEffect: "performed" }));
+    const rendered = renderEditor("hello world", vi.fn(), {
+      clipboardHandle: handle as never,
+      onClipboardObservation: (record) => { observations.push(record); },
+      onCommandPortChange: (registration) => { port = registration.port as never; },
+    });
+    await waitFor(() => expect(port).not.toBeNull());
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+
+    // Menu button has focus at request
+    const menu = document.createElement("button");
+    menu.setAttribute("role", "menuitem");
+    document.body.appendChild(menu);
+    act(() => { menu.focus(); });
+
+    act(() => { port!.execute("paste"); });
+
+    // Focus moves to search input instead of editor
+    const search = document.createElement("input");
+    document.body.appendChild(search);
+    act(() => { search.focus(); });
+
+    act(() => { pending.resolve({ outcome: "success", text: "menu-payload", systemEffect: "performed" }); });
+
+    await waitFor(() => expect(observations).toHaveLength(1));
+    expect(observations[0]).toMatchObject({
+      operation: "paste",
+      outcome: "cancelled",
+      systemEffect: "performed",
+    });
+    expect(view.state.doc.toString()).toBe("hello world");
+    menu.remove();
+    search.remove();
+  });
+
+  it("cancels in-flight copy when owner is lost and reports cancelled observation with systemEffect (ED-REPAIR-008-A2)", async () => {
+    const pending = deferred<unknown>();
+    const observations: unknown[] = [];
+    let port: { execute: (id: string, options?: unknown) => boolean } | null = null;
+    const handle = stubHandle(async () => ({ outcome: "success" }), () => pending.promise);
+    const rendered = renderEditor("hello world", vi.fn(), {
+      clipboardHandle: handle as never,
+      onClipboardObservation: (record) => { observations.push(record); },
+      onCommandPortChange: (registration) => { port = registration.port as never; },
+    });
+    await waitFor(() => expect(port).not.toBeNull());
+    const view = EditorView.findFromDOM(rendered.container.querySelector(".cm-editor")!)!;
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    act(() => { content.focus(); });
+
+    act(() => {
+      view.dispatch({ selection: EditorSelection.range(0, 5) });
+    });
+
+    act(() => { port!.execute("copy"); });
+
+    // Focus leaves editor
+    const search = document.createElement("input");
+    document.body.appendChild(search);
+    act(() => { search.focus(); });
+
+    // Write finishes with performed
+    act(() => { pending.resolve({ outcome: "success", systemEffect: "performed" }); });
+
+    await waitFor(() => expect(observations).toHaveLength(1));
+    expect(observations[0]).toMatchObject({
+      operation: "copy",
+      outcome: "cancelled",
+      systemEffect: "performed",
+    });
+    search.remove();
+  });
+
+  it("does not invoke onUnavailable on unmounted or inactive host when late denied result arrives (ED-REPAIR-008-A2)", async () => {
+    const pending = deferred<unknown>();
+    const observations: unknown[] = [];
+    const unavailableMessages: string[] = [];
+    let port: { execute: (id: string, options?: unknown) => boolean } | null = null;
+    const handle = stubHandle(() => pending.promise, async () => ({ outcome: "success", systemEffect: "performed" }));
+    const rendered = renderEditor("hello world", vi.fn(), {
+      clipboardHandle: handle as never,
+      onClipboardUnavailable: (msg) => { unavailableMessages.push(msg); },
+      onClipboardObservation: (record) => { observations.push(record); },
+      onCommandPortChange: (registration) => { port = registration.port as never; },
+    });
+    await waitFor(() => expect(port).not.toBeNull());
+    act(() => { port!.execute("paste"); });
+
+    // Host is unmounted
+    rendered.unmount();
+
+    // Late denial arrives
+    act(() => { pending.resolve({ outcome: "denied", systemEffect: "not-performed", fallbackSession: null }); });
+
+    await waitFor(() => expect(observations).toHaveLength(1));
+    expect(observations[0]).toMatchObject({
+      operation: "paste",
+      outcome: "cancelled",
+      systemEffect: "not-performed",
+    });
+    // onUnavailable should NOT have been called on unmounted host
+    expect(unavailableMessages).toHaveLength(0);
   });
 });

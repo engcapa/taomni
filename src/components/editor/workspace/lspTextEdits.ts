@@ -32,6 +32,55 @@ export function offsetFromLspPositionInString(text: string, position: LspPositio
 }
 
 /**
+ * ED-REPAIR-003: strict LSP position to string offset conversion for any line
+ * ending (LF, CRLF, isolated CR). Unlike offsetFromLspPositionInString, this
+ * never clamps out-of-range lines or characters; it returns null if the line
+ * does not exist, if the character is past the line length, if coordinates
+ * are negative or non-integer, or if NaN is supplied.
+ */
+export function offsetFromLspPositionInStringStrict(
+  text: string,
+  position: LspPosition,
+): number | null {
+  if (
+    !Number.isInteger(position.line)
+    || position.line < 0
+    || !Number.isInteger(position.character)
+    || position.character < 0
+  ) {
+    return null;
+  }
+  const lines = text.split(/\r\n|\r|\n/);
+  if (position.line >= lines.length) {
+    return null;
+  }
+  const targetLine = lines[position.line]!;
+  if (position.character > targetLine.length) {
+    return null;
+  }
+
+  let currentOffset = 0;
+  let currentLine = 0;
+  while (currentOffset < text.length && currentLine < position.line) {
+    if (text.charCodeAt(currentOffset) === 13) {
+      if (currentOffset + 1 < text.length && text.charCodeAt(currentOffset + 1) === 10) {
+        currentOffset += 2;
+      } else {
+        currentOffset += 1;
+      }
+      currentLine += 1;
+    } else if (text.charCodeAt(currentOffset) === 10) {
+      currentOffset += 1;
+      currentLine += 1;
+    } else {
+      currentOffset += 1;
+    }
+  }
+
+  return currentOffset + position.character;
+}
+
+/**
  * Apply LSP TextEdits to a document string.
  * Edits are applied from the end of the document to the start so earlier
  * offsets stay valid (standard client strategy for non-overlapping edits).

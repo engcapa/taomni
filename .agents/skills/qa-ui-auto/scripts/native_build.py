@@ -57,7 +57,8 @@ def build_inputs(*, release: bool = False) -> dict:
         "node": subprocess.check_output(["node", "--version"], text=True).strip(),
         "environment": {key: os.environ.get(key) for key in (
             "RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET", "RUSTUP_TOOLCHAIN",
-            "CC", "CXX", "CFLAGS", "CXXFLAGS", "VITE_DEV_PROXY", "TAURI_ENV_PLATFORM")},
+            "CC", "CXX", "CFLAGS", "CXXFLAGS", "VITE_DEV_PROXY", "TAURI_ENV_PLATFORM",
+            "NODE_ENV")},
     }
 
 

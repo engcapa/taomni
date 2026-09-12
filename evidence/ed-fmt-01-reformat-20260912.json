@@ -1,0 +1,27 @@
+{
+  "recordedAt": "2026-09-12T18:42:00+08:00",
+  "case": "TC-IDE-FMT-01-reformat-java-native",
+  "acceptance": [
+    "AC-FMT-01",
+    "AC-FMT-03",
+    "AC-FMT-04"
+  ],
+  "nativeRun": "qa-ui-auto-report/run-20260912-184122-076061561",
+  "nativeResult": "passed",
+  "browserRun": "qa-ui-auto-report/run-20260912-183657-089170368",
+  "browserCase": "TC-IDE-C8-03-reformat-unavailable-zero-commit-browser",
+  "browserResult": "passed",
+  "regressionNativeRun": "qa-ui-auto-report/run-20260912-184209-139310288",
+  "regressionNativeCase": "TC-IDE-AUDIT-008-intention-quickfix-apply-undo-native",
+  "regressionNativeResult": "passed",
+  "evidence": {
+    "shortcutProviderPath": "in-repo maven-single App.java, real jdtls: 4 extra leading spaces inserted on line 10; Ctrl+Alt+L reports 'Formatted App.java' and the provider edits restore the exact 8-space fixture indentation",
+    "unavailablePath": "pom.xml has no language-server preset: Ctrl+Alt+L reports a typed 'No formatter provider for pom.xml is available' and the buffer stays untouched",
+    "browserUnavailable": "README.txt with formatter markers: typed unavailable reason, marker text and unindented snippet untouched (zero commit)",
+    "mountedLayer": "CodeWorkspaceTab.test.tsx 177/177 including context-menu parity, capability-unknown execution, capability-false reason, provider failure, selection without range support, format-on-save"
+  },
+  "unrun": [
+    "readonly library-buffer native provider path",
+    "Windows/WebView2 and macOS/WKWebView formatter paths"
+  ]
+}

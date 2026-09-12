@@ -30,6 +30,7 @@ import {
   recordRefactorRecoveryJournalV2,
 } from "./workspace/refactorPlan";
 import { sha256Hex } from "./workspace/projectAnalysisModel";
+import { textIdentityFromString } from "./workspace/workspaceLayoutPersistence";
 import { workspaceActionRegistry } from "./workspace/workspaceActionRegistry";
 import {
   WorkspaceLocationController,
@@ -42,6 +43,7 @@ import { EditorSelection } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { globalEditorConfigResolver } from "./workspace/editorConfigResolver";
 import { acquireClipboardStore, resetWorkspaceClipboardStores } from "./workspace/workspaceClipboardSession";
+import * as workspaceSearchModule from "../../lib/editor/workspaceSearch";
 
 const workspaceMocks = vi.hoisted(() => ({
   workspaceListDir: vi.fn(),
@@ -2406,6 +2408,60 @@ describe("CodeWorkspaceTab", () => {
     ).openFiles["root:app:src/main.ts"]?.text).toBe("x =1"));
   });
 
+  // V-ALT-01: Linux WebKitGTK reports real chords such as Alt+Enter as
+  // key="Unidentified" with a physical code. The unified dispatcher must still
+  // open the Code Actions menu and leave the buffer untouched.
+  it.each(["Enter", "Unidentified"])("opens code actions under StrictMode for Alt+Enter key=%s", async (key) => {
+    const instanceId = `instance-actions-alt-enter-${key}`;
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: `ws-actions-alt-enter-${key}`,
+      workspaceInstanceId: instanceId,
+      name: "Actions Linux",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "x=1"));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({ codeAction: true }),
+    }));
+    lspMocks.lspCodeActions.mockResolvedValue({
+      status: documentStatus({ available: true, active: true }),
+      actions: [{
+        title: "Insert space",
+        kind: "quickfix",
+        isPreferred: true,
+        edit: null,
+        command: null,
+        commandArguments: null,
+        raw: { title: "Insert space", data: { fixId: "space" } },
+      }],
+    });
+
+    const rendered = renderWorkspace(workspace, {}, { strict: true });
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+    await waitFor(() => expect(rendered.container.querySelector(".cm-content")).not.toBeNull());
+
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    content.focus();
+    fireEvent.keyDown(content, { key, code: "Enter", altKey: true });
+
+    expect(await screen.findByRole("button", { name: "Insert space" })).toBeInTheDocument();
+    expect(lspMocks.lspCodeActions).toHaveBeenCalled();
+    // Focus and buffer stay untouched: no newline was inserted.
+    expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      instanceId,
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("x=1");
+  });
+
   // ED-AUDIT-008 A1/A3: after an intention apply, Ctrl+Z on the editor
   // surface must run the journal undo — one history unit with its verified
   // restore — instead of colliding with the document ledger, and a follow-up
@@ -3639,7 +3695,12 @@ describe("CodeWorkspaceTab", () => {
 
     // Trigger Alt+Enter on TypeScript file where LSP has no actions
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
-    
+
+    // AC-ALT-02: no provider action stays visible instead of silently no-op.
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
+      "No code actions provided by the language server",
+    ));
+
     // Assert no Java import quick fix is suggested
     expect(screen.queryByRole("button", { name: /import 'List' \(java\.util\.List\)/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /java\.util/i })).not.toBeInTheDocument();
@@ -3985,6 +4046,224 @@ describe("CodeWorkspaceTab", () => {
         insertSpaces: true,
       }),
     );
+  });
+
+  it("runs the same format action from the editor context menu", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-format-context-menu",
+      workspaceInstanceId: "instance-format-context-menu",
+      name: "Format context menu",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "const x=1"));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      presetId: "typescript-javascript",
+      languageId: "typescript",
+      displayName: "TypeScript / JavaScript",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({ formatting: true, rangeFormatting: true }),
+    }));
+    lspMocks.lspFormatting.mockResolvedValue({
+      status: documentStatus({ active: true, available: true }),
+      edits: [{
+        range: { start: { line: 0, character: 7 }, end: { line: 0, character: 7 } },
+        newText: " ",
+      }],
+    });
+
+    const rendered = renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+    expect(content).not.toBeNull();
+    const view = EditorView.findFromDOM(content!);
+    expect(view).not.toBeNull();
+    vi.spyOn(view!, "posAtCoords").mockReturnValue(null);
+
+    fireEvent.contextMenu(content!, { clientX: 20, clientY: 30, button: 2 });
+    fireEvent.click(await screen.findByTestId("editor-context-format"));
+
+    await waitFor(() => expect(lspMocks.lspFormatting).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-format-context-menu",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("const x =1"));
+  });
+
+  it("keeps format executable before the provider reports capabilities", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-format-unknown-capabilities",
+      workspaceInstanceId: "instance-format-unknown-capabilities",
+      name: "Format unknown capabilities",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "const x=1"));
+    // The open request stays pending: capability state is genuinely unknown.
+    lspMocks.lspOpenDocument.mockReturnValue(new Promise(() => {}));
+    lspMocks.lspFormatting.mockResolvedValue({
+      status: documentStatus({ active: true, available: true }),
+      edits: [{
+        range: { start: { line: 0, character: 7 }, end: { line: 0, character: 7 } },
+        newText: " ",
+      }],
+    });
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(lspMocks.lspOpenDocument).toHaveBeenCalled());
+
+    fireEvent.keyDown(window, { key: "l", ctrlKey: true, altKey: true });
+
+    // AC-FMT-03: an unreported capability does not disable the command; the
+    // provider call decides and the format still applies.
+    await waitFor(() => expect(lspMocks.lspFormatting).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-format-unknown-capabilities",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("const x =1"));
+  });
+
+  it("reports a typed no-provider reason and leaves the buffer untouched", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-format-no-provider",
+      workspaceInstanceId: "instance-format-no-provider",
+      name: "Format no provider",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "const x=1"));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      presetId: "typescript-javascript",
+      languageId: "typescript",
+      displayName: "TypeScript / JavaScript",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities(),
+    }));
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+    fireEvent.keyDown(window, { key: "l", ctrlKey: true, altKey: true });
+
+    // AC-FMT-04: capability false is a visible reason, never a silent no-op.
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
+      "No formatter provider for typescript is running",
+    ));
+    expect(lspMocks.lspFormatting).not.toHaveBeenCalled();
+    expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-format-no-provider",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("const x=1");
+  });
+
+  it("surfaces a provider request failure instead of swallowing it", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-format-provider-failure",
+      workspaceInstanceId: "instance-format-provider-failure",
+      name: "Format provider failure",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "const x=1"));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      presetId: "typescript-javascript",
+      languageId: "typescript",
+      displayName: "TypeScript / JavaScript",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({ formatting: true, rangeFormatting: true }),
+    }));
+    lspMocks.lspFormatting.mockRejectedValue(new Error("provider transport failed"));
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+    fireEvent.keyDown(window, { key: "l", ctrlKey: true, altKey: true });
+
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
+      "Format failed: provider transport failed",
+    ));
+    expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-format-provider-failure",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("const x=1");
+  });
+
+  it("refuses selection formatting when the provider only supports whole-file scope", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-format-range-unsupported",
+      workspaceInstanceId: "instance-format-range-unsupported",
+      name: "Format range unsupported",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "const x=1"));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      presetId: "typescript-javascript",
+      languageId: "typescript",
+      displayName: "TypeScript / JavaScript",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({ formatting: true, rangeFormatting: false }),
+    }));
+    lspMocks.lspFormatting.mockResolvedValue({
+      status: documentStatus({ active: true, available: true }),
+      edits: [],
+    });
+
+    const rendered = renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+    const view = EditorView.findFromDOM(content!);
+    expect(view).not.toBeNull();
+    act(() => {
+      view!.dispatch({ selection: EditorSelection.range(0, 5) });
+    });
+    // Flush the debounced selection publish so editorSelectionRef sees the
+    // non-empty range before the shortcut is evaluated.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+
+    fireEvent.keyDown(window, { key: "l", ctrlKey: true, altKey: true });
+
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("range formatting"));
+    expect(lspMocks.lspFormatting).not.toHaveBeenCalled();
+    expect(lspMocks.lspRangeFormatting).not.toHaveBeenCalled();
+    expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-format-range-unsupported",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("const x=1");
   });
 
   it("persists the workspace format-on-save switch and saves formatted text", async () => {
@@ -9222,6 +9501,45 @@ end_of_record
       expect(confirmAppDialog).not.toHaveBeenCalled();
     });
 
+    it("refuses a provider-disabled rearrange action before resolve and shows the reason (ED-MAIN-002)", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockRearrangeServer(["source.rearrange"]);
+      vi.mocked(confirmAppDialog).mockClear();
+      lspMocks.lspCodeActions.mockClear();
+      lspMocks.lspCodeActionResolve.mockClear();
+      // LSP standard disabled object: the action is returned by discovery but
+      // the provider marks it disabled with a reason.
+      lspMocks.lspCodeActions.mockResolvedValue({
+        status: documentStatus({ available: true, active: true }),
+        actions: [{
+          title: "Rearrange members",
+          kind: "source.rearrange",
+          isPreferred: true,
+          edit: null,
+          command: null,
+          commandArguments: null,
+          raw: { title: "Rearrange members", disabled: { reason: "cannot rearrange generated file" } },
+        }],
+      });
+
+      renderWorkspace(rearrangeWorkspace("instance-rearrange-disabled"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.rearrangeCode");
+      });
+      await waitFor(() => expect(useAppStore.getState().statusMessage)
+        .toContain("cannot rearrange generated file"));
+      expect(useAppStore.getState().statusMessage).toContain("disabled by the provider");
+      expect(lspMocks.lspCodeActionResolve).not.toHaveBeenCalled();
+      expect(confirmAppDialog).not.toHaveBeenCalled();
+      expect(fileText("instance-rearrange-disabled")).toBe(SERVICE_PRE);
+    });
+
     it("commits one verified transaction from the action entry on the supported path", async () => {
       const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
       const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
@@ -9747,6 +10065,8 @@ end_of_record
       fireEvent.keyDown(pane, { key: "z", ctrlKey: true });
       await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Undid Rearrange Code"));
       expect(fileText("instance-improve002-normal")).toBe(SERVICE_PRE);
+      expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-improve002-normal")
+        .openFiles[OPEN_KEY]?.historyReplay).toBe(true);
       fireEvent.keyDown(pane, { key: "z", ctrlKey: true });
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 30));
@@ -9839,6 +10159,42 @@ end_of_record
       const journals = storedJournals();
       expect(journals).toHaveLength(1);
       expect(journals[0]!.entry.status).toBe("recovery-required");
+    });
+
+    // ED-MAIN-001: a clean-buffer workflow edit mutates the buffer before the
+    // awaited save. When that save fails, the mounted transaction must report
+    // the already-performed buffer effect, keep the journal discoverable for
+    // recovery, and never register a normal success history entry.
+    it("reports the performed buffer effect and recovery-required when the workflow save fails (ED-MAIN-001)", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockWorkflowProvider("source.rearrange");
+      vi.mocked(confirmAppDialog).mockClear();
+      vi.mocked(confirmAppDialog).mockImplementation(async (opts) => opts.title === "Rearrange preview");
+      // The disk write reports a proven zero disk effect (e.g. a readonly or
+      // rejected save) after the buffer has already taken the applied text.
+      workspaceMocks.workspaceWriteFileEncoded.mockRejectedValue(Object.assign(
+        new Error("cannot replace readonly file"),
+        { kind: "io", effect: "none" },
+      ));
+
+      renderWorkspace(workflowWorkspace("instance-main001-buffer-effect"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await runWorkflow(registrationRef, "workspace.rearrangeCode");
+      // The applied text is present in the buffer even though the save failed.
+      await waitFor(() => expect(fileText("instance-main001-buffer-effect")).toBe(SERVICE_POST));
+      const message = useAppStore.getState().statusMessage;
+      expect(message).toContain("postcondition could not be verified");
+      expect(message).not.toContain("Rearranged Service.java");
+      // The prepared journal is not closed as a committed no-op.
+      const journals = storedJournals();
+      expect(journals).toHaveLength(1);
+      expect(journals[0]!.entry.status).toBe("recovery-required");
+      expect(workspaceMocks.workspaceWriteFileEncoded).toHaveBeenCalledTimes(1);
     });
 
     it("treats an unreadable post-state as recovery-required without success history", async () => {
@@ -9940,6 +10296,271 @@ end_of_record
       fireEvent.keyDown(pane, { key: "z", ctrlKey: true });
       await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Undid Code Cleanup"));
       expect(fileText("instance-improve002-cleanup")).toBe(SERVICE_PRE);
+    });
+  });
+
+  describe("ED-REPAIR-001: workspace edit save failure retry safety (mounted)", () => {
+    const SERVICE_PRE = "package com.example;\n\npublic class Service {\n    public void beta() {}\n    public void alpha() {}\n}\n";
+    const SERVICE_POST = "package com.example;\n\npublic class Service {\n    public void alpha() {}\n    public void beta() {}\n}\n";
+    const SWAP_EDIT = {
+      range: { start: { line: 3, character: 0 }, end: { line: 4, character: 26 } },
+      newText: "    public void alpha() {}\n    public void beta() {}",
+    };
+    const RECOVERY_V2_PREFIX = "taomni.refactor.recovery.v2:";
+    const OPEN_KEY = "root:app:src/Service.java";
+
+    function repairWorkspace(instance: string): CodeWorkspaceTabInfo {
+      return {
+        repoRoot: "/repo/app",
+        workspaceId: "ws-repair001",
+        workspaceInstanceId: instance,
+        name: "Repair 001",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: "src/Service.java" },
+      };
+    }
+
+    function fileText(instance: string): string | undefined {
+      return selectCodeWorkspaceUi(
+        useCodeWorkspaceStore.getState(),
+        instance,
+      ).openFiles[OPEN_KEY]?.text;
+    }
+
+    function mockWorkflowProvider(kind: "source.rearrange" | "source.cleanup" = "source.rearrange") {
+      workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+      workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/Service.java", SERVICE_PRE, { hash: "hash-pre" }));
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _rootPath: string,
+        path: string,
+        text: string,
+      ) => writeAck(file(path, text, { hash: `hash-${text}` })));
+      lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+        path: "/repo/app/src/Service.java",
+        uri: "file:///repo/app/src/Service.java",
+        presetId: "jdtls",
+        languageId: "java",
+        displayName: "Eclipse JDT Language Server",
+        available: true,
+        active: true,
+        capabilities: defaultCapabilities({ codeAction: true, codeActionKinds: [kind] }),
+      }));
+      const action = {
+        title: kind === "source.rearrange" ? "Rearrange members" : "Clean up",
+        kind,
+        isPreferred: true,
+        edit: null,
+        command: null,
+        commandArguments: null,
+        raw: { title: kind },
+      };
+      lspMocks.lspCodeActions.mockResolvedValue({
+        status: documentStatus({ available: true, active: true }),
+        actions: [action],
+      });
+      lspMocks.lspCodeActionResolve.mockResolvedValue({
+        status: documentStatus({ available: true, active: true }),
+        action: {
+          ...action,
+          edit: {
+            documentEdits: [{
+              uri: "file:///repo/app/src/Service.java",
+              path: "/repo/app/src/Service.java",
+              edits: [SWAP_EDIT],
+            }],
+          },
+        },
+      });
+    }
+
+    function storedJournals(): Array<{ key: string; entry: { status: string } }> {
+      return Object.keys(window.localStorage)
+        .filter((key) => key.startsWith(RECOVERY_V2_PREFIX))
+        .map((key) => ({ key, entry: JSON.parse(window.localStorage.getItem(key)!) }));
+    }
+
+    async function runWorkflow(
+      registrationRef: { current: WorkspaceCommandRegistration | null },
+      commandId: string,
+    ): Promise<void> {
+      await act(async () => {
+        await registrationRef.current?.executeAction(commandId);
+      });
+    }
+
+    it("retries save without duplicating buffer edits when save fails known-zero and user confirms retry (ED-REPAIR-001-A1, A2)", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockWorkflowProvider("source.rearrange");
+      let writeAttempts = 0;
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _rootPath: string,
+        path: string,
+        text: string,
+      ) => {
+        writeAttempts += 1;
+        if (writeAttempts === 1) {
+          throw Object.assign(new Error("disk locked"), { kind: "io", effect: "none" });
+        }
+        return writeAck(file(path, text, { hash: `hash-${text}` }));
+      });
+      vi.mocked(confirmAppDialog).mockClear();
+      vi.mocked(confirmAppDialog).mockImplementation(async (opts) => {
+        if (opts.title === "Rearrange preview") return true;
+        if (opts.title === "Workspace edit save failed") return true;
+        return false;
+      });
+
+      renderWorkspace(repairWorkspace("instance-repair001-retry-success"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await runWorkflow(registrationRef, "workspace.rearrangeCode");
+      // The buffer has the applied text, NOT duplicated
+      await waitFor(() => expect(fileText("instance-repair001-retry-success")).toBe(SERVICE_POST));
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Rearranged Service.java"));
+      expect(writeAttempts).toBe(2);
+
+      // Verify single history entry undo/redo
+      const pane = screen.getByTestId("code-workspace-editor-pane");
+      fireEvent.keyDown(pane, { key: "z", ctrlKey: true });
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Undid Rearrange Code"));
+      expect(fileText("instance-repair001-retry-success")).toBe(SERVICE_PRE);
+
+      // Redo restores to clean post-text
+      fireEvent.keyDown(pane, { key: "z", ctrlKey: true, shiftKey: true });
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("Redid Rearrange Code"));
+      expect(fileText("instance-repair001-retry-success")).toBe(SERVICE_POST);
+    });
+
+    it("preserves mutated buffer and marks journal recovery-required when save retry is cancelled (ED-REPAIR-001-A1, A2)", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockWorkflowProvider("source.rearrange");
+      workspaceMocks.workspaceWriteFileEncoded.mockRejectedValue(Object.assign(
+        new Error("disk locked permanently"),
+        { kind: "io", effect: "none" },
+      ));
+      vi.mocked(confirmAppDialog).mockClear();
+      vi.mocked(confirmAppDialog).mockImplementation(async (opts) => {
+        if (opts.title === "Rearrange preview") return true;
+        // User cancels retry
+        if (opts.title === "Workspace edit save failed") return false;
+        return false;
+      });
+
+      renderWorkspace(repairWorkspace("instance-repair001-retry-cancel"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await runWorkflow(registrationRef, "workspace.rearrangeCode");
+      // Applied text remains in buffer
+      await waitFor(() => expect(fileText("instance-repair001-retry-cancel")).toBe(SERVICE_POST));
+      const message = useAppStore.getState().statusMessage;
+      expect(message).toContain("postcondition could not be verified");
+      expect(message).not.toContain("Rearranged Service.java");
+
+      const journals = storedJournals();
+      expect(journals).toHaveLength(1);
+      expect(journals[0]!.entry.status).toBe("recovery-required");
+    });
+
+    it("refuses save retry if buffer text was modified by user typing before retry (ED-REPAIR-001-A2)", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockWorkflowProvider("source.rearrange");
+      let writeAttempts = 0;
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _rootPath: string,
+        path: string,
+        text: string,
+      ) => {
+        writeAttempts += 1;
+        if (writeAttempts === 1) {
+          throw Object.assign(new Error("disk locked"), { kind: "io", effect: "none" });
+        }
+        return writeAck(file(path, text, { hash: `hash-${text}` }));
+      });
+      const typedUserComment = "\n// concurrent user typing\n";
+      let dialogCalls = 0;
+      vi.mocked(confirmAppDialog).mockClear();
+      vi.mocked(confirmAppDialog).mockImplementation(async (opts) => {
+        if (opts.title === "Rearrange preview") return true;
+        if (opts.title === "Workspace edit save failed") {
+          dialogCalls += 1;
+          // Simulate user typing into the buffer while the dialog was open
+          useCodeWorkspaceStore.getState().updateOpenFiles(
+            "instance-repair001-typing-before-retry",
+            (current) => {
+              const target = current[OPEN_KEY];
+              if (!target) return current;
+              return {
+                ...current,
+                [OPEN_KEY]: {
+                  ...target,
+                  text: target.text + typedUserComment,
+                  dirty: true,
+                },
+              };
+            },
+          );
+          return true;
+        }
+        return false;
+      });
+
+      renderWorkspace(repairWorkspace("instance-repair001-typing-before-retry"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await runWorkflow(registrationRef, "workspace.rearrangeCode");
+      // Newer typing was protected and not overwritten
+      await waitFor(() => expect(fileText("instance-repair001-typing-before-retry")).toBe(SERVICE_POST + typedUserComment));
+      // Retry was aborted, so only the initial write was attempted (writeAttempts === 1)
+      expect(writeAttempts).toBe(1);
+      expect(dialogCalls).toBe(1);
+      expect(useAppStore.getState().statusMessage).not.toContain("Rearranged Service.java");
+      const journals = storedJournals();
+      expect(journals).toHaveLength(1);
+      expect(journals[0]!.entry.status).toBe("recovery-required");
+    });
+
+    it("does not offer save retry when disk write reports unknown effect (ED-REPAIR-001-A1)", async () => {
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      mockWorkflowProvider("source.rearrange");
+      workspaceMocks.workspaceWriteFileEncoded.mockRejectedValue(Object.assign(
+        new Error("network timeout writing file"),
+        { kind: "io", effect: "unknown" },
+      ));
+      const dialogTitles: string[] = [];
+      vi.mocked(confirmAppDialog).mockClear();
+      vi.mocked(confirmAppDialog).mockImplementation(async (opts) => {
+        if (opts.title) dialogTitles.push(opts.title);
+        return opts.title === "Rearrange preview";
+      });
+
+      renderWorkspace(repairWorkspace("instance-repair001-unknown-effect"), { onCommandsChange });
+      await screen.findByTitle("app / src/Service.java");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await runWorkflow(registrationRef, "workspace.rearrangeCode");
+      // Save retry dialog must NEVER be shown for unknown disk effects
+      expect(dialogTitles).not.toContain("Workspace edit save failed");
+      expect(dialogTitles).not.toContain("Workspace edit partially applied");
+      expect(useAppStore.getState().statusMessage).toContain("write result is unknown");
+      const journals = storedJournals();
+      expect(journals).toHaveLength(1);
+      expect(journals[0]!.entry.status).toBe("recovery-required");
     });
   });
 
@@ -10237,6 +10858,926 @@ end_of_record
 
       // Restart/reopen restore is covered by the CodeMirrorHost one-shot
       // apply tests and the native C4-03 reload_window case.
+    });
+  });
+
+  describe("ED-REPAIR-004: plan-less workspace edit recovery journal", () => {
+    const RECOVERY_V2_PREFIX = "taomni.refactor.recovery.v2:";
+    const PRE: Record<string, string> = {
+      "src/a.ts": "hello alpha",
+      "src/b.ts": "hello beta",
+      "src/c.ts": "reader",
+    };
+
+    interface Fixture {
+      disk: Record<string, string>;
+      workspace: CodeWorkspaceTabInfo;
+      registrationRef: { current: WorkspaceCommandRegistration | null };
+      onCommandsChange: (tabId: string, next: WorkspaceCommandRegistration | null) => void;
+    }
+
+    function setupWorkspace(instanceId: string, openFile: string): Fixture {
+      const disk: Record<string, string> = { ...PRE };
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: `ws-${instanceId}`,
+        workspaceInstanceId: `instance-${instanceId}`,
+        name: instanceId,
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: openFile },
+      };
+      workspaceMocks.workspaceListDir.mockImplementation(async (_root: string, path: string) => (
+        path === "src"
+          ? Object.keys(disk).map((rel) => entry(rel.split("/").pop()!, rel))
+          : [entry("src", "src", "dir")]
+      ));
+      workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => {
+        if (!(path in disk)) throw new Error(`missing fixture file: ${path}`);
+        return file(path, disk[path]!);
+      });
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _root: string,
+        path: string,
+        text: string,
+      ) => {
+        disk[path] = text;
+        return writeAck(file(path, text, { hash: `hash-${text}` }));
+      });
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      return { disk, workspace, registrationRef, onCommandsChange };
+    }
+
+    function storedRecoveryEntries(): Array<{
+      key: string;
+      entry: {
+        recoveryId: string;
+        status: string;
+        kind: string;
+        verification?: {
+          mismatchedUris: readonly string[];
+          appliedEffects?: readonly string[];
+          failedEffects?: readonly unknown[];
+        };
+      };
+    }> {
+      return Object.keys(window.localStorage)
+        .filter((key) => key.startsWith(RECOVERY_V2_PREFIX))
+        .map((key) => ({ key, entry: JSON.parse(window.localStorage.getItem(key)!) }));
+    }
+
+    function recoveryCalls(): Array<{ title: string; message: string }> {
+      return vi.mocked(confirmAppDialog).mock.calls.map((call) => ({
+        title: (call[0] as { title: string }).title,
+        message: (call[0] as { message: string }).message,
+      }));
+    }
+
+    function undoItem(registrationRef: Fixture["registrationRef"]) {
+      return registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit");
+    }
+
+    function installRecordingStorage(
+      onWrite?: (key: string, value: string) => void,
+    ): { restore: () => void; keys: () => string[] } {
+      const backing = new Map<string, string>();
+      const fake: Storage = {
+        get length() { return backing.size; },
+        clear: () => backing.clear(),
+        getItem: (k) => backing.get(k) ?? null,
+        key: (i) => Array.from(backing.keys())[i] ?? null,
+        removeItem: (k) => { backing.delete(k); },
+        setItem: (k, v) => { onWrite?.(k, v); backing.set(k, v); },
+      };
+      const original = window.localStorage;
+      Object.defineProperty(window, "localStorage", { value: fake, configurable: true, writable: true });
+      return {
+        restore: () => Object.defineProperty(window, "localStorage", { value: original, configurable: true, writable: true }),
+        keys: () => Array.from(backing.keys()),
+      };
+    }
+
+    async function applyEditWithPreview(workspaceId: string | undefined, edit: unknown, label = "Replace all matches") {
+      expect(workspaceId).toBeDefined();
+      void emit("lsp://workspace-apply-edit", {
+        requestId: `req-${Date.now()}`,
+        workspaceId: workspaceId!,
+        edit,
+        label,
+      });
+      const preview = await screen.findByTestId("refactoring-preview-dialog");
+      fireEvent.click(within(preview).getByTestId("refactoring-preview-apply"));
+    }
+
+    it("refuses text mutations when recovery snapshots cannot be captured", async () => {
+      const { disk, workspace, onCommandsChange } = setupWorkspace("missing-snapshots", "src/c.ts");
+      vi.mocked(confirmAppDialog).mockReset().mockResolvedValue(true);
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/c.ts");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+      workspaceMocks.workspaceListDir.mockRejectedValue(new Error("listing unavailable"));
+      await act(async () => {
+        await emit("lsp://workspace-apply-edit", {
+          requestId: "missing-snapshots", workspaceId: workspace.workspaceInstanceId,
+          edit: { documentEdits: [{ uri: "file:///repo/app/src/a.ts", path: "/repo/app/src/a.ts",
+            edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 11 } }, newText: "ALPHA" }] }] },
+        });
+      });
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toMatch(/preimage|snapshot/i));
+      expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
+      expect(disk["src/a.ts"]).toBe(PRE["src/a.ts"]);
+    });
+
+    it("retries successive failure boundaries against the full confirmed plan and undoes all files", async () => {
+      const { disk, workspace, onCommandsChange } = setupWorkspace("successive-retries", "src/c.ts");
+      disk["src/d.ts"] = "hello delta";
+      vi.mocked(confirmAppDialog).mockReset().mockResolvedValue(true);
+      const attempts = new Map<string, number>();
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (_root: string, path: string, text: string) => {
+        const attempt = (attempts.get(path) ?? 0) + 1;
+        attempts.set(path, attempt);
+        if ((path === "src/b.ts" || path === "src/d.ts") && attempt === 1) {
+          throw new Error("temporary write failure");
+        }
+        disk[path] = text;
+        return writeAck(file(path, text, { hash: `hash-${text}` }));
+      });
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/c.ts");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+      await applyEditWithPreview(workspace.workspaceInstanceId, {
+        documentEdits: ["a", "b", "d"].map((name) => ({
+          uri: `file:///repo/app/src/${name}.ts`, path: `/repo/app/src/${name}.ts`,
+          edits: [{ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } }, newText: "HELLO" }],
+        })),
+      });
+      await waitFor(() => expect(disk["src/d.ts"]).toBe("HELLO delta"));
+      expect(attempts).toEqual(new Map([["src/a.ts", 1], ["src/b.ts", 2], ["src/d.ts", 2]]));
+      await waitFor(() => expect(storedRecoveryEntries().some(({ entry }) => entry.status === "committed")).toBe(true));
+      await act(async () => { fireEvent.keyDown(window, { key: "z", ctrlKey: true }); });
+      await waitFor(() => expect(disk["src/a.ts"]).toBe(PRE["src/a.ts"]));
+      expect(disk["src/b.ts"]).toBe(PRE["src/b.ts"]);
+      expect(disk["src/d.ts"]).toBe("hello delta");
+    });
+
+    it("creates recovery journal for plan-less text edits, captures partial failure effects, and restores via recovery entry", async () => {
+      const { disk, workspace, registrationRef, onCommandsChange } = setupWorkspace("planless-partial", "src/c.ts");
+      vi.mocked(confirmAppDialog).mockReset().mockResolvedValue(true);
+
+      // Make write to src/b.ts fail with disk error
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _root: string,
+        path: string,
+        text: string,
+      ) => {
+        if (path === "src/b.ts") {
+          throw new Error("disk I/O error on b.ts");
+        }
+        disk[path] = text;
+        return writeAck(file(path, text, { hash: `hash-${text}` }));
+      });
+
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/c.ts");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await applyEditWithPreview(workspace.workspaceInstanceId, {
+        documentEdits: [
+          {
+            uri: "file:///repo/app/src/a.ts",
+            path: "/repo/app/src/a.ts",
+            edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 11 } }, newText: "ALPHA" }],
+          },
+          {
+            uri: "file:///repo/app/src/b.ts",
+            path: "/repo/app/src/b.ts",
+            edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 10 } }, newText: "BETA" }],
+          },
+        ],
+      });
+
+      // Verification:
+      // a.ts was applied to disk, b.ts was not modified
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("recovery required"));
+      expect(useAppStore.getState().statusMessage).toContain("Workspace edit postcondition failed");
+      expect(useAppStore.getState().statusMessage).toContain("Applied changes on: /repo/app/src/a.ts");
+      expect(disk["src/a.ts"]).toBe("hello ALPHA");
+      expect(disk["src/b.ts"]).toBe("hello beta");
+
+      // Undo must stay disabled (no success history registered for partial failure)
+      expect(undoItem(registrationRef)?.enabled).toBe(false);
+
+      // Journal entry must be in recovery-required state with applied effects
+      const entries = storedRecoveryEntries();
+      expect(entries).toHaveLength(1);
+      const journalEntry = entries[0]!.entry;
+      expect(journalEntry.status).toBe("recovery-required");
+      expect(journalEntry.verification?.appliedEffects).toContain("/repo/app/src/a.ts");
+
+      // Review and execute recovery via reviewRefactorRecovery action
+      vi.mocked(confirmAppDialog).mockClear();
+      vi.mocked(confirmAppDialog).mockResolvedValue(true);
+
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.reviewRefactorRecovery");
+      });
+
+      await waitFor(() => expect(recoveryCalls().length).toBeGreaterThan(0));
+      const pendingDialog = recoveryCalls().find((call) => call.title.includes("recovery pending"));
+      expect(pendingDialog).toBeDefined();
+
+      // Recovery restored src/a.ts to preText and left src/b.ts untouched
+      await waitFor(() => expect(disk["src/a.ts"]).toBe(PRE["src/a.ts"]));
+      expect(disk["src/b.ts"]).toBe(PRE["src/b.ts"]);
+      expect(getRefactorRecoveryJournalV2(journalEntry.recoveryId)?.status).toBe("rolled-back");
+      expect(useAppStore.getState().statusMessage).toContain("recovery complete");
+
+      // Idempotent re-run reports no pending entries
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.reviewRefactorRecovery");
+      });
+      expect(useAppStore.getState().statusMessage).toContain("No pending recovery entries found");
+    });
+
+    it("aborts with zero writes when the plan-less recovery journal cannot be persisted", async () => {
+      const { disk, workspace, registrationRef, onCommandsChange } = setupWorkspace("planless-quota", "src/c.ts");
+      vi.mocked(confirmAppDialog).mockReset().mockResolvedValue(true);
+      const storage = installRecordingStorage((key) => {
+        if (key.startsWith(RECOVERY_V2_PREFIX)) throw new Error("quota exceeded");
+      });
+
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/c.ts");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await act(async () => {
+        await emit("lsp://workspace-apply-edit", {
+          requestId: "req-quota",
+          workspaceId: workspace.workspaceInstanceId,
+          edit: {
+            documentEdits: [
+              {
+                uri: "file:///repo/app/src/a.ts",
+                path: "/repo/app/src/a.ts",
+                edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 11 } }, newText: "ALPHA" }],
+              },
+            ],
+          },
+          label: "Replace matches",
+        });
+      });
+
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
+        "Refactor recovery journal could not be persisted, no changes were applied",
+      ));
+      expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
+      expect(disk["src/a.ts"]).toBe(PRE["src/a.ts"]);
+      expect(undoItem(registrationRef)?.enabled).toBe(false);
+      storage.restore();
+    });
+
+    it("refuses to overwrite conflicting third-party edits during plan-less recovery", async () => {
+      const { disk, workspace, registrationRef, onCommandsChange } = setupWorkspace("planless-conflict", "src/c.ts");
+      const preA = PRE["src/a.ts"]!;
+      const postA = "hello ALPHA";
+      recordRefactorRecoveryJournalV2({
+        schemaVersion: 2,
+        recoveryId: "rec-conflict-1",
+        transactionId: "tx-conflict-1",
+        actionId: "workspace-edit:replace-1",
+        kind: "replace",
+        workspaceRoot: "/repo/app",
+        createdAt: 100,
+        updatedAt: 200,
+        status: "recovery-required",
+        appliedOperationIndex: null,
+        documents: [
+          {
+            uri: "file:///repo/app/src/a.ts",
+            canonicalPath: "/repo/app/src/a.ts",
+            preText: preA,
+            preHash: sha256Hex(preA),
+            postText: postA,
+            postHash: sha256Hex(postA),
+            encoding: "UTF-8",
+            bom: false,
+            eol: "lf",
+          },
+        ],
+        resourceMoves: [],
+        verification: { mismatchedUris: [], checkedAt: null },
+      });
+
+      // Third-party modifies src/a.ts to something else before recovery runs
+      disk["src/a.ts"] = "third-party content";
+      vi.mocked(confirmAppDialog).mockReset().mockResolvedValue(true);
+
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/c.ts");
+
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.reviewRefactorRecovery");
+      });
+
+      await waitFor(() => expect(recoveryCalls().some((call) => call.title.includes("recovery blocked"))).toBe(true));
+      const blocked = recoveryCalls().find((call) => call.title.includes("recovery blocked"));
+      expect(blocked?.message).toContain("/repo/app/src/a.ts (conflict)");
+      expect(blocked?.message).toContain("will not be overwritten");
+      expect(disk["src/a.ts"]).toBe("third-party content");
+      expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
+      expect(getRefactorRecoveryJournalV2("rec-conflict-1")?.status).toBe("recovery-required");
+    });
+
+    it("commits recovery journal and supports single undo on verified success", async () => {
+      const { disk, workspace, onCommandsChange } = setupWorkspace("planless-success", "src/c.ts");
+      vi.mocked(confirmAppDialog).mockReset().mockResolvedValue(true);
+
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/c.ts");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await applyEditWithPreview(workspace.workspaceInstanceId, {
+        documentEdits: [
+          {
+            uri: "file:///repo/app/src/a.ts",
+            path: "/repo/app/src/a.ts",
+            edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 11 } }, newText: "ALPHA" }],
+          },
+          {
+            uri: "file:///repo/app/src/b.ts",
+            path: "/repo/app/src/b.ts",
+            edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 10 } }, newText: "BETA" }],
+          },
+        ],
+      });
+
+      await waitFor(() => expect(disk["src/a.ts"]).toBe("hello ALPHA"));
+      expect(disk["src/b.ts"]).toBe("hello BETA");
+
+      // Pending recovery entry is not left behind
+      const pending = storedRecoveryEntries().filter((e) => e.entry.status === "recovery-required");
+      expect(pending).toHaveLength(0);
+
+      // Execute undo via window keydown: both files restored to PRE
+      await act(async () => {
+        fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+      });
+      await waitFor(() => expect(disk["src/a.ts"]).toBe(PRE["src/a.ts"]));
+      expect(disk["src/b.ts"]).toBe(PRE["src/b.ts"]);
+
+      // Redo: both files re-applied
+      await act(async () => {
+        fireEvent.keyDown(window, { key: "z", ctrlKey: true, shiftKey: true });
+      });
+      await waitFor(() => expect(disk["src/a.ts"]).toBe("hello ALPHA"));
+      expect(disk["src/b.ts"]).toBe("hello BETA");
+    });
+  });
+
+  describe("ED-REPAIR-006: case-preserving POSIX replace path identity (mounted)", () => {
+    function setupWorkspace(instanceId: string, openFile: string) {
+      const disk: Record<string, string> = {};
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: `ws-${instanceId}`,
+        workspaceInstanceId: `instance-${instanceId}`,
+        name: instanceId,
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: openFile },
+      };
+      workspaceMocks.workspaceListDir.mockImplementation(async (_root: string, path: string) => (
+        path === "src"
+          ? Object.keys(disk).map((rel) => entry(rel.split("/").pop()!, rel))
+          : [entry("src", "src", "dir")]
+      ));
+      workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => {
+        if (!(path in disk)) throw new Error(`missing fixture file: ${path}`);
+        return file(path, disk[path]!);
+      });
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _root: string,
+        path: string,
+        text: string,
+      ) => {
+        disk[path] = text;
+        return writeAck(file(path, text, { hash: `hash-${text}` }));
+      });
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      return { disk, workspace, registrationRef, onCommandsChange };
+    }
+
+    async function applyEditWithPreview(workspaceId: string | undefined, edit: unknown, label = "Replace all matches") {
+      expect(workspaceId).toBeDefined();
+      void emit("lsp://workspace-apply-edit", {
+        requestId: `req-${Date.now()}`,
+        workspaceId: workspaceId!,
+        edit,
+        label,
+      });
+      const preview = await screen.findByTestId("refactoring-preview-dialog");
+      fireEvent.click(within(preview).getByTestId("refactoring-preview-apply"));
+    }
+
+    it("preserves distinct identities for /repo/app/src/A.java and /repo/app/src/a.java during replace preimages and apply (ED-REPAIR-006-A1, A3)", async () => {
+      const { disk, workspace, onCommandsChange } = setupWorkspace("case-replace", "src/c.ts");
+      disk["src/c.ts"] = "hello reader";
+      disk["src/A.java"] = "hello UPPER_A";
+      disk["src/a.java"] = "hello lower_a";
+
+      renderWorkspace(workspace, { onCommandsChange });
+
+      // Apply multi-file WorkspaceEdit that edits both case-distinct files
+      await applyEditWithPreview(workspace.workspaceInstanceId, {
+        documentEdits: [
+          {
+            uri: "file:///repo/app/src/A.java",
+            path: "/repo/app/src/A.java",
+            edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 13 } }, newText: "REPLACED_UPPER" }],
+          },
+          {
+            uri: "file:///repo/app/src/a.java",
+            path: "/repo/app/src/a.java",
+            edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 13 } }, newText: "replaced_lower" }],
+          },
+        ],
+      });
+
+      // Both distinct files must be updated accurately on disk without overwriting each other
+      await waitFor(() => expect(disk["src/A.java"]).toBe("hello REPLACED_UPPER"));
+      expect(disk["src/a.java"]).toBe("hello replaced_lower");
+
+      // Undo restores both distinct files accurately
+      await act(async () => {
+        fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+      });
+      await waitFor(() => expect(disk["src/A.java"]).toBe("hello UPPER_A"));
+      expect(disk["src/a.java"]).toBe("hello lower_a");
+    });
+  });
+
+  describe("ED-REPAIR-002: replace preflight and open buffer freeze conditions (mounted)", () => {
+    function setupWorkspace(instanceId: string, openFile: string) {
+      const disk: Record<string, string> = {};
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: `ws-${instanceId}`,
+        workspaceInstanceId: `instance-${instanceId}`,
+        name: instanceId,
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: openFile },
+      };
+      workspaceMocks.workspaceListDir.mockImplementation(async (_root: string, path: string) => (
+        path === "src"
+          ? Object.keys(disk).map((rel) => entry(rel.split("/").pop()!, rel))
+          : [entry("src", "src", "dir")]
+      ));
+      workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => {
+        if (!(path in disk)) throw new Error(`missing fixture file: ${path}`);
+        return file(path, disk[path]!, { hash: `hash-${disk[path]!}` });
+      });
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _root: string,
+        path: string,
+        text: string,
+      ) => {
+        disk[path] = text;
+        return writeAck(file(path, text, { hash: `hash-${text}` }));
+      });
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      return { disk, workspace, registrationRef, onCommandsChange };
+    }
+
+    it.each(["disk-before", "open-during-final-read", "open-during-history-read", "excluded"])("validates exactly the selected replace set before the first effect: %s (ED-REPAIR-002-A1)", async (scenario) => {
+      const { disk, workspace, registrationRef, onCommandsChange } = setupWorkspace("repair-002-b-modified", "src/c.ts");
+      disk["src/c.ts"] = "hello reader";
+      disk["src/a.ts"] = "hello needle";
+      disk["src/b.ts"] = "hello needle";
+
+      let searchHandler: ((event: workspaceSearchModule.WorkspaceSearchEvent) => void) | null = null;
+      const unlisten = vi.fn();
+      vi.spyOn(workspaceSearchModule, "subscribeWorkspaceSearch").mockImplementation(async (_id, handler) => {
+        searchHandler = handler;
+        return unlisten;
+      });
+      vi.spyOn(workspaceSearchModule, "workspaceSearchStart").mockResolvedValue("search-repair-002");
+
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/c.ts");
+
+      // Open find in files panel
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.findInFiles");
+      });
+
+      const searchInput = await screen.findByLabelText("Search query");
+      fireEvent.change(searchInput, { target: { value: "needle" } });
+      fireEvent.keyDown(searchInput, { key: "Enter" });
+
+      await waitFor(() => expect(searchHandler).not.toBeNull());
+
+      // Emit search matches for a.ts and b.ts
+      await act(async () => {
+        searchHandler?.({
+          searchId: "search-repair-002",
+          kind: "batch",
+          matches: [
+            {
+              rootId: "app",
+              rootName: "app",
+              rootPath: "/repo/app",
+              path: "src/a.ts",
+              lineNumber: 1,
+              column: 7,
+              matchStart: 6,
+              matchEnd: 12,
+              lineText: "hello needle",
+            },
+            {
+              rootId: "app",
+              rootName: "app",
+              rootPath: "/repo/app",
+              path: "src/b.ts",
+              lineNumber: 1,
+              column: 7,
+              matchStart: 6,
+              matchEnd: 12,
+              lineText: "hello needle",
+            },
+          ],
+          truncated: false,
+          cancelled: false,
+          filesScanned: 2,
+          totalMatches: 2,
+          error: null,
+        });
+        searchHandler?.({
+          searchId: "search-repair-002",
+          kind: "done",
+          matches: [],
+          truncated: false,
+          cancelled: false,
+          filesScanned: 2,
+          totalMatches: 2,
+          error: null,
+        });
+      });
+
+      // Enter replace text and preview
+      fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "REPLACED" } });
+      fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+
+      const preview = await screen.findByTestId("code-workspace-replace-preview");
+      expect(preview).toBeInTheDocument();
+
+      if (scenario.startsWith("open-during")) {
+        let readsOfB = 0;
+        let readsOfA = 0;
+        workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => {
+          // Commit reads B for outer validation, recovery snapshot, then final preflight.
+          // A is read again by the applier (4) and the local-history committer (5).
+          if (path === "src/b.ts") readsOfB += 1;
+          if (path === "src/a.ts") readsOfA += 1;
+          if ((scenario === "open-during-final-read" && path === "src/b.ts" && readsOfB === 3)
+            || (scenario === "open-during-history-read" && path === "src/a.ts" && readsOfA === 5)) {
+            useCodeWorkspaceStore.getState().updateOpenFiles(workspace.workspaceInstanceId!, (current) => ({
+              ...current,
+              "root:app:src/b.ts": { ...current["root:app:src/c.ts"]!, key: "root:app:src/b.ts", path: "src/b.ts",
+                ref: { kind: "root", rootId: "app", path: "src/b.ts" },
+                text: "hello user typing", savedText: "hello needle", dirty: true, documentRevision: 1 },
+            }));
+            await new Promise((resolve) => setTimeout(resolve, 0));
+          }
+          return file(path, disk[path]!, { hash: `hash-${disk[path]!}` });
+        });
+      } else {
+        if (scenario === "excluded") {
+          fireEvent.click(within(preview).getByLabelText("Include all matches in /repo/app/src/b.ts"));
+        }
+        disk["src/b.ts"] = "hello modified";
+      }
+
+      // Click Replace All
+      fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+
+      if (scenario === "excluded") {
+        await waitFor(() => expect(disk["src/a.ts"]).toBe("hello REPLACED"));
+        expect(disk["src/b.ts"]).toBe("hello modified");
+        await waitFor(() => expect(registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled).toBe(true));
+        await act(async () => { await registrationRef.current?.executeAction("workspace.undoWorkspaceEdit"); });
+        await waitFor(() => expect(disk["src/a.ts"]).toBe("hello needle"));
+        expect(disk["src/b.ts"]).toBe("hello modified");
+        return;
+      }
+
+      // Preflight detects disk hash mismatch on src/b.ts and refuses with zero writes
+      await waitFor(() => {
+        const status = useAppStore.getState().statusMessage;
+        expect(status).toMatch(scenario === "disk-before" ? /changed on disk since/ : /opened since replace preview|unsaved modifications/);
+      });
+
+      // Both files must have ZERO writes applied
+      expect(disk["src/a.ts"]).toBe("hello needle");
+      expect(disk["src/b.ts"]).toBe(scenario === "disk-before" ? "hello modified" : "hello needle");
+      expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
+    });
+
+    it("preserves file A effect when file B write fails after first write (ED-REPAIR-002-A2)", async () => {
+      const { disk, workspace, registrationRef, onCommandsChange } = setupWorkspace("repair-002-b-fail", "src/c.ts");
+      disk["src/c.ts"] = "hello reader";
+      disk["src/a.ts"] = "hello needle";
+      disk["src/b.ts"] = "hello needle";
+
+      let searchHandler: ((event: workspaceSearchModule.WorkspaceSearchEvent) => void) | null = null;
+      const unlisten = vi.fn();
+      vi.spyOn(workspaceSearchModule, "subscribeWorkspaceSearch").mockImplementation(async (_id, handler) => {
+        searchHandler = handler;
+        return unlisten;
+      });
+      vi.spyOn(workspaceSearchModule, "workspaceSearchStart").mockResolvedValue("search-repair-002-post");
+
+      // Inject write failure on src/b.ts
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _root: string,
+        path: string,
+        text: string,
+      ) => {
+        if (path === "src/b.ts") {
+          throw new Error("disk I/O error on b.ts");
+        }
+        disk[path] = text;
+        return writeAck(file(path, text, { hash: `hash-${text}` }));
+      });
+
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/c.ts");
+
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.findInFiles");
+      });
+
+      const searchInput = await screen.findByLabelText("Search query");
+      fireEvent.change(searchInput, { target: { value: "needle" } });
+      fireEvent.keyDown(searchInput, { key: "Enter" });
+
+      await waitFor(() => expect(searchHandler).not.toBeNull());
+
+      await act(async () => {
+        searchHandler?.({
+          searchId: "search-repair-002-post",
+          kind: "batch",
+          matches: [
+            {
+              rootId: "app",
+              rootName: "app",
+              rootPath: "/repo/app",
+              path: "src/a.ts",
+              lineNumber: 1,
+              column: 7,
+              matchStart: 6,
+              matchEnd: 12,
+              lineText: "hello needle",
+            },
+            {
+              rootId: "app",
+              rootName: "app",
+              rootPath: "/repo/app",
+              path: "src/b.ts",
+              lineNumber: 1,
+              column: 7,
+              matchStart: 6,
+              matchEnd: 12,
+              lineText: "hello needle",
+            },
+          ],
+          truncated: false,
+          cancelled: false,
+          filesScanned: 2,
+          totalMatches: 2,
+          error: null,
+        });
+        searchHandler?.({
+          searchId: "search-repair-002-post",
+          kind: "done",
+          matches: [],
+          truncated: false,
+          cancelled: false,
+          filesScanned: 2,
+          totalMatches: 2,
+          error: null,
+        });
+      });
+
+      fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "REPLACED" } });
+      fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+
+      const preview = await screen.findByTestId("code-workspace-replace-preview");
+      expect(preview).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+
+      // Operation A succeeded and its effect is preserved on disk!
+      await waitFor(() => expect(disk["src/a.ts"]).toBe("hello REPLACED"));
+      // Operation B failed and was not modified
+      expect(disk["src/b.ts"]).toBe("hello needle");
+
+      // Status message indicates failure / recovery required
+      await waitFor(() => {
+        const status = useAppStore.getState().statusMessage;
+        expect(status).toContain("recovery required");
+      });
+    });
+  });
+
+  describe("ED-REPAIR-009: view state snapshot consistency (mounted)", () => {
+    const DOC_A = "line0\nline1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9";
+    const DOC_B = "other0\nother1\nother2\nother3\nother4\nother5";
+
+    function repairWorkspace(instance: string): CodeWorkspaceTabInfo {
+      return {
+        repoRoot: "/repo/app",
+        workspaceId: "ws-repair009",
+        workspaceInstanceId: instance,
+        name: "Repair 009",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: "src/A.java" },
+      };
+    }
+
+    function storedLayout(instance: string) {
+      const raw = window.localStorage.getItem(`taomni.codeWorkspace.layout.v2.${instance}`);
+      return raw ? JSON.parse(raw) : null;
+    }
+
+    it("restores caret after editing and switching tabs within 1 second (ED-REPAIR-009-A1)", async () => {
+      workspaceMocks.workspaceListDir.mockResolvedValue([
+        entry("src", "src", "dir"),
+        entry("src/A.java", "A.java", "file"),
+        entry("src/B.java", "B.java", "file"),
+      ]);
+      workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => {
+        if (path.endsWith("A.java")) return file("src/A.java", DOC_A, { hash: "hash-a" });
+        return file("src/B.java", DOC_B, { hash: "hash-b" });
+      });
+      lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({ available: true, active: false }));
+
+      const seedLayout = {
+        version: 2,
+        bottomDockOpen: false,
+        bottomDockTab: "problems",
+        rightPaneOpen: false,
+        rightPaneTab: "outline",
+        languagePanelOpen: false,
+        splitOrientation: "vertical",
+        activeEditorGroupId: "primary",
+        expandedRootIds: ["app"],
+        expandedDirKeys: [],
+        layoutTreeV2: {
+          type: "leaf",
+          id: "primary",
+          openFileKeys: ["root:app:src/A.java", "root:app:src/B.java"],
+          activeKey: "root:app:src/A.java",
+        },
+        editorGroups: {
+          primary: {
+            openOrder: ["root:app:src/A.java", "root:app:src/B.java"],
+            activeKey: "root:app:src/A.java",
+            previewKey: null,
+            pinnedKeys: [],
+          },
+        },
+        viewStates: {},
+      };
+      window.localStorage.setItem("taomni.codeWorkspace.layout.v2.instance-repair009-switch", JSON.stringify(seedLayout));
+
+      renderWorkspace(repairWorkspace("instance-repair009-switch"));
+      await screen.findByTitle("app / src/A.java");
+      await screen.findByTitle("app / src/B.java");
+
+      const pane = screen.getAllByTestId("code-workspace-editor-pane")[0]!;
+      const viewA = EditorView.findFromDOM(pane.querySelector(".cm-editor")!)!;
+
+      // Insert text and move cursor to offset 25 within 1 second
+      act(() => {
+        viewA.dispatch({
+          changes: { from: 0, insert: "ZZ" },
+          selection: EditorSelection.cursor(25),
+        });
+      });
+
+      // Switch to B.java before any 1s debounce/throttle has settled
+      const tabB = screen.getByTitle("app / src/B.java");
+      fireEvent.click(tabB);
+
+      await waitFor(() => {
+        const currentPane = screen.getAllByTestId("code-workspace-editor-pane")[0]!;
+        const currentView = EditorView.findFromDOM(currentPane.querySelector(".cm-editor")!)!;
+        expect(currentView.state.doc.toString()).toBe(DOC_B);
+      });
+
+      // Now switch back to A.java
+      const tabA = screen.getByTitle("app / src/A.java");
+      fireEvent.click(tabA);
+
+      await waitFor(() => {
+        const paneBack = screen.getAllByTestId("code-workspace-editor-pane")[0]!;
+        const viewABack = EditorView.findFromDOM(paneBack.querySelector(".cm-editor")!)!;
+        expect(viewABack.state.doc.toString().startsWith("ZZ")).toBe(true);
+        // Caret must be restored to 25!
+        expect(viewABack.state.selection.main.head).toBe(25);
+      });
+    });
+
+    it("flushes tail capture to localStorage on workspace unmount (ED-REPAIR-009-A1, A2)", async () => {
+      workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+      workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/A.java", DOC_A, { hash: "hash-a" }));
+      lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({ available: true, active: false }));
+
+      const { unmount } = renderWorkspace(repairWorkspace("instance-repair009-unmount"));
+      await screen.findByTitle("app / src/A.java");
+      const pane = screen.getAllByTestId("code-workspace-editor-pane")[0]!;
+      const view = EditorView.findFromDOM(pane.querySelector(".cm-editor")!)!;
+
+      act(() => {
+        view.dispatch({ selection: EditorSelection.cursor(35) });
+      });
+
+      // Immediately unmount (workspace closing / tab closing)
+      unmount();
+
+      const layout = storedLayout("instance-repair009-unmount");
+      expect(layout).not.toBeNull();
+      const primaryState = layout.viewStates?.primary?.["root:app:src/A.java"];
+      expect(primaryState?.mainSelection?.head).toBe(35);
+      expect(primaryState?.textIdentity).toBe(textIdentityFromString(DOC_A));
+    });
+
+    it("inactive leaf snapshot preserves original identity when text changes in active leaf and drops stale position on restore (ED-REPAIR-009-A2)", async () => {
+      workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+      workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/A.java", DOC_A, { hash: "hash-a" }));
+      lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({ available: true, active: false }));
+
+      // Seed a layout where secondary leaf has an old snapshot for "abc" with caret 2
+      const oldDocIdentity = textIdentityFromString("abc");
+      const seedLayout = {
+        version: 2,
+        bottomDockOpen: false,
+        bottomDockTab: "problems",
+        rightPaneOpen: false,
+        rightPaneTab: "outline",
+        languagePanelOpen: false,
+        splitOrientation: "vertical",
+        activeEditorGroupId: "primary",
+        expandedRootIds: ["app"],
+        expandedDirKeys: [],
+        layoutTreeV2: {
+          type: "split",
+          id: "split-root",
+          orientation: "vertical",
+          ratios: [0.5, 0.5],
+          children: [
+            { type: "leaf", id: "primary", openFileKeys: ["root:app:src/A.java"], activeKey: "root:app:src/A.java" },
+            { type: "leaf", id: "secondary", openFileKeys: ["root:app:src/A.java"], activeKey: "root:app:src/A.java" },
+          ],
+        },
+        editorGroups: {
+          primary: { openOrder: ["root:app:src/A.java"], activeKey: "root:app:src/A.java", previewKey: null, pinnedKeys: [] },
+          secondary: { openOrder: ["root:app:src/A.java"], activeKey: "root:app:src/A.java", previewKey: null, pinnedKeys: [] },
+        },
+        viewStates: {
+          primary: { "root:app:src/A.java": { mainSelection: { anchor: 10, head: 10 }, selections: [], scrollTop: 0, folds: [], textIdentity: textIdentityFromString(DOC_A) } },
+          secondary: { "root:app:src/A.java": { mainSelection: { anchor: 2, head: 2 }, selections: [], scrollTop: 0, folds: [], textIdentity: oldDocIdentity } },
+        },
+      };
+      window.localStorage.setItem("taomni.codeWorkspace.layout.v2.instance-repair009-inactive", JSON.stringify(seedLayout));
+
+      renderWorkspace(repairWorkspace("instance-repair009-inactive"));
+      await screen.findAllByTitle("app / src/A.java");
+      await waitFor(() => {
+        const panes = screen.getAllByTestId("code-workspace-editor-pane");
+        expect(panes).toHaveLength(2);
+        const primaryCm = panes[0]?.querySelector<HTMLElement>(".cm-editor");
+        const secondaryCm = panes[1]?.querySelector<HTMLElement>(".cm-editor");
+        expect(primaryCm).toBeTruthy();
+        expect(secondaryCm).toBeTruthy();
+        const primaryView = EditorView.findFromDOM(primaryCm!)!;
+        const secondaryView = EditorView.findFromDOM(secondaryCm!)!;
+        // Primary had matching identity for DOC_A -> restored caret at 10
+        expect(primaryView.state.selection.main.head).toBe(10);
+        // Secondary had identity for "abc" (mismatches DOC_A) -> stale caret 2 was DROPPED, defaults to 0
+        expect(secondaryView.state.selection.main.head).toBe(0);
+      });
     });
   });
 });

@@ -29,6 +29,21 @@ def recorded_binary(root: Path) -> Path:
 
 
 class NativeBuildTest(unittest.TestCase):
+    def test_build_identity_distinguishes_react_development_from_production(self):
+        # NODE_ENV changes React StrictMode effect replay even when both QA
+        # executables use the Rust debug profile and identical source files.
+        with (
+            patch.object(native_build, "source_identity", return_value="same-source"),
+            patch.object(native_build, "fingerprint", return_value="same-recipe"),
+            patch.object(native_build.subprocess, "check_output", return_value="tool-version"),
+        ):
+            with patch.dict(os.environ, {"NODE_ENV": "development"}):
+                development = native_build.build_inputs()
+            with patch.dict(os.environ, {"NODE_ENV": "production"}):
+                production = native_build.build_inputs()
+        self.assertNotEqual(development, production)
+        self.assertEqual(development["environment"]["NODE_ENV"], "development")
+
     def test_build_records_exact_output_in_separate_target_for_each_os(self):
         for system, release in [("Linux", False), ("Windows", False), ("Darwin", True)]:
             with self.subTest(system=system), TemporaryDirectory() as directory:

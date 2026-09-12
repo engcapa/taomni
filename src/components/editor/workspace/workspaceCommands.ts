@@ -89,6 +89,9 @@ export function normalizeKey(value: string): string {
   if (key === "right") return "arrowright";
   if (key === "up") return "arrowup";
   if (key === "down") return "arrowdown";
+  // Keypad Enter is the same logical key as the main Enter; WebKitGTK reports
+  // it as code "NumpadEnter" and browsers may leave `key` unmapped.
+  if (key === "numpadenter") return "enter";
   return key;
 }
 

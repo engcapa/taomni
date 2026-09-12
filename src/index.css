@@ -1256,6 +1256,45 @@ select.taomni-input:not(.appearance-none):not([multiple]) {
   border-color: var(--taomni-code-border) !important;
 }
 
+/* Editor candidate menus use one surface and selection treatment, whether
+   opened by Completion (Alt+/) or Quick Fix (Alt+Enter). */
+.cm-tooltip-autocomplete,
+[data-taomni-context-menu][data-appearance="code-candidates"] {
+  background: var(--taomni-code-tooltip-bg) !important;
+  color: var(--taomni-code-text) !important;
+  border: 1px solid var(--taomni-code-border) !important;
+  border-radius: 4px;
+  box-shadow: var(--taomni-shadow-lg);
+  padding: 0;
+  font-family: var(--taomni-code-font-family);
+  font-size: var(--taomni-code-font-size);
+  line-height: 1.5;
+  overflow: hidden;
+}
+.cm-tooltip-autocomplete > ul,
+[data-taomni-context-menu][data-appearance="code-candidates"] {
+  max-height: min(300px, calc(100vh - 12px)) !important;
+  max-width: min(700px, calc(100vw - 12px));
+  overflow-y: auto;
+}
+.cm-tooltip-autocomplete > ul > li[role="option"],
+[data-taomni-context-menu][data-appearance="code-candidates"] > button {
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.cm-tooltip-autocomplete > ul > li[aria-selected="true"][role="option"],
+[data-taomni-context-menu][data-appearance="code-candidates"] > button[data-active="true"]:enabled {
+  background: #1d4ed8;
+  color: #ffffff;
+  box-shadow: inset 3px 0 #93c5fd;
+}
+.cm-tooltip-autocomplete > ul > li[aria-selected="true"] .cm-completionIcon,
+.cm-tooltip-autocomplete > ul > li[aria-selected="true"] .cm-completionMatchedText,
+[data-taomni-context-menu][data-appearance="code-candidates"] > button[data-active="true"]:enabled span {
+  color: inherit;
+  opacity: 1;
+}
+
 .taomni-proto-btn {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 8px 8px 6px;

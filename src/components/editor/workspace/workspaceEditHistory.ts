@@ -1,4 +1,5 @@
 import type { LspWorkspaceEdit } from "../../../lib/editor/lsp";
+import { normalizeLineEndings } from "./saveNormalizationPipeline";
 
 /**
  * A bounded, serially-executed history for editor-level transactions.
@@ -255,8 +256,12 @@ export function workspaceEditUndoPrecondition(
     const current = currentTexts[snapshot.path];
     if (current === undefined) {
       reasons.push(`${snapshot.path}: current content unreadable`);
-    } else if (current !== snapshot.text) {
-      reasons.push(`${snapshot.path}: content changed after the recorded state`);
+    } else {
+      const match = current === snapshot.text
+        || (snapshot.eol ? normalizeLineEndings(snapshot.text, snapshot.eol) === normalizeLineEndings(current, snapshot.eol) : false);
+      if (!match) {
+        reasons.push(`${snapshot.path}: content changed after the recorded state`);
+      }
     }
   }
   return { blocked: reasons.length > 0, reasons };

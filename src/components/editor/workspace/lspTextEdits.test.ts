@@ -3,6 +3,7 @@ import {
   applyLspTextEditsToString,
   buildIncrementalContentChange,
   offsetFromLspPositionInString,
+  offsetFromLspPositionInStringStrict,
   rangeIsEmpty,
 } from "./lspTextEdits";
 import type { LspTextEdit } from "../../../lib/editor/lsp";
@@ -124,6 +125,69 @@ describe("lspTextEdits", () => {
       },
       rangeLength: 8,
       text: "",
+    });
+  });
+
+  describe("ED-REPAIR-003: offsetFromLspPositionInStringStrict", () => {
+    it("maps valid positions across LF, CRLF, isolated CR, and mixed EOL", () => {
+      const lf = "abc\ndef";
+      expect(offsetFromLspPositionInStringStrict(lf, { line: 0, character: 0 })).toBe(0);
+      expect(offsetFromLspPositionInStringStrict(lf, { line: 0, character: 3 })).toBe(3);
+      expect(offsetFromLspPositionInStringStrict(lf, { line: 1, character: 0 })).toBe(4);
+      expect(offsetFromLspPositionInStringStrict(lf, { line: 1, character: 3 })).toBe(7);
+
+      const crlf = "abc\r\ndef";
+      expect(offsetFromLspPositionInStringStrict(crlf, { line: 0, character: 3 })).toBe(3);
+      expect(offsetFromLspPositionInStringStrict(crlf, { line: 1, character: 0 })).toBe(5);
+      expect(offsetFromLspPositionInStringStrict(crlf, { line: 1, character: 3 })).toBe(8);
+
+      const cr = "abc\rdef";
+      expect(offsetFromLspPositionInStringStrict(cr, { line: 0, character: 3 })).toBe(3);
+      expect(offsetFromLspPositionInStringStrict(cr, { line: 1, character: 0 })).toBe(4);
+      expect(offsetFromLspPositionInStringStrict(cr, { line: 1, character: 3 })).toBe(7);
+
+      const mixed = "a\r\nb\rc\nd";
+      expect(offsetFromLspPositionInStringStrict(mixed, { line: 0, character: 1 })).toBe(1);
+      expect(offsetFromLspPositionInStringStrict(mixed, { line: 1, character: 1 })).toBe(4);
+      expect(offsetFromLspPositionInStringStrict(mixed, { line: 2, character: 1 })).toBe(6);
+      expect(offsetFromLspPositionInStringStrict(mixed, { line: 3, character: 1 })).toBe(8);
+    });
+
+    it("handles trailing newline and EOF positions strictly", () => {
+      const text = "abc\n";
+      // Line 0 has length 3; char 3 points at the newline (offset 3)
+      expect(offsetFromLspPositionInStringStrict(text, { line: 0, character: 3 })).toBe(3);
+      // Line 1 is the empty line at EOF; char 0 points at offset 4
+      expect(offsetFromLspPositionInStringStrict(text, { line: 1, character: 0 })).toBe(4);
+      // Char 1 on empty line 1 is out of bounds
+      expect(offsetFromLspPositionInStringStrict(text, { line: 1, character: 1 })).toBeNull();
+      // Line 2 does not exist
+      expect(offsetFromLspPositionInStringStrict(text, { line: 2, character: 0 })).toBeNull();
+    });
+
+    it("returns null for disappeared lines without clamping", () => {
+      const text = "only one line";
+      expect(offsetFromLspPositionInStringStrict(text, { line: 1, character: 0 })).toBeNull();
+      expect(offsetFromLspPositionInStringStrict(text, { line: 2, character: 0 })).toBeNull();
+      // Verify contrast: non-strict function clamps to line 0
+      expect(offsetFromLspPositionInString(text, { line: 1, character: 0 })).toBe(0);
+    });
+
+    it("returns null for shortened lines without clamping characters", () => {
+      const text = "short";
+      expect(offsetFromLspPositionInStringStrict(text, { line: 0, character: 6 })).toBeNull();
+      // Verify contrast: non-strict function clamps to line length
+      expect(offsetFromLspPositionInString(text, { line: 0, character: 6 })).toBe(5);
+    });
+
+    it("returns null for negative, non-integer, and NaN coordinates", () => {
+      const text = "line 0\nline 1";
+      expect(offsetFromLspPositionInStringStrict(text, { line: -1, character: 0 })).toBeNull();
+      expect(offsetFromLspPositionInStringStrict(text, { line: 0, character: -1 })).toBeNull();
+      expect(offsetFromLspPositionInStringStrict(text, { line: 0.5, character: 0 })).toBeNull();
+      expect(offsetFromLspPositionInStringStrict(text, { line: 0, character: 1.5 })).toBeNull();
+      expect(offsetFromLspPositionInStringStrict(text, { line: Number.NaN, character: 0 })).toBeNull();
+      expect(offsetFromLspPositionInStringStrict(text, { line: 0, character: Number.NaN })).toBeNull();
     });
   });
 });

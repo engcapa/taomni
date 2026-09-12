@@ -25,6 +25,7 @@ export type RefactorKind =
   | "inline"
   | "change-signature"
   | "move"
+  | "replace"
   | "other";
 
 export interface SafeDeleteAttestationV1 {
@@ -803,6 +804,16 @@ export interface RefactorRecoveryJournalEntryV2 {
      * paths. Read by QA to prove the reversal happened; never inferred.
      */
     reversedMoves?: readonly string[];
+    /** ED-REPAIR-004: real applied effects and failed outcomes recorded in the persistent journal. */
+    appliedEffects?: readonly string[];
+    failedEffects?: readonly {
+      path: string;
+      status: string;
+      reason?: string | null;
+      diskEffect?: string;
+    }[];
+    lastRecoveryError?: string | null;
+    restoredUris?: readonly string[];
   };
 }
 
@@ -1014,6 +1025,21 @@ export function refactorJournalPostImageMatches(
 }
 
 /**
+ * ED-REPAIR-004: compares a real text against the journal's recorded pre-image,
+ * accepting either exact or EOL-normalized match.
+ */
+export function refactorJournalPreImageMatches(
+  doc: RefactorRecoveryDocumentSnapshotV2,
+  actualText: string,
+): boolean {
+  if (sha256Hex(actualText) === doc.preHash) return true;
+  if (doc.eol) {
+    return sha256Hex(normalizeLineEndings(doc.preText, doc.eol)) === sha256Hex(actualText);
+  }
+  return false;
+}
+
+/**
  * Typed journal preparation for a plan-gated edit. `unsupported` marks the
  * explicit recovery boundary for create/delete resource operations: the
  * transaction proceeds without a journal instead of faking coverage.
@@ -1175,3 +1201,25 @@ export function prepareRefactorRecoveryJournalV2(input: {
   };
 }
 
+/**
+ * ED-REPAIR-004: build an internal recovery plan description for general
+ * text WorkspaceEdits (e.g. multi-file Replace) so that crashes, write
+ * failures, or interrupted transactions have a discoverable recovery journal
+ * without faking a provider refactoring action.
+ */
+export function buildTextWorkspaceEditRecoveryPlan(input: {
+  actionId?: string;
+  kind?: RefactorKind;
+  label?: string | null;
+  transactionId?: string;
+}): WorkspaceEditRecoveryPlan {
+  const kind: RefactorKind = input.kind
+    ?? (input.label?.toLowerCase().includes("replace") ? "replace" : "other");
+  const actionId = input.actionId
+    ?? (input.label ? `workspace-edit:${input.label}` : `workspace-edit:${input.transactionId ?? Date.now()}`);
+  return {
+    actionId,
+    kind,
+    documents: [],
+  };
+}

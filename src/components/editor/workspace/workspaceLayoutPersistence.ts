@@ -50,10 +50,55 @@ export interface PersistedEditorViewState {
   selections: PersistedViewSelection[];
   scrollTop: number;
   folds: PersistedViewFold[];
+  /**
+   * ED-MAIN-009: content identity of the buffer this snapshot belongs to.
+   * Optional so legacy/pre-009 snapshots keep their original clamp behavior;
+   * a snapshot whose identity is present but no longer matches the live text
+   * drops its selection/folds/scroll instead of re-anchoring onto new content.
+   */
+  textIdentity?: string;
+  /** Horizontal scroll offset (ED-MAIN-009); legacy snapshots default to 0. */
+  scrollLeft?: number;
 }
 
 /** leaf id -> file key -> view state. */
 export type WorkspaceViewStates = Record<string, Record<string, PersistedEditorViewState>>;
+
+/**
+ * ED-MAIN-009: content identity of a buffer. Line endings are normalized to
+ * `\n` first so the result matches the CodeMirror `Text` iterator hash in
+ * CodeMirrorHost for the same content. This is the exact (persist-time) form.
+ */
+export function textIdentityFromString(text: string): string {
+  const normalized = text.replace(/\r\n?/g, "\n");
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < normalized.length; index += 1) {
+    hash ^= normalized.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `${normalized.length}:${(hash >>> 0).toString(16)}`;
+}
+
+/**
+ * ED-REPAIR-009: Preserve each snapshot's immutable content identity.
+ * We must never overwrite an existing identity or re-sign inactive/stale snapshots
+ * with live buffer text, as doing so would allow stale positions to pass the
+ * version mismatch check (ED-REPAIR-009-A2).
+ */
+export function enrichViewStatesWithIdentity(
+  viewStates: WorkspaceViewStates,
+  _getText?: (fileKey: string) => string | undefined,
+): WorkspaceViewStates {
+  const result: WorkspaceViewStates = {};
+  for (const [leafId, files] of Object.entries(viewStates)) {
+    const perFile: Record<string, PersistedEditorViewState> = {};
+    for (const [fileKey, state] of Object.entries(files)) {
+      perFile[fileKey] = { ...state };
+    }
+    result[leafId] = perFile;
+  }
+  return result;
+}
 
 export interface PersistedEditorGroup {
   openOrder: string[];
@@ -257,6 +302,12 @@ function normalizeEditorViewState(value: unknown): PersistedEditorViewState | nu
     selections,
     scrollTop: asViewOffset(source.scrollTop) ?? 0,
     folds,
+    ...(typeof source.textIdentity === "string" && source.textIdentity.length > 0
+      ? { textIdentity: source.textIdentity }
+      : {}),
+    ...(asViewOffset(source.scrollLeft) !== null
+      ? { scrollLeft: asViewOffset(source.scrollLeft) ?? 0 }
+      : {}),
   };
 }
 

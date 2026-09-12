@@ -12,6 +12,7 @@ import {
   matchSegments,
 } from "./FindInFilesPanel";
 import { applyLspTextEditsToString } from "../lspTextEdits";
+import type { ReplaceFilePreimage, ReplacePreviewSnapshot } from "../replaceInFilesModel";
 
 const searchMocks = vi.hoisted(() => ({
   newWorkspaceSearchId: vi.fn(() => "search-1"),
@@ -643,6 +644,93 @@ describe("ED-FIND-004: replace preview commit flow in FindInFilesPanel", () => {
     expect(edit.documentEdits[0]!.edits[0]!.newText).toBe("thread");
   });
 
+  it("captures frozen preimages before the preview and passes them to the commit (ED-MAIN-005)", async () => {
+    const onReplaceMatches = vi.fn(
+      async (
+        _matches: WorkspaceSearchMatch[],
+        _replacement: string,
+        _edit: LspWorkspaceEdit,
+        _snapshot: unknown,
+      ): Promise<{ ok: boolean; appliedCount?: number; fileCount?: number }> =>
+        ({ ok: true as const, appliedCount: 2, fileCount: 2 }),
+    );
+    const onPrepareReplacePreimages = vi.fn(async (paths: readonly string[]) =>
+      paths.map((path) => ({
+        path,
+        uri: `file://${path}`,
+        textHash: `hash:${path}`,
+        encoding: "UTF-8",
+        bom: false,
+        eol: "lf" as const,
+        bufferRevision: 1,
+        dirty: false,
+        readOnly: false,
+        workspaceInstanceId: "ws",
+      })),
+    );
+    render(
+      <FindInFilesPanel
+        roots={roots}
+        onOpenMatch={vi.fn()}
+        onReplaceMatches={onReplaceMatches}
+        onPrepareReplacePreimages={onPrepareReplacePreimages}
+      />,
+    );
+    const emit = await runSearch();
+    const matches = [
+      searchMatch({ lineNumber: 1, lineText: "needle one", matchStart: 0, matchEnd: 6, column: 1 }),
+      searchMatch({ path: "src/b.ts", lineNumber: 3, lineText: "needle three", matchStart: 0, matchEnd: 6, column: 1 }),
+    ];
+    act(() => {
+      emit({ ...doneEvent(), kind: "batch", matches });
+      emit(doneEvent({ totalMatches: matches.length }));
+    });
+    fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "thread" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+    expect(await screen.findByTestId("code-workspace-replace-preview")).toBeInTheDocument();
+    expect(onPrepareReplacePreimages).toHaveBeenCalledTimes(1);
+    expect(onPrepareReplacePreimages.mock.calls[0]![0]).toHaveLength(2);
+
+    fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+    await waitFor(() => expect(onReplaceMatches).toHaveBeenCalledTimes(1));
+    const snapshot = onReplaceMatches.mock.calls[0]![3] as {
+      preimages?: Array<{ textHash: string; eol: string }>;
+    };
+    expect(snapshot.preimages).toHaveLength(2);
+    expect(snapshot.preimages?.[0]?.textHash).toContain("hash:");
+    expect(snapshot.preimages?.[0]?.eol).toBe("lf");
+  });
+
+  it("shows a preimage prepare failure and commits nothing (ED-MAIN-005)", async () => {
+    const onReplaceMatches = vi.fn();
+    const onPrepareReplacePreimages = vi.fn(async () => {
+      throw new Error("cannot read src/b.ts");
+    });
+    render(
+      <FindInFilesPanel
+        roots={roots}
+        onOpenMatch={vi.fn()}
+        onReplaceMatches={onReplaceMatches}
+        onPrepareReplacePreimages={onPrepareReplacePreimages}
+      />,
+    );
+    const emit = await runSearch();
+    const matches = [
+      searchMatch({ lineNumber: 1, lineText: "needle one", matchStart: 0, matchEnd: 6, column: 1 }),
+      searchMatch({ path: "src/b.ts", lineNumber: 3, lineText: "needle three", matchStart: 0, matchEnd: 6, column: 1 }),
+    ];
+    act(() => {
+      emit({ ...doneEvent(), kind: "batch", matches });
+      emit(doneEvent({ totalMatches: matches.length }));
+    });
+    fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "thread" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+    expect(await screen.findByTestId("code-workspace-replace-error"))
+      .toHaveTextContent("cannot read src/b.ts");
+    expect(screen.queryByTestId("code-workspace-replace-preview")).not.toBeInTheDocument();
+    expect(onReplaceMatches).not.toHaveBeenCalled();
+  });
+
   it("keeps the preview open and shows the blocker message on conflict (A2)", async () => {
     const onReplaceMatches = vi.fn(
       async () => ({ ok: false as const, message: "Replace blocked: dirty buffer" }),
@@ -698,4 +786,426 @@ describe("ED-FIND-004: replace preview commit flow in FindInFilesPanel", () => {
     expect(screen.getByTestId("code-workspace-find-error")).toHaveTextContent("Invalid search pattern");
     expect(screen.getByRole("button", { name: "Preview replace all matches" })).toBeDisabled();
   });
+
+  // ED-REPAIR-003: an illegal search-match coordinate (e.g. non-positive lineNumber)
+  // surfaces as a replace error before preview open; zero commit.
+  it("shows an illegal coordinate error when backend match has invalid line number (ED-REPAIR-003-A1)", async () => {
+    const onReplaceMatches = vi.fn();
+    render(
+      <FindInFilesPanel
+        roots={roots}
+        onOpenMatch={vi.fn()}
+        onReplaceMatches={onReplaceMatches}
+      />,
+    );
+    const emit = await runSearch();
+    const matches = [
+      searchMatch({ lineNumber: 0, lineText: "needle", matchStart: 0, matchEnd: 6, column: 1 }),
+    ];
+    act(() => {
+      emit({ ...doneEvent(), kind: "batch", matches });
+      emit(doneEvent({ totalMatches: matches.length }));
+    });
+    fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "thread" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+    expect(await screen.findByTestId("code-workspace-replace-error"))
+      .toHaveTextContent("invalid line number 0");
+    expect(screen.queryByTestId("code-workspace-replace-preview")).not.toBeInTheDocument();
+    expect(onReplaceMatches).not.toHaveBeenCalled();
+  });
+
+  // ED-REPAIR-006: case-distinct files on POSIX (e.g. A.java vs a.java) preserve
+  // separate paths in preimages, snapshot, and committed WorkspaceEdit.
+  it("preserves case distinction for A.java and a.java in preview and commit (ED-REPAIR-006-A1)", async () => {
+    const posixRoots: CodeWorkspaceRootInfo[] = [
+      { id: "root-1", name: "app", path: "/repo/app", kind: "git" },
+    ];
+    const onReplaceMatches = vi.fn(
+      async (
+        _matches: WorkspaceSearchMatch[],
+        _replacement: string,
+        _edit: LspWorkspaceEdit,
+        _snapshot: unknown,
+      ): Promise<{ ok: boolean; appliedCount?: number; fileCount?: number }> =>
+        ({ ok: true as const, appliedCount: 2, fileCount: 2 }),
+    );
+    const onPrepareReplacePreimages = vi.fn(async (paths: readonly string[]) =>
+      paths.map((path) => ({
+        path,
+        uri: `file://${path}`,
+        textHash: `hash:${path}`,
+        encoding: "UTF-8",
+        bom: false,
+        eol: "lf" as const,
+        bufferRevision: 1,
+        dirty: false,
+        readOnly: false,
+        workspaceInstanceId: "ws",
+      })),
+    );
+    render(
+      <FindInFilesPanel
+        roots={posixRoots}
+        onOpenMatch={vi.fn()}
+        onReplaceMatches={onReplaceMatches}
+        onPrepareReplacePreimages={onPrepareReplacePreimages}
+      />,
+    );
+    const emit = await runSearch();
+    const matches = [
+      searchMatch({ rootPath: "/repo/app", path: "src/A.java", lineNumber: 1, lineText: "needle one", matchStart: 0, matchEnd: 6, column: 1 }),
+      searchMatch({ rootPath: "/repo/app", path: "src/a.java", lineNumber: 1, lineText: "needle two", matchStart: 0, matchEnd: 6, column: 1 }),
+    ];
+    act(() => {
+      emit({ ...doneEvent(), kind: "batch", matches });
+      emit(doneEvent({ totalMatches: matches.length }));
+    });
+    fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "thread" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+    expect(await screen.findByTestId("code-workspace-replace-preview")).toBeInTheDocument();
+    expect(onPrepareReplacePreimages).toHaveBeenCalledTimes(1);
+    const preparedPaths = onPrepareReplacePreimages.mock.calls[0]![0];
+    expect(preparedPaths).toHaveLength(2);
+    expect(preparedPaths).toContain("/repo/app/src/A.java");
+    expect(preparedPaths).toContain("/repo/app/src/a.java");
+
+    fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+    await waitFor(() => expect(onReplaceMatches).toHaveBeenCalledTimes(1));
+    const snapshot = onReplaceMatches.mock.calls[0]![3] as {
+      preimages?: Array<{ path: string; textHash: string }>;
+    };
+    expect(snapshot.preimages).toHaveLength(2);
+    expect(snapshot.preimages?.map((p) => p.path)).toEqual(["/repo/app/src/A.java", "/repo/app/src/a.java"]);
+
+    const passedEdit = onReplaceMatches.mock.calls[0]![2] as LspWorkspaceEdit;
+    expect(passedEdit.documentEdits).toHaveLength(2);
+    expect(passedEdit.documentEdits?.map((d) => d.path)).toEqual(["/repo/app/src/A.java", "/repo/app/src/a.java"]);
+  });
+
+  describe("ED-REPAIR-005: replace prepare request cancellation and identity isolation", () => {
+    it("discards late P1 when P2 completes first and preserves P2 preview (ED-REPAIR-005-A1)", async () => {
+      let resolveP1!: (value: readonly ReplaceFilePreimage[]) => void;
+      let resolveP2!: (value: readonly ReplaceFilePreimage[]) => void;
+      const p1 = new Promise<readonly ReplaceFilePreimage[]>((res) => { resolveP1 = res; });
+      const p2 = new Promise<readonly ReplaceFilePreimage[]>((res) => { resolveP2 = res; });
+
+      let callCount = 0;
+      const onPrepareReplacePreimages = vi.fn(() => {
+        callCount++;
+        return callCount === 1 ? p1 : p2;
+      });
+
+      render(
+        <FindInFilesPanel
+          roots={roots}
+          onOpenMatch={vi.fn()}
+          onReplaceMatches={vi.fn()}
+          onPrepareReplacePreimages={onPrepareReplacePreimages}
+        />,
+      );
+
+      const emit = await runSearch();
+      const match = searchMatch({ lineNumber: 1, lineText: "needle one", matchStart: 0, matchEnd: 6, column: 1 });
+      act(() => {
+        emit({ ...doneEvent(), kind: "batch", matches: [match] });
+        emit(doneEvent({ totalMatches: 1 }));
+      });
+
+      // P1: Replace text = "thread-1"
+      fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "thread-1" } });
+      fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+      expect(onPrepareReplacePreimages).toHaveBeenCalledTimes(1);
+
+      // P2: Replace text = "thread-2"
+      fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "thread-2" } });
+      fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+      expect(onPrepareReplacePreimages).toHaveBeenCalledTimes(2);
+
+      const makePreimages = (val: string): readonly ReplaceFilePreimage[] => [
+        {
+          path: "/repo/app/notes.txt",
+          uri: "file:///repo/app/notes.txt",
+          textHash: `hash-${val}`,
+          encoding: "UTF-8",
+          bom: false,
+          eol: "lf",
+          bufferRevision: 1,
+          dirty: false,
+          readOnly: false,
+          workspaceInstanceId: "ws",
+        },
+      ];
+
+      // Resolve P2 first
+      await act(async () => {
+        resolveP2(makePreimages("thread-2"));
+      });
+      expect(await screen.findByTestId("code-workspace-replace-preview")).toBeInTheDocument();
+      expect(screen.getByTestId("code-workspace-replace-preview")).toHaveTextContent("thread-2");
+
+      // Resolve P1 late
+      await act(async () => {
+        resolveP1(makePreimages("thread-1"));
+      });
+      // P1 must be discarded: preview must remain thread-2, NOT overwritten by thread-1!
+      expect(screen.getByTestId("code-workspace-replace-preview")).toHaveTextContent("thread-2");
+      expect(screen.getByTestId("code-workspace-replace-preview")).not.toHaveTextContent("thread-1");
+    });
+
+    it("deduplicates synchronous clicks in the same event loop (ED-REPAIR-005-A1)", async () => {
+      const p = new Promise<readonly ReplaceFilePreimage[]>(() => {}); // pending
+      const onPrepareReplacePreimages = vi.fn(() => p);
+
+      render(
+        <FindInFilesPanel
+          roots={roots}
+          onOpenMatch={vi.fn()}
+          onReplaceMatches={vi.fn()}
+          onPrepareReplacePreimages={onPrepareReplacePreimages}
+        />,
+      );
+
+      const emit = await runSearch();
+      const match = searchMatch({ lineNumber: 1, lineText: "needle one", matchStart: 0, matchEnd: 6, column: 1 });
+      act(() => {
+        emit({ ...doneEvent(), kind: "batch", matches: [match] });
+        emit(doneEvent({ totalMatches: 1 }));
+      });
+
+      fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "thread" } });
+      const button = screen.getByRole("button", { name: "Preview replace all matches" });
+      // Synchronous double click in same event loop
+      fireEvent.click(button);
+      fireEvent.click(button);
+
+      // Must be called exactly once
+      expect(onPrepareReplacePreimages).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId("code-workspace-replace-preparing")).toBeInTheDocument();
+    });
+
+    it("ignores late P1 error when P2 succeeds (ED-REPAIR-005-A1)", async () => {
+      let rejectP1!: (err: Error) => void;
+      let resolveP2!: (value: readonly ReplaceFilePreimage[]) => void;
+      const p1 = new Promise<readonly ReplaceFilePreimage[]>((_, rej) => { rejectP1 = rej; });
+      const p2 = new Promise<readonly ReplaceFilePreimage[]>((res) => { resolveP2 = res; });
+
+      let callCount = 0;
+      const onPrepareReplacePreimages = vi.fn(() => {
+        callCount++;
+        return callCount === 1 ? p1 : p2;
+      });
+
+      render(
+        <FindInFilesPanel
+          roots={roots}
+          onOpenMatch={vi.fn()}
+          onReplaceMatches={vi.fn()}
+          onPrepareReplacePreimages={onPrepareReplacePreimages}
+        />,
+      );
+
+      const emit = await runSearch();
+      const match = searchMatch({ lineNumber: 1, lineText: "needle one", matchStart: 0, matchEnd: 6, column: 1 });
+      act(() => {
+        emit({ ...doneEvent(), kind: "batch", matches: [match] });
+        emit(doneEvent({ totalMatches: 1 }));
+      });
+
+      fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "val-1" } });
+      fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+
+      fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "val-2" } });
+      fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+
+      // Resolve P2 first
+      await act(async () => {
+        resolveP2([
+          {
+            path: "/repo/app/notes.txt",
+            uri: "file:///repo/app/notes.txt",
+            textHash: "hash-val-2",
+            encoding: "UTF-8",
+            bom: false,
+            eol: "lf",
+            bufferRevision: 1,
+            dirty: false,
+            readOnly: false,
+            workspaceInstanceId: "ws",
+          },
+        ]);
+      });
+      expect(await screen.findByTestId("code-workspace-replace-preview")).toBeInTheDocument();
+
+      // Reject P1 late
+      await act(async () => {
+        rejectP1(new Error("P1 disk failed"));
+      });
+
+      // Preview remains open; error from P1 is NOT shown
+      expect(screen.getByTestId("code-workspace-replace-preview")).toBeInTheDocument();
+      expect(screen.queryByTestId("code-workspace-replace-error")).not.toBeInTheDocument();
+    });
+
+    it("cancels in-flight prepare and ignores late resolution (ED-REPAIR-005-A1)", async () => {
+      let resolveP1!: (value: readonly ReplaceFilePreimage[]) => void;
+      const p1 = new Promise<readonly ReplaceFilePreimage[]>((res) => { resolveP1 = res; });
+      const onPrepareReplacePreimages = vi.fn(() => p1);
+
+      render(
+        <FindInFilesPanel
+          roots={roots}
+          onOpenMatch={vi.fn()}
+          onReplaceMatches={vi.fn()}
+          onPrepareReplacePreimages={onPrepareReplacePreimages}
+        />,
+      );
+
+      const emit = await runSearch();
+      const match = searchMatch({ lineNumber: 1, lineText: "needle one", matchStart: 0, matchEnd: 6, column: 1 });
+      act(() => {
+        emit({ ...doneEvent(), kind: "batch", matches: [match] });
+        emit(doneEvent({ totalMatches: 1 }));
+      });
+
+      fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "val-1" } });
+      fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+      expect(screen.getByTestId("code-workspace-replace-preparing")).toBeInTheDocument();
+
+      // Click cancel button
+      fireEvent.click(screen.getByTestId("code-workspace-replace-prepare-cancel"));
+      expect(screen.queryByTestId("code-workspace-replace-preparing")).not.toBeInTheDocument();
+
+      // Resolve P1 late
+      await act(async () => {
+        resolveP1([
+          {
+            path: "/repo/app/notes.txt",
+            uri: "file:///repo/app/notes.txt",
+            textHash: "hash-val-1",
+            encoding: "UTF-8",
+            bom: false,
+            eol: "lf",
+            bufferRevision: 1,
+            dirty: false,
+            readOnly: false,
+            workspaceInstanceId: "ws",
+          },
+        ]);
+      });
+
+      // Preview should NOT open
+      expect(screen.queryByTestId("code-workspace-replace-preview")).not.toBeInTheDocument();
+    });
+
+    it("invalidates in-flight prepare when query changes (ED-REPAIR-005-A2)", async () => {
+      let resolveP1!: (value: readonly ReplaceFilePreimage[]) => void;
+      const p1 = new Promise<readonly ReplaceFilePreimage[]>((res) => { resolveP1 = res; });
+      const onPrepareReplacePreimages = vi.fn(() => p1);
+
+      render(
+        <FindInFilesPanel
+          roots={roots}
+          onOpenMatch={vi.fn()}
+          onReplaceMatches={vi.fn()}
+          onPrepareReplacePreimages={onPrepareReplacePreimages}
+        />,
+      );
+
+      const emit = await runSearch();
+      const match = searchMatch({ lineNumber: 1, lineText: "needle one", matchStart: 0, matchEnd: 6, column: 1 });
+      act(() => {
+        emit({ ...doneEvent(), kind: "batch", matches: [match] });
+        emit(doneEvent({ totalMatches: 1 }));
+      });
+
+      fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "val-1" } });
+      fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+      expect(screen.getByTestId("code-workspace-replace-preparing")).toBeInTheDocument();
+
+      // Change search query while prepare is in flight
+      fireEvent.change(screen.getByLabelText("Search query"), { target: { value: "different-query" } });
+
+      // Resolve P1 late
+      await act(async () => {
+        resolveP1([
+          {
+            path: "/repo/app/notes.txt",
+            uri: "file:///repo/app/notes.txt",
+            textHash: "hash-val-1",
+            encoding: "UTF-8",
+            bom: false,
+            eol: "lf",
+            bufferRevision: 1,
+            dirty: false,
+            readOnly: false,
+            workspaceInstanceId: "ws",
+          },
+        ]);
+      });
+
+      // Preview should NOT open
+      expect(screen.queryByTestId("code-workspace-replace-preview")).not.toBeInTheDocument();
+    });
+
+    it("includes requestIdentity in snapshot matching frozen inputs (ED-REPAIR-005-A3)", async () => {
+      let capturedSnapshot: ReplacePreviewSnapshot | undefined;
+      const onReplaceMatches = vi.fn(
+        async (
+          _matches: WorkspaceSearchMatch[],
+          _replacement: string,
+          _edit: LspWorkspaceEdit,
+          snapshot?: ReplacePreviewSnapshot,
+        ) => {
+          capturedSnapshot = snapshot;
+          return { ok: true as const };
+        },
+      );
+      const onPrepareReplacePreimages = vi.fn(async (paths: readonly string[]) =>
+        paths.map((path) => ({
+          path,
+          uri: `file://${path}`,
+          textHash: `hash:${path}`,
+          encoding: "UTF-8",
+          bom: false,
+          eol: "lf" as const,
+          bufferRevision: 1,
+          dirty: false,
+          readOnly: false,
+          workspaceInstanceId: "ws-test-123",
+        })),
+      );
+
+      render(
+        <FindInFilesPanel
+          roots={roots}
+          workspaceInstanceId="ws-test-123"
+          onOpenMatch={vi.fn()}
+          onReplaceMatches={onReplaceMatches}
+          onPrepareReplacePreimages={onPrepareReplacePreimages}
+        />,
+      );
+
+      const emit = await runSearch();
+      const match = searchMatch({ lineNumber: 1, lineText: "needle one", matchStart: 0, matchEnd: 6, column: 1 });
+      act(() => {
+        emit({ ...doneEvent(), kind: "batch", matches: [match] });
+        emit(doneEvent({ totalMatches: 1 }));
+      });
+
+      fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "frozen-target" } });
+      fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+      expect(await screen.findByTestId("code-workspace-replace-preview")).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+      await waitFor(() => expect(onReplaceMatches).toHaveBeenCalledTimes(1));
+
+      expect(capturedSnapshot).toBeDefined();
+      expect(capturedSnapshot?.requestIdentity).toBeDefined();
+      expect(capturedSnapshot?.requestIdentity?.workspaceInstanceId).toBe("ws-test-123");
+      expect(capturedSnapshot?.requestIdentity?.replacement).toBe("frozen-target");
+      expect(capturedSnapshot?.requestIdentity?.token).toBeGreaterThan(0);
+      expect(capturedSnapshot?.requestIdentity?.matchCount).toBe(1);
+    });
+  });
 });
+

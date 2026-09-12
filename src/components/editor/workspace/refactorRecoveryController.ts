@@ -5,6 +5,7 @@ import type {
 } from "./refactorPlan";
 import { resolveRecoveryDocTarget } from "./refactorPlan";
 import { sha256Hex } from "./projectAnalysisModel";
+import { normalizeLineEndings } from "./saveNormalizationPipeline";
 
 /**
  * ED-AUDIT-014 recovery lifecycle for text-only refactor journals.
@@ -118,9 +119,13 @@ export async function classifyRefactorRecoveryPreconditions(
         sawUnreadable = true;
       } else {
         currentHash = sha256Hex(current.text);
-        if (currentHash === doc.preHash) {
+        const matchesPre = currentHash === doc.preHash
+          || (doc.eol ? sha256Hex(normalizeLineEndings(doc.preText, doc.eol)) === currentHash : false);
+        const matchesPost = currentHash === doc.postHash
+          || (doc.eol ? sha256Hex(normalizeLineEndings(doc.postText, doc.eol)) === currentHash : false);
+        if (matchesPre) {
           state = "already-restored";
-        } else if (currentHash === doc.postHash) {
+        } else if (matchesPost) {
           state = "restorable";
           sawRestorable = true;
         } else {
@@ -384,7 +389,9 @@ export async function executeRefactorRecovery(
       await hooks.restoreText(doc);
       const readBack = await hooks.readBack(doc);
       const restoredHash = readBack === null ? null : sha256Hex(readBack.text);
-      if (restoredHash !== doc.preHash) {
+      const preHashMatched = restoredHash === doc.preHash
+        || (doc.eol && restoredHash !== null ? sha256Hex(normalizeLineEndings(doc.preText, doc.eol)) === restoredHash : false);
+      if (!preHashMatched) {
         execution.failures.push({
           uri: doc.uri,
           canonicalPath: doc.canonicalPath,

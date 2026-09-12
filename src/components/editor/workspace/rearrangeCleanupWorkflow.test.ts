@@ -339,6 +339,29 @@ describe("ED-STYLE-002: Rearrange / Cleanup independent workflows", () => {
       expect(plan.preview.entries[0].path).toBe("/repo/src/Example.java");
     });
 
+    it("carries the provider LSP version into the immutable plan edit, separate from the editor revision (ED-MAIN-003)", () => {
+      const plan = buildRearrangePlan({
+        scope: "file",
+        targetPath: "/repo/src/Example.java",
+        targetUri: "file:///repo/src/Example.java",
+        currentText: originalText,
+        documentRevision: 42,
+        documentVersion: 7,
+        readOnly: false,
+        provider: { id: "p" },
+        edits: [
+          {
+            range: { start: { line: 1, character: 0 }, end: { line: 3, character: 0 } },
+            newText: "  void a() {}\n  void b() {}\n",
+          },
+        ],
+      });
+      // The LSP version gates the first mutation; the editor revision stays a
+      // separate precondition identity.
+      expect(plan.edit.documentEdits[0]?.version).toBe(7);
+      expect(plan.preconditions[0]?.documentRevision).toBe(42);
+    });
+
     it("detects dirty buffer or read-only conflict at plan generation", () => {
       const planDirty = buildRearrangePlan({
         scope: "file",
@@ -518,6 +541,26 @@ describe("ED-AUDIT-015: executeRearrangeTransaction supported-branch wiring (mod
     expect(deps.confirmPreview).toHaveBeenCalledTimes(1);
   });
 
+  it("propagates the resolved LSP document version into the edit handed to apply (ED-MAIN-003)", async () => {
+    const applyEdit = vi.fn(async (..._args: unknown[]) => (
+      { state: "applied" as const, postText: POST }
+    ));
+    const deps = baseDeps({
+      resolveAction: vi.fn(async () => ({
+        state: "resolved" as const,
+        edits: [...SWAP_EDITS],
+        documentVersion: 7,
+      })),
+      applyEdit,
+    });
+    const result = await executeRearrangeTransaction(deps, baseInput());
+    expect(result.ok).toBe(true);
+    const appliedEdit = applyEdit.mock.calls[0]?.[0] as {
+      documentEdits?: Array<{ version?: number }>;
+    } | undefined;
+    expect(appliedEdit?.documentEdits?.[0]?.version).toBe(7);
+  });
+
   it("short-circuits missing target and readonly with zero IO", async () => {
     const deps = baseDeps();
     const noTarget = await executeRearrangeTransaction(deps, {
@@ -559,6 +602,59 @@ describe("ED-AUDIT-015: executeRearrangeTransaction supported-branch wiring (mod
     const result = await executeRearrangeTransaction(deps, baseInput());
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.committed).toBe(false);
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("refuses a disabled rearrange candidate at request time before resolve (ED-MAIN-002)", async () => {
+    const deps = baseDeps({
+      requestActions: vi.fn(async () => ({
+        state: "ok" as const,
+        actions: [{
+          kind: "source.sortMembers",
+          title: "Sort Members",
+          raw: { disabled: { reason: "cannot sort now" } },
+        }],
+      })),
+    });
+    const result = await executeRearrangeTransaction(deps, baseInput());
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.state).toBe("unsupported");
+      expect(result.reason).toContain("cannot sort now");
+      expect(result.committed).toBe(false);
+    }
+    expect(deps.resolveAction).not.toHaveBeenCalled();
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+    expect(deps.confirmPreview).not.toHaveBeenCalled();
+  });
+
+  it("skips a disabled candidate when a same-kind enabled action exists (ED-MAIN-002)", async () => {
+    const deps = baseDeps({
+      requestActions: vi.fn(async () => ({
+        state: "ok" as const,
+        actions: [
+          { kind: "source.sortMembers", title: "Sort Members (blocked)", raw: { disabled: { reason: "nope" } } },
+          { kind: "source.sortMembers", title: "Sort Members", raw: {} },
+        ],
+      })),
+    });
+    const result = await executeRearrangeTransaction(deps, baseInput());
+    expect(result.ok).toBe(true);
+    expect(deps.resolveAction).toHaveBeenCalledTimes(1);
+    expect(deps.applyEdit).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces the standard disabled reason returned only at resolve time (ED-MAIN-002)", async () => {
+    const deps = baseDeps({
+      resolveAction: vi.fn(async () => ({
+        state: "unsupported" as const,
+        edits: [],
+        reason: "Rearrange Code action 'Sort Members' is disabled by the provider: blocked by the project; nothing applied",
+      })),
+    });
+    const result = await executeRearrangeTransaction(deps, baseInput());
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toContain("blocked by the project");
     expect(deps.applyEdit).not.toHaveBeenCalled();
   });
 
@@ -719,6 +815,28 @@ describe("ED-AUDIT-016: executeCleanupTransaction supported-branch wiring (model
       expect(result.committed).toBe(false);
       expect(result.reason).toContain("no cleanup action");
     }
+    expect(deps.applyEdit).not.toHaveBeenCalled();
+  });
+
+  it("refuses a disabled cleanup candidate at request time before resolve (ED-MAIN-002)", async () => {
+    const deps = baseDeps({
+      requestActions: vi.fn(async () => ({
+        state: "ok" as const,
+        actions: [{
+          kind: "source.cleanup",
+          title: "Clean up",
+          raw: { disabled: { reason: "cleanup is unavailable for this file" } },
+        }],
+      })),
+    });
+    const result = await executeCleanupTransaction(deps, baseInput());
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.state).toBe("unsupported");
+      expect(result.reason).toContain("cleanup is unavailable for this file");
+      expect(result.committed).toBe(false);
+    }
+    expect(deps.resolveAction).not.toHaveBeenCalled();
     expect(deps.applyEdit).not.toHaveBeenCalled();
   });
 
@@ -1285,6 +1403,7 @@ describe("ED-IMPROVE-003: provider action payload validation (model boundary)", 
       targetPath: TARGET_PATH,
       documentText: TEXT,
       documentRevision: revision,
+      documentVersion: revision,
       isSupportedKind: isRearrangeActionKind,
       capabilityLabel: "Rearrange Code",
     });
@@ -1292,7 +1411,7 @@ describe("ED-IMPROVE-003: provider action payload validation (model boundary)", 
 
   it("accepts a current-file-only text-edit payload", () => {
     const result = validate(payload());
-    expect(result).toEqual({ ok: true, edits: [EDIT] });
+    expect(result).toEqual({ ok: true, edits: [EDIT], documentVersion: null });
   });
 
   it("rejects a cross-file edit instead of filtering it out", () => {
@@ -1319,7 +1438,7 @@ describe("ED-IMPROVE-003: provider action payload validation (model boundary)", 
         operations: [{ kind: "text", document: { uri: TARGET_URI, path: TARGET_PATH, edits: [EDIT] } }],
       },
     }));
-    expect(result).toEqual({ ok: true, edits: [EDIT] });
+    expect(result).toEqual({ ok: true, edits: [EDIT], documentVersion: null });
   });
 
   it("rejects resource operations even when a text edit is present", () => {
@@ -1371,6 +1490,32 @@ describe("ED-IMPROVE-003: provider action payload validation (model boundary)", 
       expect(result.reason).toContain("disabled");
     }
   });
+
+  it("rejects the standard disabled reason object and surfaces the reason", () => {
+    const result = validate(payload({ raw: { disabled: { reason: "cannot sort members" } } }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.state).toBe("unsupported");
+      expect(result.reason).toContain("disabled");
+      expect(result.reason).toContain("cannot sort members");
+    }
+  });
+
+  it("rejects an empty disabled object with a fallback reason", () => {
+    const result = validate(payload({ raw: { disabled: {} } }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.state).toBe("unsupported");
+      expect(result.reason).toContain("did not supply a reason");
+    }
+  });
+
+  it("does not reject null/false/absent disabled values", () => {
+    for (const raw of [{ disabled: null }, { disabled: false }, {}, { disabled: "no" }]) {
+      expect(validate(payload({ raw })).ok).toBe(true);
+    }
+  });
+
 
   it("rejects malformed and reversed ranges but keeps clamping-compatible ones", () => {
     const reversed = validate(payload({
@@ -1434,6 +1579,47 @@ describe("ED-IMPROVE-003: provider action payload validation (model boundary)", 
       expect(result.reason).toContain("version 4");
       expect(result.reason).toContain("7");
     }
+  });
+
+  it("accepts a versioned edit whose LSP version matches the provider document (ED-MAIN-003)", () => {
+    const result = validate(payload({
+      edit: {
+        documentEdits: [{ uri: TARGET_URI, path: TARGET_PATH, version: 7, edits: [EDIT] }],
+      },
+    }), 7);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.documentVersion).toBe(7);
+      expect(result.edits).toEqual([EDIT]);
+    }
+  });
+
+  it("rejects a versioned edit when the provider-synchronized version is unknown (ED-MAIN-003)", () => {
+    const result = validateWorkflowProviderAction({
+      action: payload({
+        edit: {
+          documentEdits: [{ uri: TARGET_URI, path: TARGET_PATH, version: 7, edits: [EDIT] }],
+        },
+      }),
+      targetUri: TARGET_URI,
+      targetPath: TARGET_PATH,
+      documentText: TEXT,
+      documentRevision: 99,
+      documentVersion: null,
+      isSupportedKind: isRearrangeActionKind,
+      capabilityLabel: "Rearrange Code",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.state).toBe("stale");
+      expect(result.reason).toContain("provider-synchronized document version is unknown");
+    }
+  });
+
+  it("keeps an unversioned payload on the hash gates with a null document version (ED-MAIN-003)", () => {
+    const result = validate(payload());
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.documentVersion).toBeNull();
   });
 
   it("rejects a null action and an unsupported resolved kind", () => {

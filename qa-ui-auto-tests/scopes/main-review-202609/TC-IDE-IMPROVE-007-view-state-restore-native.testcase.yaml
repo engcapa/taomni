@@ -1,0 +1,79 @@
+id: TC-IDE-IMPROVE-007-view-state-restore-native
+title: "Per-leaf/file caret, scroll and fold restore across a real reload"
+description: |
+  ED-IMPROVE-007 native gate case. Seeds a two-leaf layout over the
+  view_state_fixtures 60-line Long.java where both leaves show the SAME
+  document with different view state:
+
+  1. primary: caret at line 41, a fold over the method4 block, scrollTop 300;
+  2. secondary: caret at line 6, no folds, scrollTop 0.
+
+  After `reload_window` (JS context destroyed, workspace re-entered through
+  persisted recents), each leaf must restore its OWN caret (status-bar
+  cursor), folds (fold placeholder in that editor only) and scroll (that
+  scroller's scrollTop), proving the view snapshot is keyed by leaf+file and
+  not by the shared document. Activating the secondary leaf and typing then
+  proves the restored view accepts the next input instead of being
+  overwritten by a late restore.
+
+  Highest claim on green: L2 native (Linux), packaged app, real reload.
+covers: [F25.1, F25.5]
+tags: [code-workspace, ide-c4, restore, view-state, native-gate, p1]
+modes: [native]
+fixtures: [reset_db, view_state_fixtures]
+timeout_sec: 300
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-view-state-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-viewstate","name":"qa-viewstate","roots":[{"id":"r1","name":"viewstate","path":"${fixture.view_state_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"r1","path":"Long.java"},"lastOpenedAt":1788537600000,"isGitRepo":false}]'
+  - seed_storage:
+      key: taomni.codeWorkspace.layout.v2.${fixture.view_state_instance_id}
+      value: '{"version":2,"bottomDockOpen":false,"bottomDockTab":"problems","rightPaneOpen":false,"rightPaneTab":"outline","languagePanelOpen":false,"splitOrientation":"vertical","activeEditorGroupId":"primary","expandedRootIds":["r1"],"expandedDirKeys":[],"layoutTreeV2":{"type":"split","id":"split-root","orientation":"vertical","ratios":[0.5,0.5],"children":[{"type":"leaf","id":"primary","openFileKeys":["root:r1:Long.java"],"activeKey":"root:r1:Long.java"},{"type":"leaf","id":"secondary","openFileKeys":["root:r1:Long.java"],"activeKey":"root:r1:Long.java"}]},"editorGroups":{"primary":{"openOrder":["root:r1:Long.java"],"activeKey":"root:r1:Long.java","previewKey":null,"pinnedKeys":[]},"secondary":{"openOrder":["root:r1:Long.java"],"activeKey":"root:r1:Long.java","previewKey":null,"pinnedKeys":[]}},"viewStates":{"primary":{"root:r1:Long.java":{"mainSelection":{"anchor":${fixture.view_state_primary_head},"head":${fixture.view_state_primary_head}},"selections":[],"scrollTop":300,"folds":[{"from":${fixture.view_state_fold_from},"to":${fixture.view_state_fold_to}}]}},"secondary":{"root:r1:Long.java":{"mainSelection":{"anchor":${fixture.view_state_secondary_head},"head":${fixture.view_state_secondary_head}},"selections":[],"scrollTop":0,"folds":[]}}}}'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.view_state_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 60
+  # Two leaves of the same document must both mount.
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-editor").length === 2'
+      expect_truthy: true
+  # Activate the primary leaf; reload focus placement is not the proof, the
+  # restored per-leaf state is.
+  - click: '[data-editor-group-id="primary"] [data-testid="code-workspace-editor-tab-strip"]'
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 41, Col 1"
+      timeout_sec: 30
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-scroller")[0].scrollTop > 0'
+      expect_truthy: true
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-editor")[0].querySelectorAll(".cm-foldPlaceholder").length >= 1'
+      expect_truthy: true
+  - screenshot: tc-ide-improve007-primary-restored.png
+  # Secondary restored independently: caret line 6, no fold, no scroll.
+  - click: '[data-editor-group-id="secondary"] [data-testid="code-workspace-editor-tab-strip"]'
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 6, Col 1"
+      timeout_sec: 30
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-editor")[1].querySelectorAll(".cm-foldPlaceholder").length === 0'
+      expect_truthy: true
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-scroller")[1].scrollTop === 0'
+      expect_truthy: true
+  # The restored view accepts the next input (no late restore overwrite).
+  - click: '[data-editor-group-id="secondary"] .cm-content'
+  - type: "Z"
+  - assert_text:
+      selector: '[data-editor-group-id="secondary"]'
+      contains: "Z"
+      timeout_sec: 10
+  - screenshot: tc-ide-improve007-secondary-restored.png

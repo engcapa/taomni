@@ -21,6 +21,9 @@ SEED_FILES = {
     # ED-IMPROVE-004: astral-prefixed line so replace-in-files proves the
     # code-point -> UTF-16 mapping against real disk bytes.
     "unicode.txt": "\U0001F600notes\n",
+    # ED-REPAIR-006: case-distinct files on POSIX filesystem
+    "A.java": "class CaseAlpha { void match() {} }\n",
+    "a.java": "class CaseBeta { void match() {} }\n",
 }
 
 
@@ -45,7 +48,10 @@ def setup(ctx: Any) -> None:
     for name, content in SEED_FILES.items():
         # Preserve the fixture's declared LF bytes on Windows; text-mode
         # writes would silently translate them to CRLF before the app opens it.
-        (root / name).write_bytes(content.encode("utf-8"))
+        dest = root / name
+        if dest.exists() and dest.resolve().name != name:
+            continue
+        dest.write_bytes(content.encode("utf-8"))
     values: dict[str, str] = getattr(ctx, "values")
     # These values are interpolated into JSON localStorage payloads and CSS
     # selectors. Slash-separated absolute paths work on Windows and POSIX.

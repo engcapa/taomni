@@ -525,27 +525,60 @@ function renderFsPath(parsed: ParsedFsPath): string {
 }
 
 /**
+ * Convert a file:// URI to a local filesystem path without altering case.
+ * Non-file URIs or already-filesystem paths are returned unchanged.
+ */
+export function fileUriToFsPath(candidate: string): string {
+  if (!candidate || !/^file:\/\//i.test(candidate.trim())) return candidate;
+  const trimmed = candidate.trim();
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== "file:") return candidate;
+    let path = decodeURIComponent(url.pathname);
+    if (url.hostname && url.hostname !== "localhost") {
+      path = `//${url.hostname}${path}`;
+    }
+    if (/^\/[A-Za-z]:\//.test(path)) {
+      path = path.slice(1);
+    }
+    return path;
+  } catch {
+    const stripped = trimmed.replace(/^file:\/\/(?:localhost)?\/?/i, "/");
+    let path = decodeURIComponent(stripped);
+    if (/^\/[A-Za-z]:\//.test(path)) {
+      path = path.slice(1);
+    }
+    return path;
+  }
+}
+
+/**
  * Normalize a filesystem path lexically across POSIX and Windows syntax.
  * `.` and `..` are folded without touching the filesystem, separators are
  * canonicalized to `/`, and Windows drive/UNC roots are preserved. URI-like
  * virtual documents are returned unchanged because they are not local paths.
  */
 export function normalizeFsPath(path: string): string {
-  if (!path || isDocumentUri(path)) return path;
-  return renderFsPath(parseFsPath(path));
+  if (!path) return path;
+  const candidate = fileUriToFsPath(path);
+  if (isDocumentUri(candidate)) return candidate;
+  return renderFsPath(parseFsPath(candidate));
 }
 
 export function fsPathComparisonKey(path: string): string {
-  const normalized = normalizeFsPath(path);
-  return windowsPathSyntax(path) || windowsPathSyntax(normalized)
+  const fsPath = fileUriToFsPath(path);
+  const normalized = normalizeFsPath(fsPath);
+  return windowsPathSyntax(fsPath) || windowsPathSyntax(normalized)
     ? normalized.toLocaleLowerCase("en-US")
     : normalized;
 }
 
 export function fsPathEquals(left: string, right: string): boolean {
-  const windows = windowsPathSyntax(left) || windowsPathSyntax(right);
-  const leftKey = normalizeFsPath(left);
-  const rightKey = normalizeFsPath(right);
+  const leftFs = fileUriToFsPath(left);
+  const rightFs = fileUriToFsPath(right);
+  const windows = windowsPathSyntax(leftFs) || windowsPathSyntax(rightFs);
+  const leftKey = normalizeFsPath(leftFs);
+  const rightKey = normalizeFsPath(rightFs);
   return windows
     ? leftKey.toLocaleLowerCase("en-US") === rightKey.toLocaleLowerCase("en-US")
     : leftKey === rightKey;

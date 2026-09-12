@@ -6,8 +6,9 @@
 
 import type { LspFileTextEdits, LspTextEdit, LspWorkspaceEdit } from "../../../lib/editor/lsp";
 import type { WorkspaceSearchMatch } from "../../../lib/editor/workspaceSearch";
-import { fsPathComparisonKey } from "./codeWorkspaceModel";
+import { fsPathComparisonKey, relativePathWithinRoot } from "./codeWorkspaceModel";
 import type { FindInFilesScopePlan } from "./findInFilesScopeModel";
+import { offsetFromLspPositionInStringStrict } from "./lspTextEdits";
 import {
   buildWorkspaceEditPreview,
   filterWorkspaceEditByUsages,
@@ -39,29 +40,74 @@ export function replaceMatchAbsolutePath(match: WorkspaceSearchMatch): string {
  * navigation, freshness and commit so every consumer agrees.
  */
 export function codePointOffsetToUtf16Offset(lineText: string, offset: number): number {
-  if (offset <= 0) return 0;
+  const converted = codePointOffsetToUtf16OffsetChecked(lineText, offset);
+  return converted ?? Math.max(0, Math.min(lineText.length, Math.trunc(offset) || 0));
+}
+
+/**
+ * ED-MAIN-004: strict conversion that never silently clamps. Returns null for
+ * negative, non-integer, NaN, or past-the-line code-point offsets so callers
+ * can surface a reason instead of writing at a different valid position.
+ */
+export function codePointOffsetToUtf16OffsetChecked(
+  lineText: string,
+  offset: number,
+): number | null {
+  if (!Number.isInteger(offset) || offset < 0) return null;
   let utf16 = 0;
   let codePoints = 0;
   while (utf16 < lineText.length && codePoints < offset) {
     const code = lineText.codePointAt(utf16);
-    if (code === undefined) break;
+    if (code === undefined) return null;
     utf16 += code > 0xffff ? 2 : 1;
     codePoints += 1;
   }
-  return utf16;
+  return codePoints === offset ? utf16 : null;
 }
 
 /**
- * ED-FIND-004: shared search-match mapping used by the preview dialog owner
- * and the commit owner so both sides agree on file paths, ranges, and the
- * matched text the freshness recheck compares against disk.
+ * Thrown when a backend search match carries illegal code-point coordinates.
+ * The panel and commit owners catch it and surface a zero-commit reason.
+ */
+export class InvalidSearchMatchCoordinatesError extends Error {
+  readonly path: string;
+
+  constructor(path: string, lineNumber: number, offset: number) {
+    const detail = (!Number.isInteger(lineNumber) || lineNumber < 1)
+      ? `an invalid line number ${lineNumber}`
+      : `an invalid offset ${offset}`;
+    super(`Search match at ${path}:${lineNumber} has ${detail}; replace refused`);
+    this.name = "InvalidSearchMatchCoordinatesError";
+    this.path = path;
+  }
+}
+
+/**
+ * ED-FIND-004 / ED-REPAIR-003: shared search-match mapping used by the preview
+ * dialog owner and the commit owner so both sides agree on file paths, ranges,
+ * and the matched text the freshness recheck compares against disk. Validates
+ * that lineNumber is a positive integer and code-point offsets are valid.
  */
 export function searchMatchesToReplaceInputs(matches: readonly WorkspaceSearchMatch[]): ReplaceInFilesMatch[] {
   return matches.map((match) => {
     const absolute = replaceMatchAbsolutePath(match);
-    const line = Math.max(0, match.lineNumber - 1);
-    const startCharacter = codePointOffsetToUtf16Offset(match.lineText, match.matchStart);
-    const endCharacter = codePointOffsetToUtf16Offset(match.lineText, match.matchEnd);
+    if (!Number.isInteger(match.lineNumber) || match.lineNumber < 1) {
+      throw new InvalidSearchMatchCoordinatesError(absolute, match.lineNumber, match.matchStart);
+    }
+    const line = match.lineNumber - 1;
+    // ED-MAIN-004: validate the raw code-point offsets before conversion. A
+    // negative/fractional/NaN/past-the-line/reversed match must not be clamped
+    // into a different valid range.
+    const startCharacter = codePointOffsetToUtf16OffsetChecked(match.lineText, match.matchStart);
+    const endCharacter = codePointOffsetToUtf16OffsetChecked(match.lineText, match.matchEnd);
+    if (
+      startCharacter === null
+      || endCharacter === null
+      || endCharacter < startCharacter
+    ) {
+      const badOffset = startCharacter === null ? match.matchStart : match.matchEnd;
+      throw new InvalidSearchMatchCoordinatesError(absolute, match.lineNumber, badOffset);
+    }
     return {
       filePath: absolute,
       fileUri: `file://${absolute}`,
@@ -83,15 +129,16 @@ export interface BuildReplaceEditParams {
  * Builds an LSP WorkspaceEdit from multi-file search matches and replacement text.
  */
 export function buildReplaceInFilesWorkspaceEdit(params: BuildReplaceEditParams): LspWorkspaceEdit {
-  const groupedByPath = new Map<string, { uri: string; edits: LspTextEdit[] }>();
+  const groupedByPath = new Map<string, { path: string; uri: string; edits: LspTextEdit[] }>();
 
   for (const match of params.matches) {
+    const canonicalKey = replacePreimagePathKey(match.filePath);
     const uri = match.fileUri || `file://${match.filePath.replace(/\\/g, "/")}`;
-    if (!groupedByPath.has(match.filePath)) {
-      groupedByPath.set(match.filePath, { uri, edits: [] });
+    if (!groupedByPath.has(canonicalKey)) {
+      groupedByPath.set(canonicalKey, { path: match.filePath, uri, edits: [] });
     }
 
-    const entry = groupedByPath.get(match.filePath)!;
+    const entry = groupedByPath.get(canonicalKey)!;
     entry.edits.push({
       range: {
         start: { line: match.startLine, character: match.startCharacter },
@@ -104,8 +151,8 @@ export function buildReplaceInFilesWorkspaceEdit(params: BuildReplaceEditParams)
   // LspFileTextEdits is the app's normalized per-document shape (uri + resolved
   // path + optional version), not the wire-level VersionedTextDocumentIdentifier.
   // A null version accepts the current document version.
-  const documentEdits: LspFileTextEdits[] = Array.from(groupedByPath.entries()).map(
-    ([path, { uri, edits }]) => ({ uri, path, version: null, edits }),
+  const documentEdits: LspFileTextEdits[] = Array.from(groupedByPath.values()).map(
+    ({ path, uri, edits }) => ({ uri, path, version: null, edits }),
   );
 
   return {
@@ -181,19 +228,41 @@ export function verifyReplaceMatchFreshness(
       });
       continue;
     }
-    const lines = diskText.split("\n");
-    const line = lines[match.startLine];
     const start = match.startCharacter;
     const end = match.endCharacter;
     if (
-      line === undefined
-      || match.startLine !== match.endLine
+      match.startLine !== match.endLine
+      || !Number.isInteger(match.startLine)
+      || match.startLine < 0
+      || !Number.isInteger(match.endLine)
+      || match.endLine < 0
       || !Number.isInteger(start)
       || !Number.isInteger(end)
       || start < 0
       || end < start
-      || end > line.length
-      || line.slice(start, end) !== match.matchedText
+    ) {
+      conflicts.push({
+        path: match.filePath,
+        reason: `Match "${match.matchedText}" changed since search (line ${match.startLine + 1})`,
+      });
+      continue;
+    }
+    // ED-REPAIR-003: strict LF/CRLF/CR-aware position mapping that returns null
+    // on disappeared or shortened lines, invalid line numbers, or out-of-range
+    // character offsets instead of clamping.
+    const startOffset = offsetFromLspPositionInStringStrict(diskText, {
+      line: match.startLine,
+      character: start,
+    });
+    const endOffset = offsetFromLspPositionInStringStrict(diskText, {
+      line: match.endLine,
+      character: end,
+    });
+    if (
+      startOffset === null
+      || endOffset === null
+      || endOffset < startOffset
+      || diskText.slice(startOffset, endOffset) !== match.matchedText
     ) {
       conflicts.push({
         path: match.filePath,
@@ -262,6 +331,42 @@ export interface ReplaceQueryIdentity {
   excludeGlobs: readonly string[];
 }
 
+/**
+ * ED-MAIN-005: the per-file preimage captured when the preview opens. The
+ * commit feeds the disk hashes back to the applier as the write precondition so
+ * the old ranges can never be re-anchored onto text read again later.
+ */
+export interface ReplaceFilePreimage {
+  path: string;
+  uri: string;
+  /** Hash of the preview-read text; the applier's disk precondition. */
+  textHash: string;
+  encoding: string;
+  bom: boolean;
+  eol: "lf" | "crlf" | "cr" | null;
+  bufferRevision: number | null;
+  dirty: boolean;
+  readOnly: boolean;
+  workspaceInstanceId: string;
+}
+
+export interface ReplacePrepareRequestIdentity {
+  token: number;
+  workspaceInstanceId: string;
+  scope: ReplaceScopeIdentity;
+  query: ReplaceQueryIdentity;
+  replacement: string;
+  matchKeys: readonly string[];
+  matchCount: number;
+  preparedAt: number;
+}
+
+export interface ReplacePrepareOptions {
+  token?: number;
+  workspaceInstanceId?: string;
+  signal?: AbortSignal;
+}
+
 export interface ReplacePreviewSnapshot {
   scope: ReplaceScopeIdentity;
   query: ReplaceQueryIdentity;
@@ -271,6 +376,162 @@ export interface ReplacePreviewSnapshot {
   matchCount: number;
   editSignature: string;
   capturedAt: number;
+  /** Optional for legacy snapshots; ED-MAIN-005 fills it at preview time. */
+  preimages?: readonly ReplaceFilePreimage[];
+  /** ED-REPAIR-005: request identity frozen at prepare start. */
+  requestIdentity?: ReplacePrepareRequestIdentity;
+}
+
+export interface CollectReplacePreimagesParams {
+  readonly paths: readonly string[];
+  readonly options?: ReplacePrepareOptions;
+  readonly initialWorkspaceInstanceId: string;
+  readonly getCurrentWorkspaceInstanceId: () => string;
+  readonly getCurrentRoots: () => readonly { path: string }[];
+  readonly getOpenFileState: (path: string) => { documentRevision: number | null; dirty: boolean; readOnly?: boolean } | null;
+  readonly readFile: (rootPath: string, relativePath: string) => Promise<{ text: string; hash: string; encoding?: string; bom?: boolean }>;
+  readonly isLocked?: () => boolean;
+}
+
+/**
+ * ED-REPAIR-005: Collect replace preimages while enforcing workspace instance,
+ * roots, and open buffer revision/dirty integrity across all async reads.
+ * Any mid-read mutation or abort cancels/refuses the prepare cleanly with zero writes.
+ */
+export async function collectReplacePreimages(
+  params: CollectReplacePreimagesParams,
+): Promise<readonly ReplaceFilePreimage[]> {
+  const {
+    paths,
+    options,
+    initialWorkspaceInstanceId,
+    getCurrentWorkspaceInstanceId,
+    getCurrentRoots,
+    getOpenFileState,
+    readFile,
+    isLocked,
+  } = params;
+
+  if (options?.signal?.aborted) {
+    throw new Error("Replace preview cancelled");
+  }
+  if (options?.workspaceInstanceId && options.workspaceInstanceId !== initialWorkspaceInstanceId) {
+    throw new Error("Replace preview refused: workspace instance mismatch");
+  }
+
+  const initialRoots = getCurrentRoots();
+  const initialOpenMap = new Map<string, { revision: number | null; dirty: boolean }>();
+  for (const absolute of paths) {
+    const open = getOpenFileState(absolute);
+    initialOpenMap.set(absolute, {
+      revision: open?.documentRevision ?? null,
+      dirty: open?.dirty ?? false,
+    });
+  }
+
+  const preimages: ReplaceFilePreimage[] = [];
+  for (const absolute of paths) {
+    if (options?.signal?.aborted) {
+      throw new Error("Replace preview cancelled");
+    }
+    if (getCurrentWorkspaceInstanceId() !== initialWorkspaceInstanceId) {
+      throw new Error("Replace preview cancelled: workspace changed during prepare");
+    }
+    const currentRoots = getCurrentRoots();
+    const containing = currentRoots.find(
+      (root) => relativePathWithinRoot(root.path, absolute) !== null,
+    );
+    if (!containing) {
+      throw new Error(`Replace preview refused: ${absolute} is outside the workspace`);
+    }
+    const relative = relativePathWithinRoot(containing.path, absolute) ?? "";
+    const disk = await readFile(containing.path, relative);
+    if (options?.signal?.aborted) {
+      throw new Error("Replace preview cancelled");
+    }
+    if (getCurrentWorkspaceInstanceId() !== initialWorkspaceInstanceId) {
+      throw new Error("Replace preview cancelled: workspace changed during prepare");
+    }
+    const openAfter = getOpenFileState(absolute);
+    const initialOpen = initialOpenMap.get(absolute);
+    const afterRevision = openAfter?.documentRevision ?? null;
+    const afterDirty = openAfter?.dirty ?? false;
+    if (initialOpen && (afterRevision !== initialOpen.revision || afterDirty !== initialOpen.dirty)) {
+      throw new Error(`Replace preview refused: ${absolute} was modified during prepare; please retry`);
+    }
+    const eol = disk.text.includes("\r\n")
+      ? ("crlf" as const)
+      : disk.text.includes("\r") && !disk.text.includes("\n")
+        ? ("cr" as const)
+        : ("lf" as const);
+    preimages.push({
+      path: absolute,
+      uri: `file://${absolute}`,
+      textHash: disk.hash,
+      encoding: disk.encoding ?? "UTF-8",
+      bom: disk.bom ?? false,
+      eol,
+      bufferRevision: afterRevision,
+      dirty: afterDirty,
+      readOnly: !!openAfter?.readOnly || !!isLocked?.(),
+      workspaceInstanceId: initialWorkspaceInstanceId,
+    });
+  }
+
+  // After all awaits complete, re-verify workspace instance, roots, and buffer states
+  if (getCurrentWorkspaceInstanceId() !== initialWorkspaceInstanceId || getCurrentRoots() !== initialRoots) {
+    throw new Error("Replace preview cancelled: workspace state changed during prepare");
+  }
+  for (const [absolute, initialOpen] of initialOpenMap.entries()) {
+    const openAfter = getOpenFileState(absolute);
+    const afterRevision = openAfter?.documentRevision ?? null;
+    const afterDirty = openAfter?.dirty ?? false;
+    if (afterRevision !== initialOpen.revision || afterDirty !== initialOpen.dirty) {
+      throw new Error(`Replace preview refused: ${absolute} was modified during prepare; please retry`);
+    }
+  }
+
+  return preimages;
+}
+
+/**
+ * ED-REPAIR-006: canonical path comparison key that preserves case on POSIX,
+ * normalizes Windows drive/separator and UNC syntax, and handles file:// URIs.
+ */
+export function replacePreimagePathKey(path: string): string {
+  return fsPathComparisonKey(path);
+}
+
+export function findReplacePreimage(
+  snapshot: Pick<ReplacePreviewSnapshot, "preimages">,
+  path: string,
+): ReplaceFilePreimage | null {
+  const key = replacePreimagePathKey(path);
+  return snapshot.preimages?.find((preimage) => replacePreimagePathKey(preimage.path) === key) ?? null;
+}
+
+/**
+ * ED-MAIN-005: per-file precondition map consumed by the applier. Only files
+ * with a captured preimage get an expected hash; legacy snapshots stay on the
+ * existing freshness gate.
+ * ED-REPAIR-006: canonical path keys preserve case on POSIX and normalize on
+ * Windows/UNC. Conflicting preimages for the same canonical path throw an explicit conflict.
+ */
+export function replacePreimageExpectedHashes(
+  snapshot: Pick<ReplacePreviewSnapshot, "preimages">,
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const preimage of snapshot.preimages ?? []) {
+    const key = replacePreimagePathKey(preimage.path);
+    const existing = map.get(key);
+    if (existing !== undefined && existing !== preimage.textHash) {
+      throw new Error(
+        `Conflicting replace preimages for canonical path "${key}": expected hash "${existing}" contradicts "${preimage.textHash}"`,
+      );
+    }
+    map.set(key, preimage.textHash);
+  }
+  return map;
 }
 
 export function replaceScopeIdentityFromPlan(
@@ -322,10 +583,21 @@ export interface ReplaceSelectionValidation {
  * frozen snapshot, one edit per selected match, all carrying the frozen
  * replacement text. Any drift is an internal conflict, never a partial write.
  */
+function replaceEditKey(path: string, edit: LspTextEdit): string {
+  return [
+    replacePreimagePathKey(path),
+    edit.range.start.line,
+    edit.range.start.character,
+    edit.range.end.line,
+    edit.range.end.character,
+  ].join(":");
+}
+
 export function validateReplacePreviewSelection(
   snapshot: ReplacePreviewSnapshot,
   selectedMatchKeys: ReadonlySet<string>,
   filteredEdit: LspWorkspaceEdit,
+  sourceEdit?: LspWorkspaceEdit,
 ): ReplaceSelectionValidation {
   const frozenKeys = new Set(snapshot.matchKeys);
   for (const key of selectedMatchKeys) {
@@ -336,7 +608,18 @@ export function validateReplacePreviewSelection(
       };
     }
   }
-  const edits = workspaceEditOperations(filteredEdit).flatMap((operation) => (
+  const allOperations = workspaceEditOperations(filteredEdit);
+  const resourceOperations = allOperations.filter((operation) => operation.kind !== "text");
+  if (resourceOperations.length > 0) {
+    return {
+      ok: false,
+      reason: "Resource operations are not permitted in Replace in Files; only text edits are allowed",
+    };
+  }
+  const textOperations = allOperations.filter(
+    (operation) => operation.kind === "text",
+  );
+  const edits = textOperations.flatMap((operation) => (
     operation.kind === "text" ? operation.document.edits : []
   ));
   if (edits.length !== selectedMatchKeys.size) {
@@ -345,15 +628,172 @@ export function validateReplacePreviewSelection(
       reason: `Frozen selection has ${selectedMatchKeys.size} matches but the edit carries ${edits.length}; reopen the preview`,
     };
   }
-  for (const edit of edits) {
-    if (edit.newText !== snapshot.replacement) {
-      return {
-        ok: false,
-        reason: "The edit text differs from the frozen replacement; reopen the preview",
-      };
+  const seenEditKeys = new Set<string>();
+  for (const operation of textOperations) {
+    if (operation.kind !== "text") continue;
+    const path = operation.document.path ?? operation.document.uri;
+    for (const edit of operation.document.edits) {
+      const key = replaceEditKey(path, edit);
+      if (seenEditKeys.has(key)) {
+        return {
+          ok: false,
+          reason: `Duplicate edit detected for ${path}:${edit.range.start.line}:${edit.range.start.character}; reopen the preview`,
+        };
+      }
+      seenEditKeys.add(key);
+      if (edit.newText !== snapshot.replacement) {
+        return {
+          ok: false,
+          reason: "The edit text differs from the frozen replacement; reopen the preview",
+        };
+      }
+    }
+  }
+  // ED-MAIN-005: each filtered edit must be the exact frozen path/range from the
+  // original plan, not a same-count selection that swapped a path or range.
+  if (sourceEdit) {
+    const sourceKeys = new Set<string>();
+    for (const operation of workspaceEditOperations(sourceEdit)) {
+      if (operation.kind !== "text") continue;
+      const path = operation.document.path ?? operation.document.uri;
+      for (const edit of operation.document.edits) sourceKeys.add(replaceEditKey(path, edit));
+    }
+    for (const operation of textOperations) {
+      if (operation.kind !== "text") continue;
+      const path = operation.document.path ?? operation.document.uri;
+      for (const edit of operation.document.edits) {
+        if (!sourceKeys.has(replaceEditKey(path, edit))) {
+          return {
+            ok: false,
+            reason: `Frozen edit ${path}:${edit.range.start.line}:${edit.range.start.character} is not part of the original replace plan; reopen the preview`,
+          };
+        }
+      }
     }
   }
   return { ok: true };
+}
+
+export interface ReplacePreflightFileInput {
+  path: string;
+  exists: boolean;
+  diskHash: string | null;
+  diskText: string | null;
+  encoding?: string;
+  bom?: boolean;
+  eol?: "lf" | "crlf" | "cr" | null;
+  isOpen: boolean;
+  openBufferRevision: number | null;
+  openBufferDirty: boolean;
+  openBufferReadOnly: boolean;
+}
+
+export interface ReplacePreflightConflict {
+  path: string;
+  reason: string;
+}
+
+export interface ReplacePreflightResult {
+  canCommit: boolean;
+  conflicts: readonly ReplacePreflightConflict[];
+}
+
+/**
+ * ED-REPAIR-002: Atomic whole-set preflight check before any file mutation.
+ * Verifies that all selected files exist, match their frozen preimages on disk,
+ * and have matching buffer revision and clean/read-write status. If any file fails,
+ * the entire replace plan is rejected with zero mutations.
+ */
+export function validateReplacePreflight(
+  snapshot: ReplacePreviewSnapshot,
+  currentWorkspaceInstanceId: string,
+  files: readonly ReplacePreflightFileInput[],
+): ReplacePreflightResult {
+  const conflicts: ReplacePreflightConflict[] = [];
+
+  if (snapshot.requestIdentity && snapshot.requestIdentity.workspaceInstanceId !== currentWorkspaceInstanceId) {
+    return {
+      canCommit: false,
+      conflicts: [{
+        path: "workspace",
+        reason: `workspace instance mismatch (snapshot: ${snapshot.requestIdentity.workspaceInstanceId}, current: ${currentWorkspaceInstanceId}); reopen the preview`,
+      }],
+    };
+  }
+
+  for (const file of files) {
+    if (!file.exists || file.diskHash === null || file.diskText === null) {
+      conflicts.push({
+        path: file.path,
+        reason: "file not found on disk or unreadable; reopen the preview",
+      });
+      continue;
+    }
+
+    const preimage = findReplacePreimage(snapshot, file.path);
+    if (!preimage) {
+      conflicts.push({
+        path: file.path,
+        reason: "file is not part of the frozen replace preview; reopen the preview",
+      });
+      continue;
+    }
+
+    if (preimage.workspaceInstanceId && preimage.workspaceInstanceId !== currentWorkspaceInstanceId) {
+      conflicts.push({
+        path: file.path,
+        reason: `workspace instance changed since preview (${preimage.workspaceInstanceId} -> ${currentWorkspaceInstanceId}); reopen the preview`,
+      });
+      continue;
+    }
+
+    // Disk hash precondition
+    if (file.diskHash !== preimage.textHash) {
+      conflicts.push({
+        path: file.path,
+        reason: `${file.path} changed on disk since the frozen replace preview; reopen the preview`,
+      });
+      continue;
+    }
+
+    // Open buffer session and revision precondition
+    const wasOpenAtPreview = preimage.bufferRevision !== null;
+    if (file.isOpen !== wasOpenAtPreview) {
+      conflicts.push({
+        path: file.path,
+        reason: file.isOpen
+          ? `${file.path} was opened in the editor since the frozen preview; reopen the preview`
+          : `${file.path} was closed in the editor since the frozen preview; reopen the preview`,
+      });
+      continue;
+    }
+
+    if (file.isOpen) {
+      if (file.openBufferDirty) {
+        conflicts.push({
+          path: file.path,
+          reason: `${file.path} has unsaved modifications in the editor`,
+        });
+      }
+      if (file.openBufferReadOnly) {
+        conflicts.push({
+          path: file.path,
+          reason: `${file.path} is read-only in the editor`,
+        });
+      }
+      if (preimage.bufferRevision !== null && file.openBufferRevision !== preimage.bufferRevision) {
+        conflicts.push({
+          path: file.path,
+          reason: `${file.path} was modified in the editor since the frozen replace preview (revision changed from ${preimage.bufferRevision} to ${file.openBufferRevision}); reopen the preview`,
+        });
+      }
+    }
+  }
+
+  return {
+    canCommit: conflicts.length === 0,
+    conflicts,
+  };
 }
 
 /** Minimal structural view of one applier outcome (per-document operation). */

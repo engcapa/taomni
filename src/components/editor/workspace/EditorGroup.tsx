@@ -103,6 +103,11 @@ interface EditorGroupProps {
   groupId: EditorGroupId;
   workspaceInstanceId: string;
   visible: boolean;
+  /**
+   * ED-REPAIR-008: whether this editor group is the active editor group in the workspace.
+   * When false, the group's editors are considered inactive even if visible.
+   */
+  isActiveGroup?: boolean;
   /** Temporarily blocks mutations while an external resource edit is committing. */
   readOnly?: boolean;
   tabPolicy?: WorkspaceTabPolicyV3;
@@ -278,6 +283,7 @@ export function EditorGroup({
   groupId,
   workspaceInstanceId,
   visible,
+  isActiveGroup = true,
   onClipboardUnavailable,
   onClipboardObservation,
   readOnly = false,
@@ -855,6 +861,7 @@ export function EditorGroup({
                         path={activeFile.languagePath}
                         doc={activeFile.text}
                         visible={visible}
+                        active={isActiveGroup}
                         diagnostics={activeDiagnostics}
                         highlights={activeHighlights}
                         inlayHints={activeInlayHints}
@@ -935,6 +942,7 @@ export function EditorGroup({
                       path={activeFile.languagePath}
                       doc={activeFile.text}
                       visible={visible}
+                      active={isActiveGroup}
                       diagnostics={activeDiagnostics}
                       highlights={activeHighlights}
                       inlayHints={activeInlayHints}

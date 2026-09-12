@@ -310,3 +310,82 @@ describe("§8.19.2 dispatchKeydownV2 gate", () => {
     expect(host.hasPendingChord()).toBe(false);
   });
 });
+
+describe("§8.19.2 Alt+Enter Linux event normalization", () => {
+  function altEnterHost(): { host: WorkspaceActionHost; executed: string[] } {
+    const executed: string[] = [];
+    const host = new WorkspaceActionHost({ workspaceId: "ws-alt-enter" });
+    host.registerCommands([{
+      id: "workspace.codeActions",
+      title: "Show Code Actions / Quick Fix",
+      category: "Code",
+      keybinding: "Alt+Enter",
+      run: () => {
+        executed.push("workspace.codeActions");
+      },
+    }]);
+    return { host, executed };
+  }
+
+  function dispatch(host: WorkspaceActionHost, event: KeyboardEvent): KeyDispatchResult {
+    return host.dispatchKeydownV2({
+      event,
+      workspaceId: "ws-alt-enter",
+      targetViewId: null,
+    });
+  }
+
+  it("matches a Linux event whose key is empty but reports code=Enter with altKey", () => {
+    const { host } = altEnterHost();
+    const event = makeEvent({ key: "", code: "Enter", altKey: true });
+    const result = dispatch(host, event);
+    expect(result.kind).toBe("executed");
+    if (result.kind === "executed") expect(result.actionId).toBe("workspace.codeActions");
+    expect(event.preventDefault).toHaveBeenCalled();
+  });
+
+  it("matches WebKitGTK 'Unidentified' events that still carry a physical Enter code", () => {
+    const { host } = altEnterHost();
+    const event = makeEvent({ key: "Unidentified", code: "Enter", altKey: true });
+    const result = dispatch(host, event);
+    expect(result.kind).toBe("executed");
+    if (result.kind === "executed") expect(result.actionId).toBe("workspace.codeActions");
+  });
+
+  it("matches the numpad Enter physical code for the same binding", () => {
+    const { host } = altEnterHost();
+    const event = makeEvent({ key: "Enter", code: "NumpadEnter", altKey: true });
+    const result = dispatch(host, event);
+    expect(result.kind).toBe("executed");
+  });
+
+  it("keeps rejecting IME composition even when a physical code is present", () => {
+    const { host } = altEnterHost();
+    const composing = makeEvent({
+      key: "Unidentified", code: "Enter", altKey: true, isComposing: true,
+    });
+    expect(dispatch(host, composing)).toEqual({ kind: "rejected", reason: "composing" });
+    expect(composing.preventDefault).not.toHaveBeenCalled();
+
+    const process = makeEvent({ key: "Process", code: "Enter", altKey: true });
+    expect(dispatch(host, process)).toEqual({ kind: "rejected", reason: "composing" });
+    expect(process.preventDefault).not.toHaveBeenCalled();
+
+    const editorComposing = makeEvent({ key: "Unidentified", code: "Enter", altKey: true });
+    expect(host.dispatchKeydownV2({
+      event: editorComposing,
+      workspaceId: "ws-alt-enter",
+      targetViewId: null,
+      composing: true,
+    })).toEqual({ kind: "rejected", reason: "composing" });
+    expect(editorComposing.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("does not let a modifier-less unidentified Enter reach Alt+Enter", () => {
+    const { host } = altEnterHost();
+    const event = makeEvent({ key: "Unidentified", code: "Enter" });
+    const result = dispatch(host, event);
+    expect(result.kind).toBe("rejected");
+    expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+});

@@ -211,10 +211,44 @@ import {
 } from "./workspaceVirtualSpace";
 import type { WorkspaceActionHost } from "./workspaceActionHost";
 
+// ED-MAIN-009: hashing a multi-megabyte document costs ~100ms, so capture
+// ED-REPAIR-009: exact document content hash cached by immutable Text instance.
+// Never reused across document mutations by wall-clock heuristics.
+const textIdentityCache = new WeakMap<Text, string>();
+
+function hashDocumentText(doc: Text): string {
+  let hash = 0x811c9dc5;
+  // The iterator yields line-break chunks ("\n") as values of their own, so
+  // hashing every chunk's characters reproduces the string hash exactly.
+  for (const iter = doc.iter(); !iter.next().done;) {
+    const chunk = iter.value;
+    for (let index = 0; index < chunk.length; index += 1) {
+      hash ^= chunk.charCodeAt(index);
+      hash = Math.imul(hash, 0x01000193);
+    }
+  }
+  return `${doc.length}:${(hash >>> 0).toString(16)}`;
+}
+
+/**
+ * Exact content identity for a CodeMirror document, cached on the immutable Text instance.
+ * ED-REPAIR-009: Text identity is strictly bound to the immutable Text instance,
+ * never reused across document mutations by wall-clock heuristics.
+ */
+export function documentTextIdentity(doc: Text): string {
+  const cached = textIdentityCache.get(doc);
+  if (cached !== undefined) return cached;
+  const identity = hashDocumentText(doc);
+  textIdentityCache.set(doc, identity);
+  return identity;
+}
+
 /**
  * ED-IMPROVE-007: capture this view's caret/selection, scroll and fold state.
  * Pure over the CodeMirror view so the workspace can store it in memory and
- * persist it with the layout without serializing per keystroke.
+ * persist it with the layout without serializing per keystroke. ED-MAIN-009
+ * adds the content identity and the horizontal scroll offset.
+ * ED-REPAIR-009: binds the capture identity to the exact doc version.
  */
 export function captureEditorViewState(view: EditorView): PersistedEditorViewState {
   const selection = view.state.selection;
@@ -236,20 +270,40 @@ export function captureEditorViewState(view: EditorView): PersistedEditorViewSta
     selections,
     scrollTop: view.scrollDOM?.scrollTop ?? 0,
     folds,
+    textIdentity: documentTextIdentity(view.state.doc),
+    scrollLeft: view.scrollDOM?.scrollLeft ?? 0,
   };
+}
+
+export interface ApplyPersistedEditorViewStateResult {
+  applied: boolean;
+  deferredScroll: { scrollTop: number; scrollLeft: number } | null;
 }
 
 /**
  * ED-IMPROVE-007: apply a persisted snapshot once when the view mounts.
  * Offsets beyond the live document are clamped and folds outside it are
  * dropped, so a stale or corrupt snapshot can never throw or select garbage.
+ * ED-REPAIR-009: returns deferred scroll targets if geometry is unready on mount.
  */
 export function applyPersistedEditorViewState(
   view: EditorView,
   state: PersistedEditorViewState,
-): void {
+): ApplyPersistedEditorViewStateResult {
+  // ED-MAIN-009: a snapshot that carries a content identity only restores its
+  // selection/folds/scroll when the live text still matches. Legacy snapshots
+  // without an identity keep the original clamp behavior.
+  if (
+    state.textIdentity !== undefined
+    && state.textIdentity !== documentTextIdentity(view.state.doc)
+  ) {
+    return { applied: false, deferredScroll: null };
+  }
   const docLength = view.state.doc.length;
-  const clamp = (value: number): number => Math.max(0, Math.min(docLength, Math.floor(value)));
+  const clamp = (value: number): number => {
+    if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+    return Math.max(0, Math.min(docLength, Math.floor(value)));
+  };
   const toRange = (range: PersistedViewSelection) => EditorSelection.range(
     clamp(range.anchor),
     clamp(range.head),
@@ -268,13 +322,32 @@ export function applyPersistedEditorViewState(
     if (to <= from || to > docLength) continue;
     view.dispatch({ effects: foldEffect.of({ from, to }) });
   }
-  if (state.scrollTop > 0 && view.scrollDOM) {
-    const maxScroll = Math.max(
-      0,
-      view.scrollDOM.scrollHeight - view.scrollDOM.clientHeight,
-    );
-    view.scrollDOM.scrollTop = Math.min(state.scrollTop, maxScroll);
+  let deferredScroll: { scrollTop: number; scrollLeft: number } | null = null;
+  if (view.scrollDOM && (state.scrollTop > 0 || (state.scrollLeft ?? 0) > 0)) {
+    const dom = view.scrollDOM;
+    const targetScrollTop = state.scrollTop > 0 ? state.scrollTop : 0;
+    const targetScrollLeft = (state.scrollLeft ?? 0) > 0 ? (state.scrollLeft ?? 0) : 0;
+    const canScrollVertically = targetScrollTop > 0 && dom.scrollHeight > dom.clientHeight;
+    const canScrollHorizontally = targetScrollLeft > 0 && dom.scrollWidth > dom.clientWidth;
+    if (
+      (targetScrollTop > 0 && !canScrollVertically)
+      || (targetScrollLeft > 0 && !canScrollHorizontally)
+    ) {
+      deferredScroll = {
+        scrollTop: canScrollVertically ? 0 : targetScrollTop,
+        scrollLeft: canScrollHorizontally ? 0 : targetScrollLeft,
+      };
+    }
+    if (targetScrollTop > 0 && canScrollVertically) {
+      const maxScrollTop = Math.max(0, dom.scrollHeight - dom.clientHeight);
+      dom.scrollTop = Math.min(targetScrollTop, maxScrollTop);
+    }
+    if (targetScrollLeft > 0 && canScrollHorizontally) {
+      const maxScrollLeft = Math.max(0, dom.scrollWidth - dom.clientWidth);
+      dom.scrollLeft = Math.min(targetScrollLeft, maxScrollLeft);
+    }
   }
+  return { applied: true, deferredScroll };
 }
 
 export interface EditorRevealTarget {
@@ -317,6 +390,11 @@ interface CodeMirrorHostProps {
   documentRevision?: number;
   doc: string;
   visible: boolean;
+  /**
+   * ED-REPAIR-008: whether this editor instance belongs to the active editor group.
+   * When false, the host is inactive even if visible (e.g. in multi-split layouts).
+   */
+  active?: boolean;
   /**
    * Owning workspace instance id (§8.17.6): copy/cut write the workspace
    * clipboard session and paste reads it across every split view.
@@ -483,15 +561,112 @@ let nextEditorHostViewId = 0;
 // (bound at mount) so the module-level helpers stay pure and testable.
 const clipboardContextByView = new WeakMap<
   EditorView,
-  {
-    workspaceId: string | null;
-    onUnavailable: (message: string) => void;
-    /** ED-CLIP-004: typed metadata-only observation of the guarded result. */
-    onObservation?: (record: ClipboardObservationRecord) => void;
-    /** Refcounted session handle (§8.18.4); null for legacy non-workspace views. */
-    handle: WorkspaceClipboardHandle | null;
-  }
+  ClipboardObservationEndpoint
 >();
+
+interface ClipboardObservationEndpoint {
+  workspaceId: string | null;
+  onUnavailable: (message: string) => void;
+  /** ED-CLIP-004: typed metadata-only observation of the guarded result. */
+  onObservation?: (record: ClipboardObservationRecord) => void;
+  /** Refcounted session handle (§8.18.4); null for legacy non-workspace views. */
+  handle: WorkspaceClipboardHandle | null;
+  /** ED-MAIN-007: whether this view is still the active/visible workspace leaf. */
+  isActive?: () => boolean;
+}
+
+// ED-MAIN-007: an async clipboard request freezes its owner generation and
+// request token. A request whose owner moved on (focus left without an
+// authorizing menu, another leaf became active, or a newer request started)
+// must not edit, focus, or record history, but its already-performed OS effect
+// is still observed through the frozen endpoint.
+const clipboardOwnerGenerationByView = new WeakMap<EditorView, { generation: number }>();
+const clipboardRequestTokenByView = new WeakMap<EditorView, number>();
+
+function clipboardOwnerGeneration(view: EditorView): number {
+  return clipboardOwnerGenerationByView.get(view)?.generation ?? 0;
+}
+
+export function bumpClipboardOwnerGeneration(view: EditorView): void {
+  const state = clipboardOwnerGenerationByView.get(view) ?? { generation: 0 };
+  state.generation += 1;
+  clipboardOwnerGenerationByView.set(view, state);
+}
+
+function nextClipboardRequestToken(view: EditorView): number {
+  const next = (clipboardRequestTokenByView.get(view) ?? 0) + 1;
+  clipboardRequestTokenByView.set(view, next);
+  return next;
+}
+
+function clipboardRequestIsCurrent(view: EditorView, token: number): boolean {
+  return (clipboardRequestTokenByView.get(view) ?? 0) === token;
+}
+
+function clipboardOwnerLost(
+  view: EditorView,
+  endpoint: ClipboardObservationEndpoint | undefined,
+  ownerGenerationAtRequest: number,
+  requestToken: number,
+): boolean {
+  if (!view.dom.isConnected) return true;
+  if (endpoint?.isActive && !endpoint.isActive()) return true;
+  if (!clipboardRequestIsCurrent(view, requestToken)) return true;
+  // ED-REPAIR-008: owner generation change is strictly irreversible. If focus
+  // left or generation bumped after the request started, returning focus to the
+  // editor does not restore ownership.
+  if (clipboardOwnerGeneration(view) !== ownerGenerationAtRequest) {
+    return true;
+  }
+  return false;
+}
+
+export function watchClipboardRequestFocus(view: EditorView): () => void {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return () => {};
+  }
+  const activeElementAtRequest = document.activeElement;
+  const isEditorFocusedAtRequest =
+    view.hasFocus || (activeElementAtRequest !== null && view.dom.contains(activeElementAtRequest));
+
+  const menuContainer = !isEditorFocusedAtRequest && activeElementAtRequest
+    ? (activeElementAtRequest.closest(
+        '[role="menu"], [role="menubar"], [data-testid*="menu"], .context-menu, [data-context-menu], dialog'
+      ) ?? activeElementAtRequest)
+    : null;
+
+  let cleanedUp = false;
+  const onFocusIn = (event: FocusEvent) => {
+    if (cleanedUp) return;
+    const target = event.target as Node | null;
+    if (!target) return;
+    if (target === document.body || target === document.documentElement) return;
+    if (target instanceof Element && (target.hasAttribute("data-clipboard-internal-fallback") || (target as HTMLElement).style?.left === "-9999px")) return;
+    if (view.dom.contains(target)) return;
+    if (isEditorFocusedAtRequest) {
+      bumpClipboardOwnerGeneration(view);
+      cleanup();
+      return;
+    }
+    if (activeElementAtRequest && (activeElementAtRequest === target || activeElementAtRequest.contains(target))) {
+      return;
+    }
+    if (menuContainer && menuContainer.contains(target)) {
+      return;
+    }
+    bumpClipboardOwnerGeneration(view);
+    cleanup();
+  };
+
+  const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    window.removeEventListener("focusin", onFocusIn, true);
+  };
+
+  window.addEventListener("focusin", onFocusIn, true);
+  return cleanup;
+}
 
 /**
  * ED-CLIP-004: project one settled guarded clipboard result into the typed
@@ -499,13 +674,12 @@ const clipboardContextByView = new WeakMap<
  * shape of whatever was actually inserted (OS text or workspace fallback).
  */
 function reportClipboardWriteObservation(
-  view: EditorView,
+  context: ClipboardObservationEndpoint | undefined,
   operation: ClipboardObservationOperation,
   result: GuardedSystemWriteResult,
   payload: EditorClipboardPayload,
   caretCount: number,
 ): void {
-  const context = clipboardContextByView.get(view);
   if (!context?.onObservation) return;
   const handle = context.handle;
   const snapshot = handle?.getSnapshot();
@@ -526,12 +700,11 @@ function reportClipboardWriteObservation(
 }
 
 function reportClipboardReadObservation(
-  view: EditorView,
+  context: ClipboardObservationEndpoint | undefined,
   operation: ClipboardObservationOperation,
   result: GuardedSystemReadResult,
   caretCount: number,
 ): void {
-  const context = clipboardContextByView.get(view);
   if (!context?.onObservation) return;
   const handle = context.handle;
   const snapshot = handle?.getSnapshot();
@@ -551,7 +724,7 @@ function reportClipboardReadObservation(
  * the OS effect that already happened instead of dropping the observation.
  */
 function reportClipboardCancelledObservation(
-  view: EditorView,
+  endpoint: ClipboardObservationEndpoint | undefined,
   operation: ClipboardObservationOperation,
   systemEffect: GuardedSystemEffect,
   caretCount: number,
@@ -563,10 +736,9 @@ function reportClipboardCancelledObservation(
     payloadLength?: number | null;
   } = {},
 ): void {
-  const context = clipboardContextByView.get(view);
-  if (!context?.onObservation) return;
-  const snapshot = context.handle?.getSnapshot();
-  context.onObservation(createClipboardCancelledObservation({
+  if (!endpoint?.onObservation) return;
+  const snapshot = endpoint.handle?.getSnapshot();
+  endpoint.onObservation(createClipboardCancelledObservation({
     operation,
     systemEffect,
     permission: snapshot?.permission ?? "unknown",
@@ -645,12 +817,30 @@ function payloadForSystemClipboardText(
 function writeEditorSelectionToClipboard(view: EditorView): boolean {
   const payload = editorClipboardPayload(view.state);
   if (!payload) return false;
-  const context = clipboardContextByView.get(view);
+  const docAtRequest = view.state.doc;
+  const selectionAtRequest = view.state.selection;
+  const rawContext = clipboardContextByView.get(view);
+  const context = rawContext ? { ...rawContext } : undefined;
   const handle = context?.handle;
+  const requestToken = nextClipboardRequestToken(view);
+  const ownerGenerationAtRequest = clipboardOwnerGeneration(view);
   const caretCountAtCopy = view.state.selection.ranges.length;
+  const cleanupFocusWatcher = watchClipboardRequestFocus(view);
+
   if (handle) {
     void handle.writeSystemClipboard(payload.plainText).then((res) => {
-      if (!view.dom.isConnected) return;
+      if (
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
+        || view.state.doc !== docAtRequest
+        || !view.state.selection.eq(selectionAtRequest, true)
+      ) {
+        reportClipboardCancelledObservation(context, "copy", res.systemEffect, caretCountAtCopy, {
+          segmentCount: payload.segments ? payload.segments.length : null,
+          rectangular: payload.rectangular,
+          payloadLength: payload.plainText.length,
+        });
+        return;
+      }
       if (res.outcome === "success") {
         rememberEditorClipboardPayload(view, payload);
       } else if (res.outcome === "denied") {
@@ -684,23 +874,45 @@ function writeEditorSelectionToClipboard(view: EditorView): boolean {
       // Reported after the payload landed in the slot so the observation's
       // revision/exclusion fields describe the committed state, not the
       // pre-write one.
-      reportClipboardWriteObservation(view, "copy", res, payload, caretCountAtCopy);
+      reportClipboardWriteObservation(context, "copy", res, payload, caretCountAtCopy);
+    }).catch(() => {}).finally(() => {
+      cleanupFocusWatcher();
     });
     return true;
   }
   void writeText(payload.plainText)
     .then(() => {
-      if (view.dom.isConnected) rememberEditorClipboardPayload(view, payload);
+      if (
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
+        || view.state.doc !== docAtRequest
+        || !view.state.selection.eq(selectionAtRequest, true)
+      ) {
+        reportClipboardCancelledObservation(context, "copy", "unknown", caretCountAtCopy, {
+          segmentCount: payload.segments ? payload.segments.length : null,
+          rectangular: payload.rectangular,
+          payloadLength: payload.plainText.length,
+        });
+        return;
+      }
+      rememberEditorClipboardPayload(view, payload);
     })
     .catch(() => {
+      if (
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
+        || view.state.doc !== docAtRequest
+        || !view.state.selection.eq(selectionAtRequest, true)
+      ) {
+        return;
+      }
       // System clipboard denied: the workspace session still owns the full
       // payload; surface unavailable instead of silently dropping it.
-      if (view.dom.isConnected) {
-        rememberEditorClipboardPayload(view, payload, { systemClipboardUnavailable: true });
-        context?.onUnavailable(
-          "System clipboard unavailable — copy kept for in-workspace paste only",
-        );
-      }
+      rememberEditorClipboardPayload(view, payload, { systemClipboardUnavailable: true });
+      context?.onUnavailable(
+        "System clipboard unavailable — copy kept for in-workspace paste only",
+      );
+    })
+    .finally(() => {
+      cleanupFocusWatcher();
     });
   return true;
 }
@@ -719,22 +931,28 @@ function pasteSystemClipboard(view: EditorView): boolean {
   if (view.composing || view.state.readOnly) return false;
   const docAtRequest = view.state.doc;
   const selectionAtRequest = view.state.selection;
-  const context = clipboardContextByView.get(view);
+  const rawContext = clipboardContextByView.get(view);
+  const context = rawContext ? { ...rawContext } : undefined;
   const handle = context?.handle;
+  const requestToken = nextClipboardRequestToken(view);
+  const ownerGenerationAtRequest = clipboardOwnerGeneration(view);
 
   const caretCountAtPaste = view.state.selection.ranges.length;
+  const cleanupFocusWatcher = watchClipboardRequestFocus(view);
 
   if (handle) {
     void handle.readSystemClipboard({ readTextResult: readCodeWorkspaceClipboardText }).then((result) => {
       if (
-        !view.dom.isConnected
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
         || view.composing
+        || view.state.readOnly
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
-        // ED-IMPROVE-009: the paste is cancelled with no document/focus effect,
-        // but the OS read effect that already happened is still reported.
-        reportClipboardCancelledObservation(view, "paste", result.systemEffect, caretCountAtPaste, {
+        // ED-IMPROVE-009 / ED-MAIN-007: the paste is cancelled with no document
+        // or focus effect, but the OS read effect that already happened is
+        // still reported through the frozen endpoint.
+        reportClipboardCancelledObservation(context, "paste", result.systemEffect, caretCountAtPaste, {
           baseGeneration: result.outcome === "stale-generation" ? result.baseGeneration : null,
           usedWorkspaceFallback: result.outcome !== "success" && !!result.fallbackSession,
           segmentCount: result.outcome === "success" ? null : result.fallbackSession?.segments?.length ?? null,
@@ -743,7 +961,7 @@ function pasteSystemClipboard(view: EditorView): boolean {
         });
         return;
       }
-      reportClipboardReadObservation(view, "paste", result, caretCountAtPaste);
+      reportClipboardReadObservation(context, "paste", result, caretCountAtPaste);
       if (result.outcome === "success") {
         pasteEditorClipboardPayload(
           view,
@@ -775,21 +993,24 @@ function pasteSystemClipboard(view: EditorView): boolean {
           context?.onUnavailable(reasonMsg);
         }
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      cleanupFocusWatcher();
+    });
     return true;
   }
 
   void readCodeWorkspaceClipboardText()
     .then((result) => {
       if (
-        !view.dom.isConnected
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
         || view.composing
+        || view.state.readOnly
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
-        // ED-IMPROVE-009: cancelled paste keeps the OS read fact.
+        // ED-IMPROVE-009 / ED-MAIN-007: cancelled paste keeps the OS read fact.
         reportClipboardCancelledObservation(
-          view,
+          context,
           "paste",
           result.ok ? "not-performed" : "unknown",
           caretCountAtPaste,
@@ -828,7 +1049,10 @@ function pasteSystemClipboard(view: EditorView): boolean {
       );
       view.focus();
     })
-    .catch(() => {});
+    .catch(() => {})
+    .finally(() => {
+      cleanupFocusWatcher();
+    });
   return true;
 }
 
@@ -841,27 +1065,32 @@ function pasteAsPlainText(view: EditorView): boolean {
   if (view.composing || view.state.readOnly) return false;
   const docAtRequest = view.state.doc;
   const selectionAtRequest = view.state.selection;
-  const context = clipboardContextByView.get(view);
+  const rawContext = clipboardContextByView.get(view);
+  const context = rawContext ? { ...rawContext } : undefined;
   const handle = context?.handle;
+  const requestToken = nextClipboardRequestToken(view);
+  const ownerGenerationAtRequest = clipboardOwnerGeneration(view);
 
   const caretCountAtPlainPaste = view.state.selection.ranges.length;
+  const cleanupFocusWatcher = watchClipboardRequestFocus(view);
 
   if (handle) {
     void handle.readSystemClipboard({ readTextResult: readCodeWorkspaceClipboardText }).then((result) => {
       if (
-        !view.dom.isConnected
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
         || view.composing
+        || view.state.readOnly
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
-        reportClipboardCancelledObservation(view, "paste-plain", result.systemEffect, caretCountAtPlainPaste, {
+        reportClipboardCancelledObservation(context, "paste-plain", result.systemEffect, caretCountAtPlainPaste, {
           baseGeneration: result.outcome === "stale-generation" ? result.baseGeneration : null,
           usedWorkspaceFallback: result.outcome !== "success" && !!result.fallbackSession,
           payloadLength: result.outcome === "success" ? result.text.length : result.fallbackSession?.plainText.length ?? null,
         });
         return;
       }
-      reportClipboardReadObservation(view, "paste-plain", result, caretCountAtPlainPaste);
+      reportClipboardReadObservation(context, "paste-plain", result, caretCountAtPlainPaste);
       const text = result.outcome === "success" ? result.text : result.fallbackSession?.plainText ?? "";
       if (!text) {
         context?.onUnavailable(
@@ -885,20 +1114,23 @@ function pasteAsPlainText(view: EditorView): boolean {
         );
       }
       view.focus();
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      cleanupFocusWatcher();
+    });
     return true;
   }
 
   void readCodeWorkspaceClipboardText()
     .then((result) => {
       if (
-        !view.dom.isConnected
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
         || view.composing
+        || view.state.readOnly
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
         reportClipboardCancelledObservation(
-          view,
+          context,
           "paste-plain",
           result.ok ? "not-performed" : "unknown",
           caretCountAtPlainPaste,
@@ -929,7 +1161,10 @@ function pasteAsPlainText(view: EditorView): boolean {
       }
       view.focus();
     })
-    .catch(() => {});
+    .catch(() => {})
+    .finally(() => {
+      cleanupFocusWatcher();
+    });
   return true;
 }
 
@@ -939,22 +1174,27 @@ function cutSystemClipboard(view: EditorView): boolean {
   if (!payload) return false;
   const docAtRequest = view.state.doc;
   const selectionAtRequest = view.state.selection;
-  const context = clipboardContextByView.get(view);
+  const rawContext = clipboardContextByView.get(view);
+  const context = rawContext ? { ...rawContext } : undefined;
   const handle = context?.handle;
+  const requestToken = nextClipboardRequestToken(view);
+  const ownerGenerationAtRequest = clipboardOwnerGeneration(view);
 
   const caretCountAtCut = view.state.selection.ranges.length;
+  const cleanupFocusWatcher = watchClipboardRequestFocus(view);
 
   if (handle) {
     void handle.writeSystemClipboard(payload.plainText).then((res) => {
       if (
-        !view.dom.isConnected
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
         || view.composing
+        || view.state.readOnly
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
-        // ED-IMPROVE-009: the cut is cancelled with no document/focus effect,
-        // but a possibly-performed OS write keeps its real effect fact.
-        reportClipboardCancelledObservation(view, "cut", res.systemEffect, caretCountAtCut, {
+        // ED-IMPROVE-009 / ED-MAIN-007: the cut is cancelled with no document
+        // or focus effect, but a possibly-performed OS write keeps its fact.
+        reportClipboardCancelledObservation(context, "cut", res.systemEffect, caretCountAtCut, {
           baseGeneration: res.outcome === "stale-generation" ? res.baseGeneration : null,
           segmentCount: payload.segments ? payload.segments.length : null,
           rectangular: payload.rectangular,
@@ -985,7 +1225,9 @@ function cutSystemClipboard(view: EditorView): boolean {
         context?.onUnavailable(reasonMsg);
         view.focus();
       }
-      reportClipboardWriteObservation(view, "cut", res, payload, caretCountAtCut);
+      reportClipboardWriteObservation(context, "cut", res, payload, caretCountAtCut);
+    }).catch(() => {}).finally(() => {
+      cleanupFocusWatcher();
     });
     return true;
   }
@@ -993,12 +1235,13 @@ function cutSystemClipboard(view: EditorView): boolean {
   void writeText(payload.plainText)
     .then(() => {
       if (
-        !view.dom.isConnected
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
         || view.composing
+        || view.state.readOnly
         || view.state.doc !== docAtRequest
         || !view.state.selection.eq(selectionAtRequest, true)
       ) {
-        reportClipboardCancelledObservation(view, "cut", "unknown", caretCountAtCut, {
+        reportClipboardCancelledObservation(context, "cut", "unknown", caretCountAtCut, {
           segmentCount: payload.segments ? payload.segments.length : null,
           rectangular: payload.rectangular,
           payloadLength: payload.plainText.length,
@@ -1011,18 +1254,23 @@ function cutSystemClipboard(view: EditorView): boolean {
     })
     .catch(() => {
       if (
-        view.dom.isConnected
-        && !view.composing
-        && view.state.doc === docAtRequest
-        && view.state.selection.eq(selectionAtRequest, true)
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
+        || view.composing
+        || view.state.readOnly
+        || view.state.doc !== docAtRequest
+        || !view.state.selection.eq(selectionAtRequest, true)
       ) {
-        rememberEditorClipboardPayload(view, payload, { systemClipboardUnavailable: true });
-        cutEditorSelections(view);
-        context?.onUnavailable(
-          "System clipboard unavailable — cut kept for in-workspace paste only",
-        );
-        view.focus();
+        return;
       }
+      rememberEditorClipboardPayload(view, payload, { systemClipboardUnavailable: true });
+      cutEditorSelections(view);
+      context?.onUnavailable(
+        "System clipboard unavailable — cut kept for in-workspace paste only",
+      );
+      view.focus();
+    })
+    .finally(() => {
+      cleanupFocusWatcher();
     });
   return true;
 }
@@ -1152,7 +1400,7 @@ function isCompositionNavigationKey(key: string): boolean {
   return COMPOSITION_NAVIGATION_KEYS.has(key);
 }
 
-function editorCommandPort(view: EditorView): EditorCommandPort {
+function editorCommandPort(view: EditorView, isComposing?: () => boolean): EditorCommandPort {
   return {
     execute(commandId, options) {
       switch (commandId) {
@@ -1241,7 +1489,7 @@ function editorCommandPort(view: EditorView): EditorCommandPort {
       }
     },
     state: () => ({
-      composing: view.composing,
+      composing: view.composing || (isComposing?.() ?? false),
       readOnly: view.state.readOnly,
       hasSelection: view.state.selection.ranges.some((range) => !range.empty),
       caretCount: view.state.selection.ranges.length,
@@ -1275,18 +1523,6 @@ const WORKSPACE_EDITOR_STYLE = EditorView.theme({
 });
 
 const LSP_EDITOR_STYLE = EditorView.theme({
-  ".cm-tooltip-autocomplete > ul > li": {
-    cursor: "pointer",
-  },
-  ".cm-tooltip-autocomplete > ul > li[aria-selected][role=option]": {
-    backgroundColor: "#1d4ed8",
-    color: "#ffffff",
-    boxShadow: "inset 3px 0 #93c5fd",
-  },
-  ".cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionIcon, .cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionMatchedText": {
-    color: "inherit",
-    opacity: "1",
-  },
   ".cm-lsp-diagnostic-error": {
     textDecoration: "underline wavy #ef4444 1px",
     textUnderlineOffset: "2px",
@@ -1841,6 +2077,7 @@ function areCodeMirrorHostPropsEqual(prev: CodeMirrorHostProps, next: CodeMirror
   if (prev.documentRevision !== next.documentRevision) return false;
   if (prev.doc !== next.doc) return false;
   if (prev.visible !== next.visible) return false;
+  if (prev.active !== next.active) return false;
   if (prev.readOnly !== next.readOnly) return false;
   if (prev.renderedDocEnabled !== next.renderedDocEnabled) return false;
   if (prev.renderedDocLanguageId !== next.renderedDocLanguageId) return false;
@@ -1949,6 +2186,15 @@ function applyDocumentSnapshotToView(view: EditorView, nextText: string): boolea
   return true;
 }
 
+interface CompositionSession {
+  readonly id: string;
+  status: "active" | "end_pending" | "finalized";
+  readonly owner: WorkspaceDocumentTransactionOwner;
+  readonly fileKey: string;
+  readonly viewId: string;
+  readonly workspaceId?: string | null;
+}
+
 export const CodeMirrorHost = memo(function CodeMirrorHost({
   path,
   fileKey = path,
@@ -1959,6 +2205,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   documentRevision = 0,
   doc,
   visible,
+  active = true,
   diagnostics = EMPTY_DIAGNOSTICS,
   highlights = EMPTY_HIGHLIGHTS,
   inlayHints = EMPTY_INLAY_HINTS,
@@ -2148,6 +2395,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   };
   const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
   const selectionEmitTimerRef = useRef<number | null>(null);
+  const viewportEmitTimerRef = useRef<number | null>(null);
   const renderedDiagnosticsRef = useRef(diagnostics);
   const renderedReadOnlyRef = useRef(readOnly);
   const renderedSoftWrapRef = useRef(softWrap);
@@ -2216,10 +2464,19 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   onViewStateChangeRef.current = onViewStateChange;
   const lastEmittedViewStateRef = useRef<string | null>(null);
   const viewStateEmitTimerRef = useRef<number | null>(null);
-  // ED-IMPROVE-008: IME composition ownership. While active, doc changes are
-  // dispatched with the composition origin so the owner coalesces them into
-  // one logical undo; blur/destroy/end finalize and release the session.
+  const pendingDeferredScrollRef = useRef<{ scrollTop: number; scrollLeft: number } | null>(null);
+  const userInteractedSinceMountRef = useRef(false);
+  const restoringInitialViewStateRef = useRef(false);
+  // ED-IMPROVE-008 & ED-REPAIR-007: IME composition ownership and session lifecycle.
   const compositionActiveRef = useRef(false);
+  const compositionSessionSeqRef = useRef(0);
+  const currentCompositionSessionRef = useRef<CompositionSession | null>(null);
+  const compositionEndFinalizeRef = useRef<number | null>(null);
+  // ED-MAIN-007 / ED-REPAIR-008: latest visible/active-leaf state for the async clipboard owner.
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
+  const activeRef = useRef(active);
+  activeRef.current = active;
   const onExpandSelectionRef = useRef(onExpandSelection);
   const onLightbulbRef = useRef(onLightbulb);
   const onGitChangeClickRef = useRef(onGitChangeClick);
@@ -2413,6 +2670,22 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         selectionEmitTimerRef.current = null;
         if (viewRef.current === view) emitSelection(view);
       }, delay);
+    };
+    const clearPendingViewportEmit = () => {
+      if (viewportEmitTimerRef.current === null) return;
+      window.clearTimeout(viewportEmitTimerRef.current);
+      viewportEmitTimerRef.current = null;
+    };
+    const scheduleViewportEmit = (view: EditorView, defer: boolean) => {
+      clearPendingViewportEmit();
+      if (!defer) {
+        emitViewport(view);
+        return;
+      }
+      viewportEmitTimerRef.current = window.setTimeout(() => {
+        viewportEmitTimerRef.current = null;
+        if (viewRef.current === view) emitViewport(view);
+      }, 125);
     };
     // ED-IMPROVE-007: capture is cheap and stays in memory; identical
     // snapshots are dropped so a scroll or caret move does not schedule a
@@ -2810,14 +3083,31 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
                   });
                 });
                 if (deltas.length > 0) {
-                  const composingInput = compositionActiveRef.current
+                  let currentSession = currentCompositionSessionRef.current;
+                  const compositionTransaction = update.transactions.some((tr) => tr.isUserEvent("input.type.compose"));
+                  if (currentSession?.status === "end_pending" && !compositionTransaction
+                    && !compositionActiveRef.current && !update.view.composing) {
+                    // Ordinary typing can arrive before the finalize timer.
+                    // Only CodeMirror's final compose flush extends the old session.
+                    currentSession.owner.finalizeComposition(currentSession.fileKey, currentSession.id);
+                    currentSession.status = "finalized";
+                    currentCompositionSessionRef.current = null;
+                    currentSession = null;
+                  }
+                  const isSessionComposing = currentSession !== null && (
+                    currentSession.status === "active" || currentSession.status === "end_pending"
+                  );
+                  const composingInput = isSessionComposing
+                    || compositionActiveRef.current
                     || update.view.composing
-                    || update.transactions.some((tr) => tr.isUserEvent("input.type.compose"));
+                    || compositionTransaction;
+                  const sessionId = isSessionComposing ? currentSession?.id : undefined;
                   const sharedTransaction = transactionOwnerRef.current.dispatchTransaction(
                     fileKeyRef.current,
                     viewIdRef.current,
                     deltas,
                     composingInput ? "composition" : "user-input",
+                    sessionId,
                   );
                   if (!sharedTransaction) {
                     const rejectedView = update.view;
@@ -2882,7 +3172,47 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             // than causing a React render for every keypress.
             scheduleSelectionEmit(update.view, update.docChanged ? 125 : 0);
           }
-          if (update.viewportChanged) emitViewport(update.view);
+          // Viewport offsets move with the document even when no scrolling
+          // occurs. Publishing them synchronously on each key bypasses the
+          // text/caret batching and rerenders the entire workspace. Keep the
+          // final live range (including a subsequent CodeMirror measure) for
+          // inlay hints, while ordinary scrolling still publishes immediately.
+          if (update.docChanged || update.viewportChanged) {
+            scheduleViewportEmit(update.view, update.docChanged || viewportEmitTimerRef.current !== null);
+          }
+          if (!restoringInitialViewStateRef.current && (
+            update.selectionSet
+            || update.docChanged
+            || update.transactions.some((tr) => tr.isUserEvent("select") || tr.isUserEvent("input"))
+          )) {
+            userInteractedSinceMountRef.current = true;
+            pendingDeferredScrollRef.current = null;
+          }
+          if (
+            pendingDeferredScrollRef.current
+            && !userInteractedSinceMountRef.current
+            && update.view.scrollDOM
+          ) {
+            const dom = update.view.scrollDOM;
+            const target = pendingDeferredScrollRef.current;
+            const canScrollVertically = target.scrollTop > 0 && dom.scrollHeight > dom.clientHeight;
+            const canScrollHorizontally = target.scrollLeft > 0 && dom.scrollWidth > dom.clientWidth;
+            if (canScrollVertically || canScrollHorizontally) {
+              if (target.scrollTop > 0 && canScrollVertically) {
+                const maxScrollTop = Math.max(0, dom.scrollHeight - dom.clientHeight);
+                dom.scrollTop = Math.min(target.scrollTop, maxScrollTop);
+                target.scrollTop = 0;
+              }
+              if (target.scrollLeft > 0 && canScrollHorizontally) {
+                const maxScrollLeft = Math.max(0, dom.scrollWidth - dom.clientWidth);
+                dom.scrollLeft = Math.min(target.scrollLeft, maxScrollLeft);
+                target.scrollLeft = 0;
+              }
+              if (target.scrollTop === 0 && target.scrollLeft === 0) {
+                pendingDeferredScrollRef.current = null;
+              }
+            }
+          }
           // ED-IMPROVE-007: capture caret/selection/scroll/fold changes for
           // this leaf/file; persisted later with the layout snapshot.
           if (
@@ -2906,11 +3236,24 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     // re-applied on prop changes, so late updates cannot overwrite typing.
     const initialViewState = initialViewStateRef.current;
     if (initialViewState) {
-      applyPersistedEditorViewState(view, initialViewState);
+      restoringInitialViewStateRef.current = true;
+      try {
+        const restoreResult = applyPersistedEditorViewState(view, initialViewState);
+        pendingDeferredScrollRef.current = restoreResult.deferredScroll;
+      } finally {
+        restoringInitialViewStateRef.current = false;
+      }
+      view.requestMeasure();
     }
+    const cancelDeferredScroll = () => {
+      userInteractedSinceMountRef.current = true;
+      pendingDeferredScrollRef.current = null;
+    };
+    view.scrollDOM?.addEventListener("wheel", cancelDeferredScroll, { passive: true });
+    view.scrollDOM?.addEventListener("pointerdown", cancelDeferredScroll, { passive: true });
     const compositionNavigationGuard = (event: KeyboardEvent) => {
       if (
-        (!view.composing && event.isComposing !== true)
+        (!view.composing && event.isComposing !== true && !compositionActiveRef.current)
         || !isCompositionNavigationKey(event.key)
       ) return;
       // CodeMirror intentionally ignores key handlers during composition, so
@@ -2919,25 +3262,88 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       event.preventDefault();
     };
     view.contentDOM.addEventListener("keydown", compositionNavigationGuard, true);
+    const clearPendingCompositionFinalize = () => {
+      if (compositionEndFinalizeRef.current === null) return;
+      window.clearTimeout(compositionEndFinalizeRef.current);
+      compositionEndFinalizeRef.current = null;
+    };
+    const finalizeSession = (session: CompositionSession) => {
+      if (session.status === "finalized") return;
+      session.status = "finalized";
+      try {
+        session.owner.finalizeComposition(session.fileKey, session.id);
+      } catch {
+        // ignore
+      }
+      if (currentCompositionSessionRef.current === session) {
+        currentCompositionSessionRef.current = null;
+        compositionActiveRef.current = false;
+      }
+    };
     const compositionStartGuard = () => {
+      clearPendingCompositionFinalize();
+      const previousSession = currentCompositionSessionRef.current;
+      if (previousSession && previousSession.status !== "finalized") {
+        finalizeSession(previousSession);
+      }
       compositionActiveRef.current = true;
+      const currentOwner = transactionOwnerRef.current;
+      const currentFileKey = fileKeyRef.current;
+      if (currentOwner && currentFileKey) {
+        const nextId = `comp_${++compositionSessionSeqRef.current}_${Date.now()}`;
+        const newSession: CompositionSession = {
+          id: nextId,
+          status: "active",
+          owner: currentOwner,
+          fileKey: currentFileKey,
+          viewId: viewIdRef.current,
+          workspaceId: clipboardWorkspaceId ?? null,
+        };
+        currentCompositionSessionRef.current = newSession;
+      }
     };
     const compositionEndGuard = () => {
       compositionActiveRef.current = false;
-      const owner = transactionOwnerRef.current;
-      const key = fileKeyRef.current;
-      if (owner && key) owner.finalizeComposition(key);
+      const session = currentCompositionSessionRef.current;
+      if (!session || session.status === "finalized") {
+        clearPendingCompositionFinalize();
+        return;
+      }
+      session.status = "end_pending";
+      clearPendingCompositionFinalize();
+      // ED-MAIN-006 & ED-REPAIR-007:
+      // CodeMirror dispatches the final composition change from
+      // `Promise.resolve().then(flush)` after compositionend. Defer finalization
+      // to the next macrotask so the flush extends this session's entry first.
+      compositionEndFinalizeRef.current = window.setTimeout(() => {
+        compositionEndFinalizeRef.current = null;
+        if (session.status === "end_pending") {
+          finalizeSession(session);
+        }
+      }, 0);
     };
     const compositionBlurGuard = () => {
-      if (!compositionActiveRef.current) return;
-      compositionActiveRef.current = false;
-      const owner = transactionOwnerRef.current;
-      const key = fileKeyRef.current;
-      if (owner && key) owner.finalizeComposition(key);
+      // Blur may precede CodeMirror's final microtask flush just like end.
+      // Preserve this session until that flush has joined its undo entry.
+      compositionEndGuard();
+    };
+    // ED-MAIN-007: any focus loss that leaves this view bumps the clipboard
+    // owner generation, so an in-flight result can detect that another surface
+    // (search box, sibling leaf, other window) claimed focus.
+    const clipboardFocusOutGuard = (event: FocusEvent) => {
+      const next = event.relatedTarget as Node | null;
+      if (
+        next && (
+          view.dom.contains(next)
+          || (next instanceof Element && (next.hasAttribute("data-clipboard-internal-fallback") || (next as HTMLElement).style?.left === "-9999px"))
+        )
+      ) return;
+      bumpClipboardOwnerGeneration(view);
     };
     view.contentDOM.addEventListener("compositionstart", compositionStartGuard, true);
     view.contentDOM.addEventListener("compositionend", compositionEndGuard, true);
     view.contentDOM.addEventListener("blur", compositionBlurGuard, true);
+    view.contentDOM.addEventListener("focusout", clipboardFocusOutGuard, true);
     emitSelection(view);
     emitViewport(view);
 
@@ -3035,24 +3441,62 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       bridgeRegistration?.dispose();
       unregisterEditorActions?.();
       clearPendingSelectionEmit();
+      clearPendingViewportEmit();
       if (viewStateEmitTimerRef.current !== null) {
         window.clearTimeout(viewStateEmitTimerRef.current);
         viewStateEmitTimerRef.current = null;
       }
+      // ED-REPAIR-009: Tail capture on unmount / teardown
+      if (viewRef.current === view && onViewStateChangeRef.current) {
+        try {
+          const captured = captureEditorViewState(view);
+          const serialized = JSON.stringify(captured);
+          if (serialized !== lastEmittedViewStateRef.current) {
+            lastEmittedViewStateRef.current = serialized;
+            onViewStateChangeRef.current(captured);
+          }
+        } catch {
+          // view may be in teardown
+        }
+      }
+      view.scrollDOM?.removeEventListener("wheel", cancelDeferredScroll);
+      view.scrollDOM?.removeEventListener("pointerdown", cancelDeferredScroll);
       requestParameterInfoRef.current = null;
       cancelActiveHoverResize(activeHoverResizeSessionRef);
       clipboardContextByView.delete(view);
       compositionActiveRef.current = false;
-      if (transactionOwnerRef.current && fileKeyRef.current) {
+      clearPendingCompositionFinalize();
+      if (currentCompositionSessionRef.current) {
+        finalizeSession(currentCompositionSessionRef.current);
+      } else if (transactionOwnerRef.current && fileKeyRef.current) {
         transactionOwnerRef.current.finalizeComposition(fileKeyRef.current);
       }
       view.contentDOM.removeEventListener("keydown", compositionNavigationGuard, true);
       view.contentDOM.removeEventListener("compositionstart", compositionStartGuard, true);
       view.contentDOM.removeEventListener("compositionend", compositionEndGuard, true);
       view.contentDOM.removeEventListener("blur", compositionBlurGuard, true);
+      view.contentDOM.removeEventListener("focusout", clipboardFocusOutGuard, true);
       view.destroy();
       viewRef.current = null;
       if (owner && sharedFileKey) owner.releaseView(sharedFileKey, sharedViewId);
+    };
+  }, []);
+
+  // ED-REPAIR-009: Flush view-state on window unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const view = viewRef.current;
+      if (!view || !onViewStateChangeRef.current) return;
+      try {
+        const captured = captureEditorViewState(view);
+        onViewStateChangeRef.current(captured);
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);
 
@@ -3072,6 +3516,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       onUnavailable: (message) => onClipboardUnavailableRef.current(message),
       onObservation: (record) => onClipboardObservationRef.current(record),
       handle: effectiveClipboardHandle ?? null,
+      isActive: () => visibleRef.current && (activeRef.current !== false),
     });
     return () => {
       lease?.detach();
@@ -3079,17 +3524,44 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         workspaceId: null,
         onUnavailable: () => {},
         handle: null,
+        isActive: () => false,
       });
     };
   }, [effectiveClipboardHandle, clipboardWorkspaceId, fileKey]);
+
+  // ED-MAIN-007 / ED-REPAIR-008: hiding a leaf or switching active group
+  // invalidates any in-flight clipboard request owned by it.
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view && (!visible || active === false)) bumpClipboardOwnerGeneration(view);
+  }, [visible, active]);
 
   useEffect(() => {
     const view = viewRef.current;
     if (!view || !onCommandPortChange) return;
     const token = {};
-    onCommandPortChange({ fileKey, token, port: editorCommandPort(view) });
+    onCommandPortChange({ fileKey, token, port: editorCommandPort(view, () => compositionActiveRef.current) });
     return () => onCommandPortChange({ fileKey, token, port: null });
   }, [fileKey, onCommandPortChange]);
+
+  // ED-REPAIR-007: switching files finalizes any composition belonging to the old fileKey.
+  useEffect(() => {
+    const session = currentCompositionSessionRef.current;
+    if (session && session.fileKey !== fileKey) {
+      if (compositionEndFinalizeRef.current !== null) {
+        window.clearTimeout(compositionEndFinalizeRef.current);
+        compositionEndFinalizeRef.current = null;
+      }
+      session.status = "finalized";
+      try {
+        session.owner.finalizeComposition(session.fileKey, session.id);
+      } catch {
+        // ignore
+      }
+      currentCompositionSessionRef.current = null;
+      compositionActiveRef.current = false;
+    }
+  }, [fileKey]);
 
   // §8.19.4: a resolve gate belongs to one buffer identity; switching files
   // drops the banner (the request closures would refuse to act anyway).

@@ -279,7 +279,10 @@ export interface BuildRearrangePlanInput {
   targetPath: string;
   targetUri: string;
   currentText: string;
+  /** Editor revision precondition; not the provider version. */
   documentRevision?: number;
+  /** Provider-synchronized LSP version carried into the immutable edit. */
+  documentVersion?: number | null;
   readOnly: boolean;
   provider: { id: string; version?: string };
   edits: readonly LspTextEdit[];
@@ -314,7 +317,7 @@ export function buildRearrangePlan(input: BuildRearrangePlanInput): WorkflowPlan
       {
         uri: input.targetUri,
         path: input.targetPath,
-        version: input.documentRevision,
+        version: input.documentVersion ?? undefined,
         edits: [...input.edits],
       },
     ],
@@ -347,7 +350,10 @@ export interface BuildCleanupPlanInput {
   targetPath: string;
   targetUri: string;
   currentText: string;
+  /** Editor revision precondition; not the provider version. */
   documentRevision?: number;
+  /** Provider-synchronized LSP version carried into the immutable edit. */
+  documentVersion?: number | null;
   readOnly: boolean;
   profileId?: string;
   provider: { id: string; version?: string };
@@ -383,7 +389,7 @@ export function buildCleanupPlan(input: BuildCleanupPlanInput): WorkflowPlan {
       {
         uri: input.targetUri,
         path: input.targetPath,
-        version: input.documentRevision,
+        version: input.documentVersion ?? undefined,
         edits: [...input.edits],
       },
     ],
@@ -565,6 +571,8 @@ export type RearrangeResolveState = "resolved" | "failed" | "stale" | "unsupport
 export interface RearrangeResolveResult {
   state: RearrangeResolveState;
   edits: readonly LspTextEdit[];
+  /** ED-MAIN-003: provider-synchronized version validated for these edits. */
+  documentVersion?: number | null;
   reason?: string;
 }
 
@@ -850,8 +858,17 @@ export async function executeRearrangeTransaction(
   if (afterRequest) return afterRequest;
 
   // 3. Resolve to a callable rearrange-kind action by exact kind equality.
-  const action = requested.actions.find((candidate) => isRearrangeActionKind(candidate.kind)) ?? null;
-  if (!action) {
+  // ED-MAIN-002: a provider-disabled candidate is refused here, before any
+  // resolve/preview/commit; a same-kind enabled candidate still wins.
+  const selection = selectEnabledWorkflowAction(requested.actions, isRearrangeActionKind);
+  if (!selection.action) {
+    if (selection.disabled) {
+      return fail(
+        "unsupported",
+        `Rearrange action '${selection.disabled.action.title}' is disabled by the provider`
+          + `${formatWorkflowDisabledReason(selection.disabled.reason)}; nothing applied`,
+      );
+    }
     const seen = requested.actions
       .map((candidate) => candidate.kind ?? "(no kind)")
       .slice(0, 3)
@@ -863,6 +880,7 @@ export async function executeRearrangeTransaction(
         : "Provider returned no actions. Rearrange Code requires a dedicated arrangement provider; nothing applied.",
     );
   }
+  const action = selection.action;
 
   // 4. Resolve the action to concrete edits, then reject if the provider or
   // document identity moved while the resolve was in flight.
@@ -897,6 +915,7 @@ export async function executeRearrangeTransaction(
     targetUri: input.targetUri,
     currentText: planLive.text,
     documentRevision: undefined,
+    documentVersion: resolved.documentVersion ?? null,
     readOnly: planLive.readOnly,
     provider: decision.provider ?? { id: "provider" },
     edits: resolved.edits,
@@ -1062,23 +1081,92 @@ export interface WorkflowActionValidationInput {
   targetUri: string;
   targetPath: string;
   documentText: string;
+  /**
+   * ED-MAIN-003: editor revision (ui/documentRevision) is kept separate from the
+   * provider-synchronized LSP version. Only the latter may be compared with a
+   * TextDocumentEdit `version`.
+   */
   documentRevision?: number;
+  /** Actual LSP document version currently synchronized with the provider. */
+  documentVersion?: number | null;
   isSupportedKind(kind: string | null): boolean;
   capabilityLabel: string;
 }
 
 export type WorkflowActionValidation =
-  | { ok: true; edits: readonly LspTextEdit[] }
+  | {
+    ok: true;
+    edits: readonly LspTextEdit[];
+    /**
+     * The provider document version proven for this payload (the action's
+     * version when present), or null for an unversioned payload that relies on
+     * the hash/generation/liveness gates.
+     */
+    documentVersion: number | null;
+  }
   | {
       ok: false;
       state: "unsupported" | "stale" | "failed";
       reason: string;
     };
 
+/**
+ * ED-MAIN-002: a provider action is disabled either by the legacy boolean
+ * `disabled: true` or by the LSP-standard `disabled: { reason }` object.
+ * Missing/null/false values are not disabled; an empty object still is.
+ */
+export interface WorkflowActionDisabledFact {
+  disabled: boolean;
+  reason: string | null;
+}
+
+export function readWorkflowActionDisabled(raw: unknown): WorkflowActionDisabledFact {
+  if (typeof raw !== "object" || raw === null) return { disabled: false, reason: null };
+  const value = (raw as { disabled?: unknown }).disabled;
+  if (value === true) return { disabled: true, reason: null };
+  if (typeof value === "object" && value !== null) {
+    const reasonValue = (value as { reason?: unknown }).reason;
+    const reason = typeof reasonValue === "string" && reasonValue.trim().length > 0
+      ? reasonValue.trim()
+      : null;
+    return { disabled: true, reason };
+  }
+  return { disabled: false, reason: null };
+}
+
 function workflowActionIsDisabled(raw: unknown): boolean {
-  return typeof raw === "object"
-    && raw !== null
-    && (raw as { disabled?: unknown }).disabled === true;
+  return readWorkflowActionDisabled(raw).disabled;
+}
+
+function formatWorkflowDisabledReason(reason: string | null): string {
+  return reason ? `: ${reason}` : " (the provider did not supply a reason)";
+}
+
+interface WorkflowActionSelection<T extends { kind: string | null; raw: unknown; title: string }> {
+  action: T | null;
+  disabled: { action: T; reason: string | null } | null;
+}
+
+/**
+ * Keep the existing first-matching-kind selection strategy but skip a disabled
+ * candidate when a same-kind enabled candidate exists. Request-stage callers
+ * use this to refuse before any resolve/preview/commit.
+ */
+function selectEnabledWorkflowAction<T extends { kind: string | null; raw: unknown; title: string }>(
+  actions: readonly T[],
+  isSupportedKind: (kind: string | null) => boolean,
+): WorkflowActionSelection<T> {
+  let disabled: { action: T; reason: string | null } | null = null;
+  for (const candidate of actions) {
+    if (!isSupportedKind(candidate.kind)) continue;
+    const fact = readWorkflowActionDisabled(candidate.raw);
+    if (fact.disabled) {
+      if (!disabled) disabled = { action: candidate, reason: fact.reason };
+      continue;
+    }
+    return { action: candidate, disabled: null };
+  }
+  return { action: null, disabled };
 }
 
 function workflowEditRangeIsValid(edit: LspTextEdit): boolean {
@@ -1109,10 +1197,11 @@ export function validateWorkflowProviderAction(
     };
   }
   if (workflowActionIsDisabled(action.raw)) {
+    const { reason } = readWorkflowActionDisabled(action.raw);
     return {
       ok: false,
       state: "unsupported",
-      reason: `${capabilityLabel} action '${action.title}' is disabled by the provider; nothing applied`,
+      reason: `${capabilityLabel} action '${action.title}' is disabled by the provider${formatWorkflowDisabledReason(reason)}; nothing applied`,
     };
   }
   if (!input.isSupportedKind(action.kind)) {
@@ -1165,6 +1254,7 @@ export function validateWorkflowProviderAction(
     };
   }
   const edits: LspTextEdit[] = [];
+  let provenDocumentVersion: number | null = null;
   for (const entry of documentEntries) {
     const uriMatches = !!entry.uri && entry.uri === targetUri;
     const pathMatches = entry.path != null && fsPathEquals(entry.path, targetPath);
@@ -1199,16 +1289,25 @@ export function validateWorkflowProviderAction(
         reason: `${capabilityLabel} action '${action.title}' carried a malformed document entry without uri or path; nothing applied`,
       };
     }
-    if (
-      entry.version != null
-      && input.documentRevision != null
-      && entry.version !== input.documentRevision
-    ) {
-      return {
-        ok: false,
-        state: "stale",
-        reason: `${capabilityLabel} action '${action.title}' targets document version ${entry.version} but the live document is at ${input.documentRevision}; nothing applied`,
-      };
+    if (entry.version != null) {
+      // ED-MAIN-003: compare the action's LSP version only with the actual
+      // provider-synchronized document version, never the editor revision. An
+      // unversioned payload skips this and relies on the hash/generation gates.
+      if (input.documentVersion == null) {
+        return {
+          ok: false,
+          state: "stale",
+          reason: `${capabilityLabel} action '${action.title}' targets document version ${entry.version} but the provider-synchronized document version is unknown (unsynchronized buffer); nothing applied`,
+        };
+      }
+      if (entry.version !== input.documentVersion) {
+        return {
+          ok: false,
+          state: "stale",
+          reason: `${capabilityLabel} action '${action.title}' targets document version ${entry.version} but the provider document is at ${input.documentVersion}; nothing applied`,
+        };
+      }
+      provenDocumentVersion = entry.version;
     }
     edits.push(...entry.edits);
   }
@@ -1236,7 +1335,7 @@ export function validateWorkflowProviderAction(
       };
     }
   }
-  return { ok: true, edits };
+  return { ok: true, edits, documentVersion: provenDocumentVersion };
 }
 
 /**
@@ -1287,6 +1386,8 @@ export type CleanupResolveState = "resolved" | "failed" | "stale" | "unsupported
 export interface CleanupResolveResult {
   state: CleanupResolveState;
   edits: readonly LspTextEdit[];
+  /** ED-MAIN-003: provider-synchronized version validated for these edits. */
+  documentVersion?: number | null;
   reason?: string;
 }
 
@@ -1432,8 +1533,16 @@ export async function executeCleanupTransaction(
   if (afterRequest) return afterRequest;
 
   // 3. Resolve to a callable cleanup-kind action by exact kind equality.
-  const action = requested.actions.find((candidate) => isCleanupActionKind(candidate.kind)) ?? null;
-  if (!action) {
+  // ED-MAIN-002: request-stage disabled refusal, before resolve/preview/commit.
+  const selection = selectEnabledWorkflowAction(requested.actions, isCleanupActionKind);
+  if (!selection.action) {
+    if (selection.disabled) {
+      return fail(
+        "unsupported",
+        `Cleanup action '${selection.disabled.action.title}' is disabled by the provider`
+          + `${formatWorkflowDisabledReason(selection.disabled.reason)}; nothing applied`,
+      );
+    }
     const seen = requested.actions
       .map((candidate) => candidate.kind ?? "(no kind)")
       .slice(0, 3)
@@ -1445,6 +1554,7 @@ export async function executeCleanupTransaction(
         : "Provider returned no actions. Code Cleanup requires a dedicated batch cleanup provider; nothing applied.",
     );
   }
+  const action = selection.action;
 
   // 4. Resolve the action to concrete edits, then reject if the provider or
   // document identity moved while the resolve was in flight.
@@ -1478,6 +1588,7 @@ export async function executeCleanupTransaction(
     targetUri: input.targetUri,
     currentText: planLive.text,
     documentRevision: undefined,
+    documentVersion: resolved.documentVersion ?? null,
     readOnly: planLive.readOnly,
     profileId,
     provider: input.capabilities.providerId

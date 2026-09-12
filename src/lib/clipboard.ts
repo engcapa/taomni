@@ -44,11 +44,13 @@ export async function probeClipboardCapabilities(): Promise<ClipboardCapabilitie
 function fallbackCopyText(text: string): boolean {
   if (typeof document === "undefined") return false;
   const textarea = document.createElement("textarea");
+  textarea.setAttribute("data-clipboard-internal-fallback", "true");
   textarea.value = text;
   textarea.style.position = "fixed";
   textarea.style.opacity = "0";
   textarea.style.left = "-9999px";
   document.body.appendChild(textarea);
+  const activeBefore = document.activeElement as HTMLElement | null;
   textarea.focus();
   textarea.select();
   try {
@@ -57,6 +59,9 @@ function fallbackCopyText(text: string): boolean {
     return false;
   } finally {
     document.body.removeChild(textarea);
+    if (activeBefore && typeof activeBefore.focus === "function") {
+      activeBefore.focus();
+    }
   }
 }
 

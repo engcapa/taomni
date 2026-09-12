@@ -35,7 +35,9 @@ import {
   replaceScopeIdentityFromPlan,
   searchMatchesToReplaceInputs,
   validateReplacePreviewSelection,
+  type ReplaceFilePreimage,
   type ReplaceInFilesPlan,
+  type ReplacePrepareOptions,
   type ReplacePreviewSnapshot,
 } from "../replaceInFilesModel";
 import { ReplacePreviewDialog } from "./ReplacePreviewDialog";
@@ -43,6 +45,8 @@ import {
   useProjectFactsStore,
   type WorkspaceProjectFactsEntry,
 } from "../../../../stores/projectFactsStore";
+
+const EMPTY_FACTS_MODULES: NonNullable<WorkspaceProjectFactsEntry["structure"]>["modules"] = [];
 
 interface FindInFilesPanelProps {
   roots: CodeWorkspaceRootInfo[];
@@ -52,7 +56,16 @@ interface FindInFilesPanelProps {
     matches: WorkspaceSearchMatch[],
     replacement: string,
     edit: LspWorkspaceEdit,
+    snapshot: ReplacePreviewSnapshot,
   ) => Promise<{ ok: boolean; appliedCount?: number; fileCount?: number; message?: string }>;
+  /**
+   * ED-MAIN-005 / ED-REPAIR-005: read the frozen per-file preimage before the preview can be
+   * confirmed. Returns the preimages for the given absolute paths with request identity options.
+   */
+  onPrepareReplacePreimages?: (
+    paths: readonly string[],
+    options?: ReplacePrepareOptions,
+  ) => Promise<readonly ReplaceFilePreimage[]>;
   /** Bump to move focus into the query input (Ctrl+Shift+F). */
   focusNonce?: number;
   /** Bump the nonce to overwrite the include globs ("Find in Directory..."). */
@@ -210,6 +223,7 @@ export function FindInFilesPanel({
   roots,
   onOpenMatch,
   onReplaceMatches,
+  onPrepareReplacePreimages,
   focusNonce = 0,
   includePreset,
   queryPreset,
@@ -239,6 +253,33 @@ export function FindInFilesPanel({
   } | null>(null);
   const [replaceCommitting, setReplaceCommitting] = useState(false);
   const [replaceCommitError, setReplaceCommitError] = useState<string | null>(null);
+  const [replacePreparing, setReplacePreparing] = useState(false);
+  const replacePrepareTokenRef = useRef(0);
+  const replacePreparingRef = useRef(false);
+  const replaceAbortControllerRef = useRef<AbortController | null>(null);
+
+  const invalidateReplacePrepare = useCallback(() => {
+    replacePrepareTokenRef.current++;
+    if (replaceAbortControllerRef.current) {
+      replaceAbortControllerRef.current.abort();
+      replaceAbortControllerRef.current = null;
+    }
+    if (replacePreparingRef.current) {
+      replacePreparingRef.current = false;
+      setReplacePreparing(false);
+    }
+  }, []);
+
+  const cancelReplacePrepare = useCallback(() => {
+    invalidateReplacePrepare();
+  }, [invalidateReplacePrepare]);
+
+  // Invalidate on unmount
+  useEffect(() => {
+    return () => {
+      invalidateReplacePrepare();
+    };
+  }, [invalidateReplacePrepare]);
   /** ED-FIND-003: selected search scope. Module scope requires ready facts. */
   const [scopeKind, setScopeKind] = useState<FindInFilesScopeKind>("project");
   const [scopeModuleId, setScopeModuleId] = useState("");
@@ -247,7 +288,7 @@ export function FindInFilesPanel({
   const factsEntry: WorkspaceProjectFactsEntry | null = useProjectFactsStore(
     (state) => (workspaceRoot ? (state.workspaces[workspaceRoot] ?? null) : null),
   );
-  const factsModules = factsEntry?.structure?.modules ?? [];
+  const factsModules = factsEntry?.structure?.modules ?? EMPTY_FACTS_MODULES;
 
   // ED-FIND-003 A1: the selected scope plan, rebuilt live so the panel can
   // fail closed before touching the backend. startSearch consumes the same
@@ -470,6 +511,26 @@ export function FindInFilesPanel({
     [groups],
   );
 
+  // ED-REPAIR-005: invalidate any in-flight prepare request when inputs, matches, or workspace changes
+  useEffect(() => {
+    invalidateReplacePrepare();
+  }, [
+    query,
+    replacement,
+    caseSensitive,
+    wholeWord,
+    regexp,
+    includeGlobs,
+    excludeGlobs,
+    scopeKind,
+    scopeModuleId,
+    scopeDirectory,
+    allMatches,
+    workspaceInstanceId,
+    roots,
+    invalidateReplacePrepare,
+  ]);
+
   const visibleLimitFor = useCallback((key: string, total: number): number => {
     const expand = fileExpand[key];
     if (expand === "all") return total;
@@ -574,16 +635,75 @@ export function FindInFilesPanel({
     );
   }, [languagesByPath]);
 
-  const replaceAll = useCallback(() => {
-    if (!onReplaceMatches || allMatches.length === 0 || replacePreview) return;
+  const replaceAll = useCallback(async () => {
+    if (!onReplaceMatches || allMatches.length === 0 || replacePreview || replacePreparingRef.current) return;
+    // ED-REPAIR-005: synchronously claim preparing state to prevent duplicate calls in the same event loop
+    replacePreparingRef.current = true;
+    setReplacePreparing(true);
+    setReplaceCommitError(null);
+    const token = ++replacePrepareTokenRef.current;
+    if (replaceAbortControllerRef.current) {
+      replaceAbortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    replaceAbortControllerRef.current = abortController;
+
+    const frozenScope = replaceScopeIdentityFromPlan(scopePlan);
+    const frozenQuery = {
+      query: query.trim(),
+      caseSensitive,
+      wholeWord,
+      regexp,
+      includeGlobs: splitGlobs(includeGlobs),
+      excludeGlobs: splitGlobs(excludeGlobs),
+    };
+    const frozenReplacement = replacement;
+    const frozenMatches = allMatches;
+    const frozenMatchKeys = allMatches.map(workspaceSearchMatchKey);
+    const frozenInstanceId = workspaceInstanceId ?? "";
+    const preparedAt = Date.now();
+
     // ED-FIND-004 A1: freeze the preimage — model matches, edit, and plan —
     // at dialog open. Commit reconfirms against live disk state (A2/A3).
-    const modelMatches = searchMatchesToReplaceInputs(allMatches);
-    const edit = buildReplaceInFilesWorkspaceEdit({ matches: modelMatches, replacementText: replacement });
+    // ED-MAIN-004: an illegal backend match offset is reported with a reason
+    // instead of being clamped into a different valid range.
+    let modelMatches: ReturnType<typeof searchMatchesToReplaceInputs>;
+    try {
+      modelMatches = searchMatchesToReplaceInputs(frozenMatches);
+    } catch (error) {
+      if (token !== replacePrepareTokenRef.current) return;
+      replacePreparingRef.current = false;
+      setReplacePreparing(false);
+      setReplaceCommitError(error instanceof Error ? error.message : String(error));
+      return;
+    }
+    const edit = buildReplaceInFilesWorkspaceEdit({ matches: modelMatches, replacementText: frozenReplacement });
     const plan = createReplaceInFilesPlan(edit);
+    // ED-MAIN-005: freeze the per-file preimage before the preview can be
+    // confirmed. A prepare failure is visible and commits nothing.
+    let preimages: readonly ReplaceFilePreimage[] = [];
+    if (onPrepareReplacePreimages) {
+      try {
+        preimages = await onPrepareReplacePreimages(
+          [...new Set(modelMatches.map((match) => match.filePath))],
+          { token, workspaceInstanceId: frozenInstanceId, signal: abortController.signal },
+        );
+      } catch (error) {
+        if (token !== replacePrepareTokenRef.current) return;
+        replacePreparingRef.current = false;
+        setReplacePreparing(false);
+        setReplaceCommitError(error instanceof Error ? error.message : String(error));
+        return;
+      }
+    }
+    if (token !== replacePrepareTokenRef.current) return;
+    replacePreparingRef.current = false;
+    setReplacePreparing(false);
+    setReplaceCommitError(null);
+
     // Join preview usage ids back to search-match keys for exclusion.
     const remaining = new Map<string, WorkspaceSearchMatch[]>();
-    for (const match of allMatches) {
+    for (const match of frozenMatches) {
       const key = usageJoinKeyForMatch(match);
       const list = remaining.get(key);
       if (list) list.push(match);
@@ -602,29 +722,32 @@ export function FindInFilesPanel({
       if (list && list.length === 0) remaining.delete(key);
     }
     const snapshot: ReplacePreviewSnapshot = {
-      scope: replaceScopeIdentityFromPlan(scopePlan),
-      query: {
-        query: query.trim(),
-        caseSensitive,
-        wholeWord,
-        regexp,
-        includeGlobs: splitGlobs(includeGlobs),
-        excludeGlobs: splitGlobs(excludeGlobs),
-      },
-      replacement,
-      matchKeys: allMatches.map(workspaceSearchMatchKey),
+      scope: frozenScope,
+      query: frozenQuery,
+      replacement: frozenReplacement,
+      matchKeys: frozenMatchKeys,
       matchCount: modelMatches.length,
       editSignature: replaceEditSignature(edit),
-      capturedAt: Date.now(),
+      capturedAt: preparedAt,
+      preimages,
+      requestIdentity: {
+        token,
+        workspaceInstanceId: frozenInstanceId,
+        scope: frozenScope,
+        query: frozenQuery,
+        replacement: frozenReplacement,
+        matchKeys: frozenMatchKeys,
+        matchCount: modelMatches.length,
+        preparedAt,
+      },
     };
-    setReplaceCommitError(null);
     setReplacePreview({
       edit,
       plan,
-      matches: allMatches,
+      matches: frozenMatches,
       usageToMatchKey,
       stableToUsageId,
-      replacement,
+      replacement: frozenReplacement,
       snapshot,
     });
   }, [
@@ -632,6 +755,7 @@ export function FindInFilesPanel({
     caseSensitive,
     excludeGlobs,
     includeGlobs,
+    onPrepareReplacePreimages,
     onReplaceMatches,
     query,
     regexp,
@@ -639,6 +763,7 @@ export function FindInFilesPanel({
     replacement,
     scopePlan,
     wholeWord,
+    workspaceInstanceId,
   ]);
 
   const commitReplacePreview = useCallback(async (excludedStableKeys: ReadonlySet<string>) => {
@@ -670,6 +795,7 @@ export function FindInFilesPanel({
       preview.snapshot,
       new Set(filteredMatches.map(workspaceSearchMatchKey)),
       filteredEdit,
+      preview.edit,
     );
     if (!selection.ok) {
       setReplaceCommitError(selection.reason ?? "Replace selection is stale; reopen the preview");
@@ -678,7 +804,12 @@ export function FindInFilesPanel({
     setReplaceCommitting(true);
     setReplaceCommitError(null);
     try {
-      const result = await onReplaceMatches(filteredMatches, preview.replacement, filteredEdit);
+      const result = await onReplaceMatches(
+        filteredMatches,
+        preview.replacement,
+        filteredEdit,
+        preview.snapshot,
+      );
       if (result.ok) {
         setReplacePreview(null);
       } else {
@@ -836,16 +967,38 @@ export function FindInFilesPanel({
           </button>
         )}
         {onReplaceMatches && (
-          <button
-            type="button"
-            aria-label="Preview replace all matches"
-            data-testid="code-workspace-find-replace-all"
-            disabled={allMatches.length === 0 || replaceCommitting || status === "searching"}
-            className="h-6 inline-flex items-center gap-1 rounded px-1.5 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-50"
-            onClick={() => void replaceAll()}
-          >
-            <span>Replace All</span>
-          </button>
+          <div className="inline-flex items-center gap-1">
+            <button
+              type="button"
+              aria-label="Preview replace all matches"
+              data-testid="code-workspace-find-replace-all"
+              disabled={allMatches.length === 0 || replaceCommitting || replacePreparing || status === "searching"}
+              className="h-6 inline-flex items-center gap-1 rounded px-1.5 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-50"
+              onClick={() => void replaceAll()}
+            >
+              {replacePreparing && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+              <span>{replacePreparing ? "Preparing…" : "Replace All"}</span>
+            </button>
+            {replacePreparing && (
+              <button
+                type="button"
+                aria-label="Cancel preparing replace"
+                data-testid="code-workspace-replace-prepare-cancel"
+                className="h-6 inline-flex items-center gap-1 rounded px-1.5 text-[11px] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)]"
+                onClick={cancelReplacePrepare}
+              >
+                <span>Cancel</span>
+              </button>
+            )}
+            {replacePreparing && (
+              <span
+                data-testid="code-workspace-replace-preparing"
+                className="flex items-center gap-1 text-[11px] text-[var(--taomni-code-muted)]"
+              >
+                <span>Preparing…</span>
+              </span>
+            )}
+          </div>
         )}
         <span className="ml-auto flex items-center gap-1.5 text-[10px] text-[var(--taomni-code-muted)]">
           {status === "searching" && <Loader2 className="h-3 w-3 animate-spin" />}
@@ -855,6 +1008,15 @@ export function FindInFilesPanel({
           )}
         </span>
       </div>
+      {replaceCommitError && !replacePreview ? (
+        <div
+          role="alert"
+          data-testid="code-workspace-replace-error"
+          className="border-b border-red-500/30 bg-red-500/10 px-2 py-1 text-[11px] text-red-500"
+        >
+          {replaceCommitError}
+        </div>
+      ) : null}
       {(summary?.truncated || summary?.cancelled) && (
         <div className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[10px] text-amber-500">
           {summary.cancelled ? "Search cancelled — results are partial." : `Match limit reached (${MAX_TOTAL_MATCHES}) — refine the query to see everything.`}
