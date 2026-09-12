@@ -648,6 +648,7 @@ import type { WorkspaceFocus } from "./workspace/workspaceActionRegistry";
 import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
 import {
   codePointOffsetToUtf16Offset,
+  collectReplacePreimages,
   replaceMatchAbsolutePath,
   replacePreimageExpectedHashes,
   replacePreimagePathKey,
@@ -657,6 +658,7 @@ import {
   verifyReplaceMatchFreshness,
   type FileRevisionGuard,
   type ReplaceFilePreimage,
+  type ReplacePrepareOptions,
 } from "./workspace/replaceInFilesModel";
 import type {
   CodeWorkspaceFileRef,
@@ -8274,45 +8276,34 @@ export function CodeWorkspaceTab({
     [openFile, revealEditorLocation],
   );
 
-  // ED-MAIN-005: read the frozen per-file preimage before the replace preview
-  // can be confirmed. The hash is text-only from the same read the commit's
-  // precondition uses, so a later disk change is refused instead of re-anchored.
+  // ED-MAIN-005 / ED-REPAIR-005: read the frozen per-file preimage before the replace preview
+  // can be confirmed. Validates frozen workspace instance, roots, and buffer states across
+  // all async reads; aborts or fails cleanly if states change mid-read.
   const prepareReplacePreimages = useCallback(async (
     paths: readonly string[],
+    options?: ReplacePrepareOptions,
   ): Promise<readonly ReplaceFilePreimage[]> => {
-    const preimages: ReplaceFilePreimage[] = [];
-    for (const absolute of paths) {
-      const open = Object.values(openFilesRef.current).find((file) => {
-        const currentPath = absolutePathForOpenFile(file);
-        return currentPath !== null && fsPathEquals(currentPath, absolute);
-      });
-      const containing = rootsRef.current.find(
-        (root) => relativePathWithinRoot(root.path, absolute) !== null,
-      );
-      if (!containing) {
-        throw new Error(`Replace preview refused: ${absolute} is outside the workspace`);
-      }
-      const relative = relativePathWithinRoot(containing.path, absolute) ?? "";
-      const disk = await workspaceReadFile(containing.path, relative);
-      const eol = disk.text.includes("\r\n")
-        ? ("crlf" as const)
-        : disk.text.includes("\r") && !disk.text.includes("\n")
-          ? ("cr" as const)
-          : ("lf" as const);
-      preimages.push({
-        path: absolute,
-        uri: `file://${absolute}`,
-        textHash: disk.hash,
-        encoding: disk.encoding ?? "UTF-8",
-        bom: disk.bom ?? false,
-        eol,
-        bufferRevision: open?.documentRevision ?? null,
-        dirty: open?.dirty ?? false,
-        readOnly: !!open?.library || workspaceResourceOperationLockedRef.current,
-        workspaceInstanceId,
-      });
-    }
-    return preimages;
+    return collectReplacePreimages({
+      paths,
+      options,
+      initialWorkspaceInstanceId: workspaceInstanceId,
+      getCurrentWorkspaceInstanceId: () => workspaceInstanceId,
+      getCurrentRoots: () => rootsRef.current,
+      getOpenFileState: (absolute) => {
+        const open = Object.values(openFilesRef.current).find((file) => {
+          const currentPath = absolutePathForOpenFile(file);
+          return currentPath !== null && fsPathEquals(currentPath, absolute);
+        });
+        if (!open) return null;
+        return {
+          documentRevision: open.documentRevision ?? null,
+          dirty: open.dirty ?? false,
+          readOnly: !!open.library,
+        };
+      },
+      readFile: (rootPath, relativePath) => workspaceReadFile(rootPath, relativePath),
+      isLocked: () => workspaceResourceOperationLockedRef.current,
+    });
   }, [absolutePathForOpenFile, workspaceInstanceId]);
 
   const structureFileRef = useRef<string | null>(null);
