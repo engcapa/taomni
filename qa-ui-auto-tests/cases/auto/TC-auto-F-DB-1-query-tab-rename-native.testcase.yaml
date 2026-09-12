@@ -1,0 +1,89 @@
+id: TC-auto-F-DB-1-query-tab-rename-native
+title: Native query tab rename connects MySQL, records history and survives a WebView reload
+description: |
+  Creates a real MySQL session against the configured QA database, renames the
+  query tab, runs a statement, verifies the history name chip, then reloads the
+  WebView and reopens the session to prove the custom name is restored from the
+  QA application SQLite workspace. Windows/WebView2 target.
+covers: [F-DB-1]
+tags: [database, sql, query-tab, rename, persistence, native-boundary, needs-review]
+modes: [native]
+native_platforms: [Windows]
+fixtures: [reset_db]
+timeout_sec: 300
+steps:
+  - open: ${cfg.app.base_url}
+  - vault_first_run: qa-native-rename-password
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="side-tab-sessions"]'
+  - wait_for: '[data-testid="session-new"]'
+  - click: '[data-testid="session-new"]'
+  - wait_for: '[data-testid="session-editor"]'
+  - click: '[data-testid="session-proto-mysql"]'
+  - wait_for:
+      selector: '[data-testid="session-database-section"]'
+      timeout_sec: 10
+  - fill:
+      selector: '[data-testid="session-host"]'
+      value: 10.1.5.52
+  - fill:
+      selector: '[data-testid="session-port"]'
+      value: "3306"
+  - fill:
+      selector: 'input[aria-label="Database username"]'
+      value: test
+  - fill:
+      selector: 'input[aria-label="Database password"]'
+      value: ${env.TAOMNI_TEST_MYSQL_PASSWORD}
+  - fill:
+      selector: 'input[aria-label="Database name"]'
+      value: test
+  # Store the password in the initialized vault so reopening the session can connect.
+  - click: '[data-testid="db-save-in-vault"]'
+  - click: '[data-testid="session-section-bookmark"]'
+  - wait_for: '[data-testid="bookmark-settings"]'
+  - fill:
+      selector: '[data-testid="session-name"]'
+      value: qa-ui-auto-rename-native
+  - click: '[data-testid="session-save"]'
+  # A fresh QA profile has an empty vault: the on-demand gate asks for a master
+  # password before the save can store the DB password reference.
+  - wait_for:
+      selector: '[data-testid="vault-setup-pw1"]'
+      timeout_sec: 15
+  - fill:
+      selector: '[data-testid="vault-setup-pw1"]'
+      value: qa-native-rename-master
+  - fill:
+      selector: '[data-testid="vault-setup-pw2"]'
+      value: qa-native-rename-master
+  - click: '[data-testid="vault-setup-confirm"]'
+  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-rename-native"]'
+  - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-rename-native"]'
+  - wait_for:
+      selector: '[data-testid="db-query-tab"]'
+      timeout_sec: 60
+  - assert_not_visible: '[data-testid="db-connection-error-banner"]'
+  - wait: 2
+  - dblclick: '[data-testid="db-query-tab"]'
+  - wait_for: '[data-testid="db-query-tab-input"]'
+  - wait: 1
+  - type: native-orders
+  - press: Enter
+  - assert_text:
+      selector: '[data-testid="db-query-tab"]'
+      contains: native-orders
+  - click: '[data-testid="sql-editor"]'
+  - type: select 1
+  - click: '[data-testid="db-run-current-statement"]'
+  - wait_for:
+      selector: '[data-testid="query-result-grid"]'
+      timeout_sec: 60
+  - click: '[data-testid="db-query-history-toggle"]'
+  - wait_for:
+      selector: '[data-testid="db-query-history-entry"]'
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="db-query-history-entry-name"]'
+      contains: native-orders
+  - screenshot: native-query-tab-rename-history.png

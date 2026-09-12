@@ -733,6 +733,7 @@ pub fn run() {
             database::db_list_history,
             database::db_delete_history,
             database::db_clear_history,
+            database::db_update_history_tab_name,
             database::db_load_query_workspace,
             database::db_save_query_workspace,
             database::db_close_query_workspace_tabs,

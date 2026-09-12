@@ -1433,6 +1433,8 @@ export interface DbSqlHistoryEntry {
   hasResultSet: boolean;
   error?: string | null;
   createdAt: number;
+  panelId?: string | null;
+  tabName?: string | null;
 }
 
 export async function dbAppendHistory(entry: DbSqlHistoryEntry): Promise<void> {
@@ -1459,6 +1461,14 @@ export async function dbClearHistory(savedSessionId?: string | null): Promise<vo
   return invoke<void>("db_clear_history", { savedSessionId: savedSessionId ?? null });
 }
 
+export async function dbUpdateHistoryTabName(
+  savedSessionId: string,
+  panelId: string,
+  tabName: string | null,
+): Promise<number> {
+  return invoke<number>("db_update_history_tab_name", { savedSessionId, panelId, tabName });
+}
+
 // --- Database Query Workspace ---
 
 export interface DbQueryWorkspaceTab {
@@ -1469,6 +1479,7 @@ export interface DbQueryWorkspaceTab {
   filePath?: string | null;
   fileName?: string | null;
   savedQueryId?: string | null;
+  displayName?: string | null;
   dirty: boolean;
   isOpen: boolean;
   closedAt?: number | null;
