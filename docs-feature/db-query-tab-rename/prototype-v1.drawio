@@ -1,0 +1,264 @@
+<mxGraphModel adaptiveColors="auto" dx="1600" dy="1200" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1130" math="0" shadow="0">
+  <root>
+    <mxCell id="0"/>
+    <mxCell id="1" parent="0"/>
+    <mxCell id="title" value="Taomni 数据库查询 Tab 自定义重命名 — UI 方案 v1（示意图，非最终像素；可编辑产物 prototype-v1.drawio）" style="text;html=1;align=left;verticalAlign=middle;fontSize=15;fontStyle=1;fontColor=#0f172a;" vertex="1" parent="1">
+      <mxGeometry x="20" y="8" width="1420" height="30" as="geometry"/>
+    </mxCell>
+    <mxCell id="pA" value="A · 现状 — 仅 Query N 递增，无法从标题识别业务用途（来源 issue #559 截图 Query 16）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#94a3b8;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=12;fontStyle=1;fontColor=#0f172a;" vertex="1" parent="1">
+      <mxGeometry x="20" y="46" width="690" height="360" as="geometry"/>
+    </mxCell>
+    <mxCell id="a-win" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#cbd5e1;" vertex="1" parent="1">
+      <mxGeometry x="40" y="84" width="650" height="290" as="geometry"/>
+    </mxCell>
+    <mxCell id="a-strip" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#cbd5e1;" vertex="1" parent="1">
+      <mxGeometry x="41" y="85" width="648" height="30" as="geometry"/>
+    </mxCell>
+    <mxCell id="a-t1" value="Query 1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#93c5fd;fontColor=#1e40af;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="49" y="89" width="66" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="a-t2" value="Query 2" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#cbd5e1;fontColor=#64748b;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="117" y="89" width="66" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="a-t3" value="Query 3*" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#cbd5e1;fontColor=#64748b;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="185" y="89" width="66" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="a-t16" value="Query 16*" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#cbd5e1;fontColor=#64748b;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="253" y="89" width="74" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="a-plus" value="+" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#cbd5e1;fontColor=#64748b;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="331" y="89" width="22" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="a-side-h" value="Schema | Queries" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#cbd5e1;fontSize=10;fontColor=#334155;" vertex="1" parent="1">
+      <mxGeometry x="42" y="116" width="138" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="a-side" value="public&#10;  tables&#10;    orders&#10;    users&#10;    payments&#10;  views" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#cbd5e1;fontSize=10;fontColor=#475569;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;" vertex="1" parent="1">
+      <mxGeometry x="42" y="138" width="138" height="235" as="geometry"/>
+    </mxCell>
+    <mxCell id="a-editor" value="select count(*)&#10;from orders&#10;where status = 'pending';&#10;&#10;-- 这条到底是哪个业务？只能点开逐条猜" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cbd5e1;fontSize=11;fontColor=#0f172a;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;fontFamily=Courier New;" vertex="1" parent="1">
+      <mxGeometry x="182" y="116" width="507" height="150" as="geometry"/>
+    </mxCell>
+    <mxCell id="a-result" value="Result 1     id | customer | amount | status | created_at&#10;            1001 | ACME     | 128.00 | pending | 2026-09-12 09:31&#10;            1002 | Globex   |  76.50 | paid    | 2026-09-12 09:40" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#cbd5e1;fontSize=10;fontColor=#475569;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;fontFamily=Courier New;" vertex="1" parent="1">
+      <mxGeometry x="182" y="268" width="507" height="105" as="geometry"/>
+    </mxCell>
+    <mxCell id="a-note" value="问题：长期保留多条 SQL 后，编号与业务脱钩；查找只能逐个点开内容猜测。" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#b91c1c;" vertex="1" parent="1">
+      <mxGeometry x="40" y="376" width="650" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="pB" value="B · 双击标题进入内联编辑（自动全选；Enter 提交 / Esc 取消 / 失焦提交；空白 = 清除自定义名）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#94a3b8;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=12;fontStyle=1;fontColor=#0f172a;" vertex="1" parent="1">
+      <mxGeometry x="740" y="46" width="690" height="360" as="geometry"/>
+    </mxCell>
+    <mxCell id="b-win" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#cbd5e1;" vertex="1" parent="1">
+      <mxGeometry x="760" y="84" width="650" height="290" as="geometry"/>
+    </mxCell>
+    <mxCell id="b-strip" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#cbd5e1;" vertex="1" parent="1">
+      <mxGeometry x="761" y="85" width="648" height="30" as="geometry"/>
+    </mxCell>
+    <mxCell id="b-t1" value="数据排查" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#cbd5e1;fontColor=#64748b;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="769" y="89" width="72" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="b-input" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#1e40af;" vertex="1" parent="1">
+      <mxGeometry x="845" y="89" width="104" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="b-sel" value="订单巡检" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#bfdbfe;strokeColor=none;fontColor=#1e3a8a;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="849" y="92" width="60" height="16" as="geometry"/>
+    </mxCell>
+    <mxCell id="b-caret" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1e40af;strokeColor=none;" vertex="1" parent="1">
+      <mxGeometry x="909" y="92" width="2" height="16" as="geometry"/>
+    </mxCell>
+    <mxCell id="b-t3" value="监控巡检*" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#cbd5e1;fontColor=#64748b;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="953" y="89" width="78" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="b-t4" value="Query 4" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#cbd5e1;fontColor=#64748b;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="1033" y="89" width="66" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="b-side-h" value="Schema | Queries" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#cbd5e1;fontSize=10;fontColor=#334155;" vertex="1" parent="1">
+      <mxGeometry x="762" y="116" width="138" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="b-side" value="public&#10;  tables&#10;    orders&#10;    users&#10;    payments&#10;  views" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#cbd5e1;fontSize=10;fontColor=#475569;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;" vertex="1" parent="1">
+      <mxGeometry x="762" y="138" width="138" height="235" as="geometry"/>
+    </mxCell>
+    <mxCell id="b-editor" value="select count(*)&#10;from orders&#10;where status = 'pending';&#10;&#10;-- Tab 名已改为「订单巡检」，* 表示文档有未保存改动" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#cbd5e1;fontSize=11;fontColor=#0f172a;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;fontFamily=Courier New;" vertex="1" parent="1">
+      <mxGeometry x="902" y="116" width="507" height="150" as="geometry"/>
+    </mxCell>
+    <mxCell id="b-result" value="Result 1     id | customer | amount | status | created_at&#10;            1001 | ACME     | 128.00 | pending | 2026-09-12 09:31&#10;            1002 | Globex   |  76.50 | paid    | 2026-09-12 09:40" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#cbd5e1;fontSize=10;fontColor=#475569;align=left;verticalAlign=top;spacingLeft=6;spacingTop=4;fontFamily=Courier New;" vertex="1" parent="1">
+      <mxGeometry x="902" y="268" width="507" height="105" as="geometry"/>
+    </mxCell>
+    <mxCell id="b-note" value="校验：提交后标题立即生效且 * 保留；自定义名优先于已保存查询名 / .sql 文件名；不改 SQL、不重命名文件与库内查询。" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#166534;" vertex="1" parent="1">
+      <mxGeometry x="760" y="376" width="650" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="pC" value="C · 右键菜单 — Rename tab 置于首项（与双击等价，编辑态相同）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#94a3b8;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=12;fontStyle=1;fontColor=#0f172a;" vertex="1" parent="1">
+      <mxGeometry x="20" y="430" width="690" height="470" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-win" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#cbd5e1;" vertex="1" parent="1">
+      <mxGeometry x="40" y="468" width="650" height="290" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-strip" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#cbd5e1;" vertex="1" parent="1">
+      <mxGeometry x="41" y="469" width="648" height="30" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-t1" value="订单巡检*" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#93c5fd;fontColor=#1e40af;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="49" y="473" width="80" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-t2" value="数据排查" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#cbd5e1;fontColor=#64748b;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="131" y="473" width="72" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-t3" value="Query 3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#cbd5e1;fontColor=#64748b;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="205" y="473" width="66" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-menu" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#94a3b8;shadow=1;" vertex="1" parent="1">
+      <mxGeometry x="62" y="508" width="248" height="330" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-m0" value="Rename tab" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=none;fontColor=#1e40af;fontSize=11;fontStyle=1;align=left;spacingLeft=10;" vertex="1" parent="1">
+      <mxGeometry x="64" y="510" width="244" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-msep1" value="" style="line;html=1;strokeColor=#e2e8f0;" vertex="1" parent="1">
+      <mxGeometry x="66" y="536" width="240" height="6" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-m1" value="Ask AI explain syntax" style="text;html=1;fontSize=11;fontColor=#334155;align=left;verticalAlign=middle;spacingLeft=2;" vertex="1" parent="1">
+      <mxGeometry x="66" y="542" width="240" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-m2" value="Answer language          ▸" style="text;html=1;fontSize=11;fontColor=#334155;align=left;verticalAlign=middle;spacingLeft=2;" vertex="1" parent="1">
+      <mxGeometry x="66" y="564" width="240" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-msep2" value="" style="line;html=1;strokeColor=#e2e8f0;" vertex="1" parent="1">
+      <mxGeometry x="66" y="590" width="240" height="6" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-m3" value="Run query" style="text;html=1;fontSize=11;fontColor=#334155;align=left;verticalAlign=middle;spacingLeft=2;" vertex="1" parent="1">
+      <mxGeometry x="66" y="596" width="240" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-m4" value="Run selection" style="text;html=1;fontSize=11;fontColor=#334155;align=left;verticalAlign=middle;spacingLeft=2;" vertex="1" parent="1">
+      <mxGeometry x="66" y="618" width="240" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-m5" value="Run current statement" style="text;html=1;fontSize=11;fontColor=#334155;align=left;verticalAlign=middle;spacingLeft=2;" vertex="1" parent="1">
+      <mxGeometry x="66" y="640" width="240" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-m6" value="Format SQL" style="text;html=1;fontSize=11;fontColor=#334155;align=left;verticalAlign=middle;spacingLeft=2;" vertex="1" parent="1">
+      <mxGeometry x="66" y="662" width="240" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-m7" value="Save query tab" style="text;html=1;fontSize=11;fontColor=#334155;align=left;verticalAlign=middle;spacingLeft=2;" vertex="1" parent="1">
+      <mxGeometry x="66" y="684" width="240" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-msep3" value="" style="line;html=1;strokeColor=#e2e8f0;" vertex="1" parent="1">
+      <mxGeometry x="66" y="710" width="240" height="6" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-m8" value="New query tab" style="text;html=1;fontSize=11;fontColor=#334155;align=left;verticalAlign=middle;spacingLeft=2;" vertex="1" parent="1">
+      <mxGeometry x="66" y="716" width="240" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-m9" value="Close" style="text;html=1;fontSize=11;fontColor=#334155;align=left;verticalAlign=middle;spacingLeft=2;" vertex="1" parent="1">
+      <mxGeometry x="66" y="738" width="240" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-m10" value="Close others" style="text;html=1;fontSize=11;fontColor=#334155;align=left;verticalAlign=middle;spacingLeft=2;" vertex="1" parent="1">
+      <mxGeometry x="66" y="760" width="240" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-m11" value="Close all" style="text;html=1;fontSize=11;fontColor=#334155;align=left;verticalAlign=middle;spacingLeft=2;" vertex="1" parent="1">
+      <mxGeometry x="66" y="782" width="240" height="22" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-note1" value="Rename tab 放在菜单第一项：右键后无需长距离移动即可触达；与现有 AI / 执行 / 关闭分组不冲突。" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#166534;whiteSpace=wrap;" vertex="1" parent="1">
+      <mxGeometry x="330" y="508" width="350" height="60" as="geometry"/>
+    </mxCell>
+    <mxCell id="c-note2" value="重命名范围仅显示名：&#10;- 不修改 SQL 内容与执行结果&#10;- 不重命名 .sql 文件或 Query Library 查询&#10;- 同一 workspace 会话内持久化，三端一致" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#334155;whiteSpace=wrap;" vertex="1" parent="1">
+      <mxGeometry x="330" y="580" width="350" height="90" as="geometry"/>
+    </mxCell>
+    <mxCell id="pD" value="D · History / 历史查询记录 — 展示执行时所属 Tab 的自定义名称" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#94a3b8;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=12;fontStyle=1;fontColor=#0f172a;" vertex="1" parent="1">
+      <mxGeometry x="740" y="430" width="690" height="470" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-panel" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8fafc;strokeColor=#cbd5e1;" vertex="1" parent="1">
+      <mxGeometry x="760" y="468" width="650" height="380" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-header" value="Query history  3                                                                        Refresh      Clear" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f1f5f9;strokeColor=#cbd5e1;fontSize=11;fontColor=#334155;align=left;spacingLeft=8;fontStyle=1;" vertex="1" parent="1">
+      <mxGeometry x="761" y="469" width="648" height="30" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-e1-meta" value="2026-09-12 10:24:03    128 ms    3 rows" style="text;html=1;fontSize=9;fontColor=#64748b;align=left;verticalAlign=middle;fontFamily=Courier New;" vertex="1" parent="1">
+      <mxGeometry x="770" y="503" width="360" height="16" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-e1-engine" value="mysql/test" style="text;html=1;fontSize=9;fontColor=#64748b;align=right;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="1150" y="503" width="250" height="16" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-e1-chip" value="订单巡检" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#93c5fd;fontColor=#1e40af;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="770" y="523" width="62" height="18" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-e1-sql" value="select count(*) from orders where status = 'pending'" style="text;html=1;fontSize=10;fontColor=#0f172a;align=left;verticalAlign=middle;fontFamily=Courier New;" vertex="1" parent="1">
+      <mxGeometry x="840" y="523" width="560" height="18" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-e1-act" value="Run    Select    +Tab    JSON    Ask AI                                        Delete" style="text;html=1;fontSize=9;fontColor=#475569;align=left;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="770" y="545" width="630" height="18" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-e1-div" value="" style="line;html=1;strokeColor=#e2e8f0;" vertex="1" parent="1">
+      <mxGeometry x="762" y="569" width="646" height="6" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-e2-meta" value="2026-09-12 10:21:47     64 ms    18 rows" style="text;html=1;fontSize=9;fontColor=#64748b;align=left;verticalAlign=middle;fontFamily=Courier New;" vertex="1" parent="1">
+      <mxGeometry x="770" y="581" width="360" height="16" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-e2-engine" value="mysql/test" style="text;html=1;fontSize=9;fontColor=#64748b;align=right;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="1150" y="581" width="250" height="16" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-e2-chip" value="数据排查" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#93c5fd;fontColor=#1e40af;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="770" y="601" width="62" height="18" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-e2-sql" value="select * from users where last_login &lt; now() - interval 7 day" style="text;html=1;fontSize=10;fontColor=#0f172a;align=left;verticalAlign=middle;fontFamily=Courier New;" vertex="1" parent="1">
+      <mxGeometry x="840" y="601" width="560" height="18" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-e2-act" value="Run    Select    +Tab    JSON    Ask AI                                        Delete" style="text;html=1;fontSize=9;fontColor=#475569;align=left;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="770" y="623" width="630" height="18" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-e2-div" value="" style="line;html=1;strokeColor=#e2e8f0;" vertex="1" parent="1">
+      <mxGeometry x="762" y="647" width="646" height="6" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-e3-meta" value="2026-09-11 18:02:10     12 ms    1 row" style="text;html=1;fontSize=9;fontColor=#64748b;align=left;verticalAlign=middle;fontFamily=Courier New;" vertex="1" parent="1">
+      <mxGeometry x="770" y="659" width="360" height="16" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-e3-engine" value="mysql/test" style="text;html=1;fontSize=9;fontColor=#64748b;align=right;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="1150" y="659" width="250" height="16" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-e3-chip" value="（无名称）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e2e8f0;strokeColor=#cbd5e1;fontColor=#64748b;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="770" y="679" width="62" height="18" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-e3-sql" value="show status like 'Threads_connected'" style="text;html=1;fontSize=10;fontColor=#0f172a;align=left;verticalAlign=middle;fontFamily=Courier New;" vertex="1" parent="1">
+      <mxGeometry x="840" y="679" width="560" height="18" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-e3-act" value="Run    Select    +Tab    JSON    Ask AI                                        Delete" style="text;html=1;fontSize=9;fontColor=#475569;align=left;verticalAlign=middle;" vertex="1" parent="1">
+      <mxGeometry x="770" y="701" width="630" height="18" as="geometry"/>
+    </mxCell>
+    <mxCell id="d-note" value="执行时随历史写入 panelId + tabName 快照；重命名后同一 Tab 的历史条目同步更新名称；旧数据无名称时仅显示 SQL，仍可检索。" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#166534;whiteSpace=wrap;" vertex="1" parent="1">
+      <mxGeometry x="760" y="748" width="650" height="44" as="geometry"/>
+    </mxCell>
+    <mxCell id="pE" value="E · 状态流：交互 → 持久化 → 恢复" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#94a3b8;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;fontSize=12;fontStyle=1;fontColor=#0f172a;" vertex="1" parent="1">
+      <mxGeometry x="20" y="920" width="1410" height="170" as="geometry"/>
+    </mxCell>
+    <mxCell id="g1" value="双击标题 / 右键 Rename tab" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#93c5fd;fontSize=11;fontColor=#1e40af;" vertex="1" parent="1">
+      <mxGeometry x="50" y="960" width="180" height="46" as="geometry"/>
+    </mxCell>
+    <mxCell id="g2" value="内联编辑（文本自动全选）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#93c5fd;fontSize=11;fontColor=#1e40af;" vertex="1" parent="1">
+      <mxGeometry x="280" y="960" width="160" height="46" as="geometry"/>
+    </mxCell>
+    <mxCell id="g3" value="Enter / 失焦提交，Esc 取消；空白清除自定义名" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#93c5fd;fontSize=11;fontColor=#1e40af;" vertex="1" parent="1">
+      <mxGeometry x="490" y="960" width="210" height="46" as="geometry"/>
+    </mxCell>
+    <mxCell id="g4" value="patchPanel(displayName) + 1s debounce 自动保存" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ecfdf5;strokeColor=#6ee7b7;fontSize=11;fontColor=#065f46;" vertex="1" parent="1">
+      <mxGeometry x="750" y="960" width="220" height="46" as="geometry"/>
+    </mxCell>
+    <mxCell id="g5" value="SQLite display_name 落盘；History 同 panel 条目同步" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ecfdf5;strokeColor=#6ee7b7;fontSize=11;fontColor=#065f46;" vertex="1" parent="1">
+      <mxGeometry x="1020" y="960" width="220" height="46" as="geometry"/>
+    </mxCell>
+    <mxCell id="g6" value="刷新 / 重启恢复 Tab 名" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefce8;strokeColor=#fde047;fontSize=11;fontColor=#854d0e;" vertex="1" parent="1">
+      <mxGeometry x="1290" y="960" width="120" height="46" as="geometry"/>
+    </mxCell>
+    <mxCell id="g-e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#94a3b8;" edge="1" parent="1" source="g1" target="g2">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="g-e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#94a3b8;" edge="1" parent="1" source="g2" target="g3">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="g-e3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#94a3b8;" edge="1" parent="1" source="g3" target="g4">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="g-e4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#94a3b8;" edge="1" parent="1" source="g4" target="g5">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="g-e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#94a3b8;" edge="1" parent="1" source="g5" target="g6">
+      <mxGeometry relative="1" as="geometry"/>
+    </mxCell>
+    <mxCell id="g-note" value="异常边界：重命名过程中关闭 Tab → 名称随关闭仅保存在 closed 行（30 天保留），不影响其他 Tab；保存失败时状态栏提示，内存名称保留待下次自动保存重试。" style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#334155;whiteSpace=wrap;" vertex="1" parent="1">
+      <mxGeometry x="50" y="1024" width="900" height="48" as="geometry"/>
+    </mxCell>
+  </root>
+</mxGraphModel>

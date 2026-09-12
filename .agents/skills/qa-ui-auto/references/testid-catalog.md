@@ -590,6 +590,7 @@
 - `[data-testid="query-result-generated-sql-sync"]` — interactive [optional] — F-DB-1.query-result-generated-sql-sync
 - `[data-testid="db-query-history-panel"]` — display [optional] — F-DB-1.query-history-panel
 - `[data-testid="db-query-history-refresh"]` — interactive [optional] — F-DB-1.query-history-refresh
+- `[data-testid="db-query-history-toggle"]` — interactive [optional] — F-DB-1.query-history-toggle
 - `[data-testid="db-query-history-clear"]` — interactive [optional] — F-DB-1.query-history-clear
 - `[data-testid="db-query-history-entry"]` — display [optional] — F-DB-1.query-history-entry
 - `[data-testid="db-query-history-run"]` — interactive [optional] — F-DB-1.query-history-run
@@ -598,6 +599,10 @@
 - `[data-testid="db-query-history-json"]` — interactive [optional] — F-DB-1.query-history-json
 - `[data-testid="db-query-history-ask-ai"]` — interactive [optional] — F-DB-1.query-history-ask-ai
 - `[data-testid="db-query-history-delete"]` — interactive [optional] — F-DB-1.query-history-delete
+- `[data-testid="db-query-tab"]` — interactive [optional] — F-DB-1.query-tab
+- `[data-testid="db-query-tab-input"]` — interactive [optional] — F-DB-1.query-tab-input
+- `[data-testid="db-context-rename-tab"]` — interactive [optional] — F-DB-1.query-context-rename
+- `[data-testid="db-query-history-entry-name"]` — display [optional] — F-DB-1.query-history-entry-name
 - `[data-testid="db-current-statement-panel"]` — display [optional] — F-DB-1.current-statement-panel
 - `[data-testid="db-current-statement-run"]` — interactive [optional] — F-DB-1.current-statement-run
 - `[data-testid="db-current-statement-select"]` — interactive [optional] — F-DB-1.current-statement-select
@@ -613,6 +618,7 @@
 - `[data-testid="db-query-library-tab"]` — interactive [optional] — F-DB-1.query-library-tab
 - `[data-testid="db-save-query"]` — interactive [optional] — F-DB-1.save-query
 - `[data-testid="db-tab-limit"]` — interactive [optional] — F-DB-1.tab-limit
+- `[data-testid="db-run-current-statement"]` — interactive [optional] — F-DB-1.run-current-statement
 - `[data-testid="db-connection-error-banner"]` — display [optional] — F-DB-1.connection-error-banner
 - `[data-testid="db-chat-toggle"]` — interactive [optional] — F-DB-1.chat-toggle
 - `[data-testid="db-detach"]` — interactive [optional] — F-DB-1.detach

@@ -220,6 +220,8 @@ interface StubDbSqlHistoryEntry {
   hasResultSet: boolean;
   error?: string | null;
   createdAt: number;
+  panelId?: string | null;
+  tabName?: string | null;
 }
 
 interface StubDbQueryWorkspaceTab {
@@ -230,6 +232,7 @@ interface StubDbQueryWorkspaceTab {
   filePath?: string | null;
   fileName?: string | null;
   savedQueryId?: string | null;
+  displayName?: string | null;
   dirty: boolean;
   isOpen: boolean;
   closedAt?: number | null;
@@ -3768,6 +3771,21 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
           : [],
       );
       return undefined as T;
+    }
+    case "db_update_history_tab_name": {
+      const invokeArgs = args as InvokeArgs | undefined;
+      const savedSessionId = (invokeArgs?.savedSessionId as string | undefined) ?? "";
+      const panelId = (invokeArgs?.panelId as string | undefined) ?? "";
+      const tabName = (invokeArgs?.tabName as string | null | undefined) ?? null;
+      let changed = 0;
+      saveDbSqlHistory(
+        loadDbSqlHistory().map((entry) => {
+          if (entry.savedSessionId !== savedSessionId || entry.panelId !== panelId) return entry;
+          changed += 1;
+          return { ...entry, tabName };
+        }),
+      );
+      return changed as T;
     }
     case "db_load_query_workspace": {
       const workspaceId = String((args as InvokeArgs | undefined)?.workspaceId ?? "");
