@@ -1,0 +1,111 @@
+id: TC-IDE-LAT-01-java-typing-latency-native
+title: "Java/JDT continuous typing latency with live diagnostics"
+description: |
+  AC-LAT-01/02 Linux measurement slice for the Java input path. Enters the
+  in-repo single-module Maven sample through persisted recents, opens App.java,
+  waits for the real jdtls session (Java status pill), then records continuous
+  typing at the end of the last line while the provider is active: a 24-key
+  warmup plus two 50-key measured groups (N=100 measured physical keys).
+  native_editor_performance stores keydown-to-CodeMirror-DOM raw samples per
+  group (native-editor-performance-*.json) together with the observed keydown
+  and beforeinput/input records; the case asserts the caret advanced by the
+  exact typed length, the appended bytes are present in order (no dropped or
+  reordered input), provider diagnostics converge after the burst (gutter
+  lightbulb on the error line), and four Ctrl+Z strokes remove exactly the
+  last four characters. The per-group max_p95_ms values are sanity guardrails,
+  not budgets: the recorded p50/p95/max raw samples are the evidence and no
+  absolute budget is claimed. The fixture is the checked-in Maven sample, not
+  the reporter's personal project, because native cases must never mutate a
+  personal project.
+covers: [F25.5]
+tags: [code-workspace, ide, performance, typing-latency, java-provider, native-gate, p1]
+modes: [native]
+fixtures: [reset_db, java_sample_projects, jdtls_required]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-lat-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  # Enter the real sample project through persisted recents; WebDriver cannot
+  # operate the native folder picker opened by Add Folder to Workspace.
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-lat-java","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "package com.example.single;"
+      timeout_sec: 60
+  # The provider must be actively serving the document before measuring; the
+  # status pill turns Java only after the real session opened the document.
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: "Java"
+      timeout_sec: 60
+  # Let the diagnostics-driven re-render settle before interacting.
+  - wait: 2
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  # EOF is line 55, column 1 (the fixture ends with a trailing newline); the
+  # typed burst appends to that empty line.
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["Control+End"]
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 55, Col 1"
+      timeout_sec: 10
+  # Warmup: 24 keys, loose guardrail; primes lazy per-edit paths (shared-document
+  # owner, debounced didChange, diagnostic scheduling) before the measured groups.
+  - native_editor_performance:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: "ABCDEFGHIJKLMNOPQRSTUVWX"
+      capture_text: false
+      max_p95_ms: 150
+      label: java-jdt-warmup
+  - native_editor_performance:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWX"
+      capture_text: false
+      max_p95_ms: 150
+      label: java-jdt-group1
+  - native_editor_performance:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN"
+      capture_text: false
+      max_p95_ms: 150
+      label: java-jdt-group2
+  # No dropped or reordered input: 24 + 50 + 50 = 124 appended characters move
+  # the caret from col 1 to col 125, and the exact sequence is on line 55.
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 55, Col 125"
+      timeout_sec: 10
+  - eval_readonly:
+      expression: >-
+        (document.querySelector('.cm-content')?.textContent ?? '').includes('ABCDEFGHIJKLMNOPQRSTUVWXabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWX0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN')
+      expect_truthy: true
+  # AC-LAT-02: the provider diagnostics converge after the typing burst; the
+  # caret line now carries a real jdtls diagnostic, so its gutter lightbulb
+  # must return without any further edit.
+  - wait_for:
+      selector: '[data-testid="code-workspace-lightbulb"]'
+      timeout_sec: 60
+  # Undo contract: each keystroke is one history entry, so four Ctrl+Z strokes
+  # remove exactly the last four characters (col 125 -> col 121).
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["Control+z", "Control+z", "Control+z", "Control+z"]
+  - wait: 0.5
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 55, Col 121"
+      timeout_sec: 10
+  - screenshot: tc-ide-lat-01-java-typing.png
