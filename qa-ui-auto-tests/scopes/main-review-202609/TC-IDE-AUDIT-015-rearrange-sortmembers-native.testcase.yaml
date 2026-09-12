@@ -1,0 +1,194 @@
+id: TC-IDE-AUDIT-015-rearrange-sortmembers-native
+title: "Rearrange Code via live JDT LS source.sortMembers with preview, apply, undo"
+description: |
+  ED-AUDIT-015 native gate case. Crosses the real packaged-app boundary on
+  Linux with live Eclipse JDT LS 1.61.0 and proves the supported rearrange
+  path end to end through the production UI entry:
+
+  1. A SortMembers.java file with unsorted members (methods before fields,
+     zebra before apple) is written by the host, then the workspace is
+     entered through persisted recents with that file active.
+  2. Rearrange Code is invoked from Search Everywhere Actions (the
+     production workspace.rearrangeCode entry). JDT LS is never advertised
+     in codeActionKinds, so the handler discovers the dedicated
+     source.sortMembers action live (exact kind equality) instead of
+     trusting summary booleans.
+  3. The rearrange preview dialog is confirmed, the apply status names the
+     transaction, and the editor shows fields before methods (order asserted
+     with a DOTALL pattern, not just substring presence).
+  4. One shared undo names the Rearrange Code journal entry, a save returns
+     the exact original bytes (sha256 pinned from the host-written source),
+     proving single-undo preimage restore.
+  5. ED-IMPROVE-001: while the first preview dialog is open, an external
+     process rewrites the file; the clean buffer reloads from disk, so
+     confirming that old preview must be rejected with a typed stale status
+     and zero writes (exact bytes of the external revision stay on disk)
+     before the normal rearrange flow runs on the restored preimage.
+
+  Highest claim on green: L2 native + provider-backed (Linux), packaged app
+  UI over a real jdtls process, real disk bytes. IDEA comparison (required
+  kind) is recorded separately as unrun on this box — no IDEA 2026.2.x.
+covers: [F25.5]
+tags: [code-workspace, ide-c8, rearrange, provider-fixture, native-gate, p0]
+modes: [native]
+fixtures: [reset_db, sortable_java_fixtures, jdtls_required]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-gate-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  # The sortable file is provisioned by the sortable_java_fixtures plugin
+  # (a maven-single copy plus SortMembers.java with exact bytes; pre
+  # sha256 68142fea...), so recents can point at it directly with no tree
+  # navigation. host_write_file cannot create new files, hence the plugin.
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-audit015","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.sortable_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/SortMembers.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.sortable_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "void zebra"
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: "Java"
+      timeout_sec: 60
+  # Cold-import settle: per-run fixture copies force a cold jdtls import
+  # every run (build-jobs-finished ~20s); the live codeAction discovery
+  # behind Rearrange Code needs the import done, like the 014 gate.
+  - wait: 30
+  # ---------------------------------------------------------------------
+  # ED-IMPROVE-001 phase: a document that changes while the preview is open
+  # must invalidate the plan (zero writes), instead of committing edits built
+  # for the old preimage.
+  # ---------------------------------------------------------------------
+  - press: Control+Shift+N
+  - wait_for:
+      selector: '[data-testid="code-workspace-search-everywhere"]'
+      timeout_sec: 30
+  - click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-child(5)'
+  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+  - type: Rearrange Code
+  - press: Enter
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="confirm-dialog"]'
+      contains: "Rearrange preview"
+      timeout_sec: 10
+  # A real external process rewrites the file while the preview dialog is
+  # open. The buffer is clean, so the workspace watcher reloads it from disk.
+  - host_write_file:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      text: |
+        package com.example.single;
+
+        public class SortMembers {
+            void zebra() {
+            }
+        }
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "SortMembers.java from disk"
+      timeout_sec: 30
+  # Confirming the stale preview is rejected with a typed reason, the
+  # external revision stays on disk, and no rearrange status appears.
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "changed since the frozen preimage"
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "void zebra"
+      timeout_sec: 10
+  - assert_file_sha256:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      equals: "224c54e2637efff8c89c5d0fc2901fd0254fdb3a8d88b35b45e6a336955a1e02"
+      timeout_sec: 30
+  # Restore the exact fixture preimage before the positive path.
+  - host_write_file:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      text: |
+        package com.example.single;
+
+        public class SortMembers {
+            void zebra() {
+            }
+
+            void apple() {
+            }
+
+            private int laterField = 2;
+            private int earlyField = 1;
+        }
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "SortMembers.java from disk"
+      timeout_sec: 30
+  - assert_file_sha256:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      equals: "68142feae5f38ffc310302e58f6a211c61c9d68994cfa5b643d2fbcaf239f93b"
+      timeout_sec: 30
+  # ---------------------------------------------------------------------
+  # Positive path: live discovery -> preview -> apply -> single undo.
+  # ---------------------------------------------------------------------
+  # Production entry: Search Everywhere Actions -> Rearrange Code (the
+  # workspace.rearrangeCode command). The Actions tab is the 5th tab button
+  # (All/Classes/Files/Symbols/Actions/Text); the nth-child selector follows
+  # the TC-IDE-C8-07 native precedent because role=tab queries do not
+  # resolve under the native driver.
+  - press: Control+Shift+N
+  - wait_for:
+      selector: '[data-testid="code-workspace-search-everywhere"]'
+      timeout_sec: 30
+  - click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-child(5)'
+  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+  - type: Rearrange Code
+  # The filtered row is highlighted first; Enter runs it (the native driver
+  # has no text= engine, per the 013 precedent; C8-07 uses the same Enter).
+  - press: Enter
+  # Preview gate: the rearrange preview dialog shows pre/post hashes.
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="confirm-dialog"]'
+      contains: "Rearrange preview"
+      timeout_sec: 10
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  # Apply proof: the transaction status plus the reordered surface.
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Rearranged SortMembers.java"
+      timeout_sec: 60
+  - assert_pattern:
+      selector: '[data-testid="code-workspace-editor"]'
+      regex: "(?s)private int laterField.*void apple"
+      timeout_sec: 10
+  # ONE shared undo names the Rearrange Code journal entry (proving the
+  # journal transaction was claimed, not a buffer revert); the surface
+  # returns to methods-before-fields; a save restores exact disk bytes.
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+z
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Undid Rearrange Code"
+      timeout_sec: 10
+  - assert_pattern:
+      selector: '[data-testid="code-workspace-editor"]'
+      regex: "(?s)void zebra.*private int laterField"
+      timeout_sec: 10
+  - press: Control+s
+  - assert_file_sha256:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      equals: "68142feae5f38ffc310302e58f6a211c61c9d68994cfa5b643d2fbcaf239f93b"
+      timeout_sec: 30
+  - screenshot: tc-ide-audit-015-sortmembers-undone.png

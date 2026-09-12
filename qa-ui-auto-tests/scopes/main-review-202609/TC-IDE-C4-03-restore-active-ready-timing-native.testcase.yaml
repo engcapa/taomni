@@ -1,0 +1,83 @@
+id: TC-IDE-C4-03
+title: "24-tab restore: active-ready editability, background drain, app-clock timings"
+description: |
+  ED-AUDIT-013 measurement slice. Seeds a 24-tab layout snapshot (12 tabs
+  per leaf, primary active file00.txt, secondary active file12.txt) over the
+  restore_24tab_fixtures host directory and enters through persisted recents.
+  The production restore effect records app-clock milestones
+  (request/active-ready/all-ready) and prints one [restore-timings] console
+  line at drain; the runner keeps that console artifact for aggregation.
+  This case proves behavior per run: the active leaf shows its exact bytes,
+  accepts a real typed edit, and the last background tab renders its exact
+  bytes (proving the bounded queue drained in order). The millisecond
+  numbers live in the console artifact, never in step durations.
+
+  Highest claim on green: L2 restore behavior + app-clock timing sample.
+covers: [F25.1, F25.5]
+tags: [code-workspace, ide-c4, restore, performance, native-gate, p1]
+modes: [native]
+fixtures: [reset_db, restore_24tab_fixtures]
+timeout_sec: 300
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-restore-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  # Enter through persisted recents; the layout snapshot below carries the
+  # 24-tab restore plan under the same workspace identity.
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-restore13","name":"qa-restore13","roots":[{"id":"perf","name":"perf","path":"${fixture.restore_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"perf","path":"file00.txt"},"lastOpenedAt":1788537600000,"isGitRepo":false}]'
+  - seed_storage:
+      key: taomni.codeWorkspace.layout.v2.${fixture.restore_instance_id}
+      value: '{"version":2,"bottomDockOpen":false,"bottomDockTab":"problems","rightPaneOpen":false,"rightPaneTab":"outline","languagePanelOpen":false,"splitOrientation":"vertical","activeEditorGroupId":"primary","expandedRootIds":[],"expandedDirKeys":[],"layoutTreeV2":{"type":"split","id":"split-root","orientation":"vertical","ratios":[0.5,0.5],"children":[{"type":"leaf","id":"primary","openFileKeys":["root:perf:file00.txt","root:perf:file01.txt","root:perf:file02.txt","root:perf:file03.txt","root:perf:file04.txt","root:perf:file05.txt","root:perf:file06.txt","root:perf:file07.txt","root:perf:file08.txt","root:perf:file09.txt","root:perf:file10.txt","root:perf:file11.txt"],"activeKey":"root:perf:file00.txt"},{"type":"leaf","id":"secondary","openFileKeys":["root:perf:file12.txt","root:perf:file13.txt","root:perf:file14.txt","root:perf:file15.txt","root:perf:file16.txt","root:perf:file17.txt","root:perf:file18.txt","root:perf:file19.txt","root:perf:file20.txt","root:perf:file21.txt","root:perf:file22.txt","root:perf:file23.txt"],"activeKey":"root:perf:file12.txt"}]},"editorGroups":{"primary":{"openOrder":["root:perf:file00.txt","root:perf:file01.txt","root:perf:file02.txt","root:perf:file03.txt","root:perf:file04.txt","root:perf:file05.txt","root:perf:file06.txt","root:perf:file07.txt","root:perf:file08.txt","root:perf:file09.txt","root:perf:file10.txt","root:perf:file11.txt"],"activeKey":"root:perf:file00.txt","previewKey":null,"pinnedKeys":[]},"secondary":{"openOrder":["root:perf:file12.txt","root:perf:file13.txt","root:perf:file14.txt","root:perf:file15.txt","root:perf:file16.txt","root:perf:file17.txt","root:perf:file18.txt","root:perf:file19.txt","root:perf:file20.txt","root:perf:file21.txt","root:perf:file22.txt","root:perf:file23.txt"],"activeKey":"root:perf:file12.txt","previewKey":null,"pinnedKeys":[]}}}'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.restore_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 60
+  # Restore proof: the seeded snapshot carries two leaves, so exactly two
+  # editors must mount. Anything else means the snapshot was ignored
+  # (wrong instance id or rejected shape) and the run must fail with this
+  # attribution instead of silently measuring no restore. (Class selector:
+  # the eval_readonly lint bans `=` attribute selectors.)
+  - eval_readonly:
+      expression: 'document.querySelectorAll(".cm-editor").length === 2'
+      expect_truthy: true
+  # Active-ready: the primary active leaf shows its exact bytes.
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "restore-seed-00"
+      timeout_sec: 60
+  # The active leaf accepts a real edit immediately (no waiting on background).
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press:
+      key: Control+Home
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+  - type: "X"
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "Xrestore-seed-00"
+      timeout_sec: 30
+  # All-ready functional gate: the last background target renders its exact
+  # bytes, proving the bounded queue drained in order to the end. Tabs carry
+  # their file key in data-editor-tab-key (the project tree virtualizes
+  # off-screen rows, and the native driver has no text= engine); the strip
+  # prefix follows the TC-IDE-C4-01 pattern so coverage attributes the
+  # registered tab-strip control. Clicking the restored tab focuses the
+  # already-read buffer without issuing a new read.
+  - click: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key="root:perf:file23.txt"] button'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="secondary"]'
+      contains: "restore-seed-23"
+      timeout_sec: 60
+  # The primary leaf kept the typed edit: background restore never clobbered
+  # the active leaf.
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"]'
+      contains: "Xrestore-seed-00"
+      timeout_sec: 30
+  # Let the drain-completion console line flush into the run artifact.
+  - wait: 2
+  - screenshot: tc-ide-c4-03-restore-24tab.png
