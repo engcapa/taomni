@@ -1,0 +1,105 @@
+id: TC-IDE-FMT-01-reformat-java-native
+title: "Reformat Document applies the real jdtls formatter and reports unavailable providers"
+description: |
+  AC-FMT-01/04 Linux provider-backed slice. Opens the in-repo Maven sample
+  App.java with a live jdtls session, introduces a deterministic indentation
+  defect (four extra leading spaces on line 10), then runs Format Document
+  through its real Ctrl+Alt+L binding. The status line must name the formatted
+  file and the provider's edits must restore exactly the fixture's 8-space
+  indentation, so a capability-ready shortcut is never a silent no-op. The
+  case then opens pom.xml, which has no formatter provider, and proves the
+  command stays discoverable but reports the typed unavailable reason without
+  touching the buffer. Context-menu parity, capability-unknown execution and
+  the readonly/request-failure branches are asserted at the mounted
+  CodeWorkspaceTab layer (V-FMT-01); this case proves the native shortcut and
+  real formatter path.
+covers: [F25.5]
+tags: [code-workspace, ide, format, java-provider, native-gate, p1]
+modes: [native]
+fixtures: [reset_db, java_sample_projects, jdtls_required]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-format-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  # Enter the real sample project through persisted recents; WebDriver cannot
+  # operate the native folder picker opened by Add Folder to Workspace.
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-fmt-java","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "package com.example.single;"
+      timeout_sec: 60
+  # The formatter capability only exists once the real session is serving.
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: "Java"
+      timeout_sec: 60
+  - wait: 2
+  # Line 10 (1-based) is `        System.out.println(names.size());`; put the
+  # caret before `System` (0-based column 8) and insert four extra spaces.
+  - native_pointer_drag:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      from: {line: 10, column: 8}
+      to: {line: 10, column: 8}
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 10, Col 9"
+      timeout_sec: 10
+  - type: "    "
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 10, Col 13"
+      timeout_sec: 10
+  # The defect is live in the buffer: line 10 now has 12 leading spaces.
+  - eval_readonly:
+      expression: >-
+        document.querySelector('.cm-content')?.cmTile?.root?.view?.state?.doc?.line(10)?.text?.startsWith('            System.out.println') === true
+      expect_truthy: true
+  # AC-FMT-01: the real shortcut runs the real formatter.
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["Control+Alt+l"]
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Formatted App.java"
+      timeout_sec: 30
+  # Provider edits restored the fixture's exact indentation (8 spaces).
+  - eval_readonly:
+      expression: >-
+        document.querySelector('.cm-content')?.cmTile?.root?.view?.state?.doc?.line(10)?.text?.startsWith('        System.out.println') === true
+      expect_truthy: true
+  - screenshot: tc-ide-fmt-01-formatted.png
+
+  # AC-FMT-04: a file with no formatter provider keeps the command
+  # discoverable and reports the typed reason without changing the buffer.
+  - click: '[data-testid="code-workspace-tree-file"][data-path="pom.xml"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-tab-strip"]'
+      contains: "pom.xml"
+      timeout_sec: 30
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      transport: webdriver
+      keys: ["Control+Alt+l"]
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "No formatter provider"
+      timeout_sec: 30
+  # The unavailable path never mutated pom.xml: the editor still shows the
+  # project descriptor and the save observation stays clean.
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "<artifactId>maven-single</artifactId>"
+      timeout_sec: 30
+  - screenshot: tc-ide-fmt-01-unavailable.png

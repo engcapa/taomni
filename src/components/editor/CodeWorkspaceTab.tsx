@@ -296,10 +296,10 @@ import {
 } from "./workspace/autoImportModel";
 import type { PlanTemplateCreationResult } from "./workspace/fileTemplateModel";
 import {
-  buildFormatPlan,
   filterFormattingRanges,
   resolveEffectiveSavePolicy,
 } from "./workspace/workspaceCodeStyleScheme";
+import { planReformat } from "./workspace/reformatWorkflow";
 import {
   BUILT_IN_SCHEME_ID,
   activeSchemeForLanguage,
@@ -1032,6 +1032,7 @@ import {
   isMarkdownPath,
   applyEditorEol,
   looksLikeDocumentUri,
+  lspPresetIdForPath,
   shouldLiveSyncLsp,
   shouldProbeLsp,
   makeLibraryFile,
@@ -1188,6 +1189,16 @@ interface PendingClosedFile {
   cleanup: Promise<ResourceCleanupOutcome> | null;
   didCloseCompleted: boolean;
 }
+
+/**
+ * Typed Reformat Document outcome. Provider unavailability is a value, never
+ * a silent null: the action layer turns each reason into a status message and
+ * keeps the buffer untouched (AC-FMT-03/04).
+ */
+type FormatFileOutcome =
+  | { state: "formatted"; text: string }
+  | { state: "unchanged"; text: string }
+  | { state: "unavailable"; reason: string };
 
 export function CodeWorkspaceTab({
   tabId,
@@ -5877,16 +5888,44 @@ export function CodeWorkspaceTab({
   const formatFileText = useCallback(async (
     file: OpenFileState,
     selection: EditorSelectionRange | null = null,
-  ): Promise<string | null> => {
+  ): Promise<FormatFileOutcome> => {
+    // No language-server preset means no provider can ever answer for this
+    // file: report the typed unavailable reason instead of calling one.
+    if (!lspPresetIdForPath(file.languagePath)) {
+      return {
+        state: "unavailable",
+        reason: `No formatter provider for ${file.languagePath} is available`,
+      };
+    }
     const descriptor = lspDescriptorForFile(file);
-    if (!descriptor) return null;
+    if (!descriptor) {
+      return {
+        state: "unavailable",
+        reason: `No formatter provider for ${file.languagePath} is available`,
+      };
+    }
     const capabilities = lspFilesRef.current[file.key]?.status?.capabilities ?? null;
+    const languageLabel = lspFilesRef.current[file.key]?.status?.languageId
+      ?? file.languagePath.split(".").pop()
+      ?? file.languagePath;
     const hasSelection = !!selection && !selection.empty
       && (selection.start.line !== selection.end.line
         || selection.start.character !== selection.end.character);
     const useRange = hasSelection && (capabilities?.rangeFormatting ?? false);
-    if (capabilities && !useRange && !capabilities.formatting) return null;
-    if (capabilities && useRange && !capabilities.rangeFormatting) return null;
+    if (capabilities && hasSelection && !capabilities.rangeFormatting) {
+      return {
+        state: "unavailable",
+        reason: capabilities.formatting
+          ? "The provider does not support range formatting — clear the selection to reformat the whole file"
+          : `No formatter provider for ${languageLabel} supports selection reformatting`,
+      };
+    }
+    if (capabilities && !capabilities.formatting) {
+      return {
+        state: "unavailable",
+        reason: `No formatter provider for ${languageLabel} is running`,
+      };
+    }
 
     const absPath = absolutePathForOpenFile(file) ?? file.languagePath;
     const schemeLanguageKey = file.languagePath.split(".").pop()?.toLowerCase() ?? "";
@@ -5905,7 +5944,7 @@ export function CodeWorkspaceTab({
       hasSelection && selection ? { startLine: selection.start.line, endLine: selection.end.line } : null,
       true,
     );
-    if (ranges.length === 0) return file.text;
+    if (ranges.length === 0) return { state: "unchanged", text: file.text };
 
     const result = useRange && selection
       ? await lspRangeFormatting(descriptor, {
@@ -5920,12 +5959,15 @@ export function CodeWorkspaceTab({
         insertSpaces: codeStyle.insertSpaces,
       });
     updateLspStatusForFile(file, result.status);
-    if (!result.edits.length) return file.text;
+    if (!result.edits.length) return { state: "unchanged", text: file.text };
     const filteredEdits = result.edits.filter((edit) => (
       ranges.some((range) => edit.range.start.line >= range.startLine && edit.range.end.line <= range.endLine)
     ));
-    if (!filteredEdits.length) return file.text;
-    return applyLspTextEditsToString(file.text, filteredEdits);
+    if (!filteredEdits.length) return { state: "unchanged", text: file.text };
+    const nextText = applyLspTextEditsToString(file.text, filteredEdits);
+    return nextText === file.text
+      ? { state: "unchanged", text: nextText }
+      : { state: "formatted", text: nextText };
   }, [absolutePathForOpenFile, findRoot, lspDescriptorForFile, updateLspStatusForFile, workspaceInstanceId]);
 
   const promptReloadProject = useCallback(
@@ -6036,7 +6078,12 @@ export function CodeWorkspaceTab({
           formatOnSave: effectiveSavePolicy.format.enabled,
           formatFn: async (currentText) => {
             try {
-              return await formatFileText({ ...file, text: currentText });
+              const outcome = await formatFileText({ ...file, text: currentText });
+              if (outcome.state === "unavailable") {
+                saveActionError = `Format: ${outcome.reason}`;
+                return null;
+              }
+              return outcome.text;
             } catch (err) {
               saveActionError = `Format: ${errorMessage(err)}`;
               return null;
@@ -8667,15 +8714,33 @@ export function CodeWorkspaceTab({
 
   const formatActiveFile = useCallback(async () => {
     const file = activeFile;
-    if (!file || file.loading) return;
-    try {
-      const next = await formatFileText(file, editorSelectionRef.current);
-      if (next === null) return;
-      if (next !== file.text) updateFileText(file.key, next);
-    } catch (error) {
-      console.error("Format document failed", error);
+    if (!file || file.loading) {
+      setStatusMessage("No formattable file is open");
+      return false;
     }
-  }, [activeFile, formatFileText, updateFileText]);
+    const absPath = absolutePathForOpenFile(file) ?? file.languagePath;
+    if (file.library || workspaceResourceOperationLockedRef.current) {
+      setStatusMessage(`${absPath} is read-only and cannot be reformatted`);
+      return false;
+    }
+    try {
+      const outcome = await formatFileText(file, editorSelectionRef.current);
+      if (outcome.state === "unavailable") {
+        setStatusMessage(outcome.reason);
+        return false;
+      }
+      if (outcome.state === "unchanged") {
+        setStatusMessage(`${file.title} is already formatted`);
+        return false;
+      }
+      updateFileText(file.key, outcome.text);
+      setStatusMessage(`Formatted ${file.title}`);
+      return true;
+    } catch (error) {
+      setStatusMessage(`Format failed: ${errorMessage(error)}`);
+      return false;
+    }
+  }, [absolutePathForOpenFile, activeFile, formatFileText, setStatusMessage, updateFileText]);
 
   const applyLspResourceOperationUnlocked = useCallback(async (
     operation: Exclude<LspWorkspaceEditOperation, { kind: "text" }>,
@@ -13412,57 +13477,33 @@ export function CodeWorkspaceTab({
       keywords: ["format", "prettier", "indent", "reformat"],
       when: (context) => {
         if (context.focus === "tree" || context.focus === "terminal") return false;
-        if (!activeFile || activeFile.loading) return false;
-        // Prefer capability gate when status is known; if LSP has not
-        // reported yet, still allow the command so the shortcut is live
-        // as soon as the buffer is open (the planner reports a typed reason
-        // instead of a silent no-op).
-        if (!activeCapabilities) return true;
-        return !!(activeCapabilities.formatting || activeCapabilities.rangeFormatting);
+        // Capability readiness must not disable the command: an unreported
+        // provider executes and reports its typed unavailable reason instead
+        // (AC-FMT-03), and context menu + shortcut share this one action.
+        return !!activeFile && !activeFile.loading;
       },
       run: () => {
-        // §8.19.9 R8-D2 / ED-STYLE-001: every invocation resolves through the format planner —
-        // executable scopes delegate to the provider stage; everything else
-        // surfaces a typed unavailable reason.
+        // §8.19.9 R8-D2 / ED-STYLE-001: one typed planner resolves the
+        // executable scope; everything else surfaces a typed reason.
         const selection = editorSelectionRef.current;
         const hasSelection = !!selection && !selection.empty;
         const absPath = activeFile
           ? (absolutePathForOpenFile(activeFile) ?? activeFile.languagePath)
           : null;
-        const capabilities = {
-          formatting: !!activeCapabilities?.formatting,
-          rangeFormatting: !!activeCapabilities?.rangeFormatting,
-          rearrangeSupported: resolveRearrangeCapabilities(
-            activeCapabilities,
-            activeLspState?.status,
-          ).rearrangeSupported,
-          cleanupSupported: resolveCleanupCapabilities(
-            activeCapabilities,
-            activeLspState?.status,
-          ).cleanupSupported,
-        };
-        const plan = buildFormatPlan({
+        const languageKey = activeFile?.languagePath.split(".").pop()?.toLowerCase() ?? "";
+        const decision = planReformat({
           scope: hasSelection ? "selection" : "file",
-          targets: absPath ? [absPath] : [],
-          excludedByPattern: [],
-          readOnlyPaths: new Set(activeFile?.library || workspaceResourceOperationLocked ? (absPath ? [absPath] : []) : []),
-          capabilities,
-          moduleFactsReady: false,
+          targetPath: absPath,
+          languageId: activeLanguageId ?? (languageKey || null),
+          readOnly: !!activeFile?.library || workspaceResourceOperationLocked,
+          hasSelection,
+          capabilities: {
+            formatting: !!activeCapabilities?.formatting,
+            rangeFormatting: !!activeCapabilities?.rangeFormatting,
+          },
         });
-        if (plan.state === "unavailable" || plan.stages.length === 0) {
-          if (!activeFile) {
-            setStatusMessage("No formattable file is open");
-          } else if (activeFile.library || workspaceResourceOperationLocked) {
-            setStatusMessage(`${absPath} is read-only and cannot be reformatted`);
-          } else if (hasSelection && !capabilities.rangeFormatting) {
-            setStatusMessage(capabilities.formatting
-              ? "The provider does not support range formatting — clear the selection to reformat the whole file"
-              : `No formatter provider for ${activeLanguageId ?? "this file type"} supports selection reformatting`);
-          } else if (!capabilities.formatting) {
-            setStatusMessage(`No formatter provider for ${activeLanguageId ?? "this file type"} is running`);
-          } else {
-            setStatusMessage("Formatting is unavailable for the current selection/file");
-          }
+        if (activeCapabilities && decision.kind === "unavailable") {
+          setStatusMessage(decision.reason);
           return false;
         }
         void formatActiveFile();

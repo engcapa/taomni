@@ -4044,6 +4044,224 @@ describe("CodeWorkspaceTab", () => {
     );
   });
 
+  it("runs the same format action from the editor context menu", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-format-context-menu",
+      workspaceInstanceId: "instance-format-context-menu",
+      name: "Format context menu",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "const x=1"));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      presetId: "typescript-javascript",
+      languageId: "typescript",
+      displayName: "TypeScript / JavaScript",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({ formatting: true, rangeFormatting: true }),
+    }));
+    lspMocks.lspFormatting.mockResolvedValue({
+      status: documentStatus({ active: true, available: true }),
+      edits: [{
+        range: { start: { line: 0, character: 7 }, end: { line: 0, character: 7 } },
+        newText: " ",
+      }],
+    });
+
+    const rendered = renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+    expect(content).not.toBeNull();
+    const view = EditorView.findFromDOM(content!);
+    expect(view).not.toBeNull();
+    vi.spyOn(view!, "posAtCoords").mockReturnValue(null);
+
+    fireEvent.contextMenu(content!, { clientX: 20, clientY: 30, button: 2 });
+    fireEvent.click(await screen.findByTestId("editor-context-format"));
+
+    await waitFor(() => expect(lspMocks.lspFormatting).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-format-context-menu",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("const x =1"));
+  });
+
+  it("keeps format executable before the provider reports capabilities", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-format-unknown-capabilities",
+      workspaceInstanceId: "instance-format-unknown-capabilities",
+      name: "Format unknown capabilities",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "const x=1"));
+    // The open request stays pending: capability state is genuinely unknown.
+    lspMocks.lspOpenDocument.mockReturnValue(new Promise(() => {}));
+    lspMocks.lspFormatting.mockResolvedValue({
+      status: documentStatus({ active: true, available: true }),
+      edits: [{
+        range: { start: { line: 0, character: 7 }, end: { line: 0, character: 7 } },
+        newText: " ",
+      }],
+    });
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(lspMocks.lspOpenDocument).toHaveBeenCalled());
+
+    fireEvent.keyDown(window, { key: "l", ctrlKey: true, altKey: true });
+
+    // AC-FMT-03: an unreported capability does not disable the command; the
+    // provider call decides and the format still applies.
+    await waitFor(() => expect(lspMocks.lspFormatting).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-format-unknown-capabilities",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("const x =1"));
+  });
+
+  it("reports a typed no-provider reason and leaves the buffer untouched", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-format-no-provider",
+      workspaceInstanceId: "instance-format-no-provider",
+      name: "Format no provider",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "const x=1"));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      presetId: "typescript-javascript",
+      languageId: "typescript",
+      displayName: "TypeScript / JavaScript",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities(),
+    }));
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+    fireEvent.keyDown(window, { key: "l", ctrlKey: true, altKey: true });
+
+    // AC-FMT-04: capability false is a visible reason, never a silent no-op.
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
+      "No formatter provider for typescript is running",
+    ));
+    expect(lspMocks.lspFormatting).not.toHaveBeenCalled();
+    expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-format-no-provider",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("const x=1");
+  });
+
+  it("surfaces a provider request failure instead of swallowing it", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-format-provider-failure",
+      workspaceInstanceId: "instance-format-provider-failure",
+      name: "Format provider failure",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "const x=1"));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      presetId: "typescript-javascript",
+      languageId: "typescript",
+      displayName: "TypeScript / JavaScript",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({ formatting: true, rangeFormatting: true }),
+    }));
+    lspMocks.lspFormatting.mockRejectedValue(new Error("provider transport failed"));
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+    fireEvent.keyDown(window, { key: "l", ctrlKey: true, altKey: true });
+
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
+      "Format failed: provider transport failed",
+    ));
+    expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-format-provider-failure",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("const x=1");
+  });
+
+  it("refuses selection formatting when the provider only supports whole-file scope", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-format-range-unsupported",
+      workspaceInstanceId: "instance-format-range-unsupported",
+      name: "Format range unsupported",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "const x=1"));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      presetId: "typescript-javascript",
+      languageId: "typescript",
+      displayName: "TypeScript / JavaScript",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({ formatting: true, rangeFormatting: false }),
+    }));
+    lspMocks.lspFormatting.mockResolvedValue({
+      status: documentStatus({ active: true, available: true }),
+      edits: [],
+    });
+
+    const rendered = renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content");
+    const view = EditorView.findFromDOM(content!);
+    expect(view).not.toBeNull();
+    act(() => {
+      view!.dispatch({ selection: EditorSelection.range(0, 5) });
+    });
+    // Flush the debounced selection publish so editorSelectionRef sees the
+    // non-empty range before the shortcut is evaluated.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    });
+
+    fireEvent.keyDown(window, { key: "l", ctrlKey: true, altKey: true });
+
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("range formatting"));
+    expect(lspMocks.lspFormatting).not.toHaveBeenCalled();
+    expect(lspMocks.lspRangeFormatting).not.toHaveBeenCalled();
+    expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-format-range-unsupported",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("const x=1");
+  });
+
   it("persists the workspace format-on-save switch and saves formatted text", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
