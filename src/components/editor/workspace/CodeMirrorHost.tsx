@@ -1281,7 +1281,7 @@ function isCompositionNavigationKey(key: string): boolean {
   return COMPOSITION_NAVIGATION_KEYS.has(key);
 }
 
-function editorCommandPort(view: EditorView): EditorCommandPort {
+function editorCommandPort(view: EditorView, isComposing?: () => boolean): EditorCommandPort {
   return {
     execute(commandId, options) {
       switch (commandId) {
@@ -1370,7 +1370,7 @@ function editorCommandPort(view: EditorView): EditorCommandPort {
       }
     },
     state: () => ({
-      composing: view.composing,
+      composing: view.composing || (isComposing?.() ?? false),
       readOnly: view.state.readOnly,
       hasSelection: view.state.selection.ranges.some((range) => !range.empty),
       caretCount: view.state.selection.ranges.length,
@@ -2078,6 +2078,15 @@ function applyDocumentSnapshotToView(view: EditorView, nextText: string): boolea
   return true;
 }
 
+interface CompositionSession {
+  readonly id: string;
+  status: "active" | "end_pending" | "finalized";
+  readonly owner: WorkspaceDocumentTransactionOwner;
+  readonly fileKey: string;
+  readonly viewId: string;
+  readonly workspaceId?: string | null;
+}
+
 export const CodeMirrorHost = memo(function CodeMirrorHost({
   path,
   fileKey = path,
@@ -2347,12 +2356,10 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const viewStateEmitTimerRef = useRef<number | null>(null);
   const pendingDeferredScrollRef = useRef<{ scrollTop: number; scrollLeft: number } | null>(null);
   const userInteractedSinceMountRef = useRef(false);
-  // ED-IMPROVE-008: IME composition ownership. While active, doc changes are
-  // dispatched with the composition origin so the owner coalesces them into
-  // one logical undo; blur/destroy/end finalize and release the session.
+  // ED-IMPROVE-008 & ED-REPAIR-007: IME composition ownership and session lifecycle.
   const compositionActiveRef = useRef(false);
-  // ED-MAIN-006: CodeMirror flushes the final composition change in a microtask
-  // after compositionend, so the owner finalize is deferred to the next macrotask.
+  const compositionSessionSeqRef = useRef(0);
+  const currentCompositionSessionRef = useRef<CompositionSession | null>(null);
   const compositionEndFinalizeRef = useRef<number | null>(null);
   // ED-MAIN-007: latest visible/active-leaf state for the async clipboard owner.
   const visibleRef = useRef(visible);
@@ -2947,14 +2954,21 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
                   });
                 });
                 if (deltas.length > 0) {
-                  const composingInput = compositionActiveRef.current
+                  const currentSession = currentCompositionSessionRef.current;
+                  const isSessionComposing = currentSession !== null && (
+                    currentSession.status === "active" || currentSession.status === "end_pending"
+                  );
+                  const composingInput = isSessionComposing
+                    || compositionActiveRef.current
                     || update.view.composing
                     || update.transactions.some((tr) => tr.isUserEvent("input.type.compose"));
+                  const sessionId = isSessionComposing ? currentSession?.id : undefined;
                   const sharedTransaction = transactionOwnerRef.current.dispatchTransaction(
                     fileKeyRef.current,
                     viewIdRef.current,
                     deltas,
                     composingInput ? "composition" : "user-input",
+                    sessionId,
                   );
                   if (!sharedTransaction) {
                     const rejectedView = update.view;
@@ -3085,7 +3099,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     view.scrollDOM?.addEventListener("pointerdown", cancelDeferredScroll, { passive: true });
     const compositionNavigationGuard = (event: KeyboardEvent) => {
       if (
-        (!view.composing && event.isComposing !== true)
+        (!view.composing && event.isComposing !== true && !compositionActiveRef.current)
         || !isCompositionNavigationKey(event.key)
       ) return;
       // CodeMirror intentionally ignores key handlers during composition, so
@@ -3099,36 +3113,68 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       window.clearTimeout(compositionEndFinalizeRef.current);
       compositionEndFinalizeRef.current = null;
     };
-    const finalizeCompositionNow = () => {
-      const owner = transactionOwnerRef.current;
-      const key = fileKeyRef.current;
-      if (owner && key) owner.finalizeComposition(key);
+    const finalizeSession = (session: CompositionSession) => {
+      if (session.status === "finalized") return;
+      session.status = "finalized";
+      try {
+        session.owner.finalizeComposition(session.fileKey, session.id);
+      } catch {
+        // ignore
+      }
+      if (currentCompositionSessionRef.current === session) {
+        currentCompositionSessionRef.current = null;
+        compositionActiveRef.current = false;
+      }
     };
     const compositionStartGuard = () => {
-      // A new session cancels a still-pending finalize from the previous one.
       clearPendingCompositionFinalize();
+      const previousSession = currentCompositionSessionRef.current;
+      if (previousSession && previousSession.status !== "finalized") {
+        finalizeSession(previousSession);
+      }
       compositionActiveRef.current = true;
+      const currentOwner = transactionOwnerRef.current;
+      const currentFileKey = fileKeyRef.current;
+      if (currentOwner && currentFileKey) {
+        const nextId = `comp_${++compositionSessionSeqRef.current}_${Date.now()}`;
+        const newSession: CompositionSession = {
+          id: nextId,
+          status: "active",
+          owner: currentOwner,
+          fileKey: currentFileKey,
+          viewId: viewIdRef.current,
+          workspaceId: clipboardWorkspaceId ?? null,
+        };
+        currentCompositionSessionRef.current = newSession;
+      }
     };
     const compositionEndGuard = () => {
       compositionActiveRef.current = false;
-      // ED-MAIN-006: do not release the composition owner synchronously here.
-      // CodeMirror dispatches the final composition change from
-      // `Promise.resolve().then(flush)` after compositionend; finalizing now
-      // would split that update into a second undo entry. Defer to the next
-      // macrotask (past all pending microtasks) so the flush extends the same
-      // owner entry first.
+      const session = currentCompositionSessionRef.current;
+      if (!session || session.status === "finalized") {
+        clearPendingCompositionFinalize();
+        return;
+      }
+      session.status = "end_pending";
       clearPendingCompositionFinalize();
+      // ED-MAIN-006 & ED-REPAIR-007:
+      // CodeMirror dispatches the final composition change from
+      // `Promise.resolve().then(flush)` after compositionend. Defer finalization
+      // to the next macrotask so the flush extends this session's entry first.
       compositionEndFinalizeRef.current = window.setTimeout(() => {
         compositionEndFinalizeRef.current = null;
-        if (compositionActiveRef.current) return;
-        finalizeCompositionNow();
+        if (session.status === "end_pending") {
+          finalizeSession(session);
+        }
       }, 0);
     };
     const compositionBlurGuard = () => {
       clearPendingCompositionFinalize();
-      if (!compositionActiveRef.current) return;
+      const session = currentCompositionSessionRef.current;
+      if (session && session.status !== "finalized") {
+        finalizeSession(session);
+      }
       compositionActiveRef.current = false;
-      finalizeCompositionNow();
     };
     // ED-MAIN-007: any focus loss that leaves this view bumps the clipboard
     // owner generation, so an in-flight result can detect that another surface
@@ -3263,7 +3309,9 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       clipboardContextByView.delete(view);
       compositionActiveRef.current = false;
       clearPendingCompositionFinalize();
-      if (transactionOwnerRef.current && fileKeyRef.current) {
+      if (currentCompositionSessionRef.current) {
+        finalizeSession(currentCompositionSessionRef.current);
+      } else if (transactionOwnerRef.current && fileKeyRef.current) {
         transactionOwnerRef.current.finalizeComposition(fileKeyRef.current);
       }
       view.contentDOM.removeEventListener("keydown", compositionNavigationGuard, true);
@@ -3335,9 +3383,28 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     const view = viewRef.current;
     if (!view || !onCommandPortChange) return;
     const token = {};
-    onCommandPortChange({ fileKey, token, port: editorCommandPort(view) });
+    onCommandPortChange({ fileKey, token, port: editorCommandPort(view, () => compositionActiveRef.current) });
     return () => onCommandPortChange({ fileKey, token, port: null });
   }, [fileKey, onCommandPortChange]);
+
+  // ED-REPAIR-007: switching files finalizes any composition belonging to the old fileKey.
+  useEffect(() => {
+    const session = currentCompositionSessionRef.current;
+    if (session && session.fileKey !== fileKey) {
+      if (compositionEndFinalizeRef.current !== null) {
+        window.clearTimeout(compositionEndFinalizeRef.current);
+        compositionEndFinalizeRef.current = null;
+      }
+      session.status = "finalized";
+      try {
+        session.owner.finalizeComposition(session.fileKey, session.id);
+      } catch {
+        // ignore
+      }
+      currentCompositionSessionRef.current = null;
+      compositionActiveRef.current = false;
+    }
+  }, [fileKey]);
 
   // §8.19.4: a resolve gate belongs to one buffer identity; switching files
   // drops the banner (the request closures would refuse to act anyway).

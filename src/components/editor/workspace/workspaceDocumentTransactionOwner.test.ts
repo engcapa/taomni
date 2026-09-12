@@ -406,4 +406,83 @@ describe("ED-IMPROVE-008: composition history coalescing", () => {
     owner.replaceDocument("ime.ts", "secondary", "external", "external-disk");
     expect(owner.getDocument("ime.ts")).toBe("external");
   });
+
+  it("isolates consecutive composition sessions by session ID into distinct undo entries (ED-REPAIR-007-A1)", () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    owner.acquireView("ime.ts", "primary", "");
+
+    // Session 1: compose "你"
+    owner.dispatchTransaction(
+      "ime.ts",
+      "primary",
+      [{ from: 0, to: 0, insert: "你" }],
+      "composition",
+      "comp_session_1",
+    );
+    expect(owner.getDocument("ime.ts")).toBe("你");
+    expect(owner.getHistoryState("ime.ts")).toMatchObject({ undoDepth: 1 });
+
+    // Session 2: compose "好" without any intervening non-composition transaction
+    owner.dispatchTransaction(
+      "ime.ts",
+      "primary",
+      [{ from: 1, to: 1, insert: "好" }],
+      "composition",
+      "comp_session_2",
+    );
+    expect(owner.getDocument("ime.ts")).toBe("你好");
+    expect(owner.getHistoryState("ime.ts")).toMatchObject({ undoDepth: 2 });
+
+    // First undo reverts "好", leaving "你"
+    const undone1 = owner.undo("ime.ts", "primary");
+    expect(undone1).not.toBeNull();
+    expect(owner.getDocument("ime.ts")).toBe("你");
+    expect(owner.getHistoryState("ime.ts")).toMatchObject({ undoDepth: 1 });
+
+    // Second undo reverts "你", leaving ""
+    const undone2 = owner.undo("ime.ts", "primary");
+    expect(undone2).not.toBeNull();
+    expect(owner.getDocument("ime.ts")).toBe("");
+    expect(owner.getHistoryState("ime.ts")).toMatchObject({ undoDepth: 0 });
+  });
+
+  it("guards against stale session finalization closing newer sessions (ED-REPAIR-007-A2)", () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    owner.acquireView("ime.ts", "primary", "");
+
+    // Start session 2
+    owner.dispatchTransaction(
+      "ime.ts",
+      "primary",
+      [{ from: 0, to: 0, insert: "A" }],
+      "composition",
+      "comp_session_2",
+    );
+
+    // Stale timer/callback attempts to finalize session 1
+    owner.finalizeComposition("ime.ts", "comp_session_1");
+
+    // Session 2 is still open and can coalesce further preedits
+    owner.dispatchTransaction(
+      "ime.ts",
+      "primary",
+      [{ from: 1, to: 1, insert: "B" }],
+      "composition",
+      "comp_session_2",
+    );
+    expect(owner.getDocument("ime.ts")).toBe("AB");
+    expect(owner.getHistoryState("ime.ts")).toMatchObject({ undoDepth: 1 });
+
+    // Finalizing session 2 correctly closes it
+    owner.finalizeComposition("ime.ts", "comp_session_2");
+    owner.dispatchTransaction(
+      "ime.ts",
+      "primary",
+      [{ from: 2, to: 2, insert: "C" }],
+      "composition",
+      "comp_session_3",
+    );
+    expect(owner.getHistoryState("ime.ts")).toMatchObject({ undoDepth: 2 });
+  });
 });
+

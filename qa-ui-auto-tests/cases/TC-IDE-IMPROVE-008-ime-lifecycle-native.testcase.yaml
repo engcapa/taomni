@@ -84,3 +84,32 @@ steps:
       name: aria-multiline
       equals: "true"
   - screenshot: tc-ide-improve008-cancelled.png
+  # ED-REPAIR-007: Consecutive compositions produce two distinct logical undos
+  # 1. First composition: "nihao" + Space commits CJK phrase
+  - native_ime_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      expected_engine: wbpy
+      keys: ["n", "i", "h", "a", "o", "Space"]
+  - eval_readonly:
+      expression: 'JSON.stringify([/[\u4e00-\u9fff]/.test(document.querySelectorAll(".cm-content")[0].textContent), document.querySelectorAll(".cm-content")[0].textContent.includes("nihao")])'
+      contains: "[true,false]"
+  # 2. Second composition: "shijie" + Space commits second CJK phrase immediately
+  - native_ime_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      expected_engine: wbpy
+      keys: ["s", "h", "i", "j", "i", "e", "Space"]
+  - eval_readonly:
+      expression: 'JSON.stringify([/[\u4e00-\u9fff]/.test(document.querySelectorAll(".cm-content")[0].textContent), document.querySelectorAll(".cm-content")[0].textContent.includes("shijie")])'
+      contains: "[true,false]"
+  # 3. First undo removes only the second composition, retaining the first
+  - press: Control+z
+  - eval_readonly:
+      expression: 'JSON.stringify([/[\u4e00-\u9fff]/.test(document.querySelectorAll(".cm-content")[0].textContent), document.querySelectorAll(".cm-content")[0].textContent.includes("shijie")])'
+      contains: "[true,false]"
+  # 4. Second undo removes the first composition, leaving no CJK text in document
+  - press: Control+z
+  - eval_readonly:
+      expression: '!/[\u4e00-\u9fff]/.test(document.querySelectorAll(".cm-content")[0].textContent)'
+      expect_truthy: true
+  - screenshot: tc-ide-improve008-consecutive-undo.png
+

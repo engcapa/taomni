@@ -88,6 +88,8 @@ interface HistoryEntry {
   afterText: string;
   forward: readonly DocumentChangeDelta[];
   inverse: readonly DocumentChangeDelta[];
+  /** ED-REPAIR-007: explicit composition session token */
+  compositionSessionId?: string;
 }
 
 interface DocumentRecord {
@@ -97,11 +99,11 @@ interface DocumentRecord {
   undo: HistoryEntry[];
   redo: HistoryEntry[];
   /**
-   * ED-IMPROVE-008: the source view whose IME composition currently owns the
-   * newest undo entry. Composition deltas coalesce into that one entry until
-   * the composition is finalized, cancelled or invalidated by another origin.
+   * ED-IMPROVE-008 & ED-REPAIR-007: the source view and session token whose IME composition
+   * currently owns the newest undo entry.
    */
   openCompositionViewId: string | null;
+  openCompositionSessionId: string | null;
 }
 
 interface AppliedChanges {
@@ -207,6 +209,7 @@ export class WorkspaceDocumentTransactionOwner {
       undo: [],
       redo: [],
       openCompositionViewId: null,
+      openCompositionSessionId: null,
     });
     return text;
   }
@@ -227,10 +230,14 @@ export class WorkspaceDocumentTransactionOwner {
     return canonical;
   }
 
-  /** Release one view; the document/history is evicted only at the final lease. */
+  /** Release a view lease and clear document state when no views remain. */
   releaseView(fileKey: string, viewId: string): boolean {
     const record = this.documentsByFile.get(fileKey);
     if (!record || !record.views.delete(viewId)) return false;
+    if (record.openCompositionViewId === viewId) {
+      record.openCompositionViewId = null;
+      record.openCompositionSessionId = null;
+    }
     this.notifyLeaseChanged({
       fileKey,
       viewId,
@@ -320,6 +327,7 @@ export class WorkspaceDocumentTransactionOwner {
     sourceViewId: string,
     changes: readonly DocumentChangeDelta[],
     origin: DocumentTransactionOrigin = "user-input",
+    compositionSessionId?: string,
   ): DocumentTransaction | null {
     const record = this.documentsByFile.get(fileKey);
     if (!record || changes.length === 0) return null;
@@ -339,7 +347,7 @@ export class WorkspaceDocumentTransactionOwner {
       }
     }
 
-    // ED-IMPROVE-008: a non-composition transaction closes any open IME
+    // ED-IMPROVE-008 & ED-REPAIR-007: a non-composition transaction closes any open IME
     // coalescing session before it records its own history, so a stale
     // composition can never swallow or merge into an unrelated edit. A
     // cancel that reverts to the pre-composition text drops the transient
@@ -357,9 +365,15 @@ export class WorkspaceDocumentTransactionOwner {
     }
     record.text = applied.text;
     if (canRecordHistory(origin) && !isHistoryReplay(origin) && !compositionCancelConsumed) {
-      const open = origin === "composition" && record.openCompositionViewId === sourceViewId
-        ? record.undo[record.undo.length - 1]
-        : undefined;
+      const lastUndo = record.undo[record.undo.length - 1];
+      const isSameCompositionSession = origin === "composition"
+        && record.openCompositionViewId === sourceViewId
+        && (
+          compositionSessionId
+            ? (record.openCompositionSessionId === compositionSessionId && lastUndo?.compositionSessionId === compositionSessionId)
+            : true
+        );
+      const open = isSameCompositionSession ? lastUndo : undefined;
       if (open) {
         // Extend the open composition entry with the net text transition.
         open.afterText = applied.text;
@@ -374,9 +388,11 @@ export class WorkspaceDocumentTransactionOwner {
           afterText: applied.text,
           forward: applied.changes,
           inverse: applied.inverse,
+          ...(origin === "composition" && compositionSessionId ? { compositionSessionId } : {}),
         });
         if (origin === "composition") {
           record.openCompositionViewId = sourceViewId;
+          record.openCompositionSessionId = compositionSessionId ?? null;
         }
       }
       if (
@@ -413,20 +429,27 @@ export class WorkspaceDocumentTransactionOwner {
   }
 
   /**
-   * ED-IMPROVE-008: close the open IME composition session for a document.
+   * ED-IMPROVE-008 & ED-REPAIR-007: close the open IME composition session for a document.
    * Called on compositionend, blur, view destroy and workspace switch; a
    * cancelled composition that left no net change has already dropped its
    * entry, so this only releases ownership.
    */
-  finalizeComposition(fileKey: string): void {
+  finalizeComposition(fileKey: string, targetSessionId?: string): void {
     const record = this.documentsByFile.get(fileKey);
     if (!record) return;
+    if (targetSessionId && record.openCompositionSessionId && record.openCompositionSessionId !== targetSessionId) {
+      return;
+    }
     record.openCompositionViewId = null;
+    record.openCompositionSessionId = null;
   }
 
   undo(fileKey: string, sourceViewId: string): DocumentTransaction | null {
     const record = this.documentsByFile.get(fileKey);
-    if (record) record.openCompositionViewId = null;
+    if (record) {
+      record.openCompositionViewId = null;
+      record.openCompositionSessionId = null;
+    }
     const entry = record?.undo[record.undo.length - 1];
     if (!record || !entry || record.text !== entry.afterText) return null;
     const applied = applyChanges(record.text, entry.inverse);
@@ -447,7 +470,10 @@ export class WorkspaceDocumentTransactionOwner {
 
   redo(fileKey: string, sourceViewId: string): DocumentTransaction | null {
     const record = this.documentsByFile.get(fileKey);
-    if (record) record.openCompositionViewId = null;
+    if (record) {
+      record.openCompositionViewId = null;
+      record.openCompositionSessionId = null;
+    }
     const entry = record?.redo[record.redo.length - 1];
     if (!record || !entry || record.text !== entry.beforeText) return null;
     const applied = applyChanges(record.text, entry.forward);
