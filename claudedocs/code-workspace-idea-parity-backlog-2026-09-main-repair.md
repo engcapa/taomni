@@ -1,0 +1,103 @@
+# Code Workspace main 完善实现复审修复任务板（2026-09）
+
+## 1. 任务规则与基线
+
+本板承接 [ED-MAIN 任务板](./code-workspace-idea-parity-backlog-2026-09-main-review.md) 实现后的代码复审。审查日期 2026-09-12，当前分支 `feat/code-workspace-idea-parity-main-review`，审查及建板源码 HEAD `826c0c6a5ac17ef0fb795d468d114c948306dc77`；上一轮差异基线为 `0566cc249f39b2e860cc30155462f12080111f1d`。建板前工作区干净。用户授权新增开发任务文档，本次不实施产品修复，也不更改历史任务状态、ownership 或证据。
+
+本板包含复审发现的 4 项 P1、5 项 P2，以及独立的最终集成卡。新 ID 为 `ED-REPAIR-001..010`，不是重新领取旧 ED-MAIN 卡。任务编号对应复审问题编号，不代表实施先后；依赖和实时 claimable 列表决定顺序。领取后必须重新核对最新生产 caller，不能假定行号、接口和问题形态永远不变。
+
+使用 `code-workspace-idea-task`，每次只领取一张依赖已完成的卡。所有 task-board 命令显式选择本板，禁止依赖脚本默认任务板：
+
+```bash
+python .agents/skills/code-workspace-idea-task/scripts/task_board.py --doc claudedocs/code-workspace-idea-parity-backlog-2026-09-main-repair.md validate
+python .agents/skills/code-workspace-idea-task/scripts/task_board.py --doc claudedocs/code-workspace-idea-parity-backlog-2026-09-main-repair.md list --claimable
+```
+
+本轮复审实际运行：6 个定向测试文件共 233 项通过；Tab 的 `ED-MAIN` 筛选测试 2 项通过、150 项未选中。生产函数探针和事件重放证实重复 edit、越界 freshness、路径 key 合并、IME 会话合并、剪贴板 owner 重新放行及旧定位被补写新身份等逻辑边界；这些不是原生复现或修复后通过证据。详细范围见规格。原测试通过与新负路径失败可以同时成立，不用测试数量或历史 done 累加完成度。
+
+## 2. 详细规格索引
+
+| 规格 | 内容 |
+|---|---|
+| [本轮详细规格](./code-workspace-idea-specs/idea-2026-main-repair.md) | 九项缺陷的复现、代码职责、设计决定、验收和验证；最终源码交付合同 |
+| [共享合同](./code-workspace-idea-specs/shared-contracts.md) | 身份、异步 owner、结果、事务、历史和证据语义 |
+| [ED-MAIN 规格](./code-workspace-idea-specs/idea-2026-main-review.md) | 本轮承接的 001/004/005/006/007/009 合同，以及应保持的 002/003/008 改进 |
+| [保存与恢复规格](./code-workspace-idea-specs/idea-2026-transactions.md) | 现有 Save、history、journal 与 recovery 基础设施 |
+| [编辑规格](./code-workspace-idea-specs/idea-2026-editing.md) | IME、剪贴板、共享文档与多视图 |
+| [性能规格](./code-workspace-idea-specs/idea-2026-performance.md) | 输入、保留量、恢复端点与测量约束 |
+
+## 3. 交付标准
+
+每卡初始为 `ready`，`prior_completion` 为新任务，均无 owner、claim、实施 baseline 或通过 evidence。每卡独立持有 `ED-REPAIR-xxx-A1/A2/A3`；必需 evidence 与规格逐项一致。历史源码探针必须转为可复跑的生产路径回归，记录修复前失败、修复后通过；不能只测试新增 helper 而不验证 Tab/Panel/Host caller。
+
+001..009 持有全量 owned paths 的 scoped typecheck；010 独家持有全仓 `pnpm build` 和最终能力矩阵。010 必须在最终产品源码重跑关键负路径、正常流和相关原生层，不能用文档审阅替代 unit/browser/native/provider/performance/accessibility。各类最终检查必须覆盖本类所有必需场景；同属 native 或 performance 的另一个用例通过，不能覆盖仍失败的必需用例。
+
+代码兼容 Windows、Linux、macOS。沿用用户已接受的边界：实施时当前平台必需原生验证完成即可交付，其他端分列 unverified 与执行步骤；本次设计环境为 Linux。原生测试使用隔离 QA 应用、app-data 和 fixture，禁止触碰用户 profile。Linux 路径大小写用例要在确认区分大小写的文件系统执行；Windows 路径语义可做确定性模型测试，但不能冒充 Windows API 实测。当前平台的必需层未运行、只有 skip 或仍失败时不能 done。
+
+本轮保持标准 provider disabled 拒绝、LSP version/revision 分离、真实 JDT LS `source.sortMembers`、Cleanup 无专用 provider 时 unavailable、Windows writer 不先删除旧目标、UTF-16/EOL、单次 undo、X/Y/X 多光标粘贴和视图保留量。IDEA 同 fixture 比较为可选，未执行明确记录，不声称 L3、对齐百分比或新增 Cleanup 能力。实际新增 Rust/IPC 变更时按任务工具扩展必需 Rust 验证，不默认重写 writer 或 provider。
+
+QA 实施 agent 必须使用 `qa-ui-auto` 维护 YAML、covers、controls、feature-list 和受影响目录。规格中候选新增 case、scope、矩阵、采集入口均是待实施产物，不是现成证据。每次运行审核 summary 与 receipt 的 source/case/runner/build 身份及 selected/pass/fail/skip；手工原生记录与 runner 输出分开。保留环境失败和重跑历史，不降低用例范围、性能预算或验收标准来结案。
+
+## 4. 排序与职责协调
+
+| 任务链 | 职责与交接 | 依赖理由 |
+|---|---|---|
+| 001 → 004 | 部分效果重试安全 → 无 plan 事务的恢复 | 共同持有 Tab apply/history/recovery，顺序修改 |
+| 003 → 006 → 005 | 严格 freshness → 路径身份 → prepare 请求身份 | 依次交接 replace model 与 Panel；005 固定输出快照身份 |
+| 002 | 全量 preflight 与逐文件冻结条件 | 等待 004、005、006；003 经 006 传递，复用已稳定的恢复、坐标、路径和 prepare 合同 |
+| 009 → 007 → 008 | 快照版本一致性 → IME 会话 → 剪贴板 owner | 依次交接 Host 生命周期及 Group 接线，避免互相覆盖 |
+| 010 | 最终源码回归、能力矩阵和门禁 | 001..009 全部 done |
+
+`W/` 在规格中代表 `src/components/editor/workspace/`。共享 Tab 按符号划分：001/004 持有 apply/retry/history/journal；002 持有 Replace commit 与 applier precondition hooks；005 只持有 prepare 接线；009 只持有 view-state capture/persist；007/008 只持有事件、焦点及观察接线。003 不修改通用导航的宽松坐标策略；006 复用既有路径规则，不进行全仓路径重构。不得整文件替换或回退其他 agent 的工作。共享测试文件按对应行为 describe 区域交接；QA 共用目录按最新生成结果合并，不覆盖其他卡的有效条目。
+
+## 5. 任务卡
+
+### ED-REPAIR-001 已生效 buffer edit 的保存失败重试安全
+<!-- ide-task {"id":"ED-REPAIR-001","status":"ready","priority":"P1","size":"M","depends_on":[],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-main-repair.md#ed-repair-001","acceptance":["ED-REPAIR-001-A1","ED-REPAIR-001-A2","ED-REPAIR-001-A3"],"required_evidence":["code-audit","unit","typecheck","browser","native","provider"],"audit":{"date":"2026-09-12","head":"826c0c6a5ac17ef0fb795d468d114c948306dc77","finding":"生产函数复现：foo→foobar 修改 clean buffer 后保存 known-zero 失败，结果虽有 bufferEffect=performed，但 failure boundary 仍从同一 text operation 重试，正文变成 foobarbar。Tab 只禁止 diskEffect=unknown 重试。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+目标：仅重试尚未发生的效果，不重放已修改正文的 edit；unknown、身份冲突和用户取消保留真实效果与恢复归属。Owner：applier effect/resume、Tab retry loop 及对应 workflow 测试。
+
+### ED-REPAIR-002 Replace 全量预检与打开缓冲区冻结条件
+<!-- ide-task {"id":"ED-REPAIR-002","status":"ready","priority":"P1","size":"M","depends_on":["ED-REPAIR-004","ED-REPAIR-005","ED-REPAIR-006"],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-main-repair.md#ed-repair-002","acceptance":["ED-REPAIR-002-A1","ED-REPAIR-002-A2","ED-REPAIR-002-A3"],"required_evidence":["code-audit","unit","typecheck","browser","native"],"audit":{"date":"2026-09-12","head":"826c0c6a5ac17ef0fb795d468d114c948306dc77","finding":"源码确认：expectedDiskHashes 仅在 readDisk 校验，open-buffer 分支绕过；snapshot revision/dirty/readOnly/workspace 未消费，外层 dirty 引用在 await 前捕获。B 预览后匹配外变化可能直到 A 已写入后才被 hash 检查发现。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+目标：首写前对全部实际选中目标验证冻结身份，每次异步等待后、每个目标效果前重新检查；首写前冲突全体零效果，后续冲突保留可恢复部分事务。Owner：Tab Replace commit/preflight、applier hooks、快照校验及对应测试。
+
+### ED-REPAIR-003 消失行与越界坐标的严格 freshness 拒绝
+<!-- ide-task {"id":"ED-REPAIR-003","status":"ready","priority":"P1","size":"S","depends_on":[],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-main-repair.md#ed-repair-003","acceptance":["ED-REPAIR-003-A1","ED-REPAIR-003-A2","ED-REPAIR-003-A3"],"required_evidence":["code-audit","unit","typecheck","browser","native"],"audit":{"date":"2026-09-12","head":"826c0c6a5ac17ef0fb795d468d114c948306dc77","finding":"生产函数复现：foo\\nfoo 的第二行匹配在文件缩为 foo 后仍通过 freshness；offsetFromLspPositionInString 将消失行钳制到现存行，旧 range 可以改错位置。原行存在性和 end 边界检查已移除。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+目标：Replace 的搜索输入与 freshness 使用严格 EOL/UTF-16 边界，不把非法或过期坐标映射成另一有效位置；保持合法 emoji、CRLF/LF/CR 和导航行为。Owner：replace model、必要的严格坐标 helper 和生产 caller 回归。
+
+### ED-REPAIR-004 无 plan 的部分成功事务恢复入口
+<!-- ide-task {"id":"ED-REPAIR-004","status":"ready","priority":"P1","size":"M","depends_on":["ED-REPAIR-001"],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-main-repair.md#ed-repair-004","acceptance":["ED-REPAIR-004-A1","ED-REPAIR-004-A2","ED-REPAIR-004-A3"],"required_evidence":["code-audit","unit","typecheck","browser","native"],"audit":{"date":"2026-09-12","head":"826c0c6a5ac17ef0fb795d468d114c948306dc77","finding":"源码确认：hasFailedOperation 的新 early return 禁止 history，但 journal 只在 options.plan 存在时准备。Replace 不传 plan，关闭文件 A 已写、B 失败并放弃重试后，A 没有此次事务的 undo/recovery 入口。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+目标：无 provider plan 的文本 WorkspaceEdit 也在首次效果前具有持久可恢复前像；部分失败不登记普通成功 history，但已有效果可发现、可安全恢复。Owner：Tab journal/history、现有 recovery controller/plan 辅助及测试。
+
+### ED-REPAIR-005 Replace prepare 请求的取消与身份隔离
+<!-- ide-task {"id":"ED-REPAIR-005","status":"ready","priority":"P2","size":"M","depends_on":["ED-REPAIR-006"],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-main-repair.md#ed-repair-005","acceptance":["ED-REPAIR-005-A1","ED-REPAIR-005-A2","ED-REPAIR-005-A3"],"required_evidence":["code-audit","unit","typecheck","browser","native"],"audit":{"date":"2026-09-12","head":"826c0c6a5ac17ef0fb795d468d114c948306dc77","finding":"源码确认：replaceAll await onPrepareReplacePreimages 时无 pending 状态、请求 token 或 identity 再检查；重入及 query/replacement/workspace 变化后，迟到结果仍能 setReplacePreview 覆盖新状态。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+目标：prepare 有明确 pending、取消、失败与 stale 结果，只有当前请求可以发布一致快照；旧请求不能发布预览、错误或写入。Owner：FindInFilesPanel、Tab prepareReplacePreimages、快照准备身份及测试。
+
+### ED-REPAIR-006 Replace 路径身份保留大小写语义
+<!-- ide-task {"id":"ED-REPAIR-006","status":"ready","priority":"P2","size":"S","depends_on":["ED-REPAIR-003"],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-main-repair.md#ed-repair-006","acceptance":["ED-REPAIR-006-A1","ED-REPAIR-006-A2","ED-REPAIR-006-A3"],"required_evidence":["code-audit","unit","typecheck","browser","native"],"audit":{"date":"2026-09-12","head":"826c0c6a5ac17ef0fb795d468d114c948306dc77","finding":"生产函数复现：replacePreimagePathKey 无条件 toLowerCase，Linux /ws/A.java 与 /ws/a.java 的不同 preimage 合成一个 map entry；同一 key 也用于 edit 校验。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+目标：复用现有 fsPathComparisonKey/文件身份规则，贯穿 preimage、expected hash 和 edit 校验；不误合并大小写不同文件，不破坏 Windows 路径匹配。Owner：replace model、Tab 消费点和测试。
+
+### ED-REPAIR-007 IME end/blur/reentry 的会话收尾
+<!-- ide-task {"id":"ED-REPAIR-007","status":"ready","priority":"P2","size":"M","depends_on":["ED-REPAIR-009"],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-main-repair.md#ed-repair-007","acceptance":["ED-REPAIR-007-A1","ED-REPAIR-007-A2","ED-REPAIR-007-A3"],"required_evidence":["code-audit","unit","typecheck","browser","native","accessibility"],"audit":{"date":"2026-09-12","head":"826c0c6a5ac17ef0fb795d468d114c948306dc77","finding":"生产事件处理函数和真实 transaction owner 重放：compositionend 将 active=false 并排队 finalize；blur 取消回调后直接返回。随后两次组合你好的 undoDepth=1，一次 undo 清空两次输入。此为事件逻辑复现，非真实 IME 实测。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+目标：每次组合的最终 flush 正确归属，end/blur/下一次 start/unmount 都不遗留或跨会话合并历史；保持一次确认一次 undo。Owner：Host composition guards、document transaction owner 及生命周期测试。
+
+### ED-REPAIR-008 剪贴板请求 owner 失效不可逆
+<!-- ide-task {"id":"ED-REPAIR-008","status":"ready","priority":"P2","size":"M","depends_on":["ED-REPAIR-007"],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-main-repair.md#ed-repair-008","acceptance":["ED-REPAIR-008-A1","ED-REPAIR-008-A2","ED-REPAIR-008-A3"],"required_evidence":["code-audit","unit","typecheck","browser","native"],"audit":{"date":"2026-09-12","head":"826c0c6a5ac17ef0fb795d468d114c948306dc77","finding":"生产函数重放：clipboardOwnerLost 仅在 !view.hasFocus 时拒绝 generation 变化；请求中转焦再回到原 view，ownerLost 从 true 变回 false，旧 paste/cut 重新获得执行资格。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+目标：已失效请求不因焦点返回而复活；正常菜单授权独立表达；正文/焦点/history 零迟到效果，OS performed/unknown 元数据留在原有效会话。Owner：Host clipboard guards、Group/Tab owner 接线及 session/observation 测试。
+
+### ED-REPAIR-009 定位快照与正文身份同版本捕获
+<!-- ide-task {"id":"ED-REPAIR-009","status":"ready","priority":"P2","size":"M","depends_on":[],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-main-repair.md#ed-repair-009","acceptance":["ED-REPAIR-009-A1","ED-REPAIR-009-A2","ED-REPAIR-009-A3"],"required_evidence":["code-audit","unit","typecheck","browser","native","performance"],"audit":{"date":"2026-09-12","head":"826c0c6a5ac17ef0fb795d468d114c948306dc77","finding":"源码确认 capture 可将新 caret/folds 配旧缓存 hash；生产函数探针确认 enrichViewStatesWithIdentity 将旧定位改标为当前正文 hash。前者误丢有效恢复，后者让过期定位通过身份门禁。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+目标：caret/selection/folds/双向 scroll 与正文身份绑定同一版本，尾部捕获准确，持久化不为旧定位补签新正文；保留兼容、独立 leaf 状态和输入性能。Owner：Host capture/restore、layout persistence、Tab view-state owner 及测试。
+
+### ED-REPAIR-010 修复轮最终源码回归与能力矩阵
+<!-- ide-task {"id":"ED-REPAIR-010","status":"ready","priority":"P1","size":"M","depends_on":["ED-REPAIR-001","ED-REPAIR-002","ED-REPAIR-003","ED-REPAIR-004","ED-REPAIR-005","ED-REPAIR-006","ED-REPAIR-007","ED-REPAIR-008","ED-REPAIR-009"],"spec":"claudedocs/code-workspace-idea-specs/idea-2026-main-repair.md#ed-repair-010","acceptance":["ED-REPAIR-010-A1","ED-REPAIR-010-A2","ED-REPAIR-010-A3"],"required_evidence":["code-audit","unit","build","qa-lint","browser","native","provider","performance","accessibility","document"],"audit":{"date":"2026-09-12","head":"826c0c6a5ac17ef0fb795d468d114c948306dc77","finding":"集成交付任务：旧定向 235 项通过仍遗漏本轮九项边界；需把每项修复的反例转为最终源码生产回归，并重新核对 30 个验收 ID 与实际平台证据，不能仅更新全绿矩阵。"},"prior_completion":{"kind":"new-task","completed":false}} -->
+
+目标：固定最终源码验证九项缺陷与保留能力，新增本轮矩阵和明确非空 QA scope，完整报告运行、失败、未验证及能力上限。Owner：本轮矩阵/scope、最终源码测试与质量门禁；不顺手实施新的产品修复。
