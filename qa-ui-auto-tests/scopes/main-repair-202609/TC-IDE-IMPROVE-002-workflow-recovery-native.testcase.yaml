@@ -1,0 +1,289 @@
+id: TC-IDE-IMPROVE-002-workflow-recovery-native
+title: "Rearrange workflow postcondition/undo and seeded v2 journal reopen recovery"
+description: |
+  ED-IMPROVE-002 native gate case. Crosses the real packaged-app boundary on
+  Linux with a live JDT LS provider and proves the workflow transaction
+  contract added for Rearrange Code:
+
+  1. A1/history: a real source.sortMembers rearrange applies exactly one
+     transaction through the production UI entry; the shared editor undo
+     names the Rearrange Code journal entry and restores the preimage, the
+     redo reapplies the same whole transaction, a second undo returns to the
+     preimage, and a save proves the exact original disk bytes (sha256
+     68142fea...).
+  2. A2/native restart: a seeded v2 recovery journal (status=prepared)
+     describing the workflow action is discovered after `reload_window`
+     destroys the JS context, the "Refactor recovery pending" dialog names
+     the affected file, and "Restore pre-refactor content" independently
+     re-reads and restores the preimage (host sha256 assertion). The entry
+     is then promoted to `rolled-back` and a further reload proves the
+     already-restored entry is idempotent (no dialog, no rewrite).
+  3. A2/conflict: a second seeded workflow journal with a distinct postimage
+     is blocked after a real third-party host write; the "Refactor recovery
+     blocked" dialog reports the conflict and the host bytes stay untouched.
+     Host-writing the expected postimage then allows the restore to complete.
+
+  Highest claim on green: L2 native + provider-backed (Linux), packaged app
+  UI over a real jdtls process, real disk bytes. IDEA comparison (required
+  kind) is recorded separately as unrun on this box — no IDEA 2026.2.x.
+covers: [F25.5]
+tags: [code-workspace, ide-c8, rearrange, recovery, provider-fixture, native-gate, p0]
+modes: [native]
+fixtures: [reset_db, sortable_java_fixtures, jdtls_required]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-gate-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-improve002","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.sortable_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/SortMembers.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.sortable_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "void zebra"
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: "Java"
+      timeout_sec: 60
+  # Cold-import settle (per-run fixture copies force a cold jdtls import).
+  - wait: 30
+
+  # ---- Segment 1: real sortMembers apply + single undo/redo (A1) ----
+  - press: Control+Shift+N
+  - wait_for:
+      selector: '[data-testid="code-workspace-search-everywhere"]'
+      timeout_sec: 30
+  - click: '[data-testid="code-workspace-search-everywhere"] button[role="tab"]:nth-child(5)'
+  - click: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+  - type: Rearrange Code
+  - press: Enter
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="confirm-dialog"]'
+      contains: "Rearrange preview"
+      timeout_sec: 10
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Rearranged SortMembers.java"
+      timeout_sec: 60
+  - assert_pattern:
+      selector: '[data-testid="code-workspace-editor"]'
+      regex: "(?s)private int laterField.*void apple"
+      timeout_sec: 10
+  # ONE shared undo names the Rearrange Code journal entry (proving the
+  # journal transaction was claimed, not a CodeMirror buffer revert).
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Control+z
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Undid Rearrange Code"
+      timeout_sec: 10
+  - assert_pattern:
+      selector: '[data-testid="code-workspace-editor"]'
+      regex: "(?s)void zebra.*private int laterField"
+      timeout_sec: 10
+  # The same single transaction redoes as one unit.
+  - press: Control+Shift+z
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Redid Rearrange Code"
+      timeout_sec: 10
+  - assert_pattern:
+      selector: '[data-testid="code-workspace-editor"]'
+      regex: "(?s)private int laterField.*void apple"
+      timeout_sec: 10
+  - press: Control+z
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Undid Rearrange Code"
+      timeout_sec: 10
+  - press: Control+s
+  - assert_file_sha256:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      equals: "68142feae5f38ffc310302e58f6a211c61c9d68994cfa5b643d2fbcaf239f93b"
+      timeout_sec: 30
+  - screenshot: tc-ide-improve002-segment1-undo.png
+
+  # ---- Segment 2: seeded prepared workflow journal reopen (A2 restart) ----
+  # Host-write the journal postimage so the entry classifies as restorable,
+  # then seed the v2 entry before the JS-context reload.
+  - host_write_file:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      text: |
+        package com.example.single;
+
+        public class SortMembers {
+            private int laterField = 2;
+            private int earlyField = 1;
+
+            void zebra() {
+            }
+
+            void apple() {
+            }
+        }
+  - assert_file_sha256:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      equals: "41dafa75c4ef8d67a0f08b2e0d13e63e514643d601b1ea11a2aacb9256ab5890"
+      timeout_sec: 30
+  - seed_storage:
+      key: taomni.refactor.recovery.v2:qa-improve002-restart
+      value: '{"schemaVersion":2,"recoveryId":"qa-improve002-restart","transactionId":"qa-improve002-txn-1","actionId":"rearrange:qa-improve002","kind":"other","workspaceRoot":"${fixture.sortable_single_root}","createdAt":1757000000000,"updatedAt":1757000000000,"status":"prepared","appliedOperationIndex":null,"documents":[{"uri":"file://${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java","canonicalPath":"${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java","preText":"package com.example.single;\n\npublic class SortMembers {\n    void zebra() {\n    }\n\n    void apple() {\n    }\n\n    private int laterField = 2;\n    private int earlyField = 1;\n}\n","preHash":"68142feae5f38ffc310302e58f6a211c61c9d68994cfa5b643d2fbcaf239f93b","postText":"package com.example.single;\n\npublic class SortMembers {\n    private int laterField = 2;\n    private int earlyField = 1;\n\n    void zebra() {\n    }\n\n    void apple() {\n    }\n}\n","postHash":"41dafa75c4ef8d67a0f08b2e0d13e63e514643d601b1ea11a2aacb9256ab5890","encoding":"UTF-8","bom":false,"eol":"lf"}],"resourceMoves":[],"verification":{"mismatchedUris":[],"checkedAt":null}}'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.sortable_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="confirm-dialog"]'
+      contains: "Refactor recovery pending"
+      timeout_sec: 10
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="confirm-dialog"]'
+      contains: "Restore pre-refactor content"
+      timeout_sec: 10
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Refactor recovery complete"
+      timeout_sec: 60
+  - assert_file_sha256:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      equals: "68142feae5f38ffc310302e58f6a211c61c9d68994cfa5b643d2fbcaf239f93b"
+      timeout_sec: 30
+  - screenshot: tc-ide-improve002-segment2-restored.png
+
+  # ---- Segment 3: already-restored entry is idempotent on a further reload ----
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.sortable_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait: 8
+  - assert_not_visible: '[data-testid="confirm-dialog"]'
+  - assert_file_sha256:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      equals: "68142feae5f38ffc310302e58f6a211c61c9d68994cfa5b643d2fbcaf239f93b"
+      timeout_sec: 30
+
+  # ---- Segment 4: third-party conflict is never overwritten (A2) ----
+  - host_write_file:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      text: |
+        package com.example.single;
+
+        public class SortMembers {
+            private int laterField = 2;
+            private int earlyField = 1;
+
+            void zebra() {
+            }
+
+            void apple() {
+            }
+        }
+  - seed_storage:
+      key: taomni.refactor.recovery.v2:qa-improve002-conflict
+      value: '{"schemaVersion":2,"recoveryId":"qa-improve002-conflict","transactionId":"qa-improve002-txn-2","actionId":"rearrange:qa-improve002","kind":"other","workspaceRoot":"${fixture.sortable_single_root}","createdAt":1757000100000,"updatedAt":1757000100000,"status":"prepared","appliedOperationIndex":null,"documents":[{"uri":"file://${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java","canonicalPath":"${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java","preText":"package com.example.single;\n\npublic class SortMembers {\n    void zebra() {\n    }\n\n    void apple() {\n    }\n\n    private int laterField = 2;\n    private int earlyField = 1;\n}\n","preHash":"68142feae5f38ffc310302e58f6a211c61c9d68994cfa5b643d2fbcaf239f93b","postText":"package com.example.single;\n\npublic class SortMembers {\n    private int laterField = 2;\n    private int earlyField = 1;\n\n    void zebra() {\n    }\n\n    void apple() {\n    }\n}\n","postHash":"41dafa75c4ef8d67a0f08b2e0d13e63e514643d601b1ea11a2aacb9256ab5890","encoding":"UTF-8","bom":false,"eol":"lf"}],"resourceMoves":[],"verification":{"mismatchedUris":[],"checkedAt":null}}'
+  # A genuine third-party write lands before the reopen: neither the preimage
+  # nor the journalled postimage. Recovery must refuse to overwrite it.
+  - host_write_file:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      text: |
+        package com.example.single;
+
+        public class SortMembers {
+            // third-party edit
+            void zebra() {
+            }
+        }
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.sortable_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="confirm-dialog"]'
+      contains: "Refactor recovery pending"
+      timeout_sec: 10
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="confirm-dialog"]'
+      contains: "Refactor recovery blocked"
+      timeout_sec: 10
+  - assert_text:
+      selector: '[data-testid="confirm-dialog"]'
+      contains: "will not be overwritten"
+      timeout_sec: 10
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  # Blocked recovery wrote nothing: the third-party bytes stay exactly.
+  - assert_file_sha256:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      equals: "e051b7abb64e955e302974c04caf3299be005d9ca0dcb314a763090454797c2d"
+      timeout_sec: 30
+  # Host-writing the expected postimage makes the entry restorable again.
+  - host_write_file:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      text: |
+        package com.example.single;
+
+        public class SortMembers {
+            private int laterField = 2;
+            private int earlyField = 1;
+
+            void zebra() {
+            }
+
+            void apple() {
+            }
+        }
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.sortable_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="confirm-dialog"]'
+      contains: "Refactor recovery pending"
+      timeout_sec: 10
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="confirm-dialog"]'
+      contains: "Restore pre-refactor content"
+      timeout_sec: 10
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Refactor recovery complete"
+      timeout_sec: 60
+  - assert_file_sha256:
+      path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
+      equals: "68142feae5f38ffc310302e58f6a211c61c9d68994cfa5b643d2fbcaf239f93b"
+      timeout_sec: 30
+  - screenshot: tc-ide-improve002-segment4-conflict.png

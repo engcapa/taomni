@@ -3589,6 +3589,8 @@ export function CodeWorkspaceTab({
               })}`);
               return backgroundOutcomes;
             });
+          }).finally(() => {
+            layoutRestoredOpenFilesRef.current = false;
           });
           return;
         }
@@ -3604,6 +3606,7 @@ export function CodeWorkspaceTab({
 
   const persistWorkspaceLayoutNow = useCallback((targetInstanceId = workspaceInstanceId) => {
     if (!targetInstanceId) return;
+    if (layoutRestoredOpenFilesRef.current) return;
     // Library buffers come from a live language server, so they cannot be
     // restored on the next launch — keep them out of the persisted layout.
     const persistableGroups = Object.fromEntries(

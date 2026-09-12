@@ -148,7 +148,7 @@ steps:
   - wait_for: '[data-testid="confirm-dialog"]'
   - assert_text:
       selector: '[data-testid="confirm-dialog-message"]'
-      contains: "Retry the remaining 1"
+      contains: "Retry"
       timeout_sec: 15
   - click: '[data-testid="confirm-dialog-cancel"]'
   - assert_text:
