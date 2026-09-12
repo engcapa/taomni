@@ -1473,6 +1473,56 @@ describe("ED-IMPROVE-007 leaf/file view snapshots", () => {
     const captured = onViewStateChange.mock.calls.at(-1)![0];
     expect(captured.scrollLeft).toBe(view.scrollDOM?.scrollLeft ?? 0);
   });
+
+  it("captures new text identity within 1s of typing without using stale wall-clock identity (ED-REPAIR-009-A1)", async () => {
+    const initialText = "hello world\nsecond line";
+    const onViewStateChange = vi.fn();
+    const rendered = renderEditor(initialText, vi.fn(), { onViewStateChange });
+    const view = findView(rendered);
+
+    // Edit the text within 1s of mounting
+    act(() => {
+      view.dispatch({
+        changes: { from: 6, to: 11, insert: "taomni" },
+        selection: EditorSelection.cursor(12),
+      });
+    });
+
+    await waitFor(() => expect(onViewStateChange).toHaveBeenCalled());
+    const captured = onViewStateChange.mock.calls.at(-1)![0];
+    // Captured identity must match the new doc, NOT the initial text
+    expect(captured.textIdentity).toBe(documentTextIdentity(view.state.doc));
+    expect(captured.textIdentity).not.toBe(textIdentityFromString(initialText));
+    expect(captured.mainSelection.head).toBe(12);
+    cleanup();
+
+    // Reopening with the new text must restore the caret at 12
+    const updatedText = "hello taomni\nsecond line";
+    const restored = renderEditor(updatedText, vi.fn(), { initialViewState: captured });
+    expect(findView(restored).state.selection.main.head).toBe(12);
+    cleanup();
+  });
+
+  it("performs tail capture on unmount when view state emit is pending (ED-REPAIR-009-A1, A2)", () => {
+    const doc = "alpha\nbeta\ngamma";
+    const onViewStateChange = vi.fn();
+    const rendered = renderEditor(doc, vi.fn(), { onViewStateChange });
+    const view = findView(rendered);
+
+    // Move selection but unmount immediately before the 150ms debounce fires
+    act(() => {
+      view.dispatch({ selection: EditorSelection.cursor(7) });
+    });
+    expect(onViewStateChange).not.toHaveBeenCalled();
+
+    // Cleanup triggers synchronous unmount tail capture
+    cleanup();
+
+    expect(onViewStateChange).toHaveBeenCalledTimes(1);
+    const captured = onViewStateChange.mock.calls[0]![0];
+    expect(captured.mainSelection.head).toBe(7);
+    expect(captured.textIdentity).toBe(textIdentityFromString(doc));
+  });
 });
 
 describe("ED-IMPROVE-008 IME composition lifecycle wiring", () => {

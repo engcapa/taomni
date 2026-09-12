@@ -369,7 +369,8 @@ describe("ED-IMPROVE-007 view state persistence", () => {
     expect(normalized.viewStates?.primary?.["root:app:b.ts"]?.scrollLeft ?? 0).toBe(0);
   });
 
-  it("overwrites model view states with the exact live text identity (ED-MAIN-009)", () => {
+  it("preserves snapshot content identity and refuses to re-sign inactive leaf states with live buffer text (ED-REPAIR-009-A2)", () => {
+    const originalIdentity = textIdentityFromString("abc");
     const enriched = enrichViewStatesWithIdentity(
       {
         primary: {
@@ -378,16 +379,32 @@ describe("ED-IMPROVE-007 view state persistence", () => {
             selections: [],
             scrollTop: 10,
             folds: [],
-            textIdentity: "stale-throttled-value",
+            textIdentity: originalIdentity,
             scrollLeft: 5,
           },
         },
+        secondary: {
+          "root:app:a.ts": {
+            mainSelection: { anchor: 2, head: 2 },
+            selections: [],
+            scrollTop: 0,
+            folds: [],
+            textIdentity: originalIdentity,
+            scrollLeft: 0,
+          },
+        },
       },
-      (key) => (key === "root:app:a.ts" ? "hello\r\nworld" : undefined),
+      (key) => (key === "root:app:a.ts" ? "xyz" : undefined),
     );
-    const state = enriched.primary?.["root:app:a.ts"];
-    expect(state?.textIdentity).toBe(textIdentityFromString("hello\nworld"));
-    expect(state?.scrollLeft).toBe(5);
+    // Both leaves must retain the identity recorded at snapshot time ("abc"),
+    // never re-stamped with the current live text ("xyz").
+    const primaryState = enriched.primary?.["root:app:a.ts"];
+    const secondaryState = enriched.secondary?.["root:app:a.ts"];
+    expect(primaryState?.textIdentity).toBe(originalIdentity);
+    expect(primaryState?.textIdentity).not.toBe(textIdentityFromString("xyz"));
+    expect(primaryState?.scrollLeft).toBe(5);
+    expect(secondaryState?.textIdentity).toBe(originalIdentity);
+    expect(secondaryState?.textIdentity).not.toBe(textIdentityFromString("xyz"));
   });
 
   it("keeps pre-007 snapshots restoring without a viewStates field", () => {

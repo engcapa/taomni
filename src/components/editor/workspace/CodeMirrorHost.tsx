@@ -212,16 +212,9 @@ import {
 import type { WorkspaceActionHost } from "./workspaceActionHost";
 
 // ED-MAIN-009: hashing a multi-megabyte document costs ~100ms, so capture
-// throttles it. The debounced persist recomputes the exact identity via
-// workspaceLayoutPersistence.enrichViewStatesWithIdentity, and this iterator
-// hash must stay byte-for-byte equal to textIdentityFromString for the same
-// content (line endings normalized to "\n").
-const IDENTITY_THROTTLE_MS = 1_000;
-const viewStateIdentityCache = new WeakMap<EditorView, {
-  doc: Text;
-  identity: string;
-  at: number;
-}>();
+// ED-REPAIR-009: exact document content hash cached by immutable Text instance.
+// Never reused across document mutations by wall-clock heuristics.
+const textIdentityCache = new WeakMap<Text, string>();
 
 function hashDocumentText(doc: Text): string {
   let hash = 0x811c9dc5;
@@ -237,19 +230,16 @@ function hashDocumentText(doc: Text): string {
   return `${doc.length}:${(hash >>> 0).toString(16)}`;
 }
 
-/** Exact content identity for a CodeMirror document (uncached). */
+/**
+ * Exact content identity for a CodeMirror document, cached on the immutable Text instance.
+ * ED-REPAIR-009: Text identity is strictly bound to the immutable Text instance,
+ * never reused across document mutations by wall-clock heuristics.
+ */
 export function documentTextIdentity(doc: Text): string {
-  return hashDocumentText(doc);
-}
-
-function throttledDocumentTextIdentity(view: EditorView): string {
-  const doc = view.state.doc;
-  const cached = viewStateIdentityCache.get(view);
-  if (cached && cached.doc === doc) return cached.identity;
-  const now = Date.now();
-  if (cached && now - cached.at < IDENTITY_THROTTLE_MS) return cached.identity;
+  const cached = textIdentityCache.get(doc);
+  if (cached !== undefined) return cached;
   const identity = hashDocumentText(doc);
-  viewStateIdentityCache.set(view, { doc, identity, at: now });
+  textIdentityCache.set(doc, identity);
   return identity;
 }
 
@@ -258,6 +248,7 @@ function throttledDocumentTextIdentity(view: EditorView): string {
  * Pure over the CodeMirror view so the workspace can store it in memory and
  * persist it with the layout without serializing per keystroke. ED-MAIN-009
  * adds the content identity and the horizontal scroll offset.
+ * ED-REPAIR-009: binds the capture identity to the exact doc version.
  */
 export function captureEditorViewState(view: EditorView): PersistedEditorViewState {
   const selection = view.state.selection;
@@ -279,20 +270,26 @@ export function captureEditorViewState(view: EditorView): PersistedEditorViewSta
     selections,
     scrollTop: view.scrollDOM?.scrollTop ?? 0,
     folds,
-    textIdentity: throttledDocumentTextIdentity(view),
+    textIdentity: documentTextIdentity(view.state.doc),
     scrollLeft: view.scrollDOM?.scrollLeft ?? 0,
   };
+}
+
+export interface ApplyPersistedEditorViewStateResult {
+  applied: boolean;
+  deferredScroll: { scrollTop: number; scrollLeft: number } | null;
 }
 
 /**
  * ED-IMPROVE-007: apply a persisted snapshot once when the view mounts.
  * Offsets beyond the live document are clamped and folds outside it are
  * dropped, so a stale or corrupt snapshot can never throw or select garbage.
+ * ED-REPAIR-009: returns deferred scroll targets if geometry is unready on mount.
  */
 export function applyPersistedEditorViewState(
   view: EditorView,
   state: PersistedEditorViewState,
-): void {
+): ApplyPersistedEditorViewStateResult {
   // ED-MAIN-009: a snapshot that carries a content identity only restores its
   // selection/folds/scroll when the live text still matches. Legacy snapshots
   // without an identity keep the original clamp behavior.
@@ -300,10 +297,13 @@ export function applyPersistedEditorViewState(
     state.textIdentity !== undefined
     && state.textIdentity !== documentTextIdentity(view.state.doc)
   ) {
-    return;
+    return { applied: false, deferredScroll: null };
   }
   const docLength = view.state.doc.length;
-  const clamp = (value: number): number => Math.max(0, Math.min(docLength, Math.floor(value)));
+  const clamp = (value: number): number => {
+    if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+    return Math.max(0, Math.min(docLength, Math.floor(value)));
+  };
   const toRange = (range: PersistedViewSelection) => EditorSelection.range(
     clamp(range.anchor),
     clamp(range.head),
@@ -322,17 +322,29 @@ export function applyPersistedEditorViewState(
     if (to <= from || to > docLength) continue;
     view.dispatch({ effects: foldEffect.of({ from, to }) });
   }
+  let deferredScroll: { scrollTop: number; scrollLeft: number } | null = null;
   if (view.scrollDOM && (state.scrollTop > 0 || (state.scrollLeft ?? 0) > 0)) {
     const dom = view.scrollDOM;
-    if (state.scrollTop > 0) {
-      const maxScrollTop = Math.max(0, dom.scrollHeight - dom.clientHeight);
-      dom.scrollTop = Math.min(state.scrollTop, maxScrollTop);
+    const targetScrollTop = state.scrollTop > 0 ? state.scrollTop : 0;
+    const targetScrollLeft = (state.scrollLeft ?? 0) > 0 ? (state.scrollLeft ?? 0) : 0;
+    const canScrollVertically = targetScrollTop > 0 && dom.scrollHeight > dom.clientHeight;
+    const canScrollHorizontally = targetScrollLeft > 0 && dom.scrollWidth > dom.clientWidth;
+    if (
+      (targetScrollTop > 0 && !canScrollVertically)
+      || (targetScrollLeft > 0 && !canScrollHorizontally)
+    ) {
+      deferredScroll = { scrollTop: targetScrollTop, scrollLeft: targetScrollLeft };
     }
-    if ((state.scrollLeft ?? 0) > 0) {
+    if (targetScrollTop > 0 && canScrollVertically) {
+      const maxScrollTop = Math.max(0, dom.scrollHeight - dom.clientHeight);
+      dom.scrollTop = Math.min(targetScrollTop, maxScrollTop);
+    }
+    if (targetScrollLeft > 0 && canScrollHorizontally) {
       const maxScrollLeft = Math.max(0, dom.scrollWidth - dom.clientWidth);
-      dom.scrollLeft = Math.min(state.scrollLeft ?? 0, maxScrollLeft);
+      dom.scrollLeft = Math.min(targetScrollLeft, maxScrollLeft);
     }
   }
+  return { applied: true, deferredScroll };
 }
 
 export interface EditorRevealTarget {
@@ -2333,6 +2345,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   onViewStateChangeRef.current = onViewStateChange;
   const lastEmittedViewStateRef = useRef<string | null>(null);
   const viewStateEmitTimerRef = useRef<number | null>(null);
+  const pendingDeferredScrollRef = useRef<{ scrollTop: number; scrollLeft: number } | null>(null);
+  const userInteractedSinceMountRef = useRef(false);
   // ED-IMPROVE-008: IME composition ownership. While active, doc changes are
   // dispatched with the composition origin so the owner coalesces them into
   // one logical undo; blur/destroy/end finalize and release the session.
@@ -3006,6 +3020,35 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             scheduleSelectionEmit(update.view, update.docChanged ? 125 : 0);
           }
           if (update.viewportChanged) emitViewport(update.view);
+          if (
+            update.selectionSet
+            || update.docChanged
+            || update.transactions.some((tr) => tr.isUserEvent("select") || tr.isUserEvent("input"))
+          ) {
+            userInteractedSinceMountRef.current = true;
+            pendingDeferredScrollRef.current = null;
+          }
+          if (
+            pendingDeferredScrollRef.current
+            && !userInteractedSinceMountRef.current
+            && update.view.scrollDOM
+          ) {
+            const dom = update.view.scrollDOM;
+            const target = pendingDeferredScrollRef.current;
+            const canScrollVertically = target.scrollTop > 0 && dom.scrollHeight > dom.clientHeight;
+            const canScrollHorizontally = target.scrollLeft > 0 && dom.scrollWidth > dom.clientWidth;
+            if (canScrollVertically || canScrollHorizontally) {
+              if (target.scrollTop > 0 && canScrollVertically) {
+                const maxScrollTop = Math.max(0, dom.scrollHeight - dom.clientHeight);
+                dom.scrollTop = Math.min(target.scrollTop, maxScrollTop);
+              }
+              if (target.scrollLeft > 0 && canScrollHorizontally) {
+                const maxScrollLeft = Math.max(0, dom.scrollWidth - dom.clientWidth);
+                dom.scrollLeft = Math.min(target.scrollLeft, maxScrollLeft);
+              }
+              pendingDeferredScrollRef.current = null;
+            }
+          }
           // ED-IMPROVE-007: capture caret/selection/scroll/fold changes for
           // this leaf/file; persisted later with the layout snapshot.
           if (
@@ -3029,8 +3072,17 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     // re-applied on prop changes, so late updates cannot overwrite typing.
     const initialViewState = initialViewStateRef.current;
     if (initialViewState) {
-      applyPersistedEditorViewState(view, initialViewState);
+      const restoreResult = applyPersistedEditorViewState(view, initialViewState);
+      if (restoreResult.deferredScroll) {
+        pendingDeferredScrollRef.current = restoreResult.deferredScroll;
+      }
     }
+    const cancelDeferredScroll = () => {
+      userInteractedSinceMountRef.current = true;
+      pendingDeferredScrollRef.current = null;
+    };
+    view.scrollDOM?.addEventListener("wheel", cancelDeferredScroll, { passive: true });
+    view.scrollDOM?.addEventListener("pointerdown", cancelDeferredScroll, { passive: true });
     const compositionNavigationGuard = (event: KeyboardEvent) => {
       if (
         (!view.composing && event.isComposing !== true)
@@ -3191,6 +3243,21 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         window.clearTimeout(viewStateEmitTimerRef.current);
         viewStateEmitTimerRef.current = null;
       }
+      // ED-REPAIR-009: Tail capture on unmount / teardown
+      if (viewRef.current === view && onViewStateChangeRef.current) {
+        try {
+          const captured = captureEditorViewState(view);
+          const serialized = JSON.stringify(captured);
+          if (serialized !== lastEmittedViewStateRef.current) {
+            lastEmittedViewStateRef.current = serialized;
+            onViewStateChangeRef.current(captured);
+          }
+        } catch {
+          // view may be in teardown
+        }
+      }
+      view.scrollDOM?.removeEventListener("wheel", cancelDeferredScroll);
+      view.scrollDOM?.removeEventListener("pointerdown", cancelDeferredScroll);
       requestParameterInfoRef.current = null;
       cancelActiveHoverResize(activeHoverResizeSessionRef);
       clipboardContextByView.delete(view);
@@ -3207,6 +3274,24 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       view.destroy();
       viewRef.current = null;
       if (owner && sharedFileKey) owner.releaseView(sharedFileKey, sharedViewId);
+    };
+  }, []);
+
+  // ED-REPAIR-009: Flush view-state on window unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const view = viewRef.current;
+      if (!view || !onViewStateChangeRef.current) return;
+      try {
+        const captured = captureEditorViewState(view);
+        onViewStateChangeRef.current(captured);
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);
 

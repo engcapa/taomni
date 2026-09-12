@@ -2608,15 +2608,19 @@ export function CodeWorkspaceTab({
     cleanupRequestTokenRef.current += 1;
   }, [workspaceInstanceId]);
 
+  const persistWorkspaceLayoutNowRef = useRef<((targetInstanceId?: string) => void) | null>(null);
+
   // ED-IMPROVE-007: view snapshots stay in memory and persist with the next
   // debounced layout write. A late report from a replaced view/workspace is
   // dropped instead of resurrecting an old leaf's caret.
+  // ED-REPAIR-009: ensure unmount tail captures update viewStatesRef even
+  // when the component is in unmount phase, flushing to disk immediately.
   const handleViewStateChange = useCallback((
     groupId: EditorGroupId,
     fileKey: string,
     state: PersistedEditorViewState,
   ) => {
-    if (!mountedRef.current || workspaceInstanceIdRef.current !== workspaceInstanceId) return;
+    if (workspaceInstanceIdRef.current !== workspaceInstanceId) return;
     const current = viewStatesRef.current;
     const leaf = current[groupId];
     if (leaf?.[fileKey] === state) return;
@@ -2624,8 +2628,12 @@ export function CodeWorkspaceTab({
       ...current,
       [groupId]: { ...(leaf ?? {}), [fileKey]: state },
     };
-    setViewStateRevision((revision) => revision + 1);
-  }, [workspaceInstanceId]);
+    if (mountedRef.current) {
+      setViewStateRevision((revision) => revision + 1);
+    } else {
+      persistWorkspaceLayoutNowRef.current?.(workspaceInstanceId);
+    }
+  }, [workspaceInstanceId, mountedRef]);
 
   const semanticQueryHostRef = useRef(new WorkspaceSemanticQueryHost({
     onRequest: ({ kind }) => {
@@ -3594,49 +3602,68 @@ export function CodeWorkspaceTab({
     void openFile(ref);
   }, [looseFiles, openFile, roots, workspace, workspaceInstanceId]);
 
+  const persistWorkspaceLayoutNow = useCallback((targetInstanceId = workspaceInstanceId) => {
+    if (!targetInstanceId) return;
+    // Library buffers come from a live language server, so they cannot be
+    // restored on the next launch — keep them out of the persisted layout.
+    const persistableGroups = Object.fromEntries(
+      (Object.entries(editorGroups) as Array<[EditorGroupId, typeof editorGroups.primary]>)
+        .map(([groupId, group]) => [groupId, {
+          ...group,
+          openOrder: group.openOrder.filter((key) => !libraryBuffersRef.current[key]),
+          pinnedKeys: group.pinnedKeys.filter((key) => !libraryBuffersRef.current[key]),
+          activeKey: group.activeKey && libraryBuffersRef.current[group.activeKey]
+            ? null
+            : group.activeKey,
+          previewKey: group.previewKey && libraryBuffersRef.current[group.previewKey]
+            ? null
+            : group.previewKey,
+        }]),
+    ) as typeof editorGroups;
+    writeWorkspaceLayoutSnapshot(targetInstanceId, snapshotFromWorkspaceUi({
+      bottomDockOpen,
+      bottomDockTab,
+      rightPaneOpen,
+      rightPaneTab,
+      languagePanelOpen,
+      splitOrientation,
+      activeEditorGroupId,
+      expandedRootIds,
+      expandedDirKeys,
+      editorGroups: persistableGroups,
+      layoutTreeV2: workspaceUi.layoutTreeV2,
+      tabPolicy: tabPolicyRef.current,
+      // ED-REPAIR-009: Preserve captured snapshot identities without re-stamping from live text.
+      viewStates: enrichViewStatesWithIdentity(
+        viewStatesRef.current,
+        (fileKey) => openFilesRef.current[fileKey]?.text,
+      ),
+    }), {
+      // §8.17.4 step 3: persistence refusals surface as a recovery
+      // diagnostic, not only a console line.
+      onIssue: (message) => setStatusMessage(message),
+    });
+  }, [
+    activeEditorGroupId,
+    bottomDockOpen,
+    bottomDockTab,
+    editorGroups,
+    expandedDirKeys,
+    expandedRootIds,
+    languagePanelOpen,
+    rightPaneOpen,
+    rightPaneTab,
+    splitOrientation,
+    workspaceInstanceId,
+    workspaceUi.layoutTreeV2,
+  ]);
+
+  persistWorkspaceLayoutNowRef.current = persistWorkspaceLayoutNow;
+
   useEffect(() => {
     if (!workspaceInstanceId) return;
     const timer = window.setTimeout(() => {
-      // Library buffers come from a live language server, so they cannot be
-      // restored on the next launch — keep them out of the persisted layout.
-      const persistableGroups = Object.fromEntries(
-        (Object.entries(editorGroups) as Array<[EditorGroupId, typeof editorGroups.primary]>)
-          .map(([groupId, group]) => [groupId, {
-            ...group,
-            openOrder: group.openOrder.filter((key) => !libraryBuffersRef.current[key]),
-            pinnedKeys: group.pinnedKeys.filter((key) => !libraryBuffersRef.current[key]),
-            activeKey: group.activeKey && libraryBuffersRef.current[group.activeKey]
-              ? null
-              : group.activeKey,
-            previewKey: group.previewKey && libraryBuffersRef.current[group.previewKey]
-              ? null
-              : group.previewKey,
-          }]),
-      ) as typeof editorGroups;
-      writeWorkspaceLayoutSnapshot(workspaceInstanceId, snapshotFromWorkspaceUi({
-        bottomDockOpen,
-        bottomDockTab,
-        rightPaneOpen,
-        rightPaneTab,
-        languagePanelOpen,
-        splitOrientation,
-        activeEditorGroupId,
-        expandedRootIds,
-        expandedDirKeys,
-        editorGroups: persistableGroups,
-        layoutTreeV2: workspaceUi.layoutTreeV2,
-        tabPolicy: tabPolicyRef.current,
-        // ED-MAIN-009: capture throttles the content hash; the debounced persist
-        // writes the exact identity so restart restore compares real content.
-        viewStates: enrichViewStatesWithIdentity(
-          viewStatesRef.current,
-          (fileKey) => openFilesRef.current[fileKey]?.text,
-        ),
-      }), {
-        // §8.17.4 step 3: persistence refusals surface as a recovery
-        // diagnostic, not only a console line.
-        onIssue: (message) => setStatusMessage(message),
-      });
+      persistWorkspaceLayoutNowRef.current?.(workspaceInstanceId);
     }, 250);
     return () => window.clearTimeout(timer);
   }, [
@@ -3655,6 +3682,18 @@ export function CodeWorkspaceTab({
     tabPolicyRevision,
     viewStateRevision,
   ]);
+
+  // ED-REPAIR-009: Flush layout snapshot on workspace unmount / window close
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      persistWorkspaceLayoutNowRef.current?.(workspaceInstanceIdRef.current);
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      persistWorkspaceLayoutNowRef.current?.(workspaceInstanceId);
+    };
+  }, [workspaceInstanceId]);
 
   const applyFileActionResourceOperation = useCallback((
     operation: Exclude<LspWorkspaceEditOperation, { kind: "text" }>,

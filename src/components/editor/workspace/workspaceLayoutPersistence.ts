@@ -80,22 +80,20 @@ export function textIdentityFromString(text: string): string {
 }
 
 /**
- * ED-MAIN-009: overwrite each snapshot's content identity with the exact hash
- * of the current buffer text. Capture throttles the hash to keep animation and
- * typing cheap, so the debounced persist recomputes the authoritative value.
+ * ED-REPAIR-009: Preserve each snapshot's immutable content identity.
+ * We must never overwrite an existing identity or re-sign inactive/stale snapshots
+ * with live buffer text, as doing so would allow stale positions to pass the
+ * version mismatch check (ED-REPAIR-009-A2).
  */
 export function enrichViewStatesWithIdentity(
   viewStates: WorkspaceViewStates,
-  getText: (fileKey: string) => string | undefined,
+  _getText?: (fileKey: string) => string | undefined,
 ): WorkspaceViewStates {
   const result: WorkspaceViewStates = {};
   for (const [leafId, files] of Object.entries(viewStates)) {
     const perFile: Record<string, PersistedEditorViewState> = {};
     for (const [fileKey, state] of Object.entries(files)) {
-      const text = getText(fileKey);
-      perFile[fileKey] = text === undefined
-        ? state
-        : { ...state, textIdentity: textIdentityFromString(text) };
+      perFile[fileKey] = { ...state };
     }
     result[leafId] = perFile;
   }
