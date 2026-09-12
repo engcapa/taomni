@@ -1,0 +1,74 @@
+id: TC-auto-F-DB-1-query-tab-rename
+title: Query tab rename updates the label and the browser query-workspace stub
+description: |
+  Opens the offline MySQL session scaffold, renames the active query tab via
+  double-click, verifies the browser query-workspace stub stores the custom name,
+  then exercises the context-menu rename entry and Escape cancellation. Page
+  reload restore is intentionally out of scope here: the reset_db init script
+  clears taomni.sessions.v1 on every navigation, so the workspace cannot be
+  re-opened after a reload; that path is covered by the Vitest workspace-restore
+  test and the native manual verification.
+covers: [F-DB-1]
+tags: [auto-generated, needs-review, database, sql, query-tab, rename, persistence, no-connect]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 90
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="sidebar"]'
+  # The sidebar is compact by default; open the sessions rail first.
+  - click: '[data-testid="side-tab-sessions"]'
+  - wait_for: '[data-testid="session-new"]'
+  - click: '[data-testid="session-new"]'
+  - wait_for: '[data-testid="session-editor"]'
+  - click: '[data-testid="session-proto-mysql"]'
+  - wait_for:
+      selector: '[data-testid="session-database-section"]'
+      timeout_sec: 10
+  - fill:
+      selector: '[data-testid="session-host"]'
+      value: db-host.example.test
+  - fill:
+      selector: '[data-testid="session-port"]'
+      value: "3306"
+  - fill:
+      selector: 'input[aria-label="Database username"]'
+      value: qa_user
+  - fill:
+      selector: 'input[aria-label="Database name"]'
+      value: qa_db
+  - click: '[data-testid="session-section-bookmark"]'
+  - wait_for: '[data-testid="bookmark-settings"]'
+  - fill:
+      selector: '[data-testid="session-name"]'
+      value: qa-ui-auto-rename
+  - click: '[data-testid="session-save"]'
+  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-rename"]'
+  - open_session: { name: qa-ui-auto-rename, double_click: true }
+  - wait_for: '[data-testid="db-connection-error-banner"]'
+  - wait_for: '[data-testid="db-query-tab"]'
+  - dblclick: '[data-testid="db-query-tab"]'
+  - wait_for: '[data-testid="db-query-tab-input"]'
+  - fill:
+      selector: '[data-testid="db-query-tab-input"]'
+      value: qa-rename-orders
+  - press: Enter
+  - assert_text:
+      selector: '[data-testid="db-query-tab"]'
+      contains: qa-rename-orders
+  - wait: 1.5s
+  - assert_localstorage:
+      key: taomni.stub.dbQueryWorkspaces.v1
+      contains: qa-rename-orders
+  - right_click: '[data-testid="db-query-tab"]'
+  - assert_menu_items: [Rename tab]
+  - click_menu: Rename tab
+  - wait_for: '[data-testid="db-query-tab-input"]'
+  - fill:
+      selector: '[data-testid="db-query-tab-input"]'
+      value: should-be-cancelled
+  - press: Escape
+  - assert_text:
+      selector: '[data-testid="db-query-tab"]'
+      contains: qa-rename-orders
+  - screenshot: db-query-tab-rename.png

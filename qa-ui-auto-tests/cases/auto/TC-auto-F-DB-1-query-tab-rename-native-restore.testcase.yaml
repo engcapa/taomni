@@ -1,0 +1,38 @@
+id: TC-auto-F-DB-1-query-tab-rename-native-restore
+title: Native restart restores the renamed query tab from the SQLite workspace
+description: |
+  App restart half of the native rename verification. Runs after
+  TC-auto-F-DB-1-query-tab-rename-native in the same invocation: a fresh QA
+  process unlocks the vault at startup, restores the last session from the
+  Welcome panel, and asserts the custom query tab name persisted by the first
+  case. Does not reset app state because it only reads the persisted workspace.
+covers: [F-DB-1]
+tags: [database, sql, query-tab, rename, persistence, native-boundary, needs-review]
+modes: [native]
+native_platforms: [Windows]
+timeout_sec: 180
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for:
+      selector: '[data-testid="vault-unlock-pw"]'
+      timeout_sec: 30
+  - fill:
+      selector: '[data-testid="vault-unlock-pw"]'
+      value: qa-native-rename-master
+  - click: '[data-testid="vault-unlock-confirm"]'
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="welcome-restore-last-session"]'
+  - wait_for:
+      selector: '[data-testid="db-query-tab"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="db-query-tab"]'
+      contains: native-orders
+  - click: '[data-testid="db-query-history-toggle"]'
+  - wait_for:
+      selector: '[data-testid="db-query-history-entry"]'
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="db-query-history-entry-name"]'
+      contains: native-orders
+  - screenshot: native-query-tab-rename-restored.png

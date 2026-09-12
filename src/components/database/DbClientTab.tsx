@@ -33,6 +33,7 @@ import {
   Check,
   ChevronDown,
   Languages,
+  Pencil,
 } from "lucide-react";
 import type { DbConnectInfo } from "../../types";
 import {
@@ -53,6 +54,7 @@ import {
   dbRewriteResultSql,
   dbSaveQueryWorkspace,
   dbSaveSavedQuery,
+  dbUpdateHistoryTabName,
   readFileBytes,
   selectSaveFilePath,
   writeStreamAbort,
@@ -144,6 +146,7 @@ const MIN_ROW_LIMIT = 1;
 const MAX_ROW_LIMIT = 1_000_000;
 const QUERY_WORKSPACE_CACHE_VERSION = 1;
 const QUERY_AUTO_SAVE_MS = 5000;
+const MAX_PANEL_NAME_LENGTH = 120;
 
 function createRuntimeDbSessionId(baseSessionId: string): string {
   const suffix = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -205,6 +208,7 @@ interface PanelState {
   filePath: string | null;
   fileName: string | null;
   savedQuery: DbSavedQuery | null;
+  displayName: string | null;
   dirty: boolean;
   createdAt: number;
 }
@@ -464,6 +468,7 @@ function newPanel(patch: Partial<PanelState> = {}): PanelState {
     filePath: null,
     fileName: null,
     savedQuery: null,
+    displayName: null,
     dirty: false,
     createdAt: Date.now(),
     ...patch,
@@ -486,6 +491,7 @@ function workspaceTabFromPanel(
     filePath: panel.filePath,
     fileName: panel.fileName,
     savedQueryId: panel.savedQuery?.id ?? null,
+    displayName: panel.displayName,
     dirty,
     isOpen: true,
     closedAt: null,
@@ -569,6 +575,8 @@ export default function DbClientTab({
   const [connError, setConnError] = useState<string | null>(null);
   const [panels, setPanels] = useState<PanelState[]>(() => [newPanel()]);
   const [activePanelId, setActivePanelId] = useState<string>(() => panels[0].id);
+  const [editingPanelId, setEditingPanelId] = useState<string | null>(null);
+  const [panelDraftTitle, setPanelDraftTitle] = useState("");
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [rowLimit, setRowLimit] = useState(() =>
     readIntSetting(info.engine, "rowLimit", DEFAULT_ROW_LIMIT, MIN_ROW_LIMIT, MAX_ROW_LIMIT),
@@ -598,6 +606,7 @@ export default function DbClientTab({
   const activePanelIdRef = useRef(activePanelId);
   const autoSaveInFlightRef = useRef<Promise<void> | null>(null);
   const autoSaveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const panelRenameCancelRef = useRef(false);
   const lastAutoSavedDocRef = useRef<Record<string, string>>({});
   const savedQueriesRef = useRef<Record<string, DbSavedQuery>>({});
   const rootRef = useRef<HTMLDivElement>(null);
@@ -717,6 +726,7 @@ export default function DbClientTab({
               filePath: entry.filePath ?? null,
               fileName: entry.fileName ?? (entry.filePath ? basename(entry.filePath) : null),
               savedQuery,
+              displayName: entry.displayName ?? null,
               dirty: entry.dirty,
               createdAt: entry.createdAt,
             });
@@ -951,6 +961,54 @@ export default function DbClientTab({
     }, 1000);
   }, [autoSaveWorkspace]);
 
+  const panelDerivedLabel = useCallback((panel: PanelState) => {
+    const index = panelsRef.current.findIndex((candidate) => candidate.id === panel.id);
+    return panel.fileName ?? panel.savedQuery?.name ?? `Query ${(index < 0 ? 0 : index) + 1}`;
+  }, []);
+
+  const startPanelRename = (panel: PanelState) => {
+    panelRenameCancelRef.current = false;
+    setActivePanelId(panel.id);
+    setPanelDraftTitle(panel.displayName ?? panelDerivedLabel(panel));
+    setEditingPanelId(panel.id);
+  };
+
+  const cancelPanelRename = () => {
+    panelRenameCancelRef.current = true;
+    setEditingPanelId(null);
+    setPanelDraftTitle("");
+  };
+
+  const commitPanelRename = (panelId: string, value?: string) => {
+    if (panelRenameCancelRef.current) {
+      panelRenameCancelRef.current = false;
+      setEditingPanelId(null);
+      setPanelDraftTitle("");
+      return;
+    }
+    const draft = value ?? panelDraftTitle;
+    setEditingPanelId(null);
+    setPanelDraftTitle("");
+    const panel = panelsRef.current.find((candidate) => candidate.id === panelId);
+    if (!panel) return;
+    const normalized = draft.replace(/[\r\n]+/g, " ").trim().slice(0, MAX_PANEL_NAME_LENGTH);
+    const nextName = !normalized || normalized === panelDerivedLabel(panel) ? null : normalized;
+    const previous = panel.displayName ?? null;
+    if (nextName === previous) return;
+    patchPanel(panelId, { displayName: nextName });
+    setHistoryEntries((prev) =>
+      prev.map((entry) =>
+        entry.panelId === panelId && entry.savedSessionId === workspaceSessionId
+          ? { ...entry, tabName: nextName }
+          : entry,
+      ),
+    );
+    scheduleWorkspaceSave();
+    void dbUpdateHistoryTabName(workspaceSessionId, panelId, nextName).catch((err) => {
+      setStatusMessage(`History tab name update failed: ${String(err)}`);
+    });
+  };
+
   useEffect(() => {
     const timer = setInterval(() => {
       void autoSaveWorkspace();
@@ -1132,7 +1190,9 @@ export default function DbClientTab({
       sql: string,
       startedAt: number,
       summary: QueryExecutionSummary,
+      panelId: string,
     ) => {
+      const sourcePanel = panelsRef.current.find((panel) => panel.id === panelId);
       const entry: DbSqlHistoryEntry = {
         id: createSqlHistoryId(),
         savedSessionId: workspaceSessionId,
@@ -1150,6 +1210,8 @@ export default function DbClientTab({
         hasResultSet: summary.hasResultSet,
         error: summary.error,
         createdAt: Date.now(),
+        panelId,
+        tabName: sourcePanel?.displayName ?? null,
       };
       try {
         await dbAppendHistory(entry);
@@ -1209,7 +1271,7 @@ export default function DbClientTab({
           }),
         );
         const summary = await streamQueryIntoSheet(panelId, sheet.id, statement.sql, rowLimit);
-        await appendSqlHistory(statement.sql, sheet.createdAt, summary);
+        await appendSqlHistory(statement.sql, sheet.createdAt, summary, panelId);
         if (!summary.ok) break;
       }
     },
@@ -1727,6 +1789,13 @@ export default function DbClientTab({
     const hasEditor = !!editorHandles.current[panel.id];
     const currentStmt = currentEditorStatement(panel.id);
     const items: MenuItem[] = [
+      {
+        label: t("tabs.rename"),
+        icon: <Pencil className="w-3.5 h-3.5" />,
+        testId: "db-context-rename-tab",
+        onClick: () => startPanelRename(panel),
+      },
+      { separator: true, label: "" },
       {
         label: t("dbAi.askAiExplainSyntax"),
         icon: <Sparkles className="w-3.5 h-3.5" />,
@@ -2606,21 +2675,64 @@ export default function DbClientTab({
             >
               {panels.map((p, i) => {
                 const panelRunning = p.sheets.some((sheet) => sheet.running);
-                const label = p.fileName ?? p.savedQuery?.name ?? `Query ${i + 1}`;
+                const label = p.displayName ?? p.fileName ?? p.savedQuery?.name ?? `Query ${i + 1}`;
+                if (editingPanelId === p.id) {
+                  return (
+                    <input
+                      key={p.id}
+                      type="text"
+                      data-testid="db-query-tab-input"
+                      autoFocus
+                      value={panelDraftTitle}
+                      maxLength={MAX_PANEL_NAME_LENGTH}
+                      aria-label={t("tabs.rename")}
+                      className="px-2 h-5 w-[160px] rounded text-[11px] outline-none"
+                      style={{
+                        background: "var(--taomni-selected)",
+                        color: "var(--taomni-accent)",
+                        border: "1px solid var(--taomni-selected-border)",
+                      }}
+                      onChange={(event) => setPanelDraftTitle(event.target.value)}
+                      onClick={(event) => event.stopPropagation()}
+                      onMouseDown={(event) => event.stopPropagation()}
+                      onDoubleClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => {
+                        if (event.nativeEvent.isComposing) return;
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          commitPanelRename(p.id);
+                        } else if (event.key === "Escape") {
+                          event.preventDefault();
+                          cancelPanelRename();
+                        }
+                        event.stopPropagation();
+                      }}
+                      onFocus={(event) => event.currentTarget.select()}
+                      onBlur={() => commitPanelRename(p.id)}
+                    />
+                  );
+                }
                 return (
                   <button
                     key={p.id}
                     type="button"
+                    data-testid="db-query-tab"
                     className="px-2 h-5 max-w-[190px] rounded inline-flex items-center gap-1"
                     style={{
                       background: p.id === activePanelId ? "var(--taomni-selected)" : "transparent",
                       color: p.id === activePanelId ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
                     }}
                     onClick={() => setActivePanelId(p.id)}
+                    onDoubleClick={(event) => {
+                      event.stopPropagation();
+                      startPanelRename(p);
+                    }}
                     onContextMenu={(event) => openPanelMenu(event, p)}
                     title={p.filePath ?? label}
                   >
-                    <span className="truncate">{label}{p.dirty ? "*" : ""}</span>
+                    <span className="truncate">
+                      {label}{p.dirty ? "*" : ""}
+                    </span>
                     {panelRunning && <Loader2 className="w-3 h-3 shrink-0 animate-spin" />}
                     {panels.length > 1 && (
                       <X
@@ -2855,7 +2967,7 @@ function EditorToolbar({
       <button type="button" className={btn} onClick={onToggleStatement} title="Current statement actions">
         <SquareDashedMousePointer className="w-3.5 h-3.5" /> Statement
       </button>
-      <button type="button" className={btn} onClick={onToggleHistory} title="Query history">
+      <button type="button" className={btn} onClick={onToggleHistory} title="Query history" data-testid="db-query-history-toggle">
         <Clock className="w-3.5 h-3.5" /> History
       </button>
       <button type="button" className={btn} onClick={onSave} title="Save query tab as SQL file">
@@ -3091,14 +3203,26 @@ function HistoryDropdown({
                     {entry.error && <span className="text-[#d9534f] truncate">Error</span>}
                     <span className="ml-auto truncate">{entry.schemaName ?? entry.databaseName ?? entry.engine}</span>
                   </div>
-                  <button
-                    type="button"
-                    className="mt-1 w-full text-left truncate font-mono text-[11px] text-[var(--taomni-text)]"
-                    title={entry.sqlContent}
-                    onClick={() => onSelect(entry)}
-                  >
-                    {sql}
-                  </button>
+                  <div className="mt-1 flex items-center gap-2 min-w-0">
+                    {entry.tabName && (
+                      <span
+                        data-testid="db-query-history-entry-name"
+                        className="shrink-0 max-w-[140px] truncate rounded px-1.5 py-0.5 text-[10px]"
+                        style={{ background: "var(--taomni-selected)", color: "var(--taomni-accent)" }}
+                        title={entry.tabName}
+                      >
+                        {entry.tabName}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      className="flex-1 min-w-0 text-left truncate font-mono text-[11px] text-[var(--taomni-text)]"
+                      title={entry.sqlContent}
+                      onClick={() => onSelect(entry)}
+                    >
+                      {sql}
+                    </button>
+                  </div>
                   {entry.error && (
                     <div className="mt-1 truncate text-[10px] text-[#d9534f]" title={entry.error}>
                       {entry.error}
