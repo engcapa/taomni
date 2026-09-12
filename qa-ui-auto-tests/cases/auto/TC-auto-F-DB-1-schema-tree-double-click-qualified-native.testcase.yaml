@@ -1,0 +1,96 @@
+id: TC-auto-F-DB-1-schema-tree-double-click-qualified-native
+title: Native schema-tree double-click inserts the database-qualified name
+description: |
+  Connects a real MySQL/MariaDB session whose default database is `test`, filters
+  the schema tree for a table that lives in `information_schema`, double-clicks
+  that result, and verifies the editor receives the qualified reference
+  (`information_schema`.`TABLES`) instead of the bare name. The qualified SELECT
+  is then executed and the result grid must appear, proving the inserted
+  reference resolves in a real connection. Windows/WebView2 target.
+covers: [F-DB-1]
+tags: [database, sql, schema-tree, qualified-name, native-boundary, needs-review]
+modes: [native]
+native_platforms: [Windows]
+fixtures: [reset_db]
+timeout_sec: 300
+steps:
+  - open: ${cfg.app.base_url}
+  - vault_first_run: qa-native-qualified-password
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="side-tab-sessions"]'
+  - wait_for: '[data-testid="session-new"]'
+  - click: '[data-testid="session-new"]'
+  - wait_for: '[data-testid="session-editor"]'
+  - click: '[data-testid="session-proto-mysql"]'
+  - wait_for:
+      selector: '[data-testid="session-database-section"]'
+      timeout_sec: 10
+  - fill:
+      selector: '[data-testid="session-host"]'
+      value: 10.1.5.52
+  - fill:
+      selector: '[data-testid="session-port"]'
+      value: "3306"
+  - fill:
+      selector: 'input[aria-label="Database username"]'
+      value: test
+  - fill:
+      selector: 'input[aria-label="Database password"]'
+      value: ${env.TAOMNI_TEST_MYSQL_PASSWORD}
+  - fill:
+      selector: 'input[aria-label="Database name"]'
+      value: test
+  - click: '[data-testid="db-save-in-vault"]'
+  - click: '[data-testid="session-section-bookmark"]'
+  - wait_for: '[data-testid="bookmark-settings"]'
+  - fill:
+      selector: '[data-testid="session-name"]'
+      value: qa-ui-auto-qualified
+  - click: '[data-testid="session-save"]'
+  # A fresh QA profile has an empty vault: the on-demand gate asks for a master
+  # password before the save can store the DB password reference.
+  - wait_for:
+      selector: '[data-testid="vault-setup-pw1"]'
+      timeout_sec: 15
+  - fill:
+      selector: '[data-testid="vault-setup-pw1"]'
+      value: qa-native-qualified-master
+  - fill:
+      selector: '[data-testid="vault-setup-pw2"]'
+      value: qa-native-qualified-master
+  - click: '[data-testid="vault-setup-confirm"]'
+  - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-qualified"]'
+  - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-qualified"]'
+  - wait_for:
+      selector: '[data-testid="db-query-tab"]'
+      timeout_sec: 60
+  - assert_not_visible: '[data-testid="db-connection-error-banner"]'
+  - wait_for:
+      selector: '[data-testid="schema-tree"]'
+      timeout_sec: 30
+  # The schema panel can start collapsed at this window size; expand it first.
+  - click: '[data-testid="db-schema-drawer-handle"]'
+  - wait_for: '[data-testid="schema-tree-filter"]'
+  - click: '[data-testid="sql-editor"]'
+  # Filter for a table that only exists in information_schema, not in the active
+  # `test` database, so an unqualified name cannot resolve.
+  - fill:
+      selector: '[data-testid="schema-tree-filter"]'
+      value: TABLES
+  - wait_for:
+      selector: '[data-testid="schema-tree-object"][data-schema="information_schema"][data-object-name="TABLES"]'
+      timeout_sec: 30
+  - dblclick: '[data-testid="schema-tree-object"][data-schema="information_schema"][data-object-name="TABLES"]'
+  - wait: 1
+  - eval_readonly:
+      expression: document.querySelector('.cm-content').textContent
+      contains: '`information_schema`.`TABLES`'
+  - screenshot: schema-tree-double-click-qualified-editor.png
+  # Replace the inserted reference with a full statement and run it for real.
+  - press: Control+a
+  - type: SELECT COUNT(*) FROM `information_schema`.`TABLES`;
+  - click: '[data-testid="db-run-current-statement"]'
+  - wait_for:
+      selector: '[data-testid="query-result-grid"]'
+      timeout_sec: 60
+  - screenshot: schema-tree-double-click-qualified-result.png

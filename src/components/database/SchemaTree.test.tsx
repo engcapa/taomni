@@ -1,13 +1,17 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SchemaTree } from "./SchemaTree";
 
 const ipcMock = vi.hoisted(() => ({
   dbListSchemas: vi.fn(async () => [{ name: "ecommerce" }]),
-  dbListTables: vi.fn(async () => [
-    { name: "orders", kind: "table", rowCount: 2_800_000 },
-    { name: "report_v", kind: "view", rowCount: null },
-  ]),
+  dbListTables: vi.fn(async (_sessionId: string, schema: string | null) =>
+    schema === "sales"
+      ? [{ name: "orders", kind: "table", rowCount: 12 }]
+      : [
+          { name: "orders", kind: "table", rowCount: 2_800_000 },
+          { name: "report_v", kind: "view", rowCount: null },
+        ],
+  ),
   dbSearchTables: vi.fn(async () => []),
   dbListForeignKeys: vi.fn(async () => []),
   dbListObjects: vi.fn(async (_s: string, _schema: string | null, kind: string) =>
@@ -181,6 +185,94 @@ describe("SchemaTree folder model", () => {
     fireEvent.click(await screen.findByText("Tables"));
     await waitFor(() => expect(ipcMock.dbListTables).toHaveBeenCalledWith("s1", "ecommerce", null));
     expect(await screen.findByText("orders")).toBeInTheDocument();
+  });
+});
+
+describe("SchemaTree double-click insertion", () => {
+  it("qualifies a cross-database search result with its database", async () => {
+    const onInsertTable = vi.fn();
+    ipcMock.dbListSchemas.mockResolvedValueOnce([{ name: "main" }, { name: "sales" }]);
+    render(
+      <SchemaTree
+        sessionId="s1"
+        engine="MySQL"
+        activeSchema="main"
+        onInsertTable={onInsertTable}
+      />,
+    );
+    await screen.findByText("sales");
+    fireEvent.change(screen.getByLabelText("Filter database objects"), {
+      target: { value: "orders" },
+    });
+    const salesSection = (await screen.findByTestId("schema-tree-db-sales")).parentElement;
+    fireEvent.doubleClick(await within(salesSection as HTMLElement).findByText("orders"));
+    expect(onInsertTable).toHaveBeenCalledWith("`sales`.`orders`");
+  });
+
+  it("qualifies a table in the active database too", async () => {
+    const onInsertTable = vi.fn();
+    render(
+      <SchemaTree
+        sessionId="s1"
+        engine="MySQL"
+        activeSchema="ecommerce"
+        onInsertTable={onInsertTable}
+      />,
+    );
+    fireEvent.click(await screen.findByText("ecommerce"));
+    fireEvent.click(await screen.findByText("Tables"));
+    fireEvent.doubleClick(await screen.findByText("orders"));
+    expect(onInsertTable).toHaveBeenCalledWith("`ecommerce`.`orders`");
+  });
+
+  it("includes the Presto catalog in the qualified name", async () => {
+    const onInsertTable = vi.fn();
+    render(
+      <SchemaTree sessionId="s1" engine="Presto" catalog="hive" onInsertTable={onInsertTable} />,
+    );
+    fireEvent.click(await screen.findByText("ecommerce"));
+    fireEvent.click(await screen.findByText("Tables"));
+    fireEvent.doubleClick(await screen.findByText("orders"));
+    expect(onInsertTable).toHaveBeenCalledWith('"hive"."ecommerce"."orders"');
+  });
+
+  it("quotes qualified names per engine", async () => {
+    const postgres = vi.fn();
+    const { unmount } = render(
+      <SchemaTree sessionId="s1" engine="PostgreSQL" onInsertTable={postgres} />,
+    );
+    fireEvent.click(await screen.findByText("ecommerce"));
+    fireEvent.click(await screen.findByText("Tables"));
+    fireEvent.doubleClick(await screen.findByText("orders"));
+    expect(postgres).toHaveBeenCalledWith('"ecommerce"."orders"');
+    unmount();
+
+    const sqlServer = vi.fn();
+    render(<SchemaTree sessionId="s1" engine="SQLServer" onInsertTable={sqlServer} />);
+    fireEvent.click(await screen.findByText("ecommerce"));
+    fireEvent.click(await screen.findByText("Tables"));
+    fireEvent.doubleClick(await screen.findByText("orders"));
+    expect(sqlServer).toHaveBeenCalledWith("[ecommerce].[orders]");
+  });
+
+  it("keeps column double-click inserting only the column reference", async () => {
+    const onInsertTable = vi.fn();
+    render(<SchemaTree sessionId="s1" engine="MySQL" onInsertTable={onInsertTable} />);
+    fireEvent.click(await screen.findByText("ecommerce"));
+    fireEvent.click(await screen.findByText("Tables"));
+    fireEvent.click(await screen.findByText("orders"));
+    fireEvent.doubleClick(await screen.findByText("id"));
+    expect(onInsertTable).toHaveBeenCalledWith("`id`");
+    expect(onInsertTable).not.toHaveBeenCalledWith(expect.stringContaining("orders"));
+  });
+
+  it("qualifies routine objects too", async () => {
+    const onInsertTable = vi.fn();
+    render(<SchemaTree sessionId="s1" engine="MySQL" onInsertTable={onInsertTable} />);
+    fireEvent.click(await screen.findByText("ecommerce"));
+    fireEvent.click(await screen.findByText("Procedures"));
+    fireEvent.doubleClick(await screen.findByText("sp_sync"));
+    expect(onInsertTable).toHaveBeenCalledWith("`ecommerce`.`sp_sync`");
   });
 });
 

@@ -37,6 +37,7 @@ import {
   supportsIndexes,
   supportsInlineEdit,
   actionMode,
+  qualifiedName,
   selectStatement,
   insertStatement,
   updateStatement,
@@ -71,7 +72,7 @@ interface SchemaTreeProps {
   engine: string;
   /** Called when one or more tree objects are selected. */
   onSelectionChange?: (objects: SchemaTreeSelectedObject[]) => void;
-  /** Called when a table is double-clicked — inserts its name into the editor. */
+  /** Called when a tree object is double-clicked — inserts its schema-qualified name into the editor. */
   onInsertTable?: (table: string) => void;
   /** "Select top N rows" context action. */
   onQuickSelect?: (schema: string | null, table: string) => void;
@@ -951,13 +952,17 @@ export function SchemaTree({
             className="taomni-tree-row w-full text-left"
             style={{ paddingLeft: 34, background: isSel ? "var(--taomni-selected)" : undefined }}
             aria-pressed={isSel}
+            data-testid="schema-tree-object"
+            data-schema={db}
+            data-object-name={obj.name}
+            data-object-kind={kind}
             onClick={(event) => {
               selectObject(event, db, kind, obj.name);
               if (expandable && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
                 void toggleObject(db, kind, obj.name);
               }
             }}
-            onDoubleClick={() => onInsertTable?.(obj.name)}
+            onDoubleClick={() => onInsertTable?.(qualifiedName(sqlEngine, target(db, obj.name)))}
             onContextMenu={(event) => openObjectContextMenu(event, db, kind, obj.name, obj.owner)}
             title={obj.name}
           >
