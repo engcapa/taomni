@@ -10579,4 +10579,329 @@ end_of_record
       // apply tests and the native C4-03 reload_window case.
     });
   });
+
+  describe("ED-REPAIR-004: plan-less workspace edit recovery journal", () => {
+    const RECOVERY_V2_PREFIX = "taomni.refactor.recovery.v2:";
+    const PRE: Record<string, string> = {
+      "src/a.ts": "hello alpha",
+      "src/b.ts": "hello beta",
+      "src/c.ts": "reader",
+    };
+
+    interface Fixture {
+      disk: Record<string, string>;
+      workspace: CodeWorkspaceTabInfo;
+      registrationRef: { current: WorkspaceCommandRegistration | null };
+      onCommandsChange: (tabId: string, next: WorkspaceCommandRegistration | null) => void;
+    }
+
+    function setupWorkspace(instanceId: string, openFile: string): Fixture {
+      const disk: Record<string, string> = { ...PRE };
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: `ws-${instanceId}`,
+        workspaceInstanceId: `instance-${instanceId}`,
+        name: instanceId,
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: openFile },
+      };
+      workspaceMocks.workspaceListDir.mockImplementation(async (_root: string, path: string) => (
+        path === "src"
+          ? Object.keys(disk).map((rel) => entry(rel.split("/").pop()!, rel))
+          : [entry("src", "src", "dir")]
+      ));
+      workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => {
+        if (!(path in disk)) throw new Error(`missing fixture file: ${path}`);
+        return file(path, disk[path]!);
+      });
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _root: string,
+        path: string,
+        text: string,
+      ) => {
+        disk[path] = text;
+        return writeAck(file(path, text, { hash: `hash-${text}` }));
+      });
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      return { disk, workspace, registrationRef, onCommandsChange };
+    }
+
+    function storedRecoveryEntries(): Array<{
+      key: string;
+      entry: {
+        recoveryId: string;
+        status: string;
+        kind: string;
+        verification?: {
+          mismatchedUris: readonly string[];
+          appliedEffects?: readonly string[];
+          failedEffects?: readonly unknown[];
+        };
+      };
+    }> {
+      return Object.keys(window.localStorage)
+        .filter((key) => key.startsWith(RECOVERY_V2_PREFIX))
+        .map((key) => ({ key, entry: JSON.parse(window.localStorage.getItem(key)!) }));
+    }
+
+    function recoveryCalls(): Array<{ title: string; message: string }> {
+      return vi.mocked(confirmAppDialog).mock.calls.map((call) => ({
+        title: (call[0] as { title: string }).title,
+        message: (call[0] as { message: string }).message,
+      }));
+    }
+
+    function undoItem(registrationRef: Fixture["registrationRef"]) {
+      return registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit");
+    }
+
+    function installRecordingStorage(
+      onWrite?: (key: string, value: string) => void,
+    ): { restore: () => void; keys: () => string[] } {
+      const backing = new Map<string, string>();
+      const fake: Storage = {
+        get length() { return backing.size; },
+        clear: () => backing.clear(),
+        getItem: (k) => backing.get(k) ?? null,
+        key: (i) => Array.from(backing.keys())[i] ?? null,
+        removeItem: (k) => { backing.delete(k); },
+        setItem: (k, v) => { onWrite?.(k, v); backing.set(k, v); },
+      };
+      const original = window.localStorage;
+      Object.defineProperty(window, "localStorage", { value: fake, configurable: true, writable: true });
+      return {
+        restore: () => Object.defineProperty(window, "localStorage", { value: original, configurable: true, writable: true }),
+        keys: () => Array.from(backing.keys()),
+      };
+    }
+
+    async function applyEditWithPreview(workspaceId: string | undefined, edit: unknown, label = "Replace all matches") {
+      expect(workspaceId).toBeDefined();
+      void emit("lsp://workspace-apply-edit", {
+        requestId: `req-${Date.now()}`,
+        workspaceId: workspaceId!,
+        edit,
+        label,
+      });
+      const preview = await screen.findByTestId("refactoring-preview-dialog");
+      fireEvent.click(within(preview).getByTestId("refactoring-preview-apply"));
+    }
+
+    it("creates recovery journal for plan-less text edits, captures partial failure effects, and restores via recovery entry", async () => {
+      const { disk, workspace, registrationRef, onCommandsChange } = setupWorkspace("planless-partial", "src/c.ts");
+      vi.mocked(confirmAppDialog).mockReset().mockResolvedValue(true);
+
+      // Make write to src/b.ts fail with disk error
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _root: string,
+        path: string,
+        text: string,
+      ) => {
+        if (path === "src/b.ts") {
+          throw new Error("disk I/O error on b.ts");
+        }
+        disk[path] = text;
+        return writeAck(file(path, text, { hash: `hash-${text}` }));
+      });
+
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/c.ts");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await applyEditWithPreview(workspace.workspaceInstanceId, {
+        documentEdits: [
+          {
+            uri: "file:///repo/app/src/a.ts",
+            path: "/repo/app/src/a.ts",
+            edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 11 } }, newText: "ALPHA" }],
+          },
+          {
+            uri: "file:///repo/app/src/b.ts",
+            path: "/repo/app/src/b.ts",
+            edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 10 } }, newText: "BETA" }],
+          },
+        ],
+      });
+
+      // Verification:
+      // a.ts was applied to disk, b.ts was not modified
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain("recovery required"));
+      expect(useAppStore.getState().statusMessage).toContain("Workspace edit postcondition failed");
+      expect(useAppStore.getState().statusMessage).toContain("Applied changes on: /repo/app/src/a.ts");
+      expect(disk["src/a.ts"]).toBe("hello ALPHA");
+      expect(disk["src/b.ts"]).toBe("hello beta");
+
+      // Undo must stay disabled (no success history registered for partial failure)
+      expect(undoItem(registrationRef)?.enabled).toBe(false);
+
+      // Journal entry must be in recovery-required state with applied effects
+      const entries = storedRecoveryEntries();
+      expect(entries).toHaveLength(1);
+      const journalEntry = entries[0]!.entry;
+      expect(journalEntry.status).toBe("recovery-required");
+      expect(journalEntry.verification?.appliedEffects).toContain("/repo/app/src/a.ts");
+
+      // Review and execute recovery via reviewRefactorRecovery action
+      vi.mocked(confirmAppDialog).mockClear();
+      vi.mocked(confirmAppDialog).mockResolvedValue(true);
+
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.reviewRefactorRecovery");
+      });
+
+      await waitFor(() => expect(recoveryCalls().length).toBeGreaterThan(0));
+      const pendingDialog = recoveryCalls().find((call) => call.title.includes("recovery pending"));
+      expect(pendingDialog).toBeDefined();
+
+      // Recovery restored src/a.ts to preText and left src/b.ts untouched
+      await waitFor(() => expect(disk["src/a.ts"]).toBe(PRE["src/a.ts"]));
+      expect(disk["src/b.ts"]).toBe(PRE["src/b.ts"]);
+      expect(getRefactorRecoveryJournalV2(journalEntry.recoveryId)?.status).toBe("rolled-back");
+      expect(useAppStore.getState().statusMessage).toContain("recovery complete");
+
+      // Idempotent re-run reports no pending entries
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.reviewRefactorRecovery");
+      });
+      expect(useAppStore.getState().statusMessage).toContain("No pending recovery entries found");
+    });
+
+    it("aborts with zero writes when the plan-less recovery journal cannot be persisted", async () => {
+      const { disk, workspace, registrationRef, onCommandsChange } = setupWorkspace("planless-quota", "src/c.ts");
+      vi.mocked(confirmAppDialog).mockReset().mockResolvedValue(true);
+      const storage = installRecordingStorage((key) => {
+        if (key.startsWith(RECOVERY_V2_PREFIX)) throw new Error("quota exceeded");
+      });
+
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/c.ts");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await act(async () => {
+        await emit("lsp://workspace-apply-edit", {
+          requestId: "req-quota",
+          workspaceId: workspace.workspaceInstanceId,
+          edit: {
+            documentEdits: [
+              {
+                uri: "file:///repo/app/src/a.ts",
+                path: "/repo/app/src/a.ts",
+                edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 11 } }, newText: "ALPHA" }],
+              },
+            ],
+          },
+          label: "Replace matches",
+        });
+      });
+
+      await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
+        "Refactor recovery journal could not be persisted, no changes were applied",
+      ));
+      expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
+      expect(disk["src/a.ts"]).toBe(PRE["src/a.ts"]);
+      expect(undoItem(registrationRef)?.enabled).toBe(false);
+      storage.restore();
+    });
+
+    it("refuses to overwrite conflicting third-party edits during plan-less recovery", async () => {
+      const { disk, workspace, registrationRef, onCommandsChange } = setupWorkspace("planless-conflict", "src/c.ts");
+      const preA = PRE["src/a.ts"]!;
+      const postA = "hello ALPHA";
+      recordRefactorRecoveryJournalV2({
+        schemaVersion: 2,
+        recoveryId: "rec-conflict-1",
+        transactionId: "tx-conflict-1",
+        actionId: "workspace-edit:replace-1",
+        kind: "replace",
+        workspaceRoot: "/repo/app",
+        createdAt: 100,
+        updatedAt: 200,
+        status: "recovery-required",
+        appliedOperationIndex: null,
+        documents: [
+          {
+            uri: "file:///repo/app/src/a.ts",
+            canonicalPath: "/repo/app/src/a.ts",
+            preText: preA,
+            preHash: sha256Hex(preA),
+            postText: postA,
+            postHash: sha256Hex(postA),
+            encoding: "UTF-8",
+            bom: false,
+            eol: "lf",
+          },
+        ],
+        resourceMoves: [],
+        verification: { mismatchedUris: [], checkedAt: null },
+      });
+
+      // Third-party modifies src/a.ts to something else before recovery runs
+      disk["src/a.ts"] = "third-party content";
+      vi.mocked(confirmAppDialog).mockReset().mockResolvedValue(true);
+
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/c.ts");
+
+      await act(async () => {
+        await registrationRef.current?.executeAction("workspace.reviewRefactorRecovery");
+      });
+
+      await waitFor(() => expect(recoveryCalls().some((call) => call.title.includes("recovery blocked"))).toBe(true));
+      const blocked = recoveryCalls().find((call) => call.title.includes("recovery blocked"));
+      expect(blocked?.message).toContain("/repo/app/src/a.ts (conflict)");
+      expect(blocked?.message).toContain("will not be overwritten");
+      expect(disk["src/a.ts"]).toBe("third-party content");
+      expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
+      expect(getRefactorRecoveryJournalV2("rec-conflict-1")?.status).toBe("recovery-required");
+    });
+
+    it("commits recovery journal and supports single undo on verified success", async () => {
+      const { disk, workspace, onCommandsChange } = setupWorkspace("planless-success", "src/c.ts");
+      vi.mocked(confirmAppDialog).mockReset().mockResolvedValue(true);
+
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/c.ts");
+      await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+      await applyEditWithPreview(workspace.workspaceInstanceId, {
+        documentEdits: [
+          {
+            uri: "file:///repo/app/src/a.ts",
+            path: "/repo/app/src/a.ts",
+            edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 11 } }, newText: "ALPHA" }],
+          },
+          {
+            uri: "file:///repo/app/src/b.ts",
+            path: "/repo/app/src/b.ts",
+            edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 10 } }, newText: "BETA" }],
+          },
+        ],
+      });
+
+      await waitFor(() => expect(disk["src/a.ts"]).toBe("hello ALPHA"));
+      expect(disk["src/b.ts"]).toBe("hello BETA");
+
+      // Pending recovery entry is not left behind
+      const pending = storedRecoveryEntries().filter((e) => e.entry.status === "recovery-required");
+      expect(pending).toHaveLength(0);
+
+      // Execute undo via window keydown: both files restored to PRE
+      await act(async () => {
+        fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+      });
+      await waitFor(() => expect(disk["src/a.ts"]).toBe(PRE["src/a.ts"]));
+      expect(disk["src/b.ts"]).toBe(PRE["src/b.ts"]);
+
+      // Redo: both files re-applied
+      await act(async () => {
+        fireEvent.keyDown(window, { key: "z", ctrlKey: true, shiftKey: true });
+      });
+      await waitFor(() => expect(disk["src/a.ts"]).toBe("hello ALPHA"));
+      expect(disk["src/b.ts"]).toBe("hello BETA");
+    });
+  });
 });
