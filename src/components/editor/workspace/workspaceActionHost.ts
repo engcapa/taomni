@@ -39,6 +39,18 @@ function strokeFromEvent(event: KeyboardEventLike): ShortcutStroke {
   });
 }
 
+/**
+ * True when an `Unidentified` event still carries a physical `code` that maps
+ * to a concrete logical key. Linux WebKitGTK emits `key="Unidentified"` for
+ * real chords (notably Alt+Enter); treating those as IME composition dropped
+ * the action. Genuine composition remains gated by `composing`/`isComposing`/
+ * `key === "Process"`.
+ */
+function hasPhysicalKeyIdentity(event: KeyboardEventLike): boolean {
+  if (!event.code) return false;
+  return eventLogicalKey({ key: "Unidentified", code: event.code }) !== "unidentified";
+}
+
 export type ActionInvocationKind =
   | "direct"
   | "keyboard"
@@ -180,6 +192,7 @@ function logicalKeyToCode(logicalKey: string): string | null {  const key = logi
     arrowup: "ArrowUp",
     arrowdown: "ArrowDown",
     enter: "Enter",
+    numpadenter: "Enter",
     escape: "Escape",
     tab: "Tab",
     space: "Space",
@@ -1036,7 +1049,17 @@ export class WorkspaceActionHost {
     if (this.disposed) {
       return { kind: "rejected", reason: "stale-owner" };
     }
-    if (context.composing || event.isComposing === true || event.key === "Process" || event.key === "Unidentified") {
+    // IME composition is rejected before any binding match. `Unidentified` is
+    // only composing-like when it carries no usable physical identity: Linux
+    // WebKitGTK reports real chords (notably Alt+Enter) as `key="Unidentified"`
+    // while `code` still identifies the key, and rejecting those silently
+    // dropped the action (AC-ALT-01).
+    if (
+      context.composing
+      || event.isComposing === true
+      || event.key === "Process"
+      || (event.key === "Unidentified" && !hasPhysicalKeyIdentity(event))
+    ) {
       return { kind: "rejected", reason: "composing" };
     }
     if (event.key === "Dead" || context.deadKey) {

@@ -438,6 +438,7 @@ import {
 } from "./workspace/workspaceKeymapScheme";
 import { TabSwitcher, type TabSwitcherEntry, type TabSwitcherToolWindow } from "./workspace/TabSwitcher";
 import { DapAdapterGuideDialog } from "./workspace/DapAdapterGuideDialog";
+import { disabledReasonLabel } from "./workspace/workspaceCodeMirrorKeymap";
 import {
   buildWorkspacePathSnapshotEdit,
   workspaceEditUndoPrecondition,
@@ -15082,7 +15083,11 @@ export function CodeWorkspaceTab({
         && dispatchResult.reason === "disabled"
         && dispatchResult.disabledReason
       ) {
-        setStatusMessage(dispatchResult.disabledReason);
+        // §8.19.2 typed no-op reason: a matched-but-disabled binding names its
+        // blocked state instead of silently skipping the shortcut.
+        setStatusMessage(
+          disabledReasonLabel(dispatchResult.disabledReason) ?? dispatchResult.disabledReason,
+        );
       }
     };
     // Modifier-release commit cannot be a keydown action; it stays a keyup

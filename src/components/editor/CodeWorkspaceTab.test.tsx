@@ -2408,6 +2408,56 @@ describe("CodeWorkspaceTab", () => {
     ).openFiles["root:app:src/main.ts"]?.text).toBe("x =1"));
   });
 
+  // V-ALT-01: Linux WebKitGTK reports real chords such as Alt+Enter as
+  // key="Unidentified" with a physical code. The unified dispatcher must still
+  // open the Code Actions menu and leave the buffer untouched.
+  it("opens code actions for the Linux Alt+Enter event shape (Unidentified + code)", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-actions-linux-alt-enter",
+      workspaceInstanceId: "instance-actions-linux-alt-enter",
+      name: "Actions Linux",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/main.ts", "x=1"));
+    lspMocks.lspOpenDocument.mockResolvedValue(documentStatus({
+      path: "/repo/app/src/main.ts",
+      uri: "file:///repo/app/src/main.ts",
+      available: true,
+      active: true,
+      capabilities: defaultCapabilities({ codeAction: true }),
+    }));
+    lspMocks.lspCodeActions.mockResolvedValue({
+      status: documentStatus({ available: true, active: true }),
+      actions: [{
+        title: "Insert space",
+        kind: "quickfix",
+        isPreferred: true,
+        edit: null,
+        command: null,
+        commandArguments: null,
+        raw: { title: "Insert space", data: { fixId: "space" } },
+      }],
+    });
+
+    renderWorkspace(workspace);
+    await screen.findByTitle("app / src/main.ts");
+    await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+    fireEvent.keyDown(window, { key: "Unidentified", code: "Enter", altKey: true });
+
+    expect(await screen.findByRole("button", { name: "Insert space" })).toBeInTheDocument();
+    expect(lspMocks.lspCodeActions).toHaveBeenCalled();
+    // Focus and buffer stay untouched: no newline was inserted.
+    expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(),
+      "instance-actions-linux-alt-enter",
+    ).openFiles["root:app:src/main.ts"]?.text).toBe("x=1");
+  });
+
   // ED-AUDIT-008 A1/A3: after an intention apply, Ctrl+Z on the editor
   // surface must run the journal undo — one history unit with its verified
   // restore — instead of colliding with the document ledger, and a follow-up
@@ -3641,7 +3691,12 @@ describe("CodeWorkspaceTab", () => {
 
     // Trigger Alt+Enter on TypeScript file where LSP has no actions
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
-    
+
+    // AC-ALT-02: no provider action stays visible instead of silently no-op.
+    await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
+      "No code actions provided by the language server",
+    ));
+
     // Assert no Java import quick fix is suggested
     expect(screen.queryByRole("button", { name: /import 'List' \(java\.util\.List\)/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /java\.util/i })).not.toBeInTheDocument();
