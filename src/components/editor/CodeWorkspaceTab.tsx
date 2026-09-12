@@ -18257,6 +18257,7 @@ export function CodeWorkspaceTab({
         groupId={groupId}
         workspaceInstanceId={workspaceInstanceId}
         visible={visible}
+        isActiveGroup={groupId === activeEditorGroupId}
         editorBanners={groupBanners}
         onDismissBanner={(key) => setDismissedBannerKeys((prev) => new Set(prev).add(key))}
         workspaceActionHost={actionsController.host}

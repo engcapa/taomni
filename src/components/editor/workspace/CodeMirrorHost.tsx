@@ -388,6 +388,11 @@ interface CodeMirrorHostProps {
   doc: string;
   visible: boolean;
   /**
+   * ED-REPAIR-008: whether this editor instance belongs to the active editor group.
+   * When false, the host is inactive even if visible (e.g. in multi-split layouts).
+   */
+  active?: boolean;
+  /**
    * Owning workspace instance id (§8.17.6): copy/cut write the workspace
    * clipboard session and paste reads it across every split view.
    */
@@ -604,12 +609,60 @@ function clipboardOwnerLost(
   if (!view.dom.isConnected) return true;
   if (endpoint?.isActive && !endpoint.isActive()) return true;
   if (!clipboardRequestIsCurrent(view, requestToken)) return true;
-  // A focus loss with no authorized menu owner (the generation moved after the
-  // request) means another surface claimed focus; do not steal it back.
-  if (!view.hasFocus && clipboardOwnerGeneration(view) !== ownerGenerationAtRequest) {
+  // ED-REPAIR-008: owner generation change is strictly irreversible. If focus
+  // left or generation bumped after the request started, returning focus to the
+  // editor does not restore ownership.
+  if (clipboardOwnerGeneration(view) !== ownerGenerationAtRequest) {
     return true;
   }
   return false;
+}
+
+export function watchClipboardRequestFocus(view: EditorView): () => void {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return () => {};
+  }
+  const activeElementAtRequest = document.activeElement;
+  const isEditorFocusedAtRequest =
+    view.hasFocus || (activeElementAtRequest !== null && view.dom.contains(activeElementAtRequest));
+
+  const menuContainer = !isEditorFocusedAtRequest && activeElementAtRequest
+    ? (activeElementAtRequest.closest(
+        '[role="menu"], [role="menubar"], [data-testid*="menu"], .context-menu, [data-context-menu], dialog'
+      ) ?? activeElementAtRequest)
+    : null;
+
+  let cleanedUp = false;
+  const onFocusIn = (event: FocusEvent) => {
+    if (cleanedUp) return;
+    const target = event.target as Node | null;
+    if (!target) return;
+    if (target === document.body || target === document.documentElement) return;
+    if (target instanceof Element && (target.hasAttribute("data-clipboard-internal-fallback") || (target as HTMLElement).style?.left === "-9999px")) return;
+    if (view.dom.contains(target)) return;
+    if (isEditorFocusedAtRequest) {
+      bumpClipboardOwnerGeneration(view);
+      cleanup();
+      return;
+    }
+    if (activeElementAtRequest && (activeElementAtRequest === target || activeElementAtRequest.contains(target))) {
+      return;
+    }
+    if (menuContainer && menuContainer.contains(target)) {
+      return;
+    }
+    bumpClipboardOwnerGeneration(view);
+    cleanup();
+  };
+
+  const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    window.removeEventListener("focusin", onFocusIn, true);
+  };
+
+  window.addEventListener("focusin", onFocusIn, true);
+  return cleanup;
 }
 
 /**
@@ -761,12 +814,30 @@ function payloadForSystemClipboardText(
 function writeEditorSelectionToClipboard(view: EditorView): boolean {
   const payload = editorClipboardPayload(view.state);
   if (!payload) return false;
-  const context = clipboardContextByView.get(view);
+  const docAtRequest = view.state.doc;
+  const selectionAtRequest = view.state.selection;
+  const rawContext = clipboardContextByView.get(view);
+  const context = rawContext ? { ...rawContext } : undefined;
   const handle = context?.handle;
+  const requestToken = nextClipboardRequestToken(view);
+  const ownerGenerationAtRequest = clipboardOwnerGeneration(view);
   const caretCountAtCopy = view.state.selection.ranges.length;
+  const cleanupFocusWatcher = watchClipboardRequestFocus(view);
+
   if (handle) {
     void handle.writeSystemClipboard(payload.plainText).then((res) => {
-      if (!view.dom.isConnected) return;
+      if (
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
+        || view.state.doc !== docAtRequest
+        || !view.state.selection.eq(selectionAtRequest, true)
+      ) {
+        reportClipboardCancelledObservation(context, "copy", res.systemEffect, caretCountAtCopy, {
+          segmentCount: payload.segments ? payload.segments.length : null,
+          rectangular: payload.rectangular,
+          payloadLength: payload.plainText.length,
+        });
+        return;
+      }
       if (res.outcome === "success") {
         rememberEditorClipboardPayload(view, payload);
       } else if (res.outcome === "denied") {
@@ -801,22 +872,44 @@ function writeEditorSelectionToClipboard(view: EditorView): boolean {
       // revision/exclusion fields describe the committed state, not the
       // pre-write one.
       reportClipboardWriteObservation(context, "copy", res, payload, caretCountAtCopy);
+    }).catch(() => {}).finally(() => {
+      cleanupFocusWatcher();
     });
     return true;
   }
   void writeText(payload.plainText)
     .then(() => {
-      if (view.dom.isConnected) rememberEditorClipboardPayload(view, payload);
+      if (
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
+        || view.state.doc !== docAtRequest
+        || !view.state.selection.eq(selectionAtRequest, true)
+      ) {
+        reportClipboardCancelledObservation(context, "copy", "unknown", caretCountAtCopy, {
+          segmentCount: payload.segments ? payload.segments.length : null,
+          rectangular: payload.rectangular,
+          payloadLength: payload.plainText.length,
+        });
+        return;
+      }
+      rememberEditorClipboardPayload(view, payload);
     })
     .catch(() => {
+      if (
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
+        || view.state.doc !== docAtRequest
+        || !view.state.selection.eq(selectionAtRequest, true)
+      ) {
+        return;
+      }
       // System clipboard denied: the workspace session still owns the full
       // payload; surface unavailable instead of silently dropping it.
-      if (view.dom.isConnected) {
-        rememberEditorClipboardPayload(view, payload, { systemClipboardUnavailable: true });
-        context?.onUnavailable(
-          "System clipboard unavailable — copy kept for in-workspace paste only",
-        );
-      }
+      rememberEditorClipboardPayload(view, payload, { systemClipboardUnavailable: true });
+      context?.onUnavailable(
+        "System clipboard unavailable — copy kept for in-workspace paste only",
+      );
+    })
+    .finally(() => {
+      cleanupFocusWatcher();
     });
   return true;
 }
@@ -835,12 +928,14 @@ function pasteSystemClipboard(view: EditorView): boolean {
   if (view.composing || view.state.readOnly) return false;
   const docAtRequest = view.state.doc;
   const selectionAtRequest = view.state.selection;
-  const context = clipboardContextByView.get(view);
+  const rawContext = clipboardContextByView.get(view);
+  const context = rawContext ? { ...rawContext } : undefined;
   const handle = context?.handle;
   const requestToken = nextClipboardRequestToken(view);
   const ownerGenerationAtRequest = clipboardOwnerGeneration(view);
 
   const caretCountAtPaste = view.state.selection.ranges.length;
+  const cleanupFocusWatcher = watchClipboardRequestFocus(view);
 
   if (handle) {
     void handle.readSystemClipboard({ readTextResult: readCodeWorkspaceClipboardText }).then((result) => {
@@ -895,7 +990,9 @@ function pasteSystemClipboard(view: EditorView): boolean {
           context?.onUnavailable(reasonMsg);
         }
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      cleanupFocusWatcher();
+    });
     return true;
   }
 
@@ -949,7 +1046,10 @@ function pasteSystemClipboard(view: EditorView): boolean {
       );
       view.focus();
     })
-    .catch(() => {});
+    .catch(() => {})
+    .finally(() => {
+      cleanupFocusWatcher();
+    });
   return true;
 }
 
@@ -962,12 +1062,14 @@ function pasteAsPlainText(view: EditorView): boolean {
   if (view.composing || view.state.readOnly) return false;
   const docAtRequest = view.state.doc;
   const selectionAtRequest = view.state.selection;
-  const context = clipboardContextByView.get(view);
+  const rawContext = clipboardContextByView.get(view);
+  const context = rawContext ? { ...rawContext } : undefined;
   const handle = context?.handle;
   const requestToken = nextClipboardRequestToken(view);
   const ownerGenerationAtRequest = clipboardOwnerGeneration(view);
 
   const caretCountAtPlainPaste = view.state.selection.ranges.length;
+  const cleanupFocusWatcher = watchClipboardRequestFocus(view);
 
   if (handle) {
     void handle.readSystemClipboard({ readTextResult: readCodeWorkspaceClipboardText }).then((result) => {
@@ -1009,7 +1111,9 @@ function pasteAsPlainText(view: EditorView): boolean {
         );
       }
       view.focus();
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {
+      cleanupFocusWatcher();
+    });
     return true;
   }
 
@@ -1054,7 +1158,10 @@ function pasteAsPlainText(view: EditorView): boolean {
       }
       view.focus();
     })
-    .catch(() => {});
+    .catch(() => {})
+    .finally(() => {
+      cleanupFocusWatcher();
+    });
   return true;
 }
 
@@ -1064,12 +1171,14 @@ function cutSystemClipboard(view: EditorView): boolean {
   if (!payload) return false;
   const docAtRequest = view.state.doc;
   const selectionAtRequest = view.state.selection;
-  const context = clipboardContextByView.get(view);
+  const rawContext = clipboardContextByView.get(view);
+  const context = rawContext ? { ...rawContext } : undefined;
   const handle = context?.handle;
   const requestToken = nextClipboardRequestToken(view);
   const ownerGenerationAtRequest = clipboardOwnerGeneration(view);
 
   const caretCountAtCut = view.state.selection.ranges.length;
+  const cleanupFocusWatcher = watchClipboardRequestFocus(view);
 
   if (handle) {
     void handle.writeSystemClipboard(payload.plainText).then((res) => {
@@ -1114,6 +1223,8 @@ function cutSystemClipboard(view: EditorView): boolean {
         view.focus();
       }
       reportClipboardWriteObservation(context, "cut", res, payload, caretCountAtCut);
+    }).catch(() => {}).finally(() => {
+      cleanupFocusWatcher();
     });
     return true;
   }
@@ -1140,18 +1251,23 @@ function cutSystemClipboard(view: EditorView): boolean {
     })
     .catch(() => {
       if (
-        view.dom.isConnected
-        && !view.composing
-        && view.state.doc === docAtRequest
-        && view.state.selection.eq(selectionAtRequest, true)
+        clipboardOwnerLost(view, context, ownerGenerationAtRequest, requestToken)
+        || view.composing
+        || view.state.readOnly
+        || view.state.doc !== docAtRequest
+        || !view.state.selection.eq(selectionAtRequest, true)
       ) {
-        rememberEditorClipboardPayload(view, payload, { systemClipboardUnavailable: true });
-        cutEditorSelections(view);
-        context?.onUnavailable(
-          "System clipboard unavailable — cut kept for in-workspace paste only",
-        );
-        view.focus();
+        return;
       }
+      rememberEditorClipboardPayload(view, payload, { systemClipboardUnavailable: true });
+      cutEditorSelections(view);
+      context?.onUnavailable(
+        "System clipboard unavailable — cut kept for in-workspace paste only",
+      );
+      view.focus();
+    })
+    .finally(() => {
+      cleanupFocusWatcher();
     });
   return true;
 }
@@ -1970,6 +2086,7 @@ function areCodeMirrorHostPropsEqual(prev: CodeMirrorHostProps, next: CodeMirror
   if (prev.documentRevision !== next.documentRevision) return false;
   if (prev.doc !== next.doc) return false;
   if (prev.visible !== next.visible) return false;
+  if (prev.active !== next.active) return false;
   if (prev.readOnly !== next.readOnly) return false;
   if (prev.renderedDocEnabled !== next.renderedDocEnabled) return false;
   if (prev.renderedDocLanguageId !== next.renderedDocLanguageId) return false;
@@ -2097,6 +2214,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   documentRevision = 0,
   doc,
   visible,
+  active = true,
   diagnostics = EMPTY_DIAGNOSTICS,
   highlights = EMPTY_HIGHLIGHTS,
   inlayHints = EMPTY_INLAY_HINTS,
@@ -2361,9 +2479,11 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const compositionSessionSeqRef = useRef(0);
   const currentCompositionSessionRef = useRef<CompositionSession | null>(null);
   const compositionEndFinalizeRef = useRef<number | null>(null);
-  // ED-MAIN-007: latest visible/active-leaf state for the async clipboard owner.
+  // ED-MAIN-007 / ED-REPAIR-008: latest visible/active-leaf state for the async clipboard owner.
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
+  const activeRef = useRef(active);
+  activeRef.current = active;
   const onExpandSelectionRef = useRef(onExpandSelection);
   const onLightbulbRef = useRef(onLightbulb);
   const onGitChangeClickRef = useRef(onGitChangeClick);
@@ -3181,7 +3301,12 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     // (search box, sibling leaf, other window) claimed focus.
     const clipboardFocusOutGuard = (event: FocusEvent) => {
       const next = event.relatedTarget as Node | null;
-      if (next && view.dom.contains(next)) return;
+      if (
+        next && (
+          view.dom.contains(next)
+          || (next instanceof Element && (next.hasAttribute("data-clipboard-internal-fallback") || (next as HTMLElement).style?.left === "-9999px"))
+        )
+      ) return;
       bumpClipboardOwnerGeneration(view);
     };
     view.contentDOM.addEventListener("compositionstart", compositionStartGuard, true);
@@ -3359,7 +3484,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       onUnavailable: (message) => onClipboardUnavailableRef.current(message),
       onObservation: (record) => onClipboardObservationRef.current(record),
       handle: effectiveClipboardHandle ?? null,
-      isActive: () => visibleRef.current,
+      isActive: () => visibleRef.current && (activeRef.current !== false),
     });
     return () => {
       lease?.detach();
@@ -3372,12 +3497,12 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     };
   }, [effectiveClipboardHandle, clipboardWorkspaceId, fileKey]);
 
-  // ED-MAIN-007: hiding a leaf (switching editor group) invalidates any
-  // in-flight clipboard request owned by it.
+  // ED-MAIN-007 / ED-REPAIR-008: hiding a leaf or switching active group
+  // invalidates any in-flight clipboard request owned by it.
   useEffect(() => {
     const view = viewRef.current;
-    if (view && !visible) bumpClipboardOwnerGeneration(view);
-  }, [visible]);
+    if (view && (!visible || active === false)) bumpClipboardOwnerGeneration(view);
+  }, [visible, active]);
 
   useEffect(() => {
     const view = viewRef.current;
