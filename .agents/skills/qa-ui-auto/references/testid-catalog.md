@@ -615,6 +615,8 @@
 - `[data-testid="query-cell-value-wrap"]` — interactive [optional] — F-DB-1.query-cell-value-wrap
 - `select[aria-label="Schema"]` — interactive [optional] — F-DB-1.schema-select
 - `[data-testid="db-schema-drawer-handle"]` — interactive [optional] — F-DB-1.schema-drawer-handle
+- `[data-testid="schema-tree-filter"]` — interactive [optional] — F-DB-1.schema-tree-filter
+- `[data-testid="schema-tree-object"]` — interactive [optional] — F-DB-1.schema-tree-object
 - `[data-testid="db-query-library-tab"]` — interactive [optional] — F-DB-1.query-library-tab
 - `[data-testid="db-save-query"]` — interactive [optional] — F-DB-1.save-query
 - `[data-testid="db-tab-limit"]` — interactive [optional] — F-DB-1.tab-limit
