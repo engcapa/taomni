@@ -10904,4 +10904,89 @@ end_of_record
       expect(disk["src/b.ts"]).toBe("hello BETA");
     });
   });
+
+  describe("ED-REPAIR-006: case-preserving POSIX replace path identity (mounted)", () => {
+    function setupWorkspace(instanceId: string, openFile: string) {
+      const disk: Record<string, string> = {};
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: `ws-${instanceId}`,
+        workspaceInstanceId: `instance-${instanceId}`,
+        name: instanceId,
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+        initialFile: { kind: "root", rootId: "app", path: openFile },
+      };
+      workspaceMocks.workspaceListDir.mockImplementation(async (_root: string, path: string) => (
+        path === "src"
+          ? Object.keys(disk).map((rel) => entry(rel.split("/").pop()!, rel))
+          : [entry("src", "src", "dir")]
+      ));
+      workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => {
+        if (!(path in disk)) throw new Error(`missing fixture file: ${path}`);
+        return file(path, disk[path]!);
+      });
+      workspaceMocks.workspaceWriteFileEncoded.mockImplementation(async (
+        _root: string,
+        path: string,
+        text: string,
+      ) => {
+        disk[path] = text;
+        return writeAck(file(path, text, { hash: `hash-${text}` }));
+      });
+      const registrationRef: { current: WorkspaceCommandRegistration | null } = { current: null };
+      const onCommandsChange = vi.fn((_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registrationRef.current = next;
+      });
+      return { disk, workspace, registrationRef, onCommandsChange };
+    }
+
+    async function applyEditWithPreview(workspaceId: string | undefined, edit: unknown, label = "Replace all matches") {
+      expect(workspaceId).toBeDefined();
+      void emit("lsp://workspace-apply-edit", {
+        requestId: `req-${Date.now()}`,
+        workspaceId: workspaceId!,
+        edit,
+        label,
+      });
+      const preview = await screen.findByTestId("refactoring-preview-dialog");
+      fireEvent.click(within(preview).getByTestId("refactoring-preview-apply"));
+    }
+
+    it("preserves distinct identities for /repo/app/src/A.java and /repo/app/src/a.java during replace preimages and apply (ED-REPAIR-006-A1, A3)", async () => {
+      const { disk, workspace, onCommandsChange } = setupWorkspace("case-replace", "src/c.ts");
+      disk["src/c.ts"] = "hello reader";
+      disk["src/A.java"] = "hello UPPER_A";
+      disk["src/a.java"] = "hello lower_a";
+
+      renderWorkspace(workspace, { onCommandsChange });
+
+      // Apply multi-file WorkspaceEdit that edits both case-distinct files
+      await applyEditWithPreview(workspace.workspaceInstanceId, {
+        documentEdits: [
+          {
+            uri: "file:///repo/app/src/A.java",
+            path: "/repo/app/src/A.java",
+            edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 13 } }, newText: "REPLACED_UPPER" }],
+          },
+          {
+            uri: "file:///repo/app/src/a.java",
+            path: "/repo/app/src/a.java",
+            edits: [{ range: { start: { line: 0, character: 6 }, end: { line: 0, character: 13 } }, newText: "replaced_lower" }],
+          },
+        ],
+      });
+
+      // Both distinct files must be updated accurately on disk without overwriting each other
+      await waitFor(() => expect(disk["src/A.java"]).toBe("hello REPLACED_UPPER"));
+      expect(disk["src/a.java"]).toBe("hello replaced_lower");
+
+      // Undo restores both distinct files accurately
+      await act(async () => {
+        fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+      });
+      await waitFor(() => expect(disk["src/A.java"]).toBe("hello UPPER_A"));
+      expect(disk["src/a.java"]).toBe("hello lower_a");
+    });
+  });
 });

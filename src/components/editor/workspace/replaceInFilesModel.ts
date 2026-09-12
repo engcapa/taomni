@@ -129,15 +129,16 @@ export interface BuildReplaceEditParams {
  * Builds an LSP WorkspaceEdit from multi-file search matches and replacement text.
  */
 export function buildReplaceInFilesWorkspaceEdit(params: BuildReplaceEditParams): LspWorkspaceEdit {
-  const groupedByPath = new Map<string, { uri: string; edits: LspTextEdit[] }>();
+  const groupedByPath = new Map<string, { path: string; uri: string; edits: LspTextEdit[] }>();
 
   for (const match of params.matches) {
+    const canonicalKey = replacePreimagePathKey(match.filePath);
     const uri = match.fileUri || `file://${match.filePath.replace(/\\/g, "/")}`;
-    if (!groupedByPath.has(match.filePath)) {
-      groupedByPath.set(match.filePath, { uri, edits: [] });
+    if (!groupedByPath.has(canonicalKey)) {
+      groupedByPath.set(canonicalKey, { path: match.filePath, uri, edits: [] });
     }
 
-    const entry = groupedByPath.get(match.filePath)!;
+    const entry = groupedByPath.get(canonicalKey)!;
     entry.edits.push({
       range: {
         start: { line: match.startLine, character: match.startCharacter },
@@ -150,8 +151,8 @@ export function buildReplaceInFilesWorkspaceEdit(params: BuildReplaceEditParams)
   // LspFileTextEdits is the app's normalized per-document shape (uri + resolved
   // path + optional version), not the wire-level VersionedTextDocumentIdentifier.
   // A null version accepts the current document version.
-  const documentEdits: LspFileTextEdits[] = Array.from(groupedByPath.entries()).map(
-    ([path, { uri, edits }]) => ({ uri, path, version: null, edits }),
+  const documentEdits: LspFileTextEdits[] = Array.from(groupedByPath.values()).map(
+    ({ path, uri, edits }) => ({ uri, path, version: null, edits }),
   );
 
   return {
@@ -362,8 +363,12 @@ export interface ReplacePreviewSnapshot {
   preimages?: readonly ReplaceFilePreimage[];
 }
 
+/**
+ * ED-REPAIR-006: canonical path comparison key that preserves case on POSIX,
+ * normalizes Windows drive/separator and UNC syntax, and handles file:// URIs.
+ */
 export function replacePreimagePathKey(path: string): string {
-  return path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+  return fsPathComparisonKey(path);
 }
 
 export function findReplacePreimage(
@@ -378,13 +383,22 @@ export function findReplacePreimage(
  * ED-MAIN-005: per-file precondition map consumed by the applier. Only files
  * with a captured preimage get an expected hash; legacy snapshots stay on the
  * existing freshness gate.
+ * ED-REPAIR-006: canonical path keys preserve case on POSIX and normalize on
+ * Windows/UNC. Conflicting preimages for the same canonical path throw an explicit conflict.
  */
 export function replacePreimageExpectedHashes(
   snapshot: Pick<ReplacePreviewSnapshot, "preimages">,
 ): Map<string, string> {
   const map = new Map<string, string>();
   for (const preimage of snapshot.preimages ?? []) {
-    map.set(replacePreimagePathKey(preimage.path), preimage.textHash);
+    const key = replacePreimagePathKey(preimage.path);
+    const existing = map.get(key);
+    if (existing !== undefined && existing !== preimage.textHash) {
+      throw new Error(
+        `Conflicting replace preimages for canonical path "${key}": expected hash "${existing}" contradicts "${preimage.textHash}"`,
+      );
+    }
+    map.set(key, preimage.textHash);
   }
   return map;
 }

@@ -812,4 +812,72 @@ describe("ED-FIND-004: replace preview commit flow in FindInFilesPanel", () => {
     expect(screen.queryByTestId("code-workspace-replace-preview")).not.toBeInTheDocument();
     expect(onReplaceMatches).not.toHaveBeenCalled();
   });
+
+  // ED-REPAIR-006: case-distinct files on POSIX (e.g. A.java vs a.java) preserve
+  // separate paths in preimages, snapshot, and committed WorkspaceEdit.
+  it("preserves case distinction for A.java and a.java in preview and commit (ED-REPAIR-006-A1)", async () => {
+    const posixRoots: CodeWorkspaceRootInfo[] = [
+      { id: "root-1", name: "app", path: "/repo/app", kind: "git" },
+    ];
+    const onReplaceMatches = vi.fn(
+      async (
+        _matches: WorkspaceSearchMatch[],
+        _replacement: string,
+        _edit: LspWorkspaceEdit,
+        _snapshot: unknown,
+      ): Promise<{ ok: boolean; appliedCount?: number; fileCount?: number }> =>
+        ({ ok: true as const, appliedCount: 2, fileCount: 2 }),
+    );
+    const onPrepareReplacePreimages = vi.fn(async (paths: readonly string[]) =>
+      paths.map((path) => ({
+        path,
+        uri: `file://${path}`,
+        textHash: `hash:${path}`,
+        encoding: "UTF-8",
+        bom: false,
+        eol: "lf" as const,
+        bufferRevision: 1,
+        dirty: false,
+        readOnly: false,
+        workspaceInstanceId: "ws",
+      })),
+    );
+    render(
+      <FindInFilesPanel
+        roots={posixRoots}
+        onOpenMatch={vi.fn()}
+        onReplaceMatches={onReplaceMatches}
+        onPrepareReplacePreimages={onPrepareReplacePreimages}
+      />,
+    );
+    const emit = await runSearch();
+    const matches = [
+      searchMatch({ rootPath: "/repo/app", path: "src/A.java", lineNumber: 1, lineText: "needle one", matchStart: 0, matchEnd: 6, column: 1 }),
+      searchMatch({ rootPath: "/repo/app", path: "src/a.java", lineNumber: 1, lineText: "needle two", matchStart: 0, matchEnd: 6, column: 1 }),
+    ];
+    act(() => {
+      emit({ ...doneEvent(), kind: "batch", matches });
+      emit(doneEvent({ totalMatches: matches.length }));
+    });
+    fireEvent.change(screen.getByLabelText("Replace text"), { target: { value: "thread" } });
+    fireEvent.click(screen.getByRole("button", { name: "Preview replace all matches" }));
+    expect(await screen.findByTestId("code-workspace-replace-preview")).toBeInTheDocument();
+    expect(onPrepareReplacePreimages).toHaveBeenCalledTimes(1);
+    const preparedPaths = onPrepareReplacePreimages.mock.calls[0]![0];
+    expect(preparedPaths).toHaveLength(2);
+    expect(preparedPaths).toContain("/repo/app/src/A.java");
+    expect(preparedPaths).toContain("/repo/app/src/a.java");
+
+    fireEvent.click(screen.getByTestId("code-workspace-replace-commit"));
+    await waitFor(() => expect(onReplaceMatches).toHaveBeenCalledTimes(1));
+    const snapshot = onReplaceMatches.mock.calls[0]![3] as {
+      preimages?: Array<{ path: string; textHash: string }>;
+    };
+    expect(snapshot.preimages).toHaveLength(2);
+    expect(snapshot.preimages?.map((p) => p.path)).toEqual(["/repo/app/src/A.java", "/repo/app/src/a.java"]);
+
+    const passedEdit = onReplaceMatches.mock.calls[0]![2] as LspWorkspaceEdit;
+    expect(passedEdit.documentEdits).toHaveLength(2);
+    expect(passedEdit.documentEdits?.map((d) => d.path)).toEqual(["/repo/app/src/A.java", "/repo/app/src/a.java"]);
+  });
 });

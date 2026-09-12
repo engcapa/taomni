@@ -643,9 +643,231 @@ describe("ED-IMPROVE-005: frozen replace preview snapshot", () => {
       },
     ];
     const hashes = replacePreimageExpectedHashes({ preimages });
-    expect(hashes.get("/ws/a.java")).toBe("hash-a");
+    expect(hashes.get(replacePreimagePathKey("/ws/A.java"))).toBe("hash-a");
     expect(hashes.get(replacePreimagePathKey("C:\\Ws\\B.java"))).toBe("hash-b");
     expect(findReplacePreimage({ preimages }, "/ws/A.java")?.textHash).toBe("hash-a");
     expect(findReplacePreimage({ preimages }, "/ws/missing.java")).toBeNull();
   });
+
+  describe("ED-REPAIR-006: case-preserving POSIX and canonical Windows replace path identity", () => {
+    it("preserves distinct identities for /ws/A.java and /ws/a.java in preimages and hashes (ED-REPAIR-006-A1)", () => {
+      const preimages = [
+        {
+          path: "/ws/A.java",
+          uri: "file:///ws/A.java",
+          textHash: "hash-upper-A",
+          encoding: "UTF-8",
+          bom: false,
+          eol: "lf" as const,
+          bufferRevision: 1,
+          dirty: false,
+          readOnly: false,
+          workspaceInstanceId: "ws",
+        },
+        {
+          path: "/ws/a.java",
+          uri: "file:///ws/a.java",
+          textHash: "hash-lower-a",
+          encoding: "UTF-8",
+          bom: false,
+          eol: "lf" as const,
+          bufferRevision: 2,
+          dirty: false,
+          readOnly: false,
+          workspaceInstanceId: "ws",
+        },
+      ];
+
+      // Key must preserve case on POSIX
+      expect(replacePreimagePathKey("/ws/A.java")).toBe("/ws/A.java");
+      expect(replacePreimagePathKey("/ws/a.java")).toBe("/ws/a.java");
+      expect(replacePreimagePathKey("/ws/A.java")).not.toBe(replacePreimagePathKey("/ws/a.java"));
+
+      // Hashes map must contain both preimages without overwriting
+      const hashes = replacePreimageExpectedHashes({ preimages });
+      expect(hashes.size).toBe(2);
+      expect(hashes.get(replacePreimagePathKey("/ws/A.java"))).toBe("hash-upper-A");
+      expect(hashes.get(replacePreimagePathKey("/ws/a.java"))).toBe("hash-lower-a");
+
+      // findReplacePreimage finds each file individually
+      expect(findReplacePreimage({ preimages }, "/ws/A.java")?.textHash).toBe("hash-upper-A");
+      expect(findReplacePreimage({ preimages }, "/ws/a.java")?.textHash).toBe("hash-lower-a");
+      expect(findReplacePreimage({ preimages }, "file:///ws/A.java")?.textHash).toBe("hash-upper-A");
+      expect(findReplacePreimage({ preimages }, "file:///ws/a.java")?.textHash).toBe("hash-lower-a");
+    });
+
+    it("generates separate document edits and validates selective subsets for case-distinct POSIX files (ED-REPAIR-006-A1)", () => {
+      const matchUpperA: ReplaceInFilesMatch = {
+        filePath: "/ws/A.java",
+        startLine: 0,
+        startCharacter: 0,
+        endLine: 0,
+        endCharacter: 3,
+        matchedText: "foo",
+      };
+      const matchLowerA: ReplaceInFilesMatch = {
+        filePath: "/ws/a.java",
+        startLine: 0,
+        startCharacter: 0,
+        endLine: 0,
+        endCharacter: 3,
+        matchedText: "foo",
+      };
+
+      const edit = buildReplaceInFilesWorkspaceEdit({
+        matches: [matchUpperA, matchLowerA],
+        replacementText: "bar",
+      });
+
+      // Must generate two distinct file document edits, NOT merge them
+      expect(edit.documentEdits).toHaveLength(2);
+      expect(edit.documentEdits.map((d) => d.path)).toEqual(["/ws/A.java", "/ws/a.java"]);
+
+      const snapshot: ReplacePreviewSnapshot = {
+        scope: {
+          kind: "workspace",
+          roots: ["/ws"],
+          explicitFiles: [],
+          fileMask: null,
+          generation: 1,
+        },
+        query: {
+          query: "foo",
+          caseSensitive: true,
+          wholeWord: false,
+          regexp: false,
+          includeGlobs: [],
+          excludeGlobs: [],
+        },
+        replacement: "bar",
+        matchKeys: [replaceMatchStableKey(matchUpperA), replaceMatchStableKey(matchLowerA)],
+        matchCount: 2,
+        editSignature: replaceEditSignature(edit),
+        capturedAt: Date.now(),
+      };
+
+      // Validating selection with only /ws/A.java
+      const selectedOnlyUpper = new Set([replaceMatchStableKey(matchUpperA)]);
+      const filteredEditUpper = buildReplaceInFilesWorkspaceEdit({
+        matches: [matchUpperA],
+        replacementText: "bar",
+      });
+      const validUpper = validateReplacePreviewSelection(snapshot, selectedOnlyUpper, filteredEditUpper, edit);
+      expect(validUpper.ok).toBe(true);
+
+      // Swapping edit: sourceEdit only had /ws/A.java, but filteredEdit carries /ws/a.java
+      const filteredEditLower = buildReplaceInFilesWorkspaceEdit({
+        matches: [matchLowerA],
+        replacementText: "bar",
+      });
+      const swappedResult = validateReplacePreviewSelection(snapshot, selectedOnlyUpper, filteredEditLower, filteredEditUpper);
+      expect(swappedResult.ok).toBe(false);
+      expect(swappedResult.reason).toContain("not part of the original replace plan");
+
+      // Commit report summarizes applied vs failed across distinct files
+      const outcomes = [
+        { path: "/ws/A.java", status: "applied-disk" },
+        { path: "/ws/a.java", status: "failed", reason: "permission denied" },
+      ];
+      const report = summarizeReplaceCommitReport(outcomes, [matchUpperA, matchLowerA]);
+      expect(report.ok).toBe(false);
+      expect(report.appliedCount).toBe(1);
+      expect(report.fileCount).toBe(1);
+      expect(report.plannedCount).toBe(2);
+      expect(report.plannedFileCount).toBe(2);
+      expect(report.blockers).toEqual(["/ws/a.java: permission denied"]);
+      expect(report.message).toContain("1 of 2 occurrences in 1 of 2 files");
+    });
+
+    it("normalizes Windows drive letters, path separators, UNC paths, and file URIs consistently (ED-REPAIR-006-A2)", () => {
+      // Windows drive casing and slash normalization
+      const winKeyUpper = replacePreimagePathKey("C:\\Ws\\File.java");
+      const winKeyLower = replacePreimagePathKey("c:/ws/file.java");
+      const winKeyMixed = replacePreimagePathKey("C:/WS/FILE.JAVA");
+      expect(winKeyUpper).toBe("c:/ws/file.java");
+      expect(winKeyLower).toBe("c:/ws/file.java");
+      expect(winKeyMixed).toBe("c:/ws/file.java");
+
+      // Windows file:/// URI matches filesystem path key
+      const winUriKeyUpper = replacePreimagePathKey("file:///C:/Ws/File.java");
+      const winUriKeyLower = replacePreimagePathKey("file:///c:/ws/file.java");
+      expect(winUriKeyUpper).toBe("c:/ws/file.java");
+      expect(winUriKeyLower).toBe("c:/ws/file.java");
+
+      // UNC paths
+      const uncBackslash = replacePreimagePathKey("\\\\server\\share\\repo\\File.java");
+      const uncSlash = replacePreimagePathKey("//server/share/repo/File.java");
+      const uncUri = replacePreimagePathKey("file://server/share/repo/File.java");
+      expect(uncBackslash).toBe("//server/share/repo/file.java");
+      expect(uncSlash).toBe("//server/share/repo/file.java");
+      expect(uncUri).toBe("//server/share/repo/file.java");
+
+      // Multiple Windows matches referencing same canonical file group into one documentEdit
+      const matchWin1: ReplaceInFilesMatch = {
+        filePath: "C:\\Ws\\File.java",
+        startLine: 0,
+        startCharacter: 0,
+        endLine: 0,
+        endCharacter: 3,
+        matchedText: "foo",
+      };
+      const matchWin2: ReplaceInFilesMatch = {
+        filePath: "c:/ws/file.java",
+        startLine: 1,
+        startCharacter: 0,
+        endLine: 1,
+        endCharacter: 3,
+        matchedText: "foo",
+      };
+      const winEdit = buildReplaceInFilesWorkspaceEdit({
+        matches: [matchWin1, matchWin2],
+        replacementText: "bar",
+      });
+      expect(winEdit.documentEdits).toHaveLength(1);
+      expect(winEdit.documentEdits[0]?.edits).toHaveLength(2);
+    });
+
+    it("rejects contradicting preimages for the same canonical path with an explicit conflict (ED-REPAIR-006-A2)", () => {
+      const contradictingPreimages = [
+        {
+          path: "C:\\Ws\\File.java",
+          uri: "file:///C:/Ws/File.java",
+          textHash: "hash-alpha",
+          encoding: "UTF-8",
+          bom: false,
+          eol: "crlf" as const,
+          bufferRevision: null,
+          dirty: false,
+          readOnly: false,
+          workspaceInstanceId: "ws",
+        },
+        {
+          path: "c:/ws/file.java",
+          uri: "file:///c:/ws/file.java",
+          textHash: "hash-beta",
+          encoding: "UTF-8",
+          bom: false,
+          eol: "crlf" as const,
+          bufferRevision: null,
+          dirty: false,
+          readOnly: false,
+          workspaceInstanceId: "ws",
+        },
+      ];
+
+      expect(() => replacePreimageExpectedHashes({ preimages: contradictingPreimages })).toThrow(
+        /Conflicting replace preimages for canonical path "c:\/ws\/file\.java"/,
+      );
+
+      // Duplicate entries with identical hashes succeed
+      const consistentPreimages = [
+        contradictingPreimages[0]!,
+        { ...contradictingPreimages[1]!, textHash: "hash-alpha" },
+      ];
+      const hashes = replacePreimageExpectedHashes({ preimages: consistentPreimages });
+      expect(hashes.size).toBe(1);
+      expect(hashes.get("c:/ws/file.java")).toBe("hash-alpha");
+    });
+  });
 });
+

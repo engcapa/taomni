@@ -131,3 +131,64 @@ steps:
       equals: "d10eea22971a9850a14277b8e4b2f5922c5f27530a9d216774c8029d6340a538"
       timeout_sec: 30
   - screenshot: tc-ide-d2-02-replace-undo.png
+  # ---------------------------------------------------------------------
+  # ED-REPAIR-006: case-distinct files on POSIX (A.java and a.java).
+  # Confirm independent creation and read, replace across both files,
+  # commit changes to disk, and verify single transaction undo.
+  # ---------------------------------------------------------------------
+  - assert_file_contains:
+      path: "${fixture.workspace_root}/A.java"
+      contains: "class CaseAlpha"
+      timeout_sec: 10
+  - assert_file_contains:
+      path: "${fixture.workspace_root}/a.java"
+      contains: "class CaseBeta"
+      timeout_sec: 10
+  - native_click:
+      selector: '[aria-label="Search query"]'
+  - native_keys:
+      selector: '[aria-label="Search query"]'
+      keys: ["Control+a", "m", "a", "t", "c", "h", "Enter"]
+  - click: '[data-testid="code-workspace-find-run-search"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-find-in-files-panel"]'
+      contains: "A.java"
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-find-in-files-panel"]'
+      contains: "a.java"
+      timeout_sec: 60
+  - native_click:
+      selector: '[aria-label="Replace text"]'
+  - native_keys:
+      selector: '[aria-label="Replace text"]'
+      keys: ["Control+a", "s", "w", "a", "p", "p", "e", "d"]
+  - click: '[data-testid="code-workspace-find-replace-all"]'
+  - wait_for: '[data-testid="code-workspace-replace-preview"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-replace-counts"]'
+      contains: "2 of 2"
+      timeout_sec: 10
+  - click: '[data-testid="code-workspace-replace-commit"]'
+  - assert_file_sha256:
+      path: "${fixture.workspace_root}/A.java"
+      equals: "34ff590ff2c2bb60fd7d7759c35d6248150e5ea694a47c032e580e484fef3df9"
+      timeout_sec: 30
+  - assert_file_sha256:
+      path: "${fixture.workspace_root}/a.java"
+      equals: "0b7fa25adf2ccbc0aa923ec8b0ac6b43dcd43781c360ca3da056a13276f38e2b"
+      timeout_sec: 30
+  - native_click:
+      selector: '[aria-label="Search query"]'
+  - native_keys:
+      selector: '[aria-label="Search query"]'
+      keys: ["Control+z"]
+  - assert_file_sha256:
+      path: "${fixture.workspace_root}/A.java"
+      equals: "d35a1d24a4a83b201cf533f96f2dfa0392d1ada7043d8c587a69aa46ef16b2a2"
+      timeout_sec: 30
+  - assert_file_sha256:
+      path: "${fixture.workspace_root}/a.java"
+      equals: "15d66fc6cb85ec5cd64547811d5551a91454946f3a7ddb985af514b56906c4a1"
+      timeout_sec: 30
+  - screenshot: tc-ide-d2-02-replace-case-undo.png
