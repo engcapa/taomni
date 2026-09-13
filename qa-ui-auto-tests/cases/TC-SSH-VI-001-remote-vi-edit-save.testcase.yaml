@@ -1,15 +1,16 @@
 id: TC-SSH-VI-001
-title: Remote SSH terminal opens, edits, and saves file using vi
+title: Remote SSH terminal vi comprehensive operations (navigation, yank/paste, edit, :q!, :wq)
 description: |
   Native verification across Windows, Linux, and macOS that connects to a remote SSH server,
-  launches vi to create and edit a temporary file, saves it with :wq, and verifies
-  that the file contents were successfully saved.
+  exercises vi/vim text insertion, cursor navigation (j/k), line yank and paste (yy/p),
+  word replacement/editing (cw), discarding changes with :q!, and saving changes with :wq,
+  verifying both discarded and persisted disk states.
 covers: [F3.1, F2.2, F6.4, F1.8]
 tags: [native, ssh, terminal, vi, vim, p0]
 modes: [native]
 native_platforms: [Linux, macOS, Windows]
 fixtures: [reset_db, ssh_required]
-timeout_sec: 60
+timeout_sec: 90
 steps:
   - open: "${cfg.app.base_url}"
   - click: '[data-testid="app-main-menu"]'
@@ -24,7 +25,15 @@ steps:
   - wait_for: '[data-testid="terminal-pane"]'
   - wait: 3
   - click: '[data-testid="terminal-pane"]'
+
+  # Phase 1: Initialize file and verify :q! discards unsaved changes
   - type: "rm -f /tmp/taomni_vi_test.txt"
+  - press: Enter
+  - wait: 1
+  - type: "echo 'Alpha Line Original' > /tmp/taomni_vi_test.txt"
+  - press: Enter
+  - wait: 1
+  - type: "echo 'Beta Line Original' >> /tmp/taomni_vi_test.txt"
   - press: Enter
   - wait: 1
   - type: "vi /tmp/taomni_vi_test.txt"
@@ -32,21 +41,69 @@ steps:
   - wait: 2
   - type: "i"
   - wait: 0.5
-  - type: "Taomni Native Vi Verification String"
-  - press: Enter
-  - type: "Second Line Saved Successfully"
+  - type: "DISCARD_THIS_UNSAVED_TEXT"
   - wait: 0.5
   - press: Escape
   - wait: 0.5
-  - type: ":wq"
+  - type: ":q!"
   - press: Enter
   - wait: 2
   - type: "cat /tmp/taomni_vi_test.txt"
   - press: Enter
   - wait: 1
-  - assert_text: {selector: '[data-testid="terminal-pane"]', contains: "Taomni Native Vi Verification String"}
-  - assert_text: {selector: '[data-testid="terminal-pane"]', contains: "Second Line Saved Successfully"}
+  - assert_text: {selector: '[data-testid="terminal-pane"]', contains: "Alpha Line Original"}
+  - assert_text: {selector: '[data-testid="terminal-pane"]', contains: "Beta Line Original"}
+  - type: "grep -c DISCARD_THIS /tmp/taomni_vi_test.txt || echo 0"
+  - press: Enter
+  - wait: 1
+  - assert_text: {selector: '[data-testid="terminal-pane"]', contains: "0"}
+
+  # Phase 2: Open file, test navigation (j/k), yank & paste (yy/p), word modification (cw), append (o), and :wq
+  - type: "vi /tmp/taomni_vi_test.txt"
+  - press: Enter
+  - wait: 2
+  # Move cursor down (j) then up (k) then down (j)
+  - type: "j"
+  - wait: 0.5
+  - type: "k"
+  - wait: 0.5
+  - type: "j"
+  - wait: 0.5
+  # Yank line (yy) and paste below (p)
+  - type: "yy"
+  - wait: 0.5
+  - type: "p"
+  - wait: 0.5
+  # Modify text on the new line: jump to start of line (0) and change word (cw)
+  - type: "0"
+  - wait: 0.5
+  - type: "cw"
+  - wait: 0.5
+  - type: "Replaced"
+  - wait: 0.5
+  - press: Escape
+  - wait: 0.5
+  # Open new line below (o) and insert text
+  - type: "o"
+  - wait: 0.5
+  - type: "Gamma Line Appended"
+  - wait: 0.5
+  - press: Escape
+  - wait: 0.5
+  # Save and exit with :wq
+  - type: ":wq"
+  - press: Enter
+  - wait: 2
+
+  # Phase 3: Verify final saved content and clean up
+  - type: "cat /tmp/taomni_vi_test.txt"
+  - press: Enter
+  - wait: 1
+  - assert_text: {selector: '[data-testid="terminal-pane"]', contains: "Alpha Line Original"}
+  - assert_text: {selector: '[data-testid="terminal-pane"]', contains: "Beta Line Original"}
+  - assert_text: {selector: '[data-testid="terminal-pane"]', contains: "Replaced Line Original"}
+  - assert_text: {selector: '[data-testid="terminal-pane"]', contains: "Gamma Line Appended"}
   - type: "rm -f /tmp/taomni_vi_test.txt"
   - press: Enter
   - wait: 0.5
-  - screenshot: "ssh-vi-edit-save.png"
+  - screenshot: "ssh-vi-comprehensive.png"
