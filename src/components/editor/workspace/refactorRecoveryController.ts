@@ -3,7 +3,12 @@ import type {
   RefactorRecoveryJournalEntryV2,
   RefactorRecoveryResourceMoveV1,
 } from "./refactorPlan";
-import { resolveRecoveryDocTarget } from "./refactorPlan";
+import {
+  recoveryMoveProofMatches,
+  resolveRecoveryDocTarget,
+  resolveRecoveryMoveProof,
+} from "./refactorPlan";
+import { fsPathComparisonKey } from "./codeWorkspaceModel";
 import { sha256Hex } from "./projectAnalysisModel";
 import { normalizeLineEndings } from "./saveNormalizationPipeline";
 
@@ -56,6 +61,12 @@ export interface RefactorRecoveryMovePrecondition {
    * without a content guarantee and reports it as content-unverified.
    */
   contentVerified: boolean;
+  /**
+   * RC-02/RC-03: fine-grained reason for UI display (`both-missing`,
+   * `both-present`, `content-changed`, `read-failed`, `ambiguous-proof`,
+   * `missing-pair`). The coarse `state` union stays the executor guard.
+   */
+  detail?: string;
 }
 
 export interface RefactorRecoveryPreconditionSummary {
@@ -79,14 +90,23 @@ export async function classifyRefactorRecoveryPreconditions(
   hooks: RefactorRecoveryClassifyHooks = {},
 ): Promise<RefactorRecoveryPreconditionSummary> {
   const moves = entry.resourceMoves ?? [];
+  const journalDocuments = entry.documents ?? [];
   const existence = new Map<string, boolean>();
+  const keyOf = (path: string): string => {
+    try {
+      return fsPathComparisonKey(path);
+    } catch {
+      return path;
+    }
+  };
   const checkExists = async (path: string): Promise<boolean | null> => {
-    const cached = existence.get(path);
+    const key = keyOf(path);
+    const cached = existence.get(key);
     if (cached !== undefined) return cached;
     if (hooks.pathExists) {
       try {
         const result = await hooks.pathExists(path);
-        if (result !== null) existence.set(path, result);
+        if (result !== null) existence.set(key, result);
         return result;
       } catch {
         return null;
@@ -99,14 +119,14 @@ export async function classifyRefactorRecoveryPreconditions(
       return null;
     }
   };
-  const oldExists = (oldPath: string): boolean => existence.get(oldPath) === true;
-  const documents: RefactorRecoveryPrecondition[] = [];
+  const oldExists = (oldPath: string): boolean => existence.get(keyOf(oldPath)) === true;
+  const docPreconditions: RefactorRecoveryPrecondition[] = [];
   let sawConflict = false;
   let sawUnreadable = false;
   let sawRestorable = false;
   const movePreconditions: RefactorRecoveryMovePrecondition[] = [];
   for (const move of moves) {
-    movePreconditions.push(await classifyRecoveryMove(move, readText, checkExists));
+    movePreconditions.push(await classifyRecoveryMove(move, readText, checkExists, journalDocuments));
   }
   for (const doc of entry.documents) {
     const target = resolveRecoveryDocTarget(doc, moves, oldExists);
@@ -137,7 +157,7 @@ export async function classifyRefactorRecoveryPreconditions(
       state = "unreadable";
       sawUnreadable = true;
     }
-    documents.push({ uri: doc.uri, canonicalPath: doc.canonicalPath, state, currentHash });
+    docPreconditions.push({ uri: doc.uri, canonicalPath: doc.canonicalPath, state, currentHash });
   }
   for (const move of movePreconditions) {
     if (move.state === "conflict") sawConflict = true;
@@ -151,14 +171,16 @@ export async function classifyRefactorRecoveryPreconditions(
       : sawRestorable
         ? "restorable"
         : "already-restored";
-  return { documents, moves: movePreconditions, overall };
+  return { documents: docPreconditions, moves: movePreconditions, overall };
 }
 
 async function classifyRecoveryMove(
   move: RefactorRecoveryResourceMoveV1,
   readText: (canonicalPath: string) => Promise<{ text: string } | null>,
   checkExists: (path: string) => Promise<boolean | null>,
+  documents: readonly RefactorRecoveryDocumentSnapshotV2[] = [],
 ): Promise<RefactorRecoveryMovePrecondition> {
+  const proof = resolveRecoveryMoveProof(move, documents);
   const base: RefactorRecoveryMovePrecondition = {
     oldUri: move.oldUri,
     newUri: move.newUri,
@@ -166,31 +188,42 @@ async function classifyRecoveryMove(
     newPath: move.newPath,
     state: "unreadable",
     currentHash: null,
-    contentVerified: move.contentHash !== null,
+    contentVerified: proof.kind !== "unverified",
+    detail: "read-failed",
   };
-  if (!move.oldPath || !move.newPath) return base;
+  if (!move.oldPath || !move.newPath) return { ...base, detail: "missing-pair" };
+  if (proof.kind === "ambiguous") {
+    return { ...base, state: "conflict", detail: "ambiguous-proof" };
+  }
   const [oldKnown, newKnown] = await Promise.all([
     checkExists(move.oldPath),
     checkExists(move.newPath),
   ]);
   if (oldKnown === null || newKnown === null) return base;
-  if (oldKnown && !newKnown) return { ...base, state: "already-restored" };
+  if (oldKnown && !newKnown) return { ...base, state: "already-restored", detail: "already-restored" };
   if (!oldKnown && newKnown) {
-    if (move.contentHash === null) return { ...base, state: "restorable" };
+    // RC-03: the live bytes at the new path are the POST image for mixed
+    // text+rename transactions. A document proof accepts preimage (move not
+    // yet applied / partially restored) or postimage (edits applied); the
+    // legacy single-hash proof is kept for pure moves without documents.
+    if (proof.kind === "unverified") return { ...base, state: "restorable", detail: "restorable" };
     try {
       const current = await readText(move.newPath);
       if (current === null) return base;
       const currentHash = sha256Hex(current.text);
-      if (currentHash !== move.contentHash) {
-        return { ...base, state: "conflict", currentHash };
+      if (!recoveryMoveProofMatches(proof, current.text)) {
+        return { ...base, state: "conflict", currentHash, detail: "content-changed" };
       }
-      return { ...base, state: "restorable", currentHash };
+      return { ...base, state: "restorable", currentHash, detail: "restorable" };
     } catch {
       return base;
     }
   }
   // Both present, or both missing: reversing would destroy or invent bytes.
-  return { ...base, state: "conflict" };
+  // Both-missing is the deleted-after-rename shape: it stays pending with an
+  // explicit abandon outlet instead of auto-resolving.
+  if (!oldKnown && !newKnown) return { ...base, state: "conflict", detail: "both-missing" };
+  return { ...base, state: "conflict", detail: "both-present" };
 }
 
 export interface RefactorRecoveryExecution {
@@ -267,13 +300,21 @@ export async function executeRefactorRecovery(
     moveFailures: [],
   };
   const oldExistsLive = new Map<string, boolean>();
+  const keyOfLive = (path: string): string => {
+    try {
+      return fsPathComparisonKey(path);
+    } catch {
+      return path;
+    }
+  };
   const checkOldExists = async (oldPath: string): Promise<boolean> => {
-    const cached = oldExistsLive.get(oldPath);
+    const key = keyOfLive(oldPath);
+    const cached = oldExistsLive.get(key);
     if (cached !== undefined) return cached;
     if (!hooks.pathExists) return false;
     try {
       const result = await hooks.pathExists(oldPath);
-      oldExistsLive.set(oldPath, result);
+      oldExistsLive.set(key, result);
       return result;
     } catch {
       return false;
@@ -283,14 +324,22 @@ export async function executeRefactorRecovery(
     const precondition = move.newUri ? moveByNewUri.get(move.newUri) : undefined;
     const state = precondition?.state ?? "unreadable";
     if (state === "already-restored") {
-      if (move.oldPath) oldExistsLive.set(move.oldPath, true);
+      if (move.oldPath) oldExistsLive.set(keyOfLive(move.oldPath), true);
       continue;
     }
     if (state === "conflict") {
       execution.moveConflicts.push({
         oldUri: move.oldUri,
         newUri: move.newUri,
-        reason: "move endpoints changed since the transaction; reversal would destroy or invent bytes",
+        reason: precondition?.detail === "both-missing"
+          ? "both move endpoints are missing; reversal would invent bytes"
+          : precondition?.detail === "both-present"
+            ? "both move endpoints are present; reversal would destroy bytes"
+            : precondition?.detail === "content-changed"
+              ? "bytes at the new path changed since the transaction; reversal would destroy third-party content"
+              : precondition?.detail === "ambiguous-proof"
+                ? "multiple journal documents match the same file move; reversal refused to guess"
+                : "move endpoints changed since the transaction; reversal would destroy or invent bytes",
       });
       continue;
     }
@@ -312,6 +361,49 @@ export async function executeRefactorRecovery(
       });
       continue;
     }
+    // RC-03: prove the move preserves bytes. Re-read the source endpoint now,
+    // record the hash that actually matched, reverse, then prove the bytes at
+    // home equal the pre-reverse hash (plus the journal proof). A move that
+    // fails here must block its associated text documents below.
+    const proof = resolveRecoveryMoveProof(move, entry.documents ?? []);
+    if (proof.kind === "ambiguous") {
+      execution.moveFailures.push({
+        oldUri: move.oldUri,
+        newUri: move.newUri,
+        reason: "multiple journal documents match the same file move; reversal refused to guess",
+      });
+      continue;
+    }
+    let preReverseHash: string | null = null;
+    if (proof.kind !== "unverified") {
+      try {
+        const preReverse = hooks.readMoveText ? await hooks.readMoveText(move.newPath) : null;
+        if (preReverse === null) {
+          execution.moveFailures.push({
+            oldUri: move.oldUri,
+            newUri: move.newUri,
+            reason: "bytes at the new path unreadable before reversal; content proof failed",
+          });
+          continue;
+        }
+        if (!recoveryMoveProofMatches(proof, preReverse.text)) {
+          execution.moveFailures.push({
+            oldUri: move.oldUri,
+            newUri: move.newUri,
+            reason: "bytes at the new path changed since the transaction; reversal would destroy third-party content",
+          });
+          continue;
+        }
+        preReverseHash = sha256Hex(preReverse.text);
+      } catch {
+        execution.moveFailures.push({
+          oldUri: move.oldUri,
+          newUri: move.newUri,
+          reason: "bytes at the new path unreadable before reversal; content proof failed",
+        });
+        continue;
+      }
+    }
     try {
       await hooks.reverseResourceMove(move);
       const oldPresent = await checkOldExists(move.oldPath);
@@ -331,29 +423,47 @@ export async function executeRefactorRecovery(
         });
         continue;
       }
-      if (move.contentHash !== null) {
-        let currentHash: string | null = null;
+      if (proof.kind === "unverified") {
+        execution.contentUnverifiedMoves.push(move.newPath);
+      } else {
+        let postHash: string | null = null;
+        let postText: string | null = null;
         try {
           const current = hooks.readMoveText ? await hooks.readMoveText(move.oldPath) : null;
-          currentHash = current === null ? null : sha256Hex(current.text);
+          postText = current === null ? null : current.text;
+          postHash = current === null ? null : sha256Hex(current.text);
         } catch {
-          currentHash = null;
+          postHash = null;
         }
-        if (currentHash !== move.contentHash) {
+        if (postHash === null || postText === null) {
           execution.moveFailures.push({
             oldUri: move.oldUri,
             newUri: move.newUri,
-            reason: currentHash === null
-              ? "moved-home bytes unreadable; content proof failed"
-              : "moved-home bytes do not match the journalled content proof",
+            reason: "moved-home bytes unreadable; content proof failed",
           });
           continue;
         }
-      } else {
-        execution.contentUnverifiedMoves.push(move.newPath);
+        // The reversal must preserve the exact bytes observed before the
+        // move; afterwards those bytes must still satisfy the journal proof.
+        if (preReverseHash !== null && postHash !== preReverseHash) {
+          execution.moveFailures.push({
+            oldUri: move.oldUri,
+            newUri: move.newUri,
+            reason: "moved-home bytes differ from the pre-reversal bytes; move altered content",
+          });
+          continue;
+        }
+        if (!recoveryMoveProofMatches(proof, postText)) {
+          execution.moveFailures.push({
+            oldUri: move.oldUri,
+            newUri: move.newUri,
+            reason: "moved-home bytes do not match the journalled content proof",
+          });
+          continue;
+        }
       }
       execution.reversedMoves.push(move.newPath);
-      oldExistsLive.set(move.oldPath, true);
+      oldExistsLive.set(keyOfLive(move.oldPath), true);
     } catch (error) {
       execution.moveFailures.push({
         oldUri: move.oldUri,
@@ -362,9 +472,47 @@ export async function executeRefactorRecovery(
       });
     }
   }
+  // RC-03: a text document linked to a failed/conflicted move must not be
+  // written to the wrong path after the reversal failed.
+  const blockedDocKeys = new Set<string>();
+  const failedMoves = [
+    ...execution.moveConflicts.map((m) => ({ oldUri: m.oldUri, newUri: m.newUri })),
+    ...execution.moveFailures.map((m) => ({ oldUri: m.oldUri, newUri: m.newUri })),
+  ];
+  for (const failed of failedMoves) {
+    const failedMove = moves.find((m) => m.oldUri === failed.oldUri && m.newUri === failed.newUri);
+    if (!failedMove) continue;
+    for (const raw of [failedMove.oldPath, failedMove.oldUri, failedMove.newPath, failedMove.newUri]) {
+      if (!raw) continue;
+      try {
+        blockedDocKeys.add(fsPathComparisonKey(raw));
+      } catch {
+        blockedDocKeys.add(raw);
+      }
+    }
+  }
+  const docBlockedByMove = (doc: RefactorRecoveryDocumentSnapshotV2): boolean => {
+    for (const raw of [doc.canonicalPath, doc.uri]) {
+      if (!raw) continue;
+      try {
+        if (blockedDocKeys.has(fsPathComparisonKey(raw))) return true;
+      } catch {
+        if (blockedDocKeys.has(raw)) return true;
+      }
+    }
+    return false;
+  };
   for (const doc of entry.documents) {
     const precondition = byUri.get(doc.uri);
     const state = precondition?.state ?? "unreadable";
+    if (docBlockedByMove(doc)) {
+      execution.failures.push({
+        uri: doc.uri,
+        canonicalPath: doc.canonicalPath,
+        reason: "associated file move failed; text restore skipped to avoid writing to the wrong path",
+      });
+      continue;
+    }
     if (state === "already-restored") {
       execution.skippedUris.push(doc.uri);
       continue;

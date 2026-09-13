@@ -1,0 +1,176 @@
+id: TC-IDE-JAVA-RENAME-DELETED-RECOVERY-WIN
+title: "Java rename-delete recovery on Windows: abandon both-missing, restore mixed shape"
+description: |
+  java-rename-deleted-recovery Windows-native gate case (F25.5). Runs the
+  seeded half of TC-IDE-JAVA-RENAME-DELETED-RECOVERY with Windows-supported
+  verbs only (no pointer/keyboard injection): the live JDT LS class-rename
+  provider segment runs on Linux (pointer caret verbs are Linux/X11-only),
+  while this case proves on real WebView2 + real disk + webview-persistent
+  journals:
+
+  1. AC-02/04 seeded history: a seeded v2 entry in the deleted-after-rename
+     shape (old and new paths both missing) reviews as
+     document-unreadable / move `both-missing`, states non-existence without
+     claiming the user deleted anything, keeps Restore disabled, and offers
+     Keep plus a two-step Abandon. Opening Abandon then pressing Escape
+     closes only the inline confirm and keeps the entry pending.
+  2. AC-03 abandon: confirming Abandon records only a `user-dismissed`
+     resolution marker (zero file writes: the staged post bytes keep their
+     hash, the gone paths stay gone) and the abandoned record stays silent
+     after reload while the sibling pending entry still prompts.
+  3. AC-05 seeded mixed shape: a seeded v2 entry in the production mixed
+     text+rename shape (`contentHash` = pre-image hash, document pre/post
+     images, new path staged with the POST bytes) classifies restorable,
+     restores new->old with byte-preservation proof plus preimage read-back,
+     and lands `rolled-back` with the reversed move recorded
+     (assert_file_sha256 == preHash on the moved-home bytes).
+
+  Highest claim on green: L2 native (Windows), packaged QA app over real
+  disk bytes. Explicitly NOT claimed by this run: the live provider class
+  rename (Linux case), the live user order "rename then delete the renamed
+  file via the tree then reopen" (no tree-delete verb exists; recorded
+  manual V-05), the 736x375 / 1280x800 viewport matrix (no native viewport
+  verb), host proof that a missing path stays missing (no assert-file-missing
+  verb; the zero-write ack plus unchanged staged hashes plus the
+  `user-dismissed` marker are the automated evidence), and Linux/macOS runs
+  (other ends stay unverified, never passed-by-proxy).
+covers: [F25.5]
+tags: [code-workspace, ide-editor, refactor, recovery, java-rename, native-gate, p1]
+modes: [native]
+native_platforms: [Windows]
+fixtures: [reset_db, java_rename_deleted_fixtures]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-gate-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  # Enter the fresh seeded workspace through persisted recents; the
+  # workspace identity is the deterministic recents identity of the roots,
+  # so the recovery entries survive reload_window.
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-jrdr-win","name":"jrdr","roots":[{"id":"jrdr","name":"jrdr","path":"${fixture.jrdr_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"jrdr","path":"MixNew.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.jrdr_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "public class MixNew"
+      timeout_sec: 60
+  # Seed both histories BEFORE the reload that triggers discovery: the
+  # abandoned record is newer, so the sequential review reaches it first.
+  - seed_storage:
+      key: taomni.refactor.recovery.v2:qa-jrdrw-abandon
+      value: '{"schemaVersion": 2, "recoveryId": "qa-jrdrw-abandon", "transactionId": "qa-jrdrw-txn-abandon", "actionId": "rename:qa-jrdrw-abandon", "kind": "rename", "workspaceRoot": "${fixture.jrdr_root}", "createdAt": 1757000002000, "updatedAt": 1757000002000, "status": "recovery-required", "appliedOperationIndex": null, "documents": [{"uri": "file://${fixture.jrdr_root}/Gone.java", "canonicalPath": "${fixture.jrdr_root}/Gone.java", "preText": "class Gone { int a = 1; }\n", "preHash": "d0a3257e508b876863b3ab9f4dc7f0fc04211e05fd33ba64e41c2ccc16852351", "postText": "class GoneRenamed { int a = 1; }\n", "postHash": "6fc89ed34e31da3e3927f9c1890dbc52154d62671a175db7796f45d24bde1b57", "encoding": "UTF-8", "bom": false, "eol": "lf"}], "resourceMoves": [{"oldUri": "file://${fixture.jrdr_root}/Gone.java", "newUri": "file://${fixture.jrdr_root}/GoneRenamed.java", "oldPath": "${fixture.jrdr_root}/Gone.java", "newPath": "${fixture.jrdr_root}/GoneRenamed.java", "contentHash": "d0a3257e508b876863b3ab9f4dc7f0fc04211e05fd33ba64e41c2ccc16852351"}], "verification": {"mismatchedUris": [], "checkedAt": null}}'
+  - seed_storage:
+      key: taomni.refactor.recovery.v2:qa-jrdrw-mixed
+      value: '{"schemaVersion": 2, "recoveryId": "qa-jrdrw-mixed", "transactionId": "qa-jrdrw-txn-mixed", "actionId": "rename:qa-jrdrw-mixed", "kind": "rename", "workspaceRoot": "${fixture.jrdr_root}", "createdAt": 1757000001000, "updatedAt": 1757000001000, "status": "prepared", "appliedOperationIndex": null, "documents": [{"uri": "file://${fixture.jrdr_root}/MixOld.java", "canonicalPath": "${fixture.jrdr_root}/MixOld.java", "preText": "public class MixOld {}\n", "preHash": "3533c9cac826533ea8dd12c771268366d3901f2d14fb43fd1d9a70dd794444c1", "postText": "public class MixNew {}\n", "postHash": "adf660ac77c1ba60f1cdc7106f9e8adeefe94af4657ec96348121122817f3432", "encoding": "UTF-8", "bom": false, "eol": "lf"}], "resourceMoves": [{"oldUri": "file://${fixture.jrdr_root}/MixOld.java", "newUri": "file://${fixture.jrdr_root}/MixNew.java", "oldPath": "${fixture.jrdr_root}/MixOld.java", "newPath": "${fixture.jrdr_root}/MixNew.java", "contentHash": "3533c9cac826533ea8dd12c771268366d3901f2d14fb43fd1d9a70dd794444c1"}], "verification": {"mismatchedUris": [], "checkedAt": null}}'
+  # reload_window destroys the webview JS context. Re-enter via recents so
+  # the workspace mounts fresh and workspace-ready discovery runs the
+  # pending-entry scan (the same mechanism that runs after a process
+  # restart, since localStorage is webview-persistent under the QA overlay).
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.jrdr_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  # Newest first: the both-missing record. Restore stays disabled, the
+  # states name non-existence (never "you deleted"), and the full paths
+  # remain visible/selectable for long-path review.
+  - wait_for:
+      selector: '[data-testid="refactor-recovery-review"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="refactor-recovery-review"]'
+      contains: "Gone.java"
+      timeout_sec: 10
+  - assert_text:
+      selector: '[data-testid="refactor-recovery-review"]'
+      contains: "does not exist"
+      timeout_sec: 10
+  # Restore must stay disabled while the endpoints are both missing (read
+  # the disabled DOM property; the native runner has no assert_disabled, and
+  # the eval guard rejects a literal `=`, hence fromCharCode(61)).
+  - eval_readonly:
+      expression: "document.querySelector('[data-testid' + String.fromCharCode(61) + '\"refactor-recovery-restore\"]').disabled"
+      expect_truthy: true
+  - screenshot: tc-ide-java-rename-deleted-win-both-missing.png
+  # AC-04: opening Abandon then escaping keeps the entry pending.
+  - click: '[data-testid="refactor-recovery-dismiss"]'
+  - wait_for:
+      selector: '[data-testid="refactor-recovery-dismiss-confirm"]'
+      timeout_sec: 10
+  - press: Escape
+  - assert_not_visible: '[data-testid="refactor-recovery-dismiss-confirm"]'
+  - assert_text:
+      selector: '[data-testid="refactor-recovery-review"]'
+      contains: "Gone.java"
+      timeout_sec: 10
+  # Confirm Abandon: only the resolution marker is written (zero file
+  # writes). The staged post bytes keep their hash.
+  - click: '[data-testid="refactor-recovery-dismiss"]'
+  - click: '[data-testid="refactor-recovery-dismiss-confirm-button"]'
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Abandoned refactor recovery"
+      timeout_sec: 30
+  - eval_readonly:
+      expression: "localStorage.getItem('taomni.refactor.recovery.v2:qa-jrdrw-abandon')"
+      contains: "user-dismissed"
+  - assert_file_contains:
+      path: "${fixture.jrdr_root}/MixNew.java"
+      contains: "public class MixNew {}"
+      timeout_sec: 30
+  # Settle so the closing abandon dialog is gone before asserting the
+  # sibling review that the same discover loop opens next.
+  - wait: 2
+  - assert_text:
+      selector: '[data-testid="refactor-recovery-review"]'
+      contains: "MixOld.java"
+      timeout_sec: 30
+  # Condition-based gate for classification: the restorable move label only
+  # renders after the live verify finishes (rows show "checking…" before).
+  - assert_text:
+      selector: '[data-testid="refactor-recovery-review"]'
+      contains: "ready to move back"
+      timeout_sec: 30
+  - screenshot: tc-ide-java-rename-deleted-win-mixed-review.png
+  # ---- Restore the production mixed shape (AC-05) ----
+  - eval_readonly:
+      expression: "String(document.querySelector('[data-testid' + String.fromCharCode(61) + '\"refactor-recovery-restore\"]').disabled)"
+      contains: "false"
+  - click: '[data-testid="refactor-recovery-restore"]'
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="confirm-dialog"]'
+      contains: "Restore pre-refactor content"
+      timeout_sec: 10
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Refactor recovery complete"
+      timeout_sec: 60
+  - assert_file_sha256:
+      path: "${fixture.jrdr_root}/MixOld.java"
+      equals: "3533c9cac826533ea8dd12c771268366d3901f2d14fb43fd1d9a70dd794444c1"
+      timeout_sec: 30
+  - eval_readonly:
+      expression: "localStorage.getItem('taomni.refactor.recovery.v2:qa-jrdrw-mixed')"
+      contains: "rolled-back"
+  - eval_readonly:
+      expression: "localStorage.getItem('taomni.refactor.recovery.v2:qa-jrdrw-mixed')"
+      contains: "reversedMoves"
+  - screenshot: tc-ide-java-rename-deleted-win-restored.png
+  # Reload proves final silence: the abandoned record never returns and the
+  # restored record closed as rolled-back.
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.jrdr_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait: 5
+  - assert_not_visible: '[data-testid="refactor-recovery-review"]'
