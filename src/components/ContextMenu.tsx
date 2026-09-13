@@ -185,11 +185,11 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
       data-testid="context-menu"
       data-taomni-context-menu=""
       data-appearance={appearance}
-      className="min-w-[220px] py-1 rounded shadow-lg border text-[12px] outline-none"
+      className={`min-w-[220px] ${appearance === "code-candidates" ? "py-0" : "py-1"} rounded shadow-lg border text-[12px] outline-none`}
       style={{
-        background: "var(--taomni-panel-bg)",
-        borderColor: "var(--taomni-divider)",
-        color: "var(--taomni-text)",
+        background: appearance === "code-candidates" ? "var(--taomni-code-tooltip-bg)" : "var(--taomni-panel-bg)",
+        borderColor: appearance === "code-candidates" ? "var(--taomni-code-border)" : "var(--taomni-divider)",
+        color: appearance === "code-candidates" ? "var(--taomni-code-text)" : "var(--taomni-text)",
         ...style,
         maxHeight: "calc(100vh - 12px)",
         overflowY: "auto",
@@ -198,6 +198,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
       {items.map((item, i) => (
         <MenuRow
           key={i}
+          appearance={appearance}
           item={item}
           active={activeIndex === i}
           isSubmenuOpen={openSubmenuIndex === i}
@@ -272,6 +273,7 @@ function PortalFlyout({
 }
 
 function MenuRow({
+  appearance,
   item,
   active,
   isSubmenuOpen,
@@ -280,6 +282,7 @@ function MenuRow({
   onCloseSubmenu,
   onClose,
 }: {
+  appearance?: "default" | "code-candidates";
   item: MenuItem;
   active: boolean;
   isSubmenuOpen: boolean;
@@ -293,6 +296,26 @@ function MenuRow({
   const closeTimer = useRef<number | null>(null);
 
   const open = isSubmenuOpen || openByHover;
+  const isCodeCandidates = appearance === "code-candidates";
+
+  const handleHover = () => {
+    if (item.disabled) return;
+    onHover();
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (item.disabled) return;
+    if (e.movementX !== undefined && e.movementY !== undefined && e.movementX === 0 && e.movementY === 0) {
+      return;
+    }
+    if (!active) {
+      onHover();
+    }
+  };
+
+  const rowClassName = isCodeCandidates
+    ? "w-full px-2 py-0.5 text-left flex items-center gap-2 disabled:opacity-40 outline-none"
+    : "w-full px-3 py-1 text-left flex items-center gap-2 hover:bg-[var(--taomni-hover)] data-[active=true]:bg-[var(--taomni-hover)] disabled:opacity-40 outline-none";
 
   useEffect(
     () => () => {
@@ -340,21 +363,22 @@ function MenuRow({
     const openNow = () => {
       cancelClose();
       setOpenByHover(true);
-      onHover();
+      handleHover();
       onOpenSubmenu();
     };
 
     return (
       <div
         className="relative group/menu-row"
-        onMouseEnter={item.openOnClick ? () => { cancelClose(); onHover(); } : openNow}
+        onMouseEnter={item.openOnClick ? () => { cancelClose(); handleHover(); } : (item.disabled ? undefined : openNow)}
+        onMouseMove={handleMouseMove}
         onMouseLeave={scheduleClose}
       >
         <button
           ref={triggerRef}
           data-testid={item.testId ?? `context-menu-item-${slugForTestId(item.label)}`}
           data-active={active ? "true" : undefined}
-          className="w-full px-3 py-1 text-left flex items-center gap-2 hover:bg-[var(--taomni-hover)] data-[active=true]:bg-[var(--taomni-hover)] disabled:opacity-40 outline-none"
+          className={rowClassName}
           style={item.danger ? { color: "#b22222" } : undefined}
           disabled={item.disabled}
           onClick={item.openOnClick ? () => {
@@ -375,6 +399,7 @@ function MenuRow({
             {item.customPanel ? item.customPanel : (
               <MenuSurface
                 isSubmenu
+                appearance={appearance}
                 items={item.children ?? []}
                 onClose={onClose}
                 onBack={() => {
@@ -394,9 +419,10 @@ function MenuRow({
       ref={triggerRef}
       data-testid={item.testId ?? `context-menu-item-${slugForTestId(item.label)}`}
       data-active={active ? "true" : undefined}
-      className="w-full px-3 py-1 text-left flex items-center gap-2 hover:bg-[var(--taomni-hover)] data-[active=true]:bg-[var(--taomni-hover)] disabled:opacity-40 outline-none"
+      className={rowClassName}
       style={item.danger ? { color: "#b22222" } : undefined}
-      onMouseEnter={onHover}
+      onMouseEnter={handleHover}
+      onMouseMove={handleMouseMove}
       onClick={() => {
         item.onClick?.();
         onClose();
