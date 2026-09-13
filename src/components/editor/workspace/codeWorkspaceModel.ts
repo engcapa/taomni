@@ -560,6 +560,7 @@ export function fileUriToFsPath(candidate: string): string {
  */
 export function normalizeFsPath(path: string): string {
   if (!path) return path;
+  if (isDocumentUri(path)) return path;
   const candidate = fileUriToFsPath(path);
   if (isDocumentUri(candidate)) return candidate;
   return renderFsPath(parseFsPath(candidate));

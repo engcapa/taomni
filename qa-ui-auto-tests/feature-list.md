@@ -213,6 +213,14 @@ controls:
     selector: 'span[aria-label="New output"]'
     kind: display
     optional: true
+  - id: context-menu-item-tools
+    selector: '[data-testid="context-menu-item-tools"]'
+    kind: interactive
+    optional: true
+  - id: context-menu-item-tunneling
+    selector: '[data-testid="context-menu-item-tunneling"]'
+    kind: interactive
+    optional: true
 -->
 
 - 多标签：本地终端 / SSH 终端 / SFTP / VNC / 设置 / 隧道管理 / Welcome / 占位标签
@@ -467,6 +475,10 @@ controls:
     selector: '[data-testid="context-menu-item-xserver"]'
     kind: interactive
     optional: true       # top-level toggle in the unified app menu
+  - id: context-menu-item-sessions
+    selector: '[data-testid="context-menu-item-sessions"]'
+    kind: interactive
+    optional: true       # inside the unified app menu
 -->
 
 - 原 per-menu `MenuBar`（menu-bar/menu-terminal/menu-view…）已从产品移除；统一入口是标题栏的 `app-main-menu` 按钮，经共享 ContextMenu 渲染一级/二级菜单。
@@ -2131,6 +2143,8 @@ controls:
     kind: interactive
   - id: editor-remote-host
     selector: 'input[placeholder="127.0.0.1"]'
+    aliases:
+      - 'input[placeholder="db.internal"]'
     kind: interactive
     optional: true       # only rendered for remote-forward / dynamic kinds
   - id: editor-remote-port
@@ -2454,6 +2468,10 @@ controls:
   - id: reset-terminal-default-profile
     selector: '[data-testid="settings-reset-terminal-default-profile"]'
     kind: interactive
+  - id: group-toggle-general
+    selector: '[data-testid="settings-group-toggle-general"]'
+    kind: interactive
+    optional: true       # accordion toggle for general section
   - id: group-toggle-security
     selector: '[data-testid="settings-group-toggle-security"]'
     kind: interactive
@@ -2864,9 +2882,15 @@ files:
   - src/components/settings/SettingsPanel.tsx
   - src/stores/aiStore.ts
 controls:
-  - id: ai-master-toggle
-    selector: 'text="Disable AI completely"'
+  - id: settings-group-toggle-ai
+    selector: '[data-testid="settings-group-toggle-ai"]'
     kind: interactive
+    optional: true
+  - id: ai-master-toggle
+    selector: '[data-testid="ai-master-switch"]'
+    kind: interactive
+    aliases:
+      - 'text="Disable AI completely"'
   - id: privacy-fully-local
     selector: 'text="Full local mode"'
     kind: interactive
@@ -4481,8 +4505,8 @@ controls:
     selector: '[data-testid="note-theme-paper"]'
     kind: interactive
     optional: true       # only visible while the preview dropdown is open
-  - id: note-panel-mode-floating
-    selector: '[data-testid="note-panel-mode-floating"]'
+  - id: notes-floating-toggle
+    selector: '[data-testid="notes-floating-toggle"]'
     kind: interactive
     optional: true
   - id: floating-notes-panel

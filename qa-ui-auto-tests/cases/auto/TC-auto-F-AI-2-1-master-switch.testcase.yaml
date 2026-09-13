@@ -15,16 +15,19 @@ steps:
   - wait_for: '[data-testid="ribbon-settings"]'
   - click: '[data-testid="ribbon-settings"]'
   - wait_for: '[data-testid="settings-panel"]'
+  # Expand AI section to reveal master switch
+  - click: '[data-testid="settings-group-toggle-ai"]'
   # AI master switch must be reachable (it is a toggleable card).
   - assert_visible: 'text="Disable AI completely"'
-  - click: 'text="Disable AI completely"'
+  - assert_visible: '[data-testid="ai-master-switch"]'
+  - click: '[data-testid="ai-master-switch"]'
   # After turning the master switch on, title-bar voice must disappear.
   - wait_for:
       selector: '[data-testid="ptt-button"]'
       state: detached
       timeout_sec: 10
   # Toggle back so subsequent cases keep the default state.
-  - click: 'text="Disable AI completely"'
+  - click: '[data-testid="ai-master-switch"]'
   - wait_for:
       selector: '[data-testid="ptt-button"]'
       timeout_sec: 10

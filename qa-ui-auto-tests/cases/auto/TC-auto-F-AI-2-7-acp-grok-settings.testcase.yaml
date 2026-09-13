@@ -14,6 +14,8 @@ steps:
   - open: ${cfg.app.base_url}
   - wait_for: '[data-testid="ribbon-settings"]'
   - click: '[data-testid="ribbon-settings"]'
+  - wait_for: '[data-testid="settings-panel"]'
+  - click: '[data-testid="settings-group-toggle-ai"]'
   - wait_for: '[data-testid="acp-settings"]'
   - assert_visible: '[data-testid="acp-settings"]'
   - assert_visible: '[data-testid="acp-profile-grok"]'

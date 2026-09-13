@@ -3918,35 +3918,37 @@ export function MainLayout() {
       style={{ background: "var(--taomni-chrome-bg)" }}
     >
       {!isMac && <WindowResizeHandles />}
-      <ControlBar
-        activeTabClosable={!!activeTab?.closable}
-        nativeMenu={nativeMenu}
-        xServerEnabled={xServerEnabled}
-        quickConnectVisible={quickConnectVisible}
-        workspaceCommands={activeWorkspaceCommandRegistration?.items ?? []}
-        onCommand={handleCommand}
-        onWorkspaceCommand={(commandId) => activeWorkspaceCommandRegistration?.executeAction(commandId)}
-        onToggleSidebar={toggleSidebar}
-        onStartLocalTerminal={(localShell) =>
-          openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell)
-        }
-        onConnectSession={handleConnectSession}
-        onOpenSessionEditor={() => handleNewSession()}
-        onDuplicateTab={handleDuplicateTab}
-        onDetachActiveTab={
-          activeTab && (
-            (activeTab.type === "terminal" && !terminalSplitVisible) ||
-            (activeTab.type === "rdp" && !!activeTab.rdp) ||
-            (activeTab.type === "vnc" && !!activeTab.vnc) ||
-            (activeTab.type === "database" && !!activeTab.db) ||
-            (activeTab.type === "sftp" && !!activeTab.sftp)
-          )
-            ? handleDetachActiveTab
-            : undefined
-        }
-        onCloseWindow={requestAppExit}
-        slotRef={setTabActionSlot}
-      />
+      <div data-testid="app-titlebar" className="min-w-0">
+        <ControlBar
+          activeTabClosable={!!activeTab?.closable}
+          nativeMenu={nativeMenu}
+          xServerEnabled={xServerEnabled}
+          quickConnectVisible={quickConnectVisible}
+          workspaceCommands={activeWorkspaceCommandRegistration?.items ?? []}
+          onCommand={handleCommand}
+          onWorkspaceCommand={(commandId) => activeWorkspaceCommandRegistration?.executeAction(commandId)}
+          onToggleSidebar={toggleSidebar}
+          onStartLocalTerminal={(localShell) =>
+            openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell)
+          }
+          onConnectSession={handleConnectSession}
+          onOpenSessionEditor={() => handleNewSession()}
+          onDuplicateTab={handleDuplicateTab}
+          onDetachActiveTab={
+            activeTab && (
+              (activeTab.type === "terminal" && !terminalSplitVisible) ||
+              (activeTab.type === "rdp" && !!activeTab.rdp) ||
+              (activeTab.type === "vnc" && !!activeTab.vnc) ||
+              (activeTab.type === "database" && !!activeTab.db) ||
+              (activeTab.type === "sftp" && !!activeTab.sftp)
+            )
+              ? handleDetachActiveTab
+              : undefined
+          }
+          onCloseWindow={requestAppExit}
+          slotRef={setTabActionSlot}
+        />
+      </div>
       {quickConnectVisible && (
         <QuickConnect
           onConnectInput={handleQuickConnect}

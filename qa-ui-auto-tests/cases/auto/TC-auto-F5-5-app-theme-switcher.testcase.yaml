@@ -17,6 +17,7 @@ steps:
   - wait_for: '[data-testid="ribbon-settings"]'
   - click: '[data-testid="ribbon-settings"]'
   - wait_for: '[data-testid="settings-panel"]'
+  - click: '[data-testid="settings-group-toggle-general"]'
   - assert_visible: '[data-testid="app-theme-select"]'
   - click: '[data-testid="app-theme-select"]'
   - assert_visible: '[data-testid="app-theme-light"]'

@@ -47,7 +47,7 @@ steps:
   - click: '[data-testid="welcome-recent-select"]'
   - click: '[data-testid="welcome-recent-open-selected"]'
   - wait_for:
-      selector: '[data-testid="terminal-pane"]'
+      selector: '[data-testid="terminal-split-pane"][data-active="true"] [data-testid="terminal-pane"]'
       timeout_sec: 10
 
   - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
@@ -59,13 +59,13 @@ steps:
   - assert_menu_items: [Connect, Edit..., Duplicate, Move to folder, Delete]
   - click_menu: Connect
   - wait_for:
-      selector: '[data-testid="terminal-pane"]'
+      selector: '[data-testid="terminal-split-pane"][data-active="true"] [data-testid="terminal-pane"]'
       timeout_sec: 10
 
   - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
   - click: '[data-testid="welcome-recent-open-filtered"]'
   - wait_for:
-      selector: '[data-testid="terminal-pane"]'
+      selector: '[data-testid="terminal-split-pane"][data-active="true"] [data-testid="terminal-pane"]'
       timeout_sec: 10
 
   - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
@@ -75,17 +75,19 @@ steps:
   - click: '[data-testid="welcome-recent-clear-filter"]'
   - click: '[data-testid="welcome-recent-open-all"]'
   - wait_for:
-      selector: '[data-testid="terminal-pane"]'
+      selector: '[data-testid="terminal-split-pane"][data-active="true"] [data-testid="terminal-pane"]'
       timeout_sec: 10
 
   - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
   - click: '[data-testid="welcome-recent-open"]'
   - wait_for:
-      selector: '[data-testid="terminal-pane"]'
+      selector: '[data-testid="terminal-split-pane"][data-active="true"] [data-testid="terminal-pane"]'
       timeout_sec: 10
 
   - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
   - click: '[data-testid="welcome-recent-settings"]'
+  - wait_for: '[data-testid="settings-panel"]'
+  - click: '[data-testid="settings-group-toggle-general"]'
   - wait_for: '[data-testid="settings-welcome-recent-session-limit"]'
   - fill: {selector: '[data-testid="settings-welcome-recent-session-limit"]', value: '20'}
   - screenshot: F1.6-welcome-recent-sessions.png

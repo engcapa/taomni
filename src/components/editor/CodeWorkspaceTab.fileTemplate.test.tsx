@@ -106,6 +106,15 @@ vi.mock("../../lib/editor/workspace", () => {
 
   return {
     ...workspaceMocks,
+    parseWorkspaceWriteError: (error: unknown) => {
+      if (error && typeof error === "object" && "kind" in error && "message" in error) {
+        return error;
+      }
+      return {
+        kind: "io",
+        message: error instanceof Error ? error.message : String(error),
+      };
+    },
     workspaceListDir: (...args: unknown[]) => wrap(() => workspaceMocks.workspaceListDir(...args)),
     workspaceCompactChain: (...args: unknown[]) => wrap(() => workspaceMocks.workspaceCompactChain(...args)),
     workspaceListFilesRecursive: (...args: unknown[]) => wrap(() => workspaceMocks.workspaceListFilesRecursive(...args)),
@@ -533,15 +542,14 @@ describe("ED-TEMPLATE-001: File and Code Templates production flow in CodeWorksp
       await registrationRef.current!.executeAction("workspace.undoWorkspaceEdit");
     });
 
-    await waitFor(() => {
-      expect(workspaceMocks.workspaceApplyResourceOperation).toHaveBeenCalledWith(
-        workspaceRoot,
-        expect.objectContaining({
-          kind: "delete",
-          path: "src/main/java/com/example/service/FailedService.java",
-        }),
-      );
-    });
+    // When write fails, undo is not registered to prevent false success (ED-MAIN-001 / ED-AUDIT-014)
+    expect(workspaceMocks.workspaceApplyResourceOperation).not.toHaveBeenCalledWith(
+      workspaceRoot,
+      expect.objectContaining({
+        kind: "delete",
+        path: "src/main/java/com/example/service/FailedService.java",
+      }),
+    );
   });
 
   it("supports undo to remove created Java file (ED-TEMPLATE-001-A3)", async () => {

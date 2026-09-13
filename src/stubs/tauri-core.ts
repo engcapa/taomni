@@ -4230,6 +4230,33 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       }
       return undefined as T;
     }
+    case "mirror_get_config": {
+      return ({ preference: "auto", custom_base: null } as unknown) as T;
+    }
+    case "mirror_set_config": {
+      return undefined as T;
+    }
+    case "cuda_pack_status": {
+      return ({ installed: false, path: "", size_mb: 0 } as unknown) as T;
+    }
+    case "get_ai_config": {
+      try {
+        const raw = localStorage.getItem("taomni.ai.config.v1");
+        if (raw) return JSON.parse(raw) as T;
+      } catch {}
+      return null as unknown as T;
+    }
+    case "save_ai_config": {
+      try {
+        if (args?.config) {
+          localStorage.setItem("taomni.ai.config.v1", JSON.stringify(args.config));
+        }
+      } catch {}
+      return undefined as T;
+    }
+    case "save_ai_api_key": {
+      return (`vault:stub-${args?.kind || "key"}` as unknown) as T;
+    }
     default:
       console.warn(`[tauri-stub] Unknown invoke command: ${cmd}`, args);
       if (cmd === "history_match_prefix" || cmd === "history_list_recent") {

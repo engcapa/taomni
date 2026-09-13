@@ -76,7 +76,9 @@
 
 ## ai/settings (F-AI-2.1)
 
-- `text="Disable AI completely"` — interactive — F-AI-2.1.ai-master-toggle
+- `[data-testid="settings-group-toggle-ai"]` — interactive [optional] — F-AI-2.1.settings-group-toggle-ai
+- `[data-testid="ai-master-switch"]` — interactive — F-AI-2.1.ai-master-toggle
+  ↳ `text="Disable AI completely"` — alias
 - `text="Full local mode"` — interactive [optional] — F-AI-2.1.privacy-fully-local
 
 ## ai/terminal (F-AI-2.2)
@@ -751,6 +753,7 @@
 - `[data-testid="context-menu-item-new-local-terminal"]` — interactive [optional] — F1.8.new-local-terminal-command
 - `[data-testid="context-menu-item-reload-sessions"]` — interactive [optional] — F1.8.reload-sessions-command
 - `[data-testid="context-menu-item-xserver"]` — interactive [optional] — F1.8.xserver-command
+- `[data-testid="context-menu-item-sessions"]` — interactive [optional] — F1.8.context-menu-item-sessions
 
 ## main/ribbon (F1.9)
 
@@ -794,6 +797,8 @@
 - `[data-testid="context-menu-item-move-right"]` — interactive [optional] — F1.5.tab-menu-move-right
 - `[data-testid="context-menu-item-move-to-last"]` — interactive [optional] — F1.5.tab-menu-move-last
 - `span[aria-label="New output"]` — display [optional] — F1.5.tab-new-output-dot
+- `[data-testid="context-menu-item-tools"]` — interactive [optional] — F1.5.context-menu-item-tools
+- `[data-testid="context-menu-item-tunneling"]` — interactive [optional] — F1.5.context-menu-item-tunneling
 
 ## main/theme (F5.5)
 
@@ -938,7 +943,7 @@
 - `[data-testid="note-theme-settings"]` — display [optional] — F-TAO-1.note-theme-settings
 - `[data-testid="note-theme-select"]` — interactive [optional] — F-TAO-1.note-theme-select
 - `[data-testid="note-theme-paper"]` — interactive [optional] — F-TAO-1.note-theme-paper
-- `[data-testid="note-panel-mode-floating"]` — interactive [optional] — F-TAO-1.note-panel-mode-floating
+- `[data-testid="notes-floating-toggle"]` — interactive [optional] — F-TAO-1.notes-floating-toggle
 - `[data-testid="floating-notes-panel"]` — display [optional] — F-TAO-1.floating-notes-panel
 - `[data-testid="floating-notes-dock"]` — interactive [optional] — F-TAO-1.floating-notes-dock
 - `[data-testid="tao-ribbon-badge"]` — display [optional] — F-TAO-1.tao-ribbon-badge
@@ -1138,6 +1143,7 @@
 - `[data-testid="settings-search-empty"]` — display — F11.1.search-empty
 - `[data-testid="settings-reset-code-view-profile"]` — interactive — F11.1.reset-code-view-profile
 - `[data-testid="settings-reset-terminal-default-profile"]` — interactive — F11.1.reset-terminal-default-profile
+- `[data-testid="settings-group-toggle-general"]` — interactive [optional] — F11.1.group-toggle-general
 - `[data-testid="settings-group-toggle-security"]` — interactive [optional] — F11.1.group-toggle-security
 - `[data-testid="sql-completion-settings"]` — display — F11.1.sql-completion-settings
 - `[data-testid="sql-completion-activate-on-typing"]` — interactive — F11.1.sql-completion-activate-on-typing
@@ -1427,6 +1433,7 @@
 - `input[placeholder="22"]` — interactive — F8.2.editor-port
 - `input[placeholder="0"]` — interactive — F8.2.editor-local-port
 - `input[placeholder="127.0.0.1"]` — interactive [optional] — F8.2.editor-remote-host
+  ↳ `input[placeholder="db.internal"]` — alias
 - `input[placeholder="5432"]` — interactive [optional] — F8.2.editor-remote-port
 - `label:has-text("Remote port forwarding") input[type="radio"]` — interactive — F8.2.editor-kind-remote
 - `label:has-text("Dynamic port forwarding (SOCKS proxy)") input[type="radio"]` — interactive — F8.2.editor-kind-dynamic
