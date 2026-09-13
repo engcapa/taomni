@@ -154,5 +154,87 @@ describe("ContextMenu", () => {
     fireEvent.keyDown(window, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  describe("code-candidates appearance", () => {
+    it("renders code candidate styling without default hover background classes", () => {
+      const items: MenuItem[] = [
+        { label: "Quick Fixes", disabled: true },
+        { label: "Add type annotation", onClick: vi.fn() },
+        { label: "Import class", onClick: vi.fn() },
+      ];
+
+      render(<ContextMenu appearance="code-candidates" items={items} x={10} y={10} onClose={vi.fn()} />);
+
+      const menu = screen.getByTestId("context-menu");
+      expect(menu).toHaveAttribute("data-appearance", "code-candidates");
+      expect(menu.style.background).toBe("var(--taomni-code-tooltip-bg)");
+
+      const header = screen.getByTestId("context-menu-item-quick-fixes");
+      const fix1 = screen.getByTestId("context-menu-item-add-type-annotation");
+      const fix2 = screen.getByTestId("context-menu-item-import-class");
+
+      // Initial active index skips disabled header and selects first candidate
+      expect(fix1).toHaveAttribute("data-active", "true");
+      expect(fix2).not.toHaveAttribute("data-active");
+      expect(header).not.toHaveAttribute("data-active");
+
+      // Buttons under code-candidates do not have hover:bg-[var(--taomni-hover)] class
+      expect(fix1.className).not.toContain("hover:bg-[var(--taomni-hover)]");
+      expect(fix2.className).not.toContain("hover:bg-[var(--taomni-hover)]");
+    });
+
+    it("moves focus on arrow navigation and does not leave hover selection on previous item", () => {
+      const items: MenuItem[] = [
+        { label: "Fix 1", onClick: vi.fn() },
+        { label: "Fix 2", onClick: vi.fn() },
+      ];
+
+      render(<ContextMenu appearance="code-candidates" items={items} x={10} y={10} onClose={vi.fn()} />);
+
+      const fix1 = screen.getByTestId("context-menu-item-fix-1");
+      const fix2 = screen.getByTestId("context-menu-item-fix-2");
+
+      expect(fix1).toHaveAttribute("data-active", "true");
+      expect(fix2).not.toHaveAttribute("data-active");
+
+      // ArrowDown moves active to Fix 2
+      fireEvent.keyDown(window, { key: "ArrowDown" });
+      expect(fix2).toHaveAttribute("data-active", "true");
+      expect(fix1).not.toHaveAttribute("data-active");
+
+      // Hovering or moving mouse without physical displacement does not steal focus back
+      fireEvent.mouseMove(fix1, { movementX: 0, movementY: 0 });
+      expect(fix2).toHaveAttribute("data-active", "true");
+      expect(fix1).not.toHaveAttribute("data-active");
+
+      // Physical mouse move on Fix 1 reactivates it
+      fireEvent.mouseMove(fix1, { movementX: 2, movementY: 1 });
+      expect(fix1).toHaveAttribute("data-active", "true");
+      expect(fix2).not.toHaveAttribute("data-active");
+    });
+
+    it("does not activate disabled headers on mouse hover or move", () => {
+      const items: MenuItem[] = [
+        { label: "Header", disabled: true },
+        { label: "Fix", onClick: vi.fn() },
+      ];
+
+      render(<ContextMenu appearance="code-candidates" items={items} x={10} y={10} onClose={vi.fn()} />);
+
+      const header = screen.getByTestId("context-menu-item-header");
+      const fix = screen.getByTestId("context-menu-item-fix");
+
+      expect(fix).toHaveAttribute("data-active", "true");
+      expect(header).not.toHaveAttribute("data-active");
+
+      fireEvent.mouseEnter(header);
+      expect(header).not.toHaveAttribute("data-active");
+      expect(fix).toHaveAttribute("data-active", "true");
+
+      fireEvent.mouseMove(header, { movementX: 5, movementY: 5 });
+      expect(header).not.toHaveAttribute("data-active");
+      expect(fix).toHaveAttribute("data-active", "true");
+    });
+  });
 });
 
