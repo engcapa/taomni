@@ -5657,9 +5657,12 @@ controls:
 id: F25.5
 status: partial
 area: code-workspace/editor-shell
-components: [CodeWorkspaceTab, WorkspaceTabPolicySettingsDialog, EditorGroup, HighlightingWidget, FileTreePane, TabSwitcher, Breadcrumbs, KeymapSettingsDialog, ClipboardHistoryPopup, ProjectFactsStatusBadge, TodosBookmarksPanel, EditorCompareDialog, LocalHistoryDialog, FileEncodingDialog, AutoImportSettingsDialog, AutoImportCandidateDialog, FileTemplateSettingsDialog, NewJavaClassDialog]
+components: [CodeWorkspaceTab, WorkspaceTabPolicySettingsDialog, EditorGroup, HighlightingWidget, FileTreePane, TabSwitcher, Breadcrumbs, KeymapSettingsDialog, ClipboardHistoryPopup, ProjectFactsStatusBadge, TodosBookmarksPanel, EditorCompareDialog, LocalHistoryDialog, FileEncodingDialog, AutoImportSettingsDialog, AutoImportCandidateDialog, FileTemplateSettingsDialog, NewJavaClassDialog, RefactorRecoveryReviewDialog]
 files:
   - src/components/editor/CodeWorkspaceTab.tsx
+  - src/components/editor/workspace/RefactorRecoveryReviewDialog.tsx
+  - src/components/editor/workspace/refactorPlan.ts
+  - src/components/editor/workspace/refactorRecoveryController.ts
   - src/components/editor/workspace/FileEncodingDialog.tsx
   - src/components/editor/workspace/WorkspaceTabPolicySettingsDialog.tsx
   - src/components/editor/workspace/Breadcrumbs.tsx
@@ -5728,6 +5731,38 @@ controls:
     selector: '[data-testid="refactoring-preview-apply"]'
     kind: interactive
     optional: true       # applies the previewed refactoring (C6-04)
+  - id: refactor-recovery-review
+    selector: '[data-testid="refactor-recovery-review"]'
+    kind: display
+    optional: true       # per-entry recovery review dialog (figure A)
+  - id: refactor-recovery-resource
+    selector: '[data-testid="refactor-recovery-resource"]'
+    kind: display
+    optional: true       # one row per affected file/move with its live state
+  - id: refactor-recovery-keep
+    selector: '[data-testid="refactor-recovery-keep"]'
+    kind: interactive
+    optional: true       # closes the review, entry stays pending
+  - id: refactor-recovery-dismiss
+    selector: '[data-testid="refactor-recovery-dismiss"]'
+    kind: interactive
+    optional: true       # opens the inline abandon confirm (figure B)
+  - id: refactor-recovery-dismiss-confirm
+    selector: '[data-testid="refactor-recovery-dismiss-confirm"]'
+    kind: display
+    optional: true       # inline abandon confirm panel, cancel-focused
+  - id: refactor-recovery-dismiss-cancel
+    selector: '[data-testid="refactor-recovery-dismiss-cancel"]'
+    kind: interactive
+    optional: true       # cancels the abandon, entry stays pending
+  - id: refactor-recovery-dismiss-confirm-button
+    selector: '[data-testid="refactor-recovery-dismiss-confirm-button"]'
+    kind: interactive
+    optional: true       # persists user-dismissed, files untouched
+  - id: refactor-recovery-restore
+    selector: '[data-testid="refactor-recovery-restore"]'
+    kind: interactive
+    optional: true       # verified restore, enabled only when restorable
   - id: tree-filter
     selector: '[data-testid="code-workspace-tree-filter"]'
     kind: interactive

@@ -19,13 +19,14 @@ description: |
      diagnostic) and the same probe proved rename returns a real edit. A
      variable (not the class) is renamed so no file-move operation is
      involved; undo-inversion of resource moves is a separate recorded gap.
-  2. A2/A3 native restart/disk: a seeded v2 refactor recovery journal entry
+   2. A2/A3 native restart/disk: a seeded v2 refactor recovery journal entry
      describes a `prepared` transaction whose pre/post images are the literal
      preimage and a `QA14PostA` substitute (computed offline). The webview
      JS context is destroyed by `reload_window`, the workspace is re-entered
-     through recents, the recovery controller surfaces the "Refactor recovery
-     pending" dialog, the case accepts "Review recovery", then "Restore
-     pre-refactor content" restores every affected file to its preimage. The
+     through recents, the pending entry surfaces in the review dialog
+     (affected files with live states, Keep / Restore / Abandon outlets),
+     the case presses Restore, confirms "Restore pre-refactor content", and
+     the verified rollback restores every affected file to its preimage. The
      host re-reads the affected files (assert_file_sha256 == preHash), proves
      the journal entry was promoted to `rolled-back`, and confirms a parallel
      `host_write_file` conflict is never overwritten. The case labels the
@@ -179,14 +180,18 @@ steps:
   - click: '[data-testid="welcome-history-tab-workspaces"]'
   - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
   - wait_for: '[data-testid="code-workspace-tab"]'
+  # The pending entry surfaces in the review dialog (figure A): it lists
+  # every affected file with its live state and offers Keep / Restore /
+  # Abandon. Restore reuses the "Restore pre-refactor content" app confirm
+  # before the verified rollback runs.
   - wait_for:
-      selector: '[data-testid="confirm-dialog"]'
+      selector: '[data-testid="refactor-recovery-review"]'
       timeout_sec: 60
   - assert_text:
-      selector: '[data-testid="confirm-dialog"]'
-      contains: "Refactor recovery pending"
+      selector: '[data-testid="refactor-recovery-review"]'
+      contains: "Review refactor recovery"
       timeout_sec: 10
-  - click: '[data-testid="confirm-dialog-confirm"]'
+  - click: '[data-testid="refactor-recovery-restore"]'
   - wait_for:
       selector: '[data-testid="confirm-dialog"]'
       timeout_sec: 30

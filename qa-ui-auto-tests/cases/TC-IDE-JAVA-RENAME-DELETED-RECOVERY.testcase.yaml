@@ -1,0 +1,239 @@
+id: TC-IDE-JAVA-RENAME-DELETED-RECOVERY
+title: "Java class rename + delete: no false recovery, explicit abandon, verified restore"
+description: |
+  java-rename-deleted-recovery native gate case (F25.5). Proves the three
+  production fixes over the real packaged-app boundary on Linux:
+
+  1. AC-01/provider: a real Shift+F6 rename of the top-level
+     `QuickFixTarget` class in the maven-single sample applies a genuine
+     text+rename WorkspaceEdit through the packaged app UI (preview modal
+     reporting the resource operation, apply, moved file on disk with the new
+     class, journal committed). Re-entering the workspace surfaces NO review
+     dialog for that successful transaction (identity-based postcondition:
+     no false `recovery-required` from `/` vs `\` path spellings).
+  2. AC-02/03/04 seeded history: a seeded v2 entry in the deleted-after-rename
+     shape (old and new paths both missing) reviews as
+     document-unreadable / move `both-missing`, states non-existence without
+     claiming the user deleted anything, keeps Restore disabled, and offers
+     Keep plus a two-step Abandon (Esc cancels the second step and keeps the
+     entry pending). Confirming Abandon records only a `user-dismissed`
+     resolution marker (zero file writes: the renamed file keeps its post
+     bytes, the gone paths stay gone), and after reload the abandoned record
+     stays silent while a sibling pending entry still prompts.
+  3. AC-05 seeded mixed shape: a seeded v2 entry in the production mixed
+     text+rename shape (`contentHash` = pre-image hash, document pre/post
+     images, new path staged with the POST bytes) classifies restorable
+     (document proof accepts the post image instead of conflicting on the
+     pre hash), restores new->old with byte-preservation proof plus preimage
+     read-back, and lands `rolled-back` with the reversed move recorded.
+
+  Highest claim on green: L2 native (Linux), packaged app UI over a real
+  jdtls process (segment 1) and real disk bytes plus webview-persistent
+  recovery journals (segments 2-3). Explicitly NOT claimed by this run:
+  the live user order "rename then delete the renamed file via the tree then
+  reopen" (no tree-delete verb exists in the catalog; covered by recorded
+  manual V-05), the 736x375 / 1280x800 viewport matrix (no native viewport
+  verb; small-window geometry is manual V-05), host proof that a missing path
+  stays missing (no assert-file-missing verb; the zero-write ack plus
+  unchanged sibling hashes plus the `user-dismissed` marker are the
+  automated evidence), and macOS/Windows native runs (Linux only on this
+  box; other ends stay unverified, never passed-by-proxy).
+covers: [F25.5]
+tags: [code-workspace, ide-editor, refactor, recovery, java-rename, native-gate, p1]
+modes: [native]
+fixtures: [reset_db, java_sample_projects, jdtls_required]
+timeout_sec: 600
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: "qa-native-gate-password"
+  - wait_for: '[data-testid="welcome-panel"]'
+  # Enter the real maven-single sample through persisted recents; the
+  # workspace identity is the deterministic recents identity of the roots,
+  # so the layout snapshot and recovery entries survive reload_window.
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-jrdr","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/QuickFixTarget.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait_for:
+      selector: '[data-testid="code-workspace-editor-pane"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "public class QuickFixTarget"
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="code-workspace-lsp-status-pill"]'
+      contains: "Java"
+      timeout_sec: 60
+  # Cold-import settle (same precedent as TC-IDE-AUDIT-014/C6-04): per-run
+  # fixture copies force a cold jdtls import every run; stroking rename
+  # mid-import bails or cancels loudly instead of proving anything.
+  - wait: 30
+
+  # ---- Segment 1: live top-level class rename (AC-01 success half) ----
+  # `QuickFixTarget` sits on 1-based line 9 at 1-based cols 14-29
+  # (zero-based drag column 13). Renaming the top-level type makes the
+  # server include a file-move operation, which forces the preview modal.
+  - native_pointer_drag:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      from: {line: 9, column: 13}
+      to: {line: 9, column: 13}
+  - assert_text:
+      selector: '[data-testid="status-bar-workspace-cursor"]'
+      contains: "Ln 9, Col 14"
+      timeout_sec: 10
+  - wait: 2
+  - native_keys:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      keys: ["Shift+F6"]
+      transport: webdriver
+  - wait_for:
+      selector: '[data-testid="text-input-dialog"]'
+      timeout_sec: 30
+  - assert_attribute:
+      selector: '[data-testid="text-input-dialog-input"]'
+      name: "value"
+      equals: "QuickFixTarget"
+  - fill:
+      selector: '[data-testid="text-input-dialog-input"]'
+      value: "QaDelTarget"
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for:
+      selector: '[data-testid="refactoring-preview-dialog"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="refactoring-preview-dialog"]'
+      contains: "QaDelTarget"
+      timeout_sec: 10
+  - assert_text:
+      selector: '[data-testid="refactoring-preview-dialog"]'
+      contains: "1 resource operation"
+      timeout_sec: 10
+  - click: '[data-testid="refactoring-preview-apply"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "class QaDelTarget"
+      timeout_sec: 30
+  - press: Control+s
+  - assert_file_contains:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/QaDelTarget.java"
+      contains: "class QaDelTarget"
+      timeout_sec: 30
+  - screenshot: tc-ide-java-rename-deleted-recovery-rename.png
+  # Re-enter: the committed success must NOT surface a review dialog.
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait: 5
+  - assert_not_visible: '[data-testid="refactor-recovery-review"]'
+  - screenshot: tc-ide-java-rename-deleted-recovery-clean-reopen.png
+
+  # ---- Segment 2: seeded both-missing history (AC-02/03/04) ----
+  # The abandoned record points at paths that exist at neither end; the
+  # sibling stays restorable on the live disk. The abandoned record is
+  # newer, so the sequential review reaches it first.
+  - seed_storage:
+      key: taomni.refactor.recovery.v2:qa-jrdr-abandon
+      value: '{"schemaVersion": 2, "recoveryId": "qa-jrdr-abandon", "transactionId": "qa-jrdr-txn-abandon", "actionId": "rename:qa-jrdr-abandon", "kind": "rename", "workspaceRoot": "${fixture.maven_single_root}", "createdAt": 1757000002000, "updatedAt": 1757000002000, "status": "recovery-required", "appliedOperationIndex": null, "documents": [{"uri": "file://${fixture.maven_single_root}/src/main/java/com/example/single/Gone.java", "canonicalPath": "${fixture.maven_single_root}/src/main/java/com/example/single/Gone.java", "preText": "class Gone { int a = 1; }\n", "preHash": "d0a3257e508b876863b3ab9f4dc7f0fc04211e05fd33ba64e41c2ccc16852351", "postText": "class GoneRenamed { int a = 1; }\n", "postHash": "6fc89ed34e31da3e3927f9c1890dbc52154d62671a175db7796f45d24bde1b57", "encoding": "UTF-8", "bom": false, "eol": "lf"}], "resourceMoves": [{"oldUri": "file://${fixture.maven_single_root}/src/main/java/com/example/single/Gone.java", "newUri": "file://${fixture.maven_single_root}/src/main/java/com/example/single/GoneRenamed.java", "oldPath": "${fixture.maven_single_root}/src/main/java/com/example/single/Gone.java", "newPath": "${fixture.maven_single_root}/src/main/java/com/example/single/GoneRenamed.java", "contentHash": "d0a3257e508b876863b3ab9f4dc7f0fc04211e05fd33ba64e41c2ccc16852351"}], "verification": {"mismatchedUris": [], "checkedAt": null}}'
+  # Stage the sibling's post bytes and seed its prepared entry (older, so it
+  # reviews second). Pre/post are the literal App fixture bytes pattern with
+  # MixOld/MixNew class names; contentHash carries the PRE-image hash (the
+  # production mixed-shape contract RC-03 proves).
+  - host_write_file:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/MixNew.java"
+      text: "public class MixNew {}\n"
+  - seed_storage:
+      key: taomni.refactor.recovery.v2:qa-jrdr-mixed
+      value: '{"schemaVersion": 2, "recoveryId": "qa-jrdr-mixed", "transactionId": "qa-jrdr-txn-mixed", "actionId": "rename:qa-jrdr-mixed", "kind": "rename", "workspaceRoot": "${fixture.maven_single_root}", "createdAt": 1757000001000, "updatedAt": 1757000001000, "status": "prepared", "appliedOperationIndex": null, "documents": [{"uri": "file://${fixture.maven_single_root}/src/main/java/com/example/single/MixOld.java", "canonicalPath": "${fixture.maven_single_root}/src/main/java/com/example/single/MixOld.java", "preText": "public class MixOld {}\n", "preHash": "3533c9cac826533ea8dd12c771268366d3901f2d14fb43fd1d9a70dd794444c1", "postText": "public class MixNew {}\n", "postHash": "adf660ac77c1ba60f1cdc7106f9e8adeefe94af4657ec96348121122817f3432", "encoding": "UTF-8", "bom": false, "eol": "lf"}], "resourceMoves": [{"oldUri": "file://${fixture.maven_single_root}/src/main/java/com/example/single/MixOld.java", "newUri": "file://${fixture.maven_single_root}/src/main/java/com/example/single/MixNew.java", "oldPath": "${fixture.maven_single_root}/src/main/java/com/example/single/MixOld.java", "newPath": "${fixture.maven_single_root}/src/main/java/com/example/single/MixNew.java", "contentHash": "3533c9cac826533ea8dd12c771268366d3901f2d14fb43fd1d9a70dd794444c1"}], "verification": {"mismatchedUris": [], "checkedAt": null}}'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  # Newest first: the both-missing record. Restore stays disabled, the
+  # states name non-existence (never "you deleted"), and the full paths
+  # remain visible/selectable for long-path review.
+  - wait_for:
+      selector: '[data-testid="refactor-recovery-review"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="refactor-recovery-review"]'
+      contains: "Gone.java"
+      timeout_sec: 10
+  - assert_text:
+      selector: '[data-testid="refactor-recovery-review"]'
+      contains: "does not exist"
+      timeout_sec: 10
+  - assert_disabled: '[data-testid="refactor-recovery-restore"]'
+  - screenshot: tc-ide-java-rename-deleted-recovery-both-missing.png
+  # AC-04: opening Abandon then escaping keeps the entry pending.
+  - click: '[data-testid="refactor-recovery-dismiss"]'
+  - wait_for:
+      selector: '[data-testid="refactor-recovery-dismiss-confirm"]'
+      timeout_sec: 10
+  - press: Escape
+  - assert_not_visible: '[data-testid="refactor-recovery-dismiss-confirm"]'
+  - assert_text:
+      selector: '[data-testid="refactor-recovery-review"]'
+      contains: "Gone.java"
+      timeout_sec: 10
+  # Confirm Abandon: only the resolution marker is written (zero file
+  # writes). The renamed live file keeps its post bytes.
+  - click: '[data-testid="refactor-recovery-dismiss"]'
+  - click: '[data-testid="refactor-recovery-dismiss-confirm-button"]'
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Abandoned refactor recovery"
+      timeout_sec: 30
+  - eval_readonly:
+      expression: "localStorage.getItem('taomni.refactor.recovery.v2:qa-jrdr-abandon')"
+      contains: "user-dismissed"
+  - assert_file_contains:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/QaDelTarget.java"
+      contains: "class QaDelTarget"
+      timeout_sec: 30
+  # The sibling (older pending entry) reviews next in the same loop.
+  - wait_for:
+      selector: '[data-testid="refactor-recovery-review"]'
+      timeout_sec: 60
+  - assert_text:
+      selector: '[data-testid="refactor-recovery-review"]'
+      contains: "MixOld.java"
+      timeout_sec: 10
+  - screenshot: tc-ide-java-rename-deleted-recovery-mixed-review.png
+  # ---- Segment 3: restore the production mixed shape (AC-05) ----
+  - click: '[data-testid="refactor-recovery-restore"]'
+  - wait_for:
+      selector: '[data-testid="confirm-dialog"]'
+      timeout_sec: 30
+  - assert_text:
+      selector: '[data-testid="confirm-dialog"]'
+      contains: "Restore pre-refactor content"
+      timeout_sec: 10
+  - click: '[data-testid="confirm-dialog-confirm"]'
+  - assert_text:
+      selector: '[data-testid="status-bar-message"]'
+      contains: "Refactor recovery complete"
+      timeout_sec: 60
+  - assert_file_sha256:
+      path: "${fixture.maven_single_root}/src/main/java/com/example/single/MixOld.java"
+      equals: "3533c9cac826533ea8dd12c771268366d3901f2d14fb43fd1d9a70dd794444c1"
+      timeout_sec: 30
+  - eval_readonly:
+      expression: "localStorage.getItem('taomni.refactor.recovery.v2:qa-jrdr-mixed')"
+      contains: "rolled-back"
+  - eval_readonly:
+      expression: "localStorage.getItem('taomni.refactor.recovery.v2:qa-jrdr-mixed')"
+      contains: "reversedMoves"
+  - screenshot: tc-ide-java-rename-deleted-recovery-restored.png
+  # Reload proves final silence: the abandoned record never returns and the
+  # restored record closed as rolled-back.
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - wait: 5
+  - assert_not_visible: '[data-testid="refactor-recovery-review"]'

@@ -74,6 +74,7 @@
      "restore_24tab_fixtures",
      "sortable_java_fixtures",
      "file_move_recovery_fixtures",
+     "java_rename_deleted_fixtures",
      "view_state_fixtures"
     ]
    },
