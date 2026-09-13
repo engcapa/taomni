@@ -35,6 +35,20 @@ sftp:
   password: ${env.QA_SSH_PASSWORD}
   remote_test_dir: /config/qa-ui-auto
 
+database:
+  host: 127.0.0.1
+  port: 3306
+  user: test
+  password: ${env.TAOMNI_TEST_MYSQL_PASSWORD}
+  database: test
+
+mysql:
+  host: 127.0.0.1
+  port: 3306
+  user: test
+  password: ${env.TAOMNI_TEST_MYSQL_PASSWORD}
+  database: test
+
 # Note: the qa-ui-auto runner does not start any docker fixtures. If the
 # host above is unreachable, the TCP probe fails and SSH/SFTP cases skip.
 # Fix the network rather than letting the runner fall back.

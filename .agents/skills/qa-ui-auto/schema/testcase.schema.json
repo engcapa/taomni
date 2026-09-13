@@ -63,6 +63,7 @@
      "reset_db",
      "ssh_required",
      "sftp_required",
+     "mysql_required",
      "jdtls_required",
      "linux_x11_required",
      "workspace_root",

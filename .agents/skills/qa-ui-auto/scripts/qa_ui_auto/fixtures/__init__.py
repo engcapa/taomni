@@ -35,7 +35,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Protocol
 
-from . import editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_rename_deleted_fixtures, java_sample_projects, jdtls_required, linux_x11_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, welcome_recents, workspace_root
+from . import editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_rename_deleted_fixtures, java_sample_projects, jdtls_required, linux_x11_required, mysql_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, welcome_recents, workspace_root
 
 
 class FixtureContext(Protocol):
@@ -56,6 +56,7 @@ REGISTRY: dict[str, Fixture] = {
     "reset_db":     Fixture("reset_db",     reset_db.setup,     reset_db.teardown),
     "ssh_required": Fixture("ssh_required", ssh_required.setup),
     "sftp_required": Fixture("sftp_required", sftp_required.setup),
+    "mysql_required": Fixture("mysql_required", mysql_required.setup),
     "jdtls_required": Fixture("jdtls_required", jdtls_required.setup),
     "linux_x11_required": Fixture("linux_x11_required", linux_x11_required.setup),
     "workspace_root": Fixture("workspace_root", workspace_root.setup, workspace_root.teardown),
