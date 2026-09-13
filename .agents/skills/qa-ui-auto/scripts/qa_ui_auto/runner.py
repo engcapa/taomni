@@ -403,6 +403,14 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                 r.update(status="skipped", fixtures_skipped=c.skip)
                 results.append(r)
                 continue
+            current_target = "macOS" if platform.system() == "Darwin" else platform.system()
+            if c.native_platforms and current_target not in c.native_platforms:
+                r.update(
+                    status="skipped",
+                    fixtures_skipped=f"case declares native platforms {c.native_platforms}",
+                )
+                results.append(r)
+                continue
             failure_artifacts: dict = {}
             fixture_values: dict[str, str] = {}
             last_step, last_verb, last_args = 0, "<setup>", None

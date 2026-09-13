@@ -1,0 +1,52 @@
+id: TC-SSH-VI-001
+title: Remote SSH terminal opens, edits, and saves file using vi
+description: |
+  Native verification for Linux and macOS that connects to a remote SSH server,
+  launches vi to create and edit a temporary file, saves it with :wq, and verifies
+  that the file contents were successfully saved.
+covers: [F3.1, F2.2, F6.4, F1.8]
+tags: [native, ssh, terminal, vi, vim, p0]
+modes: [native]
+native_platforms: [Linux, macOS]
+fixtures: [reset_db, ssh_required]
+timeout_sec: 60
+steps:
+  - open: "${cfg.app.base_url}"
+  - click: '[data-testid="app-main-menu"]'
+  - hover: '[data-testid="context-menu-item-view"]'
+  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+  - wait_for: '[data-testid="qc-input"]'
+  - fill: {selector: '[data-testid="qc-input"]', value: "ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}"}
+  - click: '[data-testid="qc-submit"]'
+  - wait_for: '[data-testid="auth-prompt"]'
+  - fill: {selector: '[data-testid="auth-password"]', value: "${env.QA_SSH_PASSWORD}"}
+  - click: '[data-testid="auth-submit"]'
+  - wait_for: '[data-testid="terminal-pane"]'
+  - wait: 3
+  - click: '[data-testid="terminal-pane"]'
+  - type: "rm -f /tmp/taomni_vi_test.txt"
+  - press: Enter
+  - wait: 1
+  - type: "vi /tmp/taomni_vi_test.txt"
+  - press: Enter
+  - wait: 2
+  - type: "i"
+  - wait: 0.5
+  - type: "Taomni Native Vi Verification String"
+  - press: Enter
+  - type: "Second Line Saved Successfully"
+  - wait: 0.5
+  - press: Escape
+  - wait: 0.5
+  - type: ":wq"
+  - press: Enter
+  - wait: 2
+  - type: "cat /tmp/taomni_vi_test.txt"
+  - press: Enter
+  - wait: 1
+  - assert_text: {selector: '[data-testid="terminal-pane"]', contains: "Taomni Native Vi Verification String"}
+  - assert_text: {selector: '[data-testid="terminal-pane"]', contains: "Second Line Saved Successfully"}
+  - type: "rm -f /tmp/taomni_vi_test.txt"
+  - press: Enter
+  - wait: 0.5
+  - screenshot: "ssh-vi-edit-save.png"
