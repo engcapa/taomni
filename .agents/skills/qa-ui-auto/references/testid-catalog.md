@@ -160,6 +160,14 @@
 - `[data-testid="external-file-conflict-dialog"] button[aria-label="Dismiss external file conflict"]` — interactive [optional] — F25.5.external-file-conflict-dismiss
 - `[data-testid="refactoring-preview-dialog"]` — display [optional] — F25.5.refactoring-preview-dialog
 - `[data-testid="refactoring-preview-apply"]` — interactive [optional] — F25.5.refactoring-preview-apply
+- `[data-testid="refactor-recovery-review"]` — display [optional] — F25.5.refactor-recovery-review
+- `[data-testid="refactor-recovery-resource"]` — display [optional] — F25.5.refactor-recovery-resource
+- `[data-testid="refactor-recovery-keep"]` — interactive [optional] — F25.5.refactor-recovery-keep
+- `[data-testid="refactor-recovery-dismiss"]` — interactive [optional] — F25.5.refactor-recovery-dismiss
+- `[data-testid="refactor-recovery-dismiss-confirm"]` — display [optional] — F25.5.refactor-recovery-dismiss-confirm
+- `[data-testid="refactor-recovery-dismiss-cancel"]` — interactive [optional] — F25.5.refactor-recovery-dismiss-cancel
+- `[data-testid="refactor-recovery-dismiss-confirm-button"]` — interactive [optional] — F25.5.refactor-recovery-dismiss-confirm-button
+- `[data-testid="refactor-recovery-restore"]` — interactive [optional] — F25.5.refactor-recovery-restore
 - `[data-testid="code-workspace-tree-filter"]` — interactive [optional] — F25.5.tree-filter
 - `[data-testid="code-workspace-flat-file"]` — interactive [optional] — F25.5.tree-flat-file-row
 - `[data-testid="code-workspace-editor-pane"]` — display — F25.5.editor-pane

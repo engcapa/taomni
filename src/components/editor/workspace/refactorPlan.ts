@@ -3,7 +3,7 @@ import type {
   LspWorkspaceEdit,
   LspWorkspaceEditOperation,
 } from "../../../lib/editor/lsp";
-import { normalizeFsPath, relativePathWithinRoot } from "./codeWorkspaceModel";
+import { fsPathComparisonKey, normalizeFsPath, relativePathWithinRoot } from "./codeWorkspaceModel";
 import type { CapabilityEvidenceV3 } from "./capabilityEvidence";
 import { workspaceEditOperations } from "./workspaceEditPreview";
 import { useProjectFactsStore } from "../../../stores/projectFactsStore";
@@ -586,38 +586,170 @@ export function verifyExclusionSafety(
 /**
  * ED-REF-001-A3: Verifies that post-refactor document contents match the
  * expected post-hashes computed during plan construction.
+ *
+ * RC-01 fix (java-rename-deleted-recovery): path lookup is identity-based
+ * (`fsPathComparisonKey`, handling `/` vs `\`, drive casing, file URIs),
+ * a required document without actual text is a `missing` failure instead of
+ * a silent skip, and EOL-only differences are accepted so CRLF saves are not
+ * mistaken for content mismatches in one checker while accepted in another.
  */
+export function buildRefactorPostTextIndex(
+  actualPostTexts: Record<string, string>,
+): Map<string, string> {
+  const index = new Map<string, string>();
+  for (const [rawKey, text] of Object.entries(actualPostTexts)) {
+    index.set(fsPathComparisonKey(rawKey), text);
+  }
+  return index;
+}
+
+function planPostHashMatches(expectedPostHash: string, actualText: string): boolean {
+  if (sha256Hex(actualText) === expectedPostHash) return true;
+  // Accept EOL-only differences: the shared committer may normalize line
+  // endings when writing closed files. Checking the LF/CRLF/CR variants of
+  // the actual text covers both LF-expected and CRLF-expected plans without
+  // masking real content changes.
+  const unified = actualText.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  if (sha256Hex(unified) === expectedPostHash) return true;
+  if (sha256Hex(unified.replace(/\n/g, "\r\n")) === expectedPostHash) return true;
+  if (sha256Hex(unified.replace(/\n/g, "\r")) === expectedPostHash) return true;
+  return false;
+}
+
 export function verifyRefactorPostHashes(
   plan: Pick<RefactorPlanV4, "documents">,
   actualPostTexts: Record<string, string>,
 ): {
   allMatched: boolean;
   mismatches: Array<{ uri: string; expectedPostHash: string; actualPostHash: string }>;
+  missing: Array<{ uri: string; expectedPostHash: string }>;
   verifiedDocuments: number;
 } {
+  const index = buildRefactorPostTextIndex(actualPostTexts);
   const mismatches: Array<{ uri: string; expectedPostHash: string; actualPostHash: string }> = [];
+  const missing: Array<{ uri: string; expectedPostHash: string }> = [];
   let verifiedDocuments = 0;
 
   for (const doc of plan.documents) {
     if (!doc.expectedPostHash) continue;
-    const actualText = actualPostTexts[doc.uri] ?? (doc.canonicalPath ? actualPostTexts[doc.canonicalPath] : undefined);
-    if (actualText === undefined) continue;
+    const candidates = [doc.uri, doc.canonicalPath].filter((v): v is string => !!v);
+    let actualText: string | undefined;
+    for (const candidate of candidates) {
+      const hit = index.get(fsPathComparisonKey(candidate));
+      if (hit !== undefined) {
+        actualText = hit;
+        break;
+      }
+    }
+    if (actualText === undefined) {
+      missing.push({ uri: doc.uri, expectedPostHash: doc.expectedPostHash });
+      continue;
+    }
     verifiedDocuments += 1;
-    const actualHash = sha256Hex(actualText);
-    if (actualHash !== doc.expectedPostHash) {
+    if (!planPostHashMatches(doc.expectedPostHash, actualText)) {
       mismatches.push({
         uri: doc.uri,
         expectedPostHash: doc.expectedPostHash,
-        actualPostHash: actualHash,
+        actualPostHash: sha256Hex(actualText),
       });
     }
   }
 
   return {
-    allMatched: mismatches.length === 0,
+    allMatched: mismatches.length === 0 && missing.length === 0,
     mismatches,
+    missing,
     verifiedDocuments,
   };
+}
+
+/**
+ * RC-01: ordered move-aware post-text resolution for journal/plan checks.
+ *
+ * A text document addressed to a pre-move path verifies against the bytes at
+ * the end of its move chain. The chain follows `resourceMoves` order; an
+ * ambiguous mapping (multiple moves from the same old path, cycles) or a
+ * still-present old path fails closed with `null` instead of guessing by
+ * basename or an unrelated same-name file. Display/IO paths are untouched;
+ * only the comparison keys are used for identity.
+ */
+export function resolveRefactorPostTextForDocument(
+  doc: { uri: string; canonicalPath: string | null },
+  moves: readonly RefactorRecoveryResourceMoveV1[],
+  index: ReadonlyMap<string, string>,
+): { text: string; resolvedPath: string } | null {
+  const startRaw = doc.canonicalPath || doc.uri;
+  const startKey = fsPathComparisonKey(startRaw);
+  // Follow the ordered move chain starting at the document identity.
+  let currentKey = startKey;
+  let currentRaw = startRaw;
+  const visited = new Set<string>([currentKey]);
+  let followed = false;
+  for (let step = 0; step < moves.length; step += 1) {
+    const candidates = moves.filter((move) => {
+      if (!move.oldPath && !move.oldUri) return false;
+      const oldKeys = [move.oldPath, move.oldUri].filter((v): v is string => !!v)
+        .map((v) => fsPathComparisonKey(v));
+      return oldKeys.includes(currentKey);
+    });
+    if (candidates.length === 0) break;
+    // Ambiguous fan-out: fail closed.
+    if (candidates.length > 1) return null;
+    const next = candidates[0]!;
+    const nextRaw = next.newPath || next.newUri;
+    if (!nextRaw) return null;
+    const nextKey = fsPathComparisonKey(nextRaw);
+    if (visited.has(nextKey)) return null;
+    visited.add(nextKey);
+    currentKey = nextKey;
+    currentRaw = nextRaw;
+    followed = true;
+  }
+  if (!followed) {
+    const direct = index.get(startKey);
+    return direct === undefined ? null : { text: direct, resolvedPath: startRaw };
+  }
+  // A completed rename removes the old path: a still-present old identity
+  // means the move did not complete (or a stale buffer is shadowing disk).
+  // Never prefer the stale old bytes; fail closed so the journal stays
+  // recovery-required instead of recording a false success.
+  if (index.has(startKey)) return null;
+  // Every intermediate except the final target must also be gone; otherwise
+  // the chain did not fully apply.
+  for (const seen of visited) {
+    if (seen !== startKey && seen !== currentKey && index.has(seen)) return null;
+  }
+  const finalText = index.get(currentKey);
+  return finalText === undefined ? null : { text: finalText, resolvedPath: currentRaw };
+}
+
+/**
+ * RC-01: pure-move endpoint proof for post verification. Every journalled
+ * move must show old-gone and new-present; anything else (both present,
+ * both missing, unreadable) is a postcondition failure, never a success.
+ */
+export function verifyRefactorMovePostEndpoints(
+  moves: readonly RefactorRecoveryResourceMoveV1[],
+  existsByKey: ReadonlyMap<string, boolean | null>,
+): { allVerified: boolean; missing: string[]; verifiedMoves: number } {
+  const missing: string[] = [];
+  let verifiedMoves = 0;
+  for (const move of moves) {
+    const oldRaw = move.oldPath || move.oldUri;
+    const newRaw = move.newPath || move.newUri;
+    if (!oldRaw || !newRaw) {
+      missing.push(`${move.oldUri} -> ${move.newUri}`);
+      continue;
+    }
+    const oldExists = existsByKey.get(fsPathComparisonKey(oldRaw));
+    const newExists = existsByKey.get(fsPathComparisonKey(newRaw));
+    if (oldExists === false && newExists === true) {
+      verifiedMoves += 1;
+      continue;
+    }
+    missing.push(`${oldRaw} -> ${newRaw}`);
+  }
+  return { allVerified: missing.length === 0, missing, verifiedMoves };
 }
 
 /**
@@ -796,6 +928,18 @@ export interface RefactorRecoveryJournalEntryV2 {
    * were journalled.
    */
   resourceMoves: readonly RefactorRecoveryResourceMoveV1[];
+  /**
+   * java-rename-deleted-recovery (RC-02, DEC-01/02): explicit user handling
+   * for a pending entry. `user-dismissed` ends only the recovery reminder
+   * for this record and keeps the current on-disk deletion state; it never
+   * rebuilds files, edits references, or rewrites status/pre/post history.
+   * Absent on historical entries, which stay pending until handled.
+   */
+  resolution?: {
+    kind: "user-dismissed";
+    resolvedAt: number;
+    reason: "keep-current-state";
+  };
   verification: {
     mismatchedUris: readonly string[];
     checkedAt: number | null;
@@ -884,6 +1028,16 @@ export function isRefactorRecoveryJournalEntryV2(
         || candidate.contentHash !== null && typeof candidate.contentHash !== "string"
       ) return false;
     }
+  }
+  // RC-02: optional user resolution; absent on historical entries. When
+  // present it must be a well-formed user-dismissed record; anything else
+  // keeps the entry readable but invalid so it is never silently dropped.
+  if (entry.resolution !== undefined) {
+    if (!entry.resolution || typeof entry.resolution !== "object") return false;
+    const resolution = entry.resolution as NonNullable<RefactorRecoveryJournalEntryV2["resolution"]>;
+    if (resolution.kind !== "user-dismissed") return false;
+    if (resolution.reason !== "keep-current-state") return false;
+    if (typeof resolution.resolvedAt !== "number") return false;
   }
   if (!entry.verification || typeof entry.verification !== "object") return false;
   if (!Array.isArray(entry.verification.mismatchedUris)) return false;
@@ -997,6 +1151,63 @@ export function clearRefactorRecoveryJournalV2(
   }
 }
 
+/**
+ * RC-02: single pending predicate for v2 recovery entries. `prepared` and
+ * `recovery-required` with no valid `user-dismissed` resolution are pending;
+ * committed/rolled-back or dismissed entries are not. All auto-discover,
+ * command-palette, and status surfaces must use this predicate instead of
+ * copying the status filter expression.
+ */
+export function isPendingRefactorRecoveryEntry(entry: RefactorRecoveryJournalEntryV2): boolean {
+  if (entry.status !== "prepared" && entry.status !== "recovery-required") return false;
+  const resolution = entry.resolution;
+  if (!resolution) return true;
+  return !(
+    resolution.kind === "user-dismissed"
+    && resolution.reason === "keep-current-state"
+    && typeof resolution.resolvedAt === "number"
+  );
+}
+
+/**
+ * RC-02: synchronously dismiss one pending entry (abandon this recovery
+ * reminder, keep the current on-disk state). The read-compare-write happens
+ * with no `await` in between so a single JS instance cannot interleave a
+ * second dismiss/recover of the same record mid-flight; callers must still
+ * serialize recover-vs-dismiss ownership per entry at the UI layer and
+ * re-fetch the latest entry before calling (stale `expectedUpdatedAt`
+ * fails instead of overwriting a newer transaction/recovery state).
+ * The journal facts (status/pre/post/moves/verification) are preserved;
+ * only the `resolution` marker and `updatedAt` change. Zero file writes.
+ */
+export function dismissRefactorRecoveryEntry(
+  recoveryId: string,
+  expectedUpdatedAt: number,
+  storage: Storage = defaultRecoveryStorage(),
+  now: number = Date.now(),
+): RefactorJournalWriteResult {
+  const current = getRefactorRecoveryJournalV2(recoveryId, storage);
+  if (!current) return { ok: false, reason: `recovery journal ${recoveryId} is missing or invalid` };
+  if (current.updatedAt !== expectedUpdatedAt) {
+    return { ok: false, reason: "recovery entry changed since it was reviewed; refresh and confirm again" };
+  }
+  if (!isPendingRefactorRecoveryEntry(current)) {
+    return { ok: false, reason: "recovery entry is no longer pending" };
+  }
+  return recordRefactorRecoveryJournalV2(
+    {
+      ...current,
+      updatedAt: now,
+      resolution: {
+        kind: "user-dismissed",
+        resolvedAt: now,
+        reason: "keep-current-state",
+      },
+    },
+    storage,
+  );
+}
+
 export interface RefactorRecoveryPreImageV2 {
   uri: string;
   canonicalPath: string | null;
@@ -1080,23 +1291,85 @@ export function resolveRecoveryDocTarget(
   oldExists: (oldPath: string) => boolean,
 ): string {
   const recorded = doc.canonicalPath || doc.uri;
+  const recordedKey = fsPathComparisonKey(recorded);
   for (const move of moves) {
     if (!move.oldPath || !move.newPath) continue;
-    const recordedNorm = normalizeFsPath(recorded);
     if (
-      normalizeFsPath(move.oldPath) === recordedNorm
-      || normalizeFsPath(move.oldUri) === recordedNorm
+      (move.oldPath && fsPathComparisonKey(move.oldPath) === recordedKey)
+      || (move.oldUri && fsPathComparisonKey(move.oldUri) === recordedKey)
     ) {
       return oldExists(move.oldPath) ? recorded : move.newPath;
     }
     if (
-      normalizeFsPath(move.newPath) === recordedNorm
-      || normalizeFsPath(move.newUri) === recordedNorm
+      (move.newPath && fsPathComparisonKey(move.newPath) === recordedKey)
+      || (move.newUri && fsPathComparisonKey(move.newUri) === recordedKey)
     ) {
       return recorded;
     }
   }
   return recorded;
+}
+
+/**
+ * RC-03: content proof for one journalled file move.
+ *
+ * The v2 `resourceMoves.contentHash` keeps its historical meaning (the moved
+ * bytes at prepare time, i.e. the matching text-op preimage). For a mixed
+ * text+rename transaction the live bytes at the new path are the POST image,
+ * so comparing only against `contentHash` falsely conflicts a healthy
+ * rename. When a unique journal document matches the move, that document's
+ * recorded pre/post images are authoritative: either image (under the
+ * shared encode/EOL rules) proves the bytes. A pure move without a document
+ * keeps the legacy `contentHash` proof; a move with neither stays
+ * content-unverified and never upgrades to verified. Multiple matching
+ * documents or an indeterminate chain stage refuses to guess.
+ */
+export type RefactorRecoveryMoveProof =
+  | { kind: "document"; doc: RefactorRecoveryDocumentSnapshotV2 }
+  | { kind: "legacy-hash"; hash: string }
+  | { kind: "unverified" }
+  | { kind: "ambiguous"; reason: string };
+
+export function resolveRecoveryMoveProof(
+  move: RefactorRecoveryResourceMoveV1,
+  documents: readonly RefactorRecoveryDocumentSnapshotV2[],
+): RefactorRecoveryMoveProof {
+  const keys = new Set<string>();
+  for (const raw of [move.oldPath, move.oldUri, move.newPath, move.newUri]) {
+    if (raw) keys.add(fsPathComparisonKey(raw));
+  }
+  const matched = documents.filter((doc) => {
+    const docKeys = [doc.canonicalPath, doc.uri].filter((v): v is string => !!v)
+      .map((v) => fsPathComparisonKey(v));
+    return docKeys.some((key) => keys.has(key));
+  });
+  if (matched.length > 1) {
+    return { kind: "ambiguous", reason: "multiple journal documents match the same file move" };
+  }
+  if (matched.length === 1) {
+    return { kind: "document", doc: matched[0]! };
+  }
+  if (move.contentHash !== null) return { kind: "legacy-hash", hash: move.contentHash };
+  return { kind: "unverified" };
+}
+
+/**
+ * RC-03: checks live bytes against a move proof. Document proofs accept the
+ * recorded preimage (move not yet applied / partially restored) or postimage
+ * (text edits applied, now sitting at the new path), under the shared
+ * EOL rules. Legacy proofs compare the single hash. Unverified always
+ * passes the content gate (endpoints still gate the move); ambiguous never
+ * does.
+ */
+export function recoveryMoveProofMatches(
+  proof: RefactorRecoveryMoveProof,
+  liveText: string,
+): boolean {
+  if (proof.kind === "unverified") return true;
+  if (proof.kind === "ambiguous") return false;
+  if (proof.kind === "legacy-hash") return sha256Hex(liveText) === proof.hash;
+  return refactorJournalPreImageMatches(proof.doc, liveText)
+    || refactorJournalPostImageMatches(proof.doc, liveText);
 }
 
 export function prepareRefactorRecoveryJournalV2(input: {
@@ -1128,21 +1401,35 @@ export function prepareRefactorRecoveryJournalV2(input: {
   const resourceMoves: RefactorRecoveryResourceMoveV1[] = [];
   for (const operation of renameOperations) {
     if (operation.kind !== "rename") continue;
-    const oldPath = recoveryMovePath(operation.oldUri, operation.oldPath);
-    const newPath = recoveryMovePath(operation.newUri, operation.newPath);
-    if (!oldPath || !newPath) {
+    const rawOldPath = recoveryMovePath(operation.oldUri, operation.oldPath);
+    const rawNewPath = recoveryMovePath(operation.newUri, operation.newPath);
+    if (!rawOldPath || !rawNewPath) {
       return {
         state: "incomplete",
         reason: `File move has no resolvable path pair (${operation.oldUri} -> ${operation.newUri}); refusing to mutate without a recovery journal`,
       };
     }
+    // RC-01: normalize display paths; historical unnormalized entries keep
+    // working because every reader compares by `fsPathComparisonKey`.
+    const oldPath = normalizeFsPath(rawOldPath);
+    const newPath = normalizeFsPath(rawNewPath);
     // The moved bytes' content proof comes from the matching text-op
     // preimage when the moved file also carries text edits; null otherwise
     // (reversal then moves bytes without a content proof).
-    const matchingPreImage = preImages.find((candidate) => (
-      (candidate.canonicalPath !== null && normalizeFsPath(candidate.canonicalPath) === normalizeFsPath(oldPath))
-      || candidate.uri === operation.oldUri
-    ));
+    const matchingPreImage = preImages.find((candidate) => {
+      if (candidate.canonicalPath !== null) {
+        try {
+          if (fsPathComparisonKey(candidate.canonicalPath) === fsPathComparisonKey(oldPath)) return true;
+        } catch {
+          // Fall through to URI comparison.
+        }
+      }
+      try {
+        return fsPathComparisonKey(candidate.uri) === fsPathComparisonKey(operation.oldUri);
+      } catch {
+        return candidate.uri === operation.oldUri;
+      }
+    });
     resourceMoves.push({
       oldUri: operation.oldUri,
       newUri: operation.newUri,
@@ -1154,11 +1441,21 @@ export function prepareRefactorRecoveryJournalV2(input: {
   const documents: RefactorRecoveryDocumentSnapshotV2[] = [];
   for (const operation of textOperations) {
     const document = operation.document;
-    const preImage = preImages.find((candidate) => (
-      candidate.uri === document.uri
-      || (document.path !== null && candidate.canonicalPath !== null
-        && normalizeFsPath(candidate.canonicalPath) === normalizeFsPath(document.path))
-    ));
+    const preImage = preImages.find((candidate) => {
+      try {
+        if (fsPathComparisonKey(candidate.uri) === fsPathComparisonKey(document.uri)) return true;
+      } catch {
+        if (candidate.uri === document.uri) return true;
+      }
+      if (document.path !== null && candidate.canonicalPath !== null) {
+        try {
+          return fsPathComparisonKey(candidate.canonicalPath) === fsPathComparisonKey(document.path);
+        } catch {
+          return false;
+        }
+      }
+      return false;
+    });
     if (!preImage) {
       return {
         state: "incomplete",
@@ -1170,7 +1467,7 @@ export function prepareRefactorRecoveryJournalV2(input: {
       : preImage.preText;
     documents.push({
       uri: document.uri,
-      canonicalPath: preImage.canonicalPath,
+      canonicalPath: preImage.canonicalPath ? normalizeFsPath(preImage.canonicalPath) : null,
       preText: preImage.preText,
       preHash: sha256Hex(preImage.preText),
       postText,

@@ -9425,9 +9425,14 @@ end_of_record
 
       renderWorkspace(workspace, {});
       await screen.findByTitle("app / src/reader.ts");
-      await waitFor(() => expect(recoveryCalls().some((call) => call.title === "Refactor recovery pending")).toBe(true));
-      expect(recoveryCalls()[0]?.message).toContain("/repo/app/src/main.ts");
-      expect(recoveryCalls()[0]?.message).toContain("/repo/app/src/other.ts");
+      // RC-02: auto-discover opens the review dialog (figure A) instead of a
+      // global confirm. Restore via the dialog; the second confirm reuses the
+      // mocked app dialog (default true).
+      const review = await screen.findByTestId("refactor-recovery-review");
+      expect(within(review).getAllByTestId("refactor-recovery-resource")).toHaveLength(2);
+      const restoreButton = within(review).getByTestId("refactor-recovery-restore");
+      await waitFor(() => expect(restoreButton).toBeEnabled());
+      fireEvent.click(restoreButton);
 
       await waitFor(() => expect(disk["src/main.ts"]).toBe(PRE["src/main.ts"]));
       await waitFor(() => expect(disk["src/other.ts"]).toBe(PRE["src/other.ts"]));
@@ -9458,15 +9463,108 @@ end_of_record
 
       renderWorkspace(workspace, {});
       await screen.findByTitle("app / src/reader.ts");
-      await waitFor(() => expect(recoveryCalls().some((call) => call.title === "Refactor recovery blocked")).toBe(true));
-      const blocked = recoveryCalls().find((call) => call.title === "Refactor recovery blocked");
-      expect(blocked?.message).toContain("/repo/app/src/other.ts (conflict)");
-      expect(blocked?.message).toContain("will not be overwritten");
+      // RC-02: conflicted entries render in the review dialog with restore
+      // disabled and an explicit keep outlet; nothing is overwritten.
+      const review = await screen.findByTestId("refactor-recovery-review");
+      expect(within(review).getByTestId("refactor-recovery-restore")).toBeDisabled();
+      expect(review.textContent).toContain("other.ts");
+      fireEvent.click(within(review).getByTestId("refactor-recovery-keep"));
+      await waitFor(() => expect(screen.queryByTestId("refactor-recovery-review")).not.toBeInTheDocument());
       // Zero overwrite: the third-party content and the post-state stay as-is.
       expect(disk["src/other.ts"]).toBe("user edited after the refactor");
       expect(disk["src/main.ts"]).toBe(POST["src/main.ts"]);
       expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
       expect(getRefactorRecoveryJournalV2("rec-reopen-1")?.status).toBe("recovery-required");
+    });
+
+    it("abandons a both-missing entry with zero file writes and keeps siblings pending", async () => {
+      const { disk, workspace, registrationRef, onCommandsChange } = setupWorkspace("recovery-abandon", "src/reader.ts");
+      // Sibling stays restorable on disk; the abandoned record points at files
+      // that exist at neither end (deleted-after-rename shape).
+      disk["src/main.ts"] = POST["src/main.ts"];
+      disk["src/other.ts"] = POST["src/other.ts"];
+      const gonePre = "gone pre";
+      const gonePost = "gone post";
+      expect(recordRefactorRecoveryJournalV2({
+        schemaVersion: 2,
+        recoveryId: "rec-abandon-1",
+        transactionId: "tx-abandon-1",
+        actionId: "rename:gone",
+        kind: "rename",
+        workspaceRoot: "/repo/app",
+        createdAt: 200,
+        updatedAt: 200,
+        status: "recovery-required",
+        appliedOperationIndex: null,
+        documents: [recoveryDocument(
+          "file:///repo/app/src/Gone.java",
+          "/repo/app/src/Gone.java",
+          gonePre,
+          gonePost,
+        )],
+        resourceMoves: [{
+          oldUri: "file:///repo/app/src/Gone.java",
+          newUri: "file:///repo/app/src/GoneRenamed.java",
+          oldPath: "/repo/app/src/Gone.java",
+          newPath: "/repo/app/src/GoneRenamed.java",
+          contentHash: sha256Hex(gonePre),
+        }],
+        verification: { mismatchedUris: [], checkedAt: null },
+      }).ok).toBe(true);
+      expect(recordRefactorRecoveryJournalV2({
+        schemaVersion: 2,
+        recoveryId: "rec-sibling-1",
+        transactionId: "tx-sibling-1",
+        actionId: "rename:update-two-files",
+        kind: "rename",
+        workspaceRoot: "/repo/app",
+        createdAt: 100,
+        updatedAt: 100,
+        status: "recovery-required",
+        appliedOperationIndex: null,
+        documents: [
+          recoveryDocument("file:///repo/app/src/main.ts", "/repo/app/src/main.ts", PRE["src/main.ts"], POST["src/main.ts"]),
+          recoveryDocument("file:///repo/app/src/other.ts", "/repo/app/src/other.ts", PRE["src/other.ts"], POST["src/other.ts"]),
+        ],
+        resourceMoves: [],
+        verification: { mismatchedUris: [], checkedAt: null },
+      }).ok).toBe(true);
+
+      renderWorkspace(workspace, { onCommandsChange });
+      await screen.findByTitle("app / src/reader.ts");
+      // Newest first: the both-missing record reviews first with restore disabled.
+      const abandonReview = await screen.findByTestId("refactor-recovery-review");
+      expect(abandonReview.textContent).toContain("Gone.java");
+      expect(within(abandonReview).getByTestId("refactor-recovery-restore")).toBeDisabled();
+      fireEvent.click(within(abandonReview).getByTestId("refactor-recovery-dismiss"));
+      fireEvent.click(await screen.findByTestId("refactor-recovery-dismiss-confirm-button"));
+      // Dismissal writes only the resolution marker: zero file writes, files
+      // stay exactly as they are (deleted stays deleted, sibling post intact).
+      await waitFor(() => expect(getRefactorRecoveryJournalV2("rec-abandon-1")?.resolution).toEqual({
+        kind: "user-dismissed",
+        resolvedAt: expect.any(Number),
+        reason: "keep-current-state",
+      }));
+      expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
+      expect(disk["src/main.ts"]).toBe(POST["src/main.ts"]);
+      expect(disk["src/other.ts"]).toBe(POST["src/other.ts"]);
+      expect(useAppStore.getState().statusMessage).toContain("Abandoned refactor recovery");
+      // The sibling still prompts after the abandon (same discover loop).
+      const siblingReview = await screen.findByTestId("refactor-recovery-review");
+      expect(siblingReview.textContent).toContain("main.ts");
+      expect(siblingReview.textContent).not.toContain("Gone.java");
+      fireEvent.click(within(siblingReview).getByTestId("refactor-recovery-keep"));
+      await waitFor(() => expect(screen.queryByTestId("refactor-recovery-review")).not.toBeInTheDocument());
+      expect(getRefactorRecoveryJournalV2("rec-sibling-1")?.status).toBe("recovery-required");
+      expect(getRefactorRecoveryJournalV2("rec-sibling-1")?.resolution).toBeUndefined();
+
+      // Re-review surfaces only the sibling; the abandoned record never returns.
+      const rerun = registrationRef.current?.executeAction("workspace.reviewRefactorRecovery");
+      const secondLook = await screen.findByTestId("refactor-recovery-review");
+      expect(secondLook.textContent).toContain("main.ts");
+      expect(secondLook.textContent).not.toContain("Gone.java");
+      fireEvent.click(within(secondLook).getByTestId("refactor-recovery-keep"));
+      await rerun;
     });
 
     it("never replays legacy v1 recovery journals", async () => {
@@ -10998,13 +11096,6 @@ end_of_record
         .map((key) => ({ key, entry: JSON.parse(window.localStorage.getItem(key)!) }));
     }
 
-    function recoveryCalls(): Array<{ title: string; message: string }> {
-      return vi.mocked(confirmAppDialog).mock.calls.map((call) => ({
-        title: (call[0] as { title: string }).title,
-        message: (call[0] as { message: string }).message,
-      }));
-    }
-
     function undoItem(registrationRef: Fixture["registrationRef"]) {
       return registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit");
     }
@@ -11150,13 +11241,12 @@ end_of_record
       vi.mocked(confirmAppDialog).mockClear();
       vi.mocked(confirmAppDialog).mockResolvedValue(true);
 
-      await act(async () => {
-        await registrationRef.current?.executeAction("workspace.reviewRefactorRecovery");
-      });
-
-      await waitFor(() => expect(recoveryCalls().length).toBeGreaterThan(0));
-      const pendingDialog = recoveryCalls().find((call) => call.title.includes("recovery pending"));
-      expect(pendingDialog).toBeDefined();
+      const reviewPromise = registrationRef.current?.executeAction("workspace.reviewRefactorRecovery");
+      const review = await screen.findByTestId("refactor-recovery-review");
+      const restoreButton = within(review).getByTestId("refactor-recovery-restore");
+      await waitFor(() => expect(restoreButton).toBeEnabled());
+      fireEvent.click(restoreButton);
+      await reviewPromise;
 
       // Recovery restored src/a.ts to preText and left src/b.ts untouched
       await waitFor(() => expect(disk["src/a.ts"]).toBe(PRE["src/a.ts"]));
@@ -11209,7 +11299,7 @@ end_of_record
     });
 
     it("refuses to overwrite conflicting third-party edits during plan-less recovery", async () => {
-      const { disk, workspace, registrationRef, onCommandsChange } = setupWorkspace("planless-conflict", "src/c.ts");
+      const { disk, workspace, onCommandsChange } = setupWorkspace("planless-conflict", "src/c.ts");
       const preA = PRE["src/a.ts"]!;
       const postA = "hello ALPHA";
       recordRefactorRecoveryJournalV2({
@@ -11247,14 +11337,12 @@ end_of_record
       renderWorkspace(workspace, { onCommandsChange });
       await screen.findByTitle("app / src/c.ts");
 
-      await act(async () => {
-        await registrationRef.current?.executeAction("workspace.reviewRefactorRecovery");
-      });
-
-      await waitFor(() => expect(recoveryCalls().some((call) => call.title.includes("recovery blocked"))).toBe(true));
-      const blocked = recoveryCalls().find((call) => call.title.includes("recovery blocked"));
-      expect(blocked?.message).toContain("/repo/app/src/a.ts (conflict)");
-      expect(blocked?.message).toContain("will not be overwritten");
+      // RC-02: auto-discover opens the review dialog with restore disabled.
+      const review = await screen.findByTestId("refactor-recovery-review");
+      expect(within(review).getByTestId("refactor-recovery-restore")).toBeDisabled();
+      expect(review.textContent).toContain("a.ts");
+      fireEvent.click(within(review).getByTestId("refactor-recovery-keep"));
+      await waitFor(() => expect(screen.queryByTestId("refactor-recovery-review")).not.toBeInTheDocument());
       expect(disk["src/a.ts"]).toBe("third-party content");
       expect(workspaceMocks.workspaceWriteFileEncoded).not.toHaveBeenCalled();
       expect(getRefactorRecoveryJournalV2("rec-conflict-1")?.status).toBe("recovery-required");

@@ -16,10 +16,10 @@ description: |
   a fresh plain-folder workspace. A seeded v2 journal entry carries one text
   document (Old.java pre/post images) plus one resourceMoves record with the
   moved bytes' content proof. The webview JS context is destroyed by
-  reload_window, the workspace is re-entered through recents, the recovery
-  controller surfaces "Refactor recovery pending" (listing the relocation),
-  the case accepts "Review recovery", then the restore confirm (naming the
-  move-back), and the controller reverses New.java -> Old.java through the
+  reload_window, the workspace is re-entered through recents, the pending
+  entry surfaces in the review dialog (relocation with live move state,
+  Keep / Restore / Abandon), the case presses Restore, confirms the
+  move-back, and the controller reverses New.java -> Old.java through the
   shell's real resource-operation path before restoring the preimage bytes.
   The host re-reads Old.java (assert_file_sha256 == preHash a749a308...),
   and the persisted journal entry is read back as rolled-back with the
@@ -74,14 +74,18 @@ steps:
   - click: '[data-testid="welcome-history-tab-workspaces"]'
   - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.file_move_root}"]'
   - wait_for: '[data-testid="code-workspace-tab"]'
+  # The pending entry surfaces in the review dialog (figure A): it lists the
+  # relocated file with its live move state and offers Keep / Restore /
+  # Abandon. Restore reuses the app confirm naming the move-back before the
+  # verified reversal runs.
   - wait_for:
-      selector: '[data-testid="confirm-dialog"]'
+      selector: '[data-testid="refactor-recovery-review"]'
       timeout_sec: 60
   - assert_text:
-      selector: '[data-testid="confirm-dialog"]'
-      contains: "Refactor recovery pending"
+      selector: '[data-testid="refactor-recovery-review"]'
+      contains: "Review refactor recovery"
       timeout_sec: 10
-  - click: '[data-testid="confirm-dialog-confirm"]'
+  - click: '[data-testid="refactor-recovery-restore"]'
   - wait_for:
       selector: '[data-testid="confirm-dialog"]'
       timeout_sec: 30

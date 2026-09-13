@@ -1265,7 +1265,7 @@ select.taomni-input:not(.appearance-none):not([multiple]) {
   border: 1px solid var(--taomni-code-border) !important;
   border-radius: 4px;
   box-shadow: var(--taomni-shadow-lg);
-  padding: 0;
+  padding: 0 !important;
   font-family: var(--taomni-code-font-family);
   font-size: var(--taomni-code-font-size);
   line-height: 1.5;
@@ -1278,21 +1278,33 @@ select.taomni-input:not(.appearance-none):not([multiple]) {
   overflow-y: auto;
 }
 .cm-tooltip-autocomplete > ul > li[role="option"],
-[data-taomni-context-menu][data-appearance="code-candidates"] > button {
-  padding: 2px 8px;
+[data-taomni-context-menu][data-appearance="code-candidates"] button {
+  padding: 2px 8px !important;
   cursor: pointer;
+  background: transparent !important;
+}
+.cm-tooltip-autocomplete > ul > li[role="option"]:not([aria-selected="true"]):hover,
+[data-taomni-context-menu][data-appearance="code-candidates"] button:not([data-active="true"]):hover {
+  background: transparent !important;
+  color: inherit !important;
 }
 .cm-tooltip-autocomplete > ul > li[aria-selected="true"][role="option"],
-[data-taomni-context-menu][data-appearance="code-candidates"] > button[data-active="true"]:enabled {
-  background: #1d4ed8;
-  color: #ffffff;
-  box-shadow: inset 3px 0 #93c5fd;
+[data-taomni-context-menu][data-appearance="code-candidates"] button[data-active="true"]:enabled,
+[data-taomni-context-menu][data-appearance="code-candidates"] button[data-active="true"]:enabled:hover {
+  background: #1d4ed8 !important;
+  color: #ffffff !important;
+  box-shadow: inset 3px 0 #93c5fd !important;
 }
 .cm-tooltip-autocomplete > ul > li[aria-selected="true"] .cm-completionIcon,
 .cm-tooltip-autocomplete > ul > li[aria-selected="true"] .cm-completionMatchedText,
-[data-taomni-context-menu][data-appearance="code-candidates"] > button[data-active="true"]:enabled span {
-  color: inherit;
-  opacity: 1;
+[data-taomni-context-menu][data-appearance="code-candidates"] button[data-active="true"]:enabled span {
+  color: inherit !important;
+  opacity: 1 !important;
+}
+[data-taomni-context-menu][data-appearance="code-candidates"] button:disabled {
+  cursor: default !important;
+  opacity: 0.55;
+  background: transparent !important;
 }
 
 .taomni-proto-btn {

@@ -405,17 +405,24 @@ import {
   type WorkspaceEditPreview,
 } from "./workspace/workspaceEditPreview";
 import { RefactoringPreviewDialog } from "./workspace/RefactoringPreviewDialog";
+import { RefactorRecoveryReviewDialog } from "./workspace/RefactorRecoveryReviewDialog";
 import {
   buildRefactorPlan,
   refactorApplyGate,
   evaluateDestructiveRefactorAvailability,
   verifyRefactorPostHashes,
+  buildRefactorPostTextIndex,
+  resolveRefactorPostTextForDocument,
+  verifyRefactorMovePostEndpoints,
   refactorJournalPostImageMatches,
   refactorJournalPreImageMatches,
   prepareRefactorRecoveryJournalV2,
   recordRefactorRecoveryJournalV2,
+  getRefactorRecoveryJournalV2,
   updateRefactorRecoveryJournalV2,
   listRefactorRecoveryJournalsV2,
+  isPendingRefactorRecoveryEntry,
+  dismissRefactorRecoveryEntry,
   buildTextWorkspaceEditRecoveryPlan,
   type RefactorKind,
   type RefactorPlanV3,
@@ -427,6 +434,7 @@ import {
   classifyRefactorRecoveryPreconditions,
   createRestoreEchoSuppressor,
   executeRefactorRecovery,
+  type RefactorRecoveryPreconditionSummary,
 } from "./workspace/refactorRecoveryController";
 import { sha256Hex } from "./workspace/projectAnalysisModel";
 import { KeymapCheatSheetDialog } from "./workspace/KeymapCheatSheetDialog";
@@ -9616,42 +9624,72 @@ export function CodeWorkspaceTab({
         for (const snapshot of afterSnapshots ?? []) {
           if (snapshot.text !== null) actualPostTexts[snapshot.path] = snapshot.text;
         }
-        // ED-FOLLOW-001: a journal document addressed to a pre-move path
-        // verifies against the moved-home... post-move bytes at the new
-        // path. Without this alias every rename transaction would fail its
-        // own postcondition even though the move applied exactly as planned.
-        for (const move of preparedJournal.resourceMoves ?? []) {
-          if (!move.oldPath || !move.newPath) continue;
-          const movedText = actualPostTexts[move.newPath];
-          if (movedText !== undefined && actualPostTexts[move.oldPath] === undefined) {
-            actualPostTexts[move.oldPath] = movedText;
-          }
-        }
+        // RC-01: identity-based post index (fsPathComparisonKey) plus ordered
+        // move-chain resolution. A document addressed to a pre-move path
+        // verifies against the bytes at the end of its move chain; a
+        // still-present old path or an ambiguous chain fails closed instead
+        // of aliasing a stale buffer into a false success.
+        const postIndex = buildRefactorPostTextIndex(actualPostTexts);
         const journalMismatches = preparedJournal.documents.flatMap((doc) => {
           const target = doc.canonicalPath || doc.uri;
-          const actual = actualPostTexts[target];
-          if (actual === undefined) {
+          const resolved = resolveRefactorPostTextForDocument(
+            { uri: doc.uri, canonicalPath: doc.canonicalPath },
+            preparedJournal.resourceMoves ?? [],
+            postIndex,
+          );
+          if (!resolved) {
             return [{ uri: doc.uri, path: target, unreadable: true }];
           }
-          return refactorJournalPostImageMatches(doc, actual)
+          return refactorJournalPostImageMatches(doc, resolved.text)
             ? []
             : [{ uri: doc.uri, path: target, unreadable: false }];
         });
+        // RC-01: pure moves need endpoint proof (old gone, new present).
+        const existsByKey = new Map<string, boolean | null>();
+        for (const snapshot of afterSnapshots ?? []) {
+          existsByKey.set(fsPathComparisonKey(snapshot.path), snapshot.exists);
+        }
+        // Ensure both move ends are represented even when a snapshot is
+        // missing for one end (treated as not existing, i.e. verification
+        // fails closed below).
+        for (const move of preparedJournal.resourceMoves ?? []) {
+          for (const raw of [move.oldPath ?? move.oldUri, move.newPath ?? move.newUri]) {
+            if (raw && !existsByKey.has(fsPathComparisonKey(raw))) {
+              existsByKey.set(fsPathComparisonKey(raw), false);
+            }
+          }
+        }
+        const movePostCheck = verifyRefactorMovePostEndpoints(
+          preparedJournal.resourceMoves ?? [],
+          existsByKey,
+        );
         const postHashCheck = options.plan
           ? verifyRefactorPostHashes(options.plan, actualPostTexts)
-          : { allMatched: true, mismatches: [], verifiedDocuments: 0 };
+          : { allMatched: true, mismatches: [], missing: [], verifiedDocuments: 0 };
         const failureBoundaryIndex = allOutcomes.find((outcome) => (
           outcome.operationIndex !== null
           && (outcome.status === "failed" || outcome.status === "skipped")
         ))?.operationIndex ?? null;
         const failedOutcomes = allOutcomes.filter((outcome) => outcome.status === "failed" || outcome.status === "skipped");
-        if (!afterSnapshots || journalMismatches.length > 0 || !postHashCheck.allMatched) {
+        // RC-01/AC-06: a required document without post text (`missing`), a
+        // plan mismatch, a journal mismatch, or an unverified move endpoint
+        // all fail closed. Zero verified documents never stand in for a plan
+        // that expected text.
+        const hasMissingPost = journalMismatches.some((mismatch) => mismatch.unreadable)
+          || postHashCheck.missing.length > 0
+          || !movePostCheck.allVerified;
+        if (!afterSnapshots || journalMismatches.length > 0 || !postHashCheck.allMatched || !movePostCheck.allVerified) {
           const mismatchedPaths = Array.from(new Set([
             ...journalMismatches.map((mismatch) => mismatch.path),
             ...postHashCheck.mismatches.map((mismatch) => {
               const doc = options.plan?.documents.find((candidate) => candidate.uri === mismatch.uri);
               return doc?.canonicalPath ?? mismatch.uri;
             }),
+            ...postHashCheck.missing.map((miss) => {
+              const doc = options.plan?.documents.find((candidate) => candidate.uri === miss.uri);
+              return doc?.canonicalPath ?? miss.uri;
+            }),
+            ...movePostCheck.missing,
           ]));
           const appliedEffects = allOutcomes
             .filter((outcome) => outcome.status.startsWith("applied") || bufferEffectPerformed(outcome))
@@ -9667,6 +9705,8 @@ export function CodeWorkspaceTab({
               mismatchedUris: Object.freeze([
                 ...journalMismatches.map((mismatch) => mismatch.uri),
                 ...postHashCheck.mismatches.map((mismatch) => mismatch.uri),
+                ...postHashCheck.missing.map((miss) => miss.uri),
+                ...movePostCheck.missing,
               ]),
               checkedAt: Date.now(),
               appliedEffects: Object.freeze(appliedEffects),
@@ -9683,6 +9723,9 @@ export function CodeWorkspaceTab({
           console.warn("[refactor] Post-refactor postcondition failure detected:", {
             journalMismatches,
             planMismatches: postHashCheck.mismatches,
+            planMissing: postHashCheck.missing,
+            moveMissing: movePostCheck.missing,
+            hasMissingPost,
           });
           const prefix = preparedJournal.kind === "replace" || preparedJournal.kind === "other"
             ? "Workspace edit"
@@ -9938,77 +9981,84 @@ export function CodeWorkspaceTab({
   }, [applyLspWorkspaceEditNow]);
 
   // ED-AUDIT-014: pending refactor recovery entries are surfaced through the
-  // existing confirmation workflow when the workspace becomes ready. The
-  // runner is held in a ref because it closes over callbacks defined above.
+  // review dialog when the workspace becomes ready. The runner is held in a
+  // ref because it closes over callbacks defined above.
   const refactorRecoveryPromptRef = useRef<(
     (entry: RefactorRecoveryJournalEntryV2, ownerInstanceId: string) => Promise<void>
   ) | null>(null);
   const handledRefactorRecoveryIdsRef = useRef<Set<string>>(new Set());
   const handledRefactorRecoveryOwnerRef = useRef<string | null>(null);
+  // RC-02: one-entry review dialog state (figure A). The dialog owns the
+  // A→B abandon confirm inline (cancel-focused); restore's second confirm
+  // reuses the global app dialog. Async work stays in this owner.
+  const [refactorRecoveryReview, setRefactorRecoveryReview] = useState<{
+    entry: RefactorRecoveryJournalEntryV2;
+    ownerInstanceId: string;
+    preconditions: RefactorRecoveryPreconditionSummary | null;
+    loading: boolean;
+    error: string | null;
+    busy: boolean;
+  } | null>(null);
+  const refactorRecoveryBusyRef = useRef<Set<string>>(new Set());
+  const refactorRecoveryResolveRef = useRef<Map<string, () => void>>(new Map());
+  const refactorRecoveryReviewRef = useRef<typeof refactorRecoveryReview | null>(null);
+  refactorRecoveryReviewRef.current = refactorRecoveryReview;
 
-  const promptRefactorRecoveryEntry = useCallback(async (
+  const closeRefactorRecoveryReview = useCallback((recoveryId: string) => {
+    setRefactorRecoveryReview((current) => (
+      current && current.entry.recoveryId === recoveryId ? null : current
+    ));
+    const resolve = refactorRecoveryResolveRef.current.get(recoveryId);
+    if (resolve) {
+      refactorRecoveryResolveRef.current.delete(recoveryId);
+      resolve();
+    }
+  }, []);
+
+  const classifyRecoveryEntry = useCallback(async (
     entry: RefactorRecoveryJournalEntryV2,
+  ): Promise<RefactorRecoveryPreconditionSummary> => classifyRefactorRecoveryPreconditions(entry, async (path) => {
+    const snapshot = await readWorkspaceEditPathSnapshot(path);
+    return snapshot && snapshot.text !== null ? { text: snapshot.text } : null;
+  }, {
+    pathExists: async (path) => {
+      const snapshot = await readWorkspaceEditPathSnapshot(path);
+      return snapshot === null ? null : snapshot.exists;
+    },
+  }), [readWorkspaceEditPathSnapshot]);
+
+  const runRecoveryRestore = useCallback(async (
+    targetEntry: RefactorRecoveryJournalEntryV2,
+    targetPreconditions: RefactorRecoveryPreconditionSummary,
     ownerInstanceId: string,
   ): Promise<void> => {
     const released = () => workspaceInstanceIdRef.current !== ownerInstanceId;
-    const documentList = entry.documents
-      .map((doc) => doc.canonicalPath ?? doc.uri);
-    // ED-FOLLOW-001: journalled file moves are listed alongside the text
-    // documents so the pending entry honestly describes the relocation the
-    // restore will reverse.
-    const moveList = (entry.resourceMoves ?? [])
-      .filter((move) => move.oldPath && move.newPath)
-      .map((move) => `${move.oldPath} → ${move.newPath} (moved back on restore)`);
-    const resourceList = [...documentList, ...moveList].join("\n");
-    const review = await confirmAppDialog({
-      title: "Refactor recovery pending",
-      message: `A previous ${entry.kind} transaction was interrupted or failed its postcondition check. Affected files:\n${resourceList}\n\nReview the pending recovery entry?`,
-      confirmLabel: "Review recovery",
-    });
-    if (released() || !review) return;
-    const preconditions = await classifyRefactorRecoveryPreconditions(entry, async (path) => {
-      const snapshot = await readWorkspaceEditPathSnapshot(path);
-      return snapshot && snapshot.text !== null ? { text: snapshot.text } : null;
-    }, {
-      // ED-FOLLOW-001: move endpoints need existence distinct from
-      // readability (a missing old path is the expected restorable state,
-      // not an unreadable file).
-      pathExists: async (path) => {
-        const snapshot = await readWorkspaceEditPathSnapshot(path);
-        return snapshot === null ? null : snapshot.exists;
-      },
-    });
-    if (released()) return;
-    if (preconditions.overall === "already-restored") {
-      updateRefactorRecoveryJournalV2(entry.recoveryId, (current) => ({
-        ...current,
-        status: "rolled-back",
-        verification: { mismatchedUris: Object.freeze([]), checkedAt: Date.now() },
-      }));
-      setStatusMessage("Refactor recovery: every affected file already matches its pre-refactor content; entry closed.");
-      return;
-    }
-    if (preconditions.overall === "conflict" || preconditions.overall === "unreadable") {
-      const blocked = preconditions.documents.filter((doc) => (
-        doc.state === "conflict" || doc.state === "unreadable"
-      ));
-      await confirmAppDialog({
-        title: "Refactor recovery blocked",
-        message: `These files changed since the transaction and will not be overwritten:\n${
-          blocked.map((doc) => `${doc.canonicalPath ?? doc.uri} (${doc.state})`).join("\n")
-        }\n\nThe pending entry is kept; resolve the files externally and reopen the workspace to retry.`,
-        confirmLabel: "Keep pending",
+    const recoveryId = targetEntry.recoveryId;
+    if (refactorRecoveryBusyRef.current.has(recoveryId)) return;
+    refactorRecoveryBusyRef.current.add(recoveryId);
+    setRefactorRecoveryReview((current) => (
+      current && current.entry.recoveryId === recoveryId ? { ...current, busy: true, error: null } : current
+    ));
+    try {
+      const documentList = targetEntry.documents.map((doc) => doc.canonicalPath ?? doc.uri);
+      const moveList = (targetEntry.resourceMoves ?? [])
+        .filter((move) => move.oldPath && move.newPath)
+        .map((move) => `${move.oldPath} → ${move.newPath} (moved back on restore)`);
+      const resourceList = [...documentList, ...moveList].join("\n");
+      const restore = await confirmAppDialog({
+        title: "Restore pre-refactor content",
+        message: `Restore ${targetEntry.documents.length} file(s) to their pre-refactor content`
+          + `${moveList.length > 0 ? ` and move ${moveList.length} relocated file(s) back` : ""}?\n${resourceList}`,
+        confirmLabel: "Restore files",
       });
-      return;
-    }
-    const restore = await confirmAppDialog({
-      title: "Restore pre-refactor content",
-      message: `Restore ${entry.documents.length} file(s) to their pre-refactor content`
-        + `${moveList.length > 0 ? ` and move ${moveList.length} relocated file(s) back` : ""}?\n${resourceList}`,
-      confirmLabel: "Restore files",
-    });
-    if (released() || !restore) return;
-    const execution = await executeRefactorRecovery(entry, preconditions, {
+      if (released()) return;
+      if (!restore) {
+        setRefactorRecoveryReview((current) => (
+          current && current.entry.recoveryId === recoveryId ? { ...current, busy: false } : current
+        ));
+        return;
+      }
+      const execution = await executeRefactorRecovery(targetEntry, targetPreconditions, {
       restoreText: async (doc) => {        const targetPath = doc.canonicalPath || doc.uri;
         const current = await readWorkspaceEditPathSnapshot(targetPath);
         if (!current || !current.exists || current.text === null) {
@@ -10093,9 +10143,12 @@ export function CodeWorkspaceTab({
         return snapshot && snapshot.text !== null ? { text: snapshot.text } : null;
       },
     });
-    if (released()) return;
+    if (released()) {
+      refactorRecoveryBusyRef.current.delete(recoveryId);
+      return;
+    }
     if (execution.state === "rolled-back") {
-      updateRefactorRecoveryJournalV2(entry.recoveryId, (current) => ({
+      updateRefactorRecoveryJournalV2(targetEntry.recoveryId, (current) => ({
         ...current,
         status: "rolled-back",
         verification: {
@@ -10111,6 +10164,8 @@ export function CodeWorkspaceTab({
           + `${execution.reversedMoves.length > 0 ? `, moved back ${execution.reversedMoves.length}` : ""}`
           + `${execution.contentUnverifiedMoves.length > 0 ? ` (${execution.contentUnverifiedMoves.length} move(s) without a content proof)` : ""}.`,
       );
+      refactorRecoveryBusyRef.current.delete(recoveryId);
+      closeRefactorRecoveryReview(recoveryId);
       return;
     }
     const problems = [
@@ -10120,7 +10175,7 @@ export function CodeWorkspaceTab({
       ...execution.moveFailures.map((failure) => `${failure.newUri}: ${failure.reason}`),
     ];
     // ED-REPAIR-004: partial recovery failure retains facts, accurate reasons, and progress in persistent journal
-    updateRefactorRecoveryJournalV2(entry.recoveryId, (current) => ({
+    updateRefactorRecoveryJournalV2(targetEntry.recoveryId, (current) => ({
       ...current,
       status: "recovery-required",
       verification: {
@@ -10132,19 +10187,207 @@ export function CodeWorkspaceTab({
         restoredUris: Object.freeze([...(current.verification?.restoredUris ?? []), ...execution.restoredUris]),
       },
     }));
-    handledRefactorRecoveryIdsRef.current.delete(entry.recoveryId);
-    await confirmAppDialog({
-      title: "Refactor recovery incomplete",
-      message: `Restored ${execution.restoredUris.length} of ${entry.documents.length} file(s). Pending entry kept:\n${problems.join("\n")}`,
-      confirmLabel: "Keep pending",
+    // Keep the review open with a visible error so the user can retry,
+    // keep pending, or abandon this record. Refresh preconditions so the
+    // dialog reflects the post-attempt states.
+    try {
+      const refreshed = await classifyRecoveryEntry(targetEntry);
+      if (!released()) {
+        setRefactorRecoveryReview((current) => (
+          current && current.entry.recoveryId === recoveryId
+            ? {
+              ...current,
+              preconditions: refreshed,
+              loading: false,
+              busy: false,
+              error: `Restore incomplete: restored ${execution.restoredUris.length} of ${targetEntry.documents.length} file(s). ${problems.join("; ")}`,
+            }
+            : current
+        ));
+      }
+    } catch (error) {
+      if (!released()) {
+        setRefactorRecoveryReview((current) => (
+          current && current.entry.recoveryId === recoveryId
+            ? {
+              ...current,
+              busy: false,
+              error: `Restore incomplete: restored ${execution.restoredUris.length} of ${targetEntry.documents.length} file(s). ${problems.join("; ")}`,
+            }
+            : current
+        ));
+      }
+    } finally {
+      refactorRecoveryBusyRef.current.delete(recoveryId);
+    }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setRefactorRecoveryReview((current) => (
+        current && current.entry.recoveryId === targetEntry.recoveryId
+          ? { ...current, busy: false, error: `Restore failed: ${message}` }
+          : current
+      ));
+      refactorRecoveryBusyRef.current.delete(targetEntry.recoveryId);
+    }
+  }, [applyLspResourceOperation, applyLspWorkspaceEditNow, classifyRecoveryEntry, closeRefactorRecoveryReview, readWorkspaceEditPathSnapshot, refreshTree, setStatusMessage]);
+
+  const runRecoveryDismiss = useCallback(async (
+    targetEntry: RefactorRecoveryJournalEntryV2,
+    ownerInstanceId: string,
+  ): Promise<void> => {
+    const released = () => workspaceInstanceIdRef.current !== ownerInstanceId;
+    const recoveryId = targetEntry.recoveryId;
+    if (released()) return;
+    if (refactorRecoveryBusyRef.current.has(recoveryId)) return;
+    refactorRecoveryBusyRef.current.add(recoveryId);
+    setRefactorRecoveryReview((current) => (
+      current && current.entry.recoveryId === recoveryId ? { ...current, busy: true, error: null } : current
+    ));
+    try {
+      // Re-read the latest record synchronously before comparing: no await
+      // between the freshness check and the dismiss write inside the helper.
+      const latest = getRefactorRecoveryJournalV2(recoveryId);
+      if (!latest) {
+        throw new Error("recovery entry is missing; refresh and try again");
+      }
+      if (latest.workspaceRoot !== targetEntry.workspaceRoot || latest.transactionId !== targetEntry.transactionId) {
+        throw new Error("recovery entry changed to a different transaction; refresh and confirm again");
+      }
+      if (!isPendingRefactorRecoveryEntry(latest)) {
+        // Already resolved elsewhere: close quietly without file effects.
+        setStatusMessage("Refactor recovery entry is no longer pending.");
+        refactorRecoveryBusyRef.current.delete(recoveryId);
+        closeRefactorRecoveryReview(recoveryId);
+        return;
+      }
+      const result = dismissRefactorRecoveryEntry(recoveryId, targetEntry.updatedAt);
+      if (!result.ok) {
+        throw new Error(result.reason);
+      }
+      if (released()) return;
+      const affectedCount = targetEntry.documents.length + (targetEntry.resourceMoves ?? []).length;
+      setStatusMessage(
+        `Abandoned refactor recovery for ${affectedCount} file(s); files left exactly as they are now.`,
+      );
+      refactorRecoveryBusyRef.current.delete(recoveryId);
+      closeRefactorRecoveryReview(recoveryId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!released()) {
+        setRefactorRecoveryReview((current) => (
+          current && current.entry.recoveryId === recoveryId
+            ? { ...current, busy: false, error: `Could not abandon recovery: ${message}` }
+            : current
+        ));
+      }
+      refactorRecoveryBusyRef.current.delete(recoveryId);
+    }
+  }, [closeRefactorRecoveryReview, setStatusMessage]);
+
+  const keepRecoveryReview = useCallback((recoveryId: string) => {
+    closeRefactorRecoveryReview(recoveryId);
+  }, [closeRefactorRecoveryReview]);
+
+  const promptRefactorRecoveryEntry = useCallback(async (
+    entry: RefactorRecoveryJournalEntryV2,
+    ownerInstanceId: string,
+  ): Promise<void> => {
+    const released = () => workspaceInstanceIdRef.current !== ownerInstanceId;
+    if (released()) return;
+    // RC-02: dismissed/committed entries are never pending; skip without UI.
+    const latestAtOpen = getRefactorRecoveryJournalV2(entry.recoveryId) ?? entry;
+    if (!isPendingRefactorRecoveryEntry(latestAtOpen)) return;
+    if (refactorRecoveryBusyRef.current.has(entry.recoveryId)) return;
+    // Bridge the dialog's user action back to the sequential discover loop:
+    // resolve only when the review closes (keep/restore-success/dismiss).
+    // Restore/dismiss failures keep the dialog open and do not resolve.
+    await new Promise<void>((resolve) => {
+      refactorRecoveryResolveRef.current.set(entry.recoveryId, resolve);
+      setRefactorRecoveryReview({
+        entry: latestAtOpen,
+        ownerInstanceId,
+        preconditions: null,
+        loading: true,
+        error: null,
+        busy: false,
+      });
+      void (async () => {
+        try {
+          const preconditions = await classifyRecoveryEntry(latestAtOpen);
+          if (released()) {
+            closeRefactorRecoveryReview(entry.recoveryId);
+            return;
+          }
+          if (preconditions.overall === "already-restored") {
+            updateRefactorRecoveryJournalV2(entry.recoveryId, (currentEntry) => ({
+              ...currentEntry,
+              status: "rolled-back",
+              verification: { mismatchedUris: Object.freeze([]), checkedAt: Date.now() },
+            }));
+            setStatusMessage("Refactor recovery: every affected file already matches its pre-refactor content; entry closed.");
+            closeRefactorRecoveryReview(entry.recoveryId);
+            return;
+          }
+          // Functional update with creation fallback: the loading state set
+          // above may not have rendered yet when a fast classify resolves
+          // (state updater would see null and drop this update). Either way
+          // the dialog ends loaded with preconditions.
+          setRefactorRecoveryReview((currentState) => {
+            if (currentState && currentState.entry.recoveryId === entry.recoveryId) {
+              return { ...currentState, preconditions, loading: false };
+            }
+            if (!currentState) {
+              return {
+                entry: latestAtOpen,
+                ownerInstanceId,
+                preconditions,
+                loading: false,
+                error: null,
+                busy: false,
+              };
+            }
+            return currentState;
+          });
+        } catch (error) {
+          if (released()) {
+            closeRefactorRecoveryReview(entry.recoveryId);
+            return;
+          }
+          const message = `Could not verify the pending entry: ${error instanceof Error ? error.message : String(error)}`;
+          setRefactorRecoveryReview((currentState) => {
+            if (currentState && currentState.entry.recoveryId === entry.recoveryId) {
+              return { ...currentState, loading: false, error: message };
+            }
+            if (!currentState) {
+              return {
+                entry: latestAtOpen,
+                ownerInstanceId,
+                preconditions: null,
+                loading: false,
+                error: message,
+                busy: false,
+              };
+            }
+            return currentState;
+          });
+        }
+      })();
     });
-  }, [applyLspResourceOperation, applyLspWorkspaceEditNow, readWorkspaceEditPathSnapshot, refreshTree, setStatusMessage]);
+  }, [classifyRecoveryEntry, closeRefactorRecoveryReview, setStatusMessage]);
   refactorRecoveryPromptRef.current = promptRefactorRecoveryEntry;
 
   useEffect(() => {
     if (handledRefactorRecoveryOwnerRef.current !== workspaceInstanceId) {
       handledRefactorRecoveryOwnerRef.current = workspaceInstanceId;
       handledRefactorRecoveryIdsRef.current = new Set();
+      // RC-02: workspace switch releases pending dialogs; stale async
+      // results must never commit to the new instance.
+      for (const resolve of refactorRecoveryResolveRef.current.values()) {
+        try { resolve(); } catch { /* ignore */ }
+      }
+      refactorRecoveryResolveRef.current.clear();
+      refactorRecoveryBusyRef.current.clear();
+      setRefactorRecoveryReview(null);
     }
     let disposed = false;
     const discover = async () => {
@@ -10152,11 +10395,10 @@ export function CodeWorkspaceTab({
       const runner = refactorRecoveryPromptRef.current;
       if (!rootPath || !runner) return;
       const listing = listRefactorRecoveryJournalsV2(rootPath);
-      const pending = listing.entries.filter((entry) => (
-        entry.status === "prepared" || entry.status === "recovery-required"
-      ));
+      const pending = listing.entries.filter(isPendingRefactorRecoveryEntry);
       for (const entry of pending) {
         if (disposed) return;
+        if (workspaceInstanceIdRef.current !== workspaceInstanceId) return;
         if (handledRefactorRecoveryIdsRef.current.has(entry.recoveryId)) continue;
         handledRefactorRecoveryIdsRef.current.add(entry.recoveryId);
         await runner(entry, workspaceInstanceId);
@@ -14267,9 +14509,7 @@ export function CodeWorkspaceTab({
         const rootPath = roots[0]?.path;
         if (!rootPath) return;
         const listing = listRefactorRecoveryJournalsV2(rootPath);
-        const pending = listing.entries.filter((entry) => (
-          entry.status === "prepared" || entry.status === "recovery-required"
-        ));
+        const pending = listing.entries.filter(isPendingRefactorRecoveryEntry);
         if (pending.length === 0) {
           setStatusMessage("No pending recovery entries found");
           return;
@@ -20176,6 +20416,28 @@ export function CodeWorkspaceTab({
             refactoringPreviewModal.resolve(false);
             setRefactoringPreviewModal(null);
           }}
+        />
+      )}
+      {refactorRecoveryReview && (
+        <RefactorRecoveryReviewDialog
+          entry={refactorRecoveryReview.entry}
+          workspaceRoot={roots[0]?.path ?? refactorRecoveryReview.entry.workspaceRoot}
+          preconditions={refactorRecoveryReview.preconditions}
+          loading={refactorRecoveryReview.loading}
+          error={refactorRecoveryReview.error}
+          busy={refactorRecoveryReview.busy}
+          onKeep={() => keepRecoveryReview(refactorRecoveryReview.entry.recoveryId)}
+          onRestore={() => {
+            const current = refactorRecoveryReviewRef.current;
+            if (!current || !current.preconditions) return;
+            void runRecoveryRestore(current.entry, current.preconditions, current.ownerInstanceId);
+          }}
+          onDismiss={() => {
+            const current = refactorRecoveryReviewRef.current;
+            if (!current) return;
+            void runRecoveryDismiss(current.entry, current.ownerInstanceId);
+          }}
+          onClose={() => keepRecoveryReview(refactorRecoveryReview.entry.recoveryId)}
         />
       )}
       {activeCompareSession && (

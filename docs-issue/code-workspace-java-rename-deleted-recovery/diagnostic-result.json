@@ -1,0 +1,32 @@
+{
+  "timeUtc": "2026-09-12T23:05:38.567696+00:00",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "baseline": "66dc56629b220eb9cdf250a2a54035c3b866b8b4",
+  "command": "node docs-issue/code-workspace-java-rename-deleted-recovery/diagnose.mjs",
+  "exitCode": 0,
+  "output": {
+    "diagnosticScope": "production preparation/classifier; shell alias algorithm reproduced in memory; no native UI",
+    "pathLookup": {
+      "snapshotKey": "D:/fixture/ique/MyTesting.java",
+      "moveKey": "D:\\fixture\\ique\\MyTesting.java",
+      "movedTextFound": false,
+      "oldDocumentPostTextFound": false
+    },
+    "completedTextAndMove": {
+      "overall": "conflict",
+      "document": "restorable",
+      "move": "conflict"
+    },
+    "bothFilesDeleted": {
+      "overall": "conflict",
+      "document": "unreadable",
+      "move": "conflict"
+    }
+  },
+  "stderr": "",
+  "userProjectExistence": {
+    "root": true,
+    "oldFile": false,
+    "newFile": false
+  }
+}
