@@ -1,0 +1,14 @@
+[data-testid="code-workspace-tree"] [role="treeitem"] {
+  border-radius: 4px;
+  outline-offset: -2px;
+}
+
+/* Selection remains visible while focus is in the editor or a menu. */
+[data-testid="code-workspace-tree"] [aria-selected="true"] {
+  background: var(--taomni-code-active-line-bg);
+}
+
+[data-testid="code-workspace-tree"]:focus-within [aria-selected="true"],
+[data-testid="code-workspace-tree-pane"]:focus [aria-selected="true"] {
+  background: var(--taomni-code-selection-bg);
+}

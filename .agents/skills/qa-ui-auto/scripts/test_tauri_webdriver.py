@@ -14,6 +14,50 @@ from tauri_webdriver import NativeSession
 
 
 class NativeSessionTransportTest(TestCase):
+    def test_right_click_uses_right_button_and_releases_on_failure(self):
+        session = NativeSession("http://driver.invalid", Path("unused"))
+        session.session_id = "session-1"
+        session.find = Mock(return_value="row-1")
+        session.request = Mock(side_effect=[None, RuntimeError("input failed"), None])
+        with self.assertRaisesRegex(RuntimeError, "input failed"):
+            session.right_click("#file")
+        actions = session.request.call_args_list[1].args[2]["actions"][0]["actions"]
+        self.assertEqual(actions[0]["origin"], {"element-6066-11e4-a52e-4f735466cecf": "row-1"})
+        self.assertEqual([a["button"] for a in actions[1:]], [2, 2])
+        self.assertEqual(session.request.call_args.args, ("DELETE", "/session/session-1/actions"))
+        self.assertNotIn("dispatchEvent", session.request.call_args_list[0].args[2]["script"])
+
+    def test_count_accepts_empty_but_rejects_invalid_driver_response(self):
+        session = NativeSession("http://driver.invalid", Path("unused"))
+        session.session_id = "session-1"
+        session.request = Mock(side_effect=[[], {"error": "bad response"}])
+        self.assertEqual(session.count(".tab"), 0)
+        with self.assertRaisesRegex(Exception, "invalid element list"):
+            session.count(".tab")
+
+    def test_scoped_press_focuses_without_activation(self):
+        session = NativeSession("http://driver.invalid", Path("unused"))
+        session.session_id = "session-1"
+        session.find = Mock(return_value="row-1")
+        session.request = Mock(return_value=True)
+        session.press_combo = Mock(return_value="pressed")
+        ctx = Mock(session=session)
+        native_steps._press(ctx, {"selector": "#folder", "key": "ArrowRight"})
+        session.press_combo.assert_called_once_with("ArrowRight")
+        session.request.assert_called_once()
+        self.assertTrue(session.request.call_args.args[1].endswith("/execute/sync"))
+        self.assertEqual(session.request.call_args.args[2]["args"], [{"element-6066-11e4-a52e-4f735466cecf": "row-1"}])
+
+    def test_failed_focus_does_not_send_keys_to_previous_target(self):
+        session = NativeSession("http://driver.invalid", Path("unused"))
+        session.session_id = "session-1"
+        session.find = Mock(return_value="row-1")
+        session.request = Mock(return_value=False)
+        session.press_combo = Mock()
+        with self.assertRaisesRegex(Exception, "could not receive focus"):
+            native_steps._press(Mock(session=session), {"selector": "#folder", "key": "ArrowRight"})
+        session.press_combo.assert_not_called()
+
     def test_loopback_driver_bypasses_system_proxy(self):
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):

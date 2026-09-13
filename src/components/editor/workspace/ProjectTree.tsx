@@ -3,6 +3,7 @@
  * Presentation + expand/open callbacks only — load/mutate logic stays in the shell.
  */
 import { Fragment, type MouseEvent, type ReactNode } from "react";
+import "./ProjectTree.css";
 import {
   ChevronDown,
   ChevronRight,
@@ -185,8 +186,12 @@ function renderMatchingFlatFiles(
                 data-testid="code-workspace-flat-file"
                 data-root-id={root.id}
                 data-path={entry.path}
+                data-tree-kind="file"
                 data-active={active || undefined}
                 data-selected={isSelected || undefined}
+                role="treeitem"
+                aria-level={2}
+                aria-selected={isSelected}
                 className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pl-6 pr-2 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
                 title={`${root.name} / ${entry.path}${entry.size ? ` - ${formatBytes(entry.size)}` : ""}`}
                 onClick={() => {
@@ -294,7 +299,12 @@ function renderEntries(
             data-testid="code-workspace-tree-dir"
             data-root-id={root.id}
             data-path={displayPath}
+            data-tree-kind="dir"
             data-selected={isSelected || undefined}
+            role="treeitem"
+            aria-level={depth + 1}
+            aria-expanded={isExpanded}
+            aria-selected={isSelected}
             className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pr-2 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
             style={rowStyle}
             title={`${root.name} / ${displayPath}`}
@@ -339,8 +349,12 @@ function renderEntries(
         data-testid="code-workspace-tree-file"
         data-root-id={root.id}
         data-path={entry.path}
+        data-tree-kind="file"
         data-active={active || undefined}
         data-selected={isSelected || undefined}
+        role="treeitem"
+        aria-level={depth + 1}
+        aria-selected={isSelected}
         className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pr-2 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
         style={rowStyle}
         title={`${root.name} / ${entry.path}${entry.size ? ` - ${formatBytes(entry.size)}` : ""}`}
@@ -403,7 +417,12 @@ export function ProjectTree(props: ProjectTreeProps) {
               type="button"
               data-testid="code-workspace-tree-root"
               data-root-id={root.id}
+              data-tree-kind="root"
               data-selected={selectedRoot || undefined}
+              role="treeitem"
+              aria-level={1}
+              aria-expanded={expanded}
+              aria-selected={selectedRoot}
               className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 px-2 text-left font-semibold hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
               title={root.path}
               onClick={() => onToggleRoot(root.id)}
@@ -455,9 +474,14 @@ export function ProjectTree(props: ProjectTreeProps) {
                 key={file.id}
                 type="button"
                 data-testid="code-workspace-tree-loose-file"
+                data-tree-kind="loose-file"
+                data-loose-id={file.id}
                 data-path={file.path}
                 data-active={active || undefined}
                 data-selected={selectedLoose || undefined}
+                role="treeitem"
+                aria-level={1}
+                aria-selected={selectedLoose}
                 className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pl-6 pr-2 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
                 title={file.path}
                 onClick={() => {

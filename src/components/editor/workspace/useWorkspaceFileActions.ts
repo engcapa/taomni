@@ -227,11 +227,22 @@ export function useWorkspaceFileActions({
       refreshTreeTimerRef.current = null;
       resetTreeData();
       rootsRef.current?.forEach((root) => {
-        if (expandedRoots.has(root.id)) void loadDir(root.id, "");
+        if (expandedRoots.has(root.id)) {
+          void loadDir(root.id, "");
+          // Reset clears every listing, including expanded descendants. The
+          // watcher fires for our own saves too; restore those cached listings
+          // without toggling expansion or losing the selected file.
+          if (treeViewMode !== "flat") {
+            const prefix = `${root.id}:`;
+            for (const key of expandedDirs) {
+              if (key.startsWith(prefix)) void loadDir(root.id, key.slice(prefix.length));
+            }
+          }
+        }
         if (treeViewMode === "flat") void loadFlatFiles(root.id, true);
       });
     }, 200);
-  }, [expandedRoots, loadDir, loadFlatFiles, resetTreeData, rootsRef, treeViewMode]);
+  }, [expandedDirs, expandedRoots, loadDir, loadFlatFiles, resetTreeData, rootsRef, treeViewMode]);
 
   useEffect(() => () => {
     if (refreshTreeTimerRef.current !== null) window.clearTimeout(refreshTreeTimerRef.current);

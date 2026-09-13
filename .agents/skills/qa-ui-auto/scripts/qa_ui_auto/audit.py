@@ -118,7 +118,7 @@ def _check_health(
     """Aggregate lint + catalog freshness into one structured report."""
     case_n, case_ids, case_errors = lint_cases(cases_dir)
     feat_errors, feat_stats = lint_features(features_path)
-    orphans = warn_selector_orphans(features_path, cases_dir)
+    orphans = [] if case_errors or feat_errors else warn_selector_orphans(features_path, cases_dir)
     # Catalog freshness: render expected output, compare to disk.
     catalog_stale = False
     catalog_reason: str | None = None
@@ -481,6 +481,11 @@ def build_audit(
         cases_dir=cases_dir,
         catalog_path=catalog_path,
     )
+    if rep.health["lint_cases"]["errors"] or rep.health["lint_features"]["errors"]:
+        # Do not parse an invalid testcase again through coverage/diff. Preserve
+        # the actionable lint error instead of hiding it behind a traceback.
+        rep.health["coverage_skipped"] = "Fix lint errors before coverage, diff or gate evaluation."
+        return rep
     rep.gaps = _collect_gaps(
         features_path=features_path,
         cases_dir=cases_dir,
@@ -668,6 +673,9 @@ def render_text(rep: AuditReport, *, focus_feature: str | None = None) -> str:
         out.append(f"  focus: {focus_feature}")
     out.append("")
     out.extend(_render_health(rep.health))
+    if rep.health.get("coverage_skipped"):
+        out.append(rep.health["coverage_skipped"])
+        return "\n".join(out)
     out.extend(_render_gaps(rep.gaps, focus_feature))
     if rep.diff is not None:
         out.extend(_render_diff(rep.diff))

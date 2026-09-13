@@ -2,6 +2,12 @@
 
 The task card defines `acceptance` and `required_evidence`. Both are completion gates. Evidence describes commands and observations that actually ran against the current production path; it is not a prose completion claim.
 
+Select sufficient checks with [efficient-verification](../../qa-ui-auto/references/efficient-verification.md). Evidence kinds are proof categories, not a requirement to launch separate suites: one qualifying run can support several kinds/ACs when their assertions and shared receipt are identified. Do not repeat a current passing run simply to produce another kind. A selected case set must still cover all mandatory ACs and relevant regressions.
+
+Review target acceptance and affected retained behavior separately using [regression protection](../../qa-ui-auto/references/regression-protection.md). Link pre-change observations as baseline context, not as current-source passing checks. Record pre-existing failures and unknown baselines explicitly. Board/receipt validation cannot discover omitted consumers or justify ignoring a known regression introduced by this task.
+
+Ordinary `compare_idea.py` exit 0 validates record structure and may report `incomparable`/`unverified`. Tasks claiming a measured match require `--require-match`, actual target-version observations, and separate visual/interaction review where required. Preserve historical scoped waivers as exceptions with their original ceiling; do not extend them or rewrite them as equality.
+
 ## Evidence JSON
 
 Supply one object with chronological checks:

@@ -9,6 +9,11 @@ information is missing. Apply requested changes directly and summarize the diff.
 - One unique ID per `cases/<id>-<slug>.testcase.yaml`; drafts may use `cases/auto/`.
   Set `covers: [F.x]` and `fixtures` explicitly. Use `reset_db` for persistent
   mutations, plus required network/workspace/provider fixtures.
+  For a new fixture, implement it in `scripts/qa_ui_auto/fixtures/`, add it to
+  that package's `REGISTRY`, and add its name to `schema/testcase.schema.json`.
+  Prefer a small dependency-free fixture for tree/editing checks; don't import a
+  Java project unless a provider is part of the assertion. Keep retained files
+  under the run report root and state the browser/native visibility boundary.
 - Assert the user's result after acting, including relevant failure/recovery
   paths. Control touches alone do not prove workflows work. Use browser for
   renderer behavior and selected native cases for real OS/IPC boundaries.
@@ -23,6 +28,9 @@ information is missing. Apply requested changes directly and summarize the diff.
   it does not certify those platforms. Do not substitute mocks for OS evidence.
 - Each step is a single-key map using a schema-supported verb. `eval_readonly`
   is the only raw-JS escape hatch; never mutate state or bypass the real action.
+  Its schema uses conservative text checks, not a JavaScript parser (even an `=`
+  inside a selector string can be rejected). Prefer dedicated attribute/count/text
+  assertions and short observation expressions; do not obfuscate writes to evade it.
 - Prefer exact `[data-testid="..."]` selectors from feature controls or
   [testid-catalog.md](testid-catalog.md). Add stable testids where needed; avoid
   styling classes and fragile text. Do not add expensive production polling,
@@ -44,7 +52,8 @@ not authorize unrelated product changes. Run affected IDs after a concrete
 correction, retaining first-failure evidence and disclosing skips.
 
 The runner validates YAML, so normal edits need a targeted run rather than
-separate lint/dry-run/run stages. For feature/control edits, regenerate the
+separate lint/dry-run/run stages. Use native dry-run before a new build to check
+new verbs/platform scope cheaply. For feature/control edits, regenerate the
 catalog once after the batch and run `python -m qa_ui_auto audit --gate` to check
 lint, freshness and the existing coverage ratchet. Ratchet verified improvements
 only; do not overwrite unrelated baseline losses.

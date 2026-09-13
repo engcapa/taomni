@@ -78,6 +78,41 @@ class VerificationTest(unittest.TestCase):
             path.write_text("changed case")
             row = coverage_status([case], [], observations, ["Windows"])["cases"][0]
             self.assertEqual(row["execution"]["browser:Windows"]["status"], "stale")
+            self.assertEqual(row["execution"]["browser:Windows"]["report"], value["report"])
+            self.assertIn("case changed", row["execution"]["browser:Windows"]["reason"])
+
+    def test_stale_native_report_explains_runner_change_without_claiming_build_change(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "case.yaml"
+            path.write_text("case")
+            case = TestCase(id="TC-a", title="A", modes=["native"], source_path=path)
+            identity = {"source_sha256": "same-source", "runner_sha256": "old-runner"}
+            data = {"dry_run": False, "mode": "native", "platform": "Windows", "identity": identity,
+                    "conditions_sha256": conditions_identity({}, "native"),
+                    "identity_stable": True, "exit_code": 0,
+                    "native_identity": {"identifier": "com.taomni.app.qa", "source_sha256": "same-source"},
+                    "cases": [{"id": case.id, "status": "passed", "case_sha256": input_digest(path)}]}
+            summary = root / "summary.json"
+            summary.write_text(json.dumps(data))
+            emit_runner_receipt(root, "native", ["runner"], "2026-09-06T10:00:00Z",
+                                "2026-09-06T10:00:01Z", 1, 0)
+            scenarios = [
+                ({**identity, "runner_sha256": "new-runner"}, {}, ["runner changed"]),
+                ({**identity, "source_sha256": "new-source"}, {},
+                 ["source changed", "native build source changed"]),
+                (identity, {"scenario": "different"}, ["execution config changed"]),
+            ]
+            for current_identity, cfg, reasons in scenarios:
+                with self.subTest(reasons=reasons):
+                    observations, rejected = load_observations([root], current_identity, cfg)
+                    self.assertFalse(rejected)
+                    result = coverage_status([case], [], observations, ["Windows"])
+                    self.assertFalse(result["ok"])
+                    cell = result["cases"][0]["execution"]["native:Windows"]
+                    self.assertEqual(cell["status"], "stale")
+                    self.assertEqual(cell["report"], str(summary.resolve()))
+                    self.assertEqual(cell["reason"].split("; "), reasons)
 
     def test_another_os_pass_cannot_hide_current_target_failure(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -44,6 +44,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .steps import StepError
+from .native_assertions import assert_count, assert_menu_items
 
 
 class NativeStepContext:
@@ -158,7 +159,7 @@ def _press(ctx: NativeStepContext, args: Any) -> str:
     else:
         raise StepError(f"press: expected string or {{key, selector?}}, got {args!r}")
     if selector:
-        ctx.session.click(selector)
+        ctx.session.focus(selector)
     return ctx.session.press_combo(key)
 
 
@@ -1211,6 +1212,7 @@ def _append_clipboard_observation(ctx: NativeStepContext, entry: dict[str, Any])
 
 
 VERBS: dict[str, Callable[[NativeStepContext], str]] = {}
+VERBS.update(assert_count=assert_count, assert_menu_items=assert_menu_items)
 
 
 def _verb(name: str) -> Callable[[Callable[[NativeStepContext, Any], str]], Callable[[NativeStepContext, Any], str]]:
@@ -1244,6 +1246,14 @@ def _do_click(ctx: NativeStepContext, args: Any) -> str:
 def _do_dblclick(ctx: NativeStepContext, args: Any) -> str:
     selector, _ = _selector_args(args)
     return ctx.session.dblclick(selector)
+
+
+@_verb("right_click")
+def _do_right_click(ctx: NativeStepContext, args: Any) -> str:
+    if isinstance(args, dict) and set(args) - {"selector"}:
+        raise StepError("native right_click supports only selector; modifiers/position/force are browser-only")
+    selector, _ = _selector_args(args)
+    return ctx.session.right_click(selector)
 
 
 @_verb("fill")

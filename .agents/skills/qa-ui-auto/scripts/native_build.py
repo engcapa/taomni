@@ -62,6 +62,31 @@ def build_inputs(*, release: bool = False) -> dict:
     }
 
 
+def qa_binary(*, release: bool = False) -> Path:
+    name = "taomni.exe" if platform.system() == "Windows" else "taomni"
+    return ROOT / "src-tauri" / "target" / "qa-ui-auto" / ("release" if release else "debug") / name
+
+
+def check_build(*, release: bool = False, inputs: dict | None = None) -> dict:
+    """Inspect reuse without compiling, launching, or changing the identity record."""
+    binary = qa_binary(release=release)
+    result = {"binary": str(binary), "reusable": False, "reason": "binary missing"}
+    if not binary.is_file():
+        return result
+    try:
+        previous = verify_identity(binary)
+    except ValueError as exc:
+        return dict(result, reason=str(exc))
+    expected = inputs if inputs is not None else build_inputs(release=release)
+    recorded = previous.get("build_inputs")
+    recorded = recorded if isinstance(recorded, dict) else {}
+    changed = sorted(key for key in set(expected) | set(recorded)
+                     if key not in expected or key not in recorded or expected[key] != recorded[key])
+    return dict(result, reusable=not changed, changed_inputs=changed,
+                reason="inputs match" if not changed else "build inputs changed",
+                recorded_build_duration_sec=previous.get("build_duration_sec"))
+
+
 def build_qa(*, release: bool = False, force: bool = False) -> Path:
     overlay = json.loads(QA_CONFIG.read_text(encoding="utf-8"))
     if overlay.get("identifier") != QA_APP_ID or overlay.get("mainBinaryName") != "taomni":
@@ -70,18 +95,15 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
     if not pnpm:
         raise ValueError("pnpm not found on PATH")
     target = ROOT / "src-tauri" / "target" / "qa-ui-auto"
-    name = "taomni.exe" if platform.system() == "Windows" else "taomni"
-    binary = target / ("release" if release else "debug") / name
+    binary = qa_binary(release=release)
     record_path = identity_path(binary)
     inputs = build_inputs(release=release)
-    if not force and binary.is_file():
-        try:
-            previous = verify_identity(binary)
-            if previous.get("build_inputs") == inputs:
-                print("qa-ui-auto: reusing verified QA build (source, recipe, toolchain and environment match)")
-                return binary
-        except ValueError:
-            pass
+    if not force:
+        reuse = check_build(release=release, inputs=inputs)
+        if reuse["reusable"]:
+            print("qa-ui-auto: reusing verified QA build (source, recipe, toolchain and environment match)")
+            return binary
+        print(f"qa-ui-auto: build needed: {reuse['reason']}; changed inputs: {reuse.get('changed_inputs', [])}")
     # A failed rebuild must not leave an old record authorizing a stale binary.
     record_path.unlink(missing_ok=True)
     env = dict(os.environ)
@@ -112,8 +134,15 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--release", action="store_true", help="use release profile for measurements")
     parser.add_argument("--force", action="store_true", help="rebuild even when verified inputs match")
+    parser.add_argument("--check", action="store_true", help="inspect build reuse only: exit 0 reusable, 1 build needed, 2 check error")
     args = parser.parse_args(argv)
+    if args.check and args.force:
+        parser.error("--check cannot be combined with --force")
     try:
+        if args.check:
+            result = check_build(release=args.release)
+            print(json.dumps(result, indent=2))
+            return 0 if result["reusable"] else 1
         binary = build_qa(release=args.release, force=args.force)
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:
         print(f"qa-ui-auto: QA build failed: {exc}", file=sys.stderr)

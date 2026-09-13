@@ -1,0 +1,4 @@
+interface:
+  display_name: "IDEA 场景参照"
+  short_description: "采集与复用 IDEA 真实界面、交互过程及源码依据，交接开发参照"
+  default_prompt: "使用 $idea-reference 为指定场景建立 IDEA UI 与交互参照，优先复用有效证据，只补采缺失状态。"
