@@ -12,6 +12,7 @@ from pathlib import Path
 from .feature_catalog import load_features
 from .provenance import digest_file, input_digest, execution_identity, source_input, conditions_identity
 from .testcase import TestCase, discover
+from .report_paths import summaries
 
 PLATFORMS = ("Linux", "Windows", "macOS")
 LINUX_VERBS = {"native_set_writable", "assert_native_process_delta", "native_process_snapshot",
@@ -98,10 +99,13 @@ def plan(cases: list[TestCase], features, changes: list[str] | None, target: str
                                       "--filter", ",".join(runnable)]})
     return {"schema": "qa-ui-auto.plan.v1", "platform": target, "changed_files": changes,
             "affected_features": sorted(affected), "unmapped_source_files": unmapped,
-            "selection_reason": "shared/unmapped changes: broaden selected scope" if broad else "mapped feature changes",
+            "selection_reason": ("shared/unmapped changes: review affected scope" if shared or unmapped else
+                                 "explicit case selection" if requested_ids else
+                                 "no diff supplied: all cases in the selected catalog scope" if changes is None else
+                                 "mapped feature changes"),
             "commands": commands, "native_gaps": gaps,
             "selected_cases": [c.id for c in selected],
-            "selection_requires_review": broad,
+            "selection_requires_review": shared or bool(unmapped) or (changes is None and not requested_ids),
             "performance": "assess changed hot paths; functional timings are not product performance measurements",
             "backend_tests": "run affected Rust unit/integration tests" if any(
                 n.startswith("src-tauri/") for n in changes or []) else None}
@@ -110,9 +114,13 @@ def plan(cases: list[TestCase], features, changes: list[str] | None, target: str
 def load_observations(report_dirs: list[Path], identity: dict, config: dict | None = None) -> tuple[dict, list[dict]]:
     observations = {}
     rejected = []
+    visited = set()
     for root in report_dirs:
-        paths = [root] if root.is_file() else sorted(root.glob("run-*/summary.json"))
+        paths = summaries(root)
         for path in paths:
+            if path in visited:
+                continue
+            visited.add(path)
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
                 if data.get("dry_run") is not False:
@@ -130,25 +138,40 @@ def load_observations(report_dirs: list[Path], identity: dict, config: dict | No
                     raise ValueError("summary hash does not match execution receipt")
                 if data.get("mode") not in ("browser", "native") or data.get("platform") not in (*PLATFORMS, "Darwin"):
                     raise ValueError("missing or unsupported execution mode/platform")
-                current = data.get("identity") == identity and data.get("identity_stable") is True
+                stale_reasons = []
+                recorded_identity = data.get("identity")
+                if not isinstance(recorded_identity, dict):
+                    stale_reasons.append("execution identity unavailable")
+                else:
+                    stale_reasons.extend(key.removesuffix("_sha256") + " changed"
+                                         for key in sorted(recorded_identity.keys() | identity.keys())
+                                         if key not in recorded_identity or key not in identity
+                                         or recorded_identity[key] != identity[key])
+                if data.get("identity_stable") is not True:
+                    stale_reasons.append("inputs changed during execution")
                 expected_config = config
                 if expected_config is None:
                     from .config import load_config
                     config_path = Path(data.get("config_path", "")).resolve()
                     if config_path.is_relative_to(Path.cwd().resolve()) and config_path.is_file():
                         expected_config = load_config(config_path)
-                current = current and expected_config is not None and data.get("conditions_sha256") == (
-                    conditions_identity(expected_config, data["mode"]) if expected_config is not None else None)
+                if expected_config is None:
+                    stale_reasons.append("execution config unavailable")
+                elif data.get("conditions_sha256") != conditions_identity(expected_config, data["mode"]):
+                    stale_reasons.append("execution config changed")
                 if data["mode"] == "native":
                     native = data.get("native_identity", {})
-                    current = current and native.get("identifier") == "com.taomni.app.qa" and (
-                        native.get("source_sha256") == identity["source_sha256"])
+                    if native.get("identifier") != "com.taomni.app.qa":
+                        stale_reasons.append("native QA identifier differs")
+                    if native.get("source_sha256") != identity["source_sha256"]:
+                        stale_reasons.append("native build source changed")
+                current = not stale_reasons
                 target = "macOS" if data["platform"] == "Darwin" else data["platform"]
                 for result in data.get("cases", []):
                     if result.get("status") not in ("passed", "failed", "skipped"):
                         raise ValueError("invalid case outcome")
                     key = (result["id"], data["mode"], target)
-                    item = {"status": result["status"], "current": current,
+                    item = {"status": result["status"], "current": current, "stale_reasons": stale_reasons,
                             "case_sha256": result.get("case_sha256"), "report": str(path),
                             "finished_at": data.get("finished_at", ""),
                             "duration_sec": result.get("duration_sec"),
@@ -178,9 +201,16 @@ def coverage_status(cases, features, observations, targets) -> dict:
                 valid = [v for v in candidates if v["current"] and v["case_sha256"] == case_hash]
                 latest = max(valid, key=lambda v: v["finished_at"], default=None)
                 state = latest["status"] if latest else "stale" if candidates else "unverified"
+                evidence = latest or max(candidates, key=lambda v: v["finished_at"], default=None)
+                reason = evidence.get("reason") if evidence else None
+                if state == "stale":
+                    reasons = list(evidence.get("stale_reasons", []))
+                    if evidence["case_sha256"] != case_hash:
+                        reasons.append("case changed")
+                    reason = "; ".join(reasons) or "execution inputs differ"
                 key = f"{mode}:{target}"
-                cells[key] = {"status": state, "report": latest["report"] if latest else None,
-                              "reason": latest.get("reason") if latest else None}
+                cells[key] = {"status": state, "report": evidence["report"] if evidence else None,
+                              "reason": reason}
                 if mode == "native":
                     cells[key]["automation_gap"] = native_support(case, target)
                 if state != "passed" or not reviewed:
@@ -250,7 +280,11 @@ def main(argv=None) -> int:
             from .config import load_config
             expected_config = load_config(args.config) if args.config else None
             observations, rejected = load_observations([Path(p) for p in args.reports or ["qa-ui-auto-report"]], identity, expected_config)
-            data = coverage_status(cases, features, observations, targets)
+            status_features = features
+            if not args.feature and (requested_ids or args.tag):
+                covered = {fid for case in cases for fid in case.covers}
+                status_features = [f for f in features if f.id in covered]
+            data = coverage_status(cases, status_features, observations, targets)
             data.update(identity=identity, rejected_reports=rejected)
         data["selection_scope"] = {"feature": args.feature, "tags": args.tag,
                                    "case_ids": sorted(requested_ids), "cases_dir": args.cases,

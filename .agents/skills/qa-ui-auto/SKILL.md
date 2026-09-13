@@ -5,8 +5,8 @@ description: "Efficient functional, UI and native testing for the whole Taomni a
 
 # Taomni App Verification
 
-Prove the requested behavior with the smallest sufficient set of checks. Cover
-every Taomni module. Keep product correctness, UI fidelity, test cost and app
+Prove the requested behavior with the smallest sufficient set of checks across
+Taomni modules. Keep product correctness, UI fidelity, test cost and app
 performance distinct. Read conditional references only when needed.
 
 Requests calling the repository's app testing workflow `qa-test-auto` use this
@@ -23,6 +23,7 @@ skill; `qa-ui-auto` remains the canonical installed name and CLI.
 | Launch native QA | [native-testing.md](references/native-testing.md) |
 | Claim current coverage, combine reports or release | [verification.md](references/verification.md) |
 | Compare IDEA UI/interaction | Also [idea-visual-interaction.md](references/idea-visual-interaction.md) |
+| Substantial skill/runner refactor or requested skill E2E | [skill-e2e-evaluation.md](references/skill-e2e-evaluation.md) |
 | Change only skill prose or test tools | Validate affected instructions/tools; app compilation only if changed execution behavior requires it |
 
 Do not turn routine feature work into a release checklist or full capability audit.
@@ -45,8 +46,11 @@ Do not turn routine feature work into a release checklist or full capability aud
    for a relevant change, failure recovery or unresolved assertion. Stop when the
    required checks pass; integration/release gates apply only in that scope.
 
-Pure renderer changes use browser feedback during iteration and a focused
-current-WebView visual smoke at completion. IPC, disk, processes, dialogs,
+For desktop delivery, pure renderer changes use browser feedback during iteration
+and a focused current-WebView visual smoke at completion. Explicit browser-only
+or skill/tool verification stays within that scope and records packaged-WebView
+behavior as unverified; it does not inherit an app build requirement.
+IPC, disk, processes, dialogs,
 clipboard, IME, shortcuts and windows need native evidence at affected boundaries.
 Real browser service bridges do not become native evidence. UI and interaction
 can be redesigned; test the new target while preserving retained capabilities.
@@ -62,8 +66,14 @@ python -m qa_ui_auto plan --case TC-001 --platform Windows --json
 python -m qa_ui_auto run --mode browser --filter TC-001 --require-pass
 python .agents/skills/qa-ui-auto/scripts/native_build.py --check
 python -m qa_ui_auto costs --reports qa-ui-auto-report --case TC-001
-python -m qa_ui_auto status --case TC-001 --platform Windows --json
+python -m qa_ui_auto status --case TC-001 --platform Windows --reports qa-ui-auto-report --json
 ```
+
+Read the selected YAML's actual `id` and the config's URL before executing.
+`--mode browser` selects the runner; it does not change a native-oriented config's
+URL. For browser-only work, [qa-ui-auto.config.browser.yaml](assets/qa-ui-auto.config.browser.yaml)
+is a minimal config to pass via `--config`; verify its Vite server serves this
+checkout. It requires no SSH/provider/driver setup.
 
 Use actual IDs/platforms. `plan/status --case` accept exact IDs, repeatable;
 unknown or filtered-out IDs fail. `--feature`, `--tag` and `--case` explicitly

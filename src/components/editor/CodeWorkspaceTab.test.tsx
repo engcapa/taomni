@@ -6315,6 +6315,75 @@ describe("CodeWorkspaceTab", () => {
     ).openFiles[fileKey]).toBeDefined();
   });
 
+  it("ED-TREE-001 moves selection without opening files or toggling directories", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app", workspaceId: "ws-tree-nav", workspaceInstanceId: "instance-tree-nav",
+      name: "Tree navigation", roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }], looseFiles: [],
+    };
+    workspaceMocks.workspaceListDir.mockImplementation(async (_root: string, path: string) => path === "src"
+      ? [entry("example.txt", "src/example.txt")]
+      : [entry("src", "src", "dir"), entry("README.md", "README.md"), entry("notes.txt", "notes.txt")]);
+    workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => file(path, `Keep ${path}`));
+    renderWorkspace(workspace);
+    const readme = (await screen.findAllByTestId("code-workspace-tree-file")).find((row) => row.dataset.path === "README.md")!;
+    fireEvent.click(readme);
+    await screen.findByTitle("app / README.md");
+    const before = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-nav");
+    const pane = screen.getByTestId("code-workspace-tree-pane");
+    fireEvent.keyDown(pane, { key: "ArrowDown" });
+    expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-nav").treeSelection)
+      .toEqual({ kind: "file", ref: { kind: "root", rootId: "app", path: "notes.txt" } });
+    expect(workspaceMocks.workspaceReadFile).not.toHaveBeenCalledWith("/repo/app", "notes.txt");
+    fireEvent.keyDown(pane, { key: "ArrowUp" });
+    fireEvent.keyDown(pane, { key: "ArrowUp" });
+    expect(screen.queryByTitle("app / src/example.txt")).toBeNull();
+    expect(workspaceMocks.workspaceListDir).not.toHaveBeenCalledWith("/repo/app", "src");
+    const after = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-nav");
+    expect(after.editorGroups.primary).toEqual(before.editorGroups.primary);
+    expect(after.openFiles).toEqual(before.openFiles);
+    fireEvent.keyDown(screen.getByTestId("code-workspace-tree-open-file"), { key: "ArrowDown" });
+    fireEvent.keyDown(screen.getByTestId("code-workspace-tree-filter"), { key: "ArrowDown" });
+    expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-nav").treeSelection).toEqual(after.treeSelection);
+  });
+
+  it("ED-TREE-001 expands, enters children, returns to parent and collapses directionally", async () => {
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app", workspaceId: "ws-tree-direction", workspaceInstanceId: "instance-tree-direction",
+      name: "Tree direction", roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }], looseFiles: [],
+    };
+    workspaceMocks.workspaceListDir.mockImplementation(async (_root: string, path: string) => path === "src"
+      ? [entry("example.txt", "src/example.txt")]
+      : [entry("src", "src", "dir")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("src/example.txt", "Keep tree navigation"));
+    renderWorkspace(workspace);
+    const dir = await screen.findByTestId("code-workspace-tree-dir");
+    // Select via the existing context action so this setup does not depend on
+    // directory click expansion, which may be redesigned separately.
+    fireEvent.contextMenu(dir);
+    fireEvent.keyDown(document, { key: "Escape" });
+    const pane = screen.getByTestId("code-workspace-tree-pane");
+    fireEvent.keyDown(pane, { key: "ArrowRight" });
+    const child = await screen.findByTestId("code-workspace-tree-file");
+    fireEvent.keyDown(pane, { key: "ArrowRight" });
+    expect(child).toHaveAttribute("data-selected", "true");
+    expect(workspaceMocks.workspaceReadFile).not.toHaveBeenCalled();
+    fireEvent.keyDown(pane, { key: "ArrowLeft" });
+    expect(dir).toHaveAttribute("data-selected", "true");
+    expect(child).toBeInTheDocument();
+    fireEvent.keyDown(pane, { key: "ArrowLeft" });
+    expect(screen.queryByTestId("code-workspace-tree-file")).toBeNull();
+    fireEvent.keyDown(pane, { key: "ArrowLeft" });
+    expect(screen.getByTestId("code-workspace-tree-root")).toHaveAttribute("data-selected", "true");
+    fireEvent.keyDown(pane, { key: "ArrowRight" });
+    expect(dir).toHaveAttribute("data-selected", "true");
+    fireEvent.keyDown(pane, { key: "ArrowRight" });
+    await screen.findByTestId("code-workspace-tree-file");
+    fireEvent.keyDown(pane, { key: "ArrowDown" });
+    fireEvent.keyDown(pane, { key: "Enter" });
+    await waitFor(() => expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/example.txt"));
+    expect(screen.getByRole("treeitem", { name: /example.txt/ })).toHaveAttribute("aria-selected", "true");
+  });
+
   it("opens the selected tree file in a split with Ctrl+Enter", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",

@@ -324,6 +324,30 @@ describe("useWorkspaceFileActions", () => {
     }
   });
 
+  it("reloads expanded descendants after a watcher refresh without reopening collapsed roots", () => {
+    vi.useFakeTimers();
+    try {
+      const props = options({
+        rootsRef: { current: [...roots, { ...roots[0], id: "closed", path: "/closed" }] },
+        expandedRoots: new Set(["root-1"]),
+        expandedDirs: new Set(["root-1:src", "root-1:src/main", "removed:docs", "closed:src"]),
+      });
+      const { result, unmount } = renderHook(() => useWorkspaceFileActions(props));
+      act(() => result.current.refreshTree());
+      act(() => vi.advanceTimersByTime(200));
+      expect(props.loadDir.mock.calls).toEqual([
+        ["root-1", ""], ["root-1", "src"], ["root-1", "src/main"],
+      ]);
+      props.loadDir.mockClear();
+      act(() => result.current.refreshTree());
+      unmount();
+      act(() => vi.advanceTimersByTime(200));
+      expect(props.loadDir).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("adds repository-relative ignore rules and refreshes Git state", async () => {
     gitMocks.gitIgnorePath.mockResolvedValue({
       rule: "/build/",

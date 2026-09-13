@@ -19,7 +19,9 @@ description: 统筹 Taomni Code Workspace 的 IntelliJ IDEA 功能、UI 与交�
 | `verify <范围>` | 针对已实现内容补足本次必要证据 | 不将缺证据直接认定为代码缺陷 |
 | `status <范围>` | 汇总已有实现、比较结论、当前证据、缺口和下一步 | 不执行测试或改任务状态 |
 
-用户只要求创建、修改或测试这套 skill 时，停留在 skill 文件和工具的范围；不建立真实能力清单、产品 backlog 或启动 IDEA/Taomni。示例任务不代表已领取。
+用户仅要求维护或静态验证 skill 时，停留在 skill 文件和工具范围。用户明确要求以真实需求做端到端验证时，在指定产品场景内执行参照、必要开发、回归和真实应用验证，并记录 skill 的执行问题；这不自动扩展到全量能力盘点。示例任务不代表已领取。
+
+以真实需求验证 skill 时，使用 [skill E2E 评估与完成标准](../qa-ui-auto/references/skill-e2e-evaluation.md)；分别验收产品场景和 skill 的可接续性、成本与设施修复，不能只因产品卡 done 就宣布 skill 重构完成。
 
 ## 定位与接续
 

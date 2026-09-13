@@ -7,12 +7,39 @@ related source and test edits stabilize, then batch the necessary native cases
 on that input. A native-only defect may warrant an earlier minimal probe.
 See [efficient-verification.md](efficient-verification.md) for selection and cost.
 
+Before setup, inspect the selected config's `app.native_binary` and driver path:
+an explicit legacy config overrides the harness's isolated QA default. Use the
+verified QA binary and a WebView-compatible driver in a task config; do not rebuild
+because a config points at the wrong executable. Check ports before launch.
+
+Desktop launch may show a window. Global OS input/IME tests also share the user's
+keyboard, pointer and focus: when the user is active on that desktop, agree a
+compact window for those steps or use a separate desktop/machine. WebDriver input
+and headless browser tests have different focus boundaries; do not claim background
+OS automation merely because a window is minimized. On detected focus/input
+interference, retain the failure and rerun only affected steps when the desktop is available.
+
+Windows lock is a separate condition from background execution. Headless browser
+checks normally remain usable; native WebDriver input/screenshots depend on the
+WebView/driver and must not be assumed lock-compatible. Record lock state and
+check a required observation if it changes. IDEA/global mouse/keyboard/IME sampling
+needs an interactive desktop. Never unlock or alter lock policy automatically;
+continue independent checks and reuse valid pre-lock evidence when inputs match.
+
 Before building, `python .agents/skills/qa-ui-auto/scripts/native_build.py --check`
 reports reusable (exit 0), build needed (1), or check error (2), without compiling
 or launching. It names changed input categories and prior recorded build time;
 prior duration is not time spent again on a cache hit. Normal build invocation
 still rechecks. Group cases by required frontend/profile, avoid routine `--force`
 and preserve the incremental target. Do not compile separately for each case.
+
+For a new/changed native case, first run its selected `--mode native --dry-run`
+to reject unsupported verbs/platforms before compiling. Runner, fixture or YAML
+fixes usually reuse the same binary; source fixes require a matching build.
+If retained behavior fails, preserve the run and distinguish an app defect from
+a fixture/assertion assumption before editing either. For example, multi-character
+W3C typing need not share one undo transaction: use one edit for an undo smoke,
+or explicitly test the intended grouping when grouping is the requirement.
 
 Use a separately built QA application even for manual native exploration.
 `assets/tauri.qa.conf.json` overrides the identifier to `com.taomni.app.qa` and

@@ -21,6 +21,12 @@ to establish relevant baselines and consumer checks before narrowing cases.
 | Hot path / large data | Distinguishing baseline + focused regression | Matched native measurement of that path |
 | Shared UI / cross-module refactor | Changed primitive and representative consumers | Expand to affected consumers, not automatically every feature |
 
+The completion column describes desktop app delivery. An explicit browser-only
+request or a skill/tool evaluation can finish at its stated layer, with packaged
+WebView/OS behavior unverified. Do not compile or require an unlocked desktop just
+to verify a planner change or a browser workflow. This does not waive native
+acceptance already required by an actual product task.
+
 UI/interaction may be rebuilt. Rewrite assertions for deliberately replaced
 flows against the new target, retain assertions for preserved behavior, and
 record old/new ACs. Do not remove failures merely to get a pass.
@@ -32,8 +38,10 @@ These are code-backed mechanisms, not measurements of every machine:
 - `typecheck_scope.py` runs repository `tsc -b`; scope filters diagnostics, not
   compilation. `pnpm build` also runs it. Check the union of owned paths once on
   stable input, not once per file. A successful build on identical input can
-  supply its complete unedited log via `--from-file` with known command, exit and
-  source identity. The parser cannot itself establish freshness/process success.
+  supply its complete unedited log via `--from-file <log> --exit-code <recorded-code>`
+  with known command and source identity. The helper resolves platform launchers
+  and rejects process/global compiler failures (exit 2); scoped errors return 1.
+  Log import still cannot establish freshness or authenticate its supplied exit.
 - `native_build.py` invokes `pnpm tauri build --no-bundle` and the frontend hook.
   Source changes invalidate the embedded frontend even with unchanged Rust logic.
   Preserve its incremental target and input-verified reuse. No routine `cargo
@@ -55,6 +63,12 @@ These are code-backed mechanisms, not measurements of every machine:
   no longer broaden product selection.
 - Full suites after every edit, global status gates per feature, unconditional
   release audits and repeated control generation add workflow overhead.
+  A large mounted test file may still take a minute even with no native build.
+  During iteration, select relevant names with `pnpm exec vitest run <file> -t
+  '<target|retained behaviors>'`; inspect selected/skipped counts. Keep a bounded
+  dedicated test module when a responsibility can be mounted independently, plus
+  representative shell integration tests. Do not mistake unselected tests for
+  environment skips or claim that the full file passed.
 
 Without raw timings, the relative contribution is unknown. Use the task's
 existing reports/build log; do not run a full suite just to measure test cost.

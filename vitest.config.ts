@@ -26,6 +26,8 @@ export default defineConfig({
       "**/dist/**",
       "**/.{idea,git,cache,output,temp}/**",
       "**/.claude/worktrees/**",
+      // Retained fixtures / baseline checkouts are evidence, not current tests.
+      "**/qa-ui-auto-report/**",
     ],
   },
 });

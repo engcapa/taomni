@@ -7,6 +7,7 @@ import json
 import math
 from pathlib import Path
 import statistics
+from .report_paths import summaries
 
 
 def seconds(value):
@@ -22,7 +23,7 @@ def analyze(roots: list[Path], case_ids: set[str] | None = None) -> dict:
         if root.is_file():
             paths.add(root.resolve())
         elif root.is_dir():
-            found = {p.resolve() for p in root.rglob("summary.json")}
+            found = set(summaries(root))
             paths.update(found)
             if not found:
                 problems.append({"path": str(root), "reason": "no summary.json found"})

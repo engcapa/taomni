@@ -353,7 +353,9 @@ export function FileTreePane({
       </div>
       <div
         data-testid="code-workspace-tree"
-        className="flex-1 min-h-0 overflow-auto py-1"
+        role="tree"
+        aria-label="Project files"
+        className="group/tree flex-1 min-h-0 overflow-auto py-1"
         style={{ fontSize: "var(--taomni-code-tree-font-size)" }}
       >
         {children}

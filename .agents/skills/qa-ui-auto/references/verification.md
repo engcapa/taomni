@@ -41,6 +41,13 @@ fingerprints with stable inputs during execution. Native additionally requires a
 QA ID and matching build-source fingerprint. A legacy QA binary may still run,
 but cannot establish current-source coverage until rebuilt.
 
+`--reports` accepts either a summary file or a report root. Root discovery is
+recursive for nested task directories, while known checkout/profile trees are
+excluded; overlapping roots are deduplicated. This matches `costs` and lets a
+follow-up agent pass `qa-ui-auto-report` without guessing the case-specific
+`runs` directory. Stale cells retain the historical report path and changed-input
+reason; rejected dry-runs remain visible separately.
+
 For each source/case/mode/OS, the latest current run wins, including failures and
 skips; an older pass must not conceal a newer failure. Browser results prove a
 Chromium workflow on the recorded host. Native cells distinguish all three OS

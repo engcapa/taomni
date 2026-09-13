@@ -1,0 +1,92 @@
+{
+  "verified_at": "2026-09-13T01:30:00Z",
+  "head": "7c38e41f4c84320e2ebc70a1b9d15133b943cc42",
+  "checks": [
+    {
+      "kind": "unit",
+      "command": "cwd=qa-ui-auto-report/project-tree-e2e/baseline; pnpm exec vitest run src/components/editor/CodeWorkspaceTab.test.tsx -t 'ED-TREE-001|opens the selected tree file in a split|offers tree context menu actions|opens successive tree files' --maxWorkers=1",
+      "result": "failed",
+      "summary": "Isolated HEAD plus new test assertions: 2 target failures, 3 retained passes, 175 unselected, 6.51s. ArrowDown opens notes; repeated Right toggles instead of entering child. Historical red baseline, not current candidate failure.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "python -u -m qa_ui_auto run --mode native --config qa-ui-auto-report/project-tree-e2e/config.yaml --filter TC-IDE-TREE-01-project-tree-keyboard-native --require-pass",
+      "result": "failed",
+      "summary": "run-20260913-091538-331824800: 0 passed, 1 failed, 0 skipped; 22.13s. One undo after multi-character typing removed only the last character. Failure screenshot also exposed pre-existing watcher refresh dropping expanded descendants. Preserve original summary/receipt/HTML/screenshots.",
+      "acceptance": []
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm exec vitest run src/components/editor/workspace/useWorkspaceFileActions.test.tsx -t 'reloads expanded descendants' --maxWorkers=1",
+      "result": "failed",
+      "summary": "1 failed, 8 unselected before refresh fix: root reloaded but src and src/main were not. The tested refresh implementation was unchanged from HEAD.",
+      "acceptance": []
+    },
+    {
+      "kind": "unit",
+      "command": "pnpm exec vitest run src/components/editor/workspace/useWorkspaceFileActions.test.tsx src/components/editor/workspace/ProjectTree.test.tsx --maxWorkers=1",
+      "result": "passed",
+      "summary": "12 passed in 2.25s. Tree/compact/flat/loose navigation and semantics; expanded descendant refresh, removed/collapsed roots, coalescing and unmount cleanup; existing file-action regressions.",
+      "acceptance": ["ED-TREE-001-A1", "ED-TREE-001-A2", "ED-TREE-001-A3", "ED-TREE-001-A4"]
+    },
+    {
+      "kind": "browser",
+      "command": "pnpm exec vitest run src/components/editor/CodeWorkspaceTab.test.tsx -t 'ED-TREE-001|opens the selected tree file in a split|offers tree context menu actions|opens successive tree files' --maxWorkers=1",
+      "result": "passed",
+      "summary": "Mounted renderer evidence, not standalone browser/native: 5 passed, 175 unselected, 7.79s, only the main worktree file discovered. Real shell navigation preserves open buffer/tabs and directory state, toolbar/filter isolation, directional child/parent navigation, Enter/split and retained context actions. Negative no-open/no-toggle assertions exercise the original failure mechanism.",
+      "acceptance": ["ED-TREE-001-A1", "ED-TREE-001-A2", "ED-TREE-001-A3", "ED-TREE-001-A4"]
+    },
+    {
+      "kind": "typecheck",
+      "command": "python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --path src/components/editor/CodeWorkspaceTab.tsx --path src/components/editor/CodeWorkspaceTab.test.tsx --path src/components/editor/workspace/ProjectTree.tsx --path src/components/editor/workspace/ProjectTree.test.tsx --path src/components/editor/workspace/projectTreeNavigation.ts --path src/components/editor/workspace/FileTreePane.tsx --path src/components/editor/workspace/useWorkspaceFileActions.ts --path src/components/editor/workspace/useWorkspaceFileActions.test.tsx --path vitest.config.ts",
+      "result": "passed",
+      "summary": "Actual default pnpm exec tsc -b --pretty false launcher, exit 0; scoped errors 0, out-of-scope errors 0. Final native-build-final.log also contains successful frontend tsc/Vite and packaged build, overall exit 0.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "python -u -m qa_ui_auto run --mode native --config qa-ui-auto-report/project-tree-e2e/config.yaml --filter TC-IDE-TREE-01-project-tree-keyboard-native --require-pass",
+      "result": "passed",
+      "summary": "run-20260913-092411-263275000: 1 passed, 0 failed, 0 skipped; 14.215s run / 10.528s case. Isolated QA Windows WebView2 152.0.4191.66, debug binary with production frontend. Actual disk fixture: navigation/tab preservation, Enter, right-click/Escape, F2/Delete cancellation, single-character save/undo restoring original SHA-256, watcher refresh retains selected file and Ctrl+Enter split. Reviewed native-isolation.json, summary, receipt, source/case/runner/config/binary identities and screenshots. W3C input, not physical OS/IME evidence.",
+      "acceptance": ["ED-TREE-001-A1", "ED-TREE-001-A2", "ED-TREE-001-A3", "ED-TREE-001-A4"]
+    },
+    {
+      "kind": "qa-lint",
+      "command": "python -m qa_ui_auto audit --gate --json",
+      "result": "passed",
+      "summary": "204 cases, 0 schema errors, 0 orphans, catalog fresh; required 394, covered 376, shallow 52 unchanged, no coverage regressions. This static gate is not execution coverage.",
+      "acceptance": []
+    },
+    {
+      "kind": "native",
+      "command": "python -m qa_ui_auto status --case TC-IDE-TREE-01-project-tree-keyboard-native --platform Windows --reports qa-ui-auto-report/project-tree-e2e/runs --config qa-ui-auto-report/project-tree-e2e/config.yaml --gate --json",
+      "result": "passed",
+      "summary": "Selected one reviewed case; current native:Windows passed, gaps empty, ok true. Final run receipt and all bound inputs accepted; dry-runs rejected as execution evidence. This validates the preceding run, not another app execution.",
+      "acceptance": []
+    },
+    {
+      "kind": "code-audit",
+      "command": "Review git diff HEAD and trace handleTreeKeyDown -> navigateProjectTree/setSelected or toggleRoot/toggleDir -> useWorkspaceTreeData/loadDir -> workspace IPC; trace existing openFile, command runner/file actions, save/undo and watcher refresh owners",
+      "result": "passed",
+      "summary": "Navigation is separate from row activation; visible aria ancestry includes loose/flat/compact. Toolbar/input/composing guard limits ownership. Original open/split/error paths retained; F2/Delete cancellation returns before resource effects. Tree async generation/root guards remain; refresh now restores expanded descendants after reset without changing selection. Local CSS keeps inactive selection; no shared global style or LSP lifecycle rewrite. Final diff checked.",
+      "acceptance": ["ED-TREE-001-A1", "ED-TREE-001-A2", "ED-TREE-001-A3", "ED-TREE-001-A4"]
+    },
+    {
+      "kind": "idea-comparison",
+      "command": "Review REF-TREE-2026-09-13 valid IDEA PNG/JSON states against final native 01-child-selected, 02-example-selected, 03-example-open, 04-context-menu, 05-editor-focused and 06-retained-split; see skill-e2e-project-tree.md comparison table",
+      "result": "passed",
+      "summary": "IDEA IU-262.10315.125 and byte-identical 4-file fixture. Direction semantics and focused/inactive selection roles satisfy the scoped contract. Explicit deltas: Enter still retains Taomni tree focus; editor-focused screenshot follows a separate click, mouse activation/split contract retained, theme/scale/layout/action set differ. No pixel/full Project tree parity or Home/End IDEA sampling claim.",
+      "acceptance": ["ED-TREE-001-A1", "ED-TREE-001-A2", "ED-TREE-001-A4"]
+    }
+  ],
+  "unrun": [],
+  "notes": [
+    "Current-platform contract only. Linux/WebKitGTK, macOS/WKWebView, physical OS input/IME, screen-reader, matched visual/performance benchmarks and lock-screen compatibility are unverified, not required completed layers on this Windows card.",
+    "Final native source f54cc2e897d252b4dbe66713b90df103957ec225702fd051f3cb41149d58cbed; runner 2ad7dc395df6024c457f3e17b87c6284eedbfa39db485dfb87febfca48aa79f3; case b86fec80ed025e93dc58f46e39085d33ccff7612134a505425c3ac6ce39ee627; binary 22ff3c61608278a65850d1976040530ac12706b18b359d7c22ee9799ace5229b.",
+    "Raw artifacts are retained locally under ignored qa-ui-auto-report/project-tree-e2e, not committed or universally available. Preserve failed run and valid reference images; the post-close desktop image 35 is excluded from reference use/sharing.",
+    "At product completion: 29 QA facility tests (22 pass, 7 platform skips), 6 scoped-typecheck tests, 4 skill validators pass; actual native execution verifies the changed transport/assertions. Subsequent independent read-only evaluation and skill closure are recorded in skill-e2e-project-tree.md; they are not a second independent product E2E.",
+    "Subsequent report/planner changes invalidate this native run's runner identity; current status is stale (runner changed), while native_build.py --check still reports reusable. Preserve these chronological checks as historical product acceptance, not current runner execution. No native rerun was performed during skill closure.",
+    "Two builds total: 156.469s initial; 100.0s after product refresh fix. Runner/YAML corrections reused binary; final --check reusable=true. No full LSP refactor or complete IDEA functionality inventory. No commit/push requested."
+  ]
+}

@@ -165,6 +165,7 @@
 - `[data-testid="code-workspace-editor-pane"]` — display — F25.5.editor-pane
 - `[data-testid="code-workspace-editor"]` — display [optional] — F25.5.editor-host
 - `[data-testid="code-workspace-editor-tab-strip"]` — display [optional] — F25.5.editor-tab-strip
+- `[data-testid="code-workspace-editor-split"]` — display [optional] — F25.5.editor-split-layout
 - `[data-editor-group-id="primary"] [data-testid="code-workspace-editor-tab-strip"]` — interactive [optional] — F25.5.editor-leaf-primary-tab-strip
 - `[data-editor-group-id="secondary"]` — display [optional] — F25.5.editor-leaf-secondary-pane
 - `[data-editor-group-id="secondary"] .cm-content` — interactive [optional] — F25.5.editor-leaf-secondary-content

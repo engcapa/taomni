@@ -1,8 +1,12 @@
 # Browser Exploration Fallback
 
 The YAML runner uses the Playwright Python API; it does not require
-`playwright-cli`. Prefer native testing as described in SKILL.md. For interactive
-browser exploration, use available Playwright tools or the installed CLI.
+`playwright-cli`. Choose the layer from the affected boundary: browser-only or
+renderer work should use Playwright/browser first; native is required only for
+packaged WebView, IPC, filesystem, OS input or other native boundaries. For
+interactive browser exploration, use available Playwright tools or the installed
+CLI. Browser exploration can generally continue while Windows is locked, subject
+to the browser/runtime; do not infer native or IDEA desktop evidence from it.
 
 CLI commands and flags vary by version. Start with `playwright-cli --help` and
 `playwright-cli --help open`; use a dedicated named session and a disposable

@@ -5667,6 +5667,11 @@ files:
   - src/components/editor/workspace/EditorGroup.tsx
   - src/components/editor/workspace/HighlightingWidget.tsx
   - src/components/editor/workspace/FileTreePane.tsx
+  - src/components/editor/workspace/ProjectTree.tsx
+  - src/components/editor/workspace/ProjectTree.css
+  - src/components/editor/workspace/projectTreeNavigation.ts
+  - src/components/editor/workspace/useWorkspaceFileActions.ts
+  - src/components/editor/workspace/useWorkspaceTreeData.ts
   - src/components/editor/workspace/TabSwitcher.tsx
   - src/components/editor/workspace/KeymapSettingsDialog.tsx
   - src/components/editor/workspace/ClipboardHistoryPopup.tsx
@@ -5747,6 +5752,10 @@ controls:
     selector: '[data-testid="code-workspace-editor-tab-strip"]'
     kind: display
     optional: true       # only with an open buffer
+  - id: editor-split-layout
+    selector: '[data-testid="code-workspace-editor-split"]'
+    kind: display
+    optional: true       # appears after a real split action
   # ED-IMPROVE-007: per-leaf identity selectors used by the view-state restore
   # case; the pane attribute is set by EditorGroup and the tab strip activates
   # a leaf without moving its caret.

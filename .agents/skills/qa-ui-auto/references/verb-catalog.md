@@ -1,6 +1,6 @@
 # qa-ui-auto verb catalog
 
-Authoritative list of step verbs available in `*.testcase.yaml`. Each verb is implemented in `scripts/qa_ui_auto/steps/`. Schema enforces argument shape.
+Step verbs available in `*.testcase.yaml`. Browser implementations live in `scripts/qa_ui_auto/steps/`; native dispatch lives in `native_steps.py`. Schema acceptance does not imply native support. Before a new native build, run the selected case with `--mode native --dry-run` to check supported verbs. Dry-run does not prove execution or every argument's semantics.
 
 > Read this when authoring or modifying testcases. Verbs not listed here are not allowed; the schema validator will reject them.
 
@@ -31,7 +31,7 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 |------|------|-------|
 | `click` | selector string **or** `{selector, modifiers?, position?, force?}` | `modifiers` ⊆ `Alt/Control/Meta/Shift`. |
 | `dblclick` | same as click | |
-| `right_click` | same as click | Use before `assert_menu_items` / `click_menu`. |
+| `right_click` | same as click | Native supports selector only (W3C right button); rich click options are browser-only and fail explicitly. Use before `assert_menu_items`; `click_menu` is browser-only. |
 | `hover` | selector | |
 | `drag_to` | `{from, to}` | Both selectors. |
 | `native_click` | `{selector}` | Native Linux/X11 only. Activates the exact test executable window and sends W3C pointer actions through its packaged WebKitGTK session; testcase assertions own the postcondition. |
@@ -51,7 +51,7 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `native_keys` | `{selector, keys, transport?, focus_prechecked?}` | Requires the selector to own focus. Default `transport: x11` injects XTest keys through Linux/X11 and identifies the Taomni window. `transport: webdriver` uses W3C actions in the platform WebView (Windows/Linux), not OS-level input. Records transport and observed events. `focus_prechecked: true` is limited to a testcase that asserted focus immediately before a driver fault; it omits WebDriver probes/event collection and records that limitation. Testcase assertions own the postcondition. |
 | `native_ime_keys` | `{selector, expected_engine, keys}` | Native Linux/X11 only. Injects physical XTest keys through the named configured fcitx5 engine and records an observation artifact; testcase assertions must verify the committed result. |
 | `native_editor_performance` | `{selector, keys, max_p95_ms, capture_text?, label?}` | Native packaged app only. Injects at least five ASCII keys through W3C WebDriver actions and records keydown-to-CodeMirror-DOM-mutation latency. `keys` accepts a single-char array or a plain string typed character-by-character. `capture_text` (default true) also records per-key rendered text; set it false for multi-megabyte documents so the O(N) textContent probe does not inflate the measured latency. `label` names the per-invocation artifact `native-editor-performance-<label>.json` so repeated measurement groups accumulate instead of overwriting. The artifact also records the next animation frame as a diagnostic, but does not gate on it because a frame requested from CodeMirror's mutation observer is one frame later than the paint containing that mutation. Fails when p95 exceeds the supplied guardrail. |
-| `press` | key string **or** `{key, selector?}` | E.g. `Enter`, `Control+Shift+F`. |
+| `press` | key string **or** `{key, selector?}` | E.g. `Enter`, `Control+Shift+F`. A selector focuses without clicking/activating in either mode. Native uses DOM focus then W3C key actions, not physical OS focus evidence. For activation, add a separate `click`. |
 | `select_option` | `{selector, label?, value?}` | At least one of label/value. |
 | `upload_file` | `{selector, path}` | Hooks into a file input. |
 
@@ -63,9 +63,9 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `assert_not_visible` | selector | Up to 15s wait for hidden. |
 | `assert_text` | `{selector, contains, timeout_sec?}` | Polls `text_content` and `data-terminal-text` (xterm canvas fallback). |
 | `assert_pattern` | `{selector, regex, timeout_sec?}` | Browser and native; polls Python regex against element text (terminal buffer fallback for `terminal-pane`). Use anchored output assertions to distinguish shell output from command echo, and await shell readiness before typing. |
-| `assert_count` | `{selector, min?/max?/equal?}` | Pick at least one bound. |
+| `assert_count` | `{selector, min?/max?/equal?}` | Browser/native. Pick at least one bound; checks current count, including hidden matches. Wait for readiness separately. |
 | `assert_url` | URL substring | |
-| `assert_menu_items` | `[label, label, ...]` | After `right_click`; checks each label visible inside `[data-testid="context-menu"]`. |
+| `assert_menu_items` | `[label, label, ...]` | Browser/native. After `right_click`; checks each label visible inside `[data-testid="context-menu"]` using substring matching. |
 
 ## App-specific helpers (use these instead of inlining selector chains)
 

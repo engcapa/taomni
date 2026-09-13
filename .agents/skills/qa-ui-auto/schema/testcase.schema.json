@@ -74,7 +74,8 @@
      "restore_24tab_fixtures",
      "sortable_java_fixtures",
      "file_move_recovery_fixtures",
-     "view_state_fixtures"
+     "view_state_fixtures",
+     "project_tree"
     ]
    },
    "uniqueItems": true

@@ -634,6 +634,7 @@ import {
 } from "./workspace/executionPlan";
 import { FileTreePane } from "./workspace/FileTreePane";
 import { ProjectTree } from "./workspace/ProjectTree";
+import { navigateProjectTree } from "./workspace/projectTreeNavigation";
 import { MarkdownPreview } from "./workspace/MarkdownPreview";
 import { IconButton, LspStatusPill } from "./workspace/workspaceChrome";
 import { OutlinePane } from "./workspace/OutlinePane";
@@ -4014,21 +4015,14 @@ export function CodeWorkspaceTab({
 
   const handleTreeKeyDown = useCallback((event: React.KeyboardEvent<HTMLElement>) => {
     const pane = treePaneRef.current;
-    if (!pane) return;
-    // Ignore when typing in the filter input.
-    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
-    const rows = Array.from(pane.querySelectorAll<HTMLElement>(
-      "[data-testid='code-workspace-tree-root'], [data-testid='code-workspace-tree-dir'], [data-testid='code-workspace-tree-file'], [data-testid='code-workspace-flat-file']",
-    ));
-    if (rows.length === 0) return;
-    const selectedIndex = Math.max(0, rows.findIndex((row) => row.dataset.selected === "true"));
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    const target = event.target;
+    if (!pane || !(target instanceof HTMLElement) || event.nativeEvent.isComposing) return;
+    const tree = pane.querySelector<HTMLElement>("[data-testid='code-workspace-tree']");
+    if (!tree || (target !== pane && !tree.contains(target))) return;
+    if (target.closest("input, textarea, select, [contenteditable='true']")) return;
+    if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey &&
+      navigateProjectTree(tree, event.key, { onSelect: setSelected, onToggleRoot: toggleRoot, onToggleDir: toggleDir })) {
       event.preventDefault();
-      const next = event.key === "ArrowDown"
-        ? Math.min(rows.length - 1, selectedIndex + 1)
-        : Math.max(0, selectedIndex - 1);
-      rows[next]?.click();
-      rows[next]?.focus();
       return;
     }
     if (event.key === "Enter") {
@@ -4043,29 +4037,18 @@ export function CodeWorkspaceTab({
           : undefined;
         void openFile(selected.ref, targetGroupId ? { groupId: targetGroupId } : undefined);
       } else if (selected?.kind === "file") void openFile(selected.ref);
-      else rows[selectedIndex]?.click();
+      else if (selected?.kind === "root") toggleRoot(selected.rootId);
+      else if (selected?.kind === "dir") toggleDir(selected.rootId, selected.path);
       return;
     }
     if (event.key === "F2") {
       event.preventDefault();
       workspaceCommandRunnerRef.current("workspace.tree.rename", { focus: "tree", payload: { selection: selected ?? undefined } });
-      return;
-    }
-    if (event.key === "Delete") {
+    } else if (event.key === "Delete") {
       event.preventDefault();
       workspaceCommandRunnerRef.current("workspace.tree.delete", { focus: "tree", payload: { selection: selected ?? undefined } });
-      return;
     }
-    if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
-      // Expand/collapse by re-clicking directory/root rows.
-      const row = rows[selectedIndex];
-      if (!row) return;
-      if (row.dataset.testid === "code-workspace-tree-dir" || row.dataset.testid === "code-workspace-tree-root") {
-        event.preventDefault();
-        row.click();
-      }
-    }
-  }, [openFile, selected, workspaceInstanceId]);
+  }, [openFile, selected, setSelected, toggleDir, toggleRoot, workspaceInstanceId]);
 
   const showTreeContextMenu = useCallback(
     (event: React.MouseEvent, selection: TreeSelection) => {

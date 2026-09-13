@@ -71,6 +71,7 @@ class SelectionTest(unittest.TestCase):
         self.assertEqual(json.loads(output), arguments)
 
     def test_status_checks_only_exact_case_and_retains_failure(self):
+        self.features.append(Feature(id="F-unrelated", title="Unrelated"))
         with patch.object(verification, "execution_identity", return_value={}), \
              patch.object(verification, "load_observations", return_value=({}, [])):
             code, output = self.invoke(["status", "--case", "TC-ui", "--platform", "Windows", "--gate", "--json"])
@@ -78,6 +79,23 @@ class SelectionTest(unittest.TestCase):
         data = json.loads(output)
         self.assertEqual([c["id"] for c in data["cases"]], ["TC-ui"])
         self.assertFalse(data["ok"])
+        self.assertEqual([f["id"] for f in data["features"]], ["F1"])
+
+    def test_explicit_selection_does_not_imply_shared_source_changes(self):
+        code, output = self.invoke(["plan", "--case", "TC-ui", "--json"])
+        self.assertEqual(code, 0)
+        data = json.loads(output)
+        self.assertFalse(data["selection_requires_review"])
+        self.assertIsNone(data["changed_files"])
+        self.assertEqual(data["selected_cases"], ["TC-ui"])
+
+    def test_unscoped_status_keeps_features_without_cases(self):
+        self.features.append(Feature(id="F-unrelated", title="Unrelated"))
+        with patch.object(verification, "execution_identity", return_value={}), \
+             patch.object(verification, "load_observations", return_value=({}, [])):
+            code, output = self.invoke(["status", "--platform", "Windows", "--json"])
+        self.assertEqual(code, 0)
+        self.assertEqual(len(json.loads(output)["features"]), 2)
 
 
 if __name__ == "__main__":

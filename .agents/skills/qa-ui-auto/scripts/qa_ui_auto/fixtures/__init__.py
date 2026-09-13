@@ -24,7 +24,8 @@ Fixtures are referenced from a testcase's `fixtures: [...]` list. Builtin set:
 * view_state_fixtures - native-only 60-line Long.java for per-leaf caret,
                     scroll and fold restore across reload_window
 
-Custom fixtures should live in this package and register via `register(name, fn)`.
+Custom fixtures live here, register in REGISTRY, and declare their name in
+schema/testcase.schema.json. There is no runtime register() API.
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ from dataclasses import dataclass
 from typing import Callable, Protocol
 
 from . import editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_sample_projects, jdtls_required, linux_x11_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, welcome_recents, workspace_root
+from . import project_tree
 
 
 class FixtureContext(Protocol):
@@ -50,6 +52,7 @@ class Fixture:
 
 
 REGISTRY: dict[str, Fixture] = {
+    "project_tree": Fixture("project_tree", project_tree.setup),
     "reset_db":     Fixture("reset_db",     reset_db.setup,     reset_db.teardown),
     "ssh_required": Fixture("ssh_required", ssh_required.setup),
     "sftp_required": Fixture("sftp_required", sftp_required.setup),

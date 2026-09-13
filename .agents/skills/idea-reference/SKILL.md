@@ -29,4 +29,6 @@ description: 为 IntelliJ IDEA 功能、UI 和交互对齐采集或复用真实�
 
 交付实际基线、场景步骤、原始证据及参考摘要路径、源码定位、未观测项和可复用范围。原始采样默认位于被忽略的 `qa-ui-auto-report/idea-reference/<scenario>/<run>/`；可交接摘要在用户所选设计目录或 `docs-feature/code-workspace-idea-parity/references/`，用相对链接与获取说明指向原始包。
 
+摘要须按参考包合同脱离聊天即可复现，区分有效采样、输入污染与未观测项。
+
 这里只记录参照就绪状态，不修改产品卡的 owner/done。需要正式 IDEA 比较时，由 `qa-ui-auto` 用双侧观测生成现有比较记录；先核对所用 schema/validator 支持的版本。合法参考包、源码解释和 prototype 均不能单独签发产品对齐通过。
