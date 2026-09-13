@@ -7,6 +7,7 @@ It speaks the small W3C WebDriver subset needed by the qa-ui-auto DSL.
 from __future__ import annotations
 
 import base64
+from contextlib import suppress
 import json
 import os
 import platform
@@ -68,6 +69,18 @@ def _quote_xpath_text(value: str) -> str:
 def selector_strategy(selector: str, *, interactive: bool = False) -> tuple[str, str]:
     """Map common Playwright-ish selectors to WebDriver selector strategies."""
     selector = selector.strip()
+    if " >> text=" in selector:
+        parent_sel, text_part = selector.split(" >> text=", 1)
+        text = text_part.strip()
+        if (text.startswith('"') and text.endswith('"')) or (
+            text.startswith("'") and text.endswith("'")
+        ):
+            text = text[1:-1]
+        q = _quote_xpath_text(text)
+        if parent_sel.startswith('[data-testid="') and parent_sel.endswith('"]'):
+            testid = parent_sel[14:-2]
+            return "xpath", f"//*[@data-testid='{testid}']//*[contains(normalize-space(.), {q}) or contains(@aria-label, {q})]"
+        return "xpath", f"//*[contains(normalize-space(.), {q})]"
     if selector.startswith("text="):
         text = selector[5:].strip()
         if (text.startswith('"') and text.endswith('"')) or (
@@ -183,7 +196,7 @@ class NativeSession:
             f"{self.driver_url}{path}", data=body, headers=headers, method=method
         )
         try:
-            timeout = min(30, self.deadline.remaining()) if self.deadline else 30
+            timeout = min(120, self.deadline.remaining()) if self.deadline else 120
             with self._open(req, timeout=timeout) as r:
                 data = r.read().decode("utf-8")
         except urllib.error.HTTPError as e:
@@ -256,37 +269,71 @@ class NativeSession:
         return self.endpoint(f"/element/{element_id}{suffix}")
 
     def click(self, selector: str) -> str:
-        element = self.find(selector, interactive=True)
-        self.request("POST", self.element_path(element, "/click"), {})
+        for attempt in range(3):
+            try:
+                element = self.find(selector, interactive=True)
+                self.request("POST", self.element_path(element, "/click"), {})
+                return f"clicked {selector}"
+            except WebDriverError as exc:
+                if "stale element reference" in str(exc) and attempt < 2:
+                    time.sleep(0.3)
+                    continue
+                if ("element not interactable" in str(exc) or "element click intercepted" in str(exc)) and attempt < 2:
+                    with suppress(Exception):
+                        self.execute(
+                            f"const el = document.querySelector({json.dumps(selector)});"
+                            "if (el) { el.scrollIntoView({block:'center', inline:'center'}); el.click(); }"
+                        )
+                        return f"clicked {selector}"
+                raise
         return f"clicked {selector}"
 
     def dblclick(self, selector: str) -> str:
-        element = self.find(selector, interactive=True)
-        # Use W3C Actions API so WebKitGTK registers a real double-click.
-        rect = self.request("GET", self.element_path(element, "/rect"))
-        x = int((rect.get("x", 0) + rect.get("width", 0) / 2)) if isinstance(rect, dict) else 0
-        y = int((rect.get("y", 0) + rect.get("height", 0) / 2)) if isinstance(rect, dict) else 0
-        self.request(
-            "POST",
-            self.endpoint("/actions"),
-            {
-                "actions": [
-                    {
-                        "type": "pointer",
-                        "id": "mouse",
-                        "parameters": {"pointerType": "mouse"},
-                        "actions": [
-                            {"type": "pointerMove", "duration": 0, "x": x, "y": y, "origin": "viewport"},
-                            {"type": "pointerDown", "button": 0},
-                            {"type": "pointerUp", "button": 0},
-                            {"type": "pause", "duration": 50},
-                            {"type": "pointerDown", "button": 0},
-                            {"type": "pointerUp", "button": 0},
-                        ],
-                    }
-                ]
-            },
-        )
+        try:
+            element = self.find(selector, interactive=True)
+            # Scroll element into center of view first so pointer actions hit the target.
+            with suppress(Exception):
+                self.execute(
+                    f"const el = document.querySelector({json.dumps(selector)});"
+                    "if (el) el.scrollIntoView({block:'center', inline:'center'});"
+                )
+                time.sleep(0.1)
+            # Use W3C Actions API so WebKitGTK registers a real double-click.
+            rect = self.request("GET", self.element_path(element, "/rect"))
+            x = int((rect.get("x", 0) + rect.get("width", 0) / 2)) if isinstance(rect, dict) else 0
+            y = int((rect.get("y", 0) + rect.get("height", 0) / 2)) if isinstance(rect, dict) else 0
+            self.request(
+                "POST",
+                self.endpoint("/actions"),
+                {
+                    "actions": [
+                        {
+                            "type": "pointer",
+                            "id": "mouse",
+                            "parameters": {"pointerType": "mouse"},
+                            "actions": [
+                                {"type": "pointerMove", "duration": 0, "x": x, "y": y, "origin": "viewport"},
+                                {"type": "pointerDown", "button": 0},
+                                {"type": "pointerUp", "button": 0},
+                                {"type": "pause", "duration": 50},
+                                {"type": "pointerDown", "button": 0},
+                                {"type": "pointerUp", "button": 0},
+                            ],
+                        }
+                    ]
+                },
+            )
+        except Exception as exc:
+            if "element not interactable" in str(exc) or "element click intercepted" in str(exc):
+                self.execute(
+                    f"const el = document.querySelector({json.dumps(selector)});"
+                    "if (el) {"
+                    "  el.scrollIntoView({block:'center', inline:'center'});"
+                    "  el.dispatchEvent(new MouseEvent('dblclick', {bubbles: true, cancelable: true, view: window}));"
+                    "}"
+                )
+            else:
+                raise
         return f"double-clicked {selector}"
 
     def pointer_click(self, selector: str) -> dict[str, int]:

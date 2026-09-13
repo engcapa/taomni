@@ -145,13 +145,13 @@ steps:
   - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.sortable_single_root}"]'
   - wait_for: '[data-testid="code-workspace-tab"]'
   - wait_for:
-      selector: '[data-testid="confirm-dialog"]'
+      selector: '[data-testid="refactor-recovery-review"]'
       timeout_sec: 60
   - assert_text:
-      selector: '[data-testid="confirm-dialog"]'
-      contains: "Refactor recovery pending"
+      selector: '[data-testid="refactor-recovery-review"]'
+      contains: "Review refactor recovery"
       timeout_sec: 10
-  - click: '[data-testid="confirm-dialog-confirm"]'
+  - click: '[data-testid="refactor-recovery-restore"]'
   - wait_for:
       selector: '[data-testid="confirm-dialog"]'
       timeout_sec: 30
@@ -176,6 +176,7 @@ steps:
   - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.sortable_single_root}"]'
   - wait_for: '[data-testid="code-workspace-tab"]'
   - wait: 8
+  - assert_not_visible: '[data-testid="refactor-recovery-review"]'
   - assert_not_visible: '[data-testid="confirm-dialog"]'
   - assert_file_sha256:
       path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
@@ -218,25 +219,17 @@ steps:
   - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.sortable_single_root}"]'
   - wait_for: '[data-testid="code-workspace-tab"]'
   - wait_for:
-      selector: '[data-testid="confirm-dialog"]'
+      selector: '[data-testid="refactor-recovery-review"]'
       timeout_sec: 60
   - assert_text:
-      selector: '[data-testid="confirm-dialog"]'
-      contains: "Refactor recovery pending"
-      timeout_sec: 10
-  - click: '[data-testid="confirm-dialog-confirm"]'
-  - wait_for:
-      selector: '[data-testid="confirm-dialog"]'
-      timeout_sec: 30
-  - assert_text:
-      selector: '[data-testid="confirm-dialog"]'
-      contains: "Refactor recovery blocked"
+      selector: '[data-testid="refactor-recovery-review"]'
+      contains: "Review refactor recovery"
       timeout_sec: 10
   - assert_text:
-      selector: '[data-testid="confirm-dialog"]'
-      contains: "will not be overwritten"
+      selector: '[data-testid="refactor-recovery-review"]'
+      contains: "cannot be restored automatically and will not be overwritten"
       timeout_sec: 10
-  - click: '[data-testid="confirm-dialog-confirm"]'
+  - click: '[data-testid="refactor-recovery-keep"]'
   # Blocked recovery wrote nothing: the third-party bytes stay exactly.
   - assert_file_sha256:
       path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
@@ -263,13 +256,13 @@ steps:
   - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.sortable_single_root}"]'
   - wait_for: '[data-testid="code-workspace-tab"]'
   - wait_for:
-      selector: '[data-testid="confirm-dialog"]'
+      selector: '[data-testid="refactor-recovery-review"]'
       timeout_sec: 60
   - assert_text:
-      selector: '[data-testid="confirm-dialog"]'
-      contains: "Refactor recovery pending"
+      selector: '[data-testid="refactor-recovery-review"]'
+      contains: "Review refactor recovery"
       timeout_sec: 10
-  - click: '[data-testid="confirm-dialog-confirm"]'
+  - click: '[data-testid="refactor-recovery-restore"]'
   - wait_for:
       selector: '[data-testid="confirm-dialog"]'
       timeout_sec: 30

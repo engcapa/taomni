@@ -9,6 +9,8 @@ steps:
   - wait_for: "[data-testid=\"tab-bar\"]"
   - click: "[data-testid=\"ribbon-settings\"]"
   - wait_for: "[data-testid=\"settings-panel\"]"
+  - click: '[data-testid="settings-group-toggle-security"]'
+  - wait_for: '[data-testid="vault-settings"]'
   - assert_visible: '[data-testid="vault-settings"]'
   # Open setup dialog
   - click: '[data-testid="vault-init-button"]'

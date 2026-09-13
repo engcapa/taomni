@@ -763,10 +763,13 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if mode == "native":
         from .verification import host_platform, native_support
-        unsupported = {c.id: reason for c in selected if (reason := native_support(c, host_platform()))}
-        if unsupported:
-            print(f"qa-ui-auto: unsupported native scope: {unsupported}", file=sys.stderr)
-            return 2
+        if args.filter:
+            unsupported = {c.id: reason for c in selected if (reason := native_support(c, host_platform()))}
+            if unsupported:
+                print(f"qa-ui-auto: unsupported native scope: {unsupported}", file=sys.stderr)
+                return 2
+        else:
+            selected = [c for c in selected if not native_support(c, host_platform())]
 
     requested_ids = set(args.filter.split(",")) if args.filter else set()
     missing_ids = requested_ids - {c.id for c in selected}

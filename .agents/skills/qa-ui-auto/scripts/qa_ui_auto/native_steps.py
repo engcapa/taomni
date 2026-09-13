@@ -1452,6 +1452,7 @@ def _do_native_click(ctx: NativeStepContext, args: Any) -> str:
     geometry = ctx.session.execute(
         f"const el = document.querySelector({json.dumps(selector)});"
         "if (!(el instanceof HTMLElement)) return null;"
+        "try { el.scrollIntoView({ block: 'center', inline: 'center' }); } catch (_) {}"
         "const rect = el.getBoundingClientRect();"
         "return {x:rect.x,y:rect.y,width:rect.width,height:rect.height,"
         "innerWidth:window.innerWidth,innerHeight:window.innerHeight,"

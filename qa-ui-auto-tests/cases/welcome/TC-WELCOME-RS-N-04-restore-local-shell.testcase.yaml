@@ -14,6 +14,7 @@ steps:
   - click: text="New session…"
   - wait_for: '[data-testid="session-editor"]'
   - click: '[data-testid="session-proto-shell"]'
+  - wait_for: '[data-testid="session-proto-shell"][data-active="true"]'
   - click: '[data-testid="session-section-bookmark"]'
   - wait_for: '[data-testid="bookmark-settings"]'
   - fill: {selector: '[data-testid="session-name"]', value: qa-native-shell}

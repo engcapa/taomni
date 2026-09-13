@@ -6,7 +6,7 @@ modes: [browser, native]
 fixtures: [reset_db]
 steps:
   - open: "${cfg.app.base_url}"
-  - wait_for: "[data-testid=\"app-titlebar\"]"
+  - wait_for: '[data-testid="control-bar"]'
   - click: '[data-testid="app-main-menu"]'
   - wait_for: "[data-testid=\"context-menu\"]"
   - assert_visible: '[data-testid="context-menu-item-new-local-terminal"]'

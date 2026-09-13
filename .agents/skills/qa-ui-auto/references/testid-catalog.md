@@ -1138,6 +1138,7 @@
 - `[data-testid="settings-search-empty"]` — display — F11.1.search-empty
 - `[data-testid="settings-reset-code-view-profile"]` — interactive — F11.1.reset-code-view-profile
 - `[data-testid="settings-reset-terminal-default-profile"]` — interactive — F11.1.reset-terminal-default-profile
+- `[data-testid="settings-group-toggle-security"]` — interactive [optional] — F11.1.group-toggle-security
 - `[data-testid="sql-completion-settings"]` — display — F11.1.sql-completion-settings
 - `[data-testid="sql-completion-activate-on-typing"]` — interactive — F11.1.sql-completion-activate-on-typing
 - `[data-testid="sql-completion-trigger-shortcut"]` — interactive — F11.1.sql-completion-trigger-shortcut

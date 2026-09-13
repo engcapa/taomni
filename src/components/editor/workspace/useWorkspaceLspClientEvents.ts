@@ -232,11 +232,15 @@ export function useWorkspaceLspClientEvents({
             const wasPublished = publishedProgressesRef.current.some((entry) => progressKey(entry) === key);
             pendingProgressesRef.current = reduceProgress(pendingProgressesRef.current, progress);
             scheduleProgressFlush();
+            const isRoutine = progress.title === progress.message
+              || progress.title === "Publish Diagnostics"
+              || progress.title === "Validate documents";
             if (
               visibleRef.current
               && wasPublished
               && progress.kind === "end"
               && (progress.message || progress.title)
+              && !isRoutine
             ) {
               const text = `${progress.title ?? "Language server task"}${progress.message ? `: ${progress.message}` : " completed"}`;
               if (text !== lastStatusTextRef.current) {

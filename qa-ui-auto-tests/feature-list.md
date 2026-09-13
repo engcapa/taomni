@@ -2454,6 +2454,10 @@ controls:
   - id: reset-terminal-default-profile
     selector: '[data-testid="settings-reset-terminal-default-profile"]'
     kind: interactive
+  - id: group-toggle-security
+    selector: '[data-testid="settings-group-toggle-security"]'
+    kind: interactive
+    optional: true       # accordion toggle for security & vault section
   - id: sql-completion-settings
     selector: '[data-testid="sql-completion-settings"]'
     kind: display

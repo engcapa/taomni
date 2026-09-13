@@ -733,7 +733,7 @@ export function FilePanel({
                 onResizeStart={(e) => startColResize("mtime", e)}
                 onResizeReset={() => resetCol("mtime")}
                 resizeTitle={t("fileBrowser.resizeHandleTitle")}
-                testKey="mtime"
+                testKey="modified"
               />
               <SortHeader
                 label={t("fileBrowser.sortType")}

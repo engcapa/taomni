@@ -928,6 +928,10 @@ function setupSplitDiffInteractions(mv: MergeView, options: SplitInteractionOpti
   resizeObserver?.observe(bScroll);
   window.addEventListener("resize", handleResize);
 
+  const onClick = () => {
+    connector.focus();
+  };
+  connector.addEventListener("click", onClick);
   connector.addEventListener("pointerdown", onPointerDown);
   connector.addEventListener("pointermove", onPointerMove);
   connector.addEventListener("pointerup", onPointerUp);
@@ -943,6 +947,7 @@ function setupSplitDiffInteractions(mv: MergeView, options: SplitInteractionOpti
   return () => {
     options.cancelPendingScrollCorrection();
     endDrag(false);
+    connector.removeEventListener("click", onClick);
     connector.removeEventListener("pointerdown", onPointerDown);
     connector.removeEventListener("pointermove", onPointerMove);
     connector.removeEventListener("pointerup", onPointerUp);

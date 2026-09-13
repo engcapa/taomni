@@ -4549,7 +4549,7 @@ export function CodeWorkspaceTab({
       const path = absolutePathForOpenFile(file);
       return path != null && fsPathEquals(path, normalizedPath);
     });
-    if (open) return {
+    if (open && !open.loading) return {
       path: normalizedPath,
       exists: true,
       text: open.text,
