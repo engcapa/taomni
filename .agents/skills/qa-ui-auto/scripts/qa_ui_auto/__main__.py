@@ -1,4 +1,4 @@
-"""Two routine entry points; existing modules remain directly callable."""
+"""Plan, execute, inspect evidence and diagnose verification cost."""
 from __future__ import annotations
 
 import argparse
@@ -8,12 +8,15 @@ import sys
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     parser = argparse.ArgumentParser(prog="qa_ui_auto", description=__doc__)
-    parser.add_argument("command", choices=["audit", "run", "plan", "status"], help="plan, execute, and inspect evidence")
+    parser.add_argument("command", choices=["audit", "run", "plan", "status", "costs"], help="plan, execute, and inspect evidence")
     if not argv:
         parser.print_help()
         return 0
     args = parser.parse_args(argv[:1])
     flags = argv[1:]
+    if args.command == "costs":
+        from .costs import main as costs_main
+        return costs_main(flags)
     if args.command == "audit":
         from .audit import main as audit_main
         return audit_main(flags)

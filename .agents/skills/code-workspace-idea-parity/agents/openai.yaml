@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Workspace IDEA 对齐"
+  short_description: "统筹已有能力上的 IDEA 功能、UI 与交互对齐及分阶段验证"
+  default_prompt: "使用 $code-workspace-idea-parity 推进指定范围的 IDEA 对齐，允许重构界面和交互，按最小充分验证交付。"

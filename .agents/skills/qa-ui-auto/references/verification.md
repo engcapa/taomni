@@ -2,6 +2,14 @@
 
 ## Daily Work
 
+Use [efficient-verification.md](efficient-verification.md) to distinguish quick
+iteration, current-platform completion and release scope. Native compilation is
+a stable-input completion step unless an early native-only probe is needed.
+`plan/status --case ID` (repeatable) narrows to exact cases and discloses limited
+scope; do not copy a whole-feature recommendation into every edit/test loop.
+Read existing timings with `costs --reports <task-root>` before blaming product
+performance for slow verification. Costs never replaces receipt validation.
+
 Use affected unit/component tests and browser cases for pure renderer changes.
 Add selected native cases when IPC payloads, persistence, processes, native APIs,
 WebView behavior or OS integration can change, including frontend callers.

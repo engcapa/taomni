@@ -1,6 +1,6 @@
 # Backlog And Specification Authoring
 
-Use this mode only when the caller asks to create/review task cards or designs.
+Use this mode when the caller asks to create/review task cards/designs, or an authorized development workflow explicitly hands off its planning stage.
 Do not claim product work to write a plan. Do not change historical ownership,
 status, or completion evidence unless the caller requests that change.
 
@@ -17,6 +17,18 @@ status, or completion evidence unless the caller requests that change.
 - A spec contains current code facts, proposed changes, UI-to-effect ownership,
   typed failure/cancel/stale/unknown effects, undo/recovery, exact fixture/action,
   focused tests, native platform plan, evidence kinds and completion ceiling.
+- Current UI is a baseline, not a constraint. A UI/interaction alignment card
+  names the IDEA reference, proposed layout/states/focus flows, retained behavior,
+  necessary component refactors and before/after visual/interaction assertions.
+- Include affected retained user outcomes in this card's acceptance, with relevant
+  pre-change evidence or an explicit baseline check. Trace shared consumers beyond
+  the card's feature and assign their regressions to this work. Follow
+  [regression protection](../../qa-ui-auto/references/regression-protection.md);
+  "preserve existing functionality" without observable checks is not a contract.
+- Select evidence kinds per affected AC using qa-ui-auto's efficient-verification
+  reference. Separate fast iteration, stable-input native completion and final
+  integration; do not copy every layer from an older card. One qualifying run
+  can cover several kinds. Keep explicit gates and failures truthful.
 - Distinguish a confirmed code defect from an IDEA behavior that still requires
   observation. Reference current production callers, not only exported helpers.
   Missing evidence is not automatically a code bug. Earlier failed checks followed
@@ -37,7 +49,8 @@ status, or completion evidence unless the caller requests that change.
 
 ## Handoff Check
 
-Run both commands with the exact selected board path:
+Run both commands with the exact selected board path. The dated path below is
+only a syntax example; replace it with the caller-selected board:
 
 ```bash
 python .agents/skills/code-workspace-idea-task/scripts/task_board.py --doc claudedocs/code-workspace-idea-parity-backlog-2026-09-audit.md validate

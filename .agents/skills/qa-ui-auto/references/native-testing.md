@@ -2,6 +2,18 @@
 
 ## Build Once, Run Selected Cases
 
+During development, first use focused logic/mounted/browser checks. Compile after
+related source and test edits stabilize, then batch the necessary native cases
+on that input. A native-only defect may warrant an earlier minimal probe.
+See [efficient-verification.md](efficient-verification.md) for selection and cost.
+
+Before building, `python .agents/skills/qa-ui-auto/scripts/native_build.py --check`
+reports reusable (exit 0), build needed (1), or check error (2), without compiling
+or launching. It names changed input categories and prior recorded build time;
+prior duration is not time spent again on a cache hit. Normal build invocation
+still rechecks. Group cases by required frontend/profile, avoid routine `--force`
+and preserve the incremental target. Do not compile separately for each case.
+
 Use a separately built QA application even for manual native exploration.
 `assets/tauri.qa.conf.json` overrides the identifier to `com.taomni.app.qa` and
 product name to `Taomni QA`. Keep production Tauri configuration unchanged.

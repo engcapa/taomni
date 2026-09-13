@@ -4,10 +4,10 @@ Use these commands from the repository root. Select the caller's board once and 
 
 ```bash
 task_board_doc=claudedocs/code-workspace-idea-parity-backlog-2026-09-audit.md
-# For a caller-selected earlier board, assign its path instead.
+# Example only. Replace with the caller-selected board, regardless of its date.
 ```
 
-The discovery example uses ED-AUDIT-001 on the new board. Terminal-state examples illustrate different cards; replace each ID with your actually claimed card and never update an unclaimed example card. PowerShell users should pass the literal board path through --doc. Never mix a claim on one board with an update on another.
+The discovery example uses ED-AUDIT-001 as syntax only, not a claim recommendation. Resolve the selected board/ID first. Terminal examples illustrate different cards; replace each ID with the actual claimed card. PowerShell users pass the literal board path through --doc. Never mix boards or fall back to a historical queue when the selected board is complete.
 
 ## 1. Discover And Inspect
 
@@ -39,12 +39,15 @@ python .agents/skills/code-workspace-idea-task/scripts/task_board.py --doc "$tas
 
 Inspect production callers, ownership, stores, providers/IPC, tests, and QA cases. Map each acceptance ID to a concrete implementation and verification point.
 
+For behavior refactors, establish the affected retained-behavior baseline and consumer checks using [regression protection](../../qa-ui-auto/references/regression-protection.md). The claim's HEAD alone does not capture pre-existing worktree edits or prove behavior was passing.
+
 Choose the truthful path:
 
 - Gap still exists: implement the narrow card.
 - Card is already satisfied: run its current required evidence and avoid redundant code changes.
-- Material spec conflict: do not silently redefine the result, effect, scope, failure, undo, or recovery contract. Finish as `review_required` with the exact discrepancy and proposed decision.
-- Adjacent gap: leave it outside this task. Mention it in the handoff or propose a separately reviewed card.
+- Material spec conflict: record the discrepancy and concrete revision. Apply newer user authorization within its scope, including UI/interaction refactors; unresolved product choices finish as `review_required`. Do not silently weaken data/effect/undo contracts to pass.
+- Independent pre-existing adjacent gap or new requirement: leave it outside this task unless it prevents the requested outcome; report its evidence and impact.
+- Regression introduced by this task, including in an adjacent feature: repair it within this task and verify the retained behavior. Do not finish while it remains, or create a follow-up card merely to make this card green. Missing baseline means causality is uncertain, not that the failure is pre-existing.
 
 ## 4. Update The Terminal State
 

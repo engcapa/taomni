@@ -312,7 +312,9 @@ class JdtlsReapTest(unittest.TestCase):
             self.assertEqual(runner._jdtls_pids(proc), {101})
             self.assertEqual(runner._jdtls_pids(Path(directory) / "missing"), set())
 
+    @patch("signal.SIGKILL", new=9, create=True)
     def test_reap_signals_only_new_pids_then_escalates_and_never_raises(self):
+        # This synthetic /proc + injected kill test models Linux on every host.
         import signal as signal_module
 
         with TemporaryDirectory() as directory:
@@ -406,6 +408,7 @@ class QaAppReapTest(unittest.TestCase):
             self.assertEqual(terms, [304])
             self.assertEqual(result, {"reaped": [304], "surviving": []})
 
+    @patch("signal.SIGKILL", new=9, create=True)
     def test_never_raises_and_reports_survivors(self):
         with TemporaryDirectory() as directory:
             proc = self.make_proc(Path(directory), {

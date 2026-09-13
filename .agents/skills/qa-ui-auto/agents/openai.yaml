@@ -1,0 +1,4 @@
+interface:
+  display_name: "Taomni App 高效测试"
+  short_description: "按风险选择全 App 功能与 UI 测试，诊断耗时并复用原生构建"
+  default_prompt: "使用 $qa-ui-auto 验证本次改动，先选择必要场景和最快充分层级，稳定后集中完成原生检查并报告真实证据。"
