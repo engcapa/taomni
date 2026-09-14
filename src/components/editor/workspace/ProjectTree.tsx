@@ -197,7 +197,10 @@ function renderMatchingFlatFiles(
                 onClick={() => {
                   onSelect({ kind: "file", ref });
                 }}
-                onDoubleClick={() => onOpenFile(ref, { preview: false })}
+                onDoubleClick={() => {
+                  onSelect({ kind: "file", ref });
+                  onOpenFile(ref, { preview: false });
+                }}
                 onContextMenu={(event) => onContextMenu(event, { kind: "file", ref })}
               >
                 <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
@@ -309,7 +312,10 @@ function renderEntries(
             onClick={() => {
               onSelect({ kind: "dir", rootId: root.id, path: displayPath });
             }}
-            onDoubleClick={() => onToggleDir(root.id, displayPath)}
+            onDoubleClick={() => {
+              onSelect({ kind: "dir", rootId: root.id, path: displayPath });
+              onToggleDir(root.id, displayPath);
+            }}
             onContextMenu={(event) => onContextMenu(event, { kind: "dir", rootId: root.id, path: displayPath })}
           >
             <span
@@ -372,7 +378,10 @@ function renderEntries(
         onClick={() => {
           onSelect({ kind: "file", ref });
         }}
-        onDoubleClick={() => onOpenFile(ref, { preview: false })}
+        onDoubleClick={() => {
+          onSelect({ kind: "file", ref });
+          onOpenFile(ref, { preview: false });
+        }}
         onContextMenu={(event) => onContextMenu(event, { kind: "file", ref })}
       >
         <span className="w-3.5 shrink-0" />
@@ -435,7 +444,10 @@ export function ProjectTree(props: ProjectTreeProps) {
               className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 px-2 text-left font-semibold hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
               title={root.path}
               onClick={() => onSelect({ kind: "root", rootId: root.id })}
-              onDoubleClick={() => onToggleRoot(root.id)}
+              onDoubleClick={() => {
+                onSelect({ kind: "root", rootId: root.id });
+                onToggleRoot(root.id);
+              }}
               onContextMenu={(event) => onContextMenu(event, { kind: "root", rootId: root.id })}
             >
               <span
@@ -510,7 +522,10 @@ export function ProjectTree(props: ProjectTreeProps) {
                 onClick={() => {
                   onSelect({ kind: "file", ref });
                 }}
-                onDoubleClick={() => onOpenFile(ref, { preview: false })}
+                onDoubleClick={() => {
+                  onSelect({ kind: "file", ref });
+                  onOpenFile(ref, { preview: false });
+                }}
                 onContextMenu={(event) => onContextMenu(event, { kind: "file", ref })}
               >
                 <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />

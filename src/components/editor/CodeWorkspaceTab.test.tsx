@@ -1393,7 +1393,7 @@ describe("CodeWorkspaceTab", () => {
     expect(screen.getByText("App.tsx")).toBeInTheDocument();
     expect(screen.getByText("lib.rs")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("App.tsx"));
+    fireEvent.doubleClick(screen.getByText("App.tsx"));
     await waitFor(() => {
       expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/App.tsx");
     });
@@ -1468,10 +1468,10 @@ describe("CodeWorkspaceTab", () => {
     fireEvent.click(screen.getByTestId("code-workspace-view-compact"));
 
     const compactDir = await screen.findByText("src/main/java/com/example");
-    fireEvent.click(compactDir);
+    fireEvent.doubleClick(compactDir);
     expect(await screen.findByText("UserService.java")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("UserService.java"));
+    fireEvent.doubleClick(screen.getByText("UserService.java"));
     await waitFor(() => {
       expect(workspaceMocks.workspaceReadFile).toHaveBeenCalledWith(
         "/repo/app",

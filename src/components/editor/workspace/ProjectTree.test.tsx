@@ -181,4 +181,66 @@ describe("ProjectTree navigation across views", () => {
       { preview: false }
     );
   });
+
+  it("DEC-TOF-01: double click without prior click selects before opening or toggling", () => {
+    open.mockClear();
+    const onSelect = vi.fn();
+    const onToggleDir = vi.fn();
+    const onToggleRoot = vi.fn();
+
+    render(
+      <ProjectTree
+        roots={[{ id: "root", name: "fixture", path: "/fixture", kind: "folder" }]}
+        looseFiles={[{ id: "loose-1", name: "loose.txt", path: "/loose.txt" }]}
+        directories={{
+          "root:": { entries: [{ name: "src", path: "src", fileType: "dir", size: 0, mtime: 1, isHidden: false }], loading: false, loaded: true, error: null },
+          "root:src": { entries: [{ name: "file.ts", path: "src/file.ts", fileType: "file", size: 10, mtime: 1, isHidden: false }], loading: false, loaded: true, error: null },
+        }}
+        compactChains={{}}
+        flatFiles={{}}
+        treeViewMode="tree"
+        treeFilter=""
+        expandedRoots={new Set(["root"])}
+        expandedDirs={new Set(["root:src"])}
+        selected={null}
+        activeKey={null}
+        openFiles={{}}
+        gitChangeByRootPath={new Map()}
+        onToggleRoot={onToggleRoot}
+        onToggleDir={onToggleDir}
+        onSelect={onSelect}
+        onOpenFile={open}
+        onContextMenu={() => {}}
+      />
+    );
+
+    // Direct double-click on file selects and opens
+    const file = screen.getByTestId("code-workspace-tree-file");
+    fireEvent.doubleClick(file);
+    expect(onSelect).toHaveBeenCalledWith({ kind: "file", ref: { kind: "root", rootId: "root", path: "src/file.ts" } });
+    expect(open).toHaveBeenCalledWith({ kind: "root", rootId: "root", path: "src/file.ts" }, { preview: false });
+
+    // Direct double-click on dir selects and toggles
+    onSelect.mockClear();
+    const dir = screen.getByTestId("code-workspace-tree-dir");
+    fireEvent.doubleClick(dir);
+    expect(onSelect).toHaveBeenCalledWith({ kind: "dir", rootId: "root", path: "src" });
+    expect(onToggleDir).toHaveBeenCalledWith("root", "src");
+
+    // Direct double-click on root selects and toggles
+    onSelect.mockClear();
+    const root = screen.getByTestId("code-workspace-tree-root");
+    fireEvent.doubleClick(root);
+    expect(onSelect).toHaveBeenCalledWith({ kind: "root", rootId: "root" });
+    expect(onToggleRoot).toHaveBeenCalledWith("root");
+
+    // Direct double-click on loose file selects and opens
+    onSelect.mockClear();
+    open.mockClear();
+    const loose = screen.getByTestId("code-workspace-tree-loose-file");
+    fireEvent.doubleClick(loose);
+    expect(onSelect).toHaveBeenCalledWith({ kind: "file", ref: { kind: "loose", id: "loose-1", path: "/loose.txt" } });
+    expect(open).toHaveBeenCalledWith({ kind: "loose", id: "loose-1", path: "/loose.txt" }, { preview: false });
+  });
 });
+
