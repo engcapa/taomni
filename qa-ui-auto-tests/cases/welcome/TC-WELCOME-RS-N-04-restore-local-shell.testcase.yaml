@@ -10,8 +10,10 @@ steps:
   - vault_first_run: "qa-native-gate-password"
   - wait_for: '[data-testid="welcome-panel"]'
 
-  # Create and save a LocalShell session through the real editor.
-  - click: text="New session…"
+  # Create and save a LocalShell session through the real editor. Use the
+  # stable testid (not text=): the welcome cards shift while async WSL
+  # detection resolves, and text= clicks land on card boundaries.
+  - click: '[data-testid="welcome-new-session"]'
   - wait_for: '[data-testid="session-editor"]'
   - click: '[data-testid="session-proto-shell"]'
   - wait_for: '[data-testid="session-proto-shell"][data-active="true"]'
@@ -21,6 +23,8 @@ steps:
   - click: '[data-testid="session-save"]'
   - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-native-shell"]'
 
+  # Fresh profiles start with the sidebar expanded (readSidebarCollapsed
+  # defaults to false), so the tree row is directly double-clickable.
   # Open it once: the run-snapshot collector commits the saved-session entry.
   - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-native-shell"]'
   - wait_for:

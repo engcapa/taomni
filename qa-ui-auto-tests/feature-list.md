@@ -266,6 +266,9 @@ controls:
   - id: new-session-card
     selector: 'text="New session…"'
     kind: interactive
+  - id: new-session-card-testid
+    selector: '[data-testid="welcome-new-session"]'
+    kind: interactive
   - id: recent-sessions-panel
     selector: '[data-testid="welcome-recent-sessions"]'
     kind: display

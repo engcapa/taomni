@@ -137,6 +137,12 @@ steps:
       path: "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java"
       equals: "68142feae5f38ffc310302e58f6a211c61c9d68994cfa5b643d2fbcaf239f93b"
       timeout_sec: 30
+  # Provider-convergence settle: the restore above syncs to JDT LS via an
+  # incremental didChange, but Windows JDT application/reconcile lags the
+  # notification (observed: resolve 2s after the sync still sees the stale
+  # model and returns a bogus out-of-range edit). Give the provider time to
+  # converge before the positive path, like the cold-import settle above.
+  - wait: 10
   # ---------------------------------------------------------------------
   # Positive path: live discovery -> preview -> apply -> single undo.
   # ---------------------------------------------------------------------

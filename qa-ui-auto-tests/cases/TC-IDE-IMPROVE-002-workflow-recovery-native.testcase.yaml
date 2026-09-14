@@ -151,6 +151,13 @@ steps:
       selector: '[data-testid="refactor-recovery-review"]'
       contains: "Review refactor recovery"
       timeout_sec: 10
+  # The restore button stays disabled until the async disk preconditions
+  # resolve ("checking…" row state); clicking early is a silent no-op, so wait
+  # for the restorable verdict first. (assert_enabled is browser-only.)
+  - assert_text:
+      selector: '[data-testid="refactor-recovery-review"]'
+      contains: "restorable"
+      timeout_sec: 15
   - click: '[data-testid="refactor-recovery-restore"]'
   - wait_for:
       selector: '[data-testid="confirm-dialog"]'
@@ -262,6 +269,13 @@ steps:
       selector: '[data-testid="refactor-recovery-review"]'
       contains: "Review refactor recovery"
       timeout_sec: 10
+  # The restore button stays disabled until the async disk preconditions
+  # resolve ("checking…" row state); clicking early is a silent no-op, so wait
+  # for the restorable verdict first. (assert_enabled is browser-only.)
+  - assert_text:
+      selector: '[data-testid="refactor-recovery-review"]'
+      contains: "restorable"
+      timeout_sec: 15
   - click: '[data-testid="refactor-recovery-restore"]'
   - wait_for:
       selector: '[data-testid="confirm-dialog"]'
