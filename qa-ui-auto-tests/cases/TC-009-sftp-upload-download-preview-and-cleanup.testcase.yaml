@@ -6,6 +6,10 @@ modes: [browser]
 fixtures: [reset_db, ssh_required, sftp_required]
 steps:
   - open: "${cfg.app.base_url}"
+  - click: '[data-testid="app-main-menu"]'
+  - hover: '[data-testid="context-menu-item-view"]'
+  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+  - wait_for: '[data-testid="qc-input"]'
   - fill: {selector: "[data-testid=\"qc-input\"]", value: "ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}"}
   - click: "[data-testid=\"qc-submit\"]"
   - wait_for: "[data-testid=\"auth-prompt\"]"
@@ -30,7 +34,7 @@ steps:
   - wait_for: "[data-testid=\"sftp-transfer-queue\"] >> text=\"done\""
   - click: "[data-testid=\"sftp-remote-preview\"]"
   - assert_visible: "[data-testid=\"sftp-remote-pane\"] >> text=\"qa-ui-auto-transfer.txt\""
-  - click: "role=button[name=\"Close\"]"
+  - click: '[data-testid="sftp-preview-close"]'
   - click: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-transfer.txt"'
   - click: "[data-testid=\"sftp-remote-delete\"]"
   - wait: 1

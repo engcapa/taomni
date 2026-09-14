@@ -6,7 +6,7 @@ description: |
   (mirror selector + CUDA pack toggle). Verifies the §11.4 mirror radios and
   §11.6 CUDA-pack section render so users can pick their download source
   before launching real downloads.
-covers: [F-AI-2.5, F-AI-2.6, F-AI-11]
+covers: [F-AI-2.5, F-AI-2.6, F-AI-11, F-AI-2.1]
 tags: [ai, native-search, claude-code, p2]
 modes: [browser]
 fixtures: [reset_db]
@@ -15,6 +15,8 @@ steps:
   - open: ${cfg.app.base_url}
   - wait_for: '[data-testid="ribbon-settings"]'
   - click: '[data-testid="ribbon-settings"]'
+  - wait_for: '[data-testid="settings-group-toggle-ai"]'
+  - click: '[data-testid="settings-group-toggle-ai"]'
   - wait_for: 'text=AI Settings'
   - assert_visible: 'text="AI Settings"'
   # Models advanced panel: mirror radios

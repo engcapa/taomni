@@ -3728,9 +3728,9 @@ export function TerminalPanel({
             <ExternalLink size={14} />
           </button>
         )}
+        <CaptureMenuButton />
         {detachedWindowControls && (
           <>
-            <CaptureMenuButton />
             <button
               type="button"
               data-testid="detached-reattach"

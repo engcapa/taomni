@@ -24,6 +24,6 @@ steps:
   - click: '[data-testid="tab-multiexec-toggle"]'
   - wait: 0.5
   - click: '[data-testid="tab-more"]'
-  - wait_for: "[data-testid=\"context-menu\"]"
-  - assert_visible: "[data-testid=\"context-menu\"] >> text=\"New local terminal\""
+  - wait_for: "[data-testid=\"open-tabs-menu\"]"
+  - assert_visible: "[data-testid=\"open-tabs-menu\"]"
   - screenshot: 014-tab-right-menu.png

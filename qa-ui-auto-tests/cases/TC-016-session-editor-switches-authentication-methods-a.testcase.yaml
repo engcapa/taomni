@@ -22,7 +22,9 @@ steps:
   - click: '[data-testid="session-editor"] div:has(> input[aria-label="Private key path"]) > input[type="checkbox"]'
   - wait_for: "input[aria-label=\"Private key path\"]"
   - fill: {selector: "input[aria-label=\"Private key path\"]", value: /home/qauser/.ssh/id_ed25519}
-  - send_text_via_label: {label_contains: Enable jump host, checked: true}
+  - click: "[data-testid=\"session-section-network\"]"
+  - wait_for: "[data-testid=\"network-settings\"]"
+  - select_option: {selector: "[data-testid=\"session-proxy-kind\"]", value: "ssh-tunnel"}
   - assert_visible: "input[aria-label=\"Jump host\"]"
   - fill: {selector: "input[aria-label=\"Jump host\"]", value: bastion.example.test}
   - fill: {selector: "input[aria-label=\"Jump user\"]", value: qajump}

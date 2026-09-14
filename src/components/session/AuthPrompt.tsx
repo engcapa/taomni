@@ -27,7 +27,7 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!password) return;
+    if (!password.trim()) return;
     onSubmit(password, save);
   };
 
@@ -93,7 +93,7 @@ export function AuthPrompt({ host, username, onSubmit, onCancel }: AuthPromptPro
           <button type="submit"
                   data-testid="auth-submit"
                   className="taomni-btn font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={!password}
+                  disabled={!password.trim()}
                   data-primary="true">
             {t("authPrompt.submit")}
           </button>

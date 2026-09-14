@@ -39,6 +39,11 @@ steps:
   - assert_visible: "[data-testid=\"context-menu\"] >> text=\"Move to folder\""
   - assert_visible: "[data-testid=\"context-menu\"] >> text=\"Delete\""
   - press: Escape
+  - press: Escape
+  - press: Escape
+  - wait_for:
+      selector: "[data-testid=\"context-menu\"]"
+      state: detached
   # session-edit toolbar button opens the editor for the selected session
   - click: "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-menu (copy)\"]"
   - click: '[data-testid="session-edit"]'

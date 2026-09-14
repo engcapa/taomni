@@ -16,7 +16,7 @@ steps:
   - wait_for:
       selector: '[data-testid="terminal-pane"]'
       timeout_sec: 20
-  - press: Control+Alt+M
+  - click: '[data-testid="tab-multiexec-toggle"]'
   - wait_for:
       selector: '[data-testid="multiexec-bar"]'
       timeout_sec: 5

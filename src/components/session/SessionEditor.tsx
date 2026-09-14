@@ -443,16 +443,19 @@ function Select({
   onChange,
   className = "",
   ariaLabel,
+  dataTestId,
 }: {
   value: string;
   options: SelectOption[];
   onChange?: (v: string) => void;
   className?: string;
   ariaLabel?: string;
+  dataTestId?: string;
 }) {
   return (
     <span className="relative inline-flex items-center">
       <select
+        data-testid={dataTestId}
         className={`taomni-input pr-6 appearance-none ${className || "w-[260px]"}`}
         aria-label={ariaLabel}
         value={value}
@@ -734,6 +737,7 @@ function ProxyJumpFields({
     <>
       <Field label={t("sessionEditor2.fieldProxy")}>
         <Select
+          dataTestId="session-proxy-kind"
           value={value.proxyKind}
           options={[
             { value: "none", label: t("sessionEditor2.proxyNone") },

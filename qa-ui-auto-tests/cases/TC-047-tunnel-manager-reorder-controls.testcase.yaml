@@ -18,6 +18,8 @@ steps:
   - fill: {selector: "input[placeholder=\"user\"]", value: "${cfg.ssh.user}"}
   - fill: {selector: "input[placeholder=\"22\"]", value: "${cfg.ssh.port}"}
   - fill: {selector: 'input[placeholder="0"]', value: "19191"}
+  - fill: {selector: 'input[placeholder="db.internal"]', value: "127.0.0.1"}
+  - fill: {selector: 'input[placeholder="5432"]', value: "5432"}
   - click: '[data-testid="tunnel-editor-save"]'
   - wait: 1
   - wait_for: "[data-testid=\"tunnel-manager\"] >> text=\"qa-tunnel-1\""
@@ -28,6 +30,8 @@ steps:
   - fill: {selector: "input[placeholder=\"user\"]", value: "${cfg.ssh.user}"}
   - fill: {selector: "input[placeholder=\"22\"]", value: "${cfg.ssh.port}"}
   - fill: {selector: 'input[placeholder="0"]', value: "19192"}
+  - fill: {selector: 'input[placeholder="db.internal"]', value: "127.0.0.1"}
+  - fill: {selector: 'input[placeholder="5432"]', value: "5432"}
   - click: '[data-testid="tunnel-editor-save"]'
   - wait: 1
   - wait_for: "[data-testid=\"tunnel-manager\"] >> text=\"qa-tunnel-2\""

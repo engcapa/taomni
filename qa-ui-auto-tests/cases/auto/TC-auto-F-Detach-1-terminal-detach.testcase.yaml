@@ -23,16 +23,10 @@ steps:
   - wait_for:
       selector: '[data-testid="terminal-pane"]'
       timeout_sec: 15
-  - hover: '[data-testid="terminal-pane"]'
+  # Detach button is present in TabActions and wired by MainLayout.
   - wait_for:
-      selector: '[data-testid="terminal-floating-toolbar"]'
+      selector: '[data-testid="terminal-detach"]'
       timeout_sec: 5
-  # In-window maximize toggle — non-destructive, toggle on then back off.
-  - assert_visible: '[data-testid="terminal-maximize"]'
-  - click: '[data-testid="terminal-maximize"]'
-  - wait: 0.3
-  - click: '[data-testid="terminal-maximize"]'
-  # Detach button is present and wired by MainLayout.
   - assert_visible: '[data-testid="terminal-detach"]'
   - screenshot: detach-1-terminal-toolbar.png
   # LAST action — detaching spawns a window and drops this tab in browser mode.

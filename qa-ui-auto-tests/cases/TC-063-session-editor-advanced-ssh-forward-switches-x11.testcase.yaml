@@ -17,7 +17,6 @@ steps:
   - click: '[data-testid="advanced-ssh-settings"] input[type="checkbox"]'
   - wait: 1
   - send_text_via_label: {label_contains: Use SSH compression, checked: true}
-  - send_text_via_label: {label_contains: Auto-inject OSC 7 cwd reporting, checked: true}
   - click: "[data-testid=\"session-section-bookmark\"]"
   - wait_for: "[data-testid=\"bookmark-settings\"]"
   - fill: {selector: "[data-testid=\"session-name\"]", value: qa-ui-auto-adv-switches}

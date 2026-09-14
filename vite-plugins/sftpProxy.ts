@@ -161,13 +161,16 @@ export function sftpProxyPlugin(): Plugin {
     configureServer(server: ViteDevServer) {
       wss = new WebSocketServer({ noServer: true });
 
+      let nextConnId = 1;
       wss.on("connection", (ws) => {
+        const connId = nextConnId++;
         let ssh: Client | null = null;
         let sftp: SFTPWrapper | null = null;
         let closed = false;
         const activeTransfers = new Map<string, { cancel: () => void }>();
+        const pendingCommands: CommandMessage[] = [];
 
-        const cleanup = () => {
+        const cleanup = (_reason: string = "unknown") => {
           if (closed) return;
           closed = true;
           for (const t of activeTransfers.values()) {
@@ -178,6 +181,10 @@ export function sftpProxyPlugin(): Plugin {
             }
           }
           activeTransfers.clear();
+          for (const pending of pendingCommands) {
+            replyError(pending.id, "SFTP connection closed");
+          }
+          pendingCommands.length = 0;
           try {
             sftp?.end();
           } catch {
@@ -205,116 +212,11 @@ export function sftpProxyPlugin(): Plugin {
           reply(id, { type: "error", message });
         };
 
-        ws.on("close", cleanup);
-        ws.on("error", cleanup);
-
-        ws.on("message", (raw) => {
-          let msg: ClientMessage;
-          try {
-            msg = JSON.parse(raw.toString()) as ClientMessage;
-          } catch {
-            return;
-          }
-
-          if (msg.type === "close") {
-            cleanup();
-            return;
-          }
-
-          if (msg.type === "cancel") {
-            const handle = activeTransfers.get(msg.transferId);
-            if (handle) handle.cancel();
-            return;
-          }
-
-          if (msg.type === "connect") {
-            if (ssh) {
-              replyError(msg.id, "already connected");
-              return;
-            }
-            const block = isBlockedTarget(msg.host);
-            if (block.blocked) {
-              replyError(msg.id, `Target host is not permitted from the dev proxy: ${block.reason}`);
-              cleanup();
-              return;
-            }
-
-            const cfg: ConnectConfig = {
-              host: msg.host,
-              port: msg.port || 22,
-              username: msg.username,
-              readyTimeout: 15000,
-              keepaliveInterval: 30000,
-              tryKeyboard: true,
-            };
-
-            if (msg.authMethod === "Password") {
-              cfg.password = msg.authData ?? "";
-            } else if (msg.authMethod === "PrivateKey") {
-              if (msg.authData && looksLikePemKey(msg.authData)) {
-                cfg.privateKey = msg.authData;
-              } else {
-                replyError(msg.id, "Browser preview cannot read key files. Paste the PEM private key text instead.");
-                cleanup();
-                return;
-              }
-            } else if (msg.authMethod === "Agent") {
-              replyError(msg.id, "SSH agent is not available in browser preview.");
-              cleanup();
-              return;
-            }
-
-            ssh = new Client();
-            ssh.on("ready", () => {
-              ssh!.sftp((err, channel) => {
-                if (err) {
-                  replyError(msg.id, `Failed to open SFTP channel: ${err.message}`);
-                  cleanup();
-                  return;
-                }
-                sftp = channel;
-                channel.realpath(".", (rerr, resolved) => {
-                  const home = rerr ? "/" : resolved;
-                  reply(msg.id, { type: "ok", homeDir: home });
-                });
-              });
-            });
-
-            ssh.on("keyboard-interactive", (_n, _i, _l, prompts, finish) => {
-              if (msg.authMethod === "Password" && msg.authData != null) {
-                finish(prompts.map(() => msg.authData ?? ""));
-              } else {
-                finish([]);
-              }
-            });
-
-            ssh.on("error", (err) => {
-              replyError(msg.id, err.message);
-              cleanup();
-            });
-
-            ssh.on("end", () => {
-              if (!closed) {
-                send(ws, { type: "closed" });
-                cleanup();
-              }
-            });
-
-            try {
-              ssh.connect(cfg);
-            } catch (err) {
-              replyError(msg.id, (err as Error).message);
-              cleanup();
-            }
-            return;
-          }
-
+        const executeCommand = (cmd: CommandMessage) => {
           if (!sftp) {
-            replyError(msg.id, "SFTP not connected");
+            replyError(cmd.id, "SFTP not connected");
             return;
           }
-
-          const cmd = msg as CommandMessage;
           switch (cmd.type) {
             case "list": {
               const path = cmd.path || ".";
@@ -382,7 +284,7 @@ export function sftpProxyPlugin(): Plugin {
             case "remove": {
               if (!cmd.path) return replyError(cmd.id, "missing path");
               if (cmd.recursive) {
-                recursiveRemove(sftp!, cmd.path)
+                recursiveRemove(sftp, cmd.path)
                   .then(() => reply(cmd.id, { type: "ok" }))
                   .catch((e) => replyError(cmd.id, e.message ?? String(e)));
               } else {
@@ -449,7 +351,7 @@ export function sftpProxyPlugin(): Plugin {
               return;
             }
             case "uploadbytes": {
-              if (!cmd.path || !cmd.bytesB64) return replyError(cmd.id, "missing path/bytes");
+              if (!cmd.path || cmd.bytesB64 == null) return replyError(cmd.id, "missing path/bytes");
               const buf = Buffer.from(cmd.bytesB64, "base64");
               if (buf.length > MAX_REQUEST_BYTES) {
                 return replyError(cmd.id, `payload exceeds ${MAX_REQUEST_BYTES} bytes`);
@@ -471,7 +373,9 @@ export function sftpProxyPlugin(): Plugin {
                   done: final,
                 });
               };
-              stream.on("error", (err) => replyError(cmd.id, err.message));
+              stream.on("error", (err) => {
+                replyError(cmd.id, err.message);
+              });
               stream.on("close", () => {
                 sendProgress(true);
                 reply(cmd.id, { type: "ok" });
@@ -539,6 +443,126 @@ export function sftpProxyPlugin(): Plugin {
             default:
               replyError(cmd.id, `unknown command: ${cmd.type}`);
           }
+        };
+
+        ws.on("close", () => cleanup("ws close"));
+        ws.on("error", (err) => cleanup(`ws error: ${err}`));
+
+        ws.on("message", (raw) => {
+          let msg: ClientMessage;
+          try {
+            msg = JSON.parse(raw.toString()) as ClientMessage;
+          } catch {
+            return;
+          }
+
+          if (msg.type === "close") {
+            cleanup("msg close");
+            return;
+          }
+
+          if (msg.type === "cancel") {
+            const handle = activeTransfers.get(msg.transferId);
+            if (handle) handle.cancel();
+            return;
+          }
+
+          if (msg.type === "connect") {
+            if (ssh) {
+              replyError(msg.id, "already connected");
+              return;
+            }
+            const block = isBlockedTarget(msg.host);
+            if (block.blocked) {
+              replyError(msg.id, `Target host is not permitted from the dev proxy: ${block.reason}`);
+              cleanup();
+              return;
+            }
+
+            const cfg: ConnectConfig = {
+              host: msg.host,
+              port: msg.port || 22,
+              username: msg.username,
+              readyTimeout: 15000,
+              keepaliveInterval: 30000,
+              tryKeyboard: true,
+            };
+
+            if (msg.authMethod === "Password") {
+              cfg.password = msg.authData ?? "";
+            } else if (msg.authMethod === "PrivateKey") {
+              if (msg.authData && looksLikePemKey(msg.authData)) {
+                cfg.privateKey = msg.authData;
+              } else {
+                replyError(msg.id, "Browser preview cannot read key files. Paste the PEM private key text instead.");
+                cleanup();
+                return;
+              }
+            } else if (msg.authMethod === "Agent") {
+              replyError(msg.id, "SSH agent is not available in browser preview.");
+              cleanup();
+              return;
+            }
+
+            ssh = new Client();
+            ssh.on("ready", () => {
+              ssh!.sftp((err, channel) => {
+                if (err) {
+                  replyError(msg.id, `Failed to open SFTP channel: ${err.message}`);
+                  cleanup();
+                  return;
+                }
+                sftp = channel;
+                channel.realpath(".", (rerr, resolved) => {
+                  const home = rerr ? "/" : resolved;
+                  reply(msg.id, { type: "ok", homeDir: home });
+                  const queued = pendingCommands.splice(0, pendingCommands.length);
+                  for (const queuedCmd of queued) {
+                    executeCommand(queuedCmd);
+                  }
+                });
+              });
+            });
+
+            ssh.on("keyboard-interactive", (_n, _i, _l, prompts, finish) => {
+              if (msg.authMethod === "Password" && msg.authData != null) {
+                finish(prompts.map(() => msg.authData ?? ""));
+              } else {
+                finish([]);
+              }
+            });
+
+            ssh.on("error", (err) => {
+              replyError(msg.id, err.message);
+              cleanup("ssh error");
+            });
+
+            ssh.on("end", () => {
+              if (!closed) {
+                send(ws, { type: "closed" });
+                cleanup("ssh end");
+              }
+            });
+
+            try {
+              ssh.connect(cfg);
+            } catch (err) {
+              replyError(msg.id, (err as Error).message);
+              cleanup("ssh connect thrown");
+            }
+            return;
+          }
+
+          const cmd = msg as CommandMessage;
+          if (!sftp) {
+            if (ssh && !closed) {
+              pendingCommands.push(cmd);
+              return;
+            }
+            replyError(cmd.id, "SFTP not connected");
+            return;
+          }
+          executeCommand(cmd);
         });
       });
 

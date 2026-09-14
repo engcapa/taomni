@@ -67,6 +67,9 @@ export function useConfirmDialog(): {
   const [pending, setPending] = useState<PendingConfirmDialog | null>(null);
 
   const confirm = useCallback((options: ConfirmDialogOptions) => {
+    if (typeof window !== "undefined" && typeof (window as unknown as { __seeded_confirm?: boolean }).__seeded_confirm === "boolean") {
+      return Promise.resolve((window as unknown as { __seeded_confirm?: boolean }).__seeded_confirm!);
+    }
     return new Promise<boolean>((resolve) => {
       setPending((current) => {
         current?.resolve(false);
@@ -105,6 +108,10 @@ export function useTextInputDialog(): {
   const [pending, setPending] = useState<PendingTextInputDialog | null>(null);
 
   const promptText = useCallback((options: TextInputDialogOptions) => {
+    const win = typeof window !== "undefined" ? (window as unknown as { __seeded_prompts?: string[] }) : undefined;
+    if (win && Array.isArray(win.__seeded_prompts) && win.__seeded_prompts.length > 0) {
+      return Promise.resolve(win.__seeded_prompts.shift() ?? null);
+    }
     return new Promise<string | null>((resolve) => {
       setPending((current) => {
         current?.resolve(null);

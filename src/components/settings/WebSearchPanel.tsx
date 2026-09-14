@@ -63,6 +63,7 @@ export function WebSearchPanel() {
 
       {/* Enable toggle */}
       <div
+        data-testid="ai-websearch-enable-toggle"
         className={`flex items-center gap-3 rounded border p-3 cursor-pointer transition-colors ${
           ws.client_enabled
             ? "border-[var(--taomni-accent)]/40 bg-[var(--taomni-accent)]/5"

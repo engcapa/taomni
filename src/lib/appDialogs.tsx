@@ -67,10 +67,17 @@ function enqueueDialog<T extends DialogValue>(
 }
 
 export function confirmAppDialog(options: AppConfirmDialogOptions): Promise<boolean> {
+  if (typeof window !== "undefined" && typeof (window as unknown as { __seeded_confirm?: boolean }).__seeded_confirm === "boolean") {
+    return Promise.resolve((window as unknown as { __seeded_confirm?: boolean }).__seeded_confirm!);
+  }
   return enqueueDialog<boolean>({ kind: "confirm", ...options });
 }
 
 export function promptAppDialog(options: AppPromptDialogOptions): Promise<string | null> {
+  const win = typeof window !== "undefined" ? (window as unknown as { __seeded_prompts?: string[] }) : undefined;
+  if (win && Array.isArray(win.__seeded_prompts) && win.__seeded_prompts.length > 0) {
+    return Promise.resolve(win.__seeded_prompts.shift() ?? null);
+  }
   return enqueueDialog<string | null>({ kind: "prompt", ...options });
 }
 
