@@ -17,7 +17,12 @@ steps:
   - open: ${cfg.app.base_url}
   - vault_first_run: qa-native-qualified-password
   - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="side-tab-sessions"]'
+  # Expand the Sessions panel idempotently via the main menu. A bare
+  # side-tab-sessions click toggles: on fresh profiles (sidebar expanded by
+  # default) it would collapse the panel and strand later tree steps.
+  - click: '[data-testid="app-main-menu"]'
+  - hover: '[data-testid="context-menu-item-sessions"]'
+  - click: '[data-testid="context-menu-item-show-sessions"]'
   - wait_for: '[data-testid="session-new"]'
   - click: '[data-testid="session-new"]'
   - wait_for: '[data-testid="session-editor"]'
@@ -68,9 +73,12 @@ steps:
   - wait_for:
       selector: '[data-testid="schema-tree"]'
       timeout_sec: 30
-  # The schema panel can start collapsed at this window size; expand it first.
-  - click: '[data-testid="db-schema-drawer-handle"]'
-  - wait_for: '[data-testid="schema-tree-filter"]'
+  # Fresh isolated profiles start with the schema panel expanded
+  # (taomni.db.schemaWidth.* is absent -> default 24%), so the collapse
+  # drawer handle does not exist here; wait for the filter directly.
+  - wait_for:
+      selector: '[data-testid="schema-tree-filter"]'
+      timeout_sec: 30
   - click: '[data-testid="sql-editor"]'
   # Filter for a table that only exists in information_schema, not in the active
   # `test` database, so an unqualified name cannot resolve.

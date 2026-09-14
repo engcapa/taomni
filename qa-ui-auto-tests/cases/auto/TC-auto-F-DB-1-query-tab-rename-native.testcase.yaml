@@ -15,7 +15,12 @@ steps:
   - open: ${cfg.app.base_url}
   - vault_first_run: qa-native-rename-password
   - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="side-tab-sessions"]'
+  # Expand the Sessions panel idempotently via the main menu. A bare
+  # side-tab-sessions click toggles: on fresh profiles (sidebar expanded by
+  # default) it would collapse the panel and strand later tree steps.
+  - click: '[data-testid="app-main-menu"]'
+  - hover: '[data-testid="context-menu-item-sessions"]'
+  - click: '[data-testid="context-menu-item-show-sessions"]'
   - wait_for: '[data-testid="session-new"]'
   - click: '[data-testid="session-new"]'
   - wait_for: '[data-testid="session-editor"]'
