@@ -1113,6 +1113,38 @@ describe("CodeWorkspaceTab", () => {
     expect(parentRenderCount).toBeLessThan(20);
   });
 
+  it("ED-FINDFOCUS-001 leaves Find Enter and Escape to the real panel in the workspace capture phase", async () => {
+    const { EditorView } = await import("@codemirror/view");
+    const source = "Project tree example\nThe editor buffer should survive tree navigation.\n";
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app", workspaceId: "ws-find-focus", workspaceInstanceId: "instance-find-focus",
+      name: "Find Focus", roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }],
+      looseFiles: [], initialFile: { kind: "root", rootId: "app", path: "example.txt" },
+    };
+    workspaceMocks.workspaceListDir.mockResolvedValue([entry("example.txt", "example.txt")]);
+    workspaceMocks.workspaceReadFile.mockResolvedValue(file("example.txt", source));
+    const rendered = renderWorkspace(workspace);
+    await screen.findByTitle("app / example.txt");
+    const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
+    const view = EditorView.findFromDOM(content)!;
+    act(() => { content.focus(); });
+    fireEvent.keyDown(content, { key: "f", code: "KeyF", ctrlKey: true });
+    const field = await screen.findByRole("searchbox", { name: "Find" });
+    await waitFor(() => expect(field).toHaveFocus());
+    fireEvent.input(field, { target: { value: "tree" } });
+    expect(view.state.selection.main).toMatchObject({ from: 8, to: 12 });
+    fireEvent.keyDown(field, { key: "Enter", code: "Enter" });
+    expect(view.state.selection.main).toMatchObject({ from: 54, to: 58 });
+    expect(view.state.doc.toString()).toBe(source);
+    expect(field).toHaveFocus();
+    fireEvent.keyDown(field, { key: "Enter", code: "Enter", shiftKey: true });
+    expect(view.state.selection.main).toMatchObject({ from: 8, to: 12 });
+    fireEvent.keyDown(field, { key: "Escape", code: "Escape" });
+    expect(view.hasFocus).toBe(true);
+    expect(view.state.doc.toString()).toBe(source);
+    expect(screen.queryByTestId("code-workspace-editor-search")).toBeNull();
+  });
+
   it("leaves navigation-bar keyboard state to the mounted breadcrumb surface", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",

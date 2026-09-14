@@ -79,7 +79,7 @@ import {
   unfoldAll,
   unfoldEffect,
 } from "@codemirror/language";
-import { openSearchPanel, search } from "@codemirror/search";
+import { search, searchPanelOpen } from "@codemirror/search";
 import { renderFormatted } from "../../../lib/chat/renderFormatted";
 import { readNativeTextResult, readTextResult, writeText } from "../../../lib/clipboard";
 import { codeViewExtensions } from "../../../lib/codeViewTheme";
@@ -112,7 +112,7 @@ import {
   type ClipboardObservationOperation,
   type ClipboardObservationRecord,
 } from "./clipboardObservationContract";
-import { createWorkspaceSearchPanel, WORKSPACE_SEARCH_STYLE } from "./editorSearchPanel";
+import { createWorkspaceSearchPanel, openWorkspaceReplacePanel, WORKSPACE_SEARCH_STYLE } from "./editorSearchPanel";
 import {
   activeLspSnippetChoices,
   advanceLspSnippetTabstop,
@@ -627,7 +627,7 @@ export function watchClipboardRequestFocus(view: EditorView): () => void {
   }
   const activeElementAtRequest = document.activeElement;
   const isEditorFocusedAtRequest =
-    view.hasFocus || (activeElementAtRequest !== null && view.dom.contains(activeElementAtRequest));
+    view.hasFocus || (activeElementAtRequest !== null && view.contentDOM.contains(activeElementAtRequest));
 
   const menuContainer = !isEditorFocusedAtRequest && activeElementAtRequest
     ? (activeElementAtRequest.closest(
@@ -642,7 +642,7 @@ export function watchClipboardRequestFocus(view: EditorView): () => void {
     if (!target) return;
     if (target === document.body || target === document.documentElement) return;
     if (target instanceof Element && (target.hasAttribute("data-clipboard-internal-fallback") || (target as HTMLElement).style?.left === "-9999px")) return;
-    if (view.dom.contains(target)) return;
+    if (view.contentDOM.contains(target)) return;
     if (isEditorFocusedAtRequest) {
       bumpClipboardOwnerGeneration(view);
       cleanup();
@@ -2393,7 +2393,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       trimPendingLocalDocumentEchoes(pendingEchoes);
     }
   };
-  const lastSelectionRef = useRef<{ from: number; to: number } | null>(null);
+  const lastSelectionRef = useRef<{ from: number; to: number; searchOpen: boolean } | null>(null);
   const selectionEmitTimerRef = useRef<number | null>(null);
   const viewportEmitTimerRef = useRef<number | null>(null);
   const renderedDiagnosticsRef = useRef(diagnostics);
@@ -2584,11 +2584,14 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     const from = Math.min(main.from, main.to);
     const to = Math.max(main.from, main.to);
     const previous = lastSelectionRef.current;
-    if (previous?.from === from && previous.to === to) return;
-    lastSelectionRef.current = { from, to };
+    const searchOpen = searchPanelOpen(view.state);
+    if (previous?.from === from && previous.to === to && previous.searchOpen === searchOpen) return;
+    lastSelectionRef.current = { from, to, searchOpen };
     if (handler) {
       let rect: EditorSelectionRange["rect"] = null;
-      if (!main.empty) {
+      // Search owns its own controls. Keep semantic selection consumers current
+      // without anchoring the floating selection toolbar over the Find row.
+      if (!main.empty && !searchOpen) {
         const startCoords = view.coordsAtPos(from);
         const endCoords = view.coordsAtPos(to);
         if (startCoords && endCoords) {
@@ -2735,15 +2738,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       const current = viewRef.current;
       return current ? emitParameterTrigger(current, null, "explicit") : false;
     };
-    const openReplacePanel = (view: EditorView) => {
-      openSearchPanel(view);
-      window.requestAnimationFrame(() => {
-        const field = view.dom.querySelector<HTMLInputElement>('.cm-workspace-search-input[name="replace"]');
-        field?.focus();
-        field?.select();
-      });
-      return true;
-    };
+    const openReplacePanel = openWorkspaceReplacePanel;
     const expandSemanticSelection = (view: EditorView) => {
       const handler = onExpandSelectionRef.current;
       if (!handler) return expandSyntaxSelection(view);
@@ -2835,7 +2830,9 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
           const identity = getCompletionIdentityRef.current();
           if (identity) resetBasicCompletionSession(identity.workspaceId, identity.fileKey);
         }),
-        search({ top: true, createPanel: createWorkspaceSearchPanel }),
+        search({ top: true, createPanel: (view) => createWorkspaceSearchPanel(view, () => (
+          visibleRef.current && activeRef.current !== false ? clipboardOwnerGeneration(view) : null
+        )) }),
         selectionHistoryField,
         occurrenceSessionField,
         // Drop pending LSP snippet tabstop sessions on any unrelated edit.
@@ -3166,7 +3163,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
             // A cursor move without an edit (mouse click, jump) dismisses it.
             onParameterInvalidateRef.current?.("caret-moved");
           }
-          if (update.selectionSet || update.docChanged) {
+          if (update.selectionSet || update.docChanged || searchPanelOpen(update.startState) !== searchPanelOpen(update.state)) {
             // Cursor state fans out into workspace UI and LSP effects. During
             // a text burst, publish the final cursor after a short idle rather
             // than causing a React render for every keypress.
@@ -3334,7 +3331,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       const next = event.relatedTarget as Node | null;
       if (
         next && (
-          view.dom.contains(next)
+          view.contentDOM.contains(next)
           || (next instanceof Element && (next.hasAttribute("data-clipboard-internal-fallback") || (next as HTMLElement).style?.left === "-9999px"))
         )
       ) return;

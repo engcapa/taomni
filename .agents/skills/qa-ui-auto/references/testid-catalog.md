@@ -148,6 +148,13 @@
 
 ## code-workspace/editor-shell (F25.5)
 
+- `[data-testid="code-workspace-editor-search"]` — display — F25.5.editor-find-panel
+- `[data-testid="code-workspace-editor-search"] input[name="search"]` — interactive — F25.5.editor-find-input
+- `[data-testid="code-workspace-editor-search"] input[name="replace"]` — interactive — F25.5.editor-replace-input
+- `[data-testid="code-workspace-editor-search"] button[aria-label="Show replace"]` — interactive — F25.5.editor-find-expand
+- `[data-testid="code-workspace-editor-search"] button[aria-label="More search options"]` — interactive — F25.5.editor-find-more
+- `[data-testid="code-workspace-editor-search"] .cm-workspace-search-status` — display — F25.5.editor-find-count
+- `[data-testid="code-workspace-editor-search"] button[aria-label="Close find and replace"]` — interactive — F25.5.editor-find-close
 - `[data-testid="code-workspace-tree-add-folder"]` — interactive [optional] — F25.5.tree-add-folder
 - `[data-testid="code-workspace-tree-pane"]` — display [optional] — F25.5.tree-pane
 - `[data-testid="code-workspace-tree-root"]` — interactive [optional] — F25.5.tree-root-row

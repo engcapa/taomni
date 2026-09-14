@@ -1,0 +1,39 @@
+# WP-FIND-FOCUS-01 开发任务板
+
+## 1. 选板、边界与状态规则
+
+本板只承接 REQ-01 / CW-SEARCH-001、CW-SHELL-002 的连续 F0 Find 场景；CW-NAV-002 modifier-hover、CW-TAB-002 多 view 和 clipboard focus owner 是保留消费者。开发状态唯一来源是下面 ide-task metadata。索引/设计只保存结论与链接，不维护另一套 owner 状态。
+
+P1 2026-09-14 author；接手 HEAD `884d003846a8549cc3125090eaf55359bc676a3f`，分支 `docs/code-workspace-idea-audit-20260913`，接手干净。P0 十份评估材料已提交，生产内容与 `27f99b6116f4f6aae906d324cb84e8359695e17a` 相同。保留他人成果；本轮仅编写，不领取、不实施、不改旧卡、不提交推送。
+
+执行遵循 `.agents/skills/code-workspace-idea-task/SKILL.md` 与 task-lifecycle。每条命令带 `--doc claudedocs/code-workspace-idea-parity-backlog-find-focus.md`。只领取 ready/implemented 且依赖全 done；不得重领旧 done。不自行委派其他 agent。
+
+## 2. 规格索引、参照与查重
+
+- [修复设计 / DEC-FF-01..04 / AC / V](../docs-issue/code-workspace-find-focus-design.md#ed-findfocus-001)：完整调用链、文件 owner、保留合同、negative/cancel/stale/undo/recovery。
+- [REQ-01 总需求](../docs-feature/code-workspace-idea-parity/overall-audit-plan-20260913.md#req-01)、[稳定能力矩阵](../docs-feature/code-workspace-idea-parity/capability-matrix.md)、[有效 Find 参照](../docs-feature/code-workspace-idea-parity/references/find-focus-2026.2.2.md)、[P1 身份](../docs-feature/code-workspace-idea-parity/evidence/find-focus-plan-20260914.json)。
+- [原始查找规则](code-workspace-idea-specs/search-and-navigation.md#ed-find-001)、[共享合同](code-workspace-idea-specs/shared-contracts.md)。旧 spec 的 Audit 字样不覆盖任务 metadata；本轮用户范围优先于旧 editor-only 排除。
+- 查重明细见设计 §2：ED-FIND-001/002、ED-AUDIT-007、ED-MAIN-007→ED-REPAIR-008、ED-IMPROVE-007/008→ED-REPAIR-007/009。旧卡保持原 status/owner/evidence；本卡是新增触发修复，不重开旧任务。历史 done 不算本次正常路径 baseline PASS。
+
+## 3. 交付门槛、平台与责任
+
+本卡 P2 是 scoped typecheck、实现集成、消费者回归、当前 Windows native/IME/provider、双侧自验的责任人；owner 尚未领取，不伪造 owner/claimed_at/baseline/evidence。依赖为空，真实 IDEA Find 目标已采。没有尚未解决的实现前置参照；Replace 几何、其他语言/平台全量外观不在本包新目标中，已有能力照保留断言验证。
+
+Required evidence 与设计完全一致；只证明当前范围。任何 A1–A7 未满足不能 done，本卡引入的相邻回归须由本卡修复。参照原件缺失、匹配 candidate 环境、当前 Windows WebView/IME/provider 缺失时，记录具体证据阻塞；不将未运行写成 passed。
+
+Windows、macOS、Linux 均保持兼容。当前端 Windows 完成本卡必要验证即可交付；Linux/WebKitGTK、macOS/WKWebView 未实测单列并留准确步骤。browser/stubs 不证明 OS/IME/磁盘/真实 provider；旧 Linux case 不能作为 Windows receipt。
+
+repository build gate 的明确集成卡 owner 沿用 `claudedocs/code-workspace-idea-parity-backlog.md::ED-GATE-003`，不重开该 done 卡、不继承历史红/绿结论。本卡要求 scoped typecheck；为当前端 native 证据需要的 QA binary 由本卡 P2 在相关代码/tests 稳定后检查复用/必要构建一次。同次 native 可覆盖多个 evidence kind；不机械跑全历史用例或 release gate。
+
+## 4. 唯一工作卡
+
+### ED-FINDFOCUS-001 Find 打开、匹配导航、Esc 返回与 modifier 生命周期
+<!-- ide-task {"id":"ED-FINDFOCUS-001","status":"implemented","priority":"P0","size":"M","depends_on":[],"spec":"docs-issue/code-workspace-find-focus-design.md#ed-findfocus-001","acceptance":["ED-FINDFOCUS-001-A1","ED-FINDFOCUS-001-A2","ED-FINDFOCUS-001-A3","ED-FINDFOCUS-001-A4","ED-FINDFOCUS-001-A5","ED-FINDFOCUS-001-A6","ED-FINDFOCUS-001-A7"],"required_evidence":["code-audit","unit","typecheck","browser","native","provider","accessibility","idea-comparison","qa-lint"],"audit":{"date":"2026-09-14","head":"884d003846a8549cc3125090eaf55359bc676a3f","finding":"P0 B08/B18 browser 正文获焦 Ctrl+F 的 mount.select→blur→clearMod.dispatch 重入仍有同源代码；已有 ED-AUDIT-007 docChanged 防护不覆盖该触发。P1 取得 IU-262.10315.125 F0 两轮独占 Find 导航/Esc 参照；产品检查未执行。"},"prior_completion":{"kind":"new-task","completed":false},"updated_at":"2026-09-14T00:15:59Z","evidence":{"verified_at":"2026-09-14T08:16:00+08:00","head":"884d003846a8549cc3125090eaf55359bc676a3f","checks":[{"kind":"code-audit","command":"production trace: CodeMirrorHost -> editorSearchPanel/lspHyperlink -> CM actions/clipboard owner","result":"passed","summary":"Find, Replace, focus generation, deferred modifier cleanup, shared document/history and stale clipboard ownership traced; no second store/IPC","acceptance":["ED-FINDFOCUS-001-A1","ED-FINDFOCUS-001-A2","ED-FINDFOCUS-001-A3","ED-FINDFOCUS-001-A4","ED-FINDFOCUS-001-A5","ED-FINDFOCUS-001-A6","ED-FINDFOCUS-001-A7"]},{"kind":"unit","command":"pnpm exec vitest run ... focused owner/search suites","result":"passed","summary":"45 focused tests passed; Host retained subset 65 passed/9 skipped; final shell subset included; first red reentry preserved in red-reentry.log","acceptance":["ED-FINDFOCUS-001-A1","ED-FINDFOCUS-001-A2","ED-FINDFOCUS-001-A4","ED-FINDFOCUS-001-A5","ED-FINDFOCUS-001-A6","ED-FINDFOCUS-001-A7"]},{"kind":"typecheck","command":"python .agents/skills/code-workspace-idea-task/scripts/typecheck_scope.py --path <owned union> --json","result":"passed","summary":"0 scoped errors, 0 external errors; final scope includes CodeWorkspaceTab caller and all owned tests","acceptance":[]},{"kind":"browser","command":"python -m qa_ui_auto run --mode browser --filter TC-IDE-FINDFOCUS-01 --config .agents/skills/qa-ui-auto/assets/qa-ui-auto.config.browser.yaml --require-pass","result":"passed","summary":"TC-IDE-FINDFOCUS-01 passed in 13.2s; two Find cycles, selection/navigation/Esc/repeat, invalid/zero recovery, Replace/undo and split remount; Chromium VFS boundary","acceptance":["ED-FINDFOCUS-001-A1","ED-FINDFOCUS-001-A2","ED-FINDFOCUS-001-A3","ED-FINDFOCUS-001-A5","ED-FINDFOCUS-001-A6"]},{"kind":"qa-lint","command":"python -m qa_ui_auto audit --gate","result":"passed","summary":"coverage gate OK; covered_required 383, orphans 0; catalog regenerated for Find controls","acceptance":[]},{"kind":"build","command":"python .agents/skills/qa-ui-auto/scripts/native_build.py","result":"passed","summary":"QA debug binary built with com.taomni.app.qa; 103.3s; source and binary identity recorded","acceptance":[]},{"kind":"idea-comparison","command":"Playwright browser observation + IDEA REF-FIND-FOCUS-20260914 review","result":"passed","summary":"Windows 1400x992 candidate screenshot and direct sequence match functional F0 focus/1-2-1/Esc; visual claim limited to measured panel states, no global pixel match","acceptance":["ED-FINDFOCUS-001-A2","ED-FINDFOCUS-001-A3"]}],"unrun":["native: automated Windows QA run failed on generated case visibility assertion; manual packaged run reached QA window but physical typing under Microsoft Pinyin produced IME text and focus was later lost; no native PASS claimed","provider: F0 has no provider prerequisite; real JDT LS definition path not rerun","accessibility: no independent screen-reader/200% zoom run; keyboard focus assertions are unit/browser only"],"notes":["Native failure reports retained under qa-ui-auto-report/find-focus-20260914/native-runs and manual-native/actions.jsonl","Fixture second tree offset is [54,58), corrected from handoff typo [53,57); 71-byte hash verified","No commit/push/merge; pre-existing P1 documentation changes retained"]},"last_attempt":{"owner":"codex-findfocus-20260914-884d003","claimed_from":"ready","claimed_at":"2026-09-13T23:34:59Z","baseline":"884d003846a8549cc3125090eaf55359bc676a3f","finished_at":"2026-09-14T00:15:59Z","result":"implemented","note":"生产实现与浏览器验证完成；native Windows/IME/provider/accessibility required evidence remains missing or failed. QA binary built and identity bound; native failure reports retained."}} -->
+
+用户结果：F0 example 正文获焦后 Ctrl/Cmd+F 可立即输入 tree，自动选首匹配，上下匹配导航、Esc 返回同一 view 当前匹配 selection，repeat 不再重入；保留 hover、共享 undo、dirty、IME、只读和 owner 隔离。
+
+生产 owner：`src/components/editor/workspace/editorSearchPanel.ts`、`lspHyperlink.ts`，必要 `CodeMirrorHost.tsx`。测试 owner：同名 tests、拟新增 `CodeMirrorHost.findFocus.test.tsx`，拟新增 `qa-ui-auto-tests/cases/TC-IDE-FINDFOCUS-01.testcase.yaml`（id `TC-IDE-FINDFOCUS-01`）及 F25.1/F25.5 covers/controls/catalog。新对象当前仅规划，不是现存测试。
+
+共享消费者：EditorGroup 两个 Host caller、CodeWorkspaceTab semantic navigation、workspaceDocumentTransactionOwner、clipboard monotonic owner、IME 与 view snapshot。默认只读其实现；只有 caller 证明必要才扩 Host/Keymap/Group/Tab/公共 popup/ActionHost，需在设计补理由和回归。不得关闭 hover、吞异常、取消自动 focus、改数据模型或削减旧验收规避问题。
+
+依赖：`[]`；接口沿用 CM SearchQuery / Panel、LspHyperlinkHooks、EditorHostActionHandlers 和现有 shared owner。错误/取消/迟到/销毁语义见设计 §4；首步按 V-FF-01 建真正焦点路径 red，再补 V-FF-02 正常保留基线。最小验证为 V-FF-01..06 的去重并集，实际执行后回填结构化证据；本次 P1 全部产品验证未执行。

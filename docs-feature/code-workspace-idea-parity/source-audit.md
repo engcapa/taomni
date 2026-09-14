@@ -225,3 +225,9 @@
 | [CodeStyleSettingsDialog.tsx](../../src/components/editor/workspace/CodeStyleSettingsDialog.tsx) · `CodeStyleSettingsDialog` | 29 |
 | [editorConfigResolver.ts](../../src/components/editor/workspace/editorConfigResolver.ts) · `export` | 24 |
 | [workspaceStyleController.ts](../../src/components/editor/workspace/workspaceStyleController.ts) · `createWorkspaceStyleController` | 593 |
+
+## REQ-01 P1 caller 补充（2026-09-14）
+
+局部源内容与 P0 相同；实际 HEAD `884d003846a8549cc3125090eaf55359bc676a3f`。详细 [Find 修复设计 §3](../../docs-issue/code-workspace-find-focus-design.md)补出 `editor.find → runViaHandlers → openSearchPanel → WorkspaceSearchPanel.mount.select → content blur → lspHyperlink.clearMod.dispatch`。mount 的源码调用是 select（隐式 focus），不是显式 focus；CodeMirrorHost 的生产 hyperlink hooks 只传 onDefinition，没有传 probeDefinition。现有 docChanged microtask 修复不覆盖 blur 清理。上述事实只支持局部因果链，不宣称 native 已复现，也不将 query 两匹配说成失效。
+
+保留消费者包括 EditorGroup 两个 Host caller、Tab semantic navigation→lsp_definition→真实 reveal/history、shared document undo、clipboard owner generation、IME 与 view snapshot。只有 caller 证明必要才扩大产品 owner；本次没有修改产品或执行其测试。

@@ -1,0 +1,185 @@
+{
+  "stage": "P1 planning; no product execution",
+  "head": "884d003846a8549cc3125090eaf55359bc676a3f",
+  "branch": "docs/code-workspace-idea-audit-20260913",
+  "initial_worktree": "clean",
+  "P0_head": "27f99b6116f4f6aae906d324cb84e8359695e17a",
+  "production_diff_from_P0": "none; git diff --name-only P0 HEAD limited to 10 documents",
+  "records": [
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/08-editor-find.png",
+      "sha256": "8b1fed7b35131daa245194b14b1b97ab9fba714536d2b0be646e94083f7089f4",
+      "matches_P0": true
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/09-find-results.png",
+      "sha256": "320bab3d2a93d2a849c922c7ca9776554982c74027021b8ec0018b7ea60960e1",
+      "matches_P0": true
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/18-find-repro.png",
+      "sha256": "718637642434c05bd5b1c832e7a380cde2e7b5d631d72cdc62db46c671162ee4",
+      "matches_P0": true
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/223211892622-observation.json",
+      "sha256": "259124bd5a45ccf2ecd778d598b48ce5303f22c24e3480592a6240f22504f949",
+      "matches_P0": true
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/223259815775-observation.json",
+      "sha256": "a02582fdd95b4b5f2be2ddd91caf4f807b20460ead7114d4ff4ef7a5dff949c1",
+      "matches_P0": true
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/223835321541-observation.json",
+      "sha256": "24af20f049de6fee1bd2f65b60216ad5a77462af86dc99ab2ce23c5a35ad3c3c",
+      "matches_P0": true
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/actions.json",
+      "sha256": "4ee165804105f753d1b0abb6a498f58542a075a1d31360d429ef44e872ba1461",
+      "matches_P0": true
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/console.log",
+      "sha256": "fbd47037b94b49ebaf71a8d98b3522e2ba6e55429c419be9aaa3d164739c144f",
+      "matches_P0": true
+    },
+    {
+      "path": "src/components/editor/CodeWorkspaceTab.tsx",
+      "sha256": "86b46292384f5fff7201720c0b58745f68f8361824fa5d12a4aa1d2c8b6b20d2",
+      "matches_P0": true
+    },
+    {
+      "path": "src/components/editor/workspace/workspaceActionHost.ts",
+      "sha256": "f23118d3b426de479e0be9a43a6ee4106b9e22f57ccad4576419b8eb70b72d27",
+      "matches_P0": true
+    },
+    {
+      "path": "src/components/editor/workspace/EditorGroup.tsx",
+      "sha256": "aeefc8fd5b11a8843af3a5ccfe5acbee1a8303bb2b9f6e58a04efcd6a938bf72",
+      "matches_P0": true
+    },
+    {
+      "path": "src/components/editor/workspace/workspaceDocumentTransactionOwner.ts",
+      "sha256": "067809eaa6bedd02432cc68b1d06f71f495d7769014ec08dd5cb6b83375f3cf6",
+      "matches_P0": true
+    },
+    {
+      "path": "src/components/editor/workspace/CodeMirrorHost.tsx",
+      "sha256": "423acd419d7f34ff7f1907ab5bbbc977d51ba8b542ed0140590f2ad0623081e6",
+      "matches_P0": true
+    },
+    {
+      "path": "src/components/editor/workspace/workspaceCodeMirrorKeymap.ts",
+      "sha256": "1a6c8439598f3415e450dce168a006fad9cb5c0f85f28d1d9a07d7c66988c735",
+      "matches_P0": true
+    },
+    {
+      "path": "src/components/editor/workspace/editorSearchPanel.ts",
+      "sha256": "bce82714facec1a5f030b29c66ed040d050471be3cefaf7317003e4d9939f68e",
+      "matches_P0": true
+    },
+    {
+      "path": "src/components/editor/workspace/lspHyperlink.ts",
+      "sha256": "7db0effd15a2f26215993b4f19ebfd65b113d983123cf402c209e177408c461d",
+      "matches_P0": true
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/fixture/README.md",
+      "sha256": "129d0894d94b5ee43912087eea91c53d6e1ef86ff3d1fc12e6d4aaa612252c6f",
+      "bytes": 157
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/fixture/docs/notes.txt",
+      "sha256": "32b23e9c2f782364b0b923f37ffbfe08b43574ef978fa758626065ebd4f9e3cd",
+      "bytes": 65
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/fixture/src/main/example.txt",
+      "sha256": "bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a",
+      "bytes": 71
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/fixture/tests/sample.txt",
+      "sha256": "6076b94485933c3a8d3d9aad9468cac29ba559c68734a95b263b6bf9b3a6cb0f",
+      "bytes": 18
+    }
+  ],
+  "qa_plan": {
+    "command": "python -m qa_ui_auto plan --case TC-IDE-C4-02 --case TC-IDE-C6-05-query-definition-reveal-history-native --platform Windows --json",
+    "exit": 0,
+    "path": "qa-ui-auto-report/idea-reference/find-focus/20260914/qa-plan.json",
+    "result": "2 selected; C4-02 browser candidate; C6-05 Windows native gap: native_keys requires Linux/X11; no test execution"
+  },
+  "board": {
+    "path": "claudedocs/code-workspace-idea-parity-backlog-find-focus.md",
+    "id": "ED-FINDFOCUS-001",
+    "validate": "OK: 1 tasks; exit 0",
+    "list_claimable": "ED-FINDFOCUS-001; exit 0",
+    "claimed": false
+  },
+  "idea_reference": {
+    "id": "REF-FIND-FOCUS-20260914",
+    "summary": "docs-feature/code-workspace-idea-parity/references/find-focus-2026.2.2.md",
+    "raw": "qa-ui-auto-report/idea-reference/find-focus/20260914/",
+    "zip": "qa-ui-auto-report/idea-reference/find-focus/20260914/reference-transfer.zip",
+    "zip_sha256": "fa328fa968648123d8aa3da67858bf7ab7208e690f8ff0177f9ed9f52444f5cb",
+    "valid_steps": "23-33, 53-58; 20 initial caret; 38/40/44/51 settings",
+    "not_reference": "00-11 input interleaving; 21-22 old query carryover; 34-37 unrelated personal settings excluded from transfer",
+    "exclusive_window": "2026-09-14 06:37:27-06:41:33 Asia/Shanghai",
+    "closure": "WM_CLOSE 06:41:57; Confirm Exit observed 06:43:48; no forced termination or global input after exclusive window"
+  },
+  "user_feedback": {
+    "date": "2026-09-14",
+    "quote": "按图稿与实测参照继续",
+    "figure": "docs-issue/find-focus/find-focus-v1.png",
+    "decisions": [
+      "DEC-FF-02",
+      "DEC-FF-03"
+    ],
+    "result": "User confirmed v1 structure and Esc retaining current match selection; figure and AC/V unchanged",
+    "scope": "Planning only; no task claim, implementation, product verification or automatic P2 authorization"
+  },
+  "counts": {
+    "product_tests": 0,
+    "browser_runner": 0,
+    "native_runner": 0,
+    "taomni_launch": 0,
+    "product_build": 0,
+    "formal_comparator": 0,
+    "qa_plan": 1,
+    "idea_launched_fixture_processes": 1
+  },
+  "scope": "REQ-01, CW-SEARCH-001, CW-SHELL-002; retained CW-NAV-002/CW-TAB-002/clipboard owner",
+  "limitations": [
+    "No candidate product evidence; no gap closed",
+    "Windows native/provider/IME verification planned for P2; Linux/macOS unverified",
+    "P0 raw logs are ignored and must be transferred separately; no fabricated YAML receipt",
+    "Figure v1 is a proposal rendered locally; no draw.io CLI found; no independent agent execution"
+  ],
+  "worktree_at_document_check": [
+    " M docs-feature/code-workspace-idea-parity/capability-matrix.md",
+    " M docs-feature/code-workspace-idea-parity/index.md",
+    " M docs-feature/code-workspace-idea-parity/overall-audit-plan-20260913.md",
+    " M docs-feature/code-workspace-idea-parity/source-audit.md",
+    "?? claudedocs/code-workspace-idea-parity-backlog-find-focus.md",
+    "?? docs-feature/code-workspace-idea-parity/evidence/find-focus-plan-20260914.json",
+    "?? docs-feature/code-workspace-idea-parity/handoff-p2-find-focus.md",
+    "?? docs-feature/code-workspace-idea-parity/references/find-focus-2026.2.2.md",
+    "?? docs-issue/code-workspace-find-focus-design.md",
+    "?? docs-issue/find-focus/"
+  ],
+  "document_validation": {
+    "local_links_checked": 787,
+    "link_errors": 0,
+    "identity_records_checked": 20,
+    "identity_mismatches": 0,
+    "fixture_seed_files_checked": 4,
+    "drawio_xml": "valid",
+    "git_diff_check": "passed",
+    "production_and_tests_diff": [],
+    "interpretation": "document/material checks only; no product PASS"
+  }
+}

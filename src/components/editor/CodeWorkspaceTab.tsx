@@ -14985,7 +14985,7 @@ export function CodeWorkspaceTab({
     const node = target instanceof Node ? target : null;
     const element = node instanceof Element ? node : node?.parentElement;
     return Boolean(element?.closest?.(
-      '[data-testid="code-workspace-breadcrumbs"], [data-testid="code-workspace-highlighting-widget"], [data-testid="code-workspace-todos-panel"], [data-taomni-context-menu]',
+      '[data-testid="code-workspace-editor-search"], [data-testid="code-workspace-breadcrumbs"], [data-testid="code-workspace-highlighting-widget"], [data-testid="code-workspace-todos-panel"], [data-taomni-context-menu]',
     ));
   }, []);
 

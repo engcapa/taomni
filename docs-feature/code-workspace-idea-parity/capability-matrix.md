@@ -186,6 +186,9 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 - **规格与任务来源：** [tabs-and-multiview.md](../../claudedocs/code-workspace-idea-specs/tabs-and-multiview.md)；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-TABS-001`（原记录 2026-08-31T15:44:40Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-TABS-002`（原记录 2026-08-31T16:00:29Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-TABS-003`（原记录 2026-08-31T16:36:05Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-TABS-004`（原记录 2026-09-02T00:20:00Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-MULTIVIEW-002`（原记录 2026-09-03T00:36:30Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-MULTIVIEW-003`（原记录 2026-09-03T01:21:00Z）；[code-workspace-idea-parity-backlog-2026-09-main-repair.md](../../claudedocs/code-workspace-idea-parity-backlog-2026-09-main-repair.md) `ED-REPAIR-009`（原记录 2026-09-12T14:05:00Z）。旧卡不重开；新观察需求尚未author/领取任务。
 - **上次结论 / 本次变化：** 首次整体场景结论，无上一轮同ID三维判定；本轮新增目标、静态生产链和上述实际子样本。历史卡原验收及日期仅按原链接保留，未作为本轮PASS。当前判断日期2026-09-13；没有双侧新观测关闭差距。
 
+
+- **2026-09-14 P1 局部接续：** [WP-FIND-FOCUS-01 设计](../../docs-issue/code-workspace-find-focus-design.md)、[ED-FINDFOCUS-001 唯一任务板](../../claudedocs/code-workspace-idea-parity-backlog-find-focus.md)、[真实 Find 参照](references/find-focus-2026.2.2.md)。本场景为受影响保留消费者，未开展其全量对齐。原功能/视觉/交互三维结论和差异类型保留，未关闭场景差距；任务状态仅看板。
+
 <a id="cw-tab-003"></a>
 
 ### CW-TAB-003 — MRU 切换、关闭与重开标签
@@ -357,6 +360,9 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 - **规格与任务来源：** [search-and-navigation.md](../../claudedocs/code-workspace-idea-specs/search-and-navigation.md)；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-NAV-001`（原记录 2026-09-03T01:28:00Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-NAV-002`（原记录 2026-09-03T12:44:00+08:00）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-QUERY-001`（原记录 2026-09-02T22:00:39Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-QUERY-002`（原记录 2026-09-02T23:16:28Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-QUERY-003`（原记录 2026-09-03T00:50:00Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-QUERY-004`（原记录 2026-09-04T00:04:01Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-USAGE-001`（原记录 2026-09-03T01:35:00Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-USAGE-002`（原记录 2026-09-04T07:23:00Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-BOOKMARK-001`（原记录 2026-09-03T01:46:00Z）。旧卡不重开；新观察需求尚未author/领取任务。
 - **上次结论 / 本次变化：** 首次整体场景结论，无上一轮同ID三维判定；本轮新增目标、静态生产链和上述实际子样本。历史卡原验收及日期仅按原链接保留，未作为本轮PASS。当前判断日期2026-09-13；没有双侧新观测关闭差距。
 
+
+- **2026-09-14 P1 局部接续：** [WP-FIND-FOCUS-01 设计](../../docs-issue/code-workspace-find-focus-design.md)、[ED-FINDFOCUS-001 唯一任务板](../../claudedocs/code-workspace-idea-parity-backlog-find-focus.md)、[真实 Find 参照](references/find-focus-2026.2.2.md)。本场景为受影响保留消费者，未开展其全量对齐。原功能/视觉/交互三维结论和差异类型保留，未关闭场景差距；任务状态仅看板。
+
 <a id="cw-nav-003"></a>
 
 ### CW-NAV-003 — Find / Show Usages 与 Call / Type Hierarchy
@@ -413,6 +419,9 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 - **必须保留：** K0；不破坏Ctrl/Cmd-hover定义、搜索文本/选区、只读编辑、共享undo和取消无正文修改。后续验收必须观察这些结果，不能只写“保持原功能”。
 - **规格与任务来源：** [search-and-navigation.md](../../claudedocs/code-workspace-idea-specs/search-and-navigation.md)；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-FIND-001`（原记录 2026-09-03T01:23:00Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-FIND-002`（原记录 2026-09-03T01:26:00Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-FIND-003`（原记录 2026-09-04T03:36:22Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-FIND-004`（原记录 2026-09-04T06:02:00Z）；[code-workspace-idea-parity-backlog-2026-09-main-repair.md](../../claudedocs/code-workspace-idea-parity-backlog-2026-09-main-repair.md) `ED-REPAIR-002`（原记录 2026-09-12T13:30:00Z）；[code-workspace-idea-parity-backlog-2026-09-main-repair.md](../../claudedocs/code-workspace-idea-parity-backlog-2026-09-main-repair.md) `ED-REPAIR-005`（原记录 2026-09-12T03:10:00Z）；[code-workspace-idea-parity-backlog-2026-09-main-repair.md](../../claudedocs/code-workspace-idea-parity-backlog-2026-09-main-repair.md) `ED-REPAIR-006`（原记录 2026-09-12T02:38:00Z）。旧卡不重开；新观察需求尚未author/领取任务。
 - **上次结论 / 本次变化：** 首次整体场景结论，无上一轮同ID三维判定；本轮新增目标、静态生产链和上述实际子样本。历史卡原验收及日期仅按原链接保留，未作为本轮PASS。当前判断日期2026-09-13；没有双侧新观测关闭差距。
+
+
+- **2026-09-14 P1 局部接续：** [WP-FIND-FOCUS-01 设计](../../docs-issue/code-workspace-find-focus-design.md)、[ED-FINDFOCUS-001 唯一任务板](../../claudedocs/code-workspace-idea-parity-backlog-find-focus.md)、[真实 Find 参照](references/find-focus-2026.2.2.md)。补得 F0 Find/query/Enter/Shift+Enter/Esc/repeat 的 IDEA 侧观察；Taomni candidate 尚未实施或执行。原功能/视觉/交互三维结论和差异类型保留，未关闭场景差距；任务状态仅看板。
 
 <a id="cw-search-002"></a>
 
@@ -907,6 +916,9 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 - **必须保留：** K0；焦点owner真实、取消无编辑、modifier清理不重入；对话框消费者及查找/补全/语义导航保留。后续验收必须观察这些结果，不能只写“保持原功能”。
 - **规格与任务来源：** [correctness-gates.md](../../claudedocs/code-workspace-idea-specs/correctness-gates.md)；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-GATE-001`（原记录 2026-09-02T08:34:43Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-GATE-002`（原记录 2026-09-02T08:56:15Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-GATE-003`（原记录 2026-08-31T11:05:00Z）。旧卡不重开；新观察需求尚未author/领取任务。
 - **上次结论 / 本次变化：** 首次整体场景结论，无上一轮同ID三维判定；本轮新增目标、静态生产链和上述实际子样本。历史卡原验收及日期仅按原链接保留，未作为本轮PASS。当前判断日期2026-09-13；没有双侧新观测关闭差距。
+
+
+- **2026-09-14 P1 局部接续：** [WP-FIND-FOCUS-01 设计](../../docs-issue/code-workspace-find-focus-design.md)、[ED-FINDFOCUS-001 唯一任务板](../../claudedocs/code-workspace-idea-parity-backlog-find-focus.md)、[真实 Find 参照](references/find-focus-2026.2.2.md)。补得 F0 Find/query/Enter/Shift+Enter/Esc/repeat 的 IDEA 侧观察；Taomni candidate 尚未实施或执行。原功能/视觉/交互三维结论和差异类型保留，未关闭场景差距；任务状态仅看板。
 
 <a id="cw-shell-003"></a>
 

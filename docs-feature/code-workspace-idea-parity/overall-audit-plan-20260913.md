@@ -65,6 +65,8 @@
 
 可观察验收：`REQ-01-F` 同F0查找tree返回2个匹配、正文hash不变；`REQ-01-I` 进入Find可输入，Esc回正确view/caret/selection，连续两次和分屏切换无重复dispatch异常；`REQ-01-V` 查找面板锚点/行密度/选中状态有匹配IDEA参照；`REQ-01-R` 保留modifier-hover导航/清理、IME、read-only和其他弹层owner行为。UI具体尺寸待参照，不先承诺像素值。
 
+P1 局部接续（2026-09-14）：[修复设计](../../docs-issue/code-workspace-find-focus-design.md)将以上稳定验收映射到 ED-FINDFOCUS-001-A1..A7 / V-FF-01..06；[准确任务板](../../claudedocs/code-workspace-idea-parity-backlog-find-focus.md)是状态唯一来源。[新 Find 参照](references/find-focus-2026.2.2.md)补到实测查询导航与 Esc 保留当前匹配选区，未关闭整体场景差距。以下其余 REQ 不变。
+
 <a id="req-02"></a>
 ### REQ-02：项目树打开与菜单交互
 

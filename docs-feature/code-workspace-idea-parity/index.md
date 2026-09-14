@@ -25,6 +25,15 @@
 
 总需求新增REQ-01..11，重点区分确认browser缺陷、静态引擎缺失、体验差异、纯证据缺口与待归因风险。旧任务done不作为完成依据，旧修复规格保留；没有新建owner/ready/done流程，没有改任务板。
 
+## REQ-01 的 P1 增量（2026-09-14）
+
+仅规划 `WP-FIND-FOCUS-01`，没有重新做 P0。实际 HEAD `884d003846a8549cc3125090eaf55359bc676a3f` / `docs/code-workspace-idea-audit-20260913`，接手干净；上述十份 P0 文档已提交，生产内容仍与 P0 一致。P0 结论与原图保留，不补签产品 PASS。
+
+- [唯一开发板 / ED-FINDFOCUS-001](../../claudedocs/code-workspace-idea-parity-backlog-find-focus.md)：实际开发状态与领取资格只看此板。
+- [修复设计 / DEC、AC、V](../../docs-issue/code-workspace-find-focus-design.md)、[图稿](../../docs-issue/find-focus/find-focus-v1.png)：覆盖 REQ-01-F/I/V/R，保护 CW-NAV-002 hover、CW-TAB-002 多 view 与 clipboard owner。
+- [Find 真参照](references/find-focus-2026.2.2.md)：目标 build 的两轮独占序列；Esc 保留当前匹配 selection，不强制回到打开前 caret；输入污染段及个人设置页不转作参照。
+- [P1 provenance](evidence/find-focus-plan-20260914.json)、[P2 完整接续提示词](handoff-p2-find-focus.md)。本轮产品测试/runner/构建均为零；没有关闭任何整体场景差距。
+
 ## 历史材料与接续规则
 
 原 [project-tree E2E](skill-e2e-project-tree.md)、[tree参照](references/project-tree-navigation-2026.2.2.md)、[tree任务板](../../claudedocs/code-workspace-idea-parity-backlog-2026-09-tree-e2e.md) 仍保留原合同与日期。`claudedocs/code-workspace-idea-2026-*-capability-matrix.md` 是各轮原范围的历史发布/修复汇总，不与本总矩阵竞争开发状态来源；每场景的具体关联板/ID见矩阵。
