@@ -88,8 +88,6 @@ def probe_native(cfg: dict) -> list[str]:
         verify_identity(binary)
     except ValueError as exc:
         hints.append(str(exc))
-    if platform.system() == "Darwin":
-        return hints + ["Tauri WebDriver is unsupported on macOS; use native OS automation/manual QA-app testing."]
     hints += native_tool_issues(cfg)
     if platform.system() == "Linux" and not os.environ.get("DISPLAY"):
         hints += [

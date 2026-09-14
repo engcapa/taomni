@@ -16,6 +16,7 @@ import socket
 import subprocess
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -46,7 +47,16 @@ def native_isolation_env(report_root: Path) -> dict[str, str]:
         return {f"XDG_{key.upper()}_HOME": str(path) for key, path in paths.items()}
     if system == "Windows":
         return {"APPDATA": str(paths["data"]), "LOCALAPPDATA": str(paths["cache"])}
-    raise WebDriverError("Tauri WebDriver is unsupported on this OS; use an isolated QA app with OS automation/manual testing")
+    if system == "Darwin":
+        # macOS `dirs` intentionally ignores XDG variables.  These explicit
+        # QA-only overrides are consumed by Taomni's config/cache path helpers
+        # while leaving the user's HOME and keychain untouched.
+        return {
+            "NEWMOB_DATA_DIR": str(paths["data"]),
+            "NEWMOB_CONFIG_DIR": str(paths["config"]),
+            "NEWMOB_CACHE_DIR": str(paths["cache"]),
+        }
+    raise WebDriverError("native isolation is unsupported on this OS")
 
 
 def _tcp_ok(host: str, port: int, timeout: float = 1.0) -> bool:
@@ -133,9 +143,11 @@ class TauriDriverProcess:
         self.url = f"http://{self.host}:{self.port}"
         self.proc: subprocess.Popen[str] | None = None
         self.report_root = report_root
+        self.application = native_binary(cfg)
         self.command = str(webdriver.get("tauri_driver", "tauri-driver"))
         self.native_driver = webdriver.get("native_driver")
         self.native_port = int(webdriver.get("native_port", 4445))
+        self._restart_required = False
         self.startup_timeout = float(webdriver.get("startup_timeout", 20))
 
     def start(self) -> None:
@@ -145,25 +157,86 @@ class TauriDriverProcess:
             raise WebDriverError(f"Driver port {self.port} is occupied; choose a free port so the driver inherits QA isolation")
         if self.native_port == self.port or _tcp_ok(self.host, self.native_port):
             raise WebDriverError(f"Native driver port {self.native_port} must be free and distinct from the driver port")
-        cmd = [self.command, "--port", str(self.port), "--native-port", str(self.native_port)]
-        if self.native_driver:
-            cmd += ["--native-driver", str(self.native_driver)]
         out = self.report_root / "tauri-driver.out.log"
         err = self.report_root / "tauri-driver.err.log"
         out.parent.mkdir(parents=True, exist_ok=True)
-        with out.open("w", encoding="utf-8") as stdout, err.open("w", encoding="utf-8") as stderr:
-            self.proc = subprocess.Popen(cmd, cwd=ROOT, stdout=stdout, stderr=stderr, text=True)
+        if platform.system() == "Darwin":
+            # tauri-driver intentionally refuses to run on macOS.  The QA
+            # binary contains an opt-in WKWebView bridge which exposes the
+            # same W3C subset over this run-owned loopback port.
+            if not self.application.is_file():
+                raise WebDriverError(f"macOS QA application not found: {self.application}")
+            env = dict(os.environ)
+            env["TAOMNI_QA_WEBDRIVER_HOST"] = self.host
+            env["TAOMNI_QA_WEBDRIVER_PORT"] = str(self.port)
+            with out.open("w", encoding="utf-8") as stdout, err.open("w", encoding="utf-8") as stderr:
+                self.proc = subprocess.Popen(
+                    [str(self.application.resolve())],
+                    cwd=ROOT,
+                    env=env,
+                    stdout=stdout,
+                    stderr=stderr,
+                    text=True,
+                )
+        else:
+            cmd = [self.command, "--port", str(self.port), "--native-port", str(self.native_port)]
+            if self.native_driver:
+                cmd += ["--native-driver", str(self.native_driver)]
+            with out.open("w", encoding="utf-8") as stdout, err.open("w", encoding="utf-8") as stderr:
+                self.proc = subprocess.Popen(cmd, cwd=ROOT, stdout=stdout, stderr=stderr, text=True)
         deadline = time.time() + self.startup_timeout
         while time.time() < deadline:
             if self.proc.poll() is not None:
                 raise WebDriverError(
-                    f"tauri-driver exited early with code {self.proc.returncode}; "
+                    f"native driver exited early with code {self.proc.returncode}; "
                     f"see {err}"
                 )
             if _tcp_ok(self.host, self.port):
                 return
             time.sleep(0.25)
-        raise WebDriverError(f"tauri-driver did not listen on {self.url}")
+        raise WebDriverError(f"native driver did not listen on {self.url}")
+
+    def ensure_running(self) -> None:
+        """Ensure the per-run driver endpoint is ready for a new session.
+
+        The macOS bridge lives inside the QA application and exits that
+        application when a WebDriver session is deleted.  Native cases are
+        intentionally isolated one application process at a time, so the
+        next case must wait for the old process and listening socket to go
+        away before starting a fresh one.
+        """
+        if platform.system() != "Darwin":
+            return
+
+        # The in-process bridge exits the QA application after a WebDriver
+        # session is deleted.  A new case must never attach to that old
+        # listener while the asynchronous app exit is still in flight.
+        if self._restart_required:
+            self.stop()
+            self._restart_required = False
+
+        if self.proc is not None and self.proc.poll() is None and _tcp_ok(self.host, self.port):
+            return
+
+        if self.proc is not None and self.proc.poll() is None:
+            self.proc.terminate()
+            try:
+                self.proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+                self.proc.wait(timeout=5)
+
+        deadline = time.time() + self.startup_timeout
+        while _tcp_ok(self.host, self.port) and time.time() < deadline:
+            time.sleep(0.1)
+        if _tcp_ok(self.host, self.port):
+            raise WebDriverError(f"native driver port {self.port} did not become available")
+        self.start()
+
+    def mark_session_closed(self) -> None:
+        """Force the next macOS session to start in a fresh QA process."""
+        if platform.system() == "Darwin":
+            self._restart_required = True
 
     def stop(self) -> None:
         if not self.proc:
@@ -174,14 +247,17 @@ class TauriDriverProcess:
         except subprocess.TimeoutExpired:
             self.proc.kill()
             self.proc.wait(timeout=5)
+        self.proc = None
 
 
 class NativeSession:
-    def __init__(self, driver_url: str, application: Path):
+    def __init__(self, driver_url: str, application: Path, on_close: Any | None = None):
         self.driver_url = driver_url.rstrip("/")
         self.application = application
+        self._on_close = on_close
         self.session_id: str | None = None
         self.deadline = None
+        self.transport = "macOS WKWebView bridge" if platform.system() == "Darwin" else "tauri-driver"
         # A local driver must remain reachable when the desktop uses a proxy.
         host = urllib.parse.urlsplit(self.driver_url).hostname
         self._open = (urllib.request.build_opener(urllib.request.ProxyHandler({})).open
@@ -225,7 +301,42 @@ class NativeSession:
         if not sid:
             raise WebDriverError(f"could not create WebDriver session: {value}")
         self.session_id = sid
+        if platform.system() == "Darwin":
+            # The in-process WKWebView bridge can bind before React has
+            # mounted its root.  Do not let the first native step race that
+            # mount; transient bridge/evaluation failures are retryable, but
+            # the case deadline remains authoritative.
+            self.wait_for_app_ready()
         self.install_console_hook()
+
+    def wait_for_app_ready(self, timeout: float = 20.0) -> None:
+        """Wait until the macOS QA WebView has a mounted application root."""
+        end = time.monotonic() + timeout
+        last_error = ""
+        while time.monotonic() < end:
+            if self.deadline:
+                self.deadline.remaining()
+            try:
+                ready = self.execute(
+                    "return document.readyState === 'complete' && "
+                    "!!document.querySelector('#root > *');"
+                )
+            except (WebDriverError, urllib.error.URLError, OSError, json.JSONDecodeError) as exc:
+                # The bridge is exposed at page-load time, while WebKit may
+                # still be transitioning the document to an evaluable state.
+                last_error = str(exc)
+            else:
+                if ready is True:
+                    return
+                last_error = "document root is not mounted"
+
+            sleep_for = min(0.1, end - time.monotonic())
+            if self.deadline:
+                sleep_for = min(sleep_for, self.deadline.remaining())
+            if sleep_for > 0:
+                time.sleep(sleep_for)
+        detail = f": {last_error}" if last_error else ""
+        raise WebDriverError(f"native app document did not become ready within {timeout:.1f}s{detail}")
 
     def close(self) -> None:
         if self.session_id:
@@ -233,6 +344,8 @@ class NativeSession:
                 self.request("DELETE", f"/session/{self.session_id}")
             finally:
                 self.session_id = None
+                if self._on_close is not None:
+                    self._on_close()
 
     def endpoint(self, suffix: str) -> str:
         if not self.session_id:
@@ -738,15 +851,23 @@ class NativeHarness:
             self._previous_env.clear()
 
     def create_session(self) -> NativeSession:
-        session = NativeSession(self.driver.url, self.application)
+        self.driver.ensure_running()
+        session = NativeSession(self.driver.url, self.application, self.driver.mark_session_closed)
         session.deadline = getattr(self, "deadline", None)
-        session.start()
+        try:
+            session.start()
+        except BaseException:
+            # If readiness fails after the bridge has started, there is no
+            # session object for the runner's normal finally block to close.
+            # Mark the process stale so the next case cannot reuse it.
+            self.driver.mark_session_closed()
+            raise
         return session
 
 
 def native_tool_issues(cfg: dict) -> list[str]:
     issues: list[str] = []
-    if not shutil.which(str((cfg.get("webdriver") or {}).get("tauri_driver", "tauri-driver"))):
+    if platform.system() != "Darwin" and not shutil.which(str((cfg.get("webdriver") or {}).get("tauri_driver", "tauri-driver"))):
         issues += [
             "✗ tauri-driver not found on PATH.",
             "  Install: cargo install tauri-driver --locked",

@@ -25,8 +25,6 @@ def host_platform() -> str:
 
 def native_support(case: TestCase, target: str) -> str | None:
     from .native_steps import VERBS
-    if target == "macOS":
-        return "Tauri WebDriver unavailable; collect native OS/manual evidence using the macOS runbook"
     if case.native_platforms and target not in case.native_platforms:
         return f"case declares native platforms {case.native_platforms}"
     for step in case.steps:

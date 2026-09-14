@@ -1,29 +1,29 @@
 {
   "schemaVersion": 1,
   "fixtureId": "gradle-single",
-  "generatedAt": "2026-09-04T00:02:46.020Z",
+  "generatedAt": "2026-09-13T22:58:37.510Z",
   "sanitized": true,
   "toolchain": {
     "java": {
-      "path": "/data/dev/jdk-21/bin/java",
-      "version": "21.0.4",
+      "path": "/Library/Java/JavaVirtualMachines/zulu-25.jdk/Contents/Home/bin/java",
+      "version": "25.0.3",
       "info": {
-        "line": "openjdk version \"21.0.4\" 2024-07-16 LTS",
-        "major": 21,
-        "version": "21.0.4"
+        "line": "openjdk version \"25.0.3\" 2026-04-21 LTS",
+        "major": 25,
+        "version": "25.0.3"
       }
     },
     "jdtls": {
-      "home": "~/.local/share/jdtls",
-      "version": "1.61.0.202607102111.jar"
+      "home": "/usr/local/opt/jdtls/libexec",
+      "version": "1.61.0.202609031315.jar"
     },
     "gradle": {
-      "version": "9.5.1",
-      "home": "~/.gradle/wrapper/dists/gradle-9.5.1-bin/bvvv0hnjcinfezlom7fy9dbyi/gradle-9.5.1"
+      "version": "9.7.1",
+      "home": "/usr/local/opt/gradle"
     },
-    "mavenCliDetected": "Apache Maven 3.9.9 (8e8579a9e76f7d015ee5ec7bfcdc97d260186937)"
+    "mavenCliDetected": "Apache Maven 3.9.16 (2bdd9fddda4b155ebf8000e807eb73fd829a51d5)"
   },
-  "buildModelFingerprint": "e3974bb1ad1faa14e0d1a068ece4fe74de52127cfb7f41f0f196bf764c98f106",
+  "buildModelFingerprint": "4ec279705032f1e081b14e02e3ffd526545c6e97c39c062e93f18a1b0e165832",
   "scenarios": [
     {
       "caseId": "gradle-import-sanity",
@@ -37,7 +37,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 12270,
+          "msTotal": 1117,
           "itemCount": 50,
           "isIncomplete": true,
           "satisfied": true,
@@ -109,14 +109,16 @@
       }
     ],
     "importProgress": {
-      "events": 35,
-      "beginTokens": 7,
+      "events": 24,
+      "beginTokens": 9,
       "titles": [
-        "Synchronizing projects",
+        "Repository registry initialization",
         "Building",
-        "Initialize Workspace",
+        "Synchronizing projects",
         "Detect installed JVMs",
-        "Searching..."
+        "Initialize Workspace",
+        "Check JDK Index",
+        "Validate documents"
       ],
       "anyWithPercentage": true
     },
@@ -125,6 +127,6 @@
     }
   },
   "analysisTiming": {
-    "firstCompletionSatisfiedMs": 15568
+    "firstCompletionSatisfiedMs": 3788
   }
 }

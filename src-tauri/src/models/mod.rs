@@ -89,7 +89,7 @@ pub async fn models_verify(id: String) -> Result<bool, String> {
 
 /// Path inside the user cache where the CUDA pack lives once installed.
 fn cuda_pack_dir() -> std::path::PathBuf {
-    dirs::cache_dir()
+    crate::resolved_cache_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join("taomni")
         .join("sidecar-cuda")
@@ -205,7 +205,7 @@ impl Default for MirrorPreference {
 /// `<config_dir>/taomni/mirror.json` so the model downloader can consult it
 /// without round-tripping through ai.json.
 fn mirror_pref_path() -> std::path::PathBuf {
-    dirs::config_dir()
+    crate::resolved_config_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join("taomni")
         .join("mirror.json")

@@ -404,10 +404,12 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                 results.append(r)
                 continue
             current_target = "macOS" if platform.system() == "Darwin" else platform.system()
-            if c.native_platforms and current_target not in c.native_platforms:
+            from .verification import native_support
+            unsupported_reason = native_support(c, current_target)
+            if unsupported_reason:
                 r.update(
                     status="skipped",
-                    fixtures_skipped=f"case declares native platforms {c.native_platforms}",
+                    fixtures_skipped=f"native scope unavailable on {current_target}: {unsupported_reason}",
                 )
                 results.append(r)
                 continue
@@ -763,13 +765,20 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if mode == "native":
         from .verification import host_platform, native_support
-        if args.filter:
-            unsupported = {c.id: reason for c in selected if (reason := native_support(c, host_platform()))}
+        unsupported = {c.id: reason for c in selected if (reason := native_support(c, host_platform()))}
+        # macOS has a QA-owned WKWebView bridge.  Cases that require Linux/X11
+        # are recorded as per-case skips by _native_run; they must not prevent
+        # the runnable macOS cases from starting.  Linux/Windows retain the
+        # fail-fast contract for an unsupported native verb or platform.
+        target = host_platform()
+        if target == "macOS":
+            pass
+        elif args.filter:
             if unsupported:
                 print(f"qa-ui-auto: unsupported native scope: {unsupported}", file=sys.stderr)
                 return 2
         else:
-            selected = [c for c in selected if not native_support(c, host_platform())]
+            selected = [c for c in selected if not native_support(c, target)]
 
     requested_ids = set(args.filter.split(",")) if args.filter else set()
     missing_ids = requested_ids - {c.id for c in selected}

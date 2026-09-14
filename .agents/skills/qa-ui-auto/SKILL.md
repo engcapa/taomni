@@ -22,9 +22,12 @@ execution, platform compatibility or OS-level input.
   clipboard, dialogs, shortcuts/IME, permissions and windows. A frontend change
   can still affect these boundaries. Browser stubs cannot prove them.
 - Consider Windows/WebView2, Linux/WebKitGTK and macOS/WKWebView where affected.
-  Native on one OS or Chromium on three hosts cannot prove all three. macOS has
-  no Tauri WebDriver adapter; use available OS automation or recorded manual QA.
-  Keep missing targets and unsupported verbs explicit.
+  Native on one OS or Chromium on three hosts cannot prove all three. On macOS,
+  the isolated `com.taomni.app.qa` debug binary exposes a loopback WKWebView
+  WebDriver bridge because Tauri has no upstream macOS adapter; this is native
+  execution, while OS-global input, dialogs, permissions and IME still need
+  separate OS automation/manual evidence. Keep missing targets and unsupported
+  verbs explicit.
 - Measure performance when changes affect startup, input/rendering, large data,
   search, transfers or background work. Compare matching baseline/candidate
   conditions and retain raw samples, p95 and relevant resource measurements.

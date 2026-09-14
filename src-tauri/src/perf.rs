@@ -32,7 +32,7 @@ pub struct LatencyMetric {
 /// Where the baseline lives. `<cache>/taomni/perf-baseline.jsonl`. The cache
 /// dir is the right home — this file is regenerable telemetry, not user data.
 pub fn baseline_path() -> PathBuf {
-    dirs::cache_dir()
+    crate::resolved_cache_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("taomni")
         .join("perf-baseline.jsonl")

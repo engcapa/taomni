@@ -28,6 +28,7 @@ mod notes;
 mod objectstorage;
 pub mod perf;
 mod proxy;
+mod qa_driver;
 mod rdp;
 mod sdk;
 mod serial;
@@ -58,6 +59,19 @@ use tauri::{AppHandle, Manager, State, WebviewWindowBuilder};
 
 const AI_PROCESS_REAPER_INTERVAL_SECS: u64 = 30;
 const AI_PROCESS_IDLE_REAP_SECS: u64 = 300;
+const QA_APP_ID: &str = "com.taomni.app.qa";
+
+fn qa_override_path(raw: &str) -> Option<std::path::PathBuf> {
+    let path = std::path::PathBuf::from(raw.trim());
+    if !path.is_absolute() {
+        return None;
+    }
+    if path.ends_with(QA_APP_ID) {
+        Some(path)
+    } else {
+        Some(path.join(QA_APP_ID))
+    }
+}
 
 /// Resolve the app data root, honoring the debug-only QA override used by
 /// native tests. Windows' `dirs::data_dir()` uses the Known Folder API and
@@ -67,8 +81,7 @@ pub fn resolved_app_data_dir<R: tauri::Runtime>(
 ) -> Result<std::path::PathBuf, String> {
     if cfg!(debug_assertions) {
         if let Ok(raw) = std::env::var("NEWMOB_DATA_DIR") {
-            let path = std::path::PathBuf::from(raw.trim());
-            if path.is_absolute() {
+            if let Some(path) = qa_override_path(&raw) {
                 return Ok(path);
             }
         }
@@ -76,6 +89,31 @@ pub fn resolved_app_data_dir<R: tauri::Runtime>(
     app.path()
         .app_data_dir()
         .map_err(|error| format!("failed to resolve app data dir: {error}"))
+}
+
+/// Resolve named user roots while keeping the QA run inside its own report
+/// directory on macOS.  `dirs` does not honor XDG variables there, so native
+/// QA supplies explicit debug-only overrides instead of changing HOME.
+pub fn resolved_config_dir() -> Option<std::path::PathBuf> {
+    if cfg!(debug_assertions) {
+        if let Ok(raw) = std::env::var("NEWMOB_CONFIG_DIR") {
+            if let Some(path) = qa_override_path(&raw) {
+                return Some(path);
+            }
+        }
+    }
+    dirs::config_dir()
+}
+
+pub fn resolved_cache_dir() -> Option<std::path::PathBuf> {
+    if cfg!(debug_assertions) {
+        if let Ok(raw) = std::env::var("NEWMOB_CACHE_DIR") {
+            if let Some(path) = qa_override_path(&raw) {
+                return Some(path);
+            }
+        }
+    }
+    dirs::cache_dir()
 }
 
 fn should_reap_ai_process(
@@ -310,8 +348,7 @@ pub fn run() {
                     .enable_clipboard_access();
                 if cfg!(debug_assertions) {
                     if let Ok(raw) = std::env::var("NEWMOB_DATA_DIR") {
-                        let data_dir = std::path::PathBuf::from(raw.trim());
-                        if data_dir.is_absolute() {
+                        if let Some(data_dir) = qa_override_path(&raw) {
                             let webview_dir = data_dir.join("webview");
                             std::fs::create_dir_all(&webview_dir).ok();
                             builder = builder.data_directory(webview_dir);
@@ -329,9 +366,39 @@ pub fn run() {
                         .decorations(true)
                         .title_bar_style(tauri::TitleBarStyle::Overlay)
                         .hidden_title(true);
+
+                    // A WebView accepts the bridge's TCP connection before
+                    // its document can service `eval_with_callback`.  Delay
+                    // exposing the QA endpoint until the initial page has
+                    // finished loading; subsequent reloads are harmless as
+                    // the bridge start is idempotent within this process.
+                    if let Ok(raw_port) = std::env::var("TAOMNI_QA_WEBDRIVER_PORT") {
+                        if let Ok(port) = raw_port.trim().parse::<u16>() {
+                            let host = std::env::var("TAOMNI_QA_WEBDRIVER_HOST")
+                                .unwrap_or_else(|_| "127.0.0.1".to_string());
+                            let app_handle = app.handle().clone();
+                            builder = builder.on_page_load(move |window, payload| {
+                                if payload.event() == tauri::webview::PageLoadEvent::Finished {
+                                    qa_driver::start(
+                                        app_handle.clone(),
+                                        window,
+                                        host.clone(),
+                                        port,
+                                    );
+                                }
+                            });
+                        } else {
+                            log::warn!("qa webdriver bridge ignored invalid port {raw_port:?}");
+                        }
+                    }
                 }
                 let main_window = builder.build()?;
 
+                // The macOS QA runner cannot use tauri-driver (there is no
+                // Tauri WebDriver adapter for WKWebView).  An opt-in bridge
+                // exposes the same small W3C surface from inside this exact
+                // QA window.  Normal launches never set this environment
+                // variable and therefore never start a local HTTP server.
                 // On Linux the webview is webkit2gtk, which ships with the
                 // media-stream / WebRTC settings OFF — so getUserMedia and
                 // getDisplayMedia reject and LanChat calls can't be answered or

@@ -94,7 +94,7 @@ impl AppProxyConfig {
 }
 
 pub fn default_app_proxy_path() -> PathBuf {
-    dirs::config_dir()
+    crate::resolved_config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("taomni")
         .join("proxy.json")

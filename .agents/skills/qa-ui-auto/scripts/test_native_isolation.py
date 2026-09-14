@@ -35,7 +35,8 @@ class NativeBuildTest(unittest.TestCase):
         with (
             patch.object(native_build, "source_identity", return_value="same-source"),
             patch.object(native_build, "fingerprint", return_value="same-recipe"),
-            patch.object(native_build.subprocess, "check_output", return_value="tool-version"),
+            patch.object(native_build.platform, "platform", return_value="test-platform"),
+            patch.object(native_build.subprocess, "check_output", return_value=b"tool-version"),
         ):
             with patch.dict(os.environ, {"NODE_ENV": "development"}):
                 development = native_build.build_inputs()
@@ -131,8 +132,8 @@ class NativeIsolationTest(unittest.TestCase):
                     before = dict(os.environ)
                     try:
                         with harness:
-                            self.assertEqual(os.environ["XDG_DATA_HOME"], str(root / "run" / "native-appdata"))
-                            self.assertEqual(os.environ["XDG_CACHE_HOME"], str(root / "run" / "native-appcache"))
+                            self.assertEqual(os.environ["XDG_DATA_HOME"], str((root / "run" / "native-appdata").resolve()))
+                            self.assertEqual(os.environ["XDG_CACHE_HOME"], str((root / "run" / "native-appcache").resolve()))
                     except native.WebDriverError:
                         if not fails:
                             raise
@@ -153,8 +154,8 @@ class NativeIsolationTest(unittest.TestCase):
             harness.driver.start.assert_not_called()
             self.assertFalse((root / "run").exists())
 
-    def test_reset_clears_only_qa_state_for_linux_and_windows(self):
-        for system in ("Linux", "Windows"):
+    def test_reset_clears_only_qa_state_for_supported_native_platforms(self):
+        for system in ("Linux", "Windows", "Darwin"):
             with self.subTest(system=system), TemporaryDirectory() as directory:
                 root = Path(directory)
                 with patch.object(native.platform, "system", return_value=system):
@@ -169,7 +170,13 @@ class NativeIsolationTest(unittest.TestCase):
                                 keep.append(data / "taomni.db")
                     legacy = root / "legacy-user-directory"
                     legacy.mkdir()
-                    with patch.dict(os.environ, {**env, "NEWMOB_DATA_DIR": str(legacy)}):
+                    reset_env = dict(env)
+                    if system != "Darwin":
+                        # Linux/Windows must ignore this legacy-looking
+                        # override; macOS uses NEWMOB_DATA_DIR as its explicit
+                        # QA root and therefore tests the exact run path.
+                        reset_env["NEWMOB_DATA_DIR"] = str(legacy)
+                    with patch.dict(os.environ, reset_env):
                         reset_db._reset_native(SimpleNamespace(report_root=root / "run"))
                     for path in keep:
                         self.assertEqual(path.read_bytes(), b"keep production")
@@ -228,11 +235,12 @@ class NativeIsolationTest(unittest.TestCase):
         self.assertEqual(window, "0x1")
         self.assertIn("Taomni QA", identity)
 
-    def test_macos_webdriver_refuses_without_changing_home(self):
+    def test_macos_webdriver_uses_run_owned_roots_without_changing_home(self):
         with TemporaryDirectory() as directory, patch.object(native.platform, "system", return_value="Darwin"):
             before = dict(os.environ)
-            with self.assertRaises(native.WebDriverError):
-                native.native_isolation_env(Path(directory))
+            env = native.native_isolation_env(Path(directory))
+            self.assertEqual(set(env), {"NEWMOB_DATA_DIR", "NEWMOB_CONFIG_DIR", "NEWMOB_CACHE_DIR"})
+            self.assertTrue(all(Path(value).is_relative_to(Path(directory).resolve()) for value in env.values()))
             self.assertEqual(dict(os.environ), before)
 
     def test_driver_rejects_external_listener_without_spawning(self):
@@ -248,10 +256,46 @@ class NativeIsolationTest(unittest.TestCase):
             driver = native.TauriDriverProcess({"webdriver": {"port": 4450, "native_port": 4451}}, Path(directory))
             proc = Mock()
             proc.poll.return_value = None
-            with patch.object(native, "_tcp_ok", side_effect=[False, False, True]), patch.object(native.subprocess, "Popen", return_value=proc) as spawn:
+            with patch.object(native.platform, "system", return_value="Linux"), patch.object(native, "_tcp_ok", side_effect=[False, False, True]), patch.object(native.subprocess, "Popen", return_value=proc) as spawn:
                 driver.start()
                 self.assertEqual(spawn.call_args.args[0], ["tauri-driver", "--port", "4450", "--native-port", "4451"])
                 driver.stop()
+
+    def test_macos_driver_restarts_after_previous_qa_app_exits(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = recorded_binary(root)
+            driver = native.TauriDriverProcess(
+                {"app": {"native_binary": str(binary)}, "webdriver": {"port": 4450}},
+                root / "run",
+            )
+            dead_proc = Mock()
+            dead_proc.poll.return_value = 0
+            driver.proc = dead_proc
+            with patch.object(native.platform, "system", return_value="Darwin"), \
+                 patch.object(native, "_tcp_ok", return_value=False), \
+                 patch.object(driver, "start") as start:
+                driver.ensure_running()
+            start.assert_called_once_with()
+
+    def test_macos_driver_restarts_after_session_close_marker(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = recorded_binary(root)
+            driver = native.TauriDriverProcess(
+                {"app": {"native_binary": str(binary)}, "webdriver": {"port": 4450}},
+                root / "run",
+            )
+            live_proc = Mock()
+            live_proc.poll.return_value = None
+            driver.proc = live_proc
+            with patch.object(native.platform, "system", return_value="Darwin"), \
+                 patch.object(native, "_tcp_ok", return_value=False), \
+                 patch.object(driver, "start") as start:
+                driver.mark_session_closed()
+                driver.ensure_running()
+            live_proc.terminate.assert_called_once_with()
+            start.assert_called_once_with()
 
 
 class RoutineEntryTest(unittest.TestCase):

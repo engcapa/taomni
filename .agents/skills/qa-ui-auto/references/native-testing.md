@@ -54,14 +54,17 @@ credentials as mutation fixtures, redirect HOME, or erase a profile as a shortcu
 |---|---|---|
 | Linux | `tauri-driver`, `WebKitWebDriver`, an X11 desktop or Xvfb; X11-specific verbs need real dependencies | GTK/WebKitGTK, Ctrl shortcuts, case-sensitive paths/permissions, clipboard and IME |
 | Windows | `tauri-driver` plus matching `msedgedriver.exe`/WebView2; set `webdriver.native_driver` if needed | Ctrl/Alt shortcuts, drive/UNC paths, locking/permissions, clipboard/dialogs, WebView2 |
-| macOS | Tauri WebDriver unsupported; use available OS UI automation or recorded manual QA-app runs on macOS | Cmd/Meta shortcuts, WKWebView, IME, case sensitivity, permissions, clipboard/dialogs/window controls |
+| macOS | isolated `com.taomni.app.qa` binary with the in-process WKWebView WebDriver bridge; `jdtls` + JDK 21+ for Java cases | Cmd/Meta shortcuts, WKWebView, IME, case sensitivity, permissions, clipboard/dialogs/window controls |
 
 Linux/Xvfb exercises Tauri/WebKitGTK but cannot prove physical input, GPU,
-compositor, IME or performance behavior for another desktop/device. For macOS
-packaged/manual runs, verify `CFBundleIdentifier` and QA-owned data/config/cache/
-keychain namespaces; use a disposable OS account for workflows sharing resources
-outside them. Do not install over production. Browser WebKit is supplementary
-renderer evidence, not a native WKWebView/IPC test.
+compositor, IME or performance behavior for another desktop/device. The macOS
+bridge exercises the packaged WKWebView and Tauri IPC, but cannot prove
+OS-global input, permission prompts, clipboard ownership or window-manager
+behaviour; collect OS automation/manual evidence for those boundaries. Verify
+`CFBundleIdentifier` and QA-owned data/config/cache/keychain namespaces; use a
+disposable OS account for workflows sharing resources outside them. Do not
+install over production. Browser WebKit is supplementary renderer evidence,
+not a native WKWebView/IPC test.
 
 Choose representative native workflows for each affected OS. When a host or
 dependency is unavailable, retain available evidence and label missing targets
