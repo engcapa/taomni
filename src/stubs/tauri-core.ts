@@ -1866,6 +1866,11 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
       ];
       return shells as T;
     }
+    case "list_wsl_distros": {
+      // Browser preview has no WSL; return a type-correct empty list instead
+      // of undefined so SessionEditor never stores undefined distros.
+      return ([] as unknown) as T;
+    }
     case "list_common_local_directories": {
       const home = await vfsHome();
       const usage = loadDirectoryUsage();

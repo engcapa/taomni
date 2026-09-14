@@ -29,6 +29,12 @@ steps:
   - click: '[data-testid^="terminal-context-theme-option-"] >> nth=0'
   - wait: 1
   - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: qa-theme-marker}
+  # The theme gallery stays open over the terminal and neither Escape nor an
+  # outside click dismisses it reliably; use the Find item to close the menu
+  # (proven pattern from TC-007), then close the find bar again.
+  - click: "[data-testid=\"context-menu-item-find\"]"
+  - wait_for: "input[placeholder=\"Find\"]"
+  - click: '[data-testid="terminal-pane"] button:has-text("Close")'
   - click: "[data-testid=\"terminal-pane\"]"
   - type: echo qa-theme-still-alive
   - press: Enter
