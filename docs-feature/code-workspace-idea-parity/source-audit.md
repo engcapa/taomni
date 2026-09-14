@@ -231,3 +231,18 @@
 局部源内容与 P0 相同；实际 HEAD `884d003846a8549cc3125090eaf55359bc676a3f`。详细 [Find 修复设计 §3](../../docs-issue/code-workspace-find-focus-design.md)补出 `editor.find → runViaHandlers → openSearchPanel → WorkspaceSearchPanel.mount.select → content blur → lspHyperlink.clearMod.dispatch`。mount 的源码调用是 select（隐式 focus），不是显式 focus；CodeMirrorHost 的生产 hyperlink hooks 只传 onDefinition，没有传 probeDefinition。现有 docChanged microtask 修复不覆盖 blur 清理。上述事实只支持局部因果链，不宣称 native 已复现，也不将 query 两匹配说成失效。
 
 保留消费者包括 EditorGroup 两个 Host caller、Tab semantic navigation→lsp_definition→真实 reveal/history、shared document undo、clipboard owner generation、IME 与 view snapshot。只有 caller 证明必要才扩大产品 owner；本次没有修改产品或执行其测试。
+
+<a id="tree-open-focus-20260914"></a>
+
+## 2026-09-14 REQ-02 局部生产链复核
+
+HEAD `7bbb7094148e65c389903076cd3b4dec0d04a004`，本轮无产品修改。此段只更新 CW-PROJ-002 和菜单消费者的当前源码事实；[详细 owner/调用链](../../docs-issue/code-workspace-tree-open-focus-design.md#ed-treeopen-001)、[逐文件指纹](evidence/tree-open-focus-plan-20260914.json)。
+
+- ProjectTree 的层级/平铺/loose file row 单击 select+open、双击又 open，目录 label/disclosure 共享按钮；Ctrl/MetaEnter 的 handleTreeKeyDown 先 splitLayoutLeaf 再按新 active group open；菜单 workspace.tree.open 也调用 openFile。各入口均缺显式 matching-ready-view handoff。DEC-TOF-01 用户已选择修订 mouse 合同，不再沿用旧合同作为新目标。
+- openFile 先 flush pending text、更新 leaf/tab policy，再等待 pending close cleanup；已加载早返与 library/root/loose read 分支不同。root/loose read→src/lib/editor/workspace.ts invoke→src-tauri/src/workspace.rs 真实读取；返回可 canonical remap，失败形成 error model。isCurrent 默认 true，不能把 Promise resolve 等同 view ready；需要单独核验 workspace lifetime、load commit 与 focus grant。
+- EditorGroup loading 分支没有 Host；实际 viewId=groupId、Markdown preview 是独立非 editable 分支。CodeMirrorHost 注册 token、shared lease、textIdentity snapshot 与延迟 scroll restore，reveal 会改 selection，不适合作通用 focus。现有 editorCommandPortsRef 已区分 group/file/mount token，可复用窄接口。
+- useContextMenu 也被 candidate 等消费者复用；MenuSurface 现有首项 focus、方向键/Enter/Esc、portal/clamp/overflow。tree cancel 恢复必须按 session/close reason 隔离，不能所有菜单 close 都回树。
+- Find 当前 editorSearchPanel 已有 generation/activeElement/liveness 防迟到，lspHyperlink 已立即撤销状态并延迟 decorations dispatch；Host clipboard focusout generation 保留。旧设计中的“尚未实施”不代表当前生产；ED-FINDFOCUS-001 metadata 为 implemented，本轮不改其状态/证据。
+- useWorkspaceFileActions 的 expanded descendants refresh、useWorkspaceTreeData 的 generation/root guard、store instance 生命周期、tab policy/transaction/snapshot/persistence 为保留边界。缺 current native 证据不是这些模块存在数据 bug 的结论。
+
+新增 IDEA 实测见 [Linux 参照](references/project-tree-open-focus-linux-2026.2.2.md)；P0 B03–B05 仅历史观察。本轮只读 qa plan/status，无产品测试或构建。

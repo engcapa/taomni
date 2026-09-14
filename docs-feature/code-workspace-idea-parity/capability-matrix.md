@@ -110,6 +110,8 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 - **规格与任务来源：** [project-tree-keyboard-idea-alignment-design.md](../../docs-issue/project-tree-keyboard-idea-alignment-design.md)；[code-workspace-idea-parity-backlog-2026-09-tree-e2e.md](../../claudedocs/code-workspace-idea-parity-backlog-2026-09-tree-e2e.md) `ED-TREE-001`（原记录 2026-09-13T01:30:00Z）。旧卡不重开；新观察需求尚未author/领取任务。
 - **上次结论 / 本次变化：** 首次整体场景结论，无上一轮同ID三维判定；本轮新增目标、静态生产链和上述实际子样本。历史卡原验收及日期仅按原链接保留，未作为本轮PASS。当前判断日期2026-09-13；没有双侧新观测关闭差距。
 
+**2026-09-14 P1 局部增量（不改上列 2026-09-13 结论/日期）：** 已核实本机 IU-262.10315.125 的 preview/single-click 均关闭，并实测 Enter 后直接输入/undo、已开文件、回树/菜单 Esc 与 active split；见 [新参照](references/project-tree-open-focus-linux-2026.2.2.md)。用户已接受单击只选、双击/Enter 正式打开的旧合同修订；[设计](../../docs-issue/code-workspace-tree-open-focus-design.md#ed-treeopen-001) 与 [ED-TREEOPEN-001 任务板](../../claudedocs/code-workspace-idea-parity-backlog-tree-open-focus.md) 已 author。上述“尚未 author”保留为 P0 历史记录；当前状态以新板为准。源码补核 tree→openFile→active leaf→Host ready owner，Find 共享链已有实现。未运行 Taomni，新 IDEA 参照不构成双侧关闭差距，三维历史判断不升级。
+
 <a id="cw-proj-003"></a>
 
 ### CW-PROJ-003 — 新建、重命名、删除与树菜单

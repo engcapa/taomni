@@ -41,3 +41,10 @@
 接续先核对本轮HEAD及source/caller、目标设置、fixture、case/runner/build/mode变化。只重判受影响项；无变化项保留本次2026-09-13日期，不补签新PASS。新增/拆分/合并/移出场景必须记录ID映射及分母变化；用户未明确接受的差异不能关闭。开发卡始终从原任务板读取，新的差距经P1查重/设计/author后才进入开发。
 
 本轮原件位于本机 `qa-ui-auto-report/overall-audit-20260913/`，历史IDEA有效原件位于 `qa-ui-auto-report/project-tree-e2e/idea/`。均被忽略；其他机器须取得精确原件或补采，不能仅凭摘要继承通过。
+
+## 2026-09-14 REQ-02 首包 P1 增量
+
+- 首包 `WP-TREE-OPEN-FOCUS-01`：CW-PROJ-002，CW-PROJ-003 仅 Open/cancel；[唯一任务板](../../claudedocs/code-workspace-idea-parity-backlog-tree-open-focus.md) / `ED-TREEOPEN-001`。状态以板 metadata 为准，P1 未领取/实施。
+- [设计 DEC/AC/V](../../docs-issue/code-workspace-tree-open-focus-design.md#ed-treeopen-001)、[Linux 2026.2.2 真实参照](references/project-tree-open-focus-linux-2026.2.2.md)、[状态图](references/tree-open-focus-states.svg)、[身份](evidence/tree-open-focus-plan-20260914.json)、[原件 hash 清单](evidence/tree-open-focus-artifacts-20260914.json)、[完整 P2 交接](handoff-p2-tree-open-focus.md)。
+- 用户确认：文件/目录标签单击只选择，文件双击/Enter 正式打开，箭头展开；保留其他入口 preview 数据/策略，不改全局 preview 默认。旧 mouse 合同有显式修订，不改旧 ED-TREE-001 done；Find 卡仍 implemented，已有实现不接管状态。
+- 本机 IDEA 新增参照不关闭 P0 的 Taomni 差距；CW-PROJ-002 2026-09-13 历史三维结论保留。产品测试、构建、Taomni/runner 启动为零。桌面补采已结束并归还；后续真实输入需重新约独占时段。

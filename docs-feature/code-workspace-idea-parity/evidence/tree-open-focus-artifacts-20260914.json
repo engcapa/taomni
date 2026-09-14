@@ -1,0 +1,1133 @@
+{
+  "kind": "IDEA-reference-artifact-inventory-not-Taomni-test",
+  "reference_id": "REF-TREE-OPEN-FOCUS-LINUX-20260914",
+  "ignored_raw_root": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux",
+  "entries": [
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/01-open-dialog.json",
+      "sha256": "87c78c14fad9241066056aeb0a88dfaa41138e91b0a8e88291b17aa75813b117",
+      "bytes": 385,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/01-open-dialog.png",
+      "sha256": "302d871d7ac88c82a0b773cf582d265f34a4a781fcfb1ba76aab8acffb3d9eec",
+      "bytes": 504,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/02-open-dialog.json",
+      "sha256": "b107ee35b55d1f73a6bac6c86e2d075834b547cc7bf59e2f881662fce49acf4a",
+      "bytes": 363,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/02-open-dialog.png",
+      "sha256": "bb944886dd1f74d50674859a2e30bb2b7328b7180df0208c6fb50946e2dab3c8",
+      "bytes": 37290,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/10-upgraded.png",
+      "sha256": "943bdc2d7e9d50fbedae75fb410de07d5e3a4306af325e815403bd214ee06a22",
+      "bytes": 101429,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/11-upgraded.json",
+      "sha256": "06c714aff7c51d4e1faae3a3c5ea9bd347087807b50f612711c59dd889c850ff",
+      "bytes": 363,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/11-upgraded.png",
+      "sha256": "943bdc2d7e9d50fbedae75fb410de07d5e3a4306af325e815403bd214ee06a22",
+      "bytes": 101429,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/12-close-whats-new.json",
+      "sha256": "9f6e5743ed7f68f2a8b3f2ea138566595b7cbe106f94bcf6ab59791d0b60d89f",
+      "bytes": 421,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/12-close-whats-new.png",
+      "sha256": "8292d6fb7dd17b55e3f32b589a956373a368b17b1e2a65bea32ff2f93ff16111",
+      "bytes": 114931,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/13-readme-single.json",
+      "sha256": "d90f9468c9747d051a8f3a455cf6903c96a906ecf698bc5fa86d5530e88ff324",
+      "bytes": 435,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/13-readme-single.png",
+      "sha256": "30791497670e2c009ca8fd6daadfd2add9a4fc5488567a7e5880ea7f183f7c0e",
+      "bytes": 117433,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/14-readme-enter.json",
+      "sha256": "9ae286d8b21cf50c7acd1c7842454670a1ae2be6b28e06e688fb98402bf9b723",
+      "bytes": 409,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/14-readme-enter.png",
+      "sha256": "d8fd7dd7c608ac49a47c2d6516624bf194ae90060dc6b880dfed245cfb2ca9a2",
+      "bytes": 105430,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/15-settings.json",
+      "sha256": "b2101b96eed1484193cabd6cc66c3e1e53530c8540e21aa13b87192a4133aaa3",
+      "bytes": 417,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/15-settings.png",
+      "sha256": "ab7bed1381b36dfd88c040d21e139dd70c366d8e802050c5910ffef809cc92cd",
+      "bytes": 105454,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/16-settings-ready.json",
+      "sha256": "0223fea950429c949cc075de5f258bffd5dfc72f95f790a257e987eb18139ed9",
+      "bytes": 371,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/16-settings-ready.png",
+      "sha256": "3e1425e39934c6595f211e255a604c43d98423ab984fda18800eb172bb0cdc15",
+      "bytes": 124778,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/17-keymap.json",
+      "sha256": "ce7c5f5fc6d4c43795f334b8cb0e5f90bfbe0d8d30839b12d000a8ed070fd995",
+      "bytes": 399,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/17-keymap.png",
+      "sha256": "3e1425e39934c6595f211e255a604c43d98423ab984fda18800eb172bb0cdc15",
+      "bytes": 124778,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/18-keymap-ready.json",
+      "sha256": "1a7748a710564b304fa10eb6c10bc60f9b4025deb4f15ad3ab31b291aea4e67b",
+      "bytes": 369,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/18-keymap-ready.png",
+      "sha256": "825885bfa801c943b36fc275a805dcb579cc19d4c0fe79d87761ba23a03387bb",
+      "bytes": 100746,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/19-search-font.json",
+      "sha256": "1f0bb7e2226d8cde761a1e38658cb2c956970f21b738459eeb3ee41564bf0ec6",
+      "bytes": 404,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/19-search-font.png",
+      "sha256": "2a9eb0f47bd7e80419b9bd655d06766666fed531492fe73341e18ad6c06a9923",
+      "bytes": 101867,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/20-search-font.json",
+      "sha256": "cca96c833ad6d224b86920842a73d5ce485ef8f4435cab8c2c40a7d009e5e17d",
+      "bytes": 394,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/20-search-font.png",
+      "sha256": "e00ee48e81b2f6609f1e72f331f17e10b4d1465f0fffa952933c7fe82af46629",
+      "bytes": 95731,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/21-editor-font.json",
+      "sha256": "26ea1403756363406d6bb0f31215591a9dc24ed421077953c65a572c57d667bb",
+      "bytes": 404,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/21-editor-font.png",
+      "sha256": "ae2c9fb139b6f2e9caa78fae62541810a1d333ad26e8b106a4641eff7fe140dd",
+      "bytes": 122068,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/22-editor-font.json",
+      "sha256": "eb5fc288a3cf06a10159b56988c2dfd8ea750a8f8e323e66c21840b577806923",
+      "bytes": 404,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/22-editor-font.png",
+      "sha256": "330a3446d1ade2f75261fa143a410d9c7244a528b876bbdc21807aecf67b082e",
+      "bytes": 141459,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/23-scheme-font.json",
+      "sha256": "cc87d110ef7f714d06c19d3e2ce94d81db282bc28b0635fa3fcbc81a6ce2a197",
+      "bytes": 405,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/23-scheme-font.png",
+      "sha256": "9ced1ba0bfbe3fe2f063b596817f6728cfc011761d9c626d572a64cd5cd8b2bc",
+      "bytes": 125481,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/24-editor-tabs.json",
+      "sha256": "2aa87bee49a9aa78d666ea92ad362ca164996d67efd8cfc616fa6e020c1e74a2",
+      "bytes": 405,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/24-editor-tabs.png",
+      "sha256": "cae66f0201b217be01301964632b69cfbf1643cf835eb0d82974219fe0954fa1",
+      "bytes": 97740,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/25-tabs-scroll.json",
+      "sha256": "25801c052262a8eda63c585aebd1f3fbf79b33a37609f791b82cb17a1fac7560",
+      "bytes": 415,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/25-tabs-scroll.png",
+      "sha256": "e5f0b063df3a06ab1127304be191bea1999e85d6a9a6cf8fbec748ec45088c9e",
+      "bytes": 99803,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/26-tabs-scroll.json",
+      "sha256": "e17b9bdbf18f7c695d4c1024cc98c3c4c45bab952b2ee43cecb8219261b4ad78",
+      "bytes": 415,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/26-tabs-scroll.png",
+      "sha256": "29d6de7780b68653f36c2c896bc674bdc26ec2e3932b2a050d322768e3294e36",
+      "bytes": 99204,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/27-tabs-scroll.json",
+      "sha256": "4f6276ccb3549332a810565a80ff2d91f43c78560ff6e783d9bfd887fe2ca549",
+      "bytes": 415,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/27-tabs-scroll.png",
+      "sha256": "28c8662f91c51dd9f36eed85b9fbf69067d3b2fdce95cc440346229d5d1f308c",
+      "bytes": 99900,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/28-tabs-scroll.json",
+      "sha256": "8c8357e95161eabe682aec98f830b3f0616c953bf439438790e951ba041a0ca4",
+      "bytes": 415,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/28-tabs-scroll.png",
+      "sha256": "83f7dd76f5f3a68387bfd97664dc3cb1125d4a622c42cdc5e99ddf4d3d1403bd",
+      "bytes": 100108,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/29-tabs-scroll.json",
+      "sha256": "487ed74a92c40c75d3431b33e16a08eb7f5b08aaa6117d01a50494849b7976db",
+      "bytes": 415,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/29-tabs-scroll.png",
+      "sha256": "ffefe9a9d78d771b7ba9158c163f7ffe2eb3d78ff79bbafd9f660522787d6220",
+      "bytes": 100958,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/30-tabs-scroll.json",
+      "sha256": "4200a7938e3286c1d802d6ac946f9a645b234f77d1ace8ae9c7457511a0c775c",
+      "bytes": 415,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/30-tabs-scroll.png",
+      "sha256": "6243ff9459ba352655b2693755fc88f20236a086d5ce5b51a331266d6f31d7b8",
+      "bytes": 100040,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/31-tabs-preview.json",
+      "sha256": "9e49d3b13698fc78a8a43accec29085fc1e828c55bc965ae9679e25621b1c550",
+      "bytes": 416,
+      "classification": "derived-review-not-raw"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/31-tabs-preview.png",
+      "sha256": "987b93794c42dbbc4a25526f1479e7a4f770df313c1ef85337a65bc1de67980e",
+      "bytes": 99490,
+      "classification": "derived-review-not-raw"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/32-cancel-settings.json",
+      "sha256": "37570bbd7d0519ee1d9689e09db159ec2968350797c2733d02c0f738772c55ec",
+      "bytes": 407,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/32-cancel-settings.png",
+      "sha256": "15806993c51b0087f51c2a8f964f197a3e656d778d692885bc447b64eb799455",
+      "bytes": 104221,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/33-readme-source.json",
+      "sha256": "a001d140773d69824320aa754d8650cfce95f9a64decd540c3b67b5016f6e1ff",
+      "bytes": 405,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/33-readme-source.png",
+      "sha256": "fa3348fe457ccc3c302dc37571bd6307f4e3efdc040ab43da37c2cdb0b889865",
+      "bytes": 117600,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/34-tree-options.json",
+      "sha256": "a3db8fa0f39b32969cdc3f6dd5637fe971a6963ddd3f873fdad203d752653d3a",
+      "bytes": 403,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/34-tree-options.png",
+      "sha256": "2032ffa4cf4935a5432a74442d535938eda2dec5270d0ea9e348eb8a65a8580c",
+      "bytes": 117447,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/35-tree-options.json",
+      "sha256": "3c63b8b97c02c936319f9512c81e93295c5713740f7413351839df1ad9be9026",
+      "bytes": 403,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/35-tree-options.png",
+      "sha256": "cd472e6dae47fb196a645eda7b37117b4a9cec3b846f85cefe4b39cc8643950c",
+      "bytes": 131415,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/36-tree-behavior.json",
+      "sha256": "00ad28d42926216874ac70ce2f935dd0139c1b1c5ec1eff9a7ffc62149a6d21d",
+      "bytes": 404,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/36-tree-behavior.png",
+      "sha256": "4efa4215a212f101533e810d15a107c4c9bf87bdd13daeee93b17ffcf4b7b83d",
+      "bytes": 142307,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/37-menu-dismiss.json",
+      "sha256": "03c8736ae96a697736fad00d8b0ee93c10699b2bf518c359a1de41bde12bc482",
+      "bytes": 408,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/37-menu-dismiss.png",
+      "sha256": "547637dd937ce39236b5ae8c0aa0f644c1bf1695b41a7ef54d5446d1b895d9df",
+      "bytes": 126170,
+      "classification": "setup-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/38-docs-label.json",
+      "sha256": "d23d727f16ce1e1d5db9391e8a7527212e474698b610e1f1083dcc129c2cfb99",
+      "bytes": 402,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/38-docs-label.png",
+      "sha256": "b2173fe4781f7fb02d86ffc57e86af247d584383b7ec81068219841332033528",
+      "bytes": 116277,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/39-docs-arrow.json",
+      "sha256": "aa5161321c3a24dbde8aa45a152bd2b423cac8dcb276192bcbb3737331cafede",
+      "bytes": 401,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/39-docs-arrow.png",
+      "sha256": "90b061bbba75f77966347013ee395960ef7d959f231ae9e448197f39618bb92f",
+      "bytes": 120683,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/40-docs-left.json",
+      "sha256": "32eeaa6aec5bc3b6fb61d05749ff707f7c8d828c89b4f4a8eabe18a30fc3ab2d",
+      "bytes": 389,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/40-docs-left.png",
+      "sha256": "8ae2784f3785507d3f08c0e6abb66ac2f3a9eb714b1e058bbbb5f9ff524eb8c5",
+      "bytes": 116275,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/41-src-down.json",
+      "sha256": "3555b9ccc596ef4cffd9deae912cb6ded604dfbc0af2b533e094036d8df96075",
+      "bytes": 388,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/41-src-down.png",
+      "sha256": "13b87474ab4860fae6a207b3c00ee8f670f84f8a2a116fc5bae81f3dd736160d",
+      "bytes": 116073,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/42-src-expand.json",
+      "sha256": "d3db73b500bfa5dcca82fb154acdef7c4305780759e6ae21cfcbfdf0f61d6278",
+      "bytes": 391,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/42-src-expand.png",
+      "sha256": "e87a1d053fe19135f9c43e5d17d4379b2337c0368db03f2ae4ac45d46ae290f2",
+      "bytes": 121856,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/43-main-select.json",
+      "sha256": "5e6ea002c7c00f12e3ea7a8ae15f799f4c4a56601daf304c01d6ba55a35aced8",
+      "bytes": 392,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/43-main-select.png",
+      "sha256": "7f736092cb86a191b1a5ec1080a8d793742b7e4965213a77194ee56c141bb380",
+      "bytes": 122184,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/44-main-collapse.json",
+      "sha256": "7c04d32ad0eee1ef86ebe98c5b358d41246a3f7fd181a44aba5962871e312e43",
+      "bytes": 393,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/44-main-collapse.png",
+      "sha256": "3da2a64f8920734694b9f37f311f9d6ffe03e6285f8b1d273e42be7d9b021f99",
+      "bytes": 117595,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/45-main-expand.json",
+      "sha256": "188765656d78ad6c3769c7b3d2f006956c1224fc917324ca35a96d46c07ab3ef",
+      "bytes": 392,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/45-main-expand.png",
+      "sha256": "7f736092cb86a191b1a5ec1080a8d793742b7e4965213a77194ee56c141bb380",
+      "bytes": 122184,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/46-example-select.json",
+      "sha256": "d8928a7ad7af2248f2ecbe0ea6b9bd8b67c94cb52dc2c025c316159bcdf62066",
+      "bytes": 394,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/46-example-select.png",
+      "sha256": "37046a869646d9dfa0d17b7f11dbff555e0d935506d7b474c8ac18ab7364d2ae",
+      "bytes": 122424,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/47-example-enter.json",
+      "sha256": "f6e8804fcf5ccd7ed5f108dfee5be287f6b18460d3bfb127c9c6c1e1940d8598",
+      "bytes": 395,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/47-example-enter.png",
+      "sha256": "d9c55fffd98a6f072b8b88d0e927fe0df7c7c0cd4d41305d894b43a7598f376a",
+      "bytes": 117461,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/48-example-input.json",
+      "sha256": "5c6c5d415ea3596487826b4dc6d0a1dd3a5d6349de9a2682e36e23d450b6e7bd",
+      "bytes": 391,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/48-example-input.png",
+      "sha256": "412921ac325f7333b85ef6f3a7924678b8641c46f2f3c00e8cc79d3bf20bd0c6",
+      "bytes": 117738,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/49-example-undo.json",
+      "sha256": "7f6b26ce07f65ee07f9eafb9ece1a138d5b62522eed3198617562e0863af32f1",
+      "bytes": 408,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/49-example-undo.png",
+      "sha256": "6fb1c5cfe81b34cb5dfe56108b2f16ab2931abe5aebaa473b513d3711898b3e2",
+      "bytes": 117548,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/50-return-tree.json",
+      "sha256": "d22e6e2cff23924265cffef75049fe4db2f180efc01aa1ac959094268536467a",
+      "bytes": 403,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/50-return-tree.png",
+      "sha256": "f93eeea86c7ed42b3aeba5dd752096bf81c0bb9b035444aaa92f4f623ce8b8fb",
+      "bytes": 116335,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/51-example-context.json",
+      "sha256": "a6db1f79f0a93ba618c4958cee92e640f0f0b48ff80c61625700d636725fbba7",
+      "bytes": 416,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/51-example-context.png",
+      "sha256": "19ca0cb20f26c39de818dff4123ad81fb3f9654b0227c6e136b9f288361347fa",
+      "bytes": 162571,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/52-context-escape.json",
+      "sha256": "07ee3020f64e673a38703e78bb40b409a9ad1e258ddd08f23226c9b7cbb011bf",
+      "bytes": 396,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/52-context-escape.png",
+      "sha256": "f93eeea86c7ed42b3aeba5dd752096bf81c0bb9b035444aaa92f4f623ce8b8fb",
+      "bytes": 116335,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/53-reopen-enter.json",
+      "sha256": "6ef2ddfd68813a18590c236182580095446b49132e5a4cb9da342200997a5c8c",
+      "bytes": 394,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/53-reopen-enter.png",
+      "sha256": "2b5c886f39c5eb4bac71ac6b1254910dd2d9cd8afcc26696b9bd8fdfe24b1739",
+      "bytes": 117643,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/54-reopen-input.json",
+      "sha256": "4ad7f889c44e9ea88f9507b67b56ff50311f45e888be7a5219b5bf2ff4deacd9",
+      "bytes": 390,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/54-reopen-input.png",
+      "sha256": "11b5cda27500f944b4d2bc186b812448a45574d0d3e4479be05311cd2f131c85",
+      "bytes": 120081,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/55-reopen-undo.json",
+      "sha256": "a9dc159be1edc2bedf62cb63bd0573604865a7adb77a6d61fa3905e1a2aef2fa",
+      "bytes": 407,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/55-reopen-undo.png",
+      "sha256": "1d0069224f9b680ecbe113983ccf410e6797fd1cc78165ee2bc56626da874319",
+      "bytes": 119521,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/56-file-single.json",
+      "sha256": "ad19b9b5bd913ac788c2da2099e5c5f24c11942adc958758bdc4c120888198bd",
+      "bytes": 403,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/56-file-single.png",
+      "sha256": "52acc216cf24fffe97099d3a7db51312f722a284896886defef4e2c5c19a04d4",
+      "bytes": 118930,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/57-file-double.json",
+      "sha256": "ec7bf00e31c6ceb4b02fec19fe275ab84599e1629f2ab57c6e771eea4cf3a31b",
+      "bytes": 404,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/57-file-double.png",
+      "sha256": "d8bb2858b126196ae1ba3690afeae615fb4bf36efbde63a816ceb894973d6f76",
+      "bytes": 128475,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/58-docs-double.json",
+      "sha256": "6ee91b8905b4a2fca8a6cd3a0a97978dec6fdce55cdfb78984c41cdf7842e8ef",
+      "bytes": 404,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/58-docs-double.png",
+      "sha256": "f85a71be924ff898091accb885cf56d56ef0a3f61f24000ab59506e2ab4dd2eb",
+      "bytes": 130000,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/59-docs-enter.json",
+      "sha256": "7fd37838a8b96e7cb066778b14666ed8bc1507570994989d66473d1a04d14801",
+      "bytes": 392,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/59-docs-enter.png",
+      "sha256": "109e4cdcb726c784ba695ba0b6a91808424ad62763feeb5bf5ab471aba68e484",
+      "bytes": 125838,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/60-example-double.json",
+      "sha256": "3fab533255b94bcbe08f8e84a0ab02aca24ebd3ee259bcbf033599c82a82ea93",
+      "bytes": 407,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/60-example-double.png",
+      "sha256": "28651bf11495dfb2336163aa7fe291447c2167632c49032e117c14e1ecab6ed2",
+      "bytes": 119512,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/61-tab-context.json",
+      "sha256": "a16079b8c03b464d54ee5b0f22ddd344b8dbf5f6697dd340edda088bd62927d0",
+      "bytes": 411,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/61-tab-context.png",
+      "sha256": "4a2cba0766d3382be487ca31b88a89f16f296331a43994a5cc9182f608ed5aac",
+      "bytes": 162080,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/62-split-right.json",
+      "sha256": "98bf22ecc48d09f793eb8c796d7e0b17cdaf0b5446c81a87a1c7505d25121830",
+      "bytes": 404,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/62-split-right.png",
+      "sha256": "09faa4d29b116918fffb01175217f6bf40725549c7b243a839ef751d1c10514a",
+      "bytes": 121833,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/63-split-input.json",
+      "sha256": "011f3251b9fe7a0908532544f6c39070bbe270808086d5c03d631cd57bf7c6b8",
+      "bytes": 389,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/63-split-input.png",
+      "sha256": "33b1f60ef03852142aa78c513f8621f868737c9bc01698dd29af39842e92e2ee",
+      "bytes": 122335,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/64-split-undo.json",
+      "sha256": "0e6419102c0e9612bdb8e7c90024279df361c6d68f7d32a0ae370e95ed8fa4c8",
+      "bytes": 406,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/64-split-undo.png",
+      "sha256": "3c4697b4db77c45dce1fdc2b8a56b86cbb028a2a09b23f690dd7bc03620a887c",
+      "bytes": 121909,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/65-split-return-tree.json",
+      "sha256": "43f24216ece9b53fdf3725972e3f3ceb289596658782f7e39ae661553f50f45c",
+      "bytes": 409,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/65-split-return-tree.png",
+      "sha256": "b9764e9832b8d82ac0b9f1f14ddcce76175f140b18373968f0267bba1b5da2f6",
+      "bytes": 119130,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/66-split-tree-enter.json",
+      "sha256": "71f5158dab0ee458ed7d55941fd617f1aae674ac829f0c22f0c1254303d0a4a3",
+      "bytes": 398,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/66-split-tree-enter.png",
+      "sha256": "97a73bf946e0eb1d89f1b8586a80ffbf710fcb5b019881ba28f6694e7723e47a",
+      "bytes": 121733,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/67-split-reopen-input.json",
+      "sha256": "1e361c4e6c629d7d04ec1c910b5874d90599177c4e040228bd2003081b29ba0d",
+      "bytes": 396,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/67-split-reopen-input.png",
+      "sha256": "fcc647e54fdf261eae7c1366d1f9fe4bb7128e059cc536f379202074efa83e79",
+      "bytes": 122358,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/68-split-reopen-undo.json",
+      "sha256": "ff36881c34991ee552b77816d5ada60e17a2b7ec2ef1d6408d1a6f6a9694ed09",
+      "bytes": 413,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/68-split-reopen-undo.png",
+      "sha256": "37c76512fb7997bd9b50652862931be4967916d7f791a803c6c017469f4da2c5",
+      "bytes": 122093,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/69-save-restored.json",
+      "sha256": "53791d273c616d86bcb1aca6771459b57ddfc115b4190285ef08e00e25d2f6b5",
+      "bytes": 409,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/69-save-restored.png",
+      "sha256": "1b1ad5e08fca2422ca095056b19b947c05a891af97e68666aa67889cff800b16",
+      "bytes": 124085,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/capture.py",
+      "sha256": "81b8082df3dfc5a8704b58767364fdeb55bc27c0a016c54c12f748de4b6e0f5d",
+      "bytes": 2866,
+      "classification": "raw-support"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/fixture-manifest.json",
+      "sha256": "f9c34589f447efdfbb413a2c06b352a5d6a14defbdfaf03727445a147088bb36",
+      "bytes": 358,
+      "classification": "raw-support"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/qa-plan.json",
+      "sha256": "f5d53ca06c2119392bee87d3232fa719eb5807b36bc66dadb7721b5cd87be006",
+      "bytes": 1059,
+      "classification": "raw-support"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/qa-status.json",
+      "sha256": "29d0e144cb62d27fb17a45fa73bca9fd1200b5c94048d570864e80a9b9a1c736",
+      "bytes": 2921,
+      "classification": "raw-support"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-00-initial.json",
+      "sha256": "4bca072b01e00ffce6fbdd3ce3cafb6c2c08744a2203b93c1fe2069fd0629c21",
+      "bytes": 365,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-00-initial.png",
+      "sha256": "3c4697b4db77c45dce1fdc2b8a56b86cbb028a2a09b23f690dd7bc03620a887c",
+      "bytes": 121909,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-01-close-right.json",
+      "sha256": "004e3d7c0240a2743e8989d1e76d8680b822d3b75034165e3dba99ebcc7f0e71",
+      "bytes": 406,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-01-close-right.png",
+      "sha256": "7988d6bee18dccfbdbf1880c0e1919bbb8b3cdf82ea7b1e1e110936d8ef75092",
+      "bytes": 118396,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-02-close-example.json",
+      "sha256": "5f98a4da13e207db96b30a637427be4a4b27ff6e5b3f0c1728b482a97bd36742",
+      "bytes": 408,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-02-close-example.png",
+      "sha256": "f4a35d1f3d4ba7a7ded0669e80a6539d737d0d91dcde065ab77eb5741f6ab9eb",
+      "bytes": 125364,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-03-menu.json",
+      "sha256": "f2e1d532a0a0c98eb2c3a8c1d4737364cb224cce01b13ffb6bf9d2ea35149482",
+      "bytes": 397,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-03-menu.png",
+      "sha256": "ced29402b82809cd93e742de72e4385f99d886450dfcfb8d6135344a8072982b",
+      "bytes": 153776,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-04-help.json",
+      "sha256": "debd8f0af60c01667e0eb03c597223d59057d45404aa219bd372631234d36953",
+      "bytes": 398,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-04-help.png",
+      "sha256": "5b4260c55f234468e32cca99c60d72314429b1e02d60127c8d00cea38662eb6d",
+      "bytes": 125376,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-05-menu.json",
+      "sha256": "f8147432aea1fb60d2e2dfdf3a5c213338bc11d678561771197eca067c12d5f1",
+      "bytes": 397,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-05-menu.png",
+      "sha256": "4704010644ce4d61a6980b5a40e8afe2127dcc0764d5cc2c7e7e6434f279b95c",
+      "bytes": 153789,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-06-help-hover.json",
+      "sha256": "cedd549e0d826a4d9c4e049e0ce39f4e14780d3bb54c495cb8ad1c4a334ffb65",
+      "bytes": 403,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-06-help-hover.png",
+      "sha256": "26d8961db8155429fde61c3d4d4b962aef21e6fcf81aba8c91e4176b8dca2335",
+      "bytes": 129997,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-07-help.json",
+      "sha256": "2f2222bf24e384b51524363a6bf11eb88abbe15090bd26da50571beeb3435520",
+      "bytes": 398,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-07-help.png",
+      "sha256": "8fb9bbc6cb8bd58fe670270db7e3a14b960fb79c513d7079d33629b04855f89c",
+      "bytes": 194744,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-08-about.json",
+      "sha256": "c029bc548f023a0981b1f4f8de5c4dd8984d36c2ff0ad34618c6bbabed6831fd",
+      "bytes": 417,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-08-about.png",
+      "sha256": "36bc85ecf66e12cf94a92d95203060b32ab37055d27b7f9165334f379edf2bcf",
+      "bytes": 61882,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-09-close-about.json",
+      "sha256": "437609362f2e1b2046389fb840ae815f78f1b3e018abcf0ed04165895820778c",
+      "bytes": 422,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-09-close-about.png",
+      "sha256": "5b4260c55f234468e32cca99c60d72314429b1e02d60127c8d00cea38662eb6d",
+      "bytes": 125376,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-10-docs-label.json",
+      "sha256": "042827544bc7811590e9e957d5d9e1d43202d008c0559a1cdb8e0eb989fbd0c1",
+      "bytes": 405,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-10-docs-label.png",
+      "sha256": "69f046ffb15f3ea151a76929102c6f830f0749c88abd6c4c30dc15fccdfde086",
+      "bytes": 124086,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-11-docs-expand.json",
+      "sha256": "feb3ebcd3c23deece30eaf9a02e3903390b2a22e7b69d62a01a1d05185ffcc99",
+      "bytes": 395,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-11-docs-expand.png",
+      "sha256": "a876d2e5fd18056e48a5b5863fc579a5f5c142699b1586f056c91cffefb99dc0",
+      "bytes": 128397,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-12-docs-collapse.json",
+      "sha256": "9e90472ff3c18a29687e248a7320bf18fb79e3ba56b3aa620a1d8a77aad9c4c4",
+      "bytes": 396,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-12-docs-collapse.png",
+      "sha256": "69f046ffb15f3ea151a76929102c6f830f0749c88abd6c4c30dc15fccdfde086",
+      "bytes": 124086,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-13-src.json",
+      "sha256": "48233b5228ebdc030d0fa13da3367c54495e92d6555ff9adc84c62580c237b19",
+      "bytes": 386,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-13-src.png",
+      "sha256": "b1c8f5ade83f25f37af87f7c1e413fc32e0005920810ab53190a62db35d14243",
+      "bytes": 123877,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-14-src-collapse.json",
+      "sha256": "7bf075c8dde2a927c8a7cc262e0498d01440a88fc575c4d1d2287ba8d4be60ff",
+      "bytes": 395,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-14-src-collapse.png",
+      "sha256": "e4f3cf098b84908ec252bd9640459747fc18e47f226ac7fce5c6cbca42b20f98",
+      "bytes": 116109,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-15-src-expand.json",
+      "sha256": "9a586106106a9c2dcb1ef269cee6446e3f25458e979000c45c641b7232f75493",
+      "bytes": 394,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-15-src-expand.png",
+      "sha256": "b1c8f5ade83f25f37af87f7c1e413fc32e0005920810ab53190a62db35d14243",
+      "bytes": 123877,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-16-main.json",
+      "sha256": "af14fc137b065936f561fd2e38d4c60d6feed1e8d3c52bf2ab74c6978fe27bb8",
+      "bytes": 388,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-16-main.png",
+      "sha256": "dc3055e3bed48126b53d19972cd44f8c14963e6e7b612360281250bb98845c74",
+      "bytes": 124210,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-17-example.json",
+      "sha256": "2389b1d893e028e8777fac020d255c1c513335d85a8e5699208477e6f2f8522c",
+      "bytes": 390,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-17-example.png",
+      "sha256": "fa23d7f9ffa2aeb57566a1e830505f1dab2b4928283ac832d3ff4b9e3db94b61",
+      "bytes": 124247,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-18-enter.json",
+      "sha256": "f718ebccaa23d1686be36c5026948ea2fea7751aae139c21aba9034faca6ff1a",
+      "bytes": 390,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-18-enter.png",
+      "sha256": "8f3e91765c68a424b94eec277e9d70e40050e2847e7254e906449bfd39b8d4f3",
+      "bytes": 119344,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-19-input.json",
+      "sha256": "e45262e5a054bd621ae9d3afb7ca2dc3ce3614d0163baf87b83aa8967a500b80",
+      "bytes": 386,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-19-input.png",
+      "sha256": "8ec7f60b9cf96ae9d51241881fb81a05a6e66dac5be194b20858b67305e94099",
+      "bytes": 119745,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-20-undo.json",
+      "sha256": "d207d9e8d82698eb178f0f02b50aeb46c6061dd431216213723b6362707c601a",
+      "bytes": 403,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-20-undo.png",
+      "sha256": "dd5e8f483c73fc00d8af37b26b88634053d68a036e9e9820863886879c74dfb7",
+      "bytes": 119442,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-21-return-tree.json",
+      "sha256": "ccebd85b7580965cb549a18d3849b81d4cecc8a5dc0d6f10ea89221c1f99b89e",
+      "bytes": 406,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-21-return-tree.png",
+      "sha256": "aefdbfe17bbd7335991bfbb3aa79dc2ace362310fc5d944fb0ce84b99e2ea900",
+      "bytes": 117880,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-22-menu.json",
+      "sha256": "da672956dfb04ed74d7463b65703564e532275cbee716587a9492df447980794",
+      "bytes": 408,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-22-menu.png",
+      "sha256": "6881e3dae6b4230f19c5b9834e1e5591d741461e4a3a6a534c789ce4f6290ee4",
+      "bytes": 161644,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-23-escape.json",
+      "sha256": "200317f1c3b549d5c4a07efab97d054e01d9d7668c80e5ee545c588f48fb732b",
+      "bytes": 391,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-23-escape.png",
+      "sha256": "aefdbfe17bbd7335991bfbb3aa79dc2ace362310fc5d944fb0ce84b99e2ea900",
+      "bytes": 117880,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-24-reopen.json",
+      "sha256": "24a987c8e288b25bf3197e6438caff5cd83b4be3e834bdd2e5e2f40303dd0408",
+      "bytes": 391,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-24-reopen.png",
+      "sha256": "0f0a3713750b1bd20af745685b6b9b17eaf2a3461925adc2b62d17f92af48042",
+      "bytes": 119338,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-25-input.json",
+      "sha256": "24e127ec9f9cf3c405295d4c51b5cd3b651229a3c53d67244082145e60519ba5",
+      "bytes": 386,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-25-input.png",
+      "sha256": "11b5cda27500f944b4d2bc186b812448a45574d0d3e4479be05311cd2f131c85",
+      "bytes": 120081,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-26-undo.json",
+      "sha256": "f4885501a222632effb758eae0c11fe4000a96e141f011ebcd151a0fd1393bbd",
+      "bytes": 403,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-26-undo.png",
+      "sha256": "1d0069224f9b680ecbe113983ccf410e6797fd1cc78165ee2bc56626da874319",
+      "bytes": 119521,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-27-save.json",
+      "sha256": "1ba7e335dd3e2c8e5eab44b809db3d2cf6af71dafbc75c579aa7ebdc18f5b8c8",
+      "bytes": 403,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-27-save.png",
+      "sha256": "02771e8e3432a3e3df316f4ae83709ad18c579c28e0e219347511b209cdb8858",
+      "bytes": 119409,
+      "classification": "valid-reference"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-restored-hashes.json",
+      "sha256": "6b2a19b03e83baa1b5c0fb77d21f730862892e76f27106c81755ab4c4839f61b",
+      "bytes": 454,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/r2-review.png",
+      "sha256": "9c06b5fdd93fe32d135c4f7e20dd07daf3e3c9858cba5463342307a81c86d990",
+      "bytes": 205894,
+      "classification": "derived-review-not-raw"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/restored-hashes.json",
+      "sha256": "d92bbc7c29695ff33b2a2fd38467287ecb702b32e659f81f27f0b7571321e39a",
+      "bytes": 526,
+      "classification": "raw-support"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/tree-open-focus/20260914-linux/review-contact-sheet.png",
+      "sha256": "53012108750723b0c268bddf994bdc8162f7a40b490b21ce1638fb686b679fff",
+      "bytes": 276769,
+      "classification": "derived-review-not-raw"
+    }
+  ],
+  "invalid_without_snapshots": [
+    "70–72 first-session foreign focus; guard stopped"
+  ],
+  "desktop_returned": true
+}
