@@ -106,8 +106,9 @@ export function MarkdownPreview({
   return (
     <div
       ref={rootRef}
+      tabIndex={-1}
       data-testid="code-workspace-markdown-preview"
-      className="taomni-chat-md h-full min-h-0 overflow-auto bg-[var(--taomni-code-bg)] px-5 py-4 text-[length:var(--taomni-code-font-size)] leading-6 text-[var(--taomni-code-text)]"
+      className="taomni-chat-md h-full min-h-0 overflow-auto bg-[var(--taomni-code-bg)] px-5 py-4 text-[length:var(--taomni-code-font-size)] leading-6 text-[var(--taomni-code-text)] outline-none"
       onClick={(event) => {
         const target = event.target;
         if (!(target instanceof HTMLElement)) return;

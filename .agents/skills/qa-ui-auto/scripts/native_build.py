@@ -109,7 +109,7 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
     env = dict(os.environ)
     env["CARGO_TARGET_DIR"] = str(target)
     env.pop("TAURI_CONFIG", None)
-    command = [pnpm, "tauri", "build", "--no-bundle", "--config", str(QA_CONFIG)]
+    command = [pnpm, "tauri", "build", "--no-bundle", "--config", str(QA_CONFIG), "--ignore-version-mismatches"]
     if not release:
         command.append("--debug")
     started = time.monotonic()

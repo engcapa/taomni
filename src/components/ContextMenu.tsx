@@ -17,6 +17,8 @@ export interface MenuItem {
   customPanel?: React.ReactNode;
 }
 
+export type ContextMenuCloseReason = "escape" | "action" | "outside" | "programmatic";
+
 export interface ContextMenuAppearance {
   appearance?: "default" | "code-candidates";
 }
@@ -25,7 +27,7 @@ interface ContextMenuProps extends ContextMenuAppearance {
   items: MenuItem[];
   x: number;
   y: number;
-  onClose: () => void;
+  onClose: (reason?: ContextMenuCloseReason) => void;
 }
 
 const MENU_MARGIN = 6;
@@ -54,7 +56,7 @@ export function ContextMenu({ items, x, y, onClose, appearance }: ContextMenuPro
       // Submenus and custom panels render in a portal outside `ref`, so test
       // against the shared marker attribute instead of DOM containment.
       if (!target || !target.closest("[data-taomni-context-menu]")) {
-        onClose();
+        onClose("outside");
       }
     };
     document.addEventListener("mousedown", handler);
@@ -73,7 +75,7 @@ export function ContextMenu({ items, x, y, onClose, appearance }: ContextMenuPro
 
 export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
   items: MenuItem[];
-  onClose: () => void;
+  onClose: (reason?: ContextMenuCloseReason) => void;
   style?: CSSProperties;
   isSubmenu?: boolean;
   onBack?: () => void;
@@ -145,7 +147,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
             setOpenSubmenuIndex(activeIndex);
           } else if (item.onClick) {
             item.onClick();
-            onClose();
+            onClose("action");
           }
         }
       } else if (e.key === "ArrowRight") {
@@ -169,7 +171,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
         if (isSubmenu && onBack) {
           onBack();
         } else {
-          onClose();
+          onClose("escape");
         }
       }
     };
@@ -289,7 +291,7 @@ function MenuRow({
   onHover: () => void;
   onOpenSubmenu: () => void;
   onCloseSubmenu: () => void;
-  onClose: () => void;
+  onClose: (reason?: ContextMenuCloseReason) => void;
 }) {
   const [openByHover, setOpenByHover] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -425,7 +427,7 @@ function MenuRow({
       onMouseMove={handleMouseMove}
       onClick={() => {
         item.onClick?.();
-        onClose();
+        onClose("action");
       }}
       disabled={item.disabled}
       type="button"
@@ -435,23 +437,30 @@ function MenuRow({
   );
 }
 
-export function useContextMenu() {
+export interface UseContextMenuOptions {
+  onClose?: (reason?: ContextMenuCloseReason) => void;
+}
+
+export function useContextMenu(options?: UseContextMenuOptions) {
   const [menu, setMenu] = useState<ContextMenuAppearance & { x: number; y: number; items: MenuItem[] } | null>(null);
+  const onCloseRef = useRef(options?.onClose);
+  onCloseRef.current = options?.onClose;
 
   const show = useCallback((e: React.MouseEvent, items: MenuItem[]) => {
     e.preventDefault();
     e.stopPropagation();
     setMenu({ x: e.clientX, y: e.clientY, items });
   }, []);
-  const showAt = useCallback((x: number, y: number, items: MenuItem[], options?: ContextMenuAppearance) => {
-    flushSync(() => setMenu({ x, y, items, ...options }));
+  const showAt = useCallback((x: number, y: number, items: MenuItem[], menuOptions?: ContextMenuAppearance) => {
+    flushSync(() => setMenu({ x, y, items, ...menuOptions }));
   }, []);
   const refreshItems = useCallback((items: MenuItem[]) => {
     setMenu((current) => current ? { ...current, items } : current);
   }, []);
 
-  const close = useCallback(() => {
+  const close = useCallback((reason?: ContextMenuCloseReason) => {
     setMenu(null);
+    onCloseRef.current?.(reason ?? "programmatic");
   }, []);
 
   return useMemo(() => ({

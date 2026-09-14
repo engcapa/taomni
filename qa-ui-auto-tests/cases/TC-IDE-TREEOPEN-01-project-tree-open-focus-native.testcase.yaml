@@ -1,0 +1,72 @@
+id: TC-IDE-TREEOPEN-01-project-tree-open-focus-native
+title: Project tree open transfers focus to editor without mouse click
+description: |
+  REQ-02 / CW-PROJ-002: F0 README unique tab -> navigate tree with direction keys ->
+  expand/select src/main/example.txt -> Enter formally opens example.txt and grants focus
+  directly to .cm-content without mouse click -> type into editor -> undo/save restores
+  exact original bytes -> return to tree -> right-click context menu -> Esc restores tree
+  selection and focus without mutating text.
+covers: [F25.5]
+tags: [code-workspace, project-tree, focus, p1]
+modes: [native]
+native_platforms: [Windows, Linux]
+fixtures: [reset_db, project_tree]
+timeout_sec: 120
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: qa-tree-password
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-tree","name":"fixture","roots":[{"id":"fixture","name":"fixture","path":"${fixture.project_tree_root}","kind":"folder"}],"looseFiles":[],"lastOpenedAt":1789259400000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.project_tree_root}"]'
+  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"] .cm-content'
+      contains: Disposable project tree reference
+  - press: { selector: '[data-testid="code-workspace-tree-file"][data-path="README.md"]', key: Home }
+  - press: ArrowRight
+  - assert_attribute: { selector: '[data-testid="code-workspace-tree-dir"][data-path="docs"]', name: aria-selected, equals: 'true' }
+  - press: ArrowDown
+  - assert_attribute: { selector: '[data-testid="code-workspace-tree-dir"][data-path="src"]', name: aria-expanded, equals: 'false' }
+  - press: ArrowRight
+  - wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main"]'
+  - press: ArrowRight
+  - assert_attribute: { selector: '[data-testid="code-workspace-tree-dir"][data-path="src/main"]', name: aria-selected, equals: 'true' }
+  - press: ArrowRight
+  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]'
+  - press: ArrowDown
+  - assert_attribute: { selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]', name: aria-selected, equals: 'true' }
+  - assert_count: { selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key]', equal: 1 }
+  - screenshot: 01-example-selected.png
+  - press: Enter
+  - assert_text: { selector: '[data-testid="code-workspace-editor-pane"] .cm-content', contains: The editor buffer should survive tree navigation. }
+  - assert_count: { selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key]', equal: 2 }
+  - eval_readonly:
+      expression: document.activeElement?.classList.contains('cm-content')
+  - screenshot: 02-example-open-focused-without-click.png
+  - press: Control+End
+  - type: X
+  - press: Control+s
+  - assert_file_contains: { path: '${fixture.project_tree_root}/src/main/example.txt', contains: X }
+  - press: Control+z
+  - press: Control+s
+  - assert_file_sha256:
+      path: '${fixture.project_tree_root}/src/main/example.txt'
+      equals: bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a
+  - screenshot: 03-bytes-restored.png
+  - right_click: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]'
+  - assert_menu_items: [Open, 'Rename...', Delete]
+  - screenshot: 04-tree-context-menu.png
+  - press: Escape
+  - assert_not_visible: '[data-testid="context-menu"]'
+  - assert_attribute: { selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]', name: aria-selected, equals: 'true' }
+  - eval_readonly:
+      expression: document.activeElement?.getAttribute('data-path') === 'src/main/example.txt'
+  - assert_file_sha256:
+      path: '${fixture.project_tree_root}/src/main/example.txt'
+      equals: bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a
+  - screenshot: 05-tree-focus-restored.png

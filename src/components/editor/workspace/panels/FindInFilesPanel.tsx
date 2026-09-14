@@ -333,6 +333,7 @@ export function FindInFilesPanel({
   const languagesRef = useRef<Record<string, Language | null>>({});
 
   useEffect(() => {
+    if (!focusNonce) return;
     inputRef.current?.focus();
     inputRef.current?.select();
   }, [focusNonce]);

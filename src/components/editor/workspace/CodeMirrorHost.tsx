@@ -1321,6 +1321,7 @@ export interface EditorCommandState {
 export interface EditorCommandPort {
   execute: (commandId: EditorCommandId, options?: EditorCommandOptions) => boolean;
   state: () => EditorCommandState;
+  focus?: (options?: { preventScroll?: boolean }) => boolean;
 }
 
 export interface EditorCommandPortRegistration {
@@ -1402,6 +1403,15 @@ function isCompositionNavigationKey(key: string): boolean {
 
 function editorCommandPort(view: EditorView, isComposing?: () => boolean): EditorCommandPort {
   return {
+    focus(options) {
+      if (!view.dom.isConnected) return false;
+      if (options?.preventScroll && typeof view.contentDOM?.focus === "function") {
+        view.contentDOM.focus({ preventScroll: true });
+      } else {
+        view.focus();
+      }
+      return view.hasFocus || document.activeElement === view.contentDOM;
+    },
     execute(commandId, options) {
       switch (commandId) {
         case "cloneCaretAbove": return cloneCaretAbove(view);

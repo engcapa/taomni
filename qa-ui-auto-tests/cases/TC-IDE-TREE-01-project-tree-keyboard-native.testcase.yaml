@@ -22,7 +22,7 @@ steps:
   - click: '[data-testid="welcome-history-tab-workspaces"]'
   - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.project_tree_root}"]'
   - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
-  - click: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
   - assert_text:
       selector: '[data-testid="code-workspace-editor-pane"] .cm-content'
       contains: Disposable project tree reference

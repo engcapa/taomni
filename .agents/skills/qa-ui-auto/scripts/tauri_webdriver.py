@@ -580,16 +580,29 @@ class NativeSession:
         """Type text into the focused element, one paced key pair per char."""
         seq: list[dict[str, Any]] = []
         for ch in text:
-            seq.append({"type": "keyDown", "value": ch})
-            seq.append({"type": "keyUp", "value": ch})
+            if ch.isupper():
+                shift = self.MODIFIER_MAP["Shift"]
+                seq.append({"type": "keyDown", "value": shift})
+                seq.append({"type": "keyDown", "value": ch})
+                seq.append({"type": "keyUp", "value": ch})
+                seq.append({"type": "keyUp", "value": shift})
+            else:
+                seq.append({"type": "keyDown", "value": ch})
+                seq.append({"type": "keyUp", "value": ch})
             # Let WebKit deliver the input transaction and CodeMirror finish
             # its scheduled measure before the next native character arrives.
             seq.append({"type": "pause", "duration": 20})
-        self.request(
-            "POST",
-            self.endpoint("/actions"),
-            {"actions": [{"type": "key", "id": "keyboard", "actions": seq}]},
-        )
+        try:
+            self.request(
+                "POST",
+                self.endpoint("/actions"),
+                {"actions": [{"type": "key", "id": "keyboard", "actions": seq}]},
+            )
+        finally:
+            try:
+                self.request("DELETE", self.endpoint("/actions"))
+            except WebDriverError:
+                pass
         return f"typed {len(text)} chars"
 
     def wait_absent(self, selector: str, timeout: float = 5.0) -> None:
