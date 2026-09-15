@@ -246,3 +246,13 @@ HEAD `7bbb7094148e65c389903076cd3b4dec0d04a004`，本轮无产品修改。此段
 - useWorkspaceFileActions 的 expanded descendants refresh、useWorkspaceTreeData 的 generation/root guard、store instance 生命周期、tab policy/transaction/snapshot/persistence 为保留边界。缺 current native 证据不是这些模块存在数据 bug 的结论。
 
 新增 IDEA 实测见 [Linux 参照](references/project-tree-open-focus-linux-2026.2.2.md)；P0 B03–B05 仅历史观察。本轮只读 qa plan/status，无产品测试或构建。
+
+
+<a id="shell-layout-20260914"></a>
+## 2026-09-14 REQ-03 首包 caller 增量
+
+HEAD `0694a03f839827402a628f6c7b2ccbb0c997dd0e`，无产品修改。当前生产事实及符号、真实消费者详见 [shell设计 §2](shell-layout-design.md)，逐文件hash见 [本轮身份](evidence/shell-layout-plan-20260914.json)。
+
+MainLayout 对所有 CodeWorkspaceTab 常驻挂载，以display/visible隔离active workspace；工具窗开关不得替代该生命周期。Tab 的PanelGroup、FileTreePane、EditorGroup负责内区；BottomDock为唯一生产caller下的13个mounted panels，Tab尚未使用controlled height，读取全局旧height key。codeWorkspaceStore持有per-instance flags、tabs和layoutTreeV2；workspaceLayoutPersistence序列化v2 chrome flags与正文身份绑定的view snapshots，Project/right尺寸目前不是snapshot字段。新设计不得从旧24%/192px反推IDEA目标。
+
+useWorkspaceActionsController的state Host/dispose/self-heal、Tab的visible键盘注册、toolWindowRegistry→Switcher/Search是真实共享链，新的rail/restore必须接回这条链。Tree pending intent已有epoch/ready-port，但tab/leaf/workspace往返竞态仍欠验证；不是因为旧卡done就豁免，也未运行反例故不登记确认bug。Find已有generation/deferred清理；原卡provider gap不迁移到本包。Plan/status与源码审查不证明当前产品交互。

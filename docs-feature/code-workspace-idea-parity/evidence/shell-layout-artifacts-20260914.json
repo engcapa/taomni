@@ -1,0 +1,1392 @@
+{
+  "kind": "IDEA-partial-reference-not-Taomni-test",
+  "reference_id": "REF-SHELL-LAYOUT-LINUX-20260914",
+  "ignored_raw_root": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux",
+  "entries": [
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/00-before.json",
+      "sha256": "8695d2704a424aaf936fb4a8024a276b4cf74a61ae8e6200de6aa3b87ec6a080",
+      "bytes": 378,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/00-before.png",
+      "sha256": "c9c383d492a1f63b48c52ca11ace73c4b075bbd5893726bf9001df36e04b78d1",
+      "bytes": 19983,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/01-new-window.json",
+      "sha256": "9021d85e982f5f57dbe1d4d1ce222e6ae9f08a68e9b9f2ed4630d463d00aabbc",
+      "bytes": 409,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/01-new-window.png",
+      "sha256": "f0ed084239ea6deba4234e34581abbeaf13a08b8cff6d1424eb65a2df8097611",
+      "bytes": 37350,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/02-trust.json",
+      "sha256": "702c511b73c05e5fe6e01eabcabff5981eb4fbc5b665cf97e5459130ae011683",
+      "bytes": 395,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/02-trust.png",
+      "sha256": "66c9cd5596cc01a4dacf457b771f885710c4510613479b713e78f08865a874a7",
+      "bytes": 15835,
+      "classification": "setup"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/03-normal.json",
+      "sha256": "a2130c7edbd50487a1e2525f4fb2d87fa40c7f17d9b8ca1f5a80674b6185fe16",
+      "bytes": 363,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/03-normal.png",
+      "sha256": "009b0a93807a16af9113d648821899682685f7a781ff43097d201a01b3bb0976",
+      "bytes": 118712,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/04-alt1.json",
+      "sha256": "cb4c43c544f4c032057d29cbca4bb59dcf4bf70eaf10453c3a8c567088bd216c",
+      "bytes": 398,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/04-alt1.png",
+      "sha256": "ff88a64310036dd2af506f8683d6f434bc542c35e6e802602e24fca50046b286",
+      "bytes": 115928,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/05-bottom-collapse.json",
+      "sha256": "85c043b3ab8ce763c5bb3e9dab4fd5cf9a443d4a548ad1e47166feb8416f2762",
+      "bytes": 410,
+      "classification": "unintended-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/05-bottom-collapse.png",
+      "sha256": "7d22844dd6945754a27b26589276ad940c3da6257974253ad919a1dc21702537",
+      "bytes": 115001,
+      "classification": "unintended-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/06-problems-open.json",
+      "sha256": "c557bd2f0369a494a650acc284ef7d48d2e743f9d0531af7e76128a44cd370a8",
+      "bytes": 406,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/06-problems-open.png",
+      "sha256": "17ea4cc34e4b602c8ede70baebff4994fbd3601a2e6d4361f8e09e63f7c4b2de",
+      "bytes": 131067,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/07-problems-esc.json",
+      "sha256": "2ba39029f5911964754fcc34e4923d6f73ca1dcf8ef79827fd2e76e1fc265c58",
+      "bytes": 396,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/07-problems-esc.png",
+      "sha256": "cb2f146d6393260cd87ebed0696de887776499f10d0a6b53f04a2820b982aaab",
+      "bytes": 131815,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/08-project-resize.json",
+      "sha256": "54acd7d5986086d72bc43de968a51c81ba600a3dc03c15ac4d860b3bc3be3b4c",
+      "bytes": 429,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/08-project-resize.png",
+      "sha256": "1ade6f56009b5b7453d6654eae04fd652f96d261a2928f6cd4f6aad6365da3b6",
+      "bytes": 128899,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/09-narrow-window.json",
+      "sha256": "a77d52c4acb2c30ab6437c52149c93d9de5b350f57b174832f4372564c8c2c58",
+      "bytes": 394,
+      "classification": "wrong-action-bookmark-not-window-size"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/09-narrow-window.png",
+      "sha256": "e886ce0fb42319a73982a211968e65781b1e888ccec0d42c01d9c4caa185ef9b",
+      "bytes": 129099,
+      "classification": "wrong-action-bookmark-not-window-size"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/10-bottom-collapse.json",
+      "sha256": "3389d78e7c71875e673be001579385cb6f65d6beaad4565235fea3d054239540",
+      "bytes": 408,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/10-bottom-collapse.png",
+      "sha256": "40c0522bf044cacca7bf5bbbb77cf9cecf792f4baffd9333f90ceb267713fc6c",
+      "bytes": 114989,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/11-bottom-resize.json",
+      "sha256": "1a46307e002acfc84e3905599671cfb706ffc2fcf42cba2cbff5ccf2d172d3c8",
+      "bytes": 428,
+      "classification": "wrong-target-not-bottom-resize"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/11-bottom-resize.png",
+      "sha256": "1e8d2c362b2702c092ac03c4f21283c587113d21916e76534f65dda02a16a309",
+      "bytes": 102687,
+      "classification": "wrong-target-not-bottom-resize"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/12-bottom-reopen.json",
+      "sha256": "074a5b53940cfb865db87a47401b1cd12915f4fd3f0373c2cd33beb54ca147c1",
+      "bytes": 406,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/12-bottom-reopen.png",
+      "sha256": "e61dc2ff09aabc27df78e89ee8b434db4707b133b006bece4fa604ce1846bc2c",
+      "bytes": 120125,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/13-narrow.json",
+      "sha256": "b09f48307044d32a447ba32b4f0df35e67f1601453ab0d8be3ba9a34b3509e82",
+      "bytes": 361,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/13-narrow.png",
+      "sha256": "df91126dc96e5d19ae9d273217e33dd2c9effac5a6c1ab04f056e3d52360f7ab",
+      "bytes": 91991,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/14-restored.json",
+      "sha256": "106fe2ab3ed17c36d03268ac3361ce90e15656ce644fdae80c4f7dd4ada6d895",
+      "bytes": 365,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/14-restored.png",
+      "sha256": "ae41ee27a5dbfd278826b3ec2d4fddd20294c06b8781a63f784c96785de37c76",
+      "bytes": 123701,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/15-menu.json",
+      "sha256": "b409937e366cfa902ae1a18d43a9bd59efba17a9af7676d811f5cd0fe9534a5a",
+      "bytes": 396,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/15-menu.png",
+      "sha256": "8da7b85434df604c3aec39736ccd838429458074929c132aac761275a0e85121",
+      "bytes": 162153,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/16-window-menu.json",
+      "sha256": "53ec537fd8d98f31ff99133c58e182272055465675d91e4fa8db40eba8fe4c0c",
+      "bytes": 404,
+      "classification": "menu-target-not-observed"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/16-window-menu.png",
+      "sha256": "e61dc2ff09aabc27df78e89ee8b434db4707b133b006bece4fa604ce1846bc2c",
+      "bytes": 120125,
+      "classification": "menu-target-not-observed"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/17-action-search.json",
+      "sha256": "08e91302fe216a5d34ec711cde0e053c8500b99ba4709ad5469ec6310d0b7253",
+      "bytes": 426,
+      "classification": "action-search-transient"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/17-action-search.png",
+      "sha256": "e61dc2ff09aabc27df78e89ee8b434db4707b133b006bece4fa604ce1846bc2c",
+      "bytes": 120125,
+      "classification": "action-search-transient"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/18-action-type.json",
+      "sha256": "d8b8537652454539109fc8ef44e3358fca2d92174f369d3ff1363478e8d81a75",
+      "bytes": 412,
+      "classification": "action-search-query-no-invocation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/18-action-type.png",
+      "sha256": "e79959f12b6f9c38a81fbbed1f69b050b5614b72f099d14af422fb9cdd1ce57a",
+      "bytes": 126221,
+      "classification": "action-search-query-no-invocation"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/19-action-esc.json",
+      "sha256": "48950c792121f21509a2e696dc070c0cd8a5731ae6dd0dd0094f7e0101598319",
+      "bytes": 394,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/19-action-esc.png",
+      "sha256": "e61dc2ff09aabc27df78e89ee8b434db4707b133b006bece4fa604ce1846bc2c",
+      "bytes": 120125,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/20-project-restore.json",
+      "sha256": "e4822ac2c38c6a57dd25f9a33183b219751ff95d4f9a576afedff4d1d4a44623",
+      "bytes": 430,
+      "classification": "manual-panel-size-recovery"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/20-project-restore.png",
+      "sha256": "1a7b3d30dbb65cde5cce57b60ceb0f30a38d32aa634d29a97880cb38e7a1180c",
+      "bytes": 123256,
+      "classification": "manual-panel-size-recovery"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/21-problems-collapse.json",
+      "sha256": "40807352ee6b83ae660b65836e2a5eaead75c287635772ea4b062ae70ced54e9",
+      "bytes": 410,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/21-problems-collapse.png",
+      "sha256": "b7b4b88feae106c13b9cd7ade23c8e0d228d396229986f4f6bdd153e4c1a5a45",
+      "bytes": 108902,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/22-augment-close.json",
+      "sha256": "72e53bf0e617b81887328f46e6e4d50d67854ae07a7093fc5f9a5ad6205db911",
+      "bytes": 408,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/22-augment-close.png",
+      "sha256": "3df5887fcc2ef0bc9eb4300751e8c87bed4a7d9c9b0ad95e35b8cd64ed564b95",
+      "bytes": 110059,
+      "classification": "observed-partial-state"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/23-final-restored.json",
+      "sha256": "e8b463f4b26723fbc9599740c3a1751f12bd88ae8ccabd9ee7d7bc09051a4f78",
+      "bytes": 371,
+      "classification": "manual-window-size-recovery"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/23-final-restored.png",
+      "sha256": "3df5887fcc2ef0bc9eb4300751e8c87bed4a7d9c9b0ad95e35b8cd64ed564b95",
+      "bytes": 110059,
+      "classification": "manual-window-size-recovery"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/capture.py",
+      "sha256": "812cede5612169f3a7336a10e0182da20ffd884a86b6f2ac4ee8b5de592456fb",
+      "bytes": 3278,
+      "classification": "support-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/contact-sheet.png",
+      "sha256": "e3647dc0d506ae20352607ee81a43d00c52f272e96302effb361d36d4ef9e26e",
+      "bytes": 247924,
+      "classification": "support-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/final-fixture-hashes.json",
+      "sha256": "0da62a97c88f3a2e116c36f091c1863fb4887b4baeccde3094e381dc4d2815d4",
+      "bytes": 408,
+      "classification": "support-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/fixture-manifest.json",
+      "sha256": "43953ebaef13c8315fb152cfa45c90cc8bc67f55652ec029f271697f4bac328e",
+      "bytes": 357,
+      "classification": "support-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/p1-doc-validation.json",
+      "bytes": 73,
+      "sha256": "dd8dc499847f92a426ed3cd3dd04f6e1b0cb343b43a48db4d0bfc7987260b0ec",
+      "classification": "documentation-validation-not-product-test"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/product-identity.json",
+      "sha256": "539616060465fdd4b5b8ea2109218e7a4322b4bd8d78d9f25af62fc84b608e2f",
+      "bytes": 262,
+      "classification": "support-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/qa-plan.json",
+      "sha256": "12c46c1cb18416772a948e095f909b55c813f3c6aa22877f25f61f1724a68a90",
+      "bytes": 1517,
+      "classification": "support-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-01-project-dialog.json",
+      "sha256": "3a3d5a3eafe522b4b5e6a7d47225ca4b0fe60e948a66098e11136ec0f7a50035",
+      "bytes": 391,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-01-project-dialog.png",
+      "sha256": "84b791c936483d5d8e337b9be3c2cb21f4efde28b69d8e8417df51df2ed649fb",
+      "bytes": 20145,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-02-new-window.json",
+      "sha256": "337f1367562bfb9824166412f50c3a5e96cd2466fbe8d6740f700229abecd71d",
+      "bytes": 428,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-02-new-window.png",
+      "sha256": "96feb6a6f0e123746f67beae82fd5ae84635558730aa86c91348b48ca38ef40d",
+      "bytes": 81390,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-03-initial.json",
+      "sha256": "03ed7fa647081fd70da8ad666cfdb3ddf843063de4c01b1f020949c048c41417",
+      "bytes": 367,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-03-initial.png",
+      "sha256": "5155bc99a5f33e0205083b322a3c833caa73417f9b0603c4cb9193df963d71d7",
+      "bytes": 118854,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-04-project-focus.json",
+      "sha256": "f6170641771c6b6f02c922cca12dd2e9a098718ccf4eb4fec2f2e64219676571",
+      "bytes": 410,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-04-project-focus.png",
+      "sha256": "afa670703816fcfadd7ee44d21407d34d4c96fdf49f9de595033a772b1fb3105",
+      "bytes": 116074,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-05-project-hide.json",
+      "sha256": "52197428516c8f69b172add8efcc11819477d2ea228934c50f07c65f1436be47",
+      "bytes": 409,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-05-project-hide.png",
+      "sha256": "4a444e0acae819407c3e5a03864ca7bcd6aad1bef2acfa05e2473d2dffb9c8d1",
+      "bytes": 94050,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-06-project-reopen.json",
+      "sha256": "6a88b87b13ee05a5a317b45de7208aedb5937694bd8cf6cb0d2195ff6a2d2df3",
+      "bytes": 411,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-06-project-reopen.png",
+      "sha256": "afa670703816fcfadd7ee44d21407d34d4c96fdf49f9de595033a772b1fb3105",
+      "bytes": 116074,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-07-problems.json",
+      "sha256": "1112fb801110b7f70686c035625f81dae3ecdbea4411b9f6db960c69e01b3762",
+      "bytes": 404,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-07-problems.png",
+      "sha256": "80335d6491eb6c37740bc3b1c9d49f60e608fd4fd830e8d19f3b740bdec33515",
+      "bytes": 133314,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-08-bottom-resize.json",
+      "sha256": "f6e7c63d63349042d18c3e2e87f2531f95eff19cfc7280110bcbb5e98cdb91a4",
+      "bytes": 431,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-08-bottom-resize.png",
+      "sha256": "f054616d9fa206150bc0d2468ebec8fef7a8ee98241bc1a166c2511d68ace3f1",
+      "bytes": 133316,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-09-bottom-hide.json",
+      "sha256": "b4eaef24b0db3c4b345edd624c6998a2fdff5781f3f2957203f119bdc908c5a1",
+      "bytes": 407,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-09-bottom-hide.png",
+      "sha256": "4cec22710570f1cd3aba472f9f8cde02ef55476096094c3e56c0747f533ff0d3",
+      "bytes": 119110,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-10-bottom-reopen.json",
+      "sha256": "ab24a26695933c31b9cd30b26c38953bb967f23d195c41275ccdde9d14531732",
+      "bytes": 409,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-10-bottom-reopen.png",
+      "sha256": "f054616d9fa206150bc0d2468ebec8fef7a8ee98241bc1a166c2511d68ace3f1",
+      "bytes": 133316,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-11-escape.json",
+      "sha256": "14d20806765b8ce17deadd43ca5806d760716e61c504867a7883e5ecd4144b6c",
+      "bytes": 393,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-11-escape.png",
+      "sha256": "9a05757dc575a3a23ca407848d4bfc83b075fb8841e299a5ab6c85652338c4a0",
+      "bytes": 133118,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-12-focus-probe.json",
+      "sha256": "7cf65f544ecd268caeb94b280e5d49f11588e0bb231e7b43f05c5c5b8275cf61",
+      "bytes": 394,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-12-focus-probe.png",
+      "sha256": "5389b702fb11628c5c24f8f5fffed478a384fce1a5d24111ef966878b549453b",
+      "bytes": 133220,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-13-undo.json",
+      "sha256": "e9f550375c998286292874e0d4dc2bb4a269c9f791d94bfc979116ca0451cf3e",
+      "bytes": 405,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-13-undo.png",
+      "sha256": "85bf70de5c3e3451d8464d11c7f43ca6a67831ea9d162e0465070a06c5e9dbb4",
+      "bytes": 133106,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-14-run.json",
+      "sha256": "141e17f10a183a2ada4b630b85fdb07fc62e48ca8d669ac5c18c7de687b1afd2",
+      "bytes": 400,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-14-run.png",
+      "sha256": "eef9c691e2d28671d06a045d063a5be80aa3d78615b27d19ea92ae8b26872331",
+      "bytes": 139300,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-15-action-search.json",
+      "sha256": "a22caeea7ef77f104454e5e44bfa8f29ec62d818c00894e11bb7e126e23474d5",
+      "bytes": 429,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-15-action-search.png",
+      "sha256": "95e2cb33a41ec30a2d50ea1aab783bf0297dc7d2fb577d91ea34396be5f47fc5",
+      "bytes": 143767,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-16-restore-search.json",
+      "sha256": "f14b6c8881e98894aecb0664a4c2a8828dfe6c239cafb6c68f750e92c526f9a3",
+      "bytes": 410,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-16-restore-search.png",
+      "sha256": "bdd1d47df3e05d3f9d10690c2dc67b64fb057c7fa66519113ba8e54c671ca67a",
+      "bytes": 136057,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-17-restore-results.json",
+      "sha256": "59e54affcef12c6c478f71934cf6868389a46247df75c8166c2e2fdc72eb7eb5",
+      "bytes": 375,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-17-restore-results.png",
+      "sha256": "9ff6d7ba10b1ff89bfa776e9f7f81e5877d634ef91ff8b22086da49701e5ef20",
+      "bytes": 139733,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-18-restore-invoke.json",
+      "sha256": "79c5726616a498fe7156699273de3c1c02f0de96579580c613af043dffb2d1b6",
+      "bytes": 401,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-18-restore-invoke.png",
+      "sha256": "dbe04caca0058cf33968ca217afef8e583c688f169d94ca7a539c73438fa9b87",
+      "bytes": 92962,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-19-settings.json",
+      "sha256": "6cf04c2394fef2bad1d24f8029ead21e1c2781ba58d5fad01ed76a7badff48fe",
+      "bytes": 422,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-19-settings.png",
+      "sha256": "21a8b130b1d1412ce8e7ce44c3bdc8405d1b7302e966ec59a512558ba97c615c",
+      "bytes": 57598,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-20-appearance.json",
+      "sha256": "987dee09643b69fc6dc11fa6a4e7d3dfcb734cad0438eb126827fc867a969246",
+      "bytes": 370,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-20-appearance.png",
+      "sha256": "3e1425e39934c6595f211e255a604c43d98423ab984fda18800eb172bb0cdc15",
+      "bytes": 124778,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-21-keymap.json",
+      "sha256": "42958ac00cce3042ac87c96ab56332a87e43530e3af990646b6f7d0e55909a3e",
+      "bytes": 402,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-21-keymap.png",
+      "sha256": "7478f83a7de556d86789d0ed01f47404494e0d1bd73b10e13bf8862bc3c24ef0",
+      "bytes": 101718,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-22-editor-expand.json",
+      "sha256": "2022f81a5a7371307321164850045ab5daa1f0697aa328168e0ab5ffe641f50d",
+      "bytes": 409,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-22-editor-expand.png",
+      "sha256": "40f8c7eb236ec78ca909881433ab71e6b9f70e1bad2e5385d687fc257a583377",
+      "bytes": 95389,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-23-font.json",
+      "sha256": "f321e75db05817a70d8c5b56090b29d2cbdc205e72fab96b60901af5726c0998",
+      "bytes": 400,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-23-font.png",
+      "sha256": "40f8c7eb236ec78ca909881433ab71e6b9f70e1bad2e5385d687fc257a583377",
+      "bytes": 95389,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-24-cancel-settings.json",
+      "sha256": "5a3e956dc4dbfedeb9e72d6f2013175e9c0626e25e0855a5b75cafd545cb674e",
+      "bytes": 412,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-24-cancel-settings.png",
+      "sha256": "f41eae94cc190c0d687f8a09e85a041459f09effb3d122865544651a80f254c3",
+      "bytes": 92724,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-25-project.json",
+      "sha256": "fa834b83335ac9dd4752b106e6966b75a234a8952ce62bbe396b5d7cf377c9ba",
+      "bytes": 404,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-25-project.png",
+      "sha256": "dcd7dc43cac7ec33f2cf50726520bf3d45ee09a84e78c3297a93ad80b33a83a8",
+      "bytes": 114712,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-26-problems.json",
+      "sha256": "13675a7c33c2792f60d8e08f16a3dbe08e51988b0a699382f847bb072bd22f90",
+      "bytes": 404,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-26-problems.png",
+      "sha256": "a00ae64d6644f2f8606f0add815db694ac6c385da6509158a394fab4815142ab",
+      "bytes": 131958,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-27-narrow.json",
+      "sha256": "c9c1fb1d68929ea7fbd5e2ea5eb0f96195c20c7096cf2b4527487cf96060e2ea",
+      "bytes": 364,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-27-narrow.png",
+      "sha256": "9819b1d2a1cccf2eb89191d3211c906e3cd15c2581f5dfe95903af916e042a56",
+      "bytes": 103789,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-28-menu.json",
+      "sha256": "09754f3182cbd9618277a94e4b679710663ae1049987a12f847422d4759473b2",
+      "bytes": 397,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-28-menu.png",
+      "sha256": "5c489ea3d62f2657a3a2eec4bae33ebfdc4ca665f609bf54b2da6265a99a5443",
+      "bytes": 125637,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-29-menu-escape.json",
+      "sha256": "6d0cfd8f4dad4ba86b5aeb1957c827460110d07e906a73952d3a79eb7ad94492",
+      "bytes": 396,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-29-menu-escape.png",
+      "sha256": "9819b1d2a1cccf2eb89191d3211c906e3cd15c2581f5dfe95903af916e042a56",
+      "bytes": 103789,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-30-restored-window.json",
+      "sha256": "06c4b33e338c75231b08296abd709ce0d4713ff10a141e044d7429266ee0d00e",
+      "bytes": 375,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-30-restored-window.png",
+      "sha256": "0a4acd02e86afd4301681c37e793718d44a10c59c9fe9a770d1b07842d299bfc",
+      "bytes": 132091,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-31-hide-bottom.json",
+      "sha256": "9af5296120de5f7c816e4c4affb74225236f8d581c3ba47976534e8a5040e418",
+      "bytes": 407,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-31-hide-bottom.png",
+      "sha256": "c3760abf5df4a368edd35eb1895dbc674d0cf0b202bc770fe282a15877742863",
+      "bytes": 117683,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-current-settings-readonly.json",
+      "sha256": "edefc8cf9ca64fbbfea71cae5b46b7850140b19d438713d34b428f10c958f9e1",
+      "bytes": 1338,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-final-fixture-hashes.json",
+      "sha256": "9cb8cda7fd6cbcaa3a92c4a257b967c0eb67cfc8b44d2545a9d2cf579de7bd52",
+      "bytes": 454,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r2-session-operations.json",
+      "sha256": "6d18c9fb0424effa69041fd861b1e62c888930778ebff9a5f8a58ac4c4e1025a",
+      "bytes": 989,
+      "classification": "r2-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/saved-settings-readonly.json",
+      "sha256": "878339024e43573a739995f014f07f7e64c010eef2a2c73dd8d12a899ab11c59",
+      "bytes": 966,
+      "classification": "support-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/session-operations.json",
+      "sha256": "c8af5731617655b317446f73cf0cb86a9f3ada7c80910e5da90c3b75237df9b0",
+      "bytes": 642,
+      "classification": "support-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/tree-reuse-check.json",
+      "sha256": "a2fffff2b0bd8d4f57e1ced85fa8d1cdce5c7a20f348d6e2caa3358f955b9944",
+      "bytes": 57,
+      "classification": "support-or-diagnostic"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-01-open-dialog.json",
+      "sha256": "5647c82e48145c6facb7ddaf88ce81ff8a1bd68e520d436327fffd0feef39a03",
+      "bytes": 388,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-01-open-dialog.png",
+      "sha256": "84b791c936483d5d8e337b9be3c2cb21f4efde28b69d8e8417df51df2ed649fb",
+      "bytes": 20145,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-02-new-window.json",
+      "sha256": "194f6de8e39f2d178a8c053666b242ed2c1fd0fb69871a6c2d8f40eaa75a6bd0",
+      "bytes": 414,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-02-new-window.png",
+      "sha256": "bee760efaae2abca32f34f6c722acf301c2d71d75df9f7f73237bb788725a190",
+      "bytes": 73909,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-03-initial.json",
+      "sha256": "fcfc6b320dbc3d46c25e61d7e25c180c63468c254aefc422d74be629ee3417de",
+      "bytes": 367,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-03-initial.png",
+      "sha256": "02f181424dca09e592343ad39967d88e8f98eea1ac75f5b1b6522ca723e252fb",
+      "bytes": 117373,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-04-settings.json",
+      "sha256": "2d48e58865480f893da772f76508a5e0a493e4fc9ae7757a0014b98864c5d9dd",
+      "bytes": 422,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-04-settings.png",
+      "sha256": "1456c12c511918b74041be36e4fc15047a50a29b15a7790f04ce75a4457db178",
+      "bytes": 47998,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-05-search-font.json",
+      "sha256": "fecf393c87c0dfdd048f9ddcba73b540d2f8a117ff62b4793ce410bed496d023",
+      "bytes": 407,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-05-search-font.png",
+      "sha256": "2e37a0c91bb3c98904bca386711d7d09d986ed00bd58885a02b31c612a6dd098",
+      "bytes": 138947,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-06-typed-font.json",
+      "sha256": "8d7029a0f40557eb3c1ce413e1675098a28e701a9ac2a36d8962a2bf6128fffe",
+      "bytes": 396,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-06-typed-font.png",
+      "sha256": "2e37a0c91bb3c98904bca386711d7d09d986ed00bd58885a02b31c612a6dd098",
+      "bytes": 138947,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-07-font-page.json",
+      "sha256": "344ef93e0ba5f9aab3dee8dfc54b7391d02d2126f724c4cf3c5c0ec22226276c",
+      "bytes": 396,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-07-font-page.png",
+      "sha256": "2e37a0c91bb3c98904bca386711d7d09d986ed00bd58885a02b31c612a6dd098",
+      "bytes": 138947,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-08-search-appearance.json",
+      "sha256": "d99d52f4d78091fed4ec9c2309c983f94e0a551e42588aa608b2086e9b1d3571",
+      "bytes": 413,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-08-search-appearance.png",
+      "sha256": "ce7b5054f02c26efbb24a15eecb19f6365cba4bb84a66f9efe9cd55dbc4afa4a",
+      "bytes": 143867,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-09-typed-appearance.json",
+      "sha256": "fa63f4e2fdde76ad059f83d0e53782d3b819d5f74a0543953c104de5a41dc7cb",
+      "bytes": 417,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-09-typed-appearance.png",
+      "sha256": "ce7b5054f02c26efbb24a15eecb19f6365cba4bb84a66f9efe9cd55dbc4afa4a",
+      "bytes": 143867,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-10-type-app.json",
+      "sha256": "30f6ee08193988a3dbec8b8cbc78766495573fd46951bd35699c08eafaa9f012",
+      "bytes": 400,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-10-type-app.png",
+      "sha256": "70a9a0c4b0a06f25037cfa8af78d6e8d62b7e211111bf32d2070cf0e2819b144",
+      "bytes": 137643,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-11-appearance-page.json",
+      "sha256": "89732bcdbc50e5aad961b05fc2ef2e08a05c0cf281dbb5c3889b2fa0f498d42f",
+      "bytes": 402,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-11-appearance-page.png",
+      "sha256": "70a9a0c4b0a06f25037cfa8af78d6e8d62b7e211111bf32d2070cf0e2819b144",
+      "bytes": 137643,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-12-close-dropdown.json",
+      "sha256": "8b592d3c086edff5a5614aab7bbeeb153e514c71cacd16f25e198a99074b0d7e",
+      "bytes": 401,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-12-close-dropdown.png",
+      "sha256": "8e9d67cf86b733898d70700b8765e251f7dd2a50052e0b935958b38dded5da1e",
+      "bytes": 157043,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-13-close-settings.json",
+      "sha256": "6859e8c24e45c69c797c52c9ed1002b5d5b2937fbe43ec98182f60099f29626e",
+      "bytes": 401,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-13-close-settings.png",
+      "sha256": "ce7b5054f02c26efbb24a15eecb19f6365cba4bb84a66f9efe9cd55dbc4afa4a",
+      "bytes": 143867,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-14-cancel-click.json",
+      "sha256": "c917fe880017d6f95948fcc4728a928ced339e26f00f4b7340726f6ea88e39d7",
+      "bytes": 409,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-14-cancel-click.png",
+      "sha256": "191675d8b4704a33b017d80ba13b60519b21865ac19089d927bc7ab0fc922128",
+      "bytes": 118066,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-15-drag-project-min.json",
+      "sha256": "6a582c0c3979c89b78e061ec6bc6a7d23173050812d63fd2e7a6f56d16bb1741",
+      "bytes": 433,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-15-drag-project-min.png",
+      "sha256": "1fb44583f18eab70a8c6c09209702b76ea49045e0ecf84927acb8046381aa89b",
+      "bytes": 96078,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-16-alt1.json",
+      "sha256": "7b26b9c9837ddab0391d17219c037794440db11bfb37491dd31304fa153ad438",
+      "bytes": 401,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-16-alt1.png",
+      "sha256": "faaf9123e8554b7d3b21cb9d62d1cb0e8afdc853e16ac21dbfeec5ec6a325a58",
+      "bytes": 92588,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-17-drag-project-open.json",
+      "sha256": "e0a2e5a18f5829003e9ae9757d1437a10c30fc3c9be7a12b5a3af8b73c238d96",
+      "bytes": 434,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-17-drag-project-open.png",
+      "sha256": "ab3d8b78e387ce10de77e854560d5f6039af103953c361299830c0e5aa6e0b99",
+      "bytes": 97030,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-18-restore-layout.json",
+      "sha256": "923dcba373ec251a6d785b46ffd22cf6e6c810abe6d6aad14e72289aa1ff3e1a",
+      "bytes": 415,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-18-restore-layout.png",
+      "sha256": "4f04c91db56955fd88126b12b54eb9fa24664b07b5cf5b7c3eb0b069ef4309b9",
+      "bytes": 94262,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-19-project-toggle.json",
+      "sha256": "9589340173da17b612abccbbfc55c7fd0992ab24e34cbab95be579370f1aa9dc",
+      "bytes": 409,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-19-project-toggle.png",
+      "sha256": "c70fb969292b9063738ae05fe22f995e1689244dfb8f4fc4b692cd226089caaf",
+      "bytes": 116402,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-20-drag-project-max.json",
+      "sha256": "e79be74db71c55decb7265b811a5d8931c6fb727729b7152e805e6358480d056",
+      "bytes": 435,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-20-drag-project-max.png",
+      "sha256": "25939cf810f0ab7b95b2a11f9957d5448f81bfc7abdb359bfcd5d689fb6e02b4",
+      "bytes": 119167,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-21-drag-project-right.json",
+      "sha256": "7c03156581b2e7379402766eeeea9d638375f5ccf91e925e41f6ef31558b4115",
+      "bytes": 437,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-21-drag-project-right.png",
+      "sha256": "ef3a6108097672fad858f3394e5ed03e46ef2093d09d5820b4299bf73ca2520c",
+      "bytes": 114628,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-22-check-sep.json",
+      "sha256": "e1a34b9fe7fbec19efbe2cf2026e7743c3f256ba47ca02eaa660d4db7f76b1b6",
+      "bytes": 369,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-22-check-sep.png",
+      "sha256": "84f768c1f7dca2be235f1c8b28dde10954d3b4b0aa92aee986cc0ac16d14b6e1",
+      "bytes": 114528,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-24-active.json",
+      "sha256": "23dd05cbaf25cc5af224629a1afa7ed05ad0137a328fd4bfe2002ae6c82cf407",
+      "bytes": 366,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-24-active.png",
+      "sha256": "a8045ffd74e86cd327047349ede9440eb88d46269e18b8e31560b6f1cd241cfe",
+      "bytes": 115777,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-25-drag-1250.json",
+      "sha256": "f01da333c0f6ab20f68ea93b6cc1fbada987307ff7a77374bf11d1dd44615c67",
+      "bytes": 429,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-25-drag-1250.png",
+      "sha256": "ba475b68647a7a7ce1f066d4ec5f47bad0c59a1af423d5fc1ddefae75c4a0d72",
+      "bytes": 106682,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-26-drag-1340.json",
+      "sha256": "8e3689dce882e022b3f782f7e751784155d57fb1cf6179f6b46c140173ebd815",
+      "bytes": 429,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-26-drag-1340.png",
+      "sha256": "06e2c2a429ad7ad241217cfe277637e98cf65ee6eaa091414bc2d20084dc87a2",
+      "bytes": 105433,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-27-drag-project-normal.json",
+      "sha256": "5696098c6a4500fecc0b7522ba6827f57a81a6245d31108971aee20a2db1c814",
+      "bytes": 438,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-27-drag-project-normal.png",
+      "sha256": "f1ec87ead8a15fc533c5eba666c292c15c4e6091b3afd3ea11b5a2862ba95c80",
+      "bytes": 118969,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-28-problems-open.json",
+      "sha256": "25c42c5621578f87cdb651fde8f36df82653044e82fc11ef149918aa5e578910",
+      "bytes": 409,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-28-problems-open.png",
+      "sha256": "aeea620bd977ab0c1a42f5505f7fc078d5d9c6ae11ae183f6673c3c88903f7d4",
+      "bytes": 133490,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-29-drag-bottom-max.json",
+      "sha256": "d064ee80f27bbf604f6008318c6c8c27ebe6375bf9094bf676869af03feab53d",
+      "bytes": 433,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-29-drag-bottom-max.png",
+      "sha256": "7931c69883952940af94ea45d114ba3be60892678bfe8a293a6138f9b68f6b63",
+      "bytes": 100226,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-30-drag-bottom-min.json",
+      "sha256": "c52b20eaba1b80343024a519084fd21d76a6557734c9f7ed5f228ef47ee97cea",
+      "bytes": 433,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-30-drag-bottom-min.png",
+      "sha256": "9376f46ca0099fd7b410ab2d95566f6269491347e990fc07fb1d79d31dcf6674",
+      "bytes": 125975,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-31-drag-bottom-normal.json",
+      "sha256": "b368f7421fc7b11b18c9cc1b52d7d7d844a893e2d7ed4210495516487a38a88c",
+      "bytes": 436,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-31-drag-bottom-normal.png",
+      "sha256": "9376f46ca0099fd7b410ab2d95566f6269491347e990fc07fb1d79d31dcf6674",
+      "bytes": 125975,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-32-narrow.json",
+      "sha256": "9bc4a301a201b19846da0cbd4cc3f7a4bdbf1a23c879b1d5e80074c18b694564",
+      "bytes": 364,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-32-narrow.png",
+      "sha256": "9efa21a50ec20ff3de203f95ea3de777d4fc0cab74bf2475d0354a1eac9630e3",
+      "bytes": 104153,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-33-problems-overflow-click.json",
+      "sha256": "8ce8bb24e4a162f563705ebef68be639be07ac0bbda51f38faa5ee86f6bb5d7c",
+      "bytes": 418,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-33-problems-overflow-click.png",
+      "sha256": "78e2cedc81d71ee5d98869db6e68f87cd504baa757b845eca6c3cc254183c475",
+      "bytes": 104286,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-34-overflow-click.json",
+      "sha256": "b25ea10579cd6b232165564b267218aec44df2a4431f5f30b3555bcece864119",
+      "bytes": 409,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-34-overflow-click.png",
+      "sha256": "78e2cedc81d71ee5d98869db6e68f87cd504baa757b845eca6c3cc254183c475",
+      "bytes": 104286,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-35-narrow-drag-up.json",
+      "sha256": "59d3dd8b67b603da14d49092e6e6ad004d70e984cc6c35cdfa529d8617af5f2a",
+      "bytes": 430,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-35-narrow-drag-up.png",
+      "sha256": "9ec306251016a73a10172c5cd8dc78241f89d29414c42f12e786665032cdb289",
+      "bytes": 105155,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-36-problems-open-alt6.json",
+      "sha256": "810fcdad11599bc81a01a4f9bb82afa975b90df2c86f15479b136e4fdf886731",
+      "bytes": 413,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-36-problems-open-alt6.png",
+      "sha256": "ee959ad0cb023fa586f2d55f4870fc17386e75842b367d7ca6cbc299a4027282",
+      "bytes": 100176,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-37-open-prob.json",
+      "sha256": "709b3b651e8f5bdff9b241e66ddf382d53fa72ebf1a1a3de2f9738e8fc05d731",
+      "bytes": 405,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-37-open-prob.png",
+      "sha256": "3a5be7011c59804c2cb22fa29ded5b73b0cfa1aae229ec1560db763b2037158a",
+      "bytes": 128639,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-38-narrow-with-prob.json",
+      "sha256": "d530a04bcb99523798a5f511b19d632e755960b4ccad6f339bf19d23ce35b2b9",
+      "bytes": 374,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-38-narrow-with-prob.png",
+      "sha256": "0d6ff59c3430a67dc75e9e28c4dcd87f2e4dd0012e8ceb8a5c3d028561697367",
+      "bytes": 105432,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-39-drag-up.json",
+      "sha256": "9f7119ddf0c30217b6815ff458816ff0e770e2688599e4ce8044925db29f6f69",
+      "bytes": 423,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-39-drag-up.png",
+      "sha256": "5681bf58e06c27edb24624545dc211c250984019ca89e61ffd3fbee0e3e9e089",
+      "bytes": 110702,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-40-drag-up.json",
+      "sha256": "4b79a1cbc28a8344f88a7308d58456f94fd0a69c74ab891d445eced6d85deb01",
+      "bytes": 423,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-40-drag-up.png",
+      "sha256": "5681bf58e06c27edb24624545dc211c250984019ca89e61ffd3fbee0e3e9e089",
+      "bytes": 110702,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-41-problems-overflow-menu.json",
+      "sha256": "0f8e1cc3d79063415b204f6539031d032cc3ac6b6a4912f5a43f959cf63789c0",
+      "bytes": 417,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-41-problems-overflow-menu.png",
+      "sha256": "f265545381f572f7b7b203f3cef505fe89f7a8eb0e4a0739037db7ed9e6448a4",
+      "bytes": 116654,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-42-overflow-esc.json",
+      "sha256": "b32a62e6b6fc783b6fd2c76f7acfdc43b32e03c346bee6ff5de332375432f013",
+      "bytes": 397,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-42-overflow-esc.png",
+      "sha256": "454e80f638158a799fc8f9a8aec3f564fa501989babebcaea8830a841fc7f617",
+      "bytes": 110895,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-43-restore-1400.json",
+      "sha256": "88b87e60642cb490352d7a8ea3a7f9de89dfc7b0cbc8b7469d9b64930bca0eaf",
+      "bytes": 372,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-43-restore-1400.png",
+      "sha256": "9f866506d165dd9503d40907a442885ee9e059f5dc3e8a1a412ddaeb477242ae",
+      "bytes": 133660,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-44-menu-open.json",
+      "sha256": "db32dcbb45ab4be6edf53890c63723d0e3680aa318efc3d5a81e73ad52199926",
+      "bytes": 404,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-44-menu-open.png",
+      "sha256": "901b0f5892f4c57bec9a513cd7e0bd4216860dd83191fda516c8cd99843c8bb0",
+      "bytes": 161986,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-45-menu-esc.json",
+      "sha256": "dd3f5fad9983482d42e045187ac23320ae70f0f823e3dab26142e7b234f57256",
+      "bytes": 395,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-45-menu-esc.png",
+      "sha256": "9f866506d165dd9503d40907a442885ee9e059f5dc3e8a1a412ddaeb477242ae",
+      "bytes": 133660,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-46-menu-esc-2.json",
+      "sha256": "9a5898c3394224593fc7d27c5e5725fb82de693ce51013fed6f762fe59245122",
+      "bytes": 397,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-46-menu-esc-2.png",
+      "sha256": "15e9b5731bdf13ec00167b9ffbffecd0ae929499e190dbe1771a70a1178ea25f",
+      "bytes": 133409,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-47-typed-char.json",
+      "sha256": "3b5933ea21013ef3270b551c20af5736cd6114a0bcda1c3bfc05884d62756a10",
+      "bytes": 393,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-47-typed-char.png",
+      "sha256": "f5b858d4b7039312ebc16abf45b15eb55e3513c5c65f21080c1dc886904a6c34",
+      "bytes": 133740,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-48-undo.json",
+      "sha256": "84504b3ff0f6f0192f944070c690228dfb5130aa89488225a853d06307628569",
+      "bytes": 405,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-48-undo.png",
+      "sha256": "b4b862552a1a665e513e7d7e594e207fcc60727209e66d641065f3e2409ebc82",
+      "bytes": 133208,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-49-restore-layout.json",
+      "sha256": "583dc14eab047ff637bd7e6d671c0a1c8b026732bdd5dbb6a1c8efdc7fef5b70",
+      "bytes": 415,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-49-restore-layout.png",
+      "sha256": "74057faa1b65c09de95cee44c6b9976a5f6f0d869528e7b8a03db1b777858749",
+      "bytes": 94301,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-50-typed-after-restore.json",
+      "sha256": "9399f15b1e65dc08beebc7597be2e6dd5a2a28666955f51734750ee9cad6e5f0",
+      "bytes": 402,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-50-typed-after-restore.png",
+      "sha256": "0e858e1c4ab5b1690b974073ddb3f205c4a425f549f59332d572c97a42d83eb5",
+      "bytes": 94766,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-51-undo-after-restore.json",
+      "sha256": "64ff201a291d63b5a5c3fd4d133f6de53a7cc63eb86e4b191cd13ed272350342",
+      "bytes": 419,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-51-undo-after-restore.png",
+      "sha256": "79faea46b94f16d16c35dd21a21dc80c1922e5002a4ed20fb63d0e7a9ae898ee",
+      "bytes": 94380,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-final-fixture-hashes.json",
+      "sha256": "82c7d5170bfb11912008ccfe42cc29a7eb7a115cb9b579c5977db85aaae6520c",
+      "bytes": 447,
+      "classification": "r3-supplemental"
+    },
+    {
+      "path": "qa-ui-auto-report/idea-reference/shell-layout/20260914-linux/r3-session-operations.json",
+      "sha256": "4c38cfd3f2127f638d08cb340265be99b05758b2088c2d2c4c868cfdd95b931c",
+      "bytes": 1841,
+      "classification": "r3-supplemental"
+    }
+  ],
+  "desktop_returned": true,
+  "missing_reference_states": [],
+  "retrieval": "\u672c\u673a\u76f8\u5bf9\u8def\u5f84\u53ef\u8bfb\uff1b\u8de8\u673a\u5668\u53d6\u5f97\u76f8\u540c\u539f\u4ef6\u5e76\u9010\u9879\u6821\u9a8c\uff0c\u6458\u8981\u4e0d\u66ff\u4ee3\u539f\u56fe",
+  "second_round": {
+    "time_window": "2026-09-14T21:12:09+08:00/21:22:00+08:00",
+    "major_actions": [
+      "project-hide-reopen",
+      "bottom-resize-reopen",
+      "run-empty",
+      "restore-current-layout",
+      "settings-readonly",
+      "narrow-800x700"
+    ],
+    "remaining": [
+      "font-page-line-height",
+      "density",
+      "effective-scale",
+      "true-min-max",
+      "overflow-expansion"
+    ],
+    "desktop_returned": true
+  },
+  "third_round": {
+    "time_window": "2026-09-14T21:50:00+08:00/22:20:00+08:00",
+    "major_actions": [
+      "editor-font-settings",
+      "project-clamp-min-max",
+      "bottom-clamp-min-max",
+      "problems-overflow-800x700",
+      "direct-typing-and-undo-after-restore",
+      "restore-layout-shift-f12"
+    ],
+    "remaining": [],
+    "desktop_returned": true
+  }
+}

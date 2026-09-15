@@ -48,3 +48,15 @@
 - [设计 DEC/AC/V](../../docs-issue/code-workspace-tree-open-focus-design.md#ed-treeopen-001)、[Linux 2026.2.2 真实参照](references/project-tree-open-focus-linux-2026.2.2.md)、[状态图](references/tree-open-focus-states.svg)、[身份](evidence/tree-open-focus-plan-20260914.json)、[原件 hash 清单](evidence/tree-open-focus-artifacts-20260914.json)、[完整 P2 交接](handoff-p2-tree-open-focus.md)。
 - 用户确认：文件/目录标签单击只选择，文件双击/Enter 正式打开，箭头展开；保留其他入口 preview 数据/策略，不改全局 preview 默认。旧 mouse 合同有显式修订，不改旧 ED-TREE-001 done；Find 卡仍 implemented，已有实现不接管状态。
 - 本机 IDEA 新增参照不关闭 P0 的 Taomni 差距；CW-PROJ-002 2026-09-13 历史三维结论保留。产品测试、构建、Taomni/runner 启动为零。桌面补采已结束并归还；后续真实输入需重新约独占时段。
+
+
+## 2026-09-14 REQ-03 首包 P1 增量
+
+接手分支 `docs/code-workspace-idea-audit-20260913` / HEAD `0694a03f839827402a628f6c7b2ccbb0c997dd0e`，接手干净。只处理 WP-SHELL-LAYOUT-01，没有重新做 P0；原日期和三维结论保留。
+
+- [新任务板 / ED-SHELLLAYOUT-001](../../claudedocs/code-workspace-idea-parity-backlog-shell-layout.md#ed-shelllayout-001)：开发状态和领取资格只看metadata。第二轮主要动作已补，剩余profile/最小尺寸/overflow定值未齐，暂不在可领取队列；没有owner或claim。首次author过早写ready，已于同轮纠正，不能引用中间输出领取。
+- [设计 AC / DEC / R / V](shell-layout-design.md)、[图稿 v2预览](shell-layout-wireframe.png) / [drawio](shell-layout-wireframe.drawio)、[有前置门槛的完整P2提示词](handoff-p2-shell-layout.md)。
+- [Linux IDEA局部参照](references/shell-layout-2026.2.2-linux.md)、[身份](evidence/shell-layout-plan-20260914.json)、[hash工件清单](evidence/shell-layout-artifacts-20260914.json)。已有Tree187件校验一致；本轮只证明局部IDEA状态，不关闭Taomni差距。
+- 更新主 CW-SHELL-001、配套 CW-SET-001 和真实共享消费者；Tree done / Find implemented 原卡状态不变。产品测试、build、Taomni/browser/native runner均0；QA只读plan一次。桌面已归还。
+
+2026-09-14 21:22补采修订：用户已采纳图稿v2默认结构，BL-SL-02已解除。第二轮补齐Project折叠重开、bottom真实resize及记忆、Run空态、Problems Esc直接输入/undo、Restore Current Layout、干净窄窗和主题/UI字体/zoom/keymap。BL-SL-01收敛到Font/lineHeight/density/effective scale、真实min/max及overflow细节；板仍不在可领取队列。桌面已归还，本轮没有Taomni执行或三维matched。

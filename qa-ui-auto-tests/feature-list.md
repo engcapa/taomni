@@ -5014,6 +5014,18 @@ controls:
     selector: '[data-testid="code-workspace-debug-target"]'
     kind: interactive
     optional: true       # desktop-only and requires an available adapter
+  - id: bottom-dock
+    selector: '[data-testid="code-workspace-bottom-dock"]'
+    kind: display
+    optional: true
+  - id: bottom-dock-body
+    selector: '[data-testid="code-workspace-bottom-dock-body"]'
+    kind: display
+    optional: true
+  - id: bottom-dock-resize
+    selector: '[data-testid="code-workspace-bottom-dock-resize"]'
+    kind: interactive
+    optional: true
   - id: run-tab
     selector: '[data-testid="code-workspace-bottom-tab-run"]'
     kind: interactive

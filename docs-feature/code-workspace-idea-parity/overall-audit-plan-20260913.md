@@ -82,6 +82,9 @@ P1 局部接续（2026-09-14）：[修复设计](../../docs-issue/code-workspace
 方向：先建立匹配环境，再按CW-SHELL-001、CW-SET-001、CW-PROJ-001/004做分段布局设计。验收 `REQ-03-V` 正常/选中/失焦/禁用/窄窗口/溢出原图与几何值；`REQ-03-I` resize/collapse/menu键盘进出与恢复；`REQ-03-R` 工作区、Git、Run与保存/恢复入口均仍可达。没有用户接受的有限差异，不以现状锁死重构。
 
 <a id="req-04"></a>
+
+**2026-09-14 REQ-03 P1 增量：** [首包设计](shell-layout-design.md)与[新任务板 ED-SHELLLAYOUT-001](../../claudedocs/code-workspace-idea-parity-backlog-shell-layout.md)已author；状态/领取资格只读板。关键参照未齐，不能ready；中间ready结论已纠正，无owner/claim。CW-SHELL-001主场景、CW-SET-001比较条件，REQ-03-V/I/R映射A1..A7、R1..R7、V-SL-01..07。实际新增IDEA正常/Problems开关/Project resize/窄窗局部；第一轮所缺bottom resize、Run、Project重开和Restore Layout已在21:12–21:22第二轮补齐；剩余current editor font/lineHeight/density/effective scale与min/max/overflow定值仍缺，见[参考边界](references/shell-layout-2026.2.2-linux.md)。当前端Taomni验证由P2计划，P1未执行产品测试/runner/build；未关闭原三维差距。
+
 ### REQ-04：标签、分屏与恢复
 
 目标：preview/pin/dirty/limit/MRU、递归分屏、drag、关闭/重开和恢复构成连续一致流程。当前已有layoutTreeV2、TabPolicyPlan和共享transaction owner；本轮只观察双pane和policy Cancel，恢复只看到browser刷新回Welcome，未验证显式Restore。
@@ -164,3 +167,5 @@ P1 局部接续（2026-09-14）：[修复设计](../../docs-issue/code-workspace
 | 全平台/主题/窗口组合 | 本轮无三端匹配结果 | 当前代表环境先闭环；只扩受影响变体，无变化场景保留旧日期 |
 
 用户未答复不代表接受差异。只有某维度满足目标，或明确接受的有限差异已经验证，才在同一矩阵关闭该维度；保留旧结论、来源与时间。
+
+2026-09-14 21:22 REQ-03补记：DEC-SHELL-02已由用户采用图稿v2；A1/A3仍受BL-SL-01剩余定值阻塞，A2/A4已有真实工具窗/restore输入，但Taomni保留断言仍由P2先建基线。REQ-04/11无新bug结论、REQ-10单owner不变；旧审计结论保持其日期。

@@ -1,0 +1,104 @@
+{
+  "verified_at": "2026-09-15T08:25:00+08:00",
+  "head": "0694a03f839827402a628f6c7b2ccbb0c997dd0e",
+  "checks": [
+    {
+      "kind": "unit",
+      "command": "pnpm vitest run src/components/editor/workspace/panels/BottomDock.test.tsx src/components/editor/workspace/editorContextMenu.test.ts src/stores/codeWorkspaceStore.test.ts src/components/editor/workspace/workspaceLayoutPersistence.test.ts src/components/editor/workspace/workspaceActionRegistry.test.ts src/components/editor/CodeWorkspaceTab.test.tsx",
+      "result": "passed",
+      "summary": "70/70 passed across 6 test suites covering Shift+F12 without conflict, Alt+F7 binding, BottomDock effectiveHeight clamp, IME Escape gating, visibilitychange and blur drag cleanup, requestId token invalidation, and layout snapshot persistence.",
+      "acceptance": [
+        "ED-SHELLLAYOUT-001-A2",
+        "ED-SHELLLAYOUT-001-A3",
+        "ED-SHELLLAYOUT-001-A4",
+        "ED-SHELLLAYOUT-001-A5"
+      ]
+    },
+    {
+      "kind": "typecheck",
+      "command": "pnpm tsc -b",
+      "result": "passed",
+      "summary": "TypeScript full build passed with 0 errors.",
+      "acceptance": []
+    },
+    {
+      "kind": "browser",
+      "command": "PYTHONPATH=.agents/skills/qa-ui-auto/scripts python3 -m qa_ui_auto run --mode browser --config .agents/skills/qa-ui-auto/assets/qa-ui-auto.config.browser.yaml --filter TC-IDE-SHELLLAYOUT-01 --require-pass",
+      "result": "passed",
+      "summary": "1/1 passed in 7.7s on Linux (TC-IDE-SHELLLAYOUT-01): S0 default layout, Problems/Run bottom dock, Shift+F12 restore layout.",
+      "acceptance": [
+        "ED-SHELLLAYOUT-001-A1",
+        "ED-SHELLLAYOUT-001-A2",
+        "ED-SHELLLAYOUT-001-A4"
+      ]
+    },
+    {
+      "kind": "native",
+      "command": "PYTHONPATH=.agents/skills/qa-ui-auto/scripts python3 -m qa_ui_auto run --mode native --filter TC-IDE-SHELLLAYOUT-02-shell-layout-native --require-pass",
+      "result": "passed",
+      "summary": "1/1 passed in 10.3s against com.taomni.app.qa on Linux WebKitGTK (TC-IDE-SHELLLAYOUT-02-shell-layout-native): F0 enter open, Alt+6 Problems, Alt+4 Run, Escape focus return without click, direct typing 'z' and undo exact 71 original bytes restoration, Shift+F12 restore layout, keyboard separator resizing.",
+      "acceptance": [
+        "ED-SHELLLAYOUT-001-A1",
+        "ED-SHELLLAYOUT-001-A2",
+        "ED-SHELLLAYOUT-001-A3",
+        "ED-SHELLLAYOUT-001-A4",
+        "ED-SHELLLAYOUT-001-A5"
+      ]
+    },
+    {
+      "kind": "accessibility",
+      "command": "TC-IDE-SHELLLAYOUT-02-shell-layout-native and BottomDock.test.tsx accessibility assertions",
+      "result": "passed",
+      "summary": "Verified BottomDock role=region, aria-label, resize handle role=separator, tabIndex=0, aria-orientation=horizontal, aria-label, and keyboard resizing (ArrowUp/ArrowDown) without mouse clicks. Direct Escape returns focus to editor without trap. 200% zoom and screen reader audio recorded as unrun.",
+      "acceptance": [
+        "ED-SHELLLAYOUT-001-A7"
+      ]
+    },
+    {
+      "kind": "idea-comparison",
+      "command": "python3 .agents/skills/code-workspace-idea-task/scripts/compare_idea.py --record qa-ui-auto-report/idea-comparison/ED-SHELLLAYOUT-001/run-20260915-080225/record.json --require-match",
+      "result": "passed",
+      "summary": "Validator exit 0 with --require-match. Verdict matched against IntelliJ IDEA 2026.2.2 Linux WebKitGTK/X11 reference REF-SHELL-LAYOUT-LINUX-20260914 (build 262.10315.125); 6/6 steps matched; 8 artifacts verified.",
+      "acceptance": [
+        "ED-SHELLLAYOUT-001-A1",
+        "ED-SHELLLAYOUT-001-A2",
+        "ED-SHELLLAYOUT-001-A4"
+      ]
+    },
+    {
+      "kind": "qa-lint",
+      "command": "PYTHONPATH=.agents/skills/qa-ui-auto/scripts python3 -m qa_ui_auto audit --gate",
+      "result": "passed",
+      "summary": "qa-ui-auto audit --gate passed: 210 cases, 0 errors, 0 orphan selectors; required covered 383/401; all gates passed.",
+      "acceptance": [
+        "ED-SHELLLAYOUT-001-A1",
+        "ED-SHELLLAYOUT-001-A7"
+      ]
+    },
+    {
+      "kind": "code-audit",
+      "command": "Production call chain audit against docs-feature/code-workspace-idea-parity/shell-layout-design.md",
+      "result": "passed",
+      "summary": "Audited all production changes: Alt+F7 for findReferences resolving Shift+F12 conflict; BottomDock effectiveHeight vs preferredHeight separation and container clamp; IME composition gating on Escape; drag listener cleanup on blur, unmount, visibilitychange and requestId token invalidation.",
+      "acceptance": [
+        "ED-SHELLLAYOUT-001-A1",
+        "ED-SHELLLAYOUT-001-A2",
+        "ED-SHELLLAYOUT-001-A3",
+        "ED-SHELLLAYOUT-001-A4",
+        "ED-SHELLLAYOUT-001-A5",
+        "ED-SHELLLAYOUT-001-A6",
+        "ED-SHELLLAYOUT-001-A7"
+      ]
+    }
+  ],
+  "unrun": [
+    "Windows native verification (current platform Linux verified; Windows unverified)",
+    "macOS native verification (current platform Linux verified; macOS unverified)",
+    "Screen reader audio output and 200% zoom manual accessibility (unrun on automated runner)"
+  ],
+  "notes": [
+    "Three-platform compatibility preserved in production code.",
+    "Exact SHA256 disk restoration verified: 71 bytes LF matches original seed (bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a).",
+    "compare_idea.py --require-match exit 0 verifies matched verdict against IntelliJ IDEA 2026.2.2 Linux WebKitGTK/X11 reference."
+  ]
+}

@@ -338,6 +338,9 @@
 - `[data-testid="code-workspace-run-target"]` — interactive [optional] — F25.1.run-current-target
 - `[data-testid="code-workspace-active-run-configuration"]` — interactive [optional] — F25.1.active-run-configuration
 - `[data-testid="code-workspace-debug-target"]` — interactive [optional] — F25.1.debug-current-target
+- `[data-testid="code-workspace-bottom-dock"]` — display [optional] — F25.1.bottom-dock
+- `[data-testid="code-workspace-bottom-dock-body"]` — display [optional] — F25.1.bottom-dock-body
+- `[data-testid="code-workspace-bottom-dock-resize"]` — interactive [optional] — F25.1.bottom-dock-resize
 - `[data-testid="code-workspace-bottom-tab-run"]` — interactive — F25.1.run-tab
 - `[data-testid="code-workspace-bottom-tab-build"]` — interactive — F25.1.build-tab
 - `[data-testid="code-workspace-bottom-tab-tests"]` — interactive — F25.1.tests-tab

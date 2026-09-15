@@ -488,7 +488,7 @@ import {
   type ResourceCleanupHandlers,
   type ResourceCleanupOutcome,
 } from "./workspace/workspaceResourceRecoveryCoordinator";
-import { BottomDock } from "./workspace/panels/BottomDock";
+import { BottomDock, BOTTOM_DOCK_MIN_HEIGHT, BOTTOM_DOCK_MAX_HEIGHT } from "./workspace/panels/BottomDock";
 import {
   ReferencesPanel,
   type ReferencesResultState,
@@ -1407,10 +1407,15 @@ export function CodeWorkspaceTab({
   const setLeafActiveTab = useCodeWorkspaceStore((s) => s.setLeafActiveTab);
   const setLayoutNodeRatios = useCodeWorkspaceStore((s) => s.setLayoutNodeRatios);
   const seedTreeExpandIfEmpty = useCodeWorkspaceStore((s) => s.seedTreeExpandIfEmpty);
+  const setShellChromeState = useCodeWorkspaceStore((s) => s.setShellChromeState);
+  const setBottomDockHeightForTool = useCodeWorkspaceStore((s) => s.setBottomDockHeightForTool);
+  const restoreDefaultToolWindowLayout = useCodeWorkspaceStore((s) => s.restoreDefaultToolWindowLayout);
   // The effect below initializes a missing instance after commit. Keeping the
   // render path read-only avoids notifying external-store subscribers during
   // render when a workspace is mounted for the first time.
   const workspaceUi = useCodeWorkspaceStore((s) => selectCodeWorkspaceUi(s, workspaceInstanceId));
+  const projectPanelRef = useRef<PanelImperativeHandle>(null);
+  const lastProjectPanelSizeRef = useRef(workspaceUi.shellChromeState?.projectWidthPx ?? 452);
 
   useEffect(() => {
     ensureWorkspaceUi(workspaceInstanceId);
@@ -1439,6 +1444,9 @@ export function CodeWorkspaceTab({
       if (snapshot.layoutRecovered) {
         setStatusMessage("Recovered invalid workspace layout into a single editor leaf");
       }
+      if (snapshot.shellChromeState?.projectWidthPx) {
+        lastProjectPanelSizeRef.current = snapshot.shellChromeState.projectWidthPx;
+      }
       setTabPolicy(snapshot.tabPolicy ?? { ...DEFAULT_WORKSPACE_TAB_POLICY_V3 });
       patchWorkspaceUi(workspaceInstanceId, {
         bottomDockOpen: snapshot.bottomDockOpen,
@@ -1451,6 +1459,7 @@ export function CodeWorkspaceTab({
         expandedRootIds: snapshot.expandedRootIds,
         expandedDirKeys: snapshot.expandedDirKeys,
         layoutTreeV2: snapshot.layoutTreeV2,
+        shellChromeState: snapshot.shellChromeState,
         editorGroups: Object.fromEntries(
           Object.entries(snapshot.editorGroups).map(([id, g]) => [
             id,
@@ -1657,6 +1666,15 @@ export function CodeWorkspaceTab({
     }
     return activeEditorCommandState();
   }, [activeEditorCommandState, editorCommandOwnerFor]);
+  const handleReturnToEditor = useCallback(() => {
+    const owner = activeEditorCommandOwner();
+    if (owner?.port?.focus) {
+      owner.port.focus({ preventScroll: true });
+      return;
+    }
+    const cmContent = document.querySelector<HTMLElement>(".cm-editor .cm-content");
+    cmContent?.focus({ preventScroll: true });
+  }, [activeEditorCommandOwner]);
   /**
    * Resolve a provider-action invocation target. Context-menu payloads carry
    * the clicked file and position; keyboard/palette invocations fall back to
@@ -1755,8 +1773,6 @@ export function CodeWorkspaceTab({
       languagePanelOpen: typeof open === "function" ? open(prev) : open,
     });
   }, [patchWorkspaceUi, workspaceInstanceId]);
-  const projectPanelRef = useRef<PanelImperativeHandle>(null);
-  const lastProjectPanelSizeRef = useRef(24);
   const rightPanelRef = useRef<PanelImperativeHandle>(null);
   const lastRightPanelSizeRef = useRef(20);
   const setRightPaneOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
@@ -3760,6 +3776,7 @@ export function CodeWorkspaceTab({
       editorGroups: persistableGroups,
       layoutTreeV2: workspaceUi.layoutTreeV2,
       tabPolicy: tabPolicyRef.current,
+      shellChromeState: workspaceUi.shellChromeState,
       // ED-REPAIR-009: Preserve captured snapshot identities without re-stamping from live text.
       viewStates: enrichViewStatesWithIdentity(
         viewStatesRef.current,
@@ -3783,6 +3800,7 @@ export function CodeWorkspaceTab({
     splitOrientation,
     workspaceInstanceId,
     workspaceUi.layoutTreeV2,
+    workspaceUi.shellChromeState,
   ]);
 
   persistWorkspaceLayoutNowRef.current = persistWorkspaceLayoutNow;
@@ -3806,6 +3824,7 @@ export function CodeWorkspaceTab({
     splitOrientation,
     workspaceInstanceId,
     workspaceUi.layoutTreeV2,
+    workspaceUi.shellChromeState,
     tabPolicyRevision,
     viewStateRevision,
   ]);
@@ -4185,6 +4204,12 @@ export function CodeWorkspaceTab({
       else if (selected?.kind === "dir") toggleDir(selected.rootId, selected.path);
       return;
     }
+    if ((event.nativeEvent as KeyboardEvent).isComposing) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      handleReturnToEditor();
+      return;
+    }
     if (event.key === "F2") {
       event.preventDefault();
       workspaceCommandRunnerRef.current("workspace.tree.rename", { focus: "tree", payload: { selection: selected ?? undefined } });
@@ -4192,7 +4217,7 @@ export function CodeWorkspaceTab({
       event.preventDefault();
       workspaceCommandRunnerRef.current("workspace.tree.delete", { focus: "tree", payload: { selection: selected ?? undefined } });
     }
-  }, [requestTreeOpen, selected, setSelected, toggleDir, toggleRoot]);
+  }, [handleReturnToEditor, requestTreeOpen, selected, setSelected, toggleDir, toggleRoot]);
 
   const showTreeContextMenu = useCallback(
     (event: React.MouseEvent, selection: TreeSelection) => {
@@ -11857,23 +11882,138 @@ export function CodeWorkspaceTab({
       if (!languagePanelOpen) {
         panel.collapse();
       } else {
-        panel.resize(`${lastProjectPanelSizeRef.current}%`);
+        panel.resize(`${lastProjectPanelSizeRef.current}px`);
       }
     });
     return () => cancelAnimationFrame(frame);
   }, [languagePanelOpen]);
 
   const handleProjectPanelResize = useCallback((size: PanelSize) => {
-    const percentage = size.asPercentage;
-    if (percentage > 2) {
-      lastProjectPanelSizeRef.current = percentage;
+    const pixels = size.inPixels > 0 ? Math.round(size.inPixels) : 0;
+    if (pixels > 40) {
+      lastProjectPanelSizeRef.current = pixels;
+      setShellChromeState(workspaceInstanceId, {
+        projectWidthPx: pixels,
+      });
     }
     // Avoid store churn when the panel is already in the desired open/collapsed state.
     setLanguagePanelOpen((open) => {
-      const next = percentage > 2;
+      const next = size.asPercentage > 2 && (pixels > 40 || size.inPixels === 0);
       return open === next ? open : next;
     });
-  }, [setLanguagePanelOpen]);
+  }, [setLanguagePanelOpen, setShellChromeState, workspaceInstanceId]);
+
+  const [workspaceContainerHeight, setWorkspaceContainerHeight] = useState<number>(() => {
+    return typeof window !== "undefined" ? window.innerHeight : 800;
+  });
+
+  useLayoutEffect(() => {
+    const el = rootRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        setWorkspaceContainerHeight(entry.contentRect.height);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const maxBottomDockHeight = useMemo(() => {
+    // 40px top toolbar header + 37px minimum reserved editor sliver = 77px
+    const available = Math.max(BOTTOM_DOCK_MIN_HEIGHT, workspaceContainerHeight - 77);
+    return Math.min(BOTTOM_DOCK_MAX_HEIGHT, available);
+  }, [workspaceContainerHeight]);
+
+  const currentBottomDockHeight = useMemo(() => {
+    const chrome = workspaceUi.shellChromeState;
+    if (!chrome) return 323;
+    if (chrome.bottomHeightByTool && bottomDockTab in chrome.bottomHeightByTool) {
+      return chrome.bottomHeightByTool[bottomDockTab] ?? 323;
+    }
+    return chrome.bottomHeightPx ?? 323;
+  }, [workspaceUi.shellChromeState, bottomDockTab]);
+
+  const handleBottomDockHeightChange = useCallback((height: number) => {
+    setBottomDockHeightForTool(workspaceInstanceId, bottomDockTab, height);
+  }, [bottomDockTab, setBottomDockHeightForTool, workspaceInstanceId]);
+
+  const handleActivateToolWindow = useCallback((toolId: string) => {
+    if (toolId === "project") {
+      const treeHasFocus = treePaneRef.current?.contains(document.activeElement);
+      if (!languagePanelOpen) {
+        setLanguagePanelOpen(true);
+        requestAnimationFrame(() => {
+          treePaneRef.current?.focus();
+        });
+      } else if (treeHasFocus) {
+        setLanguagePanelOpen(false);
+        handleReturnToEditor();
+      } else {
+        treePaneRef.current?.focus();
+      }
+      return;
+    }
+
+    if (toolId === "outline" || toolId === "structure") {
+      if (rightPaneOpen && rightPaneTab === "outline") {
+        setRightPaneOpen(false);
+        handleReturnToEditor();
+      } else {
+        setRightPaneTab("outline");
+        setRightPaneOpen(true);
+      }
+      return;
+    }
+
+    const bottomDockEl = document.querySelector('[data-testid="code-workspace-bottom-dock"]');
+    const dockHasFocus = bottomDockEl?.contains(document.activeElement);
+    if (!bottomDockOpen || bottomDockTab !== toolId) {
+      setBottomDockTab(toolId as BottomDockTabId);
+      setBottomDockOpen(true);
+      requestAnimationFrame(() => {
+        const el = document.querySelector<HTMLElement>(
+          '[data-testid="code-workspace-bottom-dock"] [tabindex="0"], [data-testid="code-workspace-bottom-dock"] button, [data-testid="code-workspace-bottom-dock"] input'
+        );
+        el?.focus();
+      });
+    } else if (dockHasFocus) {
+      setBottomDockOpen(false);
+      handleReturnToEditor();
+    } else {
+      const el = document.querySelector<HTMLElement>(
+        '[data-testid="code-workspace-bottom-dock"] [tabindex="0"], [data-testid="code-workspace-bottom-dock"] button, [data-testid="code-workspace-bottom-dock"] input'
+      );
+      el?.focus();
+    }
+  }, [
+    bottomDockOpen,
+    bottomDockTab,
+    handleReturnToEditor,
+    languagePanelOpen,
+    rightPaneOpen,
+    rightPaneTab,
+    setBottomDockOpen,
+    setBottomDockTab,
+    setLanguagePanelOpen,
+    setRightPaneOpen,
+    setRightPaneTab,
+  ]);
+
+  const handleRestoreToolWindowLayout = useCallback(() => {
+    restoreDefaultToolWindowLayout(workspaceInstanceId);
+    lastProjectPanelSizeRef.current = 452;
+    try {
+      projectPanelRef.current?.resize("452px");
+    } catch {
+      // ignore
+    }
+    requestAnimationFrame(() => {
+      handleReturnToEditor();
+    });
+    setStatusMessage("Restored default tool window layout");
+  }, [handleReturnToEditor, restoreDefaultToolWindowLayout, setStatusMessage, workspaceInstanceId]);
 
   const toggleOutlinePane = useCallback(() => {
     if (rightPaneOpen && rightPaneTab === "outline") {
@@ -14162,7 +14302,43 @@ export function CodeWorkspaceTab({
       category: "View",
       keybinding: "Alt+1",
       keywords: ["project", "explorer", "files", "tree", "sidebar", "collapse"],
-      run: toggleProjectTree,
+      run: () => handleActivateToolWindow("project"),
+    },
+    {
+      id: "workspace.activateToolWindow",
+      title: "Activate Tool Window",
+      category: "View",
+      keywords: ["tool", "window", "panel", "dock", "activate"],
+      run: (context) => {
+        const payload = context.payload as { toolId?: string } | undefined;
+        const toolId = payload?.toolId ?? "project";
+        handleActivateToolWindow(toolId);
+      },
+    },
+    {
+      id: "workspace.returnToEditor",
+      title: "Focus Editor",
+      category: "View",
+      keybinding: "Escape",
+      keywords: ["focus", "editor", "escape", "return"],
+      when: (context) => context.focus !== "editor" && context.focus !== "modal" && context.focus !== "search" && context.focus !== "completion" && context.focus !== "snippet",
+      run: handleReturnToEditor,
+    },
+    {
+      id: "workspace.restoreToolWindowLayout",
+      title: "Restore Default Layout",
+      category: "View",
+      keybinding: "Shift+F12",
+      keywords: ["layout", "restore", "default", "tool", "window", "reset"],
+      run: handleRestoreToolWindowLayout,
+    },
+    {
+      id: "workspace.showProblems",
+      title: "Problems",
+      category: "View",
+      keybinding: "Alt+6",
+      keywords: ["problems", "errors", "warnings", "diagnostics", "inspections"],
+      run: () => handleActivateToolWindow("problems"),
     },
     {
       id: "workspace.toggleDocumentationPane",
@@ -14237,7 +14413,7 @@ export function CodeWorkspaceTab({
       id: "workspace.findReferences",
       title: "Find Usages",
       category: "Navigation",
-      keybinding: "Shift+F12",
+      keybinding: "Alt+F7",
       keywords: ["usages", "references", "callers"],
       when: (context) => context.focus === "editor"
         && (!!activeCapabilities || !lspFilesRef.current[activeKey ?? ""]?.status)
@@ -14601,11 +14777,9 @@ export function CodeWorkspaceTab({
       id: "workspace.showRunTasks",
       title: "Show Run Tasks",
       category: "Run",
+      keybinding: "Alt+4",
       keywords: ["run", "task", "script"],
-      run: () => {
-        setBottomDockTab("run");
-        setBottomDockOpen(true);
-      },
+      run: () => handleActivateToolWindow("run"),
     },
     {
       id: "workspace.showAnalysis",
@@ -15151,7 +15325,7 @@ export function CodeWorkspaceTab({
     const node = target instanceof Node ? target : null;
     const element = node instanceof Element ? node : node?.parentElement;
     return Boolean(element?.closest?.(
-      '[data-testid="code-workspace-editor-search"], [data-testid="code-workspace-breadcrumbs"], [data-testid="code-workspace-highlighting-widget"], [data-testid="code-workspace-todos-panel"], [data-taomni-context-menu]',
+      '[data-testid="code-workspace-editor-search"], [data-testid="code-workspace-breadcrumbs"], [data-testid="code-workspace-highlighting-widget"], [data-testid="code-workspace-todos-panel"], [data-taomni-context-menu], [data-testid="code-workspace-search-everywhere"]',
     ));
   }, []);
 
@@ -15418,6 +15592,7 @@ export function CodeWorkspaceTab({
     // and Windows/Linux Ctrl+Tab share one code path and no second window
     // listener competes with the host dispatch below.
     const handleWorkspaceCommand = (event: KeyboardEvent) => {
+      if (event.isComposing) return;
       // Navigation bar and popup controls own their keyboard state. They are
       // rendered in the workspace or a portal, so the window capture listener
       // must not turn Home/arrows/Enter/Escape into editor actions first.
@@ -19457,9 +19632,8 @@ export function CodeWorkspaceTab({
           <Panel
             panelRef={projectPanelRef}
             id="project"
-            defaultSize="24%"
-            minSize="12%"
-            maxSize="45%"
+            defaultSize={`${workspaceUi.shellChromeState?.projectWidthPx ?? 452}px`}
+            minSize={0}
             collapsible
             collapsedSize={0}
             onResize={handleProjectPanelResize}
@@ -19525,7 +19699,7 @@ export function CodeWorkspaceTab({
           <Panel
             id="editor"
             defaultSize={languagePanelOpen ? "56%" : "80%"}
-            minSize={languagePanelOpen ? "30%" : "40%"}
+            minSize="37px"
             className="min-w-0"
           >
           {workspaceUi.layoutTreeV2.type === "split" ? (
@@ -19621,6 +19795,10 @@ export function CodeWorkspaceTab({
       </div>
       <BottomDock
         open={bottomDockOpen}
+        height={currentBottomDockHeight}
+        maxHeight={maxBottomDockHeight}
+        onHeightChange={handleBottomDockHeightChange}
+        onEscape={handleReturnToEditor}
         activeTab={bottomDockTab}
         tabs={[
           {
@@ -20497,6 +20675,7 @@ export function CodeWorkspaceTab({
                   editorGroups: persistableGroups,
                   layoutTreeV2: nextLayoutTreeV2,
                   tabPolicy: policy,
+                  shellChromeState: workspaceUi.shellChromeState,
                 }), {
                   onIssue: (message) => {
                     persistenceIssue = message;

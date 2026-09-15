@@ -91,6 +91,9 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 - **规格与任务来源：** [project-tree-keyboard-idea-alignment-design.md](../../docs-issue/project-tree-keyboard-idea-alignment-design.md)；[code-workspace-idea-parity-backlog-2026-09-tree-e2e.md](../../claudedocs/code-workspace-idea-parity-backlog-2026-09-tree-e2e.md) `ED-TREE-001`（原记录 2026-09-13T01:30:00Z）。旧卡不重开；新观察需求尚未author/领取任务。
 - **上次结论 / 本次变化：** 首次整体场景结论，无上一轮同ID三维判定；本轮新增目标、静态生产链和上述实际子样本。历史卡原验收及日期仅按原链接保留，未作为本轮PASS。当前判断日期2026-09-13；没有双侧新观测关闭差距。
 
+
+**2026-09-14 REQ-03 P1 增量：** 仅作首包受影响保留消费者，不扩展原场景目标。生产调用链、保留断言和最小改前/改后验证已列入R1..R7；缺当前运行证据不登记成产品bug。 [设计](shell-layout-design.md)、[任务板 ED-SHELLLAYOUT-001](../../claudedocs/code-workspace-idea-parity-backlog-shell-layout.md)、[局部参照](references/shell-layout-2026.2.2-linux.md)。任务尚不可领取，状态只读任务板；本场景2026-09-13历史三维结论/分母不变、差距未关闭。
+
 <a id="cw-proj-002"></a>
 
 ### CW-PROJ-002 — 项目树选择、展开、打开与编辑焦点
@@ -150,6 +153,9 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 - **规格与任务来源：** [project-tree-keyboard-idea-alignment-design.md](../../docs-issue/project-tree-keyboard-idea-alignment-design.md)；[code-workspace-idea-parity-backlog-2026-09-tree-e2e.md](../../claudedocs/code-workspace-idea-parity-backlog-2026-09-tree-e2e.md) `ED-TREE-001`（原记录 2026-09-13T01:30:00Z）。旧卡不重开；新观察需求尚未author/领取任务。
 - **上次结论 / 本次变化：** 首次整体场景结论，无上一轮同ID三维判定；本轮新增目标、静态生产链和上述实际子样本。历史卡原验收及日期仅按原链接保留，未作为本轮PASS。当前判断日期2026-09-13；没有双侧新观测关闭差距。
 
+
+**2026-09-14 REQ-03 P1 增量：** 仅作首包受影响保留消费者，不扩展原场景目标。生产调用链、保留断言和最小改前/改后验证已列入R1..R7；缺当前运行证据不登记成产品bug。 [设计](shell-layout-design.md)、[任务板 ED-SHELLLAYOUT-001](../../claudedocs/code-workspace-idea-parity-backlog-shell-layout.md)、[局部参照](references/shell-layout-2026.2.2-linux.md)。任务尚不可领取，状态只读任务板；本场景2026-09-13历史三维结论/分母不变、差距未关闭。
+
 <a id="cw-tab-001"></a>
 
 ### CW-TAB-001 — 预览、固定、关闭策略与溢出
@@ -168,6 +174,9 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 - **必须保留：** K0；TabPolicyPlan revision 原子提交；dirty/pinned保护；最后视图释放前保留共享文档。后续验收必须观察这些结果，不能只写“保持原功能”。
 - **规格与任务来源：** [tabs-and-multiview.md](../../claudedocs/code-workspace-idea-specs/tabs-and-multiview.md)；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-TABS-001`（原记录 2026-08-31T15:44:40Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-TABS-002`（原记录 2026-08-31T16:00:29Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-TABS-003`（原记录 2026-08-31T16:36:05Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-TABS-004`（原记录 2026-09-02T00:20:00Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-MULTIVIEW-002`（原记录 2026-09-03T00:36:30Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-MULTIVIEW-003`（原记录 2026-09-03T01:21:00Z）；[code-workspace-idea-parity-backlog-2026-09-main-repair.md](../../claudedocs/code-workspace-idea-parity-backlog-2026-09-main-repair.md) `ED-REPAIR-009`（原记录 2026-09-12T14:05:00Z）。旧卡不重开；新观察需求尚未author/领取任务。
 - **上次结论 / 本次变化：** 首次整体场景结论，无上一轮同ID三维判定；本轮新增目标、静态生产链和上述实际子样本。历史卡原验收及日期仅按原链接保留，未作为本轮PASS。当前判断日期2026-09-13；没有双侧新观测关闭差距。
+
+
+**2026-09-14 REQ-03 P1 增量：** 仅作首包受影响保留消费者，不扩展原场景目标。生产调用链、保留断言和最小改前/改后验证已列入R1..R7；缺当前运行证据不登记成产品bug。 [设计](shell-layout-design.md)、[任务板 ED-SHELLLAYOUT-001](../../claudedocs/code-workspace-idea-parity-backlog-shell-layout.md)、[局部参照](references/shell-layout-2026.2.2-linux.md)。任务尚不可领取，状态只读任务板；本场景2026-09-13历史三维结论/分母不变、差距未关闭。
 
 <a id="cw-tab-002"></a>
 
@@ -190,6 +199,9 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 
 
 - **2026-09-14 P1 局部接续：** [WP-FIND-FOCUS-01 设计](../../docs-issue/code-workspace-find-focus-design.md)、[ED-FINDFOCUS-001 唯一任务板](../../claudedocs/code-workspace-idea-parity-backlog-find-focus.md)、[真实 Find 参照](references/find-focus-2026.2.2.md)。本场景为受影响保留消费者，未开展其全量对齐。原功能/视觉/交互三维结论和差异类型保留，未关闭场景差距；任务状态仅看板。
+
+
+**2026-09-14 REQ-03 P1 增量：** 仅作首包受影响保留消费者，不扩展原场景目标。生产调用链、保留断言和最小改前/改后验证已列入R1..R7；缺当前运行证据不登记成产品bug。 [设计](shell-layout-design.md)、[任务板 ED-SHELLLAYOUT-001](../../claudedocs/code-workspace-idea-parity-backlog-shell-layout.md)、[局部参照](references/shell-layout-2026.2.2-linux.md)。任务尚不可领取，状态只读任务板；本场景2026-09-13历史三维结论/分母不变、差距未关闭。
 
 <a id="cw-tab-003"></a>
 
@@ -826,6 +838,7 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 
 <a id="cw-set-001"></a>
 
+
 ### CW-SET-001 — 外观、密度、主题、字号与可访问性
 
 - **IDEA目标结果：** 代表性主题、字体、tree/tab/tool-window密度与选中/失焦角色遵循目标；缩放不遮挡关键动作。目标为需求；除I0明确事实外，细节未冒充实测。
@@ -842,6 +855,9 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 - **必须保留：** K0；主题/字号存储兼容；键盘可达与对比度；不以冻结现状限制布局重构。后续验收必须观察这些结果，不能只写“保持原功能”。
 - **规格与任务来源：** [editor-experience.md](../../claudedocs/code-workspace-idea-specs/editor-experience.md)；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-STYLE-001`（原记录 2026-09-04T00:14:45Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-STYLE-002`（原记录 2026-09-05T05:22:00Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-IMPORT-001`（原记录 2026-09-05T05:32:00Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-GATE-002`（原记录 2026-09-02T08:56:15Z）。旧卡不重开；新观察需求尚未author/领取任务。
 - **上次结论 / 本次变化：** 首次整体场景结论，无上一轮同ID三维判定；本轮新增目标、静态生产链和上述实际子样本。历史卡原验收及日期仅按原链接保留，未作为本轮PASS。当前判断日期2026-09-13；没有双侧新观测关闭差距。
+
+
+**2026-09-14 REQ-03 P1 增量：** 仅作首包比较条件；第二轮GUI已核Islands Dark/Classic Light、Dialog16/110%、XWin，saved SourceCodePro16可读；当前Font页/line-height/density/effective scale仍缺；不把历史配置当完整新视觉规范。 [设计](shell-layout-design.md)、[任务板 ED-SHELLLAYOUT-001](../../claudedocs/code-workspace-idea-parity-backlog-shell-layout.md)、[局部参照](references/shell-layout-2026.2.2-linux.md)。任务尚不可领取，状态只读任务板；本场景2026-09-13历史三维结论/分母不变、差距未关闭。
 
 <a id="cw-set-002"></a>
 
@@ -883,6 +899,7 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 
 <a id="cw-shell-001"></a>
 
+
 ### CW-SHELL-001 — 整体布局、Tool Windows、菜单与状态栏
 
 - **IDEA目标结果：** 项目/编辑器/tool windows/主菜单组织贴近目标，布局可调整和恢复，信息层级清楚。目标为需求；除I0明确事实外，细节未冒充实测。
@@ -899,6 +916,9 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 - **必须保留：** K0；保留多workspace与全应用入口；工具窗关闭不丢运行/dirty数据；允许重组组件与动作。后续验收必须观察这些结果，不能只写“保持原功能”。
 - **规格与任务来源：** [correctness-gates.md](../../claudedocs/code-workspace-idea-specs/correctness-gates.md)；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-GATE-001`（原记录 2026-09-02T08:34:43Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-GATE-002`（原记录 2026-09-02T08:56:15Z）；[code-workspace-idea-parity-backlog.md](../../claudedocs/code-workspace-idea-parity-backlog.md) `ED-GATE-003`（原记录 2026-08-31T11:05:00Z）。旧卡不重开；新观察需求尚未author/领取任务。
 - **上次结论 / 本次变化：** 首次整体场景结论，无上一轮同ID三维判定；本轮新增目标、静态生产链和上述实际子样本。历史卡原验收及日期仅按原链接保留，未作为本轮PASS。当前判断日期2026-09-13；没有双侧新观测关闭差距。
+
+
+**2026-09-14 REQ-03 P1 增量：** 主场景。第二轮已补Linux IDEA Project折叠重开、bottom resize/记忆、Problems Esc直接editor输入undo、Run空态、Restore Current Layout和干净窄窗；current Font/lineHeight/density/effective scale、真实min/max与overflow展开仍缺；用户已采用图稿v2默认；没有Taomni同状态运行。 [设计](shell-layout-design.md)、[任务板 ED-SHELLLAYOUT-001](../../claudedocs/code-workspace-idea-parity-backlog-shell-layout.md)、[局部参照](references/shell-layout-2026.2.2-linux.md)。任务尚不可领取，状态只读任务板；本场景2026-09-13历史三维结论/分母不变、差距未关闭。
 
 <a id="cw-shell-002"></a>
 
@@ -921,6 +941,9 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 
 
 - **2026-09-14 P1 局部接续：** [WP-FIND-FOCUS-01 设计](../../docs-issue/code-workspace-find-focus-design.md)、[ED-FINDFOCUS-001 唯一任务板](../../claudedocs/code-workspace-idea-parity-backlog-find-focus.md)、[真实 Find 参照](references/find-focus-2026.2.2.md)。补得 F0 Find/query/Enter/Shift+Enter/Esc/repeat 的 IDEA 侧观察；Taomni candidate 尚未实施或执行。原功能/视觉/交互三维结论和差异类型保留，未关闭场景差距；任务状态仅看板。
+
+
+**2026-09-14 REQ-03 P1 增量：** 仅作首包受影响保留消费者，不扩展原场景目标。生产调用链、保留断言和最小改前/改后验证已列入R1..R7；缺当前运行证据不登记成产品bug。 [设计](shell-layout-design.md)、[任务板 ED-SHELLLAYOUT-001](../../claudedocs/code-workspace-idea-parity-backlog-shell-layout.md)、[局部参照](references/shell-layout-2026.2.2-linux.md)。任务尚不可领取，状态只读任务板；本场景2026-09-13历史三维结论/分母不变、差距未关闭。 Find当前已有修复且原卡implemented，Tree原卡done仅其范围；旧搜索异常文字保留历史日期，不等于HEAD仍复现。
 
 <a id="cw-shell-003"></a>
 

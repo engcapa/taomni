@@ -1,0 +1,121 @@
+id: TC-IDE-SHELLLAYOUT-02-shell-layout-native
+title: "Project, editor, and bottom tool window shell layout parity in native desktop"
+description: |
+  ED-SHELLLAYOUT-001 / WP-SHELL-LAYOUT-01: Linux WebKitGTK native verification against com.taomni.app.qa.
+  1. Default S0 layout (Project tree open, bottom dock closed, right pane closed).
+  2. Enter on src/main/example.txt opens in editor (71 bytes LF).
+  3. Alt+6 toggles Problems tool window; Alt+4 toggles Run tool window.
+  4. Esc from tool window returns focus directly to active editor (.cm-content).
+  5. Direct typing 'z' without mouse click -> undo (Ctrl+z) restores exact original 71 bytes (LF).
+  6. Shift+F12 Restore Tool Window Layout restores default S0 layout (bottom dock closed) and returns focus to editor.
+  7. Direct typing 'z' after restore -> undo (Ctrl+z) restores exact original bytes.
+  8. Preserves dirty state and workspace layout persistence.
+covers: [F25.1, F25.5]
+tags: [code-workspace, shell-layout, bottom-dock, idea-parity, native-gate, p1]
+modes: [native]
+native_platforms: [Windows, Linux]
+fixtures: [reset_db, project_tree]
+timeout_sec: 180
+steps:
+  - open: "${cfg.app.base_url}"
+  - vault_first_run: qa-shell-password
+  - wait_for: '[data-testid="welcome-panel"]'
+  - seed_storage:
+      key: taomni.recentWorkspaces.v1
+      value: '[{"id":"qa-shell","name":"fixture","roots":[{"id":"fixture","name":"fixture","path":"${fixture.project_tree_root}","kind":"folder"}],"looseFiles":[],"lastOpenedAt":1789259400000,"isGitRepo":false}]'
+  - reload_window: null
+  - click: '[data-testid="welcome-history-tab-workspaces"]'
+  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.project_tree_root}"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+
+  # S0 Initial state: Project open, bottom dock closed
+  - wait_for: '[data-testid="code-workspace-tree"]'
+  - assert_visible: '[data-testid="code-workspace-tree"]'
+  - assert_not_visible: '[data-testid="code-workspace-bottom-dock-resize"]'
+  - screenshot: 01-s0-default-layout.png
+
+  # Initial open README.md via double click
+  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+  - wait_for: '[data-testid="code-workspace-editor-pane"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"] .cm-content'
+      contains: Disposable project tree reference
+
+  # Navigate tree with direction keys and Enter on src/main/example.txt (71 bytes LF)
+  - press: { selector: '[data-testid="code-workspace-tree-file"][data-path="README.md"]', key: Home }
+  - press: ArrowRight
+  - assert_attribute: { selector: '[data-testid="code-workspace-tree-dir"][data-path="docs"]', name: aria-selected, equals: 'true' }
+  - press: ArrowDown
+  - assert_attribute: { selector: '[data-testid="code-workspace-tree-dir"][data-path="src"]', name: aria-expanded, equals: 'false' }
+  - press: ArrowRight
+  - wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main"]'
+  - press: ArrowRight
+  - assert_attribute: { selector: '[data-testid="code-workspace-tree-dir"][data-path="src/main"]', name: aria-selected, equals: 'true' }
+  - press: ArrowRight
+  - wait_for: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]'
+  - press: ArrowDown
+  - assert_attribute: { selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]', name: aria-selected, equals: 'true' }
+  - press: Enter
+  - wait_for: '[data-testid="code-workspace-editor-pane"]'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor-pane"] .cm-content'
+      contains: The editor buffer should survive tree navigation.
+
+  # Open Problems via Alt+6
+  - press: Alt+6
+  - wait_for: '[data-testid="code-workspace-bottom-dock-resize"]'
+  - assert_visible: '[data-testid="code-workspace-bottom-dock-resize"]'
+  - assert_attribute:
+      selector: '[data-testid="code-workspace-bottom-dock"]'
+      name: data-open
+      equals: 'true'
+  - press: { selector: '[data-testid="code-workspace-bottom-dock-resize"]', key: ArrowUp }
+  - press: { selector: '[data-testid="code-workspace-bottom-dock-resize"]', key: ArrowDown }
+  - screenshot: 02-problems-dock-open.png
+
+  # Switch to Run via Alt+4
+  - press: Alt+4
+  - wait_for: '[data-testid="code-workspace-run-panel"]'
+  - assert_visible: '[data-testid="code-workspace-bottom-dock-resize"]'
+  - screenshot: 03-run-dock-open.png
+
+  # Escape returns focus directly to active editor buffer
+  - press: Escape
+  - eval_readonly:
+      expression: document.activeElement?.classList.contains('cm-content')
+  - screenshot: 04-editor-focus-after-escape.png
+
+  # Direct typing 'z' into editor without mouse click
+  - press: Control+End
+  - type: z
+  - press: Control+s
+  - assert_file_contains:
+      path: '${fixture.project_tree_root}/src/main/example.txt'
+      contains: z
+  - press: Control+z
+  - press: Control+s
+  - assert_file_sha256:
+      path: '${fixture.project_tree_root}/src/main/example.txt'
+      equals: bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a
+
+  # Shift+F12 Restore Tool Window Layout restores default S0 layout (bottom dock closed)
+  - press: Shift+F12
+  - wait_for: '[data-testid="code-workspace-tree"]'
+  - assert_not_visible: '[data-testid="code-workspace-bottom-dock-resize"]'
+  - assert_visible: '[data-testid="code-workspace-editor-pane"]'
+  - screenshot: 05-shift-f12-restored-layout.png
+
+  # Direct typing 'z' again into editor without click
+  - press: Control+End
+  - type: z
+  - press: Control+s
+  - assert_file_contains:
+      path: '${fixture.project_tree_root}/src/main/example.txt'
+      contains: z
+  - press: Control+z
+  - press: Control+s
+  - assert_file_sha256:
+      path: '${fixture.project_tree_root}/src/main/example.txt'
+      equals: bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a
+  - screenshot: 06-final-verified-state.png
