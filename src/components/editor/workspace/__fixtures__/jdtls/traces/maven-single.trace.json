@@ -1,29 +1,29 @@
 {
   "schemaVersion": 1,
   "fixtureId": "maven-single",
-  "generatedAt": "2026-09-08T00:19:42.182Z",
+  "generatedAt": "2026-09-13T22:58:04.934Z",
   "sanitized": true,
   "toolchain": {
     "java": {
-      "path": "/data/dev/jdk-25/bin/java",
-      "version": "25.0.2",
+      "path": "/Library/Java/JavaVirtualMachines/zulu-25.jdk/Contents/Home/bin/java",
+      "version": "25.0.3",
       "info": {
-        "line": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+        "line": "openjdk version \"25.0.3\" 2026-04-21 LTS",
         "major": 25,
-        "version": "25.0.2"
+        "version": "25.0.3"
       }
     },
     "jdtls": {
-      "home": "~/.local/share/jdtls",
-      "version": "1.61.0.202607102111.jar"
+      "home": "/usr/local/opt/jdtls/libexec",
+      "version": "1.61.0.202609031315.jar"
     },
     "gradle": {
-      "version": "9.5.1",
-      "home": "~/.gradle/wrapper/dists/gradle-9.5.1-bin/bvvv0hnjcinfezlom7fy9dbyi/gradle-9.5.1"
+      "version": "9.7.1",
+      "home": "/usr/local/opt/gradle"
     },
-    "mavenCliDetected": "Apache Maven 3.9.9 (8e8579a9e76f7d015ee5ec7bfcdc97d260186937)"
+    "mavenCliDetected": "Apache Maven 3.9.16 (2bdd9fddda4b155ebf8000e807eb73fd829a51d5)"
   },
-  "buildModelFingerprint": "1f5457909013590296f1710d954eba6b51b61e0ab610a319e711614c1cd3465e",
+  "buildModelFingerprint": "a464c530544b9a7c92ef187293b56ef382df7cde1ce73d532f2d88d932673cad",
   "scenarios": [
     {
       "caseId": "jdk-type",
@@ -37,7 +37,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 2121,
+          "msTotal": 1266,
           "itemCount": 50,
           "isIncomplete": true,
           "satisfied": true,
@@ -61,7 +61,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 406,
+          "msTotal": 314,
           "itemCount": 58,
           "isIncomplete": true,
           "satisfied": true,
@@ -85,7 +85,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 42,
+          "msTotal": 22,
           "itemCount": 14,
           "isIncomplete": false,
           "satisfied": true,
@@ -167,7 +167,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 125,
+          "msTotal": 120,
           "itemCount": 2,
           "isIncomplete": false,
           "satisfied": true,
@@ -176,7 +176,7 @@
         }
       ],
       "resolve": {
-        "ms": 600,
+        "ms": 375,
         "additionalEditCount": 1,
         "additionalEditTexts": [
           "\n\nimport org.apache.commons.lang3.StringUtils;"
@@ -202,7 +202,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 163,
+          "msTotal": 146,
           "itemCount": 50,
           "isIncomplete": true,
           "satisfied": true,
@@ -261,7 +261,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 69,
+        "msTotal": 33,
         "signaturesCount": 13,
         "labels": [
           "append(double d) : StringBuilder",
@@ -297,7 +297,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 74,
+        "msTotal": 53,
         "signaturesCount": 3,
         "labels": [
           "parseInt(String s) : int",
@@ -323,7 +323,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 55,
+        "msTotal": 26,
         "signaturesCount": 9,
         "labels": [
           "valueOf(double d) : String",
@@ -355,7 +355,7 @@
       "scopeRequested": "default",
       "signatureHelp": {
         "attempts": 1,
-        "msTotal": 135,
+        "msTotal": 60,
         "signaturesCount": 1,
         "labels": [
           "singletonList(T o) : List<T>"
@@ -381,9 +381,9 @@
       "supersede": {
         "firstOutcome": "rejected:-32800",
         "firstCancelled": true,
-        "msFirst": 68,
+        "msFirst": 32,
         "secondSatisfied": true,
-        "msSecond": 65
+        "msSecond": 30
       },
       "notes": "$/cancelRequest on the in-flight request mirrors the production cancel bridge; second request must satisfy"
     },
@@ -397,7 +397,7 @@
       },
       "scopeRequested": "default",
       "hover": {
-        "msFirst": 51,
+        "msFirst": 74,
         "attempts": 1,
         "contentsPresent": true,
         "contentsKind": "markup-array",
@@ -418,7 +418,7 @@
       },
       "scopeRequested": "default",
       "hover": {
-        "msFirst": 129,
+        "msFirst": 85,
         "attempts": 1,
         "contentsPresent": true,
         "contentsKind": "markup-array",
@@ -439,7 +439,7 @@
       },
       "scopeRequested": "default",
       "hover": {
-        "msFirst": 64,
+        "msFirst": 33,
         "attempts": 1,
         "contentsPresent": true,
         "contentsKind": "markup-array",
@@ -513,7 +513,7 @@
     "appliedSha256": "a1a321c4326cdfef25e6aec6ccce42ec1f06395f10ba44154a0f424b5105dec2",
     "originalSha256": "f2de5c8ab98b58cf18ff998ebc47d19c127bb6f4290550d2827a40a37552e70a",
     "revertedRestoresOriginalHash": true,
-    "msTotal": 863,
+    "msTotal": 433,
     "satisfied": true,
     "reason": null,
     "resolvedShape": {
@@ -575,17 +575,17 @@
       }
     ],
     "importProgress": {
-      "events": 38,
-      "beginTokens": 12,
+      "events": 45,
+      "beginTokens": 15,
       "titles": [
-        "Synchronizing projects",
+        "Repository registry initialization",
         "Building",
-        "Initialize Workspace",
+        "Synchronizing projects",
         "Detect installed JVMs",
+        "Initialize Workspace",
         "LookupJDKToolchainsJob",
         "Reporting encoding changes.",
-        "Searching...",
-        "Validate documents"
+        "Searching..."
       ],
       "anyWithPercentage": true
     },
@@ -600,16 +600,16 @@
     }
   },
   "analysisTiming": {
-    "firstCompletionSatisfiedMs": 8070,
+    "firstCompletionSatisfiedMs": 5801,
     "offlineCacheHint": {
-      "coldSessionFirstSatisfiedMs": 8070,
-      "restartedSessionFirstSatisfiedMs": 6992,
+      "coldSessionFirstSatisfiedMs": 5801,
+      "restartedSessionFirstSatisfiedMs": 4146,
       "fasterThanCold": true
     }
   },
   "restart": {
     "performed": true,
-    "msToReadyAfterRestart": 7123,
+    "msToReadyAfterRestart": 4182,
     "completionOkAfterRestart": true,
     "signatureHelpOkAfterRestart": true,
     "reason": null,

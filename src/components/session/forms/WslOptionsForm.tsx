@@ -22,7 +22,7 @@ export function WslOptionsForm({ options, distros, status, onChange }: WslOption
   const opt = { ...DEFAULT_WSL_OPTIONS, ...options };
   const set = (patch: Partial<WslOptions>) => onChange({ ...opt, ...patch });
 
-  const distroInList = distros.some((d) => d.name === opt.distro);
+  const distroInList = (distros ?? []).some((d) => d.name === opt.distro);
   const showFreeText = !distroInList || status !== "ready";
   const previewArgs = buildWslLaunchArgs(opt);
 

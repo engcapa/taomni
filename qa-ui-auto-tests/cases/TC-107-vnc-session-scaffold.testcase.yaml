@@ -34,7 +34,6 @@ steps:
       selector: '[data-testid="session-name"]'
       value: qa-ui-auto-vnc
   - click: '[data-testid="session-save"]'
-  - click: '[data-testid="side-tab-sessions"]'
   - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc"]'
   # Open the VNC tab — the panel mounts immediately, regardless of dial state.
   - open_session: { name: qa-ui-auto-vnc, double_click: true }

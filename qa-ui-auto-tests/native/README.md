@@ -35,8 +35,9 @@ branches and can never substitute for at least one real process trace.
 - macOS: `runbooks/run-native-macos.sh`
 
 Each runbook builds the packaged debug app (`tauri build --debug --no-bundle`),
-launches it through `tauri-driver` with **isolated app-data** (never the
-developer profile), runs the native-mode cases
+launches it with **isolated app-data** (never the developer profile), and uses
+the platform transport (`tauri-driver` on Linux/Windows, the opt-in WKWebView
+bridge on macOS). It then runs the native-mode cases
 (`python -m qa_ui_auto.runner --mode native --filter TC-IDE-C0-01,…`), then
 collects one evidence entry per case via `evidence_collect.py`.
 

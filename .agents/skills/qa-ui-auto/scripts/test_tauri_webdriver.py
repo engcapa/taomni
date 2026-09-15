@@ -10,7 +10,7 @@ from unittest import TestCase, skipUnless
 from unittest.mock import Mock, call, patch
 
 from qa_ui_auto import native_steps
-from tauri_webdriver import NativeSession
+from tauri_webdriver import NativeSession, WebDriverError
 
 
 class NativeSessionTransportTest(TestCase):
@@ -79,6 +79,20 @@ class NativeSessionTransportTest(TestCase):
             server.shutdown()
             server.server_close()
             thread.join()
+
+    def test_macos_session_waits_for_react_root_before_installing_hooks(self):
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.request = Mock(return_value={"sessionId": "session-1"})
+        session.execute = Mock(side_effect=[WebDriverError("WebView is still loading"), False, True])
+        session.install_console_hook = Mock()
+
+        with patch("tauri_webdriver.platform.system", return_value="Darwin"):
+            session.start()
+
+        self.assertEqual(session.session_id, "session-1")
+        self.assertEqual(session.execute.call_count, 3)
+        self.assertIn("document.readyState", session.execute.call_args_list[0].args[0])
+        session.install_console_hook.assert_called_once_with()
 
 
 class NativeSessionFillTest(TestCase):
@@ -153,7 +167,8 @@ class NativeSessionFillTest(TestCase):
 
         session.type_text("ab")
 
-        actions = session.request.call_args.args[2]["actions"][0]["actions"]
+        post = next(call for call in session.request.call_args_list if call.args[0] == "POST")
+        actions = post.args[2]["actions"][0]["actions"]
         self.assertEqual(
             actions,
             [
@@ -165,6 +180,7 @@ class NativeSessionFillTest(TestCase):
                 {"type": "pause", "duration": 20},
             ],
         )
+        self.assertEqual(session.request.call_args.args, ("DELETE", "/session/session-1/actions"))
 
 
 class NativeSessionPointerClickTest(TestCase):

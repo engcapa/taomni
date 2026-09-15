@@ -572,6 +572,7 @@ function TerminalAppearanceSettingsContent({
 
           <div className="pt-2 border-t border-[var(--taomni-divider)]">
             <CheckControl
+              testId="ai-command-rewrite-toggle"
               label={t("terminalAppearance.enableAiRewrite")}
               checked={profile.aiCommandRewriteEnabled}
               onChange={(checked) => updateProfile({ aiCommandRewriteEnabled: checked })}
@@ -627,13 +628,15 @@ function CheckControl({
   label,
   checked,
   onChange,
+  testId,
 }: {
   label: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
+  testId?: string;
 }) {
   return (
-    <label className="inline-flex items-center gap-1.5">
+    <label className="inline-flex items-center gap-1.5" data-testid={testId}>
       <input
         className="taomni-checkbox"
         type="checkbox"

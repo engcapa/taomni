@@ -9559,6 +9559,14 @@ fn file_operation_match_paths(root_uri: &str, uri: &str) -> Option<Vec<String>> 
 }
 
 fn notify_change(path: &Path, change_type: u8) -> Option<LspWatchedFileChange> {
+    // A directory mtime bump carries no file information: the file event that
+    // caused it arrives separately on all platforms. Forwarding the directory
+    // itself makes the UI report "File changed on disk: <dir>" noise that
+    // clobbers real status confirmations, and pointlessly re-triggers server
+    // watchers. Directory create/remove are still forwarded (tree structure).
+    if change_type == 2 && path.is_dir() {
+        return None;
+    }
     path.is_absolute().then(|| LspWatchedFileChange {
         path: normalized_file_operation_path(path),
         change_type,
@@ -11980,6 +11988,34 @@ mod tests {
         let removed = NotifyEvent::new(EventKind::Remove(notify::event::RemoveKind::File))
             .add_path(new_path.clone());
         assert_eq!(notify_event_changes(&removed)[0].change_type, 3);
+    }
+
+    #[test]
+    fn native_watcher_directory_changed_events_are_dropped() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path().join("single");
+        std::fs::create_dir(&dir).unwrap();
+        let file = dir.join("SortMembers.java");
+        std::fs::write(&file, "class SortMembers {}").unwrap();
+
+        // A directory mtime bump is noise: the file event that caused it
+        // arrives separately. Forwarding the directory makes the UI report
+        // "File changed on disk: <dir>" and clobbers real statuses.
+        let dir_changed =
+            NotifyEvent::new(EventKind::Modify(ModifyKind::Any)).add_path(dir.clone());
+        assert!(notify_event_changes(&dir_changed).is_empty());
+
+        // File changes still flow, and directory create/remove are kept so
+        // tree structure stays in sync.
+        let file_changed =
+            NotifyEvent::new(EventKind::Modify(ModifyKind::Any)).add_path(file.clone());
+        assert_eq!(notify_event_changes(&file_changed).len(), 1);
+        let dir_created = NotifyEvent::new(EventKind::Create(notify::event::CreateKind::Folder))
+            .add_path(dir.clone());
+        assert_eq!(notify_event_changes(&dir_created).len(), 1);
+        let dir_removed =
+            NotifyEvent::new(EventKind::Remove(notify::event::RemoveKind::Folder)).add_path(dir);
+        assert_eq!(notify_event_changes(&dir_removed).len(), 1);
     }
 
     #[test]

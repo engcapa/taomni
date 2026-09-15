@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 /// Where downloaded models live: `<cache>/taomni/models/`.
 pub fn models_root() -> PathBuf {
-    dirs::cache_dir()
+    crate::resolved_cache_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("taomni")
         .join("models")
@@ -11,7 +11,7 @@ pub fn models_root() -> PathBuf {
 
 /// Where downloaded sidecar binaries live: `<cache>/taomni/binaries/`.
 pub fn sidecars_root() -> PathBuf {
-    dirs::cache_dir()
+    crate::resolved_cache_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("taomni")
         .join("binaries")

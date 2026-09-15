@@ -1963,7 +1963,9 @@ export default function DbClientTab({
 
   const initialWidth = useMemo(() => {
     try {
-      const v = Number(localStorage.getItem(widthKey(info.engine)));
+      const raw = localStorage.getItem(widthKey(info.engine));
+      if (raw == null || raw === "") return 24;
+      const v = Number(raw);
       return Number.isFinite(v) && v >= 0 && v <= 50 ? v : 24;
     } catch {
       return 24;

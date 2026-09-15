@@ -1216,7 +1216,7 @@ function PreviewModal({
           <span className="font-semibold">{name}</span>
           <span className="ml-2 text-[var(--taomni-text-muted)]">{path}</span>
           <div className="flex-1" />
-          <button type="button" className="px-2 py-0.5 hover:bg-[var(--taomni-hover)] rounded" onClick={onClose}>
+          <button type="button" data-testid="sftp-preview-close" className="px-2 py-0.5 hover:bg-[var(--taomni-hover)] rounded" onClick={onClose}>
             {t("fileBrowser.previewClose")}
           </button>
         </div>

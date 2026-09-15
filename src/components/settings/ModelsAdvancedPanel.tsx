@@ -41,8 +41,16 @@ export function ModelsAdvancedPanel() {
   ] as const;
 
   useEffect(() => {
-    void invoke<MirrorConfig>("mirror_get_config").then(setMirror).catch(() => undefined);
-    void invoke<CudaPackStatus>("cuda_pack_status").then(setPack).catch(() => undefined);
+    void invoke<MirrorConfig>("mirror_get_config")
+      .then((cfg) => {
+        if (cfg) setMirror(cfg);
+      })
+      .catch(() => undefined);
+    void invoke<CudaPackStatus>("cuda_pack_status")
+      .then((s) => {
+        if (s) setPack(s);
+      })
+      .catch(() => undefined);
   }, []);
 
   const updateMirror = async (patch: Partial<MirrorConfig>) => {

@@ -68,6 +68,7 @@
 
 ## ai/search (F-AI-2.5)
 
+- `[data-testid="ai-websearch-enable-toggle"]` — interactive — F-AI-2.5.web-search-enable-toggle
 - `text="Web Search"` — display — F-AI-2.5.web-search-section
 - `text="Confirm every time (default)"` — display — F-AI-2.5.web-search-confirm-per-call
 - `text="Confirm once per thread"` — display — F-AI-2.5.web-search-confirm-per-thread
@@ -76,7 +77,9 @@
 
 ## ai/settings (F-AI-2.1)
 
-- `text="Disable AI completely"` — interactive — F-AI-2.1.ai-master-toggle
+- `[data-testid="settings-group-toggle-ai"]` — interactive [optional] — F-AI-2.1.settings-group-toggle-ai
+- `[data-testid="ai-master-switch"]` — interactive — F-AI-2.1.ai-master-toggle
+  ↳ `text="Disable AI completely"` — alias
 - `text="Full local mode"` — interactive [optional] — F-AI-2.1.privacy-fully-local
 
 ## ai/terminal (F-AI-2.2)
@@ -84,6 +87,7 @@
 - `input[name="inlineSuggestionsSource"][value="history"]` — interactive — F-AI-2.2.inline-suggestions-history
 - `input[name="inlineSuggestionsSource"][value="history+path"]` — interactive — F-AI-2.2.inline-suggestions-history-path
 - `input[name="inlineSuggestionsSource"][value="history+path+ai"]` — interactive — F-AI-2.2.inline-suggestions-history-path-ai
+- `[data-testid="ai-command-rewrite-toggle"]` — interactive — F-AI-2.2.ai-command-rewrite-toggle
 - `input[aria-label="AI command rewrite shortcut"]` — interactive — F-AI-2.2.ai-command-rewrite-shortcut
 
 ## ai/voice (F-AI-2.3)
@@ -535,6 +539,7 @@
 
 ## database/hbase (F-DB-3)
 
+- `[data-testid="hbase-connection-mode"]` — interactive [optional] — F-DB-3.connection-mode
 - `input[aria-label="Remote host"]` — interactive [optional] — F-DB-3.remote-host
 - `input[aria-label="HBase namespace"]` — interactive [optional] — F-DB-3.namespace
 - `[data-testid="hbase-schema-tree"]` — display [optional] — F-DB-3.schema-tree
@@ -743,10 +748,20 @@
 - `[data-testid="collapsed-sidebar-rail"]` — interactive [optional] — F1.2.collapsed-sidebar-rail
 - `[data-testid="main-sidebar-resize-handle"]` — display — F1.2.sidebar-resize-handle
 
+## main/commands (F1.9)
+
+- `[data-testid="context-menu-item-new-remote-session"]` — interactive — F1.9.command-session
+- `[data-testid="context-menu-item-new-sftp"]` — interactive — F1.9.command-sftp
+- `[data-testid="ribbon-settings"]` — interactive — F1.9.ribbon-settings
+- `[data-testid="context-menu-item-help"]` — interactive — F1.9.command-help
+- `[data-testid="context-menu-item-settings"]` — interactive [optional] — F1.9.command-settings-menu
+- `[data-testid="context-menu-item-servers"]` — interactive [optional] — F1.9.command-servers
+- `[data-testid="context-menu-item-exit"]` — interactive [optional] — F1.9.command-exit
+- `[data-testid="context-menu-item-close-active-tab"]` — interactive [optional] — F1.9.command-close-active
+
 ## main/detach (F-Detach-1)
 
-- `[data-testid="terminal-floating-toolbar"]` — display — F-Detach-1.terminal-floating-toolbar
-- `[data-testid="terminal-detach"]` — interactive [optional] — F-Detach-1.terminal-detach
+- `[data-testid="terminal-detach"]` — interactive — F-Detach-1.terminal-detach
 - `[data-testid="terminal-maximize"]` — interactive [optional] — F-Detach-1.terminal-maximize
 - `[data-testid="vnc-detach"]` — interactive [optional] — F-Detach-1.vnc-detach
 - `[data-testid="detached-session-window"]` — display [optional] — F-Detach-1.detached-window
@@ -756,23 +771,17 @@
 ## main/menubar (F1.8)
 
 - `[data-testid="app-main-menu"]` — interactive — F1.8.app-main-menu
+- `[data-testid="about-dialog"]` — display [optional] — F1.8.about-dialog
 - `[data-testid="context-menu-item-view"]` — interactive [optional] — F1.8.context-menu-item-view
 - `[data-testid="context-menu-item-toggle-ribbon"]` — interactive [optional] — F1.8.menu-toggle-ribbon
 - `[data-testid="context-menu-item-toggle-quick-connect"]` — interactive [optional] — F1.8.menu-toggle-quick-connect
 - `[data-testid="context-menu-item-new-local-terminal"]` — interactive [optional] — F1.8.new-local-terminal-command
 - `[data-testid="context-menu-item-reload-sessions"]` — interactive [optional] — F1.8.reload-sessions-command
+- `[data-testid="context-menu-item-show-sessions"]` — interactive [optional] — F1.8.show-sessions-command
 - `[data-testid="context-menu-item-xserver"]` — interactive [optional] — F1.8.xserver-command
-
-## main/ribbon (F1.9)
-
-- `[data-testid="ribbon"]` — display [optional] — F1.9.ribbon
-- `[data-testid="ribbon-session"]` — interactive — F1.9.ribbon-session
-- `[data-testid="ribbon-sftp"]` — interactive — F1.9.ribbon-sftp
-- `[data-testid="ribbon-servers"]` — interactive — F1.9.ribbon-servers
-- `[data-testid="ribbon-settings"]` — interactive — F1.9.ribbon-settings
-- `[data-testid="ribbon-tunneling"]` — interactive — F1.9.ribbon-tunneling
-- `[data-testid="ribbon-multiexec"]` — interactive [optional] — F1.9.ribbon-multiexec
-- `[data-testid="ribbon-commands"]` — interactive [optional] — F1.9.ribbon-commands
+- `[data-testid="context-menu-item-sessions"]` — interactive [optional] — F1.8.context-menu-item-sessions
+- `[data-testid="context-menu-item-split-terminal"]` — interactive [optional] — F1.8.menu-split-terminal
+- `[data-testid="context-menu-item-toggle-sidebar"]` — interactive [optional] — F1.8.menu-toggle-sidebar
 
 ## main/statusbar (F1.7)
 
@@ -805,6 +814,8 @@
 - `[data-testid="context-menu-item-move-right"]` — interactive [optional] — F1.5.tab-menu-move-right
 - `[data-testid="context-menu-item-move-to-last"]` — interactive [optional] — F1.5.tab-menu-move-last
 - `span[aria-label="New output"]` — display [optional] — F1.5.tab-new-output-dot
+- `[data-testid="context-menu-item-tools"]` — interactive [optional] — F1.5.context-menu-item-tools
+- `[data-testid="context-menu-item-tunneling"]` — interactive [optional] — F1.5.context-menu-item-tunneling
 
 ## main/theme (F5.5)
 
@@ -823,6 +834,7 @@
 - `[data-testid="welcome-open-home-folder"]` — interactive [optional] — F1.6.open-home-folder
 - `button[aria-label="Open as administrator"]` — interactive [optional] — F1.6.open-as-administrator
 - `text="New session…"` — interactive — F1.6.new-session-card
+- `[data-testid="welcome-new-session"]` — interactive — F1.6.new-session-card-testid
 - `[data-testid="welcome-recent-sessions"]` — display — F1.6.recent-sessions-panel
 - `[data-testid="welcome-recent-filter"]` — interactive — F1.6.recent-filter
 - `[data-testid="welcome-recent-type-filter"]` — interactive — F1.6.recent-type-filter
@@ -918,6 +930,11 @@
 - `[data-testid="sockscap-block-quic"]` — interactive [optional] — F-Sockscap-1.block-quic
 - `[data-testid="sockscap-test-host"]` — interactive — F-Sockscap-1.test-host
 - `[data-testid="sockscap-test-target"]` — interactive — F-Sockscap-1.test-target
+- `[data-testid="sockscap-test-detail"]` — display [optional] — F-Sockscap-1.test-detail
+- `[data-testid="sockscap-test-detail-close"]` — interactive [optional] — F-Sockscap-1.test-detail-close
+- `[data-testid="sockscap-probe-fail-dialog"]` — display [optional] — F-Sockscap-1.probe-fail-dialog
+- `[data-testid="sockscap-probe-fail-force"]` — interactive [optional] — F-Sockscap-1.probe-fail-force
+- `[data-testid="sockscap-probe-fail-cancel"]` — interactive [optional] — F-Sockscap-1.probe-fail-cancel
 - `[data-testid="sockscap-helper-start"]` — interactive [optional] — F-Sockscap-1.helper-start
 - `[data-testid="sockscap-windivert-probe"]` — interactive [optional] — F-Sockscap-1.windivert-probe
 
@@ -949,7 +966,7 @@
 - `[data-testid="note-theme-settings"]` — display [optional] — F-TAO-1.note-theme-settings
 - `[data-testid="note-theme-select"]` — interactive [optional] — F-TAO-1.note-theme-select
 - `[data-testid="note-theme-paper"]` — interactive [optional] — F-TAO-1.note-theme-paper
-- `[data-testid="note-panel-mode-floating"]` — interactive [optional] — F-TAO-1.note-panel-mode-floating
+- `[data-testid="notes-floating-toggle"]` — interactive [optional] — F-TAO-1.notes-floating-toggle
 - `[data-testid="floating-notes-panel"]` — display [optional] — F-TAO-1.floating-notes-panel
 - `[data-testid="floating-notes-dock"]` — interactive [optional] — F-TAO-1.floating-notes-dock
 - `[data-testid="tao-ribbon-badge"]` — display [optional] — F-TAO-1.tao-ribbon-badge
@@ -981,7 +998,7 @@
 - `[data-testid="server-settings"]` — display [optional] — F-Servers-1.server-settings
 - `[data-testid="server-log"]` — display [optional] — F-Servers-1.server-log
 - `[data-testid="server-log-autoscroll"]` — interactive [optional] — F-Servers-1.server-log-autoscroll
-- `[data-testid="server-log-clear"]` — interactive [optional] — F-Servers-1.server-log-clear
+- `[data-testid="server-log-clear"]` — display [optional] — F-Servers-1.server-log-clear
 
 ## sessions (F6.2)
 
@@ -1032,6 +1049,7 @@
 - `[data-testid="session-proto-hbaseshell"]` — interactive [optional] — F6.3.proto-hbaseshell
 - `[data-testid="session-proto-mail"]` — interactive [optional] — F6.3.proto-mail
 - `input[aria-label="IMAP server"]` — interactive [optional] — F6.3.mail-imap-server
+- `input[aria-label="SMTP server"]` — interactive [optional] — F6.3.mail-smtp-server
 - `input[aria-label="Mail email or username"]` — interactive [optional] — F6.3.mail-email-user
 - `input[aria-label="Mail password or app password token"]` — interactive [optional] — F6.3.mail-password
 - `[data-testid="session-host"]` — interactive — F6.3.host
@@ -1064,6 +1082,7 @@
 - `input[aria-label="Jump host"]` — interactive [optional] — F6.3.advanced-jump-host
 - `input[aria-label="Jump user"]` — interactive [optional] — F6.3.advanced-jump-user
 - `input[aria-label="Jump port"]` — interactive [optional] — F6.3.advanced-jump-port
+- `[data-testid="session-proxy-kind"]` — interactive [optional] — F6.3.network-proxy-kind
 - `input[aria-label="Proxy host"]` — interactive — F6.3.network-proxy-host
 - `input[aria-label="Proxy port"]` — interactive — F6.3.network-proxy-port
 - `input[aria-label="Proxy username"]` — interactive — F6.3.network-proxy-user
@@ -1135,6 +1154,10 @@
 - `[data-testid="export-csv"]` — interactive [optional] — F-ImportPreview-1.export-csv
 - `[data-testid="export-html"]` — interactive [optional] — F-ImportPreview-1.export-html
 
+## sessions/import (F6.6)
+
+- `[data-testid="menu-import-sessions"]` — interactive [optional] — F6.6.menu-import-sessions
+
 ## sessions/multiselect (F-Sidebar-1)
 
 - `[data-testid="session-tree-item"][data-selected="true"]` — interactive [optional] — F-Sidebar-1.selected-session-row
@@ -1149,6 +1172,11 @@
 - `[data-testid="settings-search-empty"]` — display — F11.1.search-empty
 - `[data-testid="settings-reset-code-view-profile"]` — interactive — F11.1.reset-code-view-profile
 - `[data-testid="settings-reset-terminal-default-profile"]` — interactive — F11.1.reset-terminal-default-profile
+- `[data-testid="settings-group-toggle-general"]` — interactive [optional] — F11.1.group-toggle-general
+- `[data-testid="settings-group-toggle-security"]` — interactive [optional] — F11.1.group-toggle-security
+- `[data-testid="settings-group-toggle-code"]` — interactive [optional] — F11.1.group-toggle-code
+- `[data-testid="settings-group-toggle-database"]` — interactive [optional] — F11.1.group-toggle-database
+- `[data-testid="settings-group-toggle-terminal"]` — interactive [optional] — F11.1.group-toggle-terminal
 - `[data-testid="sql-completion-settings"]` — display — F11.1.sql-completion-settings
 - `[data-testid="sql-completion-activate-on-typing"]` — interactive — F11.1.sql-completion-activate-on-typing
 - `[data-testid="sql-completion-trigger-shortcut"]` — interactive — F11.1.sql-completion-trigger-shortcut
@@ -1218,6 +1246,7 @@
 - `[data-testid="col-resize-size"]` — interactive — F7.2.col-resize-size
 - `[data-testid="col-resize-modified"]` — interactive — F7.2.col-resize-modified
 - `[data-testid="breadcrumb-drives-root"]` — interactive [optional] — F7.2.breadcrumb-drives-root
+- `[data-testid="sftp-preview-close"]` — interactive [optional] — F7.2.preview-close
 
 ## sftp (F7.3)
 
@@ -1285,6 +1314,7 @@
 - `[data-testid="terminal-theme-select"]` — interactive — F5.2.theme-select
 - `[data-testid^="terminal-theme-option-"]` — interactive [optional] — F5.2.theme-options
 - `[data-testid="terminal-context-set-local-default-theme"]` — interactive [optional] — F5.2.local-default-theme
+- `[data-testid^="terminal-context-theme-option-"]` — interactive [optional] — F5.2.context-theme-options
 - `[data-testid="terminal-preview"]` — display — F5.2.preview
 - `[data-testid="terminal-preview-cursor"]` — display — F5.2.preview-cursor
 - `input[aria-label="Terminal font size"]` — interactive — F5.2.font-size
@@ -1437,6 +1467,7 @@
 - `input[placeholder="22"]` — interactive — F8.2.editor-port
 - `input[placeholder="0"]` — interactive — F8.2.editor-local-port
 - `input[placeholder="127.0.0.1"]` — interactive [optional] — F8.2.editor-remote-host
+  ↳ `input[placeholder="db.internal"]` — alias
 - `input[placeholder="5432"]` — interactive [optional] — F8.2.editor-remote-port
 - `label:has-text("Remote port forwarding") input[type="radio"]` — interactive — F8.2.editor-kind-remote
 - `label:has-text("Dynamic port forwarding (SOCKS proxy)") input[type="radio"]` — interactive — F8.2.editor-kind-dynamic

@@ -1,29 +1,29 @@
 {
   "schemaVersion": 1,
   "fixtureId": "maven-multi-module",
-  "generatedAt": "2026-09-04T00:02:34.857Z",
+  "generatedAt": "2026-09-13T22:58:27.983Z",
   "sanitized": true,
   "toolchain": {
     "java": {
-      "path": "/data/dev/jdk-21/bin/java",
-      "version": "21.0.4",
+      "path": "/Library/Java/JavaVirtualMachines/zulu-25.jdk/Contents/Home/bin/java",
+      "version": "25.0.3",
       "info": {
-        "line": "openjdk version \"21.0.4\" 2024-07-16 LTS",
-        "major": 21,
-        "version": "21.0.4"
+        "line": "openjdk version \"25.0.3\" 2026-04-21 LTS",
+        "major": 25,
+        "version": "25.0.3"
       }
     },
     "jdtls": {
-      "home": "~/.local/share/jdtls",
-      "version": "1.61.0.202607102111.jar"
+      "home": "/usr/local/opt/jdtls/libexec",
+      "version": "1.61.0.202609031315.jar"
     },
     "gradle": {
-      "version": "9.5.1",
-      "home": "~/.gradle/wrapper/dists/gradle-9.5.1-bin/bvvv0hnjcinfezlom7fy9dbyi/gradle-9.5.1"
+      "version": "9.7.1",
+      "home": "/usr/local/opt/gradle"
     },
-    "mavenCliDetected": "Apache Maven 3.9.9 (8e8579a9e76f7d015ee5ec7bfcdc97d260186937)"
+    "mavenCliDetected": "Apache Maven 3.9.16 (2bdd9fddda4b155ebf8000e807eb73fd829a51d5)"
   },
-  "buildModelFingerprint": "14364c510c0fe227b2371a634eaeeb330cd45b7615efcbc442c5f81811f6d7a7",
+  "buildModelFingerprint": "7c5d662dd8b6f9f2df7f2e794f8f0c4034f157135ad128021ccea1f9edb0d69d",
   "scenarios": [
     {
       "caseId": "cross-module-type",
@@ -37,7 +37,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 2358,
+          "msTotal": 1430,
           "itemCount": 1,
           "isIncomplete": false,
           "satisfied": true,
@@ -46,7 +46,7 @@
         }
       ],
       "resolve": {
-        "ms": 310,
+        "ms": 247,
         "additionalEditCount": 1,
         "additionalEditTexts": [
           "\n\nimport com.example.core.CoreUtil;\n\n"
@@ -72,7 +72,7 @@
       "requests": [
         {
           "attempts": 1,
-          "msTotal": 141,
+          "msTotal": 133,
           "itemCount": 7,
           "isIncomplete": false,
           "satisfied": true,
@@ -148,17 +148,17 @@
       }
     ],
     "importProgress": {
-      "events": 33,
-      "beginTokens": 10,
+      "events": 44,
+      "beginTokens": 15,
       "titles": [
-        "Synchronizing projects",
+        "Repository registry initialization",
         "Building",
-        "Initialize Workspace",
+        "Synchronizing projects",
         "Detect installed JVMs",
+        "Initialize Workspace",
         "LookupJDKToolchainsJob",
-        "Reporting encoding changes.",
-        "Searching...",
-        "Validate documents"
+        "Refreshing workspace",
+        "Searching..."
       ],
       "anyWithPercentage": true
     },
@@ -167,6 +167,6 @@
     }
   },
   "analysisTiming": {
-    "firstCompletionSatisfiedMs": 6064
+    "firstCompletionSatisfiedMs": 4473
   }
 }

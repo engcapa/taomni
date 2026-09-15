@@ -86,7 +86,12 @@ def resolve(value: Any, *, cfg: dict, env: dict[str, str] | None = None,
                     )
                 return str(fixture[key])
             return m.group(0)
-        return PLACEHOLDER.sub(repl, value)
+        for _ in range(5):
+            new_value = PLACEHOLDER.sub(repl, value)
+            if new_value == value:
+                break
+            value = new_value
+        return value
     if isinstance(value, dict):
         return {k: resolve(v, cfg=cfg, env=env, fixture=fixture) for k, v in value.items()}
     if isinstance(value, list):

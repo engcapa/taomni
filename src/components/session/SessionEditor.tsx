@@ -48,7 +48,7 @@ import {
   type LocalShellOption,
 } from "../../lib/ipc";
 import type { DbConnectInfo, HBaseConnectInfo } from "../../types";
-import { getAppPlatform } from "../../lib/runtime";
+import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
 import {
   DEFAULT_NETWORK_SETTINGS,
   getSessionNetworkSettings,
@@ -443,16 +443,19 @@ function Select({
   onChange,
   className = "",
   ariaLabel,
+  dataTestId,
 }: {
   value: string;
   options: SelectOption[];
   onChange?: (v: string) => void;
   className?: string;
   ariaLabel?: string;
+  dataTestId?: string;
 }) {
   return (
     <span className="relative inline-flex items-center">
       <select
+        data-testid={dataTestId}
         className={`taomni-input pr-6 appearance-none ${className || "w-[260px]"}`}
         aria-label={ariaLabel}
         value={value}
@@ -734,6 +737,7 @@ function ProxyJumpFields({
     <>
       <Field label={t("sessionEditor2.fieldProxy")}>
         <Select
+          dataTestId="session-proxy-kind"
           value={value.proxyKind}
           options={[
             { value: "none", label: t("sessionEditor2.proxyNone") },
@@ -2636,12 +2640,14 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   );
   const [wslDistros, setWslDistros] = useState<WslDistro[]>([]);
   const [wslStatus, setWslStatus] = useState<"loading" | "ready" | "error" | "unsupported">(
-    () => (getAppPlatform() === "windows" ? "loading" : "unsupported"),
+    // WSL sessions need the desktop backend; the browser preview (even on a
+    // Windows host) cannot launch them, so report unsupported there.
+    () => (getAppPlatform() === "windows" && isTauriRuntime() ? "loading" : "unsupported"),
   );
 
   useEffect(() => {
     if (proto !== "WSL") return;
-    if (getAppPlatform() !== "windows") {
+    if (getAppPlatform() !== "windows" || !isTauriRuntime()) {
       setWslStatus("unsupported");
       return;
     }
@@ -2650,11 +2656,12 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     listWslDistros()
       .then((distros) => {
         if (cancelled) return;
-        setWslDistros(distros);
+        const list = distros ?? [];
+        setWslDistros(list);
         setWslStatus("ready");
         // If editing a brand-new session, default to the system's default distro.
-        if (!wslOptions.distro && distros.length > 0) {
-          const def = distros.find((d) => d.isDefault) ?? distros[0];
+        if (!wslOptions.distro && list.length > 0) {
+          const def = list.find((d) => d.isDefault) ?? list[0];
           setWslOptions((prev) => ({ ...prev, distro: def.name }));
         }
       })

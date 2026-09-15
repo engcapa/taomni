@@ -18,13 +18,14 @@ steps:
   # Open Settings, flip the master switch, mic button must unmount.
   - click: '[data-testid="ribbon-settings"]'
   - wait_for: '[data-testid="settings-panel"]'
-  - click: 'text="Disable AI completely"'
+  - click: '[data-testid="settings-group-toggle-ai"]'
+  - click: '[data-testid="ai-master-switch"]'
   - wait_for:
       selector: '[data-testid="ptt-button"]'
       state: detached
       timeout_sec: 10
   # Restore default so other auto cases find the button again.
-  - click: 'text="Disable AI completely"'
+  - click: '[data-testid="ai-master-switch"]'
   - wait_for:
       selector: '[data-testid="ptt-button"]'
       timeout_sec: 10

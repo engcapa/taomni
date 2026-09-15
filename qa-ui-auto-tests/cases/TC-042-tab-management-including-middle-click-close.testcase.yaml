@@ -9,12 +9,12 @@ steps:
   - click: "[data-testid=\"welcome-open-local-terminal\"]"
   - wait_for: "[data-testid=\"terminal-pane\"]"
   - click: "[data-testid=\"new-local-terminal\"]"
-  - wait_for: "[data-testid=\"terminal-pane\"]"
+  - wait_for: '[data-testid="tab-item"] >> nth=2'
   - assert_count: {selector: '[data-testid="tab-item"]', min: 2}
   # Middle-click can't be issued via verbs; click the per-tab close icon (SVG) to
   # verify tab close. Welcome tab has no close icon (non-closable), so we target
   # a closable terminal tab.
-  - click: '[data-testid="tab-item"][data-tab-type="terminal"] svg:last-child'
+  - click: '[data-testid="tab-item"][data-tab-type="terminal"] [data-testid="tab-close"] >> nth=0'
   - wait: 1
   - assert_text: {selector: "[data-testid=\"status-bar\"]", contains: 1 terminals}
   - screenshot: 042-tab-middle-click-close.png

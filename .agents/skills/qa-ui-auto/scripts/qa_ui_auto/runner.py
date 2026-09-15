@@ -62,7 +62,8 @@ def _browser_context(headless: bool):
         _close_browser()
         _playwright = sync_playwright().start()
         _browser = _playwright.chromium.launch(headless=headless)
-    return _browser.new_context(viewport={"width": 1440, "height": 900})
+    return _browser.new_context(viewport={"width": 1440, "height": 900},
+                                permissions=["clipboard-read", "clipboard-write"])
 
 
 atexit.register(_close_browser)
@@ -132,6 +133,15 @@ def _run_browser_case_inner(payload: dict) -> dict:
     if case_dict.get("skip"):
         result["status"] = "skipped"
         result["fixtures_skipped"] = case_dict["skip"]
+        return result
+    current_target = "macOS" if platform.system() == "Darwin" else platform.system()
+    platforms = case_dict.get("browser_platforms", [])
+    if platforms and current_target not in platforms:
+        result["status"] = "skipped"
+        result["fixtures_skipped"] = (
+            f"browser scope unavailable on {current_target}: "
+            f"case declares browser platforms {platforms}"
+        )
         return result
 
     started = time.time()
@@ -329,6 +339,7 @@ def _serialize_case(c: tc_mod.TestCase) -> dict:
         "fixtures": c.fixtures,
         "timeout_sec": c.timeout_sec,
         "skip": c.skip,
+        "browser_platforms": c.browser_platforms,
         "steps": c.steps,
     }
 
@@ -401,6 +412,16 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
             qa_apps_before = _matching_pids(QA_APP_ORPHAN_MARKERS)
             if c.skip:
                 r.update(status="skipped", fixtures_skipped=c.skip)
+                results.append(r)
+                continue
+            current_target = "macOS" if platform.system() == "Darwin" else platform.system()
+            from .verification import native_support
+            unsupported_reason = native_support(c, current_target)
+            if unsupported_reason:
+                r.update(
+                    status="skipped",
+                    fixtures_skipped=f"native scope unavailable on {current_target}: {unsupported_reason}",
+                )
                 results.append(r)
                 continue
             failure_artifacts: dict = {}
@@ -687,13 +708,18 @@ def _rotate_runs(report_dir: Path, keep: int) -> None:
 
 
 def _configure_console_encoding() -> None:
-    """Keep report output printable on Windows consoles using legacy code pages."""
+    """Keep report output printable on Windows consoles using legacy code pages.
+
+    ``line_buffering`` keeps per-case progress visible when the runner is
+    started detached with stdout redirected to a log file; block buffering made
+    a live run look stalled for minutes.
+    """
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is None:
             continue
         try:
-            reconfigure(encoding="utf-8", errors="replace")
+            reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
         except (OSError, ValueError):
             pass
 
@@ -756,8 +782,27 @@ def main(argv: list[str] | None = None) -> int:
     if mode == "native":
         from .verification import host_platform, native_support
         unsupported = {c.id: reason for c in selected if (reason := native_support(c, host_platform()))}
-        if unsupported:
-            print(f"qa-ui-auto: unsupported native scope: {unsupported}", file=sys.stderr)
+        # macOS has a QA-owned WKWebView bridge.  Cases that require Linux/X11
+        # are recorded as per-case skips by _native_run; they must not prevent
+        # the runnable macOS cases from starting.  Linux/Windows retain the
+        # fail-fast contract for an unsupported native verb or platform.
+        target = host_platform()
+        if target == "macOS":
+            pass
+        elif args.filter:
+            if unsupported:
+                print(f"qa-ui-auto: unsupported native scope: {unsupported}", file=sys.stderr)
+                return 2
+        else:
+            selected = [c for c in selected if not native_support(c, target)]
+    if mode == "browser":
+        # OS-dependent renderer chrome (e.g. macOS title-bar) skips per case;
+        # an explicitly filtered case outside the browser scope still fails
+        # fast so CI typos and scope mistakes stay loud.
+        from .verification import browser_support, host_platform
+        scoped = {c.id: reason for c in selected if (reason := browser_support(c, host_platform()))}
+        if args.filter and scoped:
+            print(f"qa-ui-auto: unsupported browser scope: {scoped}", file=sys.stderr)
             return 2
 
     requested_ids = set(args.filter.split(",")) if args.filter else set()

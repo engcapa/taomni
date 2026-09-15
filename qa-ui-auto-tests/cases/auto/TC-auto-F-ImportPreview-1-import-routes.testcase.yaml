@@ -39,7 +39,8 @@ steps:
   # import formats plus the CSV template download.
   - click: '[data-testid="app-main-menu"]'
   - wait_for: '[data-testid="context-menu"]'
-  - hover: '[data-testid="context-menu"] >> text="Import sessions"'
+  - hover: '[data-testid="context-menu-item-sessions"]'
+  - hover: '[data-testid="menu-import-sessions"]'
   - wait: 1
   - assert_visible: '[data-testid="import-json"]'
   - assert_visible: '[data-testid="import-mobaxterm"]'

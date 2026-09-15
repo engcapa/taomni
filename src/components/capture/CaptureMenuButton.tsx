@@ -20,14 +20,21 @@ export function CaptureMenuButton() {
     const onDoc = (e: MouseEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   if (!available) return null;
 
   return (
-    <div className="flex items-center gap-1">
+    <div data-testid="capture-toolbar" className="flex items-center gap-1">
       <CaptureIndicators />
       <div ref={wrapRef} style={{ position: "relative" }}>
         <button

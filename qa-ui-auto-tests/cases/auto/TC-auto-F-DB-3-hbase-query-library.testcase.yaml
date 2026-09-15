@@ -17,6 +17,7 @@ steps:
   - wait_for: '[data-testid="session-editor"]'
   - click: '[data-testid="session-proto-hbaseshell"]'
   - wait_for: '[data-testid="session-hbase-section"]'
+  - select_option: {selector: '[data-testid="hbase-connection-mode"]', value: "rest"}
   - fill:
       selector: 'input[aria-label="Remote host"]'
       value: hbase-host.example.test

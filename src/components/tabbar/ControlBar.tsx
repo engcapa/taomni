@@ -154,17 +154,17 @@ export function ControlBar({
     ];
     ctx.show(event, [
       { label: t("menu.newLocalTerminal"), testId: "context-menu-item-new-local-terminal", icon: <TerminalIcon className="w-3 h-3" />, onClick: () => onCommand("new-terminal") },
-      { label: t("menu.newRemoteSession"), icon: <Plus className="w-3 h-3" />, onClick: () => onCommand("new-session") },
-      { label: t("ribbon.newSftp"), icon: <FolderOpen className="w-3 h-3" />, onClick: () => onCommand("new-sftp") },
-      { label: t("menu.closeActiveTab"), icon: <X className="w-3 h-3" />, onClick: () => onCommand("close-active"), disabled: !activeTabClosable },
+      { label: t("menu.newRemoteSession"), testId: "context-menu-item-new-remote-session", icon: <Plus className="w-3 h-3" />, onClick: () => onCommand("new-session") },
+      { label: t("ribbon.newSftp"), testId: "context-menu-item-new-sftp", icon: <FolderOpen className="w-3 h-3" />, onClick: () => onCommand("new-sftp") },
+      { label: t("menu.closeActiveTab"), testId: "context-menu-item-close-active-tab", icon: <X className="w-3 h-3" />, onClick: () => onCommand("close-active"), disabled: !activeTabClosable },
       { label: "", separator: true, onClick: () => {} },
       {
         label: t("menu.sessions"),
         testId: "context-menu-item-sessions",
         icon: <FolderOpen className="w-3 h-3" />,
         children: [
-          { label: t("menu.showSessions"), icon: <FolderOpen className="w-3 h-3" />, onClick: () => onCommand("sessions") },
-          { label: t("menu.newSession"), icon: <Plus className="w-3 h-3" />, onClick: () => onCommand("new-session") },
+          { label: t("menu.showSessions"), testId: "context-menu-item-show-sessions", icon: <FolderOpen className="w-3 h-3" />, onClick: () => onCommand("sessions") },
+          { label: t("menu.newSession"), testId: "context-menu-item-new-session", icon: <Plus className="w-3 h-3" />, onClick: () => onCommand("new-session") },
           { label: t("menu.reloadSessions"), testId: "context-menu-item-reload-sessions", icon: <RefreshCw className="w-3 h-3" />, onClick: () => onCommand("reload-sessions") },
           { label: "", separator: true, onClick: () => {} },
           ...importExportItems,
@@ -173,12 +173,13 @@ export function ControlBar({
       },
       {
         label: t("menu.view"),
+        testId: "context-menu-item-view",
         icon: <PanelLeft className="w-3 h-3" />,
         children: [
-          { label: t("sidebar.headerTitle"), icon: <PanelLeft className="w-3 h-3" />, onClick: onToggleSidebar },
+          { label: t("sidebar.headerTitle"), testId: "context-menu-item-toggle-sidebar", icon: <PanelLeft className="w-3 h-3" />, onClick: onToggleSidebar },
           { label: t("menu.quickConnectToolbar"), testId: "context-menu-item-toggle-quick-connect", icon: <Search className="w-3 h-3" />, checked: quickConnectVisible, onClick: () => onCommand("toggle-quick-connect") },
-          { label: t("menu.splitTerminal"), icon: <SplitSquareVertical className="w-3 h-3" />, onClick: () => onCommand("split") },
-          { label: t("ribbon.multiExec"), icon: <Users className="w-3 h-3" />, onClick: () => onCommand("multiexec") },
+          { label: t("menu.splitTerminal"), testId: "context-menu-item-split-terminal", icon: <SplitSquareVertical className="w-3 h-3" />, onClick: () => onCommand("split") },
+          { label: t("ribbon.multiExec"), testId: "context-menu-item-multiexec", icon: <Users className="w-3 h-3" />, onClick: () => onCommand("multiexec") },
         ],
         onClick: () => {},
       },
@@ -188,10 +189,10 @@ export function ControlBar({
         icon: <Wrench className="w-3 h-3" />,
         children: [
           { label: t("servers.dialogTitle"), testId: "context-menu-item-servers", icon: <Server className="w-3 h-3" />, onClick: () => onCommand("servers") },
-          { label: t("menu.tunneling"), icon: <Network className="w-3 h-3" />, onClick: () => onCommand("tunneling") },
-          { label: t("menu.sockscap"), icon: <Shield className="w-3 h-3" />, onClick: () => onCommand("sockscap") },
-          { label: t("menu.gitRepository"), icon: <GitBranch className="w-3 h-3" />, onClick: () => onCommand("git") },
-          { label: t("menu.codeWorkspace"), icon: <FileText className="w-3 h-3" />, onClick: () => onCommand("code-workspace") },
+          { label: t("menu.tunneling"), testId: "context-menu-item-tunneling", icon: <Network className="w-3 h-3" />, onClick: () => onCommand("tunneling") },
+          { label: t("menu.sockscap"), testId: "context-menu-item-sockscap", icon: <Shield className="w-3 h-3" />, onClick: () => onCommand("sockscap") },
+          { label: t("menu.gitRepository"), testId: "context-menu-item-git-repository", icon: <GitBranch className="w-3 h-3" />, onClick: () => onCommand("git") },
+          { label: t("menu.codeWorkspace"), testId: "context-menu-item-code-workspace", icon: <FileText className="w-3 h-3" />, onClick: () => onCommand("code-workspace") },
           ...(workspaceCommands.length > 0 ? [{
             label: t("menu.codeWorkspaceActions"),
             testId: "context-menu-workspace-actions",
@@ -204,16 +205,16 @@ export function ControlBar({
             })),
             onClick: () => {},
           } satisfies MenuItem] : []),
-          { label: t("tabs.lanChat"), icon: <MessageSquare className="w-3 h-3" />, onClick: () => onCommand("lan-chat") },
-          { label: t("menu.networkTools"), icon: <Wrench className="w-3 h-3" />, onClick: () => onCommand("tools") },
+          { label: t("tabs.lanChat"), testId: "context-menu-item-lan-chat", icon: <MessageSquare className="w-3 h-3" />, onClick: () => onCommand("lan-chat") },
+          { label: t("menu.networkTools"), testId: "context-menu-item-network-tools", icon: <Wrench className="w-3 h-3" />, onClick: () => onCommand("tools") },
         ],
         onClick: () => {},
       },
       { label: t("menu.xserver"), testId: "context-menu-item-xserver", icon: <Monitor className="w-3 h-3" />, checked: xServerEnabled, onClick: () => onCommand("toggle-xserver") },
-      { label: t("menu.settings"), icon: <Settings className="w-3 h-3" />, onClick: () => onCommand("settings") },
-      { label: t("menu.help"), icon: <HelpCircle className="w-3 h-3" />, onClick: () => onCommand("help") },
+      { label: t("menu.settings"), testId: "context-menu-item-settings", icon: <Settings className="w-3 h-3" />, onClick: () => onCommand("settings") },
+      { label: t("menu.help"), testId: "context-menu-item-help", icon: <HelpCircle className="w-3 h-3" />, onClick: () => onCommand("help") },
       { label: "", separator: true, onClick: () => {} },
-      { label: t("ribbon.exit"), icon: <Power className="w-3 h-3" />, onClick: () => onCommand("exit"), danger: true },
+      { label: t("ribbon.exit"), testId: "context-menu-item-exit", icon: <Power className="w-3 h-3" />, onClick: () => onCommand("exit"), danger: true },
     ]);
   };
 

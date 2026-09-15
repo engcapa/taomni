@@ -69,7 +69,7 @@ steps:
 
   # ---- Segment 1: split renders a second leaf of the same document (A1) ----
   - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
-  - press: Control+Home
+  - press: Mod+Home
   - click: '[data-testid="code-workspace-split-right"]'
   - wait_for:
       selector: '[data-testid="code-workspace-editor-pane"]:not([data-editor-group-id="primary"])'
@@ -82,7 +82,7 @@ steps:
   - wait: 2
   # Type into the NEW leaf; the primary leaf must mirror it in real time.
   - click: '[data-testid="code-workspace-editor-pane"]:not([data-editor-group-id="primary"]) .cm-content'
-  - press: Control+Home
+  - press: Mod+Home
   - type: "SPLIT1"
   - assert_text:
       selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-editor'
@@ -94,13 +94,13 @@ steps:
   # parking the caret): one Ctrl+Z in the new leaf must remove it from BOTH
   # leaves. (eval expressions cannot contain '=' - the primary leaf is the
   # first .cm-editor in DOM order, so the assert indexes it positionally.)
-  - press: Control+Home
+  - press: Mod+Home
   - type: "X"
   - assert_text:
       selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-editor'
       contains: "XSPLIT1"
       timeout_sec: 30
-  - press: Control+z
+  - press: Mod+z
   - eval_readonly:
       expression: "!document.querySelectorAll('.cm-editor')[0].innerText.includes('XSPLIT1')"
       expect_truthy: true
@@ -138,8 +138,8 @@ steps:
       timeout_sec: 15
   # ...and its history: undo/redo still reach the shared document ledger.
   - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
-  - press: Control+Home
-  - press: Control+z
+  - press: Mod+Home
+  - press: Mod+z
   - eval_readonly:
       expression: "!document.querySelector('.cm-editor').innerText.includes('XSPLIT1')"
       expect_truthy: true
@@ -151,7 +151,7 @@ steps:
 
   # ---- Segment 3: dirty last view, cancel close = zero effect (A2) ----
   - click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
-  - press: Control+Home
+  - press: Mod+Home
   - type: "TAILDIRTY "
   - assert_text:
       selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-editor'
@@ -253,7 +253,7 @@ steps:
   # on top of the ~220ms editor text commit); the next reload surfaces it in
   # the Workspace recovery dialog.
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+Home
+  - press: Mod+Home
   - type: "RECOVERYDIRTY "
   - assert_text:
       selector: '[data-testid="code-workspace-editor"]'

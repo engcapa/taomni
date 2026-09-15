@@ -95,10 +95,15 @@ def _gradle_binary() -> str | None:
 
 
 def _run_build(command: list[str], root: Path) -> dict[str, Any]:
+    build_env = {**os.environ, "CI": "true"}
+    jdk25_candidate = Path("/data/dev/jdk-25")
+    if jdk25_candidate.is_dir():
+        build_env["JAVA_HOME"] = str(jdk25_candidate)
+        build_env["PATH"] = f"{jdk25_candidate / 'bin'}{os.pathsep}{build_env.get('PATH', '')}"
     started = subprocess.run(
         command,
         cwd=root,
-        env={**os.environ, "CI": "true"},
+        env=build_env,
         capture_output=True,
         text=True,
         timeout=240,

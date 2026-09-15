@@ -339,33 +339,49 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
             ? Promise.resolve({ listing: emptyListing(), error: localHomeError })
             : loadInitialListing(sid, "local", localHome),
         ]);
-        set((state) => ({
-          sessions: {
-            ...state.sessions,
-            [sid]: {
-              ...(state.sessions[sid] ?? freshSession(sid)),
-              attached: true,
-              attaching: false,
-              homeDir: realHome,
-              remote: {
-                ...emptyPane(),
-                path: realHome,
-                ...listingState(remoteLoad.listing),
-                error: remoteLoad.error,
-                history: [realHome],
-                historyIndex: 0,
-              },
-              local: {
-                ...emptyPane(),
-                path: localHome,
-                ...listingState(localLoad.listing),
-                error: localLoad.error,
-                history: localHome ? [localHome] : [],
-                historyIndex: localHome ? 0 : -1,
+        set((state) => {
+          const current = state.sessions[sid] ?? freshSession(sid);
+          const remoteAlreadyNavigated = Boolean(
+            current.remote.path &&
+            current.remote.path !== realHome &&
+            current.remote.path !== home,
+          );
+          const localAlreadyNavigated = Boolean(
+            current.local.path &&
+            current.local.path !== localHome,
+          );
+          return {
+            sessions: {
+              ...state.sessions,
+              [sid]: {
+                ...current,
+                attached: true,
+                attaching: false,
+                homeDir: realHome,
+                remote: remoteAlreadyNavigated
+                  ? current.remote
+                  : {
+                      ...emptyPane(),
+                      path: realHome,
+                      ...listingState(remoteLoad.listing),
+                      error: remoteLoad.error,
+                      history: [realHome],
+                      historyIndex: 0,
+                    },
+                local: localAlreadyNavigated
+                  ? current.local
+                  : {
+                      ...emptyPane(),
+                      path: localHome,
+                      ...listingState(localLoad.listing),
+                      error: localLoad.error,
+                      history: localHome ? [localHome] : [],
+                      historyIndex: localHome ? 0 : -1,
+                    },
               },
             },
-          },
-        }));
+          };
+        });
         // The session is officially up. If the refcount fell to zero
         // while we were awaiting (last consumer unmounted mid-attach),
         // tear the channel back down to honour their detach intent.

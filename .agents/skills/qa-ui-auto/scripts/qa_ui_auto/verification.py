@@ -34,8 +34,6 @@ def shell_command(argv: list[str]) -> str:
 
 def native_support(case: TestCase, target: str) -> str | None:
     from .native_steps import VERBS
-    if target == "macOS":
-        return "Tauri WebDriver unavailable; collect native OS/manual evidence using the macOS runbook"
     if case.native_platforms and target not in case.native_platforms:
         return f"case declares native platforms {case.native_platforms}"
     for step in case.steps:
@@ -46,6 +44,19 @@ def native_support(case: TestCase, target: str) -> str | None:
                                              and args.get("transport", "x11") == "x11")
         if linux_only and target != "Linux":
             return f"{verb} requires Linux/X11"
+    return None
+
+
+def browser_support(case: TestCase, target: str) -> str | None:
+    """Browser analogue of native_support for OS-dependent renderer chrome.
+
+    The browser DOM still branches on the host OS (e.g. macOS hides the
+    in-bar window controls and shows the traffic-light inset). Cases that
+    assert one platform's chrome declare it and skip explicitly elsewhere;
+    selector coverage stays global.
+    """
+    if case.browser_platforms and target not in case.browser_platforms:
+        return f"case declares browser platforms {case.browser_platforms}"
     return None
 
 

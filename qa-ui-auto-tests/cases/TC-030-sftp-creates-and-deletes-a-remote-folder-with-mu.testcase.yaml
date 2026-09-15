@@ -6,6 +6,10 @@ modes: [browser]
 fixtures: [reset_db, ssh_required, sftp_required]
 steps:
   - open: "${cfg.app.base_url}"
+  - click: '[data-testid="app-main-menu"]'
+  - hover: '[data-testid="context-menu-item-view"]'
+  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+  - wait_for: '[data-testid="qc-input"]'
   - fill: {selector: "[data-testid=\"qc-input\"]", value: "ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}"}
   - click: "[data-testid=\"qc-submit\"]"
   - wait_for: "[data-testid=\"auth-prompt\"]"
@@ -15,6 +19,7 @@ steps:
   - wait: 2
   - click: "[data-testid=\"attached-sftp-toggle\"]"
   - wait_for: "[data-testid=\"sftp-browser\"]"
+  - click: "[data-testid=\"sftp-remote-path\"]"
   - fill: {selector: "[data-testid=\"sftp-remote-path\"]", value: "${cfg.sftp.remote_test_dir}"}
   - press: Enter
   - wait: 1
@@ -23,8 +28,8 @@ steps:
   - wait: 1
   - click: "[data-testid=\"sftp-remote-new-folder\"]"
   - wait: 1
-  - wait_for: "[data-testid=\"session-tree\"] >> text=\"qa-ui-auto-folder-a\""
-  - wait_for: "[data-testid=\"session-tree\"] >> text=\"qa-ui-auto-folder-b\""
+  - wait_for: "[data-testid=\"sftp-remote-pane\"] >> text=\"qa-ui-auto-folder-a\""
+  - wait_for: "[data-testid=\"sftp-remote-pane\"] >> text=\"qa-ui-auto-folder-b\""
   - click: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-folder-a"'
   - click:
       selector: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-folder-b"'

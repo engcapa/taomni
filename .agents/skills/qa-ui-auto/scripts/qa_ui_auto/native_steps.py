@@ -688,6 +688,8 @@ def _x11_keysyms_for_chord(chord: str) -> list[int]:
         "Space": 0x0020,
         "Control": 0xFFE3,
         "Ctrl": 0xFFE3,
+        # X11 transport is Linux-only, where Mod is Control.
+        "Mod": 0xFFE3,
         "Shift": 0xFFE1,
         "Alt": 0xFFE9,
         "Meta": 0xFFE7,
@@ -1462,6 +1464,7 @@ def _do_native_click(ctx: NativeStepContext, args: Any) -> str:
     geometry = ctx.session.execute(
         f"const el = document.querySelector({json.dumps(selector)});"
         "if (!(el instanceof HTMLElement)) return null;"
+        "try { el.scrollIntoView({ block: 'center', inline: 'center' }); } catch (_) {}"
         "const rect = el.getBoundingClientRect();"
         "return {x:rect.x,y:rect.y,width:rect.width,height:rect.height,"
         "innerWidth:window.innerWidth,innerHeight:window.innerHeight,"

@@ -28,6 +28,7 @@ class TestCase:
     tags: list[str] = field(default_factory=list)
     modes: list[str] = field(default_factory=lambda: ["browser"])
     native_platforms: list[str] = field(default_factory=list)
+    browser_platforms: list[str] = field(default_factory=list)
     fixtures: list[str] = field(default_factory=list)
     timeout_sec: int = 90
     skip: str | None = None
@@ -82,6 +83,7 @@ def load_case(path: Path) -> TestCase:
         tags=list(raw.get("tags", [])),
         modes=list(raw["modes"]),
         native_platforms=list(raw.get("native_platforms", [])),
+        browser_platforms=list(raw.get("browser_platforms", [])),
         fixtures=list(raw.get("fixtures", [])),
         timeout_sec=int(raw["timeout_sec"]),
         skip=raw.get("skip"),

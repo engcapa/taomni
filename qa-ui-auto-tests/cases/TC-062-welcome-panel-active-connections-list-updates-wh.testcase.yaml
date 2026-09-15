@@ -18,5 +18,5 @@ steps:
   - wait: 1
   - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
   - wait: 1
-  - assert_text: {selector: '[data-testid="welcome-panel"]', contains: "local shell"}
+  - assert_text: {selector: '[data-testid="welcome-panel"]', contains: "Start local terminal"}
   - screenshot: 062-welcome-active-connections.png

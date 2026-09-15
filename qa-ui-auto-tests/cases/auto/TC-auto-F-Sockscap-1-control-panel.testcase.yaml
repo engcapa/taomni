@@ -15,6 +15,7 @@ timeout_sec: 45
 steps:
   - open: ${cfg.app.base_url}
   - wait_for: '[data-testid="sidebar"]'
+  - click: '[data-testid="side-tab-tools"]'
   - click: '[data-testid="sidebar-tool-sockscap"]'
   - wait_for: '[data-testid="sockscap-panel"]'
   - assert_visible: '[data-testid="sockscap-start"]'
@@ -66,11 +67,15 @@ steps:
       selector: '[data-testid="sockscap-test-host"]'
       value: www.google.com
   - click: '[data-testid="sockscap-test-target"]'
+  - assert_visible: '[data-testid="sockscap-test-detail"]'
+  - click: '[data-testid="sockscap-test-detail-close"]'
   - click: '[data-testid="sockscap-add-profile"]'
   - assert_text:
       selector: '[data-testid="sockscap-panel"]'
       contains: 方案 2
   - click: '[data-testid="sockscap-start"]'
+  - wait_for: '[data-testid="sockscap-probe-fail-dialog"]'
+  - click: '[data-testid="sockscap-probe-fail-force"]'
   - wait_for: '[data-testid="sockscap-stop"]'
   - assert_visible: '[data-testid="sockscap-locked-banner"]'
   - assert_disabled: '[data-testid="sockscap-add-profile"]'

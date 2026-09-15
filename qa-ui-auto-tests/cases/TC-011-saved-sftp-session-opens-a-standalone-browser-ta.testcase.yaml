@@ -6,8 +6,9 @@ modes: [browser, native]
 fixtures: [reset_db, sftp_required]
 steps:
   - open: "${cfg.app.base_url}"
-  - click: "[data-testid=\"ribbon-sftp\"]"
+  - click: "[data-testid=\"session-new\"]"
   - wait_for: "[data-testid=\"session-editor\"]"
+  - click: "[data-testid=\"session-proto-sftp\"]"
   - assert_visible: "[data-testid=\"session-proto-sftp\"]"
   - fill: {selector: "[data-testid=\"session-host\"]", value: "${cfg.sftp.host}"}
   - fill: {selector: "[data-testid=\"session-port\"]", value: "${cfg.sftp.port}"}

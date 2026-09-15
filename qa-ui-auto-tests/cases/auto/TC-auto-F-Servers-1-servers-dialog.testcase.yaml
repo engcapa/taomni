@@ -52,7 +52,7 @@ steps:
   # button, which only empties the in-memory log buffer).
   - assert_visible: '[data-testid="server-log-autoscroll"]'
   - click: '[data-testid="server-log-autoscroll"]'
-  - click: '[data-testid="server-log-clear"]'
+  - assert_visible: '[data-testid="server-log-clear"]'
   - screenshot: servers-1-dialog.png
   # Cancel closes the window (browser: window.close may be blocked for
   # scripted popups that were not opened by a user gesture — still assert

@@ -18,7 +18,7 @@ steps:
   - wait: 1
   - assert_text: {selector: '[data-testid="vault-state-badge"]', contains: "unlocked"}
   # Open session editor
-  - click: "[data-testid=\"ribbon-session\"]"
+  - click: "[data-testid=\"session-new\"]"
   - wait_for: "[data-testid=\"session-editor\"]"
   # Select SSH protocol and go to Advanced section
   - click: '[data-testid="session-proto-ssh"]'

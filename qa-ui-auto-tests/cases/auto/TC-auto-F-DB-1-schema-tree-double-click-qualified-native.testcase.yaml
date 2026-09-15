@@ -6,18 +6,24 @@ description: |
   that result, and verifies the editor receives the qualified reference
   (`information_schema`.`TABLES`) instead of the bare name. The qualified SELECT
   is then executed and the result grid must appear, proving the inserted
-  reference resolves in a real connection. Windows/WebView2 target.
+  reference resolves in a real connection. Cross-platform native target (Linux, macOS, Windows).
 covers: [F-DB-1]
 tags: [database, sql, schema-tree, qualified-name, native-boundary, needs-review]
 modes: [native]
-native_platforms: [Windows]
-fixtures: [reset_db]
+native_platforms: [Linux, macOS, Windows]
+fixtures: [reset_db, mysql_required]
 timeout_sec: 300
 steps:
   - open: ${cfg.app.base_url}
   - vault_first_run: qa-native-qualified-password
   - wait_for: '[data-testid="welcome-panel"]'
+  # Expand the Sessions panel idempotently on every native OS. The
+  # in-bar app menu is hidden on native macOS by design, so switch away
+  # first: a bare side-tab-sessions click would toggle-collapse a fresh
+  # profile instead of selecting.
+  - click: '[data-testid="side-tab-tools"]'
   - click: '[data-testid="side-tab-sessions"]'
+  - wait_for: '[data-testid="session-tree"]'
   - wait_for: '[data-testid="session-new"]'
   - click: '[data-testid="session-new"]'
   - wait_for: '[data-testid="session-editor"]'
@@ -27,19 +33,19 @@ steps:
       timeout_sec: 10
   - fill:
       selector: '[data-testid="session-host"]'
-      value: 10.1.5.52
+      value: ${cfg.database.host}
   - fill:
       selector: '[data-testid="session-port"]'
-      value: "3306"
+      value: "${cfg.database.port}"
   - fill:
       selector: 'input[aria-label="Database username"]'
-      value: test
+      value: ${cfg.database.user}
   - fill:
       selector: 'input[aria-label="Database password"]'
-      value: ${env.TAOMNI_TEST_MYSQL_PASSWORD}
+      value: ${cfg.database.password}
   - fill:
       selector: 'input[aria-label="Database name"]'
-      value: test
+      value: ${cfg.database.database}
   - click: '[data-testid="db-save-in-vault"]'
   - click: '[data-testid="session-section-bookmark"]'
   - wait_for: '[data-testid="bookmark-settings"]'
@@ -68,10 +74,13 @@ steps:
   - wait_for:
       selector: '[data-testid="schema-tree"]'
       timeout_sec: 30
-  # The schema panel can start collapsed at this window size; expand it first.
-  - click: '[data-testid="db-schema-drawer-handle"]'
-  - wait_for: '[data-testid="schema-tree-filter"]'
-  - click: '[data-testid="sql-editor"]'
+  # Fresh isolated profiles start with the schema panel expanded
+  # (taomni.db.schemaWidth.* is absent -> default 24%), so the collapse
+  # drawer handle does not exist here; wait for the filter directly.
+  - wait_for:
+      selector: '[data-testid="schema-tree-filter"]'
+      timeout_sec: 30
+  - click: '[data-testid="sql-editor"] .cm-content'
   # Filter for a table that only exists in information_schema, not in the active
   # `test` database, so an unqualified name cannot resolve.
   - fill:
@@ -87,7 +96,7 @@ steps:
       contains: '`information_schema`.`TABLES`'
   - screenshot: schema-tree-double-click-qualified-editor.png
   # Replace the inserted reference with a full statement and run it for real.
-  - press: Control+a
+  - press: Mod+a
   - type: SELECT COUNT(*) FROM `information_schema`.`TABLES`;
   - click: '[data-testid="db-run-current-statement"]'
   - wait_for:

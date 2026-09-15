@@ -24,6 +24,7 @@ export function AiMasterSwitch() {
 
   return (
     <div
+      data-testid="ai-master-switch"
       className={`flex items-center gap-3 rounded border p-3 cursor-pointer transition-colors ${
         disabled
           ? "border-yellow-500/50 bg-yellow-500/10"

@@ -6,7 +6,10 @@ modes: [browser]
 fixtures: [reset_db, ssh_required]
 steps:
   - open: "${cfg.app.base_url}"
-  - click: "[data-testid=\"ribbon-tunneling\"]"
+  - wait_for: '[data-testid="app-main-menu"]'
+  - click: '[data-testid="app-main-menu"]'
+  - hover: '[data-testid="context-menu-item-tools"]'
+  - click: '[data-testid="context-menu-item-tunneling"]'
   - wait_for: "[data-testid=\"tunnel-manager\"]"
   - click: "[data-testid=\"tunnel-new\"]"
   - wait_for: "[data-testid=\"tunnel-editor\"]"
@@ -22,17 +25,17 @@ steps:
   - click: '[data-testid="tunnel-editor-save"]'
   - wait: 1
   - wait_for: "[data-testid=\"tunnel-manager\"] >> text=\"qa-ui-auto-remote-tunnel\""
-  - assert_visible: "[data-testid=\"tunnel-editor\"] >> text=\"Remote\""
+  - assert_visible: '[data-testid="tunnel-manager"] >> text="Remote"'
   - click: '[data-testid="tunnel-manager"] tr:has-text("qa-ui-auto-remote-tunnel") button[title="Clone"]'
   - wait: 1
-  - wait_for: "[data-testid=\"tunnel-manager\"] >> text=\"qa-ui-auto-remote-tunnel (copy)\""
+  - wait_for: '[data-testid="tunnel-manager"] >> text="qa-ui-auto-remote-tunnel (copy)"'
   - click: '[data-testid="tunnel-manager"] tr:has-text("qa-ui-auto-remote-tunnel (copy)") button[title="Edit"]'
   - wait: 1
   - click: 'label:has-text("Dynamic port forwarding (SOCKS proxy)") input[type="radio"]'
   - wait: 1
   - click: '[data-testid="tunnel-editor-save"]'
   - wait: 1
-  - wait_for: "[data-testid=\"tunnel-editor\"] >> text=\"Dynamic\""
+  - wait_for: '[data-testid="tunnel-manager"] >> text="Dynamic"'
   - seed_dialog: {confirm: true}
   - wait: 1
   - screenshot: 056-tunnel-remote-dynamic-clone.png

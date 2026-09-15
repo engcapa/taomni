@@ -58,7 +58,7 @@ steps:
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
-      keys: ["Control+End"]
+      keys: ["Mod+End"]
   - assert_text:
       selector: '[data-testid="status-bar-workspace-cursor"]'
       contains: "${fixture.editor_perf_Large1MiB_cursor_at_end}"
@@ -104,7 +104,7 @@ steps:
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
-      keys: ["Control+z", "Control+z", "Control+z", "Control+z"]
+      keys: ["Mod+z", "Mod+z", "Mod+z", "Mod+z"]
   - wait: 0.5
   - press: Control+s
   - assert_file_sha256:
@@ -133,7 +133,7 @@ steps:
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
-      keys: ["Control+End"]
+      keys: ["Mod+End"]
   - assert_text:
       selector: '[data-testid="status-bar-workspace-cursor"]'
       contains: "${fixture.editor_perf_Stress5MiB_cursor_at_end}"
@@ -209,7 +209,7 @@ steps:
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
-      keys: ["Control+End"]
+      keys: ["Mod+End"]
   - assert_text:
       selector: '[data-testid="status-bar-workspace-cursor"]'
       contains: "${fixture.editor_perf_Small_cursor_at_end}"

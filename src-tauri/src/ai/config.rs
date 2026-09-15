@@ -466,7 +466,7 @@ pub struct FallbackConfig {
 // ── Config path ───────────────────────────────────────────────────────────────
 
 pub fn default_ai_config_path() -> PathBuf {
-    dirs::config_dir()
+    crate::resolved_config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("taomni")
         .join("ai.json")

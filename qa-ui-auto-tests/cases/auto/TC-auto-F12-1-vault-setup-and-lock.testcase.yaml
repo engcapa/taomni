@@ -10,6 +10,8 @@ steps:
   # Open settings to access vault
   - click: "[data-testid=\"ribbon-settings\"]"
   - wait_for: "[data-testid=\"settings-panel\"]"
+  - click: '[data-testid="settings-group-toggle-security"]'
+  - wait_for: '[data-testid="vault-settings"]'
   # Vault settings should be visible with empty state
   - assert_visible: '[data-testid="vault-settings"]'
   - assert_visible: '[data-testid="vault-state-badge"]'

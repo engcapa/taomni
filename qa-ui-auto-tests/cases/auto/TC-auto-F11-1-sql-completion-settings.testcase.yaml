@@ -24,7 +24,9 @@ steps:
   - fill: {selector: '[data-testid="settings-search-input"]', value: ''}
 
   # Existing global reset controls remain reachable after adding the SQL section.
+  - click: '[data-testid="settings-group-toggle-code"]'
   - click: '[data-testid="settings-reset-code-view-profile"]'
+  - click: '[data-testid="settings-group-toggle-terminal"]'
   - click: '[data-testid="settings-reset-terminal-default-profile"]'
 
   - assert_visible: '[data-testid="sql-completion-settings"]'

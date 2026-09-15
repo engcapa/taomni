@@ -38,6 +38,9 @@ steps:
   - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-rdp"]'
   # Open the RDP tab — the panel mounts immediately, regardless of dial state.
   - open_session: { name: qa-ui-auto-rdp, double_click: true }
+  - wait_for: '[data-testid="auth-prompt"]'
+  - fill: {selector: '[data-testid="auth-password"]', value: "rdp-test"}
+  - click: '[data-testid="auth-submit"]'
   - wait_for:
       selector: '[data-testid="rdp-panel"]'
       timeout_sec: 10

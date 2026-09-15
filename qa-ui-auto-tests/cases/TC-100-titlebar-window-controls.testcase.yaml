@@ -10,11 +10,16 @@ description: |
 covers: [F1.3]
 tags: [smoke, p1, main, window]
 modes: [browser]
+# WindowControls render only on non-macOS chrome (ControlBar hides them on
+# macOS in favour of the traffic-light inset). Linux/Windows prove the
+# three-button surface; macOS hosts skip explicitly, coverage stays global.
+browser_platforms: [Linux, Windows]
 fixtures: [reset_db]
 timeout_sec: 30
 steps:
   - open: ${cfg.app.base_url}
   - wait_for: '[data-testid="control-bar"]'
+  - assert_visible: '[data-testid="control-bar"]'
   - assert_visible: '[data-testid="window-drag-handle"]'
   - assert_visible: '[data-testid="window-controls"]'
   - assert_visible: '[data-testid="window-min"]'

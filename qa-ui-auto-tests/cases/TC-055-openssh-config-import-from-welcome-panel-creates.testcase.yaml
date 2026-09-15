@@ -9,7 +9,9 @@ steps:
   - wait_for: "[data-testid=\"welcome-panel\"]"
   - assert_not_visible: '[data-testid="welcome-panel"] >> text="Import OpenSSH config"'
   - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu"] >> text="Import sessions"'
-  - assert_visible: '[data-testid="context-menu"] >> [data-testid="import-openssh"]'
+  - hover: '[data-testid="context-menu-item-sessions"]'
+  - hover: '[data-testid="menu-import-sessions"]'
+  - assert_visible: '[data-testid="import-openssh"]'
+  - press: Escape
   - press: Escape
   - screenshot: 055-openssh-config-import.png

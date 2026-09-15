@@ -6,7 +6,7 @@ description: |
   field. Confirms each radio is selectable (interactive coverage), that
   +path+ai persists, and that the Ctrl+K shortcut field is editable when
   the toggle is on.
-covers: [F-AI-2.2]
+covers: [F-AI-2.2, F1.3]
 tags: [ai, ghost-text, p1]
 modes: [browser]
 fixtures: [reset_db]
@@ -15,6 +15,8 @@ steps:
   - open: ${cfg.app.base_url}
   - wait_for: '[data-testid="ribbon-settings"]'
   - click: '[data-testid="ribbon-settings"]'
+  - wait_for: '[data-testid="settings-group-toggle-terminal"]'
+  - click: '[data-testid="settings-group-toggle-terminal"]'
   - wait_for: '[data-testid="settings-panel"] >> text=Inline command suggestions'
   # The three radio choices must be present + selectable.
   - assert_visible: 'input[name="inlineSuggestionsSource"][value="history"]'
@@ -24,6 +26,7 @@ steps:
   - click: 'input[name="inlineSuggestionsSource"][value="history+path"]'
   - click: 'input[name="inlineSuggestionsSource"][value="history+path+ai"]'
   # AI rewrite toggle + shortcut input
+  - click: '[data-testid="ai-command-rewrite-toggle"]'
   - assert_visible: 'input[aria-label="AI command rewrite shortcut"]'
   - fill:
       selector: 'input[aria-label="AI command rewrite shortcut"]'
