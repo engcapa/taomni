@@ -383,6 +383,8 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 
 - **2026-09-14 P1 局部接续：** [WP-FIND-FOCUS-01 设计](../../docs-issue/code-workspace-find-focus-design.md)、[ED-FINDFOCUS-001 唯一任务板](../../claudedocs/code-workspace-idea-parity-backlog-find-focus.md)、[真实 Find 参照](references/find-focus-2026.2.2.md)。本场景为受影响保留消费者，未开展其全量对齐。原功能/视觉/交互三维结论和差异类型保留，未关闭场景差距；任务状态仅看板。
 
+- **2026-09-15 P1 新卡增量：** [ED-PARITY-001 设计](find-provider-accessibility-plan.md#ed-parity-001) / [参考与补采](references/ed-parity-001-reference.md) / [完整 P2](handoff-p2-ed-parity-001.md)。当前 Find 防重入修复已存在；本卡只接续 Find 后真实 provider 导航与 accessibility 证据。独立 DEC/AC/V 与本轮Linux真参照已齐（Find、两轮Java定义/Back、hover/release）；用户确认沿用原AC、播报未验证。P1规划完成，唯一板同卡 ready/planning_required=false，无开发owner。Linux 只读 status：C6-05 stale、Find unverified；本轮零产品执行，未关闭本场景差距、未将历史三维判断升级。
+
 <a id="cw-nav-003"></a>
 
 ### CW-NAV-003 — Find / Show Usages 与 Call / Type Hierarchy
@@ -442,6 +444,8 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 
 
 - **2026-09-14 P1 局部接续：** [WP-FIND-FOCUS-01 设计](../../docs-issue/code-workspace-find-focus-design.md)、[ED-FINDFOCUS-001 唯一任务板](../../claudedocs/code-workspace-idea-parity-backlog-find-focus.md)、[真实 Find 参照](references/find-focus-2026.2.2.md)。补得 F0 Find/query/Enter/Shift+Enter/Esc/repeat 的 IDEA 侧观察；Taomni candidate 尚未实施或执行。原功能/视觉/交互三维结论和差异类型保留，未关闭场景差距；任务状态仅看板。
+
+- **2026-09-15 P1 新卡增量：** [ED-PARITY-001 设计](find-provider-accessibility-plan.md#ed-parity-001) / [参考与补采](references/ed-parity-001-reference.md) / [完整 P2](handoff-p2-ed-parity-001.md)。当前 Find 防重入修复已存在；本卡只接续 Find 后真实 provider 导航与 accessibility 证据。独立 DEC/AC/V 与本轮Linux真参照已齐（Find、两轮Java定义/Back、hover/release）；用户确认沿用原AC、播报未验证。P1规划完成，唯一板同卡 ready/planning_required=false，无开发owner。Linux 只读 status：C6-05 stale、Find unverified；本轮零产品执行，未关闭本场景差距、未将历史三维判断升级。
 
 <a id="cw-search-002"></a>
 
@@ -950,6 +954,8 @@ IDEA I0 = [REF-TREE-2026-09-13](references/project-tree-navigation-2026.2.2.md)�
 
 
 **2026-09-14 REQ-03 P1 增量：** 仅作首包受影响保留消费者，不扩展原场景目标。生产调用链、保留断言和最小改前/改后验证已列入R1..R7；缺当前运行证据不登记成产品bug。 [设计](shell-layout-design.md)、[任务板 ED-SHELLLAYOUT-001](../../claudedocs/code-workspace-idea-parity-backlog-shell-layout.md)、[局部参照](references/shell-layout-2026.2.2-linux.md)。任务尚不可领取，状态只读任务板；本场景2026-09-13历史三维结论/分母不变、差距未关闭。 Find当前已有修复且原卡implemented，Tree原卡done仅其范围；旧搜索异常文字保留历史日期，不等于HEAD仍复现。
+
+- **2026-09-15 P1 新卡增量：** [ED-PARITY-001 设计](find-provider-accessibility-plan.md#ed-parity-001) / [参考与补采](references/ed-parity-001-reference.md) / [完整 P2](handoff-p2-ed-parity-001.md)。当前 Find 防重入修复已存在；本卡只接续 Find 后真实 provider 导航与 accessibility 证据。独立 DEC/AC/V 与本轮Linux真参照已齐（Find、两轮Java定义/Back、hover/release）；用户确认沿用原AC、播报未验证。P1规划完成，唯一板同卡 ready/planning_required=false，无开发owner。Linux 只读 status：C6-05 stale、Find unverified；本轮零产品执行，未关闭本场景差距、未将历史三维判断升级。
 
 <a id="cw-shell-003"></a>
 

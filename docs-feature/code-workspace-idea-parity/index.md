@@ -6,6 +6,9 @@
 
 ## 当前任务入口（2026-09-15）
 
+**2026-09-15 P1 完成：** [ED-PARITY-001](find-provider-accessibility-plan.md#ed-parity-001)（REQ-01 / CW-SEARCH-001、CW-SHELL-002、CW-NAV-002）已完成补证设计、独立 DEC/AC/V 与保留断言；[Linux 真实参照](references/ed-parity-001-reference.md#observed)、[完整 P2 提示词](handoff-p2-ed-parity-001.md)、[静态核对](evidence/ed-parity-001-p1-static.md)。唯一板同卡 ready/planning_required=false，无开发owner；用户已确认播报保留未验证。两段IDEA采样结束并归还桌面。本结论只是P1规划就绪，不是Taomni功能/UI/交互已对齐，产品测试/构建/领取/实现均未执行。
+
+
 - **唯一新任务板：[backlog.md](backlog.md)**，新卡 ID 为 `ED-PARITY-xxx`。P0 从真实差距产卡；P1 自动选定一张卡做规划；P2 在该卡 ready 后正式领取开发。禁止混入或接续 `claudedocs/` 旧板任务。
 - **可直接复制：[固定 P1 提示词](handoff-p1-next.md)**。无需填写任务或环境参数；缺少影响设计的 IDEA 信息时，P1 可以询问用户。
 - [P0 新卡待细化规格](task-planning.md)：当前是文档补录的起点，必须完成 P1 才能进入开发。
