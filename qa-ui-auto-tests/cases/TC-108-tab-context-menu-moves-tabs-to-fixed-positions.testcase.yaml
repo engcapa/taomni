@@ -12,8 +12,15 @@ steps:
   - open: "${cfg.app.base_url}"
   - click: "[data-testid=\"welcome-open-local-terminal\"]"
   - wait_for: "[data-testid=\"terminal-pane\"]"
+  - dblclick: '[data-testid="tab-title"] >> nth=1'
+  - wait_for: '[data-testid="tab-title-input"]'
+  - fill: {selector: '[data-testid="tab-title-input"]', value: "Terminal 1"}
+  - press: {key: "Enter", selector: '[data-testid="tab-title-input"]'}
+  - wait: 0.3
   - click: "[data-testid=\"new-local-terminal\"]"
+  - wait: 0.3
   - click: "[data-testid=\"new-local-terminal\"]"
+  - wait: 0.3
   - assert_count: {selector: '[data-testid="tab-item"]', min: 4}
   - right_click: '[data-testid="tab-item"][data-tab-title="Terminal 1"]'
   - wait_for: "[data-testid=\"context-menu\"]"

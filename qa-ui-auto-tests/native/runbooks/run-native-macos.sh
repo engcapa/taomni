@@ -1,34 +1,94 @@
 #!/usr/bin/env bash
 # R9 native gate — macOS runbook (§8.19.10).
 #
-# KNOWN LIMITATION: tauri-driver does not support macOS (no WebDriver
-# implementation for WKWebView). G1 keyboard/IME/a11y evidence on macOS is a
-# MANUAL checklist: perform each gate interaction by hand on the packaged app,
-# then record one entry per item with --result passed|failed. Automated
-# browser-mode runs never substitute for this.
-#
-# The only automatable slice is the Rust fault harness + unit gates, which do
-# not need the UI:
-#   cargo test -p taomni --features hbase-kerberos workspace::
+# macOS has no upstream Tauri WebDriver adapter, so the QA debug binary starts
+# an opt-in WKWebView bridge on a run-owned loopback port. This exercises the
+# packaged WebView/IPC path. OS-global input, dialogs, permissions and IME still
+# need separate OS automation/manual evidence.
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
 
-echo "== [1/2] build packaged debug app =="
+native_java_home="${TAOMNI_NATIVE_JAVA_HOME:-}"
+if [ -z "$native_java_home" ]; then
+  native_java_home="$(/usr/libexec/java_home -v 21 2>/dev/null || true)"
+fi
+if [ -n "$native_java_home" ]; then
+  export JAVA_HOME="$native_java_home"
+  export PATH="$JAVA_HOME/bin:$PATH"
+fi
+
+# The fixture runners intentionally reject their old Linux default paths. A
+# runbook invocation should be self-contained, while still allowing CI or a
+# developer to pin a different provider installation explicitly.
+if [ -z "${TAOMNI_FIXTURE_JAVA:-}" ]; then
+  if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+    export TAOMNI_FIXTURE_JAVA="$JAVA_HOME/bin/java"
+  else
+    export TAOMNI_FIXTURE_JAVA="$(command -v java || true)"
+  fi
+fi
+if ! command -v jdtls >/dev/null 2>&1; then
+  echo "jdtls is required for Java native cases (install with: brew install jdtls)" >&2
+  exit 2
+fi
+if [ -z "${JDTLS_HOME:-}" ]; then
+  jdtls_prefix="$(brew --prefix jdtls 2>/dev/null || true)"
+  JDTLS_HOME="$jdtls_prefix/libexec"
+  if [ -n "$jdtls_prefix" ] && [ -d "$JDTLS_HOME/plugins" ]; then
+    export JDTLS_HOME
+  else
+    unset JDTLS_HOME
+  fi
+fi
+if ! command -v mvn >/dev/null 2>&1; then
+  echo "Maven is required for Java native cases (install with: brew install maven)" >&2
+  exit 2
+fi
+if ! command -v gradle >/dev/null 2>&1; then
+  echo "Gradle is required for Java native cases (install with: brew install gradle)" >&2
+  exit 2
+fi
+if [ -z "${TAOMNI_FIXTURE_GRADLE:-}" ]; then
+  fixture_gradle_home="$(brew --prefix gradle 2>/dev/null || true)"
+  if [ -n "$fixture_gradle_home" ] && [ -x "$fixture_gradle_home/bin/gradle" ]; then
+    export TAOMNI_FIXTURE_GRADLE="$fixture_gradle_home"
+  fi
+fi
+
+echo "== [1/3] Java/LSP toolchain =="
+echo "JAVA_HOME=${JAVA_HOME:-<unset>}"
+echo "TAOMNI_FIXTURE_JAVA=$TAOMNI_FIXTURE_JAVA"
+echo "JDTLS_HOME=${JDTLS_HOME:-<auto>}"
+echo "TAOMNI_FIXTURE_GRADLE=${TAOMNI_FIXTURE_GRADLE:-<auto>}"
+JAVA_MAJOR="$(java -version 2>&1 | sed -n 's/.*version "\([0-9][0-9]*\).*/\1/p' | head -1)"
+if [ -z "$JAVA_MAJOR" ] || [ "$JAVA_MAJOR" -lt 21 ]; then
+  echo "JDK 21+ is required for jdtls (found Java ${JAVA_MAJOR:-unknown})" >&2
+  exit 2
+fi
+java -version 2>&1 | head -1
+echo "jdtls=$(command -v jdtls)"
+jdtls --help >/dev/null
+echo "maven=$(mvn -version 2>&1 | head -1)"
+echo "gradle=$(gradle --version 2>&1 | sed -n '/^Gradle /{p;q;}')"
+
+echo "== [2/3] build packaged debug app =="
 python .agents/skills/qa-ui-auto/scripts/native_build.py
 
-echo "== [2/2] manual gate checklist =="
-cat <<'EOF'
-For each §8.19.10 matrix item, drive the packaged app by hand and record:
-  python .agents/skills/qa-ui-auto/scripts/evidence_collect.py \
-    --case <item-id> --gate <G0|G1|perf|a11y> \
-    --platform macos --result <passed|failed> \
-    --command "<what you did>" --layout <layout> --ime <ime> --scale <100%|200%> \
-    --gap "<anything not covered>"
+echo "== [3/3] run isolated macOS native cases =="
+export PYTHONPATH=".agents/skills/qa-ui-auto/scripts${PYTHONPATH:+:$PYTHONPATH}"
+REPORT_DIR="${QA_UI_AUTO_REPORT_DIR:-qa-ui-auto-report/native-macos}"
+python -m qa_ui_auto run \
+  --mode native \
+  --config qa-ui-auto-tests/qa-ui-auto.config.yaml \
+  --report-dir "$REPORT_DIR" \
+  --keep-runs 0 \
+  "$@"
 
-Use only the com.taomni.app.qa build and record its binary hash and source
-identity. Use QA-owned data/config/cache and disposable workspaces. Do not
-launch the production app or redirect HOME. Workflows sharing Keychain or
-other host resources require a disposable OS account.
-Building does not prove native execution. Record observable outcomes and
-artifacts; browser evidence does not satisfy WKWebView/OS checks.
+cat <<'EOF'
+
+The automated report covers the packaged WKWebView/IPC path. Record separate
+OS-global evidence (Cmd/Meta, IME, permissions, dialogs, clipboard ownership,
+window controls) with evidence_collect.py when those boundaries are in scope.
+Use only the com.taomni.app.qa build, QA-owned data/config/cache and disposable
+workspaces; never launch the production app or redirect HOME.
 EOF

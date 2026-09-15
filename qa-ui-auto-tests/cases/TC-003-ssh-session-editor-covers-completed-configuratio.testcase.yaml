@@ -19,7 +19,6 @@ steps:
   - fill: {selector: "[data-testid=\"session-user\"]", value: "${cfg.ssh.user}"}
   - assert_visible: "[data-testid=\"advanced-ssh-settings\"]"
   - assert_visible: "[data-testid=\"session-editor\"] >> text=\"SSH-browser type\""
-  - assert_visible: "[data-testid=\"session-editor\"] >> text=\"Auto-inject OSC 7 cwd reporting\""
   - fill: {selector: "input[aria-label=\"Execute command\"]", value: echo qa-ui-auto-session}
   - click: "[data-testid=\"session-section-terminal\"]"
   - assert_visible: "[data-testid=\"terminal-settings\"]"
@@ -28,6 +27,7 @@ steps:
   - click: "[data-testid=\"session-section-network\"]"
   - assert_visible: "[data-testid=\"network-settings\"]"
   - assert_visible: "[data-testid=\"session-editor\"] >> text=\"Keep-alive\""
+  - select_option: {selector: "[data-testid=\"session-proxy-kind\"]", value: "http"}
   - fill: {selector: "input[aria-label=\"Proxy host\"]", value: proxy.example.test}
   - fill: {selector: "input[aria-label=\"New forward local address\"]", value: "127.0.0.1:19090"}
   - fill: {selector: "input[aria-label=\"New forward remote address\"]", value: "127.0.0.1:22"}

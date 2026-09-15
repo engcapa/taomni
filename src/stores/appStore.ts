@@ -385,11 +385,11 @@ function writeVaultUnlockMode(mode: VaultUnlockMode) {
 function readSidebarCollapsed(): boolean {
   try {
     const value = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
-    if (value === "false") return false;
     if (value === "true") return true;
-    return true;
+    if (value === "false") return false;
+    return false;
   } catch {
-    return true;
+    return false;
   }
 }
 

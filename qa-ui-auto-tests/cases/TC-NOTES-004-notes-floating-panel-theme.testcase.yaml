@@ -26,7 +26,7 @@ steps:
   - wait: 0.3
   - assert_attribute: { selector: '[data-testid="notes-panel"]', name: 'data-notes-theme', equals: 'paper' }
   # Pop out into the single floating panel.
-  - click: '[data-testid="note-panel-mode-floating"]'
+  - click: '[data-testid="notes-floating-toggle"]'
   - wait_for: '[data-testid="floating-notes-panel"]'
   - assert_count: { selector: '[data-testid="floating-notes-panel"]', equal: 1 }
   - assert_localstorage: { key: "taomni.stub.notePrefs.v1", contains: "paper" }

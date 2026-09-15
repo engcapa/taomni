@@ -213,6 +213,14 @@ controls:
     selector: 'span[aria-label="New output"]'
     kind: display
     optional: true
+  - id: context-menu-item-tools
+    selector: '[data-testid="context-menu-item-tools"]'
+    kind: interactive
+    optional: true
+  - id: context-menu-item-tunneling
+    selector: '[data-testid="context-menu-item-tunneling"]'
+    kind: interactive
+    optional: true
 -->
 
 - 多标签：本地终端 / SSH 终端 / SFTP / VNC / 设置 / 隧道管理 / Welcome / 占位标签
@@ -257,6 +265,9 @@ controls:
     optional: true       # only rendered when selected shell canElevate
   - id: new-session-card
     selector: 'text="New session…"'
+    kind: interactive
+  - id: new-session-card-testid
+    selector: '[data-testid="welcome-new-session"]'
     kind: interactive
   - id: recent-sessions-panel
     selector: '[data-testid="welcome-recent-sessions"]'
@@ -435,14 +446,19 @@ controls:
 id: F1.8
 status: done
 area: main/menubar
-components: [ControlBar, ContextMenu]
+components: [ControlBar, ContextMenu, AboutDialog]
 files:
   - src/components/tabbar/ControlBar.tsx
   - src/components/ContextMenu.tsx
+  - src/components/AboutDialog.tsx
 controls:
   - id: app-main-menu
     selector: '[data-testid="app-main-menu"]'
     kind: interactive     # opens the unified app menu (ControlBar)
+  - id: about-dialog
+    selector: '[data-testid="about-dialog"]'
+    kind: display
+    optional: true        # opens via Help menu or command-help
   - id: context-menu-item-view          # slug-generated from label "View"
     selector: '[data-testid="context-menu-item-view"]'
     kind: interactive
@@ -463,10 +479,26 @@ controls:
     selector: '[data-testid="context-menu-item-reload-sessions"]'
     kind: interactive
     optional: true       # inside the unified app menu → Sessions submenu
+  - id: show-sessions-command
+    selector: '[data-testid="context-menu-item-show-sessions"]'
+    kind: interactive
+    optional: true       # inside the unified app menu → Sessions submenu; idempotent expand
   - id: xserver-command
     selector: '[data-testid="context-menu-item-xserver"]'
     kind: interactive
     optional: true       # top-level toggle in the unified app menu
+  - id: context-menu-item-sessions
+    selector: '[data-testid="context-menu-item-sessions"]'
+    kind: interactive
+    optional: true       # inside the unified app menu
+  - id: menu-split-terminal
+    selector: '[data-testid="context-menu-item-split-terminal"]'
+    kind: interactive
+    optional: true
+  - id: menu-toggle-sidebar
+    selector: '[data-testid="context-menu-item-toggle-sidebar"]'
+    kind: interactive
+    optional: true
 -->
 
 - 原 per-menu `MenuBar`（menu-bar/menu-terminal/menu-view…）已从产品移除；统一入口是标题栏的 `app-main-menu` 按钮，经共享 ContextMenu 渲染一级/二级菜单。
@@ -476,47 +508,50 @@ controls:
 - 下拉项调用 ribbon 命令或在新标签内打开会话
 - 右键菜单兜底已被 ContextMenu 通用化
 
-### 1.9 Ribbon 命令条 `Ribbon` ✅
+### 1.9 控制栏核心命令分发 ✅
 
 <!-- feature
 id: F1.9
 status: done
-area: main/ribbon
-components: [Ribbon]
+area: main/commands
+components: [ControlBar, Sidebar]
 files:
-  - src/components/menubar/Ribbon.tsx
+  - src/components/tabbar/ControlBar.tsx
+  - src/components/sidebar/Sidebar.tsx
+  - src/components/menubar/commands.ts
 controls:
-  - id: ribbon
-    selector: '[data-testid="ribbon"]'
-    kind: display
-    optional: true       # hidden by default; enable via View -> Tool button bar
-  - id: ribbon-session
-    selector: '[data-testid="ribbon-session"]'
+  - id: command-session
+    selector: '[data-testid="context-menu-item-new-remote-session"]'
     kind: interactive
-  - id: ribbon-sftp
-    selector: '[data-testid="ribbon-sftp"]'
+  - id: command-sftp
+    selector: '[data-testid="context-menu-item-new-sftp"]'
     kind: interactive
-  - id: ribbon-servers
-    selector: '[data-testid="ribbon-servers"]'
-    kind: interactive       # opens the Local servers dialog (F-Servers-1)
   - id: ribbon-settings
     selector: '[data-testid="ribbon-settings"]'
     kind: interactive
-  - id: ribbon-tunneling
-    selector: '[data-testid="ribbon-tunneling"]'
+  - id: command-help
+    selector: '[data-testid="context-menu-item-help"]'
     kind: interactive
-  - id: ribbon-multiexec
-    selector: '[data-testid="ribbon-multiexec"]'
+  - id: command-settings-menu
+    selector: '[data-testid="context-menu-item-settings"]'
     kind: interactive
     optional: true
-  - id: ribbon-commands
-    selector: '[data-testid="ribbon-commands"]'
+  - id: command-servers
+    selector: '[data-testid="context-menu-item-servers"]'
+    kind: interactive
+    optional: true
+  - id: command-exit
+    selector: '[data-testid="context-menu-item-exit"]'
+    kind: interactive
+    optional: true
+  - id: command-close-active
+    selector: '[data-testid="context-menu-item-close-active-tab"]'
     kind: interactive
     optional: true
 -->
 
-- 大图标命令：Session / SFTP / Servers / Tools / View / Split / MultiExec / Tunneling / Packages / Settings / Help
-- 每条命令通过 `data-testid={`ribbon-${slug(label)}`}` 暴露稳定锚点
+- 控制栏统一菜单承接原 Ribbon 大图标核心命令分发：Session / SFTP / Settings / Help / Servers / Exit。
+- 每条命令通过显式 `data-testid="context-menu-item-<command>"` 暴露稳定锚点，分发到各功能面板或对话框。
 
 ---
 
@@ -1097,6 +1132,10 @@ controls:
     selector: '[data-testid="terminal-context-set-local-default-theme"]'
     kind: interactive
     optional: true       # only visible in the local terminal context menu
+  - id: context-theme-options
+    selector: '[data-testid^="terminal-context-theme-option-"]'
+    kind: interactive
+    optional: true
   - id: preview
     selector: '[data-testid="terminal-preview"]'
     kind: display
@@ -1400,6 +1439,10 @@ controls:
     selector: 'input[aria-label="IMAP server"]'
     kind: interactive
     optional: true
+  - id: mail-smtp-server
+    selector: 'input[aria-label="SMTP server"]'
+    kind: interactive
+    optional: true
   - id: mail-email-user
     selector: 'input[aria-label="Mail email or username"]'
     kind: interactive
@@ -1522,6 +1565,10 @@ controls:
     kind: interactive
     optional: true
   # Network inputs
+  - id: network-proxy-kind
+    selector: '[data-testid="session-proxy-kind"]'
+    kind: interactive
+    optional: true
   - id: network-proxy-host
     selector: 'input[aria-label="Proxy host"]'
     kind: interactive
@@ -1660,7 +1707,11 @@ status: done
 area: sessions/import
 files:
   - src/lib/sessionImportExport.ts
-controls: []   # UI entry is the Sessions menu import flow; this feature is the import library logic only
+controls:
+  - id: menu-import-sessions
+    selector: '[data-testid="menu-import-sessions"]'
+    kind: interactive
+    optional: true
 -->
 
 - 解析 `~/.ssh/config` 并批量导入会话
@@ -1753,6 +1804,10 @@ controls:
     selector: '[data-testid="breadcrumb-drives-root"]'
     kind: interactive
     optional: true          # Windows-only drives breadcrumb
+  - id: preview-close
+    selector: '[data-testid="sftp-preview-close"]'
+    kind: interactive
+    optional: true
 -->
 
 - 远程面板 + 本地面板（左右或上下，可切换 orientation）
@@ -2131,6 +2186,8 @@ controls:
     kind: interactive
   - id: editor-remote-host
     selector: 'input[placeholder="127.0.0.1"]'
+    aliases:
+      - 'input[placeholder="db.internal"]'
     kind: interactive
     optional: true       # only rendered for remote-forward / dynamic kinds
   - id: editor-remote-port
@@ -2454,6 +2511,26 @@ controls:
   - id: reset-terminal-default-profile
     selector: '[data-testid="settings-reset-terminal-default-profile"]'
     kind: interactive
+  - id: group-toggle-general
+    selector: '[data-testid="settings-group-toggle-general"]'
+    kind: interactive
+    optional: true       # accordion toggle for general section
+  - id: group-toggle-security
+    selector: '[data-testid="settings-group-toggle-security"]'
+    kind: interactive
+    optional: true       # accordion toggle for security & vault section
+  - id: group-toggle-code
+    selector: '[data-testid="settings-group-toggle-code"]'
+    kind: interactive
+    optional: true       # accordion toggle for code editor section
+  - id: group-toggle-database
+    selector: '[data-testid="settings-group-toggle-database"]'
+    kind: interactive
+    optional: true       # accordion toggle for database section
+  - id: group-toggle-terminal
+    selector: '[data-testid="settings-group-toggle-terminal"]'
+    kind: interactive
+    optional: true       # accordion toggle for terminal section
   - id: sql-completion-settings
     selector: '[data-testid="sql-completion-settings"]'
     kind: display
@@ -2860,9 +2937,15 @@ files:
   - src/components/settings/SettingsPanel.tsx
   - src/stores/aiStore.ts
 controls:
-  - id: ai-master-toggle
-    selector: 'text="Disable AI completely"'
+  - id: settings-group-toggle-ai
+    selector: '[data-testid="settings-group-toggle-ai"]'
     kind: interactive
+    optional: true
+  - id: ai-master-toggle
+    selector: '[data-testid="ai-master-switch"]'
+    kind: interactive
+    aliases:
+      - 'text="Disable AI completely"'
   - id: privacy-fully-local
     selector: 'text="Full local mode"'
     kind: interactive
@@ -2892,6 +2975,9 @@ controls:
     kind: interactive
   - id: inline-suggestions-history-path-ai
     selector: 'input[name="inlineSuggestionsSource"][value="history+path+ai"]'
+    kind: interactive
+  - id: ai-command-rewrite-toggle
+    selector: '[data-testid="ai-command-rewrite-toggle"]'
     kind: interactive
   - id: ai-command-rewrite-shortcut
     selector: 'input[aria-label="AI command rewrite shortcut"]'
@@ -3072,6 +3158,9 @@ files:
   - src/components/settings/WebSearchPanel.tsx
   - src/components/chat/SearchProgressChip.tsx
 controls:
+  - id: web-search-enable-toggle
+    selector: '[data-testid="ai-websearch-enable-toggle"]'
+    kind: interactive
   - id: web-search-section
     selector: 'text="Web Search"'
     kind: display
@@ -3632,16 +3721,12 @@ files:
   - src/lib/detachWindowing.ts
   - src/lib/detachedSession.ts
 controls:
-  # Per-panel "detach to its own window" buttons in each panel's floating toolbar.
+  # Per-panel "detach to its own window" buttons portaled into TabActionSlot.
   # Each fires window.open (browser) / open_detached_window (Tauri) and drops the
   # source tab — a destructive action, so cases click it LAST (see TC-111).
-  - id: terminal-floating-toolbar  # the terminal panel's FloatingToolbar host (F10.1 infra)
-    selector: '[data-testid="terminal-floating-toolbar"]'
-    kind: display
   - id: terminal-detach
     selector: '[data-testid="terminal-detach"]'
     kind: interactive
-    optional: true       # only when MainLayout wires detachToggle (not in terminal split mode)
   - id: terminal-maximize
     selector: '[data-testid="terminal-maximize"]'
     kind: interactive
@@ -3807,7 +3892,7 @@ controls:
     optional: true
   - id: server-log-clear
     selector: '[data-testid="server-log-clear"]'
-    kind: interactive
+    kind: display
     optional: true
 -->
 
@@ -4227,6 +4312,10 @@ files:
   - src/lib/hbaseStatements.ts
   - src/lib/databaseTabLimit.ts
 controls:
+  - id: connection-mode
+    selector: '[data-testid="hbase-connection-mode"]'
+    kind: interactive
+    optional: true
   - id: remote-host
     selector: 'input[aria-label="Remote host"]'
     kind: interactive
@@ -4477,8 +4566,8 @@ controls:
     selector: '[data-testid="note-theme-paper"]'
     kind: interactive
     optional: true       # only visible while the preview dropdown is open
-  - id: note-panel-mode-floating
-    selector: '[data-testid="note-panel-mode-floating"]'
+  - id: notes-floating-toggle
+    selector: '[data-testid="notes-floating-toggle"]'
     kind: interactive
     optional: true
   - id: floating-notes-panel
@@ -4924,6 +5013,26 @@ controls:
   - id: test-target
     selector: '[data-testid="sockscap-test-target"]'
     kind: interactive
+  - id: test-detail
+    selector: '[data-testid="sockscap-test-detail"]'
+    kind: display
+    optional: true
+  - id: test-detail-close
+    selector: '[data-testid="sockscap-test-detail-close"]'
+    kind: interactive
+    optional: true
+  - id: probe-fail-dialog
+    selector: '[data-testid="sockscap-probe-fail-dialog"]'
+    kind: display
+    optional: true
+  - id: probe-fail-force
+    selector: '[data-testid="sockscap-probe-fail-force"]'
+    kind: interactive
+    optional: true
+  - id: probe-fail-cancel
+    selector: '[data-testid="sockscap-probe-fail-cancel"]'
+    kind: interactive
+    optional: true
   - id: helper-start
     selector: '[data-testid="sockscap-helper-start"]'
     kind: interactive
@@ -5014,6 +5123,18 @@ controls:
     selector: '[data-testid="code-workspace-debug-target"]'
     kind: interactive
     optional: true       # desktop-only and requires an available adapter
+  - id: bottom-dock
+    selector: '[data-testid="code-workspace-bottom-dock"]'
+    kind: display
+    optional: true
+  - id: bottom-dock-body
+    selector: '[data-testid="code-workspace-bottom-dock-body"]'
+    kind: display
+    optional: true
+  - id: bottom-dock-resize
+    selector: '[data-testid="code-workspace-bottom-dock-resize"]'
+    kind: interactive
+    optional: true
   - id: run-tab
     selector: '[data-testid="code-workspace-bottom-tab-run"]'
     kind: interactive
@@ -5659,6 +5780,9 @@ status: partial
 area: code-workspace/editor-shell
 components: [CodeWorkspaceTab, WorkspaceTabPolicySettingsDialog, EditorGroup, HighlightingWidget, FileTreePane, TabSwitcher, Breadcrumbs, KeymapSettingsDialog, ClipboardHistoryPopup, ProjectFactsStatusBadge, TodosBookmarksPanel, EditorCompareDialog, LocalHistoryDialog, FileEncodingDialog, AutoImportSettingsDialog, AutoImportCandidateDialog, FileTemplateSettingsDialog, NewJavaClassDialog, RefactorRecoveryReviewDialog]
 files:
+  - src/components/editor/workspace/CodeMirrorHost.tsx
+  - src/components/editor/workspace/editorSearchPanel.ts
+  - src/components/editor/workspace/lspHyperlink.ts
   - src/components/editor/CodeWorkspaceTab.tsx
   - src/components/editor/workspace/RefactorRecoveryReviewDialog.tsx
   - src/components/editor/workspace/refactorPlan.ts
@@ -5688,6 +5812,27 @@ files:
   - src/components/editor/workspace/FileTemplateSettingsDialog.tsx
   - src/components/editor/workspace/NewJavaClassDialog.tsx
 controls:
+  - id: editor-find-panel
+    selector: '[data-testid="code-workspace-editor-search"]'
+    kind: display
+  - id: editor-find-input
+    selector: '[data-testid="code-workspace-editor-search"] input[name="search"]'
+    kind: interactive
+  - id: editor-replace-input
+    selector: '[data-testid="code-workspace-editor-search"] input[name="replace"]'
+    kind: interactive
+  - id: editor-find-expand
+    selector: '[data-testid="code-workspace-editor-search"] button[aria-label="Show replace"]'
+    kind: interactive
+  - id: editor-find-more
+    selector: '[data-testid="code-workspace-editor-search"] button[aria-label="More search options"]'
+    kind: interactive
+  - id: editor-find-count
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    kind: display
+  - id: editor-find-close
+    selector: '[data-testid="code-workspace-editor-search"] button[aria-label="Close find and replace"]'
+    kind: interactive
   - id: tree-add-folder
     selector: '[data-testid="code-workspace-tree-add-folder"]'
     kind: interactive

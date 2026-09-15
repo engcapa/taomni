@@ -95,7 +95,7 @@ steps:
       selector: '[data-testid="code-workspace-bookmark-group-input"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
   - press:
-      key: Control+Home
+      key: Mod+Home
       selector: '[data-testid="code-workspace-editor"] .cm-content'
   - press:
       key: ArrowDown
@@ -119,10 +119,10 @@ steps:
   # origin so the mounted Back control can restore it.
   - click: '[data-testid="code-workspace-editor"] .cm-content'
   - press:
-      key: Control+Home
+      key: Mod+Home
       selector: '[data-testid="code-workspace-editor"] .cm-content'
   - press:
-      key: Control+J
+      key: Mod+J
       selector: '[data-testid="code-workspace-editor"] .cm-content'
   - assert_text:
       selector: '[data-testid="status-bar-message"]'

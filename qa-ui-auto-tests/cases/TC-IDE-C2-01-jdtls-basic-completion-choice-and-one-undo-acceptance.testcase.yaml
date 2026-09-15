@@ -108,9 +108,7 @@ steps:
       selector: '[data-testid="status-bar-workspace-cursor"]'
       contains: "Ln 30, Col 22"
       timeout_sec: 10
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["Control+Space"]
+  - press: "Alt+/"
   - wait_for:
       selector: '.cm-tooltip-autocomplete'
       timeout_sec: 90
@@ -197,9 +195,7 @@ steps:
       selector: '[data-testid="status-bar-workspace-cursor"]'
       contains: "Ln 27, Col 38"
       timeout_sec: 10
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      keys: ["Control+Space"]
+  - press: "Alt+/"
   - wait_for:
       selector: '.cm-tooltip-autocomplete'
       timeout_sec: 90

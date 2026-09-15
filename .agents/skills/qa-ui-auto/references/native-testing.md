@@ -46,10 +46,16 @@ Use a separately built QA application even for manual native exploration.
 product name to `Taomni QA`. Keep production Tauri configuration unchanged.
 Environment overrides or renamed executables cannot change a compiled ID.
 
-From the repository root (with the module path set as in SKILL.md):
+From the repository root (with the module path set as in SKILL.md). The build
+takes minutes: start it detached and wait instead of blocking a foreground tool
+call (see `scripts/background_job.py` in SKILL.md).
 
 ```bash
-python .agents/skills/qa-ui-auto/scripts/native_build.py
+python .agents/skills/qa-ui-auto/scripts/background_job.py start --name native-build \
+  --log qa-ui-auto-report/_local/native-build.log -- \
+  python .agents/skills/qa-ui-auto/scripts/native_build.py
+python .agents/skills/qa-ui-auto/scripts/background_job.py wait \
+  --state qa-ui-auto-report/_local/native-build.log.job.json --timeout 3600
 python -m qa_ui_auto run --mode native --filter TC-NATIVE-CORE-001
 ```
 
@@ -75,11 +81,14 @@ across React modes. This exercises development StrictMode with real native
 services, but does not test the Vite dev server or HMR transport. Record that
 distinction and verify the expected frontend mode in the selected scenario.
 
-The harness redirects Linux XDG data/config/cache or Windows AppData/LocalAppData
-to this run, then restores its environment on exit. `reset_db` only clears QA
-application state inside verified run roots. Native runs are sequential. The
-driver must be started by this run to inherit isolation; an existing listener is
-rejected. Configure free WebDriver and native-driver ports for independent jobs.
+The harness redirects Linux XDG data/config/cache and the app's debug-only
+`NEWMOB_DATA_DIR`/`NEWMOB_CONFIG_DIR`/`NEWMOB_CACHE_DIR` overrides (Windows and
+macOS; `dirs` resolves Windows Known Folders and ignores `APPDATA`, so the
+explicit override is the only effective redirection there), then restores its
+environment on exit. `reset_db` only clears QA application state inside verified
+run roots. Native runs are sequential. The driver must be started by this run to
+inherit isolation; an existing listener is rejected. Configure free WebDriver and
+native-driver ports for independent jobs.
 
 An independent ID does not isolate arbitrary files, hardcoded shared credential
 service names, clipboard, global shortcuts or SSH targets. Use disposable
@@ -93,14 +102,17 @@ credentials as mutation fixtures, redirect HOME, or erase a profile as a shortcu
 |---|---|---|
 | Linux | `tauri-driver`, `WebKitWebDriver`, an X11 desktop or Xvfb; X11-specific verbs need real dependencies | GTK/WebKitGTK, Ctrl shortcuts, case-sensitive paths/permissions, clipboard and IME |
 | Windows | `tauri-driver` plus matching `msedgedriver.exe`/WebView2; set `webdriver.native_driver` if needed | Ctrl/Alt shortcuts, drive/UNC paths, locking/permissions, clipboard/dialogs, WebView2 |
-| macOS | Tauri WebDriver unsupported; use available OS UI automation or recorded manual QA-app runs on macOS | Cmd/Meta shortcuts, WKWebView, IME, case sensitivity, permissions, clipboard/dialogs/window controls |
+| macOS | isolated `com.taomni.app.qa` binary with the in-process WKWebView WebDriver bridge; `jdtls` + JDK 21+ for Java cases | Cmd/Meta shortcuts, WKWebView, IME, case sensitivity, permissions, clipboard/dialogs/window controls |
 
 Linux/Xvfb exercises Tauri/WebKitGTK but cannot prove physical input, GPU,
-compositor, IME or performance behavior for another desktop/device. For macOS
-packaged/manual runs, verify `CFBundleIdentifier` and QA-owned data/config/cache/
-keychain namespaces; use a disposable OS account for workflows sharing resources
-outside them. Do not install over production. Browser WebKit is supplementary
-renderer evidence, not a native WKWebView/IPC test.
+compositor, IME or performance behavior for another desktop/device. The macOS
+bridge exercises the packaged WKWebView and Tauri IPC, but cannot prove
+OS-global input, permission prompts, clipboard ownership or window-manager
+behaviour; collect OS automation/manual evidence for those boundaries. Verify
+`CFBundleIdentifier` and QA-owned data/config/cache/keychain namespaces; use a
+disposable OS account for workflows sharing resources outside them. Do not
+install over production. Browser WebKit is supplementary renderer evidence,
+not a native WKWebView/IPC test.
 
 Choose representative native workflows for each affected OS. When a host or
 dependency is unavailable, retain available evidence and label missing targets

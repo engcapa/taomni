@@ -19,15 +19,6 @@ steps:
   - wait_for:
       selector: '[data-testid="control-bar"]'
       timeout_sec: 55
-  - assert_not_visible: '[data-testid="ribbon"]'
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-view"]'
-  - click: '[data-testid="context-menu-item-toggle-ribbon"]'
-  - wait_for: '[data-testid="ribbon"]'
-  - assert_visible: '[data-testid="ribbon"]'
-  - assert_visible: '[data-testid="ribbon-session"]'
-  - assert_visible: '[data-testid="ribbon-sftp"]'
-  - assert_visible: '[data-testid="ribbon-settings"]'
   - assert_not_visible: '[data-testid="quick-connect"]'
   - click: '[data-testid="app-main-menu"]'
   - hover: '[data-testid="context-menu-item-view"]'

@@ -3,23 +3,38 @@ title: Terminal theme preview picker hot-swaps without reconnecting
 covers: [F5.1, F5.2]
 tags: [appearance, legacy-imported, p1, terminal, theme]
 modes: [browser]
-fixtures: [reset_db]
+fixtures: [reset_db, ssh_required]
 steps:
   - open: "${cfg.app.base_url}"
-  - click: "[data-testid=\"welcome-open-local-terminal\"]"
+  - click: '[data-testid="app-main-menu"]'
+  - hover: '[data-testid="context-menu-item-view"]'
+  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+  - wait_for: '[data-testid="qc-input"]'
+  - fill: {selector: "[data-testid=\"qc-input\"]", value: "ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}"}
+  - click: "[data-testid=\"qc-submit\"]"
+  - wait_for: "[data-testid=\"auth-prompt\"]"
+  - fill: {selector: "[data-testid=\"auth-password\"]", value: "${env.QA_SSH_PASSWORD}"}
+  - click: "[data-testid=\"auth-submit\"]"
   - wait_for: "[data-testid=\"terminal-pane\"]"
+  - wait: 2
   - click: "[data-testid=\"terminal-pane\"]"
   - type: echo qa-theme-marker
   - press: Enter
   - wait: 1
   - right_click: { selector: "[data-testid=\"terminal-pane\"]", position: { x: 24, y: 24 } }
   - wait_for: "[data-testid=\"context-menu\"]"
-  - hover: "[data-testid=\"context-menu\"] >> text=Theme"
-  - wait: 1
-  - assert_count: { selector: '[data-testid="context-menu"] [data-testid^="terminal-context-theme-option-"]', min: 3 }
-  - click: '[data-testid="context-menu"] >> [data-testid="terminal-context-theme-option-termius-dark"]'
+  - hover: '[data-testid="context-menu-item-appearance"]'
+  - wait: 0.5
+  - assert_count: { selector: '[data-testid^="terminal-context-theme-option-"]', min: 3 }
+  - click: '[data-testid^="terminal-context-theme-option-"] >> nth=0'
   - wait: 1
   - assert_text: {selector: "[data-testid=\"terminal-pane\"]", contains: qa-theme-marker}
+  # The theme gallery stays open over the terminal and neither Escape nor an
+  # outside click dismisses it reliably; use the Find item to close the menu
+  # (proven pattern from TC-007), then close the find bar again.
+  - click: "[data-testid=\"context-menu-item-find\"]"
+  - wait_for: "input[placeholder=\"Find\"]"
+  - click: '[data-testid="terminal-pane"] button:has-text("Close")'
   - click: "[data-testid=\"terminal-pane\"]"
   - type: echo qa-theme-still-alive
   - press: Enter

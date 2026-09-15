@@ -20,7 +20,7 @@ describe("codeWorkspaceStore", () => {
     store.ensureInstance("ws-a");
     store.ensureInstance("ws-b");
     store.patchInstance("ws-a", { bottomDockOpen: false, activeKey: "file:1" });
-    store.patchInstance("ws-b", { rightPaneOpen: true, searchEverywhereMode: "classes" });
+    store.patchInstance("ws-b", { bottomDockOpen: true, rightPaneOpen: true, searchEverywhereMode: "classes" });
 
     const a = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "ws-a");
     const b = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "ws-b");
@@ -30,6 +30,38 @@ describe("codeWorkspaceStore", () => {
     expect(b.rightPaneOpen).toBe(true);
     expect(b.searchEverywhereMode).toBe("classes");
     expect(b.bottomDockOpen).toBe(true);
+  });
+
+  it("manages shell chrome state and remembers height per tool", () => {
+    const store = useCodeWorkspaceStore.getState();
+    store.ensureInstance("ws-chrome");
+    const initial = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "ws-chrome");
+    expect(initial.languagePanelOpen).toBe(true);
+    expect(initial.bottomDockOpen).toBe(false);
+    expect(initial.shellChromeState.projectWidthPx).toBe(452);
+    expect(initial.shellChromeState.bottomHeightByTool?.problems).toBe(449);
+    expect(initial.shellChromeState.bottomHeightByTool?.run).toBe(323);
+
+    store.setBottomDockHeightForTool("ws-chrome", "problems", 500);
+    store.setBottomDockHeightForTool("ws-chrome", "run", 350);
+    const updated = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "ws-chrome");
+    expect(updated.shellChromeState.bottomHeightByTool?.problems).toBe(500);
+    expect(updated.shellChromeState.bottomHeightByTool?.run).toBe(350);
+    expect(updated.shellChromeState.bottomHeightPx).toBe(350);
+
+    store.patchInstance("ws-chrome", {
+      languagePanelOpen: false,
+      bottomDockOpen: true,
+      rightPaneOpen: true,
+    });
+    store.restoreDefaultToolWindowLayout("ws-chrome");
+    const restored = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "ws-chrome");
+    expect(restored.languagePanelOpen).toBe(true);
+    expect(restored.bottomDockOpen).toBe(false);
+    expect(restored.rightPaneOpen).toBe(false);
+    expect(restored.shellChromeState.projectWidthPx).toBe(452);
+    expect(restored.shellChromeState.bottomHeightByTool?.problems).toBe(449);
+    expect(restored.shellChromeState.bottomHeightByTool?.run).toBe(323);
   });
 
   it("disposes instance state without affecting others", () => {

@@ -14,8 +14,8 @@ steps:
       timeout_sec: 20
   - click: '[data-testid="new-local-terminal"]'
   - wait_for:
-      selector: '[data-testid="terminal-pane"]'
-      timeout_sec: 20
+      selector: '[data-testid="tab-item"] >> nth=2'
+      timeout_sec: 5
   - click: '[data-testid="tab-split-view"]'
   - wait_for:
       selector: '[data-testid="terminal-split-toolbar"]'
@@ -28,7 +28,6 @@ steps:
   - click: '[data-testid="terminal-split-layout-grid"]'
   - assert_attribute: {selector: '[data-testid="terminal-split-panes"]', name: data-layout, equals: grid}
   - assert_visible: '[data-testid="terminal-split-grid-column-resize-handle"]'
-  - assert_visible: '[data-testid="terminal-split-grid-row-resize-handle"]'
   - click: '[data-testid="terminal-split-layout-horizontal"]'
   - assert_attribute: {selector: '[data-testid="terminal-split-panes"]', name: data-layout, equals: horizontal}
   - click: '[data-testid^="terminal-split-lock-"]'

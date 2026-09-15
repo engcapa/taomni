@@ -33,6 +33,8 @@ steps:
   # Network section: fill proxy + keep-alive inputs
   - click: '[data-testid="session-section-network"]'
   - wait_for: '[data-testid="network-settings"]'
+  - select_option: {selector: '[data-testid="network-settings"] select', value: 'http'}
+  - fill: {selector: 'input[aria-label="Proxy host"]', value: 'proxy.example.test'}
   - fill: {selector: 'input[aria-label="Proxy port"]', value: '3128'}
   - fill: {selector: 'input[aria-label="Proxy username"]', value: qa-user}
   - fill: {selector: 'input[aria-label="Proxy password"]', value: qa-pass}
@@ -43,8 +45,10 @@ steps:
   - wait_for: '[data-testid="bookmark-settings"]'
   - fill: {selector: 'input[aria-label="Background image"]', value: '/tmp/bg.png'}
   - fill: {selector: 'input[aria-label="Background opacity"]', value: '0.6'}
-  - fill: {selector: 'input[aria-label="Additional parameters"]', value: '-o ServerAliveInterval=15'}
-  - fill: {selector: 'input[aria-label="Keyboard shortcut"]', value: 'Ctrl+Shift+Q'}
+  - fill: {selector: 'input[aria-label="Keyboard shortcut"]', value: 'Ctrl+Alt+S'}
+  - click: '[data-testid="session-proto-file"]'
+  - wait_for: 'input[aria-label="Additional parameters"]'
+  - fill: {selector: 'input[aria-label="Additional parameters"]', value: '--verbose'}
 
   - press: Escape
   - wait_for:

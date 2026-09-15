@@ -78,13 +78,13 @@ steps:
   # Keyboard-only copy of the whole document through the real keymap.
   - click: '[data-testid="code-workspace-editor"] .cm-content'
   - press:
-      key: Control+Home
+      key: Mod+Home
       selector: '[data-testid="code-workspace-editor"] .cm-content'
   - press:
-      key: Control+a
+      key: Mod+a
       selector: '[data-testid="code-workspace-editor"] .cm-content'
   - press:
-      key: Control+c
+      key: Mod+c
       selector: '[data-testid="code-workspace-editor"] .cm-content'
   - wait_for: '[data-testid="code-workspace-tab"][data-clipboard-revision="1"]'
 
@@ -127,7 +127,7 @@ steps:
 
   # Multi-caret copy updates the reported shape, not just the outcome.
   - press:
-      key: Control+Home
+      key: Mod+Home
       selector: '[data-testid="code-workspace-editor"] .cm-content'
   - press:
       key: Shift+ArrowRight
@@ -136,7 +136,7 @@ steps:
       key: Control+Alt+Shift+ArrowDown
       selector: '[data-testid="code-workspace-editor"] .cm-content'
   - press:
-      key: Control+c
+      key: Mod+c
       selector: '[data-testid="code-workspace-editor"] .cm-content'
   - wait_for: '[data-testid="code-workspace-tab"][data-clipboard-revision="2"]'
   - eval_readonly:
@@ -151,10 +151,10 @@ steps:
       key: Escape
       selector: '[data-testid="code-workspace-editor"] .cm-content'
   - press:
-      key: Control+End
+      key: Mod+End
       selector: '[data-testid="code-workspace-editor"] .cm-content'
   - press:
-      key: Control+v
+      key: Mod+v
       selector: '[data-testid="code-workspace-editor"] .cm-content'
   - wait: 1
   - assert_attribute:
@@ -175,7 +175,7 @@ steps:
 
   # One undo reverses the paste transaction with focus retained.
   - press:
-      key: Control+z
+      key: Mod+z
       selector: '[data-testid="code-workspace-editor"] .cm-content'
   - wait: 0.5
   - eval_readonly:

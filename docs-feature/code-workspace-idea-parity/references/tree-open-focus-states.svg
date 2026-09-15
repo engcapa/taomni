@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="540" viewBox="0 0 1100 540"><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8Z" fill="#536078"/></marker></defs><rect width="1100" height="540" fill="white"/><g font-family="sans-serif" fill="#15233b"><text x="20" y="28" font-size="18">Proposed state sketch - DEC-TOF-01..04 (not an IDEA screenshot)</text>
+<rect x="20" y="60" width="290" height="190" rx="10" fill="#e4edff" stroke="#536078"/>
+<text x="35" y="90" font-size="14">1  TREE OWNS FOCUS</text>
+<text x="35" y="115" font-size="14">README sole formal tab</text>
+<text x="35" y="140" font-size="14">example selected (blue)</text>
+<text x="35" y="165" font-size="14">Single click: select only</text>
+<text x="35" y="190" font-size="14">Arrows: navigate / expand</text>
+<rect x="400" y="60" width="290" height="190" rx="10" fill="#fff0d5" stroke="#536078"/>
+<text x="415" y="90" font-size="14">2  OPEN PENDING</text>
+<text x="415" y="115" font-size="14">Capture workspace / leaf / file</text>
+<text x="415" y="140" font-size="14">Read or reuse loaded buffer</text>
+<text x="415" y="165" font-size="14">Wait for matching view + snapshot</text>
+<text x="415" y="190" font-size="14">Tree keeps focus until ready</text>
+<rect x="780" y="60" width="290" height="190" rx="10" fill="#e2f1e6" stroke="#536078"/>
+<text x="795" y="90" font-size="14">3  EDITOR OWNS FOCUS</text>
+<text x="795" y="115" font-size="14">README + example formal tabs</text>
+<text x="795" y="140" font-size="14">example selected (inactive gray)</text>
+<text x="795" y="165" font-size="14">Caret in exact active leaf</text>
+<text x="795" y="190" font-size="14">Direct input -&gt; undo -&gt; restore</text>
+<rect x="400" y="340" width="290" height="110" rx="10" fill="#ffe5e5" stroke="#536078"/>
+<text x="415" y="370" font-size="14">REVOKED / FAILED</text>
+<text x="415" y="395" font-size="14">No late focus or stale data commit</text>
+<text x="415" y="420" font-size="14">Error can retry; preserve dirty data</text>
+<rect x="780" y="340" width="290" height="110" rx="10" fill="#ece8ff" stroke="#536078"/>
+<text x="795" y="370" font-size="14">TREE MENU</text>
+<text x="795" y="395" font-size="14">Return tree -&gt; right click</text>
+<text x="795" y="420" font-size="14">Esc returns tree; Open enters flow</text>
+<text x="795" y="445" font-size="14">Outside click keeps new target</text>
+<path d="M310 150 H400" fill="none" stroke="#536078" marker-end="url(#arrow)"/><text x="323" y="130" font-size="12">Open</text>
+<path d="M690 150 H780" fill="none" stroke="#536078" marker-end="url(#arrow)"/><text x="700" y="130" font-size="12">Ready</text>
+<path d="M545 250 V340" fill="none" stroke="#536078" marker-end="url(#arrow)"/><text x="555" y="300" font-size="12">Revoke</text>
+<path d="M925 250 V340" fill="none" stroke="#536078" marker-end="url(#arrow)"/><text x="935" y="300" font-size="12">Return tree</text>
+<path d="M925 450 V480 H165 V250" fill="none" stroke="#536078" marker-end="url(#arrow)"/><text x="210" y="470" font-size="12">Esc: tree focus</text>
+<text x="20" y="510" font-size="13">Focus permission and file loading have separate lifetimes. A new user action revokes only the old focus grant.</text></g></svg>

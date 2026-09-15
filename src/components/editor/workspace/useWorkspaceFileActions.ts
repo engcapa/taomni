@@ -74,7 +74,7 @@ interface UseWorkspaceFileActionsOptions {
   loadFlatFiles: (rootId: string, force?: boolean) => Promise<void>;
   resetTreeData: () => void;
   removeTreeDataRoot: (rootId: string) => void;
-  openFile: (ref: CodeWorkspaceFileRef, options?: { preview?: boolean }) => Promise<void>;
+  openFile: (ref: CodeWorkspaceFileRef, options?: { preview?: boolean }) => Promise<unknown>;
   applyResourceOperation: (
     operation: Exclude<LspWorkspaceEditOperation, { kind: "text" }>,
   ) => Promise<void>;

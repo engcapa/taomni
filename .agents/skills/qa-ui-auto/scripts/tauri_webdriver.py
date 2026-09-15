@@ -7,6 +7,7 @@ It speaks the small W3C WebDriver subset needed by the qa-ui-auto DSL.
 from __future__ import annotations
 
 import base64
+from contextlib import suppress
 import json
 import os
 import platform
@@ -15,6 +16,7 @@ import socket
 import subprocess
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -34,7 +36,15 @@ def native_binary(cfg: dict) -> Path:
 
 
 def native_isolation_env(report_root: Path) -> dict[str, str]:
-    """Resolve only run-owned roots; never fall back to a user's profile."""
+    """Resolve only run-owned roots; never fall back to a user's profile.
+
+    ``dirs`` honors XDG on Linux and is explicitly overridden on macOS, but on
+    Windows it resolves Known Folders and ignores ``APPDATA``; Taomni's
+    debug-only ``NEWMOB_*`` override is the only effective redirection there
+    (src-tauri/src/lib.rs documents the same requirement).  Without those keys
+    the QA app wrote to the real ``%APPDATA%\\com.taomni.app.qa``, ``reset_db``
+    cleaned a path the app never used, and state leaked across cases.
+    """
     root = report_root.resolve()
     paths = {key: root / f"native-app{key}" for key in ("data", "config", "cache")}
     checked = [path for root_path in paths.values() for path in (root_path, root_path / QA_APP_ID)]
@@ -44,8 +54,23 @@ def native_isolation_env(report_root: Path) -> dict[str, str]:
     if system == "Linux":
         return {f"XDG_{key.upper()}_HOME": str(path) for key, path in paths.items()}
     if system == "Windows":
-        return {"APPDATA": str(paths["data"]), "LOCALAPPDATA": str(paths["cache"])}
-    raise WebDriverError("Tauri WebDriver is unsupported on this OS; use an isolated QA app with OS automation/manual testing")
+        return {
+            "APPDATA": str(paths["data"]),
+            "LOCALAPPDATA": str(paths["cache"]),
+            "NEWMOB_DATA_DIR": str(paths["data"]),
+            "NEWMOB_CONFIG_DIR": str(paths["config"]),
+            "NEWMOB_CACHE_DIR": str(paths["cache"]),
+        }
+    if system == "Darwin":
+        # macOS `dirs` intentionally ignores XDG variables.  These explicit
+        # QA-only overrides are consumed by Taomni's config/cache path helpers
+        # while leaving the user's HOME and keychain untouched.
+        return {
+            "NEWMOB_DATA_DIR": str(paths["data"]),
+            "NEWMOB_CONFIG_DIR": str(paths["config"]),
+            "NEWMOB_CACHE_DIR": str(paths["cache"]),
+        }
+    raise WebDriverError("native isolation is unsupported on this OS")
 
 
 def _tcp_ok(host: str, port: int, timeout: float = 1.0) -> bool:
@@ -68,6 +93,18 @@ def _quote_xpath_text(value: str) -> str:
 def selector_strategy(selector: str, *, interactive: bool = False) -> tuple[str, str]:
     """Map common Playwright-ish selectors to WebDriver selector strategies."""
     selector = selector.strip()
+    if " >> text=" in selector:
+        parent_sel, text_part = selector.split(" >> text=", 1)
+        text = text_part.strip()
+        if (text.startswith('"') and text.endswith('"')) or (
+            text.startswith("'") and text.endswith("'")
+        ):
+            text = text[1:-1]
+        q = _quote_xpath_text(text)
+        if parent_sel.startswith('[data-testid="') and parent_sel.endswith('"]'):
+            testid = parent_sel[14:-2]
+            return "xpath", f"//*[@data-testid='{testid}']//*[contains(normalize-space(.), {q}) or contains(@aria-label, {q})]"
+        return "xpath", f"//*[contains(normalize-space(.), {q})]"
     if selector.startswith("text="):
         text = selector[5:].strip()
         if (text.startswith('"') and text.endswith('"')) or (
@@ -120,9 +157,11 @@ class TauriDriverProcess:
         self.url = f"http://{self.host}:{self.port}"
         self.proc: subprocess.Popen[str] | None = None
         self.report_root = report_root
+        self.application = native_binary(cfg)
         self.command = str(webdriver.get("tauri_driver", "tauri-driver"))
         self.native_driver = webdriver.get("native_driver")
         self.native_port = int(webdriver.get("native_port", 4445))
+        self._restart_required = False
         self.startup_timeout = float(webdriver.get("startup_timeout", 20))
 
     def start(self) -> None:
@@ -132,25 +171,86 @@ class TauriDriverProcess:
             raise WebDriverError(f"Driver port {self.port} is occupied; choose a free port so the driver inherits QA isolation")
         if self.native_port == self.port or _tcp_ok(self.host, self.native_port):
             raise WebDriverError(f"Native driver port {self.native_port} must be free and distinct from the driver port")
-        cmd = [self.command, "--port", str(self.port), "--native-port", str(self.native_port)]
-        if self.native_driver:
-            cmd += ["--native-driver", str(self.native_driver)]
         out = self.report_root / "tauri-driver.out.log"
         err = self.report_root / "tauri-driver.err.log"
         out.parent.mkdir(parents=True, exist_ok=True)
-        with out.open("w", encoding="utf-8") as stdout, err.open("w", encoding="utf-8") as stderr:
-            self.proc = subprocess.Popen(cmd, cwd=ROOT, stdout=stdout, stderr=stderr, text=True)
+        if platform.system() == "Darwin":
+            # tauri-driver intentionally refuses to run on macOS.  The QA
+            # binary contains an opt-in WKWebView bridge which exposes the
+            # same W3C subset over this run-owned loopback port.
+            if not self.application.is_file():
+                raise WebDriverError(f"macOS QA application not found: {self.application}")
+            env = dict(os.environ)
+            env["TAOMNI_QA_WEBDRIVER_HOST"] = self.host
+            env["TAOMNI_QA_WEBDRIVER_PORT"] = str(self.port)
+            with out.open("w", encoding="utf-8") as stdout, err.open("w", encoding="utf-8") as stderr:
+                self.proc = subprocess.Popen(
+                    [str(self.application.resolve())],
+                    cwd=ROOT,
+                    env=env,
+                    stdout=stdout,
+                    stderr=stderr,
+                    text=True,
+                )
+        else:
+            cmd = [self.command, "--port", str(self.port), "--native-port", str(self.native_port)]
+            if self.native_driver:
+                cmd += ["--native-driver", str(self.native_driver)]
+            with out.open("w", encoding="utf-8") as stdout, err.open("w", encoding="utf-8") as stderr:
+                self.proc = subprocess.Popen(cmd, cwd=ROOT, stdout=stdout, stderr=stderr, text=True)
         deadline = time.time() + self.startup_timeout
         while time.time() < deadline:
             if self.proc.poll() is not None:
                 raise WebDriverError(
-                    f"tauri-driver exited early with code {self.proc.returncode}; "
+                    f"native driver exited early with code {self.proc.returncode}; "
                     f"see {err}"
                 )
             if _tcp_ok(self.host, self.port):
                 return
             time.sleep(0.25)
-        raise WebDriverError(f"tauri-driver did not listen on {self.url}")
+        raise WebDriverError(f"native driver did not listen on {self.url}")
+
+    def ensure_running(self) -> None:
+        """Ensure the per-run driver endpoint is ready for a new session.
+
+        The macOS bridge lives inside the QA application and exits that
+        application when a WebDriver session is deleted.  Native cases are
+        intentionally isolated one application process at a time, so the
+        next case must wait for the old process and listening socket to go
+        away before starting a fresh one.
+        """
+        if platform.system() != "Darwin":
+            return
+
+        # The in-process bridge exits the QA application after a WebDriver
+        # session is deleted.  A new case must never attach to that old
+        # listener while the asynchronous app exit is still in flight.
+        if self._restart_required:
+            self.stop()
+            self._restart_required = False
+
+        if self.proc is not None and self.proc.poll() is None and _tcp_ok(self.host, self.port):
+            return
+
+        if self.proc is not None and self.proc.poll() is None:
+            self.proc.terminate()
+            try:
+                self.proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+                self.proc.wait(timeout=5)
+
+        deadline = time.time() + self.startup_timeout
+        while _tcp_ok(self.host, self.port) and time.time() < deadline:
+            time.sleep(0.1)
+        if _tcp_ok(self.host, self.port):
+            raise WebDriverError(f"native driver port {self.port} did not become available")
+        self.start()
+
+    def mark_session_closed(self) -> None:
+        """Force the next macOS session to start in a fresh QA process."""
+        if platform.system() == "Darwin":
+            self._restart_required = True
 
     def stop(self) -> None:
         if not self.proc:
@@ -161,14 +261,17 @@ class TauriDriverProcess:
         except subprocess.TimeoutExpired:
             self.proc.kill()
             self.proc.wait(timeout=5)
+        self.proc = None
 
 
 class NativeSession:
-    def __init__(self, driver_url: str, application: Path):
+    def __init__(self, driver_url: str, application: Path, on_close: Any | None = None):
         self.driver_url = driver_url.rstrip("/")
         self.application = application
+        self._on_close = on_close
         self.session_id: str | None = None
         self.deadline = None
+        self.transport = "macOS WKWebView bridge" if platform.system() == "Darwin" else "tauri-driver"
         # A local driver must remain reachable when the desktop uses a proxy.
         host = urllib.parse.urlsplit(self.driver_url).hostname
         self._open = (urllib.request.build_opener(urllib.request.ProxyHandler({})).open
@@ -183,7 +286,7 @@ class NativeSession:
             f"{self.driver_url}{path}", data=body, headers=headers, method=method
         )
         try:
-            timeout = min(30, self.deadline.remaining()) if self.deadline else 30
+            timeout = min(120, self.deadline.remaining()) if self.deadline else 120
             with self._open(req, timeout=timeout) as r:
                 data = r.read().decode("utf-8")
         except urllib.error.HTTPError as e:
@@ -212,7 +315,42 @@ class NativeSession:
         if not sid:
             raise WebDriverError(f"could not create WebDriver session: {value}")
         self.session_id = sid
+        if platform.system() == "Darwin":
+            # The in-process WKWebView bridge can bind before React has
+            # mounted its root.  Do not let the first native step race that
+            # mount; transient bridge/evaluation failures are retryable, but
+            # the case deadline remains authoritative.
+            self.wait_for_app_ready()
         self.install_console_hook()
+
+    def wait_for_app_ready(self, timeout: float = 20.0) -> None:
+        """Wait until the macOS QA WebView has a mounted application root."""
+        end = time.monotonic() + timeout
+        last_error = ""
+        while time.monotonic() < end:
+            if self.deadline:
+                self.deadline.remaining()
+            try:
+                ready = self.execute(
+                    "return document.readyState === 'complete' && "
+                    "!!document.querySelector('#root > *');"
+                )
+            except (WebDriverError, urllib.error.URLError, OSError, json.JSONDecodeError) as exc:
+                # The bridge is exposed at page-load time, while WebKit may
+                # still be transitioning the document to an evaluable state.
+                last_error = str(exc)
+            else:
+                if ready is True:
+                    return
+                last_error = "document root is not mounted"
+
+            sleep_for = min(0.1, end - time.monotonic())
+            if self.deadline:
+                sleep_for = min(sleep_for, self.deadline.remaining())
+            if sleep_for > 0:
+                time.sleep(sleep_for)
+        detail = f": {last_error}" if last_error else ""
+        raise WebDriverError(f"native app document did not become ready within {timeout:.1f}s{detail}")
 
     def close(self) -> None:
         if self.session_id:
@@ -220,6 +358,8 @@ class NativeSession:
                 self.request("DELETE", f"/session/{self.session_id}")
             finally:
                 self.session_id = None
+                if self._on_close is not None:
+                    self._on_close()
 
     def endpoint(self, suffix: str) -> str:
         if not self.session_id:
@@ -256,8 +396,23 @@ class NativeSession:
         return self.endpoint(f"/element/{element_id}{suffix}")
 
     def click(self, selector: str) -> str:
-        element = self.find(selector, interactive=True)
-        self.request("POST", self.element_path(element, "/click"), {})
+        for attempt in range(3):
+            try:
+                element = self.find(selector, interactive=True)
+                self.request("POST", self.element_path(element, "/click"), {})
+                return f"clicked {selector}"
+            except WebDriverError as exc:
+                if "stale element reference" in str(exc) and attempt < 2:
+                    time.sleep(0.3)
+                    continue
+                if ("element not interactable" in str(exc) or "element click intercepted" in str(exc)) and attempt < 2:
+                    with suppress(Exception):
+                        self.execute(
+                            f"const el = document.querySelector({json.dumps(selector)});"
+                            "if (el) { el.scrollIntoView({block:'center', inline:'center'}); el.click(); }"
+                        )
+                        return f"clicked {selector}"
+                raise
         return f"clicked {selector}"
 
     def count(self, selector: str) -> int:
@@ -302,32 +457,51 @@ class NativeSession:
         return f"focused {selector}"
 
     def dblclick(self, selector: str) -> str:
-        element = self.find(selector, interactive=True)
-        # Use W3C Actions API so WebKitGTK registers a real double-click.
-        rect = self.request("GET", self.element_path(element, "/rect"))
-        x = int((rect.get("x", 0) + rect.get("width", 0) / 2)) if isinstance(rect, dict) else 0
-        y = int((rect.get("y", 0) + rect.get("height", 0) / 2)) if isinstance(rect, dict) else 0
-        self.request(
-            "POST",
-            self.endpoint("/actions"),
-            {
-                "actions": [
-                    {
-                        "type": "pointer",
-                        "id": "mouse",
-                        "parameters": {"pointerType": "mouse"},
-                        "actions": [
-                            {"type": "pointerMove", "duration": 0, "x": x, "y": y, "origin": "viewport"},
-                            {"type": "pointerDown", "button": 0},
-                            {"type": "pointerUp", "button": 0},
-                            {"type": "pause", "duration": 50},
-                            {"type": "pointerDown", "button": 0},
-                            {"type": "pointerUp", "button": 0},
-                        ],
-                    }
-                ]
-            },
-        )
+        try:
+            element = self.find(selector, interactive=True)
+            # Scroll element into center of view first so pointer actions hit the target.
+            with suppress(Exception):
+                self.execute(
+                    f"const el = document.querySelector({json.dumps(selector)});"
+                    "if (el) el.scrollIntoView({block:'center', inline:'center'});"
+                )
+                time.sleep(0.1)
+            # Use W3C Actions API so WebKitGTK registers a real double-click.
+            rect = self.request("GET", self.element_path(element, "/rect"))
+            x = int((rect.get("x", 0) + rect.get("width", 0) / 2)) if isinstance(rect, dict) else 0
+            y = int((rect.get("y", 0) + rect.get("height", 0) / 2)) if isinstance(rect, dict) else 0
+            self.request(
+                "POST",
+                self.endpoint("/actions"),
+                {
+                    "actions": [
+                        {
+                            "type": "pointer",
+                            "id": "mouse",
+                            "parameters": {"pointerType": "mouse"},
+                            "actions": [
+                                {"type": "pointerMove", "duration": 0, "x": x, "y": y, "origin": "viewport"},
+                                {"type": "pointerDown", "button": 0},
+                                {"type": "pointerUp", "button": 0},
+                                {"type": "pause", "duration": 50},
+                                {"type": "pointerDown", "button": 0},
+                                {"type": "pointerUp", "button": 0},
+                            ],
+                        }
+                    ]
+                },
+            )
+        except Exception as exc:
+            if "element not interactable" in str(exc) or "element click intercepted" in str(exc):
+                self.execute(
+                    f"const el = document.querySelector({json.dumps(selector)});"
+                    "if (el) {"
+                    "  el.scrollIntoView({block:'center', inline:'center'});"
+                    "  el.dispatchEvent(new MouseEvent('dblclick', {bubbles: true, cancelable: true, view: window}));"
+                    "}"
+                )
+            else:
+                raise
         return f"double-clicked {selector}"
 
     def pointer_click(self, selector: str) -> dict[str, int]:
@@ -525,6 +699,11 @@ class NativeSession:
         "Meta": "\ue03d",
         "Cmd": "\ue03d",
         "Command": "\ue03d",
+        # Platform Command-Mod: Meta on macOS (where CodeMirror and the
+        # product map Mod to Cmd), Control elsewhere. Lets one `Mod+X`
+        # chord drive the platform-native editing primitive on Linux,
+        # Windows and macOS from a single testcase.
+        "Mod": "\ue03d" if platform.system() == "Darwin" else "\ue009",
     }
 
     def _combo_actions(self, combo: str) -> list[dict[str, Any]]:
@@ -559,6 +738,17 @@ class NativeSession:
         /actions requests. A single input source preserves the same native
         keydown/keyup semantics without exercising that driver failure.
         """
+        if platform.system() == "Darwin" and len(combos) > 1:
+            # The macOS in-process bridge dispatches a whole sequence inside
+            # one synchronous JS task. Read-modify-write strokes (undo/redo)
+            # then race: every async consumer reads the same pre-burst
+            # document and all but one collapse. One request per chord with
+            # a settle gap keeps Darwin semantics equal to the real drivers.
+            for index, combo in enumerate(combos):
+                self.press_combos([combo])
+                if index < len(combos) - 1:
+                    time.sleep(0.2)
+            return f"pressed {len(combos)} combo(s)"
         seq = [action for combo in combos for action in self._combo_actions(combo)]
         try:
             self.request(
@@ -578,18 +768,49 @@ class NativeSession:
 
     def type_text(self, text: str) -> str:
         """Type text into the focused element, one paced key pair per char."""
+        if platform.system() == "Darwin":
+            # The macOS in-process bridge dispatches a whole /actions
+            # sequence inside one synchronous JS task. MutationObserver
+            # callbacks then coalesce, so per-key latency sampling
+            # (native_editor_performance) sees one batch instead of one
+            # sample per key. One request per char preserves event-loop
+            # turns; tauri-driver platforms keep the single batched request.
+            for ch in text:
+                self.request(
+                    "POST",
+                    self.endpoint("/actions"),
+                    {"actions": [{"type": "key", "id": "keyboard", "actions": [
+                        {"type": "keyDown", "value": ch},
+                        {"type": "keyUp", "value": ch},
+                        {"type": "pause", "duration": 20},
+                    ]}]},
+                )
+            return f"typed {len(text)} chars"
         seq: list[dict[str, Any]] = []
         for ch in text:
-            seq.append({"type": "keyDown", "value": ch})
-            seq.append({"type": "keyUp", "value": ch})
+            if ch.isupper():
+                shift = self.MODIFIER_MAP["Shift"]
+                seq.append({"type": "keyDown", "value": shift})
+                seq.append({"type": "keyDown", "value": ch})
+                seq.append({"type": "keyUp", "value": ch})
+                seq.append({"type": "keyUp", "value": shift})
+            else:
+                seq.append({"type": "keyDown", "value": ch})
+                seq.append({"type": "keyUp", "value": ch})
             # Let WebKit deliver the input transaction and CodeMirror finish
             # its scheduled measure before the next native character arrives.
             seq.append({"type": "pause", "duration": 20})
-        self.request(
-            "POST",
-            self.endpoint("/actions"),
-            {"actions": [{"type": "key", "id": "keyboard", "actions": seq}]},
-        )
+        try:
+            self.request(
+                "POST",
+                self.endpoint("/actions"),
+                {"actions": [{"type": "key", "id": "keyboard", "actions": seq}]},
+            )
+        finally:
+            try:
+                self.request("DELETE", self.endpoint("/actions"))
+            except WebDriverError:
+                pass
         return f"typed {len(text)} chars"
 
     def wait_absent(self, selector: str, timeout: float = 5.0) -> None:
@@ -732,15 +953,23 @@ class NativeHarness:
             self._previous_env.clear()
 
     def create_session(self) -> NativeSession:
-        session = NativeSession(self.driver.url, self.application)
+        self.driver.ensure_running()
+        session = NativeSession(self.driver.url, self.application, self.driver.mark_session_closed)
         session.deadline = getattr(self, "deadline", None)
-        session.start()
+        try:
+            session.start()
+        except BaseException:
+            # If readiness fails after the bridge has started, there is no
+            # session object for the runner's normal finally block to close.
+            # Mark the process stale so the next case cannot reuse it.
+            self.driver.mark_session_closed()
+            raise
         return session
 
 
 def native_tool_issues(cfg: dict) -> list[str]:
     issues: list[str] = []
-    if not shutil.which(str((cfg.get("webdriver") or {}).get("tauri_driver", "tauri-driver"))):
+    if platform.system() != "Darwin" and not shutil.which(str((cfg.get("webdriver") or {}).get("tauri_driver", "tauri-driver"))):
         issues += [
             "✗ tauri-driver not found on PATH.",
             "  Install: cargo install tauri-driver --locked",

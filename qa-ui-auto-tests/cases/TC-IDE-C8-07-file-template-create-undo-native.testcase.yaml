@@ -76,6 +76,6 @@ steps:
       contains: "public class QaTemplateSmoke"
       timeout_sec: 30
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
-  - press: Control+z
+  - press: Mod+z
   - assert_not_visible: '[data-testid="code-workspace-tree-file"][data-path="src/main/java/com/example/single/QaTemplateSmoke.java"]'
   - screenshot: tc-ide-c8-07-file-template-create-undo.png

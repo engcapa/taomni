@@ -6,10 +6,12 @@ description: |
   process unlocks the vault at startup, restores the last session from the
   Welcome panel, and asserts the custom query tab name persisted by the first
   case. Does not reset app state because it only reads the persisted workspace.
+  Cross-platform native target (Linux, macOS, Windows).
 covers: [F-DB-1]
 tags: [database, sql, query-tab, rename, persistence, native-boundary, needs-review]
 modes: [native]
-native_platforms: [Windows]
+native_platforms: [Linux, macOS, Windows]
+fixtures: [mysql_required]
 timeout_sec: 180
 steps:
   - open: ${cfg.app.base_url}

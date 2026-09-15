@@ -3,11 +3,20 @@ title: Terminal macro records keystrokes and replays via Ctrl+Space
 covers: [F4.4]
 tags: [legacy-imported, macro, p1, terminal]
 modes: [browser]
-fixtures: [reset_db]
+fixtures: [reset_db, ssh_required]
 steps:
   - open: "${cfg.app.base_url}"
-  - click: "[data-testid=\"welcome-open-local-terminal\"]"
+  - click: '[data-testid="app-main-menu"]'
+  - hover: '[data-testid="context-menu-item-view"]'
+  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+  - wait_for: '[data-testid="qc-input"]'
+  - fill: {selector: "[data-testid=\"qc-input\"]", value: "ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}"}
+  - click: "[data-testid=\"qc-submit\"]"
+  - wait_for: "[data-testid=\"auth-prompt\"]"
+  - fill: {selector: "[data-testid=\"auth-password\"]", value: "${env.QA_SSH_PASSWORD}"}
+  - click: "[data-testid=\"auth-submit\"]"
   - wait_for: "[data-testid=\"terminal-pane\"]"
+  - wait: 2
   - click: "[data-testid=\"terminal-pane\"]"
   - wait: 1
   - right_click: { selector: "[data-testid=\"terminal-pane\"]", position: { x: 24, y: 24 } }

@@ -178,6 +178,8 @@ def step_seed_dialog(ctx: StepContext, args: Any) -> None:
     script = (
         "(seed) => {"
         "  let i = 0;"
+        "  window.__seeded_prompts = Array.isArray(seed.prompts) ? [...seed.prompts] : [seed.prompts];"
+        "  window.__seeded_confirm = seed.confirm;"
         "  window.prompt = () => (i < seed.prompts.length ? seed.prompts[i++] : '');"
         "  window.confirm = () => seed.confirm;"
         "  return true;"
@@ -242,6 +244,11 @@ def step_assert_attribute(ctx: StepContext, args: Any) -> None:
         return
     loc = ctx.page.locator(selector).first  # type: ignore[attr-defined]
     actual = loc.get_attribute(name)
+    if actual is None and name == "value":
+        try:
+            actual = loc.input_value()
+        except Exception:
+            pass
     if str(actual) != str(expected):
         raise StepError(
             f"{selector}[{name}]={actual!r} != {expected!r}"
@@ -253,7 +260,8 @@ def step_assert_disabled(ctx: StepContext, args: Any) -> None:
     selector = args if isinstance(args, str) else args["selector"]
     if ctx.dry_run:
         return
-    if not ctx.page.locator(selector).first.is_disabled():  # type: ignore[attr-defined]
+    loc = ctx.page.locator(selector).first  # type: ignore[attr-defined]
+    if not (loc.is_disabled() or loc.get_attribute("disabled") is not None):
         raise StepError(f"{selector} is not disabled")
 
 

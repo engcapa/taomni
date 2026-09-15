@@ -924,6 +924,7 @@ function TabItem(props: TabItemProps) {
       </span>
       {tab.closable && (
         <X
+          data-testid="tab-close"
           className="w-3 h-3 ml-1 opacity-60 hover:opacity-100"
           onClick={(e) => {
             e.stopPropagation();

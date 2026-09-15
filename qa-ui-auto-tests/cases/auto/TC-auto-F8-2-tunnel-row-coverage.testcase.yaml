@@ -17,18 +17,16 @@ fixtures: [reset_db]
 timeout_sec: 90
 steps:
   - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="ribbon"]'
-  - click: '[data-testid="ribbon-tunneling"]'
+  - wait_for: '[data-testid="app-main-menu"]'
+  - click: '[data-testid="app-main-menu"]'
+  - hover: '[data-testid="context-menu-item-tools"]'
+  - click: '[data-testid="context-menu-item-tunneling"]'
   - wait_for: '[data-testid="tunnel-manager"]'
   - assert_visible: '[data-testid="tunnel-list"]'
 
   # Bulk action affordances
   - assert_visible: '[data-testid="tunnel-start-all"]'
   - assert_visible: '[data-testid="tunnel-stop-all"]'
-  - click: '[data-testid="tunnel-start-all"]'
-  - wait: 1
-  - click: '[data-testid="tunnel-stop-all"]'
-  - wait: 1
 
   # ── Persist tunnel A ─────────────────────────────────────────────
   - click: '[data-testid="tunnel-new"]'
@@ -38,8 +36,16 @@ steps:
   - fill: {selector: 'input[placeholder="user"]', value: alice}
   - fill: {selector: 'input[placeholder="22"]', value: '22'}
   - fill: {selector: 'input[placeholder="0"]', value: '19401'}
+  - fill: {selector: 'input[placeholder="db.internal"]', value: 127.0.0.1}
+  - fill: {selector: 'input[placeholder="5432"]', value: '5432'}
   - click: '[data-testid="tunnel-editor-save"]'
   - wait_for: '[data-testid="tunnel-manager"] >> text="qa-row-coverage-a"'
+
+  # Bulk action clicks (enabled now that at least one tunnel exists)
+  - click: '[data-testid="tunnel-start-all"]'
+  - wait: 1
+  - click: '[data-testid="tunnel-stop-all"]'
+  - wait: 1
 
   # ── On the single existing row, exercise every settings-column testid.
   # Direct testid selectors disambiguate to the only match.
@@ -72,6 +78,8 @@ steps:
   - fill: {selector: 'input[placeholder="user"]', value: bob}
   - fill: {selector: 'input[placeholder="22"]', value: '22'}
   - fill: {selector: 'input[placeholder="0"]', value: '19402'}
+  - fill: {selector: 'input[placeholder="db.internal"]', value: 127.0.0.1}
+  - fill: {selector: 'input[placeholder="5432"]', value: '5432'}
   - click: '[data-testid="tunnel-editor-save"]'
   - wait_for: '[data-testid="tunnel-manager"] >> text="qa-row-coverage-b"'
   - assert_count: {selector: '[data-testid="tunnel-row"]', equal: 2}

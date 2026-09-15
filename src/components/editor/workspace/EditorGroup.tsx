@@ -37,6 +37,7 @@ import type {
 import type { ParameterPopupView } from "./referenceInfoSession";
 import {
   CodeMirrorHost,
+  type EditorCommandPort,
   type EditorCommandPortRegistration,
   type EditorContextMenuRequest,
   type EditorSelectionRange,
@@ -406,6 +407,54 @@ export function EditorGroup({
   ) => {
     onEditorCommandPortChange?.(groupId, registration);
   }, [groupId, onEditorCommandPortChange]);
+
+  useEffect(() => {
+    if (
+      activeFile
+      && !activeFile.loading
+      && isMarkdownPath(activeFile.languagePath)
+      && activeMarkdownMode === "preview"
+    ) {
+      const token = {};
+      const fileKey = activeFile.key;
+      const port: EditorCommandPort = {
+        execute: () => false,
+        state: () => ({
+          canUndo: false,
+          canRedo: false,
+          hasSelection: false,
+          lineCount: 1,
+          currentLine: 1,
+          currentColumn: 1,
+          selectedCharCount: 0,
+          encoding: "UTF-8",
+          eol: "\n",
+          languageId: "markdown",
+          readOnly: true,
+          composing: false,
+          caretCount: 1,
+          occurrenceSessionActive: false,
+          completionActive: false,
+        }),
+        focus: (options) => {
+          const el = editorPaneRef.current?.querySelector<HTMLElement>("[data-testid='code-workspace-markdown-preview']");
+          if (!el) return false;
+          el.focus(options);
+          return document.activeElement === el;
+        },
+      };
+      handleEditorCommandPortChange({ fileKey, token, port });
+      return () => handleEditorCommandPortChange({ fileKey, token, port: null });
+    }
+  }, [
+    activeFile?.key,
+    activeFile?.loading,
+    activeFile?.languagePath,
+    activeMarkdownMode,
+    handleEditorCommandPortChange,
+    isMarkdownPath,
+    editorPaneRef,
+  ]);
 
   const stickyLines = useMemo(() => {
     if (stickyLinesEnabled === false || !activeSymbols || !activeFile) return [];

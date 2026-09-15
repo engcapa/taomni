@@ -7,10 +7,10 @@ trace。任何 capability 在没有对应 trace 证据前,只能声明
 
 ## 工具链(固定版本,trace 内记录)
 
-- JDK 21:Zulu 21.0.4(`TAOMNI_FIXTURE_JAVA` 覆盖,默认 `/data/dev/jdk-21/bin/java`)。
-- jdtls 1.61.0.202607102111(`JDTLS_HOME` 覆盖,默认 `~/.local/share/jdtls`)。
+- JDK 21+: macOS/Linux 可通过 `TAOMNI_FIXTURE_JAVA` 覆盖；本机 native QA 使用已安装的 Zulu 25。
+- jdtls 1.61.0(`JDTLS_HOME` 覆盖,默认 `~/.local/share/jdtls`;当前 macOS trace build 为 `1.61.0.202609031315`)。
 - Maven 3.9.x(jdtls 内嵌 m2e 解析 pom;`mvnCliDetected` 仅记录探测结果)。
-- Gradle:`~/.gradle/wrapper/dists` 缓存中的最高发行版(9.5.1;
+- Gradle:`~/.gradle/wrapper/dists` 缓存中的最高发行版(9.7.1;
   `TAOMNI_FIXTURE_GRADLE` 覆盖),经 `java.import.gradle.home` 注入。
 
 ## Fixture 项目(`projects/`)
@@ -85,4 +85,4 @@ node runner/run-jdtls-fixture.mjs [--fixture <id>]...
 - [x] 真实 jdtls trace(R3-c,2026-08-24,Linux 实机):五个项目全部
   绿,见 `traces/*.trace.json`;Vitest 断言 trace 与期望一致
   (`jdtlsTraceContract.test.ts`)。
-- [ ] Windows/macOS 平台重复运行(R9);IDEA 2026.2 对照录制。
+- [ ] Windows 平台重复运行(R9);IDEA 2026.2 对照录制。macOS 使用 `config_mac` 的 provider 运行由本机 QA runbook 覆盖。

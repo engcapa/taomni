@@ -3918,35 +3918,37 @@ export function MainLayout() {
       style={{ background: "var(--taomni-chrome-bg)" }}
     >
       {!isMac && <WindowResizeHandles />}
-      <ControlBar
-        activeTabClosable={!!activeTab?.closable}
-        nativeMenu={nativeMenu}
-        xServerEnabled={xServerEnabled}
-        quickConnectVisible={quickConnectVisible}
-        workspaceCommands={activeWorkspaceCommandRegistration?.items ?? []}
-        onCommand={handleCommand}
-        onWorkspaceCommand={(commandId) => activeWorkspaceCommandRegistration?.executeAction(commandId)}
-        onToggleSidebar={toggleSidebar}
-        onStartLocalTerminal={(localShell) =>
-          openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell)
-        }
-        onConnectSession={handleConnectSession}
-        onOpenSessionEditor={() => handleNewSession()}
-        onDuplicateTab={handleDuplicateTab}
-        onDetachActiveTab={
-          activeTab && (
-            (activeTab.type === "terminal" && !terminalSplitVisible) ||
-            (activeTab.type === "rdp" && !!activeTab.rdp) ||
-            (activeTab.type === "vnc" && !!activeTab.vnc) ||
-            (activeTab.type === "database" && !!activeTab.db) ||
-            (activeTab.type === "sftp" && !!activeTab.sftp)
-          )
-            ? handleDetachActiveTab
-            : undefined
-        }
-        onCloseWindow={requestAppExit}
-        slotRef={setTabActionSlot}
-      />
+      <div data-testid="app-titlebar" className="min-w-0">
+        <ControlBar
+          activeTabClosable={!!activeTab?.closable}
+          nativeMenu={nativeMenu}
+          xServerEnabled={xServerEnabled}
+          quickConnectVisible={quickConnectVisible}
+          workspaceCommands={activeWorkspaceCommandRegistration?.items ?? []}
+          onCommand={handleCommand}
+          onWorkspaceCommand={(commandId) => activeWorkspaceCommandRegistration?.executeAction(commandId)}
+          onToggleSidebar={toggleSidebar}
+          onStartLocalTerminal={(localShell) =>
+            openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell)
+          }
+          onConnectSession={handleConnectSession}
+          onOpenSessionEditor={() => handleNewSession()}
+          onDuplicateTab={handleDuplicateTab}
+          onDetachActiveTab={
+            activeTab && (
+              (activeTab.type === "terminal" && !terminalSplitVisible) ||
+              (activeTab.type === "rdp" && !!activeTab.rdp) ||
+              (activeTab.type === "vnc" && !!activeTab.vnc) ||
+              (activeTab.type === "database" && !!activeTab.db) ||
+              (activeTab.type === "sftp" && !!activeTab.sftp)
+            )
+              ? handleDetachActiveTab
+              : undefined
+          }
+          onCloseWindow={requestAppExit}
+          slotRef={setTabActionSlot}
+        />
+      </div>
       {quickConnectVisible && (
         <QuickConnect
           onConnectInput={handleQuickConnect}
@@ -4161,6 +4163,13 @@ export function MainLayout() {
                                 ? (data) => broadcastToSelectedTerminals(data, tab.id)
                                 : undefined
                             }
+                            detachToggle={!terminalSplitVisible ? {
+                              onDetach: () => openDetachedTerminal(tab.id, tab, tab.title),
+                            } : undefined}
+                            chatToggle={!aiFullyDisabled ? {
+                              open: chatDrawerOpen && activeTabId === tab.id,
+                              onToggle: () => void toggleTabChat(tab.id),
+                            } : undefined}
                             sftpToggle={!terminalSplitVisible && tab.ssh ? {
                               open: sidebarOpen,
                               onToggle: () => {
@@ -4513,7 +4522,8 @@ export function MainLayout() {
 
                 {/* VNC tabs — always mounted so connection survives tab switches */}
                 {vncTabs.map((tab) => {
-                  if (!tab.vnc) return null;
+                  const vnc = tab.vnc;
+                  if (!vnc) return null;
                   const isActive = activeTabId === tab.id;
                   return (
                     <div
@@ -4524,24 +4534,26 @@ export function MainLayout() {
                       <Suspense fallback={<VncLoadingPanel />}>
                         <VncPanel
                           tabId={tab.id}
-                          host={tab.vnc.host}
-                          port={tab.vnc.port}
-                          username={tab.vnc.username}
-                          password={tab.vnc.password}
-                          networkSettingsJson={tab.vnc.networkSettingsJson}
-                          securityPolicy={tab.vnc.securityPolicy}
-                          viewOnly={tab.vnc.viewOnly}
-                          clipboardPolicy={tab.vnc.clipboardPolicy}
+                          host={vnc.host}
+                          port={vnc.port}
+                          username={vnc.username}
+                          password={vnc.password}
+                          networkSettingsJson={vnc.networkSettingsJson}
+                          securityPolicy={vnc.securityPolicy}
+                          viewOnly={vnc.viewOnly}
+                          clipboardPolicy={vnc.clipboardPolicy}
                           visible={isActive}
+                          onDetach={() => openDetachedVnc(tab.id, vnc, tab.title)}
                         />
                       </Suspense>
                     </div>
                   );
                 })}
 
-                {/* RDP tabs — always mounted so the WS relay stays alive across tab switches */}
+                {/* RDP tabs */}
                 {rdpTabs.map((tab) => {
-                  if (!tab.rdp) return null;
+                  const rdp = tab.rdp;
+                  if (!rdp) return null;
                   const isActive = activeTabId === tab.id;
                   return (
                     <div
@@ -4552,13 +4564,14 @@ export function MainLayout() {
                       <Suspense fallback={<RdpLoadingPanel />}>
                         <RdpPanel
                           tabId={tab.id}
-                          host={tab.rdp.host}
-                          port={tab.rdp.port}
-                          username={tab.rdp.username}
-                          password={tab.rdp.password}
-                          options={tab.rdp.options}
-                          networkSettingsJson={tab.rdp.networkSettingsJson}
+                          host={rdp.host}
+                          port={rdp.port}
+                          username={rdp.username}
+                          password={rdp.password}
+                          options={rdp.options}
+                          networkSettingsJson={rdp.networkSettingsJson}
                           visible={isActive}
+                          onDetach={() => openDetachedRdp(tab.id, rdp, tab.title)}
                         />
                       </Suspense>
                     </div>

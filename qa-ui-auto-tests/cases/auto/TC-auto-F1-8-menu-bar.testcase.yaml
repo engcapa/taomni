@@ -37,6 +37,7 @@ steps:
   - assert_visible: '[data-testid="context-menu"] >> text="Show sessions"'
   - assert_visible: '[data-testid="context-menu-item-reload-sessions"]'
   - press: Escape
+  - press: Escape
   - wait_for:
       selector: '[data-testid="context-menu"]'
       state: detached
@@ -46,8 +47,9 @@ steps:
   - click: '[data-testid="app-main-menu"]'
   - hover: '[data-testid="context-menu-item-view"]'
   - assert_visible: '[data-testid="context-menu-item-toggle-quick-connect"]'
-  - assert_visible: '[data-testid="context-menu-item-toggle-ribbon"]'
-  - assert_visible: '[data-testid="context-menu"] >> text="Split active terminal"'
+  - hover: '[data-testid="context-menu-item-toggle-sidebar"]'
+  - hover: '[data-testid="context-menu-item-split-terminal"]'
+  - press: Escape
   - press: Escape
   - wait_for:
       selector: '[data-testid="context-menu"]'

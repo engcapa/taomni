@@ -627,6 +627,7 @@ function TunnelRow({
     if (!hasSecret) return "(none)";
     return "••••••••";
   }, [tunnel.ssh.authMethod, tunnel.ssh.authData, hasSecret]);
+  const [revealed, setRevealed] = useState(false);
 
   return (
     <tr
@@ -712,9 +713,16 @@ function TunnelRow({
           <span className="text-[10.5px] px-1 rounded" style={{ background: "var(--taomni-hover)", color: "var(--taomni-text-muted)" }}>
             {tunnel.ssh.authMethod}
           </span>
-          <span className="text-[10.5px] taomni-mono" style={{ color: "var(--taomni-text-muted)" }}>
-            {authPreview}
-          </span>
+          <button
+            data-testid="tunnel-row-toggle-reveal"
+            type="button"
+            className="text-[10.5px] taomni-mono hover:underline cursor-pointer"
+            style={{ color: "var(--taomni-text-muted)" }}
+            onClick={() => setRevealed((v) => !v)}
+            title={revealed ? t("tunnels.rowHide") : t("tunnels.rowShow")}
+          >
+            {revealed && tunnel.ssh.authData ? tunnel.ssh.authData : authPreview}
+          </button>
         </div>
       </Td>
       <Td className="text-center">

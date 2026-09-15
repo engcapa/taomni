@@ -16,7 +16,6 @@ steps:
   - wait_for:
       selector: '[data-testid="terminal-pane"]'
       timeout_sec: 15
-  - hover: '[data-testid="terminal-pane"]'
   - wait_for:
       selector: '[data-testid="capture-toolbar"]'
       timeout_sec: 5

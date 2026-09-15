@@ -58,7 +58,10 @@ function resolveJdtlsHome() {
   return {
     home,
     launcherJar,
-    configArea: join(home, "config_linux"),
+    configArea: join(
+      home,
+      process.platform === "darwin" ? "config_mac" : process.platform === "win32" ? "config_win" : "config_linux",
+    ),
     version: core?.replace("org.eclipse.jdt.ls.core_", "") ?? "unknown",
   };
 }

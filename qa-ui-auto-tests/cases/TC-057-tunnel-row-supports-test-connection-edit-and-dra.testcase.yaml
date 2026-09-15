@@ -6,7 +6,10 @@ modes: [browser]
 fixtures: [reset_db, ssh_required]
 steps:
   - open: "${cfg.app.base_url}"
-  - click: "[data-testid=\"ribbon-tunneling\"]"
+  - wait_for: '[data-testid="app-main-menu"]'
+  - click: '[data-testid="app-main-menu"]'
+  - hover: '[data-testid="context-menu-item-tools"]'
+  - click: '[data-testid="context-menu-item-tunneling"]'
   - wait_for: "[data-testid=\"tunnel-manager\"]"
   - click: "[data-testid=\"tunnel-new\"]"
   - wait_for: "[data-testid=\"tunnel-editor\"]"
@@ -15,6 +18,8 @@ steps:
   - fill: {selector: "input[placeholder=\"user\"]", value: "${cfg.ssh.user}"}
   - fill: {selector: "input[placeholder=\"22\"]", value: "${cfg.ssh.port}"}
   - fill: {selector: 'input[placeholder="0"]', value: "19333"}
+  - fill: {selector: 'input[placeholder="db.internal"]', value: "127.0.0.1"}
+  - fill: {selector: 'input[placeholder="5432"]', value: "5432"}
   - click: '[data-testid="tunnel-editor-save"]'
   - wait: 1
   - wait_for: "[data-testid=\"tunnel-manager\"] >> text=\"qa-ui-auto-reorder-a\""
@@ -25,13 +30,14 @@ steps:
   - fill: {selector: "input[placeholder=\"user\"]", value: "${cfg.ssh.user}"}
   - fill: {selector: "input[placeholder=\"22\"]", value: "${cfg.ssh.port}"}
   - fill: {selector: 'input[placeholder="0"]', value: "19334"}
+  - fill: {selector: 'input[placeholder="db.internal"]', value: "127.0.0.1"}
+  - fill: {selector: 'input[placeholder="5432"]', value: "5432"}
   - click: '[data-testid="tunnel-editor-save"]'
   - wait: 1
   - wait_for: "[data-testid=\"tunnel-manager\"] >> text=\"qa-ui-auto-reorder-b\""
   - click: '[data-testid="tunnel-manager"] tr:has-text("qa-ui-auto-reorder-a") button[title="Move down"]'
   - wait: 1
+  - seed_dialog: {confirm: true}
   - click: '[data-testid="tunnel-manager"] tr:has-text("qa-ui-auto-reorder-a") button[title="Test SSH connection"]'
   - wait: 2
-  - seed_dialog: {confirm: true}
-  - wait: 1
   - screenshot: 057-tunnel-reorder-test.png

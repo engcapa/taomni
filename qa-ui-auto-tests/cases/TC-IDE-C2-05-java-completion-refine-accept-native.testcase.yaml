@@ -30,7 +30,7 @@ steps:
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
-      keys: ["Control+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "Home", "Shift+End"]
+      keys: ["Mod+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "Home", "Shift+End"]
   - type: "        System.out.p"
   - wait_for:
       selector: '.cm-tooltip-autocomplete li.cm-completion-type-method'
@@ -57,26 +57,38 @@ steps:
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
-      keys: ["Control+z"]
+      keys: ["Mod+z"]
   - eval_readonly:
       expression: 'document.querySelector(".cm-content").innerText.includes("System.out.println\n")'
       expect_truthy: true
-  - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      transport: webdriver
-      keys: ["Control+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "End"]
-  - press: "Alt+/"
-  - wait_for: '.cm-tooltip-autocomplete li.cm-completion-type-method'
+  # Round 2 (mouse accept) reuses the proven automatic-popup path. The undo
+  # caret is already on the println line, so select the whole line and
+  # retype the refined prefix with BARE presses only: a click (including the
+  # implicit click of press-with-selector) re-anchors the caret to the
+  # viewport origin under the synthetic bridge, and no vertical navigation
+  # is needed. The full identifier narrows jdtls to println overloads on
+  # every provider build, so the first row is positionally stable; only the
+  # accept modality (mouse click) differs from round 1.
+  - press: Escape
+  - eval_readonly:
+      expression: 'document.activeElement === document.querySelectorAll(".cm-content")[0]'
+      expect_truthy: true
+  - press: Home
+  - press: Shift+End
+  - type: "        System.out.println"
+  - wait_for:
+      selector: '.cm-tooltip-autocomplete li.cm-completion-type-method'
+      timeout_sec: 90
   - wait: 1
-  - click: '.cm-tooltip-autocomplete li.cm-completion-type-method:nth-child(2)'
+  - click: '.cm-tooltip-autocomplete li.cm-completion-type-method:nth-child(1)'
   - assert_text:
       selector: '[data-testid="code-workspace-editor"]'
       contains: "System.out.println("
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
-      keys: ["Control+z"]
+      keys: ["Mod+z"]
+  # Undo removes the mouse-accepted overload, restoring the retyped line.
   - eval_readonly:
       expression: 'document.querySelector(".cm-content").innerText.includes("System.out.println\n")'
       expect_truthy: true

@@ -19,6 +19,8 @@ steps:
   - wait_for: '[data-testid="session-editor"]'
   - fill: {selector: '[data-testid="session-host"]', value: '${cfg.ssh.host}'}
   - fill: {selector: '[data-testid="session-port"]', value: '${cfg.ssh.port}'}
+  - send_text_via_label: {label_contains: Specify username, checked: true}
+  - wait: 1
   - fill: {selector: '[data-testid="session-user"]', value: '${cfg.ssh.user}'}
   - click: '[data-testid="session-section-bookmark"]'
   - wait_for: '[data-testid="bookmark-settings"]'
@@ -30,6 +32,8 @@ steps:
   - wait_for: '[data-testid="session-editor"]'
   - fill: {selector: '[data-testid="session-host"]', value: '${cfg.ssh.host}'}
   - fill: {selector: '[data-testid="session-port"]', value: '${cfg.ssh.port}'}
+  - send_text_via_label: {label_contains: Specify username, checked: true}
+  - wait: 1
   - fill: {selector: '[data-testid="session-user"]', value: '${cfg.ssh.user}'}
   - click: '[data-testid="session-section-bookmark"]'
   - wait_for: '[data-testid="bookmark-settings"]'

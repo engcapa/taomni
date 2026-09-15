@@ -12,8 +12,10 @@ fixtures: [reset_db]
 timeout_sec: 45
 steps:
   - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="ribbon"]'
-  - click: '[data-testid="ribbon-tunneling"]'
+  - wait_for: '[data-testid="app-main-menu"]'
+  - click: '[data-testid="app-main-menu"]'
+  - hover: '[data-testid="context-menu-item-tools"]'
+  - click: '[data-testid="context-menu-item-tunneling"]'
   - wait_for: '[data-testid="tunnel-manager"]'
   - assert_visible: '[data-testid="tunnel-list"]'
   - assert_visible: '[data-testid="tunnel-new"]'

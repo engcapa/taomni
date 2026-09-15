@@ -6,6 +6,10 @@ modes: [browser, native]
 fixtures: [reset_db, ssh_required]
 steps:
   - open: "${cfg.app.base_url}"
+  - click: '[data-testid="app-main-menu"]'
+  - hover: '[data-testid="context-menu-item-view"]'
+  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+  - wait_for: '[data-testid="qc-input"]'
   - fill: {selector: "[data-testid=\"qc-input\"]", value: "ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}"}
   - click: "[data-testid=\"qc-submit\"]"
   - wait_for: "[data-testid=\"auth-prompt\"]"

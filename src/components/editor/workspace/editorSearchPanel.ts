@@ -1,4 +1,4 @@
-import { RegExpCursor, SearchQuery, closeSearchPanel, findNext, findPrevious, getSearchQuery, replaceAll, replaceNext, setSearchQuery } from "@codemirror/search";
+import { RegExpCursor, SearchQuery, closeSearchPanel, findNext, findPrevious, getSearchQuery, openSearchPanel, replaceAll, replaceNext, setSearchQuery } from "@codemirror/search";
 import { EditorSelection, type EditorState } from "@codemirror/state";
 import { syntaxTree } from "@codemirror/language";
 import { EditorView, type Panel, type ViewUpdate } from "@codemirror/view";
@@ -248,7 +248,7 @@ export function replaceNextPreserveCase(
   query: SearchQuery,
   preserveCase: boolean,
 ): boolean {
-  if (!query.valid || !query.search) return false;
+  if (view.state.readOnly || !query.valid || !query.search) return false;
   if (!preserveCase) return replaceNext(view);
 
   const sel = view.state.selection.main;
@@ -316,7 +316,7 @@ export function replaceAllPreserveCase(
   query: SearchQuery,
   preserveCase: boolean,
 ): boolean {
-  if (!query.valid || !query.search) return false;
+  if (view.state.readOnly || !query.valid || !query.search) return false;
   if (!preserveCase) return replaceAll(view);
 
   const cursor = query.getCursor(view.state);
@@ -341,6 +341,10 @@ export function replaceAllPreserveCase(
   return true;
 }
 
+// The panel stays owned by CM. This registry only routes the existing Replace
+// action to that view's panel; query/document state is never duplicated here.
+const panels = new WeakMap<EditorView, WorkspaceSearchPanel>();
+
 class WorkspaceSearchPanel implements Panel {
   readonly dom: HTMLElement;
   readonly top = true;
@@ -358,8 +362,17 @@ class WorkspaceSearchPanel implements Panel {
   private readonly preserveCaseButton: HTMLButtonElement;
   private readonly selectAllButton: HTMLButtonElement;
   private readonly status: HTMLSpanElement;
+  private readonly replaceRow: HTMLDivElement;
+  private readonly expandButton: HTMLButtonElement;
+  private readonly moreOptions: HTMLDivElement;
+  private readonly moreButton: HTMLButtonElement;
+  private focusGeneration = 0;
+  private destroyed = false;
+  private composing = false;
+  private cancelFocus: (() => void) | null = null;
 
-  constructor(private readonly view: EditorView) {
+  constructor(private readonly view: EditorView, private readonly focusOwner: () => number | null) {
+    panels.set(view, this);
     this.query = getSearchQuery(view.state);
     // type=search lets the platform show a native clear; do not add a custom ×.
     this.searchField = input("Find", "search", "Find", "search");
@@ -376,23 +389,34 @@ class WorkspaceSearchPanel implements Panel {
     this.status.className = "cm-workspace-search-status";
     this.status.setAttribute("aria-live", "polite");
 
+    this.expandButton = button("Show replace", "›", () => this.setReplaceOpen(this.replaceRow.hidden === true));
+    this.expandButton.setAttribute("aria-expanded", "false");
+    this.moreOptions = document.createElement("div");
+    this.moreOptions.className = "cm-workspace-search-options";
+    this.moreOptions.hidden = true;
+    this.moreOptions.append(this.inSelectionButton, this.contextFilterButton, this.selectAllButton);
+    this.moreButton = button("More search options", "…", () => {
+      this.moreOptions.hidden = !this.moreOptions.hidden;
+      this.moreButton.setAttribute("aria-expanded", String(!this.moreOptions.hidden));
+    });
+    this.moreButton.setAttribute("aria-expanded", "false");
+    const searchShell = fieldShell(this.searchField);
+    searchShell.append(this.caseButton, this.wordButton, this.regexpButton);
     const findRow = document.createElement("div");
     findRow.className = "cm-workspace-search-row";
     findRow.append(
-      fieldShell(this.searchField),
-      this.caseButton,
-      this.wordButton,
-      this.regexpButton,
-      this.inSelectionButton,
-      this.contextFilterButton,
+      this.expandButton,
+      searchShell,
       this.status,
       button("Previous match", "↑", () => findPrevious(this.view)),
       button("Next match", "↓", () => findNext(this.view)),
-      this.selectAllButton,
+      this.moreButton,
       button("Close find and replace", "×", () => closeSearchPanel(this.view)),
     );
 
     const replaceRow = document.createElement("div");
+    this.replaceRow = replaceRow;
+    replaceRow.hidden = true;
     replaceRow.className = "cm-workspace-search-row cm-workspace-replace-row";
     replaceRow.append(
       fieldShell(this.replaceField),
@@ -404,15 +428,66 @@ class WorkspaceSearchPanel implements Panel {
     this.dom = document.createElement("div");
     this.dom.className = "cm-workspace-search";
     this.dom.setAttribute("data-testid", "code-workspace-editor-search");
-    this.dom.append(findRow, replaceRow);
+    this.dom.append(findRow, replaceRow, this.moreOptions);
     this.dom.addEventListener("keydown", (event) => this.onKeyDown(event));
     this.searchField.addEventListener("input", () => this.commit());
     this.replaceField.addEventListener("input", () => this.commit());
+    this.dom.addEventListener("compositionstart", () => { this.composing = true; });
+    this.dom.addEventListener("compositionend", () => { this.composing = false; });
     this.syncQuery(this.query);
   }
 
   mount(): void {
-    this.searchField.select();
+    this.requestFocus(this.searchField);
+  }
+
+  destroy(): void {
+    this.destroyed = true;
+    this.focusGeneration += 1;
+    this.cancelFocus?.();
+    if (panels.get(this.view) === this) panels.delete(this.view);
+  }
+
+  setReplaceOpen(open: boolean): void {
+    this.replaceRow.hidden = !open;
+    this.expandButton.textContent = open ? "⌄" : "›";
+    this.expandButton.setAttribute("aria-label", open ? "Hide replace" : "Show replace");
+    this.expandButton.title = open ? "Hide replace" : "Show replace";
+    this.expandButton.setAttribute("aria-expanded", String(open));
+    this.requestFocus(open ? this.replaceField : this.searchField);
+  }
+
+  private requestFocus(field: HTMLInputElement): void {
+    this.cancelFocus?.();
+    const generation = ++this.focusGeneration;
+    const owner = this.focusOwner();
+    const origin = this.view.root.activeElement;
+    // Remember intervening focus transfers, including A -> B -> A. Merely
+    // testing isConnected or current focus would resurrect a stale request.
+    const onFocus = (event: Event) => {
+      if (event.target !== origin && !this.dom.contains(event.target as Node)) this.focusGeneration += 1;
+    };
+    const root = this.dom.ownerDocument;
+    root.addEventListener("focusin", onFocus, true);
+    const cancel = () => root.removeEventListener("focusin", onFocus, true);
+    this.cancelFocus = cancel;
+    queueMicrotask(() => {
+      cancel();
+      if (this.destroyed || generation !== this.focusGeneration || owner === null
+        || this.focusOwner() !== owner || !this.dom.isConnected) return;
+      field.focus();
+      field.select();
+      this.selectInitialMatch();
+    });
+  }
+
+  private selectInitialMatch(): void {
+    if (this.view.state.selection.ranges.length > 1) return;
+    const matches = getFilteredMatches(this.view.state, this.query);
+    const from = this.view.state.selection.main.from;
+    const match = matches.find((candidate) => candidate.from >= from) ?? matches[0];
+    if (!match) return;
+    this.view.dispatch({ selection: { anchor: match.from, head: match.to }, scrollIntoView: true });
   }
 
   update(update: ViewUpdate): void {
@@ -437,6 +512,7 @@ class WorkspaceSearchPanel implements Panel {
     if (query.eq(this.query)) return;
     this.query = query;
     this.view.dispatch({ effects: setSearchQuery.of(query) });
+    this.selectInitialMatch();
     this.updateStatus();
   }
 
@@ -521,11 +597,29 @@ class WorkspaceSearchPanel implements Panel {
 
   private updateStatus(): void {
     this.status.textContent = matchStatus(this.view, this.query);
+    this.replaceRow.querySelectorAll<HTMLButtonElement>("button").forEach((control) => {
+      control.disabled = this.view.state.readOnly;
+      if (control.disabled) control.title = "Document is read-only";
+    });
   }
 
   private onKeyDown(event: KeyboardEvent): void {
+    if (event.isComposing || this.composing || event.keyCode === 229) return;
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "r") {
+      event.preventDefault();
+      event.stopPropagation();
+      this.setReplaceOpen(true);
+      return;
+    }
     if (event.key === "Escape") {
       event.preventDefault();
+      event.stopPropagation();
+      if (!this.moreOptions.hidden) {
+        this.moreOptions.hidden = true;
+        this.moreButton.setAttribute("aria-expanded", "false");
+        this.searchField.focus();
+        return;
+      }
       closeSearchPanel(this.view);
       return;
     }
@@ -541,8 +635,14 @@ class WorkspaceSearchPanel implements Panel {
   }
 }
 
-export function createWorkspaceSearchPanel(view: EditorView): Panel {
-  return new WorkspaceSearchPanel(view);
+export function createWorkspaceSearchPanel(view: EditorView, focusOwner: () => number | null = () => 0): Panel {
+  return new WorkspaceSearchPanel(view, focusOwner);
+}
+
+export function openWorkspaceReplacePanel(view: EditorView): boolean {
+  openSearchPanel(view);
+  panels.get(view)?.setReplaceOpen(true);
+  return true;
 }
 
 export const WORKSPACE_SEARCH_STYLE = EditorView.theme({
@@ -556,7 +656,7 @@ export const WORKSPACE_SEARCH_STYLE = EditorView.theme({
     padding: "6px 8px",
     background: "var(--taomni-code-gutter-bg)",
     color: "var(--taomni-code-text)",
-    fontSize: "11px",
+    fontSize: "var(--taomni-ui-font-size, 12px)",
   },
   ".cm-workspace-search-row": {
     display: "flex",
@@ -568,15 +668,24 @@ export const WORKSPACE_SEARCH_STYLE = EditorView.theme({
     position: "relative",
     display: "flex",
     alignItems: "center",
-    width: "min(320px, 45%)",
-    minWidth: "120px",
+    flex: "1 1 320px",
+    maxWidth: "520px",
+    minWidth: "80px",
+    border: "1px solid var(--taomni-code-border)",
+    borderRadius: "4px",
+    background: "var(--taomni-code-bg)",
+    overflow: "hidden",
+  },
+  ".cm-workspace-search-field:focus-within": {
+    borderColor: "var(--taomni-accent)",
+    outline: "1px solid var(--taomni-accent)",
   },
   ".cm-workspace-search-input": {
     boxSizing: "border-box",
     width: "100%",
     minWidth: "0",
-    height: "26px",
-    border: "1px solid var(--taomni-code-border)",
+    height: "2.2em",
+    border: "none",
     borderRadius: "4px",
     padding: "0 7px",
     outline: "none",
@@ -593,8 +702,9 @@ export const WORKSPACE_SEARCH_STYLE = EditorView.theme({
   },
   ".cm-workspace-search-button": {
     boxSizing: "border-box",
-    height: "26px",
-    minWidth: "26px",
+    height: "2.2em",
+    minWidth: "2em",
+    flexShrink: "0",
     border: "1px solid transparent",
     borderRadius: "4px",
     padding: "0 6px",
@@ -612,13 +722,29 @@ export const WORKSPACE_SEARCH_STYLE = EditorView.theme({
     color: "var(--taomni-accent)",
   },
   ".cm-workspace-search-status": {
-    minWidth: "64px",
+    minWidth: "3.5em",
     marginLeft: "4px",
     color: "var(--taomni-code-muted)",
     whiteSpace: "nowrap",
   },
   ".cm-workspace-replace-row": {
-    paddingLeft: "0",
+    paddingLeft: "calc(2em + 4px)",
+  },
+  ".cm-workspace-search [hidden]": {
+    display: "none",
+  },
+  ".cm-workspace-search-options": {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "4px",
+  },
+  ".cm-workspace-search-button:focus-visible": {
+    outline: "2px solid var(--taomni-accent)",
+    outlineOffset: "-2px",
+  },
+  ".cm-workspace-search-button:disabled": {
+    opacity: "0.5",
+    cursor: "default",
   },
   ".cm-searchMatch": {
     backgroundColor: "var(--taomni-code-selection-match-bg)",

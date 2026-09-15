@@ -37,3 +37,8 @@ IDEA 2026.2.2（IU-262.10315.125，IntelliJ Dark New UI）在隔离 fixture 上�
 快速迭代：目标 mounted 测试与 FileTreePane/toolbar 现有测试；随后 scoped typecheck。稳定后只构建一次隔离 QA binary，运行上述 native case（Windows WebView2）；浏览器 case 只证明 renderer。IDEA 截图用于交互/视觉比较，不把 validator 退出码当作对齐通过。Linux/macOS 原生和屏幕阅读器本轮未运行。
 
 失败/取消恢复：方向键不得改变打开文件、磁盘或 history；Enter/open 失败沿现有 toast/错误 owner；右键 Escape 不改变所选文件。若异步目录加载中，旧选择不得覆盖新选择。
+
+
+## 2026-09-14 后续合同修订入口（不改历史验收与旧卡状态）
+
+REQ-02 首包用户已选择按实测 profile 修订鼠标合同：[ED-TREEOPEN-001 / DEC-TOF-01](code-workspace-tree-open-focus-design.md#ed-treeopen-001)。文件/目录标签单击只选择，文件双击/Enter 正式打开并在 matching view ready 后获焦；目录箭头、双击/Enter 切展开。此修订替代本文件旧“文件单击正式打开、目录单击展开”和 Enter 不负责 editor focus 的范围限制；其他导航、数据保护与刷新合同继续有效。保留其他入口 preview 策略，不改全局默认。旧 ED-TREE-001 done 与其日期/证据不重写；新任务状态只读 [新板](../claudedocs/code-workspace-idea-parity-backlog-tree-open-focus.md)，不是重领旧卡。

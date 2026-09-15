@@ -51,6 +51,25 @@ export type EditorGroupId = "primary" | "secondary" | string;
 export type EditorSplitOrientation = "horizontal" | "vertical";
 export type RightPaneTabId = "outline" | "documentation";
 
+export interface ShellChromeState {
+  version: 1;
+  projectWidthPx?: number;
+  rightWidthPx?: number;
+  bottomHeightPx?: number;
+  bottomHeightByTool?: Partial<Record<BottomDockTabId, number>>;
+}
+
+export const DEFAULT_SHELL_CHROME_STATE: ShellChromeState = {
+  version: 1,
+  projectWidthPx: 452,
+  rightWidthPx: 280,
+  bottomHeightPx: 323,
+  bottomHeightByTool: {
+    problems: 449,
+    run: 323,
+  },
+};
+
 export interface CodeWorkspaceEditorGroupState {
   id: EditorGroupId;
   openOrder: string[];
@@ -86,6 +105,7 @@ export interface CodeWorkspaceInstanceUi {
   debugSubTab: DebugSubTabId;
   rightPaneOpen: boolean;
   rightPaneTab: RightPaneTabId;
+  shellChromeState: ShellChromeState;
   searchEverywhereOpen: boolean;
   searchEverywhereMode: SearchEverywhereMode;
   recentFilesOpen: boolean;
@@ -128,11 +148,15 @@ export interface CodeWorkspaceInstanceUi {
 export function createDefaultCodeWorkspaceUi(): CodeWorkspaceInstanceUi {
   return {
     languagePanelOpen: true,
-    bottomDockOpen: true,
-    bottomDockTab: "references",
+    bottomDockOpen: false,
+    bottomDockTab: "problems",
     debugSubTab: "debugger",
     rightPaneOpen: false,
     rightPaneTab: "outline",
+    shellChromeState: {
+      ...DEFAULT_SHELL_CHROME_STATE,
+      bottomHeightByTool: { ...DEFAULT_SHELL_CHROME_STATE.bottomHeightByTool },
+    },
     searchEverywhereOpen: false,
     searchEverywhereMode: "files",
     recentFilesOpen: false,
@@ -341,6 +365,9 @@ interface CodeWorkspaceStoreState {
   updateExpandedRootIds: (instanceId: string, updater: Updater<string[]>) => void;
   updateExpandedDirKeys: (instanceId: string, updater: Updater<string[]>) => void;
   seedTreeExpandIfEmpty: (instanceId: string, rootIds: string[], dirKeys: string[]) => void;
+  setShellChromeState: (instanceId: string, patch: Partial<ShellChromeState>) => void;
+  setBottomDockHeightForTool: (instanceId: string, toolId: BottomDockTabId, height: number) => void;
+  restoreDefaultToolWindowLayout: (instanceId: string) => void;
 }
 
 export const useCodeWorkspaceStore = create<CodeWorkspaceStoreState>((set, get) => ({
@@ -1047,6 +1074,78 @@ export const useCodeWorkspaceStore = create<CodeWorkspaceStoreState>((set, get) 
             ...current,
             expandedRootIds: rootIds,
             expandedDirKeys: dirKeys,
+          },
+        },
+      };
+    });
+  },
+
+  setShellChromeState: (instanceId, patch) => {
+    get().ensureInstance(instanceId);
+    set((state) => {
+      const current = state.byInstanceId[instanceId] ?? createDefaultCodeWorkspaceUi();
+      const prevChrome = current.shellChromeState ?? DEFAULT_SHELL_CHROME_STATE;
+      const nextChrome: ShellChromeState = {
+        ...prevChrome,
+        ...patch,
+        bottomHeightByTool: {
+          ...prevChrome.bottomHeightByTool,
+          ...(patch.bottomHeightByTool ?? {}),
+        },
+      };
+      return {
+        byInstanceId: {
+          ...state.byInstanceId,
+          [instanceId]: {
+            ...current,
+            shellChromeState: nextChrome,
+          },
+        },
+      };
+    });
+  },
+
+  setBottomDockHeightForTool: (instanceId, toolId, height) => {
+    get().ensureInstance(instanceId);
+    set((state) => {
+      const current = state.byInstanceId[instanceId] ?? createDefaultCodeWorkspaceUi();
+      const prevChrome = current.shellChromeState ?? DEFAULT_SHELL_CHROME_STATE;
+      const nextChrome: ShellChromeState = {
+        ...prevChrome,
+        bottomHeightPx: height,
+        bottomHeightByTool: {
+          ...prevChrome.bottomHeightByTool,
+          [toolId]: height,
+        },
+      };
+      return {
+        byInstanceId: {
+          ...state.byInstanceId,
+          [instanceId]: {
+            ...current,
+            shellChromeState: nextChrome,
+          },
+        },
+      };
+    });
+  },
+
+  restoreDefaultToolWindowLayout: (instanceId) => {
+    get().ensureInstance(instanceId);
+    set((state) => {
+      const current = state.byInstanceId[instanceId] ?? createDefaultCodeWorkspaceUi();
+      return {
+        byInstanceId: {
+          ...state.byInstanceId,
+          [instanceId]: {
+            ...current,
+            languagePanelOpen: true,
+            bottomDockOpen: false,
+            rightPaneOpen: false,
+            shellChromeState: {
+              ...DEFAULT_SHELL_CHROME_STATE,
+              bottomHeightByTool: { ...DEFAULT_SHELL_CHROME_STATE.bottomHeightByTool },
+            },
           },
         },
       };

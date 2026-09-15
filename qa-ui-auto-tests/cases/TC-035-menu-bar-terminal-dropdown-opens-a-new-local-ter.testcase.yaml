@@ -3,10 +3,14 @@ title: Unified app menu opens a new local terminal and lists session entries
 covers: [F1.2, F1.8]
 tags: [legacy-imported, main, unified-menu, p1]
 modes: [browser, native]
+# The in-bar menu is hidden on native macOS by design (native global menu);
+# native runs there skip explicitly while browser + Linux/Windows native
+# prove the unified menu. Coverage stays global.
+native_platforms: [Linux, Windows]
 fixtures: [reset_db]
 steps:
   - open: "${cfg.app.base_url}"
-  - wait_for: "[data-testid=\"app-titlebar\"]"
+  - wait_for: '[data-testid="control-bar"]'
   - click: '[data-testid="app-main-menu"]'
   - wait_for: "[data-testid=\"context-menu\"]"
   - assert_visible: '[data-testid="context-menu-item-new-local-terminal"]'
@@ -21,5 +25,10 @@ steps:
   - assert_visible: '[data-testid="context-menu"] >> text="New session…"'
   - assert_visible: '[data-testid="context-menu"] >> text="Show sessions"'
   - assert_visible: '[data-testid="context-menu-item-reload-sessions"]'
+  # Exercise the Sessions-submenu leaf by testid (F1.8 show-sessions-command);
+  # the command idempotently expands the session tree on every platform where
+  # this menu exists.
+  - click: '[data-testid="context-menu-item-show-sessions"]'
+  - wait_for: '[data-testid="session-tree"]'
   - press: Escape
   - screenshot: 035-unified-menu.png

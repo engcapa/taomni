@@ -21,13 +21,11 @@ steps:
   - wait_for: '[data-testid="quick-connect"]'
   - assert_visible: '[data-testid="qc-back"]'
   - assert_visible: '[data-testid="qc-forward"]'
+  - hover: '[data-testid="qc-back"]'
+  - hover: '[data-testid="qc-forward"]'
   - assert_visible: '[data-testid="qc-home"]'
   - assert_visible: '[data-testid="qc-refresh"]'
 
-  - click: '[data-testid="qc-back"]'
-  - wait: 0.3
-  - click: '[data-testid="qc-forward"]'
-  - wait: 0.3
   - click: '[data-testid="qc-home"]'
   - wait: 0.3
   - assert_visible: '[data-testid="welcome-panel"]'

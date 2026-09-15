@@ -57,14 +57,31 @@ function resolveJdtlsHome() {
   return {
     home,
     launcherJar,
-    configArea: join(home, "config_linux"),
+    // The Equinox config contains platform-specific native launcher
+    // fragments. Keep the provider fixture runnable on the same OS as the
+    // packaged native app instead of silently using the Linux config on macOS.
+    configArea: join(
+      home,
+      process.platform === "darwin" ? "config_mac" : process.platform === "win32" ? "config_win" : "config_linux",
+    ),
     version: core?.replace("org.eclipse.jdt.ls.core_", "") ?? "unknown",
   };
 }
 
 function resolveGradleDist() {
   const override = process.env.TAOMNI_FIXTURE_GRADLE;
-  if (override && existsSync(join(override, "bin/gradle"))) return override;
+  if (override && existsSync(join(override, "bin/gradle"))) {
+    let version = "configured";
+    try {
+      const output = execFileSync(join(override, "bin/gradle"), ["--version"], { encoding: "utf8" });
+      version = output.match(/Gradle\s+([0-9][^\s]*)/)?.[1] ?? version;
+    } catch {
+      // The configured home is still useful to jdtls even when its version
+      // probe is unavailable; keep the trace explicit rather than failing
+      // before the provider starts.
+    }
+    return { version, home: override };
+  }
   const dists = join(homedir(), ".gradle/wrapper/dists");
   if (!existsSync(dists)) return null;
   const candidates = [];
@@ -84,7 +101,7 @@ function resolveGradleDist() {
   return candidates[0] ?? null;
 }
 
-/** Mirrors the Linux branch of the production jdtls launch recipe. */
+/** Mirrors the non-Windows production jdtls launch recipe. */
 function launchArgs(jdtls, dataDir) {
   return [
     "-Declipse.application=org.eclipse.jdt.ls.core.id1",

@@ -31,6 +31,7 @@ LOCAL_STORAGE_KEYS = [
     "taomni.terminalProfile.v1",
     "taomni.compactMode",
     "taomni.stub.sdkRegistry.v1",
+    "taomni.ai.config.v1",
 ]
 LOCAL_STORAGE_PREFIXES = [
     "taomni.sftp.",

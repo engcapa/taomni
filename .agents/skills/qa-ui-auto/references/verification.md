@@ -22,9 +22,11 @@ selects cases; shared/unmapped code broadens selection. Changed YAML is included
 graph or proof that unmapped code is covered. Native-only cases remain in mapped
 feature plans even when shared cases run in browser.
 
-Use native runbooks for Windows/Linux. The macOS runbook builds only: execute and
-record actual WKWebView/OS scenarios separately. CI browser jobs explicitly select
-browser mode; running Chromium on three hosts is not native platform coverage.
+Use native runbooks for Windows/Linux/macOS. The macOS runbook launches the
+isolated QA binary through its opt-in WKWebView bridge and records actual native
+case results; OS-global WKWebView behaviours still require separate OS evidence.
+CI browser jobs explicitly select browser mode; running Chromium on three hosts
+is not native platform coverage.
 
 ## What Was Actually Tested
 

@@ -39,7 +39,7 @@ interface UseWorkspaceNavigationOptions {
   openFile: (
     ref: CodeWorkspaceFileRef,
     options?: { preview?: boolean; groupId?: EditorGroupId },
-  ) => Promise<void>;
+  ) => Promise<unknown>;
   /** Reveal caret after back/forward (same path as go-to-definition). */
   revealLocation: (key: string, position: WorkspaceNavPosition) => void;
   setSearchEverywhereMode: (mode: SearchEverywhereMode) => void;

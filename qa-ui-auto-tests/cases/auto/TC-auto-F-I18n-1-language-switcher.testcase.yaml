@@ -33,6 +33,7 @@ steps:
   # Settings panel exposes the same picker.
   - click: '[data-testid="ribbon-settings"]'
   - wait_for: '[data-testid="settings-panel"]'
+  - click: '[data-testid="settings-group-toggle-general"]'
   - assert_visible: '[data-testid="settings-language-section"]'
   - assert_visible: '[data-testid="settings-language-en"]'
   - assert_visible: '[data-testid="settings-language-zh-CN"]'

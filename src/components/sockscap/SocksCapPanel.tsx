@@ -4053,6 +4053,7 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
               </button>
               <button
                 type="button"
+                data-testid="sockscap-test-detail-close"
                 className="px-3 py-1.5 rounded text-[12px] bg-[var(--taomni-accent)] text-white hover:opacity-90"
                 onClick={() => setTestDetail(null)}
               >

@@ -106,12 +106,14 @@ export function createLspHyperlinkExtension(hooks: LspHyperlinkHooks): Extension
     class implements HyperlinkPlugin {
       private modHeld = false;
       private destroyed = false;
+      private intentGeneration = 0;
       private lastPos: number | null = null;
       private probeToken = 0;
       private probeTimer: number | null = null;
       private readonly onKeyDown = (event: KeyboardEvent) => {
         if (!isGotoModifier(event)) return;
         if (this.modHeld) return;
+        this.intentGeneration += 1;
         this.modHeld = true;
         this.view.dispatch({ effects: setModHeldEffect.of(true) });
         if (this.lastPos !== null) this.refreshAt(this.lastPos, true);
@@ -136,17 +138,20 @@ export function createLspHyperlinkExtension(hooks: LspHyperlinkHooks): Extension
           // Dispatching from inside update() is forbidden (CM6 throws
           // "CodeMirror plugin crashed", e.g. Ctrl+Z with the pointer still
           // over the content); re-validate after the transaction settles.
+          const generation = this.intentGeneration;
           queueMicrotask(() => {
-            if (!this.destroyed && this.lastPos !== null) this.refreshAt(this.lastPos, false);
+            if (!this.destroyed && generation === this.intentGeneration && this.modHeld && this.lastPos !== null) this.refreshAt(this.lastPos, false);
           });
         }
         const held = update.state.field(modHeldField);
         const hasLink = update.state.field(hyperlinkField).size > 0;
-        update.view.dom.classList.toggle("cm-lsp-hyperlink-cursor", held && hasLink);
+        update.view.dom.classList.toggle("cm-lsp-hyperlink-cursor", this.modHeld && held && hasLink);
       }
 
       destroy() {
         this.destroyed = true;
+        this.intentGeneration += 1;
+        this.probeToken += 1;
         window.removeEventListener("keydown", this.onKeyDown, true);
         window.removeEventListener("keyup", this.onKeyUp, true);
         window.removeEventListener("blur", this.onWindowBlur);
@@ -155,26 +160,39 @@ export function createLspHyperlinkExtension(hooks: LspHyperlinkHooks): Extension
       }
 
       private clearMod() {
+        if (this.destroyed) return;
         if (!this.modHeld && this.view.state.field(hyperlinkField).size === 0) return;
         this.modHeld = false;
+        const generation = ++this.intentGeneration;
         this.probeToken += 1;
         if (this.probeTimer !== null) {
           window.clearTimeout(this.probeTimer);
           this.probeTimer = null;
         }
-        this.view.dispatch({
-          effects: [setModHeldEffect.of(false), setHyperlinkEffect.of(null)],
-        });
         this.view.dom.classList.remove("cm-lsp-hyperlink-cursor");
+        // Blur may run inside CM's panel mount/update. Revoke ownership now,
+        // but publish decorations only after that transaction has settled.
+        queueMicrotask(() => {
+          if (this.destroyed || generation !== this.intentGeneration) return;
+          this.view.dispatch({
+            effects: [setModHeldEffect.of(false), setHyperlinkEffect.of(null)],
+          });
+        });
       }
 
       private clearLinkOnly() {
+        this.probeToken += 1;
+        if (this.probeTimer !== null) {
+          window.clearTimeout(this.probeTimer);
+          this.probeTimer = null;
+        }
         if (this.view.state.field(hyperlinkField).size === 0) return;
         this.view.dispatch({ effects: setHyperlinkEffect.of(null) });
         this.view.dom.classList.remove("cm-lsp-hyperlink-cursor");
       }
 
       handleMouseMove(event: MouseEvent) {
+        this.intentGeneration += 1;
         const pos = this.view.posAtCoords({ x: event.clientX, y: event.clientY });
         this.lastPos = pos;
         if (pos === null) {
@@ -182,7 +200,7 @@ export function createLspHyperlinkExtension(hooks: LspHyperlinkHooks): Extension
           return;
         }
         const mod = isGotoModifier(event);
-        if (mod !== this.modHeld) {
+        if (mod !== this.modHeld || mod !== this.view.state.field(modHeldField)) {
           this.modHeld = mod;
           this.view.dispatch({ effects: setModHeldEffect.of(mod) });
         }
@@ -225,8 +243,12 @@ export function createLspHyperlinkExtension(hooks: LspHyperlinkHooks): Extension
         this.probeTimer = window.setTimeout(() => {
           this.probeTimer = null;
           void Promise.resolve(hooks.probeDefinition?.(position)).then((ok) => {
-            if (token !== this.probeToken || !this.modHeld) return;
+            if (this.destroyed || token !== this.probeToken || !this.modHeld) return;
             if (!ok) this.clearLinkOnly();
+          }).catch(() => {
+            // Probe failure is not evidence of a definition. Navigation still
+            // uses the production hook and its own error/retry reporting.
+            if (!this.destroyed && token === this.probeToken) this.clearLinkOnly();
           });
         }, 90);
       }

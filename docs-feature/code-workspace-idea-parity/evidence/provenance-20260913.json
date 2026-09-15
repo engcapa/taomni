@@ -1,0 +1,346 @@
+{
+  "run": "AUDIT-20260913-01",
+  "head": "27f99b6116f4f6aae906d324cb84e8359695e17a",
+  "branch": "main",
+  "initial_worktree": "clean",
+  "source_sha256": "41875a20d6c07cf619fdd537e425219aa7ae191d6a7d36ca5ecf6bd82c5f1f75",
+  "runner_sha256": "e5081e48ab279b114041bbd062f74a7eba69371ad42dd76a8c849d19d7357c6b",
+  "mode": "browser, Vite development/React StrictMode, Tauri aliases to stubs",
+  "browser": "HeadlessChrome/153.0.0.0",
+  "os": "Windows",
+  "viewport": {
+    "width": 1400,
+    "height": 992,
+    "dpr": 1
+  },
+  "config": "vite.config.ts (CLI session, no YAML runner)",
+  "native_build": {
+    "check_exit": 1,
+    "reason": "binary missing",
+    "builds": 0,
+    "runs": 0
+  },
+  "tests": {
+    "vitest": 0,
+    "cargo": 0,
+    "yaml_runner": 0,
+    "formal_idea_comparison": 0
+  },
+  "tree_status": {
+    "command": "python -m qa_ui_auto status --case TC-IDE-TREE-01-project-tree-keyboard-native --platform Windows --reports qa-ui-auto-report/project-tree-e2e/runs --config qa-ui-auto-report/project-tree-e2e/config.yaml --json",
+    "exit": 0,
+    "ok": false,
+    "status": "stale",
+    "reason": "runner changed; source changed; native build source changed",
+    "summary": "qa-ui-auto-report/project-tree-e2e/runs/run-20260913-092411-263275000/summary.json",
+    "interpretation": "Evidence invalidation; not a product regression"
+  },
+  "case": {
+    "id": "TC-IDE-TREE-01-project-tree-keyboard-native",
+    "path": "qa-ui-auto-tests/cases/TC-IDE-TREE-01-project-tree-keyboard-native.testcase.yaml",
+    "sha256": "4e1d282334c317987fc5d1b3d34caaa7f69b9e0d3b7375b79fe00693ba88aab4",
+    "executed_this_run": false
+  },
+  "idea": {
+    "product_info": "D:/Software/idea-2026.2.2.win/product-info.json",
+    "sha256": "e4cb8371ae3c12fd117b89beb05ae707e739c2fce474ffd95eb67a9c6febd426",
+    "version": "2026.2.2",
+    "build": "IU-262.10315.125",
+    "current_capture": "diagnostic only; focus activation failed, zero keyboard/mouse operations",
+    "reused_reference": "REF-TREE-2026-09-13"
+  },
+  "reused_reference_artifacts": [
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/08-src-click.png",
+      "exists": true,
+      "sha256": "d4e8c084844dae67846105feceed26c8b74d12d0948fa4d69fe409ad92260cd2",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/08-src-click.json",
+      "exists": true,
+      "sha256": "313c7975b05766aa407cd332fa90a5e3e57438b1e8f651aae5a21a1df9b9f184",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/09-right-expand.png",
+      "exists": true,
+      "sha256": "3cb48adc3098dba04e2489036b4456b7cc45786eacba978d0cab02c65f106b85",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/09-right-expand.json",
+      "exists": true,
+      "sha256": "e0bb804d1626e1f66feaaf545df62413d3f88b65a263481215e505555ba45497",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/10-right-child.png",
+      "exists": true,
+      "sha256": "b42a0b02c57895b179efc890a0043c311865cc78af20fbe79a5b52ebf96bb33a",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/10-right-child.json",
+      "exists": true,
+      "sha256": "0c8d2b2a5ab09464763813601520eeda0e4e9c1deb9219d84bef1bad48425d79",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/11-left-parent.png",
+      "exists": true,
+      "sha256": "3cb48adc3098dba04e2489036b4456b7cc45786eacba978d0cab02c65f106b85",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/11-left-parent.json",
+      "exists": true,
+      "sha256": "5141f7eeac3e7326dc1eb8f28c15fa10c1d7d0470c1d7cb930c718f1d374b81f",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/12-left-collapse.png",
+      "exists": true,
+      "sha256": "a68736387ec97f2f9d6a14f9283635dcc8b8d6692e8b702bbdb748c158c15b66",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/12-left-collapse.json",
+      "exists": true,
+      "sha256": "07a2567ab7f6da9e23cd893a2fddf765e72944198c1b56dad269b3a3ec62ec89",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/13-down-select-src.png",
+      "exists": true,
+      "sha256": "196cf9b2221f99725a222ed4fe3447a92aeedc1b973f1767ca438b6da4bbf9e5",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/13-down-select-src.json",
+      "exists": true,
+      "sha256": "bde98fa24839812a29347990b8f17799172a84179838a3495fe3243a1223983c",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/29-up-main.png",
+      "exists": true,
+      "sha256": "cd8ce346d1f90f4fe228199e13ec705700560cb8795294266f0c1b229265aaec",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/29-up-main.json",
+      "exists": true,
+      "sha256": "1fb3b2d76cb281cc40ceb2fe87551afd4653199dea67966009bf753f289f6339",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/30-right-expand-main.png",
+      "exists": true,
+      "sha256": "5ae5b7ad6f82e96682a21ef5f2de65b2c51cf0f1a9aa09167af6e8d62959251a",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/30-right-expand-main.json",
+      "exists": true,
+      "sha256": "43432f56406f389bc550f0facfb49023e9cfe8c94406b1000ff4523774ca979c",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/31-down-example.png",
+      "exists": true,
+      "sha256": "e8f288ff57080b792b6589804c6bd42ecff239e1c84836d166c64a96f2dee5ed",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/31-down-example.json",
+      "exists": true,
+      "sha256": "7f80addc65599e8b5ef0cfc25293e5e800c68d90f487eea4b6328641dc19c96f",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/32-enter-example.png",
+      "exists": true,
+      "sha256": "c4a63b4fdd2fbb22d6267e3b955e958699ea4ff227ce03fc414ee54f34a82071",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/32-enter-example.json",
+      "exists": true,
+      "sha256": "06fc3492041f9e18b7f9279de0d523a9003a4602618da289538833c75ef1c8da",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/33-context-example.png",
+      "exists": true,
+      "sha256": "fe0355c35f6f0fcad1cb68a2449e963f5d0d695936a5949d63072caee20296a8",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/33-context-example.json",
+      "exists": true,
+      "sha256": "af7681ff763075722c2b92d3d325cecf60cec72afdce8ffc03ba91378e1dccc3",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/34-context-dismiss.png",
+      "exists": true,
+      "sha256": "3bb0b5c926eae9597c0e1169790c4df32ef7f69260cfca88bc8ebc06f005e8c7",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    },
+    {
+      "path": "qa-ui-auto-report/project-tree-e2e/idea/34-context-dismiss.json",
+      "exists": true,
+      "sha256": "f42e369501e581170578bc8c759a647bdea64fe1a95b609c989be3b52ba06446",
+      "classification": "historical capture; reusable only for recorded tree behavior, not matched visual"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/00-welcome.png",
+      "sha256": "d3be28f262601a440e60bd4133e5f70d55f8e18187495f6b5ab9d86d81371740",
+      "bytes": 99728
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/01-empty-workspace.png",
+      "sha256": "73093a01baf15c1c41f9587ff1cca7350bc6bf01ebf7423160ee3d54922a4ab7",
+      "bytes": 77462
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/02-readme-open.png",
+      "sha256": "b618c18b2e837ffc5baca71105d3615a27877a4a56ab43c09db08f572a993e09",
+      "bytes": 100910
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/03-child-selected.png",
+      "sha256": "6d5b89bcffcaac2b1135c1bdaaa4244bd40a68eecaa07eaf5842ff846231927f",
+      "bytes": 102078
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/04-example-selected.png",
+      "sha256": "5f5ef8ef34e2b9752893aff4f01ecca3e6b1c2e28176cbc4f5ef0f8d3416ab12",
+      "bytes": 103132
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/05-example-enter.png",
+      "sha256": "29d70719c5167cafcf18555c004ee6ceafe351a7b4292a36226e3cb112bc3919",
+      "bytes": 96398
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/06-context-menu.png",
+      "sha256": "ee041987373fa8848b15ec945a84d8c5ac4f3415053087751f8a21a17fc0081e",
+      "bytes": 113993
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/07-rename-prompt.png",
+      "sha256": "6ad9ad59c512e910d9f027bd0ad0f0526015f57568c63037bcdd5ee91308fb61",
+      "bytes": 100970
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/08-editor-find.png",
+      "sha256": "8b1fed7b35131daa245194b14b1b97ab9fba714536d2b0be646e94083f7089f4",
+      "bytes": 103682
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/09-find-results.png",
+      "sha256": "320bab3d2a93d2a849c922c7ca9776554982c74027021b8ec0018b7ea60960e1",
+      "bytes": 104475
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/10-split-right.png",
+      "sha256": "0771bb3958de7cec6997af37e298009adb29bbbd2086d3779b31ce7b276999f3",
+      "bytes": 106714
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/11-tab-policy.png",
+      "sha256": "51ea7c3e4004a5c359158ec7c8ec90ffb266d94e51bedf23bb2b74e799ba01df",
+      "bytes": 162095
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/12-find-in-files.png",
+      "sha256": "b4885e0c48ad0d628f5ff753e07efe4d36cb72c7b8ea6faa7bde2ff3d4fc086c",
+      "bytes": 109614
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/13-problems.png",
+      "sha256": "8043ed3411dd2e760c8da21dbee925d7f2976171719ac6ab02caa20acfd385aa",
+      "bytes": 104952
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/14-debug-empty.png",
+      "sha256": "d694eac14bf9c930c0fac424f7047e9646c97e866fd5786e543496364f3ceb9d",
+      "bytes": 111027
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/15-search-everywhere.png",
+      "sha256": "c11716181ec6e0034c364271bd1a7d64443e6cd6524911e14137524bb4df5e2c",
+      "bytes": 168820
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/16-keymap-settings.png",
+      "sha256": "207004d63ac2ef259ed17e4d9c65781e19ae8e04e85ea53de60cb9d678fd7bd9",
+      "bytes": 184141
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/17-run-empty.png",
+      "sha256": "5c9ab6106b409f493b2a9b93ba2994ba5d018d1d509c77271f86a04a4805353e",
+      "bytes": 108511
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/18-find-repro.png",
+      "sha256": "718637642434c05bd5b1c832e7a380cde2e7b5d631d72cdc62db46c671162ee4",
+      "bytes": 115524
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/19-reload-restoration.png",
+      "sha256": "0115bd1196dc34dac7764523cc3344ba91ee34ba3696a48c0c0b6c447971487b",
+      "bytes": 6317
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/20-reload-settled.png",
+      "sha256": "e704fceaeca7701b0efe00edb5ddd319437e9f65474ce8a79f462eaad16b60e1",
+      "bytes": 110087
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/223211892622-observation.json",
+      "sha256": "259124bd5a45ccf2ecd778d598b48ce5303f22c24e3480592a6240f22504f949",
+      "bytes": 5210
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/223259815775-observation.json",
+      "sha256": "a02582fdd95b4b5f2be2ddd91caf4f807b20460ead7114d4ff4ef7a5dff949c1",
+      "bytes": 5707
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/223835321541-observation.json",
+      "sha256": "24af20f049de6fee1bd2f65b60216ad5a77462af86dc99ab2ce23c5a35ad3c3c",
+      "bytes": 796
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/actions.json",
+      "sha256": "4ee165804105f753d1b0abb6a498f58542a075a1d31360d429ef44e872ba1461",
+      "bytes": 17900
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/console.log",
+      "sha256": "fbd47037b94b49ebaf71a8d98b3522e2ba6e55429c419be9aaa3d164739c144f",
+      "bytes": 7598
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/browser/contact-sheet.png",
+      "sha256": "4b5eba3e53f583ee80b6cdb058ebb540381349926fb00c41ca4a2664bb502e19",
+      "bytes": 354613
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/idea/blocker.json",
+      "sha256": "7e116f917c7a9e8a3126b22a183ba43954d5ca0356764ac9204c25f929dd19ac",
+      "bytes": 230
+    },
+    {
+      "path": "qa-ui-auto-report/overall-audit-20260913/idea/diagnostic-unfocused.png",
+      "sha256": "e99bbd8c01315545aab60b5977d3238760c299f4679521c1824dc68dbf46277a",
+      "bytes": 127924
+    }
+  ],
+  "raw_manifest": "qa-ui-auto-report/overall-audit-20260913/artifact-manifest.json"
+}

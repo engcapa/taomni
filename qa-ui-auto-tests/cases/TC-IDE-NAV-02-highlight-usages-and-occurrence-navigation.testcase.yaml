@@ -36,7 +36,7 @@ steps:
 
   # Position caret at the beginning of the document (on the first "item")
   - press:
-      key: Control+Home
+      key: Mod+Home
       selector: '[data-testid="code-workspace-editor"] .cm-content'
 
   # Trigger workspace.highlightUsagesInFile via Ctrl+Shift+F7 (ED-NAV-002-A1)
