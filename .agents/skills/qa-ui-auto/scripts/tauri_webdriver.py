@@ -644,6 +644,11 @@ class NativeSession:
         "Meta": "\ue03d",
         "Cmd": "\ue03d",
         "Command": "\ue03d",
+        # Platform Command-Mod: Meta on macOS (where CodeMirror and the
+        # product map Mod to Cmd), Control elsewhere. Lets one `Mod+X`
+        # chord drive the platform-native editing primitive on Linux,
+        # Windows and macOS from a single testcase.
+        "Mod": "\ue03d" if platform.system() == "Darwin" else "\ue009",
     }
 
     def _combo_actions(self, combo: str) -> list[dict[str, Any]]:
@@ -678,6 +683,17 @@ class NativeSession:
         /actions requests. A single input source preserves the same native
         keydown/keyup semantics without exercising that driver failure.
         """
+        if platform.system() == "Darwin" and len(combos) > 1:
+            # The macOS in-process bridge dispatches a whole sequence inside
+            # one synchronous JS task. Read-modify-write strokes (undo/redo)
+            # then race: every async consumer reads the same pre-burst
+            # document and all but one collapse. One request per chord with
+            # a settle gap keeps Darwin semantics equal to the real drivers.
+            for index, combo in enumerate(combos):
+                self.press_combos([combo])
+                if index < len(combos) - 1:
+                    time.sleep(0.2)
+            return f"pressed {len(combos)} combo(s)"
         seq = [action for combo in combos for action in self._combo_actions(combo)]
         try:
             self.request(
@@ -697,6 +713,24 @@ class NativeSession:
 
     def type_text(self, text: str) -> str:
         """Type text into the focused element, one paced key pair per char."""
+        if platform.system() == "Darwin":
+            # The macOS in-process bridge dispatches a whole /actions
+            # sequence inside one synchronous JS task. MutationObserver
+            # callbacks then coalesce, so per-key latency sampling
+            # (native_editor_performance) sees one batch instead of one
+            # sample per key. One request per char preserves event-loop
+            # turns; tauri-driver platforms keep the single batched request.
+            for ch in text:
+                self.request(
+                    "POST",
+                    self.endpoint("/actions"),
+                    {"actions": [{"type": "key", "id": "keyboard", "actions": [
+                        {"type": "keyDown", "value": ch},
+                        {"type": "keyUp", "value": ch},
+                        {"type": "pause", "duration": 20},
+                    ]}]},
+                )
+            return f"typed {len(text)} chars"
         seq: list[dict[str, Any]] = []
         for ch in text:
             seq.append({"type": "keyDown", "value": ch})

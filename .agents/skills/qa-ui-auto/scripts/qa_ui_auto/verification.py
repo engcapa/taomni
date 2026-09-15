@@ -38,6 +38,19 @@ def native_support(case: TestCase, target: str) -> str | None:
     return None
 
 
+def browser_support(case: TestCase, target: str) -> str | None:
+    """Browser analogue of native_support for OS-dependent renderer chrome.
+
+    The browser DOM still branches on the host OS (e.g. macOS hides the
+    in-bar window controls and shows the traffic-light inset). Cases that
+    assert one platform's chrome declare it and skip explicitly elsewhere;
+    selector coverage stays global.
+    """
+    if case.browser_platforms and target not in case.browser_platforms:
+        return f"case declares browser platforms {case.browser_platforms}"
+    return None
+
+
 def changed_files(root: Path, base: str) -> list[str]:
     names = set()
     # Include committed, staged, unstaged and untracked changes. Invalid refs fail closed.

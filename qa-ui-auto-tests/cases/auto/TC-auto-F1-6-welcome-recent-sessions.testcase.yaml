@@ -53,6 +53,13 @@ steps:
   - click: '[data-testid="welcome-recent-reveal"]'
   - assert_visible: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-welcome-recent"]'
   - assert_attribute: {selector: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-welcome-recent"]', name: data-selected, equals: 'true'}
+  # F6.2 side-tab-sessions is toggle-semantic: bare click on fresh profiles
+  # collapses the panel. Switch away first so the sessions click is a real
+  # select + session-tree proof, not a collapse.
+  - click: '[data-testid="side-tab-tools"]'
+  - click: '[data-testid="side-tab-sessions"]'
+  - wait_for: '[data-testid="session-tree"]'
+  - assert_visible: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-welcome-recent"]'
   - right_click: '[data-testid="welcome-recent-session-row"][data-session-name="qa-ui-auto-welcome-recent"]'
   - assert_menu_items: [Connect, Edit..., Duplicate, Move to folder, Delete]
   - click_menu: Connect

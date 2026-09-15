@@ -15,12 +15,13 @@ steps:
   - open: ${cfg.app.base_url}
   - vault_first_run: qa-native-rename-password
   - wait_for: '[data-testid="welcome-panel"]'
-  # Expand the Sessions panel idempotently via the main menu. A bare
-  # side-tab-sessions click toggles: on fresh profiles (sidebar expanded by
-  # default) it would collapse the panel and strand later tree steps.
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-sessions"]'
-  - click: '[data-testid="context-menu-item-show-sessions"]'
+  # Expand the Sessions panel idempotently on every native OS. The
+  # in-bar app menu is hidden on native macOS by design, so switch away
+  # first: a bare side-tab-sessions click would toggle-collapse a fresh
+  # profile instead of selecting.
+  - click: '[data-testid="side-tab-tools"]'
+  - click: '[data-testid="side-tab-sessions"]'
+  - wait_for: '[data-testid="session-tree"]'
   - wait_for: '[data-testid="session-new"]'
   - click: '[data-testid="session-new"]'
   - wait_for: '[data-testid="session-editor"]'
@@ -78,7 +79,7 @@ steps:
   - assert_text:
       selector: '[data-testid="db-query-tab"]'
       contains: native-orders
-  - click: '[data-testid="sql-editor"]'
+  - click: '[data-testid="sql-editor"] .cm-content'
   - type: select 1
   - click: '[data-testid="db-run-current-statement"]'
   - wait_for:

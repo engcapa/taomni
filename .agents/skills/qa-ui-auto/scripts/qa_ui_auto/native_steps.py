@@ -687,6 +687,8 @@ def _x11_keysyms_for_chord(chord: str) -> list[int]:
         "Space": 0x0020,
         "Control": 0xFFE3,
         "Ctrl": 0xFFE3,
+        # X11 transport is Linux-only, where Mod is Control.
+        "Mod": 0xFFE3,
         "Shift": 0xFFE1,
         "Alt": 0xFFE9,
         "Meta": 0xFFE7,

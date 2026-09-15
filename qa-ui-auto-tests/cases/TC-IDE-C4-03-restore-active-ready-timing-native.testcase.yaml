@@ -53,7 +53,7 @@ steps:
   # The active leaf accepts a real edit immediately (no waiting on background).
   - click: '[data-testid="code-workspace-editor"] .cm-content'
   - press:
-      key: Control+Home
+      key: Mod+Home
       selector: '[data-testid="code-workspace-editor"] .cm-content'
   - type: "X"
   - assert_text:

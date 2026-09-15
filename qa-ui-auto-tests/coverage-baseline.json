@@ -1,10 +1,10 @@
 {
   "version": 1,
   "totals": {
-    "features_with_controls": 67,
-    "required": 394,
-    "covered_required": 376,
-    "shallow": 52,
+    "features_with_controls": 68,
+    "required": 396,
+    "covered_required": 379,
+    "shallow": 51,
     "orphans": 0
   },
   "features": {
@@ -24,8 +24,8 @@
       "shallow": 0
     },
     "F1.6": {
-      "required": 23,
-      "covered_required": 23,
+      "required": 24,
+      "covered_required": 24,
       "shallow": 2
     },
     "F1.7": {
@@ -39,7 +39,7 @@
       "shallow": 2
     },
     "F1.9": {
-      "required": 5,
+      "required": 4,
       "covered_required": 4,
       "shallow": 0
     },
@@ -128,6 +128,11 @@
       "covered_required": 5,
       "shallow": 0
     },
+    "F6.6": {
+      "required": 0,
+      "covered_required": 0,
+      "shallow": 0
+    },
     "F7.2": {
       "required": 12,
       "covered_required": 12,
@@ -189,8 +194,8 @@
       "shallow": 0
     },
     "F-AI-2.2": {
-      "required": 4,
-      "covered_required": 4,
+      "required": 5,
+      "covered_required": 5,
       "shallow": 0
     },
     "F-AI-2.3": {
@@ -204,8 +209,8 @@
       "shallow": 5
     },
     "F-AI-2.5": {
-      "required": 5,
-      "covered_required": 5,
+      "required": 6,
+      "covered_required": 6,
       "shallow": 0
     },
     "F-AI-2.6": {
@@ -221,7 +226,7 @@
     "F-Split-1": {
       "required": 0,
       "covered_required": 0,
-      "shallow": 3
+      "shallow": 2
     },
     "F-Confirm-1": {
       "required": 0,

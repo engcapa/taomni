@@ -22,9 +22,10 @@ steps:
   - assert_count: {selector: '[data-testid^="tab-details-card-"]', equal: 1}
   - hover: '[data-testid="terminal-pane"]'
   - assert_not_visible: '[data-testid="tab-details-overlay"]'
-  - press: Control+Shift+H
+  # Mod+Shift+H: product matches Meta on macOS, Control elsewhere.
+  - press: Mod+Shift+H
   - assert_count: {selector: '[data-testid^="tab-details-card-"]', min: 2}
-  - press: Control+Shift+H
+  - press: Mod+Shift+H
   - assert_not_visible: '[data-testid="tab-details-overlay"]'
   - hover: '[data-testid="tab-details-hover"]'
   - wait_for: '[data-testid="tab-details-overlay"]'

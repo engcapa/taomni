@@ -479,6 +479,10 @@ controls:
     selector: '[data-testid="context-menu-item-reload-sessions"]'
     kind: interactive
     optional: true       # inside the unified app menu → Sessions submenu
+  - id: show-sessions-command
+    selector: '[data-testid="context-menu-item-show-sessions"]'
+    kind: interactive
+    optional: true       # inside the unified app menu → Sessions submenu; idempotent expand
   - id: xserver-command
     selector: '[data-testid="context-menu-item-xserver"]'
     kind: interactive

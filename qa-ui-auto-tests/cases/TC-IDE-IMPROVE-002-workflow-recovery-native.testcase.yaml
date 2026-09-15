@@ -84,7 +84,7 @@ steps:
   # ONE shared undo names the Rearrange Code journal entry (proving the
   # journal transaction was claimed, not a CodeMirror buffer revert).
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Control+z
+  - press: Mod+z
   - assert_text:
       selector: '[data-testid="status-bar-message"]'
       contains: "Undid Rearrange Code"
@@ -103,7 +103,7 @@ steps:
       selector: '[data-testid="code-workspace-editor"]'
       regex: "(?s)private int laterField.*void apple"
       timeout_sec: 10
-  - press: Control+z
+  - press: Mod+z
   - assert_text:
       selector: '[data-testid="status-bar-message"]'
       contains: "Undid Rearrange Code"

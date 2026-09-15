@@ -766,6 +766,7 @@
 - `[data-testid="context-menu-item-toggle-quick-connect"]` — interactive [optional] — F1.8.menu-toggle-quick-connect
 - `[data-testid="context-menu-item-new-local-terminal"]` — interactive [optional] — F1.8.new-local-terminal-command
 - `[data-testid="context-menu-item-reload-sessions"]` — interactive [optional] — F1.8.reload-sessions-command
+- `[data-testid="context-menu-item-show-sessions"]` — interactive [optional] — F1.8.show-sessions-command
 - `[data-testid="context-menu-item-xserver"]` — interactive [optional] — F1.8.xserver-command
 - `[data-testid="context-menu-item-sessions"]` — interactive [optional] — F1.8.context-menu-item-sessions
 - `[data-testid="context-menu-item-split-terminal"]` — interactive [optional] — F1.8.menu-split-terminal

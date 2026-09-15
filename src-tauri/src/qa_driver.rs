@@ -9,25 +9,25 @@ use std::{
     collections::HashMap,
     process::Command,
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicU64, Ordering},
     },
     time::Duration,
 };
 
 use axum::{
+    Json, Router,
     extract::{Path, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{delete, get, post},
-    Json, Router,
 };
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
-use serde_json::{json, Value};
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
+use serde_json::{Value, json};
 use std::sync::Mutex as StdMutex;
 
 use tauri::{AppHandle, Runtime, WebviewWindow};
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{Mutex, oneshot};
 
 const SESSION_ID: &str = "taomni-qa-macos";
 static BRIDGE_STARTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -208,11 +208,13 @@ async fn find_element<R: Runtime>(
                 "qa-element-{}",
                 state.next_element.fetch_add(1, Ordering::Relaxed)
             );
-            state
-                .elements
-                .lock()
-                .await
-                .insert(id.clone(), ElementRef { using: using.into(), selector: selector.into() });
+            state.elements.lock().await.insert(
+                id.clone(),
+                ElementRef {
+                    using: using.into(),
+                    selector: selector.into(),
+                },
+            );
             ok(json!({"element-6066-11e4-a52e-4f735466cecf": id}))
         }
         Ok(_) => error(format!("element not found: {selector}")),
@@ -289,7 +291,9 @@ async fn element_text<R: Runtime>(
         Err(message) => return error(message),
     };
     let mut script = element_lookup(&reference.using, &reference.selector);
-    script.push_str("if (!el) throw new Error('stale element'); return el.innerText ?? el.textContent ?? '';" );
+    script.push_str(
+        "if (!el) throw new Error('stale element'); return el.innerText ?? el.textContent ?? '';",
+    );
     match eval_js(&state, script).await {
         Ok(value) => ok(value),
         Err(message) => error(message),
@@ -302,9 +306,10 @@ fn json_text(payload: &Value) -> Result<String, String> {
         .and_then(Value::as_str)
         .map(str::to_string)
         .or_else(|| {
-            payload.get("value").and_then(Value::as_array).map(|values| {
-                values.iter().filter_map(Value::as_str).collect::<String>()
-            })
+            payload
+                .get("value")
+                .and_then(Value::as_array)
+                .map(|values| values.iter().filter_map(Value::as_str).collect::<String>())
         })
         .ok_or_else(|| "element value requires a text string".to_string())
 }
@@ -375,13 +380,14 @@ fn actions_script(payload: &Value) -> Result<String, String> {
         }}[value] || value);
         const __qaEmitKey = (type, raw) => {{
           const key = __qaKey(raw);
+          const domType = type === 'keyDown' ? 'keydown' : 'keyup';
           const modifier = key === 'Control' || key === 'Shift' || key === 'Alt' || key === 'Meta';
-          if (modifier) __qaModifiers[key] = type === 'keyDown';
-          const event = new KeyboardEvent(type, {{key, code:key.length === 1 ? ('Key' + key.toUpperCase()) : key,
+          if (modifier) __qaModifiers[key] = domType === 'keydown';
+          const event = new KeyboardEvent(domType, {{key, code:key.length === 1 ? ('Key' + key.toUpperCase()) : key,
             bubbles:true, cancelable:true, ctrlKey:__qaModifiers.Control, shiftKey:__qaModifiers.Shift,
             altKey:__qaModifiers.Alt, metaKey:__qaModifiers.Meta}});
           __qaActive.dispatchEvent(event);
-          if (type === 'keyDown' && !modifier && !event.defaultPrevented &&
+          if (domType === 'keydown' && !modifier && !event.defaultPrevented &&
               !__qaModifiers.Control && !__qaModifiers.Meta && !__qaModifiers.Alt) {{
             if (__qaActive.isContentEditable) {{
               if (key === 'Enter') document.execCommand('insertParagraph', false, null);
@@ -462,7 +468,10 @@ async fn execute_sync<R: Runtime>(
     }
 }
 
-async fn refresh<R: Runtime>(State(state): State<DriverState<R>>, Path(session_id): Path<String>) -> Response {
+async fn refresh<R: Runtime>(
+    State(state): State<DriverState<R>>,
+    Path(session_id): Path<String>,
+) -> Response {
     if !session_is_valid(&session_id) {
         return error("unknown WebDriver session");
     }
@@ -472,7 +481,10 @@ async fn refresh<R: Runtime>(State(state): State<DriverState<R>>, Path(session_i
     }
 }
 
-async fn current_url<R: Runtime>(State(state): State<DriverState<R>>, Path(session_id): Path<String>) -> Response {
+async fn current_url<R: Runtime>(
+    State(state): State<DriverState<R>>,
+    Path(session_id): Path<String>,
+) -> Response {
     if !session_is_valid(&session_id) {
         return error("unknown WebDriver session");
     }
@@ -485,7 +497,8 @@ async fn current_url<R: Runtime>(State(state): State<DriverState<R>>, Path(sessi
 fn screen_capture() -> Result<String, String> {
     #[cfg(target_os = "macos")]
     {
-        let path = std::env::temp_dir().join(format!("taomni-qa-screen-{}.png", std::process::id()));
+        let path =
+            std::env::temp_dir().join(format!("taomni-qa-screen-{}.png", std::process::id()));
         let output = Command::new("/usr/sbin/screencapture")
             .args(["-x", "-t", "png"])
             .arg(&path)
@@ -502,7 +515,10 @@ fn screen_capture() -> Result<String, String> {
     Err("screen capture is only available on macOS".into())
 }
 
-async fn screenshot<R: Runtime>(State(_state): State<DriverState<R>>, Path(_session_id): Path<String>) -> Response {
+async fn screenshot<R: Runtime>(
+    State(_state): State<DriverState<R>>,
+    Path(_session_id): Path<String>,
+) -> Response {
     match screen_capture() {
         Ok(encoded) => ok(Value::String(encoded)),
         Err(message) => error(message),
@@ -534,13 +550,34 @@ pub fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, host: Stri
             .route("/session", post(create_session))
             .route("/session/{session_id}", delete(delete_session::<R>))
             .route("/session/{session_id}/element", post(find_element::<R>))
-            .route("/session/{session_id}/element/{element_id}/click", post(element_click::<R>))
-            .route("/session/{session_id}/element/{element_id}/rect", get(element_rect::<R>))
-            .route("/session/{session_id}/element/{element_id}/text", get(element_text::<R>))
-            .route("/session/{session_id}/element/{element_id}/value", post(element_value::<R>))
-            .route("/session/{session_id}/element/{element_id}/clear", post(element_clear::<R>))
-            .route("/session/{session_id}/actions", post(actions::<R>).delete(release_actions))
-            .route("/session/{session_id}/execute/sync", post(execute_sync::<R>))
+            .route(
+                "/session/{session_id}/element/{element_id}/click",
+                post(element_click::<R>),
+            )
+            .route(
+                "/session/{session_id}/element/{element_id}/rect",
+                get(element_rect::<R>),
+            )
+            .route(
+                "/session/{session_id}/element/{element_id}/text",
+                get(element_text::<R>),
+            )
+            .route(
+                "/session/{session_id}/element/{element_id}/value",
+                post(element_value::<R>),
+            )
+            .route(
+                "/session/{session_id}/element/{element_id}/clear",
+                post(element_clear::<R>),
+            )
+            .route(
+                "/session/{session_id}/actions",
+                post(actions::<R>).delete(release_actions),
+            )
+            .route(
+                "/session/{session_id}/execute/sync",
+                post(execute_sync::<R>),
+            )
             .route("/session/{session_id}/refresh", post(refresh::<R>))
             .route("/session/{session_id}/url", get(current_url::<R>))
             .route("/session/{session_id}/screenshot", get(screenshot::<R>))

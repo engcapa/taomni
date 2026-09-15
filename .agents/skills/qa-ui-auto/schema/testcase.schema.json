@@ -88,6 +88,13 @@
    "minItems": 1,
    "description": "Optional native platform restriction. Does not certify that a platform was tested."
   },
+  "browser_platforms": {
+   "type": "array",
+   "items": {"enum": ["Linux", "Windows", "macOS"]},
+   "uniqueItems": true,
+   "minItems": 1,
+   "description": "Optional browser platform restriction for OS-dependent renderer chrome (e.g. macOS title-bar). Coverage stays global; the skip is explicit per host."
+  },
   "timeout_sec": {
    "type": "integer",
    "minimum": 5,

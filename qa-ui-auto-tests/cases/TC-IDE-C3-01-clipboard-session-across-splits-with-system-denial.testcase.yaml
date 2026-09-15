@@ -41,13 +41,13 @@ steps:
   # clipboard contract rather than the separate selection-keymap contract.
   - click: '[data-testid="code-workspace-editor"] .cm-content'
   - press:
-      key: Control+Home
+      key: Mod+Home
       selector: '[data-testid="code-workspace-editor"] .cm-content'
   - press:
-      key: Control+a
+      key: Mod+a
       selector: '[data-testid="code-workspace-editor"] .cm-content'
   - press:
-      key: Control+c
+      key: Mod+c
       selector: '[data-testid="code-workspace-editor"] .cm-content'
   - wait_for: '[data-testid="code-workspace-tab"][data-clipboard-revision="1"]'
 
@@ -62,10 +62,10 @@ steps:
   # the second pane so this cannot accidentally exercise leaf A.
   - click: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
   - press:
-      key: Control+End
+      key: Mod+End
       selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
   - press:
-      key: Control+v
+      key: Mod+v
       selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
   # System-clipboard read/fallback settles asynchronously; wait before the
   # exact text assertions instead of racing the production promise.
@@ -89,7 +89,7 @@ steps:
 
   # One undo restores the exact empty line in leaf B.
   - press:
-      key: Control+z
+      key: Mod+z
       selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
   - eval_readonly:
       expression: 'document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[3]?.textContent === ""'
@@ -101,7 +101,7 @@ steps:
   # History ring selection promotes the chosen payload to revision 2 and pastes
   # the same exact first line back into the active second leaf.
   - press:
-      key: Control+Shift+v
+      key: Mod+Shift+v
       selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
   - wait_for: '[data-testid="clipboard-history-popup"]'
   - assert_visible: '[data-testid="clipboard-history-popup"]'
@@ -143,7 +143,7 @@ steps:
       expression: 'document.activeElement === document.querySelectorAll(".cm-content")[1]'
       expect_truthy: true
   - press:
-      key: Control+z
+      key: Mod+z
       selector: '[data-testid="code-workspace-editor-pane"] >> nth=1 >> [data-testid="code-workspace-editor"] .cm-content'
   - eval_readonly:
       expression: 'document.querySelectorAll(".cm-content")[1]?.querySelectorAll(".cm-line")[3]?.textContent === ""'

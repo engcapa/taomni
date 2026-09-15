@@ -56,7 +56,7 @@ steps:
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
-      keys: ["Control+End"]
+      keys: ["Mod+End"]
   - assert_text:
       selector: '[data-testid="status-bar-workspace-cursor"]'
       contains: "Ln 55, Col 1"
@@ -102,7 +102,7 @@ steps:
   - native_keys:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
-      keys: ["Control+z", "Control+z", "Control+z", "Control+z"]
+      keys: ["Mod+z", "Mod+z", "Mod+z", "Mod+z"]
   - wait: 0.5
   - assert_text:
       selector: '[data-testid="status-bar-workspace-cursor"]'

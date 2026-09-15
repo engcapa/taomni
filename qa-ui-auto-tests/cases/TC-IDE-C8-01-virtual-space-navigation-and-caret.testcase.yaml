@@ -78,7 +78,7 @@ steps:
   # Select the X at line 1, then add the X occurrences at visual columns 0
   # and 10. ArrowRight collapses each selection at its own right edge. A
   # single ArrowDown must keep desired columns 7, 1, and 11 independently.
-  - press: Control+Home
+  - press: Mod+Home
   - press: End
   - press: Shift+ArrowLeft
   - press: Alt+j
@@ -98,7 +98,7 @@ steps:
 
   # One undo removes the typed payload and its deferred padding from every
   # caret, restoring the exact pre-transaction document.
-  - press: Control+z
+  - press: Mod+z
   - eval_readonly:
       expression: 'document.querySelectorAll(".cm-line")[0]?.textContent === "prefixX"'
       expect_truthy: true
@@ -117,7 +117,7 @@ steps:
   # space per caret, one undo restores the text, and typing V again
   # re-manufactures the same padding through the RESTORED virtual caret.
   - press: Escape
-  - press: Control+Home
+  - press: Mod+Home
   - press: End
   - press: Shift+ArrowLeft
   - press: Alt+j
@@ -128,7 +128,7 @@ steps:
   - eval_readonly:
       expression: 'JSON.stringify([document.querySelectorAll(".cm-line")[0]?.textContent, document.querySelectorAll(".cm-line")[1]?.textContent, document.querySelectorAll(".cm-line")[2]?.textContent])'
       contains: '["prefixX W","X W","longprefixX W"]'
-  - press: Control+z
+  - press: Mod+z
   - eval_readonly:
       expression: 'document.querySelectorAll(".cm-line")[0]?.textContent === "prefixX" && document.querySelectorAll(".cm-line")[1]?.textContent === "X" && document.querySelectorAll(".cm-line")[2]?.textContent === "longprefixX"'
       expect_truthy: true
@@ -136,7 +136,7 @@ steps:
   - eval_readonly:
       expression: 'JSON.stringify([document.querySelectorAll(".cm-line")[0]?.textContent, document.querySelectorAll(".cm-line")[1]?.textContent, document.querySelectorAll(".cm-line")[2]?.textContent])'
       contains: '["prefixX V","X V","longprefixX V"]'
-  - press: Control+z
+  - press: Mod+z
   - eval_readonly:
       expression: 'document.querySelectorAll(".cm-line")[0]?.textContent === "prefixX"'
       expect_truthy: true
@@ -145,7 +145,7 @@ steps:
   # anchor. With a stable anchor, typing Q inserts at line 2; swapping anchor
   # and head would replace the first two lines instead.
   - press: Escape
-  - press: Control+Home
+  - press: Mod+Home
   - press: ArrowDown
   - press: Shift+ArrowDown
   - press: Shift+ArrowUp
@@ -161,11 +161,11 @@ steps:
   - eval_readonly:
       expression: 'document.querySelectorAll(".cm-line")[2]?.textContent === "longprefixX"'
       expect_truthy: true
-  - press: Control+z
+  - press: Mod+z
 
   # Browser composition: the composing ArrowDown must not dispatch a workspace
   # movement. The committed glyph therefore remains at line 1 column 0.
-  - press: Control+Home
+  - press: Mod+Home
   - compose_text:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       text: "你"

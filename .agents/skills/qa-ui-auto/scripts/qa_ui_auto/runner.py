@@ -62,7 +62,8 @@ def _browser_context(headless: bool):
         _close_browser()
         _playwright = sync_playwright().start()
         _browser = _playwright.chromium.launch(headless=headless)
-    return _browser.new_context(viewport={"width": 1440, "height": 900})
+    return _browser.new_context(viewport={"width": 1440, "height": 900},
+                                permissions=["clipboard-read", "clipboard-write"])
 
 
 atexit.register(_close_browser)
@@ -132,6 +133,15 @@ def _run_browser_case_inner(payload: dict) -> dict:
     if case_dict.get("skip"):
         result["status"] = "skipped"
         result["fixtures_skipped"] = case_dict["skip"]
+        return result
+    current_target = "macOS" if platform.system() == "Darwin" else platform.system()
+    platforms = case_dict.get("browser_platforms", [])
+    if platforms and current_target not in platforms:
+        result["status"] = "skipped"
+        result["fixtures_skipped"] = (
+            f"browser scope unavailable on {current_target}: "
+            f"case declares browser platforms {platforms}"
+        )
         return result
 
     started = time.time()
@@ -329,6 +339,7 @@ def _serialize_case(c: tc_mod.TestCase) -> dict:
         "fixtures": c.fixtures,
         "timeout_sec": c.timeout_sec,
         "skip": c.skip,
+        "browser_platforms": c.browser_platforms,
         "steps": c.steps,
     }
 
@@ -779,6 +790,15 @@ def main(argv: list[str] | None = None) -> int:
                 return 2
         else:
             selected = [c for c in selected if not native_support(c, target)]
+    if mode == "browser":
+        # OS-dependent renderer chrome (e.g. macOS title-bar) skips per case;
+        # an explicitly filtered case outside the browser scope still fails
+        # fast so CI typos and scope mistakes stay loud.
+        from .verification import browser_support, host_platform
+        scoped = {c.id: reason for c in selected if (reason := browser_support(c, host_platform()))}
+        if args.filter and scoped:
+            print(f"qa-ui-auto: unsupported browser scope: {scoped}", file=sys.stderr)
+            return 2
 
     requested_ids = set(args.filter.split(",")) if args.filter else set()
     missing_ids = requested_ids - {c.id for c in selected}

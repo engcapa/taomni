@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import platform
+import re
 from typing import Any
 
 from . import StepContext, StepError, verb
@@ -78,6 +80,10 @@ def step_press(ctx: StepContext, args: Any) -> None:
         raise StepError("press: expected string or {key, selector?}")
     if ctx.dry_run:
         return
+    # Platform Command-Mod: `Mod+X` drives Meta+X on macOS (where CodeMirror
+    # maps Mod to Cmd) and Control+X elsewhere, so one testcase covers the
+    # platform-native editing primitive on Linux, Windows and macOS.
+    key = re.sub(r"(?i)(^|\+)mod(\+|$)", lambda m: f"{m.group(1)}{'Meta' if platform.system() == 'Darwin' else 'Control'}{m.group(2)}", key)
     if selector:
         ctx.page.locator(selector).first.press(key)  # type: ignore[attr-defined]
     else:
