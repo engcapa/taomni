@@ -27,18 +27,36 @@ qa-ui-auto-tests/
 Browser mode (default):
 
 ```bash
-# preflight (in another terminal)
-DEV_PROXY_ALLOW_PRIVATE=1 ALLOW_PRIVATE_TARGETS=1 pnpm dev
+# preflight: start Vite detached so a resident server never blocks the caller
+python .agents/skills/qa-ui-auto/scripts/background_job.py start --name vite \
+  --log qa-ui-auto-report/_local/vite.log -- pnpm dev
+python .agents/skills/qa-ui-auto/scripts/background_job.py status \
+  --state qa-ui-auto-report/_local/vite.log.job.json --tail 20
 export QA_SSH_PASSWORD=...
 
 # Optional static audit; not a prerequisite to every selected execution
 PYTHONPATH=.agents/skills/qa-ui-auto/scripts python -m qa_ui_auto.audit --gate
 
-# real run
+# real run (foreground is fine for a bounded sweep; --workers 6 on 8+ cores)
 PYTHONPATH=.agents/skills/qa-ui-auto/scripts python -m qa_ui_auto run --mode browser --tag smoke --workers 4
 PYTHONPATH=.agents/skills/qa-ui-auto/scripts python -m qa_ui_auto plan --diff HEAD
 PYTHONPATH=.agents/skills/qa-ui-auto/scripts python -m qa_ui_auto status --json
 ```
+
+Long jobs must never be left in a foreground tool call: the agent harness waits
+for the whole process tree, so a resident process freezes the session until it
+exits. Start suites and native builds detached and poll them:
+
+```bash
+python .agents/skills/qa-ui-auto/scripts/background_job.py start --name browser-full \
+  --log qa-ui-auto-report/_local/browser-full.log -- python -m qa_ui_auto run --mode browser --workers 6
+python .agents/skills/qa-ui-auto/scripts/background_job.py wait \
+  --state qa-ui-auto-report/_local/browser-full.log.job.json --timeout 3600
+```
+
+`background_job.py` works on Windows (WMI detach), Linux and macOS (`setsid`);
+`wait` propagates the job's exit code and suite logs are line-buffered when
+redirected.
 
 Reports land in `qa-ui-auto-report/run-<timestamp>/`.
 

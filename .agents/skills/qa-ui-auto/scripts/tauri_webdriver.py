@@ -36,7 +36,15 @@ def native_binary(cfg: dict) -> Path:
 
 
 def native_isolation_env(report_root: Path) -> dict[str, str]:
-    """Resolve only run-owned roots; never fall back to a user's profile."""
+    """Resolve only run-owned roots; never fall back to a user's profile.
+
+    ``dirs`` honors XDG on Linux and is explicitly overridden on macOS, but on
+    Windows it resolves Known Folders and ignores ``APPDATA``; Taomni's
+    debug-only ``NEWMOB_*`` override is the only effective redirection there
+    (src-tauri/src/lib.rs documents the same requirement).  Without those keys
+    the QA app wrote to the real ``%APPDATA%\\com.taomni.app.qa``, ``reset_db``
+    cleaned a path the app never used, and state leaked across cases.
+    """
     root = report_root.resolve()
     paths = {key: root / f"native-app{key}" for key in ("data", "config", "cache")}
     checked = [path for root_path in paths.values() for path in (root_path, root_path / QA_APP_ID)]
@@ -46,7 +54,13 @@ def native_isolation_env(report_root: Path) -> dict[str, str]:
     if system == "Linux":
         return {f"XDG_{key.upper()}_HOME": str(path) for key, path in paths.items()}
     if system == "Windows":
-        return {"APPDATA": str(paths["data"]), "LOCALAPPDATA": str(paths["cache"])}
+        return {
+            "APPDATA": str(paths["data"]),
+            "LOCALAPPDATA": str(paths["cache"]),
+            "NEWMOB_DATA_DIR": str(paths["data"]),
+            "NEWMOB_CONFIG_DIR": str(paths["config"]),
+            "NEWMOB_CACHE_DIR": str(paths["cache"]),
+        }
     if system == "Darwin":
         # macOS `dirs` intentionally ignores XDG variables.  These explicit
         # QA-only overrides are consumed by Taomni's config/cache path helpers

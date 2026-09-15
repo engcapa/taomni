@@ -7,10 +7,16 @@ Use a separately built QA application even for manual native exploration.
 product name to `Taomni QA`. Keep production Tauri configuration unchanged.
 Environment overrides or renamed executables cannot change a compiled ID.
 
-From the repository root (with the module path set as in SKILL.md):
+From the repository root (with the module path set as in SKILL.md). The build
+takes minutes: start it detached and wait instead of blocking a foreground tool
+call (see `scripts/background_job.py` in SKILL.md).
 
 ```bash
-python .agents/skills/qa-ui-auto/scripts/native_build.py
+python .agents/skills/qa-ui-auto/scripts/background_job.py start --name native-build \
+  --log qa-ui-auto-report/_local/native-build.log -- \
+  python .agents/skills/qa-ui-auto/scripts/native_build.py
+python .agents/skills/qa-ui-auto/scripts/background_job.py wait \
+  --state qa-ui-auto-report/_local/native-build.log.job.json --timeout 3600
 python -m qa_ui_auto run --mode native --filter TC-NATIVE-CORE-001
 ```
 
@@ -36,11 +42,14 @@ across React modes. This exercises development StrictMode with real native
 services, but does not test the Vite dev server or HMR transport. Record that
 distinction and verify the expected frontend mode in the selected scenario.
 
-The harness redirects Linux XDG data/config/cache or Windows AppData/LocalAppData
-to this run, then restores its environment on exit. `reset_db` only clears QA
-application state inside verified run roots. Native runs are sequential. The
-driver must be started by this run to inherit isolation; an existing listener is
-rejected. Configure free WebDriver and native-driver ports for independent jobs.
+The harness redirects Linux XDG data/config/cache and the app's debug-only
+`NEWMOB_DATA_DIR`/`NEWMOB_CONFIG_DIR`/`NEWMOB_CACHE_DIR` overrides (Windows and
+macOS; `dirs` resolves Windows Known Folders and ignores `APPDATA`, so the
+explicit override is the only effective redirection there), then restores its
+environment on exit. `reset_db` only clears QA application state inside verified
+run roots. Native runs are sequential. The driver must be started by this run to
+inherit isolation; an existing listener is rejected. Configure free WebDriver and
+native-driver ports for independent jobs.
 
 An independent ID does not isolate arbitrary files, hardcoded shared credential
 service names, clipboard, global shortcuts or SSH targets. Use disposable
