@@ -70,6 +70,27 @@ use environment variables for secrets. Verify a reused server serves this checko
 Run affected failures again only after a concrete fix or diagnosed recovery.
 Keep the first failure. Broaden coverage for shared behavior or release scope.
 
+Long-running jobs (Vite, native builds, suite sweeps) must be started detached
+with `scripts/background_job.py`; never leave a resident process in a foreground
+tool call because the harness waits for the whole process tree and the session
+freezes until it exits (observed: a 101-minute stall on Windows).
+
+```bash
+python .agents/skills/qa-ui-auto/scripts/background_job.py start --name vite \
+  --log qa-ui-auto-report/_local/vite.log -- pnpm dev
+python .agents/skills/qa-ui-auto/scripts/background_job.py status \
+  --state qa-ui-auto-report/_local/vite.log.job.json --tail 20
+python .agents/skills/qa-ui-auto/scripts/background_job.py wait \
+  --state qa-ui-auto-report/_local/vite.log.job.json --timeout 3600
+```
+
+`wait` propagates the job's exit code. Suite output is line-buffered when
+redirected, so logs and `run-*/summary.json` show live progress. Keep a verified
+Vite server resident across runs; on machines with eight or more cores a browser
+sweep may use `--workers 6`, while native stays sequential and exclusive for
+performance gates. Windows detaches through the WMI service; POSIX uses a new
+session (`setsid`).
+
 For case/control changes, read [authoring.md](references/authoring.md) and the
 relevant [verb-catalog.md](references/verb-catalog.md) entries. Assert user results,
 including failure/recovery and disk postconditions where relevant. Update related

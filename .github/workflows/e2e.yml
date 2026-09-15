@@ -77,6 +77,10 @@ jobs:
         run: |
           PYTHONPATH=.agents/skills/qa-ui-auto/scripts \
             python -m qa_ui_auto.audit --gate
+      - name: Helper unit tests (background detach, native isolation)
+        run: |
+          PYTHONPATH=.agents/skills/qa-ui-auto/scripts \
+            python -m unittest test_background_job test_native_isolation
       - name: Start Vite (background)
         run: |
           nohup pnpm dev > vite.log 2>&1 &
@@ -140,6 +144,11 @@ jobs:
         run: |
           PYTHONPATH=.agents/skills/qa-ui-auto/scripts \
             python -m qa_ui_auto.audit --gate
+      - name: Helper unit tests (background detach, native isolation)
+        shell: bash
+        run: |
+          PYTHONPATH=.agents/skills/qa-ui-auto/scripts \
+            python -m unittest test_background_job test_native_isolation
       - name: Start Vite (background)
         run: |
           nohup pnpm dev > vite.log 2>&1 &
@@ -202,6 +211,11 @@ jobs:
         run: |
           PYTHONPATH=.agents/skills/qa-ui-auto/scripts \
             python -m qa_ui_auto.audit --gate
+      - name: Helper unit tests (background detach, native isolation)
+        shell: bash
+        run: |
+          PYTHONPATH=.agents/skills/qa-ui-auto/scripts \
+            python -m unittest test_background_job test_native_isolation
       - name: Start Vite (background)
         run: |
           nohup pnpm dev > vite.log 2>&1 &

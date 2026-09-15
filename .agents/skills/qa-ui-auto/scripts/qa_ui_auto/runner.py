@@ -720,13 +720,18 @@ def _rotate_runs(report_dir: Path, keep: int) -> None:
 
 
 def _configure_console_encoding() -> None:
-    """Keep report output printable on Windows consoles using legacy code pages."""
+    """Keep report output printable on Windows consoles using legacy code pages.
+
+    ``line_buffering`` keeps per-case progress visible when the runner is
+    started detached with stdout redirected to a log file; block buffering made
+    a live run look stalled for minutes.
+    """
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is None:
             continue
         try:
-            reconfigure(encoding="utf-8", errors="replace")
+            reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
         except (OSError, ValueError):
             pass
 

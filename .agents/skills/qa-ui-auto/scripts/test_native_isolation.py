@@ -155,34 +155,52 @@ class NativeIsolationTest(unittest.TestCase):
             self.assertFalse((root / "run").exists())
 
     def test_reset_clears_only_qa_state_for_supported_native_platforms(self):
+        expected_keys = {
+            "Linux": {"XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"},
+            "Windows": {"APPDATA", "LOCALAPPDATA", "NEWMOB_DATA_DIR",
+                        "NEWMOB_CONFIG_DIR", "NEWMOB_CACHE_DIR"},
+            "Darwin": {"NEWMOB_DATA_DIR", "NEWMOB_CONFIG_DIR", "NEWMOB_CACHE_DIR"},
+        }
         for system in ("Linux", "Windows", "Darwin"):
             with self.subTest(system=system), TemporaryDirectory() as directory:
                 root = Path(directory)
                 with patch.object(native.platform, "system", return_value=system):
                     env = native.native_isolation_env(root / "run")
+                    self.assertEqual(set(env), expected_keys[system])
+                    run_root = (root / "run").resolve()
+                    self.assertTrue(all(Path(value).is_relative_to(run_root)
+                                        for value in env.values()))
                     keep = []
-                    for value in env.values():
+                    for value in set(env.values()):
                         for app_id in (native_build.QA_APP_ID, "com.taomni.app"):
                             data = Path(value) / app_id
                             data.mkdir(parents=True, exist_ok=True)
                             (data / "taomni.db").write_bytes(b"keep production")
                             if app_id == "com.taomni.app":
                                 keep.append(data / "taomni.db")
-                    legacy = root / "legacy-user-directory"
-                    legacy.mkdir()
-                    reset_env = dict(env)
-                    if system != "Darwin":
-                        # Linux/Windows must ignore this legacy-looking
-                        # override; macOS uses NEWMOB_DATA_DIR as its explicit
-                        # QA root and therefore tests the exact run path.
-                        reset_env["NEWMOB_DATA_DIR"] = str(legacy)
-                    with patch.dict(os.environ, reset_env):
+                    # An unrelated directory (a stale operator override, a
+                    # production profile) must never be touched.
+                    legacy = root / "legacy-user-directory" / native_build.QA_APP_ID
+                    legacy.mkdir(parents=True)
+                    (legacy / "taomni.db").write_bytes(b"untouched legacy")
+                    with patch.dict(os.environ, env):
                         reset_db._reset_native(SimpleNamespace(report_root=root / "run"))
                     for path in keep:
                         self.assertEqual(path.read_bytes(), b"keep production")
-                    self.assertTrue(legacy.is_dir())
-                    for value in env.values():
+                    self.assertEqual((legacy / "taomni.db").read_bytes(),
+                                     b"untouched legacy")
+                    for value in set(env.values()):
                         self.assertFalse((Path(value) / native_build.QA_APP_ID).exists())
+
+    def test_reset_refuses_a_missing_windows_debug_override(self):
+        with TemporaryDirectory() as directory, patch.object(native.platform, "system", return_value="Windows"):
+            root = Path(directory)
+            env = native.native_isolation_env(root / "run")
+            partial = {key: value for key, value in env.items() if key != "NEWMOB_DATA_DIR"}
+            with patch.dict(os.environ, partial):
+                os.environ.pop("NEWMOB_DATA_DIR", None)
+                with self.assertRaises(RuntimeError):
+                    reset_db._reset_native(SimpleNamespace(report_root=root / "run"))
 
     def test_reset_refuses_missing_or_wrong_run_environment(self):
         with TemporaryDirectory() as directory, patch.object(native.platform, "system", return_value="Linux"):
@@ -414,6 +432,7 @@ class JdtlsReapTest(unittest.TestCase):
             self.assertEqual(runner._jdtls_pids(proc), {101})
             self.assertEqual(runner._jdtls_pids(Path(directory) / "missing"), set())
 
+    @unittest.skipUnless(os.name == "posix", "POSIX signal escalation")
     def test_reap_signals_only_new_pids_then_escalates_and_never_raises(self):
         import signal as signal_module
 
@@ -508,6 +527,7 @@ class QaAppReapTest(unittest.TestCase):
             self.assertEqual(terms, [304])
             self.assertEqual(result, {"reaped": [304], "surviving": []})
 
+    @unittest.skipUnless(os.name == "posix", "POSIX signal escalation")
     def test_never_raises_and_reports_survivors(self):
         with TemporaryDirectory() as directory:
             proc = self.make_proc(Path(directory), {
