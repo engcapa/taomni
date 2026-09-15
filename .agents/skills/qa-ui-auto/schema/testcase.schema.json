@@ -582,7 +582,8 @@
          "Alt",
          "Control",
          "Meta",
-         "Shift"
+         "Shift",
+         "Mod"
         ]
        },
        "uniqueItems": true
@@ -781,7 +782,7 @@
      "type": "array",
      "uniqueItems": true,
      "items": {
-      "enum": ["Alt", "Control", "Meta", "Shift"]
+      "enum": ["Alt", "Control", "Meta", "Shift", "Mod"]
      }
     }
    }

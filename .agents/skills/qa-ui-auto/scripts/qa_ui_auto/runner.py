@@ -62,8 +62,7 @@ def _browser_context(headless: bool):
         _close_browser()
         _playwright = sync_playwright().start()
         _browser = _playwright.chromium.launch(headless=headless)
-    return _browser.new_context(viewport={"width": 1440, "height": 900},
-                                permissions=["clipboard-read", "clipboard-write"])
+    return _browser.new_context(viewport={"width": 1440, "height": 900})
 
 
 atexit.register(_close_browser)
@@ -427,6 +426,19 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
             failure_artifacts: dict = {}
             fixture_values: dict[str, str] = {}
             last_step, last_verb, last_args = 0, "<setup>", None
+            if platform.system() == "Darwin":
+                # reset_db deletes the run-owned profile tree. On macOS the
+                # QA application itself is the driver child and is already
+                # alive here for the run's first case; deleting its freshly
+                # created profile from underneath live SQLite handles makes
+                # later writes fail with SQLITE_READONLY ("attempt to write
+                # a readonly database") while the dirs look untouched.
+                # Stop it first so the reset always lands on a dead app;
+                # create_session restarts it afterwards. No-op once the
+                # previous session already exited it. Linux/Windows keep
+                # tauri-driver up: it spawns the app per session (after
+                # fixtures), so they are unaffected by construction.
+                harness.driver.stop()
             ctx_ns = SimpleNamespace(
                 page=None, case_id=c.id, case_dir=case_dir, cfg=cfg, env=env,
                 dry_run=False, worker_id=0, report_root=report_root,

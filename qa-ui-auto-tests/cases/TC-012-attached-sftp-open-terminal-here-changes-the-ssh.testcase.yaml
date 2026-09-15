@@ -6,9 +6,14 @@ modes: [browser, native]
 fixtures: [reset_db, ssh_required, sftp_required]
 steps:
   - open: "${cfg.app.base_url}"
-  - click: '[data-testid="app-main-menu"]'
-  - hover: '[data-testid="context-menu-item-view"]'
-  - click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+  # Reveal the QuickConnect bar without the in-bar app menu: that menu is
+  # hidden on native macOS by design (native global menu). Seeding the
+  # persisted visibility flag and reloading selects the same UI on all three
+  # platforms; Menu-path coverage stays in the browser-only cases.
+  - seed_storage:
+      key: taomni.quickConnectVisible
+      value: 'true'
+  - reload_window: null
   - wait_for: '[data-testid="qc-input"]'
   - fill: {selector: "[data-testid=\"qc-input\"]", value: "ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}"}
   - click: "[data-testid=\"qc-submit\"]"
@@ -19,10 +24,25 @@ steps:
   - wait: 4
   - click: "[data-testid=\"attached-sftp-toggle\"]"
   - wait_for: "[data-testid=\"sftp-browser\"]"
+  # The attached pane navigates to the SSH home on mount. Setting the path
+  # while that first listing is still in flight lets the older response
+  # overwrite the typed target (observed: breadcrumb reverts to home and
+  # open-terminal-here cds to the wrong dir). Let the first listing settle,
+  # then set + prove the target path; the assertion owns the postcondition.
+  - wait_for:
+      selector: '[data-testid="sftp-remote-list"] tbody tr'
+      timeout_sec: 30
   - click: "[data-testid=\"sftp-remote-path\"]"
   - fill: {selector: "[data-testid=\"sftp-remote-path\"]", value: "${cfg.sftp.remote_test_dir}"}
   - press: Enter
-  - wait: 2
+  - wait: 1
+  - click: "[data-testid=\"sftp-remote-path\"]"
+  - fill: {selector: "[data-testid=\"sftp-remote-path\"]", value: "${cfg.sftp.remote_test_dir}"}
+  - press: Enter
+  - assert_text:
+      selector: '[data-testid="sftp-remote-path"]'
+      contains: "qa-ui-auto"
+      timeout_sec: 15
   - click: "[data-testid=\"sftp-remote-open-terminal-here\"]"
   - wait: 3
   - click: "[data-testid=\"terminal-pane\"]"

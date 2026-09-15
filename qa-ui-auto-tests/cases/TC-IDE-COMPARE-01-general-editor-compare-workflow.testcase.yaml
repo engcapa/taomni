@@ -34,7 +34,7 @@ steps:
   # this verifies the typed native-read failure rather than fabricating text.
   - press: Home
   - press: Shift+End
-  - press: Control+c
+  - press: Mod+c
   - wait: 0.5
   - press: Control+Shift+N
   - wait_for:

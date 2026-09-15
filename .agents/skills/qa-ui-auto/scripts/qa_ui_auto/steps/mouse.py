@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import platform
 from typing import Any
 
 from . import StepContext, StepError, verb
@@ -14,7 +15,15 @@ def _resolve_click(args: Any) -> tuple[str, dict[str, Any]]:
         sel = args["selector"]
         kwargs: dict[str, Any] = {}
         if "modifiers" in args:
-            kwargs["modifiers"] = list(args["modifiers"])
+            # Platform Command-Mod (mirrors the `press` verb): on macOS a
+            # Control+click is delivered as a right-click by the OS/Chromium
+            # convention, so `Mod` selects Meta there and Control elsewhere.
+            is_mac = platform.system() == "Darwin"
+            kwargs["modifiers"] = [
+                ("Meta" if (str(m).lower() == "mod" and is_mac)
+                 else "Control" if str(m).lower() == "mod" else m)
+                for m in args["modifiers"]
+            ]
         if "force" in args:
             kwargs["force"] = bool(args["force"])
         if "position" in args:

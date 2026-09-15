@@ -31,7 +31,7 @@ steps:
   - click: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-ms-a.txt"'
   - click:
       selector: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-ms-b.txt"'
-      modifiers: [Control]
+      modifiers: [Mod]
   - assert_text: {selector: '[data-testid="sftp-remote-pane"]', contains: "2 selected"}
   - click: "[data-testid=\"sftp-remote-list\"]"
   - press: Control+a

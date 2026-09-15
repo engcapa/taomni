@@ -297,6 +297,64 @@ class NativeIsolationTest(unittest.TestCase):
             live_proc.terminate.assert_called_once_with()
             start.assert_called_once_with()
 
+    def test_native_run_stops_darwin_app_before_fixtures(self):
+        # reset_db deletes the run-owned profile tree. On macOS the QA app
+        # itself is the driver child and is already alive for the run's
+        # first case; deleting its profile from underneath live SQLite
+        # handles makes later writes fail with SQLITE_READONLY. The runner
+        # must stop the app before fixtures run (create_session restarts
+        # it). Linux/Windows keep tauri-driver up: it spawns the app per
+        # session after fixtures, so no stop is issued there.
+        for system, expect_stop in (("Darwin", True), ("Linux", False)):
+            with self.subTest(system=system), TemporaryDirectory() as directory:
+                root = Path(directory)
+                order: list[str] = []
+                harness = Mock()
+                harness.driver = Mock()
+                harness.driver.stop.side_effect = lambda: order.append("driver.stop")
+                harness.__enter__ = Mock(return_value=harness)
+                harness.__exit__ = Mock(return_value=False)
+                fixture = Mock()
+                fixture.setup.side_effect = lambda ctx: order.append("fixture.setup")
+                session = Mock()
+                session.console_entries.return_value = []
+                harness.create_session.side_effect = (
+                    lambda: (order.append("create_session"), session)[1]
+                )
+                case = SimpleNamespace(
+                    id="TC-RESET-ORDER", title="reset ordering probe", tags=[],
+                    covers=[], modes=["native"], native_platforms=[],
+                    fixtures=["reset_db"], timeout_sec=60, skip=None,
+                    steps=[{"wait": 0.01}],
+                )
+                with (
+                    patch.object(runner.platform, "system", return_value=system),
+                    patch("tauri_webdriver.NativeHarness", return_value=harness),
+                    patch.object(runner, "get_fixture", return_value=fixture),
+                    patch("qa_ui_auto.native_steps.run_native_step", return_value="ok"),
+                    patch("qa_ui_auto.native_steps.NativeStepContext"),
+                    patch.object(runner, "_jdtls_pids", return_value=set()),
+                    patch.object(runner, "_matching_pids", return_value=set()),
+                    patch.object(runner, "_reap_orphaned_jdtls", return_value={}),
+                    patch.object(runner, "_reap_lingering_qa_apps", return_value={}),
+                ):
+                    results = runner._native_run(
+                        [case],
+                        {"app": {"base_url": "http://127.0.0.1:5000", "mode": "native"}},
+                        {},
+                        root,
+                        False,
+                    )
+                self.assertEqual(results[0]["status"], "passed")
+                self.assertIn("fixture.setup", order)
+                self.assertIn("create_session", order)
+                self.assertLess(order.index("fixture.setup"), order.index("create_session"))
+                if expect_stop:
+                    self.assertIn("driver.stop", order)
+                    self.assertLess(order.index("driver.stop"), order.index("fixture.setup"))
+                else:
+                    self.assertNotIn("driver.stop", order)
+
 
 class RoutineEntryTest(unittest.TestCase):
     def test_run_defaults_browser_and_forwards_explicit_modes(self):

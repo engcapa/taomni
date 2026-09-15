@@ -121,7 +121,8 @@ class NativeSessionFillTest(TestCase):
         session.session_id = "session-1"
         session.request = Mock(return_value=None)
 
-        session.type_text("ab")
+        with patch("tauri_webdriver.platform.system", return_value="Linux"):
+            session.type_text("ab")
 
         actions = session.request.call_args.args[2]["actions"][0]["actions"]
         self.assertEqual(
@@ -135,6 +136,30 @@ class NativeSessionFillTest(TestCase):
                 {"type": "pause", "duration": 20},
             ],
         )
+
+    def test_type_text_splits_per_char_on_darwin(self) -> None:
+        # The macOS bridge dispatches a whole sequence in one synchronous
+        # JS task (coalescing MutationObserver callbacks), so Darwin sends
+        # one /actions request per char to preserve event-loop turns.
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.session_id = "session-1"
+        session.request = Mock(return_value=None)
+
+        with patch("tauri_webdriver.platform.system", return_value="Darwin"):
+            result = session.type_text("ab")
+
+        self.assertEqual(result, "typed 2 chars")
+        self.assertEqual(session.request.call_count, 2)
+        for call, ch in zip(session.request.call_args_list, "ab"):
+            actions = call.args[2]["actions"][0]["actions"]
+            self.assertEqual(
+                actions,
+                [
+                    {"type": "keyDown", "value": ch},
+                    {"type": "keyUp", "value": ch},
+                    {"type": "pause", "duration": 20},
+                ],
+            )
 
 
 class NativeSessionPointerClickTest(TestCase):

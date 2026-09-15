@@ -46,10 +46,11 @@ steps:
       selector: '[data-testid="session-tree-item"][data-session-name="qa-multi-a"]'
       name: data-selected
       equals: 'true'
-  # Ctrl+click B → both selected.
+  # Mod+click B → both selected (Meta on macOS: a Control+click is
+  # delivered as a right-click by the OS/Chromium convention there).
   - click:
       selector: '[data-testid="session-tree-item"][data-session-name="qa-multi-b"]'
-      modifiers: [Control]
+      modifiers: [Mod]
   - assert_attribute:
       selector: '[data-testid="session-tree-item"][data-session-name="qa-multi-a"]'
       name: data-selected

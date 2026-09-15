@@ -378,14 +378,59 @@ fn actions_script(payload: &Value) -> Result<String, String> {
           '\uE012':'ArrowLeft','\uE013':'ArrowUp','\uE014':'ArrowRight','\uE015':'ArrowDown',
           '\uE016':'Insert','\uE017':'Delete','\uE03D':'Meta'
         }}[value] || value);
+        // Legacy keyCode/which. Constructed KeyboardEvents always report 0
+        // for both, but xterm.js v6 switches on ev.keyCode for every named
+        // key (Escape 27, Tab 9, arrows 37-40, Home/End, F-keys) and drops
+        // anything it cannot classify - Escape/:q!/:wq silently never
+        // reached the remote shell. Mirror real US-layout key codes so the
+        // packaged terminal classifies keys exactly like a physical
+        // keyboard; printable punctuation uses its OEM virtual key (e.g.
+        // '.' is 190, not the char code 46 which is the Delete key).
+        const __qaCharKey = (ch) => {{
+          const lower = ch.toLowerCase();
+          if (lower >= 'a' && lower <= 'z') return ['Key' + lower.toUpperCase(), lower.toUpperCase().charCodeAt(0)];
+          return {{
+            '0':['Digit0',48],'1':['Digit1',49],'2':['Digit2',50],'3':['Digit3',51],'4':['Digit4',52],
+            '5':['Digit5',53],'6':['Digit6',54],'7':['Digit7',55],'8':['Digit8',56],'9':['Digit9',57],
+            ')':['Digit0',48],'!':['Digit1',49],'@':['Digit2',50],'#':['Digit3',51],'$':['Digit4',52],
+            '%':['Digit5',53],'^':['Digit6',54],'&':['Digit7',55],'*':['Digit8',56],'(':['Digit9',57],
+            ' ':['Space',32],
+            '-':['Minus',189],'_':['Minus',189],'=':['Equal',187],'+':['Equal',187],
+            '[':['BracketLeft',219],'{{':['BracketLeft',219],']':['BracketRight',221],'}}':['BracketRight',221],
+            '\\':['Backslash',220],'|':['Backslash',220],
+            ';':['Semicolon',186],':':['Semicolon',186],"'":['Quote',222],'"':['Quote',222],
+            ',':['Comma',188],'<':['Comma',188],'.':['Period',190],'>':['Period',190],
+            '/':['Slash',191],'?':['Slash',191],'`':['Backquote',192],'~':['Backquote',192]
+          }}[ch] || null;
+        }};
+        const __qaNamedKeyCode = (key) => {{
+          const named = {{
+            'Backspace':8,'Tab':9,'Enter':13,'Shift':16,'Control':17,'Alt':18,
+            'CapsLock':20,'Escape':27,'PageUp':33,'PageDown':34,'End':35,
+            'Home':36,'ArrowLeft':37,'ArrowUp':38,'ArrowRight':39,'ArrowDown':40,
+            'Insert':45,'Delete':46,'Meta':91
+          }}[key];
+          if (named !== undefined) return named;
+          if (/^F([1-9]|1[0-2])$/.test(key)) return 111 + Number(key.slice(1));
+          return 0;
+        }};
         const __qaEmitKey = (type, raw) => {{
           const key = __qaKey(raw);
           const domType = type === 'keyDown' ? 'keydown' : 'keyup';
           const modifier = key === 'Control' || key === 'Shift' || key === 'Alt' || key === 'Meta';
           if (modifier) __qaModifiers[key] = domType === 'keydown';
-          const event = new KeyboardEvent(domType, {{key, code:key.length === 1 ? ('Key' + key.toUpperCase()) : key,
+          const charKey = key.length === 1 ? __qaCharKey(key) : null;
+          const code = charKey ? charKey[0] : key;
+          const event = new KeyboardEvent(domType, {{key, code,
             bubbles:true, cancelable:true, ctrlKey:__qaModifiers.Control, shiftKey:__qaModifiers.Shift,
             altKey:__qaModifiers.Alt, metaKey:__qaModifiers.Meta}});
+          const keyCode = charKey ? charKey[1] : __qaNamedKeyCode(key);
+          if (keyCode) {{
+            try {{
+              Object.defineProperty(event, 'keyCode', {{ get: () => keyCode }});
+              Object.defineProperty(event, 'which', {{ get: () => keyCode }});
+            }} catch (_) {{}}
+          }}
           __qaActive.dispatchEvent(event);
           if (domType === 'keydown' && !modifier && !event.defaultPrevented &&
               !__qaModifiers.Control && !__qaModifiers.Meta && !__qaModifiers.Alt) {{
