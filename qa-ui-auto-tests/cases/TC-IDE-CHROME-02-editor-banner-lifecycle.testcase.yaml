@@ -48,9 +48,9 @@ steps:
       selector: '[data-testid="code-workspace-editor-banners"]'
       contains: "C# language server is not available in browser preview"
       timeout_sec: 15
-  - click: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
   - assert_not_visible: '[data-testid="code-workspace-editor-banners"]'
-  - click: '[data-testid="code-workspace-tree-file"][data-path="Program.cs"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="Program.cs"]'
   - wait_for: '[data-testid="code-workspace-editor-banners"]'
   - assert_visible: '[data-testid="code-workspace-editor-banners"]'
 

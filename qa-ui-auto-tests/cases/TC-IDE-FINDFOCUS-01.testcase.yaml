@@ -162,8 +162,8 @@ steps:
     value: /preview/fixture
 - click: '[data-testid="text-input-dialog-confirm"]'
 - assert_not_visible: '[data-testid="text-input-dialog"]'
-- click: '[data-testid="code-workspace-tree-dir"][data-path="src"]'
-- click: '[data-testid="code-workspace-tree-dir"][data-path="src/main"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src/main"] [data-testid="code-workspace-tree-dir-arrow"]'
 - dblclick: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]'
 - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
 - click: '[data-testid="code-workspace-editor"] .cm-content'

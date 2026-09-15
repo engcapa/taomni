@@ -28,7 +28,7 @@ steps:
   - click: '[data-testid="text-input-dialog-confirm"]'
   - wait_for: '[data-testid="code-workspace-tree-file"]'
   # Open README.txt into the active leaf.
-  - click: '[data-testid="code-workspace-tree-file"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
   - assert_visible: '[data-testid="code-workspace-editor-tab-strip"]'
 

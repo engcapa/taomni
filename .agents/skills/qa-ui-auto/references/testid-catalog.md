@@ -349,6 +349,10 @@
 - `[data-testid="code-workspace-bottom-tab-build"]` — interactive — F25.1.build-tab
 - `[data-testid="code-workspace-bottom-tab-tests"]` — interactive — F25.1.tests-tab
 - `[data-testid="code-workspace-bottom-tab-debug"]` — interactive — F25.1.debug-tab
+- `[data-testid="code-workspace-bottom-tab-overflow"]` — interactive [optional] — F25.1.bottom-tab-overflow
+- `[data-testid="code-workspace-bottom-tab-overflow-menu"]` — display [optional] — F25.1.bottom-tab-overflow-menu
+- `[data-testid="code-workspace-bottom-tab-overflow-tests"]` — interactive [optional] — F25.1.bottom-tab-overflow-tests
+- `[data-testid="code-workspace-bottom-tab-overflow-debug"]` — interactive [optional] — F25.1.bottom-tab-overflow-debug
 - `[data-testid="code-workspace-run-panel"]` — display — F25.1.run-panel
 - `[data-testid="run-panel-custom-command"]` — interactive — F25.1.custom-command
 - `[data-testid="run-panel-add-custom-task"]` — interactive — F25.1.add-custom-task

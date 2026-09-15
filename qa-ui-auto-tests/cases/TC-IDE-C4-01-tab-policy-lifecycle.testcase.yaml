@@ -29,7 +29,7 @@ steps:
   - wait_for: '[data-testid="text-input-dialog"]'
   - click: '[data-testid="text-input-dialog-confirm"]'
   - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
-  - click: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
   - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
 
   # Create two more real VFS files. New File opens each as a permanent tab.

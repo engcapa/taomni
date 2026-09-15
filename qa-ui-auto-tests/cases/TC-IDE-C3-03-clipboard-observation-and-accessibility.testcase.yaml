@@ -28,7 +28,7 @@ steps:
   - wait_for: '[data-testid="text-input-dialog"]'
   - click: '[data-testid="text-input-dialog-confirm"]'
   - wait_for: '[data-testid="code-workspace-tree-file"]'
-  - click: '[data-testid="code-workspace-tree-file"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
 
   # Product's 200%-of-13px editor size, as in the ED-SAVE-004 a11y slice.

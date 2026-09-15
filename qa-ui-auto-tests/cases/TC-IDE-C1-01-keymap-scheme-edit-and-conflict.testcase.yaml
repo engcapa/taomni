@@ -27,7 +27,7 @@ steps:
   - wait_for: '[data-testid="code-workspace-tree-file"]'
   # Open a file first: editor.replace is requiresEditor and is filtered from
   # the keymap rows while no editor is open.
-  - click: '[data-testid="code-workspace-tree-file"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
 
   # Normalize focus into the workspace surface, then dispatch

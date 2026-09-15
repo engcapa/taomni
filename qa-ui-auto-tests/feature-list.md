@@ -5147,6 +5147,22 @@ controls:
   - id: debug-tab
     selector: '[data-testid="code-workspace-bottom-tab-debug"]'
     kind: interactive
+  - id: bottom-tab-overflow
+    selector: '[data-testid="code-workspace-bottom-tab-overflow"]'
+    kind: interactive
+    optional: true       # rendered only when dock tabs exceed the header width
+  - id: bottom-tab-overflow-menu
+    selector: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
+    kind: display
+    optional: true       # mounted while the overflow dropdown is open
+  - id: bottom-tab-overflow-tests
+    selector: '[data-testid="code-workspace-bottom-tab-overflow-tests"]'
+    kind: interactive
+    optional: true       # Tests entry inside the overflow dropdown
+  - id: bottom-tab-overflow-debug
+    selector: '[data-testid="code-workspace-bottom-tab-overflow-debug"]'
+    kind: interactive
+    optional: true       # Debug entry inside the overflow dropdown
   - id: run-panel
     selector: '[data-testid="code-workspace-run-panel"]'
     kind: display
