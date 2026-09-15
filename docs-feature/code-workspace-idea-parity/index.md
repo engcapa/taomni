@@ -1,8 +1,30 @@
 # Code Workspace IDEA 总需求与评估入口
 
-本入口按用户请求于 2026-09-13 首次建立。目标是功能、视觉与交互高度一致，当前布局不作为保留约束。任务板仍是开发状态唯一来源；本目录不维护 owner/ready/done 流程。
+本入口按用户请求于 2026-09-13 首次建立。目标是功能、视觉与交互高度一致，当前布局不作为保留约束。本文件只维护来源、链接和派生摘要；开发状态唯一来源为下述新任务板。
 
-本轮：`audit/plan` 整体 Code Workspace，仅评估及需求文档；不实施产品、测试、任务状态、提交或推送。起始分支 `main`，HEAD `27f99b6116f4f6aae906d324cb84e8359695e17a`，起始工作区干净。
+首次 P0 基线：`audit/plan` 整体 Code Workspace，起始分支 `main`、HEAD `27f99b6116f4f6aae906d324cb84e8359695e17a`。首次评估已经完成，之后已有多轮 P1–P3；后续无需重新执行首次 P0。
+
+## 当前任务入口（2026-09-15）
+
+- **唯一新任务板：[backlog.md](backlog.md)**，新卡 ID 为 `ED-PARITY-xxx`。P0 从真实差距产卡；P1 自动选定一张卡做规划；P2 在该卡 ready 后正式领取开发。禁止混入或接续 `claudedocs/` 旧板任务。
+- **可直接复制：[固定 P1 提示词](handoff-p1-next.md)**。无需填写任务或环境参数；缺少影响设计的 IDEA 信息时，P1 可以询问用户。
+- [P0 新卡待细化规格](task-planning.md)：当前是文档补录的起点，必须完成 P1 才能进入开发。
+- [原协作模板](agent-collaboration-prompts.md)：保留原带参数 P1；P0 模板现要求产出新卡，后续增量继续维护同一板。
+
+本次依据已有 P0 与后续交付记录补录新卡，没有重跑 P0、产品测试或比较，也没有迁移历史 owner/状态/PASS。
+旧卡和本页下方历史“唯一板”“未实施”“不可领取”等语句只说明当时情况，**不再是当前选板指令**。
+旧任务 metadata 保留原样；卡 done 与整场景三维对齐仍分别判断。
+
+| P0 来源 | 新板接续 | 已有交付如何使用 |
+|---|---|---|
+| REQ-01 | ED-PARITY-001 | 旧 Find implemented 仅作已实现基础；本次新目标是尚缺证据的判断与补足 |
+| REQ-11 / REQ-04 | ED-PARITY-002 / 003 | 保存竞争保留基线、preview/分屏首包；不复刻旧整域队列 |
+| REQ-10 / REQ-05 | ED-PARITY-004 / 005 | 改键冲突、Java Basic Completion 首包 |
+| REQ-08 / REQ-06 | ED-PARITY-006 / 007 | 项目替换预览、Extract Method；旧 Rename done 不重领 |
+| REQ-07 / REQ-09 | ED-PARITY-008 / 009 | 本地多 repo diff、Java Structural Search 首包 |
+| REQ-02 / REQ-03 | 暂不重复创建已交付首包 | 旧 Tree/Shell metadata 均为 done；未覆盖范围留在矩阵，后续 P0 增量按具体差距产卡 |
+
+这张表仅关联需求与卡，不保存另一份任务状态；实时规划/开发资格读取 backlog.md。新卡均有独立 AC 和 P0 来源，9 张首包卡不代表覆盖或完成全部 45 场景。
 
 ## 有效材料
 
@@ -15,13 +37,14 @@
 | [fixture目录与平台/语言边界](references/fixture-catalog.md) | F0实采字节；F1–F5未执行的补采规格与条件 |
 | [当前生产源码审查](source-audit.md) | 每域caller/owner/IPC/provider与旧线索纠正依据 |
 | [证据身份](evidence/provenance-20260913.json) / [源码映射](evidence/source-map-20260913.json) | HEAD、source/runner/case/build/config/mode、原图hash与current/historical/stale/unverified依据 |
-| [下一入口P1完整提示词](handoff-p1-find-focus.md) | 首包Find焦点生命周期的可复制交接；未启动下一角色 |
+| [固定 P1：自动选卡规划](handoff-p1-next.md) | 当前直接使用的入口；从 backlog.md 选一张 P0 新卡 |
+| [历史 Find P1](handoff-p1-find-focus.md) | 原首包交接记录，仅供查历史目标与参照，不再作为选卡入口 |
 | [ED-REF-001 设计](refactor-rename-design.md) | Rename/Refactor 完整性、冲突、post-hash、undo/restart recovery 的当前审计与 P2 验收设计 |
 | [ED-REF-001 IDEA 参照](references/refactor-rename-idea-2026.2.2.md) | IDEA 2026.2.2 Rename Preview/取消/确认/Undo 的匹配 fixture、步骤、状态与补采缺口 |
-| [ED-REF-001 P2 交接](handoff-p2-refactor-rename.md) | 可直接交给开发 agent 的 owner、DEC/AC/V、依赖、回归保护与启动门槛 |
-| [ED-REF-001 P3 交接](handoff-p3-refactor-rename.md) | 可直接交给独立验收 agent 的审查指引、DEC/AC/V、双侧比较与证据核对提示词 |
+| [ED-REF-001 P2 交接](handoff-p2-refactor-rename.md) | 历史旧卡开发交接，仅供审查原范围，不再复制为新开发指令 |
+| [ED-REF-001 P3 交接](handoff-p3-refactor-rename.md) | 历史旧卡验收合同和证据核对依据，不改变当前新板入口 |
 
-## 本轮结论
+## 首次 P0 结论（2026-09-13 历史快照）
 
 45场景 / 11域 / 135个三维格；16场景有本轮局部实际UI记录，29场景仍需按矩阵补采。只有项目树方向/Enter等子动作有可复用双侧依据，完整三维通过0、关闭差距0。没有总体对齐百分比。
 
@@ -42,7 +65,7 @@
 
 原 [project-tree E2E](skill-e2e-project-tree.md)、[tree参照](references/project-tree-navigation-2026.2.2.md)、[tree任务板](../../claudedocs/code-workspace-idea-parity-backlog-2026-09-tree-e2e.md) 仍保留原合同与日期。`claudedocs/code-workspace-idea-2026-*-capability-matrix.md` 是各轮原范围的历史发布/修复汇总，不与本总矩阵竞争开发状态来源；每场景的具体关联板/ID见矩阵。
 
-接续先核对本轮HEAD及source/caller、目标设置、fixture、case/runner/build/mode变化。只重判受影响项；无变化项保留本次2026-09-13日期，不补签新PASS。新增/拆分/合并/移出场景必须记录ID映射及分母变化；用户未明确接受的差异不能关闭。开发卡始终从原任务板读取，新的差距经P1查重/设计/author后才进入开发。
+接续先核对本轮HEAD及source/caller、目标设置、fixture、case/runner/build/mode变化。只重判受影响项；无变化项保留2026-09-13日期，不补签新PASS。新增/拆分/合并/移出场景必须记录ID映射及分母变化；用户未明确接受的差异不能关闭。历史完成事实从原板只读核对；当前新差距由 P0 写入 backlog.md，P1 细化同一卡，再交 P2 领取开发。
 
 本轮原件位于本机 `qa-ui-auto-report/overall-audit-20260913/`，历史IDEA有效原件位于 `qa-ui-auto-report/project-tree-e2e/idea/`。均被忽略；其他机器须取得精确原件或补采，不能仅凭摘要继承通过。
 

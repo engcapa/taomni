@@ -2,6 +2,12 @@
 
 唯一有效整体场景矩阵：`AUDIT-20260913-01`，2026-09-13首次建立。总需求见 [overall audit plan](overall-audit-plan-20260913.md)，入口见 [index](index.md)。此处是需求与证据结论，不是开发任务状态表。
 
+**2026-09-15 任务来源修订：** P0 新差距统一写入 [backlog.md](backlog.md) 的 `ED-PARITY-xxx` 卡；
+[固定 P1](handoff-p1-next.md) 只从该板选一张卡规划，P2 只领取该板可开发卡。
+下文所有 `claudedocs/` 旧卡链接、旧状态和 P1 阶段摘要是历史依据，不能作为当前领取指令。
+本次仅从已有材料补录新卡并建立映射，没有重新进行功能/UI/交互比较，原结论与日期不刷新为新通过；
+具体 REQ→新卡、既有 Tree/Shell/Rename 交付及剩余范围见 [index 当前入口](index.md)。
+
 ## 分母、结论与共同身份
 
 整体需求目录为 **45 个稳定场景 / 11 个能力域 / 135 个功能、视觉、交互维度**。这是首次明确分母，不宣称枚举完所有IDEA动作。语言/provider/edition/平台变体见 [fixture catalog](references/fixture-catalog.md)，尚未量化的扩展不会计作已对齐。没有总体对齐百分比。
