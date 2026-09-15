@@ -16,6 +16,10 @@
 | [当前生产源码审查](source-audit.md) | 每域caller/owner/IPC/provider与旧线索纠正依据 |
 | [证据身份](evidence/provenance-20260913.json) / [源码映射](evidence/source-map-20260913.json) | HEAD、source/runner/case/build/config/mode、原图hash与current/historical/stale/unverified依据 |
 | [下一入口P1完整提示词](handoff-p1-find-focus.md) | 首包Find焦点生命周期的可复制交接；未启动下一角色 |
+| [ED-REF-001 设计](refactor-rename-design.md) | Rename/Refactor 完整性、冲突、post-hash、undo/restart recovery 的当前审计与 P2 验收设计 |
+| [ED-REF-001 IDEA 参照](references/refactor-rename-idea-2026.2.2.md) | IDEA 2026.2.2 Rename Preview/取消/确认/Undo 的匹配 fixture、步骤、状态与补采缺口 |
+| [ED-REF-001 P2 交接](handoff-p2-refactor-rename.md) | 可直接交给开发 agent 的 owner、DEC/AC/V、依赖、回归保护与启动门槛 |
+| [ED-REF-001 P3 交接](handoff-p3-refactor-rename.md) | 可直接交给独立验收 agent 的审查指引、DEC/AC/V、双侧比较与证据核对提示词 |
 
 ## 本轮结论
 
