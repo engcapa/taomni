@@ -99,12 +99,20 @@ freezes until it exits (observed: a 101-minute stall on Windows).
 
 ```bash
 python .agents/skills/qa-ui-auto/scripts/background_job.py start --name vite \
-  --log qa-ui-auto-report/_local/vite.log -- pnpm dev
+  --log qa-ui-auto-report/_local/vite.log \
+  --env DEV_PROXY_ALLOW_PRIVATE=1 -- pnpm dev
 python .agents/skills/qa-ui-auto/scripts/background_job.py status \
   --state qa-ui-auto-report/_local/vite.log.job.json --tail 20
 python .agents/skills/qa-ui-auto/scripts/background_job.py wait \
   --state qa-ui-auto-report/_local/vite.log.job.json --timeout 3600
 ```
+
+Browser SSH/SFTP/RDP cases reach the configured servers through the Vite dev
+proxy. `pnpm dev` already defaults `DEV_PROXY_ALLOW_PRIVATE=1` from
+`vite-plugins/devProxyDefaults.ts`; the explicit `--env` keeps the documented
+start command self-contained and works when Vite is launched another way.
+Never drop the flag on a server started by hand: without it the proxy blocks
+private targets and the SSH/SFTP cases fail with an explicit block reason.
 
 `wait` propagates the job's exit code. Suite output is line-buffered when
 redirected, so logs and `run-*/summary.json` show live progress. Keep a verified
