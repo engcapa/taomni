@@ -2,9 +2,12 @@ id: TC-IDE-C2-04-java25-completion-lsp-reuse-performance-native
 title: "Java 25 live-template keyboard completion, LSP reuse, and input latency"
 description: |
   Creates and compiles isolated Maven and Gradle projects with Java 25 before
-  launching the packaged app. In the Maven source, physical Alt+/ opens the
-  multi-choice live-template popup, ArrowDown changes its selected option, and
-  Tab accepts that option. Opening a Java file in another package must retain a
+  launching the packaged app. In the Maven source the provider already ships
+  the Eclipse `soutm` template, so the app's live template yields: physical
+  Alt+/ opens the provider proposal and accepting it inserts the resolved
+  enclosing method name. Abbreviations the provider does not own (for example
+  `soutp`) stay app-owned and expand through the exact-abbreviation Tab path.
+  Opening a Java file in another package must retain a
   single new jdtls process. Physical typing in that second source records the
   keydown-to-render p95 and enforces a 50 ms interaction budget. The Gradle
   build is independently proven by the fixture build receipt.
@@ -38,26 +41,42 @@ steps:
       selector: '[data-testid="code-workspace-editor"] .cm-content'
       transport: webdriver
       keys: ["Control+Home", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "ArrowDown", "End"]
-  - type: "sout"
+  # Provider-owned template: jdtls ships the Eclipse `soutm`, so the app's live
+  # template yields to it. Physical Alt+/ opens the provider proposal and
+  # accepting it inserts the resolved enclosing method name.
+  - type: "soutm"
   - press: "Alt+/"
   - wait_for:
       selector: '.cm-tooltip-autocomplete'
       timeout_sec: 10
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      transport: webdriver
-      keys: ["ArrowDown"]
+  - assert_text:
+      selector: '.cm-tooltip-autocomplete'
+      contains: "print current method to standard out"
+      timeout_sec: 10
+  # The provider owns the exact abbreviation: the app's placeholder entry must
+  # leave the popup once the provider result is merged (the popup stays open).
+  - wait: 1
   - eval_readonly:
-      expression: 'document.querySelector(".cm-tooltip-autocomplete [aria-selected]")?.textContent'
-      contains: "soutm"
-  - native_keys:
-      selector: '[data-testid="code-workspace-editor"] .cm-content'
-      transport: webdriver
-      keys: ["Tab"]
+      expression: 'document.querySelector(".cm-tooltip-autocomplete")?.textContent?.includes("Prints current method name to System.out") !== true && document.querySelector(".cm-tooltip-autocomplete") !== null'
+      expect_truthy: true
+  - press: Tab
   - assert_text:
       selector: '[data-testid="code-workspace-editor"]'
-      contains: 'System.out.println("MethodName");'
+      contains: 'System.out.println("App.completionTargets()");'
       timeout_sec: 30
+  # Provider gap: jdtls has no `soutp`, so the app's live template still fills
+  # it and expands through the exact-abbreviation Tab path.
+  - press: Escape
+  - press: End
+  - press: Enter
+  - type: "soutp"
+  - press: Escape
+  - press: Tab
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"]'
+      contains: "System.out.println();"
+      timeout_sec: 15
+  - press: Escape
   - fill:
       selector: '[data-testid="code-workspace-tree-filter"]'
       value: "Helper"
