@@ -165,26 +165,53 @@ def _press(ctx: NativeStepContext, args: Any) -> str:
 
 def _wait_for(ctx: NativeStepContext, args: Any) -> str:
     timeout = 10.0
+    state = "visible"
     selectors: list[str]
     if isinstance(args, dict):
         raw = args.get("selector", args.get("text"))
         timeout = float(args.get("timeout_sec", timeout))
+        state = str(args.get("state", "visible"))
     else:
         raw = args
     if raw is None:
         raise StepError(f"wait_for: unsupported args {args!r}")
+    if state not in ("attached", "detached", "visible", "hidden"):
+        raise StepError(
+            f"wait_for: unsupported state {state!r}; use attached/detached/visible/hidden"
+        )
     selectors = raw if isinstance(raw, list) else [raw]
     last = ""
     deadline = time.time() + timeout
     while time.time() < deadline:
         for sel in selectors:
-            try:
-                ctx.session.find(sel, timeout=0.5)
-                return f"found {sel}"
-            except Exception as e:  # noqa: BLE001
-                last = str(e)
+            found = _find_quiet(ctx, sel)
+            # "visible" is a geometry probe: display:none/zero-size nodes are
+            # hidden even though they exist in the DOM. "attached" is plain
+            # presence, matching the WebDriver element lookup semantics.
+            visible = found and _element_has_layout(ctx, sel) if state in ("visible", "hidden") else found
+            satisfied = (
+                found if state == "attached"
+                else visible if state == "visible"
+                else not found if state == "detached"
+                else not visible
+            )
+            if satisfied:
+                return f"{state} {sel}"
+            last = f"{sel}: found={found} visible={visible}"
         time.sleep(0.25)
-    raise StepError(f"wait_for: none found within {timeout}s ({last})")
+    raise StepError(f"wait_for: {state} condition not met within {timeout}s ({last})")
+
+
+def _element_has_layout(ctx: NativeStepContext, selector: str) -> bool:
+    try:
+        return bool(ctx.session.execute(
+            f"const el = document.querySelector({json.dumps(selector)});"
+            "if (!el) return false;"
+            "const rect = el.getBoundingClientRect();"
+            "return rect.width > 0 && rect.height > 0;"
+        ))
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _assert_visible(ctx: NativeStepContext, args: Any) -> str:
