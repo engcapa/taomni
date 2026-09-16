@@ -92,4 +92,10 @@ steps:
   - assert_text:
       selector: '[data-testid="db-query-history-entry-name"]'
       contains: native-orders
+  # The query workspace snapshot (including the custom tab name) autosaves on
+  # a 5s cadence plus a debounce; the restore half of this pair runs after an
+  # app restart and can only see it once a tick has landed. Wait past one
+  # cadence before the case ends, so the persisted row is deterministic
+  # instead of racing the harness teardown.
+  - wait: 8
   - screenshot: native-query-tab-rename-history.png

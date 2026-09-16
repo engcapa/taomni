@@ -22,6 +22,9 @@ steps:
       selector: '[data-testid="vault-unlock-pw"]'
       value: qa-native-rename-master
   - click: '[data-testid="vault-unlock-confirm"]'
+  # The unlock runs an async KDF; clicking restore before it resolves makes
+  # the restore's connect queue a second "saved password" unlock prompt and
+  # the restore hangs with no db-query-tab. Prove the dialog closed first.
   - assert_not_visible: '[data-testid="vault-unlock-dialog"]'
   - wait_for: '[data-testid="welcome-panel"]'
   - click: '[data-testid="welcome-restore-last-session"]'

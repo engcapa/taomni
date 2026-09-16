@@ -33,7 +33,7 @@ steps:
   - click: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-folder-a"'
   - click:
       selector: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-folder-b"'
-      modifiers: [Control]
+      modifiers: [Mod]
   - click: "[data-testid=\"sftp-remote-delete\"]"
   - wait: 1
   - screenshot: 030-sftp-folder-multiselect.png
