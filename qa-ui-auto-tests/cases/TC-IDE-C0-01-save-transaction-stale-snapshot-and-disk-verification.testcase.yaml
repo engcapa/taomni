@@ -45,7 +45,7 @@ steps:
   - wait_for: '[data-testid="code-workspace-tab"]'
   - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
   # Open README.md into the active leaf and replace it with the matrix fixture.
-  - click: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
   - fill:
       selector: '[data-testid="code-workspace-editor"] .cm-content'

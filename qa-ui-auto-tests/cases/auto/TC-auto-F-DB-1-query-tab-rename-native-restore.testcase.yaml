@@ -23,13 +23,9 @@ steps:
       value: qa-native-rename-master
   - click: '[data-testid="vault-unlock-confirm"]'
   # The unlock runs an async KDF; clicking restore before it resolves makes
-  # the restore's connect queue a SECOND unlock prompt (vault still seen as
-  # locked) and the operation hangs. Waiting for the dialog to detach proves
-  # the vault is unlocked, so the restore's saved-password connect proceeds.
-  - wait_for:
-      selector: '[data-testid="vault-unlock-dialog"]'
-      state: detached
-      timeout_sec: 30
+  # the restore's connect queue a second "saved password" unlock prompt and
+  # the restore hangs with no db-query-tab. Prove the dialog closed first.
+  - assert_not_visible: '[data-testid="vault-unlock-dialog"]'
   - wait_for: '[data-testid="welcome-panel"]'
   - click: '[data-testid="welcome-restore-last-session"]'
   - wait_for:

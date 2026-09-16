@@ -62,7 +62,7 @@ steps:
       selector: '[data-testid="code-workspace-tree-filter"]'
       value: "Helper"
   - wait_for: '[data-testid="code-workspace-flat-file"][data-path="src/main/java/com/example/other/Helper.java"]'
-  - click: '[data-testid="code-workspace-flat-file"][data-path="src/main/java/com/example/other/Helper.java"]'
+  - dblclick: '[data-testid="code-workspace-flat-file"][data-path="src/main/java/com/example/other/Helper.java"]'
   - assert_text:
       selector: '[data-testid="code-workspace-editor"]'
       contains: "// PERF:"

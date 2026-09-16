@@ -114,7 +114,7 @@ steps:
       timeout_sec: 30
   # Segment 2: reopen the file — the open-buffer applier path with an
   # unwritable workspace directory.
-  - click: '[data-testid="code-workspace-tree-file"][data-path="notes.txt"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="notes.txt"]'
   - wait_for: '[data-testid="code-workspace-editor-tab-strip"]'
   - assert_text:
       selector: '[data-testid="code-workspace-editor"]'
