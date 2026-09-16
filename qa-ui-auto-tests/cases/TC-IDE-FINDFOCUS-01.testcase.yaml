@@ -88,6 +88,7 @@ steps:
       Keep this content when browsing, collapsing, selecting and reopening files.
 
       '
+- wait_for: '[data-testid="code-workspace-save-observation"][data-dirty="true"]'
 - press: Control+s
 - wait_for: '[data-testid="code-workspace-save-observation"][data-dirty="false"]'
 - assert_attribute:
@@ -109,6 +110,7 @@ steps:
       The editor buffer should survive tree navigation.
 
       '
+- wait_for: '[data-testid="code-workspace-save-observation"][data-dirty="true"]'
 - press: Control+s
 - wait_for: '[data-testid="code-workspace-save-observation"][data-dirty="false"]'
 - assert_attribute:
@@ -130,6 +132,7 @@ steps:
       Second file for selection and editor tab checks.
 
       '
+- wait_for: '[data-testid="code-workspace-save-observation"][data-dirty="true"]'
 - press: Control+s
 - wait_for: '[data-testid="code-workspace-save-observation"][data-dirty="false"]'
 - assert_attribute:
@@ -149,6 +152,7 @@ steps:
     value: 'Example test data
 
       '
+- wait_for: '[data-testid="code-workspace-save-observation"][data-dirty="true"]'
 - press: Control+s
 - wait_for: '[data-testid="code-workspace-save-observation"][data-dirty="false"]'
 - assert_attribute:

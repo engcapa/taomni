@@ -82,7 +82,7 @@ steps:
 
   # AC-FMT-04: a file with no formatter provider keeps the command
   # discoverable and reports the typed reason without changing the buffer.
-  - click: '[data-testid="code-workspace-tree-file"][data-path="pom.xml"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="pom.xml"]'
   - assert_text:
       selector: '[data-testid="code-workspace-editor-tab-strip"]'
       contains: "pom.xml"

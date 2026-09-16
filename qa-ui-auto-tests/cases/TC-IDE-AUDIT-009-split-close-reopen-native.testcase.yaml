@@ -253,7 +253,9 @@ steps:
   # on top of the ~220ms editor text commit); the next reload surfaces it in
   # the Workspace recovery dialog.
   - click: '[data-testid="code-workspace-editor"] .cm-content'
-  - press: Mod+Home
+  - press:
+      key: Mod+Home
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
   - type: "RECOVERYDIRTY "
   - assert_text:
       selector: '[data-testid="code-workspace-editor"]'

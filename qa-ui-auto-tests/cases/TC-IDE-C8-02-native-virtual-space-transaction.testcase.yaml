@@ -25,7 +25,7 @@ steps:
   - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
   - wait_for: '[data-testid="code-workspace-tab"]'
   - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
-  - click: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
   - wait_for: '[data-testid="code-workspace-editor-pane"]'
 
   # Seed the deterministic document before enabling virtual-space policy;
