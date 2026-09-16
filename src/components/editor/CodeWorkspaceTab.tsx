@@ -1415,7 +1415,26 @@ export function CodeWorkspaceTab({
   // render when a workspace is mounted for the first time.
   const workspaceUi = useCodeWorkspaceStore((s) => selectCodeWorkspaceUi(s, workspaceInstanceId));
   const projectPanelRef = useRef<PanelImperativeHandle>(null);
-  const lastProjectPanelSizeRef = useRef(workspaceUi.shellChromeState?.projectWidthPx ?? 452);
+  // Panel `defaultSize` is a mount-time input for react-resizable-panels:
+  // re-passing a value that changes while the pointer is down makes the library
+  // re-register the panel, tear the group down and drop the live drag session,
+  // which freezes the splitter after the first pixel of movement. Resolve the
+  // persisted width exactly once and keep it constant for the mount.
+  const initialProjectPanelWidthRef = useRef<number | null>(null);
+  if (initialProjectPanelWidthRef.current === null) {
+    // A live instance already carries the session's width; a fresh mount must
+    // fall back to the persisted snapshot because `workspaceUi` still holds the
+    // 452px store default until the hydration effect below runs.
+    const storedWidth = useCodeWorkspaceStore.getState().byInstanceId[workspaceInstanceId]
+      ?.shellChromeState?.projectWidthPx
+      ?? readWorkspaceLayoutSnapshot(workspaceInstanceId)?.shellChromeState?.projectWidthPx;
+    initialProjectPanelWidthRef.current =
+      typeof storedWidth === "number" && Number.isFinite(storedWidth) && storedWidth > 40
+        ? Math.round(storedWidth)
+        : 452;
+  }
+  const initialProjectPanelSize = `${initialProjectPanelWidthRef.current}px`;
+  const lastProjectPanelSizeRef = useRef(initialProjectPanelWidthRef.current);
 
   useEffect(() => {
     ensureWorkspaceUi(workspaceInstanceId);
@@ -11891,17 +11910,18 @@ export function CodeWorkspaceTab({
   const handleProjectPanelResize = useCallback((size: PanelSize) => {
     const pixels = size.inPixels > 0 ? Math.round(size.inPixels) : 0;
     if (pixels > 40) {
+      // Only record the live width here. Writing it to the store on every
+      // pointer move re-renders the shell, changes the Panel's `defaultSize`
+      // and kills the in-flight drag session inside react-resizable-panels;
+      // persistence happens on release via the group's onLayoutChanged.
       lastProjectPanelSizeRef.current = pixels;
-      setShellChromeState(workspaceInstanceId, {
-        projectWidthPx: pixels,
-      });
     }
     // Avoid store churn when the panel is already in the desired open/collapsed state.
     setLanguagePanelOpen((open) => {
       const next = size.asPercentage > 2 && (pixels > 40 || size.inPixels === 0);
       return open === next ? open : next;
     });
-  }, [setLanguagePanelOpen, setShellChromeState, workspaceInstanceId]);
+  }, [setLanguagePanelOpen]);
 
   const [workspaceContainerHeight, setWorkspaceContainerHeight] = useState<number>(() => {
     return typeof window !== "undefined" ? window.innerHeight : 800;
@@ -19628,11 +19648,21 @@ export function CodeWorkspaceTab({
           orientation="horizontal"
           id={`code-workspace-${workspaceInstanceId}`}
           className="flex-1 min-h-0 min-w-0"
+          onLayoutChanged={(_layout, meta) => {
+            // Pointer drags report here only on release (never per move), which
+            // is the library's intended persistence point for saved layouts.
+            if (!meta?.isUserInteraction) return;
+            if (lastProjectPanelSizeRef.current > 40) {
+              setShellChromeState(workspaceInstanceId, {
+                projectWidthPx: lastProjectPanelSizeRef.current,
+              });
+            }
+          }}
         >
           <Panel
             panelRef={projectPanelRef}
             id="project"
-            defaultSize={`${workspaceUi.shellChromeState?.projectWidthPx ?? 452}px`}
+            defaultSize={initialProjectPanelSize}
             minSize={0}
             collapsible
             collapsedSize={0}
@@ -19691,9 +19721,11 @@ export function CodeWorkspaceTab({
             </div>
           </Panel>
           <PanelResizeHandle
+            id="code-workspace-project-resize-handle"
             data-testid="code-workspace-project-resize-handle"
+            disabled={!languagePanelOpen}
             className={languagePanelOpen
-              ? "w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"
+              ? "w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] active:bg-[var(--taomni-accent)] transition-colors cursor-col-resize shrink-0 relative after:absolute after:inset-y-0 after:-left-1.5 after:-right-1.5 after:z-20"
               : "hidden"}
           />
           <Panel

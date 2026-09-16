@@ -206,7 +206,7 @@ export function FileTreePane({
       tabIndex={0}
       data-testid="code-workspace-tree-pane"
       data-tree-toolbar-density={density}
-      className="h-full min-h-0 flex flex-col border-r border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] outline-none focus-visible:ring-1 focus-visible:ring-[var(--taomni-accent)]"
+      className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-gutter-bg)] outline-none focus-visible:ring-1 focus-visible:ring-[var(--taomni-accent)]"
       style={style}
       onKeyDown={onKeyDown}
     >
