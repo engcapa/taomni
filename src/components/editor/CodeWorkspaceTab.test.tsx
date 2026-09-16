@@ -12180,6 +12180,105 @@ end_of_record
       });
     });
 
+    it("mounts the project panel at the persisted projectWidthPx instead of the 452px default (ED-SPLITTER-001)", async () => {
+      window.localStorage.setItem(
+        "taomni.codeWorkspace.layout.v2.instance-shell-splitter-persist",
+        JSON.stringify({
+          version: 2,
+          bottomDockOpen: false,
+          bottomDockTab: "problems",
+          rightPaneOpen: false,
+          rightPaneTab: "outline",
+          languagePanelOpen: true,
+          splitOrientation: null,
+          activeEditorGroupId: "primary",
+          expandedRootIds: [],
+          expandedDirKeys: [],
+          layoutTreeV2: { type: "leaf", id: "primary", openFileKeys: [], activeKey: null },
+          editorGroups: {
+            primary: { openOrder: [], activeKey: null, previewKey: null, pinnedKeys: [] },
+            secondary: { openOrder: [], activeKey: null, previewKey: null, pinnedKeys: [] },
+          },
+          viewStates: {},
+          shellChromeState: { version: 1, projectWidthPx: 318 },
+        }),
+      );
+
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: "ws-shell-splitter-persist",
+        workspaceInstanceId: "instance-shell-splitter-persist",
+        name: "Shell Splitter Persist",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+      };
+      const { container } = renderWorkspace(workspace);
+
+      await waitFor(() => {
+        expect(container.querySelector('[data-testid="panel"][data-default-size="318px"]')).toBeTruthy();
+      });
+      expect(container.querySelector('[data-testid="panel"][data-default-size="452px"]')).toBeNull();
+    });
+
+    it("keeps the project panel defaultSize static when the persisted width changes mid-session (ED-SPLITTER-001)", async () => {
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: "ws-shell-splitter-static",
+        workspaceInstanceId: "instance-shell-splitter-static",
+        name: "Shell Splitter Static",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+      };
+      const { container } = renderWorkspace(workspace);
+
+      await waitFor(() => {
+        expect(container.querySelector('[data-testid="panel"][data-default-size="452px"]')).toBeTruthy();
+      });
+
+      act(() => {
+        useCodeWorkspaceStore.getState().setShellChromeState("instance-shell-splitter-static", {
+          projectWidthPx: 320,
+        });
+      });
+
+      // A live drag writes the width to the shell store while the pointer is
+      // down. The mounted Panel must keep its mount-time defaultSize, otherwise
+      // react-resizable-panels re-registers it and the drag session freezes.
+      expect(container.querySelector('[data-testid="panel"][data-default-size="452px"]')).toBeTruthy();
+      expect(container.querySelector('[data-testid="panel"][data-default-size="320px"]')).toBeNull();
+    });
+
+    it("renders the project splitter handle with an explicit id, hot zone and disabled collapse state (ED-SPLITTER-001)", async () => {
+      const workspace: CodeWorkspaceTabInfo = {
+        repoRoot: "/repo/app",
+        workspaceId: "ws-shell-splitter-handle",
+        workspaceInstanceId: "instance-shell-splitter-handle",
+        name: "Shell Splitter Handle",
+        roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
+        looseFiles: [],
+      };
+      renderWorkspace(workspace);
+
+      const handle = await screen.findByTestId("code-workspace-project-resize-handle");
+      expect(handle).toHaveAttribute("id", "code-workspace-project-resize-handle");
+      expect(handle).not.toHaveAttribute("aria-disabled");
+      expect(handle.className).toContain("cursor-col-resize");
+      expect(handle.className).toContain("after:-left-1.5");
+      expect(handle.className).toContain("after:-right-1.5");
+      expect(handle.className).toContain("active:bg-[var(--taomni-accent)]");
+
+      fireEvent.click(screen.getByTestId("code-workspace-tree-collapse"));
+      await waitFor(() => {
+        expect(
+          selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-shell-splitter-handle").languagePanelOpen,
+        ).toBe(false);
+      });
+
+      const collapsedHandle = screen.getByTestId("code-workspace-project-resize-handle");
+      expect(collapsedHandle).toHaveAttribute("aria-disabled", "true");
+      expect(collapsedHandle.className).toContain("hidden");
+    });
+
     it("toggles bottom dock tool windows with Alt+6 (Problems) and Alt+4 (Run)", async () => {
       const workspace: CodeWorkspaceTabInfo = {
         repoRoot: "/repo/app",

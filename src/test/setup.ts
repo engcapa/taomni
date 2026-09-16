@@ -56,8 +56,19 @@ vi.mock("react-resizable-panels", () => {
       }, children);
     },
   );
-  const Separator = ({ className, "data-testid": testId }: HTMLAttributes<HTMLDivElement> & { "data-testid"?: string }) => (
-    createElement("div", { className, "data-separator": true, "data-testid": testId ?? "panel-resize-handle" })
+  const Separator = ({
+    className,
+    "data-testid": testId,
+    id,
+    disabled,
+  }: HTMLAttributes<HTMLDivElement> & { "data-testid"?: string; id?: string; disabled?: boolean }) => (
+    createElement("div", {
+      className,
+      id,
+      "aria-disabled": disabled || undefined,
+      "data-separator": disabled ? "disabled" : true,
+      "data-testid": testId ?? "panel-resize-handle",
+    })
   );
 
   return {
