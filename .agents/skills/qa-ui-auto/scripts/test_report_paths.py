@@ -10,7 +10,10 @@ from qa_ui_auto.verification import load_observations
 class ReportDiscoveryTest(TestCase):
     def test_nested_reports_are_discovered_without_fixture_or_profile_noise(self):
         with TemporaryDirectory() as tmp:
-            root = Path(tmp)
+            # Discovery returns resolved paths (dedup needs one canonical
+            # identity); on macOS TemporaryDirectory sits under the /var ->
+            # /private/var symlink, so resolve the expectation too.
+            root = Path(tmp).resolve()
             valid = root / "task/runs/run-1/summary.json"
             for relative in ("task/runs/run-1", "node_modules/pkg", "native-appcache/cache", "baseline"):
                 folder = root / relative
